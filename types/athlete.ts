@@ -1,9 +1,5 @@
-export interface Athlete {
-  id: string;
-  userId: string;
-  displayName: string;
-  belt?: string;
-  stripes?: number;
-  createdAt: string;
-  updatedAt: string;
-}
+import { Tables, TablesInsert, TablesUpdate } from "./database";
+
+export type Athlete = Tables<"athletes">;
+export type AthleteInsert = TablesInsert<"athletes">;
+export type AthleteUpdate = TablesUpdate<"athletes">;

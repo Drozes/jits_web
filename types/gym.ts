@@ -1,7 +1,5 @@
-export interface Gym {
-  id: string;
-  name: string;
-  location?: string;
-  createdAt: string;
-  updatedAt: string;
-}
+import { Tables, TablesInsert, TablesUpdate } from "./database";
+
+export type Gym = Tables<"gyms">;
+export type GymInsert = TablesInsert<"gyms">;
+export type GymUpdate = TablesUpdate<"gyms">;

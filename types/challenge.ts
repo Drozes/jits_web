@@ -1,7 +1,5 @@
-export interface Challenge {
-  id: string;
-  title: string;
-  description?: string;
-  createdAt: string;
-  updatedAt: string;
-}
+import { Tables, TablesInsert, TablesUpdate } from "./database";
+
+export type Challenge = Tables<"challenges">;
+export type ChallengeInsert = TablesInsert<"challenges">;
+export type ChallengeUpdate = TablesUpdate<"challenges">;
