@@ -12,6 +12,8 @@
 
 # testing
 /coverage
+/playwright-report/
+/test-results/
 
 # next.js
 /.next/
@@ -36,6 +38,15 @@ yarn-error.log*
 
 # vercel
 .vercel
+
+# supabase
+supabase/.temp/
+
+# claude
+.claude/
+
+# external assets (Figma exports, design references)
+/outside_assets/
 
 # typescript
 *.tsbuildinfo
