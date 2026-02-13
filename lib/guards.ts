@@ -27,7 +27,7 @@ export async function requireAthlete() {
   const { data: athlete, error } = await supabase
     .from("athletes")
     .select("*")
-    .eq("user_id", user.id)
+    .eq("auth_user_id", user.id)
     .single();
 
   if (error || !athlete) {
