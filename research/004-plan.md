@@ -6,6 +6,23 @@
 
 ---
 
+## Change Log
+
+| Date | Step | Status | Notes |
+|------|------|--------|-------|
+| 2026-02-13 | Step 1: Layout Shell | **Done** | app-header, bottom-nav-bar, page-container, header-user-button, layout migration |
+| 2026-02-13 | Step 2: Types & Data Fetching | **Done** | Already existed — database.ts generated, domain type aliases, guards in place |
+| 2026-02-13 | Step 3: Dashboard Screen | **Done** | stat-overview, match-card, interactive card CVA variant, full page rebuild with Suspense |
+
+## Learnings
+
+1. **Schema differs from design mocks** — Athletes table has no `belt_rank`, `wins`, `losses`, `win_streak`, `gym_name`. Stats must be computed from `match_participants`. Gym name requires joining via `primary_gym_id → gyms`.
+2. **Supabase joins return arrays** — FK joins like `athletes!fk_participants_athlete(display_name)` return `T[]`, not `T`. Always access with `[0]`.
+3. **Next.js 16 requires Suspense** — Async server components with data fetching must be wrapped in `<Suspense>` or the build fails with "Uncached data was accessed outside of `<Suspense>`".
+4. **`belt-badge` is premature** — No `belt_rank` column exists in the database. Skip until the backend adds it.
+
+---
+
 ## Principles
 
 These principles address problems identified during plan review:

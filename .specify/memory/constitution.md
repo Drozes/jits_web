@@ -1,34 +1,25 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: 1.0.0 → 1.1.0
-Bump rationale: MINOR — new principle added (VI. Testing Discipline),
-tech stack expanded with test frameworks, and component architecture
-rules added to existing sections.
-
-Modified principles:
-- Principle II (Separation of Concerns): Added component layer rules
-  (ui / domain / layout) and shadcn install-on-demand rule.
-- Principle III (Auth Assumptions): Added `requireAthlete()` guard
-  standardization rule.
+Version change: 1.1.0 → 1.2.0
+Bump rationale: MINOR — new principle added (VI. Change Tracking).
+Previous Testing Discipline renumbered from VI to VII.
 
 Added sections:
-- Principle VI: Testing Discipline
-- Tech Stack: Vitest and Playwright entries
-- Tech Stack: Component Architecture subsection
+- Principle VI: Change Tracking — requires maintaining a changelog
+  and learnings section in the active plan file.
+
+Renumbered sections:
+- Testing Discipline: VI → VII
 
 Removed sections: None
 
 Templates requiring updates:
 - .specify/templates/plan-template.md: ⚠️ pending
-  (Constitution Check should reference Principle VI for test gates)
+  (Should include Change Log table and Learnings section in template.
+  Constitution Check should reference Principle VII for test gates.)
 - .specify/templates/spec-template.md: ✅ no updates required
 - .specify/templates/tasks-template.md: ✅ no updates required
-  (already has optional test task sections)
-
-Follow-up TODOs:
-- Plan template Constitution Check section should list Principle VI
-  as a gate for features that touch user flows.
 -->
 
 # Jits Arena Web Constitution
@@ -129,7 +120,26 @@ not future flexibility.
 **Rationale**: Premature abstraction creates cognitive overhead.
 Simple, explicit code is easier to modify and delete.
 
-### VI. Testing Discipline
+### VI. Change Tracking
+
+Every implementation step MUST be logged in the plan's Change Log
+when completed.
+
+- The active plan file (`research/004-plan.md` or equivalent) MUST
+  include a **Change Log** table at the top
+- Each completed step MUST be recorded with: date, step name,
+  status (**Done**), and brief notes on what was built or changed
+- Learnings discovered during implementation (schema surprises,
+  framework quirks, pattern decisions) MUST be recorded in a
+  **Learnings** section in the plan file
+- The change log is the source of truth for what has been
+  implemented — keep it current
+
+**Rationale**: Without a living record of progress and learnings,
+context is lost between sessions. The changelog prevents duplicate
+work and ensures hard-won knowledge is preserved.
+
+### VII. Testing Discipline
 
 Every feature MUST be verifiable. Tests exist to catch regressions
 and validate user flows, not to achieve coverage metrics.
@@ -223,6 +233,6 @@ this repository.
 - Complexity MUST be justified against Principle V
 - Template outputs (spec.md, plan.md, tasks.md) MUST reference
   applicable principles
-- TypeScript and Next.js build MUST pass (Principle VI)
+- TypeScript and Next.js build MUST pass (Principle VII)
 
-**Version**: 1.1.0 | **Ratified**: 2026-02-04 | **Last Amended**: 2026-02-13
+**Version**: 1.2.0 | **Ratified**: 2026-02-04 | **Last Amended**: 2026-02-13
