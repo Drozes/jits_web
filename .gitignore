@@ -43,6 +43,9 @@ supabase/.temp/
 # claude
 .claude/
 
+# external assets (Figma exports, design references)
+/outside_assets/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
