@@ -30,6 +30,19 @@
 **Known Issue**
 - Playwright browser launch hangs in current environment — E2E tests need `npx playwright install` and may require system dependencies
 
+### Phase 3 — Type Safety & Data Patterns (2026-02-14)
+
+**Added**
+- `lib/constants.ts` — centralized `MATCH_TYPE`, `CHALLENGE_STATUS`, `MATCH_OUTCOME`, `ATHLETE_STATUS` constants with TypeScript types
+- `types/composites.ts` — shared FK join shapes (`ChallengerJoin`, `OpponentJoin`, `GymJoin`, `MatchJoin`), `ComputedStats`, and `EloStakes` types
+
+**Changed**
+- Replaced `as unknown as Array<...>` casts with proper FK join array types in `pending-challenges-content.tsx` and `athlete-profile-content.tsx`
+- Moved gym fetch from client-side `useEffect` in `setup-form.tsx` to server-side in `setup/page.tsx` — gyms now passed as prop
+- Challenge sheet and challenge response sheet now use shared `EloStakes` type and `MATCH_TYPE` constants instead of local duplicates
+- Match card uses `MATCH_OUTCOME` constants for result config
+- Guards use `ATHLETE_STATUS.PENDING` instead of string literal
+
 ### Step 1: Layout Shell + Layout Migration (004-plan)
 
 **Added**

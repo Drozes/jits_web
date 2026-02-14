@@ -46,13 +46,10 @@ export async function PendingChallengesContent() {
     received
       ?.filter((c) => new Date(c.expires_at) > now)
       .map((c) => {
-        const challenger = (
-          c.challenger as unknown as Array<{
-            id: string;
-            display_name: string;
-            current_elo: number;
-          }>
-        )?.[0];
+        const challengerArr = c.challenger as
+          | { id: string; display_name: string; current_elo: number }[]
+          | null;
+        const challenger = challengerArr?.[0];
         return {
           id: c.id,
           challengerName: challenger?.display_name ?? "Unknown",
@@ -69,12 +66,10 @@ export async function PendingChallengesContent() {
     sent
       ?.filter((c) => new Date(c.expires_at) > now)
       .map((c) => {
-        const opponent = (
-          c.opponent as unknown as Array<{
-            id: string;
-            display_name: string;
-          }>
-        )?.[0];
+        const opponentArr = c.opponent as
+          | { id: string; display_name: string }[]
+          | null;
+        const opponent = opponentArr?.[0];
         return {
           id: c.id,
           opponentName: opponent?.display_name ?? "Unknown",

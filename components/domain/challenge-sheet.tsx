@@ -14,6 +14,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Swords, TrendingUp, TrendingDown, Check } from "lucide-react";
+import type { EloStakes } from "@/types/composites";
+import { MATCH_TYPE, type MatchType } from "@/lib/constants";
 
 interface ChallengeSheetProps {
   competitorId: string;
@@ -23,15 +25,6 @@ interface ChallengeSheetProps {
   currentAthleteWeight: number | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-}
-
-interface EloStakes {
-  challenger_win: number;
-  challenger_loss: number;
-  opponent_win: number;
-  opponent_loss: number;
-  challenger_expected: number;
-  opponent_expected: number;
 }
 
 export function ChallengeSheet({
@@ -44,7 +37,7 @@ export function ChallengeSheet({
   onOpenChange,
 }: ChallengeSheetProps) {
   const router = useRouter();
-  const [matchType, setMatchType] = useState<"casual" | "ranked">("casual");
+  const [matchType, setMatchType] = useState<MatchType>(MATCH_TYPE.CASUAL);
   const [weight, setWeight] = useState(currentAthleteWeight?.toString() ?? "");
   const [stakes, setStakes] = useState<EloStakes | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -52,7 +45,7 @@ export function ChallengeSheet({
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    if (matchType !== "ranked" || !open) {
+    if (matchType !== MATCH_TYPE.RANKED || !open) {
       setStakes(null);
       return;
     }
@@ -68,7 +61,7 @@ export function ChallengeSheet({
   }, [matchType, open, currentAthleteElo, competitorElo]);
 
   function resetState() {
-    setMatchType("casual");
+    setMatchType(MATCH_TYPE.CASUAL);
     setWeight(currentAthleteWeight?.toString() ?? "");
     setStakes(null);
     setError(null);
@@ -144,31 +137,31 @@ export function ChallengeSheet({
               <Label>Match Type</Label>
               <div className="flex gap-2">
                 <Button
-                  variant={matchType === "casual" ? "default" : "outline"}
+                  variant={matchType === MATCH_TYPE.CASUAL ? "default" : "outline"}
                   className="flex-1"
-                  onClick={() => setMatchType("casual")}
+                  onClick={() => setMatchType(MATCH_TYPE.CASUAL)}
                   type="button"
                 >
                   Casual
                 </Button>
                 <Button
-                  variant={matchType === "ranked" ? "default" : "outline"}
+                  variant={matchType === MATCH_TYPE.RANKED ? "default" : "outline"}
                   className="flex-1"
-                  onClick={() => setMatchType("ranked")}
+                  onClick={() => setMatchType(MATCH_TYPE.RANKED)}
                   type="button"
                 >
                   Ranked
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
-                {matchType === "casual"
+                {matchType === MATCH_TYPE.CASUAL
                   ? "Practice match — no ELO changes"
                   : "Competitive match — ELO at stake"}
               </p>
             </div>
 
             {/* ELO Stakes Preview */}
-            {matchType === "ranked" && stakes && (
+            {matchType === MATCH_TYPE.RANKED && stakes && (
               <Card className="bg-primary/5 border-primary/20">
                 <CardContent className="p-3">
                   <p className="text-xs font-medium mb-2">ELO Stakes</p>

@@ -2,11 +2,12 @@ import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { MATCH_OUTCOME, type MatchOutcome } from "@/lib/constants";
 
 interface MatchCardProps {
   type: "match" | "challenge";
   opponentName: string;
-  result?: "win" | "loss" | "draw" | null;
+  result?: MatchOutcome | null;
   status?: string;
   eloDelta?: number;
   date: string;
@@ -27,9 +28,9 @@ function formatRelativeDate(dateString: string): string {
 }
 
 const resultConfig = {
-  win: { label: "Win", variant: "default" as const },
-  loss: { label: "Loss", variant: "destructive" as const },
-  draw: { label: "Draw", variant: "secondary" as const },
+  [MATCH_OUTCOME.WIN]: { label: "Win", variant: "default" as const },
+  [MATCH_OUTCOME.LOSS]: { label: "Loss", variant: "destructive" as const },
+  [MATCH_OUTCOME.DRAW]: { label: "Draw", variant: "secondary" as const },
 } as const;
 
 function CardInner({ type, opponentName, result, status, eloDelta, date }: MatchCardProps) {
