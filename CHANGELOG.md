@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+### Step 12: Match Flow — Lobby → Live → Results (2026-02-14)
+
+**Added**
+- Match Lobby page (`app/(app)/match/[id]/page.tsx`) — VS screen with both athletes, ELO stakes for ranked, start match via `start_match_from_challenge()` RPC
+- Live Match page (`app/(app)/match/[id]/live/page.tsx`) — countdown timer, start/end match controls, `start_match()` RPC for pending → in_progress transition
+- Match Results page (`app/(app)/match/[id]/results/page.tsx`) — dual-purpose: records result via `record_match_result()` RPC or displays completed results with ELO changes
+- `record-result-client.tsx` — submission type picker (grouped by category), winner selection, finish time from timer
+- `results-display.tsx` — victory/defeat/draw display with ELO delta for ranked matches
+- `MATCH_STATUS` and `MATCH_RESULT` constants in `lib/constants.ts`
+- Unit tests: `lib/constants.test.ts` (9 tests), `results-display.test.tsx` (8 tests), `live-match-client.test.tsx` (9 tests) — 49 total tests now
+
+**Match Flow Lifecycle**
+- Challenge accepted → Match Lobby (VS screen + ELO stakes)
+- Start Match → creates match via RPC → redirects to Live page
+- Live page → Start Timer (pending → in_progress) → countdown → End Match
+- End Match → Results page → record submission/draw → ELO updates (ranked only)
+- Results display → Back to Arena / Home navigation
+
 ### Phase 1 — Safety Net (2026-02-14)
 
 **Added**
