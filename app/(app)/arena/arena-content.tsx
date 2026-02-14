@@ -1,13 +1,12 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Swords, Users, Activity, Clock, CheckCircle2 } from "lucide-react";
+import { Swords, Users, Activity, Clock } from "lucide-react";
 import { getInitials } from "@/lib/utils";
+import { LookingForMatchToggle } from "./looking-for-match-toggle";
 
 interface Competitor {
   id: string;
@@ -15,6 +14,7 @@ interface Competitor {
   currentElo: number;
   gymName?: string;
   eloDiff: number;
+  lookingForMatch: boolean;
 }
 
 interface ActivityItem {
@@ -36,114 +36,90 @@ function timeAgo(dateStr: string) {
   return `${days}d ago`;
 }
 
+function CompetitorCard({ competitor }: { competitor: Competitor }) {
+  return (
+    <Link href={`/athlete/${competitor.id}`}>
+      <Card variant="interactive" className="p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Avatar className="h-12 w-12 border-2 border-accent/20 bg-gradient-to-br from-primary to-primary/80 text-white">
+              <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 font-bold text-white">
+                {getInitials(competitor.displayName)}
+              </AvatarFallback>
+            </Avatar>
+            <div>
+              <h4 className="font-semibold">{competitor.displayName}</h4>
+              <div className="text-sm text-muted-foreground">
+                ELO: {competitor.currentElo}
+                {competitor.eloDiff !== 0 && (
+                  <span className={competitor.eloDiff > 0 ? "text-red-500" : "text-green-500"}>
+                    {" "}({competitor.eloDiff > 0 ? "+" : ""}{competitor.eloDiff})
+                  </span>
+                )}
+              </div>
+              {competitor.gymName && (
+                <div className="text-xs text-muted-foreground">
+                  {competitor.gymName}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </Card>
+    </Link>
+  );
+}
+
 export function ArenaContent({
   competitors,
   activityItems,
+  currentAthleteId,
+  currentAthleteLooking,
 }: {
   competitors: Competitor[];
   activityItems: ActivityItem[];
+  currentAthleteId: string;
+  currentAthleteLooking: boolean;
 }) {
-  const [isLooking, setIsLooking] = useState(false);
-  const [matchPrefs, setMatchPrefs] = useState<string[]>(["Casual"]);
-
-  function togglePref(pref: string) {
-    setMatchPrefs((prev) => {
-      if (prev.includes(pref)) {
-        return prev.length > 1 ? prev.filter((p) => p !== pref) : prev;
-      }
-      return [...prev, pref];
-    });
-  }
+  const lookingCompetitors = competitors.filter((c) => c.lookingForMatch);
+  const otherCompetitors = competitors.filter((c) => !c.lookingForMatch);
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Looking for Match Toggle */}
-      <Card className="p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h4 className="font-semibold uppercase tracking-wide">
-              Looking for Match
-            </h4>
-            <p className="text-sm text-muted-foreground">
-              Let others know you&apos;re ready to compete
-            </p>
-          </div>
-          <Switch checked={isLooking} onCheckedChange={setIsLooking} />
-        </div>
+      <LookingForMatchToggle
+        athleteId={currentAthleteId}
+        initialLooking={currentAthleteLooking}
+      />
 
-        {isLooking && (
-          <div className="mt-3 border-t pt-3">
-            <div className="mb-2 flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-green-500" />
-              <span className="text-sm font-medium text-green-700">
-                You&apos;re visible to potential opponents
-              </span>
-            </div>
-            <div className="flex gap-2">
-              <Badge
-                variant={matchPrefs.includes("Casual") ? "default" : "outline"}
-                className="cursor-pointer"
-                onClick={() => togglePref("Casual")}
-              >
-                Casual
-              </Badge>
-              <Badge
-                variant={matchPrefs.includes("Ranked") ? "default" : "outline"}
-                className="cursor-pointer"
-                onClick={() => togglePref("Ranked")}
-              >
-                Ranked
-              </Badge>
-            </div>
-            <div className="mt-3 space-y-1 border-t pt-2 text-xs text-muted-foreground">
-              <p><span className="font-medium">Casual:</span> Practice sessions · No ELO changes</p>
-              <p><span className="font-medium">Ranked:</span> Competitive matches · ELO at stake</p>
-            </div>
+      {/* Athletes Looking for Match */}
+      {lookingCompetitors.length > 0 && (
+        <section className="flex flex-col gap-3">
+          <div className="flex items-center gap-2">
+            <Swords className="h-4 w-4 text-green-500" />
+            <h2 className="text-lg font-semibold">Looking for Match</h2>
+            <Badge variant="secondary" className="text-xs">
+              {lookingCompetitors.length}
+            </Badge>
           </div>
-        )}
-      </Card>
+          <div className="flex flex-col gap-2">
+            {lookingCompetitors.map((c) => (
+              <CompetitorCard key={c.id} competitor={c} />
+            ))}
+          </div>
+        </section>
+      )}
 
-      {/* Nearby Competitors */}
+      {/* All Competitors */}
       <section className="flex flex-col gap-3">
         <div className="flex items-center gap-2">
           <Users className="h-4 w-4 text-muted-foreground" />
           <h2 className="text-lg font-semibold">Competitors</h2>
         </div>
 
-        {competitors.length > 0 ? (
+        {otherCompetitors.length > 0 ? (
           <div className="flex flex-col gap-2">
-            {competitors.map((c) => (
-              <Link key={c.id} href={`/athlete/${c.id}`}>
-                <Card variant="interactive" className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="relative">
-                        <Avatar className="h-12 w-12 border-2 border-accent/20 bg-gradient-to-br from-primary to-primary/80 text-white">
-                          <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 font-bold text-white">
-                            {getInitials(c.displayName)}
-                          </AvatarFallback>
-                        </Avatar>
-                      </div>
-                      <div>
-                        <h4 className="font-semibold">{c.displayName}</h4>
-                        <div className="text-sm text-muted-foreground">
-                          ELO: {c.currentElo}
-                          {c.eloDiff !== 0 && (
-                            <span className={c.eloDiff > 0 ? "text-red-500" : "text-green-500"}>
-                              {" "}({c.eloDiff > 0 ? "+" : ""}{c.eloDiff})
-                            </span>
-                          )}
-                        </div>
-                        {c.gymName && (
-                          <div className="text-xs text-muted-foreground">
-                            {c.gymName}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-              </Link>
+            {otherCompetitors.map((c) => (
+              <CompetitorCard key={c.id} competitor={c} />
             ))}
           </div>
         ) : (

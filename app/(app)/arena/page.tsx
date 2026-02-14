@@ -19,7 +19,7 @@ async function ArenaData() {
   // Fetch other athletes ordered by ELO proximity to current user
   const { data: athletes } = await supabase
     .from("athletes")
-    .select("id, display_name, current_elo, primary_gym_id, gyms!athletes_primary_gym_id_fkey(name)")
+    .select("id, display_name, current_elo, looking_for_match, primary_gym_id, gyms!athletes_primary_gym_id_fkey(name)")
     .eq("status", "active")
     .neq("id", currentAthlete.id)
     .order("current_elo", { ascending: false })
@@ -31,6 +31,7 @@ async function ArenaData() {
     currentElo: a.current_elo,
     gymName: extractGymName(a.gyms as { name: string }[] | null) ?? undefined,
     eloDiff: a.current_elo - currentAthlete.current_elo,
+    lookingForMatch: a.looking_for_match ?? false,
   }));
 
   // Fetch recent completed matches for activity feed
@@ -82,6 +83,8 @@ async function ArenaData() {
     <ArenaContent
       competitors={competitors}
       activityItems={activityItems}
+      currentAthleteId={currentAthlete.id}
+      currentAthleteLooking={currentAthlete.looking_for_match ?? false}
     />
   );
 }

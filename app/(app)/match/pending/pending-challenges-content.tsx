@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { AppHeader } from "@/components/layout/app-header";
 import { PageContainer } from "@/components/layout/page-container";
 import { MatchCard } from "@/components/domain/match-card";
+import { ReceivedChallengesList } from "./received-challenges-list";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,7 +24,7 @@ export async function PendingChallengesContent() {
   const { data: received } = await supabase
     .from("challenges")
     .select(
-      "id, created_at, match_type, status, challenger:athletes!fk_challenges_challenger(id, display_name)",
+      "id, created_at, match_type, status, challenger_weight, challenger:athletes!fk_challenges_challenger(id, display_name, current_elo)",
     )
     .eq("opponent_id", athlete.id)
     .eq("status", "pending")
@@ -45,12 +46,15 @@ export async function PendingChallengesContent() {
         c.challenger as unknown as Array<{
           id: string;
           display_name: string;
+          current_elo: number;
         }>
       )?.[0];
       return {
         id: c.id,
-        opponentName: challenger?.display_name ?? "Unknown",
-        opponentId: challenger?.id,
+        challengerName: challenger?.display_name ?? "Unknown",
+        challengerId: challenger?.id,
+        challengerElo: challenger?.current_elo ?? 1000,
+        challengerWeight: c.challenger_weight,
         matchType: c.match_type,
         date: c.created_at,
       };
@@ -102,22 +106,10 @@ export async function PendingChallengesContent() {
 
             <TabsContent value="received" className="mt-4">
               {receivedChallenges.length > 0 ? (
-                <div className="flex flex-col gap-2">
-                  {receivedChallenges.map((challenge) => (
-                    <MatchCard
-                      key={challenge.id}
-                      type="challenge"
-                      opponentName={challenge.opponentName}
-                      status="Pending"
-                      date={challenge.date}
-                      href={
-                        challenge.opponentId
-                          ? `/athlete/${challenge.opponentId}`
-                          : undefined
-                      }
-                    />
-                  ))}
-                </div>
+                <ReceivedChallengesList
+                  challenges={receivedChallenges}
+                  currentAthleteElo={athlete.current_elo}
+                />
               ) : (
                 <EmptyState message="No challenges received yet" />
               )}

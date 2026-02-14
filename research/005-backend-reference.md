@@ -2,6 +2,7 @@
 
 **Source:** `/Users/msponagle/code/experiments/jr_be/`
 **Last reviewed:** 2026-02-13
+**Backend status:** Alpha (4 features complete, 260+ pgTAP tests passing)
 
 ---
 
@@ -43,9 +44,10 @@ END IF;
 | id | UUID | gen_random_uuid() | PK |
 | auth_user_id | UUID | — | UNIQUE, FK → auth.users, ON DELETE CASCADE |
 | display_name | VARCHAR(100) | — | NOT NULL, UNIQUE |
-| current_weight | DECIMAL(5,2) | NULL | CHECK: 0-500 |
+| current_weight | DECIMAL(5,2) | NULL | CHECK: 0-500, kilograms |
 | current_elo | INTEGER | 1000 | CHECK: >= 0, cached from elo_history |
 | highest_elo | INTEGER | 1000 | CHECK: >= current_elo |
+| looking_for_match | BOOLEAN | FALSE | Availability toggle |
 | status | VARCHAR(32) | 'pending' | pending, active, inactive, suspended, banned |
 | primary_gym_id | UUID | NULL | FK → gyms, ON DELETE SET NULL |
 | created_at | TIMESTAMPTZ | now() | |
@@ -55,6 +57,7 @@ END IF;
 Athletes can only update their own record (`auth.uid() = auth_user_id`):
 - `display_name` — must remain unique
 - `current_weight`
+- `looking_for_match`
 - `primary_gym_id`
 
 Protected (never client-updated): `current_elo`, `highest_elo`, `status`, `auth_user_id`
@@ -85,6 +88,29 @@ Protected (never client-updated): `current_elo`, `highest_elo`, `status`, `auth_
 **RLS:** All authenticated users can read all gyms. No insert/update/delete for regular users.
 
 **Seed data:** 5 gyms in Toronto/GTA area (3 verified, 2 not).
+
+---
+
+## Submission Types (Read-Only)
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | UUID | PK |
+| code | VARCHAR(50) | Machine key (e.g., `rear_naked_choke`) |
+| display_name | VARCHAR(100) | Human label (e.g., `Rear Naked Choke`) |
+| category | VARCHAR(32) | `choke`, `joint_lock`, `leg_lock`, `other` |
+| sort_order | INTEGER | Display ordering |
+
+**23 seeded submissions** across 4 categories. Use `code` (not `id`) when calling `record_match_result`.
+
+```ts
+const { data } = await supabase
+  .from('submission_types')
+  .select('*')
+  .eq('status', 'active')
+  .order('category')
+  .order('sort_order');
+```
 
 ---
 
@@ -210,6 +236,15 @@ const { data, error } = await supabase.rpc('start_match_from_challenge', {
 
 **Race condition handling:** If both athletes click Start simultaneously, the second call gets a unique violation, catches it, and returns the existing match with `already_exists: true`.
 
+### Transitioning to In-Progress (RPC)
+
+```ts
+const { data } = await supabase.rpc('start_match', { p_match_id: matchId });
+// Returns: { success: true, match_id }
+```
+
+Moves match from `pending` → `in_progress`. Call this when both athletes are ready and the timer should start.
+
 ### Match Schema
 
 | Column | Type | Default | Notes |
@@ -239,42 +274,88 @@ const { data, error } = await supabase.rpc('start_match_from_challenge', {
 | elo_delta | INTEGER | 0 | Change amount |
 | status | VARCHAR(32) | 'active' | 'active' or 'removed' |
 
-### Recording Match Outcome
+### Recording Match Outcome (RPC)
 
-After a match completes, update both tables:
+Use the `record_match_result` RPC — it handles match completion, participant outcomes, and ELO updates atomically:
 
 ```ts
-// 1. Update match
-await supabase.from('matches').update({
-  status: 'completed',
-  result: 'submission', // or 'draw'
-  completed_at: new Date().toISOString(),
-}).eq('id', matchId);
+// Submission win
+const { data } = await supabase.rpc('record_match_result', {
+  p_match_id: matchId,
+  p_result: 'submission',
+  p_winner_id: winnerId,
+  p_submission_type_code: 'rear_naked_choke',  // use submission_types.code
+  p_finish_time_seconds: 245
+});
 
-// 2. Update winner participant
-await supabase.from('match_participants').update({
-  outcome: 'win',
-  elo_before: winnerCurrentElo,
-  elo_after: winnerNewElo,
-  elo_delta: winnerNewElo - winnerCurrentElo,
-}).eq('match_id', matchId).eq('athlete_id', winnerId);
-
-// 3. Update loser participant
-await supabase.from('match_participants').update({
-  outcome: 'loss',
-  elo_before: loserCurrentElo,
-  elo_after: loserNewElo,
-  elo_delta: loserNewElo - loserCurrentElo,
-}).eq('match_id', matchId).eq('athlete_id', loserId);
-
-// 4. Update athletes ELO (ranked only)
-await supabase.from('athletes').update({
-  current_elo: winnerNewElo,
-  highest_elo: Math.max(winnerNewElo, winnerHighestElo),
-}).eq('id', winnerId);
+// Draw
+const { data } = await supabase.rpc('record_match_result', {
+  p_match_id: matchId,
+  p_result: 'draw'
+});
 ```
 
-**Note:** ELO calculation service doesn't exist in the backend yet. Frontend is responsible for computing new ELO values using the formula below and updating all records.
+**Returns:**
+```json
+{
+  "success": true,
+  "match_id": "uuid",
+  "result": "submission",
+  "elo_changes": {
+    "winner": { "before": 1000, "after": 1016, "delta": 16 },
+    "loser": { "before": 1000, "after": 984, "delta": -16 }
+  }
+}
+```
+
+`elo_changes` is `null` for casual matches.
+
+**This replaces manual multi-table updates.** The RPC handles: match status → completed, participant outcomes, ELO snapshots, athlete ELO updates, and highest_elo tracking.
+
+---
+
+## Match History & ELO History (RPCs)
+
+### `get_match_history(p_athlete_id)`
+
+Get completed matches with full details (opponent, submission, ELO):
+
+```ts
+const { data } = await supabase.rpc('get_match_history', { p_athlete_id: athleteId });
+```
+
+Returns array of:
+```json
+{
+  "match_id": "uuid",
+  "match_type": "ranked",
+  "result": "submission",
+  "completed_at": "timestamp",
+  "opponent_id": "uuid",
+  "opponent_display_name": "string",
+  "athlete_outcome": "win",
+  "submission_type_code": "rear_naked_choke",
+  "submission_type_display_name": "Rear Naked Choke",
+  "finish_time_seconds": 245,
+  "elo_before": 1000,
+  "elo_after": 1016,
+  "elo_delta": 16,
+  "opponent_elo_at_time": 1000
+}
+```
+
+### `get_elo_history(p_athlete_id)`
+
+Get rating change history (own profile only):
+
+```ts
+const { data } = await supabase.rpc('get_elo_history', { p_athlete_id: athleteId });
+```
+
+Returns array of:
+```json
+{ "match_id": "uuid", "rating_before": 1000, "rating_after": 1016, "delta": 16, "created_at": "timestamp" }
+```
 
 ---
 
@@ -326,6 +407,37 @@ const { data } = await supabase.rpc('calculate_elo_stakes', {
 | `can_create_challenge(p_opponent_id)` | UUID (optional) | BOOLEAN | Rate limit (< 3 pending) + opponent active check |
 | `calculate_elo_stakes(challenger_elo, opponent_elo, k_factor)` | INT, INT, INT(32) | JSONB | Preview ELO changes for display |
 | `start_match_from_challenge(p_challenge_id)` | UUID | JSONB | Atomic challenge → match conversion |
+| `start_match(p_match_id)` | UUID | JSONB | Transition match pending → in_progress |
+| `record_match_result(p_match_id, p_result, p_winner_id?, p_submission_type_code?, p_finish_time_seconds?)` | UUID, TEXT, UUID?, TEXT?, INT? | JSONB | Record outcome + auto ELO |
+| `get_match_history(p_athlete_id)` | UUID | JSONB[] | Completed matches with opponent/ELO details |
+| `get_elo_history(p_athlete_id)` | UUID | JSONB[] | Rating change timeline |
+
+---
+
+## Enum Reference
+
+| Enum | Values |
+|------|--------|
+| `match_type_enum` | `ranked`, `casual` |
+| `match_result_enum` | `submission`, `draw` |
+| `participant_role_enum` | `competitor`, `referee` |
+| `participant_outcome_enum` | `win`, `loss`, `draw` |
+
+---
+
+## Business Rules Summary
+
+| Rule | Detail |
+|------|--------|
+| **Athlete auto-activation** | Setting `primary_gym_id` when `status = 'pending'` auto-activates. Guide new users through profile completion. |
+| **Challenge limit** | Max 3 pending outgoing challenges. Use `can_create_challenge()` to check before showing the button. |
+| **Challenge expiry** | Challenges expire after 7 days. Display `expires_at` countdown. |
+| **No self-challenge** | `challenger_id ≠ opponent_id` enforced at DB level. |
+| **Match duration** | Default 600s (10 min), max 3600s (1 hr). Frontend timer should use `duration_seconds`. |
+| **ELO only for ranked** | `elo_changes` is `null` for casual matches. Don't show ELO UI for casual. |
+| **ELO floor** | Ratings cannot go below 0. |
+| **Submission codes** | Use `submission_types.code` (not `id`) when calling `record_match_result`. |
+| **Idempotent match start** | `start_match_from_challenge` is safe to call multiple times — returns `already_exists: true` on repeat. |
 
 ---
 
@@ -334,9 +446,32 @@ const { data } = await supabase.rpc('calculate_elo_stakes', {
 | Issue | Current Frontend | Backend Expects | Priority |
 |-------|-----------------|-----------------|----------|
 | Activation signal | `current_weight == null` → needs setup | `primary_gym_id IS NOT NULL` triggers activation | **HIGH** — setup must include gym picker |
-| Weight units | Setup says "lbs" | `athletes.current_weight` has no unit spec (0-500 range). Challenge weights are explicitly lbs | **MEDIUM** — clarify with BE |
+| Weight units | Setup says "lbs" | `athletes.current_weight` is kilograms. Challenge weights are explicitly lbs | **MEDIUM** — clarify with BE |
+| `looking_for_match` | Not surfaced in UI | Available toggle, updatable by own athlete | **LOW** — add to profile/arena |
 | Status filtering | Leaderboard/arena show all athletes | RLS only returns `active`/`inactive` to other users | **LOW** — RLS handles this |
 | Challenge creation | Button disabled, not implemented | Full flow exists: insert with RLS validation | **HIGH** — next feature to build |
 | Gym selection | Not in setup flow | Required for activation (`primary_gym_id` must be set) | **HIGH** — add gym picker to setup |
 | Match start | Not implemented | Use `start_match_from_challenge()` RPC | **HIGH** — needed for match flow |
-| ELO updates | Not implemented | Frontend responsible for computing + writing ELO | **MEDIUM** — needed when matches work |
+| Match recording | Not implemented | Use `record_match_result()` RPC (auto ELO) | **HIGH** — needed when matches work |
+| Match history | Not implemented | Use `get_match_history()` RPC | **MEDIUM** — for profile/stats |
+| ELO history | Not implemented | Use `get_elo_history()` RPC | **LOW** — for ELO chart |
+| Submission types | Not fetched | 23 seeded types, needed for match result recording | **MEDIUM** — needed for match flow |
+
+---
+
+## Next Three Planned Backend Tasks
+
+### 1. Dispute Resolution System (Feature 005)
+**Priority**: High — Completes the match lifecycle
+**What**: Allow athletes to dispute match results within a time window after completion. Includes a `disputes` table, status workflow (`opened` → `under_review` → `resolved`/`dismissed`), and RPC functions to open, review, and resolve disputes. Resolving a dispute may reverse ELO changes for ranked matches.
+**Frontend impact**: Dispute button on completed matches, dispute detail view, notification for opponent.
+
+### 2. Real-Time Challenge & Match Notifications (Supabase Realtime)
+**Priority**: High — Critical for UX
+**What**: Enable Supabase Realtime subscriptions on `challenges` and `matches` tables so both athletes receive instant updates when a challenge is accepted/declined or a match status changes. No new tables needed — requires configuring Realtime publication policies and documenting subscription patterns for the frontend.
+**Frontend impact**: Subscribe to challenge/match changes via `supabase.channel()`, handle real-time status transitions, push notifications.
+
+### 3. Leaderboard & Public Rankings API
+**Priority**: Medium — Key engagement feature
+**What**: Create an RPC function `get_leaderboard(p_limit, p_offset, p_gym_id?)` that returns ranked athletes ordered by `current_elo DESC` with win/loss/draw stats. Optionally filter by gym. Requires a `matches_played` materialized view or computed query joining `match_participants` for aggregate stats. Relaxes RLS to allow public read of leaderboard data.
+**Frontend impact**: Leaderboard page with global/gym-filtered rankings, athlete cards with W/L/D records.
