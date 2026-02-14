@@ -7,8 +7,8 @@ export function NavigationProgress() {
   const pathname = usePathname();
   const [progress, setProgress] = useState(0);
   const [visible, setVisible] = useState(false);
-  const intervalRef = useRef<ReturnType<typeof setInterval>>();
-  const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const intervalRef = useRef<ReturnType<typeof setInterval>>(undefined);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const cleanup = useCallback(() => {
     if (intervalRef.current) clearInterval(intervalRef.current);

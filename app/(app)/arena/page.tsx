@@ -4,17 +4,6 @@ import { createClient } from "@/lib/supabase/server";
 import { ArenaContent } from "./arena-content";
 import { extractGymName } from "@/lib/utils";
 
-function ArenaSkeleton() {
-  return (
-    <div className="flex flex-col gap-6 animate-pulse">
-      <div className="h-7 w-32 bg-muted rounded" />
-      <div className="h-24 bg-muted rounded-lg" />
-      <div className="h-24 bg-muted rounded-lg" />
-      <div className="h-24 bg-muted rounded-lg" />
-    </div>
-  );
-}
-
 export default function ArenaPage() {
   return (
     <Suspense fallback={<ArenaSkeleton />}>
