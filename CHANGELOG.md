@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+### Loading UX: Navigation Progress, Streaming Suspense, Route Loading States
+
+**Added**
+- `components/layout/navigation-progress.tsx` — thin animated progress bar at top of viewport (z-60) that activates on internal link clicks and completes on route change
+- `app/(app)/loading.tsx` — dashboard route-level loading skeleton for instant navigation feedback
+- `app/(app)/arena/loading.tsx` — arena route-level loading skeleton
+- `app/(app)/leaderboard/loading.tsx` — leaderboard route-level loading skeleton
+- `app/(app)/profile/loading.tsx` — profile route-level loading skeleton
+- `app/(app)/dashboard-stats.tsx` — extracted async stats section (greeting + stat cards)
+- `app/(app)/dashboard-challenges.tsx` — extracted async incoming challenges section
+- `app/(app)/dashboard-matches.tsx` — extracted async recent matches section
+
+**Changed**
+- `app/(app)/layout.tsx` — added `NavigationProgress` component above header
+- `app/(app)/page.tsx` — split single monolithic Suspense boundary into 3 independent nested boundaries (stats, challenges, matches) for progressive streaming; uses `computeStats()`/`computeWinStreak()` from `lib/utils.ts` instead of inline computation
+
 ### Step 1: Layout Shell + Layout Migration (004-plan)
 
 **Added**
