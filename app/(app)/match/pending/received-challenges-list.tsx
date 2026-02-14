@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { MatchCard } from "@/components/domain/match-card";
 import { ChallengeResponseSheet } from "@/components/domain/challenge-response-sheet";
+import { ExpiryBadge } from "@/components/domain/expiry-badge";
 import { Button } from "@/components/ui/button";
 
 export interface ReceivedChallenge {
@@ -12,6 +13,7 @@ export interface ReceivedChallenge {
   challengerElo: number;
   challengerWeight: number | null;
   matchType: "casual" | "ranked";
+  expiresAt: string;
   date: string;
 }
 
@@ -43,14 +45,17 @@ export function ReceivedChallengesList({
                   : undefined
               }
             />
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full"
-              onClick={() => setSelectedChallenge(challenge)}
-            >
-              Respond
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1"
+                onClick={() => setSelectedChallenge(challenge)}
+              >
+                Respond
+              </Button>
+              <ExpiryBadge expiresAt={challenge.expiresAt} />
+            </div>
           </div>
         ))}
       </div>

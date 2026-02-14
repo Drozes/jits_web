@@ -3,8 +3,8 @@ import { requireAthlete } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
 import { AppHeader } from "@/components/layout/app-header";
 import { PageContainer } from "@/components/layout/page-container";
-import { MatchCard } from "@/components/domain/match-card";
 import { ReceivedChallengesList } from "./received-challenges-list";
+import { SentChallengesList } from "./sent-challenges-list";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -24,7 +24,7 @@ export async function PendingChallengesContent() {
   const { data: received } = await supabase
     .from("challenges")
     .select(
-      "id, created_at, match_type, status, challenger_weight, challenger:athletes!fk_challenges_challenger(id, display_name, current_elo)",
+      "id, created_at, expires_at, match_type, status, challenger_weight, challenger:athletes!fk_challenges_challenger(id, display_name, current_elo)",
     )
     .eq("opponent_id", athlete.id)
     .eq("status", "pending")
@@ -34,48 +34,56 @@ export async function PendingChallengesContent() {
   const { data: sent } = await supabase
     .from("challenges")
     .select(
-      "id, created_at, match_type, status, opponent:athletes!fk_challenges_opponent(id, display_name)",
+      "id, created_at, expires_at, match_type, status, opponent:athletes!fk_challenges_opponent(id, display_name)",
     )
     .eq("challenger_id", athlete.id)
     .eq("status", "pending")
     .order("created_at", { ascending: false });
 
+  const now = new Date();
+
   const receivedChallenges =
-    received?.map((c) => {
-      const challenger = (
-        c.challenger as unknown as Array<{
-          id: string;
-          display_name: string;
-          current_elo: number;
-        }>
-      )?.[0];
-      return {
-        id: c.id,
-        challengerName: challenger?.display_name ?? "Unknown",
-        challengerId: challenger?.id,
-        challengerElo: challenger?.current_elo ?? 1000,
-        challengerWeight: c.challenger_weight,
-        matchType: c.match_type,
-        date: c.created_at,
-      };
-    }) ?? [];
+    received
+      ?.filter((c) => new Date(c.expires_at) > now)
+      .map((c) => {
+        const challenger = (
+          c.challenger as unknown as Array<{
+            id: string;
+            display_name: string;
+            current_elo: number;
+          }>
+        )?.[0];
+        return {
+          id: c.id,
+          challengerName: challenger?.display_name ?? "Unknown",
+          challengerId: challenger?.id,
+          challengerElo: challenger?.current_elo ?? 1000,
+          challengerWeight: c.challenger_weight,
+          matchType: c.match_type,
+          expiresAt: c.expires_at,
+          date: c.created_at,
+        };
+      }) ?? [];
 
   const sentChallenges =
-    sent?.map((c) => {
-      const opponent = (
-        c.opponent as unknown as Array<{
-          id: string;
-          display_name: string;
-        }>
-      )?.[0];
-      return {
-        id: c.id,
-        opponentName: opponent?.display_name ?? "Unknown",
-        opponentId: opponent?.id,
-        matchType: c.match_type,
-        date: c.created_at,
-      };
-    }) ?? [];
+    sent
+      ?.filter((c) => new Date(c.expires_at) > now)
+      .map((c) => {
+        const opponent = (
+          c.opponent as unknown as Array<{
+            id: string;
+            display_name: string;
+          }>
+        )?.[0];
+        return {
+          id: c.id,
+          opponentName: opponent?.display_name ?? "Unknown",
+          opponentId: opponent?.id,
+          matchType: c.match_type,
+          expiresAt: c.expires_at,
+          date: c.created_at,
+        };
+      }) ?? [];
 
   return (
     <>
@@ -117,22 +125,7 @@ export async function PendingChallengesContent() {
 
             <TabsContent value="sent" className="mt-4">
               {sentChallenges.length > 0 ? (
-                <div className="flex flex-col gap-2">
-                  {sentChallenges.map((challenge) => (
-                    <MatchCard
-                      key={challenge.id}
-                      type="challenge"
-                      opponentName={challenge.opponentName}
-                      status="Pending"
-                      date={challenge.date}
-                      href={
-                        challenge.opponentId
-                          ? `/athlete/${challenge.opponentId}`
-                          : undefined
-                      }
-                    />
-                  ))}
-                </div>
+                <SentChallengesList challenges={sentChallenges} />
               ) : (
                 <EmptyState message="No challenges sent yet" />
               )}
