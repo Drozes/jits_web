@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { getInitials } from "@/lib/utils";
 
 export async function HeaderUserButton() {
   const supabase = await createClient();
@@ -16,12 +17,7 @@ export async function HeaderUserButton() {
     .single();
 
   const displayName = athlete?.display_name ?? (user.email as string);
-  const initials = displayName
-    .split(" ")
-    .map((s: string) => s[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
+  const initials = getInitials(displayName);
 
   return (
     <Link href="/profile" className="flex items-center gap-2">

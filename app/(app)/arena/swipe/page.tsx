@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { requireAthlete } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
 import { SwipeDiscoveryClient } from "./swipe-discovery-client";
+import { extractGymName, computeStats } from "@/lib/utils";
 
 export default function SwipeDiscoveryPage() {
   return (
@@ -19,7 +20,7 @@ async function SwipeData() {
   const { data: athletes } = await supabase
     .from("athletes")
     .select(
-      "id, display_name, current_elo, primary_gym_id, gyms!athletes_primary_gym_id_fkey(name)",
+      "id, display_name, current_elo, current_weight, primary_gym_id, gyms!athletes_primary_gym_id_fkey(name)",
     )
     .eq("status", "active")
     .neq("id", currentAthlete.id)
@@ -35,16 +36,15 @@ async function SwipeData() {
     .not("outcome", "is", null);
 
   const competitors = (athletes ?? []).map((a) => {
-    const gymsArr = a.gyms as { name: string }[] | null;
     const outcomes = allOutcomes?.filter((o) => o.athlete_id === a.id) ?? [];
-    const wins = outcomes.filter((o) => o.outcome === "win").length;
-    const losses = outcomes.filter((o) => o.outcome === "loss").length;
+    const { wins, losses } = computeStats(outcomes);
 
     return {
       id: a.id,
       displayName: a.display_name,
       currentElo: a.current_elo,
-      gymName: gymsArr?.[0]?.name ?? null,
+      gymName: extractGymName(a.gyms as { name: string }[] | null),
+      weight: a.current_weight,
       wins,
       losses,
     };

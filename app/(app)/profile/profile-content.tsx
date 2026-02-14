@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { requireAthlete } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
-import { ProfileHeader } from "@/components/domain/profile-header";
-import { DisplayNameEditor } from "@/components/profile/display-name-editor";
+import { EditableProfileHeader } from "@/components/profile/editable-profile-header";
 import { LogoutButton } from "@/components/logout-button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { ShareProfileSheet } from "@/components/domain/share-profile-sheet";
+import { computeStats } from "@/lib/utils";
 import {
   Trophy,
   Target,
@@ -28,10 +28,7 @@ export async function ProfileContent() {
     .eq("athlete_id", athlete.id)
     .not("outcome", "is", null);
 
-  const wins = outcomes?.filter((o) => o.outcome === "win").length ?? 0;
-  const losses = outcomes?.filter((o) => o.outcome === "loss").length ?? 0;
-  const total = wins + losses;
-  const winRate = total > 0 ? Math.round((wins / total) * 100) : 0;
+  const { wins, losses, winRate } = computeStats(outcomes ?? []);
 
   // Fetch gym name via join
   let gymName: string | null = null;
@@ -53,12 +50,7 @@ export async function ProfileContent() {
 
   return (
     <div className="flex flex-col gap-6">
-      <DisplayNameEditor
-        athleteId={athlete.id}
-        initialName={athlete.display_name}
-      />
-
-      <ProfileHeader
+      <EditableProfileHeader
         athlete={athlete}
         gymName={gymName}
         stats={{ wins, losses, winRate }}
@@ -72,12 +64,15 @@ export async function ProfileContent() {
           </Link>
         </Button>
         <ShareProfileSheet
-          athleteId={athlete.id}
-          displayName={athlete.display_name}
-          elo={athlete.current_elo}
-          wins={wins}
-          losses={losses}
-          gymName={gymName}
+          athlete={{
+            id: athlete.id,
+            displayName: athlete.display_name,
+            elo: athlete.current_elo,
+            wins,
+            losses,
+            weight: athlete.current_weight,
+            gymName,
+          }}
         >
           <Button variant="outline" size="icon">
             <Share2 className="h-4 w-4" />

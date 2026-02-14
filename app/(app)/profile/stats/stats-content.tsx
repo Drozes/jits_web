@@ -1,9 +1,8 @@
 import { requireAthlete } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StatsTabs } from "./stats-tabs";
+import { computeStats, computeWinStreak } from "@/lib/utils";
 
 export async function StatsContent() {
   const { athlete } = await requireAthlete();
@@ -17,22 +16,11 @@ export async function StatsContent() {
     .not("outcome", "is", null)
     .order("match_id", { ascending: false });
 
-  const wins = participations?.filter((p) => p.outcome === "win").length ?? 0;
-  const losses =
-    participations?.filter((p) => p.outcome === "loss").length ?? 0;
+  const { wins, losses, winRate } = computeStats(participations ?? []);
   const draws =
     participations?.filter((p) => p.outcome === "draw").length ?? 0;
   const total = wins + losses + draws;
-  const winRate = total > 0 ? Math.round((wins / total) * 100) : 0;
-
-  // Calculate win streak
-  let winStreak = 0;
-  if (participations) {
-    for (const p of participations) {
-      if (p.outcome === "win") winStreak++;
-      else break;
-    }
-  }
+  const winStreak = computeWinStreak(participations ?? []);
 
   // Calculate ELO change this month
   const now = new Date();

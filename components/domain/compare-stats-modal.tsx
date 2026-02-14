@@ -14,6 +14,7 @@ interface AthleteStats {
   wins: number;
   losses: number;
   winRate: number;
+  weight: number | null;
 }
 
 interface CompareStatsModalProps {
@@ -105,6 +106,17 @@ export function CompareStatsModal({
             left={currentAthlete.winRate}
             right={competitor.winRate}
           />
+          {(currentAthlete.weight != null || competitor.weight != null) && (
+            <div className="grid grid-cols-3 items-center py-2">
+              <p className="text-lg font-bold tabular-nums text-center">
+                {currentAthlete.weight != null ? `${currentAthlete.weight}` : "—"}
+              </p>
+              <p className="text-xs text-muted-foreground text-center">Weight (lbs)</p>
+              <p className="text-lg font-bold tabular-nums text-center">
+                {competitor.weight != null ? `${competitor.weight}` : "—"}
+              </p>
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>

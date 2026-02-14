@@ -2,21 +2,13 @@ import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Crown, Medal, Award } from "lucide-react";
+import { getInitials } from "@/lib/utils";
 
 function getRankDisplay(rank: number) {
   if (rank === 1) return <Crown className="h-5 w-5 text-yellow-500" />;
   if (rank === 2) return <Medal className="h-5 w-5 text-gray-400" />;
   if (rank === 3) return <Award className="h-5 w-5 text-amber-600" />;
   return <span className="text-sm font-medium text-muted-foreground">#{rank}</span>;
-}
-
-function getInitials(name: string) {
-  return name
-    .split(" ")
-    .map((w) => w[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
 }
 
 interface AthleteCardProps {
