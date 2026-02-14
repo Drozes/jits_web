@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { requireAuth } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
+import { ATHLETE_STATUS } from "@/lib/constants";
 import { SetupForm } from "./setup-form";
 
 export default function ProfileSetupPage() {
@@ -57,9 +58,16 @@ async function SetupContent() {
     .single();
 
   // If athlete is already activated, redirect to home
-  if (athlete && athlete.status !== "pending") {
+  if (athlete && athlete.status !== ATHLETE_STATUS.PENDING) {
     redirect("/");
   }
+
+  // Fetch gyms server-side so the client component doesn't need to
+  const { data: gyms } = await supabase
+    .from("gyms")
+    .select("id, name")
+    .eq("status", "active")
+    .order("name");
 
   return (
     <div className="flex min-h-[80vh] items-center justify-center px-4">
@@ -75,6 +83,7 @@ async function SetupContent() {
         <SetupForm
           athleteId={athlete?.id ?? null}
           defaultDisplayName={athlete?.display_name ?? ""}
+          gyms={gyms ?? []}
         />
       </div>
     </div>

@@ -18,6 +18,47 @@
 - `app/(app)/layout.tsx` — added `NavigationProgress` component above header
 - `app/(app)/page.tsx` — split single monolithic Suspense boundary into 3 independent nested boundaries (stats, challenges, matches) for progressive streaming; uses `computeStats()`/`computeWinStreak()` from `lib/utils.ts` instead of inline computation
 
+### Phase 1 — Safety Net (2026-02-14)
+
+**Added**
+- Error boundaries at root (`app/error.tsx`), app (`app/(app)/error.tsx`), and athlete profile (`app/(app)/athlete/error.tsx`) — graceful error UI instead of raw Next.js error page
+- Custom 404 pages at root and app levels (`not-found.tsx`)
+- Suspense fallback skeletons for Dashboard, Arena, and Leaderboard pages — loading placeholders instead of blank screens
+- Pre-alpha codebase audit (`research/006-pre-alpha-codebase-audit.md`)
+
+**Fixed**
+- Removed unused `opacity` variable in swipe-discovery-client
+- Removed unused `Badge` import in challenge-sheet
+- Removed unused `gyms` query in leaderboard page (gym stats already computed from athlete FK joins)
+- Excluded `outside_assets/` from ESLint to eliminate 30+ irrelevant warnings
+
+### Phase 2 — Tooling & Test Foundation (2026-02-14)
+
+**Added**
+- Unit tests for `lib/utils.ts` — 17 tests covering `getInitials`, `computeStats`, `computeWinStreak`, `extractGymName` (23 total tests now)
+- Husky pre-commit hook running `tsc --noEmit`, `eslint`, and `vitest run` on every commit
+
+**Changed**
+- Pinned `@supabase/ssr` (^0.8.0), `@supabase/supabase-js` (^2.94.1), and `next` (^16.1.6) — removed `"latest"` tags
+- Rewrote E2E smoke tests for auth-aware routes (public pages + redirect assertions instead of guarded pages)
+- Playwright config: increased webServer timeout, `reuseExistingServer: true`
+
+**Known Issue**
+- Playwright browser launch hangs in current environment — E2E tests need `npx playwright install` and may require system dependencies
+
+### Phase 3 — Type Safety & Data Patterns (2026-02-14)
+
+**Added**
+- `lib/constants.ts` — centralized `MATCH_TYPE`, `CHALLENGE_STATUS`, `MATCH_OUTCOME`, `ATHLETE_STATUS` constants with TypeScript types
+- `types/composites.ts` — shared FK join shapes (`ChallengerJoin`, `OpponentJoin`, `GymJoin`, `MatchJoin`), `ComputedStats`, and `EloStakes` types
+
+**Changed**
+- Replaced `as unknown as Array<...>` casts with proper FK join array types in `pending-challenges-content.tsx` and `athlete-profile-content.tsx`
+- Moved gym fetch from client-side `useEffect` in `setup-form.tsx` to server-side in `setup/page.tsx` — gyms now passed as prop
+- Challenge sheet and challenge response sheet now use shared `EloStakes` type and `MATCH_TYPE` constants instead of local duplicates
+- Match card uses `MATCH_OUTCOME` constants for result config
+- Guards use `ATHLETE_STATUS.PENDING` instead of string literal
+
 ### Step 1: Layout Shell + Layout Migration (004-plan)
 
 **Added**
