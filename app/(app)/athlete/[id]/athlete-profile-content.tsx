@@ -84,11 +84,16 @@ export async function AthleteProfileContent({
     headToHead =
       sharedParticipations
         ?.filter((p) => {
-          const match = (p.matches as unknown as Array<{ status: string }>)?.[0];
-          return match?.status === "completed";
+          const matchArr = p.matches as
+            | { status: string; completed_at: string | null }[]
+            | null;
+          return matchArr?.[0]?.status === "completed";
         })
         .map((p) => {
-          const match = (p.matches as unknown as Array<{ completed_at: string | null }>)?.[0];
+          const matchArr = p.matches as
+            | { status: string; completed_at: string | null }[]
+            | null;
+          const match = matchArr?.[0];
           return {
             opponentName: competitor.display_name,
             result: p.outcome as "win" | "loss" | "draw" | null,

@@ -21,6 +21,8 @@ import {
   Check,
   Scale,
 } from "lucide-react";
+import type { EloStakes } from "@/types/composites";
+import { MATCH_TYPE, type MatchType } from "@/lib/constants";
 
 interface ChallengeResponseSheetProps {
   challenge: {
@@ -28,20 +30,11 @@ interface ChallengeResponseSheetProps {
     challengerName: string;
     challengerElo: number;
     challengerWeight: number | null;
-    matchType: "casual" | "ranked";
+    matchType: MatchType;
   };
   currentAthleteElo: number;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-}
-
-interface EloStakes {
-  challenger_win: number;
-  challenger_loss: number;
-  opponent_win: number;
-  opponent_loss: number;
-  challenger_expected: number;
-  opponent_expected: number;
 }
 
 export function ChallengeResponseSheet({
@@ -58,7 +51,7 @@ export function ChallengeResponseSheet({
   const [success, setSuccess] = useState<"accepted" | "declined" | null>(null);
 
   useEffect(() => {
-    if (challenge.matchType !== "ranked" || !open) {
+    if (challenge.matchType !== MATCH_TYPE.RANKED || !open) {
       setStakes(null);
       return;
     }
@@ -186,15 +179,15 @@ export function ChallengeResponseSheet({
                   </Badge>
                 )}
                 <Badge
-                  variant={challenge.matchType === "ranked" ? "default" : "outline"}
+                  variant={challenge.matchType === MATCH_TYPE.RANKED ? "default" : "outline"}
                 >
-                  {challenge.matchType === "ranked" ? "Ranked" : "Casual"}
+                  {challenge.matchType === MATCH_TYPE.RANKED ? "Ranked" : "Casual"}
                 </Badge>
               </div>
             </div>
 
             {/* ELO Stakes (ranked only) */}
-            {challenge.matchType === "ranked" && stakes && (
+            {challenge.matchType === MATCH_TYPE.RANKED && stakes && (
               <Card className="bg-primary/5 border-primary/20">
                 <CardContent className="p-3">
                   <p className="text-xs font-medium mb-2">Your ELO Stakes</p>

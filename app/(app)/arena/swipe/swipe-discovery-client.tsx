@@ -91,7 +91,6 @@ export function SwipeDiscoveryClient({
   }
 
   const rotation = dragOffset * 0.1;
-  const opacity = Math.max(0, 1 - Math.abs(dragOffset) / 300);
 
   return (
     <>

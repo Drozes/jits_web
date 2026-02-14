@@ -5,9 +5,19 @@ import { StatOverview } from "@/components/domain/stat-overview";
 import { MatchCard } from "@/components/domain/match-card";
 import { Swords, Zap } from "lucide-react";
 
+function DashboardSkeleton() {
+  return (
+    <div className="flex flex-col gap-6 animate-pulse">
+      <div><div className="h-7 w-48 bg-muted rounded" /><div className="h-4 w-32 bg-muted rounded mt-2" /></div>
+      <div className="h-32 bg-muted rounded-lg" />
+      <div className="h-48 bg-muted rounded-lg" />
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   return (
-    <Suspense>
+    <Suspense fallback={<DashboardSkeleton />}>
       <DashboardContent />
     </Suspense>
   );

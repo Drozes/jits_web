@@ -127,6 +127,17 @@ Use these consistently across all stat displays:
 
 Don't create abstractions for things used once. Don't add error handling for impossible states. This is alpha — ship fast, refactor when real patterns emerge. The threshold for extraction is 2+ usages across files (see Principle 2).
 
+## Pre-Commit Quality Checks
+
+Before every commit, run these checks and fix any failures:
+
+1. **TypeScript** — `npx tsc --noEmit` (always)
+2. **Build** — `npx next build` (always)
+3. **Unit tests** — `npm test` (always)
+4. **E2E tests** — `npm run test:e2e` (for complex commits: new pages/routes, layout changes, auth flow changes, or multi-file refactors)
+
+Do not commit if any check fails. Fix the issue first.
+
 ## UI Kit Maintenance
 
 ### shadcn/ui Components (`components/ui/`)

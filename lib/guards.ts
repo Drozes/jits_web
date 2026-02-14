@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { ATHLETE_STATUS } from "@/lib/constants";
 
 /**
  * Requires authentication. Returns the user if authenticated,
@@ -36,7 +37,7 @@ export async function requireAthlete() {
 
   // Athlete exists but hasn't been activated by the backend
   // (activation requires display_name + primary_gym_id)
-  if (athlete.status === "pending") {
+  if (athlete.status === ATHLETE_STATUS.PENDING) {
     redirect("/profile/setup");
   }
 

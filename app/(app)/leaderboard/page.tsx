@@ -4,9 +4,20 @@ import { createClient } from "@/lib/supabase/server";
 import { LeaderboardContent } from "./leaderboard-content";
 import { extractGymName } from "@/lib/utils";
 
+function LeaderboardSkeleton() {
+  return (
+    <div className="flex flex-col gap-6 animate-pulse">
+      <div className="h-8 w-40 bg-muted rounded" />
+      <div className="flex gap-4 justify-center"><div className="h-32 w-24 bg-muted rounded-lg" /><div className="h-40 w-24 bg-muted rounded-lg" /><div className="h-32 w-24 bg-muted rounded-lg" /></div>
+      <div className="h-16 bg-muted rounded-lg" />
+      <div className="h-16 bg-muted rounded-lg" />
+    </div>
+  );
+}
+
 export default function LeaderboardPage() {
   return (
-    <Suspense>
+    <Suspense fallback={<LeaderboardSkeleton />}>
       <LeaderboardData />
     </Suspense>
   );
@@ -54,12 +65,6 @@ async function LeaderboardData() {
       isCurrentUser: a.id === currentAthlete.id,
     };
   });
-
-  // Fetch gyms with member stats
-  const { data: gyms } = await supabase
-    .from("gyms")
-    .select("id, name")
-    .eq("status", "active");
 
   // Count members and total ELO per gym from athlete data
   const gymStatsMap = new Map<string, { name: string; totalElo: number; memberCount: number }>();
