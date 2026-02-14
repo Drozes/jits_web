@@ -1,10 +1,7 @@
 import Link from "next/link";
 import { requireAthlete } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
-import { ProfileHeader } from "@/components/domain/profile-header";
-import { DisplayNameEditor } from "@/components/profile/display-name-editor";
-import { WeightEditor } from "@/components/profile/weight-editor";
-import { GymEditor } from "@/components/profile/gym-editor";
+import { EditableProfileHeader } from "@/components/profile/editable-profile-header";
 import { LogoutButton } from "@/components/logout-button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -53,23 +50,7 @@ export async function ProfileContent() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <DisplayNameEditor
-          athleteId={athlete.id}
-          initialName={athlete.display_name}
-        />
-        <WeightEditor
-          athleteId={athlete.id}
-          initialWeight={athlete.current_weight}
-        />
-        <GymEditor
-          athleteId={athlete.id}
-          initialGymId={athlete.primary_gym_id}
-          initialGymName={gymName}
-        />
-      </div>
-
-      <ProfileHeader
+      <EditableProfileHeader
         athlete={athlete}
         gymName={gymName}
         stats={{ wins, losses, winRate }}

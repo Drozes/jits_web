@@ -3,6 +3,7 @@ import { requireAthlete } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
 import { StatOverview } from "@/components/domain/stat-overview";
 import { MatchCard } from "@/components/domain/match-card";
+import { Swords, Zap } from "lucide-react";
 
 export default function DashboardPage() {
   return (
@@ -122,7 +123,10 @@ async function DashboardContent() {
       />
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">Incoming Challenges</h2>
+        <div className="flex items-center gap-2">
+          <Zap className="h-5 w-5 text-yellow-500" />
+          <h2 className="text-lg font-semibold">Incoming Challenges</h2>
+        </div>
         {pendingChallenges && pendingChallenges.length > 0 ? (
           <div className="flex flex-col gap-2">
             {pendingChallenges.map((challenge) => {
@@ -142,14 +146,17 @@ async function DashboardContent() {
             })}
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">
-            No pending challenges
-          </p>
+          <div className="rounded-lg border border-dashed p-6 text-center text-muted-foreground">
+            <p className="text-sm">No pending challenges</p>
+          </div>
         )}
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">Recent Matches</h2>
+        <div className="flex items-center gap-2">
+          <Swords className="h-5 w-5 text-primary" />
+          <h2 className="text-lg font-semibold">Recent Matches</h2>
+        </div>
         {matchesWithOpponents.length > 0 ? (
           <div className="flex flex-col gap-2">
             {matchesWithOpponents.map((match) => (
@@ -164,9 +171,9 @@ async function DashboardContent() {
             ))}
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">
-            No matches yet — find an opponent in the Arena!
-          </p>
+          <div className="rounded-lg border border-dashed p-6 text-center text-muted-foreground">
+            <p className="text-sm">No matches yet — find an opponent in the Arena!</p>
+          </div>
         )}
       </section>
     </div>
