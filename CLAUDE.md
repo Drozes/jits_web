@@ -4,6 +4,12 @@
 
 JITS Web is a BJJ competitor matchmaking app built with Next.js 16, Supabase, Tailwind CSS, and shadcn/ui. The backend lives in a separate repo — this is frontend only.
 
+**Backend repo:** `/Users/msponagle/code/experiments/jr_be/`
+- Supabase migrations in `supabase/migrations/`
+- DB tests in `supabase/tests/`
+- Feature specs in `specs/`
+- Read the BE repo's `README.md` and migrations when you need to understand the database schema, RLS policies, or business rules.
+
 ## Architecture
 
 - **Framework:** Next.js 16 App Router with `cacheComponents` enabled
@@ -167,3 +173,23 @@ Match participants -> Athletes: athletes!fk_participants_athlete(display_name)
 Challenges -> Challenger:       athletes!fk_challenges_challenger(display_name)
 Matches -> Participants:        matches!fk_participants_match(completed_at, status)
 ```
+
+## Backend Integration
+
+**Full reference:** [research/005-backend-reference.md](research/005-backend-reference.md)
+
+Read this doc before building challenge, match, or ELO features. Key points:
+
+- **Athlete activation** requires `primary_gym_id` to be set (trigger-based, not `current_weight`)
+- **Challenges:** INSERT with RLS validation, max 3 pending, opponent must be `active`
+- **Starting matches:** use `start_match_from_challenge()` RPC, never direct INSERT
+- **ELO stakes preview:** use `calculate_elo_stakes()` RPC for display
+- **ELO updates:** frontend responsible for computing + writing new ELO (no backend service yet)
+
+### Frontend/Backend Discrepancies (Must Fix)
+
+1. **Activation trigger uses `primary_gym_id`, not `current_weight`** — setup must include gym picker
+2. **Weight units unclear** — `athletes.current_weight` constraint is 0-500 with no unit. Challenge weights are explicitly lbs.
+3. **Challenge creation not implemented** — button disabled on competitor profile
+4. **No gym selection in setup** — required for backend activation
+5. **Match flow not implemented** — RPC exists but no frontend screens
