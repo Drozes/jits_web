@@ -15,6 +15,10 @@
 | 2026-02-13 | Step 3: Dashboard Screen | **Done** | stat-overview, match-card, interactive card CVA variant, full page rebuild with Suspense |
 | 2026-02-13 | Step 4: Profile Screen Rebuild | **Done** | profile-header, elo-badge (CVA), profile page rebuild with achievements + account section, stats sub-page with tabs, LogoutButton fix |
 | 2026-02-13 | Step 5: Leaderboard + Arena | **Done** | athlete-card, leaderboard (podium + Fighters/Gyms toggle), arena (looking-for-match toggle + competitors + activity feed), deleted challenges/ and gyms/ stubs, installed switch + select |
+| 2026-02-13 | Step 6: Competitor Profile | **Done** | compare-stats-modal (dialog), athlete/[id] page with profile-header reuse, head-to-head history, action buttons, wrapped BottomNavBar in Suspense for dynamic routes |
+| 2026-02-13 | Step 7: Pending Challenges | **Done** | match/pending page with Received/Sent tabs, challenge cards linking to athlete profiles, empty states with Arena CTA, info card |
+| 2026-02-13 | Step 8: Share Profile | **Done** | share-profile-sheet (sheet), profile preview card, copy link + native share, privacy notice, Share button on profile page |
+| 2026-02-13 | Step 9: Swipe Discovery | **Done** | arena/swipe page with draggable card stack, pointer-based swipe gestures, PASS/LIKE indicators, action buttons, end state with session summary |
 
 ## Learnings
 
@@ -22,6 +26,8 @@
 2. **Supabase joins return arrays** — FK joins like `athletes!fk_participants_athlete(display_name)` return `T[]`, not `T`. Always access with `[0]`.
 3. **Next.js 16 requires Suspense** — Async server components with data fetching must be wrapped in `<Suspense>` or the build fails with "Uncached data was accessed outside of `<Suspense>`".
 4. **`belt-badge` is premature** — No `belt_rank` column exists in the database. Skip until the backend adds it.
+5. **Client hooks in layout need Suspense for dynamic routes** — `usePathname()` in `BottomNavBar` causes prerender failures on `[id]` routes. Wrapping in `<Suspense>` fixes it.
+6. **`cacheComponents` disables route segment config** — `export const dynamic = "force-dynamic"` is not compatible with Next.js 16 `cacheComponents`. Use Suspense boundaries instead.
 
 ---
 

@@ -7,12 +7,14 @@ import { LogoutButton } from "@/components/logout-button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { ShareProfileSheet } from "@/components/domain/share-profile-sheet";
 import {
   Trophy,
   Target,
   Swords,
   Award,
   Settings,
+  Share2,
 } from "lucide-react";
 
 export async function ProfileContent() {
@@ -69,6 +71,18 @@ export async function ProfileContent() {
             View Stats
           </Link>
         </Button>
+        <ShareProfileSheet
+          athleteId={athlete.id}
+          displayName={athlete.display_name}
+          elo={athlete.current_elo}
+          wins={wins}
+          losses={losses}
+          gymName={gymName}
+        >
+          <Button variant="outline" size="icon">
+            <Share2 className="h-4 w-4" />
+          </Button>
+        </ShareProfileSheet>
       </div>
 
       {/* Achievements */}
