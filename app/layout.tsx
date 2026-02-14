@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist } from "next/font/google";
+import localFont from "next/font/local";
 import { ThemeProvider } from "next-themes";
 import "./globals.css";
 
@@ -13,10 +13,10 @@ export const metadata: Metadata = {
   description: "Track your jiu-jitsu journey",
 };
 
-const geistSans = Geist({
+const geistSans = localFont({
+  src: "../node_modules/geist/dist/fonts/geist-sans/Geist-Variable.woff2",
   variable: "--font-geist-sans",
   display: "swap",
-  subsets: ["latin"],
 });
 
 export default function RootLayout({
