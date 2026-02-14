@@ -21,6 +21,7 @@
 | 2026-02-13 | Step 9: Swipe Discovery | **Done** | arena/swipe page with draggable card stack, pointer-based swipe gestures, PASS/LIKE indicators, action buttons, end state with session summary |
 | 2026-02-13 | Setup Refactor | **Done** | Backend auto-creates athletes on signup; setup form now UPDATEs instead of INSERTing; `current_weight == null` = needs onboarding |
 | 2026-02-13 | Weight Display | **Done** | Added `current_weight` to profile-header, compare-stats-modal, swipe-card, share-profile-sheet; weight required during setup |
+| 2026-02-13 | Code Review | **Done** | Full codebase review; created CLAUDE.md with principles, code quality guidelines, UI kit rules, and tech debt tracker |
 
 ## Learnings
 
