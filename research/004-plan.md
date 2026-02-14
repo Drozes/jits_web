@@ -17,6 +17,8 @@
 | 2026-02-13 | Step 5: Leaderboard + Arena | **Done** | athlete-card, leaderboard (podium + Fighters/Gyms toggle), arena (looking-for-match toggle + competitors + activity feed), deleted challenges/ and gyms/ stubs, installed switch + select |
 | 2026-02-13 | Step 6: Competitor Profile | **Done** | compare-stats-modal (dialog), athlete/[id] page with profile-header reuse, head-to-head history, action buttons, wrapped BottomNavBar in Suspense for dynamic routes |
 | 2026-02-13 | Step 7: Pending Challenges | **Done** | match/pending page with Received/Sent tabs, challenge cards linking to athlete profiles, empty states with Arena CTA, info card |
+| 2026-02-13 | Step 8: Share Profile | **Done** | share-profile-sheet (sheet), profile preview card, copy link + native share, privacy notice, Share button on profile page |
+| 2026-02-13 | Step 9: Swipe Discovery | **Done** | arena/swipe page with draggable card stack, pointer-based swipe gestures, PASS/LIKE indicators, action buttons, end state with session summary |
 
 ## Learnings
 
