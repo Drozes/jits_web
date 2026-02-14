@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Swords, Users, Activity, Clock, CheckCircle2 } from "lucide-react";
+import { getInitials } from "@/lib/utils";
 
 interface Competitor {
   id: string;
@@ -21,15 +23,6 @@ interface ActivityItem {
   loserName: string;
   result: string;
   date: string;
-}
-
-function getInitials(name: string) {
-  return name
-    .split(" ")
-    .map((w) => w[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
 }
 
 function timeAgo(dateStr: string) {
@@ -120,35 +113,37 @@ export function ArenaContent({
         {competitors.length > 0 ? (
           <div className="flex flex-col gap-2">
             {competitors.map((c) => (
-              <Card key={c.id} variant="interactive" className="p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="relative">
-                      <Avatar className="h-12 w-12 border-2 border-accent/20 bg-gradient-to-br from-primary to-primary/80 text-white">
-                        <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 font-bold text-white">
-                          {getInitials(c.displayName)}
-                        </AvatarFallback>
-                      </Avatar>
-                    </div>
-                    <div>
-                      <h4 className="font-semibold">{c.displayName}</h4>
-                      <div className="text-sm text-muted-foreground">
-                        ELO: {c.currentElo}
-                        {c.eloDiff !== 0 && (
-                          <span className={c.eloDiff > 0 ? "text-red-500" : "text-green-500"}>
-                            {" "}({c.eloDiff > 0 ? "+" : ""}{c.eloDiff})
-                          </span>
+              <Link key={c.id} href={`/athlete/${c.id}`}>
+                <Card variant="interactive" className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="relative">
+                        <Avatar className="h-12 w-12 border-2 border-accent/20 bg-gradient-to-br from-primary to-primary/80 text-white">
+                          <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 font-bold text-white">
+                            {getInitials(c.displayName)}
+                          </AvatarFallback>
+                        </Avatar>
+                      </div>
+                      <div>
+                        <h4 className="font-semibold">{c.displayName}</h4>
+                        <div className="text-sm text-muted-foreground">
+                          ELO: {c.currentElo}
+                          {c.eloDiff !== 0 && (
+                            <span className={c.eloDiff > 0 ? "text-red-500" : "text-green-500"}>
+                              {" "}({c.eloDiff > 0 ? "+" : ""}{c.eloDiff})
+                            </span>
+                          )}
+                        </div>
+                        {c.gymName && (
+                          <div className="text-xs text-muted-foreground">
+                            {c.gymName}
+                          </div>
                         )}
                       </div>
-                      {c.gymName && (
-                        <div className="text-xs text-muted-foreground">
-                          {c.gymName}
-                        </div>
-                      )}
                     </div>
                   </div>
-                </div>
-              </Card>
+                </Card>
+              </Link>
             ))}
           </div>
         ) : (

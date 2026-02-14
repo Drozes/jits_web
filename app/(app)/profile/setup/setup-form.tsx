@@ -1,12 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface SetupFormProps {
   athleteId: string | null;
@@ -17,8 +24,20 @@ export function SetupForm({ athleteId, defaultDisplayName }: SetupFormProps) {
   const router = useRouter();
   const [displayName, setDisplayName] = useState(defaultDisplayName);
   const [weight, setWeight] = useState("");
+  const [gymId, setGymId] = useState("");
+  const [gyms, setGyms] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase
+      .from("gyms")
+      .select("id, name")
+      .eq("status", "active")
+      .order("name")
+      .then(({ data }) => setGyms(data ?? []));
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -47,6 +66,7 @@ export function SetupForm({ athleteId, defaultDisplayName }: SetupFormProps) {
         .update({
           display_name: trimmed,
           current_weight: parsedWeight,
+          ...(gymId ? { primary_gym_id: gymId } : {}),
         })
         .eq("id", athleteId);
 
@@ -60,6 +80,7 @@ export function SetupForm({ athleteId, defaultDisplayName }: SetupFormProps) {
       const { error: insertError } = await supabase.from("athletes").insert({
         display_name: trimmed,
         current_weight: parsedWeight,
+        ...(gymId ? { primary_gym_id: gymId } : {}),
       });
 
       if (insertError) {
@@ -106,6 +127,25 @@ export function SetupForm({ athleteId, defaultDisplayName }: SetupFormProps) {
             />
             <p className="text-xs text-muted-foreground">
               Used for weight class matching.
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Label>Gym (optional)</Label>
+            <Select value={gymId} onValueChange={setGymId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select your gym" />
+              </SelectTrigger>
+              <SelectContent>
+                {gyms.map((gym) => (
+                  <SelectItem key={gym.id} value={gym.id}>
+                    {gym.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              You can set or change this later.
             </p>
           </div>
 

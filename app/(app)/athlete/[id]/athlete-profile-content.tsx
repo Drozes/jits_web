@@ -114,6 +114,7 @@ export async function AthleteProfileContent({
 
           <AthleteProfileActions
             competitorId={competitor.id}
+            currentAthleteId={currentAthlete.id}
             currentAthlete={{
               displayName: currentAthlete.display_name,
               elo: currentAthlete.current_elo,
