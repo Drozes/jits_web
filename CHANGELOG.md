@@ -16,6 +16,20 @@
 - Removed unused `gyms` query in leaderboard page (gym stats already computed from athlete FK joins)
 - Excluded `outside_assets/` from ESLint to eliminate 30+ irrelevant warnings
 
+### Phase 2 — Tooling & Test Foundation (2026-02-14)
+
+**Added**
+- Unit tests for `lib/utils.ts` — 17 tests covering `getInitials`, `computeStats`, `computeWinStreak`, `extractGymName` (23 total tests now)
+- Husky pre-commit hook running `tsc --noEmit`, `eslint`, and `vitest run` on every commit
+
+**Changed**
+- Pinned `@supabase/ssr` (^0.8.0), `@supabase/supabase-js` (^2.94.1), and `next` (^16.1.6) — removed `"latest"` tags
+- Rewrote E2E smoke tests for auth-aware routes (public pages + redirect assertions instead of guarded pages)
+- Playwright config: increased webServer timeout, `reuseExistingServer: true`
+
+**Known Issue**
+- Playwright browser launch hangs in current environment — E2E tests need `npx playwright install` and may require system dependencies
+
 ### Step 1: Layout Shell + Layout Migration (004-plan)
 
 **Added**
