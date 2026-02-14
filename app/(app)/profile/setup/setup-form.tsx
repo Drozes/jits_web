@@ -66,7 +66,7 @@ export function SetupForm({ athleteId, defaultDisplayName }: SetupFormProps) {
         .update({
           display_name: trimmed,
           current_weight: parsedWeight,
-          ...(gymId ? { primary_gym_id: gymId } : {}),
+          primary_gym_id: gymId,
         })
         .eq("id", athleteId);
 
@@ -80,7 +80,7 @@ export function SetupForm({ athleteId, defaultDisplayName }: SetupFormProps) {
       const { error: insertError } = await supabase.from("athletes").insert({
         display_name: trimmed,
         current_weight: parsedWeight,
-        ...(gymId ? { primary_gym_id: gymId } : {}),
+        primary_gym_id: gymId,
       });
 
       if (insertError) {
@@ -131,7 +131,7 @@ export function SetupForm({ athleteId, defaultDisplayName }: SetupFormProps) {
           </div>
 
           <div className="flex flex-col gap-2">
-            <Label>Gym (optional)</Label>
+            <Label>Gym</Label>
             <Select value={gymId} onValueChange={setGymId}>
               <SelectTrigger>
                 <SelectValue placeholder="Select your gym" />
@@ -145,7 +145,7 @@ export function SetupForm({ athleteId, defaultDisplayName }: SetupFormProps) {
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              You can set or change this later.
+              Required to activate your profile and appear to other athletes.
             </p>
           </div>
 
@@ -155,7 +155,7 @@ export function SetupForm({ athleteId, defaultDisplayName }: SetupFormProps) {
 
           <Button
             type="submit"
-            disabled={loading || !displayName.trim() || !weight}
+            disabled={loading || !displayName.trim() || !weight || !gymId}
           >
             {loading ? "Saving..." : "Get Started"}
           </Button>

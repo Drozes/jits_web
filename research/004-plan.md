@@ -24,6 +24,7 @@
 | 2026-02-13 | Code Review | **Done** | Full codebase review; created CLAUDE.md with principles, code quality guidelines, UI kit rules, and tech debt tracker |
 | 2026-02-14 | Arena FK Fix | **Done** | FK constraint is `fk_athletes_primary_gym`, not `athletes_primary_gym_id_fkey`. Fixed across all queries. Split arena into two targeted queries (looking vs. not-looking). |
 | 2026-02-14 | RPC Contracts | **Done** | Integrated BE `docs/rpc-contracts.md` into `research/005-backend-reference.md`. All 7 RPCs documented with params, responses, and error hints. |
+| 2026-02-14 | Step 10: Setup Fix | **Done** | Gym picker now required (not optional). Guard checks `status='pending'` instead of `current_weight`. Setup page checks status for redirect. `primary_gym_id` always sent on submit. |
 
 ## Learnings
 

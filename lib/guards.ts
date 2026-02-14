@@ -34,8 +34,9 @@ export async function requireAthlete() {
     redirect("/profile/setup");
   }
 
-  // Athlete exists but hasn't completed onboarding (no weight set)
-  if (athlete.current_weight == null) {
+  // Athlete exists but hasn't been activated by the backend
+  // (activation requires display_name + primary_gym_id)
+  if (athlete.status === "pending") {
     redirect("/profile/setup");
   }
 
