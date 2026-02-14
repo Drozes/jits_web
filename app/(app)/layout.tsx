@@ -22,7 +22,9 @@ export default function AppLayout({
       <PageContainer className="py-6">
         {children}
       </PageContainer>
-      <BottomNavBar />
+      <Suspense>
+        <BottomNavBar />
+      </Suspense>
     </div>
   );
 }
