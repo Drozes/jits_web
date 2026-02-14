@@ -34,6 +34,11 @@ export async function requireAthlete() {
     redirect("/profile/setup");
   }
 
+  // Athlete exists but hasn't completed onboarding (no weight set)
+  if (athlete.current_weight == null) {
+    redirect("/profile/setup");
+  }
+
   return { user, athlete };
 }
 

@@ -9,12 +9,14 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 
 interface SetupFormProps {
-  userId: string;
+  athleteId: string | null;
+  defaultDisplayName: string;
 }
 
-export function SetupForm({ userId }: SetupFormProps) {
+export function SetupForm({ athleteId, defaultDisplayName }: SetupFormProps) {
   const router = useRouter();
-  const [displayName, setDisplayName] = useState("");
+  const [displayName, setDisplayName] = useState(defaultDisplayName);
+  const [weight, setWeight] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -27,19 +29,44 @@ export function SetupForm({ userId }: SetupFormProps) {
       return;
     }
 
+    const parsedWeight = weight ? parseFloat(weight) : null;
+    if (!parsedWeight || parsedWeight < 50 || parsedWeight > 400) {
+      setError("Please enter a valid weight between 50 and 400 lbs");
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
     const supabase = createClient();
-    const { error: insertError } = await supabase.from("athletes").insert({
-      auth_user_id: userId,
-      display_name: trimmed,
-    });
 
-    if (insertError) {
-      setError(insertError.message);
-      setLoading(false);
-      return;
+    if (athleteId) {
+      // Update existing athlete record (auto-created by backend)
+      const { error: updateError } = await supabase
+        .from("athletes")
+        .update({
+          display_name: trimmed,
+          current_weight: parsedWeight,
+        })
+        .eq("id", athleteId);
+
+      if (updateError) {
+        setError(updateError.message);
+        setLoading(false);
+        return;
+      }
+    } else {
+      // Fallback: insert if no athlete record exists yet
+      const { error: insertError } = await supabase.from("athletes").insert({
+        display_name: trimmed,
+        current_weight: parsedWeight,
+      });
+
+      if (insertError) {
+        setError(insertError.message);
+        setLoading(false);
+        return;
+      }
     }
 
     router.push("/");
@@ -65,12 +92,32 @@ export function SetupForm({ userId }: SetupFormProps) {
             </p>
           </div>
 
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="weight">Weight (lbs)</Label>
+            <Input
+              id="weight"
+              type="number"
+              placeholder="e.g. 155"
+              value={weight}
+              onChange={(e) => setWeight(e.target.value)}
+              min={50}
+              max={400}
+              step={0.1}
+            />
+            <p className="text-xs text-muted-foreground">
+              Used for weight class matching.
+            </p>
+          </div>
+
           {error && (
             <p className="text-sm text-destructive">{error}</p>
           )}
 
-          <Button type="submit" disabled={loading || !displayName.trim()}>
-            {loading ? "Creating profile..." : "Create Profile"}
+          <Button
+            type="submit"
+            disabled={loading || !displayName.trim() || !weight}
+          >
+            {loading ? "Saving..." : "Get Started"}
           </Button>
         </form>
       </CardContent>

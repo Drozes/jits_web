@@ -16,14 +16,15 @@ async function SetupContent() {
   const user = await requireAuth();
   const supabase = await createClient();
 
-  // If athlete already exists, redirect to home
-  const { data: existing } = await supabase
+  // Fetch existing athlete (auto-created by backend on signup)
+  const { data: athlete } = await supabase
     .from("athletes")
-    .select("id")
+    .select("id, display_name, current_weight")
     .eq("auth_user_id", user.id)
     .single();
 
-  if (existing) {
+  // If athlete has completed setup (has weight), redirect to home
+  if (athlete?.current_weight != null) {
     redirect("/");
   }
 
@@ -38,7 +39,10 @@ async function SetupContent() {
             Set up your athlete profile to get started
           </p>
         </div>
-        <SetupForm userId={user.id} />
+        <SetupForm
+          athleteId={athlete?.id ?? null}
+          defaultDisplayName={athlete?.display_name ?? ""}
+        />
       </div>
     </div>
   );
