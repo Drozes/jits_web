@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { ShareProfileSheet } from "@/components/domain/share-profile-sheet";
 import { computeStats } from "@/lib/utils";
+import { ThemeSwitcher } from "@/components/theme-switcher";
 import {
   Trophy,
   Target,
@@ -15,6 +16,7 @@ import {
   Award,
   Settings,
   Share2,
+  Palette,
 } from "lucide-react";
 
 export async function ProfileContent() {
@@ -115,6 +117,13 @@ export async function ProfileContent() {
           <CardContent className="p-4">
             <h4 className="font-semibold mb-3">Account</h4>
             <div className="flex flex-col gap-1">
+              <div className="flex items-center justify-between px-3 py-2">
+                <div className="flex items-center gap-3">
+                  <Palette className="h-4 w-4" />
+                  <span className="text-sm font-medium">Theme</span>
+                </div>
+                <ThemeSwitcher />
+              </div>
               <Button variant="ghost" className="w-full justify-start">
                 <Settings className="mr-3 h-4 w-4" />
                 Settings & Privacy

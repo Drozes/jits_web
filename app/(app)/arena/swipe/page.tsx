@@ -20,7 +20,7 @@ async function SwipeData() {
   const { data: athletes } = await supabase
     .from("athletes")
     .select(
-      "id, display_name, current_elo, current_weight, primary_gym_id, gyms!athletes_primary_gym_id_fkey(name)",
+      "id, display_name, current_elo, current_weight, primary_gym_id, gyms!fk_athletes_primary_gym(name)",
     )
     .eq("status", "active")
     .neq("id", currentAthlete.id)

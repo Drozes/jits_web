@@ -247,7 +247,7 @@ View another athlete's public profile with stats, match history, and compare mod
 
 ### Data
 
-- Fetch competitor by `id`, join gym via `gyms!athletes_primary_gym_id_fkey(name)`
+- Fetch competitor by `id`, join gym via `gyms!fk_athletes_primary_gym(name)`
 - Match history via `match_participants` for both athletes sharing the same `match_id`
 - W/L stats from `match_participants.outcome`
 

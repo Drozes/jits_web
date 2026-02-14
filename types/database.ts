@@ -23,6 +23,7 @@ export type Database = {
           display_name: string
           highest_elo: number
           id: string
+          looking_for_match: boolean
           primary_gym_id: string | null
           status: string
         }
@@ -34,6 +35,7 @@ export type Database = {
           display_name: string
           highest_elo?: number
           id?: string
+          looking_for_match?: boolean
           primary_gym_id?: string | null
           status?: string
         }
@@ -45,6 +47,7 @@ export type Database = {
           display_name?: string
           highest_elo?: number
           id?: string
+          looking_for_match?: boolean
           primary_gym_id?: string | null
           status?: string
         }

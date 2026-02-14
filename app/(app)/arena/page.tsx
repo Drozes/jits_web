@@ -16,22 +16,38 @@ async function ArenaData() {
   const { athlete: currentAthlete } = await requireAthlete();
   const supabase = await createClient();
 
-  // Fetch other athletes ordered by ELO proximity to current user
-  const { data: athletes } = await supabase
+  const athleteSelect = "id, display_name, current_elo, looking_for_match, primary_gym_id, gyms!fk_athletes_primary_gym(name)";
+
+  // Fetch athletes looking for a match
+  const { data: lookingAthletes } = await supabase
     .from("athletes")
-    .select("id, display_name, current_elo, primary_gym_id, gyms!athletes_primary_gym_id_fkey(name)")
+    .select(athleteSelect)
     .eq("status", "active")
+    .eq("looking_for_match", true)
+    .neq("id", currentAthlete.id)
+    .order("current_elo", { ascending: false });
+
+  // Fetch other active athletes (not looking)
+  const { data: otherAthletes } = await supabase
+    .from("athletes")
+    .select(athleteSelect)
+    .eq("status", "active")
+    .eq("looking_for_match", false)
     .neq("id", currentAthlete.id)
     .order("current_elo", { ascending: false })
     .limit(20);
 
-  const competitors = (athletes ?? []).map((a) => ({
+  const toCompetitor = (a: (typeof lookingAthletes extends (infer T)[] | null ? T : never)) => ({
     id: a.id,
     displayName: a.display_name,
     currentElo: a.current_elo,
     gymName: extractGymName(a.gyms as { name: string }[] | null) ?? undefined,
     eloDiff: a.current_elo - currentAthlete.current_elo,
-  }));
+    lookingForMatch: a.looking_for_match ?? false,
+  });
+
+  const lookingCompetitors = (lookingAthletes ?? []).map(toCompetitor);
+  const otherCompetitors = (otherAthletes ?? []).map(toCompetitor);
 
   // Fetch recent completed matches for activity feed
   const { data: recentMatchParticipants } = await supabase
@@ -80,8 +96,11 @@ async function ArenaData() {
 
   return (
     <ArenaContent
-      competitors={competitors}
+      lookingCompetitors={lookingCompetitors}
+      otherCompetitors={otherCompetitors}
       activityItems={activityItems}
+      currentAthleteId={currentAthlete.id}
+      currentAthleteLooking={currentAthlete.looking_for_match ?? false}
     />
   );
 }

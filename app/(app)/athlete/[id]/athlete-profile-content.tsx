@@ -109,6 +109,7 @@ export async function AthleteProfileContent({
           <ProfileHeader
             athlete={competitor}
             gymName={competitorGymName}
+            lookingForMatch={competitor.looking_for_match}
             stats={compStats}
           />
 
