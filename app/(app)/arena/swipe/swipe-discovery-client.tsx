@@ -16,6 +16,7 @@ interface Competitor {
   displayName: string;
   currentElo: number;
   gymName: string | null;
+  weight: number | null;
   wins: number;
   losses: number;
 }
@@ -253,6 +254,11 @@ function SwipeCard({
       {competitor.gymName && (
         <p className="text-sm text-muted-foreground mt-0.5">
           {competitor.gymName}
+        </p>
+      )}
+      {competitor.weight != null && (
+        <p className="text-sm text-muted-foreground mt-0.5">
+          {competitor.weight} lbs
         </p>
       )}
 

@@ -19,6 +19,7 @@ interface ShareProfileSheetProps {
   elo: number;
   wins: number;
   losses: number;
+  weight: number | null;
   gymName?: string | null;
   children: React.ReactNode;
 }
@@ -29,6 +30,7 @@ export function ShareProfileSheet({
   elo,
   wins,
   losses,
+  weight,
   gymName,
   children,
 }: ShareProfileSheetProps) {
@@ -73,6 +75,7 @@ export function ShareProfileSheet({
               </div>
               <p className="text-sm text-muted-foreground mt-1">
                 {wins}W - {losses}L
+                {weight != null && ` · ${weight} lbs`}
               </p>
               {gymName && (
                 <p className="text-xs text-muted-foreground mt-0.5">

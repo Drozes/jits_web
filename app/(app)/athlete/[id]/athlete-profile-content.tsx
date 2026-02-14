@@ -130,6 +130,7 @@ export async function AthleteProfileContent({
               wins: myWins,
               losses: myLosses,
               winRate: myWinRate,
+              weight: currentAthlete.current_weight,
             }}
             competitor={{
               displayName: competitor.display_name,
@@ -137,6 +138,7 @@ export async function AthleteProfileContent({
               wins: compWins,
               losses: compLosses,
               winRate: compWinRate,
+              weight: competitor.current_weight,
             }}
           />
 

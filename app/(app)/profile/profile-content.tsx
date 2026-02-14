@@ -77,6 +77,7 @@ export async function ProfileContent() {
           elo={athlete.current_elo}
           wins={wins}
           losses={losses}
+          weight={athlete.current_weight}
           gymName={gymName}
         >
           <Button variant="outline" size="icon">

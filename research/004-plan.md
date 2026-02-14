@@ -19,6 +19,8 @@
 | 2026-02-13 | Step 7: Pending Challenges | **Done** | match/pending page with Received/Sent tabs, challenge cards linking to athlete profiles, empty states with Arena CTA, info card |
 | 2026-02-13 | Step 8: Share Profile | **Done** | share-profile-sheet (sheet), profile preview card, copy link + native share, privacy notice, Share button on profile page |
 | 2026-02-13 | Step 9: Swipe Discovery | **Done** | arena/swipe page with draggable card stack, pointer-based swipe gestures, PASS/LIKE indicators, action buttons, end state with session summary |
+| 2026-02-13 | Setup Refactor | **Done** | Backend auto-creates athletes on signup; setup form now UPDATEs instead of INSERTing; `current_weight == null` = needs onboarding |
+| 2026-02-13 | Weight Display | **Done** | Added `current_weight` to profile-header, compare-stats-modal, swipe-card, share-profile-sheet; weight required during setup |
 
 ## Learnings
 

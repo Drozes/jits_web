@@ -52,6 +52,11 @@ export function ProfileHeader({ athlete, gymName, stats }: ProfileHeaderProps) {
                 {gymName}
               </p>
             )}
+            {athlete.current_weight && (
+              <p className="text-sm text-muted-foreground mt-0.5">
+                {athlete.current_weight} lbs
+              </p>
+            )}
           </div>
         </div>
 

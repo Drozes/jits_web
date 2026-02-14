@@ -11,6 +11,7 @@ interface AthleteStats {
   wins: number;
   losses: number;
   winRate: number;
+  weight: number | null;
 }
 
 interface AthleteProfileActionsProps {
