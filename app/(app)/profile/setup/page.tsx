@@ -6,9 +6,27 @@ import { SetupForm } from "./setup-form";
 
 export default function ProfileSetupPage() {
   return (
-    <Suspense>
+    <Suspense fallback={<SetupSkeleton />}>
       <SetupContent />
     </Suspense>
+  );
+}
+
+function SetupSkeleton() {
+  return (
+    <div className="flex min-h-[80vh] items-center justify-center px-4">
+      <div className="w-full max-w-sm animate-pulse">
+        <div className="text-center mb-8">
+          <div className="mx-auto h-8 w-48 rounded bg-muted" />
+          <div className="mx-auto mt-2 h-4 w-64 rounded bg-muted" />
+        </div>
+        <div className="flex flex-col gap-4">
+          <div className="h-10 rounded-lg bg-muted" />
+          <div className="h-10 rounded-lg bg-muted" />
+          <div className="h-10 rounded-lg bg-muted" />
+        </div>
+      </div>
+    </div>
   );
 }
 

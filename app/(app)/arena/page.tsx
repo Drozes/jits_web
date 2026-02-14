@@ -6,9 +6,32 @@ import { extractGymName } from "@/lib/utils";
 
 export default function ArenaPage() {
   return (
-    <Suspense>
+    <Suspense fallback={<ArenaSkeleton />}>
       <ArenaData />
     </Suspense>
+  );
+}
+
+function ArenaSkeleton() {
+  return (
+    <div className="flex flex-col gap-6 animate-pulse">
+      <div className="h-12 rounded-lg bg-muted" />
+      <div className="flex flex-col gap-3">
+        <div className="h-6 w-44 rounded bg-muted" />
+        <div className="h-20 rounded-lg bg-muted" />
+        <div className="h-20 rounded-lg bg-muted" />
+      </div>
+      <div className="flex flex-col gap-3">
+        <div className="h-6 w-32 rounded bg-muted" />
+        <div className="h-20 rounded-lg bg-muted" />
+        <div className="h-20 rounded-lg bg-muted" />
+        <div className="h-20 rounded-lg bg-muted" />
+      </div>
+      <div className="flex flex-col gap-3">
+        <div className="h-6 w-36 rounded bg-muted" />
+        <div className="h-24 rounded-lg bg-muted" />
+      </div>
+    </div>
   );
 }
 
