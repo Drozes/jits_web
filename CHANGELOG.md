@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### Phase 1 — Safety Net (2026-02-14)
+
+**Added**
+- Error boundaries at root (`app/error.tsx`), app (`app/(app)/error.tsx`), and athlete profile (`app/(app)/athlete/error.tsx`) — graceful error UI instead of raw Next.js error page
+- Custom 404 pages at root and app levels (`not-found.tsx`)
+- Suspense fallback skeletons for Dashboard, Arena, and Leaderboard pages — loading placeholders instead of blank screens
+- Pre-alpha codebase audit (`research/006-pre-alpha-codebase-audit.md`)
+
+**Fixed**
+- Removed unused `opacity` variable in swipe-discovery-client
+- Removed unused `Badge` import in challenge-sheet
+- Removed unused `gyms` query in leaderboard page (gym stats already computed from athlete FK joins)
+- Excluded `outside_assets/` from ESLint to eliminate 30+ irrelevant warnings
+
 ### Step 1: Layout Shell + Layout Migration (004-plan)
 
 **Added**
