@@ -16,6 +16,7 @@
 | 2026-02-13 | Step 4: Profile Screen Rebuild | **Done** | profile-header, elo-badge (CVA), profile page rebuild with achievements + account section, stats sub-page with tabs, LogoutButton fix |
 | 2026-02-13 | Step 5: Leaderboard + Arena | **Done** | athlete-card, leaderboard (podium + Fighters/Gyms toggle), arena (looking-for-match toggle + competitors + activity feed), deleted challenges/ and gyms/ stubs, installed switch + select |
 | 2026-02-13 | Step 6: Competitor Profile | **Done** | compare-stats-modal (dialog), athlete/[id] page with profile-header reuse, head-to-head history, action buttons, wrapped BottomNavBar in Suspense for dynamic routes |
+| 2026-02-13 | Step 7: Pending Challenges | **Done** | match/pending page with Received/Sent tabs, challenge cards linking to athlete profiles, empty states with Arena CTA, info card |
 
 ## Learnings
 
