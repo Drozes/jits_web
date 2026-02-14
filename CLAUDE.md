@@ -153,16 +153,16 @@ Shell components that define the app's structure:
 ## Known Tech Debt (Priority Order)
 
 **High — functional issues:**
-- [ ] `proxy.ts` exists but no `middleware.ts` wires it — session refresh may not work
-- [ ] `update-password-form.tsx` has a stale redirect to `/protected`
+- [x] `proxy.ts` — already correctly named for Next.js 16 (`proxy` convention, not `middleware`)
+- [x] `update-password-form.tsx` redirect fixed to `/`
 
-**Medium — duplication to clean up when touching these files:**
-- [ ] `getInitials()` duplicated in 5 files — extract to `lib/utils.ts`
-- [ ] Win/loss stats computation duplicated in 6 files — extract to `lib/utils.ts`
-- [ ] Gym name fetching duplicated in 3 files — extract to a shared helper
+**Medium — duplication cleaned up:**
+- [x] `getInitials()` extracted to `lib/utils.ts`
+- [x] `computeStats()` and `computeWinStreak()` extracted to `lib/utils.ts`
+- [x] `extractGymName()` extracted to `lib/utils.ts`
 
 **Low — code style improvements:**
-- [ ] `share-profile-sheet.tsx` uses 8 granular props instead of an object
+- [x] `share-profile-sheet.tsx` refactored to use `athlete` object prop
 - [ ] Auth form components (`login-form`, `sign-up-form`, `forgot-password-form`) share ~70% identical code
 
 ## Key FK Join Names

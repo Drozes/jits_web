@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { requireAthlete } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
 import { ArenaContent } from "./arena-content";
+import { extractGymName } from "@/lib/utils";
 
 export default function ArenaPage() {
   return (
@@ -24,16 +25,13 @@ async function ArenaData() {
     .order("current_elo", { ascending: false })
     .limit(20);
 
-  const competitors = (athletes ?? []).map((a) => {
-    const gymsArr = a.gyms as { name: string }[] | null;
-    return {
-      id: a.id,
-      displayName: a.display_name,
-      currentElo: a.current_elo,
-      gymName: gymsArr?.[0]?.name,
-      eloDiff: a.current_elo - currentAthlete.current_elo,
-    };
-  });
+  const competitors = (athletes ?? []).map((a) => ({
+    id: a.id,
+    displayName: a.display_name,
+    currentElo: a.current_elo,
+    gymName: extractGymName(a.gyms as { name: string }[] | null) ?? undefined,
+    eloDiff: a.current_elo - currentAthlete.current_elo,
+  }));
 
   // Fetch recent completed matches for activity feed
   const { data: recentMatchParticipants } = await supabase

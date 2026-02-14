@@ -1,6 +1,7 @@
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { EloBadge } from "@/components/domain/elo-badge";
+import { getInitials } from "@/lib/utils";
 import type { Athlete } from "@/types/athlete";
 
 interface ProfileHeaderProps {
@@ -11,15 +12,6 @@ interface ProfileHeaderProps {
     losses: number;
     winRate: number;
   };
-}
-
-function getInitials(name: string): string {
-  return name
-    .split(" ")
-    .map((w) => w[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
 }
 
 export function ProfileHeader({ athlete, gymName, stats }: ProfileHeaderProps) {

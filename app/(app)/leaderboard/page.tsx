@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { requireAthlete } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
 import { LeaderboardContent } from "./leaderboard-content";
+import { extractGymName } from "@/lib/utils";
 
 export default function LeaderboardPage() {
   return (
@@ -41,14 +42,13 @@ async function LeaderboardData() {
   }
 
   const rankedAthletes = (athletes ?? []).map((a, i) => {
-    const gymsArr = a.gyms as { name: string }[] | null;
     const stats = statsMap.get(a.id) ?? { wins: 0, losses: 0 };
     return {
       id: a.id,
       rank: i + 1,
       displayName: a.display_name,
       currentElo: a.current_elo,
-      gymName: gymsArr?.[0]?.name,
+      gymName: extractGymName(a.gyms as { name: string }[] | null) ?? undefined,
       wins: stats.wins,
       losses: stats.losses,
       isCurrentUser: a.id === currentAthlete.id,
@@ -65,8 +65,7 @@ async function LeaderboardData() {
   const gymStatsMap = new Map<string, { name: string; totalElo: number; memberCount: number }>();
   for (const a of athletes ?? []) {
     if (!a.primary_gym_id) continue;
-    const gymsArr = a.gyms as { name: string }[] | null;
-    const gymName = gymsArr?.[0]?.name ?? "Unknown";
+    const gymName = extractGymName(a.gyms as { name: string }[] | null) ?? "Unknown";
     const entry = gymStatsMap.get(a.primary_gym_id) ?? { name: gymName, totalElo: 0, memberCount: 0 };
     entry.totalElo += a.current_elo;
     entry.memberCount++;

@@ -14,31 +14,27 @@ import { EloBadge } from "@/components/domain/elo-badge";
 import { Share2, Copy, Check, Info } from "lucide-react";
 
 interface ShareProfileSheetProps {
-  athleteId: string;
-  displayName: string;
-  elo: number;
-  wins: number;
-  losses: number;
-  weight: number | null;
-  gymName?: string | null;
+  athlete: {
+    id: string;
+    displayName: string;
+    elo: number;
+    wins: number;
+    losses: number;
+    weight: number | null;
+    gymName?: string | null;
+  };
   children: React.ReactNode;
 }
 
 export function ShareProfileSheet({
-  athleteId,
-  displayName,
-  elo,
-  wins,
-  losses,
-  weight,
-  gymName,
+  athlete,
   children,
 }: ShareProfileSheetProps) {
   const [copied, setCopied] = useState(false);
   const profileUrl =
     typeof window !== "undefined"
-      ? `${window.location.origin}/athlete/${athleteId}`
-      : `/athlete/${athleteId}`;
+      ? `${window.location.origin}/athlete/${athlete.id}`
+      : `/athlete/${athlete.id}`;
 
   async function handleCopy() {
     await navigator.clipboard.writeText(profileUrl);
@@ -49,8 +45,8 @@ export function ShareProfileSheet({
   async function handleNativeShare() {
     if (navigator.share) {
       await navigator.share({
-        title: `${displayName} on Jits`,
-        text: `Check out ${displayName}'s profile on Jits`,
+        title: `${athlete.displayName} on Jits`,
+        text: `Check out ${athlete.displayName}'s profile on Jits`,
         url: profileUrl,
       });
     }
@@ -68,18 +64,18 @@ export function ShareProfileSheet({
           {/* Profile preview card */}
           <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
             <CardContent className="p-4 text-center">
-              <h3 className="text-lg font-bold">{displayName}</h3>
+              <h3 className="text-lg font-bold">{athlete.displayName}</h3>
               <div className="flex items-center justify-center gap-2 mt-1">
                 <span className="text-sm text-muted-foreground">ELO</span>
-                <EloBadge elo={elo} variant="compact" />
+                <EloBadge elo={athlete.elo} variant="compact" />
               </div>
               <p className="text-sm text-muted-foreground mt-1">
-                {wins}W - {losses}L
-                {weight != null && ` · ${weight} lbs`}
+                {athlete.wins}W - {athlete.losses}L
+                {athlete.weight != null && ` · ${athlete.weight} lbs`}
               </p>
-              {gymName && (
+              {athlete.gymName && (
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  {gymName}
+                  {athlete.gymName}
                 </p>
               )}
             </CardContent>

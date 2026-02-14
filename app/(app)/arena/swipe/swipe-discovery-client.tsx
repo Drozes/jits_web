@@ -8,7 +8,7 @@ import { EloBadge } from "@/components/domain/elo-badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
+import { cn, getInitials } from "@/lib/utils";
 import { X, Eye, Heart, Trophy, RotateCcw } from "lucide-react";
 
 interface Competitor {
@@ -23,15 +23,6 @@ interface Competitor {
 
 interface SwipeDiscoveryClientProps {
   competitors: Competitor[];
-}
-
-function getInitials(name: string): string {
-  return name
-    .split(" ")
-    .map((w) => w[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
 }
 
 export function SwipeDiscoveryClient({

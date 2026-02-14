@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { AthleteCard } from "@/components/domain/athlete-card";
 import { Crown, Medal, Award, Trophy, Users } from "lucide-react";
+import { getInitials } from "@/lib/utils";
 
 interface RankedAthlete {
   id: string;
@@ -25,15 +26,6 @@ interface RankedGym {
   totalElo: number;
   averageElo: number;
   memberCount: number;
-}
-
-function getInitials(name: string) {
-  return name
-    .split(" ")
-    .map((w) => w[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
 }
 
 function getRankIcon(rank: number) {

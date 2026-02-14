@@ -7,6 +7,7 @@ import { AppHeader } from "@/components/layout/app-header";
 import { PageContainer } from "@/components/layout/page-container";
 import { Swords } from "lucide-react";
 import { AthleteProfileActions } from "./athlete-profile-actions";
+import { computeStats } from "@/lib/utils";
 
 export async function AthleteProfileContent({
   paramsPromise,
@@ -44,13 +45,7 @@ export async function AthleteProfileContent({
     .eq("athlete_id", competitor.id)
     .not("outcome", "is", null);
 
-  const compWins =
-    competitorOutcomes?.filter((o) => o.outcome === "win").length ?? 0;
-  const compLosses =
-    competitorOutcomes?.filter((o) => o.outcome === "loss").length ?? 0;
-  const compTotal = compWins + compLosses;
-  const compWinRate =
-    compTotal > 0 ? Math.round((compWins / compTotal) * 100) : 0;
+  const compStats = computeStats(competitorOutcomes ?? []);
 
   // Compute current athlete stats (for compare modal)
   const { data: currentOutcomes } = await supabase
@@ -59,12 +54,7 @@ export async function AthleteProfileContent({
     .eq("athlete_id", currentAthlete.id)
     .not("outcome", "is", null);
 
-  const myWins =
-    currentOutcomes?.filter((o) => o.outcome === "win").length ?? 0;
-  const myLosses =
-    currentOutcomes?.filter((o) => o.outcome === "loss").length ?? 0;
-  const myTotal = myWins + myLosses;
-  const myWinRate = myTotal > 0 ? Math.round((myWins / myTotal) * 100) : 0;
+  const myStats = computeStats(currentOutcomes ?? []);
 
   // Head-to-head matches: find matches where both athletes participated
   const { data: competitorMatches } = await supabase
@@ -119,7 +109,7 @@ export async function AthleteProfileContent({
           <ProfileHeader
             athlete={competitor}
             gymName={competitorGymName}
-            stats={{ wins: compWins, losses: compLosses, winRate: compWinRate }}
+            stats={compStats}
           />
 
           <AthleteProfileActions
@@ -127,17 +117,13 @@ export async function AthleteProfileContent({
             currentAthlete={{
               displayName: currentAthlete.display_name,
               elo: currentAthlete.current_elo,
-              wins: myWins,
-              losses: myLosses,
-              winRate: myWinRate,
+              ...myStats,
               weight: currentAthlete.current_weight,
             }}
             competitor={{
               displayName: competitor.display_name,
               elo: competitor.current_elo,
-              wins: compWins,
-              losses: compLosses,
-              winRate: compWinRate,
+              ...compStats,
               weight: competitor.current_weight,
             }}
           />
