@@ -22,6 +22,8 @@
 | 2026-02-13 | Setup Refactor | **Done** | Backend auto-creates athletes on signup; setup form now UPDATEs instead of INSERTing; `current_weight == null` = needs onboarding |
 | 2026-02-13 | Weight Display | **Done** | Added `current_weight` to profile-header, compare-stats-modal, swipe-card, share-profile-sheet; weight required during setup |
 | 2026-02-13 | Code Review | **Done** | Full codebase review; created CLAUDE.md with principles, code quality guidelines, UI kit rules, and tech debt tracker |
+| 2026-02-14 | Arena FK Fix | **Done** | FK constraint is `fk_athletes_primary_gym`, not `athletes_primary_gym_id_fkey`. Fixed across all queries. Split arena into two targeted queries (looking vs. not-looking). |
+| 2026-02-14 | RPC Contracts | **Done** | Integrated BE `docs/rpc-contracts.md` into `research/005-backend-reference.md`. All 7 RPCs documented with params, responses, and error hints. |
 
 ## Learnings
 
@@ -31,6 +33,8 @@
 4. **`belt-badge` is premature** — No `belt_rank` column exists in the database. Skip until the backend adds it.
 5. **Client hooks in layout need Suspense for dynamic routes** — `usePathname()` in `BottomNavBar` causes prerender failures on `[id]` routes. Wrapping in `<Suspense>` fixes it.
 6. **`cacheComponents` disables route segment config** — `export const dynamic = "force-dynamic"` is not compatible with Next.js 16 `cacheComponents`. Use Suspense boundaries instead.
+7. **FK constraint names don't match Supabase auto-naming** — The `athletes → gyms` FK is `fk_athletes_primary_gym`, not the auto-generated `athletes_primary_gym_id_fkey`. Always verify FK names against migrations.
+8. **Gym is required for activation, not weight** — Backend trigger `handle_athlete_activation()` activates athletes when `primary_gym_id IS NOT NULL`, not when `current_weight` is set. Setup flow must require gym selection.
 
 ---
 
@@ -340,11 +344,167 @@ Step 8 (Share Profile) — independent, builds on profile page
 
 ---
 
-## Beyond Step 9 (speckit — match flow)
+## Step 10: Setup Fix — Require Gym for Activation
 
-These screens require real-time state, timers, and multi-user coordination. Use speckit to spec:
+The setup flow currently treats gym as optional, but the backend activation trigger requires `primary_gym_id IS NOT NULL` to move athletes from `pending` → `active`. Without activation, athletes are invisible to other users via RLS.
 
-- `match/[id]/accept/` — accept challenge
-- `match/[id]/lobby/` — pre-match VS screen
-- `match/[id]/live/` — active match timer
-- `match/[id]/results/` — post-match results
+### Changes
+
+| File | Change |
+|------|--------|
+| `setup-form.tsx` | Make gym picker **required** (not optional). Disable submit until gym selected. |
+| `setup/page.tsx` | Check `primary_gym_id IS NULL` instead of `current_weight == null` for "needs setup" |
+| `lib/guards.ts` | Update `requireAthlete()` to redirect to setup if `status = 'pending'` |
+
+### Current state
+
+- Setup form has gym picker but labeled "optional" with hint "You can set or change this later"
+- Backend: `handle_athlete_activation()` fires on UPDATE — if `status = 'pending'` AND `primary_gym_id IS NOT NULL` AND `display_name IS NOT NULL`, sets `status = 'active'`
+- RLS `athletes_select_public` only shows `active`/`inactive` athletes to others
+
+---
+
+## Step 11: Challenge Response Flow
+
+The pending challenges page (Step 7) shows received/sent challenges but has no accept/decline buttons. The challenge-sheet (Step 6) already handles **creating** challenges. This step adds **responding** to them.
+
+### What exists
+
+- `match/pending/page.tsx` — lists challenges in Received/Sent tabs
+- `challenge-sheet.tsx` — creates challenges with match type, weight, ELO stakes preview
+- Backend: `challenges` table supports `pending → accepted → started` and `pending → declined` transitions
+- RLS: only opponent can accept/decline, only pending challenges can be updated
+
+### What to build
+
+| Component | Notes |
+|-----------|-------|
+| Accept/Decline buttons on received challenge cards | Update `status` to `accepted`/`declined` via Supabase |
+| Cancel button on sent challenges | Update `status` to `cancelled` (only for pending) |
+| Expiry display | Show `expires_at` countdown, disable actions if expired |
+| Weight confirmation on accept | Opponent enters their weight when accepting |
+
+### Data patterns (from RPC contracts)
+
+```ts
+// Accept
+.from('challenges').update({ status: 'accepted', opponent_weight: 160, updated_at: new Date().toISOString() }).eq('id', challengeId).eq('status', 'pending')
+
+// Decline
+.from('challenges').update({ status: 'declined', updated_at: new Date().toISOString() }).eq('id', challengeId).eq('status', 'pending')
+
+// Cancel (either party, accepted challenges only)
+.from('challenges').update({ status: 'cancelled', updated_at: new Date().toISOString() }).eq('id', challengeId).eq('status', 'accepted')
+```
+
+---
+
+## Step 12: Match Flow — Lobby → Live → Results
+
+This is the core gameplay loop. Uses RPCs for all state transitions.
+
+### Routes
+
+| Route | Screen | RPC |
+|-------|--------|-----|
+| `match/[id]/page.tsx` | Match lobby / VS screen | `start_match_from_challenge(p_challenge_id)` |
+| `match/[id]/live/page.tsx` | Active match timer | `start_match(p_match_id)` |
+| `match/[id]/results/page.tsx` | Post-match results + ELO changes | `record_match_result(...)` |
+
+### Match Lobby (`match/[id]/page.tsx`)
+
+Entry point after challenge is accepted. Shows VS screen with both athletes.
+
+1. **VS header** — Both athletes' avatars, names, ELO, weight
+2. **ELO stakes** — `calculate_elo_stakes()` RPC for ranked matches
+3. **Start Match button** — calls `start_match_from_challenge(p_challenge_id)`
+4. **Cancel button** — updates challenge status to `cancelled`
+5. **Status**: match transitions `pending` after RPC call
+
+### Live Match (`match/[id]/live/page.tsx`)
+
+Countdown timer + match controls.
+
+1. **Timer** — 10:00 countdown (uses `duration_seconds` from match, default 600)
+2. **Start button** — calls `start_match(p_match_id)` to transition `pending → in_progress`
+3. **End Match button** — navigates to results when timer hits 0 or manual end
+4. **Match info** — match type badge (ranked/casual), opponent name
+
+### Results Recording (`match/[id]/results/page.tsx`)
+
+Record the outcome using `record_match_result()` RPC.
+
+1. **Outcome selection** — Submission or Draw
+2. **If submission**: select winner, pick submission type (from `submission_types` table), enter finish time
+3. **Submit** — calls `record_match_result()` RPC
+4. **Results display** — show outcome, ELO changes (for ranked), submission details
+5. **Navigation** — "Back to Arena" / "View Match History"
+
+### RPC contracts (see 005-backend-reference.md for full details)
+
+```ts
+// 1. Create match from accepted challenge
+await supabase.rpc('start_match_from_challenge', { p_challenge_id })
+// → { match_id, status: 'pending', already_exists }
+
+// 2. Start the match (pending → in_progress)
+await supabase.rpc('start_match', { p_match_id })
+// → { success: true, match_id }
+
+// 3. Record result
+await supabase.rpc('record_match_result', {
+  p_match_id, p_result: 'submission',
+  p_winner_id, p_submission_type_code: 'rear_naked_choke',
+  p_finish_time_seconds: 245
+})
+// → { success, match_id, result, elo_changes }
+
+// 4. Get submission types for picker
+await supabase.from('submission_types').select('code, display_name, category')
+  .eq('status', 'active').order('sort_order')
+```
+
+### Error handling
+
+All RPCs return structured errors with `hint` codes for programmatic handling:
+- `not_participant` — user isn't in this match
+- `invalid_status` — match isn't in expected state
+- `missing_fields` — submission result missing required fields
+
+---
+
+## Step 13: Match History (Profile Enhancement)
+
+Add match history to the profile using the `get_match_history()` RPC.
+
+### Changes
+
+| File | Change |
+|------|--------|
+| `profile/stats/page.tsx` | Add "Match History" tab using `get_match_history(p_athlete_id)` RPC |
+| `match-card.tsx` | Extend to show submission type, finish time, opponent ELO at time |
+
+### RPC response columns
+
+`match_id`, `match_type`, `result`, `completed_at`, `opponent_id`, `opponent_display_name`, `athlete_outcome`, `submission_type_code`, `submission_type_display_name`, `finish_time_seconds`, `elo_before`, `elo_after`, `elo_delta`, `opponent_elo_at_time`
+
+---
+
+## Updated Dependency Graph (Steps 10+)
+
+```
+Step 10 (Setup Fix) — independent, fixes activation blocker
+  └── All subsequent steps require athletes to be 'active'
+
+Step 11 (Challenge Response) — depends on Step 7 (Pending Challenges)
+  └── Step 12 (Match Flow) — depends on accepted challenges
+
+Step 12 (Match Flow) — core gameplay
+  └── Step 13 (Match History) — depends on completed matches existing
+
+Step 13 (Match History) — profile enhancement
+```
+
+**Execution order:** 10 → 11 → 12 → 13
+
+**Priority rationale:** Step 10 is the activation blocker — without it, new users can never become visible to others. Step 11 enables the challenge handshake. Step 12 is the main gameplay. Step 13 surfaces the data generated by matches.
