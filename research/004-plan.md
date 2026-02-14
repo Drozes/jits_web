@@ -14,6 +14,7 @@
 | 2026-02-13 | Step 2: Types & Data Fetching | **Done** | Already existed — database.ts generated, domain type aliases, guards in place |
 | 2026-02-13 | Step 3: Dashboard Screen | **Done** | stat-overview, match-card, interactive card CVA variant, full page rebuild with Suspense |
 | 2026-02-13 | Step 4: Profile Screen Rebuild | **Done** | profile-header, elo-badge (CVA), profile page rebuild with achievements + account section, stats sub-page with tabs, LogoutButton fix |
+| 2026-02-13 | Step 5: Leaderboard + Arena | **Done** | athlete-card, leaderboard (podium + Fighters/Gyms toggle), arena (looking-for-match toggle + competitors + activity feed), deleted challenges/ and gyms/ stubs, installed switch + select |
 
 ## Learnings
 
