@@ -71,18 +71,18 @@ function CompetitorCard({ competitor }: { competitor: Competitor }) {
 }
 
 export function ArenaContent({
-  competitors,
+  lookingCompetitors,
+  otherCompetitors,
   activityItems,
   currentAthleteId,
   currentAthleteLooking,
 }: {
-  competitors: Competitor[];
+  lookingCompetitors: Competitor[];
+  otherCompetitors: Competitor[];
   activityItems: ActivityItem[];
   currentAthleteId: string;
   currentAthleteLooking: boolean;
 }) {
-  const lookingCompetitors = competitors.filter((c) => c.lookingForMatch);
-  const otherCompetitors = competitors.filter((c) => !c.lookingForMatch);
 
   return (
     <div className="flex flex-col gap-6">

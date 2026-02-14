@@ -399,12 +399,110 @@ const { data } = await supabase.rpc('calculate_elo_stakes', {
 
 ---
 
+## RPC Contracts (Frontend Integration)
+
+All RPCs are called via `supabase.rpc('function_name', { params })`. Caller must be authenticated.
+
+### Match Lifecycle Flow
+
+```
+Challenge accepted → start_match_from_challenge(challenge_id) → match (pending)
+                   → start_match(match_id) → match (in_progress)
+                   → record_match_result(match_id, ...) → match (completed)
+```
+
+### `start_match_from_challenge(p_challenge_id)`
+
+Creates match from accepted challenge. Idempotent (returns existing match on retry with `already_exists: true`).
+
+```ts
+const { data, error } = await supabase.rpc('start_match_from_challenge', { p_challenge_id: 'uuid' })
+// Returns: { match_id, challenge_id, gym_id, match_type, duration_seconds, status, created_at, already_exists }
+// Errors: "Not authenticated", "Challenge not found, not accepted, or not authorized"
+```
+
+### `start_match(p_match_id)`
+
+Transitions match from `pending` to `in_progress`.
+
+```ts
+const { data, error } = await supabase.rpc('start_match', { p_match_id: 'uuid' })
+// Returns: { success: true, match_id }
+// Error hints: not_participant, not_found, invalid_status
+```
+
+### `record_match_result(p_match_id, p_result, p_winner_id?, p_submission_type_code?, p_finish_time_seconds?)`
+
+Records outcome. Handles ELO atomically for ranked matches.
+
+```ts
+// Submission
+const { data } = await supabase.rpc('record_match_result', {
+  p_match_id: 'uuid', p_result: 'submission', p_winner_id: 'uuid',
+  p_submission_type_code: 'rear_naked_choke', p_finish_time_seconds: 245
+})
+// Draw
+const { data } = await supabase.rpc('record_match_result', { p_match_id: 'uuid', p_result: 'draw' })
+// Returns: { success, match_id, result, elo_changes } — elo_changes is null for casual
+// Error hints: not_found, not_participant, invalid_status, invalid_result, missing_fields, invalid_winner, invalid_submission_type, invalid_finish_time
+```
+
+### `get_match_history(p_athlete_id)`
+
+Returns completed matches (own profile only). Columns: `match_id`, `match_type`, `result`, `completed_at`, `opponent_id`, `opponent_display_name`, `athlete_outcome`, `submission_type_code`, `submission_type_display_name`, `finish_time_seconds`, `elo_before`, `elo_after`, `elo_delta`, `opponent_elo_at_time`.
+
+### `get_elo_history(p_athlete_id)`
+
+Returns rating changes over time (own profile only). Columns: `match_id`, `rating_before`, `rating_after`, `delta`, `created_at`.
+
+### `calculate_elo_stakes(challenger_elo, opponent_elo, k_factor?)`
+
+Pure calculation, no auth required. Returns: `{ challenger_win, challenger_loss, opponent_win, opponent_loss, challenger_expected, opponent_expected }`.
+
+### `can_create_challenge()`
+
+Returns `true`/`false` — whether caller has < 3 pending outgoing challenges.
+
+### Direct Table Queries
+
+```ts
+// Athletes looking for match (excludes self)
+.from('athletes').select('id, display_name, current_elo, ...').eq('looking_for_match', true).neq('id', myId)
+
+// Incoming challenges
+.from('challenges').select('*, challenger:athletes!challenger_id(display_name, current_elo)').eq('opponent_id', myId).eq('status', 'pending')
+
+// Accept/decline challenge
+.from('challenges').update({ status: 'accepted', opponent_weight: 160 }).eq('id', challengeId)
+
+// Match with participants
+.from('matches').select('*, match_participants(...), submissions(...)').eq('id', matchId).single()
+```
+
+### Error Handling
+
+```ts
+// error.hint → machine-readable code (switch on this)
+// error.message → user-facing display text
+// error.code → PostgreSQL code (P0001 for business logic)
+```
+
+### Submission Types (23 seeded)
+
+Categories: chokes (8), joint_locks (7), leg_locks (5), other (3). Use `code` field (not `id`) when calling `record_match_result`.
+
+```ts
+const { data } = await supabase.from('submission_types').select('code, display_name, category').eq('status', 'active').order('sort_order')
+```
+
+---
+
 ## Database Functions Reference
 
 | Function | Params | Returns | Purpose |
 |----------|--------|---------|---------|
 | `auth_athlete_id()` | none | UUID | Current user's athlete ID (used in RLS) |
-| `can_create_challenge(p_opponent_id)` | UUID (optional) | BOOLEAN | Rate limit (< 3 pending) + opponent active check |
+| `can_create_challenge()` | none | BOOLEAN | Rate limit (< 3 pending) + opponent active check |
 | `calculate_elo_stakes(challenger_elo, opponent_elo, k_factor)` | INT, INT, INT(32) | JSONB | Preview ELO changes for display |
 | `start_match_from_challenge(p_challenge_id)` | UUID | JSONB | Atomic challenge → match conversion |
 | `start_match(p_match_id)` | UUID | JSONB | Transition match pending → in_progress |

@@ -168,7 +168,7 @@ Shell components that define the app's structure:
 ## Key FK Join Names
 
 ```
-Athletes -> Gyms:              gyms!athletes_primary_gym_id_fkey(name)
+Athletes -> Gyms:              gyms!fk_athletes_primary_gym(name)
 Match participants -> Athletes: athletes!fk_participants_athlete(display_name)
 Challenges -> Challenger:       athletes!fk_challenges_challenger(display_name)
 Matches -> Participants:        matches!fk_participants_match(completed_at, status)
