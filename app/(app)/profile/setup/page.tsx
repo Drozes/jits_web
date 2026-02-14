@@ -20,10 +20,25 @@ function SetupSkeleton() {
           <div className="mx-auto h-8 w-48 rounded bg-muted" />
           <div className="mx-auto mt-2 h-4 w-64 rounded bg-muted" />
         </div>
-        <div className="flex flex-col gap-4">
-          <div className="h-10 rounded-lg bg-muted" />
-          <div className="h-10 rounded-lg bg-muted" />
-          <div className="h-10 rounded-lg bg-muted" />
+        <div className="rounded-lg border bg-card p-6">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
+              <div className="h-4 w-24 rounded bg-muted" />
+              <div className="h-10 rounded-md bg-muted" />
+              <div className="h-3 w-52 rounded bg-muted" />
+            </div>
+            <div className="flex flex-col gap-2">
+              <div className="h-4 w-20 rounded bg-muted" />
+              <div className="h-10 rounded-md bg-muted" />
+              <div className="h-3 w-40 rounded bg-muted" />
+            </div>
+            <div className="flex flex-col gap-2">
+              <div className="h-4 w-10 rounded bg-muted" />
+              <div className="h-10 rounded-md bg-muted" />
+              <div className="h-3 w-56 rounded bg-muted" />
+            </div>
+            <div className="h-10 rounded-md bg-muted" />
+          </div>
         </div>
       </div>
     </div>
