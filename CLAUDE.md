@@ -127,16 +127,16 @@ Use these consistently across all stat displays:
 
 Don't create abstractions for things used once. Don't add error handling for impossible states. This is alpha — ship fast, refactor when real patterns emerge. The threshold for extraction is 2+ usages across files (see Principle 2).
 
-## Pre-Commit Quality Checks
+## Pre-Commit Quality Checks (MANDATORY)
 
-Before every commit, run these checks and fix any failures:
+**You MUST run the test suite and type checks before EVERY commit. No exceptions.** Do not commit if any check fails — fix the issue first, then re-run.
 
-1. **TypeScript** — `npx tsc --noEmit` (always)
-2. **Build** — `npx next build` (always)
-3. **Unit tests** — `npm test` (always)
+1. **TypeScript** — `npx tsc --noEmit` (always, before every commit)
+2. **Unit tests** — `npm test` (always, before every commit)
+3. **Build** — `npx next build` (for non-trivial changes: new components, refactors, dependency updates)
 4. **E2E tests** — `npm run test:e2e` (for complex commits: new pages/routes, layout changes, auth flow changes, or multi-file refactors)
 
-Do not commit if any check fails. Fix the issue first.
+If dependencies are not installed, run `npm install` first.
 
 ## UI Kit Maintenance
 
