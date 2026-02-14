@@ -208,13 +208,133 @@ Step 4 (Profile Rebuild)
 
 ---
 
-## Beyond Step 5 (future)
+## Step 6: Competitor Profile
 
-These screens are deferred — they depend on the match flow which requires more backend coordination:
+View another athlete's public profile with stats, match history, and compare modal.
 
-- `athlete/[id]/` — competitor profile + compare stats modal
-- `arena/swipe/` — tinder-style match discovery
-- `match/pending/` — pending challenges list
+### Domain components to build (`components/domain/`)
+
+| Component | Notes |
+|-----------|-------|
+| `compare-stats-modal.tsx` | Dialog showing side-by-side stat comparison (ELO, W/L, win rate) |
+
+### shadcn to install
+
+- `dialog` — for compare stats modal
+
+### Route
+
+| Route | Screen |
+|-------|--------|
+| `app/(app)/athlete/[id]/page.tsx` | Competitor profile with header, actions, match history |
+
+### Screen sections
+
+1. **Profile header** — reuse `profile-header.tsx` with competitor's data
+2. **Action buttons** — "Challenge" (link to pending challenges) + "Compare Stats" (opens modal)
+3. **ELO stakes** — `elo-badge.tsx` `stakes` variant showing potential win/loss
+4. **Match history** — `match-card` entries for head-to-head matches
+5. **Compare stats modal** — `Dialog` with side-by-side ELO, record, win rate
+
+### Data
+
+- Fetch competitor by `id`, join gym via `gyms!athletes_primary_gym_id_fkey(name)`
+- Match history via `match_participants` for both athletes sharing the same `match_id`
+- W/L stats from `match_participants.outcome`
+
+---
+
+## Step 7: Pending Challenges
+
+Full-page list of sent and received challenges with status tracking.
+
+### Route
+
+| Route | Screen |
+|-------|--------|
+| `app/(app)/match/pending/page.tsx` | Sent/received challenge tabs |
+
+### Screen sections
+
+1. **Tabs** — "Received" / "Sent" (reuse `tabs` component)
+2. **Challenge cards** — opponent avatar + name, match type badge, ELO stakes, timestamp
+3. **Empty state** — "No pending challenges" with CTA to Arena
+4. **Info card** — brief challenge flow explainer
+
+### Data
+
+- Received: `challenges` where `opponent_id = currentAthlete.id`, `status = 'pending'`
+- Sent: `challenges` where `challenger_id = currentAthlete.id`, `status = 'pending'`
+- Join athlete data via `athletes!fk_challenges_challenger` / `athletes!fk_challenges_opponent`
+
+---
+
+## Step 8: Share Profile
+
+Share profile card triggered from profile page as a `<Sheet>` (not a route).
+
+### Domain components to build (`components/domain/`)
+
+| Component | Notes |
+|-----------|-------|
+| `share-profile-sheet.tsx` | Sheet with profile preview card + share actions |
+
+### Screen sections
+
+1. **Profile preview card** — name, ELO, W/L record, gym (styled as shareable card)
+2. **Share actions** — Copy link (clipboard API), native share (if available)
+3. **Privacy notice** — what's shared
+
+### Integration
+
+- Add "Share" button to `app/(app)/profile/page.tsx`
+- Sheet receives athlete data + stats as props
+
+---
+
+## Step 9: Swipe Discovery
+
+Tinder-style card swiping for opponent discovery. Client-heavy with drag interactions.
+
+### Route
+
+| Route | Screen |
+|-------|--------|
+| `app/(app)/arena/swipe/page.tsx` | Swipeable competitor cards |
+
+### Screen sections
+
+1. **Swipeable card stack** — drag left to pass, right to like (CSS transforms + pointer events)
+2. **Card content** — avatar, name, ELO, gym, W/L record, ELO stakes
+3. **Action buttons** — Pass (X), View Profile (eye), Like (heart)
+4. **End state** — "All caught up" with session summary
+
+### Data
+
+- Same as arena: athletes excluding current user, ordered by ELO proximity
+- Swipe state managed client-side
+
+---
+
+## Updated Dependency Graph
+
+```
+Steps 1-5 (complete)
+  └── Step 6 (Competitor Profile) — reuses profile-header, elo-badge, match-card
+        ├── Step 7 (Pending Challenges) — "Challenge" button links here
+        └── Step 9 (Swipe Discovery) — "View Profile" links to athlete/[id]
+
+Step 8 (Share Profile) — independent, builds on profile page
+```
+
+**Execution order:** 6 → 7 → 8 → 9
+
+---
+
+## Beyond Step 9 (speckit — match flow)
+
+These screens require real-time state, timers, and multi-user coordination. Use speckit to spec:
+
 - `match/[id]/accept/` — accept challenge
 - `match/[id]/lobby/` — pre-match VS screen
 - `match/[id]/live/` — active match timer
