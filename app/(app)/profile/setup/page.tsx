@@ -19,12 +19,12 @@ async function SetupContent() {
   // Fetch existing athlete (auto-created by backend on signup)
   const { data: athlete } = await supabase
     .from("athletes")
-    .select("id, display_name, current_weight")
+    .select("id, display_name, status")
     .eq("auth_user_id", user.id)
     .single();
 
-  // If athlete has completed setup (has weight), redirect to home
-  if (athlete?.current_weight != null) {
+  // If athlete is already activated, redirect to home
+  if (athlete && athlete.status !== "pending") {
     redirect("/");
   }
 
