@@ -1,6 +1,7 @@
 # 005 — Backend Reference
 
 **Source:** `/Users/msponagle/code/experiments/jr_be/`
+**RPC Contracts:** `/Users/msponagle/code/experiments/jr_be/docs/rpc-contracts.md`
 **Last reviewed:** 2026-02-13
 **Backend status:** Alpha (4 features complete, 260+ pgTAP tests passing)
 
