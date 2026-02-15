@@ -293,6 +293,45 @@ export async function getMatchDetails(
   };
 }
 
+export interface ChallengeBetween {
+  id: string;
+  status: string;
+  match_type: string;
+  created_at: string;
+  expires_at: string;
+  challenger_weight: number | null;
+  opponent_weight: number | null;
+  challenger: { id: string; display_name: string; current_elo: number };
+  opponent: { id: string; display_name: string; current_elo: number };
+}
+
+/** Fetch all challenges between two athletes (bidirectional), newest first */
+export async function getChallengesBetween(
+  supabase: Client,
+  athleteA: string,
+  athleteB: string,
+): Promise<ChallengeBetween[]> {
+  const { data } = await supabase
+    .from("challenges")
+    .select(
+      `id, status, match_type, created_at, expires_at, challenger_weight, opponent_weight,
+      challenger:athletes!fk_challenges_challenger(id, display_name, current_elo),
+      opponent:athletes!fk_challenges_opponent(id, display_name, current_elo)`,
+    )
+    .or(
+      `and(challenger_id.eq.${athleteA},opponent_id.eq.${athleteB}),and(challenger_id.eq.${athleteB},opponent_id.eq.${athleteA})`,
+    )
+    .order("created_at", { ascending: false });
+
+  if (!data) return [];
+
+  return data.map((d) => ({
+    ...d,
+    challenger: d.challenger as unknown as ChallengeBetween["challenger"],
+    opponent: d.opponent as unknown as ChallengeBetween["opponent"],
+  }));
+}
+
 /** Find a pending challenge between two athletes (either direction) */
 export async function getPendingChallengeBetween(
   supabase: Client,

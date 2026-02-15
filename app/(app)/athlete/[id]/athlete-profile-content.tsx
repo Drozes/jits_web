@@ -74,6 +74,7 @@ export async function AthleteProfileContent({
     competitorMatches?.map((m) => m.match_id) ?? [];
 
   let headToHead: Array<{
+    matchId: string;
     opponentName: string;
     result: "win" | "loss" | "draw" | null;
     eloDelta: number | null;
@@ -103,6 +104,7 @@ export async function AthleteProfileContent({
             | null;
           const match = matchArr?.[0];
           return {
+            matchId: p.match_id,
             opponentName: competitor.display_name,
             result: p.outcome as "win" | "loss" | "draw" | null,
             eloDelta: p.elo_delta,
@@ -153,14 +155,15 @@ export async function AthleteProfileContent({
 
             {headToHead.length > 0 ? (
               <div className="flex flex-col gap-2">
-                {headToHead.map((match, i) => (
+                {headToHead.map((match) => (
                   <MatchCard
-                    key={i}
+                    key={match.matchId}
                     type="match"
                     opponentName={match.opponentName}
                     result={match.result}
                     eloDelta={match.eloDelta ?? undefined}
                     date={match.date}
+                    href={`/match/${match.matchId}/results`}
                   />
                 ))}
               </div>
