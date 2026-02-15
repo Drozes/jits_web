@@ -84,11 +84,14 @@ function PodiumSlot({
 export function LeaderboardContent({
   athletes,
   gyms,
+  challengedIds = [],
 }: {
   athletes: RankedAthlete[];
   gyms: RankedGym[];
+  challengedIds?: string[];
 }) {
   const [isAthleteMode, setIsAthleteMode] = useState(true);
+  const challengedSet = new Set(challengedIds);
 
   return (
     <div className="flex flex-col gap-6">
@@ -122,6 +125,7 @@ export function LeaderboardContent({
             {athletes.map((a) => (
               <AthleteCard
                 key={a.id}
+                id={a.id}
                 rank={a.rank}
                 displayName={a.displayName}
                 currentElo={a.currentElo}
@@ -129,6 +133,7 @@ export function LeaderboardContent({
                 losses={a.losses}
                 gymName={a.gymName}
                 isCurrentUser={a.isCurrentUser}
+                hasPendingChallenge={challengedSet.has(a.id)}
               />
             ))}
           </div>

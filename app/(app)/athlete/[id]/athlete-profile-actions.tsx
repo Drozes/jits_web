@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { CompareStatsModal } from "@/components/domain/compare-stats-modal";
 import { ChallengeSheet } from "@/components/domain/challenge-sheet";
@@ -20,6 +21,7 @@ interface AthleteProfileActionsProps {
   currentAthleteId: string;
   currentAthlete: AthleteStats;
   competitor: AthleteStats;
+  pendingChallengeId: string | null;
 }
 
 export function AthleteProfileActions({
@@ -27,6 +29,7 @@ export function AthleteProfileActions({
   currentAthleteId,
   currentAthlete,
   competitor,
+  pendingChallengeId,
 }: AthleteProfileActionsProps) {
   const [compareOpen, setCompareOpen] = useState(false);
   const [challengeOpen, setChallengeOpen] = useState(false);
@@ -37,10 +40,19 @@ export function AthleteProfileActions({
     <>
       <div className="flex gap-2">
         {!isSelf && (
-          <Button className="flex-1" onClick={() => setChallengeOpen(true)}>
-            <Swords className="mr-2 h-4 w-4" />
-            Challenge
-          </Button>
+          pendingChallengeId ? (
+            <Button className="flex-1 bg-amber-500 hover:bg-amber-600 text-white" asChild>
+              <Link href="/match/pending">
+                <Swords className="mr-2 h-4 w-4" />
+                View Challenge
+              </Link>
+            </Button>
+          ) : (
+            <Button className="flex-1" onClick={() => setChallengeOpen(true)}>
+              <Swords className="mr-2 h-4 w-4" />
+              Challenge
+            </Button>
+          )
         )}
         <Button
           className="flex-1"
@@ -52,11 +64,12 @@ export function AthleteProfileActions({
         </Button>
       </div>
 
-      {!isSelf && (
+      {!isSelf && !pendingChallengeId && (
         <ChallengeSheet
           competitorId={competitorId}
           competitorName={competitor.displayName}
           competitorElo={competitor.elo}
+          currentAthleteId={currentAthleteId}
           currentAthleteElo={currentAthlete.elo}
           currentAthleteWeight={currentAthlete.weight}
           open={challengeOpen}

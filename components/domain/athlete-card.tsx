@@ -1,8 +1,10 @@
+import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Crown, Medal, Award } from "lucide-react";
 import { getInitials } from "@/lib/utils";
+import { ChallengeBadge } from "./challenge-badge";
 
 function getRankDisplay(rank: number) {
   if (rank === 1) return <Crown className="h-5 w-5 text-yellow-500" />;
@@ -12,6 +14,7 @@ function getRankDisplay(rank: number) {
 }
 
 interface AthleteCardProps {
+  id?: string;
   rank: number;
   displayName: string;
   currentElo: number;
@@ -19,9 +22,11 @@ interface AthleteCardProps {
   losses: number;
   gymName?: string;
   isCurrentUser?: boolean;
+  hasPendingChallenge?: boolean;
 }
 
 export function AthleteCard({
+  id,
   rank,
   displayName,
   currentElo,
@@ -29,10 +34,11 @@ export function AthleteCard({
   losses,
   gymName,
   isCurrentUser,
+  hasPendingChallenge,
 }: AthleteCardProps) {
-  return (
+  const card = (
     <Card
-      variant="interactive"
+      variant={id && !isCurrentUser ? "interactive" : undefined}
       className={`p-4 ${isCurrentUser ? "ring-2 ring-accent bg-accent/5" : ""}`}
     >
       <div className="flex items-center justify-between">
@@ -51,6 +57,7 @@ export function AthleteCard({
                   You
                 </Badge>
               )}
+              {hasPendingChallenge && <ChallengeBadge />}
             </div>
             {gymName && (
               <span className="text-xs text-muted-foreground">{gymName}</span>
@@ -66,4 +73,9 @@ export function AthleteCard({
       </div>
     </Card>
   );
+
+  if (id && !isCurrentUser) {
+    return <Link href={`/athlete/${id}`}>{card}</Link>;
+  }
+  return card;
 }

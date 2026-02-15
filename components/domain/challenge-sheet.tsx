@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Swords, TrendingUp, TrendingDown, Check } from "lucide-react";
 import type { EloStakes } from "@/types/composites";
 import { MATCH_TYPE, type MatchType } from "@/lib/constants";
@@ -21,6 +22,7 @@ interface ChallengeSheetProps {
   competitorId: string;
   competitorName: string;
   competitorElo: number;
+  currentAthleteId: string;
   currentAthleteElo: number;
   currentAthleteWeight: number | null;
   open: boolean;
@@ -31,6 +33,7 @@ export function ChallengeSheet({
   competitorId,
   competitorName,
   competitorElo,
+  currentAthleteId,
   currentAthleteElo,
   currentAthleteWeight,
   open,
@@ -40,6 +43,7 @@ export function ChallengeSheet({
   const [matchType, setMatchType] = useState<MatchType>(MATCH_TYPE.CASUAL);
   const [weight, setWeight] = useState(currentAthleteWeight?.toString() ?? "");
   const [stakes, setStakes] = useState<EloStakes | null>(null);
+  const [weightConfirmed, setWeightConfirmed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -64,6 +68,7 @@ export function ChallengeSheet({
     setMatchType(MATCH_TYPE.CASUAL);
     setWeight(currentAthleteWeight?.toString() ?? "");
     setStakes(null);
+    setWeightConfirmed(false);
     setError(null);
     setSuccess(false);
   }
@@ -80,6 +85,7 @@ export function ChallengeSheet({
 
     const supabase = createClient();
     const { error: insertError } = await supabase.from("challenges").insert({
+      challenger_id: currentAthleteId,
       opponent_id: competitorId,
       match_type: matchType,
       challenger_weight: parsedWeight,
@@ -112,16 +118,16 @@ export function ChallengeSheet({
         if (!v) resetState();
       }}
     >
-      <SheetContent side="bottom" className="rounded-t-2xl">
-        <SheetHeader>
-          <SheetTitle className="flex items-center gap-2">
+      <SheetContent side="bottom" className="rounded-t-2xl px-6 pb-10">
+        <SheetHeader className="px-0">
+          <SheetTitle className="flex items-center gap-2 text-lg">
             <Swords className="h-5 w-5" />
             Challenge {competitorName}
           </SheetTitle>
         </SheetHeader>
 
         {success ? (
-          <div className="flex flex-col items-center gap-3 py-8">
+          <div className="flex flex-col items-center gap-3 py-10">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
               <Check className="h-6 w-6 text-green-600" />
             </div>
@@ -131,11 +137,11 @@ export function ChallengeSheet({
             </p>
           </div>
         ) : (
-          <div className="flex flex-col gap-4 pt-4">
+          <div className="flex flex-col gap-6 pt-2">
             {/* Match Type */}
-            <div className="flex flex-col gap-2">
-              <Label>Match Type</Label>
-              <div className="flex gap-2">
+            <div className="flex flex-col gap-3">
+              <Label className="text-sm font-medium">Match Type</Label>
+              <div className="flex gap-3">
                 <Button
                   variant={matchType === MATCH_TYPE.CASUAL ? "default" : "outline"}
                   className="flex-1"
@@ -183,25 +189,43 @@ export function ChallengeSheet({
             )}
 
             {/* Weight */}
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="challenge-weight">Your Weight (lbs)</Label>
+            <div className="flex flex-col gap-3">
+              <Label htmlFor="challenge-weight" className="text-sm font-medium">Your Weight (lbs)</Label>
               <Input
                 id="challenge-weight"
                 type="number"
                 value={weight}
-                onChange={(e) => setWeight(e.target.value)}
+                onChange={(e) => { setWeight(e.target.value); setWeightConfirmed(false); }}
                 placeholder="e.g. 155"
                 min={1}
                 max={500}
                 step="0.1"
+                className="h-11"
               />
             </div>
 
-            {error && <p className="text-sm text-destructive">{error}</p>}
+            {/* Weight Confirmation */}
+            <div className="flex items-center gap-3">
+              <Checkbox
+                id="confirm-weight"
+                checked={weightConfirmed}
+                onCheckedChange={(checked) => setWeightConfirmed(checked === true)}
+              />
+              <Label htmlFor="confirm-weight" className="text-sm leading-tight">
+                I confirm my weight is accurate
+              </Label>
+            </div>
+
+            {error && (
+              <div className="rounded-lg bg-destructive/10 px-4 py-3">
+                <p className="text-sm text-destructive">{error}</p>
+              </div>
+            )}
 
             <Button
               onClick={handleSubmit}
-              disabled={submitting || !weight}
+              disabled={submitting || !weight || !weightConfirmed}
+              className="h-12 text-base mt-1"
             >
               {submitting ? "Sending..." : "Send Challenge"}
             </Button>

@@ -214,6 +214,128 @@ export interface LobbyData {
   gym: { id: string; name: string; address: string | null; city: string | null } | null;
 }
 
+// ---------------------------------------------------------------------------
+// Match details (for live + results pages)
+// ---------------------------------------------------------------------------
+
+export interface MatchParticipant {
+  athlete_id: string;
+  display_name: string;
+  current_elo: number;
+  role: string;
+  outcome: string | null;
+  elo_before: number | null;
+  elo_after: number | null;
+  elo_delta: number;
+}
+
+export interface MatchDetails {
+  id: string;
+  challenge_id: string;
+  match_type: string;
+  duration_seconds: number;
+  status: string;
+  result: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  participants: MatchParticipant[];
+}
+
+/** Fetch match details with participants for live/results screens */
+export async function getMatchDetails(
+  supabase: Client,
+  matchId: string,
+): Promise<MatchDetails | null> {
+  const { data } = await supabase
+    .from("matches")
+    .select(
+      `id, challenge_id, match_type, duration_seconds, status, result, started_at, completed_at,
+      match_participants(
+        athlete_id, role, outcome, elo_before, elo_after, elo_delta,
+        athletes!fk_participants_athlete(display_name, current_elo)
+      )`,
+    )
+    .eq("id", matchId)
+    .single();
+
+  if (!data) return null;
+
+  const participants = ((data.match_participants ?? []) as unknown[]).map(
+    (p: unknown) => {
+      const part = p as Record<string, unknown>;
+      const athleteArr = part.athletes as
+        | { display_name: string; current_elo: number }[]
+        | null;
+      const athlete = athleteArr?.[0];
+      return {
+        athlete_id: part.athlete_id as string,
+        display_name: athlete?.display_name ?? "Unknown",
+        current_elo: athlete?.current_elo ?? 1000,
+        role: part.role as string,
+        outcome: part.outcome as string | null,
+        elo_before: part.elo_before as number | null,
+        elo_after: part.elo_after as number | null,
+        elo_delta: (part.elo_delta as number) ?? 0,
+      };
+    },
+  );
+
+  return {
+    id: data.id,
+    challenge_id: data.challenge_id,
+    match_type: data.match_type,
+    duration_seconds: data.duration_seconds,
+    status: data.status,
+    result: data.result,
+    started_at: data.started_at,
+    completed_at: data.completed_at,
+    participants,
+  };
+}
+
+/** Find a pending challenge between two athletes (either direction) */
+export async function getPendingChallengeBetween(
+  supabase: Client,
+  athleteA: string,
+  athleteB: string,
+): Promise<{ id: string } | null> {
+  const { data } = await supabase
+    .from("challenges")
+    .select("id")
+    .eq("status", "pending")
+    .or(
+      `and(challenger_id.eq.${athleteA},opponent_id.eq.${athleteB}),and(challenger_id.eq.${athleteB},opponent_id.eq.${athleteA})`,
+    )
+    .limit(1)
+    .maybeSingle();
+
+  return data ? { id: data.id } : null;
+}
+
+/** Get IDs of all athletes who have a pending challenge with this athlete (either direction) */
+export async function getPendingChallengeOpponentIds(
+  supabase: Client,
+  athleteId: string,
+): Promise<Set<string>> {
+  const [{ data: sent }, { data: received }] = await Promise.all([
+    supabase
+      .from("challenges")
+      .select("opponent_id")
+      .eq("challenger_id", athleteId)
+      .eq("status", "pending"),
+    supabase
+      .from("challenges")
+      .select("challenger_id")
+      .eq("opponent_id", athleteId)
+      .eq("status", "pending"),
+  ]);
+
+  const ids = new Set<string>();
+  for (const c of sent ?? []) ids.add(c.opponent_id);
+  for (const c of received ?? []) ids.add(c.challenger_id);
+  return ids;
+}
+
 /** Fetch full challenge details for match lobby screen */
 export async function getLobbyData(
   supabase: Client,

@@ -1,4 +1,7 @@
 import { Suspense } from "react";
+import { Timer } from "lucide-react";
+import { AppHeader } from "@/components/layout/app-header";
+import { PageContainer } from "@/components/layout/page-container";
 import { LiveMatchContent } from "./live-match-content";
 
 export default function LiveMatchPage({
@@ -7,19 +10,21 @@ export default function LiveMatchPage({
   params: Promise<{ id: string }>;
 }) {
   return (
-    <Suspense fallback={<LiveMatchSkeleton />}>
-      <LiveMatchContent paramsPromise={params} />
-    </Suspense>
-  );
-}
-
-function LiveMatchSkeleton() {
-  return (
-    <div className="flex flex-col gap-6 animate-pulse pt-14 px-4 max-w-md mx-auto">
-      <div className="h-6 w-28 rounded bg-muted mx-auto" />
-      <div className="h-32 w-32 rounded-full bg-muted mx-auto" />
-      <div className="h-4 w-48 rounded bg-muted mx-auto" />
-      <div className="h-12 rounded-lg bg-muted" />
-    </div>
+    <>
+      <AppHeader title="Live Match" icon={<Timer className="h-5 w-5" />} />
+      <PageContainer className="py-6">
+        <Suspense
+          fallback={
+            <div className="animate-pulse space-y-6 py-8 text-center">
+              <div className="h-8 w-48 mx-auto rounded bg-muted" />
+              <div className="h-24 w-40 mx-auto rounded bg-muted" />
+              <div className="h-12 rounded-lg bg-muted" />
+            </div>
+          }
+        >
+          <LiveMatchContent paramsPromise={params} />
+        </Suspense>
+      </PageContainer>
+    </>
   );
 }

@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation";
+import { Badge } from "@/components/ui/badge";
 import { requireAthlete } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
-import { AppHeader } from "@/components/layout/app-header";
-import { PageContainer } from "@/components/layout/page-container";
-import { MATCH_STATUS } from "@/lib/constants";
-import { LiveMatchClient } from "./live-match-client";
+import { getMatchDetails } from "@/lib/api/queries";
+import { MATCH_TYPE } from "@/lib/constants";
+import { MatchTimer } from "./match-timer";
 
 export async function LiveMatchContent({
   paramsPromise,
@@ -15,67 +15,44 @@ export async function LiveMatchContent({
   const { athlete } = await requireAthlete();
   const supabase = await createClient();
 
-  // Fetch match with participants and athlete names
-  const { data: match, error: matchError } = await supabase
-    .from("matches")
-    .select("id, match_type, status, duration_seconds, created_at")
-    .eq("id", matchId)
-    .single();
+  const match = await getMatchDetails(supabase, matchId);
+  if (!match) redirect("/match/pending");
 
-  if (matchError || !match) {
-    redirect("/match/pending");
-  }
-
-  // Redirect if match is already completed
-  if (match.status === MATCH_STATUS.COMPLETED) {
+  if (match.status === "completed") {
     redirect(`/match/${matchId}/results`);
   }
 
-  // Fetch participants
-  const { data: participants } = await supabase
-    .from("match_participants")
-    .select(
-      "id, athlete_id, role, athletes!fk_participants_athlete(id, display_name)",
-    )
-    .eq("match_id", matchId)
-    .eq("role", "competitor");
-
-  if (!participants || participants.length < 2) {
-    redirect("/match/pending");
-  }
-
-  // Verify current user is a participant
-  const currentParticipant = participants.find((p) => {
-    const athleteArr = p.athletes as
-      | { id: string; display_name: string }[]
-      | null;
-    return athleteArr?.[0]?.id === athlete.id;
-  });
-
-  if (!currentParticipant) {
-    redirect("/match/pending");
-  }
-
-  const rivalParticipant = participants.find(
-    (p) => p.id !== currentParticipant.id,
+  const isParticipant = match.participants.some(
+    (p) => p.athlete_id === athlete.id,
   );
-  const rivalAthleteArr = rivalParticipant?.athletes as
-    | { id: string; display_name: string }[]
-    | null;
-  const rivalName = rivalAthleteArr?.[0]?.display_name ?? "Opponent";
+  if (!isParticipant) redirect("/");
+
+  const opponent = match.participants.find(
+    (p) => p.athlete_id !== athlete.id,
+  );
 
   return (
-    <>
-      <AppHeader title="Live Match" />
-      <PageContainer className="pt-6">
-        <LiveMatchClient
-          matchId={matchId}
-          matchStatus={match.status}
-          matchType={match.match_type}
-          durationSeconds={match.duration_seconds}
-          opponentName={rivalName}
-        />
-      </PageContainer>
-    </>
+    <div className="space-y-6 text-center">
+      <div>
+        <p className="text-sm text-muted-foreground">
+          {athlete.display_name} vs {opponent?.display_name ?? "Opponent"}
+        </p>
+        <Badge
+          variant={
+            match.match_type === MATCH_TYPE.RANKED ? "default" : "secondary"
+          }
+          className="mt-2"
+        >
+          {match.match_type === MATCH_TYPE.RANKED ? "Ranked" : "Casual"}
+        </Badge>
+      </div>
+
+      <MatchTimer
+        matchId={matchId}
+        durationSeconds={match.duration_seconds}
+        status={match.status}
+        startedAt={match.started_at}
+      />
+    </div>
   );
 }

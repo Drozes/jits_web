@@ -3,6 +3,7 @@ import { requireAthlete } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
 import { LeaderboardContent } from "./leaderboard-content";
 import { extractGymName } from "@/lib/utils";
+import { getPendingChallengeOpponentIds } from "@/lib/api/queries";
 
 function LeaderboardSkeleton() {
   return (
@@ -88,10 +89,13 @@ async function LeaderboardData() {
     .sort((a, b) => b.totalElo - a.totalElo)
     .map((g, i) => ({ ...g, rank: i + 1 }));
 
+  const challengedIds = await getPendingChallengeOpponentIds(supabase, currentAthlete.id);
+
   return (
     <LeaderboardContent
       athletes={rankedAthletes}
       gyms={rankedGyms}
+      challengedIds={Array.from(challengedIds)}
     />
   );
 }
