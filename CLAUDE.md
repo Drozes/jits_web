@@ -27,6 +27,7 @@ components/
   profile/          # Profile-specific components
   ui/               # shadcn/ui primitives (DO NOT edit manually)
 lib/
+  api/              # Typed data access layer (queries, mutations, errors)
   supabase/         # Server and browser Supabase clients
   guards.ts         # Auth guard functions
   utils.ts          # Shared utilities (cn, helpers)
@@ -49,20 +50,25 @@ types/              # database.ts (generated) + per-table aliases
 
 ### 2. Don't Duplicate Logic
 
-When you see the same logic in 2+ files, extract it to `lib/utils.ts`. Before writing a new helper, check if one already exists there.
+When you see the same logic in 2+ files, extract it to `lib/utils.ts` or `lib/api/`. Before writing a new helper, check if one already exists.
 
-**Currently duplicated (tech debt — extract when you touch these files):**
-- `getInitials(name)` — duplicated in 5 files
-- Win/loss/winRate computation from outcomes — duplicated in 6 files
-- Gym name fetching by `primary_gym_id` — duplicated in 3 files
+**Extracted to `lib/utils.ts`:** `getInitials()`, `computeStats()`, `computeWinStreak()`, `extractGymName()`
+**Extracted to `lib/api/queries.ts`:** `getAthleteProfile()`, `getLeaderboard()`, `getAthleteStats()`
+
+**Remaining duplication (tech debt):**
 - Relative date formatting — duplicated in 2 files
 
-### 3. Supabase FK Joins Return Arrays
+### 3. Supabase FK Join Behavior
 
-FK joins like `athletes!fk_name(col)` return `T[]`, not `T`. Always access with `[0]`:
+**Unaliased** FK joins like `athletes!fk_name(col)` return `T[]`. Access with `[0]`:
 ```ts
 const gymsArr = a.gyms as { name: string }[] | null;
 const gymName = gymsArr?.[0]?.name ?? null;
+```
+
+**Aliased** FK joins like `challenger:athletes!fk(col)` return `T` directly — no `[0]` needed:
+```ts
+const challenger = data.challenger; // already a single object
 ```
 
 ### 4. Stats Are Computed, Not Stored
@@ -185,22 +191,58 @@ Challenges -> Challenger:       athletes!fk_challenges_challenger(display_name)
 Matches -> Participants:        matches!fk_participants_match(completed_at, status)
 ```
 
+## Data Access Layer (`lib/api/`)
+
+Typed wrappers for all Supabase queries and mutations. Use these instead of raw `.from()` / `.rpc()` calls in new code.
+
+### Queries (`lib/api/queries.ts`) — Server-side
+
+- `getAthleteProfile(supabase, id)` — athlete + gym join + computed stats + win streak
+- `getAthleteStats(supabase, id)` — wins/losses/winRate only
+- `getLeaderboard(supabase, limit?)` — top N athletes by ELO with stats
+- `getMatchHistory(supabase, athleteId)` — wraps `get_match_history` RPC
+- `getEloHistory(supabase, athleteId)` — wraps `get_elo_history` RPC
+- `getEloStakes(supabase, challengerElo, opponentElo)` — wraps `calculate_elo_stakes` RPC
+- `getSubmissionTypes(supabase)` — all 23 active submission techniques
+- `canCreateChallenge(supabase, opponentId?)` — wraps `can_create_challenge` RPC
+- `getLobbyData(supabase, challengeId)` — full challenge details for match lobby
+
+### Mutations (`lib/api/mutations.ts`) — Client-side
+
+- `createChallenge(supabase, { opponentId, matchType, challengerWeight? })` → `Result<{ id }>`
+- `acceptChallenge(supabase, { challengeId, opponentWeight? })` → `Result<void>`
+- `declineChallenge(supabase, challengeId)` → `Result<void>`
+- `cancelChallenge(supabase, challengeId)` → `Result<void>`
+- `startMatchFromChallenge(supabase, challengeId)` → `Result<StartMatchResponse>`
+- `startMatch(supabase, matchId)` → `Result<StartMatchTimerResponse>`
+- `recordMatchResult(supabase, { matchId, result, winnerId?, ... })` → `Result<RecordResultResponse>`
+- `toggleLookingForMatch(supabase, athleteId, looking)` → `Result<void>`
+
+### Error Handling (`lib/api/errors.ts`)
+
+All mutations return `Result<T>` = `{ ok: true, data: T } | { ok: false, error: DomainError }`. Domain error codes: `MAX_PENDING_CHALLENGES`, `OPPONENT_INACTIVE`, `MATCH_NOT_IN_PROGRESS`, `NOT_PARTICIPANT`, etc.
+
+## Type Generation
+
+Run `npm run db:types` to regenerate `types/database.ts` from the local Supabase instance in the backend repo. Run this after every backend migration.
+
 ## Backend Integration
 
 **Full reference:** [research/005-backend-reference.md](research/005-backend-reference.md)
+**Integration brief:** [research/007-frontend-backend-integration-brief.md](research/007-frontend-backend-integration-brief.md)
 
-Read this doc before building challenge, match, or ELO features. Key points:
+Read these docs before building challenge, match, or ELO features. Key points:
 
-- **Athlete activation** requires `primary_gym_id` to be set (trigger-based, not `current_weight`)
+- **Athlete activation** requires `display_name` + `current_weight` + (`primary_gym_id` OR `free_agent = true`)
 - **Challenges:** INSERT with RLS validation, max 3 pending, opponent must be `active`
-- **Starting matches:** use `start_match_from_challenge()` RPC, never direct INSERT
-- **ELO stakes preview:** use `calculate_elo_stakes()` RPC for display
-- **ELO updates:** frontend responsible for computing + writing new ELO (no backend service yet)
+- **Starting matches:** use `startMatchFromChallenge()` then `startMatch()` — never direct INSERT
+- **Recording results:** use `recordMatchResult()` — auto-calculates ELO for ranked matches
+- **ELO stakes preview:** use `getEloStakes()` for display before sending challenges
 
-### Frontend/Backend Discrepancies (Must Fix)
+### Frontend/Backend Discrepancies (Status)
 
-1. **Activation trigger uses `primary_gym_id`, not `current_weight`** — setup must include gym picker
-2. **Weight units unclear** — `athletes.current_weight` constraint is 0-500 with no unit. Challenge weights are explicitly lbs.
-3. **Challenge creation not implemented** — button disabled on competitor profile
-4. **No gym selection in setup** — required for backend activation
-5. **Match flow not implemented** — RPC exists but no frontend screens
+1. ~~Activation trigger uses `primary_gym_id`, not `current_weight`~~ — [x] setup includes gym picker + free agent path
+2. **Weight units unclear** — `athletes.current_weight` spec says kg, `challenges` spec says lbs. Needs BE resolution.
+3. ~~Challenge creation not implemented~~ — [x] ChallengeSheet component works
+4. ~~No gym selection in setup~~ — [x] setup form includes gym dropdown
+5. **Match flow not implemented** — RPCs exist and are typed, frontend screens needed
