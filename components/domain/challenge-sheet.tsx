@@ -22,6 +22,7 @@ interface ChallengeSheetProps {
   competitorId: string;
   competitorName: string;
   competitorElo: number;
+  currentAthleteId: string;
   currentAthleteElo: number;
   currentAthleteWeight: number | null;
   open: boolean;
@@ -32,6 +33,7 @@ export function ChallengeSheet({
   competitorId,
   competitorName,
   competitorElo,
+  currentAthleteId,
   currentAthleteElo,
   currentAthleteWeight,
   open,
@@ -83,6 +85,7 @@ export function ChallengeSheet({
 
     const supabase = createClient();
     const { error: insertError } = await supabase.from("challenges").insert({
+      challenger_id: currentAthleteId,
       opponent_id: competitorId,
       match_type: matchType,
       challenger_weight: parsedWeight,

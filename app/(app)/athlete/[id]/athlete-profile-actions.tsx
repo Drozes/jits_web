@@ -57,6 +57,7 @@ export function AthleteProfileActions({
           competitorId={competitorId}
           competitorName={competitor.displayName}
           competitorElo={competitor.elo}
+          currentAthleteId={currentAthleteId}
           currentAthleteElo={currentAthlete.elo}
           currentAthleteWeight={currentAthlete.weight}
           open={challengeOpen}
