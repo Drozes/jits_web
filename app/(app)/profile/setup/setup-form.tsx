@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTheme } from "next-themes";
+import { Sun, Moon, Laptop } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,6 +25,7 @@ interface SetupFormProps {
 
 export function SetupForm({ athleteId, defaultDisplayName, gyms }: SetupFormProps) {
   const router = useRouter();
+  const { theme, setTheme } = useTheme();
   const [displayName, setDisplayName] = useState(defaultDisplayName);
   const [weight, setWeight] = useState("");
   const [gymId, setGymId] = useState("");
@@ -136,6 +139,34 @@ export function SetupForm({ athleteId, defaultDisplayName, gyms }: SetupFormProp
             </Select>
             <p className="text-xs text-muted-foreground">
               Required to activate your profile and appear to other athletes.
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Label>Theme</Label>
+            <div className="grid grid-cols-3 gap-2">
+              {([
+                { value: "light", label: "Light", icon: Sun },
+                { value: "dark", label: "Dark", icon: Moon },
+                { value: "system", label: "System", icon: Laptop },
+              ] as const).map(({ value, label, icon: Icon }) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setTheme(value)}
+                  className={`flex flex-col items-center gap-1.5 rounded-lg border p-3 text-sm transition-colors ${
+                    theme === value
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-border text-muted-foreground hover:border-primary/50"
+                  }`}
+                >
+                  <Icon size={18} />
+                  {label}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              You can change this later in your profile settings.
             </p>
           </div>
 
