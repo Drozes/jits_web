@@ -26,6 +26,7 @@
 | 2026-02-14 | RPC Contracts | **Done** | Integrated BE `docs/rpc-contracts.md` into `research/005-backend-reference.md`. All 7 RPCs documented with params, responses, and error hints. |
 | 2026-02-14 | Step 10: Setup Fix | **Done** | Gym picker now required (not optional). Guard checks `status='pending'` instead of `current_weight`. Setup page checks status for redirect. `primary_gym_id` always sent on submit. |
 | 2026-02-14 | Step 11: Challenge Response | **Done** | Accept/decline already existed (challenge-response-sheet). Added: cancel button on sent challenges (sent-challenges-list), expiry badge with countdown (expiry-badge), expired challenge filtering server-side. |
+| 2026-02-14 | Step 12: Match Flow | **Done** | 3 screens: lobby (`match/lobby/[id]` with VS layout + ELO stakes), live (`match/[id]/live` with countdown timer), results (`match/[id]/results` with recording form + display). Added `getMatchDetails` query. Lobby uses challenge ID; live/results use match ID. |
 
 ## Learnings
 
