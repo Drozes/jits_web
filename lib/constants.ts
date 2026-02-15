@@ -37,3 +37,21 @@ export const ATHLETE_STATUS = {
 
 export type AthleteStatus =
   (typeof ATHLETE_STATUS)[keyof typeof ATHLETE_STATUS];
+
+/** Match status lifecycle */
+export const MATCH_STATUS = {
+  PENDING: "pending",
+  IN_PROGRESS: "in_progress",
+  COMPLETED: "completed",
+  DISPUTED: "disputed",
+} as const;
+
+export type MatchStatus = (typeof MATCH_STATUS)[keyof typeof MATCH_STATUS];
+
+/** Match result type */
+export const MATCH_RESULT = {
+  SUBMISSION: "submission",
+  DRAW: "draw",
+} as const;
+
+export type MatchResult = (typeof MATCH_RESULT)[keyof typeof MATCH_RESULT];
