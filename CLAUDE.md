@@ -206,6 +206,7 @@ Typed wrappers for all Supabase queries and mutations. Use these instead of raw 
 - `getSubmissionTypes(supabase)` — all 23 active submission techniques
 - `canCreateChallenge(supabase, opponentId?)` — wraps `can_create_challenge` RPC
 - `getLobbyData(supabase, challengeId)` — full challenge details for match lobby
+- `getMatchDetails(supabase, matchId)` — match + participants with athlete names/ELO for live/results screens
 
 ### Mutations (`lib/api/mutations.ts`) — Client-side
 
@@ -245,4 +246,4 @@ Read these docs before building challenge, match, or ELO features. Key points:
 2. **Weight units unclear** — `athletes.current_weight` spec says kg, `challenges` spec says lbs. Needs BE resolution.
 3. ~~Challenge creation not implemented~~ — [x] ChallengeSheet component works
 4. ~~No gym selection in setup~~ — [x] setup form includes gym dropdown
-5. **Match flow not implemented** — RPCs exist and are typed, frontend screens needed
+5. ~~Match flow not implemented~~ — [x] Lobby (`/match/lobby/[challengeId]`), live timer (`/match/[matchId]/live`), results recording (`/match/[matchId]/results`)

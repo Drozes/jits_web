@@ -14,7 +14,6 @@ import { SubmissionFields } from "./submission-fields";
 interface RecordResultFormProps {
   matchId: string;
   participants: MatchParticipant[];
-  matchType: string;
   submissionTypes: SubmissionType[];
 }
 

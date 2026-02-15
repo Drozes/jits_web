@@ -32,7 +32,6 @@ export async function ResultsContent({
     <RecordResultForm
       matchId={matchId}
       participants={match.participants}
-      matchType={match.match_type}
       submissionTypes={submissionTypes}
     />
   );
