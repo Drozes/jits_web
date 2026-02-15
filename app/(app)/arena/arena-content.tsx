@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Swords, Users, Activity, Clock } from "lucide-react";
 import { getInitials } from "@/lib/utils";
+import { ChallengeBadge } from "@/components/domain/challenge-badge";
 import { LookingForMatchToggle } from "./looking-for-match-toggle";
 
 interface Competitor {
@@ -36,7 +37,7 @@ function timeAgo(dateStr: string) {
   return `${days}d ago`;
 }
 
-function CompetitorCard({ competitor }: { competitor: Competitor }) {
+function CompetitorCard({ competitor, hasPendingChallenge }: { competitor: Competitor; hasPendingChallenge?: boolean }) {
   return (
     <Link href={`/athlete/${competitor.id}`}>
       <Card variant="interactive" className="p-4">
@@ -48,7 +49,10 @@ function CompetitorCard({ competitor }: { competitor: Competitor }) {
               </AvatarFallback>
             </Avatar>
             <div>
-              <h4 className="font-semibold">{competitor.displayName}</h4>
+              <div className="flex items-center gap-2">
+                <h4 className="font-semibold">{competitor.displayName}</h4>
+                {hasPendingChallenge && <ChallengeBadge />}
+              </div>
               <div className="text-sm text-muted-foreground">
                 ELO: {competitor.currentElo}
                 {competitor.eloDiff !== 0 && (
@@ -76,13 +80,16 @@ export function ArenaContent({
   activityItems,
   currentAthleteId,
   currentAthleteLooking,
+  challengedIds = [],
 }: {
   lookingCompetitors: Competitor[];
   otherCompetitors: Competitor[];
   activityItems: ActivityItem[];
   currentAthleteId: string;
   currentAthleteLooking: boolean;
+  challengedIds?: string[];
 }) {
+  const challengedSet = new Set(challengedIds);
 
   return (
     <div className="flex flex-col gap-6">
@@ -103,7 +110,7 @@ export function ArenaContent({
           </div>
           <div className="flex flex-col gap-2">
             {lookingCompetitors.map((c) => (
-              <CompetitorCard key={c.id} competitor={c} />
+              <CompetitorCard key={c.id} competitor={c} hasPendingChallenge={challengedSet.has(c.id)} />
             ))}
           </div>
         </section>
@@ -119,7 +126,7 @@ export function ArenaContent({
         {otherCompetitors.length > 0 ? (
           <div className="flex flex-col gap-2">
             {otherCompetitors.map((c) => (
-              <CompetitorCard key={c.id} competitor={c} />
+              <CompetitorCard key={c.id} competitor={c} hasPendingChallenge={challengedSet.has(c.id)} />
             ))}
           </div>
         ) : (

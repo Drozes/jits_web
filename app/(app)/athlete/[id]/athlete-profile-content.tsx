@@ -8,6 +8,7 @@ import { PageContainer } from "@/components/layout/page-container";
 import { Swords } from "lucide-react";
 import { AthleteProfileActions } from "./athlete-profile-actions";
 import { computeStats } from "@/lib/utils";
+import { getPendingChallengeBetween } from "@/lib/api/queries";
 
 export async function AthleteProfileContent({
   paramsPromise,
@@ -55,6 +56,13 @@ export async function AthleteProfileContent({
     .not("outcome", "is", null);
 
   const myStats = computeStats(currentOutcomes ?? []);
+
+  // Check for pending challenge between current athlete and competitor
+  const pendingChallenge = await getPendingChallengeBetween(
+    supabase,
+    currentAthlete.id,
+    competitor.id,
+  );
 
   // Head-to-head matches: find matches where both athletes participated
   const { data: competitorMatches } = await supabase
@@ -133,6 +141,7 @@ export async function AthleteProfileContent({
               ...compStats,
               weight: competitor.current_weight,
             }}
+            pendingChallengeId={pendingChallenge?.id ?? null}
           />
 
           {/* Head-to-Head History */}

@@ -3,6 +3,7 @@ import { requireAthlete } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
 import { ArenaContent } from "./arena-content";
 import { extractGymName } from "@/lib/utils";
+import { getPendingChallengeOpponentIds } from "@/lib/api/queries";
 
 function ArenaSkeleton() {
   return (
@@ -60,6 +61,9 @@ async function ArenaData() {
   const lookingCompetitors = (lookingAthletes ?? []).map(toCompetitor);
   const otherCompetitors = (otherAthletes ?? []).map(toCompetitor);
 
+  // Fetch pending challenge opponent IDs
+  const challengedIds = await getPendingChallengeOpponentIds(supabase, currentAthlete.id);
+
   // Fetch recent completed matches for activity feed
   const { data: recentMatchParticipants } = await supabase
     .from("match_participants")
@@ -112,6 +116,7 @@ async function ArenaData() {
       activityItems={activityItems}
       currentAthleteId={currentAthlete.id}
       currentAthleteLooking={currentAthlete.looking_for_match ?? false}
+      challengedIds={Array.from(challengedIds)}
     />
   );
 }

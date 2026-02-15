@@ -293,6 +293,49 @@ export async function getMatchDetails(
   };
 }
 
+/** Find a pending challenge between two athletes (either direction) */
+export async function getPendingChallengeBetween(
+  supabase: Client,
+  athleteA: string,
+  athleteB: string,
+): Promise<{ id: string } | null> {
+  const { data } = await supabase
+    .from("challenges")
+    .select("id")
+    .eq("status", "pending")
+    .or(
+      `and(challenger_id.eq.${athleteA},opponent_id.eq.${athleteB}),and(challenger_id.eq.${athleteB},opponent_id.eq.${athleteA})`,
+    )
+    .limit(1)
+    .maybeSingle();
+
+  return data ? { id: data.id } : null;
+}
+
+/** Get IDs of all athletes who have a pending challenge with this athlete (either direction) */
+export async function getPendingChallengeOpponentIds(
+  supabase: Client,
+  athleteId: string,
+): Promise<Set<string>> {
+  const [{ data: sent }, { data: received }] = await Promise.all([
+    supabase
+      .from("challenges")
+      .select("opponent_id")
+      .eq("challenger_id", athleteId)
+      .eq("status", "pending"),
+    supabase
+      .from("challenges")
+      .select("challenger_id")
+      .eq("opponent_id", athleteId)
+      .eq("status", "pending"),
+  ]);
+
+  const ids = new Set<string>();
+  for (const c of sent ?? []) ids.add(c.opponent_id);
+  for (const c of received ?? []) ids.add(c.challenger_id);
+  return ids;
+}
+
 /** Fetch full challenge details for match lobby screen */
 export async function getLobbyData(
   supabase: Client,
