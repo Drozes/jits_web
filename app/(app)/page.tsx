@@ -177,6 +177,7 @@ async function DashboardContent() {
                 result={match.result}
                 eloDelta={match.eloDelta}
                 date={match.date}
+                href={`/match/${match.id}/results`}
               />
             ))}
           </div>

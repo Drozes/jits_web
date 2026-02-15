@@ -42,7 +42,7 @@ export function AthleteProfileActions({
         {!isSelf && (
           pendingChallengeId ? (
             <Button className="flex-1 bg-amber-500 hover:bg-amber-600 text-white" asChild>
-              <Link href="/match/pending">
+              <Link href={`/athlete/${competitorId}/challenges`}>
                 <Swords className="mr-2 h-4 w-4" />
                 View Challenge
               </Link>
