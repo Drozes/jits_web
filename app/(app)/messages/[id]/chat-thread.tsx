@@ -104,7 +104,7 @@ export function ChatThread({
   );
 
   return (
-    <div className="flex flex-col -mx-4 -mt-6 h-[calc(100dvh-3.5rem-4rem)]">
+    <div className="fixed inset-0 z-50 mx-auto flex w-full max-w-md flex-col bg-background">
       {/* Header */}
       <div className="flex items-center gap-3 border-b px-4 py-3">
         <button
