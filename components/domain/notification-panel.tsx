@@ -19,10 +19,11 @@ interface NotificationPanelProps {
   challenges: PendingChallenge[];
 }
 
-function ChallengeItem({ challenge }: { challenge: PendingChallenge }) {
+function ChallengeItem({ challenge, onNavigate }: { challenge: PendingChallenge; onNavigate: () => void }) {
   return (
     <Link
       href="/match/pending"
+      onClick={onNavigate}
       className="flex items-center gap-3 rounded-lg p-3 transition-colors hover:bg-accent/50"
     >
       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-yellow-500/10">
@@ -74,7 +75,7 @@ export function NotificationPanel({
           {challenges.length > 0 ? (
             <div className="flex flex-col px-1">
               {challenges.map((c) => (
-                <ChallengeItem key={c.id} challenge={c} />
+                <ChallengeItem key={c.id} challenge={c} onNavigate={() => onOpenChange(false)} />
               ))}
             </div>
           ) : (
@@ -91,7 +92,7 @@ export function NotificationPanel({
                 className="w-full text-xs"
                 asChild
               >
-                <Link href="/match/pending">View all challenges</Link>
+                <Link href="/match/pending" onClick={() => onOpenChange(false)}>View all challenges</Link>
               </Button>
             </div>
           )}

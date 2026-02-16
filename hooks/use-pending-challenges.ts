@@ -42,12 +42,12 @@ export function usePendingChallenges(
     if (data) {
       setChallenges(
         data.map((c) => {
-          const challengerArr = c.challenger as
-            | { display_name: string }[]
+          const challenger = c.challenger as unknown as
+            | { display_name: string }
             | null;
           return {
             id: c.id,
-            challengerName: challengerArr?.[0]?.display_name ?? "Unknown",
+            challengerName: challenger?.display_name ?? "Unknown",
             matchType: c.match_type,
             createdAt: c.created_at,
             expiresAt: c.expires_at,
