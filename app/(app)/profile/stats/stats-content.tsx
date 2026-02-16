@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent } from "@/components/ui/card";
 import { StatsTabs } from "./stats-tabs";
 import { computeStats, computeWinStreak } from "@/lib/utils";
+import { getMatchHistory, getEloHistory } from "@/lib/api/queries";
 
 export async function StatsContent() {
   const { athlete } = await requireAthlete();
@@ -76,6 +77,12 @@ export async function StatsContent() {
   const submissionRate =
     wins > 0 ? Math.round((submissionWins / wins) * 100) : 0;
 
+  // Fetch match history and ELO history in parallel
+  const [matchHistory, eloHistory] = await Promise.all([
+    getMatchHistory(supabase, athlete.id),
+    getEloHistory(supabase, athlete.id),
+  ]);
+
   return (
     <div className="flex flex-col gap-6">
       <h2 className="text-xl font-bold">Performance Stats</h2>
@@ -112,6 +119,9 @@ export async function StatsContent() {
         submissionRate={submissionRate}
         totalMatches={total}
         recentPerformance={recentPerformance}
+        matchHistory={matchHistory}
+        eloHistory={eloHistory}
+        currentElo={athlete.current_elo}
       />
     </div>
   );
