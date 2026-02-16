@@ -9,34 +9,53 @@ import { CheckCircle2, Swords } from "lucide-react";
 
 interface LookingForMatchToggleProps {
   athleteId: string;
-  initialLooking: boolean;
+  initialCasual: boolean;
+  initialRanked: boolean;
 }
 
 export function LookingForMatchToggle({
   athleteId,
-  initialLooking,
+  initialCasual,
+  initialRanked,
 }: LookingForMatchToggleProps) {
   const router = useRouter();
-  const [isLooking, setIsLooking] = useState(initialLooking);
-  const [matchPrefs, setMatchPrefs] = useState<string[]>(["Casual"]);
+  const [casual, setCasual] = useState(initialCasual);
+  const [ranked, setRanked] = useState(initialRanked);
 
-  function togglePref(pref: string) {
-    setMatchPrefs((prev) => {
-      if (prev.includes(pref)) {
-        return prev.length > 1 ? prev.filter((p) => p !== pref) : prev;
-      }
-      return [...prev, pref];
-    });
-  }
+  const isLooking = casual || ranked;
 
-  async function handleToggle(checked: boolean) {
-    setIsLooking(checked);
+  async function persist(nextCasual: boolean, nextRanked: boolean) {
     const supabase = createClient();
     await supabase
       .from("athletes")
-      .update({ looking_for_match: checked })
+      .update({ looking_for_casual: nextCasual, looking_for_ranked: nextRanked })
       .eq("id", athleteId);
     router.refresh();
+  }
+
+  async function handleToggle(checked: boolean) {
+    if (checked) {
+      // Turning on: default to casual
+      setCasual(true);
+      await persist(true, ranked);
+    } else {
+      // Turning off: clear both
+      setCasual(false);
+      setRanked(false);
+      await persist(false, false);
+    }
+  }
+
+  async function togglePref(pref: "casual" | "ranked") {
+    const nextCasual = pref === "casual" ? !casual : casual;
+    const nextRanked = pref === "ranked" ? !ranked : ranked;
+
+    // Don't allow deselecting the last preference — turn off the switch instead
+    if (!nextCasual && !nextRanked) return;
+
+    setCasual(nextCasual);
+    setRanked(nextRanked);
+    await persist(nextCasual, nextRanked);
   }
 
   return (
@@ -74,16 +93,16 @@ export function LookingForMatchToggle({
           </div>
           <div className="flex gap-2">
             <Badge
-              variant={matchPrefs.includes("Casual") ? "default" : "outline"}
+              variant={casual ? "default" : "outline"}
               className="cursor-pointer"
-              onClick={() => togglePref("Casual")}
+              onClick={() => togglePref("casual")}
             >
               Casual
             </Badge>
             <Badge
-              variant={matchPrefs.includes("Ranked") ? "default" : "outline"}
+              variant={ranked ? "default" : "outline"}
               className="cursor-pointer"
-              onClick={() => togglePref("Ranked")}
+              onClick={() => togglePref("ranked")}
             >
               Ranked
             </Badge>

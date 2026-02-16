@@ -15,7 +15,8 @@ interface Competitor {
   currentElo: number;
   gymName?: string;
   eloDiff: number;
-  lookingForMatch: boolean;
+  lookingForCasual: boolean;
+  lookingForRanked: boolean;
 }
 
 interface ActivityItem {
@@ -66,6 +67,12 @@ function CompetitorCard({ competitor, hasPendingChallenge }: { competitor: Compe
                   {competitor.gymName}
                 </div>
               )}
+              {(competitor.lookingForCasual || competitor.lookingForRanked) && (
+                <div className="flex gap-1 mt-1">
+                  {competitor.lookingForCasual && <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Casual</Badge>}
+                  {competitor.lookingForRanked && <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Ranked</Badge>}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -79,14 +86,16 @@ export function ArenaContent({
   otherCompetitors,
   activityItems,
   currentAthleteId,
-  currentAthleteLooking,
+  currentAthleteCasual,
+  currentAthleteRanked,
   challengedIds = [],
 }: {
   lookingCompetitors: Competitor[];
   otherCompetitors: Competitor[];
   activityItems: ActivityItem[];
   currentAthleteId: string;
-  currentAthleteLooking: boolean;
+  currentAthleteCasual: boolean;
+  currentAthleteRanked: boolean;
   challengedIds?: string[];
 }) {
   const challengedSet = new Set(challengedIds);
@@ -95,7 +104,8 @@ export function ArenaContent({
     <div className="flex flex-col gap-6">
       <LookingForMatchToggle
         athleteId={currentAthleteId}
-        initialLooking={currentAthleteLooking}
+        initialCasual={currentAthleteCasual}
+        initialRanked={currentAthleteRanked}
       />
 
       {/* Athletes Looking for Match */}

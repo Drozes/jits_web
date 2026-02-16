@@ -16,7 +16,7 @@ type Client = SupabaseClient<Database>;
 
 /** Common select for athletes with gym join */
 const ATHLETE_WITH_GYM_SELECT =
-  "id, display_name, current_elo, highest_elo, current_weight, status, looking_for_match, free_agent, primary_gym_id, created_at, gyms!fk_athletes_primary_gym(name)" as const;
+  "id, display_name, current_elo, highest_elo, current_weight, status, looking_for_casual, looking_for_ranked, free_agent, primary_gym_id, created_at, gyms!fk_athletes_primary_gym(name)" as const;
 
 export interface AthleteWithGym {
   id: string;
@@ -25,7 +25,8 @@ export interface AthleteWithGym {
   highest_elo: number;
   current_weight: number | null;
   status: string;
-  looking_for_match: boolean;
+  looking_for_casual: boolean;
+  looking_for_ranked: boolean;
   free_agent: boolean;
   primary_gym_id: string | null;
   created_at: string;

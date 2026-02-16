@@ -192,15 +192,18 @@ export async function recordMatchResult(
 // Athlete mutations
 // ---------------------------------------------------------------------------
 
-/** Toggle looking_for_match status */
-export async function toggleLookingForMatch(
+/** Toggle looking_for_casual / looking_for_ranked preferences */
+export async function toggleMatchPreferences(
   supabase: Client,
   athleteId: string,
-  looking: boolean,
+  prefs: { lookingForCasual: boolean; lookingForRanked: boolean },
 ): Promise<Result<void>> {
   const { error } = await supabase
     .from("athletes")
-    .update({ looking_for_match: looking })
+    .update({
+      looking_for_casual: prefs.lookingForCasual,
+      looking_for_ranked: prefs.lookingForRanked,
+    })
     .eq("id", athleteId);
 
   if (error) {
