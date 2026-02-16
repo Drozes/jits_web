@@ -5,6 +5,7 @@ import { AppHeader } from "@/components/layout/app-header";
 import { PageContainer } from "@/components/layout/page-container";
 import { GlobalNotificationsProvider } from "@/components/layout/global-notifications-provider";
 import { OnlinePresenceBootstrap } from "@/components/layout/online-presence-bootstrap";
+import { DeploymentCheckBootstrap } from "@/components/layout/deployment-check-bootstrap";
 import { NotificationBell } from "@/components/domain/notification-bell";
 import { getActiveAthlete } from "@/lib/guards";
 
@@ -40,6 +41,7 @@ export default function AppLayout({
       <Suspense>
         <PresenceBootstrap />
       </Suspense>
+      <DeploymentCheckBootstrap />
     </div>
   );
 }
