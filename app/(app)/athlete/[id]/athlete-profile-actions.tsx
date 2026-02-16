@@ -5,7 +5,9 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { CompareStatsModal } from "@/components/domain/compare-stats-modal";
 import { ChallengeSheet } from "@/components/domain/challenge-sheet";
-import { Swords, BarChart3 } from "lucide-react";
+import { Swords, BarChart3, MessageSquare } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 
 interface AthleteStats {
   displayName: string;
@@ -33,8 +35,26 @@ export function AthleteProfileActions({
 }: AthleteProfileActionsProps) {
   const [compareOpen, setCompareOpen] = useState(false);
   const [challengeOpen, setChallengeOpen] = useState(false);
+  const [messagingLoading, setMessagingLoading] = useState(false);
+  const router = useRouter();
 
   const isSelf = currentAthleteId === competitorId;
+
+  async function handleMessage() {
+    setMessagingLoading(true);
+    try {
+      const supabase = createClient();
+      const { data } = await supabase.rpc("create_direct_conversation", {
+        p_other_athlete_id: competitorId,
+      });
+      const result = data as unknown as { conversation_id: string } | null;
+      if (result?.conversation_id) {
+        router.push(`/messages/${result.conversation_id}`);
+      }
+    } finally {
+      setMessagingLoading(false);
+    }
+  }
 
   return (
     <>
@@ -53,6 +73,17 @@ export function AthleteProfileActions({
               Challenge
             </Button>
           )
+        )}
+        {!isSelf && (
+          <Button
+            className="flex-1"
+            variant="outline"
+            onClick={handleMessage}
+            disabled={messagingLoading}
+          >
+            <MessageSquare className="mr-2 h-4 w-4" />
+            Message
+          </Button>
         )}
         <Button
           className="flex-1"

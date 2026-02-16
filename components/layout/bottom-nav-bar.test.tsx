@@ -6,13 +6,18 @@ vi.mock("next/navigation", () => ({
   usePathname: () => "/",
 }));
 
+vi.mock("@/hooks/use-unread-count", () => ({
+  useUnreadCount: () => 0,
+}));
+
 describe("BottomNavBar", () => {
-  it("renders all four navigation tabs", () => {
+  it("renders all five navigation tabs", () => {
     render(<BottomNavBar />);
 
     expect(screen.getByText("Home")).toBeInTheDocument();
     expect(screen.getByText("Rankings")).toBeInTheDocument();
     expect(screen.getByText("Arena")).toBeInTheDocument();
+    expect(screen.getByText("Messages")).toBeInTheDocument();
     expect(screen.getByText("Profile")).toBeInTheDocument();
   });
 
@@ -37,6 +42,10 @@ describe("BottomNavBar", () => {
     expect(screen.getByText("Arena").closest("a")).toHaveAttribute(
       "href",
       "/arena",
+    );
+    expect(screen.getByText("Messages").closest("a")).toHaveAttribute(
+      "href",
+      "/messages",
     );
     expect(screen.getByText("Profile").closest("a")).toHaveAttribute(
       "href",
