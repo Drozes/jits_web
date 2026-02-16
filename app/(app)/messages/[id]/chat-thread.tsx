@@ -117,7 +117,7 @@ export function ChatThread({
   const isGroupChat = conversationType === "gym";
 
   return (
-    <div className="fixed inset-0 z-50 mx-auto flex w-full max-w-md flex-col bg-background">
+    <div className="fixed inset-0 z-50 mx-auto flex w-full max-w-md flex-col bg-background pt-[env(safe-area-inset-top)]">
       <ThreadHeader
         name={headerName}
         photoUrl={headerPhotoUrl}
@@ -129,7 +129,7 @@ export function ChatThread({
       <div
         ref={scrollRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto px-4 py-3"
+        className="flex-1 overflow-y-auto overscroll-contain px-4 py-3"
       >
         {hasMore && (
           <button
@@ -193,7 +193,8 @@ function ThreadHeader({
     <div className="flex items-center gap-3 border-b px-4 py-3">
       <button
         onClick={onBack}
-        className="text-muted-foreground hover:text-foreground"
+        className="flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground hover:text-foreground active:bg-muted"
+        aria-label="Go back"
       >
         <ArrowLeft className="h-5 w-5" />
       </button>

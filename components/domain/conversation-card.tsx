@@ -29,7 +29,7 @@ export function ConversationCard({
   return (
     <Link
       href={`/messages/${c.conversation_id}`}
-      className="flex items-center gap-3 rounded-lg px-3 py-3 transition-colors hover:bg-muted/50"
+      className="flex items-center gap-3 rounded-lg px-3 py-3 transition-all hover:bg-muted/50 active:scale-[0.98] active:opacity-90"
     >
       <OnlineIndicator athleteId={isDirect ? (c.other_athlete_id ?? "") : ""} className="shrink-0">
         <Avatar className="h-10 w-10 border-2 border-accent/20 bg-gradient-to-br from-primary to-primary/80 text-white">

@@ -24,7 +24,7 @@ export function BottomNavBar() {
   if (HIDE_PATTERNS.some((p) => p.test(pathname))) return null;
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="mx-auto flex h-16 max-w-md items-center justify-around">
         {tabs.map(({ href, label, icon: Icon }) => {
           const isActive =
