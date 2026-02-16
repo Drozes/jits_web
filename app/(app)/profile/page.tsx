@@ -1,10 +1,14 @@
 import { Suspense } from "react";
 import { ProfileContent } from "./profile-content";
 
-export default function ProfilePage() {
+export default function ProfilePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ demo?: string }>;
+}) {
   return (
     <Suspense fallback={<ProfileSkeleton />}>
-      <ProfileContent />
+      <ProfileContent searchParams={searchParams} />
     </Suspense>
   );
 }

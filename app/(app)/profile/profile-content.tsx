@@ -7,30 +7,44 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { ShareProfileSheet } from "@/components/domain/share-profile-sheet";
-import { computeStats } from "@/lib/utils";
+import { computeStats, computeWinStreak } from "@/lib/utils";
 import { ThemeSwitcher } from "@/components/theme-switcher";
-import {
-  Trophy,
-  Target,
-  Swords,
-  Award,
-  Settings,
-  Share2,
-  Palette,
-} from "lucide-react";
+import { AchievementsSection } from "./achievements-section";
+import { Trophy, Settings, Share2, Palette } from "lucide-react";
 
-export async function ProfileContent() {
+const DEMO_DATA = {
+  wins: 18,
+  losses: 6,
+  winRate: 75,
+  winStreak: 5,
+  fastestWin: 147, // 2:27
+  submissionRate: 72,
+  eloThisMonth: 45,
+  totalMatches: 24,
+};
+
+export async function ProfileContent({
+  searchParams,
+}: {
+  searchParams: Promise<{ demo?: string }>;
+}) {
+  const { demo } = await searchParams;
+  const isDemo = demo === "true";
   const { athlete } = await requireAthlete();
   const supabase = await createClient();
 
-  // Fetch win/loss stats from match_participants
-  const { data: outcomes } = await supabase
+  // Fetch match participations with match details for stats + achievements
+  const { data: participations } = await supabase
     .from("match_participants")
-    .select("outcome")
+    .select(
+      "outcome, elo_delta, match_id, matches(created_at, duration_seconds, result)",
+    )
     .eq("athlete_id", athlete.id)
-    .not("outcome", "is", null);
+    .not("outcome", "is", null)
+    .order("match_id", { ascending: false });
 
-  const { wins, losses, winRate } = computeStats(outcomes ?? []);
+  const { wins, losses, winRate } = computeStats(participations ?? []);
+  const winStreak = computeWinStreak(participations ?? []);
 
   // Fetch gym name via join
   let gymName: string | null = null;
@@ -43,19 +57,47 @@ export async function ProfileContent() {
     gymName = gym?.name ?? null;
   }
 
-  const achievements = [
-    { name: "Win Streak", value: "12", icon: Trophy, color: "text-yellow-600" },
-    { name: "Quick Finisher", value: "< 3min", icon: Target, color: "text-blue-600" },
-    { name: "Sub Master", value: "89%", icon: Swords, color: "text-green-600" },
-    { name: "Rank Climber", value: "+15", icon: Award, color: "text-purple-600" },
-  ];
+  // Compute achievement data from participations
+  const matchData = (participations ?? []).map((p) => {
+    const matchArr = p.matches as
+      | { created_at: string; duration_seconds: number; result: string | null }[]
+      | null;
+    const match = matchArr?.[0];
+    return { outcome: p.outcome, eloDelta: p.elo_delta ?? 0, match };
+  });
+
+  const submissionWins = matchData.filter(
+    (m) => m.outcome === "win" && m.match?.result === "submission",
+  ).length;
+  const submissionRate =
+    wins > 0 ? Math.round((submissionWins / wins) * 100) : 0;
+
+  const winDurations = matchData
+    .filter((m) => m.outcome === "win" && m.match?.duration_seconds)
+    .map((m) => m.match!.duration_seconds);
+  const fastestWin =
+    winDurations.length > 0 ? Math.min(...winDurations) : null;
+
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const eloThisMonth = matchData
+    .filter((m) => m.match && new Date(m.match.created_at) >= startOfMonth)
+    .reduce((sum, m) => sum + m.eloDelta, 0);
+
+  const totalMatches = wins + losses;
+
+  // Use demo data when ?demo=true is in the URL
+  const d = isDemo ? DEMO_DATA : null;
+  const displayStats = d
+    ? { wins: d.wins, losses: d.losses, winRate: d.winRate }
+    : { wins, losses, winRate };
 
   return (
     <div className="flex flex-col gap-6">
       <EditableProfileHeader
         athlete={athlete}
         gymName={gymName}
-        stats={{ wins, losses, winRate }}
+        stats={displayStats}
       />
 
       <div className="flex gap-2">
@@ -70,8 +112,8 @@ export async function ProfileContent() {
             id: athlete.id,
             displayName: athlete.display_name,
             elo: athlete.current_elo,
-            wins,
-            losses,
+            wins: displayStats.wins,
+            losses: displayStats.losses,
             weight: athlete.current_weight,
             gymName,
           }}
@@ -82,33 +124,15 @@ export async function ProfileContent() {
         </ShareProfileSheet>
       </div>
 
-      {/* Achievements */}
-      <section>
-        <div className="flex items-center gap-2 mb-3">
-          <Award className="h-5 w-5 text-primary" />
-          <h3 className="text-lg font-semibold">Recent Achievements</h3>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          {achievements.map((achievement) => {
-            const Icon = achievement.icon;
-            return (
-              <Card key={achievement.name}>
-                <CardContent className="p-3">
-                  <div className="flex items-center gap-2">
-                    <Icon className={`h-5 w-5 ${achievement.color}`} />
-                    <div>
-                      <p className="text-sm font-medium">{achievement.name}</p>
-                      <p className="text-lg font-bold text-primary">
-                        {achievement.value}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      </section>
+      <AchievementsSection
+        totalMatches={d?.totalMatches ?? totalMatches}
+        winStreak={d?.winStreak ?? winStreak}
+        fastestWin={d?.fastestWin ?? fastestWin}
+        submissionRate={d?.submissionRate ?? submissionRate}
+        eloThisMonth={d?.eloThisMonth ?? eloThisMonth}
+        isDemo={isDemo}
+        hasRealData={totalMatches > 0}
+      />
 
       {/* Account Section */}
       <section>
