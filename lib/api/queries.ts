@@ -52,7 +52,7 @@ export async function getAthleteProfile(
   if (!raw) return null;
 
   const gymName = extractGymName(
-    raw.gyms as { name: string }[] | null,
+    raw.gyms as unknown as { name: string } | null,
   );
 
   // Single query for both stats and win streak (ordered, limited to 50)
@@ -114,7 +114,7 @@ export async function getLeaderboard(
 
   return athletes.map((a) => ({
     ...a,
-    gymName: extractGymName(a.gyms as { name: string }[] | null),
+    gymName: extractGymName(a.gyms as unknown as { name: string } | null),
     stats: computeStats(outcomesByAthlete.get(a.id) ?? []),
   }));
 }

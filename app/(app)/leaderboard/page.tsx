@@ -50,7 +50,7 @@ async function LeaderboardData() {
       rank: i + 1,
       displayName: a.display_name,
       currentElo: a.current_elo,
-      gymName: extractGymName(a.gyms as { name: string }[] | null) ?? undefined,
+      gymName: extractGymName(a.gyms as unknown as { name: string } | null) ?? undefined,
       wins: stats.wins,
       losses: stats.losses,
       isCurrentUser: a.id === currentAthlete.id,
@@ -61,7 +61,7 @@ async function LeaderboardData() {
   const gymStatsMap = new Map<string, { name: string; totalElo: number; memberCount: number }>();
   for (const a of athletes ?? []) {
     if (!a.primary_gym_id) continue;
-    const gymName = extractGymName(a.gyms as { name: string }[] | null) ?? "Unknown";
+    const gymName = extractGymName(a.gyms as unknown as { name: string } | null) ?? "Unknown";
     const entry = gymStatsMap.get(a.primary_gym_id) ?? { name: gymName, totalElo: 0, memberCount: 0 };
     entry.totalElo += a.current_elo;
     entry.memberCount++;

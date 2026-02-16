@@ -38,7 +38,7 @@ async function SwipeData() {
       id: a.id,
       displayName: a.display_name,
       currentElo: a.current_elo,
-      gymName: extractGymName(a.gyms as { name: string }[] | null),
+      gymName: extractGymName(a.gyms as unknown as { name: string } | null),
       weight: a.current_weight,
       wins: stats.wins,
       losses: stats.losses,

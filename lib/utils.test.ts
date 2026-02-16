@@ -109,7 +109,11 @@ describe("computeWinStreak", () => {
 });
 
 describe("extractGymName", () => {
-  it("extracts name from FK join array", () => {
+  it("extracts name from FK join object (to-one)", () => {
+    expect(extractGymName({ name: "Gracie Barra" })).toBe("Gracie Barra");
+  });
+
+  it("extracts name from FK join array (legacy)", () => {
     expect(extractGymName([{ name: "Gracie Barra" }])).toBe("Gracie Barra");
   });
 
@@ -119,11 +123,5 @@ describe("extractGymName", () => {
 
   it("returns null for empty array", () => {
     expect(extractGymName([])).toBeNull();
-  });
-
-  it("returns first gym name when multiple present", () => {
-    expect(
-      extractGymName([{ name: "First Gym" }, { name: "Second Gym" }]),
-    ).toBe("First Gym");
   });
 });

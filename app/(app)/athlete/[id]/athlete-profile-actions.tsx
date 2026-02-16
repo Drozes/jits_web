@@ -58,41 +58,43 @@ export function AthleteProfileActions({
 
   return (
     <>
-      <div className="flex gap-2">
+      <div className="flex flex-col gap-2">
         {!isSelf && (
           pendingChallengeId ? (
-            <Button className="flex-1 bg-amber-500 hover:bg-amber-600 text-white" asChild>
+            <Button className="w-full bg-amber-500 hover:bg-amber-600 text-white" asChild>
               <Link href={`/athlete/${competitorId}/challenges`}>
                 <Swords className="mr-2 h-4 w-4" />
                 View Challenge
               </Link>
             </Button>
           ) : (
-            <Button className="flex-1" onClick={() => setChallengeOpen(true)}>
+            <Button className="w-full" onClick={() => setChallengeOpen(true)}>
               <Swords className="mr-2 h-4 w-4" />
               Challenge
             </Button>
           )
         )}
-        {!isSelf && (
+        <div className="flex gap-2">
+          {!isSelf && (
+            <Button
+              className="flex-1"
+              variant="outline"
+              onClick={handleMessage}
+              disabled={messagingLoading}
+            >
+              <MessageSquare className="mr-2 h-4 w-4" />
+              Message
+            </Button>
+          )}
           <Button
-            className="flex-1"
+            className={isSelf ? "w-full" : "flex-1"}
             variant="outline"
-            onClick={handleMessage}
-            disabled={messagingLoading}
+            onClick={() => setCompareOpen(true)}
           >
-            <MessageSquare className="mr-2 h-4 w-4" />
-            Message
+            <BarChart3 className="mr-2 h-4 w-4" />
+            Compare Stats
           </Button>
-        )}
-        <Button
-          className="flex-1"
-          variant="outline"
-          onClick={() => setCompareOpen(true)}
-        >
-          <BarChart3 className="mr-2 h-4 w-4" />
-          Compare Stats
-        </Button>
+        </div>
       </div>
 
       {!isSelf && !pendingChallengeId && (

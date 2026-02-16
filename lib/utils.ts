@@ -42,9 +42,11 @@ export function computeWinStreak(
 }
 
 export function extractGymName(
-  gyms: { name: string }[] | null,
+  gyms: { name: string } | { name: string }[] | null,
 ): string | null {
-  return (gyms as { name: string }[] | null)?.[0]?.name ?? null;
+  if (!gyms) return null;
+  if (Array.isArray(gyms)) return gyms[0]?.name ?? null;
+  return gyms.name ?? null;
 }
 
 export function formatRelativeDate(dateString: string): string {

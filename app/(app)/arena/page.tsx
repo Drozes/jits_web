@@ -54,7 +54,7 @@ async function ArenaData() {
     id: a.id,
     displayName: a.display_name,
     currentElo: a.current_elo,
-    gymName: extractGymName(a.gyms as { name: string }[] | null) ?? undefined,
+    gymName: extractGymName(a.gyms as unknown as { name: string } | null) ?? undefined,
     eloDiff: a.current_elo - currentAthlete.current_elo,
     lookingForCasual: a.looking_for_casual,
     lookingForRanked: a.looking_for_ranked,

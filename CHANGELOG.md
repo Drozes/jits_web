@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### UI Fixes (2026-02-16)
+
+**Fixed**
+- Athlete profile action buttons no longer overflow on mobile — Challenge is now full-width primary CTA with Message and Compare side-by-side below
+- Gym names showing "Unknown" everywhere — `extractGymName()` now handles PostgREST's to-one FK join shape (single object) instead of incorrectly treating it as an array. Fixes gym leaderboard, arena, and swipe pages.
+
 ### Online Presence Indicators (2026-02-16)
 
 **Added**
