@@ -223,7 +223,7 @@ Typed wrappers for all Supabase queries and mutations. Use these instead of raw 
 - `getLeaderboard(supabase, limit?)` — top N athletes by ELO with stats
 - `getMatchHistory(supabase, athleteId)` — wraps `get_match_history` RPC
 - `getEloHistory(supabase, athleteId)` — wraps `get_elo_history` RPC
-- `getEloStakes(supabase, challengerElo, opponentElo)` — wraps `calculate_elo_stakes` RPC
+- `getEloStakes(supabase, challengerElo, opponentElo, challengerWeight?, opponentWeight?)` — wraps `calculate_elo_stakes` RPC (weight-aware)
 - `getSubmissionTypes(supabase)` — all 23 active submission techniques
 - `canCreateChallenge(supabase, opponentId?)` — wraps `can_create_challenge` RPC
 - `getLobbyData(supabase, challengeId)` — full challenge details for match lobby
@@ -291,7 +291,9 @@ Read these docs before building challenge, match, ELO, or presence features. Key
 - **Challenges:** INSERT with RLS validation, max 3 pending, opponent must be `active`
 - **Starting matches:** use `startMatchFromChallenge()` then `startMatch()` — never direct INSERT
 - **Recording results:** use `recordMatchResult()` — auto-calculates ELO for ranked matches
-- **ELO stakes preview:** use `getEloStakes()` for display before sending challenges
+- **ELO stakes preview:** use `getEloStakes()` for display before sending challenges — pass weights for weight-aware stakes
+- **Weight-aware ELO:** When both athletes have weights, heavier athletes get a phantom ELO offset (+50 per IBJJF division gap). Pass weights to `calculate_elo_stakes` for accurate preview. Show `weight_division_gap` when > 0.
+- **Draws always cost ELO (Pressure Score):** Both athletes lose ELO on draw. Show `challenger_draw` / `opponent_draw` in stakes UI (amber color). Equal match = harshest penalty.
 
 ### Frontend/Backend Discrepancies (Status)
 

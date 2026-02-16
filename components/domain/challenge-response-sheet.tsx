@@ -19,6 +19,7 @@ import {
   Swords,
   TrendingUp,
   TrendingDown,
+  Minus,
   Check,
   Scale,
 } from "lucide-react";
@@ -61,11 +62,12 @@ export function ChallengeResponseSheet({
       .rpc("calculate_elo_stakes", {
         challenger_elo: challenge.challengerElo,
         opponent_elo: currentAthleteElo,
+        ...(challenge.challengerWeight ? { challenger_weight: challenge.challengerWeight } : {}),
       })
       .then(({ data }) => {
         if (data) setStakes(data as EloStakes);
       });
-  }, [challenge.matchType, challenge.challengerElo, currentAthleteElo, open]);
+  }, [challenge.matchType, challenge.challengerElo, challenge.challengerWeight, currentAthleteElo, open]);
 
   function resetState() {
     setWeight("");
@@ -181,13 +183,22 @@ export function ChallengeResponseSheet({
               <Card className="bg-primary/5 border-primary/20">
                 <CardContent className="p-3">
                   <p className="text-xs font-medium mb-2">Your ELO Stakes</p>
-                  <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="grid grid-cols-3 gap-3 text-sm">
                     <div className="flex items-center gap-1.5">
                       <TrendingUp className="h-3.5 w-3.5 text-green-500" />
                       <span>
                         Win:{" "}
                         <span className="font-semibold text-green-500">
                           +{stakes.opponent_win}
+                        </span>
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <Minus className="h-3.5 w-3.5 text-amber-500" />
+                      <span>
+                        Draw:{" "}
+                        <span className="font-semibold text-amber-500">
+                          {stakes.opponent_draw}
                         </span>
                       </span>
                     </div>
@@ -204,6 +215,9 @@ export function ChallengeResponseSheet({
                   <p className="text-xs text-muted-foreground mt-2">
                     Your win probability:{" "}
                     {Math.round(stakes.opponent_expected * 100)}%
+                    {stakes.weight_division_gap > 0 && (
+                      <> &middot; {stakes.weight_division_gap} weight class{stakes.weight_division_gap > 1 ? "es" : ""} apart</>
+                    )}
                   </p>
                 </CardContent>
               </Card>

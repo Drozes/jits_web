@@ -29,6 +29,8 @@ export async function LobbyContent({
           supabase,
           lobby.challenger.current_elo,
           lobby.opponent.current_elo,
+          lobby.challenger_weight,
+          lobby.opponent_weight,
         )
       : null;
 
@@ -53,13 +55,21 @@ export async function LobbyContent({
               ELO Stakes
             </p>
             <div className="flex justify-center gap-4 text-sm font-semibold">
-              <span className="text-green-600">
+              <span className="text-green-500">
                 Win: +{isChallenger ? stakes.challenger_win : stakes.opponent_win}
               </span>
-              <span className="text-red-600">
+              <span className="text-amber-500">
+                Draw: {isChallenger ? stakes.challenger_draw : stakes.opponent_draw}
+              </span>
+              <span className="text-red-500">
                 Loss: {isChallenger ? stakes.challenger_loss : stakes.opponent_loss}
               </span>
             </div>
+            {stakes.weight_division_gap > 0 && (
+              <p className="text-xs text-muted-foreground text-center mt-2">
+                {stakes.weight_division_gap} weight class{stakes.weight_division_gap > 1 ? "es" : ""} apart
+              </p>
+            )}
           </CardContent>
         </Card>
       )}

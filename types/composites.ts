@@ -45,10 +45,14 @@ export interface ComputedStats {
 export interface EloStakes {
   challenger_win: number;
   challenger_loss: number;
+  challenger_draw: number;
   opponent_win: number;
   opponent_loss: number;
+  opponent_draw: number;
   challenger_expected: number;
   opponent_expected: number;
+  weight_division_gap: number;
+  draw_score: number;
 }
 
 /** Row returned by get_match_history RPC */
@@ -73,15 +77,22 @@ export interface StartMatchResponse {
   error?: string;
 }
 
+/** ELO change for a single player */
+interface EloChange {
+  before: number;
+  after: number;
+  delta: number;
+}
+
 /** Response from record_match_result RPC */
 export interface RecordResultResponse {
   success: boolean;
   match_id?: string;
   result?: string;
-  elo_changes?: {
-    winner: { before: number; after: number; delta: number };
-    loser: { before: number; after: number; delta: number };
-  } | null;
+  elo_changes?:
+    | ({ winner: EloChange; loser: EloChange; weight_division_gap?: number } & { player_a?: never; player_b?: never })
+    | ({ player_a: EloChange; player_b: EloChange; weight_division_gap?: number } & { winner?: never; loser?: never })
+    | null;
   error?: string;
 }
 

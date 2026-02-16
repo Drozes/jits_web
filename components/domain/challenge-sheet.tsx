@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Swords, TrendingUp, TrendingDown, Check } from "lucide-react";
+import { Swords, TrendingUp, TrendingDown, Minus, Check } from "lucide-react";
 import type { EloStakes } from "@/types/composites";
 import { MATCH_TYPE, type MatchType } from "@/lib/constants";
 
@@ -22,6 +22,7 @@ interface ChallengeSheetProps {
   competitorId: string;
   competitorName: string;
   competitorElo: number;
+  competitorWeight: number | null;
   currentAthleteId: string;
   currentAthleteElo: number;
   currentAthleteWeight: number | null;
@@ -33,6 +34,7 @@ export function ChallengeSheet({
   competitorId,
   competitorName,
   competitorElo,
+  competitorWeight,
   currentAthleteId,
   currentAthleteElo,
   currentAthleteWeight,
@@ -58,11 +60,13 @@ export function ChallengeSheet({
       .rpc("calculate_elo_stakes", {
         challenger_elo: currentAthleteElo,
         opponent_elo: competitorElo,
+        ...(currentAthleteWeight ? { challenger_weight: currentAthleteWeight } : {}),
+        ...(competitorWeight ? { opponent_weight: competitorWeight } : {}),
       })
       .then(({ data }) => {
         if (data) setStakes(data as EloStakes);
       });
-  }, [matchType, open, currentAthleteElo, competitorElo]);
+  }, [matchType, open, currentAthleteElo, competitorElo, currentAthleteWeight, competitorWeight]);
 
   function resetState() {
     setMatchType(MATCH_TYPE.CASUAL);
@@ -172,10 +176,14 @@ export function ChallengeSheet({
               <Card className="bg-primary/5 border-primary/20">
                 <CardContent className="p-3">
                   <p className="text-xs font-medium mb-2">ELO Stakes</p>
-                  <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="grid grid-cols-3 gap-3 text-sm">
                     <div className="flex items-center gap-1.5">
                       <TrendingUp className="h-3.5 w-3.5 text-green-500" />
                       <span>Win: <span className="font-semibold text-green-500">+{stakes.challenger_win}</span></span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <Minus className="h-3.5 w-3.5 text-amber-500" />
+                      <span>Draw: <span className="font-semibold text-amber-500">{stakes.challenger_draw}</span></span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <TrendingDown className="h-3.5 w-3.5 text-red-500" />
@@ -184,6 +192,9 @@ export function ChallengeSheet({
                   </div>
                   <p className="text-xs text-muted-foreground mt-2">
                     Win probability: {Math.round(stakes.challenger_expected * 100)}%
+                    {stakes.weight_division_gap > 0 && (
+                      <> &middot; {stakes.weight_division_gap} weight class{stakes.weight_division_gap > 1 ? "es" : ""} apart</>
+                    )}
                   </p>
                 </CardContent>
               </Card>

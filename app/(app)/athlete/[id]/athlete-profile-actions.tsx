@@ -100,6 +100,7 @@ export function AthleteProfileActions({
           competitorId={competitorId}
           competitorName={competitor.displayName}
           competitorElo={competitor.elo}
+          competitorWeight={competitor.weight}
           currentAthleteId={currentAthleteId}
           currentAthleteElo={currentAthlete.elo}
           currentAthleteWeight={currentAthlete.weight}

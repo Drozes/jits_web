@@ -30,7 +30,7 @@ export function ResultsDisplay({ match, currentAthleteId }: ResultsDisplayProps)
       ? "text-green-500"
       : current?.outcome === "loss"
         ? "text-red-500"
-        : "text-muted-foreground";
+        : "text-amber-500";
 
   return (
     <div className="space-y-6 text-center animate-page-in">
@@ -61,12 +61,13 @@ export function ResultsDisplay({ match, currentAthleteId }: ResultsDisplayProps)
       </Card>
 
       {match.match_type === MATCH_TYPE.RANKED &&
-        current?.elo_delta !== undefined &&
-        current.elo_delta !== 0 && (
+        current?.elo_delta !== undefined && (
           <EloChangeCard
             eloBefore={current.elo_before}
             eloAfter={current.elo_after}
             eloDelta={current.elo_delta}
+            isDraw={current.outcome === "draw"}
+            weightDivisionGap={current.weight_division_gap}
           />
         )}
 
@@ -86,11 +87,21 @@ function EloChangeCard({
   eloBefore,
   eloAfter,
   eloDelta,
+  isDraw,
+  weightDivisionGap,
 }: {
   eloBefore: number | null;
   eloAfter: number | null;
   eloDelta: number;
+  isDraw: boolean;
+  weightDivisionGap: number | null;
 }) {
+  const deltaColor = eloDelta > 0
+    ? "text-green-500"
+    : isDraw
+      ? "text-amber-500"
+      : "text-red-500";
+
   return (
     <Card>
       <CardContent className="py-4 px-4">
@@ -103,15 +114,16 @@ function EloChangeCard({
           <span className="text-lg font-bold tabular-nums">
             {eloAfter ?? "—"}
           </span>
-          <span
-            className={`text-sm font-semibold ${
-              eloDelta > 0 ? "text-green-500" : "text-red-500"
-            }`}
-          >
+          <span className={`text-sm font-semibold ${deltaColor}`}>
             ({eloDelta > 0 ? "+" : ""}
             {eloDelta})
           </span>
         </div>
+        {weightDivisionGap != null && weightDivisionGap > 0 && (
+          <p className="text-xs text-muted-foreground text-center mt-2">
+            {weightDivisionGap} weight class{weightDivisionGap > 1 ? "es" : ""} apart
+          </p>
+        )}
       </CardContent>
     </Card>
   );

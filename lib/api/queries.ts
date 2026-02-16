@@ -186,15 +186,19 @@ export async function getEloHistory(
   return (data as EloHistoryRow[]) ?? [];
 }
 
-/** Preview ELO stakes for a potential ranked match */
+/** Preview ELO stakes for a potential ranked match (weight-aware) */
 export async function getEloStakes(
   supabase: Client,
   challengerElo: number,
   opponentElo: number,
+  challengerWeight?: number | null,
+  opponentWeight?: number | null,
 ): Promise<EloStakes | null> {
   const { data } = await supabase.rpc("calculate_elo_stakes", {
     challenger_elo: challengerElo,
     opponent_elo: opponentElo,
+    ...(challengerWeight ? { challenger_weight: challengerWeight } : {}),
+    ...(opponentWeight ? { opponent_weight: opponentWeight } : {}),
   });
   return (data as unknown as EloStakes) ?? null;
 }
@@ -259,6 +263,7 @@ export interface MatchParticipant {
   elo_before: number | null;
   elo_after: number | null;
   elo_delta: number;
+  weight_division_gap: number | null;
 }
 
 export interface MatchDetails {
@@ -283,7 +288,7 @@ export async function getMatchDetails(
     .select(
       `id, challenge_id, match_type, duration_seconds, status, result, started_at, completed_at,
       match_participants(
-        athlete_id, role, outcome, elo_before, elo_after, elo_delta,
+        athlete_id, role, outcome, elo_before, elo_after, elo_delta, weight_division_gap,
         athletes!fk_participants_athlete(display_name, current_elo)
       )`,
     )
@@ -308,6 +313,7 @@ export async function getMatchDetails(
         elo_before: part.elo_before as number | null,
         elo_after: part.elo_after as number | null,
         elo_delta: (part.elo_delta as number) ?? 0,
+        weight_division_gap: (part.weight_division_gap as number | null) ?? null,
       };
     },
   );

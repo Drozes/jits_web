@@ -322,6 +322,7 @@ export type Database = {
             | null
           role: Database["public"]["Enums"]["participant_role_enum"]
           status: string
+          weight_division_gap: number | null
         }
         Insert: {
           athlete_id: string
@@ -335,6 +336,7 @@ export type Database = {
             | null
           role?: Database["public"]["Enums"]["participant_role_enum"]
           status?: string
+          weight_division_gap?: number | null
         }
         Update: {
           athlete_id?: string
@@ -348,6 +350,7 @@ export type Database = {
             | null
           role?: Database["public"]["Enums"]["participant_role_enum"]
           status?: string
+          weight_division_gap?: number | null
         }
         Relationships: [
           {
@@ -570,8 +573,10 @@ export type Database = {
       calculate_elo_stakes: {
         Args: {
           challenger_elo: number
+          challenger_weight?: number
           k_factor?: number
           opponent_elo: number
+          opponent_weight?: number
         }
         Returns: Json
       }
@@ -652,6 +657,7 @@ export type Database = {
           unread_count: number
         }[]
       }
+      get_weight_division: { Args: { p_weight: number }; Returns: number }
       is_conversation_participant: {
         Args: { p_conversation_id: string }
         Returns: boolean
