@@ -184,6 +184,25 @@ Shell components that define the app's structure:
 - [x] `share-profile-sheet.tsx` refactored to use `athlete` object prop
 - [ ] Auth form components (`login-form`, `sign-up-form`, `forgot-password-form`) share ~70% identical code
 
+## Chat UI Patterns
+
+### Message Grouping
+
+Consecutive messages from the same sender within 2 minutes are grouped. Pass `isFirstInGroup` / `isLastInGroup` booleans to `MessageBubble`. Effects:
+- **Spacing:** 0.5 gap within groups, 12px gap between groups
+- **Border radius:** Corners flatten where messages connect (e.g., `rounded-tr-md` on non-first own messages)
+- **Timestamps:** Only shown on the last message in a group
+- **Avatars:** Only shown on the last message in a group (bottom-aligned)
+- **Sender names:** Only shown on the first message in a group (group chats only)
+
+### Thread Participant Data
+
+The thread page fetches all participant profiles server-side into a `Record<string, ParticipantInfo>` map keyed by athlete ID. This map is passed to `ChatThread` → `MessageList` → `MessageBubble` for avatar/name rendering. No per-message queries needed.
+
+### Date Separators
+
+`DateSeparator` renders "Today", "Yesterday", weekday names (< 7 days), or "Mon DD" with horizontal rules. Inserted in `MessageList` when the day changes between messages.
+
 ## Key FK Join Names
 
 ```
