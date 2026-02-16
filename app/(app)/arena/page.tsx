@@ -28,14 +28,14 @@ async function ArenaData() {
   const { athlete: currentAthlete } = await requireAthlete();
   const supabase = await createClient();
 
-  const athleteSelect = "id, display_name, current_elo, looking_for_match, primary_gym_id, gyms!fk_athletes_primary_gym(name)";
+  const athleteSelect = "id, display_name, current_elo, looking_for_casual, looking_for_ranked, primary_gym_id, gyms!fk_athletes_primary_gym(name)";
 
-  // Fetch athletes looking for a match
+  // Fetch athletes looking for a match (casual or ranked)
   const { data: lookingAthletes } = await supabase
     .from("athletes")
     .select(athleteSelect)
     .eq("status", "active")
-    .eq("looking_for_match", true)
+    .or("looking_for_casual.eq.true,looking_for_ranked.eq.true")
     .neq("id", currentAthlete.id)
     .order("current_elo", { ascending: false });
 
@@ -44,7 +44,8 @@ async function ArenaData() {
     .from("athletes")
     .select(athleteSelect)
     .eq("status", "active")
-    .eq("looking_for_match", false)
+    .eq("looking_for_casual", false)
+    .eq("looking_for_ranked", false)
     .neq("id", currentAthlete.id)
     .order("current_elo", { ascending: false })
     .limit(20);
@@ -55,7 +56,8 @@ async function ArenaData() {
     currentElo: a.current_elo,
     gymName: extractGymName(a.gyms as { name: string }[] | null) ?? undefined,
     eloDiff: a.current_elo - currentAthlete.current_elo,
-    lookingForMatch: a.looking_for_match ?? false,
+    lookingForCasual: a.looking_for_casual,
+    lookingForRanked: a.looking_for_ranked,
   });
 
   const lookingCompetitors = (lookingAthletes ?? []).map(toCompetitor);
@@ -115,7 +117,8 @@ async function ArenaData() {
       otherCompetitors={otherCompetitors}
       activityItems={activityItems}
       currentAthleteId={currentAthlete.id}
-      currentAthleteLooking={currentAthlete.looking_for_match ?? false}
+      currentAthleteCasual={currentAthlete.looking_for_casual}
+      currentAthleteRanked={currentAthlete.looking_for_ranked}
       challengedIds={Array.from(challengedIds)}
     />
   );

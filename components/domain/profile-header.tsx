@@ -7,7 +7,8 @@ import type { Athlete } from "@/types/athlete";
 interface ProfileHeaderProps {
   athlete: Athlete;
   gymName?: string | null;
-  lookingForMatch?: boolean;
+  lookingForCasual?: boolean;
+  lookingForRanked?: boolean;
   stats: {
     wins: number;
     losses: number;
@@ -15,7 +16,7 @@ interface ProfileHeaderProps {
   };
 }
 
-export function ProfileHeader({ athlete, gymName, lookingForMatch, stats }: ProfileHeaderProps) {
+export function ProfileHeader({ athlete, gymName, lookingForCasual, lookingForRanked, stats }: ProfileHeaderProps) {
   return (
     <Card>
       <CardContent className="p-4">
@@ -50,10 +51,12 @@ export function ProfileHeader({ athlete, gymName, lookingForMatch, stats }: Prof
                 {athlete.current_weight} lbs
               </p>
             )}
-            {lookingForMatch && (
+            {(lookingForCasual || lookingForRanked) && (
               <div className="flex items-center gap-1.5 mt-1">
                 <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-                <span className="text-xs font-medium text-green-600">Looking for match</span>
+                <span className="text-xs font-medium text-green-600">
+                  Looking for {[lookingForCasual && "casual", lookingForRanked && "ranked"].filter(Boolean).join(" & ")}
+                </span>
               </div>
             )}
           </div>
