@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { Sun, Moon, Laptop, ArrowLeft } from "lucide-react";
+import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -93,8 +94,26 @@ export function SetupForm({
       }
     }
 
-    router.push(isEditing ? "/profile" : "/");
-    router.refresh();
+    // Verify the backend activation trigger set status to 'active'
+    const { data: updated } = await supabase
+      .from("athletes")
+      .select("status")
+      .eq("id", athleteId!)
+      .single();
+
+    if (updated?.status !== "active") {
+      setError("Profile saved but activation failed. Please try again.");
+      setLoading(false);
+      return;
+    }
+
+    if (isEditing) {
+      toast.success("Profile updated successfully");
+      router.push("/profile");
+    } else {
+      // Hard navigation to bypass client-side router cache
+      window.location.href = "/";
+    }
   }
 
   return (
@@ -148,7 +167,7 @@ export function SetupForm({
           <div className="flex flex-col gap-2">
             <Label>Gym</Label>
             <Select value={gymId} onValueChange={setGymId}>
-              <SelectTrigger>
+              <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select your gym" />
               </SelectTrigger>
               <SelectContent>

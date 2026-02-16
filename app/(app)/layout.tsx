@@ -27,7 +27,7 @@ export default function AppLayout({
           </div>
         }
       />
-      <PageContainer className="py-6">
+      <PageContainer className="pt-6">
         {children}
       </PageContainer>
       <Suspense>
