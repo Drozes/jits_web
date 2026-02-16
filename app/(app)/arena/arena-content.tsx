@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Swords, Users, Activity, Clock } from "lucide-react";
 import { getInitials } from "@/lib/utils";
 import { ChallengeBadge } from "@/components/domain/challenge-badge";
+import { OnlineIndicator } from "@/components/domain/online-indicator";
 import { LookingForMatchToggle } from "./looking-for-match-toggle";
 
 interface Competitor {
@@ -44,11 +45,13 @@ function CompetitorCard({ competitor, hasPendingChallenge }: { competitor: Compe
       <Card variant="interactive" className="p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Avatar className="h-12 w-12 border-2 border-accent/20 bg-gradient-to-br from-primary to-primary/80 text-white">
-              <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 font-bold text-white">
-                {getInitials(competitor.displayName)}
-              </AvatarFallback>
-            </Avatar>
+            <OnlineIndicator athleteId={competitor.id}>
+              <Avatar className="h-12 w-12 border-2 border-accent/20 bg-gradient-to-br from-primary to-primary/80 text-white">
+                <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 font-bold text-white">
+                  {getInitials(competitor.displayName)}
+                </AvatarFallback>
+              </Avatar>
+            </OnlineIndicator>
             <div>
               <div className="flex items-center gap-2">
                 <h4 className="font-semibold">{competitor.displayName}</h4>

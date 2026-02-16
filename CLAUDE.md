@@ -166,6 +166,8 @@ Shell components that define the app's structure:
 - `app-header.tsx` — top bar with title, back button, optional actions
 - `bottom-nav-bar.tsx` — tab navigation (Home, Arena, Leaderboard, Profile)
 - `page-container.tsx` — content wrapper with consistent padding
+- `global-notifications-provider.tsx` — mounts realtime message listener (renders null)
+- `online-presence-bootstrap.tsx` — mounts `app:online` Presence channel (renders null)
 
 ## Known Tech Debt (Priority Order)
 
@@ -223,6 +225,37 @@ Typed wrappers for all Supabase queries and mutations. Use these instead of raw 
 
 All mutations return `Result<T>` = `{ ok: true, data: T } | { ok: false, error: DomainError }`. Domain error codes: `MAX_PENDING_CHALLENGES`, `OPPONENT_INACTIVE`, `MATCH_NOT_IN_PROGRESS`, `NOT_PARTICIPANT`, etc.
 
+## Realtime & Presence
+
+### Two-Tier Presence Model (Supabase Presence API)
+
+The app uses **two Presence channels** to distinguish between general online status and lobby matchmaking:
+
+| Channel | Who Joins | Purpose |
+|---------|-----------|---------|
+| `app:online` | Every authenticated active athlete with the app open | Chat online indicators (green dots) |
+| `lobby:online` | Athletes with `looking_for_casual=true` OR `looking_for_ranked=true` | Matchmaking lobby (not yet implemented) |
+
+**Implementation pattern:** External store (`useSyncExternalStore`) instead of React Context — avoids wrapping the layout in a provider. Any client component can import `useOnlineStatus(athleteId)` from `hooks/use-online-presence.ts`.
+
+Key files:
+- `hooks/use-online-presence.ts` — channel setup + external store + `useOnlineStatus()` consumer hook
+- `components/layout/online-presence-bootstrap.tsx` — side-effect component mounted in layout
+- `components/domain/online-indicator.tsx` — green dot, renders nothing when offline
+
+### Realtime Subscriptions (Postgres Changes)
+
+- `hooks/use-global-notifications.ts` — global message listener → toast notifications
+- `hooks/use-pending-challenges.ts` — challenge INSERT/UPDATE → bell badge
+- `hooks/use-chat-channel.ts` — per-conversation messages + typing indicators (broadcast)
+- `hooks/use-unread-count.ts` — polling (30s) + manual refresh via event dispatch
+
+### Supabase Client Realtime Config
+
+The browser client (`lib/supabase/client.ts`) is configured with:
+- `heartbeatIntervalMs: 15_000` — 15s heartbeat to prevent silent disconnections
+- `worker: true` — Web Worker for background tab support (critical for mobile PWA)
+
 ## Type Generation
 
 Run `npm run db:types` to regenerate `types/database.ts` from the local Supabase instance in the backend repo. Run this after every backend migration.
@@ -231,8 +264,9 @@ Run `npm run db:types` to regenerate `types/database.ts` from the local Supabase
 
 **Full reference:** [research/005-backend-reference.md](research/005-backend-reference.md)
 **Integration brief:** [research/007-frontend-backend-integration-brief.md](research/007-frontend-backend-integration-brief.md)
+**Backend integration guide:** `jr_be/FRONTEND_INTEGRATION_GUIDE.md` (42KB, covers all features including presence, chat, challenges, matches)
 
-Read these docs before building challenge, match, or ELO features. Key points:
+Read these docs before building challenge, match, ELO, or presence features. Key points:
 
 - **Athlete activation** requires `display_name` + `current_weight` + (`primary_gym_id` OR `free_agent = true`)
 - **Challenges:** INSERT with RLS validation, max 3 pending, opponent must be `active`

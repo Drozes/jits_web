@@ -2,6 +2,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { EloBadge } from "@/components/domain/elo-badge";
 import { getInitials } from "@/lib/utils";
+import { OnlineIndicator } from "./online-indicator";
 import type { Athlete } from "@/types/athlete";
 
 interface ProfileHeaderProps {
@@ -21,11 +22,13 @@ export function ProfileHeader({ athlete, gymName, lookingForCasual, lookingForRa
     <Card>
       <CardContent className="p-4">
         <div className="flex items-center gap-4">
-          <Avatar className="h-20 w-20 bg-gradient-to-br from-primary to-red-600 text-white border-2 border-muted shadow-md">
-            <AvatarFallback className="text-xl bg-gradient-to-br from-primary to-red-600 text-white">
-              {getInitials(athlete.display_name)}
-            </AvatarFallback>
-          </Avatar>
+          <OnlineIndicator athleteId={athlete.id}>
+            <Avatar className="h-20 w-20 bg-gradient-to-br from-primary to-red-600 text-white border-2 border-muted shadow-md">
+              <AvatarFallback className="text-xl bg-gradient-to-br from-primary to-red-600 text-white">
+                {getInitials(athlete.display_name)}
+              </AvatarFallback>
+            </Avatar>
+          </OnlineIndicator>
 
           <div className="flex-1 min-w-0">
             <h2 className="text-xl font-bold tracking-tight truncate">

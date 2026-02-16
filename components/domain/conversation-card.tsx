@@ -3,6 +3,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import type { ConversationRow } from "@/lib/api/chat-queries";
 import { getInitials } from "@/lib/utils";
+import { OnlineIndicator } from "./online-indicator";
 import { Users } from "lucide-react";
 
 interface ConversationCardProps {
@@ -24,14 +25,16 @@ export function ConversationCard({ conversation: c }: ConversationCardProps) {
       href={`/messages/${c.conversation_id}`}
       className="flex items-center gap-3 rounded-lg px-3 py-3 transition-colors hover:bg-muted/50"
     >
-      <Avatar className="h-10 w-10 shrink-0">
-        {isDirect && c.other_athlete_profile_photo_url && (
-          <AvatarImage src={c.other_athlete_profile_photo_url} alt={name} />
-        )}
-        <AvatarFallback className="text-xs">
-          {isDirect ? getInitials(name) : <Users className="h-4 w-4" />}
-        </AvatarFallback>
-      </Avatar>
+      <OnlineIndicator athleteId={isDirect ? (c.other_athlete_id ?? "") : ""} className="shrink-0">
+        <Avatar className="h-10 w-10">
+          {isDirect && c.other_athlete_profile_photo_url && (
+            <AvatarImage src={c.other_athlete_profile_photo_url} alt={name} />
+          )}
+          <AvatarFallback className="text-xs">
+            {isDirect ? getInitials(name) : <Users className="h-4 w-4" />}
+          </AvatarFallback>
+        </Avatar>
+      </OnlineIndicator>
 
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-2">
