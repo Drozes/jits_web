@@ -9,6 +9,8 @@ import {
   TrendingUp,
   Target,
 } from "lucide-react";
+import { EloSparkline } from "./elo-sparkline";
+import { MatchHistoryList } from "./match-history-list";
 
 interface RecentPerformance {
   period: string;
@@ -17,12 +19,31 @@ interface RecentPerformance {
   eloChange: number;
 }
 
+interface MatchHistoryItem {
+  match_id: string;
+  match_type: string;
+  athlete_outcome: string;
+  opponent_display_name: string;
+  elo_delta: number;
+  completed_at: string;
+  submission_type_display_name: string;
+  result: string;
+}
+
+interface EloHistoryItem {
+  rating_after: number;
+  delta: number;
+}
+
 interface StatsTabsProps {
   winStreak: number;
   eloThisMonth: number;
   submissionRate: number;
   totalMatches: number;
   recentPerformance: RecentPerformance[];
+  matchHistory: MatchHistoryItem[];
+  eloHistory: EloHistoryItem[];
+  currentElo: number;
 }
 
 export function StatsTabs({
@@ -31,15 +52,33 @@ export function StatsTabs({
   submissionRate,
   totalMatches,
   recentPerformance,
+  matchHistory,
+  eloHistory,
+  currentElo,
 }: StatsTabsProps) {
   return (
     <Tabs defaultValue="overview">
-      <TabsList className="grid w-full grid-cols-2">
+      <TabsList className="grid w-full grid-cols-3">
         <TabsTrigger value="overview">Overview</TabsTrigger>
         <TabsTrigger value="performance">Performance</TabsTrigger>
+        <TabsTrigger value="history">History</TabsTrigger>
       </TabsList>
 
       <TabsContent value="overview" className="mt-4 space-y-4">
+        {/* ELO Trend */}
+        <Card>
+          <CardContent className="p-4">
+            <h3 className="font-semibold mb-3 flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-primary" />
+              ELO Trend
+            </h3>
+            <EloSparkline
+              points={eloHistory.map((e) => ({ rating: e.rating_after, delta: e.delta }))}
+              currentElo={currentElo}
+            />
+          </CardContent>
+        </Card>
+
         {/* Current Performance */}
         <Card>
           <CardContent className="p-4">
@@ -137,6 +176,10 @@ export function StatsTabs({
             </div>
           </CardContent>
         </Card>
+      </TabsContent>
+
+      <TabsContent value="history" className="mt-4">
+        <MatchHistoryList matches={matchHistory} />
       </TabsContent>
     </Tabs>
   );
