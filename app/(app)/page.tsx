@@ -3,7 +3,7 @@ import { requireAthlete } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
 import { StatOverview } from "@/components/domain/stat-overview";
 import { MatchCard } from "@/components/domain/match-card";
-import { Swords, Zap } from "lucide-react";
+import { Send, Swords, Zap } from "lucide-react";
 
 function DashboardSkeleton() {
   return (
@@ -116,6 +116,15 @@ async function DashboardContent() {
     .order("created_at", { ascending: false })
     .limit(5);
 
+  // Fetch sent challenges (where current athlete is the challenger)
+  const { data: sentChallenges } = await supabase
+    .from("challenges")
+    .select("id, created_at, status, opponent:athletes!fk_challenges_opponent(id, display_name)")
+    .eq("challenger_id", athlete.id)
+    .eq("status", "pending")
+    .order("created_at", { ascending: false })
+    .limit(5);
+
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -158,6 +167,36 @@ async function DashboardContent() {
         ) : (
           <div className="rounded-lg border border-dashed p-6 text-center text-muted-foreground">
             <p className="text-sm">No pending challenges</p>
+          </div>
+        )}
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <div className="flex items-center gap-2">
+          <Send className="h-5 w-5 text-blue-500" />
+          <h2 className="text-lg font-semibold">Sent Challenges</h2>
+        </div>
+        {sentChallenges && sentChallenges.length > 0 ? (
+          <div className="flex flex-col gap-2">
+            {sentChallenges.map((challenge) => {
+              const opponent = challenge.opponent as unknown as
+                | { id: string; display_name: string }
+                | null;
+              return (
+                <MatchCard
+                  key={challenge.id}
+                  type="challenge"
+                  opponentName={opponent?.display_name ?? "Unknown"}
+                  status="Pending"
+                  date={challenge.created_at}
+                  href={opponent?.id ? `/athlete/${opponent.id}` : undefined}
+                />
+              );
+            })}
+          </div>
+        ) : (
+          <div className="rounded-lg border border-dashed p-6 text-center text-muted-foreground">
+            <p className="text-sm">No sent challenges</p>
           </div>
         )}
       </section>
