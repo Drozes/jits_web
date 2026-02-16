@@ -63,7 +63,7 @@ export function MatchCard(props: MatchCardProps) {
   if (props.href) {
     return (
       <Link href={props.href}>
-        <Card className="cursor-pointer hover:bg-accent/50 transition-colors">
+        <Card className="cursor-pointer hover:bg-accent/50 transition-all active:scale-[0.98] active:opacity-90">
           <CardInner {...props} />
         </Card>
       </Link>

@@ -102,7 +102,7 @@ export function MatchTimer({
       {error && <p className="text-sm text-red-500">{error}</p>}
 
       <div className="flex flex-col items-center gap-2">
-        <p className="text-7xl font-mono font-bold tabular-nums tracking-tight">
+        <p className="text-6xl sm:text-7xl font-mono font-bold tabular-nums tracking-tight">
           {formatTime(remaining)}
         </p>
         {running && (

@@ -53,7 +53,7 @@ export function MessageInput({ onSend, onTyping, isSending }: MessageInputProps)
   const canSend = value.trim().length > 0 && !isSending;
 
   return (
-    <div className="border-t bg-background px-4 py-2">
+    <div className="border-t bg-background px-4 py-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
       {isNearLimit && (
         <p className="text-[10px] text-muted-foreground text-right mb-1">
           {value.length}/{MAX_CHARS}
@@ -67,13 +67,13 @@ export function MessageInput({ onSend, onTyping, isSending }: MessageInputProps)
           onKeyDown={handleKeyDown}
           placeholder="Message..."
           rows={1}
-          className="flex-1 resize-none rounded-lg border bg-muted/50 px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+          className="flex-1 resize-none rounded-lg border bg-muted/50 px-3 py-2 text-base md:text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
         />
         <button
           onClick={handleSend}
           disabled={!canSend}
           className={cn(
-            "flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors",
+            "flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors",
             canSend
               ? "bg-primary text-primary-foreground hover:bg-primary/90"
               : "bg-muted text-muted-foreground",
