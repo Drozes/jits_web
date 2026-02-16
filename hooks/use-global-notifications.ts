@@ -50,8 +50,8 @@ export function useGlobalNotifications(currentAthleteId: string): void {
         async (payload: RealtimePostgresInsertPayload<Message>) => {
           const msg = payload.new;
 
-          // Skip own messages
-          if (msg.sender_id === currentAthleteId) return;
+          // Skip own messages and system messages (no sender)
+          if (!msg.sender_id || msg.sender_id === currentAthleteId) return;
 
           // Refresh unread badge immediately
           refreshUnreadCounts();

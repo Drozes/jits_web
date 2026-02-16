@@ -48,6 +48,7 @@ export type Database = {
           looking_for_ranked: boolean
           primary_gym_id: string | null
           profile_photo_url: string | null
+          role: Database["public"]["Enums"]["athlete_role"]
           status: string
         }
         Insert: {
@@ -63,6 +64,7 @@ export type Database = {
           looking_for_ranked?: boolean
           primary_gym_id?: string | null
           profile_photo_url?: string | null
+          role?: Database["public"]["Enums"]["athlete_role"]
           status?: string
         }
         Update: {
@@ -78,6 +80,7 @@ export type Database = {
           looking_for_ranked?: boolean
           primary_gym_id?: string | null
           profile_photo_url?: string | null
+          role?: Database["public"]["Enums"]["athlete_role"]
           status?: string
         }
         Relationships: [
@@ -434,7 +437,8 @@ export type Database = {
           created_at: string
           id: string
           image_url: string | null
-          sender_id: string
+          message_type: Database["public"]["Enums"]["message_type_enum"]
+          sender_id: string | null
         }
         Insert: {
           body?: string | null
@@ -442,7 +446,8 @@ export type Database = {
           created_at?: string
           id?: string
           image_url?: string | null
-          sender_id: string
+          message_type?: Database["public"]["Enums"]["message_type_enum"]
+          sender_id?: string | null
         }
         Update: {
           body?: string | null
@@ -450,7 +455,8 @@ export type Database = {
           created_at?: string
           id?: string
           image_url?: string | null
-          sender_id?: string
+          message_type?: Database["public"]["Enums"]["message_type_enum"]
+          sender_id?: string | null
         }
         Relationships: [
           {
@@ -576,6 +582,23 @@ export type Database = {
         Args: { p_other_athlete_id: string }
         Returns: Json
       }
+      get_athlete_stats: {
+        Args: { p_athlete_id: string }
+        Returns: {
+          draws: number
+          losses: number
+          wins: number
+        }[]
+      }
+      get_athletes_stats: {
+        Args: { p_athlete_ids: string[] }
+        Returns: {
+          athlete_id: string
+          draws: number
+          losses: number
+          wins: number
+        }[]
+      }
       get_conversations: {
         Args: never
         Returns: {
@@ -586,6 +609,7 @@ export type Database = {
           last_message_body: string
           last_message_created_at: string
           last_message_sender_id: string
+          last_message_type: Database["public"]["Enums"]["message_type_enum"]
           other_athlete_display_name: string
           other_athlete_id: string
           other_athlete_profile_photo_url: string
@@ -646,6 +670,13 @@ export type Database = {
         }
         Returns: Json
       }
+      set_athlete_role: {
+        Args: {
+          p_athlete_id: string
+          p_role: Database["public"]["Enums"]["athlete_role"]
+        }
+        Returns: undefined
+      }
       start_match: { Args: { p_match_id: string }; Returns: Json }
       start_match_from_challenge: {
         Args: { p_challenge_id: string }
@@ -653,9 +684,11 @@ export type Database = {
       }
     }
     Enums: {
+      athlete_role: "athlete" | "bot" | "admin"
       conversation_type_enum: "direct" | "gym"
       match_result_enum: "submission" | "draw"
       match_type_enum: "ranked" | "casual"
+      message_type_enum: "user" | "system"
       participant_outcome_enum: "win" | "loss" | "draw"
       participant_role_enum: "competitor" | "referee"
     }
@@ -788,9 +821,11 @@ export const Constants = {
   },
   public: {
     Enums: {
+      athlete_role: ["athlete", "bot", "admin"],
       conversation_type_enum: ["direct", "gym"],
       match_result_enum: ["submission", "draw"],
       match_type_enum: ["ranked", "casual"],
+      message_type_enum: ["user", "system"],
       participant_outcome_enum: ["win", "loss", "draw"],
       participant_role_enum: ["competitor", "referee"],
     },

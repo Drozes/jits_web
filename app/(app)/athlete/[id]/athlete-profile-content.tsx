@@ -7,8 +7,11 @@ import { AppHeader } from "@/components/layout/app-header";
 import { PageContainer } from "@/components/layout/page-container";
 import { Swords } from "lucide-react";
 import { AthleteProfileActions } from "./athlete-profile-actions";
-import { computeStats } from "@/lib/utils";
-import { getPendingChallengeBetween } from "@/lib/api/queries";
+import {
+  getPendingChallengeBetween,
+  getAthleteStatsRpc,
+  getMatchHistory,
+} from "@/lib/api/queries";
 
 export async function AthleteProfileContent({
   paramsPromise,
@@ -39,82 +42,25 @@ export async function AthleteProfileContent({
     competitorGymName = gym?.name ?? null;
   }
 
-  // Compute competitor stats
-  const { data: competitorOutcomes } = await supabase
-    .from("match_participants")
-    .select("outcome")
-    .eq("athlete_id", competitor.id)
-    .not("outcome", "is", null);
+  // Fetch stats and pending challenge in parallel
+  const [compStats, myStats, pendingChallenge, matchHistory] =
+    await Promise.all([
+      getAthleteStatsRpc(supabase, competitor.id),
+      getAthleteStatsRpc(supabase, currentAthlete.id),
+      getPendingChallengeBetween(supabase, currentAthlete.id, competitor.id),
+      getMatchHistory(supabase, currentAthlete.id),
+    ]);
 
-  const compStats = computeStats(competitorOutcomes ?? []);
-
-  // Compute current athlete stats (for compare modal)
-  const { data: currentOutcomes } = await supabase
-    .from("match_participants")
-    .select("outcome")
-    .eq("athlete_id", currentAthlete.id)
-    .not("outcome", "is", null);
-
-  const myStats = computeStats(currentOutcomes ?? []);
-
-  // Check for pending challenge between current athlete and competitor
-  const pendingChallenge = await getPendingChallengeBetween(
-    supabase,
-    currentAthlete.id,
-    competitor.id,
-  );
-
-  // Head-to-head matches: find matches where both athletes participated
-  const { data: competitorMatches } = await supabase
-    .from("match_participants")
-    .select("match_id")
-    .eq("athlete_id", competitor.id);
-
-  const competitorMatchIds =
-    competitorMatches?.map((m) => m.match_id) ?? [];
-
-  let headToHead: Array<{
-    matchId: string;
-    opponentName: string;
-    result: "win" | "loss" | "draw" | null;
-    eloDelta: number | null;
-    date: string;
-  }> = [];
-
-  if (competitorMatchIds.length > 0) {
-    const { data: sharedParticipations } = await supabase
-      .from("match_participants")
-      .select(
-        "match_id, outcome, elo_delta, matches!fk_participants_match(completed_at, status)",
-      )
-      .eq("athlete_id", currentAthlete.id)
-      .in("match_id", competitorMatchIds);
-
-    headToHead =
-      sharedParticipations
-        ?.filter((p) => {
-          const matchArr = p.matches as
-            | { status: string; completed_at: string | null }[]
-            | null;
-          return matchArr?.[0]?.status === "completed";
-        })
-        .map((p) => {
-          const matchArr = p.matches as
-            | { status: string; completed_at: string | null }[]
-            | null;
-          const match = matchArr?.[0];
-          return {
-            matchId: p.match_id,
-            opponentName: competitor.display_name,
-            result: p.outcome as "win" | "loss" | "draw" | null,
-            eloDelta: p.elo_delta,
-            date: match?.completed_at ?? "",
-          };
-        })
-        .sort(
-          (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
-        ) ?? [];
-  }
+  // Head-to-head: filter own match history for matches against this competitor
+  const headToHead = matchHistory
+    .filter((m) => m.opponent_id === competitor.id)
+    .map((m) => ({
+      matchId: m.match_id,
+      opponentName: m.opponent_display_name,
+      result: m.athlete_outcome as "win" | "loss" | "draw" | null,
+      eloDelta: m.elo_delta || null,
+      date: m.completed_at,
+    }));
 
   return (
     <>

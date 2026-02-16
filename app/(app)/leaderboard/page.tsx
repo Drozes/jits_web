@@ -3,7 +3,10 @@ import { requireAthlete } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
 import { LeaderboardContent } from "./leaderboard-content";
 import { extractGymName } from "@/lib/utils";
-import { getPendingChallengeOpponentIds } from "@/lib/api/queries";
+import {
+  getPendingChallengeOpponentIds,
+  getAthletesStatsRpc,
+} from "@/lib/api/queries";
 
 function LeaderboardSkeleton() {
   return (
@@ -36,25 +39,12 @@ async function LeaderboardData() {
     .order("current_elo", { ascending: false })
     .limit(50);
 
-  // Fetch all outcomes for these athletes in one query
+  // Fetch all stats via batch RPC (bypasses match_participants RLS)
   const athleteIds = (athletes ?? []).map((a) => a.id);
-  const { data: allOutcomes } = await supabase
-    .from("match_participants")
-    .select("athlete_id, outcome")
-    .in("athlete_id", athleteIds)
-    .not("outcome", "is", null);
-
-  // Aggregate W/L per athlete
-  const statsMap = new Map<string, { wins: number; losses: number }>();
-  for (const o of allOutcomes ?? []) {
-    const entry = statsMap.get(o.athlete_id) ?? { wins: 0, losses: 0 };
-    if (o.outcome === "win") entry.wins++;
-    else if (o.outcome === "loss") entry.losses++;
-    statsMap.set(o.athlete_id, entry);
-  }
+  const statsMap = await getAthletesStatsRpc(supabase, athleteIds);
 
   const rankedAthletes = (athletes ?? []).map((a, i) => {
-    const stats = statsMap.get(a.id) ?? { wins: 0, losses: 0 };
+    const stats = statsMap.get(a.id) ?? { wins: 0, losses: 0, draws: 0 };
     return {
       id: a.id,
       rank: i + 1,

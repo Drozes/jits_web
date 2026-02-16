@@ -120,6 +120,43 @@ export async function getLeaderboard(
 }
 
 // ---------------------------------------------------------------------------
+// Athlete stats (via RPC — bypasses match_participants RLS)
+// ---------------------------------------------------------------------------
+
+/** Fetch wins/losses/draws for a single athlete (public, any athlete) */
+export async function getAthleteStatsRpc(
+  supabase: Client,
+  athleteId: string,
+): Promise<{ wins: number; losses: number; draws: number; winRate: number }> {
+  const { data } = await supabase.rpc("get_athlete_stats", {
+    p_athlete_id: athleteId,
+  });
+  const row = (data as { wins: number; losses: number; draws: number }[] | null)?.[0];
+  const wins = row?.wins ?? 0;
+  const losses = row?.losses ?? 0;
+  const draws = row?.draws ?? 0;
+  const total = wins + losses;
+  const winRate = total > 0 ? Math.round((wins / total) * 100) : 0;
+  return { wins, losses, draws, winRate };
+}
+
+/** Batch-fetch wins/losses/draws for multiple athletes (for leaderboard) */
+export async function getAthletesStatsRpc(
+  supabase: Client,
+  athleteIds: string[],
+): Promise<Map<string, { wins: number; losses: number; draws: number }>> {
+  if (athleteIds.length === 0) return new Map();
+  const { data } = await supabase.rpc("get_athletes_stats", {
+    p_athlete_ids: athleteIds,
+  });
+  const map = new Map<string, { wins: number; losses: number; draws: number }>();
+  for (const row of (data ?? []) as { athlete_id: string; wins: number; losses: number; draws: number }[]) {
+    map.set(row.athlete_id, { wins: row.wins, losses: row.losses, draws: row.draws });
+  }
+  return map;
+}
+
+// ---------------------------------------------------------------------------
 // Match history (via RPC)
 // ---------------------------------------------------------------------------
 

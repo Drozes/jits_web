@@ -261,7 +261,7 @@ function MessageList({
         const isLastInGroup = !sameSenderAsNext;
 
         // Resolve sender data for received messages (avatar + optional label)
-        const sender = !isOwn ? participants[msg.sender_id] : undefined;
+        const sender = !isOwn && msg.sender_id ? participants[msg.sender_id] : undefined;
         const senderName = sender?.displayName ?? undefined;
         const senderPhotoUrl =
           !isOwn && isLastInGroup

@@ -2,7 +2,8 @@ import { Suspense } from "react";
 import { requireAthlete } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
 import { SwipeDiscoveryClient } from "./swipe-discovery-client";
-import { extractGymName, computeStats } from "@/lib/utils";
+import { extractGymName } from "@/lib/utils";
+import { getAthletesStatsRpc } from "@/lib/api/queries";
 
 export default function SwipeDiscoveryPage() {
   return (
@@ -27,26 +28,20 @@ async function SwipeData() {
     .order("current_elo", { ascending: false })
     .limit(30);
 
-  // Compute stats for each athlete
+  // Fetch stats via batch RPC (bypasses match_participants RLS)
   const athleteIds = (athletes ?? []).map((a) => a.id);
-  const { data: allOutcomes } = await supabase
-    .from("match_participants")
-    .select("athlete_id, outcome")
-    .in("athlete_id", athleteIds)
-    .not("outcome", "is", null);
+  const statsMap = await getAthletesStatsRpc(supabase, athleteIds);
 
   const competitors = (athletes ?? []).map((a) => {
-    const outcomes = allOutcomes?.filter((o) => o.athlete_id === a.id) ?? [];
-    const { wins, losses } = computeStats(outcomes);
-
+    const stats = statsMap.get(a.id) ?? { wins: 0, losses: 0, draws: 0 };
     return {
       id: a.id,
       displayName: a.display_name,
       currentElo: a.current_elo,
       gymName: extractGymName(a.gyms as { name: string }[] | null),
       weight: a.current_weight,
-      wins,
-      losses,
+      wins: stats.wins,
+      losses: stats.losses,
     };
   });
 

@@ -3,6 +3,7 @@ import { requireAthlete } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
 import { StatOverview } from "@/components/domain/stat-overview";
 import { MatchCard } from "@/components/domain/match-card";
+import { getMatchHistory } from "@/lib/api/queries";
 import { Send, Swords, Zap } from "lucide-react";
 
 function DashboardSkeleton() {
@@ -29,31 +30,12 @@ async function DashboardContent() {
 
   // Fire all independent queries in parallel
   const [
-    { data: recentOutcomes },
-    { data: recentMatches },
+    matchHistory,
     { data: pendingChallenges },
     { data: sentChallenges },
   ] = await Promise.all([
-    // Win/loss stats + win streak (single query, ordered for streak calc)
-    supabase
-      .from("match_participants")
-      .select("outcome")
-      .eq("athlete_id", athlete.id)
-      .not("outcome", "is", null)
-      .order("match_id", { ascending: false })
-      .limit(50),
-    // Recent matches (last 5)
-    supabase
-      .from("match_participants")
-      .select(
-        `outcome, elo_delta, match_id,
-        matches(id, created_at, status),
-        athletes!fk_participants_athlete(display_name)`,
-      )
-      .eq("athlete_id", athlete.id)
-      .not("outcome", "is", null)
-      .order("match_id", { ascending: false })
-      .limit(5),
+    // Match history via RPC (bypasses match_participants RLS)
+    getMatchHistory(supabase, athlete.id),
     // Pending challenges (incoming)
     supabase
       .from("challenges")
@@ -72,49 +54,26 @@ async function DashboardContent() {
       .limit(5),
   ]);
 
-  // Compute stats from the single outcomes query
-  const wins = recentOutcomes?.filter((o) => o.outcome === "win").length ?? 0;
-  const losses = recentOutcomes?.filter((o) => o.outcome === "loss").length ?? 0;
+  // Compute stats from match history
+  const wins = matchHistory.filter((m) => m.athlete_outcome === "win").length;
+  const losses = matchHistory.filter((m) => m.athlete_outcome === "loss").length;
   const total = wins + losses;
   const winRate = total > 0 ? Math.round((wins / total) * 100) : 0;
 
   let winStreak = 0;
-  if (recentOutcomes) {
-    for (const entry of recentOutcomes) {
-      if (entry.outcome === "win") winStreak++;
-      else break;
-    }
+  for (const m of matchHistory) {
+    if (m.athlete_outcome === "win") winStreak++;
+    else break;
   }
 
-  // Batch-fetch all opponent names in a single query (instead of N+1)
-  const matchIds = (recentMatches ?? []).map((mp) => mp.match_id);
-  const { data: allOpponents } = matchIds.length
-    ? await supabase
-        .from("match_participants")
-        .select("match_id, athletes!fk_participants_athlete(display_name)")
-        .in("match_id", matchIds)
-        .neq("athlete_id", athlete.id)
-        .eq("role", "competitor")
-    : { data: [] as { match_id: string; athletes: unknown }[] };
-
-  const opponentByMatch = new Map<string, string>();
-  for (const opp of allOpponents ?? []) {
-    const arr = opp.athletes as { display_name: string }[] | null;
-    opponentByMatch.set(opp.match_id, arr?.[0]?.display_name ?? "Unknown");
-  }
-
-  const matchesWithOpponents = (recentMatches ?? []).map((mp) => {
-    const matchArr = mp.matches as
-      | { id: string; created_at: string; status: string }[]
-      | null;
-    return {
-      id: mp.match_id,
-      opponentName: opponentByMatch.get(mp.match_id) ?? "Unknown",
-      result: mp.outcome as "win" | "loss" | "draw",
-      eloDelta: mp.elo_delta,
-      date: matchArr?.[0]?.created_at ?? "",
-    };
-  });
+  // Recent matches (last 5) from match history
+  const matchesWithOpponents = matchHistory.slice(0, 5).map((m) => ({
+    id: m.match_id,
+    opponentName: m.opponent_display_name,
+    result: m.athlete_outcome as "win" | "loss" | "draw",
+    eloDelta: m.elo_delta,
+    date: m.completed_at,
+  }));
 
   return (
     <div className="flex flex-col gap-6 animate-page-in">

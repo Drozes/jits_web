@@ -64,6 +64,7 @@ export function useChatMessages({
         sender_id: currentAthleteId,
         body: trimmed,
         image_url: null,
+        message_type: "user",
         created_at: new Date().toISOString(),
         _pending: true,
       };
