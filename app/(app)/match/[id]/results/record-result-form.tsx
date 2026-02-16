@@ -63,7 +63,7 @@ export function RecordResultForm({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-page-in">
       {error && <p className="text-sm text-red-500 text-center">{error}</p>}
 
       <div className="space-y-2">

@@ -104,7 +104,7 @@ export function ArenaContent({
   const challengedSet = new Set(challengedIds);
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 animate-page-in">
       <LookingForMatchToggle
         athleteId={currentAthleteId}
         initialCasual={currentAthleteCasual}

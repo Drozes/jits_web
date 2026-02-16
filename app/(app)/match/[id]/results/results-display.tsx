@@ -33,7 +33,7 @@ export function ResultsDisplay({ match, currentAthleteId }: ResultsDisplayProps)
         : "text-muted-foreground";
 
   return (
-    <div className="space-y-6 text-center">
+    <div className="space-y-6 text-center animate-page-in">
       <div>
         <p className={`text-3xl font-black ${outcomeColor}`}>{outcomeLabel}</p>
         <p className="text-sm text-muted-foreground mt-1">

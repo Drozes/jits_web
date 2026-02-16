@@ -33,7 +33,7 @@ export async function LobbyContent({
       : null;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-page-in">
       <VsHeader challenger={lobby.challenger} opponent={lobby.opponent} />
 
       <div className="text-center">

@@ -32,7 +32,7 @@ export async function LiveMatchContent({
   );
 
   return (
-    <div className="space-y-6 text-center">
+    <div className="space-y-6 text-center animate-page-in">
       <div>
         <p className="text-sm text-muted-foreground">
           {athlete.display_name} vs {opponent?.display_name ?? "Opponent"}

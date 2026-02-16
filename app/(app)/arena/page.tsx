@@ -83,33 +83,35 @@ async function ArenaData() {
     .order("match_id", { ascending: false })
     .limit(5);
 
-  // For each winning participant, get the loser's name
-  const activityItems = await Promise.all(
-    (recentMatchParticipants ?? []).map(async (mp) => {
-      const winnerArr = mp.athletes as { display_name: string }[] | null;
-      const matchArr = mp.matches as
-        | { id: string; created_at: string; result: string | null; status: string }[]
-        | null;
-      const match = matchArr?.[0];
-
-      const { data: loser } = await supabase
+  // Batch-fetch all losers in a single query (instead of N+1)
+  const activityMatchIds = (recentMatchParticipants ?? []).map((mp) => mp.match_id);
+  const { data: allLosers } = activityMatchIds.length
+    ? await supabase
         .from("match_participants")
-        .select("athletes!fk_participants_athlete(display_name)")
-        .eq("match_id", mp.match_id)
+        .select("match_id, athletes!fk_participants_athlete(display_name)")
+        .in("match_id", activityMatchIds)
         .eq("outcome", "loss")
-        .single();
+    : { data: [] as { match_id: string; athletes: unknown }[] };
 
-      const loserArr = loser?.athletes as { display_name: string }[] | null;
+  const loserByMatch = new Map<string, string>();
+  for (const l of allLosers ?? []) {
+    const arr = l.athletes as { display_name: string }[] | null;
+    loserByMatch.set(l.match_id, arr?.[0]?.display_name ?? "Unknown");
+  }
 
-      return {
-        id: mp.match_id,
-        winnerName: winnerArr?.[0]?.display_name ?? "Unknown",
-        loserName: loserArr?.[0]?.display_name ?? "Unknown",
-        result: match?.result ?? "submission",
-        date: match?.created_at ?? "",
-      };
-    }),
-  );
+  const activityItems = (recentMatchParticipants ?? []).map((mp) => {
+    const winnerArr = mp.athletes as { display_name: string }[] | null;
+    const matchArr = mp.matches as
+      | { id: string; created_at: string; result: string | null; status: string }[]
+      | null;
+    return {
+      id: mp.match_id,
+      winnerName: winnerArr?.[0]?.display_name ?? "Unknown",
+      loserName: loserByMatch.get(mp.match_id) ?? "Unknown",
+      result: matchArr?.[0]?.result ?? "submission",
+      date: matchArr?.[0]?.created_at ?? "",
+    };
+  });
 
   return (
     <ArenaContent

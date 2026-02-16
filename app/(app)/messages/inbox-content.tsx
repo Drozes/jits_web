@@ -26,7 +26,7 @@ export function InboxContent({
   }
 
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-1 animate-page-in">
       <h1 className="text-xl font-bold mb-2">Messages</h1>
       {conversations.map((conv) => (
         <ConversationCard
