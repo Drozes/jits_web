@@ -1,5 +1,4 @@
 import { Suspense } from "react";
-import { redirect } from "next/navigation";
 import { requireAuth } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
 import { ATHLETE_STATUS } from "@/lib/constants";
@@ -20,14 +19,12 @@ async function SetupContent() {
   // Fetch existing athlete (auto-created by backend on signup)
   const { data: athlete } = await supabase
     .from("athletes")
-    .select("id, display_name, status")
+    .select("id, display_name, current_weight, primary_gym_id, status")
     .eq("auth_user_id", user.id)
     .single();
 
-  // If athlete is already activated, redirect to home
-  if (athlete && athlete.status !== ATHLETE_STATUS.PENDING) {
-    redirect("/");
-  }
+  const isEditing =
+    !!athlete && athlete.status !== ATHLETE_STATUS.PENDING;
 
   // Fetch gyms server-side so the client component doesn't need to
   const { data: gyms } = await supabase
@@ -41,16 +38,21 @@ async function SetupContent() {
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold tracking-tight">
-            Welcome to Jits
+            {isEditing ? "Edit Profile" : "Welcome to Jits"}
           </h1>
           <p className="text-sm text-muted-foreground mt-2">
-            Set up your athlete profile to get started
+            {isEditing
+              ? "Update your athlete details"
+              : "Set up your athlete profile to get started"}
           </p>
         </div>
         <SetupForm
           athleteId={athlete?.id ?? null}
           defaultDisplayName={athlete?.display_name ?? ""}
+          defaultWeight={athlete?.current_weight?.toString() ?? ""}
+          defaultGymId={athlete?.primary_gym_id ?? ""}
           gyms={gyms ?? []}
+          isEditing={isEditing}
         />
       </div>
     </div>

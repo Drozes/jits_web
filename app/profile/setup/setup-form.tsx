@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
-import { Sun, Moon, Laptop } from "lucide-react";
+import { Sun, Moon, Laptop, ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,15 +20,25 @@ import {
 interface SetupFormProps {
   athleteId: string | null;
   defaultDisplayName: string;
+  defaultWeight?: string;
+  defaultGymId?: string;
   gyms: { id: string; name: string }[];
+  isEditing?: boolean;
 }
 
-export function SetupForm({ athleteId, defaultDisplayName, gyms }: SetupFormProps) {
+export function SetupForm({
+  athleteId,
+  defaultDisplayName,
+  defaultWeight = "",
+  defaultGymId = "",
+  gyms,
+  isEditing = false,
+}: SetupFormProps) {
   const router = useRouter();
   const { theme, setTheme } = useTheme();
   const [displayName, setDisplayName] = useState(defaultDisplayName);
-  const [weight, setWeight] = useState("");
-  const [gymId, setGymId] = useState("");
+  const [weight, setWeight] = useState(defaultWeight);
+  const [gymId, setGymId] = useState(defaultGymId);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -83,7 +93,7 @@ export function SetupForm({ athleteId, defaultDisplayName, gyms }: SetupFormProp
       }
     }
 
-    router.push("/");
+    router.push(isEditing ? "/profile" : "/");
     router.refresh();
   }
 
@@ -91,6 +101,18 @@ export function SetupForm({ athleteId, defaultDisplayName, gyms }: SetupFormProp
     <Card>
       <CardContent className="p-6">
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          {isEditing && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="-ml-2 -mt-2 mb-1 w-fit"
+              onClick={() => router.back()}
+            >
+              <ArrowLeft className="mr-1 h-4 w-4" />
+              Back
+            </Button>
+          )}
           <div className="flex flex-col gap-2">
             <Label htmlFor="displayName">Display Name</Label>
             <Input
@@ -178,7 +200,7 @@ export function SetupForm({ athleteId, defaultDisplayName, gyms }: SetupFormProp
             type="submit"
             disabled={loading || !displayName.trim() || !weight || !gymId}
           >
-            {loading ? "Saving..." : "Get Started"}
+            {loading ? "Saving..." : isEditing ? "Save Changes" : "Get Started"}
           </Button>
         </form>
       </CardContent>

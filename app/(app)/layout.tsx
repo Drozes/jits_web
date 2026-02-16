@@ -4,7 +4,8 @@ import { HeaderUserButton } from "@/components/layout/header-user-button";
 import { AppHeader } from "@/components/layout/app-header";
 import { PageContainer } from "@/components/layout/page-container";
 import { GlobalNotificationsProvider } from "@/components/layout/global-notifications-provider";
-import { requireAthlete } from "@/lib/guards";
+import { NotificationBell } from "@/components/domain/notification-bell";
+import { getActiveAthlete } from "@/lib/guards";
 
 export default function AppLayout({
   children,
@@ -16,9 +17,14 @@ export default function AppLayout({
       <AppHeader
         title="Jits"
         rightAction={
-          <Suspense>
-            <HeaderUserButton />
-          </Suspense>
+          <div className="flex items-center gap-1">
+            <Suspense>
+              <HeaderNotificationBell />
+            </Suspense>
+            <Suspense>
+              <HeaderUserButton />
+            </Suspense>
+          </div>
         }
       />
       <PageContainer className="py-6">
@@ -34,7 +40,14 @@ export default function AppLayout({
   );
 }
 
+async function HeaderNotificationBell() {
+  const athlete = await getActiveAthlete();
+  if (!athlete) return null;
+  return <NotificationBell athleteId={athlete.id} />;
+}
+
 async function NotificationsBootstrap() {
-  const { athlete } = await requireAthlete();
+  const athlete = await getActiveAthlete();
+  if (!athlete) return null;
   return <GlobalNotificationsProvider athleteId={athlete.id} />;
 }

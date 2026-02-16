@@ -45,6 +45,30 @@ export async function requireAthlete() {
 }
 
 /**
+ * Like requireAthlete but returns null instead of redirecting.
+ * Use in layouts/components that render on pages where the athlete
+ * may not exist yet (e.g. /profile/setup).
+ */
+export async function getActiveAthlete() {
+  const supabase = await createClient();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+  if (authError || !user) return null;
+
+  const { data: athlete, error } = await supabase
+    .from("athletes")
+    .select("*")
+    .eq("auth_user_id", user.id)
+    .single();
+
+  if (error || !athlete || athlete.status === ATHLETE_STATUS.PENDING) {
+    return null;
+  }
+
+  return athlete;
+}
+
+/**
  * Redirects to login if the user is not authenticated.
  * Use this for pages that should redirect unauthenticated users.
  */
