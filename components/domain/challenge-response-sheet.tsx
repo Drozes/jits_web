@@ -135,7 +135,8 @@ export function ChallengeResponseSheet({
         if (!v) resetState();
       }}
     >
-      <SheetContent side="bottom" className="rounded-t-2xl">
+      <SheetContent side="bottom" className="max-h-[85vh] rounded-t-2xl">
+        <div className="overflow-y-auto px-4 pb-6">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
             <Swords className="h-5 w-5" />
@@ -245,6 +246,7 @@ export function ChallengeResponseSheet({
             </div>
           </div>
         )}
+        </div>
       </SheetContent>
     </Sheet>
   );

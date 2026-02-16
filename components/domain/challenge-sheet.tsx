@@ -118,7 +118,8 @@ export function ChallengeSheet({
         if (!v) resetState();
       }}
     >
-      <SheetContent side="bottom" className="rounded-t-2xl px-6 pb-10">
+      <SheetContent side="bottom" className="max-h-[85vh] rounded-t-2xl">
+        <div className="overflow-y-auto px-6 pb-10">
         <SheetHeader className="px-0">
           <SheetTitle className="flex items-center gap-2 text-lg">
             <Swords className="h-5 w-5" />
@@ -231,6 +232,7 @@ export function ChallengeSheet({
             </Button>
           </div>
         )}
+        </div>
       </SheetContent>
     </Sheet>
   );
