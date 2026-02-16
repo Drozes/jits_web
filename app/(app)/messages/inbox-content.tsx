@@ -6,9 +6,13 @@ import { ConversationCard } from "@/components/domain/conversation-card";
 
 interface InboxContentProps {
   conversations: ConversationRow[];
+  currentAthleteId: string;
 }
 
-export function InboxContent({ conversations }: InboxContentProps) {
+export function InboxContent({
+  conversations,
+  currentAthleteId,
+}: InboxContentProps) {
   if (conversations.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -25,7 +29,11 @@ export function InboxContent({ conversations }: InboxContentProps) {
     <div className="flex flex-col gap-1">
       <h1 className="text-xl font-bold mb-2">Messages</h1>
       {conversations.map((conv) => (
-        <ConversationCard key={conv.conversation_id} conversation={conv} />
+        <ConversationCard
+          key={conv.conversation_id}
+          conversation={conv}
+          currentAthleteId={currentAthleteId}
+        />
       ))}
     </div>
   );

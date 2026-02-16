@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { requireAthlete } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
 import { getMessages } from "@/lib/api/chat-queries";
-import { ChatThread } from "./chat-thread";
+import { ChatThread, type ParticipantInfo } from "./chat-thread";
 
 function ThreadSkeleton() {
   return (
@@ -39,34 +39,47 @@ async function ThreadData({
   const { athlete } = await requireAthlete();
   const supabase = await createClient();
 
-  // Fetch conversation metadata
-  const { data: convParticipants } = await supabase
-    .from("conversation_participants")
-    .select("athlete_id")
-    .eq("conversation_id", conversationId);
+  // Fetch participant athlete IDs + profiles in parallel with conversation details
+  const [{ data: convParticipants }, { data: conversation }] = await Promise.all([
+    supabase
+      .from("conversation_participants")
+      .select("athlete_id")
+      .eq("conversation_id", conversationId),
+    supabase
+      .from("conversations")
+      .select("id, type, gym_id, gyms!fk_conversations_gym(name)")
+      .eq("id", conversationId)
+      .single(),
+  ]);
 
-  const otherParticipantId = convParticipants?.find(
-    (p) => p.athlete_id !== athlete.id,
-  )?.athlete_id;
+  const participantIds = convParticipants?.map((p) => p.athlete_id) ?? [];
+  const otherParticipantId = participantIds.find((id) => id !== athlete.id);
 
-  // Fetch conversation details for the header
-  const { data: conversation } = await supabase
-    .from("conversations")
-    .select("id, type, gym_id, gyms!fk_conversations_gym(name)")
-    .eq("id", conversationId)
-    .single();
+  // Fetch all participant profiles (for avatars + names in thread)
+  const { data: participantProfiles } = participantIds.length > 0
+    ? await supabase
+        .from("athletes")
+        .select("id, display_name, profile_photo_url")
+        .in("id", participantIds)
+    : { data: [] };
+
+  const participants: Record<string, ParticipantInfo> = {};
+  for (const p of participantProfiles ?? []) {
+    participants[p.id] = {
+      displayName: p.display_name,
+      profilePhotoUrl: p.profile_photo_url,
+    };
+  }
 
   let headerName = "Chat";
+  let headerPhotoUrl: string | null = null;
   if (conversation?.type === "gym") {
     const gyms = conversation.gyms as { name: string }[] | null;
     headerName = gyms?.[0]?.name ?? "Gym Chat";
   } else if (otherParticipantId) {
-    const { data: otherAthlete } = await supabase
-      .from("athletes")
-      .select("display_name")
-      .eq("id", otherParticipantId)
-      .single();
-    headerName = otherAthlete?.display_name ?? "Chat";
+    const other = participants[otherParticipantId];
+    headerName = other?.displayName ?? "Chat";
+    headerPhotoUrl = other?.profilePhotoUrl ?? null;
   }
 
   // Prefetch initial messages (newest 50, reversed to chronological)
@@ -75,9 +88,12 @@ async function ThreadData({
   return (
     <ChatThread
       conversationId={conversationId}
+      conversationType={conversation?.type ?? "direct"}
       currentAthleteId={athlete.id}
       headerName={headerName}
+      headerPhotoUrl={headerPhotoUrl}
       otherAthleteId={otherParticipantId ?? null}
+      participants={participants}
       initialMessages={initialMessages.reverse()}
     />
   );
