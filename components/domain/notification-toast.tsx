@@ -22,7 +22,7 @@ export function NotificationToast({ id, payload }: NotificationToastProps) {
   return (
     <button
       onClick={handleClick}
-      className="flex w-full items-center gap-3 rounded-lg border bg-background p-3 shadow-lg transition-colors hover:bg-muted/50"
+      className="flex w-full items-center gap-3 rounded-lg border border-primary/20 bg-background p-3 shadow-[0_4px_24px_rgba(0,0,0,0.12)] ring-1 ring-primary/10 transition-colors hover:bg-muted/50"
     >
       <Avatar className="h-9 w-9 shrink-0">
         {payload.avatarUrl && (
