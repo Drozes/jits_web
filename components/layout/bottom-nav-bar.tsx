@@ -14,9 +14,14 @@ const tabs = [
   { href: "/profile", label: "Profile", icon: User },
 ] as const;
 
+// Hide the nav bar when inside a conversation thread
+const HIDE_PATTERNS = [/^\/messages\/[^/]+$/];
+
 export function BottomNavBar() {
   const pathname = usePathname();
   const totalUnread = useUnreadCount();
+
+  if (HIDE_PATTERNS.some((p) => p.test(pathname))) return null;
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
