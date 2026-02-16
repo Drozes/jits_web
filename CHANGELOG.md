@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Online Presence Indicators (2026-02-16)
+
+**Added**
+- `hooks/use-online-presence.ts` — Core Supabase Presence hook for the `app:online` channel. Uses an external store pattern (`useSyncExternalStore`) so any client component can check online status without a React Context provider. Tracks `{ athlete_id, display_name, profile_photo_url }` per the BE contract.
+- `components/layout/online-presence-bootstrap.tsx` — Side-effect client component mounted in app layout. Sets up the presence channel on app open (same pattern as `GlobalNotificationsProvider`).
+- `components/domain/online-indicator.tsx` — Green dot component. Uses `useOnlineStatus(athleteId)` from the store. Renders nothing when offline, shows an absolutely-positioned green circle when online. Supports `className` override for size variants.
+- Online indicators added to 4 avatar locations: leaderboard athlete cards, arena competitor cards, chat conversation list (DMs only), and competitor profile header.
+
+**Changed**
+- `app/(app)/layout.tsx` — Added `PresenceBootstrap` async component in a Suspense boundary.
+- `CLAUDE.md` — Added Realtime & Presence architecture section documenting the two-tier model, external store pattern, and all realtime hooks.
+
 ### Step 12: Match Flow — Lobby → Live → Results (2026-02-14)
 
 **Added**

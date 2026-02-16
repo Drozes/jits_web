@@ -4,6 +4,7 @@ import { HeaderUserButton } from "@/components/layout/header-user-button";
 import { AppHeader } from "@/components/layout/app-header";
 import { PageContainer } from "@/components/layout/page-container";
 import { GlobalNotificationsProvider } from "@/components/layout/global-notifications-provider";
+import { OnlinePresenceBootstrap } from "@/components/layout/online-presence-bootstrap";
 import { NotificationBell } from "@/components/domain/notification-bell";
 import { getActiveAthlete } from "@/lib/guards";
 
@@ -27,7 +28,7 @@ export default function AppLayout({
           </div>
         }
       />
-      <PageContainer className="py-6">
+      <PageContainer className="pt-6">
         {children}
       </PageContainer>
       <Suspense>
@@ -35,6 +36,9 @@ export default function AppLayout({
       </Suspense>
       <Suspense>
         <NotificationsBootstrap />
+      </Suspense>
+      <Suspense>
+        <PresenceBootstrap />
       </Suspense>
     </div>
   );
@@ -50,4 +54,16 @@ async function NotificationsBootstrap() {
   const athlete = await getActiveAthlete();
   if (!athlete) return null;
   return <GlobalNotificationsProvider athleteId={athlete.id} />;
+}
+
+async function PresenceBootstrap() {
+  const athlete = await getActiveAthlete();
+  if (!athlete) return null;
+  return (
+    <OnlinePresenceBootstrap
+      athleteId={athlete.id}
+      displayName={athlete.display_name}
+      profilePhotoUrl={athlete.profile_photo_url}
+    />
+  );
 }

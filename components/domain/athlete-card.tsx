@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Crown, Medal, Award } from "lucide-react";
 import { getInitials } from "@/lib/utils";
 import { ChallengeBadge } from "./challenge-badge";
+import { OnlineIndicator } from "./online-indicator";
 
 function getRankDisplay(rank: number) {
   if (rank === 1) return <Crown className="h-5 w-5 text-yellow-500" />;
@@ -44,11 +45,13 @@ export function AthleteCard({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="flex w-8 justify-center">{getRankDisplay(rank)}</div>
-          <Avatar className="h-12 w-12 border-2 border-accent/20 bg-gradient-to-br from-primary to-primary/80 text-white">
-            <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 font-bold text-white">
-              {getInitials(displayName)}
-            </AvatarFallback>
-          </Avatar>
+          <OnlineIndicator athleteId={id ?? ""}>
+            <Avatar className="h-12 w-12 border-2 border-accent/20 bg-gradient-to-br from-primary to-primary/80 text-white">
+              <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 font-bold text-white">
+                {getInitials(displayName)}
+              </AvatarFallback>
+            </Avatar>
+          </OnlineIndicator>
           <div>
             <div className="flex items-center gap-2 font-semibold">
               <span>{displayName}</span>
