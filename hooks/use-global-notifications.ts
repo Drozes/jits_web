@@ -40,7 +40,6 @@ export function useGlobalNotifications(currentAthleteId: string): void {
   const senderCache = useRef(new Map<string, SenderMeta>());
 
   useEffect(() => {
-    console.log("[notifications] mounting global listener for", currentAthleteId);
     const supabase = createClient();
 
     const channel = supabase
@@ -50,7 +49,6 @@ export function useGlobalNotifications(currentAthleteId: string): void {
         { event: "INSERT", schema: "public", table: "messages" },
         async (payload: RealtimePostgresInsertPayload<Message>) => {
           const msg = payload.new;
-          console.log("[notifications] message received:", msg.id, msg.body);
 
           // Skip own messages
           if (msg.sender_id === currentAthleteId) return;
@@ -79,9 +77,7 @@ export function useGlobalNotifications(currentAthleteId: string): void {
           });
         },
       )
-      .subscribe((status) => {
-        console.log("[notifications] channel status:", status);
-      });
+      .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
