@@ -30,11 +30,11 @@ export function ConversationCard({
       href={`/messages/${c.conversation_id}`}
       className="flex items-center gap-3 rounded-lg px-3 py-3 transition-colors hover:bg-muted/50"
     >
-      <Avatar className="h-10 w-10 shrink-0" size="lg">
+      <Avatar className="h-10 w-10 shrink-0 border-2 border-accent/20 bg-gradient-to-br from-primary to-primary/80 text-white" size="lg">
         {isDirect && c.other_athlete_profile_photo_url && (
           <AvatarImage src={c.other_athlete_profile_photo_url} alt={name} />
         )}
-        <AvatarFallback className="text-xs">
+        <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 font-bold text-white text-xs">
           {isDirect ? getInitials(name) : <Users className="h-4 w-4" />}
         </AvatarFallback>
       </Avatar>
