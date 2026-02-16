@@ -73,7 +73,7 @@ const challenger = data.challenger; // already a single object
 
 ### 4. Stats Are Computed, Not Stored
 
-The `athletes` table has no `wins`, `losses`, `win_streak`, or `belt_rank` columns. All stats come from querying `match_participants` and filtering by `outcome`.
+The `athletes` table has no `wins`, `losses`, `win_streak`, or `belt_rank` columns. All stats are computed from the `get_match_history` RPC which returns complete match data including `athlete_outcome`, `elo_delta`, `result`, `finish_time_seconds`, and `completed_at`. **Do not query `match_participants` directly** — RLS restrictions prevent direct table access; always use the RPC via `getMatchHistory()` from `lib/api/queries.ts`.
 
 ### 5. Suspense Is Mandatory for Async Server Components
 

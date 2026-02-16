@@ -2,42 +2,38 @@ import { requireAthlete } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent } from "@/components/ui/card";
 import { StatsTabs } from "./stats-tabs";
-import { computeStats, computeWinStreak } from "@/lib/utils";
 import { getMatchHistory, getEloHistory } from "@/lib/api/queries";
 
 export async function StatsContent() {
   const { athlete } = await requireAthlete();
   const supabase = await createClient();
 
-  // Fetch all match participation outcomes
-  const { data: participations } = await supabase
-    .from("match_participants")
-    .select("outcome, elo_delta, match_id, matches(created_at, duration_seconds, result)")
-    .eq("athlete_id", athlete.id)
-    .not("outcome", "is", null)
-    .order("match_id", { ascending: false });
+  // Fetch match history and ELO history via RPCs (bypass RLS)
+  const [matchHistory, eloHistory] = await Promise.all([
+    getMatchHistory(supabase, athlete.id),
+    getEloHistory(supabase, athlete.id),
+  ]);
 
-  const { wins, losses, winRate } = computeStats(participations ?? []);
-  const draws =
-    participations?.filter((p) => p.outcome === "draw").length ?? 0;
+  // Compute stats from match history
+  const wins = matchHistory.filter((m) => m.athlete_outcome === "win").length;
+  const losses = matchHistory.filter((m) => m.athlete_outcome === "loss").length;
+  const draws = matchHistory.filter((m) => m.athlete_outcome === "draw").length;
   const total = wins + losses + draws;
-  const winStreak = computeWinStreak(participations ?? []);
+  const winRate = total > 0 ? Math.round((wins / (wins + losses || 1)) * 100) : 0;
 
-  // Calculate ELO change this month
+  // Win streak (matchHistory is newest first)
+  let winStreak = 0;
+  for (const m of matchHistory) {
+    if (m.athlete_outcome === "win") winStreak++;
+    else break;
+  }
+
+  // ELO change this month
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const thisMonthParticipations =
-    participations?.filter((p) => {
-      const matchArr = p.matches as
-        | { created_at: string; duration_seconds: number; result: string | null }[]
-        | null;
-      const match = matchArr?.[0];
-      return match && new Date(match.created_at) >= startOfMonth;
-    }) ?? [];
-  const eloThisMonth = thisMonthParticipations.reduce(
-    (sum, p) => sum + (p.elo_delta ?? 0),
-    0,
-  );
+  const eloThisMonth = matchHistory
+    .filter((m) => new Date(m.completed_at) >= startOfMonth)
+    .reduce((sum, m) => sum + (m.elo_delta ?? 0), 0);
 
   // Recent performance periods
   const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -45,17 +41,12 @@ export async function StatsContent() {
   const threeMonthsAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
 
   function periodStats(since: Date) {
-    const filtered =
-      participations?.filter((p) => {
-        const matchArr = p.matches as
-          | { created_at: string; duration_seconds: number; result: string | null }[]
-          | null;
-        const match = matchArr?.[0];
-        return match && new Date(match.created_at) >= since;
-      }) ?? [];
-    const w = filtered.filter((p) => p.outcome === "win").length;
-    const l = filtered.filter((p) => p.outcome === "loss").length;
-    const elo = filtered.reduce((sum, p) => sum + (p.elo_delta ?? 0), 0);
+    const filtered = matchHistory.filter(
+      (m) => new Date(m.completed_at) >= since,
+    );
+    const w = filtered.filter((m) => m.athlete_outcome === "win").length;
+    const l = filtered.filter((m) => m.athlete_outcome === "loss").length;
+    const elo = filtered.reduce((sum, m) => sum + (m.elo_delta ?? 0), 0);
     return { wins: w, losses: l, eloChange: elo };
   }
 
@@ -66,22 +57,11 @@ export async function StatsContent() {
   ];
 
   // Submission stats
-  const submissionWins =
-    participations?.filter((p) => {
-      const matchArr = p.matches as
-        | { created_at: string; duration_seconds: number; result: string | null }[]
-        | null;
-      const match = matchArr?.[0];
-      return p.outcome === "win" && match?.result === "submission";
-    }).length ?? 0;
+  const submissionWins = matchHistory.filter(
+    (m) => m.athlete_outcome === "win" && m.result === "submission",
+  ).length;
   const submissionRate =
     wins > 0 ? Math.round((submissionWins / wins) * 100) : 0;
-
-  // Fetch match history and ELO history in parallel
-  const [matchHistory, eloHistory] = await Promise.all([
-    getMatchHistory(supabase, athlete.id),
-    getEloHistory(supabase, athlete.id),
-  ]);
 
   return (
     <div className="flex flex-col gap-6">
