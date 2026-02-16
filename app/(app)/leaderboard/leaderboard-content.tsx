@@ -94,7 +94,7 @@ export function LeaderboardContent({
   const challengedSet = new Set(challengedIds);
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 animate-page-in">
       {/* Mode Toggle */}
       <div className="flex items-center justify-center gap-3">
         <span className={`text-sm uppercase tracking-wider ${isAthleteMode ? "text-foreground" : "text-muted-foreground"}`}>

@@ -90,7 +90,7 @@ export async function ProfileContent({
     : { wins, losses, winRate };
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 animate-page-in">
       <EditableProfileHeader
         athlete={athlete}
         gymName={gymName}

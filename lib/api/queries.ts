@@ -55,14 +55,7 @@ export async function getAthleteProfile(
     raw.gyms as { name: string }[] | null,
   );
 
-  const { data: outcomes } = await supabase
-    .from("match_participants")
-    .select("outcome")
-    .eq("athlete_id", athleteId)
-    .not("outcome", "is", null);
-
-  const stats = computeStats(outcomes ?? []);
-
+  // Single query for both stats and win streak (ordered, limited to 50)
   const { data: recentOutcomes } = await supabase
     .from("match_participants")
     .select("outcome")
@@ -71,6 +64,7 @@ export async function getAthleteProfile(
     .order("match_id", { ascending: false })
     .limit(50);
 
+  const stats = computeStats(recentOutcomes ?? []);
   const winStreak = computeWinStreak(recentOutcomes ?? []);
 
   return { ...raw, gymName, stats, winStreak };

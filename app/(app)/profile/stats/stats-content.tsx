@@ -64,7 +64,7 @@ export async function StatsContent() {
     wins > 0 ? Math.round((submissionWins / wins) * 100) : 0;
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 animate-page-in">
       <h2 className="text-xl font-bold">Performance Stats</h2>
 
       {/* Quick stats header */}

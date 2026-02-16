@@ -96,7 +96,7 @@ export function SwipeDiscoveryClient({
     <>
       <AppHeader title="Discover" back />
       <PageContainer className="pt-6">
-        <div className="flex flex-col items-center gap-6">
+        <div className="flex flex-col items-center gap-6 animate-page-in">
           {!isFinished && current ? (
             <>
               {/* Card stack */}

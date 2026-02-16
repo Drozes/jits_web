@@ -120,7 +120,7 @@ export async function AthleteProfileContent({
     <>
       <AppHeader title={competitor.display_name} back />
       <PageContainer className="pt-6">
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-6 animate-page-in">
           <ProfileHeader
             athlete={competitor}
             gymName={competitorGymName}

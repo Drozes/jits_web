@@ -59,6 +59,10 @@ export default {
           from: { transform: "translateY(20px)", opacity: "0" },
           to: { transform: "translateY(0)", opacity: "1" },
         },
+        "page-in": {
+          from: { opacity: "0", transform: "translateY(8px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
         "pulse-red": {
           "0%, 100%": { boxShadow: "0 0 0 0 hsl(var(--primary) / 0.4)" },
           "50%": { boxShadow: "0 0 0 8px hsl(var(--primary) / 0)" },
@@ -66,6 +70,7 @@ export default {
       },
       animation: {
         "fade-in-up": "fade-in-up 0.6s ease-out",
+        "page-in": "page-in 0.3s ease-out",
         "pulse-red": "pulse-red 2s infinite",
       },
     },
