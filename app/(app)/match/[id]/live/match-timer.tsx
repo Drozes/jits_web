@@ -6,6 +6,7 @@ import { Loader2, Play, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { startMatch } from "@/lib/api/mutations";
+import { useMatchSync } from "@/hooks/use-match-sync";
 
 interface MatchTimerProps {
   matchId: string;
@@ -40,9 +41,24 @@ export function MatchTimer({
     return durationSeconds;
   });
 
+  const { broadcastTimerStarted, broadcastMatchEnded } = useMatchSync({
+    matchId,
+    onTimerStarted: (remoteStartedAt) => {
+      const elapsed = Math.floor(
+        (Date.now() - new Date(remoteStartedAt).getTime()) / 1000,
+      );
+      setRemaining(Math.max(0, durationSeconds - elapsed));
+      setRunning(true);
+    },
+    onMatchEnded: () => {
+      router.push(`/match/${matchId}/results`);
+    },
+  });
+
   const handleEnd = useCallback(() => {
+    broadcastMatchEnded();
     router.push(`/match/${matchId}/results`);
-  }, [router, matchId]);
+  }, [router, matchId, broadcastMatchEnded]);
 
   useEffect(() => {
     if (!running || remaining <= 0) return;
@@ -63,15 +79,20 @@ export function MatchTimer({
   }, [running, remaining, handleEnd]);
 
   async function handleStart() {
+    if (running) return;
     setLoading(true);
     setError(null);
     const supabase = createClient();
     const result = await startMatch(supabase, matchId);
     if (!result.ok) {
+      // If the other athlete already started, the broadcast will have set running
+      if (running) return;
       setError(result.error.message);
       setLoading(false);
       return;
     }
+    const now = new Date().toISOString();
+    broadcastTimerStarted(now);
     setLoading(false);
     setRunning(true);
   }

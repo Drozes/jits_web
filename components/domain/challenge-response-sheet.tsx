@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { acceptChallenge, declineChallenge } from "@/lib/api/mutations";
 import {
   Sheet,
   SheetContent,
@@ -84,20 +85,15 @@ export function ChallengeResponseSheet({
     setError(null);
 
     const supabase = createClient();
-    const { error: updateError } = await supabase
-      .from("challenges")
-      .update({
-        status: "accepted",
-        opponent_weight: parsedWeight,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", challenge.id)
-      .eq("status", "pending");
+    const result = await acceptChallenge(supabase, {
+      challengeId: challenge.id,
+      opponentWeight: parsedWeight,
+    });
 
     setSubmitting(false);
 
-    if (updateError) {
-      setError(updateError.message);
+    if (!result.ok) {
+      setError(result.error.message);
       return;
     }
 
@@ -105,7 +101,7 @@ export function ChallengeResponseSheet({
     setTimeout(() => {
       onOpenChange(false);
       resetState();
-      router.refresh();
+      router.push(`/match/lobby/${challenge.id}`);
     }, 1500);
   }
 
@@ -114,19 +110,12 @@ export function ChallengeResponseSheet({
     setError(null);
 
     const supabase = createClient();
-    const { error: updateError } = await supabase
-      .from("challenges")
-      .update({
-        status: "declined",
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", challenge.id)
-      .eq("status", "pending");
+    const result = await declineChallenge(supabase, challenge.id);
 
     setSubmitting(false);
 
-    if (updateError) {
-      setError(updateError.message);
+    if (!result.ok) {
+      setError(result.error.message);
       return;
     }
 

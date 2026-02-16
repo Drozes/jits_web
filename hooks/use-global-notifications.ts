@@ -42,7 +42,7 @@ export function useGlobalNotifications(currentAthleteId: string): void {
   useEffect(() => {
     const supabase = createClient();
 
-    const channel = supabase
+    const messageChannel = supabase
       .channel("global-messages")
       .on(
         "postgres_changes",
@@ -79,8 +79,59 @@ export function useGlobalNotifications(currentAthleteId: string): void {
       )
       .subscribe();
 
+    // Listen for updates to challenges this athlete sent (accepted/declined)
+    const challengeChannel = supabase
+      .channel(`challenge-updates-${currentAthleteId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "challenges",
+          filter: `challenger_id=eq.${currentAthleteId}`,
+        },
+        async (payload) => {
+          const challenge = payload.new as {
+            id: string;
+            status: string;
+            opponent_id: string;
+          };
+
+          if (challenge.status === "accepted") {
+            const opponent = await resolveSender(
+              supabase,
+              challenge.opponent_id,
+              senderCache.current,
+            );
+            showNotification({
+              type: "challenge",
+              title: "Challenge Accepted!",
+              body: `${opponent.name} accepted your challenge`,
+              href: `/match/lobby/${challenge.id}`,
+              avatarUrl: opponent.avatarUrl,
+            });
+          }
+
+          if (challenge.status === "declined") {
+            const opponent = await resolveSender(
+              supabase,
+              challenge.opponent_id,
+              senderCache.current,
+            );
+            showNotification({
+              type: "challenge",
+              title: "Challenge Declined",
+              body: `${opponent.name} declined your challenge`,
+              avatarUrl: opponent.avatarUrl,
+            });
+          }
+        },
+      )
+      .subscribe();
+
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(messageChannel);
+      supabase.removeChannel(challengeChannel);
     };
   }, [currentAthleteId]);
 }

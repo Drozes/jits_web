@@ -9,6 +9,7 @@ import {
   startMatchFromChallenge,
   cancelChallenge,
 } from "@/lib/api/mutations";
+import { useLobbySync } from "@/hooks/use-lobby-sync";
 
 interface LobbyActionsProps {
   challengeId: string;
@@ -18,6 +19,11 @@ export function LobbyActions({ challengeId }: LobbyActionsProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const { broadcastMatchStarted, broadcastCancelled } = useLobbySync({
+    challengeId,
+    onCancelled: () => router.push("/match/pending"),
+  });
 
   async function handleStart() {
     setLoading(true);
@@ -29,11 +35,14 @@ export function LobbyActions({ challengeId }: LobbyActionsProps) {
       setLoading(false);
       return;
     }
-    router.push(`/match/${result.data.match_id}/live`);
+    const matchId = result.data.match_id!;
+    broadcastMatchStarted(matchId);
+    router.push(`/match/${matchId}/live`);
   }
 
   async function handleCancel() {
     setLoading(true);
+    broadcastCancelled();
     const supabase = createClient();
     await cancelChallenge(supabase, challengeId);
     router.push("/match/pending");

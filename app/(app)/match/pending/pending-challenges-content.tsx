@@ -5,6 +5,7 @@ import { AppHeader } from "@/components/layout/app-header";
 import { PageContainer } from "@/components/layout/page-container";
 import { ReceivedChallengesList } from "./received-challenges-list";
 import { SentChallengesList } from "./sent-challenges-list";
+import { ActiveMatchesList } from "./active-matches-list";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -39,6 +40,35 @@ export async function PendingChallengesContent() {
     .eq("challenger_id", athlete.id)
     .eq("status", "pending")
     .order("created_at", { ascending: false });
+
+  // Fetch accepted challenges (waiting in lobby)
+  const { data: accepted } = await supabase
+    .from("challenges")
+    .select(
+      "id, match_type, challenger_id, challenger:athletes!fk_challenges_challenger(display_name), opponent:athletes!fk_challenges_opponent(display_name)",
+    )
+    .or(`challenger_id.eq.${athlete.id},opponent_id.eq.${athlete.id}`)
+    .eq("status", "accepted")
+    .order("created_at", { ascending: false });
+
+  // Find active matches: first get match IDs where this athlete participates
+  const { data: participations } = await supabase
+    .from("match_participants")
+    .select("match_id")
+    .eq("athlete_id", athlete.id);
+
+  const myMatchIds = participations?.map((p) => p.match_id) ?? [];
+
+  // Then get those matches that are still active, with all participants
+  const { data: matchRows } = myMatchIds.length > 0
+    ? await supabase
+        .from("matches")
+        .select(
+          "id, status, match_type, match_participants(athlete_id, athletes!fk_participants_athlete(display_name))",
+        )
+        .in("id", myMatchIds)
+        .in("status", ["pending", "in_progress"])
+    : { data: null };
 
   const now = new Date();
 
@@ -78,11 +108,44 @@ export async function PendingChallengesContent() {
         };
       }) ?? [];
 
+  // Map accepted challenges to lobby entries
+  const lobbies = (accepted ?? []).map((c) => {
+    const isChallenger = c.challenger_id === athlete.id;
+    const challenger = c.challenger as unknown as { display_name: string } | null;
+    const opponent = c.opponent as unknown as { display_name: string } | null;
+    const opponentName = isChallenger
+      ? (opponent?.display_name ?? "Unknown")
+      : (challenger?.display_name ?? "Unknown");
+    return {
+      challengeId: c.id,
+      opponentName,
+      matchType: c.match_type,
+    };
+  });
+
+  // Map active matches with opponent names
+  type ParticipantRow = {
+    athlete_id: string;
+    athletes: { display_name: string }[] | null;
+  };
+  const activeMatches = (matchRows ?? []).map((m) => {
+    const participants = m.match_participants as unknown as ParticipantRow[];
+    const opponent = participants?.find((p) => p.athlete_id !== athlete.id);
+    const opponentName = opponent?.athletes?.[0]?.display_name ?? "Opponent";
+    return {
+      matchId: m.id,
+      opponentName,
+      matchType: m.match_type,
+      status: m.status,
+    };
+  });
+
   return (
     <>
-      <AppHeader title="Pending Challenges" back />
+      <AppHeader title="Matches" back />
       <PageContainer className="pt-6">
         <div className="flex flex-col gap-6">
+          <ActiveMatchesList lobbies={lobbies} matches={activeMatches} />
           <Tabs defaultValue="received">
             <TabsList className="w-full">
               <TabsTrigger value="received" className="flex-1 gap-1.5">

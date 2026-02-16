@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/client";
 import { recordMatchResult } from "@/lib/api/mutations";
+import { useMatchSync } from "@/hooks/use-match-sync";
 import type { MatchParticipant } from "@/lib/api/queries";
 import type { SubmissionType } from "@/types/submission-type";
 import { SubmissionFields } from "./submission-fields";
@@ -23,6 +24,10 @@ export function RecordResultForm({
   submissionTypes,
 }: RecordResultFormProps) {
   const router = useRouter();
+  const { broadcastResultRecorded } = useMatchSync({
+    matchId,
+    onResultRecorded: () => router.refresh(),
+  });
   const [result, setResult] = useState<"submission" | "draw" | null>(null);
   const [winnerId, setWinnerId] = useState("");
   const [submissionCode, setSubmissionCode] = useState("");
@@ -53,6 +58,7 @@ export function RecordResultForm({
       setLoading(false);
       return;
     }
+    broadcastResultRecorded();
     router.refresh();
   }
 
