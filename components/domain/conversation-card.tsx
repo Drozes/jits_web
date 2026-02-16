@@ -2,18 +2,24 @@ import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import type { ConversationRow } from "@/lib/api/chat-queries";
-import { getInitials } from "@/lib/utils";
+import { cn, getInitials } from "@/lib/utils";
 import { Users } from "lucide-react";
 
 interface ConversationCardProps {
   conversation: ConversationRow;
+  currentAthleteId: string;
 }
 
-export function ConversationCard({ conversation: c }: ConversationCardProps) {
+export function ConversationCard({
+  conversation: c,
+  currentAthleteId,
+}: ConversationCardProps) {
   const isDirect = c.conversation_type === "direct";
   const name = isDirect
     ? (c.other_athlete_display_name ?? "Unknown")
     : (c.gym_name ?? "Gym Chat");
+
+  const hasUnread = c.unread_count > 0;
 
   const timeLabel = c.last_message_created_at
     ? formatRelativeTime(c.last_message_created_at)
@@ -24,7 +30,7 @@ export function ConversationCard({ conversation: c }: ConversationCardProps) {
       href={`/messages/${c.conversation_id}`}
       className="flex items-center gap-3 rounded-lg px-3 py-3 transition-colors hover:bg-muted/50"
     >
-      <Avatar className="h-10 w-10 shrink-0">
+      <Avatar className="h-10 w-10 shrink-0" size="lg">
         {isDirect && c.other_athlete_profile_photo_url && (
           <AvatarImage src={c.other_athlete_profile_photo_url} alt={name} />
         )}
@@ -35,15 +41,36 @@ export function ConversationCard({ conversation: c }: ConversationCardProps) {
 
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-2">
-          <span className="truncate text-sm font-medium">{name}</span>
+          <span
+            className={cn(
+              "truncate text-sm",
+              hasUnread ? "font-semibold" : "font-medium",
+            )}
+          >
+            {name}
+          </span>
           {timeLabel && (
-            <span className="shrink-0 text-xs text-muted-foreground">
+            <span
+              className={cn(
+                "shrink-0 text-xs",
+                hasUnread ? "font-medium text-primary" : "text-muted-foreground",
+              )}
+            >
               {timeLabel}
             </span>
           )}
         </div>
-        <p className="truncate text-xs text-muted-foreground">
-          {c.last_message_body ?? "No messages yet"}
+        <p
+          className={cn(
+            "truncate text-xs",
+            hasUnread ? "text-foreground font-medium" : "text-muted-foreground",
+          )}
+        >
+          {c.last_message_body
+            ? c.last_message_sender_id === currentAthleteId
+              ? `You: ${c.last_message_body}`
+              : c.last_message_body
+            : "No messages yet"}
         </p>
       </div>
 

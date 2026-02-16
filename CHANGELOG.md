@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+### Chat UI Polish — Modern Messaging UX (2026-02-16)
+
+**Added**
+- **Message grouping** — consecutive messages from the same sender within 2 minutes cluster together with tight spacing (0.5) and larger gaps (12px) between groups, creating a visual conversation rhythm
+- **Date separators** — "Today", "Yesterday", weekday names, or "Feb 14" dividers between message groups from different days (`components/domain/date-separator.tsx`)
+- **Sender avatars in thread** — received messages show a small avatar (bottom of each group), with initials fallback; group chats also show sender display names above the first message in each group
+- **Adaptive bubble corners** — border radius adjusts based on group position (rounded corners flatten where messages connect, matching iMessage/WhatsApp style)
+- **"You:" prefix in inbox** — last message preview shows "You: message text" when the current user sent it, using the existing `last_message_sender_id` from the RPC
+- **Enhanced thread header** — avatar + name in header bar; taps through to the other athlete's profile page for direct chats; gym chats show a Users icon
+- **Unread visual emphasis** — conversations with unread messages show bold name, darker preview text, and primary-colored timestamp
+- Participant profiles fetched server-side in thread page (parallel query) for avatar/name data
+
+**Changed**
+- `MessageBubble` — new props: `isFirstInGroup`, `isLastInGroup`, `senderName`, `senderPhotoUrl`, `showAvatar`; timestamps only shown on last message in group
+- `ChatThread` — extracted `ThreadHeader` and `MessageList` sub-components; receives `participants` map and `conversationType`
+- `ConversationCard` — now receives `currentAthleteId` for "You:" prefix; uses `cn()` for conditional unread styling
+- Thread page (`messages/[id]/page.tsx`) — fetches all participant profiles in a single query for the participants map
+
 ### Step 12: Match Flow — Lobby → Live → Results (2026-02-14)
 
 **Added**

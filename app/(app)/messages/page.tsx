@@ -30,9 +30,14 @@ export default function MessagesPage() {
 }
 
 async function InboxData() {
-  await requireAthlete();
+  const { athlete } = await requireAthlete();
   const supabase = await createClient();
   const conversations = await getConversations(supabase);
 
-  return <InboxContent conversations={conversations} />;
+  return (
+    <InboxContent
+      conversations={conversations}
+      currentAthleteId={athlete.id}
+    />
+  );
 }
