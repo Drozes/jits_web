@@ -11,6 +11,7 @@ interface MessageBubbleProps {
   senderName?: string;
   senderPhotoUrl?: string | null;
   showAvatar?: boolean;
+  showSenderLabel?: boolean;
 }
 
 export function MessageBubble({
@@ -22,6 +23,7 @@ export function MessageBubble({
   senderName,
   senderPhotoUrl,
   showAvatar,
+  showSenderLabel,
 }: MessageBubbleProps) {
   const time = new Date(message.created_at).toLocaleTimeString(undefined, {
     hour: "numeric",
@@ -62,7 +64,7 @@ export function MessageBubble({
       )}
 
       <div className="max-w-[75%]">
-        {senderName && (
+        {showSenderLabel && senderName && (
           <p className="mb-0.5 ml-1 text-[11px] font-medium text-muted-foreground">
             {senderName}
           </p>

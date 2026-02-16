@@ -259,16 +259,14 @@ function MessageList({
         const isFirstInGroup = !sameSenderAsPrev;
         const isLastInGroup = !sameSenderAsNext;
 
-        // For received messages in group chats, show sender info on first message in group
+        // Resolve sender data for received messages (avatar + optional label)
         const sender = !isOwn ? participants[msg.sender_id] : undefined;
-        const senderName =
-          showSenderInfo && !isOwn && isFirstInGroup
-            ? (sender?.displayName ?? "Unknown")
-            : undefined;
+        const senderName = sender?.displayName ?? undefined;
         const senderPhotoUrl =
           !isOwn && isLastInGroup
             ? (sender?.profilePhotoUrl ?? null)
             : null;
+        const showSenderLabel = showSenderInfo && !isOwn && isFirstInGroup;
 
         return (
           <div
@@ -285,6 +283,7 @@ function MessageList({
               senderName={senderName}
               senderPhotoUrl={senderPhotoUrl}
               showAvatar={!isOwn}
+              showSenderLabel={showSenderLabel}
             />
           </div>
         );
