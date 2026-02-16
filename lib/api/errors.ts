@@ -11,6 +11,9 @@ export type DomainErrorCode =
   | "MATCH_NOT_PENDING"
   | "INVALID_RESULT"
   | "NOT_PARTICIPANT"
+  | "SELF_CONVERSATION"
+  | "INVALID_ATHLETE"
+  | "SEND_REQUIRES_ACTIVE"
   | "RLS_VIOLATION"
   | "UNKNOWN";
 
@@ -70,6 +73,10 @@ export function mapRpcError(response: {
     return { code: "NOT_PARTICIPANT", message: msg };
   if (msg.includes("Invalid result") || msg.includes("invalid result"))
     return { code: "INVALID_RESULT", message: msg };
+  if (msg.includes("yourself"))
+    return { code: "SELF_CONVERSATION", message: msg };
+  if (msg.includes("not found or not active"))
+    return { code: "INVALID_ATHLETE", message: msg };
 
   return { code: "UNKNOWN", message: msg };
 }

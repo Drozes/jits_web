@@ -154,6 +154,71 @@ export type Database = {
           },
         ]
       }
+      conversation_participants: {
+        Row: {
+          athlete_id: string
+          conversation_id: string
+          joined_at: string
+          last_read_at: string
+        }
+        Insert: {
+          athlete_id: string
+          conversation_id: string
+          joined_at?: string
+          last_read_at?: string
+        }
+        Update: {
+          athlete_id?: string
+          conversation_id?: string
+          joined_at?: string
+          last_read_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_cp_athlete"
+            columns: ["athlete_id"]
+            isOneToOne: false
+            referencedRelation: "athletes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_cp_conversation"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversations: {
+        Row: {
+          created_at: string
+          gym_id: string | null
+          id: string
+          type: Database["public"]["Enums"]["conversation_type_enum"]
+        }
+        Insert: {
+          created_at?: string
+          gym_id?: string | null
+          id?: string
+          type: Database["public"]["Enums"]["conversation_type_enum"]
+        }
+        Update: {
+          created_at?: string
+          gym_id?: string | null
+          id?: string
+          type?: Database["public"]["Enums"]["conversation_type_enum"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_conversations_gym"
+            columns: ["gym_id"]
+            isOneToOne: true
+            referencedRelation: "gyms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       elo_history: {
         Row: {
           athlete_id: string
@@ -362,6 +427,48 @@ export type Database = {
           },
         ]
       }
+      messages: {
+        Row: {
+          body: string | null
+          conversation_id: string
+          created_at: string
+          id: string
+          image_url: string | null
+          sender_id: string
+        }
+        Insert: {
+          body?: string | null
+          conversation_id: string
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          sender_id: string
+        }
+        Update: {
+          body?: string | null
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          sender_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_messages_conversation"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_messages_sender"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "athletes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       submission_types: {
         Row: {
           category: string
@@ -465,6 +572,26 @@ export type Database = {
       can_create_challenge:
         | { Args: never; Returns: boolean }
         | { Args: { p_opponent_id?: string }; Returns: boolean }
+      create_direct_conversation: {
+        Args: { p_other_athlete_id: string }
+        Returns: Json
+      }
+      get_conversations: {
+        Args: never
+        Returns: {
+          conversation_id: string
+          conversation_type: Database["public"]["Enums"]["conversation_type_enum"]
+          gym_id: string
+          gym_name: string
+          last_message_body: string
+          last_message_created_at: string
+          last_message_sender_id: string
+          other_athlete_display_name: string
+          other_athlete_id: string
+          other_athlete_profile_photo_url: string
+          unread_count: number
+        }[]
+      }
       get_elo_history: {
         Args: { p_athlete_id: string }
         Returns: {
@@ -494,6 +621,21 @@ export type Database = {
           submission_type_display_name: string
         }[]
       }
+      get_unread_counts: {
+        Args: never
+        Returns: {
+          conversation_id: string
+          unread_count: number
+        }[]
+      }
+      is_conversation_participant: {
+        Args: { p_conversation_id: string }
+        Returns: boolean
+      }
+      mark_conversation_read: {
+        Args: { p_conversation_id: string }
+        Returns: Json
+      }
       record_match_result: {
         Args: {
           p_finish_time_seconds?: number
@@ -511,6 +653,7 @@ export type Database = {
       }
     }
     Enums: {
+      conversation_type_enum: "direct" | "gym"
       match_result_enum: "submission" | "draw"
       match_type_enum: "ranked" | "casual"
       participant_outcome_enum: "win" | "loss" | "draw"
@@ -645,6 +788,7 @@ export const Constants = {
   },
   public: {
     Enums: {
+      conversation_type_enum: ["direct", "gym"],
       match_result_enum: ["submission", "draw"],
       match_type_enum: ["ranked", "casual"],
       participant_outcome_enum: ["win", "loss", "draw"],

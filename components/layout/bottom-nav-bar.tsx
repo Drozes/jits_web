@@ -2,18 +2,21 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Trophy, Search, User } from "lucide-react";
+import { Home, Trophy, Search, MessageSquare, User } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useUnreadCount } from "@/hooks/use-unread-count";
 
 const tabs = [
   { href: "/", label: "Home", icon: Home },
   { href: "/leaderboard", label: "Rankings", icon: Trophy },
   { href: "/arena", label: "Arena", icon: Search },
+  { href: "/messages", label: "Messages", icon: MessageSquare },
   { href: "/profile", label: "Profile", icon: User },
 ] as const;
 
 export function BottomNavBar() {
   const pathname = usePathname();
+  const totalUnread = useUnreadCount();
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -27,13 +30,18 @@ export function BottomNavBar() {
               key={href}
               href={href}
               className={cn(
-                "flex flex-col items-center gap-1 px-3 py-2 text-xs font-medium transition-colors",
+                "relative flex flex-col items-center gap-1 px-3 py-2 text-xs font-medium transition-colors",
                 isActive
                   ? "text-primary"
                   : "text-muted-foreground hover:text-foreground",
               )}
             >
               <Icon className={cn("h-5 w-5", isActive && "stroke-[2.5]")} />
+              {href === "/messages" && totalUnread > 0 && (
+                <span className="absolute -top-0.5 right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
+                  {totalUnread > 99 ? "99+" : totalUnread}
+                </span>
+              )}
               <span>{label}</span>
             </Link>
           );
