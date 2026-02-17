@@ -155,7 +155,7 @@ export function EditableProfileHeader({
             </div>
 
             {athlete.highest_elo > athlete.current_elo && (
-              <p className="text-sm text-primary mt-0.5">
+              <p className="text-sm text-muted-foreground mt-0.5">
                 Peak: {athlete.highest_elo}
               </p>
             )}

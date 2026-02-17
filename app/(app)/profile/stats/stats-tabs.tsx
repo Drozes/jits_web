@@ -157,7 +157,7 @@ export function StatsTabs({
                       </span>
                       <Badge
                         variant={
-                          period.eloChange >= 0 ? "default" : "destructive"
+                          period.eloChange >= 0 ? "success" : "destructive"
                         }
                       >
                         {period.eloChange > 0 ? "+" : ""}

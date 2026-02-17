@@ -42,7 +42,7 @@ export function EloBadge({ elo, peak, delta, variant, className }: EloBadgeProps
     <div className={cn(eloBadgeVariants({ variant }), className)}>
       <span>{elo}</span>
       {variant === "display" && peak != null && peak > elo && (
-        <span className="text-sm font-normal text-primary">
+        <span className="text-sm font-normal text-muted-foreground">
           Peak: {peak}
         </span>
       )}

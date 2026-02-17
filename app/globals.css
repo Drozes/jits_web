@@ -29,6 +29,8 @@
     --chart-4: 0 84% 60%;
     --chart-5: 0 79% 35%;
     --radius: 0.5rem;
+    --success: 145 63% 42%;
+    --success-foreground: 0 0% 100%;
     --brand-gold: 38 92% 50%;
     --brand-orange: 25 95% 53%;
     --brand-deep-red: 0 84% 50%;
@@ -58,6 +60,8 @@
     --chart-3: 0 0% 40%;
     --chart-4: 0 84% 60%;
     --chart-5: 0 79% 35%;
+    --success: 145 63% 49%;
+    --success-foreground: 0 0% 100%;
     --brand-gold: 38 92% 50%;
     --brand-orange: 25 95% 53%;
     --brand-deep-red: 0 84% 50%;

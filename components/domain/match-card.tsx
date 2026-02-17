@@ -17,7 +17,7 @@ interface MatchCardProps {
 }
 
 const resultConfig = {
-  [MATCH_OUTCOME.WIN]: { label: "Win", variant: "default" as const },
+  [MATCH_OUTCOME.WIN]: { label: "Win", variant: "success" as const },
   [MATCH_OUTCOME.LOSS]: { label: "Loss", variant: "destructive" as const },
   [MATCH_OUTCOME.DRAW]: { label: "Draw", variant: "secondary" as const },
 } as const;

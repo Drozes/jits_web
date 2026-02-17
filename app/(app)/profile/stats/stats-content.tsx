@@ -71,7 +71,7 @@ export async function StatsContent() {
       <div className="grid grid-cols-3 gap-3 text-center">
         <Card>
           <CardContent className="py-3 px-2">
-            <p className="text-2xl font-bold text-primary tabular-nums">
+            <p className="text-2xl font-bold tabular-nums">
               {athlete.current_elo}
             </p>
             <p className="text-xs text-muted-foreground">Current ELO</p>
@@ -85,7 +85,7 @@ export async function StatsContent() {
         </Card>
         <Card>
           <CardContent className="py-3 px-2">
-            <p className="text-2xl font-bold text-primary tabular-nums">
+            <p className="text-2xl font-bold text-success tabular-nums">
               {winRate}%
             </p>
             <p className="text-xs text-muted-foreground">Win Rate</p>

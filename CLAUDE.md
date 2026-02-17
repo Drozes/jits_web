@@ -124,10 +124,13 @@ When passing 4+ related fields about the same entity, group them into an object 
 ### 9. Color Tokens for Stats
 
 Use these consistently across all stat displays:
-- **Wins/positive:** `text-green-500`
-- **Losses/negative:** `text-red-500`
-- **Primary/ELO:** `text-primary`
-- **Neutral stats:** default text color with `tabular-nums`
+- **Wins/positive:** `text-green-500` (inline text) or `bg-success text-success-foreground` (badges)
+- **Losses/negative:** `text-red-500` (inline text) or `bg-destructive text-destructive-foreground` (badges)
+- **Draws/pressure:** `text-amber-500`
+- **ELO/neutral stats:** default foreground color with `tabular-nums` (NOT `text-primary` — that's brand red)
+- **Brand accent:** `text-primary` — reserved for branding, buttons, and section header icons. Never for data values.
+
+**Theme token:** `--success` (`hsl(145 63% 42%)` light / `hsl(145 63% 49%)` dark) is available as `bg-success`, `text-success`, and Badge `variant="success"`. Use it for win badges and positive ELO change badges.
 
 ### 10. MatchCard Shows Match Type
 
@@ -155,6 +158,7 @@ Do not commit if any check fails. Fix the issue first.
 - **Never edit these files manually.** They are managed by `npx shadcn@latest add <component>`.
 - To customize, use Tailwind classes in the consuming component or extend via `cn()`.
 - Currently installed: `avatar`, `badge`, `button`, `card`, `dialog`, `input`, `label`, `select`, `separator`, `sheet`, `switch`, `tabs`
+- **Exception:** `badge.tsx` has a custom `success` variant added (green bg for win badges). Preserve this when regenerating.
 
 ### Domain Components (`components/domain/`)
 

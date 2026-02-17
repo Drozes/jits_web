@@ -68,7 +68,7 @@ export function AthleteCard({
           </div>
         </div>
         <div className="text-right">
-          <div className="text-lg font-bold text-primary">{currentElo}</div>
+          <div className="text-lg font-bold">{currentElo}</div>
           <div className="text-sm text-muted-foreground">
             {wins}W - {losses}L
           </div>

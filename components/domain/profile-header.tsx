@@ -43,7 +43,7 @@ export function ProfileHeader({ athlete, gymName, lookingForCasual, lookingForRa
         <span className="text-sm text-muted-foreground ml-1.5">ELO</span>
       </div>
       {athlete.highest_elo > athlete.current_elo && (
-        <p className="text-xs text-primary">Peak: {athlete.highest_elo}</p>
+        <p className="text-xs text-muted-foreground">Peak: {athlete.highest_elo}</p>
       )}
 
       {/* Metadata: gym + weight */}

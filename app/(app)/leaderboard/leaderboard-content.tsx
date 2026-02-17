@@ -166,7 +166,7 @@ export function LeaderboardContent({
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-lg font-bold text-primary">{gym.totalElo}</div>
+                    <div className="text-lg font-bold">{gym.totalElo}</div>
                   </div>
                 </div>
               </Card>

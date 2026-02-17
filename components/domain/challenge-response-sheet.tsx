@@ -160,7 +160,7 @@ export function ChallengeResponseSheet({
                   {challenge.challengerName}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  ELO: <span className="text-primary font-semibold">{challenge.challengerElo}</span>
+                  ELO: <span className="font-semibold">{challenge.challengerElo}</span>
                 </p>
               </div>
               <div className="flex items-center gap-2">

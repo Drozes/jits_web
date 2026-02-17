@@ -35,10 +35,10 @@ export function StatOverview({ athlete, stats }: StatOverviewProps) {
       <Card>
         <CardContent className="pt-4 pb-4">
           <div className="flex items-center gap-1.5 mb-1">
-            <TrendingUp className="h-3.5 w-3.5 text-primary" />
+            <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" />
             <p className="text-xs text-muted-foreground">ELO Rating</p>
           </div>
-          <p className="text-2xl font-bold text-primary tabular-nums">
+          <p className="text-2xl font-bold tabular-nums">
             {athlete.current_elo}
           </p>
           {showPeakElo && <PeakLabel>peak: {athlete.highest_elo}</PeakLabel>}
