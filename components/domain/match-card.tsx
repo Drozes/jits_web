@@ -9,6 +9,7 @@ interface MatchCardProps {
   opponentName: string;
   result?: MatchOutcome | null;
   status?: string;
+  direction?: "incoming" | "sent";
   eloDelta?: number;
   date: string;
   href?: string;
@@ -20,7 +21,7 @@ const resultConfig = {
   [MATCH_OUTCOME.DRAW]: { label: "Draw", variant: "secondary" as const },
 } as const;
 
-function CardInner({ type, opponentName, result, status, eloDelta, date }: MatchCardProps) {
+function CardInner({ type, opponentName, result, status, direction, eloDelta, date }: MatchCardProps) {
   return (
     <CardContent className="flex items-center justify-between py-3 px-4">
       <div className="flex flex-col gap-0.5">
@@ -51,7 +52,13 @@ function CardInner({ type, opponentName, result, status, eloDelta, date }: Match
           </Badge>
         )}
 
-        {type === "challenge" && (
+        {type === "challenge" && direction && (
+          <Badge variant={direction === "incoming" ? "secondary" : "outline"}>
+            {direction === "incoming" ? "Incoming" : "Sent"}
+          </Badge>
+        )}
+
+        {type === "challenge" && !direction && (
           <Badge variant="outline">{status ?? "Pending"}</Badge>
         )}
       </div>

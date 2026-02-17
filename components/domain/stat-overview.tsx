@@ -1,12 +1,15 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { TrendingUp, Swords, Percent, Flame } from "lucide-react";
+import { TrendingUp, Swords, Trophy, Flame } from "lucide-react";
 import type { Athlete } from "@/types/athlete";
 
 interface AthleteStats {
   wins: number;
   losses: number;
-  winRate: number;
+  draws: number;
   winStreak: number;
+  rank: number;
+  bestRank: number;
+  bestWinStreak: number;
 }
 
 interface StatOverviewProps {
@@ -14,7 +17,19 @@ interface StatOverviewProps {
   stats: AthleteStats;
 }
 
+function PeakLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="text-[10px] text-muted-foreground mt-0.5">
+      {children}
+    </p>
+  );
+}
+
 export function StatOverview({ athlete, stats }: StatOverviewProps) {
+  const showPeakElo = athlete.highest_elo > athlete.current_elo;
+  const showBestRank = stats.bestRank < stats.rank;
+  const showBestStreak = stats.bestWinStreak > stats.winStreak;
+
   return (
     <div className="grid grid-cols-2 gap-3">
       <Card>
@@ -26,6 +41,20 @@ export function StatOverview({ athlete, stats }: StatOverviewProps) {
           <p className="text-2xl font-bold text-primary tabular-nums">
             {athlete.current_elo}
           </p>
+          {showPeakElo && <PeakLabel>peak: {athlete.highest_elo}</PeakLabel>}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="pt-4 pb-4">
+          <div className="flex items-center gap-1.5 mb-1">
+            <Trophy className="h-3.5 w-3.5 text-yellow-500" />
+            <p className="text-xs text-muted-foreground">Rank</p>
+          </div>
+          <p className="text-2xl font-bold tabular-nums">
+            #{stats.rank}
+          </p>
+          {showBestRank && <PeakLabel>best: #{stats.bestRank}</PeakLabel>}
         </CardContent>
       </Card>
 
@@ -37,20 +66,10 @@ export function StatOverview({ athlete, stats }: StatOverviewProps) {
           </div>
           <p className="text-2xl font-bold tabular-nums">
             <span className="text-green-500">{stats.wins}</span>
-            <span className="text-muted-foreground mx-1">-</span>
+            <span className="text-muted-foreground mx-0.5">-</span>
+            <span className="text-amber-500">{stats.draws}</span>
+            <span className="text-muted-foreground mx-0.5">-</span>
             <span className="text-red-500">{stats.losses}</span>
-          </p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent className="pt-4 pb-4">
-          <div className="flex items-center gap-1.5 mb-1">
-            <Percent className="h-3.5 w-3.5 text-muted-foreground" />
-            <p className="text-xs text-muted-foreground">Win Rate</p>
-          </div>
-          <p className="text-2xl font-bold tabular-nums">
-            {stats.winRate}%
           </p>
         </CardContent>
       </Card>
@@ -64,6 +83,7 @@ export function StatOverview({ athlete, stats }: StatOverviewProps) {
           <p className="text-2xl font-bold tabular-nums">
             {stats.winStreak}
           </p>
+          {showBestStreak && <PeakLabel>best: {stats.bestWinStreak}</PeakLabel>}
         </CardContent>
       </Card>
     </div>

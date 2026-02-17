@@ -119,6 +119,19 @@ export async function getLeaderboard(
   }));
 }
 
+/** Get an athlete's rank by counting how many active athletes have higher ELO */
+export async function getAthleteRank(
+  supabase: Client,
+  elo: number,
+): Promise<number> {
+  const { count } = await supabase
+    .from("athletes")
+    .select("*", { count: "exact", head: true })
+    .gt("current_elo", elo)
+    .eq("status", "active");
+  return (count ?? 0) + 1;
+}
+
 // ---------------------------------------------------------------------------
 // Athlete stats (via RPC — bypasses match_participants RLS)
 // ---------------------------------------------------------------------------
