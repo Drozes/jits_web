@@ -49,6 +49,13 @@ export function extractGymName(
   return gyms.name ?? null;
 }
 
+export function getEloTierClass(elo: number): string {
+  if (elo >= 1400) return "outline-cyan-400/60";
+  if (elo >= 1200) return "outline-yellow-400/60";
+  if (elo >= 1000) return "outline-gray-400/60";
+  return "outline-amber-600/60";
+}
+
 export function formatRelativeDate(dateString: string): string {
   const date = new Date(dateString);
   const now = new Date();

@@ -2,6 +2,9 @@ import { Suspense } from "react";
 import { requireAthlete } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
 import { ArenaContent } from "./arena-content";
+import { AppHeader } from "@/components/layout/app-header";
+import { PageContainer } from "@/components/layout/page-container";
+import { PageHeaderActions } from "@/components/layout/page-header-actions";
 import { getArenaData } from "@/lib/api/queries";
 
 function ArenaSkeleton() {
@@ -17,9 +20,14 @@ function ArenaSkeleton() {
 
 export default function ArenaPage() {
   return (
-    <Suspense fallback={<ArenaSkeleton />}>
-      <ArenaData />
-    </Suspense>
+    <>
+      <AppHeader title="Arena" rightAction={<PageHeaderActions />} />
+      <PageContainer className="pt-6">
+        <Suspense fallback={<ArenaSkeleton />}>
+          <ArenaData />
+        </Suspense>
+      </PageContainer>
+    </>
   );
 }
 

@@ -4,6 +4,9 @@ import { requireAthlete } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
 import { StatOverview } from "@/components/domain/stat-overview";
 import { MatchCard } from "@/components/domain/match-card";
+import { AppHeader } from "@/components/layout/app-header";
+import { PageContainer } from "@/components/layout/page-container";
+import { PageHeaderActions } from "@/components/layout/page-header-actions";
 import { getDashboardSummary } from "@/lib/api/queries";
 import { Swords, Zap } from "lucide-react";
 
@@ -27,9 +30,14 @@ function DashboardSkeleton() {
 
 export default function DashboardPage() {
   return (
-    <Suspense fallback={<DashboardSkeleton />}>
-      <DashboardContent />
-    </Suspense>
+    <>
+      <AppHeader title="Jits Arena" rightAction={<PageHeaderActions />} />
+      <PageContainer className="pt-6">
+        <Suspense fallback={<DashboardSkeleton />}>
+          <DashboardContent />
+        </Suspense>
+      </PageContainer>
+    </>
   );
 }
 

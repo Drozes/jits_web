@@ -2,6 +2,9 @@ import { Suspense } from "react";
 import { requireAthlete } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
 import { LeaderboardContent } from "./leaderboard-content";
+import { AppHeader } from "@/components/layout/app-header";
+import { PageContainer } from "@/components/layout/page-container";
+import { PageHeaderActions } from "@/components/layout/page-header-actions";
 import { extractGymName } from "@/lib/utils";
 import {
   getPendingChallengeOpponentIds,
@@ -21,9 +24,14 @@ function LeaderboardSkeleton() {
 
 export default function LeaderboardPage() {
   return (
-    <Suspense fallback={<LeaderboardSkeleton />}>
-      <LeaderboardData />
-    </Suspense>
+    <>
+      <AppHeader title="Rankings" rightAction={<PageHeaderActions />} />
+      <PageContainer className="pt-6">
+        <Suspense fallback={<LeaderboardSkeleton />}>
+          <LeaderboardData />
+        </Suspense>
+      </PageContainer>
+    </>
   );
 }
 

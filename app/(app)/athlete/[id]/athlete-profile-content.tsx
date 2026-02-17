@@ -60,7 +60,7 @@ export async function AthleteProfileContent({
 
   return (
     <>
-      <AppHeader title={competitor.display_name} back />
+      <AppHeader title="" back />
       <PageContainer className="pt-6">
         <div className="flex flex-col gap-6 animate-page-in">
           <ProfileHeader
@@ -112,8 +112,10 @@ export async function AthleteProfileContent({
                 ))}
               </div>
             ) : (
-              <div className="rounded-lg border border-dashed p-6 text-center text-muted-foreground">
-                <p className="text-sm">No matches against this opponent yet</p>
+              <div className="rounded-lg border border-dashed p-8 text-center">
+                <Swords className="h-8 w-8 mx-auto text-muted-foreground/30 mb-3" />
+                <p className="text-sm font-medium text-muted-foreground">No history yet</p>
+                <p className="text-xs text-muted-foreground/70 mt-1">Challenge them to your first match!</p>
               </div>
             )}
           </section>

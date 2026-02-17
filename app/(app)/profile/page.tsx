@@ -1,4 +1,7 @@
 import { Suspense } from "react";
+import { AppHeader } from "@/components/layout/app-header";
+import { PageContainer } from "@/components/layout/page-container";
+import { PageHeaderActions } from "@/components/layout/page-header-actions";
 import { ProfileContent } from "./profile-content";
 
 export default function ProfilePage({
@@ -7,9 +10,14 @@ export default function ProfilePage({
   searchParams: Promise<{ demo?: string }>;
 }) {
   return (
-    <Suspense fallback={<ProfileSkeleton />}>
-      <ProfileContent searchParams={searchParams} />
-    </Suspense>
+    <>
+      <AppHeader title="Profile" rightAction={<PageHeaderActions />} />
+      <PageContainer className="pt-6">
+        <Suspense fallback={<ProfileSkeleton />}>
+          <ProfileContent searchParams={searchParams} />
+        </Suspense>
+      </PageContainer>
+    </>
   );
 }
 

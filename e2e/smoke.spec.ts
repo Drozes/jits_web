@@ -22,7 +22,7 @@ test.describe("Public pages", () => {
     await page.goto("/forgot-password");
 
     await expect(
-      page.locator("text=Forgot Password").first(),
+      page.locator("text=Reset Your Password").first(),
     ).toBeVisible();
   });
 });
