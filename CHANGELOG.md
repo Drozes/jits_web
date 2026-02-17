@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Premium Features Teaser (2026-02-17)
+
+**Added**
+- `components/domain/premium-features-modal.tsx` — Gold gem icon button that opens a "Coming Soon" modal showcasing future premium features (Video Analysis, ELO Tournaments, Advanced Analytics, Gym Leaderboards, AI Match Insights).
+- `components/layout/page-header-actions.tsx` — Premium button added to header alongside notification bell on all main nav pages.
+
 ### Dynamic Dashboard Hero Subtitle (2026-02-17)
 
 **Changed**
