@@ -100,10 +100,7 @@ export async function cancelChallenge(
 ): Promise<Result<void>> {
   const { error } = await supabase
     .from("challenges")
-    .update({
-      status: "cancelled",
-      updated_at: new Date().toISOString(),
-    })
+    .update({ status: "cancelled" })
     .eq("id", challengeId);
 
   if (error) {

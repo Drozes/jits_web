@@ -39,7 +39,7 @@ async function DashboardContent() {
     // Pending challenges (incoming)
     supabase
       .from("challenges")
-      .select("id, created_at, status, challenger:athletes!fk_challenges_challenger(display_name)")
+      .select("id, created_at, status, challenger:athletes!fk_challenges_challenger(id, display_name)")
       .eq("opponent_id", athlete.id)
       .eq("status", "pending")
       .order("created_at", { ascending: false })
@@ -99,10 +99,9 @@ async function DashboardContent() {
         {pendingChallenges && pendingChallenges.length > 0 ? (
           <div className="flex flex-col gap-2">
             {pendingChallenges.map((challenge) => {
-              const challengerArr = challenge.challenger as
-                | { display_name: string }[]
+              const challenger = challenge.challenger as unknown as
+                | { id: string; display_name: string }
                 | null;
-              const challenger = challengerArr?.[0] ?? null;
               return (
                 <MatchCard
                   key={challenge.id}
@@ -110,6 +109,7 @@ async function DashboardContent() {
                   opponentName={challenger?.display_name ?? "Unknown"}
                   status="Pending"
                   date={challenge.created_at}
+                  href={challenger?.id ? `/athlete/${challenger.id}` : undefined}
                 />
               );
             })}
