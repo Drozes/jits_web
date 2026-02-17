@@ -25,7 +25,7 @@ export function AppHeader({
   return (
     <header
       className={cn(
-        "sticky top-0 z-40 flex h-14 items-center gap-3 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60",
+        "sticky top-0 z-40 flex h-14 items-center gap-3 border-b border-border/50 bg-background/80 px-4 backdrop-blur-xl",
         className,
       )}
     >
@@ -35,12 +35,13 @@ export function AppHeader({
           size="icon"
           onClick={() => router.back()}
           aria-label="Go back"
+          className="rounded-xl"
         >
           <ArrowLeft className="h-5 w-5" />
         </Button>
       )}
 
-      <div className="flex flex-1 items-center gap-2">
+      <div className="flex flex-1 items-center gap-2.5">
         {icon && <span className="text-primary">{icon}</span>}
         <h1 className="text-lg font-bold tracking-tight">{title}</h1>
       </div>

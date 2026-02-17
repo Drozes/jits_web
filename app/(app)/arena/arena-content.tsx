@@ -27,11 +27,11 @@ interface Competitor {
 function CompetitorCard({ competitor, hasPendingChallenge }: { competitor: Competitor; hasPendingChallenge?: boolean }) {
   return (
     <Link href={`/athlete/${competitor.id}`}>
-      <Card variant="interactive" className="p-4">
+      <Card variant="interactive" className="p-4 active:scale-[0.98] active:opacity-90">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <OnlineIndicator athleteId={competitor.id}>
-              <Avatar className="h-12 w-12 border-2 border-accent/20 bg-gradient-to-br from-primary to-primary/80 text-white">
+              <Avatar className="h-12 w-12 border-2 border-border bg-gradient-to-br from-primary to-primary/80 text-white">
                 {competitor.profilePhotoUrl && (
                   <AvatarImage src={getProfilePhotoUrl(competitor.profilePhotoUrl)!} alt={competitor.displayName} className="object-cover" />
                 )}
@@ -42,11 +42,11 @@ function CompetitorCard({ competitor, hasPendingChallenge }: { competitor: Compe
             </OnlineIndicator>
             <div>
               <div className="flex items-center gap-2">
-                <h4 className="font-semibold">{competitor.displayName}</h4>
+                <h4 className="font-semibold text-[15px]">{competitor.displayName}</h4>
                 {hasPendingChallenge && <ChallengeBadge />}
               </div>
               <div className="text-sm text-muted-foreground">
-                ELO: {competitor.currentElo}
+                ELO: <span className="font-medium tabular-nums">{competitor.currentElo}</span>
                 {competitor.eloDiff !== 0 && (
                   <span className={competitor.eloDiff > 0 ? "text-red-500" : "text-green-500"}>
                     {" "}({competitor.eloDiff > 0 ? "+" : ""}{competitor.eloDiff})
@@ -60,8 +60,8 @@ function CompetitorCard({ competitor, hasPendingChallenge }: { competitor: Compe
               )}
               {(competitor.lookingForCasual || competitor.lookingForRanked) && (
                 <div className="flex gap-1 mt-1">
-                  {competitor.lookingForCasual && <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Casual</Badge>}
-                  {competitor.lookingForRanked && <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Ranked</Badge>}
+                  {competitor.lookingForCasual && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 rounded-full">Casual</Badge>}
+                  {competitor.lookingForRanked && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 rounded-full">Ranked</Badge>}
                 </div>
               )}
               <LobbyActiveIndicator athleteId={competitor.id} />
@@ -105,13 +105,15 @@ export function ArenaContent({
         <section className="flex flex-col gap-3">
           <div>
             <div className="flex items-center gap-2">
-              <Swords className="h-4 w-4 text-green-500" />
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-green-500/10">
+                <Swords className="h-4 w-4 text-green-500" />
+              </div>
               <h2 className="text-lg font-semibold">Ready to Fight</h2>
-              <Badge variant="success" className="text-xs">
+              <Badge variant="success" className="text-xs rounded-full">
                 {readyToFight.length}
               </Badge>
             </div>
-            <p className="text-xs text-muted-foreground mt-0.5 ml-6">Online athletes looking for a match</p>
+            <p className="text-xs text-muted-foreground mt-0.5 ml-9">Online athletes looking for a match</p>
           </div>
           <div className="flex flex-col gap-2">
             {readyToFight.map((c) => (
@@ -126,13 +128,15 @@ export function ArenaContent({
         <section className="flex flex-col gap-3">
           <div>
             <div className="flex items-center gap-2">
-              <Circle className="h-4 w-4 text-muted-foreground" />
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-muted">
+                <Circle className="h-4 w-4 text-muted-foreground" />
+              </div>
               <h2 className="text-lg font-semibold">Looking for Match</h2>
-              <Badge variant="secondary" className="text-xs">
+              <Badge variant="secondary" className="text-xs rounded-full">
                 {lookingOffline.length}
               </Badge>
             </div>
-            <p className="text-xs text-muted-foreground mt-0.5 ml-6">Athletes open to challenges but currently offline</p>
+            <p className="text-xs text-muted-foreground mt-0.5 ml-9">Athletes open to challenges but currently offline</p>
           </div>
           <div className="flex flex-col gap-2">
             {lookingOffline.map((c) => (
@@ -143,7 +147,7 @@ export function ArenaContent({
       )}
 
       {readyToFight.length === 0 && lookingOffline.length === 0 && (
-        <div className="rounded-lg border border-dashed p-6 text-center">
+        <div className="rounded-2xl border border-dashed border-border p-8 text-center">
           <p className="text-sm text-muted-foreground">No one is looking for a match right now</p>
         </div>
       )}

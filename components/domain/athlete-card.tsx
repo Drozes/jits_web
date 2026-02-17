@@ -8,10 +8,10 @@ import { ChallengeBadge } from "./challenge-badge";
 import { OnlineIndicator } from "./online-indicator";
 
 function getRankDisplay(rank: number) {
-  if (rank === 1) return <Crown className="h-5 w-5 text-yellow-500" />;
+  if (rank === 1) return <Crown className="h-5 w-5 text-yellow-500 drop-shadow-sm" />;
   if (rank === 2) return <Medal className="h-5 w-5 text-gray-400" />;
   if (rank === 3) return <Award className="h-5 w-5 text-amber-600" />;
-  return <span className="text-sm font-medium text-muted-foreground">#{rank}</span>;
+  return <span className="text-sm font-semibold text-muted-foreground">#{rank}</span>;
 }
 
 interface AthleteCardProps {
@@ -42,26 +42,26 @@ export function AthleteCard({
   const card = (
     <Card
       variant={id && !isCurrentUser ? "interactive" : undefined}
-      className={`p-4 ${isCurrentUser ? "ring-2 ring-accent bg-accent/5" : ""}`}
+      className={`p-4 ${isCurrentUser ? "ring-2 ring-primary/20 bg-primary/[0.03]" : ""}`}
     >
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3.5">
           <div className="flex w-8 justify-center">{getRankDisplay(rank)}</div>
           <OnlineIndicator athleteId={id ?? ""}>
-            <Avatar className="h-12 w-12 border-2 border-accent/20 bg-gradient-to-br from-primary to-primary/80 text-white">
+            <Avatar className="h-11 w-11 border-2 border-border bg-gradient-to-br from-primary to-primary/80 text-white">
               {profilePhotoUrl && (
                 <AvatarImage src={getProfilePhotoUrl(profilePhotoUrl)!} alt={displayName} className="object-cover" />
               )}
-              <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 font-bold text-white">
+              <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 font-bold text-white text-sm">
                 {getInitials(displayName)}
               </AvatarFallback>
             </Avatar>
           </OnlineIndicator>
           <div>
             <div className="flex items-center gap-2 font-semibold">
-              <span>{displayName}</span>
+              <span className="text-[15px]">{displayName}</span>
               {isCurrentUser && (
-                <Badge variant="outline" className="border-accent text-xs text-accent">
+                <Badge variant="outline" className="border-primary/30 bg-primary/5 text-[10px] text-primary">
                   You
                 </Badge>
               )}
@@ -73,9 +73,11 @@ export function AthleteCard({
           </div>
         </div>
         <div className="text-right">
-          <div className="text-lg font-bold">{currentElo}</div>
-          <div className="text-sm text-muted-foreground">
-            {wins}W - {losses}L
+          <div className="text-lg font-bold tabular-nums">{currentElo}</div>
+          <div className="text-xs text-muted-foreground tabular-nums">
+            <span className="text-green-500">{wins}W</span>
+            <span className="mx-0.5">·</span>
+            <span className="text-red-500">{losses}L</span>
           </div>
         </div>
       </div>

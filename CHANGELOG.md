@@ -2,6 +2,38 @@
 
 ## [Unreleased]
 
+### Modernize UI/UX Design (2026-02-17)
+
+**Changed**
+- **Theme refresh** (`app/globals.css`) — Warmer color palette with blue-tinted dark mode (was pure black). Richer borders using proper HSL values instead of alpha-channel opacity. Increased default border radius from `0.5rem` to `0.75rem` for softer, rounder feel.
+- **New animations** (`tailwind.config.ts`) — Added `scale-in`, `slide-up-fade`, `shimmer`, and `glow-pulse` keyframes. Stagger animation support for child elements via `.stagger-children` class.
+- **Floating bottom nav** (`components/layout/bottom-nav-bar.tsx`) — Floating pill-style navigation with rounded corners, card-style glass background, and active tab indicator with icon highlight bubble. Increased bottom margin for "floating" effect.
+- **Glass header** (`components/layout/app-header.tsx`) — Softer backdrop blur with semi-transparent border for modern frosted glass look.
+- **Card component** (`components/ui/card.tsx`) — Cards now use `rounded-2xl` globally. Added `glass` variant for frosted glass cards. `interactive` variant uses `shadow-card-hover` on hover instead of accent background. Added `shadow-card` base utility for consistent elevation.
+- **Stat overview cards** (`components/domain/stat-overview.tsx`) — Each stat card gets a colored icon pill (rounded-lg with tinted background), decorative background circle element, and staggered entry animation.
+- **Profile header** (`components/domain/profile-header.tsx`) — Stats section uses colored tinted backgrounds (green for wins, red for losses) with rounded-2xl pill containers. Wider avatar outline offset, larger looking-for pulse dot, improved spacing.
+- **Athlete card** (`components/domain/athlete-card.tsx`) — Colorized W/L record display (green wins, red losses with dot separator). "You" badge uses primary-tinted background. Slightly smaller avatar (h-11) for better proportion.
+- **Match card** (`components/domain/match-card.tsx`) — Slightly larger avatar (h-9). Badges use `rounded-lg`. Match type text uses `font-medium` for emphasis.
+- **Dashboard hero** (`app/(app)/page.tsx`) — Gradient hero greeting section with `text-gradient-primary` on athlete name and subtitle. Section headers use icon pills (rounded-lg with tinted background).
+- **Recent activity** (`components/domain/recent-activity-section.tsx`) — Filter pills have more padding, `shadow-sm` on active state, softer inactive background. Section header uses icon pill. Empty states use `rounded-2xl`.
+- **Arena content** (`app/(app)/arena/arena-content.tsx`) — Section headers use colored icon pills. Badges use `rounded-full`. Competitor cards use `border-border` instead of accent.
+- **Leaderboard podium** (`app/(app)/leaderboard/leaderboard-content.tsx`) — Podium slots use translucent gradient backgrounds with colored borders instead of opaque gradients. Trophy icons in rounded-2xl containers with glow effects on gold. Toggle labels use `font-medium` with `transition-colors`.
+- **Achievements section** (`app/(app)/profile/achievements-section.tsx`) — Each achievement card gets a colored icon pill (rounded-xl, 9x9) with tinted background. Decorative background circle. Section header uses icon pill. Stagger animation on grid.
+- **Profile page** (`app/(app)/profile/profile-content.tsx`) — Buttons use `rounded-xl`. Ghost buttons in account section use `rounded-xl`.
+- **App layout** (`app/(app)/layout.tsx`) — Background uses `bg-gradient-subtle` for subtle gradient wash.
+- **All skeleton loaders** — Updated from `rounded-lg` to `rounded-2xl` to match new card radius.
+- **Badge component** (`components/ui/badge.tsx`) — Default border radius changed from `rounded-md` to `rounded-lg`.
+- **Page container** (`components/layout/page-container.tsx`) — Bottom padding increased from `5rem` to `6rem` to accommodate floating nav bar.
+
+**Added**
+- `bg-gradient-hero` utility — Subtle primary-tinted top gradient for hero sections (light and dark mode variants)
+- `bg-gradient-subtle` utility — Vertical gradient wash for page backgrounds
+- `text-gradient-primary` utility — Red-to-orange gradient text effect
+- `shadow-glow-primary`, `shadow-glow-success`, `shadow-glow-gold` utilities — Colored glow effects for emphasis
+- `shadow-card` and `shadow-card-hover` utilities — Consistent card elevation system
+- `.glass` component class — Frosted glass card effect with backdrop blur
+- `.stagger-children` component class — Auto-staggered fade-in-up animation for child elements (60ms delay per child)
+
 ### Challenge Versus Card Navigation (2026-02-17)
 
 **Changed**

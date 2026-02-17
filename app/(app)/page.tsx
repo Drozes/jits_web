@@ -14,16 +14,16 @@ import { Zap } from "lucide-react";
 function DashboardSkeleton() {
   return (
     <div className="flex flex-col gap-6 animate-pulse">
-      <div className="h-8 w-40 bg-muted rounded" />
+      <div className="h-10 w-48 bg-muted rounded-xl" />
       <div className="grid grid-cols-2 gap-3">
         {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="h-[88px] bg-muted rounded-xl" />
+          <div key={i} className="h-[88px] bg-muted rounded-2xl" />
         ))}
       </div>
       <div className="flex flex-col gap-3">
         <div className="h-5 w-28 bg-muted rounded" />
-        <div className="h-[52px] bg-muted rounded-xl" />
-        <div className="h-[52px] bg-muted rounded-xl" />
+        <div className="h-[52px] bg-muted rounded-2xl" />
+        <div className="h-[52px] bg-muted rounded-2xl" />
       </div>
     </div>
   );
@@ -142,9 +142,13 @@ async function DashboardContent() {
 
   return (
     <div className="flex flex-col gap-6 animate-page-in">
-      <h1 className="text-2xl font-bold">
-        Hey, {athlete.display_name}
-      </h1>
+      {/* Hero greeting */}
+      <div className="bg-gradient-hero rounded-2xl -mx-4 px-4 pt-2 pb-4">
+        <h1 className="text-2xl font-bold tracking-tight">
+          Hey, <span className="text-gradient-primary">{athlete.display_name}</span>
+        </h1>
+        <p className="text-sm text-muted-foreground mt-0.5">Ready to compete?</p>
+      </div>
 
       <StatOverview
         athlete={athlete}
@@ -162,11 +166,13 @@ async function DashboardContent() {
       <section className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Zap className="h-5 w-5 text-yellow-500" />
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-yellow-500/10">
+              <Zap className="h-4 w-4 text-yellow-500" />
+            </div>
             <h2 className="text-lg font-semibold">Challenges</h2>
           </div>
           {allChallenges.length > 0 && (
-            <Link href="/match/pending" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+            <Link href="/match/pending" className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors">
               View all
             </Link>
           )}
@@ -188,9 +194,9 @@ async function DashboardContent() {
             ))}
           </div>
         ) : (
-          <div className="rounded-lg border border-dashed p-6 text-center">
+          <div className="rounded-2xl border border-dashed border-border p-8 text-center">
             <p className="text-sm text-muted-foreground">No active challenges</p>
-            <Link href="/arena" className="text-xs text-primary hover:underline mt-1.5 inline-block">
+            <Link href="/arena" className="text-xs font-medium text-primary hover:underline mt-2 inline-block">
               Find an opponent
             </Link>
           </div>

@@ -76,7 +76,7 @@ export function ChallengeVersusCard(props: ChallengeVersusCardProps) {
   if (props.href) {
     return (
       <Link href={props.href} prefetch={false}>
-        <Card className="cursor-pointer hover:bg-accent/50 transition-all active:scale-[0.98] active:opacity-90">
+        <Card variant="interactive" className="active:scale-[0.98] active:opacity-90">
           <CardInner {...props} />
         </Card>
       </Link>

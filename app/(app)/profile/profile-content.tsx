@@ -98,7 +98,7 @@ export async function ProfileContent({
       />
 
       <div className="flex gap-2">
-        <Button className="flex-1" variant="outline" asChild>
+        <Button className="flex-1 rounded-xl" variant="outline" asChild>
           <Link href="/profile/stats">
             <Trophy className="mr-2 h-4 w-4" />
             View Stats
@@ -115,7 +115,7 @@ export async function ProfileContent({
             gymName,
           }}
         >
-          <Button variant="outline" size="icon">
+          <Button variant="outline" size="icon" className="rounded-xl">
             <Share2 className="h-4 w-4" />
           </Button>
         </ShareProfileSheet>
@@ -145,13 +145,13 @@ export async function ProfileContent({
                 </div>
                 <ThemeSwitcher />
               </div>
-              <Button variant="ghost" className="w-full justify-start" asChild>
+              <Button variant="ghost" className="w-full justify-start rounded-xl" asChild>
                 <Link href="/profile/setup">
                   <UserPen className="mr-3 h-4 w-4" />
                   Edit Profile
                 </Link>
               </Button>
-              <Button variant="ghost" className="w-full justify-start">
+              <Button variant="ghost" className="w-full justify-start rounded-xl">
                 <Settings className="mr-3 h-4 w-4" />
                 Settings & Privacy
               </Button>

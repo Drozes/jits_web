@@ -15,9 +15,9 @@ function LeaderboardSkeleton() {
   return (
     <div className="flex flex-col gap-6 animate-pulse">
       <div className="h-8 w-40 bg-muted rounded" />
-      <div className="flex gap-4 justify-center"><div className="h-32 w-24 bg-muted rounded-lg" /><div className="h-40 w-24 bg-muted rounded-lg" /><div className="h-32 w-24 bg-muted rounded-lg" /></div>
-      <div className="h-16 bg-muted rounded-lg" />
-      <div className="h-16 bg-muted rounded-lg" />
+      <div className="flex gap-4 justify-center"><div className="h-32 w-24 bg-muted rounded-2xl" /><div className="h-40 w-24 bg-muted rounded-2xl" /><div className="h-32 w-24 bg-muted rounded-2xl" /></div>
+      <div className="h-16 bg-muted rounded-2xl" />
+      <div className="h-16 bg-muted rounded-2xl" />
     </div>
   );
 }

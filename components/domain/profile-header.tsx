@@ -22,9 +22,9 @@ export function ProfileHeader({ athlete, gymName, lookingForCasual, lookingForRa
   return (
     <section className="flex flex-col items-center text-center">
       {/* Avatar with ELO tier ring */}
-      <div className={`rounded-full outline outline-3 outline-offset-2 ${getEloTierClass(athlete.current_elo)}`}>
+      <div className={`rounded-full outline outline-3 outline-offset-4 ${getEloTierClass(athlete.current_elo)} transition-all`}>
         <OnlineIndicator athleteId={athlete.id}>
-          <Avatar className="h-24 w-24 bg-gradient-to-br from-primary to-red-600 text-white border-2 border-muted shadow-md">
+          <Avatar className="h-24 w-24 bg-gradient-to-br from-primary to-red-600 text-white border-4 border-background shadow-lg">
             {athlete.profile_photo_url && (
               <AvatarImage
                 src={getProfilePhotoUrl(athlete.profile_photo_url)!}
@@ -40,17 +40,17 @@ export function ProfileHeader({ athlete, gymName, lookingForCasual, lookingForRa
       </div>
 
       {/* Name */}
-      <h2 className="mt-4 text-2xl font-bold tracking-tight">
+      <h2 className="mt-5 text-2xl font-bold tracking-tight">
         {athlete.display_name}
       </h2>
 
       {/* ELO */}
-      <div className="mt-1">
+      <div className="mt-1.5 flex items-baseline gap-1.5">
         <span className="text-3xl font-bold tabular-nums">{athlete.current_elo}</span>
-        <span className="text-sm text-muted-foreground ml-1.5">ELO</span>
+        <span className="text-sm font-medium text-muted-foreground">ELO</span>
       </div>
       {athlete.highest_elo > athlete.current_elo && (
-        <p className="text-xs text-muted-foreground">Peak: {athlete.highest_elo}</p>
+        <p className="text-xs text-muted-foreground mt-0.5">Peak: {athlete.highest_elo}</p>
       )}
 
       {/* Metadata: gym + weight */}
@@ -62,8 +62,8 @@ export function ProfileHeader({ athlete, gymName, lookingForCasual, lookingForRa
 
       {/* Looking-for badge */}
       {lookingFor && (
-        <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-green-500/10 px-3 py-1 border border-green-500/20">
-          <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
+        <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-green-500/10 px-3 py-1.5 border border-green-500/20">
+          <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
           <span className="text-xs font-medium text-green-600">
             Open to {lookingFor}
           </span>
@@ -71,18 +71,18 @@ export function ProfileHeader({ athlete, gymName, lookingForCasual, lookingForRa
       )}
 
       {/* Stats */}
-      <div className="mt-4 grid w-full grid-cols-3 gap-4 text-center">
-        <div>
+      <div className="mt-5 grid w-full grid-cols-3 gap-2">
+        <div className="rounded-2xl bg-green-500/5 border border-green-500/10 py-3 px-2">
           <p className="text-2xl font-bold text-green-500 tabular-nums">{stats.wins}</p>
-          <p className="text-xs text-muted-foreground">Wins</p>
+          <p className="text-[11px] font-medium text-muted-foreground mt-0.5">Wins</p>
         </div>
-        <div>
+        <div className="rounded-2xl bg-red-500/5 border border-red-500/10 py-3 px-2">
           <p className="text-2xl font-bold text-red-500 tabular-nums">{stats.losses}</p>
-          <p className="text-xs text-muted-foreground">Losses</p>
+          <p className="text-[11px] font-medium text-muted-foreground mt-0.5">Losses</p>
         </div>
-        <div>
+        <div className="rounded-2xl bg-muted/50 border border-border py-3 px-2">
           <p className="text-2xl font-bold tabular-nums">{stats.winRate}%</p>
-          <p className="text-xs text-muted-foreground">Win Rate</p>
+          <p className="text-[11px] font-medium text-muted-foreground mt-0.5">Win Rate</p>
         </div>
       </div>
     </section>

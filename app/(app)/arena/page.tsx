@@ -11,9 +11,9 @@ function ArenaSkeleton() {
   return (
     <div className="flex flex-col gap-6 animate-pulse">
       <div className="h-7 w-32 bg-muted rounded" />
-      <div className="h-24 bg-muted rounded-lg" />
-      <div className="h-24 bg-muted rounded-lg" />
-      <div className="h-24 bg-muted rounded-lg" />
+      <div className="h-24 bg-muted rounded-2xl" />
+      <div className="h-24 bg-muted rounded-2xl" />
+      <div className="h-24 bg-muted rounded-2xl" />
     </div>
   );
 }
