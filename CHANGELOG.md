@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Stat Cards Redesign (2026-02-17)
+
+**Changed**
+- `components/domain/stat-overview.tsx` — Moved icons into the decorative corner circles (top-right), promoted labels to standalone left-aligned `text-sm`, and added subtle 70% opacity to icons for a cleaner look.
+
 ### SSO Avatar Support (2026-02-17)
 
 **Changed**
