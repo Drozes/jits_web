@@ -15,6 +15,7 @@ interface Competitor {
   displayName: string;
   currentElo: number;
   gymName?: string;
+  weight?: number;
   eloDiff: number;
   lookingForCasual: boolean;
   lookingForRanked: boolean;
@@ -65,9 +66,9 @@ function CompetitorCard({ competitor, hasPendingChallenge }: { competitor: Compe
                   </span>
                 )}
               </div>
-              {competitor.gymName && (
+              {(competitor.gymName || competitor.weight) && (
                 <div className="text-xs text-muted-foreground">
-                  {competitor.gymName}
+                  {[competitor.gymName, competitor.weight ? `${competitor.weight} lbs` : null].filter(Boolean).join(" · ")}
                 </div>
               )}
               {(competitor.lookingForCasual || competitor.lookingForRanked) && (

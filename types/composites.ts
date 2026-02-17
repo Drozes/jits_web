@@ -161,6 +161,7 @@ export interface ArenaData {
     looking_for_casual: boolean;
     looking_for_ranked: boolean;
     profile_photo_url: string | null;
+    current_weight: number | null;
   }[];
   other_athletes: {
     id: string;
@@ -168,6 +169,7 @@ export interface ArenaData {
     current_elo: number;
     gym_name: string | null;
     profile_photo_url: string | null;
+    current_weight: number | null;
   }[];
   challenged_opponent_ids: string[];
   recent_activity: {
