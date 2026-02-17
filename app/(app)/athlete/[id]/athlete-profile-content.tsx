@@ -88,6 +88,7 @@ export async function AthleteProfileContent({
             }}
             headToHead={headToHead}
             pendingChallengeId={pendingChallenge?.id ?? null}
+            lookingForRanked={competitor.looking_for_ranked}
           />
 
           {/* Head-to-Head History */}

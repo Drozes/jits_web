@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Challenge & Activity UX Improvements (2026-02-17)
+
+**Changed**
+- `components/domain/challenge-sheet.tsx` — Challenge sheet now accepts `defaultMatchType` prop and defaults to Ranked when the opponent has `looking_for_ranked` enabled.
+- `app/(app)/athlete/[id]/athlete-profile-actions.tsx` — Threads `lookingForRanked` flag to ChallengeSheet.
+- `app/(app)/athlete/[id]/athlete-profile-content.tsx` — Passes `competitor.looking_for_ranked` to AthleteProfileActions.
+- `components/domain/recent-activity-section.tsx` — Reordered scope filter: "All" is now the default first option instead of "Me".
+
 ### Lobby Presence & Unified Challenge Lobby (2026-02-17)
 
 **Added**

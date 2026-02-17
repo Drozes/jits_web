@@ -26,6 +26,7 @@ interface AthleteProfileActionsProps {
   competitor: AthleteStats;
   headToHead: HeadToHeadMatch[];
   pendingChallengeId: string | null;
+  lookingForRanked?: boolean;
 }
 
 export function AthleteProfileActions({
@@ -35,6 +36,7 @@ export function AthleteProfileActions({
   competitor,
   headToHead,
   pendingChallengeId,
+  lookingForRanked,
 }: AthleteProfileActionsProps) {
   const [compareOpen, setCompareOpen] = useState(false);
   const [challengeOpen, setChallengeOpen] = useState(false);
@@ -109,6 +111,7 @@ export function AthleteProfileActions({
           currentAthleteId={currentAthleteId}
           currentAthleteElo={currentAthlete.elo}
           currentAthleteWeight={currentAthlete.weight}
+          defaultMatchType={lookingForRanked ? "ranked" : undefined}
           open={challengeOpen}
           onOpenChange={setChallengeOpen}
         />

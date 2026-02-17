@@ -26,6 +26,7 @@ interface ChallengeSheetProps {
   currentAthleteId: string;
   currentAthleteElo: number;
   currentAthleteWeight: number | null;
+  defaultMatchType?: MatchType;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -37,12 +38,13 @@ export function ChallengeSheet({
   competitorWeight,
   currentAthleteId,
   currentAthleteElo,
+  defaultMatchType,
   currentAthleteWeight,
   open,
   onOpenChange,
 }: ChallengeSheetProps) {
   const router = useRouter();
-  const [matchType, setMatchType] = useState<MatchType>(MATCH_TYPE.CASUAL);
+  const [matchType, setMatchType] = useState<MatchType>(defaultMatchType ?? MATCH_TYPE.CASUAL);
   const [weight, setWeight] = useState(currentAthleteWeight?.toString() ?? "");
   const [stakes, setStakes] = useState<EloStakes | null>(null);
   const [weightConfirmed, setWeightConfirmed] = useState(false);
@@ -69,7 +71,7 @@ export function ChallengeSheet({
   }, [matchType, open, currentAthleteElo, competitorElo, currentAthleteWeight, competitorWeight]);
 
   function resetState() {
-    setMatchType(MATCH_TYPE.CASUAL);
+    setMatchType(defaultMatchType ?? MATCH_TYPE.CASUAL);
     setWeight(currentAthleteWeight?.toString() ?? "");
     setStakes(null);
     setWeightConfirmed(false);

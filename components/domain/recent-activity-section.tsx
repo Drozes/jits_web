@@ -30,8 +30,8 @@ type Scope = "me" | "all";
 type TypeFilter = "all" | "ranked" | "casual";
 
 const scopeOptions: { value: Scope; label: string }[] = [
-  { value: "me", label: "Me" },
   { value: "all", label: "All" },
+  { value: "me", label: "Me" },
 ];
 
 const typeOptions: { value: TypeFilter; label: string }[] = [
