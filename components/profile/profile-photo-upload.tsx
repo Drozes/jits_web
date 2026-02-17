@@ -14,12 +14,18 @@ interface ProfilePhotoUploadProps {
   athleteId: string;
   displayName: string;
   profilePhotoUrl: string | null;
+  /** Hide the "Tap to add photo" label (useful when used inline). */
+  showLabel?: boolean;
+  /** Called after a successful upload or delete so the parent can refresh. */
+  onPhotoChange?: () => void;
 }
 
 export function ProfilePhotoUpload({
   athleteId,
   displayName,
   profilePhotoUrl,
+  showLabel = true,
+  onPhotoChange,
 }: ProfilePhotoUploadProps) {
   const [uploading, setUploading] = useState(false);
   const [photoPath, setPhotoPath] = useState(profilePhotoUrl);
@@ -67,6 +73,7 @@ export function ProfilePhotoUpload({
       setPhotoPath(filePath);
       setCacheBuster(Date.now());
       toast.success("Photo updated");
+      onPhotoChange?.();
     } catch {
       toast.error("Failed to upload photo");
     } finally {
@@ -88,6 +95,7 @@ export function ProfilePhotoUpload({
 
       setPhotoPath(null);
       toast.success("Photo removed");
+      onPhotoChange?.();
     } catch {
       toast.error("Failed to remove photo");
     } finally {
@@ -147,9 +155,11 @@ export function ProfilePhotoUpload({
         disabled={uploading}
       />
 
-      <p className="text-xs text-muted-foreground">
-        {uploading ? "Uploading\u2026" : "Tap to add photo"}
-      </p>
+      {showLabel && (
+        <p className="text-xs text-muted-foreground">
+          {uploading ? "Uploading\u2026" : "Tap to add photo"}
+        </p>
+      )}
     </div>
   );
 }
