@@ -33,7 +33,7 @@ export function MatchHistoryList({ matches }: MatchHistoryListProps) {
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       {matches.map((m) => (
         <MatchCard
           key={m.match_id}

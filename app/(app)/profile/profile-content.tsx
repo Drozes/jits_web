@@ -138,9 +138,9 @@ export async function ProfileContent({
           <CardContent className="p-4">
             <h4 className="font-semibold mb-3">Account</h4>
             <div className="flex flex-col gap-1">
-              <div className="flex items-center justify-between px-3 py-2">
-                <div className="flex items-center gap-3">
-                  <Palette className="h-4 w-4" />
+              <div className="flex items-center justify-between h-9 px-4 py-2">
+                <div className="flex items-center gap-2">
+                  <Palette className="mr-3 h-4 w-4" />
                   <span className="text-sm font-medium">Theme</span>
                 </div>
                 <ThemeSwitcher />
