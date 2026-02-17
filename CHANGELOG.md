@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Challenge Versus Card Navigation (2026-02-17)
+
+**Changed**
+- `components/domain/challenge-versus-card.tsx` — Added optional `href` prop; card now wraps in a Link with hover/active feedback when provided.
+- `app/(app)/athlete/[id]/challenges/challenges-content.tsx` — Active challenges pass `href` to navigate to lobby on card tap.
+
 ### Challenge & Activity UX Improvements (2026-02-17)
 
 **Changed**

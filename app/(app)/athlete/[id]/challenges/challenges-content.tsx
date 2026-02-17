@@ -74,6 +74,7 @@ export async function ChallengesContent({
                         matchType={c.match_type}
                         date={c.created_at}
                         currentAthleteId={currentAthlete.id}
+                        href={`/match/lobby/${c.id}`}
                       />
                       <ChallengeVersusActions
                         challengeId={c.id}

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +19,7 @@ interface ChallengeVersusCardProps {
   matchType: string;
   date: string;
   currentAthleteId: string;
+  href?: string;
 }
 
 const statusConfig: Record<string, { label: string; className: string }> = {
@@ -49,27 +51,41 @@ function AvatarWithLabel({ participant, isYou }: { participant: Participant; isY
   );
 }
 
-export function ChallengeVersusCard({
-  challenger, opponent, status, matchType, date, currentAthleteId,
-}: ChallengeVersusCardProps) {
+function CardInner({ challenger, opponent, status, matchType, date, currentAthleteId }: ChallengeVersusCardProps) {
   const config = statusConfig[status] ?? statusConfig.pending;
 
   return (
-    <Card>
-      <CardContent className="py-4 px-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <AvatarWithLabel participant={challenger} isYou={challenger.id === currentAthleteId} />
-            <Swords className="h-5 w-5 text-muted-foreground shrink-0" />
-            <AvatarWithLabel participant={opponent} isYou={opponent.id === currentAthleteId} />
-          </div>
-          <div className="flex flex-col items-end gap-1">
-            <Badge variant="outline" className={config.className}>{config.label}</Badge>
-            <span className="text-[11px] text-muted-foreground capitalize">{matchType}</span>
-            <span className="text-[11px] text-muted-foreground">{formatRelativeDate(date)}</span>
-          </div>
+    <CardContent className="py-4 px-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <AvatarWithLabel participant={challenger} isYou={challenger.id === currentAthleteId} />
+          <Swords className="h-5 w-5 text-muted-foreground shrink-0" />
+          <AvatarWithLabel participant={opponent} isYou={opponent.id === currentAthleteId} />
         </div>
-      </CardContent>
+        <div className="flex flex-col items-end gap-1">
+          <Badge variant="outline" className={config.className}>{config.label}</Badge>
+          <span className="text-[11px] text-muted-foreground capitalize">{matchType}</span>
+          <span className="text-[11px] text-muted-foreground">{formatRelativeDate(date)}</span>
+        </div>
+      </div>
+    </CardContent>
+  );
+}
+
+export function ChallengeVersusCard(props: ChallengeVersusCardProps) {
+  if (props.href) {
+    return (
+      <Link href={props.href} prefetch={false}>
+        <Card className="cursor-pointer hover:bg-accent/50 transition-all active:scale-[0.98] active:opacity-90">
+          <CardInner {...props} />
+        </Card>
+      </Link>
+    );
+  }
+
+  return (
+    <Card>
+      <CardInner {...props} />
     </Card>
   );
 }
