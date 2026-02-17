@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { CompareStatsModal } from "@/components/domain/compare-stats-modal";
+import { CompareStatsModal, type HeadToHeadMatch } from "@/components/domain/compare-stats-modal";
 import { ChallengeSheet } from "@/components/domain/challenge-sheet";
 import { Swords, BarChart3, MessageSquare } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -14,6 +14,7 @@ interface AthleteStats {
   elo: number;
   wins: number;
   losses: number;
+  draws: number;
   winRate: number;
   weight: number | null;
 }
@@ -23,6 +24,7 @@ interface AthleteProfileActionsProps {
   currentAthleteId: string;
   currentAthlete: AthleteStats;
   competitor: AthleteStats;
+  headToHead: HeadToHeadMatch[];
   pendingChallengeId: string | null;
 }
 
@@ -31,6 +33,7 @@ export function AthleteProfileActions({
   currentAthleteId,
   currentAthlete,
   competitor,
+  headToHead,
   pendingChallengeId,
 }: AthleteProfileActionsProps) {
   const [compareOpen, setCompareOpen] = useState(false);
@@ -114,6 +117,7 @@ export function AthleteProfileActions({
       <CompareStatsModal
         currentAthlete={currentAthlete}
         competitor={competitor}
+        headToHead={headToHead}
         open={compareOpen}
         onOpenChange={setCompareOpen}
       />

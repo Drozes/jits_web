@@ -86,6 +86,7 @@ export async function AthleteProfileContent({
               ...compStats,
               weight: competitor.current_weight,
             }}
+            headToHead={headToHead}
             pendingChallengeId={pendingChallenge?.id ?? null}
           />
 
