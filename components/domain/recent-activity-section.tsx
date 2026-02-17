@@ -45,8 +45,10 @@ function FilterPill<T extends string>({ value, label, active, onSelect }: { valu
     <button
       onClick={() => onSelect(value)}
       className={cn(
-        "rounded-full px-3 py-1 text-xs font-medium transition-colors",
-        active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80",
+        "rounded-full px-3.5 py-1.5 text-xs font-medium transition-all duration-200",
+        active
+          ? "bg-primary text-primary-foreground shadow-sm"
+          : "bg-muted/60 text-muted-foreground hover:bg-muted",
       )}
     >
       {label}
@@ -67,17 +69,19 @@ export function RecentActivitySection({ myMatches, allActivity }: { myMatches: M
     <section className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Activity className="h-5 w-5 text-primary" />
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10">
+            <Activity className="h-4 w-4 text-primary" />
+          </div>
           <h2 className="text-lg font-semibold">Recent Activity</h2>
         </div>
         {scope === "me" && myMatches.length > 0 && (
-          <Link href="/profile/stats" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+          <Link href="/profile/stats" className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors">
             View all
           </Link>
         )}
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2.5">
         <div className="flex gap-1">
           {scopeOptions.map((o) => (
             <FilterPill key={o.value} value={o.value} label={o.label} active={scope === o.value} onSelect={setScope} />
@@ -102,7 +106,7 @@ export function RecentActivitySection({ myMatches, allActivity }: { myMatches: M
           <EmptyState message={typeFilter === "all" ? "No matches yet" : `No ${typeFilter} matches yet`} showLink />
         )
       ) : hasContent ? (
-        <Card className="divide-y">
+        <Card className="divide-y divide-border">
           {filteredActivity.map((item) => (
             <ActivityFeedItem key={item.id} item={item} />
           ))}
@@ -118,7 +122,7 @@ function ActivityFeedItem({ item }: { item: ActivityItem }) {
   const isDraw = item.result === "draw";
   return (
     <div className="flex items-start gap-3 p-4">
-      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
+      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary/10">
         <Swords className="h-4 w-4 text-primary" />
       </div>
       <div className="flex-1">
@@ -139,10 +143,10 @@ function ActivityFeedItem({ item }: { item: ActivityItem }) {
 
 function EmptyState({ message, showLink }: { message: string; showLink?: boolean }) {
   return (
-    <div className="rounded-lg border border-dashed p-6 text-center">
+    <div className="rounded-2xl border border-dashed border-border p-8 text-center">
       <p className="text-sm text-muted-foreground">{message}</p>
       {showLink && (
-        <Link href="/arena" className="text-xs text-primary hover:underline mt-1.5 inline-block">
+        <Link href="/arena" className="text-xs font-medium text-primary hover:underline mt-2 inline-block">
           Head to the Arena
         </Link>
       )}

@@ -12,7 +12,7 @@ describe("PageContainer", () => {
     render(<PageContainer>Content</PageContainer>);
     const container = screen.getByText("Content");
     expect(container).toHaveClass("max-w-md", "mx-auto", "px-4");
-    expect(container.className).toContain("pb-[calc(5rem+env(safe-area-inset-bottom))]");
+    expect(container.className).toContain("pb-[calc(6rem+env(safe-area-inset-bottom))]");
   });
 
   it("merges custom className", () => {

@@ -28,7 +28,7 @@ function CardInner({ type, opponentName, opponentPhotoUrl, result, status, direc
   return (
     <CardContent className="flex items-center justify-between py-3 px-4">
       <div className="flex items-center gap-3 min-w-0">
-        <Avatar className="h-8 w-8 shrink-0 border border-accent/20">
+        <Avatar className="h-9 w-9 shrink-0 border border-border">
           {opponentPhotoUrl && (
             <AvatarImage src={getProfilePhotoUrl(opponentPhotoUrl)!} alt={opponentName} className="object-cover" />
           )}
@@ -41,7 +41,7 @@ function CardInner({ type, opponentName, opponentPhotoUrl, result, status, direc
           <p className="text-xs text-muted-foreground">
             {formatRelativeDate(date)}
             {matchType && (
-              <> · {matchType === "ranked" ? "Ranked" : "Casual"}</>
+              <> · <span className="font-medium">{matchType === "ranked" ? "Ranked" : "Casual"}</span></>
             )}
           </p>
         </div>
@@ -63,20 +63,20 @@ function CardInner({ type, opponentName, opponentPhotoUrl, result, status, direc
         )}
 
         {type === "match" && result && (
-          <Badge variant={resultConfig[result].variant}>
+          <Badge variant={resultConfig[result].variant} className="rounded-lg">
             {resultConfig[result].label}
           </Badge>
         )}
 
         {type === "challenge" && direction && (
-          <Badge variant={direction === "incoming" ? "secondary" : "outline"}>
+          <Badge variant={direction === "incoming" ? "secondary" : "outline"} className="rounded-lg">
             {direction === "incoming" ? "Incoming" : "Sent"}
           </Badge>
         )}
 
         {type === "challenge" && !direction && (
           <div className="flex flex-col items-end gap-0.5">
-            <Badge variant={status === "Accepted" ? "success" : "outline"}>
+            <Badge variant={status === "Accepted" ? "success" : "outline"} className="rounded-lg">
               {status ?? "Pending"}
             </Badge>
             {status === "Accepted" && (
@@ -93,7 +93,7 @@ export function MatchCard(props: MatchCardProps) {
   if (props.href) {
     return (
       <Link href={props.href} prefetch={false}>
-        <Card className="cursor-pointer hover:bg-accent/50 transition-all active:scale-[0.98] active:opacity-90">
+        <Card variant="interactive" className="active:scale-[0.98] active:opacity-90">
           <CardInner {...props} />
         </Card>
       </Link>

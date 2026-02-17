@@ -8,7 +8,7 @@ export function PageContainer({
   children: React.ReactNode;
 }) {
   return (
-    <div className={cn("max-w-md mx-auto px-4 pb-[calc(5rem+env(safe-area-inset-bottom))] w-full", className)}>
+    <div className={cn("max-w-md mx-auto px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] w-full", className)}>
       {children}
     </div>
   );
