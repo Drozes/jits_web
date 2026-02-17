@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### SSO Avatar Support (2026-02-17)
+
+**Changed**
+- `lib/utils.ts` — `getProfilePhotoUrl()` now handles absolute URLs (SSO avatars from Google/Apple) in addition to relative Supabase storage paths. Absolute URLs are returned as-is; relative paths still resolve from the `athlete-photos` bucket.
+
 ### Premium Features Teaser (2026-02-17)
 
 **Added**

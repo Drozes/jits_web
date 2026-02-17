@@ -57,15 +57,19 @@ export function getEloTierClass(elo: number): string {
 }
 
 /**
- * Build the public Supabase Storage URL for a profile photo.
- * Returns null when the athlete has no photo set.
+ * Build the public URL for a profile photo.
+ * Handles three cases:
+ *  - null → no photo
+ *  - Absolute URL (SSO avatar from Google/Apple) → use directly
+ *  - Relative path → resolve from Supabase storage bucket
  */
 export function getProfilePhotoUrl(
-  relativePath: string | null,
+  profilePhotoUrl: string | null,
   cacheBuster?: number,
 ): string | null {
-  if (!relativePath) return null;
-  const base = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/athlete-photos/${relativePath}`;
+  if (!profilePhotoUrl) return null;
+  if (profilePhotoUrl.startsWith("http")) return profilePhotoUrl;
+  const base = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/athlete-photos/${profilePhotoUrl}`;
   return cacheBuster ? `${base}?t=${cacheBuster}` : base;
 }
 
