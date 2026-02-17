@@ -74,7 +74,11 @@ export async function LobbyContent({
         </Card>
       )}
 
-      <LobbyActions challengeId={challengeId} />
+      <LobbyActions
+        challengeId={challengeId}
+        status={lobby.status as "pending" | "accepted"}
+        isChallenger={isChallenger}
+      />
     </div>
   );
 }

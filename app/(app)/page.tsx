@@ -45,27 +45,59 @@ async function DashboardContent() {
   const { athlete } = await requireAthlete();
   const supabase = await createClient();
 
-  const summary = await getDashboardSummary(supabase);
+  const [summary, { data: acceptedRows }] = await Promise.all([
+    getDashboardSummary(supabase),
+    supabase
+      .from("challenges")
+      .select(
+        "id, created_at, match_type, challenger_id, challenger:athletes!fk_challenges_challenger(display_name), opponent:athletes!fk_challenges_opponent(display_name)",
+      )
+      .or(`challenger_id.eq.${athlete.id},opponent_id.eq.${athlete.id}`)
+      .eq("status", "accepted")
+      .order("created_at", { ascending: false }),
+  ]);
 
-  // Merge incoming + sent challenges, sorted newest first
-  const allChallenges = [
+  // Map accepted challenges
+  const acceptedChallenges = (acceptedRows ?? []).map((c) => {
+    const isChallenger = c.challenger_id === athlete.id;
+    const challenger = c.challenger as unknown as { display_name: string } | null;
+    const opponent = c.opponent as unknown as { display_name: string } | null;
+    return {
+      id: c.id,
+      created_at: c.created_at,
+      status: "accepted" as const,
+      matchType: c.match_type as "ranked" | "casual",
+      opponentName: isChallenger
+        ? (opponent?.display_name ?? "Unknown")
+        : (challenger?.display_name ?? "Unknown"),
+      href: `/match/lobby/${c.id}`,
+    };
+  });
+
+  // Merge accepted + incoming + sent challenges; accepted first, then by date
+  const pendingChallenges = [
     ...summary.pending_challenges.incoming.map((c) => ({
       id: c.id,
       created_at: c.created_at,
+      status: "pending" as const,
       direction: "incoming" as const,
       matchType: c.match_type as "ranked" | "casual",
       opponentName: c.challenger_name,
-      opponentId: c.challenger_id,
+      href: `/match/lobby/${c.id}`,
     })),
     ...summary.pending_challenges.sent.map((c) => ({
       id: c.id,
       created_at: c.created_at,
+      status: "pending" as const,
       direction: "sent" as const,
       matchType: c.match_type as "ranked" | "casual",
       opponentName: c.opponent_name,
-      opponentId: c.opponent_id,
+      href: `/match/lobby/${c.id}`,
     })),
   ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+  // Accepted challenges always on top
+  const allChallenges = [...acceptedChallenges, ...pendingChallenges];
 
   const recentMatches = summary.recent_matches.map((m) => ({
     id: m.match_id,
@@ -114,10 +146,11 @@ async function DashboardContent() {
                 key={c.id}
                 type="challenge"
                 opponentName={c.opponentName}
-                direction={c.direction}
+                direction={"direction" in c ? c.direction : undefined}
+                status={c.status === "accepted" ? "Accepted" : undefined}
                 matchType={c.matchType}
                 date={c.created_at}
-                href={c.opponentId ? `/athlete/${c.opponentId}` : undefined}
+                href={c.href}
               />
             ))}
           </div>

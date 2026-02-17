@@ -4,10 +4,12 @@ import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Swords, Users, Activity, Clock } from "lucide-react";
+import { Swords, Circle, Activity, Clock } from "lucide-react";
 import { getInitials } from "@/lib/utils";
 import { ChallengeBadge } from "@/components/domain/challenge-badge";
 import { OnlineIndicator } from "@/components/domain/online-indicator";
+import { LobbyActiveIndicator } from "@/components/domain/lobby-active-indicator";
+import { useLobbyIds } from "@/hooks/use-lobby-presence";
 import { LookingForMatchToggle } from "./looking-for-match-toggle";
 
 interface Competitor {
@@ -77,6 +79,7 @@ function CompetitorCard({ competitor, hasPendingChallenge }: { competitor: Compe
                   {competitor.lookingForRanked && <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Ranked</Badge>}
                 </div>
               )}
+              <LobbyActiveIndicator athleteId={competitor.id} />
             </div>
           </div>
         </div>
@@ -87,7 +90,6 @@ function CompetitorCard({ competitor, hasPendingChallenge }: { competitor: Compe
 
 export function ArenaContent({
   lookingCompetitors,
-  otherCompetitors,
   activityItems,
   currentAthleteId,
   currentAthleteCasual,
@@ -95,7 +97,6 @@ export function ArenaContent({
   challengedIds = [],
 }: {
   lookingCompetitors: Competitor[];
-  otherCompetitors: Competitor[];
   activityItems: ActivityItem[];
   currentAthleteId: string;
   currentAthleteCasual: boolean;
@@ -103,6 +104,10 @@ export function ArenaContent({
   challengedIds?: string[];
 }) {
   const challengedSet = new Set(challengedIds);
+  const lobbyIds = useLobbyIds();
+
+  const readyToFight = lookingCompetitors.filter((c) => lobbyIds.has(c.id));
+  const lookingOffline = lookingCompetitors.filter((c) => !lobbyIds.has(c.id));
 
   return (
     <div className="flex flex-col gap-6 animate-page-in">
@@ -112,43 +117,53 @@ export function ArenaContent({
         initialRanked={currentAthleteRanked}
       />
 
-      {/* Athletes Looking for Match */}
-      {lookingCompetitors.length > 0 && (
+      {/* Athletes in lobby — online and looking */}
+      {readyToFight.length > 0 && (
         <section className="flex flex-col gap-3">
-          <div className="flex items-center gap-2">
-            <Swords className="h-4 w-4 text-green-500" />
-            <h2 className="text-lg font-semibold">Looking for Match</h2>
-            <Badge variant="secondary" className="text-xs">
-              {lookingCompetitors.length}
-            </Badge>
+          <div>
+            <div className="flex items-center gap-2">
+              <Swords className="h-4 w-4 text-green-500" />
+              <h2 className="text-lg font-semibold">Ready to Fight</h2>
+              <Badge variant="success" className="text-xs">
+                {readyToFight.length}
+              </Badge>
+            </div>
+            <p className="text-xs text-muted-foreground mt-0.5 ml-6">Online athletes looking for a match</p>
           </div>
           <div className="flex flex-col gap-2">
-            {lookingCompetitors.map((c) => (
+            {readyToFight.map((c) => (
               <CompetitorCard key={c.id} competitor={c} hasPendingChallenge={challengedSet.has(c.id)} />
             ))}
           </div>
         </section>
       )}
 
-      {/* All Competitors */}
-      <section className="flex flex-col gap-3">
-        <div className="flex items-center gap-2">
-          <Users className="h-4 w-4 text-muted-foreground" />
-          <h2 className="text-lg font-semibold">Competitors</h2>
-        </div>
-
-        {otherCompetitors.length > 0 ? (
+      {/* Athletes looking but not currently online */}
+      {lookingOffline.length > 0 && (
+        <section className="flex flex-col gap-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <Circle className="h-4 w-4 text-muted-foreground" />
+              <h2 className="text-lg font-semibold">Looking for Match</h2>
+              <Badge variant="secondary" className="text-xs">
+                {lookingOffline.length}
+              </Badge>
+            </div>
+            <p className="text-xs text-muted-foreground mt-0.5 ml-6">Athletes open to challenges but currently offline</p>
+          </div>
           <div className="flex flex-col gap-2">
-            {otherCompetitors.map((c) => (
+            {lookingOffline.map((c) => (
               <CompetitorCard key={c.id} competitor={c} hasPendingChallenge={challengedSet.has(c.id)} />
             ))}
           </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            No competitors found nearby
-          </p>
-        )}
-      </section>
+        </section>
+      )}
+
+      {readyToFight.length === 0 && lookingOffline.length === 0 && (
+        <div className="rounded-lg border border-dashed p-6 text-center">
+          <p className="text-sm text-muted-foreground">No one is looking for a match right now</p>
+        </div>
+      )}
 
       {/* Recent Activity Feed */}
       <section className="flex flex-col gap-3">

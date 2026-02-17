@@ -40,11 +40,7 @@ export function ReceivedChallengesList({
               matchType={challenge.matchType}
               status="Pending"
               date={challenge.date}
-              href={
-                challenge.challengerId
-                  ? `/athlete/${challenge.challengerId}`
-                  : undefined
-              }
+              href={`/match/lobby/${challenge.id}`}
             />
             <div className="flex items-center gap-2">
               <Button

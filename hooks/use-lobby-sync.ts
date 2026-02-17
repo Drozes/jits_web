@@ -8,18 +8,21 @@ import type { RealtimeChannel } from "@supabase/supabase-js";
 interface UseLobbySyncOpts {
   challengeId: string;
   onCancelled?: () => void;
+  onAccepted?: () => void;
 }
 
 /**
  * Broadcast channel for lobby coordination between two athletes.
  * Both athletes join `lobby:{challengeId}` when they enter the lobby.
- * Events: match_started (with match_id), lobby_cancelled.
+ * Events: match_started (with match_id), lobby_cancelled, challenge_accepted.
  */
-export function useLobbySync({ challengeId, onCancelled }: UseLobbySyncOpts) {
+export function useLobbySync({ challengeId, onCancelled, onAccepted }: UseLobbySyncOpts) {
   const router = useRouter();
   const channelRef = useRef<RealtimeChannel | null>(null);
   const onCancelledRef = useRef(onCancelled);
   onCancelledRef.current = onCancelled;
+  const onAcceptedRef = useRef(onAccepted);
+  onAcceptedRef.current = onAccepted;
 
   useEffect(() => {
     const supabase = createClient();
@@ -34,6 +37,9 @@ export function useLobbySync({ challengeId, onCancelled }: UseLobbySyncOpts) {
       })
       .on("broadcast", { event: "lobby_cancelled" }, () => {
         onCancelledRef.current?.();
+      })
+      .on("broadcast", { event: "challenge_accepted" }, () => {
+        onAcceptedRef.current?.();
       })
       .subscribe();
 
@@ -60,5 +66,13 @@ export function useLobbySync({ challengeId, onCancelled }: UseLobbySyncOpts) {
     });
   }, []);
 
-  return { broadcastMatchStarted, broadcastCancelled };
+  const broadcastAccepted = useCallback(() => {
+    channelRef.current?.send({
+      type: "broadcast",
+      event: "challenge_accepted",
+      payload: {},
+    });
+  }, []);
+
+  return { broadcastMatchStarted, broadcastCancelled, broadcastAccepted };
 }

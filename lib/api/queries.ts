@@ -478,7 +478,7 @@ export async function getLobbyData(
       gym:gyms!fk_challenges_gym(id, name, address, city)`,
     )
     .eq("id", challengeId)
-    .eq("status", "accepted")
+    .in("status", ["pending", "accepted"])
     .single();
 
   if (!data) return null;

@@ -61,11 +61,7 @@ export function SentChallengesList({ challenges }: SentChallengesListProps) {
             matchType={challenge.matchType as "ranked" | "casual"}
             status="Pending"
             date={challenge.date}
-            href={
-              challenge.opponentId
-                ? `/athlete/${challenge.opponentId}`
-                : undefined
-            }
+            href={`/match/lobby/${challenge.id}`}
           />
           <div className="flex items-center gap-2">
             <Button

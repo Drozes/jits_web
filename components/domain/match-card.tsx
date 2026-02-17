@@ -63,7 +63,14 @@ function CardInner({ type, opponentName, result, status, direction, matchType, e
         )}
 
         {type === "challenge" && !direction && (
-          <Badge variant="outline">{status ?? "Pending"}</Badge>
+          <div className="flex flex-col items-end gap-0.5">
+            <Badge variant={status === "Accepted" ? "success" : "outline"}>
+              {status ?? "Pending"}
+            </Badge>
+            {status === "Accepted" && (
+              <span className="text-[10px] text-muted-foreground">Go to Lobby</span>
+            )}
+          </div>
         )}
       </div>
     </CardContent>

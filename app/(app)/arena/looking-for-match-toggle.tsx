@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { joinLobby, leaveLobby } from "@/hooks/use-lobby-presence";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { CheckCircle2, Swords } from "lucide-react";
@@ -30,6 +31,17 @@ export function LookingForMatchToggle({
       .from("athletes")
       .update({ looking_for_casual: nextCasual, looking_for_ranked: nextRanked })
       .eq("id", athleteId);
+
+    if (nextCasual || nextRanked) {
+      joinLobby({
+        athlete_id: athleteId,
+        looking_for_casual: nextCasual,
+        looking_for_ranked: nextRanked,
+      });
+    } else {
+      leaveLobby();
+    }
+
     router.refresh();
   }
 
