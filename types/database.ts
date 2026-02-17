@@ -48,6 +48,7 @@ export type Database = {
           looking_for_ranked: boolean
           primary_gym_id: string | null
           profile_photo_url: string | null
+          push_token: string | null
           role: Database["public"]["Enums"]["athlete_role"]
           status: string
         }
@@ -64,6 +65,7 @@ export type Database = {
           looking_for_ranked?: boolean
           primary_gym_id?: string | null
           profile_photo_url?: string | null
+          push_token?: string | null
           role?: Database["public"]["Enums"]["athlete_role"]
           status?: string
         }
@@ -80,6 +82,7 @@ export type Database = {
           looking_for_ranked?: boolean
           primary_gym_id?: string | null
           profile_photo_url?: string | null
+          push_token?: string | null
           role?: Database["public"]["Enums"]["athlete_role"]
           status?: string
         }
@@ -587,11 +590,15 @@ export type Database = {
         Args: { p_other_athlete_id: string }
         Returns: Json
       }
+      get_arena_data: { Args: { p_limit?: number }; Returns: Json }
       get_athlete_stats: {
         Args: { p_athlete_id: string }
         Returns: {
+          best_win_streak: number
           draws: number
           losses: number
+          total_matches: number
+          win_streak: number
           wins: number
         }[]
       }
@@ -601,6 +608,7 @@ export type Database = {
           athlete_id: string
           draws: number
           losses: number
+          total_matches: number
           wins: number
         }[]
       }
@@ -621,6 +629,7 @@ export type Database = {
           unread_count: number
         }[]
       }
+      get_dashboard_summary: { Args: never; Returns: Json }
       get_elo_history: {
         Args: { p_athlete_id: string }
         Returns: {
@@ -648,6 +657,16 @@ export type Database = {
           result: Database["public"]["Enums"]["match_result_enum"]
           submission_type_code: string
           submission_type_display_name: string
+        }[]
+      }
+      get_recent_activity: {
+        Args: { p_limit?: number }
+        Returns: {
+          completed_at: string
+          loser_name: string
+          match_id: string
+          result: string
+          winner_name: string
         }[]
       }
       get_unread_counts: {

@@ -4,7 +4,7 @@ import { requireAthlete } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
 import { StatOverview } from "@/components/domain/stat-overview";
 import { MatchCard } from "@/components/domain/match-card";
-import { getMatchHistory, getAthleteRank } from "@/lib/api/queries";
+import { getDashboardSummary } from "@/lib/api/queries";
 import { Swords, Zap } from "lucide-react";
 
 function DashboardSkeleton() {
@@ -37,84 +37,32 @@ async function DashboardContent() {
   const { athlete } = await requireAthlete();
   const supabase = await createClient();
 
-  const [
-    matchHistory,
-    rank,
-    bestRank,
-    { data: pendingIncoming },
-    { data: pendingSent },
-  ] = await Promise.all([
-    getMatchHistory(supabase, athlete.id),
-    getAthleteRank(supabase, athlete.current_elo),
-    getAthleteRank(supabase, athlete.highest_elo),
-    supabase
-      .from("challenges")
-      .select("id, created_at, status, match_type, challenger:athletes!fk_challenges_challenger(id, display_name)")
-      .eq("opponent_id", athlete.id)
-      .eq("status", "pending")
-      .order("created_at", { ascending: false })
-      .limit(5),
-    supabase
-      .from("challenges")
-      .select("id, created_at, status, match_type, opponent:athletes!fk_challenges_opponent(id, display_name)")
-      .eq("challenger_id", athlete.id)
-      .eq("status", "pending")
-      .order("created_at", { ascending: false })
-      .limit(5),
-  ]);
-
-  // Compute stats from match history
-  const wins = matchHistory.filter((m) => m.athlete_outcome === "win").length;
-  const losses = matchHistory.filter((m) => m.athlete_outcome === "loss").length;
-  const draws = matchHistory.filter((m) => m.athlete_outcome === "draw").length;
-
-  let winStreak = 0;
-  for (const m of matchHistory) {
-    if (m.athlete_outcome === "win") winStreak++;
-    else break;
-  }
-
-  let bestWinStreak = 0;
-  let currentRun = 0;
-  for (const m of matchHistory) {
-    if (m.athlete_outcome === "win") {
-      currentRun++;
-      if (currentRun > bestWinStreak) bestWinStreak = currentRun;
-    } else {
-      currentRun = 0;
-    }
-  }
+  const summary = await getDashboardSummary(supabase);
 
   // Merge incoming + sent challenges, sorted newest first
   const allChallenges = [
-    ...(pendingIncoming ?? []).map((c) => {
-      const challenger = c.challenger as unknown as { id: string; display_name: string } | null;
-      return {
-        id: c.id,
-        created_at: c.created_at,
-        direction: "incoming" as const,
-        matchType: c.match_type as "ranked" | "casual",
-        opponentName: challenger?.display_name ?? "Unknown",
-        opponentId: challenger?.id,
-      };
-    }),
-    ...(pendingSent ?? []).map((c) => {
-      const opponent = c.opponent as unknown as { id: string; display_name: string } | null;
-      return {
-        id: c.id,
-        created_at: c.created_at,
-        direction: "sent" as const,
-        matchType: c.match_type as "ranked" | "casual",
-        opponentName: opponent?.display_name ?? "Unknown",
-        opponentId: opponent?.id,
-      };
-    }),
+    ...summary.pending_challenges.incoming.map((c) => ({
+      id: c.id,
+      created_at: c.created_at,
+      direction: "incoming" as const,
+      matchType: c.match_type as "ranked" | "casual",
+      opponentName: c.challenger_name,
+      opponentId: c.challenger_id,
+    })),
+    ...summary.pending_challenges.sent.map((c) => ({
+      id: c.id,
+      created_at: c.created_at,
+      direction: "sent" as const,
+      matchType: c.match_type as "ranked" | "casual",
+      opponentName: c.opponent_name,
+      opponentId: c.opponent_id,
+    })),
   ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-  const recentMatches = matchHistory.slice(0, 5).map((m) => ({
+  const recentMatches = summary.recent_matches.map((m) => ({
     id: m.match_id,
-    opponentName: m.opponent_display_name,
-    result: m.athlete_outcome as "win" | "loss" | "draw",
+    opponentName: m.opponent_name,
+    result: m.outcome,
     matchType: m.match_type as "ranked" | "casual",
     eloDelta: m.elo_delta,
     date: m.completed_at,
@@ -128,7 +76,15 @@ async function DashboardContent() {
 
       <StatOverview
         athlete={athlete}
-        stats={{ wins, losses, draws, winStreak, rank, bestRank, bestWinStreak }}
+        stats={{
+          wins: summary.stats.wins,
+          losses: summary.stats.losses,
+          draws: summary.stats.draws,
+          winStreak: summary.stats.win_streak,
+          rank: summary.rank.current,
+          bestRank: summary.rank.best,
+          bestWinStreak: summary.stats.best_win_streak,
+        }}
       />
 
       <section className="flex flex-col gap-3">

@@ -102,3 +102,79 @@ export interface StartMatchTimerResponse {
   match_id?: string;
   error?: string;
 }
+
+// ---------------------------------------------------------------------------
+// Aggregated RPC response types (JSONB return shapes)
+// ---------------------------------------------------------------------------
+
+/** Response from get_dashboard_summary RPC */
+export interface DashboardSummary {
+  stats: {
+    wins: number;
+    losses: number;
+    draws: number;
+    win_streak: number;
+    best_win_streak: number;
+    total_matches: number;
+  };
+  rank: {
+    current: number;
+    best: number;
+    total: number;
+  };
+  recent_matches: {
+    match_id: string;
+    opponent_name: string;
+    outcome: "win" | "loss" | "draw";
+    match_type: string;
+    elo_delta: number;
+    completed_at: string;
+  }[];
+  pending_challenges: {
+    incoming: {
+      id: string;
+      created_at: string;
+      expires_at: string;
+      match_type: string;
+      challenger_weight: number | null;
+      challenger_id: string;
+      challenger_name: string;
+    }[];
+    sent: {
+      id: string;
+      created_at: string;
+      expires_at: string;
+      match_type: string;
+      opponent_id: string;
+      opponent_name: string;
+    }[];
+  };
+}
+
+/** Response from get_arena_data RPC */
+export interface ArenaData {
+  looking_athletes: {
+    id: string;
+    display_name: string;
+    current_elo: number;
+    gym_name: string | null;
+    looking_for_casual: boolean;
+    looking_for_ranked: boolean;
+    profile_photo_url: string | null;
+  }[];
+  other_athletes: {
+    id: string;
+    display_name: string;
+    current_elo: number;
+    gym_name: string | null;
+    profile_photo_url: string | null;
+  }[];
+  challenged_opponent_ids: string[];
+  recent_activity: {
+    match_id: string;
+    winner_name: string;
+    loser_name: string;
+    result: string;
+    completed_at: string;
+  }[];
+}
