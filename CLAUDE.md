@@ -151,6 +151,10 @@ Before every commit, run these checks and fix any failures:
 
 Do not commit if any check fails. Fix the issue first.
 
+### Changelog
+
+**Always update `CHANGELOG.md`** when committing changes. Add entries under `## [Unreleased]` at the top, organized by feature area with `**Added**`, `**Changed**`, `**Fixed**`, and `**Removed**` subsections. Include file paths for new files. Keep entries concise but specific enough to understand what changed and why.
+
 ## UI Kit Maintenance
 
 ### shadcn/ui Components (`components/ui/`)

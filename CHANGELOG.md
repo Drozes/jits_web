@@ -2,6 +2,72 @@
 
 ## [Unreleased]
 
+### Lobby Presence & Unified Challenge Lobby (2026-02-17)
+
+**Added**
+- `hooks/use-lobby-presence.ts` — `lobby:online` Supabase Presence channel (tier 2 of two-tier model). External store pattern with `useLobbyStatus(athleteId)`, `useLobbyIds()`, and imperative `joinLobby()`/`leaveLobby()` API for toggle integration without channel teardown.
+- `components/layout/lobby-presence-bootstrap.tsx` — Side-effect client component in app layout. Conditionally tracks if `looking_for_casual` or `looking_for_ranked` is true; everyone subscribes to read.
+- `components/domain/lobby-active-indicator.tsx` — Pulsing green dot + "Active now" text. Uses `useLobbyStatus()`, renders nothing when athlete is not in lobby.
+- `challenge_accepted` broadcast event in `use-lobby-sync.ts` — when opponent accepts a challenge, the challenger's lobby page auto-refreshes to show "Start Match" state.
+
+**Changed**
+- `app/(app)/match/lobby/[id]/lobby-actions.tsx` — Rewritten to handle 3 challenge states:
+  - **Pending (challenger):** "Waiting for opponent to respond..." with pulsing clock + Cancel button
+  - **Pending (opponent):** Weight input + Accept/Decline buttons
+  - **Accepted:** Start Match/Cancel buttons (previous behavior)
+- `lib/api/queries.ts` — `getLobbyData()` now accepts `pending` and `accepted` challenges (was `accepted` only)
+- All challenge card links updated to point to `/match/lobby/[challengeId]` instead of `/athlete/[id]`:
+  - `app/(app)/page.tsx` (dashboard pending challenges)
+  - `app/(app)/match/pending/received-challenges-list.tsx`
+  - `app/(app)/match/pending/sent-challenges-list.tsx`
+- `app/(app)/arena/arena-content.tsx` — Removed "Competitors" section. Split `lookingCompetitors` into "Ready to Fight" (online + in lobby) and "Looking for Match" (interested but offline) with descriptive subtitles. Uses `useLobbyIds()` for real-time filtering.
+- `app/(app)/arena/looking-for-match-toggle.tsx` — Wired `joinLobby()`/`leaveLobby()` imperative API after DB toggle update.
+- `app/(app)/page.tsx` — Dashboard now fetches accepted challenges in parallel and shows them at top of Challenges section with green "Accepted" badge + "Go to Lobby" text.
+- `components/domain/match-card.tsx` — Added `variant="success"` badge for accepted status and "Go to Lobby" text below badge.
+- `app/(app)/layout.tsx` — Added `LobbyBootstrap` async component in Suspense boundary alongside existing presence bootstrap.
+
+### Profile Photos (2026-02-17)
+
+**Added**
+- `components/profile/profile-photo-upload.tsx` — Photo upload component with Supabase storage integration
+- Profile photo upload on setup screen (`app/profile/setup/setup-form.tsx`)
+- Editable profile photo on Profile tab header (`components/profile/editable-profile-header.tsx`)
+
+### Compare Stats Modal Enhancement (2026-02-16)
+
+**Added**
+- Draws row in compare stats modal
+- Ranked/Casual filter pills that recompute stats from head-to-head match history
+
+### Arena Weight Display (2026-02-16)
+
+**Changed**
+- Arena competitor cards now show weight alongside gym name (e.g., "Gym Name · 185 lbs") using `current_weight` from `get_arena_data` RPC
+
+### Success Color Token (2026-02-16)
+
+**Added**
+- `--success` CSS variable (`hsl(145 63% 42%)` light / `hsl(145 63% 49%)` dark)
+- `bg-success`/`text-success`/`text-success-foreground` Tailwind tokens
+- Badge `variant="success"` for win badges
+
+**Changed**
+- Win badges use green (`variant="success"`), loss badges use red (`variant="destructive"`)
+- ELO numbers use default foreground (not `text-primary`)
+
+### Match Type Labels (2026-02-16)
+
+**Changed**
+- `MatchCard` shows "Ranked"/"Casual" inline with date via `matchType` prop
+- All 6 call sites updated: dashboard matches, dashboard challenges, match history, head-to-head, received challenges, sent challenges
+
+### Single-Header Navigation & Profile Redesign (2026-02-16)
+
+**Changed**
+- Consolidated app header navigation pattern
+- Profile hero section redesigned
+- Match history filters added to stats sub-page
+
 ### UI Fixes (2026-02-16)
 
 **Fixed**

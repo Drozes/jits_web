@@ -1,13 +1,14 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Swords } from "lucide-react";
-import { getInitials, formatRelativeDate } from "@/lib/utils";
+import { getInitials, getProfilePhotoUrl, formatRelativeDate } from "@/lib/utils";
 import type { ChallengeStatus } from "@/lib/constants";
 
 interface Participant {
   id: string;
   displayName: string;
+  profilePhotoUrl?: string | null;
 }
 
 interface ChallengeVersusCardProps {
@@ -31,6 +32,9 @@ function AvatarWithLabel({ participant, isYou }: { participant: Participant; isY
   return (
     <div className="flex flex-col items-center gap-1 min-w-0">
       <Avatar className="h-12 w-12 border-2 border-accent/20 bg-gradient-to-br from-primary to-primary/80 text-white">
+        {participant.profilePhotoUrl && (
+          <AvatarImage src={getProfilePhotoUrl(participant.profilePhotoUrl)!} alt={participant.displayName} className="object-cover" />
+        )}
         <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 font-bold text-white text-sm">
           {getInitials(participant.displayName)}
         </AvatarFallback>

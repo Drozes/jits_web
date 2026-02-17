@@ -3,10 +3,10 @@
 import { useState } from "react";
 import { Switch } from "@/components/ui/switch";
 import { Card } from "@/components/ui/card";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { AthleteCard } from "@/components/domain/athlete-card";
 import { Crown, Medal, Award, Trophy, Users } from "lucide-react";
-import { getInitials } from "@/lib/utils";
+import { getInitials, getProfilePhotoUrl } from "@/lib/utils";
 
 interface RankedAthlete {
   id: string;
@@ -14,6 +14,7 @@ interface RankedAthlete {
   displayName: string;
   currentElo: number;
   gymName?: string;
+  profilePhotoUrl?: string;
   wins: number;
   losses: number;
   isCurrentUser: boolean;
@@ -66,6 +67,9 @@ function PodiumSlot({
       </div>
       <div className={`rounded-t-lg border-2 bg-gradient-to-b ${s.gradient} pb-2 pt-3 shadow-md`}>
         <Avatar className={`${s.avatar} mx-auto mb-2 border-2 border-white/50 bg-gradient-to-br from-primary to-primary/80 text-white shadow-lg`}>
+          {athlete.profilePhotoUrl && (
+            <AvatarImage src={getProfilePhotoUrl(athlete.profilePhotoUrl)!} alt={athlete.displayName} className="object-cover" />
+          )}
           <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 font-bold text-white">
             {getInitials(athlete.displayName)}
           </AvatarFallback>
@@ -132,6 +136,7 @@ export function LeaderboardContent({
                 wins={a.wins}
                 losses={a.losses}
                 gymName={a.gymName}
+                profilePhotoUrl={a.profilePhotoUrl}
                 isCurrentUser={a.isCurrentUser}
                 hasPendingChallenge={challengedSet.has(a.id)}
               />

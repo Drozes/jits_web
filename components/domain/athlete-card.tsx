@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Crown, Medal, Award } from "lucide-react";
-import { getInitials } from "@/lib/utils";
+import { getInitials, getProfilePhotoUrl } from "@/lib/utils";
 import { ChallengeBadge } from "./challenge-badge";
 import { OnlineIndicator } from "./online-indicator";
 
@@ -22,6 +22,7 @@ interface AthleteCardProps {
   wins: number;
   losses: number;
   gymName?: string;
+  profilePhotoUrl?: string;
   isCurrentUser?: boolean;
   hasPendingChallenge?: boolean;
 }
@@ -34,6 +35,7 @@ export function AthleteCard({
   wins,
   losses,
   gymName,
+  profilePhotoUrl,
   isCurrentUser,
   hasPendingChallenge,
 }: AthleteCardProps) {
@@ -47,6 +49,9 @@ export function AthleteCard({
           <div className="flex w-8 justify-center">{getRankDisplay(rank)}</div>
           <OnlineIndicator athleteId={id ?? ""}>
             <Avatar className="h-12 w-12 border-2 border-accent/20 bg-gradient-to-br from-primary to-primary/80 text-white">
+              {profilePhotoUrl && (
+                <AvatarImage src={getProfilePhotoUrl(profilePhotoUrl)!} alt={displayName} className="object-cover" />
+              )}
               <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 font-bold text-white">
                 {getInitials(displayName)}
               </AvatarFallback>

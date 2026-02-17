@@ -37,13 +37,14 @@ async function ArenaData() {
 
   const arena = await getArenaData(supabase);
 
-  type ArenaAthlete = { id: string; display_name: string; current_elo: number; gym_name: string | null; current_weight: number | null; looking_for_casual?: boolean; looking_for_ranked?: boolean };
+  type ArenaAthlete = { id: string; display_name: string; current_elo: number; gym_name: string | null; current_weight: number | null; profile_photo_url?: string | null; looking_for_casual?: boolean; looking_for_ranked?: boolean };
   const toCompetitor = (a: ArenaAthlete) => ({
     id: a.id,
     displayName: a.display_name,
     currentElo: a.current_elo,
     gymName: a.gym_name ?? undefined,
     weight: a.current_weight ?? undefined,
+    profilePhotoUrl: a.profile_photo_url ?? undefined,
     eloDiff: a.current_elo - currentAthlete.current_elo,
     lookingForCasual: a.looking_for_casual ?? false,
     lookingForRanked: a.looking_for_ranked ?? false,

@@ -1,12 +1,12 @@
 import { redirect } from "next/navigation";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { EloBadge } from "@/components/domain/elo-badge";
 import { requireAthlete } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
 import { getLobbyData, getEloStakes } from "@/lib/api/queries";
-import { getInitials } from "@/lib/utils";
+import { getInitials, getProfilePhotoUrl } from "@/lib/utils";
 import { MATCH_TYPE } from "@/lib/constants";
 import { LobbyActions } from "./lobby-actions";
 
@@ -87,14 +87,19 @@ function AthleteColumn({
   name,
   elo,
   weight,
+  profilePhotoUrl,
 }: {
   name: string;
   elo: number;
   weight: number | null;
+  profilePhotoUrl?: string | null;
 }) {
   return (
     <div className="flex flex-col items-center gap-2 flex-1 min-w-0">
       <Avatar className="h-16 w-16 bg-gradient-to-br from-primary to-red-600 text-white border-2 border-muted shadow-md">
+        {profilePhotoUrl && (
+          <AvatarImage src={getProfilePhotoUrl(profilePhotoUrl)!} alt={name} className="object-cover" />
+        )}
         <AvatarFallback className="bg-gradient-to-br from-primary to-red-600 text-white text-lg">
           {getInitials(name)}
         </AvatarFallback>
@@ -112,8 +117,8 @@ function VsHeader({
   challenger,
   opponent,
 }: {
-  challenger: { display_name: string; current_elo: number; current_weight: number | null };
-  opponent: { display_name: string; current_elo: number; current_weight: number | null };
+  challenger: { display_name: string; current_elo: number; current_weight: number | null; profile_photo_url?: string | null };
+  opponent: { display_name: string; current_elo: number; current_weight: number | null; profile_photo_url?: string | null };
 }) {
   return (
     <div className="flex items-center gap-4">
@@ -121,6 +126,7 @@ function VsHeader({
         name={challenger.display_name}
         elo={challenger.current_elo}
         weight={challenger.current_weight}
+        profilePhotoUrl={challenger.profile_photo_url}
       />
       <span className="text-2xl font-black text-muted-foreground shrink-0">
         VS
@@ -129,6 +135,7 @@ function VsHeader({
         name={opponent.display_name}
         elo={opponent.current_elo}
         weight={opponent.current_weight}
+        profilePhotoUrl={opponent.profile_photo_url}
       />
     </div>
   );

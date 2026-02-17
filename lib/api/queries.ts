@@ -18,7 +18,7 @@ type Client = SupabaseClient<Database>;
 
 /** Common select for athletes with gym join */
 const ATHLETE_WITH_GYM_SELECT =
-  "id, display_name, current_elo, highest_elo, current_weight, status, looking_for_casual, looking_for_ranked, free_agent, primary_gym_id, created_at, gyms!fk_athletes_primary_gym(name)" as const;
+  "id, display_name, current_elo, highest_elo, current_weight, status, looking_for_casual, looking_for_ranked, free_agent, primary_gym_id, profile_photo_url, created_at, gyms!fk_athletes_primary_gym(name)" as const;
 
 export interface AthleteWithGym {
   id: string;
@@ -31,6 +31,7 @@ export interface AthleteWithGym {
   looking_for_ranked: boolean;
   free_agent: boolean;
   primary_gym_id: string | null;
+  profile_photo_url: string | null;
   created_at: string;
   gymName: string | null;
 }
@@ -296,8 +297,8 @@ export interface LobbyData {
   challenger_weight: number | null;
   opponent_weight: number | null;
   status: string;
-  challenger: { id: string; display_name: string; current_elo: number; highest_elo: number; current_weight: number | null };
-  opponent: { id: string; display_name: string; current_elo: number; highest_elo: number; current_weight: number | null };
+  challenger: { id: string; display_name: string; current_elo: number; highest_elo: number; current_weight: number | null; profile_photo_url: string | null };
+  opponent: { id: string; display_name: string; current_elo: number; highest_elo: number; current_weight: number | null; profile_photo_url: string | null };
   gym: { id: string; name: string; address: string | null; city: string | null } | null;
 }
 
@@ -390,8 +391,8 @@ export interface ChallengeBetween {
   expires_at: string;
   challenger_weight: number | null;
   opponent_weight: number | null;
-  challenger: { id: string; display_name: string; current_elo: number };
-  opponent: { id: string; display_name: string; current_elo: number };
+  challenger: { id: string; display_name: string; current_elo: number; profile_photo_url: string | null };
+  opponent: { id: string; display_name: string; current_elo: number; profile_photo_url: string | null };
 }
 
 /** Fetch all challenges between two athletes (bidirectional), newest first */
@@ -404,8 +405,8 @@ export async function getChallengesBetween(
     .from("challenges")
     .select(
       `id, status, match_type, created_at, expires_at, challenger_weight, opponent_weight,
-      challenger:athletes!fk_challenges_challenger(id, display_name, current_elo),
-      opponent:athletes!fk_challenges_opponent(id, display_name, current_elo)`,
+      challenger:athletes!fk_challenges_challenger(id, display_name, current_elo, profile_photo_url),
+      opponent:athletes!fk_challenges_opponent(id, display_name, current_elo, profile_photo_url)`,
     )
     .or(
       `and(challenger_id.eq.${athleteA},opponent_id.eq.${athleteB}),and(challenger_id.eq.${athleteB},opponent_id.eq.${athleteA})`,
@@ -473,8 +474,8 @@ export async function getLobbyData(
     .from("challenges")
     .select(
       `*,
-      challenger:athletes!fk_challenges_challenger(id, display_name, current_elo, highest_elo, current_weight),
-      opponent:athletes!fk_challenges_opponent(id, display_name, current_elo, highest_elo, current_weight),
+      challenger:athletes!fk_challenges_challenger(id, display_name, current_elo, highest_elo, current_weight, profile_photo_url),
+      opponent:athletes!fk_challenges_opponent(id, display_name, current_elo, highest_elo, current_weight, profile_photo_url),
       gym:gyms!fk_challenges_gym(id, name, address, city)`,
     )
     .eq("id", challengeId)

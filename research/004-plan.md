@@ -27,6 +27,18 @@
 | 2026-02-14 | Step 10: Setup Fix | **Done** | Gym picker now required (not optional). Guard checks `status='pending'` instead of `current_weight`. Setup page checks status for redirect. `primary_gym_id` always sent on submit. |
 | 2026-02-14 | Step 11: Challenge Response | **Done** | Accept/decline already existed (challenge-response-sheet). Added: cancel button on sent challenges (sent-challenges-list), expiry badge with countdown (expiry-badge), expired challenge filtering server-side. |
 | 2026-02-14 | Step 12: Match Flow | **Done** | 3 screens: lobby (`match/lobby/[id]` with VS layout + ELO stakes), live (`match/[id]/live` with countdown timer), results (`match/[id]/results` with recording form + display). Added `getMatchDetails` query, MATCH_STATUS/MATCH_RESULT constants. Lobby uses challenge ID; live/results use match ID. |
+| 2026-02-15 | Chat Implementation | **Done** | Messages tab with inbox, thread view, typing indicators, date separators, message grouping, unread counts. 3 realtime hooks: `use-chat-channel`, `use-chat-messages`, `use-unread-count`. |
+| 2026-02-15 | Online Presence | **Done** | `app:online` Presence channel with external store pattern. Green dot indicators on 4 avatar locations. Bootstrap in layout. |
+| 2026-02-16 | Weight-Aware ELO | **Done** | `calculate_elo_stakes` RPC with weight division gap. Stakes UI shows Win/Draw/Loss columns. Draws always negative (Pressure Score). |
+| 2026-02-16 | Match Type Labels | **Done** | `MatchCard` shows "Ranked"/"Casual" inline with date. All 6 call sites updated. |
+| 2026-02-16 | Success Color Token | **Done** | `--success` CSS var, `bg-success`/`text-success` Tailwind tokens, Badge `variant="success"`. Win badges green, loss badges red. |
+| 2026-02-16 | Arena Weight Display | **Done** | `get_arena_data` RPC includes `current_weight`. Arena cards show "Gym · 185 lbs". |
+| 2026-02-16 | Compare Stats Modal | **Done** | Draws row, Ranked/Casual filter pills that recompute stats from head-to-head match history. |
+| 2026-02-17 | Lobby Presence Channel | **Done** | `lobby:online` Presence channel (tier 2). External store with `useLobbyStatus`/`useLobbyIds`. Imperative `joinLobby`/`leaveLobby` API. Bootstrap in layout. `LobbyActiveIndicator` component. |
+| 2026-02-17 | Unified Challenge Lobby | **Done** | All challenge clicks → `/match/lobby/[id]`. Lobby handles 3 states: pending-incoming (accept/decline), pending-sent (waiting/cancel), accepted (start/cancel). `challenge_accepted` broadcast event for real-time sync. |
+| 2026-02-17 | Arena Restructure | **Done** | Removed "Competitors" section. Split looking athletes into "Ready to Fight" (in lobby) and "Looking for Match" (offline). Subtitles on each section. |
+| 2026-02-17 | Dashboard Accepted Challenges | **Done** | Accepted challenges shown at top of Challenges section with green badge + "Go to Lobby" text. Links to `/match/lobby/[id]`. |
+| 2026-02-17 | Profile Photo Upload | **Done** | Photo upload on setup screen and editable profile header. Supabase storage integration. |
 
 ## Learnings
 

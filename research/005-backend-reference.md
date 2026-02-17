@@ -45,12 +45,15 @@ END IF;
 | id | UUID | gen_random_uuid() | PK |
 | auth_user_id | UUID | — | UNIQUE, FK → auth.users, ON DELETE CASCADE |
 | display_name | VARCHAR(100) | — | NOT NULL, UNIQUE |
-| current_weight | DECIMAL(5,2) | NULL | CHECK: 0-500, kilograms |
+| current_weight | DECIMAL(5,2) | NULL | CHECK: 0-500, in lbs |
 | current_elo | INTEGER | 1000 | CHECK: >= 0, cached from elo_history |
 | highest_elo | INTEGER | 1000 | CHECK: >= current_elo |
-| looking_for_match | BOOLEAN | FALSE | Availability toggle |
+| looking_for_casual | BOOLEAN | FALSE | Casual match availability toggle |
+| looking_for_ranked | BOOLEAN | FALSE | Ranked match availability toggle |
+| free_agent | BOOLEAN | FALSE | No gym affiliation |
 | status | VARCHAR(32) | 'pending' | pending, active, inactive, suspended, banned |
 | primary_gym_id | UUID | NULL | FK → gyms, ON DELETE SET NULL |
+| avatar_path | TEXT | NULL | Supabase storage path for profile photo |
 | created_at | TIMESTAMPTZ | now() | |
 
 ### Updatable Fields (RLS)
@@ -58,8 +61,11 @@ END IF;
 Athletes can only update their own record (`auth.uid() = auth_user_id`):
 - `display_name` — must remain unique
 - `current_weight`
-- `looking_for_match`
+- `looking_for_casual`
+- `looking_for_ranked`
 - `primary_gym_id`
+- `free_agent`
+- `avatar_path`
 
 Protected (never client-updated): `current_elo`, `highest_elo`, `status`, `auth_user_id`
 

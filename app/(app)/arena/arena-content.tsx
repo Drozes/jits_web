@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Swords, Circle, Activity, Clock } from "lucide-react";
-import { getInitials } from "@/lib/utils";
+import { getInitials, getProfilePhotoUrl } from "@/lib/utils";
 import { ChallengeBadge } from "@/components/domain/challenge-badge";
 import { OnlineIndicator } from "@/components/domain/online-indicator";
 import { LobbyActiveIndicator } from "@/components/domain/lobby-active-indicator";
@@ -18,6 +18,7 @@ interface Competitor {
   currentElo: number;
   gymName?: string;
   weight?: number;
+  profilePhotoUrl?: string;
   eloDiff: number;
   lookingForCasual: boolean;
   lookingForRanked: boolean;
@@ -50,6 +51,9 @@ function CompetitorCard({ competitor, hasPendingChallenge }: { competitor: Compe
           <div className="flex items-center gap-3">
             <OnlineIndicator athleteId={competitor.id}>
               <Avatar className="h-12 w-12 border-2 border-accent/20 bg-gradient-to-br from-primary to-primary/80 text-white">
+                {competitor.profilePhotoUrl && (
+                  <AvatarImage src={getProfilePhotoUrl(competitor.profilePhotoUrl)!} alt={competitor.displayName} className="object-cover" />
+                )}
                 <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 font-bold text-white">
                   {getInitials(competitor.displayName)}
                 </AvatarFallback>

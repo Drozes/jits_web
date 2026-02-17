@@ -5,10 +5,10 @@ import Link from "next/link";
 import { AppHeader } from "@/components/layout/app-header";
 import { PageContainer } from "@/components/layout/page-container";
 import { EloBadge } from "@/components/domain/elo-badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { cn, getInitials } from "@/lib/utils";
+import { cn, getInitials, getProfilePhotoUrl } from "@/lib/utils";
 import { X, Eye, Heart, Trophy, RotateCcw } from "lucide-react";
 
 interface Competitor {
@@ -17,6 +17,7 @@ interface Competitor {
   currentElo: number;
   gymName: string | null;
   weight: number | null;
+  profilePhotoUrl?: string;
   wins: number;
   losses: number;
 }
@@ -234,6 +235,9 @@ function SwipeCard({
       )}
     >
       <Avatar className="h-24 w-24 bg-gradient-to-br from-primary to-red-600 text-white border-2 border-muted shadow-md mb-4">
+        {competitor.profilePhotoUrl && (
+          <AvatarImage src={getProfilePhotoUrl(competitor.profilePhotoUrl)!} alt={competitor.displayName} className="object-cover" />
+        )}
         <AvatarFallback className="text-2xl bg-gradient-to-br from-primary to-red-600 text-white">
           {getInitials(competitor.displayName)}
         </AvatarFallback>
