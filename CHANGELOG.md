@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Dynamic Dashboard Hero Subtitle (2026-02-17)
+
+**Changed**
+- `app/(app)/page.tsx` — Hero subtitle is now context-aware: shows pulsing green "Looking for Ranked/Casual matches" when active, or a tappable CTA banner linking to Arena when not looking. Removed `bg-gradient-hero` background.
+
 ### Modernize UI/UX Design (2026-02-17)
 
 **Changed**

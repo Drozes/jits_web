@@ -9,7 +9,7 @@ import { AppHeader } from "@/components/layout/app-header";
 import { PageContainer } from "@/components/layout/page-container";
 import { PageHeaderActions } from "@/components/layout/page-header-actions";
 import { getDashboardSummary, getRecentActivity } from "@/lib/api/queries";
-import { Zap } from "lucide-react";
+import { Zap, ChevronRight, Radio, Swords } from "lucide-react";
 
 function DashboardSkeleton() {
   return (
@@ -143,11 +143,14 @@ async function DashboardContent() {
   return (
     <div className="flex flex-col gap-6 animate-page-in">
       {/* Hero greeting */}
-      <div className="bg-gradient-hero rounded-2xl -mx-4 px-4 pt-2 pb-4">
+      <div className="rounded-2xl -mx-4 px-4 pt-2 pb-4">
         <h1 className="text-2xl font-bold tracking-tight">
           Hey, <span className="text-gradient-primary">{athlete.display_name}</span>
         </h1>
-        <p className="text-sm text-muted-foreground mt-0.5">Ready to compete?</p>
+        <HeroSubtitle
+          lookingForCasual={athlete.looking_for_casual}
+          lookingForRanked={athlete.looking_for_ranked}
+        />
       </div>
 
       <StatOverview
@@ -205,5 +208,36 @@ async function DashboardContent() {
 
       <RecentActivitySection myMatches={recentMatches} allActivity={recentActivity} />
     </div>
+  );
+}
+
+function HeroSubtitle({ lookingForCasual, lookingForRanked }: { lookingForCasual: boolean; lookingForRanked: boolean }) {
+  const isLooking = lookingForCasual || lookingForRanked;
+
+  if (isLooking) {
+    const label = lookingForCasual && lookingForRanked
+      ? "Ranked & Casual matches"
+      : lookingForRanked ? "Ranked matches" : "Casual matches";
+    return (
+      <div className="flex items-center gap-2 mt-1">
+        <Radio className="h-3.5 w-3.5 text-green-500 animate-pulse" />
+        <p className="text-sm font-medium text-green-600 dark:text-green-400">
+          Looking for {label}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <Link
+      href="/arena"
+      className="mt-2 flex items-center justify-between rounded-xl bg-primary/10 px-3.5 py-2.5 group w-full transition-colors hover:bg-primary/15 active:scale-[0.98]"
+    >
+      <div className="flex items-center gap-2">
+        <Swords className="h-4 w-4 text-primary" />
+        <span className="text-sm font-medium">Start looking for matches</span>
+      </div>
+      <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
+    </Link>
   );
 }
