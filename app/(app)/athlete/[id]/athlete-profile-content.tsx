@@ -22,34 +22,29 @@ export async function AthleteProfileContent({
   const { athlete: currentAthlete } = await requireAthlete();
   const supabase = await createClient();
 
-  // Fetch competitor
-  const { data: competitor } = await supabase
-    .from("athletes")
-    .select("*")
-    .eq("id", athleteId)
-    .single();
+  // Parallelize all independent queries (competitor fetch uses FK join for gym)
+  const [
+    { data: competitor },
+    compStats,
+    myStats,
+    pendingChallenge,
+    matchHistory,
+  ] = await Promise.all([
+    supabase
+      .from("athletes")
+      .select("*, gyms!fk_athletes_primary_gym(name)")
+      .eq("id", athleteId)
+      .single(),
+    getAthleteStatsRpc(supabase, athleteId),
+    getAthleteStatsRpc(supabase, currentAthlete.id),
+    getPendingChallengeBetween(supabase, currentAthlete.id, athleteId),
+    getMatchHistory(supabase, currentAthlete.id),
+  ]);
 
   if (!competitor) notFound();
 
-  // Fetch competitor gym name
-  let competitorGymName: string | null = null;
-  if (competitor.primary_gym_id) {
-    const { data: gym } = await supabase
-      .from("gyms")
-      .select("name")
-      .eq("id", competitor.primary_gym_id)
-      .single();
-    competitorGymName = gym?.name ?? null;
-  }
-
-  // Fetch stats and pending challenge in parallel
-  const [compStats, myStats, pendingChallenge, matchHistory] =
-    await Promise.all([
-      getAthleteStatsRpc(supabase, competitor.id),
-      getAthleteStatsRpc(supabase, currentAthlete.id),
-      getPendingChallengeBetween(supabase, currentAthlete.id, competitor.id),
-      getMatchHistory(supabase, currentAthlete.id),
-    ]);
+  const gymsData = competitor.gyms as unknown as { name: string } | null;
+  const competitorGymName = gymsData?.name ?? null;
 
   // Head-to-head: filter own match history for matches against this competitor
   const headToHead = matchHistory

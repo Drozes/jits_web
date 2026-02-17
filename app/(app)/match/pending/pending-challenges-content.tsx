@@ -21,41 +21,46 @@ export async function PendingChallengesContent() {
   const { athlete } = await requireAthlete();
   const supabase = await createClient();
 
-  // Fetch received challenges
-  const { data: received } = await supabase
-    .from("challenges")
-    .select(
-      "id, created_at, expires_at, match_type, status, challenger_weight, challenger:athletes!fk_challenges_challenger(id, display_name, current_elo)",
-    )
-    .eq("opponent_id", athlete.id)
-    .eq("status", "pending")
-    .order("created_at", { ascending: false });
-
-  // Fetch sent challenges
-  const { data: sent } = await supabase
-    .from("challenges")
-    .select(
-      "id, created_at, expires_at, match_type, status, opponent:athletes!fk_challenges_opponent(id, display_name)",
-    )
-    .eq("challenger_id", athlete.id)
-    .eq("status", "pending")
-    .order("created_at", { ascending: false });
-
-  // Fetch accepted challenges (waiting in lobby)
-  const { data: accepted } = await supabase
-    .from("challenges")
-    .select(
-      "id, match_type, challenger_id, challenger:athletes!fk_challenges_challenger(display_name), opponent:athletes!fk_challenges_opponent(display_name)",
-    )
-    .or(`challenger_id.eq.${athlete.id},opponent_id.eq.${athlete.id}`)
-    .eq("status", "accepted")
-    .order("created_at", { ascending: false });
-
-  // Find active matches: first get match IDs where this athlete participates
-  const { data: participations } = await supabase
-    .from("match_participants")
-    .select("match_id")
-    .eq("athlete_id", athlete.id);
+  // Parallelize all independent queries
+  const [
+    { data: received },
+    { data: sent },
+    { data: accepted },
+    { data: participations },
+  ] = await Promise.all([
+    // Fetch received challenges
+    supabase
+      .from("challenges")
+      .select(
+        "id, created_at, expires_at, match_type, status, challenger_weight, challenger:athletes!fk_challenges_challenger(id, display_name, current_elo)",
+      )
+      .eq("opponent_id", athlete.id)
+      .eq("status", "pending")
+      .order("created_at", { ascending: false }),
+    // Fetch sent challenges
+    supabase
+      .from("challenges")
+      .select(
+        "id, created_at, expires_at, match_type, status, opponent:athletes!fk_challenges_opponent(id, display_name)",
+      )
+      .eq("challenger_id", athlete.id)
+      .eq("status", "pending")
+      .order("created_at", { ascending: false }),
+    // Fetch accepted challenges (waiting in lobby)
+    supabase
+      .from("challenges")
+      .select(
+        "id, match_type, challenger_id, challenger:athletes!fk_challenges_challenger(display_name), opponent:athletes!fk_challenges_opponent(display_name)",
+      )
+      .or(`challenger_id.eq.${athlete.id},opponent_id.eq.${athlete.id}`)
+      .eq("status", "accepted")
+      .order("created_at", { ascending: false }),
+    // Find active matches: first get match IDs where this athlete participates
+    supabase
+      .from("match_participants")
+      .select("match_id")
+      .eq("athlete_id", athlete.id),
+  ]);
 
   const myMatchIds = participations?.map((p) => p.match_id) ?? [];
 

@@ -28,29 +28,11 @@ Same fix applies to `getActiveAthlete()` at line 58.
 
 ---
 
-## 2. Athlete Profile Page: `select("*")` + Separate Gym Fetch (N+1)
+## ~~2. Athlete Profile Page: `select("*")` + Separate Gym Fetch (N+1)~~ ✅ DONE
 
-**File:** `app/(app)/athlete/[id]/athlete-profile-content.tsx:26-43`
+**File:** `app/(app)/athlete/[id]/athlete-profile-content.tsx`
 
-**Current behavior:**
-1. **Line 26-30:** Fetches competitor with `select("*")` — no gym join
-2. **Line 37-41:** Separate query to fetch gym name by `primary_gym_id`
-3. **Line 47-52:** Four more queries via `Promise.all()` (stats x2, pending challenge, match history)
-
-**Total: 6 sequential queries** (2 serial + 4 parallel)
-
-**Recommendation:** Use a FK join to eliminate the separate gym query:
-```ts
-const { data: competitor } = await supabase
-  .from("athletes")
-  .select("id, display_name, current_elo, highest_elo, current_weight, status, looking_for_casual, looking_for_ranked, free_agent, primary_gym_id, gyms!fk_athletes_primary_gym(name)")
-  .eq("id", athleteId)
-  .single();
-```
-
-Then move this fetch into the `Promise.all()` block with the other four queries. Result: **1 serial query + 4 parallel queries → 5 queries total in 2 round trips** (down from 6 queries in 3 round trips).
-
-**Severity:** High — this page is visited frequently (opponent profiles from arena, leaderboard, dashboard).
+**Fixed:** Added `gyms!fk_athletes_primary_gym(name)` FK join to eliminate separate gym query. Moved competitor fetch into `Promise.all()` alongside stats, pending challenge, and match history queries. Result: **5 queries in 2 round trips** (down from 6 queries in 3 round trips).
 
 ---
 
@@ -70,68 +52,19 @@ Option A is the simplest — it adds gym name to the guard that every page alrea
 
 ---
 
-## 4. Arena Page: Sequential Queries That Should Be Parallel
+## ~~4. Arena Page: Sequential Queries That Should Be Parallel~~ ✅ DONE
 
-**File:** `app/(app)/arena/page.tsx:34-94`
+**File:** `app/(app)/arena/page.tsx`
 
-**Current behavior:** The `ArenaData` component runs queries mostly sequentially:
-1. **Line 34-40:** Fetch looking-for-match athletes
-2. **Line 43-51:** Fetch other active athletes (sequential — waits for #1 to finish)
-3. **Line 67:** Fetch pending challenge opponent IDs (sequential)
-4. **Line 70-84:** Fetch recent winners for activity feed (sequential)
-5. **Line 88-94:** Fetch losers for those matches (depends on #4 — correctly sequential)
-
-Queries 1, 2, 3, and 4 have **no dependencies** on each other but run sequentially.
-
-**Recommendation:** Wrap independent queries in `Promise.all()`:
-```ts
-const [
-  { data: lookingAthletes },
-  { data: otherAthletes },
-  challengedIds,
-  { data: recentMatchParticipants },
-] = await Promise.all([
-  supabase.from("athletes").select(athleteSelect)...  // looking
-  supabase.from("athletes").select(athleteSelect)...  // other
-  getPendingChallengeOpponentIds(supabase, currentAthlete.id),
-  supabase.from("match_participants").select(...)...   // activity
-]);
-```
-
-**Severity:** High — saves 3 serial round trips on the Arena page. Each PostgREST round trip is ~50-100ms on Supabase hosted.
+**Fixed:** Wrapped 4 independent queries (looking athletes, other athletes, challenged IDs, recent matches) into `Promise.all()`. Losers query remains sequential as it depends on match IDs. **Saves ~3 serial round trips.**
 
 ---
 
-## 5. Pending Challenges Page: 5 Sequential Queries
+## ~~5. Pending Challenges Page: 5 Sequential Queries~~ ✅ DONE
 
-**File:** `app/(app)/match/pending/pending-challenges-content.tsx:25-71`
+**File:** `app/(app)/match/pending/pending-challenges-content.tsx`
 
-**Current behavior:** Five queries run sequentially:
-1. **Line 25-32:** Received challenges
-2. **Line 35-42:** Sent challenges
-3. **Line 45-52:** Accepted challenges (lobbies)
-4. **Line 55-58:** Match participant IDs
-5. **Line 63-71:** Active matches (depends on #4)
-
-Queries 1-4 are independent but await each other.
-
-**Recommendation:**
-```ts
-const [
-  { data: received },
-  { data: sent },
-  { data: accepted },
-  { data: participations },
-] = await Promise.all([
-  supabase.from("challenges").select(...)...  // received
-  supabase.from("challenges").select(...)...  // sent
-  supabase.from("challenges").select(...)...  // accepted
-  supabase.from("match_participants").select("match_id").eq("athlete_id", athlete.id),
-]);
-// Then query #5 which depends on #4
-```
-
-**Severity:** High — saves 3 serial round trips.
+**Fixed:** Wrapped 4 independent queries (received, sent, accepted, participations) into `Promise.all()`. Active matches query remains sequential as it depends on participation IDs. **Saves ~3 serial round trips.**
 
 ---
 
@@ -381,9 +314,9 @@ if (authError || !challengerId) {
 
 | # | Enhancement | Severity | Effort | Impact |
 |---|---|---|---|---|
-| 4 | Arena page: parallelize queries | High | Low | -3 round trips |
-| 5 | Pending challenges: parallelize queries | High | Low | -3 round trips |
-| 2 | Athlete profile: FK join + parallelize | High | Low | -1 query, -1 round trip |
+| ~~4~~ | ~~Arena page: parallelize queries~~ | ~~High~~ | ~~Low~~ | ~~-3 round trips~~ ✅ |
+| ~~5~~ | ~~Pending challenges: parallelize queries~~ | ~~High~~ | ~~Low~~ | ~~-3 round trips~~ ✅ |
+| ~~2~~ | ~~Athlete profile: FK join + parallelize~~ | ~~High~~ | ~~Low~~ | ~~-1 query, -1 round trip~~ ✅ |
 | 1 | Guards: explicit select columns | Medium | Low | Reduced payload every page |
 | 10 | ChallengeSheet: use data access layer | Medium | Medium | Consistency + error handling |
 | 17 | createChallenge: protect auth_athlete_id | Medium | Low | Data integrity |

@@ -30,27 +30,53 @@ async function ArenaData() {
 
   const athleteSelect = "id, display_name, current_elo, looking_for_casual, looking_for_ranked, primary_gym_id, gyms!fk_athletes_primary_gym(name)";
 
-  // Fetch athletes looking for a match (casual or ranked)
-  const { data: lookingAthletes } = await supabase
-    .from("athletes")
-    .select(athleteSelect)
-    .eq("status", "active")
-    .or("looking_for_casual.eq.true,looking_for_ranked.eq.true")
-    .neq("id", currentAthlete.id)
-    .order("current_elo", { ascending: false });
+  // Parallelize all independent queries
+  const [
+    { data: lookingAthletes },
+    { data: otherAthletes },
+    challengedIds,
+    { data: recentMatchParticipants },
+  ] = await Promise.all([
+    // Fetch athletes looking for a match (casual or ranked)
+    supabase
+      .from("athletes")
+      .select(athleteSelect)
+      .eq("status", "active")
+      .or("looking_for_casual.eq.true,looking_for_ranked.eq.true")
+      .neq("id", currentAthlete.id)
+      .order("current_elo", { ascending: false }),
+    // Fetch other active athletes (not looking)
+    supabase
+      .from("athletes")
+      .select(athleteSelect)
+      .eq("status", "active")
+      .eq("looking_for_casual", false)
+      .eq("looking_for_ranked", false)
+      .neq("id", currentAthlete.id)
+      .order("current_elo", { ascending: false })
+      .limit(20),
+    // Fetch pending challenge opponent IDs
+    getPendingChallengeOpponentIds(supabase, currentAthlete.id),
+    // Fetch recent completed matches for activity feed
+    supabase
+      .from("match_participants")
+      .select(
+        `
+        outcome,
+        athlete_id,
+        match_id,
+        athletes!fk_participants_athlete(display_name),
+        matches(id, created_at, result, status)
+      `,
+      )
+      .eq("outcome", "win")
+      .eq("role", "competitor")
+      .order("match_id", { ascending: false })
+      .limit(5),
+  ]);
 
-  // Fetch other active athletes (not looking)
-  const { data: otherAthletes } = await supabase
-    .from("athletes")
-    .select(athleteSelect)
-    .eq("status", "active")
-    .eq("looking_for_casual", false)
-    .eq("looking_for_ranked", false)
-    .neq("id", currentAthlete.id)
-    .order("current_elo", { ascending: false })
-    .limit(20);
-
-  const toCompetitor = (a: (typeof lookingAthletes extends (infer T)[] | null ? T : never)) => ({
+  type AthleteRow = NonNullable<typeof lookingAthletes>[number];
+  const toCompetitor = (a: AthleteRow) => ({
     id: a.id,
     displayName: a.display_name,
     currentElo: a.current_elo,
@@ -62,26 +88,6 @@ async function ArenaData() {
 
   const lookingCompetitors = (lookingAthletes ?? []).map(toCompetitor);
   const otherCompetitors = (otherAthletes ?? []).map(toCompetitor);
-
-  // Fetch pending challenge opponent IDs
-  const challengedIds = await getPendingChallengeOpponentIds(supabase, currentAthlete.id);
-
-  // Fetch recent completed matches for activity feed
-  const { data: recentMatchParticipants } = await supabase
-    .from("match_participants")
-    .select(
-      `
-      outcome,
-      athlete_id,
-      match_id,
-      athletes!fk_participants_athlete(display_name),
-      matches(id, created_at, result, status)
-    `,
-    )
-    .eq("outcome", "win")
-    .eq("role", "competitor")
-    .order("match_id", { ascending: false })
-    .limit(5);
 
   // Batch-fetch all losers in a single query (instead of N+1)
   const activityMatchIds = (recentMatchParticipants ?? []).map((mp) => mp.match_id);
