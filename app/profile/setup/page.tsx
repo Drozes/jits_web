@@ -38,7 +38,7 @@ async function SetupContent() {
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold tracking-tight">
-            {isEditing ? "Edit Profile" : "Welcome to Jits"}
+            {isEditing ? "Edit Profile" : "Welcome to Jits Arena"}
           </h1>
           <p className="text-sm text-muted-foreground mt-2">
             {isEditing

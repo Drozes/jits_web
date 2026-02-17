@@ -17,7 +17,7 @@ export default function AppLayout({
   return (
     <div className="min-h-screen bg-background">
       <AppHeader
-        title="Jits"
+        title="Jits Arena"
         rightAction={
           <div className="flex items-center gap-1">
             <Suspense>

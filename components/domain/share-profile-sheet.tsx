@@ -45,8 +45,8 @@ export function ShareProfileSheet({
   async function handleNativeShare() {
     if (navigator.share) {
       await navigator.share({
-        title: `${athlete.displayName} on Jits`,
-        text: `Check out ${athlete.displayName}'s profile on Jits`,
+        title: `${athlete.displayName} on Jits Arena`,
+        text: `Check out ${athlete.displayName}'s profile on Jits Arena`,
         url: profileUrl,
       });
     }

@@ -10,12 +10,12 @@ const defaultUrl = process.env.VERCEL_URL
 
 export const metadata: Metadata = {
   metadataBase: new URL(defaultUrl),
-  title: "Jits",
+  title: "Jits Arena",
   description: "Track your jiu-jitsu journey",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Jits",
+    title: "Jits Arena",
   },
 };
 
