@@ -4,11 +4,12 @@ import { requireAthlete } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
 import { StatOverview } from "@/components/domain/stat-overview";
 import { MatchCard } from "@/components/domain/match-card";
+import { RecentActivitySection } from "@/components/domain/recent-activity-section";
 import { AppHeader } from "@/components/layout/app-header";
 import { PageContainer } from "@/components/layout/page-container";
 import { PageHeaderActions } from "@/components/layout/page-header-actions";
-import { getDashboardSummary } from "@/lib/api/queries";
-import { Swords, Zap } from "lucide-react";
+import { getDashboardSummary, getRecentActivity } from "@/lib/api/queries";
+import { Zap } from "lucide-react";
 
 function DashboardSkeleton() {
   return (
@@ -45,23 +46,24 @@ async function DashboardContent() {
   const { athlete } = await requireAthlete();
   const supabase = await createClient();
 
-  const [summary, { data: acceptedRows }] = await Promise.all([
+  const [summary, { data: acceptedRows }, activityItems] = await Promise.all([
     getDashboardSummary(supabase),
     supabase
       .from("challenges")
       .select(
-        "id, created_at, match_type, challenger_id, challenger:athletes!fk_challenges_challenger(display_name), opponent:athletes!fk_challenges_opponent(display_name)",
+        "id, created_at, match_type, challenger_id, challenger:athletes!fk_challenges_challenger(display_name, profile_photo_url), opponent:athletes!fk_challenges_opponent(display_name, profile_photo_url)",
       )
       .or(`challenger_id.eq.${athlete.id},opponent_id.eq.${athlete.id}`)
       .eq("status", "accepted")
       .order("created_at", { ascending: false }),
+    getRecentActivity(supabase, 10),
   ]);
 
   // Map accepted challenges
   const acceptedChallenges = (acceptedRows ?? []).map((c) => {
     const isChallenger = c.challenger_id === athlete.id;
-    const challenger = c.challenger as unknown as { display_name: string } | null;
-    const opponent = c.opponent as unknown as { display_name: string } | null;
+    const challenger = c.challenger as unknown as { display_name: string; profile_photo_url: string | null } | null;
+    const opponent = c.opponent as unknown as { display_name: string; profile_photo_url: string | null } | null;
     return {
       id: c.id,
       created_at: c.created_at,
@@ -70,9 +72,28 @@ async function DashboardContent() {
       opponentName: isChallenger
         ? (opponent?.display_name ?? "Unknown")
         : (challenger?.display_name ?? "Unknown"),
+      opponentPhotoUrl: isChallenger
+        ? (opponent?.profile_photo_url ?? null)
+        : (challenger?.profile_photo_url ?? null),
       href: `/match/lobby/${c.id}`,
     };
   });
+
+  // Batch query photos for pending challenge opponents
+  const pendingAthleteIds = [
+    ...summary.pending_challenges.incoming.map((c) => c.challenger_id),
+    ...summary.pending_challenges.sent.map((c) => c.opponent_id),
+  ];
+  const photoMap = new Map<string, string | null>();
+  if (pendingAthleteIds.length > 0) {
+    const { data: photoRows } = await supabase
+      .from("athletes")
+      .select("id, profile_photo_url")
+      .in("id", pendingAthleteIds);
+    for (const row of photoRows ?? []) {
+      photoMap.set(row.id, row.profile_photo_url);
+    }
+  }
 
   // Merge accepted + incoming + sent challenges; accepted first, then by date
   const pendingChallenges = [
@@ -83,6 +104,7 @@ async function DashboardContent() {
       direction: "incoming" as const,
       matchType: c.match_type as "ranked" | "casual",
       opponentName: c.challenger_name,
+      opponentPhotoUrl: photoMap.get(c.challenger_id) ?? null,
       href: `/match/lobby/${c.id}`,
     })),
     ...summary.pending_challenges.sent.map((c) => ({
@@ -92,6 +114,7 @@ async function DashboardContent() {
       direction: "sent" as const,
       matchType: c.match_type as "ranked" | "casual",
       opponentName: c.opponent_name,
+      opponentPhotoUrl: photoMap.get(c.opponent_id) ?? null,
       href: `/match/lobby/${c.id}`,
     })),
   ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
@@ -106,6 +129,15 @@ async function DashboardContent() {
     matchType: m.match_type as "ranked" | "casual",
     eloDelta: m.elo_delta,
     date: m.completed_at,
+  }));
+
+  const recentActivity = activityItems.map((a) => ({
+    id: a.match_id,
+    winnerName: a.winner_name,
+    loserName: a.loser_name,
+    result: a.result,
+    matchType: a.match_type,
+    date: a.completed_at,
   }));
 
   return (
@@ -146,6 +178,7 @@ async function DashboardContent() {
                 key={c.id}
                 type="challenge"
                 opponentName={c.opponentName}
+                opponentPhotoUrl={c.opponentPhotoUrl}
                 direction={"direction" in c ? c.direction : undefined}
                 status={c.status === "accepted" ? "Accepted" : undefined}
                 matchType={c.matchType}
@@ -164,42 +197,7 @@ async function DashboardContent() {
         )}
       </section>
 
-      <section className="flex flex-col gap-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Swords className="h-5 w-5 text-primary" />
-            <h2 className="text-lg font-semibold">Recent Matches</h2>
-          </div>
-          {recentMatches.length > 0 && (
-            <Link href="/profile/stats" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
-              View all
-            </Link>
-          )}
-        </div>
-        {recentMatches.length > 0 ? (
-          <div className="flex flex-col gap-2">
-            {recentMatches.map((match) => (
-              <MatchCard
-                key={match.id}
-                type="match"
-                opponentName={match.opponentName}
-                result={match.result}
-                matchType={match.matchType}
-                eloDelta={match.eloDelta}
-                date={match.date}
-                href={`/match/${match.id}/results`}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="rounded-lg border border-dashed p-6 text-center">
-            <p className="text-sm text-muted-foreground">No matches yet</p>
-            <Link href="/arena" className="text-xs text-primary hover:underline mt-1.5 inline-block">
-              Head to the Arena
-            </Link>
-          </div>
-        )}
-      </section>
+      <RecentActivitySection myMatches={recentMatches} allActivity={recentActivity} />
     </div>
   );
 }

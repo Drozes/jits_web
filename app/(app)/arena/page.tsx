@@ -50,18 +50,9 @@ async function ArenaData() {
     lookingForRanked: a.looking_for_ranked ?? false,
   });
 
-  const activityItems = arena.recent_activity.map((a) => ({
-    id: a.match_id,
-    winnerName: a.winner_name,
-    loserName: a.loser_name,
-    result: a.result,
-    date: a.completed_at,
-  }));
-
   return (
     <ArenaContent
       lookingCompetitors={arena.looking_athletes.map((a) => toCompetitor(a))}
-      activityItems={activityItems}
       currentAthleteId={currentAthlete.id}
       currentAthleteCasual={currentAthlete.looking_for_casual}
       currentAthleteRanked={currentAthlete.looking_for_ranked}

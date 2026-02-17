@@ -172,11 +172,15 @@ export interface ArenaData {
     current_weight: number | null;
   }[];
   challenged_opponent_ids: string[];
-  recent_activity: {
-    match_id: string;
-    winner_name: string;
-    loser_name: string;
-    result: string;
-    completed_at: string;
-  }[];
+  recent_activity: RecentActivityItem[];
+}
+
+/** Shape of a single item from get_recent_activity RPC */
+export interface RecentActivityItem {
+  match_id: string;
+  winner_name: string;
+  loser_name: string;
+  result: string;
+  match_type: string;
+  completed_at: string;
 }

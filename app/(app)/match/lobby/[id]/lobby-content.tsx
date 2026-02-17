@@ -78,6 +78,7 @@ export async function LobbyContent({
         challengeId={challengeId}
         status={lobby.status as "pending" | "accepted"}
         isChallenger={isChallenger}
+        currentWeight={isChallenger ? undefined : lobby.opponent.current_weight}
       />
     </div>
   );

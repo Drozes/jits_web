@@ -665,6 +665,7 @@ export type Database = {
           completed_at: string
           loser_name: string
           match_id: string
+          match_type: string
           result: string
           winner_name: string
         }[]

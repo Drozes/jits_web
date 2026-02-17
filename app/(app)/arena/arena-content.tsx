@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Swords, Circle, Activity, Clock } from "lucide-react";
+import { Swords, Circle } from "lucide-react";
 import { getInitials, getProfilePhotoUrl } from "@/lib/utils";
 import { ChallengeBadge } from "@/components/domain/challenge-badge";
 import { OnlineIndicator } from "@/components/domain/online-indicator";
@@ -22,25 +22,6 @@ interface Competitor {
   eloDiff: number;
   lookingForCasual: boolean;
   lookingForRanked: boolean;
-}
-
-interface ActivityItem {
-  id: string;
-  winnerName: string;
-  loserName: string;
-  result: string;
-  date: string;
-}
-
-function timeAgo(dateStr: string) {
-  if (!dateStr) return "";
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60_000);
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
 }
 
 function CompetitorCard({ competitor, hasPendingChallenge }: { competitor: Competitor; hasPendingChallenge?: boolean }) {
@@ -94,14 +75,12 @@ function CompetitorCard({ competitor, hasPendingChallenge }: { competitor: Compe
 
 export function ArenaContent({
   lookingCompetitors,
-  activityItems,
   currentAthleteId,
   currentAthleteCasual,
   currentAthleteRanked,
   challengedIds = [],
 }: {
   lookingCompetitors: Competitor[];
-  activityItems: ActivityItem[];
   currentAthleteId: string;
   currentAthleteCasual: boolean;
   currentAthleteRanked: boolean;
@@ -168,44 +147,6 @@ export function ArenaContent({
           <p className="text-sm text-muted-foreground">No one is looking for a match right now</p>
         </div>
       )}
-
-      {/* Recent Activity Feed */}
-      <section className="flex flex-col gap-3">
-        <div className="flex items-center gap-2">
-          <Activity className="h-4 w-4 text-muted-foreground" />
-          <h2 className="text-lg font-semibold">Recent Activity</h2>
-        </div>
-
-        {activityItems.length > 0 ? (
-          <Card className="divide-y">
-            {activityItems.map((item) => (
-              <div key={item.id} className="flex items-start gap-3 p-4">
-                <div className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
-                  <Swords className="h-4 w-4 text-primary" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm">
-                    <span className="font-medium">{item.winnerName}</span>{" "}
-                    defeated{" "}
-                    <span className="font-medium">{item.loserName}</span>{" "}
-                    by <span className="font-medium text-green-600">{item.result}</span>
-                  </p>
-                  {item.date && (
-                    <div className="mt-1 flex items-center text-xs text-muted-foreground">
-                      <Clock className="mr-1 h-3 w-3" />
-                      {timeAgo(item.date)}
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </Card>
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            No recent activity
-          </p>
-        )}
-      </section>
     </div>
   );
 }

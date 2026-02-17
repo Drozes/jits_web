@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/client";
@@ -19,13 +20,15 @@ interface LobbyActionsProps {
   challengeId: string;
   status: "pending" | "accepted";
   isChallenger: boolean;
+  currentWeight?: number | null;
 }
 
-export function LobbyActions({ challengeId, status, isChallenger }: LobbyActionsProps) {
+export function LobbyActions({ challengeId, status, isChallenger, currentWeight }: LobbyActionsProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [weight, setWeight] = useState("");
+  const [weight, setWeight] = useState(currentWeight?.toString() ?? "");
+  const [weightConfirmed, setWeightConfirmed] = useState(false);
 
   const { broadcastMatchStarted, broadcastCancelled, broadcastAccepted } = useLobbySync({
     challengeId,
@@ -127,24 +130,35 @@ export function LobbyActions({ challengeId, status, isChallenger }: LobbyActions
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-2">
-        <Label htmlFor="lobby-weight">Your Weight (lbs)</Label>
+        <Label htmlFor="lobby-weight" className="text-sm font-medium">Your Weight (lbs)</Label>
         <Input
           id="lobby-weight"
           type="number"
           value={weight}
-          onChange={(e) => setWeight(e.target.value)}
+          onChange={(e) => { setWeight(e.target.value); setWeightConfirmed(false); }}
           placeholder="e.g. 155"
           min={1}
           max={500}
           step="0.1"
+          className="h-11"
         />
+      </div>
+      <div className="flex items-center gap-3">
+        <Checkbox
+          id="confirm-lobby-weight"
+          checked={weightConfirmed}
+          onCheckedChange={(checked) => setWeightConfirmed(checked === true)}
+        />
+        <Label htmlFor="confirm-lobby-weight" className="text-sm leading-tight">
+          I confirm my weight is accurate
+        </Label>
       </div>
       {error && <p className="text-sm text-red-500 text-center">{error}</p>}
       <div className="flex gap-2">
         <Button variant="outline" className="flex-1" onClick={handleDecline} disabled={loading}>
           {loading ? "..." : "Decline"}
         </Button>
-        <Button className="flex-1" onClick={handleAccept} disabled={loading || !weight}>
+        <Button className="flex-1" onClick={handleAccept} disabled={loading || !weight || !weightConfirmed}>
           {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           Accept
         </Button>

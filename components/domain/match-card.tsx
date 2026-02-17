@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { cn, formatRelativeDate } from "@/lib/utils";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { cn, formatRelativeDate, getInitials, getProfilePhotoUrl } from "@/lib/utils";
 import { MATCH_OUTCOME, type MatchOutcome, type MatchType } from "@/lib/constants";
 
 interface MatchCardProps {
   type: "match" | "challenge";
   opponentName: string;
+  opponentPhotoUrl?: string | null;
   result?: MatchOutcome | null;
   status?: string;
   direction?: "incoming" | "sent";
@@ -22,17 +24,27 @@ const resultConfig = {
   [MATCH_OUTCOME.DRAW]: { label: "Draw", variant: "secondary" as const },
 } as const;
 
-function CardInner({ type, opponentName, result, status, direction, matchType, eloDelta, date }: MatchCardProps) {
+function CardInner({ type, opponentName, opponentPhotoUrl, result, status, direction, matchType, eloDelta, date }: MatchCardProps) {
   return (
     <CardContent className="flex items-center justify-between py-3 px-4">
-      <div className="flex flex-col gap-0.5">
-        <p className="text-sm font-medium">{opponentName}</p>
-        <p className="text-xs text-muted-foreground">
-          {formatRelativeDate(date)}
-          {matchType && (
-            <> · {matchType === "ranked" ? "Ranked" : "Casual"}</>
+      <div className="flex items-center gap-3 min-w-0">
+        <Avatar className="h-8 w-8 shrink-0 border border-accent/20">
+          {opponentPhotoUrl && (
+            <AvatarImage src={getProfilePhotoUrl(opponentPhotoUrl)!} alt={opponentName} className="object-cover" />
           )}
-        </p>
+          <AvatarFallback className="text-xs bg-gradient-to-br from-primary to-primary/80 text-white">
+            {getInitials(opponentName)}
+          </AvatarFallback>
+        </Avatar>
+        <div className="flex flex-col gap-0.5 min-w-0">
+          <p className="text-sm font-medium truncate">{opponentName}</p>
+          <p className="text-xs text-muted-foreground">
+            {formatRelativeDate(date)}
+            {matchType && (
+              <> · {matchType === "ranked" ? "Ranked" : "Casual"}</>
+            )}
+          </p>
+        </div>
       </div>
 
       <div className="flex items-center gap-2">
@@ -80,7 +92,7 @@ function CardInner({ type, opponentName, result, status, direction, matchType, e
 export function MatchCard(props: MatchCardProps) {
   if (props.href) {
     return (
-      <Link href={props.href}>
+      <Link href={props.href} prefetch={false}>
         <Card className="cursor-pointer hover:bg-accent/50 transition-all active:scale-[0.98] active:opacity-90">
           <CardInner {...props} />
         </Card>

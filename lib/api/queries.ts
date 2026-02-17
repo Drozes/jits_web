@@ -6,6 +6,7 @@ import type {
   EloHistoryRow,
   DashboardSummary,
   ArenaData,
+  RecentActivityItem,
 } from "@/types/composites";
 import type { SubmissionType } from "@/types/submission-type";
 import { computeStats, computeWinStreak, extractGymName } from "@/lib/utils";
@@ -154,6 +155,17 @@ export async function getArenaData(
 ): Promise<ArenaData> {
   const { data } = await supabase.rpc("get_arena_data", { p_limit: limit });
   return data as unknown as ArenaData;
+}
+
+/** Fetch platform-wide recent match activity */
+export async function getRecentActivity(
+  supabase: Client,
+  limit = 10,
+): Promise<RecentActivityItem[]> {
+  const { data } = await supabase.rpc("get_recent_activity", {
+    p_limit: limit,
+  });
+  return (data as RecentActivityItem[]) ?? [];
 }
 
 // ---------------------------------------------------------------------------
