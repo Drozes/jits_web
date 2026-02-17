@@ -179,7 +179,7 @@ function ThreadHeader({
     <div className="flex min-w-0 items-center gap-2.5">
       <Avatar className="h-8 w-8 border-2 border-accent/20 bg-gradient-to-br from-primary to-primary/80 text-white" size="default">
         {!isGroupChat && photoUrl && (
-          <AvatarImage src={photoUrl} alt={name} />
+          <AvatarImage src={photoUrl} alt={name} className="object-cover" />
         )}
         <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 font-bold text-white text-xs">
           {isGroupChat ? <Users className="h-3.5 w-3.5" /> : getInitials(name)}

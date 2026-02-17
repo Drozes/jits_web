@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import type { ConversationRow } from "@/lib/api/chat-queries";
-import { cn, getInitials } from "@/lib/utils";
+import { cn, getInitials, getProfilePhotoUrl } from "@/lib/utils";
 import { OnlineIndicator } from "./online-indicator";
 import { Users } from "lucide-react";
 
@@ -34,7 +34,7 @@ export function ConversationCard({
       <OnlineIndicator athleteId={isDirect ? (c.other_athlete_id ?? "") : ""} className="shrink-0">
         <Avatar className="h-10 w-10 border-2 border-accent/20 bg-gradient-to-br from-primary to-primary/80 text-white">
           {isDirect && c.other_athlete_profile_photo_url && (
-            <AvatarImage src={c.other_athlete_profile_photo_url} alt={name} />
+            <AvatarImage src={getProfilePhotoUrl(c.other_athlete_profile_photo_url)!} alt={name} className="object-cover" />
           )}
           <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 font-bold text-white text-xs">
             {isDirect ? getInitials(name) : <Users className="h-4 w-4" />}

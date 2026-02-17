@@ -53,7 +53,7 @@ export function MessageBubble({
           {isLastInGroup && (
             <Avatar className="h-7 w-7" size="sm">
               {senderPhotoUrl && (
-                <AvatarImage src={senderPhotoUrl} alt={senderName ?? ""} />
+                <AvatarImage src={senderPhotoUrl} alt={senderName ?? ""} className="object-cover" />
               )}
               <AvatarFallback className="text-[10px]">
                 {getInitials(senderName ?? "?")}

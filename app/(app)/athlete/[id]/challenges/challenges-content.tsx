@@ -68,8 +68,8 @@ export async function ChallengesContent({
                   return (
                     <div key={c.id} className="flex flex-col gap-2">
                       <ChallengeVersusCard
-                        challenger={{ id: c.challenger.id, displayName: c.challenger.display_name }}
-                        opponent={{ id: c.opponent.id, displayName: c.opponent.display_name }}
+                        challenger={{ id: c.challenger.id, displayName: c.challenger.display_name, profilePhotoUrl: c.challenger.profile_photo_url }}
+                        opponent={{ id: c.opponent.id, displayName: c.opponent.display_name, profilePhotoUrl: c.opponent.profile_photo_url }}
                         status={c.status as ChallengeStatus}
                         matchType={c.match_type}
                         date={c.created_at}
@@ -100,8 +100,8 @@ export async function ChallengesContent({
                 {history.map((c) => (
                   <ChallengeVersusCard
                     key={c.id}
-                    challenger={{ id: c.challenger.id, displayName: c.challenger.display_name }}
-                    opponent={{ id: c.opponent.id, displayName: c.opponent.display_name }}
+                    challenger={{ id: c.challenger.id, displayName: c.challenger.display_name, profilePhotoUrl: c.challenger.profile_photo_url }}
+                    opponent={{ id: c.opponent.id, displayName: c.opponent.display_name, profilePhotoUrl: c.opponent.profile_photo_url }}
                     status={c.status as ChallengeStatus}
                     matchType={c.match_type}
                     date={c.created_at}
