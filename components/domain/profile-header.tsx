@@ -1,5 +1,5 @@
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { getInitials, getEloTierClass } from "@/lib/utils";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { getInitials, getEloTierClass, getProfilePhotoUrl } from "@/lib/utils";
 import { OnlineIndicator } from "./online-indicator";
 import type { Athlete } from "@/types/athlete";
 
@@ -25,6 +25,13 @@ export function ProfileHeader({ athlete, gymName, lookingForCasual, lookingForRa
       <div className={`rounded-full outline outline-3 outline-offset-2 ${getEloTierClass(athlete.current_elo)}`}>
         <OnlineIndicator athleteId={athlete.id}>
           <Avatar className="h-24 w-24 bg-gradient-to-br from-primary to-red-600 text-white border-2 border-muted shadow-md">
+            {athlete.profile_photo_url && (
+              <AvatarImage
+                src={getProfilePhotoUrl(athlete.profile_photo_url)!}
+                alt={athlete.display_name}
+                className="object-cover"
+              />
+            )}
             <AvatarFallback className="text-2xl bg-gradient-to-br from-primary to-red-600 text-white">
               {getInitials(athlete.display_name)}
             </AvatarFallback>

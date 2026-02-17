@@ -56,6 +56,19 @@ export function getEloTierClass(elo: number): string {
   return "outline-amber-600/60";
 }
 
+/**
+ * Build the public Supabase Storage URL for a profile photo.
+ * Returns null when the athlete has no photo set.
+ */
+export function getProfilePhotoUrl(
+  relativePath: string | null,
+  cacheBuster?: number,
+): string | null {
+  if (!relativePath) return null;
+  const base = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/athlete-photos/${relativePath}`;
+  return cacheBuster ? `${base}?t=${cacheBuster}` : base;
+}
+
 export function formatRelativeDate(dateString: string): string {
   const date = new Date(dateString);
   const now = new Date();

@@ -17,12 +17,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ProfilePhotoUpload } from "@/components/profile/profile-photo-upload";
 
 interface SetupFormProps {
   athleteId: string | null;
   defaultDisplayName: string;
   defaultWeight?: string;
   defaultGymId?: string;
+  defaultProfilePhotoUrl?: string | null;
   gyms: { id: string; name: string }[];
   isEditing?: boolean;
 }
@@ -32,6 +34,7 @@ export function SetupForm({
   defaultDisplayName,
   defaultWeight = "",
   defaultGymId = "",
+  defaultProfilePhotoUrl = null,
   gyms,
   isEditing = false,
 }: SetupFormProps) {
@@ -132,6 +135,15 @@ export function SetupForm({
               Back
             </Button>
           )}
+
+          {athleteId && (
+            <ProfilePhotoUpload
+              athleteId={athleteId}
+              displayName={displayName}
+              profilePhotoUrl={defaultProfilePhotoUrl}
+            />
+          )}
+
           <div className="flex flex-col gap-2">
             <Label htmlFor="displayName">Display Name</Label>
             <Input
