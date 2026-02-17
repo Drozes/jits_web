@@ -49,14 +49,14 @@ async function DashboardContent() {
     getAthleteRank(supabase, athlete.highest_elo),
     supabase
       .from("challenges")
-      .select("id, created_at, status, challenger:athletes!fk_challenges_challenger(id, display_name)")
+      .select("id, created_at, status, match_type, challenger:athletes!fk_challenges_challenger(id, display_name)")
       .eq("opponent_id", athlete.id)
       .eq("status", "pending")
       .order("created_at", { ascending: false })
       .limit(5),
     supabase
       .from("challenges")
-      .select("id, created_at, status, opponent:athletes!fk_challenges_opponent(id, display_name)")
+      .select("id, created_at, status, match_type, opponent:athletes!fk_challenges_opponent(id, display_name)")
       .eq("challenger_id", athlete.id)
       .eq("status", "pending")
       .order("created_at", { ascending: false })
@@ -93,6 +93,7 @@ async function DashboardContent() {
         id: c.id,
         created_at: c.created_at,
         direction: "incoming" as const,
+        matchType: c.match_type as "ranked" | "casual",
         opponentName: challenger?.display_name ?? "Unknown",
         opponentId: challenger?.id,
       };
@@ -103,6 +104,7 @@ async function DashboardContent() {
         id: c.id,
         created_at: c.created_at,
         direction: "sent" as const,
+        matchType: c.match_type as "ranked" | "casual",
         opponentName: opponent?.display_name ?? "Unknown",
         opponentId: opponent?.id,
       };
@@ -113,6 +115,7 @@ async function DashboardContent() {
     id: m.match_id,
     opponentName: m.opponent_display_name,
     result: m.athlete_outcome as "win" | "loss" | "draw",
+    matchType: m.match_type as "ranked" | "casual",
     eloDelta: m.elo_delta,
     date: m.completed_at,
   }));
@@ -148,6 +151,7 @@ async function DashboardContent() {
                 type="challenge"
                 opponentName={c.opponentName}
                 direction={c.direction}
+                matchType={c.matchType}
                 date={c.created_at}
                 href={c.opponentId ? `/athlete/${c.opponentId}` : undefined}
               />
@@ -183,6 +187,7 @@ async function DashboardContent() {
                 type="match"
                 opponentName={match.opponentName}
                 result={match.result}
+                matchType={match.matchType}
                 eloDelta={match.eloDelta}
                 date={match.date}
                 href={`/match/${match.id}/results`}

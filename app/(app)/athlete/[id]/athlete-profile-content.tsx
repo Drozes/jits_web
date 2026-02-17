@@ -58,6 +58,7 @@ export async function AthleteProfileContent({
       matchId: m.match_id,
       opponentName: m.opponent_display_name,
       result: m.athlete_outcome as "win" | "loss" | "draw" | null,
+      matchType: m.match_type as "ranked" | "casual",
       eloDelta: m.elo_delta || null,
       date: m.completed_at,
     }));
@@ -108,6 +109,7 @@ export async function AthleteProfileContent({
                     type="match"
                     opponentName={match.opponentName}
                     result={match.result}
+                    matchType={match.matchType}
                     eloDelta={match.eloDelta ?? undefined}
                     date={match.date}
                     href={`/match/${match.matchId}/results`}

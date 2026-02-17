@@ -37,6 +37,7 @@ export function ReceivedChallengesList({
             <MatchCard
               type="challenge"
               opponentName={challenge.challengerName}
+              matchType={challenge.matchType}
               status="Pending"
               date={challenge.date}
               href={

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn, formatRelativeDate } from "@/lib/utils";
-import { MATCH_OUTCOME, type MatchOutcome } from "@/lib/constants";
+import { MATCH_OUTCOME, type MatchOutcome, type MatchType } from "@/lib/constants";
 
 interface MatchCardProps {
   type: "match" | "challenge";
@@ -10,6 +10,7 @@ interface MatchCardProps {
   result?: MatchOutcome | null;
   status?: string;
   direction?: "incoming" | "sent";
+  matchType?: MatchType;
   eloDelta?: number;
   date: string;
   href?: string;
@@ -21,13 +22,16 @@ const resultConfig = {
   [MATCH_OUTCOME.DRAW]: { label: "Draw", variant: "secondary" as const },
 } as const;
 
-function CardInner({ type, opponentName, result, status, direction, eloDelta, date }: MatchCardProps) {
+function CardInner({ type, opponentName, result, status, direction, matchType, eloDelta, date }: MatchCardProps) {
   return (
     <CardContent className="flex items-center justify-between py-3 px-4">
       <div className="flex flex-col gap-0.5">
         <p className="text-sm font-medium">{opponentName}</p>
         <p className="text-xs text-muted-foreground">
           {formatRelativeDate(date)}
+          {matchType && (
+            <> · {matchType === "ranked" ? "Ranked" : "Casual"}</>
+          )}
         </p>
       </div>
 

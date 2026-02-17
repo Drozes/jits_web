@@ -129,7 +129,11 @@ Use these consistently across all stat displays:
 - **Primary/ELO:** `text-primary`
 - **Neutral stats:** default text color with `tabular-nums`
 
-### 10. Avoid Premature Abstraction
+### 10. MatchCard Shows Match Type
+
+`MatchCard` accepts an optional `matchType` prop (`"ranked" | "casual"`). When provided, it displays "Ranked" or "Casual" inline with the date (e.g., "2d ago · Ranked"). Pass `matchType` on both `type="match"` and `type="challenge"` cards — all 6 call sites already do this (dashboard matches, dashboard challenges, match history, head-to-head, received challenges, sent challenges).
+
+### 11. Avoid Premature Abstraction
 
 Don't create abstractions for things used once. Don't add error handling for impossible states. This is alpha — ship fast, refactor when real patterns emerge. The threshold for extraction is 2+ usages across files (see Principle 2).
 

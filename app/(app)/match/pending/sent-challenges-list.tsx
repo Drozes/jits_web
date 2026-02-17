@@ -58,6 +58,7 @@ export function SentChallengesList({ challenges }: SentChallengesListProps) {
           <MatchCard
             type="challenge"
             opponentName={challenge.opponentName}
+            matchType={challenge.matchType as "ranked" | "casual"}
             status="Pending"
             date={challenge.date}
             href={
