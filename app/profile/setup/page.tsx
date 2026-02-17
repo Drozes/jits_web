@@ -19,7 +19,7 @@ async function SetupContent() {
   // Fetch existing athlete (auto-created by backend on signup)
   const { data: athlete } = await supabase
     .from("athletes")
-    .select("id, display_name, current_weight, primary_gym_id, status")
+    .select("id, display_name, current_weight, primary_gym_id, status, profile_photo_url")
     .eq("auth_user_id", user.id)
     .single();
 
@@ -51,6 +51,7 @@ async function SetupContent() {
           defaultDisplayName={athlete?.display_name ?? ""}
           defaultWeight={athlete?.current_weight?.toString() ?? ""}
           defaultGymId={athlete?.primary_gym_id ?? ""}
+          defaultProfilePhotoUrl={athlete?.profile_photo_url ?? null}
           gyms={gyms ?? []}
           isEditing={isEditing}
         />

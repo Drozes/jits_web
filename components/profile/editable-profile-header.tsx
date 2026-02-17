@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { EloBadge } from "@/components/domain/elo-badge";
-import { getInitials } from "@/lib/utils";
+import { getInitials, getProfilePhotoUrl } from "@/lib/utils";
 import { Pencil } from "lucide-react";
 import type { Athlete } from "@/types/athlete";
 
@@ -131,6 +131,13 @@ export function EditableProfileHeader({
       <CardContent className="p-4">
         <div className="flex items-center gap-4">
           <Avatar className="h-20 w-20 bg-gradient-to-br from-primary to-red-600 text-white border-2 border-muted shadow-md">
+            {athlete.profile_photo_url && (
+              <AvatarImage
+                src={getProfilePhotoUrl(athlete.profile_photo_url)!}
+                alt={athlete.display_name}
+                className="object-cover"
+              />
+            )}
             <AvatarFallback className="text-xl bg-gradient-to-br from-primary to-red-600 text-white">
               {getInitials(athlete.display_name)}
             </AvatarFallback>
