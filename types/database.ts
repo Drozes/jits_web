@@ -686,6 +686,13 @@ export type Database = {
         Args: { p_conversation_id: string }
         Returns: Json
       }
+      opponent_accepts_match_type: {
+        Args: {
+          p_match_type: Database["public"]["Enums"]["match_type_enum"]
+          p_opponent_id: string
+        }
+        Returns: boolean
+      }
       record_match_result: {
         Args: {
           p_finish_time_seconds?: number
