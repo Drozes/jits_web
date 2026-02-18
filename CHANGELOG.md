@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Prototype-to-Production Guide (2026-02-18)
+
+**Added**
+- `research/010-prototype-to-production-guide.md` — Comprehensive guide documenting how the JITS Arena project was built from a Figma Make prototype + Supabase backend in 5 days. Covers project setup, governance layer, Figma audit workflow, 6-phase build cycle, Claude Code prompt patterns, cross-repo coordination, and branching strategy.
+
 ### Challenge → Match Flow Bug Spec (2026-02-18)
 
 **Added**
