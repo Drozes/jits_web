@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { cancelChallenge } from "@/lib/api/mutations";
 import { MatchCard } from "@/components/domain/match-card";
 import { ExpiryBadge } from "@/components/domain/expiry-badge";
 import { Button } from "@/components/ui/button";
@@ -31,19 +32,12 @@ export function SentChallengesList({ challenges }: SentChallengesListProps) {
     setError(null);
 
     const supabase = createClient();
-    const { error: updateError } = await supabase
-      .from("challenges")
-      .update({
-        status: "cancelled",
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", challengeId)
-      .eq("status", "pending");
+    const result = await cancelChallenge(supabase, challengeId);
 
     setCancellingId(null);
 
-    if (updateError) {
-      setError(updateError.message);
+    if (!result.ok) {
+      setError(result.error.message);
       return;
     }
 

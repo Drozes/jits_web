@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Challenge → Match Flow Fixes (2026-02-18)
+
+**Fixed**
+- `components/domain/challenge-response-sheet.tsx` — Broadcast `challenge_accepted` to `lobby:{challengeId}` channel after acceptance so the challenger's lobby page auto-refreshes.
+- `components/domain/challenge-sheet.tsx` — Replaced raw `supabase.from("challenges").insert()` with `createChallenge()` mutation. Removes `currentAthleteId` prop (mutation derives it from auth). Error messages now go through domain error mapping.
+- `app/(app)/match/pending/sent-challenges-list.tsx` — Replaced raw `supabase.from("challenges").update()` with `cancelChallenge()` mutation for consistent error handling.
+- `app/(app)/match/[id]/live/match-timer.tsx` — Timer broadcast now uses `started_at` from `start_match()` RPC response (server clock) instead of client `new Date()`, preventing timer desync between devices.
+- `types/composites.ts` — Added `started_at` field to `StartMatchTimerResponse` interface.
+
+**Changed**
+- `app/(app)/athlete/[id]/athlete-profile-actions.tsx` — Removed `currentAthleteId` prop from `ChallengeSheet` call site.
+
 ### Prototype-to-Production Guide (2026-02-18)
 
 **Added**

@@ -99,6 +99,16 @@ export function ChallengeResponseSheet({
       return;
     }
 
+    // Broadcast acceptance so the challenger's lobby page refreshes
+    const channel = supabase.channel(`lobby:${challenge.id}`);
+    await channel.subscribe();
+    await channel.send({
+      type: "broadcast",
+      event: "challenge_accepted",
+      payload: {},
+    });
+    supabase.removeChannel(channel);
+
     setSuccess("accepted");
     setTimeout(() => {
       onOpenChange(false);

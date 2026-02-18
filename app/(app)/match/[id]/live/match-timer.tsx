@@ -91,8 +91,8 @@ export function MatchTimer({
       setLoading(false);
       return;
     }
-    const now = new Date().toISOString();
-    broadcastTimerStarted(now);
+    const serverStartedAt = result.data.started_at ?? new Date().toISOString();
+    broadcastTimerStarted(serverStartedAt);
     setLoading(false);
     setRunning(true);
   }

@@ -100,6 +100,7 @@ export interface RecordResultResponse {
 export interface StartMatchTimerResponse {
   success: boolean;
   match_id?: string;
+  started_at?: string;
   error?: string;
 }
 

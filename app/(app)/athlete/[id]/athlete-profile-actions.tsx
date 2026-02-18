@@ -108,7 +108,6 @@ export function AthleteProfileActions({
           competitorName={competitor.displayName}
           competitorElo={competitor.elo}
           competitorWeight={competitor.weight}
-          currentAthleteId={currentAthleteId}
           currentAthleteElo={currentAthlete.elo}
           currentAthleteWeight={currentAthlete.weight}
           defaultMatchType={lookingForRanked ? "ranked" : undefined}

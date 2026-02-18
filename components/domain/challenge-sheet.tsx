@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { createChallenge } from "@/lib/api/mutations";
 import {
   Sheet,
   SheetContent,
@@ -23,7 +24,6 @@ interface ChallengeSheetProps {
   competitorName: string;
   competitorElo: number;
   competitorWeight: number | null;
-  currentAthleteId: string;
   currentAthleteElo: number;
   currentAthleteWeight: number | null;
   defaultMatchType?: MatchType;
@@ -36,7 +36,6 @@ export function ChallengeSheet({
   competitorName,
   competitorElo,
   competitorWeight,
-  currentAthleteId,
   currentAthleteElo,
   defaultMatchType,
   currentAthleteWeight,
@@ -90,21 +89,16 @@ export function ChallengeSheet({
     setError(null);
 
     const supabase = createClient();
-    const { error: insertError } = await supabase.from("challenges").insert({
-      challenger_id: currentAthleteId,
-      opponent_id: competitorId,
-      match_type: matchType,
-      challenger_weight: parsedWeight,
+    const result = await createChallenge(supabase, {
+      opponentId: competitorId,
+      matchType,
+      challengerWeight: parsedWeight ?? undefined,
     });
 
     setSubmitting(false);
 
-    if (insertError) {
-      if (insertError.code === "42501") {
-        setError("You already have 3 pending challenges. Wait for a response or cancel one first.");
-      } else {
-        setError(insertError.message);
-      }
+    if (!result.ok) {
+      setError(result.error.message);
       return;
     }
 
