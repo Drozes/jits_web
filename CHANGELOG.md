@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Challenge → Match Flow Bug Spec (2026-02-18)
+
+**Added**
+- `specs/challenge-match-flow-fixes.md` — E2E flow analysis documenting 4 bugs: missing lobby broadcast on accept, ChallengeSheet/SentChallengesList bypassing mutations layer, timer client-vs-server timestamp desync. Includes exact file locations, prescribed fixes, and manual test scenario.
+
 ### PWA Safe Area Fix (2026-02-18)
 
 **Fixed**
