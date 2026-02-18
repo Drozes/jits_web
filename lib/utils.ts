@@ -18,29 +18,6 @@ export function getInitials(name: string): string {
     .slice(0, 2);
 }
 
-export function computeStats(outcomes: { outcome: string | null }[]): {
-  wins: number;
-  losses: number;
-  winRate: number;
-} {
-  const wins = outcomes.filter((o) => o.outcome === "win").length;
-  const losses = outcomes.filter((o) => o.outcome === "loss").length;
-  const total = wins + losses;
-  const winRate = total > 0 ? Math.round((wins / total) * 100) : 0;
-  return { wins, losses, winRate };
-}
-
-export function computeWinStreak(
-  outcomes: { outcome: string | null }[],
-): number {
-  let streak = 0;
-  for (const o of outcomes) {
-    if (o.outcome === "win") streak++;
-    else break;
-  }
-  return streak;
-}
-
 export function extractGymName(
   gyms: { name: string } | { name: string }[] | null,
 ): string | null {

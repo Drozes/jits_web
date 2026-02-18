@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### Dashboard Query Consolidation + Dead Code Cleanup (2026-02-18)
+
+**Changed**
+- `app/(app)/page.tsx` — Dashboard now uses a single `get_dashboard_summary` RPC call instead of 3-4 separate queries. Accepted challenges, pending challenge photos, and platform-wide recent activity are all included in the RPC response.
+- `types/composites.ts` — Extended `DashboardSummary` type with `accepted_challenges`, `recent_activity`, and photo URL fields on pending challenges.
+
+**Backend dependency**
+- `get_dashboard_summary` RPC extended (backend migration `20260218100000_dashboard_summary_v2`) to include accepted challenges, platform-wide recent activity, and profile photo URLs on pending challenges. Deploy backend before this frontend.
+
+**Removed**
+- `lib/api/queries.ts` — Removed 5 dead functions superseded by RPCs: `getAthleteProfile()`, `getAthleteStats()`, `getLeaderboard()`, `getAthleteRank()` (all used direct `match_participants` queries blocked by RLS), and `getRecentActivity()` (now embedded in dashboard summary). Also removed `ATHLETE_WITH_GYM_SELECT`, `AthleteWithGym`, `AthleteProfile` types.
+- `lib/utils.ts` — Removed `computeStats()` and `computeWinStreak()` (only used by the dead query functions; stats are now computed server-side by RPCs).
+- `lib/utils.test.ts` — Removed test blocks for `computeStats` and `computeWinStreak`.
+
 ### Challenge → Match Flow Fixes (2026-02-18)
 
 **Fixed**

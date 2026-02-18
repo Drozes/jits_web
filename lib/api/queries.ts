@@ -6,145 +6,21 @@ import type {
   EloHistoryRow,
   DashboardSummary,
   ArenaData,
-  RecentActivityItem,
 } from "@/types/composites";
 import type { SubmissionType } from "@/types/submission-type";
-import { computeStats, computeWinStreak, extractGymName } from "@/lib/utils";
 
 type Client = SupabaseClient<Database>;
-
-// ---------------------------------------------------------------------------
-// Athlete queries
-// ---------------------------------------------------------------------------
-
-/** Common select for athletes with gym join */
-const ATHLETE_WITH_GYM_SELECT =
-  "id, display_name, current_elo, highest_elo, current_weight, status, looking_for_casual, looking_for_ranked, free_agent, primary_gym_id, profile_photo_url, created_at, gyms!fk_athletes_primary_gym(name)" as const;
-
-export interface AthleteWithGym {
-  id: string;
-  display_name: string;
-  current_elo: number;
-  highest_elo: number;
-  current_weight: number | null;
-  status: string;
-  looking_for_casual: boolean;
-  looking_for_ranked: boolean;
-  free_agent: boolean;
-  primary_gym_id: string | null;
-  profile_photo_url: string | null;
-  created_at: string;
-  gymName: string | null;
-}
-
-export interface AthleteProfile extends AthleteWithGym {
-  stats: { wins: number; losses: number; winRate: number };
-  winStreak: number;
-}
-
-/** Fetch an athlete by ID with gym name, stats, and win streak */
-export async function getAthleteProfile(
-  supabase: Client,
-  athleteId: string,
-): Promise<AthleteProfile | null> {
-  const { data: raw } = await supabase
-    .from("athletes")
-    .select(ATHLETE_WITH_GYM_SELECT)
-    .eq("id", athleteId)
-    .single();
-
-  if (!raw) return null;
-
-  const gymName = extractGymName(
-    raw.gyms as unknown as { name: string } | null,
-  );
-
-  // Single query for both stats and win streak (ordered, limited to 50)
-  const { data: recentOutcomes } = await supabase
-    .from("match_participants")
-    .select("outcome")
-    .eq("athlete_id", athleteId)
-    .not("outcome", "is", null)
-    .order("match_id", { ascending: false })
-    .limit(50);
-
-  const stats = computeStats(recentOutcomes ?? []);
-  const winStreak = computeWinStreak(recentOutcomes ?? []);
-
-  return { ...raw, gymName, stats, winStreak };
-}
-
-/** Fetch stats for an athlete (wins, losses, winRate) */
-export async function getAthleteStats(
-  supabase: Client,
-  athleteId: string,
-): Promise<{ wins: number; losses: number; winRate: number }> {
-  const { data: outcomes } = await supabase
-    .from("match_participants")
-    .select("outcome")
-    .eq("athlete_id", athleteId)
-    .not("outcome", "is", null);
-
-  return computeStats(outcomes ?? []);
-}
-
-/** Fetch top athletes by ELO with stats (for leaderboard) */
-export async function getLeaderboard(
-  supabase: Client,
-  limit = 50,
-): Promise<(AthleteWithGym & { stats: { wins: number; losses: number; winRate: number } })[]> {
-  const { data: athletes } = await supabase
-    .from("athletes")
-    .select(ATHLETE_WITH_GYM_SELECT)
-    .eq("status", "active")
-    .order("current_elo", { ascending: false })
-    .limit(limit);
-
-  if (!athletes?.length) return [];
-
-  const athleteIds = athletes.map((a) => a.id);
-  const { data: allOutcomes } = await supabase
-    .from("match_participants")
-    .select("athlete_id, outcome")
-    .in("athlete_id", athleteIds)
-    .not("outcome", "is", null);
-
-  const outcomesByAthlete = new Map<string, { outcome: string | null }[]>();
-  for (const o of allOutcomes ?? []) {
-    const arr = outcomesByAthlete.get(o.athlete_id) ?? [];
-    arr.push(o);
-    outcomesByAthlete.set(o.athlete_id, arr);
-  }
-
-  return athletes.map((a) => ({
-    ...a,
-    gymName: extractGymName(a.gyms as unknown as { name: string } | null),
-    stats: computeStats(outcomesByAthlete.get(a.id) ?? []),
-  }));
-}
-
-/** Get an athlete's rank by counting how many active athletes have higher ELO */
-export async function getAthleteRank(
-  supabase: Client,
-  elo: number,
-): Promise<number> {
-  const { count } = await supabase
-    .from("athletes")
-    .select("*", { count: "exact", head: true })
-    .gt("current_elo", elo)
-    .eq("status", "active");
-  return (count ?? 0) + 1;
-}
 
 // ---------------------------------------------------------------------------
 // Aggregated page RPCs (single-call replacements)
 // ---------------------------------------------------------------------------
 
-/** Fetch all dashboard data in a single RPC (stats, rank, matches, challenges) */
+/** Fetch all dashboard data in a single RPC (stats, rank, matches, challenges, activity) */
 export async function getDashboardSummary(
   supabase: Client,
 ): Promise<DashboardSummary> {
-  const { data } = await supabase.rpc("get_dashboard_summary");
+  const { data, error } = await supabase.rpc("get_dashboard_summary");
+  if (error || !data) throw new Error("Failed to load dashboard");
   return data as unknown as DashboardSummary;
 }
 
@@ -155,17 +31,6 @@ export async function getArenaData(
 ): Promise<ArenaData> {
   const { data } = await supabase.rpc("get_arena_data", { p_limit: limit });
   return data as unknown as ArenaData;
-}
-
-/** Fetch platform-wide recent match activity */
-export async function getRecentActivity(
-  supabase: Client,
-  limit = 10,
-): Promise<RecentActivityItem[]> {
-  const { data } = await supabase.rpc("get_recent_activity", {
-    p_limit: limit,
-  });
-  return (data as RecentActivityItem[]) ?? [];
 }
 
 // ---------------------------------------------------------------------------

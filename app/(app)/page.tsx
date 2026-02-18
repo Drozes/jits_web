@@ -8,7 +8,7 @@ import { RecentActivitySection } from "@/components/domain/recent-activity-secti
 import { AppHeader } from "@/components/layout/app-header";
 import { PageContainer } from "@/components/layout/page-container";
 import { PageHeaderActions } from "@/components/layout/page-header-actions";
-import { getDashboardSummary, getRecentActivity } from "@/lib/api/queries";
+import { getDashboardSummary } from "@/lib/api/queries";
 import { Zap, ChevronRight, Radio, Swords } from "lucide-react";
 
 function DashboardSkeleton() {
@@ -46,56 +46,21 @@ async function DashboardContent() {
   const { athlete } = await requireAthlete();
   const supabase = await createClient();
 
-  const [summary, { data: acceptedRows }, activityItems] = await Promise.all([
-    getDashboardSummary(supabase),
-    supabase
-      .from("challenges")
-      .select(
-        "id, created_at, match_type, challenger_id, challenger:athletes!fk_challenges_challenger(display_name, profile_photo_url), opponent:athletes!fk_challenges_opponent(display_name, profile_photo_url)",
-      )
-      .or(`challenger_id.eq.${athlete.id},opponent_id.eq.${athlete.id}`)
-      .eq("status", "accepted")
-      .order("created_at", { ascending: false }),
-    getRecentActivity(supabase, 10),
-  ]);
+  // Single RPC call for all dashboard data
+  const summary = await getDashboardSummary(supabase);
 
-  // Map accepted challenges
-  const acceptedChallenges = (acceptedRows ?? []).map((c) => {
-    const isChallenger = c.challenger_id === athlete.id;
-    const challenger = c.challenger as unknown as { display_name: string; profile_photo_url: string | null } | null;
-    const opponent = c.opponent as unknown as { display_name: string; profile_photo_url: string | null } | null;
-    return {
-      id: c.id,
-      created_at: c.created_at,
-      status: "accepted" as const,
-      matchType: c.match_type as "ranked" | "casual",
-      opponentName: isChallenger
-        ? (opponent?.display_name ?? "Unknown")
-        : (challenger?.display_name ?? "Unknown"),
-      opponentPhotoUrl: isChallenger
-        ? (opponent?.profile_photo_url ?? null)
-        : (challenger?.profile_photo_url ?? null),
-      href: `/match/lobby/${c.id}`,
-    };
-  });
+  // Map accepted challenges (opponent already resolved by RPC)
+  const acceptedChallenges = summary.accepted_challenges.map((c) => ({
+    id: c.id,
+    created_at: c.created_at,
+    status: "accepted" as const,
+    matchType: c.match_type as "ranked" | "casual",
+    opponentName: c.opponent_name,
+    opponentPhotoUrl: c.opponent_photo_url,
+    href: `/match/lobby/${c.id}`,
+  }));
 
-  // Batch query photos for pending challenge opponents
-  const pendingAthleteIds = [
-    ...summary.pending_challenges.incoming.map((c) => c.challenger_id),
-    ...summary.pending_challenges.sent.map((c) => c.opponent_id),
-  ];
-  const photoMap = new Map<string, string | null>();
-  if (pendingAthleteIds.length > 0) {
-    const { data: photoRows } = await supabase
-      .from("athletes")
-      .select("id, profile_photo_url")
-      .in("id", pendingAthleteIds);
-    for (const row of photoRows ?? []) {
-      photoMap.set(row.id, row.profile_photo_url);
-    }
-  }
-
-  // Merge accepted + incoming + sent challenges; accepted first, then by date
+  // Map pending challenges (photos now included in RPC)
   const pendingChallenges = [
     ...summary.pending_challenges.incoming.map((c) => ({
       id: c.id,
@@ -104,7 +69,7 @@ async function DashboardContent() {
       direction: "incoming" as const,
       matchType: c.match_type as "ranked" | "casual",
       opponentName: c.challenger_name,
-      opponentPhotoUrl: photoMap.get(c.challenger_id) ?? null,
+      opponentPhotoUrl: c.challenger_photo_url,
       href: `/match/lobby/${c.id}`,
     })),
     ...summary.pending_challenges.sent.map((c) => ({
@@ -114,12 +79,11 @@ async function DashboardContent() {
       direction: "sent" as const,
       matchType: c.match_type as "ranked" | "casual",
       opponentName: c.opponent_name,
-      opponentPhotoUrl: photoMap.get(c.opponent_id) ?? null,
+      opponentPhotoUrl: c.opponent_photo_url,
       href: `/match/lobby/${c.id}`,
     })),
   ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-  // Accepted challenges always on top
   const allChallenges = [...acceptedChallenges, ...pendingChallenges];
 
   const recentMatches = summary.recent_matches.map((m) => ({
@@ -131,7 +95,7 @@ async function DashboardContent() {
     date: m.completed_at,
   }));
 
-  const recentActivity = activityItems.map((a) => ({
+  const recentActivity = summary.recent_activity.map((a) => ({
     id: a.match_id,
     winnerName: a.winner_name,
     loserName: a.loser_name,

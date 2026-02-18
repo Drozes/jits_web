@@ -140,6 +140,7 @@ export interface DashboardSummary {
       challenger_weight: number | null;
       challenger_id: string;
       challenger_name: string;
+      challenger_photo_url: string | null;
     }[];
     sent: {
       id: string;
@@ -148,8 +149,17 @@ export interface DashboardSummary {
       match_type: string;
       opponent_id: string;
       opponent_name: string;
+      opponent_photo_url: string | null;
     }[];
   };
+  accepted_challenges: {
+    id: string;
+    created_at: string;
+    match_type: string;
+    opponent_name: string;
+    opponent_photo_url: string | null;
+  }[];
+  recent_activity: RecentActivityItem[];
 }
 
 /** Response from get_arena_data RPC */
