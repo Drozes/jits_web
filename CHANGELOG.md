@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+### Demo Video Recording System (2026-02-18)
+
+**Added**
+- `demo/record.ts` — Playwright test orchestrator that records 12 per-scene video clips with per-scene browser contexts (no dead time between scenes).
+- `demo/scenes/01-login.ts` through `demo/scenes/12-profile.ts` — 12 scene scripts covering login, dashboard, arena, swipe, athlete profile, send/accept challenge, live match, record results, leaderboard, messages, and profile.
+- `demo/scenes/types.ts` — Scene interface with `shouldRun` pre-check gates and `skipAuth` for login scene.
+- `demo/helpers/auth.ts` — `saveAuthState()` for off-screen auth capture, `createSceneContext()` for per-scene video-recording contexts.
+- `demo/helpers/nav.ts` — `navigateTo()` and `tapNavItem()` with `waitUntil: "commit"` to handle Next.js streaming.
+- `demo/helpers/pause.ts` — Speed-adjustable pause system (`DEMO_SPEED` multiplier) with per-type overrides.
+- `demo/playwright.config.ts` — iPhone 14 viewport (390x844, 3x scale), loads `.env.demo` manually.
+- `demo/post-process.sh` — Docker-based ffmpeg pipeline (`jrottenberg/ffmpeg:5-alpine`) for webm-to-mp4 conversion, concatenation, and side-by-side dual-account clips.
+- `.env.demo.example` — Template for demo account credentials and speed settings.
+- `package.json` — Added `demo:record` and `demo:process` scripts.
+- `.gitignore` — Added `.env.demo` and `demo/output/` exclusions.
+
 ### Stat Cards Redesign (2026-02-17)
 
 **Changed**

@@ -11,6 +11,8 @@
     "test:e2e:ui": "playwright test --ui",
     "typecheck": "tsc --noEmit",
     "db:types": "cd ../jr_be && supabase gen types typescript --local > ../jits_web/types/database.ts",
+    "demo:record": "npx playwright test --config demo/playwright.config.ts",
+    "demo:process": "bash demo/post-process.sh",
     "prepare": "husky"
   },
   "dependencies": {
