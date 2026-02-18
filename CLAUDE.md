@@ -250,7 +250,7 @@ Typed wrappers for all Supabase queries and mutations. Use these instead of raw 
 - `startMatchFromChallenge(supabase, challengeId)` → `Result<StartMatchResponse>`
 - `startMatch(supabase, matchId)` → `Result<StartMatchTimerResponse>`
 - `recordMatchResult(supabase, { matchId, result, winnerId?, ... })` → `Result<RecordResultResponse>`
-- `toggleLookingForMatch(supabase, athleteId, looking)` → `Result<void>`
+- `toggleMatchPreferences(supabase, athleteId, { lookingForCasual, lookingForRanked })` → `Result<void>`
 
 ### Error Handling (`lib/api/errors.ts`)
 
@@ -311,6 +311,7 @@ Read these docs before building challenge, match, ELO, or presence features. Key
 
 1. ~~Activation trigger uses `primary_gym_id`, not `current_weight`~~ — [x] setup includes gym picker + free agent path
 2. **Weight units unclear** — `athletes.current_weight` spec says kg, `challenges` spec says lbs. Needs BE resolution.
-3. ~~Challenge creation not implemented~~ — [x] ChallengeSheet component works
+3. ~~Challenge creation not implemented~~ — [x] ChallengeSheet uses `createChallenge()` mutation (no raw inserts)
 4. ~~No gym selection in setup~~ — [x] setup form includes gym dropdown
 5. ~~Match flow not implemented~~ — [x] Lobby (`/match/lobby/[challengeId]`), live timer (`/match/[matchId]/live`), results recording (`/match/[matchId]/results`)
+6. ~~Challenge→match flow bugs~~ — [x] All 4 bugs fixed (lobby broadcast on accept, mutations layer consistency, server timestamp for timer sync). See `specs/challenge-match-flow-fixes.md`.

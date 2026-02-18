@@ -1,5 +1,7 @@
 # Challenge → Match → Complete: E2E Flow Fixes
 
+> **Status: IMPLEMENTED** — All 4 fixes landed in commit `c76a335` on 2026-02-18.
+
 ## Context
 
 A full code review of the challenge → match → complete flow identified 4 functional bugs. This spec documents each bug with exact file locations, root causes, and prescribed fixes.
