@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### PWA Safe Area Fix (2026-02-18)
+
+**Fixed**
+- `components/layout/app-header.tsx` — Added `pt-[env(safe-area-inset-top)]` so the header clears the status bar/notch in standalone PWA mode (Add to Home Screen).
+
 ### Demo Video Recording System (2026-02-18)
 
 **Added**

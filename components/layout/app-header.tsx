@@ -25,7 +25,7 @@ export function AppHeader({
   return (
     <header
       className={cn(
-        "sticky top-0 z-40 flex h-14 items-center gap-3 border-b border-border/50 bg-background/80 px-4 backdrop-blur-xl",
+        "sticky top-0 z-40 flex h-14 items-center gap-3 border-b border-border/50 bg-background/80 px-4 pt-[env(safe-area-inset-top)] backdrop-blur-xl",
         className,
       )}
     >
