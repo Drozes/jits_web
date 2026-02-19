@@ -126,10 +126,9 @@ export async function startMatchFromChallenge(
     return { ok: false, error: mapPostgrestError(error) };
   }
 
+  // This RPC returns match data directly (no success wrapper).
+  // Errors come as PostgreSQL exceptions caught above.
   const response = data as unknown as StartMatchResponse;
-  if (!response.success) {
-    return { ok: false, error: mapRpcError(response) };
-  }
   return { ok: true, data: response };
 }
 

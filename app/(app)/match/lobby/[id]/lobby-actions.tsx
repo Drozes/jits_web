@@ -46,7 +46,7 @@ export function LobbyActions({ challengeId, status, isChallenger, currentWeight 
       setLoading(false);
       return;
     }
-    const matchId = result.data.match_id!;
+    const matchId = result.data.match_id;
     broadcastMatchStarted(matchId);
     router.push(`/match/${matchId}/live`);
   }

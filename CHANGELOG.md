@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Fix: Start Match RPC response mismatch (2026-02-19)
+
+**Fixed**
+- `lib/api/mutations.ts` — `startMatchFromChallenge()` no longer checks for a `success` field that the backend RPC doesn't return. The RPC returns match data directly; errors come as PostgreSQL exceptions (already handled). This was causing every successful "Start Match" click to show "Unknown error".
+- `types/composites.ts` — `StartMatchResponse` fields updated from optional to required, removed phantom `success`/`error` fields to match actual backend contract.
+- `app/(app)/match/lobby/[id]/lobby-actions.tsx` — Removed non-null assertion on `match_id` (now typed as required).
+
 ### Dashboard Query Consolidation + Dead Code Cleanup (2026-02-18)
 
 **Changed**

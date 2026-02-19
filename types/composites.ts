@@ -63,18 +63,18 @@ export type MatchHistoryRow =
 export type EloHistoryRow =
   Database["public"]["Functions"]["get_elo_history"]["Returns"][number];
 
-/** Response from start_match_from_challenge RPC */
+/** Response from start_match_from_challenge RPC.
+ *  Returns match data directly — no success/error wrapper.
+ *  Errors come as PostgreSQL exceptions (PostgrestError). */
 export interface StartMatchResponse {
-  success: boolean;
-  match_id?: string;
-  challenge_id?: string;
-  gym_id?: string | null;
-  match_type?: string;
-  duration_seconds?: number;
-  status?: string;
-  created_at?: string;
-  already_exists?: boolean;
-  error?: string;
+  match_id: string;
+  challenge_id: string;
+  gym_id: string | null;
+  match_type: string;
+  duration_seconds: number;
+  status: string;
+  created_at: string;
+  already_exists: boolean;
 }
 
 /** ELO change for a single player */
