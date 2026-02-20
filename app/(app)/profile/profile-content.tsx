@@ -151,9 +151,11 @@ export async function ProfileContent({
                   Edit Profile
                 </Link>
               </Button>
-              <Button variant="ghost" className="w-full justify-start rounded-xl">
-                <Settings className="mr-3 h-4 w-4" />
-                Settings & Privacy
+              <Button variant="ghost" className="w-full justify-start rounded-xl" asChild>
+                <Link href="/settings">
+                  <Settings className="mr-3 h-4 w-4" />
+                  Settings & Privacy
+                </Link>
               </Button>
               <LogoutButton />
             </div>

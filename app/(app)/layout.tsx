@@ -4,6 +4,7 @@ import { GlobalNotificationsProvider } from "@/components/layout/global-notifica
 import { OnlinePresenceBootstrap } from "@/components/layout/online-presence-bootstrap";
 import { DeploymentCheckBootstrap } from "@/components/layout/deployment-check-bootstrap";
 import { LobbyPresenceBootstrap } from "@/components/layout/lobby-presence-bootstrap";
+import { PushRegistrationBootstrap } from "@/components/layout/push-registration-bootstrap";
 import { getActiveAthlete } from "@/lib/guards";
 
 export default function AppLayout({
@@ -25,6 +26,9 @@ export default function AppLayout({
       </Suspense>
       <Suspense>
         <LobbyBootstrap />
+      </Suspense>
+      <Suspense>
+        <PushBootstrap />
       </Suspense>
       <DeploymentCheckBootstrap />
     </div>
@@ -59,4 +63,10 @@ async function LobbyBootstrap() {
       lookingForRanked={athlete.looking_for_ranked}
     />
   );
+}
+
+async function PushBootstrap() {
+  const athlete = await getActiveAthlete();
+  if (!athlete) return null;
+  return <PushRegistrationBootstrap athleteId={athlete.id} />;
 }

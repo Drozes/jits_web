@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+### Push notifications — device registration, service worker, preferences UI (2026-02-20)
+
+**Added**
+- `public/sw.js` — Service worker for Web Push notifications (push event → showNotification, notificationclick → navigate to challenge/chat/match).
+- `hooks/use-push-registration.ts` — Hook that registers the service worker and subscribes to Web Push on app launch. Silently no-ops if push isn't supported or VAPID key is missing.
+- `components/layout/push-registration-bootstrap.tsx` — Side-effect bootstrap component mounted in app layout to trigger push registration.
+- `app/(app)/settings/page.tsx` — New settings page with back navigation.
+- `app/(app)/settings/settings-content.tsx` — Server component that fetches notification preferences.
+- `app/(app)/settings/notification-preferences.tsx` — Client component with three Switch toggles for challenge/chat/match notification preferences.
+- `lib/api/mutations.ts` — `registerPushDevice()`, `removePushDevice()`, `getNotificationPreferences()`, `updateNotificationPreferences()` mutations for push subscriptions and notification preferences tables.
+- `types/push-subscription.ts` — Type aliases for `PushSubscription`, `PushSubscriptionInsert`.
+- `types/notification-preference.ts` — Type aliases for `NotificationPreference`, `NotificationPreferenceUpdate`.
+
+**Changed**
+- `types/database.ts` — Regenerated to include `push_subscriptions` and `notification_preferences` tables from BE migration 010.
+- `app/(app)/layout.tsx` — Added `PushBootstrap` Suspense wrapper alongside existing bootstrap components.
+- `app/(app)/profile/profile-content.tsx` — "Settings & Privacy" button now links to `/settings` (was a dead button).
+
 ### Skeleton loading states, guard optimization, realtime optimization (2026-02-19)
 
 **Changed**

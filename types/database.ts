@@ -48,7 +48,6 @@ export type Database = {
           looking_for_ranked: boolean
           primary_gym_id: string | null
           profile_photo_url: string | null
-          push_token: string | null
           role: Database["public"]["Enums"]["athlete_role"]
           status: string
         }
@@ -65,7 +64,6 @@ export type Database = {
           looking_for_ranked?: boolean
           primary_gym_id?: string | null
           profile_photo_url?: string | null
-          push_token?: string | null
           role?: Database["public"]["Enums"]["athlete_role"]
           status?: string
         }
@@ -82,7 +80,6 @@ export type Database = {
           looking_for_ranked?: boolean
           primary_gym_id?: string | null
           profile_photo_url?: string | null
-          push_token?: string | null
           role?: Database["public"]["Enums"]["athlete_role"]
           status?: string
         }
@@ -102,6 +99,7 @@ export type Database = {
           challenger_weight: number | null
           created_at: string
           expires_at: string
+          expiry_notified_at: string | null
           id: string
           match_type: Database["public"]["Enums"]["match_type_enum"]
           opponent_id: string
@@ -115,6 +113,7 @@ export type Database = {
           challenger_weight?: number | null
           created_at?: string
           expires_at?: string
+          expiry_notified_at?: string | null
           id?: string
           match_type: Database["public"]["Enums"]["match_type_enum"]
           opponent_id: string
@@ -128,6 +127,7 @@ export type Database = {
           challenger_weight?: number | null
           created_at?: string
           expires_at?: string
+          expiry_notified_at?: string | null
           id?: string
           match_type?: Database["public"]["Enums"]["match_type_enum"]
           opponent_id?: string
@@ -475,6 +475,76 @@ export type Database = {
           {
             foreignKeyName: "fk_messages_sender"
             columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "athletes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_preferences: {
+        Row: {
+          athlete_id: string
+          enable_challenges: boolean
+          enable_chat: boolean
+          enable_matches: boolean
+          updated_at: string
+        }
+        Insert: {
+          athlete_id: string
+          enable_challenges?: boolean
+          enable_chat?: boolean
+          enable_matches?: boolean
+          updated_at?: string
+        }
+        Update: {
+          athlete_id?: string
+          enable_challenges?: boolean
+          enable_chat?: boolean
+          enable_matches?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_preferences_athlete_id_fkey"
+            columns: ["athlete_id"]
+            isOneToOne: true
+            referencedRelation: "athletes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      push_subscriptions: {
+        Row: {
+          athlete_id: string
+          created_at: string
+          device_label: string | null
+          id: string
+          last_used_at: string
+          platform: string
+          token: string
+        }
+        Insert: {
+          athlete_id: string
+          created_at?: string
+          device_label?: string | null
+          id?: string
+          last_used_at?: string
+          platform: string
+          token: string
+        }
+        Update: {
+          athlete_id?: string
+          created_at?: string
+          device_label?: string | null
+          id?: string
+          last_used_at?: string
+          platform?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_subscriptions_athlete_id_fkey"
+            columns: ["athlete_id"]
             isOneToOne: false
             referencedRelation: "athletes"
             referencedColumns: ["id"]

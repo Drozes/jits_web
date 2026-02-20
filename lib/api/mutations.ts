@@ -202,3 +202,98 @@ export async function toggleMatchPreferences(
   }
   return { ok: true, data: undefined };
 }
+
+// ---------------------------------------------------------------------------
+// Push notifications
+// ---------------------------------------------------------------------------
+
+interface RegisterPushDeviceParams {
+  athleteId: string;
+  platform: "expo" | "web";
+  token: string;
+  deviceLabel?: string;
+}
+
+/** Register a push notification device. Upserts on (athlete_id, token). */
+export async function registerPushDevice(
+  supabase: Client,
+  params: RegisterPushDeviceParams,
+): Promise<Result<void>> {
+  const { error } = await supabase
+    .from("push_subscriptions")
+    .upsert(
+      {
+        athlete_id: params.athleteId,
+        platform: params.platform,
+        token: params.token,
+        device_label: params.deviceLabel,
+      },
+      { onConflict: "athlete_id,token" },
+    );
+
+  if (error) {
+    return { ok: false, error: mapPostgrestError(error) };
+  }
+  return { ok: true, data: undefined };
+}
+
+/** Remove a push notification device by ID. */
+export async function removePushDevice(
+  supabase: Client,
+  deviceId: string,
+): Promise<Result<void>> {
+  const { error } = await supabase
+    .from("push_subscriptions")
+    .delete()
+    .eq("id", deviceId);
+
+  if (error) {
+    return { ok: false, error: mapPostgrestError(error) };
+  }
+  return { ok: true, data: undefined };
+}
+
+// ---------------------------------------------------------------------------
+// Notification preferences
+// ---------------------------------------------------------------------------
+
+export interface NotificationPrefs {
+  enable_challenges: boolean;
+  enable_chat: boolean;
+  enable_matches: boolean;
+}
+
+/** Fetch current notification preferences. Returns defaults if no row exists. */
+export async function getNotificationPreferences(
+  supabase: Client,
+): Promise<NotificationPrefs> {
+  const { data } = await supabase
+    .from("notification_preferences")
+    .select("enable_challenges, enable_chat, enable_matches")
+    .maybeSingle();
+
+  return {
+    enable_challenges: data?.enable_challenges ?? true,
+    enable_chat: data?.enable_chat ?? true,
+    enable_matches: data?.enable_matches ?? true,
+  };
+}
+
+/** Upsert notification preferences. */
+export async function updateNotificationPreferences(
+  supabase: Client,
+  athleteId: string,
+  prefs: Partial<NotificationPrefs>,
+): Promise<Result<void>> {
+  const { error } = await supabase
+    .from("notification_preferences")
+    .upsert(
+      { athlete_id: athleteId, ...prefs },
+      { onConflict: "athlete_id" },
+    );
+
+  if (error) {
+    return { ok: false, error: mapPostgrestError(error) };
+  }
+  return { ok: true, data: undefined };
+}
