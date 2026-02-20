@@ -20,18 +20,23 @@ interface LobbyActionsProps {
   challengeId: string;
   status: "pending" | "accepted";
   isChallenger: boolean;
+  currentAthleteId: string;
+  opponentId: string;
+  opponentName: string;
   currentWeight?: number | null;
 }
 
-export function LobbyActions({ challengeId, status, isChallenger, currentWeight }: LobbyActionsProps) {
+export function LobbyActions({ challengeId, status, isChallenger, currentAthleteId, opponentId, opponentName, currentWeight }: LobbyActionsProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [weight, setWeight] = useState(currentWeight?.toString() ?? "");
   const [weightConfirmed, setWeightConfirmed] = useState(false);
 
-  const { broadcastMatchStarted, broadcastCancelled, broadcastAccepted } = useLobbySync({
+  const { broadcastMatchStarted, broadcastCancelled, broadcastAccepted, opponentPresent } = useLobbySync({
     challengeId,
+    currentAthleteId,
+    opponentId,
     onCancelled: () => router.push("/match/pending"),
     onAccepted: status === "pending" && isChallenger ? () => router.refresh() : undefined,
   });
@@ -67,7 +72,7 @@ export function LobbyActions({ challengeId, status, isChallenger, currentWeight 
 
   async function handleAccept() {
     const parsedWeight = parseFloat(weight);
-    if (!parsedWeight || parsedWeight <= 0 || parsedWeight > 500) {
+    if (isNaN(parsedWeight) || parsedWeight <= 0 || parsedWeight > 500) {
       setError("Please enter a valid weight (1-500 lbs)");
       return;
     }
@@ -102,7 +107,15 @@ export function LobbyActions({ challengeId, status, isChallenger, currentWeight 
     return (
       <div className="space-y-3">
         {error && <p className="text-sm text-red-500 text-center">{error}</p>}
-        <Button className="w-full" size="lg" onClick={handleStart} disabled={loading}>
+        {!opponentPresent && (
+          <div className="flex flex-col items-center gap-2 py-4">
+            <Clock className="h-6 w-6 text-muted-foreground animate-pulse" />
+            <p className="text-sm text-muted-foreground text-center">
+              Waiting for {opponentName} to join...
+            </p>
+          </div>
+        )}
+        <Button className="w-full" size="lg" onClick={handleStart} disabled={loading || !opponentPresent}>
           {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           Start Match
         </Button>
@@ -162,7 +175,8 @@ export function LobbyActions({ challengeId, status, isChallenger, currentWeight 
       {error && <p className="text-sm text-red-500 text-center">{error}</p>}
       <div className="flex gap-2">
         <Button variant="outline" className="flex-1" onClick={handleDecline} disabled={loading}>
-          {loading ? "..." : "Decline"}
+          {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          Decline
         </Button>
         <Button className="flex-1" onClick={handleAccept} disabled={loading || !weight || !weightConfirmed}>
           {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

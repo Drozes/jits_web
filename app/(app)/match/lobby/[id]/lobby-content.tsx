@@ -78,6 +78,9 @@ export async function LobbyContent({
         challengeId={challengeId}
         status={lobby.status as "pending" | "accepted"}
         isChallenger={isChallenger}
+        currentAthleteId={athlete.id}
+        opponentId={isChallenger ? lobby.opponent.id : lobby.challenger.id}
+        opponentName={isChallenger ? lobby.opponent.display_name : lobby.challenger.display_name}
         currentWeight={isChallenger ? undefined : lobby.opponent.current_weight}
       />
     </div>
