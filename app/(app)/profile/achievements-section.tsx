@@ -122,19 +122,14 @@ export function AchievementsSection({
           const Icon = achievement.icon;
           return (
             <Card key={achievement.name} className="overflow-hidden">
-              <CardContent className="relative p-3.5">
-                <div className="absolute -right-2 -top-2 h-12 w-12 rounded-full opacity-30" style={{ background: `hsl(var(--muted))` }} />
-                <div className="flex items-center gap-2.5">
-                  <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${achievement.bg}`}>
-                    <Icon className={`h-4 w-4 ${achievement.color}`} />
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-medium text-muted-foreground">{achievement.name}</p>
-                    <p className="text-lg font-bold tabular-nums">
-                      {achievement.value}
-                    </p>
-                  </div>
+              <CardContent className="relative pt-4 pb-4">
+                <div className={`absolute -right-2 -top-2 flex h-14 w-14 items-center justify-center rounded-full ${achievement.bg}`}>
+                  <Icon className={`h-5 w-5 ${achievement.color}/70`} />
                 </div>
+                <p className="text-sm font-medium text-muted-foreground mb-1.5">{achievement.name}</p>
+                <p className="text-2xl font-bold tabular-nums">
+                  {achievement.value}
+                </p>
               </CardContent>
             </Card>
           );

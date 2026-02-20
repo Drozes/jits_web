@@ -131,22 +131,29 @@ async function DashboardContent() {
       />
 
       <section className="flex flex-col gap-3">
-        <div className="flex items-center justify-between">
+        <Link
+          href="/match/pending"
+          className="flex items-center justify-between group"
+        >
           <div className="flex items-center gap-2">
             <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-yellow-500/10">
               <Zap className="h-4 w-4 text-yellow-500" />
             </div>
             <h2 className="text-lg font-semibold">Challenges</h2>
+            {allChallenges.length > 0 && (
+              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-bold text-primary-foreground">
+                {allChallenges.length}
+              </span>
+            )}
           </div>
-          {allChallenges.length > 0 && (
-            <Link href="/match/pending" className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors">
-              View all
-            </Link>
-          )}
-        </div>
+          <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground group-hover:text-foreground transition-colors">
+            View all
+            <ChevronRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
+          </div>
+        </Link>
         {allChallenges.length > 0 ? (
           <div className="flex flex-col gap-2">
-            {allChallenges.map((c) => (
+            {allChallenges.slice(0, 3).map((c) => (
               <MatchCard
                 key={c.id}
                 type="challenge"
@@ -159,6 +166,15 @@ async function DashboardContent() {
                 href={c.href}
               />
             ))}
+            {allChallenges.length > 3 && (
+              <Link
+                href="/match/pending"
+                className="flex items-center justify-center gap-1.5 rounded-xl border border-border py-2.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:border-foreground/20 transition-colors"
+              >
+                +{allChallenges.length - 3} more challenges
+                <ChevronRight className="h-3.5 w-3.5" />
+              </Link>
+            )}
           </div>
         ) : (
           <div className="rounded-2xl border border-dashed border-border p-8 text-center">

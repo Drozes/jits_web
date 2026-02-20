@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### UI: dashboard challenges section + achievements card restyle (2026-02-19)
+
+**Changed**
+- `app/(app)/profile/achievements-section.tsx` — Restyled achievement cards to match dashboard stat-overview layout: icon circle floats top-right, label/value stacked vertically on the left, larger text sizing.
+- `app/(app)/page.tsx` — Challenges section header is now a tappable link to pending page with chevron, count badge next to title, limited to 3 visible cards with "+N more" overflow link.
+
 ### Fix: match results — winner names + auto-fill finish time (2026-02-19)
 
 **Fixed**
