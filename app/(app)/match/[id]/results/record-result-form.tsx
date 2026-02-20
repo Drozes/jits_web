@@ -16,12 +16,14 @@ interface RecordResultFormProps {
   matchId: string;
   participants: MatchParticipant[];
   submissionTypes: SubmissionType[];
+  elapsedSeconds?: number;
 }
 
 export function RecordResultForm({
   matchId,
   participants,
   submissionTypes,
+  elapsedSeconds,
 }: RecordResultFormProps) {
   const router = useRouter();
   const { broadcastResultRecorded } = useMatchSync({
@@ -31,7 +33,9 @@ export function RecordResultForm({
   const [result, setResult] = useState<"submission" | "draw" | null>(null);
   const [winnerId, setWinnerId] = useState("");
   const [submissionCode, setSubmissionCode] = useState("");
-  const [finishTime, setFinishTime] = useState<number | undefined>();
+  const [finishTime, setFinishTime] = useState<number | undefined>(
+    elapsedSeconds,
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -92,6 +96,7 @@ export function RecordResultForm({
           submissionTypes={submissionTypes}
           winnerId={winnerId}
           submissionCode={submissionCode}
+          defaultElapsedSeconds={elapsedSeconds}
           onWinnerChange={setWinnerId}
           onSubmissionChange={setSubmissionCode}
           onFinishTimeChange={setFinishTime}

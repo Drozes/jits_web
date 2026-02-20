@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Fix: match results — winner names + auto-fill finish time (2026-02-19)
+
+**Fixed**
+- `lib/api/queries.ts` — `getMatchDetails()` FK join `athletes!fk_participants_athlete` returns an object (many-to-one), not an array. Was doing `[0]` on an object which returned `undefined`, causing both participants to show as "Unknown" in the winner dropdown.
+
+**Added**
+- `app/(app)/match/[id]/results/results-content.tsx` — Computes elapsed seconds from `match.started_at` and passes to form as default finish time.
+- `app/(app)/match/[id]/results/record-result-form.tsx` — Accepts `elapsedSeconds` prop, initializes `finishTime` state with it.
+- `app/(app)/match/[id]/results/submission-fields.tsx` — Accepts `defaultElapsedSeconds` prop, pre-fills min/sec inputs from elapsed match time.
+
 ### Fix: Start Match RPC response mismatch (2026-02-19)
 
 **Fixed**

@@ -229,10 +229,13 @@ export async function getMatchDetails(
   const participants = ((data.match_participants ?? []) as unknown[]).map(
     (p: unknown) => {
       const part = p as Record<string, unknown>;
-      const athleteArr = part.athletes as
+      const athleteRaw = part.athletes as
+        | { display_name: string; current_elo: number }
         | { display_name: string; current_elo: number }[]
         | null;
-      const athlete = athleteArr?.[0];
+      const athlete = Array.isArray(athleteRaw)
+        ? athleteRaw[0]
+        : athleteRaw;
       return {
         athlete_id: part.athlete_id as string,
         display_name: athlete?.display_name ?? "Unknown",

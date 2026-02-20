@@ -28,11 +28,17 @@ export async function ResultsContent({
 
   const submissionTypes = await getSubmissionTypes(supabase);
 
+  // Compute elapsed match time from server started_at for auto-fill
+  const elapsedSeconds = match.started_at
+    ? Math.floor((Date.now() - new Date(match.started_at).getTime()) / 1000)
+    : undefined;
+
   return (
     <RecordResultForm
       matchId={matchId}
       participants={match.participants}
       submissionTypes={submissionTypes}
+      elapsedSeconds={elapsedSeconds}
     />
   );
 }

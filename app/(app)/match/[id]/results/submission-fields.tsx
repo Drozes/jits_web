@@ -19,6 +19,7 @@ interface SubmissionFieldsProps {
   submissionTypes: SubmissionType[];
   winnerId: string;
   submissionCode: string;
+  defaultElapsedSeconds?: number;
   onWinnerChange: (id: string) => void;
   onSubmissionChange: (code: string) => void;
   onFinishTimeChange: (seconds: number | undefined) => void;
@@ -29,12 +30,19 @@ export function SubmissionFields({
   submissionTypes,
   winnerId,
   submissionCode,
+  defaultElapsedSeconds,
   onWinnerChange,
   onSubmissionChange,
   onFinishTimeChange,
 }: SubmissionFieldsProps) {
-  const [minutes, setMinutes] = useState("");
-  const [seconds, setSeconds] = useState("");
+  const defaultMins = defaultElapsedSeconds
+    ? String(Math.floor(defaultElapsedSeconds / 60))
+    : "";
+  const defaultSecs = defaultElapsedSeconds
+    ? String(defaultElapsedSeconds % 60)
+    : "";
+  const [minutes, setMinutes] = useState(defaultMins);
+  const [seconds, setSeconds] = useState(defaultSecs);
 
   function updateTime(mins: string, secs: string) {
     setMinutes(mins);
