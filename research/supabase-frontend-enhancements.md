@@ -4,27 +4,9 @@ Audit of all Supabase interactions in the JITS Web frontend with optimization re
 
 ---
 
-## 1. Guards: `requireAthlete()` Over-Fetches on Every Page Load
+## ~~1. Guards: `requireAthlete()` Over-Fetches on Every Page Load~~ ✅ DONE
 
-**File:** `lib/guards.ts:28-32`
-
-**Current behavior:** Every authenticated page calls `requireAthlete()`, which runs `select("*")` on the `athletes` table. This fetches all columns (including `bio`, `profile_photo_url`, `created_at`, `updated_at`, etc.) when most pages only need `id`, `display_name`, `current_elo`, `current_weight`, `status`, and `looking_for_*` flags.
-
-**Impact:** This query runs on *every single page navigation* for authenticated users. It's the most frequently executed query in the app.
-
-**Recommendation:**
-```ts
-// Replace select("*") with explicit columns
-const { data: athlete } = await supabase
-  .from("athletes")
-  .select("id, auth_user_id, display_name, current_elo, highest_elo, current_weight, status, looking_for_casual, looking_for_ranked, free_agent, primary_gym_id, profile_photo_url")
-  .eq("auth_user_id", user.id)
-  .single();
-```
-
-Same fix applies to `getActiveAthlete()` at line 58.
-
-**Severity:** Medium — reduces payload size on every page load.
+**Fixed:** Both `requireAthlete()` and `getActiveAthlete()` now use `ATHLETE_GUARD_SELECT` constant with 12 explicit columns instead of `select("*")`. Excludes unused `created_at`, `push_token`, and `role`. Consumer components (`StatOverview`, `EditableProfileHeader`) updated to use `Pick<Athlete, ...>` props.
 
 ---
 
@@ -183,31 +165,9 @@ This reduces payload size for message-heavy conversations (50 messages per page 
 
 ---
 
-## 12. `usePendingChallenges` Re-Fetches Entire List on Every Change
+## ~~12. `usePendingChallenges` Re-Fetches Entire List on Every Change~~ ✅ DONE
 
-**File:** `hooks/use-pending-challenges.ts:76-87`
-
-**Current behavior:** On every `INSERT` or `UPDATE` event from the realtime channel, the hook calls `fetchChallenges()` which re-queries the entire pending challenges list.
-
-**Problem:** The realtime payload already contains the new/updated row. For `INSERT`, the hook could append to state. For `UPDATE` (e.g., status changed to `accepted`), it could remove from state.
-
-**Recommendation:** Optimistic state patching:
-```ts
-// On INSERT: append to challenges state
-(payload) => {
-  setChallenges(prev => [mapChallenge(payload.new), ...prev]);
-}
-// On UPDATE: remove if status changed from pending
-(payload) => {
-  if (payload.new.status !== "pending") {
-    setChallenges(prev => prev.filter(c => c.id !== payload.new.id));
-  }
-}
-```
-
-Fall back to full refetch only if state becomes inconsistent.
-
-**Severity:** Low — saves one query per realtime event, but events are infrequent.
+**Fixed:** INSERT handler now appends new challenge to state with a lightweight single-athlete name lookup (instead of re-querying all pending challenges). UPDATE handler removes non-pending challenges from state directly. Full refetch only on initial mount.
 
 ---
 
@@ -317,7 +277,7 @@ if (authError || !challengerId) {
 | ~~4~~ | ~~Arena page: parallelize queries~~ | ~~High~~ | ~~Low~~ | ~~-3 round trips~~ ✅ |
 | ~~5~~ | ~~Pending challenges: parallelize queries~~ | ~~High~~ | ~~Low~~ | ~~-3 round trips~~ ✅ |
 | ~~2~~ | ~~Athlete profile: FK join + parallelize~~ | ~~High~~ | ~~Low~~ | ~~-1 query, -1 round trip~~ ✅ |
-| 1 | Guards: explicit select columns | Medium | Low | Reduced payload every page |
+| ~~1~~ | ~~Guards: explicit select columns~~ | ~~Medium~~ | ~~Low~~ | ~~Reduced payload every page~~ ✅ |
 | 10 | ChallengeSheet: use data access layer | Medium | Medium | Consistency + error handling |
 | 17 | createChallenge: protect auth_athlete_id | Medium | Low | Data integrity |
 | 13 | Unread count: increase poll interval | Low | Trivial | -50% idle RPC calls |
@@ -327,7 +287,7 @@ if (authError || !challengerId) {
 | 8 | Submission types: explicit select | Low | Trivial | Reduced payload |
 | 9 | Lobby data: explicit select | Low | Trivial | Reduced payload |
 | 11 | Chat messages: explicit select | Low | Trivial | Reduced payload |
-| 12 | Challenge hook: optimistic updates | Low | Medium | -1 query per event |
+| ~~12~~ | ~~Challenge hook: optimistic updates~~ | ~~Low~~ | ~~Medium~~ | ~~-1 query per event~~ ✅ |
 | 14 | Global messages: narrow scope | Low | Low | Reduced server processing |
 | 15 | Dashboard: combine challenge queries | Low | Low | -1 query |
 | 16 | Thread page: parallelize messages | Low | Low | -1 round trip |

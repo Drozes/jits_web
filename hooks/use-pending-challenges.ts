@@ -16,9 +16,24 @@ interface UsePendingChallengesResult {
   challenges: PendingChallenge[];
 }
 
+/** Raw challenge row shape from realtime payload (no FK joins). */
+interface ChallengePayload {
+  id: string;
+  challenger_id: string;
+  opponent_id: string;
+  status: string;
+  match_type: string;
+  created_at: string;
+  expires_at: string;
+}
+
 /**
  * Subscribes to realtime challenge changes and maintains a live list
  * of pending received challenges for the current athlete.
+ *
+ * Uses optimistic state patching: INSERT appends to state (with a
+ * lightweight name lookup), UPDATE removes non-pending challenges.
+ * Falls back to full refetch only on initial load.
  */
 export function usePendingChallenges(
   athleteId: string,
@@ -62,7 +77,6 @@ export function usePendingChallenges(
 
     const supabase = createClient();
 
-    // Re-fetch on any challenge insert or status update targeting this athlete
     const channel = supabase
       .channel(`challenges-${athleteId}`)
       .on(
@@ -73,7 +87,27 @@ export function usePendingChallenges(
           table: "challenges",
           filter: `opponent_id=eq.${athleteId}`,
         },
-        () => fetchChallenges(),
+        async (payload) => {
+          const row = payload.new as ChallengePayload;
+          if (row.status !== "pending" || new Date(row.expires_at) <= new Date()) return;
+
+          // Lightweight lookup for challenger name (no full refetch)
+          const { data: challenger } = await supabase
+            .from("athletes")
+            .select("display_name")
+            .eq("id", row.challenger_id)
+            .single();
+
+          const newChallenge: PendingChallenge = {
+            id: row.id,
+            challengerName: challenger?.display_name ?? "Unknown",
+            matchType: row.match_type,
+            createdAt: row.created_at,
+            expiresAt: row.expires_at,
+          };
+
+          setChallenges((prev) => [newChallenge, ...prev]);
+        },
       )
       .on(
         "postgres_changes",
@@ -83,7 +117,13 @@ export function usePendingChallenges(
           table: "challenges",
           filter: `opponent_id=eq.${athleteId}`,
         },
-        () => fetchChallenges(),
+        (payload) => {
+          const row = payload.new as ChallengePayload;
+          // Remove challenge if it's no longer pending
+          if (row.status !== "pending") {
+            setChallenges((prev) => prev.filter((c) => c.id !== row.id));
+          }
+        },
       )
       .subscribe();
 

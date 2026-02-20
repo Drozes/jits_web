@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Skeleton loading states, guard optimization, realtime optimization (2026-02-19)
+
+**Changed**
+- `app/(app)/match/[id]/live/page.tsx` — Replaced generic inline skeleton with named `LiveMatchSkeleton` component matching actual page layout (name vs name text, badge, timer, button).
+- `app/(app)/match/[id]/results/page.tsx` — Replaced generic inline skeleton with named `ResultsSkeleton` component matching results card layout (heading, participant rows with avatars/badges, action buttons).
+- `app/(app)/match/lobby/[id]/page.tsx` — Replaced generic inline skeleton with named `LobbySkeleton` component matching VS header layout (two athlete columns with avatars/ELO, badge, stakes card, action buttons).
+- `app/(app)/match/pending/page.tsx` — Replaced generic `PendingChallengesSkeleton` with layout-accurate version (header, tabs bar, challenge cards with avatar/name/badge, info card).
+- `lib/guards.ts` — `requireAthlete()` and `getActiveAthlete()` now use explicit column select (12 columns) instead of `select("*")` (15 columns), reducing payload on every authenticated page load. Excludes unused `created_at`, `push_token`, and `role`.
+- `components/domain/stat-overview.tsx` — Props type narrowed from `Athlete` to `Pick<Athlete, "current_elo" | "highest_elo">` to match guard's explicit select.
+- `components/profile/editable-profile-header.tsx` — Props type narrowed from `Athlete` to `Pick<Athlete, ...>` (7 fields) to match guard's explicit select.
+- `hooks/use-pending-challenges.ts` — Replaced full-refetch-on-every-event with optimistic state patching: INSERT appends new challenge to state (with lightweight name lookup), UPDATE removes non-pending challenges. Full refetch only on initial mount.
+
 ### UI: dashboard challenges section + achievements card restyle (2026-02-19)
 
 **Changed**

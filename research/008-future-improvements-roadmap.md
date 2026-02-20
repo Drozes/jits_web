@@ -103,22 +103,9 @@
 
 ---
 
-### 6. Improve Skeleton Loading States
+### ~~6. Improve Skeleton Loading States~~ ✅ DONE
 
-**Problem:** 4 pages use generic text fallbacks instead of skeleton components:
-
-| Page | Current Fallback |
-|------|-----------------|
-| `app/(app)/match/[id]/live/page.tsx` | `"Loading match..."` |
-| `app/(app)/match/[id]/results/page.tsx` | `"Loading results..."` |
-| `app/(app)/match/lobby/[id]/page.tsx` | `"Loading lobby..."` |
-| `app/(app)/match/pending/page.tsx` | `"Loading challenges..."` |
-
-Additionally, `app/(app)/athlete/[id]/challenges/page.tsx` has inline skeleton markup instead of a named component.
-
-**Status:** 10 of 14 pages already have proper skeleton components. These 4 are the remaining gaps.
-
-**Recommendation:** Create `<MatchLiveSkeleton>`, `<ResultsSkeleton>`, `<LobbySkeleton>`, and `<PendingChallengesSkeleton>` components matching the layout of their content.
+**Fixed:** All 4 pages now have named skeleton components (`LiveMatchSkeleton`, `ResultsSkeleton`, `LobbySkeleton`, `PendingChallengesSkeleton`) that match their actual content layout with appropriate avatar circles, text blocks, badges, and card structures.
 
 ---
 
@@ -180,7 +167,7 @@ Additionally, `app/(app)/athlete/[id]/challenges/page.tsx` has inline skeleton m
 | 3 | Accessibility labels | High | Medium | ~30 files |
 | 4 | Split oversized components | Medium | Large | ~2,500 lines |
 | 5 | Code-splitting (`next/dynamic`) | Medium | Medium | ~10 files |
-| 6 | Skeleton loading states | Medium | Small | 4 pages |
+| ~~6~~ | ~~Skeleton loading states~~ | ~~Medium~~ | ~~Small~~ | ~~4 pages~~ ✅ |
 | 7 | Challenge sheet props | Low | Small | 2 files |
 | 8 | Data access layer coverage | Low | Small | 5 files |
 | 9 | Hook test coverage | Low | Medium | 2 hooks |

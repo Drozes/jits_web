@@ -19,7 +19,7 @@ import { Pencil } from "lucide-react";
 import type { Athlete } from "@/types/athlete";
 
 interface EditableProfileHeaderProps {
-  athlete: Athlete;
+  athlete: Pick<Athlete, "id" | "display_name" | "current_elo" | "highest_elo" | "current_weight" | "primary_gym_id" | "profile_photo_url">;
   gymName: string | null;
   stats: { wins: number; losses: number; winRate: number };
 }

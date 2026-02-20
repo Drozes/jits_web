@@ -13,7 +13,7 @@ interface AthleteStats {
 }
 
 interface StatOverviewProps {
-  athlete: Athlete;
+  athlete: Pick<Athlete, "current_elo" | "highest_elo">;
   stats: AthleteStats;
 }
 
