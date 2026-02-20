@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Clock, Target } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -11,27 +12,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { MatchParticipant } from "@/lib/api/queries";
 import type { SubmissionType } from "@/types/submission-type";
 
 interface SubmissionFieldsProps {
-  participants: MatchParticipant[];
   submissionTypes: SubmissionType[];
-  winnerId: string;
   submissionCode: string;
   defaultElapsedSeconds?: number;
-  onWinnerChange: (id: string) => void;
   onSubmissionChange: (code: string) => void;
   onFinishTimeChange: (seconds: number | undefined) => void;
 }
 
 export function SubmissionFields({
-  participants,
   submissionTypes,
-  winnerId,
   submissionCode,
   defaultElapsedSeconds,
-  onWinnerChange,
   onSubmissionChange,
   onFinishTimeChange,
 }: SubmissionFieldsProps) {
@@ -58,23 +52,10 @@ export function SubmissionFields({
     <Card>
       <CardContent className="space-y-4 py-4 px-4">
         <div className="space-y-2">
-          <Label>Winner</Label>
-          <Select value={winnerId} onValueChange={onWinnerChange}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select winner" />
-            </SelectTrigger>
-            <SelectContent>
-              {participants.map((p) => (
-                <SelectItem key={p.athlete_id} value={p.athlete_id}>
-                  {p.display_name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="space-y-2">
-          <Label>Submission Type</Label>
+          <Label className="flex items-center gap-1.5 text-muted-foreground">
+            <Target className="h-3.5 w-3.5" />
+            Submission Type
+          </Label>
           <Select value={submissionCode} onValueChange={onSubmissionChange}>
             <SelectTrigger>
               <SelectValue placeholder="Select submission" />
@@ -90,7 +71,10 @@ export function SubmissionFields({
         </div>
 
         <div className="space-y-2">
-          <Label>Finish Time (optional)</Label>
+          <Label className="flex items-center gap-1.5 text-muted-foreground">
+            <Clock className="h-3.5 w-3.5" />
+            Finish Time (optional)
+          </Label>
           <div className="flex items-center gap-2">
             <Input
               type="number"

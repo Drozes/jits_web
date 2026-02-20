@@ -27,28 +27,33 @@ export default function MatchResultsPage({
 
 function ResultsSkeleton() {
   return (
-    <div className="animate-pulse space-y-6 py-8">
-      {/* Outcome heading */}
-      <div className="h-7 w-40 mx-auto rounded bg-muted" />
-      {/* Result card with participant rows */}
-      <div className="rounded-lg border p-4 space-y-4">
-        <div className="h-5 w-24 rounded bg-muted" />
-        <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-full bg-muted" />
-          <div className="h-4 w-32 rounded bg-muted" />
-          <div className="ml-auto h-5 w-16 rounded-full bg-muted" />
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-full bg-muted" />
-          <div className="h-4 w-28 rounded bg-muted" />
-          <div className="ml-auto h-5 w-16 rounded-full bg-muted" />
+    <div className="animate-pulse space-y-6">
+      {/* Result type toggle */}
+      <div className="space-y-2">
+        <div className="h-4 w-40 rounded bg-muted" />
+        <div className="grid grid-cols-2 gap-2 rounded-xl bg-muted/50 p-1.5">
+          <div className="h-11 rounded-lg bg-muted" />
+          <div className="h-11 rounded-lg bg-muted" />
         </div>
       </div>
-      {/* Action buttons */}
+      {/* VS athlete cards */}
       <div className="space-y-3">
-        <div className="h-11 rounded-lg bg-muted" />
-        <div className="h-11 rounded-lg bg-muted" />
+        <div className="h-4 w-20 rounded bg-muted" />
+        <div className="flex gap-3">
+          <div className="flex-1 flex flex-col items-center gap-2 rounded-xl border-2 border-muted p-4">
+            <div className="h-14 w-14 rounded-full bg-muted" />
+            <div className="h-4 w-20 rounded bg-muted" />
+            <div className="h-3 w-14 rounded bg-muted" />
+          </div>
+          <div className="flex-1 flex flex-col items-center gap-2 rounded-xl border-2 border-muted p-4">
+            <div className="h-14 w-14 rounded-full bg-muted" />
+            <div className="h-4 w-20 rounded bg-muted" />
+            <div className="h-3 w-14 rounded bg-muted" />
+          </div>
+        </div>
       </div>
+      {/* Submit button */}
+      <div className="h-12 rounded-lg bg-muted" />
     </div>
   );
 }
