@@ -8,7 +8,6 @@ import type {
 import {
   type Result,
   mapPostgrestError,
-  mapRpcError,
 } from "./errors";
 
 type Client = SupabaseClient<Database>;
@@ -145,10 +144,8 @@ export async function startMatch(
     return { ok: false, error: mapPostgrestError(error) };
   }
 
+  // Errors come as PostgreSQL exceptions caught above.
   const response = data as unknown as StartMatchTimerResponse;
-  if (!response.success) {
-    return { ok: false, error: mapRpcError(response) };
-  }
   return { ok: true, data: response };
 }
 
@@ -177,10 +174,8 @@ export async function recordMatchResult(
     return { ok: false, error: mapPostgrestError(error) };
   }
 
+  // Errors come as PostgreSQL exceptions caught above.
   const response = data as unknown as RecordResultResponse;
-  if (!response.success) {
-    return { ok: false, error: mapRpcError(response) };
-  }
   return { ok: true, data: response };
 }
 

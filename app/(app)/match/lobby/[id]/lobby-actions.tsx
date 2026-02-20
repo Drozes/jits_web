@@ -53,9 +53,15 @@ export function LobbyActions({ challengeId, status, isChallenger, currentWeight 
 
   async function handleCancel() {
     setLoading(true);
-    broadcastCancelled();
+    setError(null);
     const supabase = createClient();
-    await cancelChallenge(supabase, challengeId);
+    const result = await cancelChallenge(supabase, challengeId);
+    if (!result.ok) {
+      setError(result.error.message);
+      setLoading(false);
+      return;
+    }
+    broadcastCancelled();
     router.push("/match/pending");
   }
 

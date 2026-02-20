@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import type { ConversationRow } from "@/lib/api/chat-queries";
-import { cn, getInitials, getProfilePhotoUrl } from "@/lib/utils";
+import { cn, getInitials, getProfilePhotoUrl, formatRelativeTime } from "@/lib/utils";
 import { OnlineIndicator } from "./online-indicator";
 import { Users } from "lucide-react";
 
@@ -84,25 +84,4 @@ export function ConversationCard({
       )}
     </Link>
   );
-}
-
-function formatRelativeTime(iso: string): string {
-  const now = Date.now();
-  const then = new Date(iso).getTime();
-  const diffMs = now - then;
-  const diffMin = Math.floor(diffMs / 60_000);
-
-  if (diffMin < 1) return "now";
-  if (diffMin < 60) return `${diffMin}m`;
-
-  const diffHr = Math.floor(diffMin / 60);
-  if (diffHr < 24) return `${diffHr}h`;
-
-  const diffDay = Math.floor(diffHr / 24);
-  if (diffDay < 7) return `${diffDay}d`;
-
-  return new Date(iso).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-  });
 }

@@ -82,8 +82,9 @@ export function useChatChannel({
     channelRef.current = channel;
 
     return () => {
-      typingTimers.current.forEach((t) => clearTimeout(t));
-      typingTimers.current.clear();
+      const timers = typingTimers.current;
+      timers.forEach((t) => clearTimeout(t));
+      timers.clear();
       supabase.removeChannel(channel);
     };
   }, [conversationId, currentAthleteId]);

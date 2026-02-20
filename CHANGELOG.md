@@ -10,6 +10,17 @@
 - `app/(app)/match/lobby/[id]/lobby-actions.tsx` — Removed non-null assertion on `match_id` (now typed as required).
 - `lib/api/errors.ts` — `mapPostgrestError()` now maps `P0001` business logic errors using `error.hint` (e.g. `not_participant`, `invalid_status`) to clean domain error messages instead of falling through to "Unknown error".
 
+### Cleanup: match flow & chat tech debt (2026-02-19)
+
+**Fixed**
+- `hooks/use-chat-channel.ts` — Copied `typingTimers.current` to local variable in cleanup to fix React lint warning about stale ref values.
+- `app/(app)/match/lobby/[id]/lobby-actions.tsx` — `handleCancel` now checks mutation result and shows errors instead of fire-and-forget navigation.
+- `lib/api/mutations.ts` — Removed dead `!response.success` checks from `startMatch()` and `recordMatchResult()` (errors come as PostgreSQL exceptions, not response bodies). Removed unused `mapRpcError` import.
+
+**Changed**
+- `lib/utils.ts` — Added `formatRelativeTime()` (minute/hour granularity: "now", "5m", "3h", "2d", "Jan 15") extracted from `conversation-card.tsx`.
+- `components/domain/conversation-card.tsx` — Now imports `formatRelativeTime` from `lib/utils` instead of defining its own copy.
+
 ### Dashboard Query Consolidation + Dead Code Cleanup (2026-02-18)
 
 **Changed**
