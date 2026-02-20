@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { createChallenge } from "@/lib/api/mutations";
+import { canCreateChallenge } from "@/lib/api/queries";
 import {
   Sheet,
   SheetContent,
@@ -15,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Swords, TrendingUp, TrendingDown, Minus, Check } from "lucide-react";
+import { Swords, TrendingUp, TrendingDown, Minus, Check, AlertCircle, Loader2 } from "lucide-react";
 import type { EloStakes } from "@/types/composites";
 import { MATCH_TYPE, type MatchType } from "@/lib/constants";
 
@@ -50,6 +51,20 @@ export function ChallengeSheet({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [canChallenge, setCanChallenge] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (!open) {
+      setCanChallenge(null);
+      return;
+    }
+    let cancelled = false;
+    const supabase = createClient();
+    canCreateChallenge(supabase, competitorId).then((ok) => {
+      if (!cancelled) setCanChallenge(ok);
+    });
+    return () => { cancelled = true; };
+  }, [open, competitorId]);
 
   useEffect(() => {
     if (matchType !== MATCH_TYPE.RANKED || !open) {
@@ -76,11 +91,12 @@ export function ChallengeSheet({
     setWeightConfirmed(false);
     setError(null);
     setSuccess(false);
+    setCanChallenge(null);
   }
 
   async function handleSubmit() {
-    const parsedWeight = weight ? parseFloat(weight) : null;
-    if (!parsedWeight || parsedWeight <= 0 || parsedWeight > 500) {
+    const parsedWeight = weight ? parseFloat(weight) : NaN;
+    if (isNaN(parsedWeight) || parsedWeight <= 0 || parsedWeight > 500) {
       setError("Please enter a valid weight");
       return;
     }
@@ -127,7 +143,19 @@ export function ChallengeSheet({
           </SheetTitle>
         </SheetHeader>
 
-        {success ? (
+        {canChallenge === null && open ? (
+          <div className="flex items-center justify-center py-10">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : canChallenge === false ? (
+          <div className="flex flex-col items-center gap-3 py-10">
+            <AlertCircle className="h-10 w-10 text-muted-foreground" />
+            <p className="font-semibold">Can&apos;t Challenge</p>
+            <p className="text-sm text-muted-foreground text-center">
+              You have too many pending challenges or this opponent is currently unavailable.
+            </p>
+          </div>
+        ) : success ? (
           <div className="flex flex-col items-center gap-3 py-10">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
               <Check className="h-6 w-6 text-green-600" />

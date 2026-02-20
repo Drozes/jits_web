@@ -61,7 +61,7 @@ export function MatchTimer({
   }, [router, matchId, broadcastMatchEnded]);
 
   useEffect(() => {
-    if (!running || remaining <= 0) return;
+    if (!running) return;
     const interval = setInterval(() => {
       setRemaining((prev) => {
         if (prev <= 1) {
@@ -72,7 +72,7 @@ export function MatchTimer({
       });
     }, 1000);
     return () => clearInterval(interval);
-  }, [running, remaining]);
+  }, [running]);
 
   useEffect(() => {
     if (running && remaining === 0) handleEnd();

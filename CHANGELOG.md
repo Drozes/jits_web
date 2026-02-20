@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### Backend integration: get_match_details RPC, challenge expiration, canCreateChallenge (2026-02-20)
+
+**Changed**
+- `types/database.ts` — Regenerated to include `get_match_details` RPC from BE migration.
+- `lib/api/queries.ts` — `getMatchDetails()` now uses single `get_match_details` RPC call instead of two-query workaround (match + challenge join with JS merge). Same return type, no consumer changes needed.
+- `hooks/use-global-notifications.ts` — Added "Challenge Expired" toast notifications for both challenger (`challenger_id` filter) and opponent (`opponent_id` filter) when pg_cron auto-expires challenges.
+- `components/domain/challenge-sheet.tsx` — ChallengeSheet now validates `canCreateChallenge(opponentId)` when opened; shows loading spinner, then error state if at 3-challenge limit or opponent unavailable.
+
+**Fixed**
+- `app/(app)/match/[id]/live/match-timer.tsx` — Removed `remaining` from timer interval effect deps; was tearing down and re-creating the interval every second instead of once.
+- `app/(app)/match/lobby/[id]/lobby-actions.tsx` — Weight validation uses `isNaN()` instead of falsy check; Decline button now shows spinner instead of "...".
+- `components/domain/challenge-sheet.tsx` — Weight validation uses `isNaN()` instead of falsy check; `canCreateChallenge` async call now uses cleanup flag to prevent state update after unmount.
+- `hooks/use-global-notifications.ts` — `resolveSender()` no longer caches failed athlete lookups (prevents permanently showing "Someone").
+
 ### Push notifications — device registration, service worker, preferences UI (2026-02-20)
 
 **Added**

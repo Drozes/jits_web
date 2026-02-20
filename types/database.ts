@@ -660,6 +660,7 @@ export type Database = {
         Args: { p_other_athlete_id: string }
         Returns: Json
       }
+      expire_pending_challenges: { Args: never; Returns: number }
       get_arena_data: { Args: { p_limit?: number }; Returns: Json }
       get_athlete_stats: {
         Args: { p_athlete_id: string }
@@ -710,6 +711,7 @@ export type Database = {
           rating_before: number
         }[]
       }
+      get_match_details: { Args: { p_match_id: string }; Returns: Json }
       get_match_history: {
         Args: { p_athlete_id: string }
         Returns: {

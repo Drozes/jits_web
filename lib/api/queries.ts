@@ -187,6 +187,7 @@ export interface MatchParticipant {
   athlete_id: string;
   display_name: string;
   current_elo: number;
+  profile_photo_url: string | null;
   role: string;
   outcome: string | null;
   elo_before: number | null;
@@ -207,59 +208,25 @@ export interface MatchDetails {
   participants: MatchParticipant[];
 }
 
-/** Fetch match details with participants for live/results screens */
+/** Fetch match details with participants for live/results screens. */
 export async function getMatchDetails(
   supabase: Client,
   matchId: string,
 ): Promise<MatchDetails | null> {
-  const { data } = await supabase
-    .from("matches")
-    .select(
-      `id, challenge_id, match_type, duration_seconds, status, result, started_at, completed_at,
-      match_participants(
-        athlete_id, role, outcome, elo_before, elo_after, elo_delta, weight_division_gap,
-        athletes!fk_participants_athlete(display_name, current_elo)
-      )`,
-    )
-    .eq("id", matchId)
-    .single();
+  const { data, error } = await supabase.rpc("get_match_details", {
+    p_match_id: matchId,
+  });
 
-  if (!data) return null;
+  if (error || !data) return null;
 
-  const participants = ((data.match_participants ?? []) as unknown[]).map(
-    (p: unknown) => {
-      const part = p as Record<string, unknown>;
-      const athleteRaw = part.athletes as
-        | { display_name: string; current_elo: number }
-        | { display_name: string; current_elo: number }[]
-        | null;
-      const athlete = Array.isArray(athleteRaw)
-        ? athleteRaw[0]
-        : athleteRaw;
-      return {
-        athlete_id: part.athlete_id as string,
-        display_name: athlete?.display_name ?? "Unknown",
-        current_elo: athlete?.current_elo ?? 1000,
-        role: part.role as string,
-        outcome: part.outcome as string | null,
-        elo_before: part.elo_before as number | null,
-        elo_after: part.elo_after as number | null,
-        elo_delta: (part.elo_delta as number) ?? 0,
-        weight_division_gap: (part.weight_division_gap as number | null) ?? null,
-      };
-    },
-  );
+  const result = data as unknown as {
+    match: Omit<MatchDetails, "participants">;
+    participants: MatchParticipant[];
+  };
 
   return {
-    id: data.id,
-    challenge_id: data.challenge_id,
-    match_type: data.match_type,
-    duration_seconds: data.duration_seconds,
-    status: data.status,
-    result: data.result,
-    started_at: data.started_at,
-    completed_at: data.completed_at,
-    participants,
+    ...result.match,
+    participants: result.participants,
   };
 }
 

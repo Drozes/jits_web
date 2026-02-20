@@ -24,9 +24,12 @@ async function resolveSender(
     .eq("id", senderId)
     .single();
 
+  // Don't cache failed lookups — allow retry on next notification
+  if (!data) return { name: "Someone", avatarUrl: null };
+
   const meta: SenderMeta = {
-    name: data?.display_name ?? "Someone",
-    avatarUrl: data?.profile_photo_url ?? null,
+    name: data.display_name ?? "Someone",
+    avatarUrl: data.profile_photo_url ?? null,
   };
   cache.set(senderId, meta);
   return meta;
@@ -123,6 +126,50 @@ export function useGlobalNotifications(currentAthleteId: string): void {
               title: "Challenge Declined",
               body: `${opponent.name} declined your challenge`,
               avatarUrl: opponent.avatarUrl,
+            });
+          }
+
+          if (challenge.status === "expired") {
+            const opponent = await resolveSender(
+              supabase,
+              challenge.opponent_id,
+              senderCache.current,
+            );
+            showNotification({
+              type: "challenge",
+              title: "Challenge Expired",
+              body: `Your challenge to ${opponent.name} has expired`,
+              avatarUrl: opponent.avatarUrl,
+            });
+          }
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "challenges",
+          filter: `opponent_id=eq.${currentAthleteId}`,
+        },
+        async (payload) => {
+          const challenge = payload.new as {
+            id: string;
+            status: string;
+            challenger_id: string;
+          };
+
+          if (challenge.status === "expired") {
+            const challenger = await resolveSender(
+              supabase,
+              challenge.challenger_id,
+              senderCache.current,
+            );
+            showNotification({
+              type: "challenge",
+              title: "Challenge Expired",
+              body: `${challenger.name}'s challenge has expired`,
+              avatarUrl: challenger.avatarUrl,
             });
           }
         },
