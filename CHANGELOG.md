@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Version label on profile (2026-02-21)
+
+**Added**
+- `package.json` — Added `name` ("jits-web") and `version` ("0.1.0") fields.
+- `app/(app)/profile/profile-content.tsx` — Small "JITS v0.1.0" label at bottom of profile page.
+
 ### Backend integration: get_match_details RPC, challenge expiration, canCreateChallenge (2026-02-20)
 
 **Changed**
