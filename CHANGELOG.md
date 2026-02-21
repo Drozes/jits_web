@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Arena toggle defaults to both match types (2026-02-21)
+
+**Changed**
+- `app/(app)/arena/looking-for-match-toggle.tsx` — "Looking for Match" toggle now enables both Casual and Ranked by default (was Casual only).
+
 ### Version label on profile (2026-02-21)
 
 **Added**

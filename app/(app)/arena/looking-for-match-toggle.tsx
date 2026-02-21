@@ -47,9 +47,10 @@ export function LookingForMatchToggle({
 
   async function handleToggle(checked: boolean) {
     if (checked) {
-      // Turning on: default to casual
+      // Turning on: default to both casual and ranked
       setCasual(true);
-      await persist(true, ranked);
+      setRanked(true);
+      await persist(true, true);
     } else {
       // Turning off: clear both
       setCasual(false);
