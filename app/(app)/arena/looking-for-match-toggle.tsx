@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { toggleMatchPreferences } from "@/lib/api/mutations";
 import { joinLobby, leaveLobby } from "@/hooks/use-lobby-presence";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -27,10 +28,16 @@ export function LookingForMatchToggle({
 
   async function persist(nextCasual: boolean, nextRanked: boolean) {
     const supabase = createClient();
-    await supabase
-      .from("athletes")
-      .update({ looking_for_casual: nextCasual, looking_for_ranked: nextRanked })
-      .eq("id", athleteId);
+    const result = await toggleMatchPreferences(supabase, athleteId, {
+      lookingForCasual: nextCasual,
+      lookingForRanked: nextRanked,
+    });
+
+    if (!result.ok) {
+      setCasual(initialCasual);
+      setRanked(initialRanked);
+      return;
+    }
 
     if (nextCasual || nextRanked) {
       joinLobby({

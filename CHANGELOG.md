@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Code quality audit fixes (2026-03-06)
+
+**Fixed**
+- `components/domain/conversation-card.tsx` — Unread timestamp used `text-primary` (brand color); changed to `text-foreground` per color token conventions.
+- `lib/api/mutations.ts` — `createChallenge()` had unsafe `.data!` non-null assertion on `auth_athlete_id` RPC; replaced with proper null check and early error return.
+- `app/(app)/arena/looking-for-match-toggle.tsx` — Used raw `supabase.from("athletes").update()` instead of `toggleMatchPreferences()` mutation from API layer; now uses mutation with optimistic rollback on failure.
+
 ### Arena toggle defaults to both match types (2026-02-21)
 
 **Changed**

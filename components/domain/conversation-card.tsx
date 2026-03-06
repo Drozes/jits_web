@@ -56,7 +56,7 @@ export function ConversationCard({
             <span
               className={cn(
                 "shrink-0 text-xs",
-                hasUnread ? "font-medium text-primary" : "text-muted-foreground",
+                hasUnread ? "font-medium text-foreground" : "text-muted-foreground",
               )}
             >
               {timeLabel}

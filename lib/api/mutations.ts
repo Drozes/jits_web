@@ -28,10 +28,15 @@ export async function createChallenge(
   supabase: Client,
   params: CreateChallengeParams,
 ): Promise<Result<{ id: string }>> {
+  const authResult = await supabase.rpc("auth_athlete_id");
+  if (authResult.error || !authResult.data) {
+    return { ok: false, error: { code: "UNKNOWN" as const, message: "Could not identify current athlete" } };
+  }
+
   const { data, error } = await supabase
     .from("challenges")
     .insert({
-      challenger_id: (await supabase.rpc("auth_athlete_id")).data!,
+      challenger_id: authResult.data,
       opponent_id: params.opponentId,
       match_type: params.matchType,
       challenger_weight: params.challengerWeight,
