@@ -194,7 +194,12 @@ Shell components that define the app's structure:
 
 **Low — code style improvements:**
 - [x] `share-profile-sheet.tsx` refactored to use `athlete` object prop
+- [x] `conversation-card.tsx` — fixed `text-primary` on unread timestamp → `text-foreground`
+- [x] `mutations.ts` — fixed unsafe `.data!` on `auth_athlete_id` RPC → null-safe check
+- [x] `looking-for-match-toggle.tsx` — raw Supabase `.update()` → `toggleMatchPreferences()` mutation
 - [ ] Auth form components (`login-form`, `sign-up-form`, `forgot-password-form`) share ~70% identical code
+- [ ] 12 components exceed 80-line target (largest: `challenge-response-sheet` 301, `swipe-discovery-client` 284, `challenge-sheet` 274, `record-result-form` 260)
+- [ ] 5 components have props that should be grouped into objects (`message-bubble`, `chat-thread`, `lobby-actions`, `arena-content`, `looking-for-match-toggle`)
 
 ## Chat UI Patterns
 
