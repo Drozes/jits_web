@@ -2,22 +2,22 @@
 
 ## [Unreleased]
 
-### Phase 1: Registration and onboarding updates (2026-04-12)
+### Phase 3: Gym Finder, Sessions & Dashboard Card (2026-04-12)
 
 **Added**
-- `app/profile/setup/theme-picker.tsx` — Extracted theme picker into standalone client component (~40 lines).
-- `app/profile/setup/tos-step.tsx` — Terms of Service acceptance step with scrollable text, checkbox, and continue button.
-- `lib/tos-content.ts` — Placeholder TOS text constant covering risk acknowledgement, liability release, facility rules, health/insurance, and code of conduct.
-- Gender (Select, M/F, required), Date of Birth (date input, required, age >= 16), and City (text, optional) fields added to setup form.
-- TOS acceptance stored via `waiver_acknowledgements` table (waiver slug `app-liability-v1`); setup form is now a two-step wizard (TOS first, then profile fields).
-- City field added to `EditableProfileHeader` with inline edit support (new `CityField` sub-component).
+- Gym Finder page at `/gyms` with search and session indicators (`app/(app)/gyms/`)
+- Gym Detail page at `/gyms/[id]` with session list and RSVP (`app/(app)/gyms/[id]/`)
+- Session card domain component (`components/domain/session-card.tsx`)
+- Gym card domain component (`components/domain/gym-card.tsx`)
+- Active session card on dashboard (`components/domain/active-session-card.tsx`)
+- "Start Session" button for gym members (prototype testing)
+- Session types (`types/session.ts`)
+- Session queries: `getGymsWithSessions`, `getGymDetail`, `getActiveSession` (`lib/api/queries.ts`)
+- Session mutations: `rsvpToSession`, `cancelRsvp`, `createSession` (`lib/api/mutations.ts`)
+- Session error codes in `lib/api/errors.ts`: `SESSION_NOT_FOUND`, `SESSION_FULL`, `ALREADY_JOINED`, `SESSION_NOT_ACTIVE`, `NOT_SESSION_PARTICIPANT`, `WAIVER_REQUIRED`
 
 **Changed**
-- `app/profile/setup/setup-form.tsx` — Replaced inline theme grid with `<ThemePicker />` import; added gender/DOB/city state, validation, and Supabase payload fields; added TOS step state. TOS insert has error handling with retry support.
-- `app/profile/setup/page.tsx` — Fetches `gender`, `date_of_birth`, `city` from athlete record; queries `waivers` and `waiver_acknowledgements` for TOS status; passes new props to `SetupForm`.
-- `lib/guards.ts` — Added `gender`, `date_of_birth`, `city` to `ATHLETE_GUARD_SELECT`.
-- `types/database.ts` — Updated generated types to include `gender`, `date_of_birth`, `city` on athletes table, plus `waivers`, `waiver_acknowledgements`, and other new tables from Phase 0 migrations.
-- `components/profile/editable-profile-header.tsx` — Added `city` to athlete prop Pick type, `EditingField` union, cancel/save logic, and render tree. Note: component is now ~430 lines (tech debt, already tracked).
+- Dashboard: replaced Challenges section with Active Session card
 
 ### Phase 2: Navigation and hidden features (2026-04-12)
 
@@ -35,6 +35,23 @@
 - `app/(app)/match/pending/pending-challenges-content.tsx` — Added `redirect("/")` to hide route.
 - `app/(app)/match/lobby/[id]/lobby-content.tsx` — Added `redirect("/")` to hide route.
 - `app/(app)/athlete/[id]/challenges/challenges-content.tsx` — Added `redirect("/")` to hide route.
+
+### Phase 1: Registration and onboarding updates (2026-04-12)
+
+**Added**
+- `app/profile/setup/theme-picker.tsx` — Extracted theme picker into standalone client component (~40 lines).
+- `app/profile/setup/tos-step.tsx` — Terms of Service acceptance step with scrollable text, checkbox, and continue button.
+- `lib/tos-content.ts` — Placeholder TOS text constant covering risk acknowledgement, liability release, facility rules, health/insurance, and code of conduct.
+- Gender (Select, M/F, required), Date of Birth (date input, required, age >= 16), and City (text, optional) fields added to setup form.
+- TOS acceptance stored via `waiver_acknowledgements` table (waiver slug `app-liability-v1`); setup form is now a two-step wizard (TOS first, then profile fields).
+- City field added to `EditableProfileHeader` with inline edit support (new `CityField` sub-component).
+
+**Changed**
+- `app/profile/setup/setup-form.tsx` — Replaced inline theme grid with `<ThemePicker />` import; added gender/DOB/city state, validation, and Supabase payload fields; added TOS step state. TOS insert has error handling with retry support.
+- `app/profile/setup/page.tsx` — Fetches `gender`, `date_of_birth`, `city` from athlete record; queries `waivers` and `waiver_acknowledgements` for TOS status; passes new props to `SetupForm`.
+- `lib/guards.ts` — Added `gender`, `date_of_birth`, `city` to `ATHLETE_GUARD_SELECT`.
+- `types/database.ts` — Updated generated types to include `gender`, `date_of_birth`, `city` on athletes table, plus `waivers`, `waiver_acknowledgements`, and other new tables from Phase 0 migrations.
+- `components/profile/editable-profile-header.tsx` — Added `city` to athlete prop Pick type, `EditingField` union, cancel/save logic, and render tree. Note: component is now ~430 lines (tech debt, already tracked).
 
 ### Code quality audit fixes (2026-03-06)
 

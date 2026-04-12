@@ -8,6 +8,12 @@ import type {
   ArenaData,
 } from "@/types/composites";
 import type { SubmissionType } from "@/types/submission-type";
+import type {
+  GymListItem,
+  GymDetail,
+  SessionListItem,
+  ActiveSessionInfo,
+} from "@/types/session";
 
 type Client = SupabaseClient<Database>;
 
@@ -311,6 +317,284 @@ export async function getPendingChallengeOpponentIds(
   for (const c of received ?? []) ids.add(c.challenger_id);
   return ids;
 }
+
+// ---------------------------------------------------------------------------
+// Sessions & Gyms
+// ---------------------------------------------------------------------------
+
+/** Fetch all active gyms with session counts and member counts */
+export async function getGymsWithSessions(
+  supabase: Client,
+): Promise<GymListItem[]> {
+  // 1. Fetch active gyms
+  const { data: gyms } = await supabase
+    .from("gyms")
+    .select("id, name, city, status")
+    .eq("status", "active")
+    .order("name");
+
+  if (!gyms || gyms.length === 0) return [];
+
+  // 2. Fetch member counts grouped by primary_gym_id
+  const { data: athletes } = await supabase
+    .from("athletes")
+    .select("primary_gym_id")
+    .eq("status", "active")
+    .not("primary_gym_id", "is", null);
+
+  const memberCountMap = new Map<string, number>();
+  for (const a of athletes ?? []) {
+    if (a.primary_gym_id) {
+      memberCountMap.set(a.primary_gym_id, (memberCountMap.get(a.primary_gym_id) ?? 0) + 1);
+    }
+  }
+
+  // 3. Fetch sessions that are active or upcoming scheduled
+  const { data: sessions } = await supabase
+    .from("sessions")
+    .select("id, gym_id, status, scheduled_start")
+    .in("status", ["active", "scheduled"]);
+
+  const activeMap = new Map<string, number>();
+  const upcomingMap = new Map<string, number>();
+  const now = new Date().toISOString();
+
+  for (const s of sessions ?? []) {
+    if (s.status === "active") {
+      activeMap.set(s.gym_id, (activeMap.get(s.gym_id) ?? 0) + 1);
+    } else if (s.status === "scheduled" && s.scheduled_start > now) {
+      upcomingMap.set(s.gym_id, (upcomingMap.get(s.gym_id) ?? 0) + 1);
+    }
+  }
+
+  // 4. Build GymListItem array, sort by active sessions first then name
+  const items: GymListItem[] = gyms.map((g) => {
+    const activeSessions = activeMap.get(g.id) ?? 0;
+    return {
+      id: g.id,
+      name: g.name,
+      city: g.city,
+      status: g.status,
+      memberCount: memberCountMap.get(g.id) ?? 0,
+      activeSessions,
+      upcomingSessions: upcomingMap.get(g.id) ?? 0,
+      hasActiveSession: activeSessions > 0,
+    };
+  });
+
+  items.sort((a, b) => {
+    if (a.hasActiveSession !== b.hasActiveSession) return a.hasActiveSession ? -1 : 1;
+    return a.name.localeCompare(b.name);
+  });
+
+  return items;
+}
+
+/** Fetch gym detail with sessions, RSVP info, and membership check */
+export async function getGymDetail(
+  supabase: Client,
+  gymId: string,
+  athleteId: string,
+): Promise<GymDetail | null> {
+  // 1. Fetch gym
+  const { data: gym } = await supabase
+    .from("gyms")
+    .select("id, name, city, status")
+    .eq("id", gymId)
+    .single();
+
+  if (!gym) return null;
+
+  // 2. Fetch current/upcoming sessions for this gym
+  const now = new Date().toISOString();
+  const { data: sessions } = await supabase
+    .from("sessions")
+    .select("id, title, scheduled_start, scheduled_end, status, max_participants, created_by")
+    .eq("gym_id", gymId)
+    .in("status", ["scheduled", "active"])
+    .gt("scheduled_end", now)
+    .order("scheduled_start", { ascending: true });
+
+  // 3. For each session, get participant counts and RSVP counts
+  const sessionIds = (sessions ?? []).map((s) => s.id);
+
+  // Parallel fetch: participants, RSVPs, and creator names
+  const [participantsResult, rsvpsResult, creatorsResult, athleteRsvpsResult] =
+    await Promise.all([
+      sessionIds.length > 0
+        ? supabase.from("session_participants").select("session_id").in("session_id", sessionIds)
+        : Promise.resolve({ data: [] as { session_id: string }[] }),
+      sessionIds.length > 0
+        ? supabase.from("session_rsvps").select("session_id").in("session_id", sessionIds)
+        : Promise.resolve({ data: [] as { session_id: string }[] }),
+      sessionIds.length > 0
+        ? supabase
+            .from("athletes")
+            .select("id, display_name")
+            .in("id", (sessions ?? []).map((s) => s.created_by))
+        : Promise.resolve({ data: [] as { id: string; display_name: string }[] }),
+      sessionIds.length > 0
+        ? supabase.from("session_rsvps").select("session_id").eq("athlete_id", athleteId).in("session_id", sessionIds)
+        : Promise.resolve({ data: [] as { session_id: string }[] }),
+    ]);
+
+  // Count participants per session
+  const participantCountMap = new Map<string, number>();
+  for (const p of participantsResult.data ?? []) {
+    participantCountMap.set(p.session_id, (participantCountMap.get(p.session_id) ?? 0) + 1);
+  }
+
+  // Count RSVPs per session
+  const rsvpCountMap = new Map<string, number>();
+  for (const r of rsvpsResult.data ?? []) {
+    rsvpCountMap.set(r.session_id, (rsvpCountMap.get(r.session_id) ?? 0) + 1);
+  }
+
+  // Creator name map
+  const creatorNameMap = new Map<string, string>();
+  for (const c of creatorsResult.data ?? []) {
+    creatorNameMap.set(c.id, c.display_name);
+  }
+
+  // Athlete's RSVP session IDs
+  const rsvpSessionIds = (athleteRsvpsResult.data ?? []).map(
+    (r) => r.session_id,
+  );
+
+  // 4. Build SessionListItems
+  const sessionListItems: SessionListItem[] = (sessions ?? []).map((s) => ({
+    id: s.id,
+    title: s.title,
+    scheduledStart: s.scheduled_start,
+    scheduledEnd: s.scheduled_end,
+    status: s.status,
+    participantCount: participantCountMap.get(s.id) ?? 0,
+    maxParticipants: s.max_participants,
+    rsvpCount: rsvpCountMap.get(s.id) ?? 0,
+    createdByName: creatorNameMap.get(s.created_by) ?? "Unknown",
+  }));
+
+  // 5. Check membership
+  const { data: athleteRow } = await supabase
+    .from("athletes")
+    .select("primary_gym_id")
+    .eq("id", athleteId)
+    .single();
+
+  const isMemberGym = athleteRow?.primary_gym_id === gymId;
+
+  return {
+    id: gym.id,
+    name: gym.name,
+    city: gym.city,
+    status: gym.status,
+    sessions: sessionListItems,
+    rsvpSessionIds,
+    isMemberGym,
+  };
+}
+
+/** Fetch active or upcoming session for dashboard card */
+export async function getActiveSession(
+  supabase: Client,
+  athleteId: string,
+): Promise<ActiveSessionInfo | null> {
+  // Priority 1: Active session where athlete is a participant (not 'left')
+  const { data: activeParticipants } = await supabase
+    .from("session_participants")
+    .select("session_id")
+    .eq("athlete_id", athleteId)
+    .neq("status", "left");
+
+  if (activeParticipants && activeParticipants.length > 0) {
+    // Check if any of those sessions are active
+    const participantSessionIds = activeParticipants.map((p) => p.session_id);
+    const { data: activeSessions } = await supabase
+      .from("sessions")
+      .select("id, gym_id, status, scheduled_start, scheduled_end")
+      .in("id", participantSessionIds)
+      .eq("status", "active")
+      .limit(1);
+
+    if (activeSessions && activeSessions.length > 0) {
+      const session = activeSessions[0];
+      // Get gym name
+      const { data: gymRow } = await supabase
+        .from("gyms")
+        .select("name")
+        .eq("id", session.gym_id)
+        .single();
+
+      // Count participants
+      const { count } = await supabase
+        .from("session_participants")
+        .select("id", { count: "exact", head: true })
+        .eq("session_id", session.id);
+
+      return {
+        sessionId: session.id,
+        gymId: session.gym_id,
+        gymName: gymRow?.name ?? "Unknown",
+        status: "active",
+        scheduledStart: session.scheduled_start,
+        scheduledEnd: session.scheduled_end,
+        participantCount: count ?? 0,
+        isRsvpd: false,
+      };
+    }
+  }
+
+  // Priority 2: Nearest upcoming session with an RSVP
+  const { data: rsvps } = await supabase
+    .from("session_rsvps")
+    .select("session_id")
+    .eq("athlete_id", athleteId);
+
+  if (rsvps && rsvps.length > 0) {
+    const rsvpSessionIds = rsvps.map((r) => r.session_id);
+    const now = new Date().toISOString();
+
+    const { data: upcomingSessions } = await supabase
+      .from("sessions")
+      .select("id, gym_id, status, scheduled_start, scheduled_end")
+      .in("id", rsvpSessionIds)
+      .eq("status", "scheduled")
+      .gt("scheduled_start", now)
+      .order("scheduled_start", { ascending: true })
+      .limit(1);
+
+    if (upcomingSessions && upcomingSessions.length > 0) {
+      const session = upcomingSessions[0];
+      const { data: gymRow } = await supabase
+        .from("gyms")
+        .select("name")
+        .eq("id", session.gym_id)
+        .single();
+
+      const { count } = await supabase
+        .from("session_participants")
+        .select("id", { count: "exact", head: true })
+        .eq("session_id", session.id);
+
+      return {
+        sessionId: session.id,
+        gymId: session.gym_id,
+        gymName: gymRow?.name ?? "Unknown",
+        status: "scheduled",
+        scheduledStart: session.scheduled_start,
+        scheduledEnd: session.scheduled_end,
+        participantCount: count ?? 0,
+        isRsvpd: true,
+      };
+    }
+  }
+
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Challenge lobby
+// ---------------------------------------------------------------------------
 
 /** Fetch full challenge details for match lobby screen */
 export async function getLobbyData(

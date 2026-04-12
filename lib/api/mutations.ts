@@ -185,6 +185,69 @@ export async function recordMatchResult(
 }
 
 // ---------------------------------------------------------------------------
+// Session mutations
+// ---------------------------------------------------------------------------
+
+/** RSVP to a scheduled session */
+export async function rsvpToSession(
+  supabase: Client,
+  sessionId: string,
+): Promise<Result<void>> {
+  const authResult = await supabase.rpc("auth_athlete_id");
+  if (authResult.error || !authResult.data) {
+    return { ok: false, error: { code: "UNKNOWN" as const, message: "Could not identify current athlete" } };
+  }
+
+  const { error } = await supabase
+    .from("session_rsvps")
+    .insert({ session_id: sessionId, athlete_id: authResult.data });
+
+  if (error) {
+    return { ok: false, error: mapPostgrestError(error, "session_rsvp") };
+  }
+  return { ok: true, data: undefined };
+}
+
+/** Cancel an existing RSVP */
+export async function cancelRsvp(
+  supabase: Client,
+  sessionId: string,
+): Promise<Result<void>> {
+  const authResult = await supabase.rpc("auth_athlete_id");
+  if (authResult.error || !authResult.data) {
+    return { ok: false, error: { code: "UNKNOWN" as const, message: "Could not identify current athlete" } };
+  }
+
+  const { error } = await supabase
+    .from("session_rsvps")
+    .delete()
+    .eq("session_id", sessionId)
+    .eq("athlete_id", authResult.data);
+
+  if (error) {
+    return { ok: false, error: mapPostgrestError(error) };
+  }
+  return { ok: true, data: undefined };
+}
+
+/** Create a 2-hour session starting now (prototype "Start Session" button) */
+export async function createSession(
+  supabase: Client,
+  gymId: string,
+): Promise<Result<{ id: string }>> {
+  const { data, error } = await supabase.rpc("create_session", {
+    p_gym_id: gymId,
+    p_scheduled_start: new Date().toISOString(),
+    p_scheduled_end: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
+  });
+
+  if (error) {
+    return { ok: false, error: mapPostgrestError(error) };
+  }
+  return { ok: true, data: { id: data } };
+}
+
+// ---------------------------------------------------------------------------
 // Athlete mutations
 // ---------------------------------------------------------------------------
 

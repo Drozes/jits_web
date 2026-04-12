@@ -14,6 +14,12 @@ export type DomainErrorCode =
   | "SELF_CONVERSATION"
   | "INVALID_ATHLETE"
   | "SEND_REQUIRES_ACTIVE"
+  | "SESSION_NOT_FOUND"
+  | "SESSION_FULL"
+  | "ALREADY_JOINED"
+  | "SESSION_NOT_ACTIVE"
+  | "NOT_SESSION_PARTICIPANT"
+  | "WAIVER_REQUIRED"
   | "RLS_VIOLATION"
   | "UNKNOWN";
 
@@ -62,6 +68,30 @@ const HINT_TO_CODE: Record<string, { code: DomainErrorCode; message: string }> =
     not_accepted: {
       code: "CHALLENGE_NOT_ACCEPTED",
       message: "Challenge has not been accepted yet.",
+    },
+    session_not_found: {
+      code: "SESSION_NOT_FOUND",
+      message: "Session not found.",
+    },
+    session_full: {
+      code: "SESSION_FULL",
+      message: "This session is full.",
+    },
+    already_joined: {
+      code: "ALREADY_JOINED",
+      message: "You have already joined this session.",
+    },
+    session_not_active: {
+      code: "SESSION_NOT_ACTIVE",
+      message: "This session is not currently active.",
+    },
+    not_session_participant: {
+      code: "NOT_SESSION_PARTICIPANT",
+      message: "You are not a participant in this session.",
+    },
+    waiver_required: {
+      code: "WAIVER_REQUIRED",
+      message: "You must sign the waiver before joining.",
     },
   };
 

@@ -4,10 +4,11 @@ import { requireAthlete } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
 import { StatOverview } from "@/components/domain/stat-overview";
 import { RecentActivitySection } from "@/components/domain/recent-activity-section";
+import { ActiveSessionCard } from "@/components/domain/active-session-card";
 import { AppHeader } from "@/components/layout/app-header";
 import { PageContainer } from "@/components/layout/page-container";
 import { PageHeaderActions } from "@/components/layout/page-header-actions";
-import { getDashboardSummary } from "@/lib/api/queries";
+import { getDashboardSummary, getActiveSession } from "@/lib/api/queries";
 import { ChevronRight, Radio, MapPin } from "lucide-react";
 
 function DashboardSkeleton() {
@@ -45,8 +46,11 @@ async function DashboardContent() {
   const { athlete } = await requireAthlete();
   const supabase = await createClient();
 
-  // Single RPC call for all dashboard data
-  const summary = await getDashboardSummary(supabase);
+  // Parallel fetch: dashboard summary + active session
+  const [summary, activeSession] = await Promise.all([
+    getDashboardSummary(supabase),
+    getActiveSession(supabase, athlete.id),
+  ]);
 
   const recentMatches = summary.recent_matches.map((m) => ({
     id: m.match_id,
@@ -91,6 +95,8 @@ async function DashboardContent() {
           bestWinStreak: summary.stats.best_win_streak,
         }}
       />
+
+      <ActiveSessionCard session={activeSession} />
 
       <RecentActivitySection myMatches={recentMatches} allActivity={recentActivity} />
     </div>
