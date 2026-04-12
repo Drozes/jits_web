@@ -2,24 +2,25 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Trophy, Search, MessageSquare, User } from "lucide-react";
+import { Home, MapPin, Trophy, User } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useUnreadCount } from "@/hooks/use-unread-count";
 
 const tabs = [
   { href: "/", label: "Home", icon: Home },
+  { href: "/gyms", label: "Gyms", icon: MapPin },
   { href: "/leaderboard", label: "Rankings", icon: Trophy },
-  { href: "/arena", label: "Arena", icon: Search },
-  { href: "/messages", label: "Messages", icon: MessageSquare },
   { href: "/profile", label: "Profile", icon: User },
 ] as const;
 
-// Hide the nav bar when inside a conversation thread
-const HIDE_PATTERNS = [/^\/messages\/[^/]+$/];
+// Hide the nav bar during session match flow, lobby, and join wizard
+const HIDE_PATTERNS = [
+  /^\/session\/[^/]+\/match\//,
+  /^\/session\/[^/]+\/lobby/,
+  /^\/session\/[^/]+\/join/,
+];
 
 export function BottomNavBar() {
   const pathname = usePathname();
-  const totalUnread = useUnreadCount();
 
   if (HIDE_PATTERNS.some((p) => p.test(pathname))) return null;
 
@@ -49,11 +50,6 @@ export function BottomNavBar() {
               >
                 <Icon className={cn("h-[18px] w-[18px] transition-all duration-200", isActive && "stroke-[2.5] scale-110")} />
               </div>
-              {href === "/messages" && totalUnread > 0 && (
-                <span className="absolute top-0.5 right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground shadow-sm">
-                  {totalUnread > 99 ? "99+" : totalUnread}
-                </span>
-              )}
               <span className={cn("transition-all duration-200", isActive && "font-semibold")}>{label}</span>
             </Link>
           );

@@ -15,12 +15,13 @@ export async function LobbyContent({
 }: {
   paramsPromise: Promise<{ id: string }>;
 }) {
+  redirect("/");
+  // All code below is unreachable (preserved for when redirect is removed)
   const { id: challengeId } = await paramsPromise;
   const { athlete } = await requireAthlete();
   const supabase = await createClient();
 
-  const lobby = await getLobbyData(supabase, challengeId);
-  if (!lobby) redirect("/match/pending");
+  const lobby = (await getLobbyData(supabase, challengeId))!;
 
   const isChallenger = athlete.id === lobby.challenger.id;
   const stakes =
@@ -56,18 +57,18 @@ export async function LobbyContent({
             </p>
             <div className="flex justify-center gap-4 text-sm font-semibold">
               <span className="text-green-500">
-                Win: +{isChallenger ? stakes.challenger_win : stakes.opponent_win}
+                Win: +{isChallenger ? stakes?.challenger_win : stakes?.opponent_win}
               </span>
               <span className="text-amber-500">
-                Draw: {isChallenger ? stakes.challenger_draw : stakes.opponent_draw}
+                Draw: {isChallenger ? stakes?.challenger_draw : stakes?.opponent_draw}
               </span>
               <span className="text-red-500">
-                Loss: {isChallenger ? stakes.challenger_loss : stakes.opponent_loss}
+                Loss: {isChallenger ? stakes?.challenger_loss : stakes?.opponent_loss}
               </span>
             </div>
-            {stakes.weight_division_gap > 0 && (
+            {(stakes?.weight_division_gap ?? 0) > 0 && (
               <p className="text-xs text-muted-foreground text-center mt-2">
-                {stakes.weight_division_gap} weight class{stakes.weight_division_gap > 1 ? "es" : ""} apart
+                {stakes?.weight_division_gap} weight class{(stakes?.weight_division_gap ?? 0) > 1 ? "es" : ""} apart
               </p>
             )}
           </CardContent>

@@ -8,7 +8,7 @@ import { ATHLETE_STATUS } from "@/lib/constants";
  * created_at, push_token, and role to reduce payload on every page load.
  */
 const ATHLETE_GUARD_SELECT =
-  "id, auth_user_id, display_name, current_elo, highest_elo, current_weight, primary_gym_id, profile_photo_url, looking_for_casual, looking_for_ranked, status, free_agent" as const;
+  "id, auth_user_id, display_name, current_elo, highest_elo, current_weight, primary_gym_id, profile_photo_url, looking_for_casual, looking_for_ranked, status, free_agent, gender, date_of_birth, city" as const;
 
 /**
  * Requires authentication. Returns the user if authenticated,

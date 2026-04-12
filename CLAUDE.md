@@ -176,7 +176,7 @@ Custom business components. Each should:
 
 Shell components that define the app's structure:
 - `app-header.tsx` — top bar with title, back button, optional actions
-- `bottom-nav-bar.tsx` — tab navigation (Home, Arena, Leaderboard, Profile)
+- `bottom-nav-bar.tsx` — tab navigation (Home, Gyms, Rankings, Profile)
 - `page-container.tsx` — content wrapper with consistent padding
 - `global-notifications-provider.tsx` — mounts realtime message listener (renders null)
 - `online-presence-bootstrap.tsx` — mounts `app:online` Presence channel (renders null)
@@ -198,7 +198,7 @@ Shell components that define the app's structure:
 - [x] `mutations.ts` — fixed unsafe `.data!` on `auth_athlete_id` RPC → null-safe check
 - [x] `looking-for-match-toggle.tsx` — raw Supabase `.update()` → `toggleMatchPreferences()` mutation
 - [ ] Auth form components (`login-form`, `sign-up-form`, `forgot-password-form`) share ~70% identical code
-- [ ] 12 components exceed 80-line target (largest: `challenge-response-sheet` 301, `swipe-discovery-client` 284, `challenge-sheet` 274, `record-result-form` 260)
+- [ ] 14 components exceed 80-line target (largest: `editable-profile-header` ~459, `setup-form` ~321, `challenge-response-sheet` 301, `swipe-discovery-client` 284, `challenge-sheet` 274, `record-result-form` 260)
 - [ ] 5 components have props that should be grouped into objects (`message-bubble`, `chat-thread`, `lobby-actions`, `arena-content`, `looking-for-match-toggle`)
 
 ## Chat UI Patterns
@@ -292,6 +292,23 @@ The browser client (`lib/supabase/client.ts`) is configured with:
 - `heartbeatIntervalMs: 15_000` — 15s heartbeat to prevent silent disconnections
 - `worker: true` — Web Worker for background tab support (critical for mobile PWA)
 
+## Feature Flags
+
+Two-tier system:
+- **Frontend flags** (`lib/feature-flags.ts`): Hardcoded constants for UI toggles during development. Use `getFlag("flagName")` in server components, `useFeatureFlag("flagName")` hook in client components.
+- **Backend flags** (`feature_flags` table): Database-controlled flags for backend features (e.g., `timekeeper_role`).
+
+Current frontend flags: `timekeeperEnabled` (false), `messagesEnabled` (false).
+
+## Hidden Routes (Session Transition)
+
+These routes redirect to `/` during the session-based transition. Code is preserved, not deleted:
+- `/arena`, `/arena/swipe` (replaced by Gyms + Sessions)
+- `/match/pending`, `/match/lobby/[id]` (challenge-based flow)
+- `/athlete/[id]/challenges`
+
+Dashboard challenges section also removed. Bottom nav: Home, Gyms, Rankings, Profile.
+
 ## Type Generation
 
 Run `npm run db:types` to regenerate `types/database.ts` from the local Supabase instance in the backend repo. Run this after every backend migration.
@@ -304,7 +321,8 @@ Run `npm run db:types` to regenerate `types/database.ts` from the local Supabase
 
 Read these docs before building challenge, match, ELO, or presence features. Key points:
 
-- **Athlete activation** requires `display_name` + `current_weight` + (`primary_gym_id` OR `free_agent = true`)
+- **Athlete activation** requires `display_name` + `current_weight` + (`primary_gym_id` OR `free_agent = true`) + `gender` + `date_of_birth`
+- **Setup flow:** Two-step wizard: Step 1 = TOS acceptance (waiver_acknowledgements), Step 2 = profile fields (name, weight, gym, gender, DOB, city, theme)
 - **Challenges:** INSERT with RLS validation, max 3 pending, opponent must be `active`
 - **Starting matches:** use `startMatchFromChallenge()` then `startMatch()` — never direct INSERT
 - **Recording results:** use `recordMatchResult()` — auto-calculates ELO for ranked matches

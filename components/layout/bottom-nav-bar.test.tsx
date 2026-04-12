@@ -6,18 +6,13 @@ vi.mock("next/navigation", () => ({
   usePathname: () => "/",
 }));
 
-vi.mock("@/hooks/use-unread-count", () => ({
-  useUnreadCount: () => 0,
-}));
-
 describe("BottomNavBar", () => {
-  it("renders all five navigation tabs", () => {
+  it("renders all four navigation tabs", () => {
     render(<BottomNavBar />);
 
     expect(screen.getByText("Home")).toBeInTheDocument();
+    expect(screen.getByText("Gyms")).toBeInTheDocument();
     expect(screen.getByText("Rankings")).toBeInTheDocument();
-    expect(screen.getByText("Arena")).toBeInTheDocument();
-    expect(screen.getByText("Messages")).toBeInTheDocument();
     expect(screen.getByText("Profile")).toBeInTheDocument();
   });
 
@@ -35,17 +30,13 @@ describe("BottomNavBar", () => {
     render(<BottomNavBar />);
 
     expect(screen.getByText("Home").closest("a")).toHaveAttribute("href", "/");
+    expect(screen.getByText("Gyms").closest("a")).toHaveAttribute(
+      "href",
+      "/gyms",
+    );
     expect(screen.getByText("Rankings").closest("a")).toHaveAttribute(
       "href",
       "/leaderboard",
-    );
-    expect(screen.getByText("Arena").closest("a")).toHaveAttribute(
-      "href",
-      "/arena",
-    );
-    expect(screen.getByText("Messages").closest("a")).toHaveAttribute(
-      "href",
-      "/messages",
     );
     expect(screen.getByText("Profile").closest("a")).toHaveAttribute(
       "href",

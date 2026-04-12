@@ -19,12 +19,12 @@ import { Pencil } from "lucide-react";
 import type { Athlete } from "@/types/athlete";
 
 interface EditableProfileHeaderProps {
-  athlete: Pick<Athlete, "id" | "display_name" | "current_elo" | "highest_elo" | "current_weight" | "primary_gym_id" | "profile_photo_url">;
+  athlete: Pick<Athlete, "id" | "display_name" | "current_elo" | "highest_elo" | "current_weight" | "primary_gym_id" | "profile_photo_url" | "city">;
   gymName: string | null;
   stats: { wins: number; losses: number; winRate: number };
 }
 
-type EditingField = "name" | "weight" | "gym" | null;
+type EditingField = "name" | "weight" | "gym" | "city" | null;
 
 export function EditableProfileHeader({
   athlete,
@@ -46,6 +46,9 @@ export function EditableProfileHeader({
   const [selectedGymId, setSelectedGymId] = useState(athlete.primary_gym_id ?? "");
   const [loadingGyms, setLoadingGyms] = useState(false);
 
+  // City state
+  const [cityValue, setCityValue] = useState(athlete.city ?? "");
+
   useEffect(() => {
     if (editing !== "gym") return;
     setLoadingGyms(true);
@@ -65,6 +68,7 @@ export function EditableProfileHeader({
     setName(athlete.display_name);
     setWeight(athlete.current_weight?.toString() ?? "");
     setSelectedGymId(athlete.primary_gym_id ?? "");
+    setCityValue(athlete.city ?? "");
     setEditing(null);
   };
 
@@ -108,6 +112,14 @@ export function EditableProfileHeader({
         return;
       }
       updateData = { primary_gym_id: gymId };
+    } else if (editing === "city") {
+      const trimmedCity = cityValue.trim() || null;
+      if (trimmedCity === (athlete.city ?? null)) {
+        setEditing(null);
+        setSaving(false);
+        return;
+      }
+      updateData = { city: trimmedCity };
     }
 
     const { error } = await supabase
@@ -170,6 +182,18 @@ export function EditableProfileHeader({
               loading={loadingGyms}
               onEdit={() => setEditing("gym")}
               onSelect={setSelectedGymId}
+              onSave={handleSave}
+              onCancel={cancelEdit}
+            />
+
+            <CityField
+              editing={editing === "city"}
+              city={cityValue}
+              initialCity={athlete.city}
+              saving={saving}
+              onEdit={() => setEditing("city")}
+              onChange={setCityValue}
+              onKeyDown={handleKeyDown}
               onSave={handleSave}
               onCancel={cancelEdit}
             />
@@ -358,6 +382,55 @@ function WeightField({
     <button onClick={onEdit} className="group flex items-center gap-1.5 text-left mt-0.5">
       <span className="text-sm text-muted-foreground">
         {initialWeight ? `${initialWeight} lbs` : "Set weight"}
+      </span>
+      <Pencil className="h-3 w-3 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 shrink-0" />
+    </button>
+  );
+}
+
+function CityField({
+  editing,
+  city,
+  initialCity,
+  saving,
+  onEdit,
+  onChange,
+  onKeyDown,
+  onSave,
+  onCancel,
+}: {
+  editing: boolean;
+  city: string;
+  initialCity: string | null;
+  saving: boolean;
+  onEdit: () => void;
+  onChange: (v: string) => void;
+  onKeyDown: (e: React.KeyboardEvent) => void;
+  onSave: () => void;
+  onCancel: () => void;
+}) {
+  if (editing) {
+    return (
+      <div className="flex items-center gap-2 mt-0.5">
+        <Input
+          value={city}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={onKeyDown}
+          autoFocus
+          placeholder="e.g. Austin, TX"
+          className="max-w-[160px] text-xs h-8"
+          maxLength={100}
+          disabled={saving}
+        />
+        <SaveCancelButtons saving={saving} onSave={onSave} onCancel={onCancel} />
+      </div>
+    );
+  }
+
+  return (
+    <button onClick={onEdit} className="group flex items-center gap-1.5 text-left mt-0.5">
+      <span className="text-sm text-muted-foreground truncate">
+        {initialCity || "Set city"}
       </span>
       <Pencil className="h-3 w-3 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 shrink-0" />
     </button>

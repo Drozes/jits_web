@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { requireAthlete } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
 import { AppHeader } from "@/components/layout/app-header";
@@ -16,6 +16,7 @@ export async function ChallengesContent({
 }: {
   paramsPromise: Promise<{ id: string }>;
 }) {
+  redirect("/");
   const { id: competitorId } = await paramsPromise;
   const { athlete: currentAthlete } = await requireAthlete();
   const supabase = await createClient();
@@ -40,7 +41,7 @@ export async function ChallengesContent({
 
   return (
     <>
-      <AppHeader title={`vs ${competitor.display_name}`} back />
+      <AppHeader title={`vs ${competitor!.display_name}`} back />
       <PageContainer className="pt-6">
         <Tabs defaultValue="active">
           <TabsList className="w-full">

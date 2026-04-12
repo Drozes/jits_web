@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
-import { Sun, Moon, Laptop, ArrowLeft } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -18,15 +18,22 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ProfilePhotoUpload } from "@/components/profile/profile-photo-upload";
+import { ThemePicker } from "./theme-picker";
+import { TosStep } from "./tos-step";
 
 interface SetupFormProps {
   athleteId: string | null;
   defaultDisplayName: string;
   defaultWeight?: string;
   defaultGymId?: string;
+  defaultGender?: string;
+  defaultDateOfBirth?: string;
+  defaultCity?: string;
   defaultProfilePhotoUrl?: string | null;
   gyms: { id: string; name: string }[];
   isEditing?: boolean;
+  hasAcceptedTos?: boolean;
+  waiverId?: string;
 }
 
 export function SetupForm({
@@ -34,17 +41,41 @@ export function SetupForm({
   defaultDisplayName,
   defaultWeight = "",
   defaultGymId = "",
+  defaultGender = "",
+  defaultDateOfBirth = "",
+  defaultCity = "",
   defaultProfilePhotoUrl = null,
   gyms,
   isEditing = false,
+  hasAcceptedTos = false,
+  waiverId,
 }: SetupFormProps) {
   const router = useRouter();
   const { theme, setTheme } = useTheme();
+  const [step, setStep] = useState<1 | 2>(hasAcceptedTos ? 2 : 1);
   const [displayName, setDisplayName] = useState(defaultDisplayName);
   const [weight, setWeight] = useState(defaultWeight);
   const [gymId, setGymId] = useState(defaultGymId);
+  const [gender, setGender] = useState(defaultGender);
+  const [dateOfBirth, setDateOfBirth] = useState(defaultDateOfBirth);
+  const [city, setCity] = useState(defaultCity);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  async function handleTosAccept() {
+    if (athleteId && waiverId) {
+      const supabase = createClient();
+      const { error: tosError } = await supabase.from("waiver_acknowledgements").insert({
+        athlete_id: athleteId,
+        waiver_id: waiverId,
+      });
+      if (tosError) {
+        setError("Failed to save Terms of Service acceptance. Please try again.");
+        return;
+      }
+    }
+    setStep(2);
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -61,20 +92,44 @@ export function SetupForm({
       return;
     }
 
+    if (!gender) {
+      setError("Gender is required");
+      return;
+    }
+
+    if (!dateOfBirth) {
+      setError("Date of birth is required");
+      return;
+    }
+
+    const dob = new Date(dateOfBirth);
+    const today = new Date();
+    const age = today.getFullYear() - dob.getFullYear();
+    const hasBirthdayPassed =
+      today.getMonth() > dob.getMonth() ||
+      (today.getMonth() === dob.getMonth() && today.getDate() >= dob.getDate());
+    if ((hasBirthdayPassed ? age : age - 1) < 16) {
+      setError("You must be at least 16 years old to compete");
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
     const supabase = createClient();
+    const payload = {
+      display_name: trimmed,
+      current_weight: parsedWeight,
+      primary_gym_id: gymId,
+      gender,
+      date_of_birth: dateOfBirth || null,
+      city: city.trim() || null,
+    };
 
     if (athleteId) {
-      // Update existing athlete record (auto-created by backend)
       const { error: updateError } = await supabase
         .from("athletes")
-        .update({
-          display_name: trimmed,
-          current_weight: parsedWeight,
-          primary_gym_id: gymId,
-        })
+        .update(payload)
         .eq("id", athleteId);
 
       if (updateError) {
@@ -83,12 +138,9 @@ export function SetupForm({
         return;
       }
     } else {
-      // Fallback: insert if no athlete record exists yet
-      const { error: insertError } = await supabase.from("athletes").insert({
-        display_name: trimmed,
-        current_weight: parsedWeight,
-        primary_gym_id: gymId,
-      });
+      const { error: insertError } = await supabase
+        .from("athletes")
+        .insert(payload);
 
       if (insertError) {
         setError(insertError.message);
@@ -97,7 +149,6 @@ export function SetupForm({
       }
     }
 
-    // Verify the backend activation trigger set status to 'active'
     const { data: updated } = await supabase
       .from("athletes")
       .select("status")
@@ -114,9 +165,20 @@ export function SetupForm({
       toast.success("Profile updated successfully");
       router.push("/profile");
     } else {
-      // Hard navigation to bypass client-side router cache
       window.location.href = "/";
     }
+  }
+
+  if (step === 1) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <h2 className="text-lg font-semibold mb-4">Terms of Service</h2>
+          <TosStep onAccept={handleTosAccept} />
+          {error && <p className="text-sm text-destructive mt-2">{error}</p>}
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
@@ -196,32 +258,49 @@ export function SetupForm({
           </div>
 
           <div className="flex flex-col gap-2">
-            <Label>Theme</Label>
-            <div className="grid grid-cols-3 gap-2">
-              {([
-                { value: "light", label: "Light", icon: Sun },
-                { value: "dark", label: "Dark", icon: Moon },
-                { value: "system", label: "System", icon: Laptop },
-              ] as const).map(({ value, label, icon: Icon }) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setTheme(value)}
-                  className={`flex flex-col items-center gap-1.5 rounded-lg border p-3 text-sm transition-colors ${
-                    theme === value
-                      ? "border-primary bg-primary/10 text-primary"
-                      : "border-border text-muted-foreground hover:border-primary/50"
-                  }`}
-                >
-                  <Icon size={18} />
-                  {label}
-                </button>
-              ))}
-            </div>
+            <Label>Gender</Label>
+            <Select value={gender} onValueChange={setGender}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select gender" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="M">Male</SelectItem>
+                <SelectItem value="F">Female</SelectItem>
+              </SelectContent>
+            </Select>
             <p className="text-xs text-muted-foreground">
-              You can change this later in your profile settings.
+              Used for competition brackets.
             </p>
           </div>
+
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="dateOfBirth">Date of Birth</Label>
+            <Input
+              id="dateOfBirth"
+              type="date"
+              value={dateOfBirth}
+              onChange={(e) => setDateOfBirth(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              You must be at least 16 to compete.
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="city">City</Label>
+            <Input
+              id="city"
+              placeholder="e.g. Austin, TX"
+              value={city}
+              onChange={(e) => setCity(e.target.value)}
+              maxLength={100}
+            />
+            <p className="text-xs text-muted-foreground">
+              Helps you find local sessions and gyms.
+            </p>
+          </div>
+
+          <ThemePicker theme={theme} onThemeChange={setTheme} />
 
           {error && (
             <p className="text-sm text-destructive">{error}</p>
@@ -229,7 +308,14 @@ export function SetupForm({
 
           <Button
             type="submit"
-            disabled={loading || !displayName.trim() || !weight || !gymId}
+            disabled={
+              loading ||
+              !displayName.trim() ||
+              !weight ||
+              !gymId ||
+              !gender ||
+              !dateOfBirth
+            }
           >
             {loading ? "Saving..." : isEditing ? "Save Changes" : "Get Started"}
           </Button>

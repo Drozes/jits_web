@@ -2,6 +2,40 @@
 
 ## [Unreleased]
 
+### Phase 1: Registration and onboarding updates (2026-04-12)
+
+**Added**
+- `app/profile/setup/theme-picker.tsx` — Extracted theme picker into standalone client component (~40 lines).
+- `app/profile/setup/tos-step.tsx` — Terms of Service acceptance step with scrollable text, checkbox, and continue button.
+- `lib/tos-content.ts` — Placeholder TOS text constant covering risk acknowledgement, liability release, facility rules, health/insurance, and code of conduct.
+- Gender (Select, M/F, required), Date of Birth (date input, required, age >= 16), and City (text, optional) fields added to setup form.
+- TOS acceptance stored via `waiver_acknowledgements` table (waiver slug `app-liability-v1`); setup form is now a two-step wizard (TOS first, then profile fields).
+- City field added to `EditableProfileHeader` with inline edit support (new `CityField` sub-component).
+
+**Changed**
+- `app/profile/setup/setup-form.tsx` — Replaced inline theme grid with `<ThemePicker />` import; added gender/DOB/city state, validation, and Supabase payload fields; added TOS step state. TOS insert has error handling with retry support.
+- `app/profile/setup/page.tsx` — Fetches `gender`, `date_of_birth`, `city` from athlete record; queries `waivers` and `waiver_acknowledgements` for TOS status; passes new props to `SetupForm`.
+- `lib/guards.ts` — Added `gender`, `date_of_birth`, `city` to `ATHLETE_GUARD_SELECT`.
+- `types/database.ts` — Updated generated types to include `gender`, `date_of_birth`, `city` on athletes table, plus `waivers`, `waiver_acknowledgements`, and other new tables from Phase 0 migrations.
+- `components/profile/editable-profile-header.tsx` — Added `city` to athlete prop Pick type, `EditingField` union, cancel/save logic, and render tree. Note: component is now ~430 lines (tech debt, already tracked).
+
+### Phase 2: Navigation and hidden features (2026-04-12)
+
+**Added**
+- `lib/feature-flags.ts` — Hardcoded feature flag utility with `getFlag()` and `FeatureFlag` type. Initial flags: `timekeeperEnabled`, `messagesEnabled` (both false).
+- `hooks/use-feature-flag.ts` — Client hook wrapper for `getFlag()`.
+- `app/(app)/gyms/page.tsx` — Placeholder Gyms page ("Coming soon") for bottom nav link.
+
+**Changed**
+- `components/layout/bottom-nav-bar.tsx` — Replaced 5-tab nav with 4 tabs: Home, Gyms (MapPin icon), Rankings, Profile. Removed Messages tab, unread badge, and `useUnreadCount` hook. Updated `HIDE_PATTERNS` for session sub-routes.
+- `components/layout/bottom-nav-bar.test.tsx` — Updated tests for new 4-tab configuration.
+- `app/(app)/page.tsx` — Removed Challenges section from dashboard. Updated HeroSubtitle CTA: "/arena" to "/gyms", "Start looking for matches" to "Find a session", Swords icon to MapPin.
+- `app/(app)/arena/page.tsx` — Added `redirect("/")` to hide route.
+- `app/(app)/arena/swipe/page.tsx` — Added `redirect("/")` to hide route.
+- `app/(app)/match/pending/pending-challenges-content.tsx` — Added `redirect("/")` to hide route.
+- `app/(app)/match/lobby/[id]/lobby-content.tsx` — Added `redirect("/")` to hide route.
+- `app/(app)/athlete/[id]/challenges/challenges-content.tsx` — Added `redirect("/")` to hide route.
+
 ### Code quality audit fixes (2026-03-06)
 
 **Fixed**

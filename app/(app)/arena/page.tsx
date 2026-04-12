@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { redirect } from "next/navigation";
 import { requireAthlete } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
 import { ArenaContent } from "./arena-content";
@@ -32,6 +33,7 @@ export default function ArenaPage() {
 }
 
 async function ArenaData() {
+  redirect("/");
   const { athlete: currentAthlete } = await requireAthlete();
   const supabase = await createClient();
 

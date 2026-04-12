@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { redirect } from "next/navigation";
 import { requireAthlete } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
 import { SwipeDiscoveryClient } from "./swipe-discovery-client";
@@ -14,6 +15,7 @@ export default function SwipeDiscoveryPage() {
 }
 
 async function SwipeData() {
+  redirect("/");
   const { athlete: currentAthlete } = await requireAthlete();
   const supabase = await createClient();
 

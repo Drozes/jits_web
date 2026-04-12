@@ -3,13 +3,12 @@ import Link from "next/link";
 import { requireAthlete } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
 import { StatOverview } from "@/components/domain/stat-overview";
-import { MatchCard } from "@/components/domain/match-card";
 import { RecentActivitySection } from "@/components/domain/recent-activity-section";
 import { AppHeader } from "@/components/layout/app-header";
 import { PageContainer } from "@/components/layout/page-container";
 import { PageHeaderActions } from "@/components/layout/page-header-actions";
 import { getDashboardSummary } from "@/lib/api/queries";
-import { Zap, ChevronRight, Radio, Swords } from "lucide-react";
+import { ChevronRight, Radio, MapPin } from "lucide-react";
 
 function DashboardSkeleton() {
   return (
@@ -48,43 +47,6 @@ async function DashboardContent() {
 
   // Single RPC call for all dashboard data
   const summary = await getDashboardSummary(supabase);
-
-  // Map accepted challenges (opponent already resolved by RPC)
-  const acceptedChallenges = summary.accepted_challenges.map((c) => ({
-    id: c.id,
-    created_at: c.created_at,
-    status: "accepted" as const,
-    matchType: c.match_type as "ranked" | "casual",
-    opponentName: c.opponent_name,
-    opponentPhotoUrl: c.opponent_photo_url,
-    href: `/match/lobby/${c.id}`,
-  }));
-
-  // Map pending challenges (photos now included in RPC)
-  const pendingChallenges = [
-    ...summary.pending_challenges.incoming.map((c) => ({
-      id: c.id,
-      created_at: c.created_at,
-      status: "pending" as const,
-      direction: "incoming" as const,
-      matchType: c.match_type as "ranked" | "casual",
-      opponentName: c.challenger_name,
-      opponentPhotoUrl: c.challenger_photo_url,
-      href: `/match/lobby/${c.id}`,
-    })),
-    ...summary.pending_challenges.sent.map((c) => ({
-      id: c.id,
-      created_at: c.created_at,
-      status: "pending" as const,
-      direction: "sent" as const,
-      matchType: c.match_type as "ranked" | "casual",
-      opponentName: c.opponent_name,
-      opponentPhotoUrl: c.opponent_photo_url,
-      href: `/match/lobby/${c.id}`,
-    })),
-  ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-
-  const allChallenges = [...acceptedChallenges, ...pendingChallenges];
 
   const recentMatches = summary.recent_matches.map((m) => ({
     id: m.match_id,
@@ -130,62 +92,6 @@ async function DashboardContent() {
         }}
       />
 
-      <section className="flex flex-col gap-3">
-        <Link
-          href="/match/pending"
-          className="flex items-center justify-between group"
-        >
-          <div className="flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-yellow-500/10">
-              <Zap className="h-4 w-4 text-yellow-500" />
-            </div>
-            <h2 className="text-lg font-semibold">Challenges</h2>
-            {allChallenges.length > 0 && (
-              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-bold text-primary-foreground">
-                {allChallenges.length}
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground group-hover:text-foreground transition-colors">
-            View all
-            <ChevronRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
-          </div>
-        </Link>
-        {allChallenges.length > 0 ? (
-          <div className="flex flex-col gap-2">
-            {allChallenges.slice(0, 3).map((c) => (
-              <MatchCard
-                key={c.id}
-                type="challenge"
-                opponentName={c.opponentName}
-                opponentPhotoUrl={c.opponentPhotoUrl}
-                direction={"direction" in c ? c.direction : undefined}
-                status={c.status === "accepted" ? "Accepted" : undefined}
-                matchType={c.matchType}
-                date={c.created_at}
-                href={c.href}
-              />
-            ))}
-            {allChallenges.length > 3 && (
-              <Link
-                href="/match/pending"
-                className="flex items-center justify-center gap-1.5 rounded-xl border border-border py-2.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:border-foreground/20 transition-colors"
-              >
-                +{allChallenges.length - 3} more challenges
-                <ChevronRight className="h-3.5 w-3.5" />
-              </Link>
-            )}
-          </div>
-        ) : (
-          <div className="rounded-2xl border border-dashed border-border p-8 text-center">
-            <p className="text-sm text-muted-foreground">No active challenges</p>
-            <Link href="/arena" className="text-xs font-medium text-primary hover:underline mt-2 inline-block">
-              Find an opponent
-            </Link>
-          </div>
-        )}
-      </section>
-
       <RecentActivitySection myMatches={recentMatches} allActivity={recentActivity} />
     </div>
   );
@@ -210,12 +116,12 @@ function HeroSubtitle({ lookingForCasual, lookingForRanked }: { lookingForCasual
 
   return (
     <Link
-      href="/arena"
+      href="/gyms"
       className="mt-2 flex items-center justify-between rounded-xl bg-primary/10 px-3.5 py-2.5 group w-full transition-colors hover:bg-primary/15 active:scale-[0.98]"
     >
       <div className="flex items-center gap-2">
-        <Swords className="h-4 w-4 text-primary" />
-        <span className="text-sm font-medium">Start looking for matches</span>
+        <MapPin className="h-4 w-4 text-primary" />
+        <span className="text-sm font-medium">Find a session</span>
       </div>
       <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
     </Link>

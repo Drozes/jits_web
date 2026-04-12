@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { requireAthlete } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
 import { AppHeader } from "@/components/layout/app-header";
@@ -18,6 +19,7 @@ import {
 import { Inbox, Send, Info, Search } from "lucide-react";
 
 export async function PendingChallengesContent() {
+  redirect("/");
   const { athlete } = await requireAthlete();
   const supabase = await createClient();
 
