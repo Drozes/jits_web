@@ -53,6 +53,33 @@ export async function requireAthlete() {
 }
 
 /**
+ * Requires athlete to be a checked-in participant of a session.
+ * Non-participants are redirected to the join page.
+ */
+export async function requireSessionParticipant(sessionId: string) {
+  const { user, athlete } = await requireAthlete();
+  const supabase = await createClient();
+
+  const { data: participant } = await supabase
+    .from("session_participants")
+    .select("id, status, weight_confirmed")
+    .eq("session_id", sessionId)
+    .eq("athlete_id", athlete.id)
+    .neq("status", "done")
+    .single();
+
+  if (!participant) {
+    redirect(`/session/${sessionId}/join`);
+  }
+
+  return {
+    user,
+    athlete,
+    participant: participant as { id: string; status: string; weight_confirmed: number | null },
+  };
+}
+
+/**
  * Like requireAthlete but returns null instead of redirecting.
  * Use in layouts/components that render on pages where the athlete
  * may not exist yet (e.g. /profile/setup).

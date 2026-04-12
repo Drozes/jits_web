@@ -13,6 +13,7 @@ import type {
   GymDetail,
   SessionListItem,
   ActiveSessionInfo,
+  SessionJoinData,
 } from "@/types/session";
 
 type Client = SupabaseClient<Database>;
@@ -590,6 +591,74 @@ export async function getActiveSession(
   }
 
   return null;
+}
+
+/** Fetch session data needed by the join wizard */
+export async function getSessionForJoin(
+  supabase: Client,
+  sessionId: string,
+  athleteId: string,
+): Promise<SessionJoinData | null> {
+  // 1. Fetch session with gym join
+  const { data: session } = await supabase
+    .from("sessions")
+    .select("id, gym_id, status, scheduled_start, scheduled_end, gyms!inner(name, city, latitude, longitude)")
+    .eq("id", sessionId)
+    .single();
+
+  if (!session || session.status === "completed" || session.status === "cancelled") {
+    return null;
+  }
+
+  const gym = session.gyms as unknown as {
+    name: string;
+    city: string | null;
+    latitude: number | null;
+    longitude: number | null;
+  };
+
+  // 2. Check for active app-level waiver
+  const { data: activeWaiver } = await supabase
+    .from("waivers")
+    .select("id")
+    .eq("scope", "app")
+    .eq("is_active", true)
+    .limit(1)
+    .maybeSingle();
+
+  const requiresWaiver = !!activeWaiver;
+
+  // 3. Check if athlete has signed the waiver
+  let hasSignedWaiver = false;
+  if (requiresWaiver && activeWaiver) {
+    const { data: ack } = await supabase
+      .from("waiver_acknowledgements")
+      .select("id")
+      .eq("waiver_id", activeWaiver.id)
+      .eq("athlete_id", athleteId)
+      .limit(1)
+      .maybeSingle();
+    hasSignedWaiver = !!ack;
+  }
+
+  // 4. Get athlete's current weight
+  const { data: athlete } = await supabase
+    .from("athletes")
+    .select("current_weight")
+    .eq("id", athleteId)
+    .single();
+
+  return {
+    sessionId: session.id,
+    gymName: gym.name,
+    gymCity: gym.city ?? null,
+    gymLatitude: gym.latitude ?? null,
+    gymLongitude: gym.longitude ?? null,
+    status: session.status,
+    requiresWaiver,
+    hasSignedWaiver,
+    athleteWeight: athlete?.current_weight ?? null,
+  };
 }
 
 // ---------------------------------------------------------------------------

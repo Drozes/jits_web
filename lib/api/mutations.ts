@@ -230,6 +230,61 @@ export async function cancelRsvp(
   return { ok: true, data: undefined };
 }
 
+/** Join a session lobby by inserting into session_participants */
+export async function joinSessionLobby(
+  supabase: Client,
+  params: { sessionId: string; confirmedWeight: number },
+): Promise<Result<{ participantId: string }>> {
+  const authResult = await supabase.rpc("auth_athlete_id");
+  if (authResult.error || !authResult.data) {
+    return { ok: false, error: { code: "UNKNOWN" as const, message: "Could not identify current athlete" } };
+  }
+
+  const { data, error } = await supabase
+    .from("session_participants")
+    .insert({
+      session_id: params.sessionId,
+      athlete_id: authResult.data,
+      status: "checked_in",
+      weight_confirmed: params.confirmedWeight,
+    })
+    .select("id")
+    .single();
+
+  if (error) {
+    return { ok: false, error: mapPostgrestError(error, "session_join") };
+  }
+  return { ok: true, data: { participantId: data.id } };
+}
+
+/** Accept a session waiver. Duplicate acknowledgements are treated as success. */
+export async function acceptSessionWaiver(
+  supabase: Client,
+  params: { sessionId: string; waiverId: string },
+): Promise<Result<void>> {
+  const authResult = await supabase.rpc("auth_athlete_id");
+  if (authResult.error || !authResult.data) {
+    return { ok: false, error: { code: "UNKNOWN" as const, message: "Could not identify current athlete" } };
+  }
+
+  const { error } = await supabase
+    .from("waiver_acknowledgements")
+    .insert({
+      waiver_id: params.waiverId,
+      athlete_id: authResult.data,
+      session_id: params.sessionId,
+    });
+
+  if (error) {
+    // Unique constraint violation = already signed; treat as success
+    if (error.code === "23505") {
+      return { ok: true, data: undefined };
+    }
+    return { ok: false, error: mapPostgrestError(error) };
+  }
+  return { ok: true, data: undefined };
+}
+
 /** Create a 2-hour session starting now (prototype "Start Session" button) */
 export async function createSession(
   supabase: Client,

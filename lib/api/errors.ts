@@ -119,7 +119,14 @@ export function mapPostgrestError(
   }
 
   if (error.code === "23505") {
-    // Unique constraint violation
+    // Unique constraint violation — infer from context
+    if (context === "session_join") {
+      return {
+        code: "ALREADY_JOINED",
+        message: "You have already joined this session.",
+        raw: error,
+      };
+    }
     return {
       code: "MATCH_ALREADY_EXISTS",
       message: "A match already exists for this challenge.",

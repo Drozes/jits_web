@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+### Phase 4: Session Lobby Entry (Join Wizard) (2026-04-12)
+
+**Added**
+- Session join wizard at `/session/[id]/join` with 4 steps: geo check, waiver, weight confirm, lobby entry (`app/(app)/session/[id]/join/`)
+- Geo check step with soft location validation using Haversine formula (`steps/geo-check-step.tsx`)
+- Waiver signing step with scrollable text and checkbox (`steps/waiver-step.tsx`)
+- Weight confirmation step pre-filled from athlete profile (`steps/weight-confirm-step.tsx`)
+- Confirm and join step with session summary and lobby entry (`steps/confirm-step.tsx`)
+- `requireSessionParticipant` guard in `lib/guards.ts` for lobby page access control
+- `getSessionForJoin` query in `lib/api/queries.ts` for fetching session, gym coords, waiver status, and athlete weight
+- `joinSessionLobby` and `acceptSessionWaiver` mutations in `lib/api/mutations.ts`
+- Context-aware unique constraint mapping in `lib/api/errors.ts` for `session_join` context
+
 ### Phase 3: Gym Finder, Sessions & Dashboard Card (2026-04-12)
 
 **Added**
