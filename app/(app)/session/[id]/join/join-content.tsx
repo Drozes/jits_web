@@ -22,7 +22,7 @@ export async function JoinContent({
     .select("id")
     .eq("session_id", sessionId)
     .eq("athlete_id", athlete.id)
-    .neq("status", "done")
+    .not("status", "in", "(done,left)")
     .limit(1)
     .maybeSingle();
 

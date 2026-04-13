@@ -29,6 +29,9 @@ export async function MatchFlowContent({
   paramsPromise: Promise<{ id: string; matchId: string }>;
 }) {
   const { id: sessionId, matchId } = await paramsPromise;
+  // Use requireAthlete (not requireSessionParticipant) because the match page
+  // must also be accessible to timekeepers. Participant validation happens
+  // via getMatchDetails RLS + the find check below.
   const { athlete } = await requireAthlete();
   const supabase = await createClient();
 

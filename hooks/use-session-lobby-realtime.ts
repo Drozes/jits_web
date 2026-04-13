@@ -79,7 +79,22 @@ export function useSessionLobbyRealtime(
         setParticipants((prev) => prev.map((p) => ids.includes(p.athleteId) ? { ...p, status: "in_match" } : p));
       })
       .on("broadcast", { event: "participant_joined" }, ({ payload }) => {
-        const p = payload as LobbyParticipant;
+        const raw = payload as Record<string, unknown>;
+        const p: LobbyParticipant = {
+          participantId: (raw.participantId as string) ?? "",
+          athleteId: raw.athleteId as string,
+          displayName: raw.displayName as string,
+          currentElo: raw.currentElo as number,
+          currentWeight: (raw.currentWeight as number) ?? null,
+          profilePhotoUrl: (raw.profilePhotoUrl as string) ?? null,
+          primaryGymId: null,
+          gymName: null,
+          status: "checked_in",
+          weightConfirmed: (raw.currentWeight as number) ?? null,
+          currentMatchId: null,
+          checkedInAt: new Date().toISOString(),
+          eloDistance: 0,
+        };
         setParticipants((prev) => prev.some((x) => x.athleteId === p.athleteId) ? prev : [...prev, p]);
       })
       .subscribe();

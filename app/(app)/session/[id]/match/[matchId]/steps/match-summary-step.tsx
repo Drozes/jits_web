@@ -11,12 +11,13 @@ interface MatchSummaryStepProps {
   onNext: () => void;
   matchId: string;
   matchType: "casual" | "ranked";
+  matchStatus: string;
   currentAthleteId: string;
   opponent: { id: string; displayName: string };
   resultData: BroadcastResult | null;
 }
 
-export function MatchSummaryStep({ onNext, matchId, matchType, currentAthleteId, opponent, resultData }: MatchSummaryStepProps) {
+export function MatchSummaryStep({ onNext, matchId, matchType, matchStatus, currentAthleteId, opponent, resultData }: MatchSummaryStepProps) {
   const [myConfirmed, setMyConfirmed] = useState(false);
   const [opponentConfirmed, setOpponentConfirmed] = useState(false);
   const [disputing, setDisputing] = useState(false);
@@ -43,6 +44,15 @@ export function MatchSummaryStep({ onNext, matchId, matchType, currentAthleteId,
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [matchId]);
+
+  // If the match is already completed on mount (e.g., after page refresh),
+  // auto-advance since the PG Changes event will never fire.
+  useEffect(() => {
+    if (matchStatus === "completed") {
+      const timer = setTimeout(() => onNextRef.current(), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [matchStatus]);
 
   async function handleConfirm() {
     if (confirmedRef.current) return;

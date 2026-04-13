@@ -65,7 +65,7 @@ export async function requireSessionParticipant(sessionId: string) {
     .select("id, status, weight_confirmed")
     .eq("session_id", sessionId)
     .eq("athlete_id", athlete.id)
-    .neq("status", "done")
+    .not("status", "in", "(done,left)")
     .single();
 
   if (!participant) {

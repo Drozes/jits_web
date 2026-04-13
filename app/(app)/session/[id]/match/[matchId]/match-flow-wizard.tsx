@@ -28,7 +28,7 @@ interface MatchFlowWizardProps {
 }
 
 export function MatchFlowWizard(props: MatchFlowWizardProps) {
-  const { sessionId, matchId, matchType, durationSeconds, currentAthlete, opponent, isTimekeeper, timekeeperEnabled, submissionTypes, initialStep } = props;
+  const { sessionId, matchId, matchType, matchStatus, durationSeconds, currentAthlete, opponent, isTimekeeper, timekeeperEnabled, submissionTypes, initialStep } = props;
   const [step, setStep] = useState<MatchFlowStep>(initialStep);
   const [startedAt, setStartedAt] = useState(props.startedAt);
   const resultRef = useRef<BroadcastResult | null>(null);
@@ -64,7 +64,7 @@ export function MatchFlowWizard(props: MatchFlowWizardProps) {
     case "result-recording":
       return <ResultRecordingStep onNext={handleNext} matchId={matchId} participants={[{ id: currentAthlete.id, displayName: currentAthlete.displayName }, { id: opponent.id, displayName: opponent.displayName }]} submissionTypes={submissionTypes} timekeeperEnabled={timekeeperEnabled} isTimekeeper={isTimekeeper} />;
     case "match-summary":
-      return <MatchSummaryStep onNext={handleNext} matchId={matchId} matchType={matchType} currentAthleteId={currentAthlete.id} opponent={opponent} resultData={resultRef.current} />;
+      return <MatchSummaryStep onNext={handleNext} matchId={matchId} matchType={matchType} matchStatus={matchStatus} currentAthleteId={currentAthlete.id} opponent={opponent} resultData={resultRef.current} />;
     case "match-recorded":
       return <MatchRecordedStep sessionId={sessionId} matchId={matchId} />;
   }
