@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { AthleteCard } from "@/components/domain/athlete-card";
 import { Crown, Medal, Award, Trophy, Users } from "lucide-react";
-import { getInitials, getProfilePhotoUrl } from "@/lib/utils";
+import { cn, getInitials, getProfilePhotoUrl } from "@/lib/utils";
 
 interface RankedAthlete {
   id: string;
@@ -18,6 +18,7 @@ interface RankedAthlete {
   wins: number;
   losses: number;
   isCurrentUser: boolean;
+  gender?: "M" | "F" | null;
 }
 
 interface RankedGym {
@@ -101,7 +102,16 @@ export function LeaderboardContent({
   challengedIds?: string[];
 }) {
   const [isAthleteMode, setIsAthleteMode] = useState(true);
+  const [genderFilter, setGenderFilter] = useState<"all" | "male" | "female">("all");
   const challengedSet = new Set(challengedIds);
+
+  const filteredAthletes = genderFilter === "all"
+    ? athletes
+    : athletes.filter((a) => {
+        if (genderFilter === "male") return a.gender === "M";
+        if (genderFilter === "female") return a.gender === "F";
+        return true;
+      });
 
   return (
     <div className="flex flex-col gap-6 animate-page-in">
@@ -121,18 +131,36 @@ export function LeaderboardContent({
 
       {isAthleteMode ? (
         <>
+          {/* Gender Filter Pills */}
+          <div className="flex justify-center gap-1.5">
+            {(["all", "male", "female"] as const).map((g) => (
+              <button
+                key={g}
+                onClick={() => setGenderFilter(g)}
+                className={cn(
+                  "rounded-full px-3.5 py-1.5 text-xs font-medium transition-all duration-200",
+                  genderFilter === g
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "bg-muted/60 text-muted-foreground hover:bg-muted",
+                )}
+              >
+                {g === "all" ? "All" : g === "male" ? "Male" : "Female"}
+              </button>
+            ))}
+          </div>
+
           {/* Top 3 Podium */}
-          {athletes.length >= 3 && (
+          {filteredAthletes.length >= 3 && (
             <div className="flex items-end justify-center gap-3">
-              <PodiumSlot athlete={athletes[1]} place={2} />
-              <PodiumSlot athlete={athletes[0]} place={1} />
-              <PodiumSlot athlete={athletes[2]} place={3} />
+              <PodiumSlot athlete={filteredAthletes[1]} place={2} />
+              <PodiumSlot athlete={filteredAthletes[0]} place={1} />
+              <PodiumSlot athlete={filteredAthletes[2]} place={3} />
             </div>
           )}
 
           {/* Full Rankings */}
           <div className="flex flex-col gap-2.5">
-            {athletes.map((a) => (
+            {filteredAthletes.map((a) => (
               <AthleteCard
                 key={a.id}
                 id={a.id}
@@ -145,11 +173,12 @@ export function LeaderboardContent({
                 profilePhotoUrl={a.profilePhotoUrl}
                 isCurrentUser={a.isCurrentUser}
                 hasPendingChallenge={challengedSet.has(a.id)}
+                eloTrend="neutral"
               />
             ))}
           </div>
 
-          {athletes.length === 0 && (
+          {filteredAthletes.length === 0 && (
             <p className="text-center text-sm text-muted-foreground">
               No athletes found
             </p>

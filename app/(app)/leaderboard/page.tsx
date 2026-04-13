@@ -42,7 +42,7 @@ async function LeaderboardData() {
   // Fetch all athletes ranked by ELO, join gym name
   const { data: athletes } = await supabase
     .from("athletes")
-    .select("id, display_name, current_elo, primary_gym_id, profile_photo_url, gyms!fk_athletes_primary_gym(name)")
+    .select("id, display_name, current_elo, primary_gym_id, profile_photo_url, gender, gyms!fk_athletes_primary_gym(name)")
     .eq("status", "active")
     .order("current_elo", { ascending: false })
     .limit(50);
@@ -60,6 +60,7 @@ async function LeaderboardData() {
       currentElo: a.current_elo,
       gymName: extractGymName(a.gyms as unknown as { name: string } | null) ?? undefined,
       profilePhotoUrl: a.profile_photo_url ?? undefined,
+      gender: a.gender as "M" | "F" | null,
       wins: stats.wins,
       losses: stats.losses,
       isCurrentUser: a.id === currentAthlete.id,

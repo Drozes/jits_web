@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Crown, Medal, Award } from "lucide-react";
+import { Crown, Medal, Award, TrendingUp, TrendingDown } from "lucide-react";
 import { getInitials, getProfilePhotoUrl } from "@/lib/utils";
 import { ChallengeBadge } from "./challenge-badge";
 import { OnlineIndicator } from "./online-indicator";
@@ -25,6 +25,7 @@ interface AthleteCardProps {
   profilePhotoUrl?: string;
   isCurrentUser?: boolean;
   hasPendingChallenge?: boolean;
+  eloTrend?: "up" | "down" | "neutral";
 }
 
 export function AthleteCard({
@@ -38,6 +39,7 @@ export function AthleteCard({
   profilePhotoUrl,
   isCurrentUser,
   hasPendingChallenge,
+  eloTrend,
 }: AthleteCardProps) {
   const card = (
     <Card
@@ -73,7 +75,11 @@ export function AthleteCard({
           </div>
         </div>
         <div className="text-right">
-          <div className="text-lg font-bold tabular-nums">{currentElo}</div>
+          <div className="flex items-center justify-end gap-1">
+            {eloTrend === "up" && <TrendingUp className="h-3 w-3 text-green-500" />}
+            {eloTrend === "down" && <TrendingDown className="h-3 w-3 text-red-500" />}
+            <span className="text-lg font-bold tabular-nums">{currentElo}</span>
+          </div>
           <div className="text-xs text-muted-foreground tabular-nums">
             <span className="text-green-500">{wins}W</span>
             <span className="mx-0.5">·</span>

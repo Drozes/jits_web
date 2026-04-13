@@ -2,6 +2,28 @@
 
 ## [Unreleased]
 
+### Phase 9: Leaderboard Updates (2026-04-13)
+
+**Added**
+- Gender filter pills (All/Male/Female) on leaderboard for client-side athlete filtering
+- `eloTrend` prop on `AthleteCard` for ELO trend indicators (hardcoded neutral for now)
+
+**Changed**
+- Leaderboard data fetch now includes `gender` column from athletes table
+- `AthleteCard` ELO display updated to support inline trend icon
+
+### Phase 10: Settings and Profile (2026-04-13)
+
+**Added**
+- Video Settings stub page at `app/(app)/settings/video/page.tsx`
+- Feedback stub page at `app/(app)/settings/feedback/page.tsx`
+- Help & Support stub page at `app/(app)/settings/help/page.tsx`
+- Settings "General" section with navigation links to Video, Feedback, and Help pages
+
+**Note**
+- City display and editing in profile header was already implemented in Phase 1
+- City is already included in `ATHLETE_GUARD_SELECT` from Phase 1
+
 ### Phase 7-8: Confirmation/Dispute + Dashboard Cleanup (2026-04-13)
 
 **Added**
