@@ -196,6 +196,7 @@ export interface MatchParticipant {
   athlete_id: string;
   display_name: string;
   current_elo: number;
+  current_weight: number | null;
   profile_photo_url: string | null;
   role: string;
   outcome: string | null;
@@ -207,13 +208,17 @@ export interface MatchParticipant {
 
 export interface MatchDetails {
   id: string;
-  challenge_id: string;
+  challenge_id: string | null;
+  session_id: string | null;
   match_type: string;
   duration_seconds: number;
   status: string;
   result: string | null;
   started_at: string | null;
   completed_at: string | null;
+  paused_at: string | null;
+  total_paused_duration: number;
+  timekeeper_id: string | null;
   participants: MatchParticipant[];
 }
 

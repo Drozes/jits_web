@@ -360,6 +360,101 @@ export async function requestRandomMatch(
 }
 
 // ---------------------------------------------------------------------------
+// Session match lifecycle mutations (RPC wrappers)
+// ---------------------------------------------------------------------------
+
+/** Pause an in-progress match timer. Returns the paused_at timestamp. */
+export async function pauseMatch(
+  supabase: Client,
+  matchId: string,
+): Promise<Result<{ paused_at: string }>> {
+  const { data, error } = await supabase.rpc("pause_match", {
+    p_match_id: matchId,
+  });
+
+  if (error) {
+    return { ok: false, error: mapPostgrestError(error) };
+  }
+
+  const response = data as unknown as { paused_at: string };
+  return { ok: true, data: { paused_at: response.paused_at } };
+}
+
+/** Resume a paused match. Returns the updated total_paused_duration. */
+export async function resumeMatch(
+  supabase: Client,
+  matchId: string,
+): Promise<Result<{ total_paused_duration: number }>> {
+  const { data, error } = await supabase.rpc("resume_match", {
+    p_match_id: matchId,
+  });
+
+  if (error) {
+    return { ok: false, error: mapPostgrestError(error) };
+  }
+
+  const response = data as unknown as { total_paused_duration: number };
+  return { ok: true, data: { total_paused_duration: response.total_paused_duration } };
+}
+
+/** End an in-progress match (stops timer, transitions to completed). */
+export async function endMatch(
+  supabase: Client,
+  matchId: string,
+): Promise<Result<void>> {
+  const { error } = await supabase.rpc("end_match", {
+    p_match_id: matchId,
+  });
+
+  if (error) {
+    return { ok: false, error: mapPostgrestError(error) };
+  }
+  return { ok: true, data: undefined };
+}
+
+/** Confirm the recorded match result. Auto-finalizes when both participants confirm. */
+export async function confirmMatchResult(
+  supabase: Client,
+  matchId: string,
+): Promise<Result<void>> {
+  const { data, error } = await supabase.rpc("confirm_match_result", {
+    p_match_id: matchId,
+  });
+
+  if (error) {
+    return { ok: false, error: mapPostgrestError(error) };
+  }
+
+  const response = data as unknown as { success: boolean; error?: string };
+  if (!response.success) {
+    return { ok: false, error: { code: "UNKNOWN", message: response.error ?? "Failed to confirm result" } };
+  }
+  return { ok: true, data: undefined };
+}
+
+/** Dispute a match result. Sets match status to disputed. */
+export async function disputeMatchResult(
+  supabase: Client,
+  matchId: string,
+  reason?: string,
+): Promise<Result<void>> {
+  const { data, error } = await supabase.rpc("dispute_match_result", {
+    p_match_id: matchId,
+    p_reason: reason ?? undefined,
+  });
+
+  if (error) {
+    return { ok: false, error: mapPostgrestError(error) };
+  }
+
+  const response = data as unknown as { success: boolean; error?: string };
+  if (!response.success) {
+    return { ok: false, error: { code: "UNKNOWN", message: response.error ?? "Failed to dispute result" } };
+  }
+  return { ok: true, data: undefined };
+}
+
+// ---------------------------------------------------------------------------
 // Athlete mutations
 // ---------------------------------------------------------------------------
 

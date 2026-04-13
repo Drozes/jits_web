@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+### Phase 6: Session Match Flow (2026-04-12)
+
+**Added**
+- Match flow wizard at `/session/[id]/match/[matchId]` with 8-step state machine (`app/(app)/session/[id]/match/[matchId]/`)
+- Timer hook (`hooks/use-session-match-timer.ts`) with pause/resume awareness and broadcast sync
+- Match sync hook (`hooks/use-session-match-sync.ts`) for 7 broadcast events (timer, ready, result, confirm)
+- Video recorder hook (`hooks/use-video-recorder.ts`) with MediaRecorder, codec negotiation, Supabase Storage upload
+- 8 step components: timekeeper-wait, weight-verify, ready-check, fighter-live, timekeeper-live, result-recording, match-summary, match-recorded
+- 5 mutations: `pauseMatch`, `resumeMatch`, `endMatch`, `confirmMatchResult`, `disputeMatchResult`
+- 3 error codes: `MATCH_NOT_PAUSED`, `ALREADY_CONFIRMED`, `ALREADY_DISPUTED`
+- Dual confirmation flow with Postgres Changes auto-advance on both-confirm
+- Timekeeper disconnect fallback (60s timeout) in result recording
+
+**Changed**
+- `lib/api/queries.ts` extended `MatchDetails` with session fields (`session_id`, `paused_at`, `total_paused_duration`, `timekeeper_id`)
+
 ### Phase 5: Session Lobby (2026-04-12)
 
 **Added**

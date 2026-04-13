@@ -20,6 +20,9 @@ export type DomainErrorCode =
   | "SESSION_NOT_ACTIVE"
   | "NOT_SESSION_PARTICIPANT"
   | "WAIVER_REQUIRED"
+  | "MATCH_NOT_PAUSED"
+  | "ALREADY_CONFIRMED"
+  | "ALREADY_DISPUTED"
   | "RLS_VIOLATION"
   | "UNKNOWN";
 
@@ -92,6 +95,22 @@ const HINT_TO_CODE: Record<string, { code: DomainErrorCode; message: string }> =
     waiver_required: {
       code: "WAIVER_REQUIRED",
       message: "You must sign the waiver before joining.",
+    },
+    match_not_paused: {
+      code: "MATCH_NOT_PAUSED",
+      message: "Match is not currently paused.",
+    },
+    already_confirmed: {
+      code: "ALREADY_CONFIRMED",
+      message: "You have already confirmed this result.",
+    },
+    already_disputed: {
+      code: "ALREADY_DISPUTED",
+      message: "This result has already been disputed.",
+    },
+    already_paused: {
+      code: "MATCH_NOT_IN_PROGRESS",
+      message: "Match is already paused.",
     },
   };
 
