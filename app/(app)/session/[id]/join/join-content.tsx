@@ -52,6 +52,10 @@ export async function JoinContent({
       requiresWaiver={session.requiresWaiver}
       hasSignedWaiver={session.hasSignedWaiver}
       activeWaiverId={activeWaiverId}
+      currentAthleteId={athlete.id}
+      currentAthleteName={athlete.display_name}
+      currentAthleteElo={athlete.current_elo}
+      currentAthletePhotoUrl={athlete.profile_photo_url ?? null}
     />
   );
 }

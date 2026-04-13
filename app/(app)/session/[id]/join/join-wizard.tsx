@@ -18,10 +18,18 @@ interface JoinWizardProps {
   requiresWaiver: boolean;
   hasSignedWaiver: boolean;
   activeWaiverId: string | null;
+  currentAthleteId: string;
+  currentAthleteName: string;
+  currentAthleteElo: number;
+  currentAthletePhotoUrl: string | null;
 }
 
 export function JoinWizard(props: JoinWizardProps) {
-  const { sessionId, gymName, gymLatitude, gymLongitude, athleteWeight, requiresWaiver, hasSignedWaiver, activeWaiverId } = props;
+  const {
+    sessionId, gymName, gymLatitude, gymLongitude, athleteWeight,
+    requiresWaiver, hasSignedWaiver, activeWaiverId,
+    currentAthleteId, currentAthleteName, currentAthleteElo, currentAthletePhotoUrl,
+  } = props;
 
   const steps = useMemo(() => {
     const all: Step[] = [];
@@ -70,7 +78,15 @@ export function JoinWizard(props: JoinWizardProps) {
         <WeightConfirmStep athleteWeight={athleteWeight} onNext={handleWeightConfirm} />
       )}
       {currentStep === "confirm" && confirmedWeight != null && (
-        <ConfirmStep sessionId={sessionId} gymName={gymName} confirmedWeight={confirmedWeight} />
+        <ConfirmStep
+          sessionId={sessionId}
+          gymName={gymName}
+          confirmedWeight={confirmedWeight}
+          currentAthleteId={currentAthleteId}
+          currentAthleteName={currentAthleteName}
+          currentAthleteElo={currentAthleteElo}
+          currentAthletePhotoUrl={currentAthletePhotoUrl}
+        />
       )}
     </div>
   );

@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+### Phase 5: Session Lobby (2026-04-12)
+
+**Added**
+- Session lobby page at `/session/[id]/lobby` with real-time participant list (`app/(app)/session/[id]/lobby/`)
+- Realtime hook (`hooks/use-session-lobby-realtime.ts`) with Postgres Changes (participant INSERT/UPDATE/DELETE) and Broadcast (ephemeral challenges, match_started, participant_joined)
+- Participant card with avatar, ELO, weight, and challenge button (`participant-card.tsx`)
+- In-session challenge sheet with match type toggle and ELO stakes preview (`session-challenge-sheet.tsx`)
+- Incoming challenge sheet with accept/decline (`session-challenge-received-sheet.tsx`)
+- Random match button calling `random_match` RPC (`random-match-button.tsx`)
+- `getSessionLobbyData` query wrapping `get_session_lobby` RPC
+- `createInSessionMatch`, `leaveSessionLobby`, `requestRandomMatch` mutations
+- Broadcast of `participant_joined` from join wizard confirm step for real-time lobby updates
+
+**Changed**
+- `types/session.ts` extended `SessionLobbyData` with `gymName` and `status` fields
+- `app/(app)/session/[id]/join/confirm-step.tsx` now broadcasts participant info on join
+
 ### Phase 4: Session Lobby Entry (Join Wizard) (2026-04-12)
 
 **Added**

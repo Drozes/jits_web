@@ -14,6 +14,8 @@ import type {
   SessionListItem,
   ActiveSessionInfo,
   SessionJoinData,
+  SessionLobbyData,
+  LobbyParticipant,
 } from "@/types/session";
 
 type Client = SupabaseClient<Database>;
@@ -658,6 +660,66 @@ export async function getSessionForJoin(
     requiresWaiver,
     hasSignedWaiver,
     athleteWeight: athlete?.current_weight ?? null,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Session lobby
+// ---------------------------------------------------------------------------
+
+/** Fetch session lobby data (participants + session info) via RPC */
+export async function getSessionLobbyData(
+  supabase: Client,
+  sessionId: string,
+): Promise<SessionLobbyData | null> {
+  const { data, error } = await supabase.rpc("get_session_lobby", {
+    p_session_id: sessionId,
+  });
+
+  if (error || !data) return null;
+
+  const result = data as unknown as {
+    session_id: string;
+    gym_name: string;
+    status: string;
+    participants: Array<{
+      participant_id: string;
+      athlete_id: string;
+      display_name: string;
+      current_elo: number;
+      current_weight: number | null;
+      profile_photo_url: string | null;
+      primary_gym_id: string | null;
+      gym_name: string | null;
+      status: string;
+      weight_confirmed: number | null;
+      current_match_id: string | null;
+      checked_in_at: string;
+      elo_distance: number;
+    }>;
+  };
+
+  const participants: LobbyParticipant[] = result.participants.map((p) => ({
+    participantId: p.participant_id,
+    athleteId: p.athlete_id,
+    displayName: p.display_name,
+    currentElo: p.current_elo,
+    currentWeight: p.current_weight,
+    profilePhotoUrl: p.profile_photo_url,
+    primaryGymId: p.primary_gym_id,
+    gymName: p.gym_name,
+    status: p.status,
+    weightConfirmed: p.weight_confirmed,
+    currentMatchId: p.current_match_id,
+    checkedInAt: p.checked_in_at,
+    eloDistance: p.elo_distance,
+  }));
+
+  return {
+    sessionId: result.session_id,
+    gymName: result.gym_name,
+    status: result.status,
+    participants,
   };
 }
 

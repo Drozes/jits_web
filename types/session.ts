@@ -77,6 +77,8 @@ export interface LobbyParticipant {
 /** Wrapper for session lobby data */
 export interface SessionLobbyData {
   sessionId: string;
+  gymName: string;
+  status: string;
   participants: LobbyParticipant[];
 }
 

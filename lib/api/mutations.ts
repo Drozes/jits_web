@@ -302,6 +302,63 @@ export async function createSession(
   return { ok: true, data: { id: data } };
 }
 
+/** Create an in-session match via RPC */
+export async function createInSessionMatch(
+  supabase: Client,
+  params: { sessionId: string; opponentId: string },
+): Promise<Result<{ matchId: string }>> {
+  const { data, error } = await supabase.rpc("create_session_match", {
+    p_session_id: params.sessionId,
+    p_opponent_id: params.opponentId,
+  });
+
+  if (error) {
+    return { ok: false, error: mapPostgrestError(error) };
+  }
+
+  const result = data as unknown as { match_id: string };
+  return { ok: true, data: { matchId: result.match_id } };
+}
+
+/** Leave a session lobby by setting status to 'left' */
+export async function leaveSessionLobby(
+  supabase: Client,
+  sessionId: string,
+): Promise<Result<void>> {
+  const authResult = await supabase.rpc("auth_athlete_id");
+  if (authResult.error || !authResult.data) {
+    return { ok: false, error: { code: "UNKNOWN" as const, message: "Could not identify current athlete" } };
+  }
+
+  const { error } = await supabase
+    .from("session_participants")
+    .update({ status: "left" })
+    .eq("session_id", sessionId)
+    .eq("athlete_id", authResult.data);
+
+  if (error) {
+    return { ok: false, error: mapPostgrestError(error) };
+  }
+  return { ok: true, data: undefined };
+}
+
+/** Request a random match within a session */
+export async function requestRandomMatch(
+  supabase: Client,
+  sessionId: string,
+): Promise<Result<{ matchId: string; opponentId: string; opponentName: string }>> {
+  const { data, error } = await supabase.rpc("random_match", {
+    p_session_id: sessionId,
+  });
+
+  if (error) {
+    return { ok: false, error: mapPostgrestError(error) };
+  }
+
+  const result = data as unknown as { match_id: string; opponent_id: string; opponent_name: string };
+  return { ok: true, data: { matchId: result.match_id, opponentId: result.opponent_id, opponentName: result.opponent_name } };
+}
+
 // ---------------------------------------------------------------------------
 // Athlete mutations
 // ---------------------------------------------------------------------------

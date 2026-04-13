@@ -11,9 +11,16 @@ interface ConfirmStepProps {
   sessionId: string;
   gymName: string;
   confirmedWeight: number;
+  currentAthleteId: string;
+  currentAthleteName: string;
+  currentAthleteElo: number;
+  currentAthletePhotoUrl: string | null;
 }
 
-export function ConfirmStep({ sessionId, gymName, confirmedWeight }: ConfirmStepProps) {
+export function ConfirmStep({
+  sessionId, gymName, confirmedWeight,
+  currentAthleteId, currentAthleteName, currentAthleteElo, currentAthletePhotoUrl,
+}: ConfirmStepProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -28,6 +35,24 @@ export function ConfirmStep({ sessionId, gymName, confirmedWeight }: ConfirmStep
       setError(result.error.message);
       return;
     }
+
+    // Broadcast participant_joined so existing lobby members see the new athlete
+    const channel = supabase.channel(`session:${sessionId}`);
+    await channel.subscribe();
+    await channel.send({
+      type: "broadcast",
+      event: "participant_joined",
+      payload: {
+        athleteId: currentAthleteId,
+        displayName: currentAthleteName,
+        currentElo: currentAthleteElo,
+        currentWeight: confirmedWeight,
+        profilePhotoUrl: currentAthletePhotoUrl,
+        status: "checked_in",
+      },
+    });
+    supabase.removeChannel(channel);
+
     router.push(`/session/${sessionId}/lobby`);
   }
 
