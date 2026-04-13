@@ -9,7 +9,7 @@ import { AppHeader } from "@/components/layout/app-header";
 import { PageContainer } from "@/components/layout/page-container";
 import { PageHeaderActions } from "@/components/layout/page-header-actions";
 import { getDashboardSummary, getActiveSession } from "@/lib/api/queries";
-import { ChevronRight, Radio, MapPin } from "lucide-react";
+import { Calendar, ChevronRight, Radio, MapPin } from "lucide-react";
 
 function DashboardSkeleton() {
   return (
@@ -96,7 +96,15 @@ async function DashboardContent() {
         }}
       />
 
-      <ActiveSessionCard session={activeSession} />
+      <section className="flex flex-col gap-3">
+        <div className="flex items-center gap-2">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-green-500/10">
+            <Calendar className="h-4 w-4 text-green-500" />
+          </div>
+          <h2 className="text-lg font-semibold">Sessions</h2>
+        </div>
+        <ActiveSessionCard session={activeSession} />
+      </section>
 
       <RecentActivitySection myMatches={recentMatches} allActivity={recentActivity} />
     </div>

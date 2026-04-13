@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+### Phase 7-8: Confirmation/Dispute + Dashboard Cleanup (2026-04-13)
+
+**Added**
+- "Sessions" section header with Calendar icon on dashboard
+
+**Changed**
+- Dashboard `ActiveSessionCard` now wrapped in styled section matching other dashboard sections
+
+**Note**
+- `confirmMatchResult`, `disputeMatchResult` mutations and `ALREADY_CONFIRMED`/`ALREADY_DISPUTED` error codes were already implemented in Phase 6
+- `ActiveSessionCard` and `getActiveSession` were already implemented in Phase 3
+- Challenge sections were already removed in Phase 2
+
 ### Phase 6: Session Match Flow (2026-04-12)
 
 **Added**
