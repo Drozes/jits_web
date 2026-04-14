@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { requireAuth } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
 import { ATHLETE_STATUS } from "@/lib/constants";
-import { SetupForm } from "./setup-form";
+import { SetupWizard } from "./setup-wizard";
 
 export default function ProfileSetupPage() {
   return (
@@ -16,7 +16,6 @@ async function SetupContent() {
   const user = await requireAuth();
   const supabase = await createClient();
 
-  // Fetch existing athlete (auto-created by backend on signup)
   const { data: athlete } = await supabase
     .from("athletes")
     .select(
@@ -25,17 +24,14 @@ async function SetupContent() {
     .eq("auth_user_id", user.id)
     .single();
 
-  const isEditing =
-    !!athlete && athlete.status !== ATHLETE_STATUS.PENDING;
+  const isEditing = !!athlete && athlete.status !== ATHLETE_STATUS.PENDING;
 
-  // Fetch gyms server-side so the client component doesn't need to
   const { data: gyms } = await supabase
     .from("gyms")
     .select("id, name")
     .eq("status", "active")
     .order("name");
 
-  // Check TOS acceptance via waiver_acknowledgements table
   const { data: waiver } = await supabase
     .from("waivers")
     .select("id")
@@ -68,14 +64,16 @@ async function SetupContent() {
               : "Set up your athlete profile to get started"}
           </p>
         </div>
-        <SetupForm
+        <SetupWizard
           athleteId={athlete?.id ?? null}
-          defaultDisplayName={athlete?.display_name ?? ""}
-          defaultWeight={athlete?.current_weight?.toString() ?? ""}
-          defaultGymId={athlete?.primary_gym_id ?? ""}
-          defaultGender={athlete?.gender ?? ""}
-          defaultDateOfBirth={athlete?.date_of_birth ?? ""}
-          defaultCity={athlete?.city ?? ""}
+          defaults={{
+            displayName: athlete?.display_name ?? "",
+            weight: athlete?.current_weight?.toString() ?? "",
+            gymId: athlete?.primary_gym_id ?? "",
+            gender: athlete?.gender ?? "",
+            dateOfBirth: athlete?.date_of_birth ?? "",
+            city: athlete?.city ?? "",
+          }}
           defaultProfilePhotoUrl={athlete?.profile_photo_url ?? null}
           gyms={gyms ?? []}
           isEditing={isEditing}
