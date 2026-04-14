@@ -39,6 +39,7 @@ export function SessionLobbyClient(props: Props) {
 
   return (
     <div className="space-y-4 animate-page-in">
+      <div aria-live="polite" aria-atomic="true" className="sr-only">{lobby.announcement}</div>
       <div>
         <h2 className="text-lg font-semibold">{gymName}</h2>
         <p className="text-sm text-muted-foreground">{activeCount} fighter{activeCount !== 1 ? "s" : ""} in lobby</p>

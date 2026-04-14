@@ -29,11 +29,20 @@ export function ResultRecordingStep({ onNext, matchId, participants, submissionT
   const [submissionCode, setSubmissionCode] = useState("");
   const [finishTime, setFinishTime] = useState<number | undefined>();
   const [loading, setLoading] = useState(false);
+  const [remainingLock, setRemainingLock] = useState(isLocked ? 60 : 0);
 
   useEffect(() => {
     if (!isLocked) return;
     const t = setTimeout(() => setUnlocked(true), 60_000);
     return () => clearTimeout(t);
+  }, [isLocked]);
+
+  useEffect(() => {
+    if (!isLocked) return;
+    const id = setInterval(() => {
+      setRemainingLock((prev) => (prev <= 1 ? 0 : prev - 1));
+    }, 1000);
+    return () => clearInterval(id);
   }, [isLocked]);
 
   const sync = useSessionMatchSync({
@@ -63,7 +72,9 @@ export function ResultRecordingStep({ onNext, matchId, participants, submissionT
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 px-4">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        <p className="text-sm text-muted-foreground">Waiting for timekeeper to record result...</p>
+        <p className="text-sm text-muted-foreground">
+          Waiting for timekeeper... {remainingLock}s
+        </p>
       </div>
     );
   }
@@ -84,7 +95,7 @@ export function ResultRecordingStep({ onNext, matchId, participants, submissionT
       )}
       <Button className="w-full h-12 text-base font-semibold" onClick={handleSubmit} disabled={!canSubmit || loading}>
         {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-        Submit Result
+        {loading ? "Recording..." : "Record Result"}
       </Button>
     </div>
   );

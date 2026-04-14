@@ -68,7 +68,10 @@ export function ReadyCheckStep({ onNext, matchId, currentAthleteId, opponentId, 
 
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center gap-6 px-4">
-      <h2 className="text-lg font-semibold">Ready Check</h2>
+      <div className="flex flex-col items-center gap-1">
+        <h2 className="text-lg font-semibold">Ready Check</h2>
+        <p className="text-muted-foreground text-sm">Both athletes must tap Ready to start.</p>
+      </div>
       <div className="grid grid-cols-2 gap-4 w-full max-w-sm">
         <ReadyPanel label="You" ready={myReady} />
         <ReadyPanel label="Opponent" ready={opponentReady} />

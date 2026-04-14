@@ -36,9 +36,12 @@ export function useSessionLobbyRealtime(
   const [participants, setParticipants] = useState(initialParticipants);
   const [incomingChallenge, setIncomingChallenge] = useState<InSessionChallenge | null>(null);
   const [busyIds, setBusyIds] = useState<Set<string>>(new Set());
+  const [announcement, setAnnouncement] = useState("");
   const channelRef = useRef<RealtimeChannel | null>(null);
   const meRef = useRef(currentAthleteId);
   meRef.current = currentAthleteId;
+  const participantsRef = useRef(participants);
+  participantsRef.current = participants;
 
   const clearChallenge = useCallback(() => setIncomingChallenge(null), []);
 
@@ -53,6 +56,8 @@ export function useSessionLobbyRealtime(
       })
       .on("postgres_changes", { event: "DELETE", schema: "public", table: "session_participants", filter: `session_id=eq.${sessionId}` }, ({ old: row }) => {
         const r = row as { athlete_id: string };
+        const leaving = participantsRef.current.find((p) => p.athleteId === r.athlete_id);
+        if (leaving) setAnnouncement(`${leaving.displayName} left the lobby`);
         setParticipants((prev) => prev.filter((p) => p.athleteId !== r.athlete_id));
       })
       .subscribe();
@@ -62,7 +67,10 @@ export function useSessionLobbyRealtime(
       .on("broadcast", { event: "challenge_sent" }, ({ payload }) => {
         const { from, fromName, fromElo, to, matchType } = payload as { from: string; fromName: string; fromElo: number; to: string; matchType: "casual" | "ranked" };
         setBusyIds((prev) => addBusy(prev, from, to));
-        if (to === meRef.current) setIncomingChallenge({ fromAthleteId: from, fromDisplayName: fromName, fromElo, matchType });
+        if (to === meRef.current) {
+          setIncomingChallenge({ fromAthleteId: from, fromDisplayName: fromName, fromElo, matchType });
+          setAnnouncement(`${fromName} challenged you`);
+        }
       })
       .on("broadcast", { event: "challenge_accepted" }, ({ payload }) => {
         const { from, to, matchId } = payload as { from: string; to: string; matchId: string };
@@ -95,7 +103,11 @@ export function useSessionLobbyRealtime(
           checkedInAt: new Date().toISOString(),
           eloDistance: 0,
         };
-        setParticipants((prev) => prev.some((x) => x.athleteId === p.athleteId) ? prev : [...prev, p]);
+        setParticipants((prev) => {
+          if (prev.some((x) => x.athleteId === p.athleteId)) return prev;
+          setAnnouncement(`${p.displayName} joined the lobby`);
+          return [...prev, p];
+        });
       })
       .subscribe();
 
@@ -144,5 +156,5 @@ export function useSessionLobbyRealtime(
     [incomingChallenge, sessionId, currentAthleteId, router],
   );
 
-  return { participants, incomingChallenge, clearChallenge, sendChallenge, respondToChallenge, busyIds };
+  return { participants, incomingChallenge, clearChallenge, sendChallenge, respondToChallenge, busyIds, announcement };
 }
