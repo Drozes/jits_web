@@ -15,7 +15,7 @@ JITS Web is a BJJ competitor matchmaking app built with Next.js 16, Supabase, Ta
 - **Framework:** Next.js 16 App Router with `cacheComponents` enabled
 - **Auth/DB:** Supabase (server client for RSC, browser client for client components)
 - **Styling:** Tailwind CSS + shadcn/ui component library
-- **Guards:** `requireAuth()` → `requireAthlete()` → progressive auth checks in `lib/guards.ts`
+- **Guards:** `requireAuth()` → `requireAthlete()` → `requireSessionParticipant(sessionId)` — progressive auth checks in `lib/guards.ts`
 
 ### Directory Structure
 
@@ -124,17 +124,17 @@ When passing 4+ related fields about the same entity, group them into an object 
 ### 9. Color Tokens for Stats
 
 Use these consistently across all stat displays:
-- **Wins/positive:** `text-green-500` (inline text) or `bg-success text-success-foreground` (badges)
-- **Losses/negative:** `text-red-500` (inline text) or `bg-destructive text-destructive-foreground` (badges)
+- **Wins/positive:** `text-success` (inline text) or `bg-success text-success-foreground` (badges)
+- **Losses/negative:** `text-destructive` (inline text) or `bg-destructive text-destructive-foreground` (badges)
 - **Draws/pressure:** `text-amber-500`
 - **ELO/neutral stats:** default foreground color with `tabular-nums` (NOT `text-primary` — that's brand red)
 - **Brand accent:** `text-primary` — reserved for branding, buttons, and section header icons. Never for data values.
 
-**Theme token:** `--success` (`hsl(145 63% 42%)` light / `hsl(145 63% 49%)` dark) is available as `bg-success`, `text-success`, and Badge `variant="success"`. Use it for win badges and positive ELO change badges.
+**Theme token:** `--success` (`hsl(145 63% 37%)` light / `hsl(145 63% 49%)` dark) is available as `bg-success`, `text-success`, and Badge `variant="success"`. Use it for win badges and positive ELO change badges. Light-mode lightness is tuned to pass WCAG AA on `--background`.
 
 ### 10. MatchCard Shows Match Type
 
-`MatchCard` accepts an optional `matchType` prop (`"ranked" | "casual"`). When provided, it displays "Ranked" or "Casual" inline with the date (e.g., "2d ago · Ranked"). Pass `matchType` on both `type="match"` and `type="challenge"` cards — all 6 call sites already do this (dashboard matches, dashboard challenges, match history, head-to-head, received challenges, sent challenges).
+`MatchCard` accepts an optional `matchType` prop (`"ranked" | "casual"`). When provided, it displays "Ranked" or "Casual" inline with the date (e.g., "2d ago · Ranked"). Pass `matchType` on both `type="match"` and `type="challenge"` cards. Active call sites: dashboard recent matches, match history, head-to-head. Hidden call sites (challenge flow): received challenges, sent challenges.
 
 ### 11. Avoid Premature Abstraction
 
@@ -198,7 +198,7 @@ Shell components that define the app's structure:
 - [x] `mutations.ts` — fixed unsafe `.data!` on `auth_athlete_id` RPC → null-safe check
 - [x] `looking-for-match-toggle.tsx` — raw Supabase `.update()` → `toggleMatchPreferences()` mutation
 - [ ] Auth form components (`login-form`, `sign-up-form`, `forgot-password-form`) share ~70% identical code
-- [ ] 14 components exceed 80-line target (largest: `editable-profile-header` ~459, `setup-form` ~321, `challenge-response-sheet` 301, `swipe-discovery-client` 284, `challenge-sheet` 274, `record-result-form` 260)
+- [ ] 20 non-shadcn components exceed 80-line target (largest: `editable-profile-header` ~459, `challenge-response-sheet` 301, `challenge-sheet` 274). Many are in hidden features (chat, challenges, arena). Active components over target: `login-form` 186, `sign-up-form` 169, `profile-photo-upload` 165, `recent-activity-section` 155, `match-card` 108, `forgot-password-form` 105.
 - [ ] 5 components have props that should be grouped into objects (`message-bubble`, `chat-thread`, `lobby-actions`, `arena-content`, `looking-for-match-toggle`)
 
 ## Chat UI Patterns
@@ -223,10 +223,12 @@ The thread page fetches all participant profiles server-side into a `Record<stri
 ## Key FK Join Names
 
 ```
-Athletes -> Gyms:              gyms!fk_athletes_primary_gym(name)
-Match participants -> Athletes: athletes!fk_participants_athlete(display_name)
-Challenges -> Challenger:       athletes!fk_challenges_challenger(display_name)
-Matches -> Participants:        matches!fk_participants_match(completed_at, status)
+Athletes -> Gyms:               gyms!fk_athletes_primary_gym(name)
+Match participants -> Athletes:  athletes!fk_participants_athlete(display_name)
+Challenges -> Challenger:        athletes!fk_challenges_challenger(display_name)
+Matches -> Participants:         matches!fk_participants_match(completed_at, status)
+Sessions -> Gyms:                gyms!fk_sessions_gym(name, city, latitude, longitude)
+Session participants -> Athletes: athletes!fk_session_participants_athlete(display_name, current_elo, current_weight)
 ```
 
 ## Data Access Layer (`lib/api/`)
@@ -235,31 +237,67 @@ Typed wrappers for all Supabase queries and mutations. Use these instead of raw 
 
 ### Queries (`lib/api/queries.ts`) — Server-side
 
-- `getAthleteProfile(supabase, id)` — athlete + gym join + computed stats + win streak
-- `getAthleteStats(supabase, id)` — wins/losses/winRate only
-- `getLeaderboard(supabase, limit?)` — top N athletes by ELO with stats
+**Dashboard & Profile:**
+- `getDashboardSummary(supabase)` — stats, rank, recent matches, recent activity
+- `getAthleteStatsRpc(supabase, athleteId)` — wins/losses/draws for any athlete via RPC
+- `getAthletesStatsRpc(supabase, athleteIds)` — batch stats for leaderboard/swipe
 - `getMatchHistory(supabase, athleteId)` — wraps `get_match_history` RPC
 - `getEloHistory(supabase, athleteId)` — wraps `get_elo_history` RPC
-- `getEloStakes(supabase, challengerElo, opponentElo, challengerWeight?, opponentWeight?)` — wraps `calculate_elo_stakes` RPC (weight-aware)
-- `getSubmissionTypes(supabase)` — all 23 active submission techniques
+
+**Challenges (hidden features, still available):**
+- `getEloStakes(supabase, ...)` — wraps `calculate_elo_stakes` RPC (weight-aware)
 - `canCreateChallenge(supabase, opponentId?)` — wraps `can_create_challenge` RPC
 - `getLobbyData(supabase, challengeId)` — full challenge details for match lobby
-- `getMatchDetails(supabase, matchId)` — match + participants with athlete names/ELO for live/results screens
+- `getChallengesBetween(supabase, ...)` — challenges between two athletes
+- `getPendingChallengeBetween(supabase, ...)` — pending challenge between two athletes
+- `getPendingChallengeOpponentIds(supabase, athleteId)` — IDs of athletes with pending challenges
+
+**Sessions & Gyms:**
+- `getActiveSession(supabase, athleteId)` — athlete's current active/scheduled session
+- `getGymsWithSessions(supabase)` — all active gyms with session counts
+- `getGymDetail(supabase, gymId)` — gym details with upcoming sessions
+- `getSessionForJoin(supabase, sessionId)` — session + gym coords + waiver + athlete weight for join wizard
+- `getSessionLobbyData(supabase, sessionId)` — wraps `get_session_lobby` RPC
+
+**Match:**
+- `getMatchDetails(supabase, matchId)` — match + participants with athlete names/ELO + session fields
+- `getSubmissionTypes(supabase)` — all 23 active submission techniques
 
 ### Mutations (`lib/api/mutations.ts`) — Client-side
 
+**Challenges (hidden features, still available):**
 - `createChallenge(supabase, { opponentId, matchType, challengerWeight? })` → `Result<{ id }>`
 - `acceptChallenge(supabase, { challengeId, opponentWeight? })` → `Result<void>`
 - `declineChallenge(supabase, challengeId)` → `Result<void>`
 - `cancelChallenge(supabase, challengeId)` → `Result<void>`
 - `startMatchFromChallenge(supabase, challengeId)` → `Result<StartMatchResponse>`
+
+**Sessions:**
+- `rsvpToSession(supabase, sessionId)` → `Result<void>`
+- `cancelRsvp(supabase, sessionId)` → `Result<void>`
+- `joinSessionLobby(supabase, { sessionId, weight })` → `Result<void>`
+- `acceptSessionWaiver(supabase, { sessionId, waiverId })` → `Result<void>`
+- `createSession(supabase, { gymId, scheduledStart, ... })` → `Result<{ id }>`
+- `createInSessionMatch(supabase, { sessionId, opponentId, matchType })` → `Result<{ matchId }>`
+- `leaveSessionLobby(supabase, sessionId)` → `Result<void>`
+- `requestRandomMatch(supabase, sessionId)` → `Result<{ matchId }>`
+
+**Match lifecycle:**
 - `startMatch(supabase, matchId)` → `Result<StartMatchTimerResponse>`
+- `pauseMatch(supabase, matchId)` → `Result<void>`
+- `resumeMatch(supabase, matchId)` → `Result<void>`
+- `endMatch(supabase, matchId)` → `Result<void>`
 - `recordMatchResult(supabase, { matchId, result, winnerId?, ... })` → `Result<RecordResultResponse>`
+- `confirmMatchResult(supabase, matchId)` → `Result<void>`
+- `disputeMatchResult(supabase, matchId, reason?)` → `Result<void>`
+
+**Preferences & Notifications:**
 - `toggleMatchPreferences(supabase, athleteId, { lookingForCasual, lookingForRanked })` → `Result<void>`
+- `registerPushDevice(supabase, ...)` / `removePushDevice(supabase, ...)` — push notification management
 
 ### Error Handling (`lib/api/errors.ts`)
 
-All mutations return `Result<T>` = `{ ok: true, data: T } | { ok: false, error: DomainError }`. Domain error codes: `MAX_PENDING_CHALLENGES`, `OPPONENT_INACTIVE`, `MATCH_NOT_IN_PROGRESS`, `NOT_PARTICIPANT`, etc.
+All mutations return `Result<T>` = `{ ok: true, data: T } | { ok: false, error: DomainError }`. Domain error codes include: `MAX_PENDING_CHALLENGES`, `OPPONENT_INACTIVE`, `MATCH_NOT_IN_PROGRESS`, `NOT_PARTICIPANT`, `SESSION_NOT_FOUND`, `SESSION_FULL`, `ALREADY_JOINED`, `SESSION_NOT_ACTIVE`, `WAIVER_REQUIRED`, `MATCH_NOT_PAUSED`, `ALREADY_CONFIRMED`, `ALREADY_DISPUTED`, `RLS_VIOLATION`, `UNKNOWN`.
 
 ## Realtime & Presence
 
@@ -279,12 +317,23 @@ Key files:
 - `components/layout/online-presence-bootstrap.tsx` — side-effect component mounted in layout
 - `components/domain/online-indicator.tsx` — green dot, renders nothing when offline
 
-### Realtime Subscriptions (Postgres Changes)
+### Realtime Subscriptions (Postgres Changes + Broadcast)
 
+**Global (mounted in layout):**
 - `hooks/use-global-notifications.ts` — global message listener → toast notifications
 - `hooks/use-pending-challenges.ts` — challenge INSERT/UPDATE → bell badge
-- `hooks/use-chat-channel.ts` — per-conversation messages + typing indicators (broadcast)
 - `hooks/use-unread-count.ts` — polling (30s) + manual refresh via event dispatch
+
+**Chat (hidden feature):**
+- `hooks/use-chat-channel.ts` — per-conversation messages + typing indicators (broadcast)
+
+**Session lobby:**
+- `hooks/use-session-lobby-realtime.ts` — Postgres Changes (participant INSERT/UPDATE/DELETE) + Broadcast (ephemeral challenges, match_started, participant_joined)
+
+**Session match:**
+- `hooks/use-session-match-sync.ts` — Broadcast for 7 match events (timer, ready, result, confirm)
+- `hooks/use-session-match-timer.ts` — timer with pause/resume awareness and broadcast sync
+- `hooks/use-video-recorder.ts` — MediaRecorder with codec negotiation and Supabase Storage upload
 
 ### Supabase Client Realtime Config
 
@@ -304,10 +353,24 @@ Current frontend flags: `timekeeperEnabled` (false), `messagesEnabled` (false).
 
 These routes redirect to `/` during the session-based transition. Code is preserved, not deleted:
 - `/arena`, `/arena/swipe` (replaced by Gyms + Sessions)
-- `/match/pending`, `/match/lobby/[id]` (challenge-based flow)
+- `/match/pending`, `/match/lobby/[id]` (challenge-based flow, replaced by session match flow)
+- `/match/[id]/live`, `/match/[id]/results` (redirect if not participant, but old challenge flow is unreachable)
 - `/athlete/[id]/challenges`
 
-Dashboard challenges section also removed. Bottom nav: Home, Gyms, Rankings, Profile.
+Dashboard challenges section also removed. Messages feature flagged off (`messagesEnabled: false`).
+
+**Active routes (session-based model):**
+- `/` (dashboard with stats, sessions, activity)
+- `/gyms`, `/gyms/[id]` (gym finder + gym detail with sessions)
+- `/session/[id]/join` (4-step join wizard: geo, waiver, weight, confirm)
+- `/session/[id]/lobby` (realtime participant list, challenges, random match)
+- `/session/[id]/match/[matchId]` (8-step match wizard: wait, weight, ready, live, result, summary)
+- `/leaderboard` (fighters + gyms with gender filter)
+- `/profile`, `/profile/stats`, `/profile/setup`
+- `/settings`, `/settings/video`, `/settings/feedback`, `/settings/help`
+- `/athlete/[id]` (competitor profile)
+
+Bottom nav: Home, Gyms, Rankings, Profile.
 
 ## Type Generation
 
@@ -336,5 +399,5 @@ Read these docs before building challenge, match, ELO, or presence features. Key
 2. **Weight units unclear** — `athletes.current_weight` spec says kg, `challenges` spec says lbs. Needs BE resolution.
 3. ~~Challenge creation not implemented~~ — [x] ChallengeSheet uses `createChallenge()` mutation (no raw inserts)
 4. ~~No gym selection in setup~~ — [x] setup form includes gym dropdown
-5. ~~Match flow not implemented~~ — [x] Lobby (`/match/lobby/[challengeId]`), live timer (`/match/[matchId]/live`), results recording (`/match/[matchId]/results`)
-6. ~~Challenge→match flow bugs~~ — [x] All 4 bugs fixed (lobby broadcast on accept, mutations layer consistency, server timestamp for timer sync). See `specs/challenge-match-flow-fixes.md`.
+5. ~~Match flow not implemented~~ — [x] Session match wizard (`/session/[id]/match/[matchId]`) with 8-step state machine, timer, video recording, confirm/dispute
+6. ~~Challenge→match flow bugs~~ — [x] All 4 bugs fixed. See `specs/challenge-match-flow-fixes.md`.

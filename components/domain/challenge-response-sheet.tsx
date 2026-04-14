@@ -195,10 +195,10 @@ export function ChallengeResponseSheet({
                   <p className="text-xs font-medium mb-2">Your ELO Stakes</p>
                   <div className="grid grid-cols-3 gap-3 text-sm">
                     <div className="flex items-center gap-1.5">
-                      <TrendingUp className="h-3.5 w-3.5 text-green-500" />
+                      <TrendingUp className="h-3.5 w-3.5 text-success" />
                       <span>
                         Win:{" "}
-                        <span className="font-semibold text-green-500">
+                        <span className="font-semibold text-success">
                           +{stakes.opponent_win}
                         </span>
                       </span>
@@ -213,10 +213,10 @@ export function ChallengeResponseSheet({
                       </span>
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <TrendingDown className="h-3.5 w-3.5 text-red-500" />
+                      <TrendingDown className="h-3.5 w-3.5 text-destructive" />
                       <span>
                         Loss:{" "}
-                        <span className="font-semibold text-red-500">
+                        <span className="font-semibold text-destructive">
                           {stakes.opponent_loss}
                         </span>
                       </span>

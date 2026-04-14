@@ -29,7 +29,7 @@
     --chart-4: 0 84% 60%;
     --chart-5: 0 79% 35%;
     --radius: 0.75rem;
-    --success: 145 63% 42%;
+    --success: 145 63% 37%;
     --success-foreground: 0 0% 100%;
     --brand-gold: 38 92% 50%;
     --brand-orange: 25 95% 53%;
@@ -101,6 +101,18 @@
 @keyframes pulse-red {
   0%, 100% { box-shadow: 0 0 0 0 hsl(var(--primary) / 0.4); }
   50% { box-shadow: 0 0 0 8px hsl(var(--primary) / 0); }
+}
+
+@keyframes timer-expired-pulse {
+  0% { transform: scale(1); color: hsl(var(--destructive)); }
+  50% { transform: scale(1.08); color: hsl(var(--destructive)); }
+  100% { transform: scale(1); color: hsl(var(--destructive)); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .animate-timer-expired {
+    animation: timer-expired-pulse 1s ease-out;
+  }
 }
 
 @layer components {

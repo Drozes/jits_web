@@ -65,11 +65,11 @@ export function StatOverview({ athlete, stats }: StatOverviewProps) {
           </div>
           <p className="text-sm font-medium text-muted-foreground mb-1.5">Record</p>
           <p className="text-2xl font-bold tabular-nums">
-            <span className="text-green-500">{stats.wins}</span>
+            <span className="text-success">{stats.wins}</span>
             <span className="text-muted-foreground/50 mx-0.5">-</span>
             <span className="text-amber-500">{stats.draws}</span>
             <span className="text-muted-foreground/50 mx-0.5">-</span>
-            <span className="text-red-500">{stats.losses}</span>
+            <span className="text-destructive">{stats.losses}</span>
           </p>
         </CardContent>
       </Card>

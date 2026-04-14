@@ -105,8 +105,8 @@ function ResultBanner({ resultData, currentAthleteId, matchType }: { resultData:
   const isLoser = resultData?.result === "submission" && resultData.winnerId !== currentAthleteId;
   return (
     <div className="text-center space-y-1">
-      {isWinner && <p className="text-3xl font-bold text-green-500">Victory!</p>}
-      {isLoser && <p className="text-3xl font-bold text-red-500">Defeat</p>}
+      {isWinner && <p className="text-3xl font-bold text-success">Victory!</p>}
+      {isLoser && <p className="text-3xl font-bold text-destructive">Defeat</p>}
       {resultData?.result === "draw" && <p className="text-3xl font-bold text-amber-500">Draw</p>}
       {!resultData && <p className="text-xl font-semibold">Match Complete</p>}
       {matchType === "ranked" && (

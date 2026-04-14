@@ -76,6 +76,7 @@ export function ForgotPasswordForm({
                   <Input
                     id="email"
                     type="email"
+                    autoComplete="email"
                     placeholder="m@example.com"
                     required
                     value={email}

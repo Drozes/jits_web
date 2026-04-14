@@ -76,14 +76,14 @@ export function AthleteCard({
         </div>
         <div className="text-right">
           <div className="flex items-center justify-end gap-1">
-            {eloTrend === "up" && <TrendingUp className="h-3 w-3 text-green-500" />}
-            {eloTrend === "down" && <TrendingDown className="h-3 w-3 text-red-500" />}
+            {eloTrend === "up" && <TrendingUp className="h-3 w-3 text-success" />}
+            {eloTrend === "down" && <TrendingDown className="h-3 w-3 text-destructive" />}
             <span className="text-lg font-bold tabular-nums">{currentElo}</span>
           </div>
           <div className="text-xs text-muted-foreground tabular-nums">
-            <span className="text-green-500">{wins}W</span>
+            <span className="text-success">{wins}W</span>
             <span className="mx-0.5">·</span>
-            <span className="text-red-500">{losses}L</span>
+            <span className="text-destructive">{losses}L</span>
           </div>
         </div>
       </div>

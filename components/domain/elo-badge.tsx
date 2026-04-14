@@ -50,8 +50,8 @@ export function EloBadge({ elo, peak, delta, variant, className }: EloBadgeProps
         <span
           className={cn(
             "text-xs font-semibold",
-            delta > 0 && "text-green-500",
-            delta < 0 && "text-red-500",
+            delta > 0 && "text-success",
+            delta < 0 && "text-destructive",
           )}
         >
           {delta > 0 ? "+" : ""}

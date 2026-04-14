@@ -41,6 +41,7 @@ export function EloSparkline({ points, currentElo, className }: EloSparklineProp
   const last = ratings[ratings.length - 1];
   const first = ratings[0];
   const trending = last >= first;
+  const strokeColor = trending ? "hsl(var(--success))" : "hsl(var(--destructive))";
 
   return (
     <div className={className}>
@@ -48,7 +49,7 @@ export function EloSparkline({ points, currentElo, className }: EloSparklineProp
         <polyline
           points={polyline}
           fill="none"
-          stroke={trending ? "rgb(34 197 94)" : "rgb(239 68 68)"}
+          stroke={strokeColor}
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -58,13 +59,13 @@ export function EloSparkline({ points, currentElo, className }: EloSparklineProp
           cx={toX(ratings.length - 1)}
           cy={toY(last)}
           r="3"
-          fill={trending ? "rgb(34 197 94)" : "rgb(239 68 68)"}
+          fill={strokeColor}
           vectorEffect="non-scaling-stroke"
         />
       </svg>
       <div className="flex justify-between text-xs text-muted-foreground mt-1 px-1">
         <span className="tabular-nums">{first}</span>
-        <span className={cn("font-semibold tabular-nums", trending ? "text-green-500" : "text-red-500")}>
+        <span className={cn("font-semibold tabular-nums", trending ? "text-success" : "text-destructive")}>
           {last}
         </span>
       </div>

@@ -73,11 +73,11 @@ export function ProfileHeader({ athlete, gymName, lookingForCasual, lookingForRa
       {/* Stats */}
       <div className="mt-5 grid w-full grid-cols-3 gap-2">
         <div className="rounded-2xl bg-green-500/5 border border-green-500/10 py-3 px-2">
-          <p className="text-2xl font-bold text-green-500 tabular-nums">{stats.wins}</p>
+          <p className="text-2xl font-bold text-success tabular-nums">{stats.wins}</p>
           <p className="text-[11px] font-medium text-muted-foreground mt-0.5">Wins</p>
         </div>
         <div className="rounded-2xl bg-red-500/5 border border-red-500/10 py-3 px-2">
-          <p className="text-2xl font-bold text-red-500 tabular-nums">{stats.losses}</p>
+          <p className="text-2xl font-bold text-destructive tabular-nums">{stats.losses}</p>
           <p className="text-[11px] font-medium text-muted-foreground mt-0.5">Losses</p>
         </div>
         <div className="rounded-2xl bg-muted/50 border border-border py-3 px-2">

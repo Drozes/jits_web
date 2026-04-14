@@ -58,11 +58,11 @@ function StatRow({
 
   return (
     <div className="grid grid-cols-3 items-center py-2">
-      <p className={cn("text-lg font-bold tabular-nums text-center", leftWins && "text-green-500")}>
+      <p className={cn("text-lg font-bold tabular-nums text-center", leftWins && "text-success")}>
         {fmt(left)}
       </p>
       <p className="text-xs text-muted-foreground text-center">{label}</p>
-      <p className={cn("text-lg font-bold tabular-nums text-center", rightWins && "text-green-500")}>
+      <p className={cn("text-lg font-bold tabular-nums text-center", rightWins && "text-success")}>
         {fmt(right)}
       </p>
     </div>

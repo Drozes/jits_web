@@ -70,9 +70,9 @@ export function MatchHistoryList({ matches }: MatchHistoryListProps) {
           ))}
         </div>
         <div className="flex items-center gap-1.5 text-xs tabular-nums">
-          <span className="font-semibold text-green-500">{wins}W</span>
+          <span className="font-semibold text-success">{wins}W</span>
           <span className="text-muted-foreground">-</span>
-          <span className="font-semibold text-red-500">{losses}L</span>
+          <span className="font-semibold text-destructive">{losses}L</span>
           <span className="text-muted-foreground">-</span>
           <span className="font-semibold text-muted-foreground">{draws}D</span>
         </div>

@@ -202,16 +202,16 @@ export function ChallengeSheet({
                   <p className="text-xs font-medium mb-2">ELO Stakes</p>
                   <div className="grid grid-cols-3 gap-3 text-sm">
                     <div className="flex items-center gap-1.5">
-                      <TrendingUp className="h-3.5 w-3.5 text-green-500" />
-                      <span>Win: <span className="font-semibold text-green-500">+{stakes.challenger_win}</span></span>
+                      <TrendingUp className="h-3.5 w-3.5 text-success" />
+                      <span>Win: <span className="font-semibold text-success">+{stakes.challenger_win}</span></span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <Minus className="h-3.5 w-3.5 text-amber-500" />
                       <span>Draw: <span className="font-semibold text-amber-500">{stakes.challenger_draw}</span></span>
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <TrendingDown className="h-3.5 w-3.5 text-red-500" />
-                      <span>Loss: <span className="font-semibold text-red-500">{stakes.challenger_loss}</span></span>
+                      <TrendingDown className="h-3.5 w-3.5 text-destructive" />
+                      <span>Loss: <span className="font-semibold text-destructive">{stakes.challenger_loss}</span></span>
                     </div>
                   </div>
                   <p className="text-xs text-muted-foreground mt-2">

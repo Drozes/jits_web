@@ -52,8 +52,8 @@ function CardInner({ type, opponentName, opponentPhotoUrl, result, status, direc
           <span
             className={cn(
               "text-sm font-semibold tabular-nums",
-              eloDelta > 0 && "text-green-500",
-              eloDelta < 0 && "text-red-500",
+              eloDelta > 0 && "text-success",
+              eloDelta < 0 && "text-destructive",
               eloDelta === 0 && "text-muted-foreground",
             )}
           >
