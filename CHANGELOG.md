@@ -2,6 +2,46 @@
 
 ## [Unreleased]
 
+### UX/UI Full-Pass Review (2026-04-13)
+
+Three-team review (PM + design + implementation). 14 ship-now items plus 6 design decisions.
+
+**Added**
+- `components/domain/session-unavailable.tsx` — shared "session not available" UI with `reason?: "not-found" | "ended"`
+- `app/profile/setup/setup-wizard.tsx` — multi-step profile-setup stepper (replaces single `setup-form.tsx`)
+- `app/profile/setup/wizard-progress.tsx` — reusable dot-progress indicator matching join-wizard pattern
+- `app/profile/setup/use-setup-submit.ts` — hook extracting TOS accept + submit logic
+- `app/profile/setup/steps/identity-step.tsx`, `training-step.tsx`, `optional-step.tsx`
+- Match timer end-of-round signals in `fighter-live-step.tsx`: 800Hz/300ms Web Audio beep, `navigator.vibrate([200,100,200])`, and a visual pulse (`.animate-timer-expired` keyframe in `globals.css`). Single-fire guard via ref, respects `prefers-reduced-motion`.
+- `sr-only` `aria-live="polite"` regions in lobby (participant join/leave, challenge received) and match (paused/resumed/expired)
+- `role="progressbar"` + `aria-value*` + "Step X of Y — {name}" caption on join-wizard and setup-wizard progress dots
+- Back button on join-wizard steps 2+ and setup-wizard steps 2+
+- `isCheckedIn` field on `ActiveSessionInfo` (extends `getActiveSession` with a light `session_participants` existence check for RSVP path)
+
+**Changed**
+- `app/globals.css` — `--success` light-mode lightness `42% → 37%` for WCAG AA contrast on `--background`; added `@keyframes timer-expired-pulse` under `prefers-reduced-motion: no-preference`
+- CLAUDE.md Principle 9 — inline win/loss text now recommends `text-success` / `text-destructive` tokens (was `text-green-500` / `text-red-500`)
+- Inline W/L/ELO stat text switched to `text-success` / `text-destructive` tokens across 15+ domain components (match-card, elo-badge, athlete-card, profile-header, stat-overview, challenge-sheet, challenge-response-sheet, compare-stats-modal, session-challenge-sheet, match-history-list, stats-tabs, editable-profile-header, match-summary-step)
+- `components/domain/challenge-badge.tsx` — added `dark:text-amber-400 dark:bg-amber-500/15` for dark-mode contrast
+- `app/(app)/profile/stats/elo-sparkline.tsx` — hardcoded RGB stroke/fill replaced with `hsl(var(--success))` / `hsl(var(--destructive))`
+- `app/(app)/session/[id]/join/steps/weight-confirm-step.tsx` — added `<Label htmlFor="weight">`, `id="weight"`, `inputMode="decimal"`, `autoComplete="off"`; heading now "Confirm your weight (lbs)"
+- `app/(app)/session/[id]/join/steps/waiver-step.tsx` — loading label "Signing..." → "Accepting..."
+- `app/(app)/session/[id]/join/steps/geo-check-step.tsx` — "Continue anyway" → "Continue"; softer explanatory copy for out-of-geo/denied cases
+- `app/(app)/session/[id]/match/[matchId]/steps/result-recording-step.tsx` — "Submit Result" → "Record Result"; 60s timekeeper lock shows live countdown ("Waiting for timekeeper... {n}s")
+- `app/(app)/session/[id]/match/[matchId]/steps/ready-check-step.tsx` — added subtitle "Both athletes must tap Ready to start."
+- `components/domain/recent-activity-section.tsx` — dead `/arena` empty-state link replaced with `/gyms` ("Find a session")
+- `components/domain/active-session-card.tsx` — primary button now shows "Check In" (→ `/session/{id}/join`) when `!isCheckedIn`, else "Go to Lobby" (→ `/session/{id}/lobby`)
+- `app/(app)/leaderboard/leaderboard-content.tsx` — gender filter and mode toggle now URL-backed via `useSearchParams`; defaults stripped from URL; preserved other params
+- `app/(app)/session/[id]/lobby/session-challenge-sheet.tsx` — stake rows get `aria-label="Win/Draw/Loss: ±N ELO"` and icons get `aria-hidden`
+- `app/(app)/session/[id]/lobby/session-lobby-content.tsx` — silent redirect on missing session replaced with `<SessionUnavailable reason="not-found" />`; existing ended branch reuses the component
+- `app/(app)/session/[id]/join/join-content.tsx` — `notFound()` replaced with `<SessionUnavailable reason="not-found" />` for friendlier messaging
+- `lib/api/queries.ts` — `getActiveSession` returns `isCheckedIn`; `types/session.ts` `ActiveSessionInfo` extended
+- `hooks/use-session-lobby-realtime.ts` — emits `announcement` state for aria-live consumers
+- Auth forms (`login-form.tsx`, `sign-up-form.tsx`, `forgot-password-form.tsx`) — added `autoComplete` (`email`, `current-password`, `new-password`)
+
+**Removed**
+- `app/profile/setup/setup-form.tsx` — superseded by `setup-wizard.tsx`
+
 ### Phase 9: Leaderboard Updates (2026-04-13)
 
 **Added**
