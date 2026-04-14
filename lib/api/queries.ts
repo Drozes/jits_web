@@ -548,6 +548,7 @@ export async function getActiveSession(
         scheduledEnd: session.scheduled_end,
         participantCount: count ?? 0,
         isRsvpd: false,
+        isCheckedIn: true,
       };
     }
   }
@@ -584,6 +585,15 @@ export async function getActiveSession(
         .select("id", { count: "exact", head: true })
         .eq("session_id", session.id);
 
+      // Athletes with an RSVP haven't necessarily checked in; verify via session_participants
+      const { data: participantRow } = await supabase
+        .from("session_participants")
+        .select("id")
+        .eq("session_id", session.id)
+        .eq("athlete_id", athleteId)
+        .neq("status", "left")
+        .maybeSingle();
+
       return {
         sessionId: session.id,
         gymId: session.gym_id,
@@ -593,6 +603,7 @@ export async function getActiveSession(
         scheduledEnd: session.scheduled_end,
         participantCount: count ?? 0,
         isRsvpd: true,
+        isCheckedIn: !!participantRow,
       };
     }
   }

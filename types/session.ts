@@ -55,6 +55,7 @@ export interface ActiveSessionInfo {
   scheduledEnd: string;
   participantCount: number;
   isRsvpd: boolean;
+  isCheckedIn: boolean;
 }
 
 /** Participant from get_session_lobby RPC */

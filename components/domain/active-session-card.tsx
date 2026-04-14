@@ -47,8 +47,16 @@ export function ActiveSessionCard({ session }: ActiveSessionCardProps) {
             <Users className="h-3 w-3" />
             {session.participantCount} checked in
           </div>
-          <Link href={`/session/${session.sessionId}/join`}>
-            <Button size="sm" className="w-full mt-1">Go to Lobby</Button>
+          <Link
+            href={
+              session.isCheckedIn
+                ? `/session/${session.sessionId}/lobby`
+                : `/session/${session.sessionId}/join`
+            }
+          >
+            <Button size="sm" className="w-full mt-1">
+              {session.isCheckedIn ? "Go to Lobby" : "Check In"}
+            </Button>
           </Link>
         </div>
       </Card>

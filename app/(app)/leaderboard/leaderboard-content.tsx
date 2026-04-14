@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Switch } from "@/components/ui/switch";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -101,9 +102,28 @@ export function LeaderboardContent({
   gyms: RankedGym[];
   challengedIds?: string[];
 }) {
-  const [isAthleteMode, setIsAthleteMode] = useState(true);
-  const [genderFilter, setGenderFilter] = useState<"all" | "male" | "female">("all");
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const mode = searchParams.get("mode") === "gyms" ? "gyms" : "fighters";
+  const isAthleteMode = mode === "fighters";
+  const rawGender = searchParams.get("gender");
+  const genderFilter: "all" | "male" | "female" =
+    rawGender === "male" || rawGender === "female" ? rawGender : "all";
   const challengedSet = new Set(challengedIds);
+
+  const updateParam = useCallback(
+    (key: string, value: string, defaultValue: string) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (value === defaultValue) {
+        params.delete(key);
+      } else {
+        params.set(key, value);
+      }
+      const qs = params.toString();
+      router.replace(qs ? `?${qs}` : "?", { scroll: false });
+    },
+    [router, searchParams],
+  );
 
   const filteredAthletes = genderFilter === "all"
     ? athletes
@@ -122,7 +142,7 @@ export function LeaderboardContent({
         </span>
         <Switch
           checked={!isAthleteMode}
-          onCheckedChange={(checked) => setIsAthleteMode(!checked)}
+          onCheckedChange={(checked) => updateParam("mode", checked ? "gyms" : "fighters", "fighters")}
         />
         <span className={`text-sm font-medium transition-colors ${!isAthleteMode ? "text-foreground" : "text-muted-foreground"}`}>
           Gyms
@@ -136,7 +156,7 @@ export function LeaderboardContent({
             {(["all", "male", "female"] as const).map((g) => (
               <button
                 key={g}
-                onClick={() => setGenderFilter(g)}
+                onClick={() => updateParam("gender", g, "all")}
                 className={cn(
                   "rounded-full px-3.5 py-1.5 text-xs font-medium transition-all duration-200",
                   genderFilter === g
