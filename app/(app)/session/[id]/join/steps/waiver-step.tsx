@@ -60,7 +60,7 @@ export function WaiverStep({ sessionId, waiverId, onNext }: WaiverStepProps) {
         disabled={!agreed || loading}
         className="w-full rounded-xl"
       >
-        {loading ? "Signing..." : "Continue"}
+        {loading ? "Accepting..." : "Continue"}
       </Button>
     </div>
   );

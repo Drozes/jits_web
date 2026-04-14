@@ -56,9 +56,9 @@ export function GeoCheckStep({ gymLatitude, gymLongitude, gymName, onNext }: Geo
   const message = {
     checking: "Checking your location...",
     success: `You're near ${gymName}`,
-    far: `You appear to be far from ${gymName}. You can still continue.`,
-    failed: "Location unavailable. You can still continue.",
-    denied: "Location permission denied. You can still continue.",
+    far: `You appear to be far from ${gymName}. You can still continue if you're actually there.`,
+    failed: "Location unavailable, so we couldn't verify you're at the gym. You can still continue if you're actually there.",
+    denied: "Location permission denied, so we couldn't verify you're at the gym. You can still continue if you're actually there.",
   }[status];
 
   return (
@@ -67,7 +67,7 @@ export function GeoCheckStep({ gymLatitude, gymLongitude, gymName, onNext }: Geo
       <p className="text-center text-sm text-muted-foreground">{message}</p>
       {status !== "checking" && (
         <Button onClick={onNext} className="w-full rounded-xl">
-          {status === "success" ? "Continue" : "Continue anyway"}
+          Continue
         </Button>
       )}
     </div>

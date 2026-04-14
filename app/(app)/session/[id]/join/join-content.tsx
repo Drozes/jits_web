@@ -1,7 +1,8 @@
-import { notFound, redirect } from "next/navigation";
+import { redirect } from "next/navigation";
 import { requireAthlete } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionForJoin } from "@/lib/api/queries";
+import { SessionUnavailable } from "@/components/domain/session-unavailable";
 import { JoinWizard } from "./join-wizard";
 
 export async function JoinContent({
@@ -14,7 +15,9 @@ export async function JoinContent({
   const supabase = await createClient();
 
   const session = await getSessionForJoin(supabase, sessionId, athlete.id);
-  if (!session) notFound();
+  if (!session) {
+    return <SessionUnavailable reason="not-found" />;
+  }
 
   // Check if already a participant (not done) and redirect to lobby
   const { data: existing } = await supabase

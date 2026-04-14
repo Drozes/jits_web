@@ -146,8 +146,8 @@ function EmptyState({ message, showLink }: { message: string; showLink?: boolean
     <div className="rounded-2xl border border-dashed border-border p-8 text-center">
       <p className="text-sm text-muted-foreground">{message}</p>
       {showLink && (
-        <Link href="/arena" className="text-xs font-medium text-primary hover:underline mt-2 inline-block">
-          Head to the Arena
+        <Link href="/gyms" className="text-xs font-medium text-primary hover:underline mt-2 inline-block">
+          Find a session
         </Link>
       )}
     </div>
