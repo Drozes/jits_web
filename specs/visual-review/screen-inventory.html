@@ -2182,6 +2182,18 @@
     font-size: 11px; color: var(--gray-400); padding: 4px 0; font-style: italic;
   }
 
+  /* ── Error message ── */
+  .fb-error-msg {
+    background: #2d1518 !important; border-color: #f87171 !important; color: #f87171;
+    font-size: 12px; padding: 8px 12px; border-radius: 8px; border: 1px solid #f87171;
+    align-self: flex-start; max-width: 100%;
+  }
+
+  /* ── Cost/duration footer ── */
+  .fb-cost-footer {
+    font-size: 10px; color: var(--gray-600); padding: 2px 0;
+  }
+
   /* ── Diff preview ── */
   .fb-diff-block {
     margin-top: 10px; border: 1px solid #333; border-radius: 6px; overflow: hidden;
@@ -2484,6 +2496,7 @@
       });
       if (!response.ok) {
         const err = await response.json().catch(() => ({ error: 'Server error' }));
+        if (response.status === 409) throw new Error('Claude is already processing another request. Please wait.');
         throw new Error(err.error || 'Server error');
       }
       const reader = response.body.getReader();
@@ -2518,19 +2531,40 @@
               els.messages.scrollTop = els.messages.scrollHeight;
             } else if (parsed.type === 'tool_use') {
               const toolEl = document.createElement('div'); toolEl.className = 'fb-tool-use';
-              toolEl.textContent = `Using ${parsed.tool}...`;
+              toolEl.textContent = (parsed.tool === 'Edit' || parsed.tool === 'Write')
+                ? `Editing file...` : parsed.tool === 'Read'
+                ? `Reading file...` : `Using ${parsed.tool}...`;
               els.messages.appendChild(toolEl);
               els.messages.scrollTop = els.messages.scrollHeight;
             }
           }
           if (eventType === 'diff' && parsed.diff) diffText = parsed.diff;
-          if (eventType === 'done' && parsed.result && parsed.result !== assistantText) assistantText = parsed.result;
-          if (eventType === 'error') { if (typingEl.parentNode) typingEl.remove(); assistantText += '\n[Error: ' + (parsed.message || 'Unknown error') + ']'; }
+          if (eventType === 'done') {
+            if (parsed.result && parsed.result !== assistantText) assistantText = parsed.result;
+            if (parsed.cost || parsed.duration_ms) {
+              const footerEl = document.createElement('div'); footerEl.className = 'fb-cost-footer';
+              const p = [];
+              if (parsed.duration_ms) p.push(`${(parsed.duration_ms / 1000).toFixed(1)}s`);
+              if (parsed.cost) p.push(`$${parsed.cost.toFixed(3)}`);
+              footerEl.textContent = p.join(' \u00b7 ');
+              els.messages.appendChild(footerEl);
+            }
+          }
+          if (eventType === 'error') {
+            if (typingEl.parentNode) typingEl.remove();
+            const errEl = document.createElement('div'); errEl.className = 'fb-error-msg';
+            errEl.textContent = parsed.message || 'Something went wrong';
+            els.messages.appendChild(errEl);
+            els.messages.scrollTop = els.messages.scrollHeight;
+          }
         }
       }
     } catch (err) {
       if (typingEl.parentNode) typingEl.remove();
-      assistantText = '[Error: ' + err.message + ']';
+      const errEl = document.createElement('div'); errEl.className = 'fb-error-msg';
+      errEl.textContent = err.message || 'Connection failed';
+      els.messages.appendChild(errEl);
+      if (!assistantText) assistantText = '(error)';
     }
 
     const aMsg = { role: 'assistant', text: assistantText, timestamp: new Date().toISOString() };

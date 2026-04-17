@@ -44,8 +44,12 @@ function git(cmd) {
 }
 
 function getDirtyFiles() {
-  const out = git("diff --name-only");
-  return new Set(out ? out.split("\n") : []);
+  const unstaged = git("diff --name-only");
+  const staged = git("diff --cached --name-only");
+  const all = new Set();
+  if (unstaged) unstaged.split("\n").forEach((f) => all.add(f));
+  if (staged) staged.split("\n").forEach((f) => all.add(f));
+  return all;
 }
 
 function getUntrackedFiles() {
@@ -128,7 +132,12 @@ function handleChat(req, res) {
     }
 
     activePin = pinId;
-    createSnapshot();
+
+    // Only snapshot if no pending Claude changes (preserves snapshot across multi-turn)
+    const pending = getClaudeChangedFiles();
+    if (pending.changed.length === 0 && pending.created.length === 0) {
+      createSnapshot();
+    }
 
     const isFirstTurn = !sessionId;
     const sid = sessionId || randomUUID();
@@ -160,6 +169,7 @@ function handleChat(req, res) {
       "-p", prompt,
       "--output-format", "stream-json",
       "--verbose",
+      "--include-partial-messages",
       "--permission-mode", "acceptEdits",
     ];
 
@@ -191,49 +201,65 @@ function handleChat(req, res) {
 
     let fullText = "";
     let stderrBuf = "";
+    let stdoutBuf = "";
 
-    proc.stdout.on("data", (chunk) => {
-      const lines = chunk.toString().split("\n").filter(Boolean);
-      for (const line of lines) {
-        try {
-          const event = JSON.parse(line);
-
-          if (event.type === "assistant" && event.message?.content) {
-            for (const block of event.message.content) {
-              if (block.type === "text") {
-                fullText += block.text;
-                sendSSE("chunk", { type: "text", text: block.text });
-              } else if (block.type === "tool_use") {
-                sendSSE("chunk", {
-                  type: "tool_use",
-                  tool: block.name,
-                  input: block.input,
-                });
-              }
-            }
-          } else if (event.type === "result") {
-            if (event.result && event.result !== fullText) {
-              fullText = event.result;
-            }
-            // Grab diff after Claude finishes
-            try {
-              const diff = git("diff");
-              const { changed, created } = getClaudeChangedFiles();
-              if (diff || created.length > 0) {
-                sendSSE("diff", { diff, files: [...changed, ...created] });
-              }
-            } catch { /* no diff available */ }
-
-            sendSSE("done", {
-              sessionId: sid,
-              cost: event.total_cost_usd,
-              duration_ms: event.duration_ms,
-              result: fullText,
+    function handleStreamLine(event) {
+      // Incremental streaming via --include-partial-messages
+      if (event.type === "stream_event") {
+        const inner = event.event;
+        if (inner.type === "content_block_delta") {
+          if (inner.delta?.type === "text_delta" && inner.delta.text) {
+            fullText += inner.delta.text;
+            sendSSE("chunk", { type: "text", text: inner.delta.text });
+          }
+        } else if (inner.type === "content_block_start") {
+          if (inner.content_block?.type === "tool_use") {
+            sendSSE("chunk", {
+              type: "tool_use",
+              tool: inner.content_block.name,
+              id: inner.content_block.id,
             });
           }
-        } catch {
-          // non-JSON line, ignore
         }
+        // Ignore message_start, content_block_stop, message_delta, message_stop
+        return;
+      }
+
+      // Complete message (authoritative fullText)
+      if (event.type === "assistant" && event.message?.content) {
+        for (const block of event.message.content) {
+          if (block.type === "text") fullText = block.text;
+        }
+        return;
+      }
+
+      // Final result
+      if (event.type === "result") {
+        try {
+          const diff = git("diff");
+          const { changed, created } = getClaudeChangedFiles();
+          if (diff || created.length > 0) {
+            sendSSE("diff", { diff, files: [...changed, ...created] });
+          }
+        } catch { /* no diff available */ }
+
+        sendSSE("done", {
+          sessionId: sid,
+          cost: event.total_cost_usd,
+          duration_ms: event.duration_ms,
+          result: event.result || fullText,
+        });
+      }
+    }
+
+    proc.stdout.on("data", (chunk) => {
+      stdoutBuf += chunk.toString();
+      const parts = stdoutBuf.split("\n");
+      stdoutBuf = parts.pop(); // keep incomplete last line in buffer
+      for (const line of parts) {
+        if (!line.trim()) continue;
+        try { handleStreamLine(JSON.parse(line)); }
+        catch { /* non-JSON line, ignore */ }
       }
     });
 
@@ -285,6 +311,10 @@ function handleDiff(req, res) {
 }
 
 function handleAccept(req, res) {
+  if (activeProcess) {
+    json(res, 409, { error: "Cannot accept while Claude is still working" });
+    return;
+  }
   readBody(req).then((body) => {
     const { message } = body;
     try {
@@ -316,6 +346,10 @@ function handleAccept(req, res) {
 }
 
 function handleReject(req, res) {
+  if (activeProcess) {
+    json(res, 409, { error: "Cannot reject while Claude is still working" });
+    return;
+  }
   try {
     const { changed, created } = getClaudeChangedFiles();
 
@@ -327,15 +361,21 @@ function handleReject(req, res) {
     const reverted = [];
 
     if (changed.length > 0) {
+      // Unstage any staged files first, then revert working tree
+      try { git(`reset HEAD -- ${changed.map((f) => `"${f}"`).join(" ")}`); } catch { /* may not be staged */ }
       git(`checkout HEAD -- ${changed.map((f) => `"${f}"`).join(" ")}`);
       reverted.push(...changed);
     }
 
     for (const f of created) {
-      const fullPath = join(PROJECT_ROOT, f);
-      if (existsSync(fullPath)) {
-        unlinkSync(fullPath);
-        reverted.push(f);
+      try {
+        const fullPath = join(PROJECT_ROOT, f);
+        if (existsSync(fullPath)) {
+          unlinkSync(fullPath);
+          reverted.push(f);
+        }
+      } catch (err) {
+        console.error(`Failed to delete ${f}: ${err.message}`);
       }
     }
 
