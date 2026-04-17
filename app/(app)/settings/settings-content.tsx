@@ -48,7 +48,7 @@ function SettingsLink({
   return (
     <Link
       href={href}
-      className="flex items-center justify-between rounded-xl border border-border px-4 py-3.5 hover:bg-muted/50 transition-colors"
+      className="flex items-center justify-between rounded-xl border border-border border-l-2 border-l-blue-500 px-4 py-3.5 hover:bg-muted/50 transition-colors"
     >
       <div className="flex items-center gap-3">
         <Icon className="h-4 w-4 text-muted-foreground" />

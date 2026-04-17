@@ -102,8 +102,8 @@ export function FighterLiveStep({ onNext, matchId, durationSeconds, startedAt, p
         Match in progress
       </p>
       <p className={cn(
-        "text-6xl sm:text-7xl font-mono font-bold tabular-nums tracking-tight",
-        expired && "animate-timer-expired",
+        "text-6xl sm:text-7xl font-mono font-bold tabular-nums tracking-tight text-amber-500",
+        expired && "animate-timer-expired text-destructive",
       )}>
         {timer.formatted}
       </p>

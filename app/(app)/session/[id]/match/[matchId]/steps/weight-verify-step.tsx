@@ -25,7 +25,7 @@ export function WeightVerifyStep({ onNext, currentAthlete, opponent, matchType }
 
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center gap-6 px-4">
-      <Scale className="h-8 w-8 text-primary" />
+      <Scale className="h-8 w-8 text-destructive" />
       <h2 className="text-lg font-semibold">Verify Weights</h2>
 
       <div className="grid grid-cols-2 gap-3 w-full max-w-sm">

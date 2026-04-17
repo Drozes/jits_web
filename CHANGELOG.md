@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Conversational Design Feedback Tool (2026-04-16)
+
+**Added**
+- `specs/visual-review/feedback-server.mjs` -- Zero-dependency Node bridge server (port 3847) that proxies between the browser-based screen inventory and Claude CLI. Endpoints: `POST /api/chat` (SSE-streamed Claude responses via `--output-format stream-json`), `GET /api/diff` (git diff of Claude's changes), `POST /api/accept` (selective git commit), `POST /api/reject` (selective file revert using pre-chat snapshot), `POST /api/cancel` (kill active process), `GET /api/status` (busy/idle state). Serves static files from `specs/visual-review/` so the HTML works at `http://localhost:3847/`. Multi-turn conversations via `--session-id` + `--resume`. Snapshot-based revert only touches files Claude changed (not pre-existing uncommitted work).
+- `specs/visual-review/screen-inventory.html` -- Reconstructed 19-screen wireframe inventory with v2 feedback overlay: chat panel with threaded messages, streaming text display, inline diff preview (colored unified diff), Accept/Reject buttons per response, pin status badges (open/accepted/rejected), server connection indicator with 10s polling, graceful offline fallback to static pin editing. Data model v2 adds `status`, `sessionId`, `messages[]` per pin with backward-compatible migration from v1 `text` field. Enter to send, Shift+Enter for newline, auto-scroll, cancel button.
+- `specs/visual-review/apply-feedback.mjs` -- Updated CLI: launcher mode (no args) starts the bridge server + opens browser; legacy CLI mode preserved for batch processing exported JSON files.
+
+### Screen Inventory Updates (2026-04-15)
+
+**Changed**
+- `specs/visual-review/screen-inventory.html` -- Match flow routes (screens 10-17) updated from `/match/[id]/*` to `/session/[id]/match/[matchId] (step: <name>)`. Session Lobby header changed to "Session Lobby", removed planned-but-unshipped timer bar and Timekeeper button. Dashboard "Pending Challenges" renamed to "Recent Activity". Bottom nav corrected across all wireframes (Home/Gyms/Rankings/Profile). Gym Detail notes flag shipped vs planned components.
+
 ### UX/UI Full-Pass Review (2026-04-13)
 
 Three-team review (PM + design + implementation). 14 ship-now items plus 6 design decisions.

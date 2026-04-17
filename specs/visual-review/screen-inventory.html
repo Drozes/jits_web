@@ -1,0 +1,2638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JITS Arena: Screen Inventory &amp; Wireframes</title>
+  <style>
+  :root {
+    --green-500: #22c55e;
+    --green-600: #16a34a;
+    --green-100: #dcfce7;
+    --red-500: #ef4444;
+    --red-100: #fee2e2;
+    --amber-500: #f59e0b;
+    --amber-100: #fef3c7;
+    --primary-red: hsl(0, 72%, 51%);
+    --gray-50: #f9fafb;
+    --gray-100: #f3f4f6;
+    --gray-200: #e5e7eb;
+    --gray-300: #d1d5db;
+    --gray-400: #9ca3af;
+    --gray-500: #6b7280;
+    --gray-600: #4b5563;
+    --gray-700: #374151;
+    --gray-800: #1f2937;
+    --gray-900: #111827;
+    --blue-500: #3b82f6;
+    --blue-100: #dbeafe;
+    --success: hsl(145, 63%, 42%);
+    --success-light: hsl(145, 63%, 92%);
+    --feature-flag-border: #f59e0b;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #0f0f0f;
+    color: #e5e7eb;
+    padding: 32px 24px 64px;
+    line-height: 1.5;
+  }
+
+  h1 {
+    text-align: center;
+    font-size: 28px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 8px;
+    letter-spacing: -0.5px;
+  }
+
+  .subtitle {
+    text-align: center;
+    font-size: 14px;
+    color: var(--gray-400);
+    margin-bottom: 40px;
+  }
+
+  /* Legend */
+  .legend {
+    max-width: 900px;
+    margin: 0 auto 48px;
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 12px;
+    padding: 24px;
+  }
+
+  .legend h2 {
+    font-size: 16px;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 16px;
+  }
+
+  .legend-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 20px;
+  }
+
+  .legend-section h3 {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--gray-300);
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--gray-400);
+    margin-bottom: 6px;
+  }
+
+  /* Section Headers */
+  .section-header {
+    max-width: 1280px;
+    margin: 0 auto 32px;
+  }
+
+  .section-header h2 {
+    font-size: 22px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 4px;
+  }
+
+  .section-header p {
+    font-size: 14px;
+    color: var(--gray-400);
+  }
+
+  /* Screen Grid */
+  .screen-grid {
+    max-width: 1280px;
+    margin: 0 auto 56px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+    gap: 24px;
+  }
+
+  /* Screen Card */
+  .screen-card {
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .screen-card-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding: 16px;
+  }
+
+  .screen-card-header h3 {
+    font-size: 15px;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 2px;
+  }
+
+  .screen-route {
+    font-family: 'SF Mono', SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
+    font-size: 12px;
+    color: var(--gray-500);
+  }
+
+  .screen-badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 10px;
+    border-radius: 999px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .badge-new {
+    background: var(--green-100);
+    color: var(--green-600);
+  }
+
+  .badge-modified {
+    background: var(--blue-100);
+    color: var(--blue-500);
+  }
+
+  .badge-flagged {
+    background: transparent;
+    color: var(--amber-500);
+    border: 1.5px dashed var(--feature-flag-border);
+  }
+
+  /* Screen Notes */
+  .screen-notes {
+    padding: 12px 16px 16px;
+    border-top: 1px solid #2a2a2a;
+    font-size: 12px;
+    color: var(--gray-500);
+    line-height: 1.6;
+  }
+
+  .note-tag {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    vertical-align: middle;
+  }
+
+  .note-tag.new {
+    background: var(--green-100);
+    color: var(--green-600);
+  }
+
+  .note-tag.reuse {
+    background: var(--blue-100);
+    color: var(--blue-500);
+  }
+
+  .note-tag.token {
+    background: var(--amber-100);
+    color: var(--amber-500);
+  }
+
+  /* Phone Frame */
+  .phone-frame {
+    max-width: 280px;
+    margin: 0 auto 4px;
+    border-radius: 24px;
+    overflow: hidden;
+    border: 2px solid #333;
+    aspect-ratio: 9 / 19.5;
+    background: #fff;
+    position: relative;
+  }
+
+  .phone-screen {
+    background: #fff;
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .notch {
+    width: 120px;
+    height: 28px;
+    background: #0f0f0f;
+    border-radius: 0 0 16px 16px;
+    margin: 0 auto;
+    position: relative;
+    z-index: 10;
+    flex-shrink: 0;
+  }
+
+  /* Wireframe Header */
+  .wf-header {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    background: var(--gray-50);
+    border-bottom: 1px solid var(--gray-200);
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .header-icon {
+    width: 20px;
+    height: 20px;
+    background: var(--gray-200);
+    border-radius: 4px;
+    flex-shrink: 0;
+  }
+
+  .header-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--gray-900);
+    flex: 1;
+  }
+
+  .header-action {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--primary-red);
+    cursor: default;
+  }
+
+  .back-btn {
+    font-size: 16px;
+    color: var(--gray-500);
+    flex-shrink: 0;
+    line-height: 1;
+  }
+
+  /* Wireframe Body */
+  .wf-body {
+    display: flex;
+    flex-direction: column;
+    padding: 10px 12px;
+    gap: 8px;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* Search Bar */
+  .wf-search {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--gray-100);
+    border-radius: 8px;
+    padding: 7px 10px;
+    flex-shrink: 0;
+  }
+
+  .wf-search-icon {
+    width: 14px;
+    height: 14px;
+    background: var(--gray-300);
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .wf-search-text {
+    font-size: 11px;
+    color: var(--gray-400);
+  }
+
+  /* List Items */
+  .wf-list-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--gray-100);
+  }
+
+  .wf-list-text {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .wf-list-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--gray-800);
+  }
+
+  .wf-list-sub {
+    font-size: 10px;
+    color: var(--gray-400);
+  }
+
+  /* Avatar */
+  .wf-avatar {
+    width: 36px;
+    height: 36px;
+    background: var(--gray-200);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--gray-500);
+    flex-shrink: 0;
+  }
+
+  /* Badges */
+  .wf-badge {
+    font-size: 9px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 999px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .wf-badge.success {
+    background: var(--success-light);
+    color: var(--success);
+  }
+
+  .wf-badge.amber {
+    background: var(--amber-100);
+    color: var(--amber-500);
+  }
+
+  .wf-badge.info {
+    background: var(--blue-100);
+    color: var(--blue-500);
+  }
+
+  /* Blocks */
+  .wf-block {
+    border: 1px solid var(--gray-200);
+    border-radius: 8px;
+    padding: 8px 10px;
+  }
+
+  .wf-block.green {
+    background: var(--success-light);
+    border-color: var(--success);
+  }
+
+  .wf-block-label {
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--gray-400);
+    margin-bottom: 3px;
+  }
+
+  .wf-block-content {
+    font-size: 11px;
+    color: var(--gray-700);
+    line-height: 1.4;
+  }
+
+  /* Buttons */
+  .wf-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 7px 14px;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: default;
+    border: none;
+    text-align: center;
+  }
+
+  .wf-btn.primary {
+    background: var(--primary-red);
+    color: #fff;
+  }
+
+  .wf-btn.blue {
+    background: var(--blue-500);
+    color: #fff;
+  }
+
+  .wf-btn.outline {
+    background: transparent;
+    border: 1.5px solid var(--gray-300);
+    color: var(--gray-600);
+  }
+
+  .wf-btn.success {
+    background: var(--success);
+    color: #fff;
+  }
+
+  .wf-btn-row {
+    display: flex;
+    gap: 8px;
+  }
+
+  .wf-btn-row .wf-btn {
+    flex: 1;
+  }
+
+  /* Timer Bar */
+  .wf-timer-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 10px;
+    background: var(--gray-100);
+    border-radius: 8px;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--gray-800);
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+  }
+
+  /* Separator */
+  .wf-separator {
+    height: 1px;
+    background: var(--gray-200);
+    margin: 4px 0;
+  }
+
+  /* Checkbox */
+  .wf-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--gray-700);
+  }
+
+  .wf-checkbox-dot {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    border: 2px solid var(--gray-300);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .wf-checkbox-dot.checked {
+    background: var(--success);
+    border-color: var(--success);
+  }
+
+  /* Progress Dots */
+  .wf-progress-dots {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 6px 0;
+    flex-shrink: 0;
+  }
+
+  .wf-progress-dots .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--gray-200);
+  }
+
+  .wf-progress-dots .dot.active {
+    background: var(--primary-red);
+  }
+
+  .wf-progress-dots .dot.done {
+    background: var(--success);
+  }
+
+  /* Bottom Nav */
+  .wf-bottom-nav {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    padding: 8px 0 10px;
+    background: var(--gray-50);
+    border-top: 1px solid var(--gray-200);
+    flex-shrink: 0;
+    margin-top: auto;
+  }
+
+  .wf-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .wf-nav-dot {
+    width: 18px;
+    height: 18px;
+    background: var(--gray-200);
+    border-radius: 4px;
+  }
+
+  .wf-nav-dot.active {
+    background: var(--primary-red);
+  }
+
+  .wf-nav-label {
+    font-size: 9px;
+    color: var(--gray-400);
+  }
+
+  .wf-nav-label.active {
+    color: var(--primary-red);
+    font-weight: 700;
+  }
+
+  /* Legend color swatches */
+  .swatch {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+  </style>
+</head>
+<body>
+
+  <h1>JITS Arena: Screen Inventory</h1>
+  <p class="subtitle">19 screens across 5 flows. Wireframes show layout, color tokens, and component structure.</p>
+
+  <div class="legend">
+    <h2>Legend</h2>
+    <div class="legend-grid">
+      <div class="legend-section">
+        <h3>Color Tokens</h3>
+        <div class="legend-item">
+          <span class="swatch" style="background: var(--success);"></span>
+          <span><strong>text-success</strong> — wins, positive ELO</span>
+        </div>
+        <div class="legend-item">
+          <span class="swatch" style="background: var(--red-500);"></span>
+          <span><strong>text-destructive</strong> — losses, negative ELO</span>
+        </div>
+        <div class="legend-item">
+          <span class="swatch" style="background: var(--amber-500);"></span>
+          <span><strong>text-amber-500</strong> — draws, pressure</span>
+        </div>
+        <div class="legend-item">
+          <span class="swatch" style="background: var(--primary-red);"></span>
+          <span><strong>text-primary</strong> — brand accent only</span>
+        </div>
+        <div class="legend-item">
+          <span class="swatch" style="background: var(--gray-800); font-family: monospace; color: #fff; font-size: 9px; display: flex; align-items: center; justify-content: center; width: auto; padding: 0 5px;">1234</span>
+          <span><strong>tabular-nums</strong> — ELO, stats values</span>
+        </div>
+      </div>
+      <div class="legend-section">
+        <h3>Component Tags</h3>
+        <div class="legend-item">
+          <span class="note-tag new">NEW</span>
+          <span>New component for this screen</span>
+        </div>
+        <div class="legend-item">
+          <span class="note-tag reuse">REUSE</span>
+          <span>Existing component reused</span>
+        </div>
+        <div class="legend-item">
+          <span class="note-tag token">TOKEN</span>
+          <span>Uses color token from design system</span>
+        </div>
+      </div>
+      <div class="legend-section">
+        <h3>Screen Status</h3>
+        <div class="legend-item">
+          <span class="screen-badge badge-new">New</span>
+          <span>Newly added screen</span>
+        </div>
+        <div class="legend-item">
+          <span class="screen-badge badge-modified">Modified</span>
+          <span>Existing screen with changes</span>
+        </div>
+        <div class="legend-item">
+          <span class="screen-badge badge-flagged">Flagged</span>
+          <span>Behind feature flag</span>
+        </div>
+      </div>
+    </div>
+  </div>
+<!-- ================================================ -->
+<!-- SECTION: GYM FINDER -->
+<!-- ================================================ -->
+<div class="section-header">
+  <h2>Gym Finder</h2>
+  <p>Browse gyms, view details, and discover active sessions. Entry point for the session-based match flow.</p>
+</div>
+
+<div class="screen-grid">
+
+  <!-- 1. Gym Finder -->
+  <div class="screen-card">
+    <div class="screen-card-header">
+      <div>
+        <h3>1. Gym Finder</h3>
+        <div class="screen-route">/gyms</div>
+      </div>
+      <span class="screen-badge badge-new">New</span>
+    </div>
+    <div class="phone-frame">
+      <div class="phone-screen">
+        <div class="notch"></div>
+
+        <!-- Header -->
+        <div class="wf-header">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--gray-500)" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            <span class="header-title">Gyms</span>
+          </div>
+          <div class="header-action">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--gray-400)" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          </div>
+        </div>
+
+        <div class="wf-body" style="gap:12px;">
+          <!-- Search -->
+          <div class="wf-search">
+            <span class="wf-search-icon">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--gray-400)" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+            </span>
+            <span class="wf-search-text">Search gyms...</span>
+          </div>
+
+          <!-- Gym Card 1: My Gym with Live Session -->
+          <div style="border:1px solid var(--gray-200);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:6px;">
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span style="font-size:13px;font-weight:600;">Gracie Academy</span>
+              <span class="wf-badge info" style="font-size:9px;">My Gym</span>
+              <span class="wf-badge success" style="font-size:9px;">Live</span>
+            </div>
+            <span style="font-size:10px;color:var(--gray-400);">Torrance, CA</span>
+            <div style="display:flex;align-items:center;gap:12px;font-size:10px;color:var(--gray-400);margin-top:2px;">
+              <span style="display:flex;align-items:center;gap:3px;">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                24 members
+              </span>
+              <span style="color:#22c55e;font-weight:500;">1 active</span>
+            </div>
+          </div>
+
+          <!-- Gym Card 2: Regular gym -->
+          <div style="border:1px solid var(--gray-200);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:6px;">
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span style="font-size:13px;font-weight:600;">10th Planet</span>
+            </div>
+            <span style="font-size:10px;color:var(--gray-400);">Los Angeles, CA</span>
+            <div style="display:flex;align-items:center;gap:12px;font-size:10px;color:var(--gray-400);margin-top:2px;">
+              <span style="display:flex;align-items:center;gap:3px;">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                18 members
+              </span>
+              <span>2 upcoming</span>
+            </div>
+          </div>
+
+          <!-- Gym Card 3 -->
+          <div style="border:1px solid var(--gray-200);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:6px;">
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span style="font-size:13px;font-weight:600;">Atos HQ</span>
+              <span class="wf-badge success" style="font-size:9px;">Live</span>
+            </div>
+            <span style="font-size:10px;color:var(--gray-400);">San Diego, CA</span>
+            <div style="display:flex;align-items:center;gap:12px;font-size:10px;color:var(--gray-400);margin-top:2px;">
+              <span style="display:flex;align-items:center;gap:3px;">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                31 members
+              </span>
+              <span style="color:#22c55e;font-weight:500;">1 active</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bottom Nav -->
+        <div class="wf-bottom-nav">
+          <div class="wf-nav-item">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--gray-400)" stroke-width="2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            <span class="wf-nav-label">Home</span>
+          </div>
+          <div class="wf-nav-item" style="color:var(--primary);">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            <span class="wf-nav-label" style="font-weight:600;">Gyms</span>
+            <div class="wf-nav-dot"></div>
+          </div>
+          <div class="wf-nav-item">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--gray-400)" stroke-width="2"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>
+            <span class="wf-nav-label">Rankings</span>
+          </div>
+          <div class="wf-nav-item">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--gray-400)" stroke-width="2"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            <span class="wf-nav-label">Profile</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="screen-notes">
+      <span class="note-tag new">GymSearch</span>
+      <span class="note-tag new">GymCard</span>
+      <span class="note-tag reuse">AppHeader</span>
+      <span class="note-tag reuse">BottomNavBar</span>
+      <span class="note-tag token">Session Live badge: bg-success text-success-foreground</span>
+      <span class="note-tag token">My Gym badge: bg-blue-100 text-blue-600</span>
+      <span class="note-tag token">Member/session counts: text-muted-foreground tabular-nums</span>
+      <span class="note-tag reuse">BottomNavBar</span>
+      Client-side search filtering by gym name or city. GymCard shows "My Gym" outline badge, "Live" success badge, member count, and active/upcoming session counts.
+    </div>
+  </div>
+
+  <!-- 2. Gym Detail -->
+  <div class="screen-card">
+    <div class="screen-card-header">
+      <div>
+        <h3>2. Gym Detail</h3>
+        <div class="screen-route">/gyms/[id]</div>
+      </div>
+      <span class="screen-badge badge-new">New</span>
+    </div>
+    <div class="phone-frame">
+      <div class="phone-screen">
+        <div class="notch"></div>
+
+        <!-- Header -->
+        <div class="wf-header">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span class="back-btn">&larr;</span>
+            <span class="header-title">Gym</span>
+          </div>
+        </div>
+
+        <div class="wf-body" style="gap:16px;">
+          <!-- Gym Header -->
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:18px;font-weight:700;">Gracie Academy</span>
+              <span class="wf-badge info" style="font-size:9px;">My Gym</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--gray-400);">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              Torrance, CA
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--gray-400);">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              Members at this gym
+            </div>
+          </div>
+
+          <!-- Start Session Button -->
+          <button class="wf-btn primary" style="width:100%;padding:10px;border-radius:12px;">Start Session</button>
+
+          <!-- Sessions Section Header -->
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div style="width:24px;height:24px;border-radius:6px;background:rgba(220,38,38,0.1);display:flex;align-items:center;justify-content:center;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
+            </div>
+            <span style="font-size:14px;font-weight:600;">Sessions</span>
+            <span style="background:var(--gray-100);border-radius:999px;padding:0 6px;font-size:10px;font-weight:700;color:var(--gray-400);">2</span>
+          </div>
+
+          <!-- Session Card: Live -->
+          <div style="border:1px solid var(--gray-200);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:6px;border-left:3px solid #22c55e;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:12px;font-weight:600;">Open Mat</span>
+              <span class="wf-badge success" style="font-size:9px;">Live</span>
+            </div>
+            <span style="font-size:10px;color:var(--gray-400);">Hosted by Coach Mike</span>
+            <span style="font-size:10px;color:var(--gray-400);">6 checked in, 2 RSVP</span>
+          </div>
+
+          <!-- Session Card: Scheduled -->
+          <div style="border:1px solid var(--gray-200);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:6px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:12px;font-weight:600;">Evening Roll</span>
+              <span class="wf-badge amber" style="font-size:9px;">Scheduled</span>
+            </div>
+            <span style="font-size:10px;color:var(--gray-400);">Hosted by Coach Sarah</span>
+            <span style="font-size:10px;color:var(--gray-400);">2 RSVP</span>
+          </div>
+        </div>
+
+        <!-- Bottom Nav -->
+        <div class="wf-bottom-nav">
+          <div class="wf-nav-item">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--gray-400)" stroke-width="2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            <span class="wf-nav-label">Home</span>
+          </div>
+          <div class="wf-nav-item" style="color:var(--primary);">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            <span class="wf-nav-label" style="font-weight:600;">Gyms</span>
+            <div class="wf-nav-dot"></div>
+          </div>
+          <div class="wf-nav-item">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--gray-400)" stroke-width="2"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>
+            <span class="wf-nav-label">Rankings</span>
+          </div>
+          <div class="wf-nav-item">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--gray-400)" stroke-width="2"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            <span class="wf-nav-label">Profile</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="screen-notes">
+      <span class="note-tag new">GymDetailContent</span>
+      <span class="note-tag new">SessionList</span>
+      <span class="note-tag new">StartSessionButton</span>
+      <span class="note-tag reuse">AppHeader (back button)</span>
+      <span class="note-tag reuse">BottomNavBar</span>
+      <span class="note-tag token">Live session: border-left-3px green-500, badge-success "Live"</span>
+      <span class="note-tag token">Scheduled session: badge-amber "Scheduled"</span>
+      <span class="note-tag token">Start Session: bg-primary</span>
+      <span class="note-tag token">Session cards show: hosted by, checked-in count, RSVP count</span>
+      <span class="note-tag reuse">SessionCard</span>
+      GymStatsRow, LastSessionCard, and standalone Upcoming Sessions list are planned; implementation currently renders gym header + Start Session + SessionList. "Start Session" button only shown if isMemberGym. "My Gym" badge shown via variant="outline".
+    </div>
+  </div>
+
+</div>
+
+
+<!-- ================================================ -->
+<!-- SECTION: JOIN WIZARD -->
+<!-- ================================================ -->
+<div class="section-header">
+  <h2>Join Wizard</h2>
+  <p>Multi-step wizard to join a session lobby. Steps are dynamic: geo check is skipped if gym has no coordinates; waiver step is skipped if already signed or not required.</p>
+</div>
+
+<div class="screen-grid">
+
+  <!-- 3. Join Wizard: Geo Check -->
+  <div class="screen-card">
+    <div class="screen-card-header">
+      <div>
+        <h3>3. Join Wizard: Geo Check</h3>
+        <div class="screen-route">/session/[id]/join</div>
+      </div>
+      <span class="screen-badge badge-new">New</span>
+    </div>
+    <div class="phone-frame">
+      <div class="phone-screen">
+        <div class="notch"></div>
+
+        <!-- Header -->
+        <div class="wf-header">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span class="back-btn">&larr;</span>
+            <span class="header-title">Join Session</span>
+          </div>
+        </div>
+
+        <div class="wf-body" style="gap:12px;align-items:center;">
+          <!-- Progress -->
+          <div style="display:flex;flex-direction:column;align-items:center;gap:6px;">
+            <span style="font-size:10px;color:var(--gray-400);">Step 1 of 4 &mdash; Location</span>
+            <div style="display:flex;gap:6px;">
+              <div style="width:10px;height:10px;border-radius:50%;background:var(--primary);"></div>
+              <div style="width:10px;height:10px;border-radius:50%;background:var(--gray-200);"></div>
+              <div style="width:10px;height:10px;border-radius:50%;background:var(--gray-200);"></div>
+              <div style="width:10px;height:10px;border-radius:50%;background:var(--gray-200);"></div>
+            </div>
+          </div>
+
+          <!-- Geo Check Content -->
+          <div style="display:flex;flex-direction:column;align-items:center;gap:12px;padding:24px 0;">
+            <!-- Spinner icon -->
+            <div style="width:40px;height:40px;border:3px solid var(--gray-200);border-top-color:var(--gray-500);border-radius:50%;display:flex;align-items:center;justify-content:center;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--gray-400)" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+            </div>
+            <span style="font-size:12px;color:var(--gray-400);text-align:center;">Checking your location...</span>
+          </div>
+
+          <!-- Success state hint -->
+          <div style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:8px 0;border-top:1px dashed var(--gray-200);width:100%;">
+            <span style="font-size:9px;color:var(--gray-300);text-transform:uppercase;letter-spacing:0.5px;">On success:</span>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+              <span style="font-size:11px;color:#22c55e;">You're near Gracie Academy</span>
+            </div>
+            <button class="wf-btn primary" style="width:100%;padding:8px;border-radius:12px;font-size:12px;">Continue</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="screen-notes">
+      <span class="note-tag new">GeoCheckStep</span>
+      <span class="note-tag new">JoinWizard</span>
+      <span class="note-tag token">Success: text-success (green check)</span>
+      <span class="note-tag token">Warning/far: text-amber-500</span>
+      <span class="note-tag token">Progress dots: bg-primary (filled), bg-muted (empty)</span>
+      <p style="margin-top:4px; font-size:11px; color:var(--gray-500);">Uses browser geolocation API. Haversine distance check (2km threshold). Four states: checking (spinner), success (green check), far (amber warning, can still continue), denied/failed (can still continue). Step is skipped entirely if gym has no lat/lng.</p>
+    </div>
+  </div>
+
+  <!-- 4. Join Wizard: Waiver -->
+  <div class="screen-card">
+    <div class="screen-card-header">
+      <div>
+        <h3>4. Join Wizard: Waiver</h3>
+        <div class="screen-route">/session/[id]/join (step 2)</div>
+      </div>
+      <span class="screen-badge badge-new">New</span>
+    </div>
+    <div class="phone-frame">
+      <div class="phone-screen">
+        <div class="notch"></div>
+
+        <!-- Header -->
+        <div class="wf-header">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span class="back-btn">&larr;</span>
+            <span class="header-title">Join Session</span>
+          </div>
+        </div>
+
+        <div class="wf-body" style="gap:12px;">
+          <!-- Progress -->
+          <div style="display:flex;flex-direction:column;align-items:center;gap:6px;">
+            <span style="font-size:10px;color:var(--gray-400);">Step 2 of 4 &mdash; Waiver</span>
+            <div style="display:flex;gap:6px;">
+              <div style="width:10px;height:10px;border-radius:50%;background:var(--gray-300);"></div>
+              <div style="width:10px;height:10px;border-radius:50%;background:var(--primary);"></div>
+              <div style="width:10px;height:10px;border-radius:50%;background:var(--gray-200);"></div>
+              <div style="width:10px;height:10px;border-radius:50%;background:var(--gray-200);"></div>
+            </div>
+          </div>
+
+          <!-- Waiver Title -->
+          <h2 style="font-size:14px;font-weight:600;text-align:center;margin:0;">Liability Waiver</h2>
+
+          <!-- Waiver Text Area -->
+          <div style="border:1px solid var(--gray-200);border-radius:12px;padding:10px;max-height:120px;overflow:hidden;font-size:10px;color:var(--gray-400);line-height:1.5;">
+            By using the JITS platform to arrange and participate in Brazilian Jiu-Jitsu matches, you acknowledge and accept the inherent risks of grappling, including but not limited to physical injury. You agree to hold the JITS platform, its creators, and operators harmless from any claims arising from your participation...
+            <div style="text-align:center;color:var(--gray-300);font-size:9px;margin-top:4px;">(scrollable)</div>
+          </div>
+
+          <!-- Checkbox -->
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div class="wf-checkbox">
+              <div class="wf-checkbox-dot"></div>
+            </div>
+            <span style="font-size:11px;color:var(--gray-600);">I have read and agree to this waiver</span>
+          </div>
+
+          <!-- Continue button -->
+          <button class="wf-btn primary" style="width:100%;padding:10px;border-radius:12px;opacity:0.5;">Continue</button>
+
+          <!-- Back button -->
+          <button style="width:100%;padding:8px;background:transparent;border:none;font-size:11px;color:var(--gray-400);display:flex;align-items:center;justify-content:center;gap:4px;">
+            &larr; Back
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="screen-notes">
+      <span class="note-tag new">WaiverStep</span>
+      Scrollable waiver text (max-h-48). Checkbox enables "Continue" button. Calls <code>acceptSessionWaiver</code> mutation on accept. Step skipped if waiver already signed or not required by session.
+    </div>
+  </div>
+
+  <!-- 5. Join Wizard: Weight Confirm -->
+  <div class="screen-card">
+    <div class="screen-card-header">
+      <div>
+        <h3>5. Join Wizard: Weight Confirm</h3>
+        <div class="screen-route">/session/[id]/join (step 3)</div>
+      </div>
+      <span class="screen-badge badge-new">New</span>
+    </div>
+    <div class="phone-frame">
+      <div class="phone-screen">
+        <div class="notch"></div>
+
+        <!-- Header -->
+        <div class="wf-header">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span class="back-btn">&larr;</span>
+            <span class="header-title">Join Session</span>
+          </div>
+        </div>
+
+        <div class="wf-body" style="gap:12px;">
+          <!-- Progress -->
+          <div style="display:flex;flex-direction:column;align-items:center;gap:6px;">
+            <span style="font-size:10px;color:var(--gray-400);">Step 3 of 4 &mdash; Weight</span>
+            <div style="display:flex;gap:6px;">
+              <div style="width:10px;height:10px;border-radius:50%;background:var(--gray-300);"></div>
+              <div style="width:10px;height:10px;border-radius:50%;background:var(--gray-300);"></div>
+              <div style="width:10px;height:10px;border-radius:50%;background:var(--primary);"></div>
+              <div style="width:10px;height:10px;border-radius:50%;background:var(--gray-200);"></div>
+            </div>
+          </div>
+
+          <!-- Weight Title -->
+          <div style="padding:12px 0;display:flex;flex-direction:column;align-items:center;gap:8px;">
+            <h2 style="font-size:14px;font-weight:600;text-align:center;margin:0;">Confirm your weight (lbs)</h2>
+            <span style="font-size:11px;color:var(--gray-400);text-align:center;">Your weight is used for fair matchmaking.</span>
+          </div>
+
+          <!-- Weight Input -->
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div style="flex:1;border:1px solid var(--gray-200);border-radius:12px;padding:10px 12px;font-size:16px;font-weight:600;font-variant-numeric:tabular-nums;text-align:center;">
+              175
+            </div>
+            <span style="font-size:12px;font-weight:500;color:var(--gray-400);">lbs</span>
+          </div>
+
+          <!-- Confirm button -->
+          <button class="wf-btn primary" style="width:100%;padding:10px;border-radius:12px;">Confirm</button>
+
+          <!-- Back button -->
+          <button style="width:100%;padding:8px;background:transparent;border:none;font-size:11px;color:var(--gray-400);display:flex;align-items:center;justify-content:center;gap:4px;">
+            &larr; Back
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="screen-notes">
+      <span class="note-tag new">WeightConfirmStep</span>
+      <span class="note-tag token">Weight input: tabular-nums, inputMode="decimal", autoComplete="off"</span>
+      <span class="note-tag token">Label: "Confirm your weight (lbs)"</span>
+      <span class="note-tag token">Helper: text-muted-foreground "Your weight is used for fair matchmaking"</span>
+      <p style="margin-top:4px; font-size:11px; color:var(--gray-500);">Editable Input pre-filled with athlete's current_weight from profile. Validates weight > 0 before enabling Confirm. Always shown (never skipped).</p>
+    </div>
+  </div>
+
+  <!-- 6. Join Wizard: Confirm & Join -->
+  <div class="screen-card">
+    <div class="screen-card-header">
+      <div>
+        <h3>6. Join Wizard: Confirm & Join</h3>
+        <div class="screen-route">/session/[id]/join (step 4)</div>
+      </div>
+      <span class="screen-badge badge-new">New</span>
+    </div>
+    <div class="phone-frame">
+      <div class="phone-screen">
+        <div class="notch"></div>
+
+        <!-- Header -->
+        <div class="wf-header">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span class="back-btn">&larr;</span>
+            <span class="header-title">Join Session</span>
+          </div>
+        </div>
+
+        <div class="wf-body" style="gap:12px;">
+          <!-- Progress -->
+          <div style="display:flex;flex-direction:column;align-items:center;gap:6px;">
+            <span style="font-size:10px;color:var(--gray-400);">Step 4 of 4 &mdash; Confirm</span>
+            <div style="display:flex;gap:6px;">
+              <div style="width:10px;height:10px;border-radius:50%;background:var(--gray-300);"></div>
+              <div style="width:10px;height:10px;border-radius:50%;background:var(--gray-300);"></div>
+              <div style="width:10px;height:10px;border-radius:50%;background:var(--gray-300);"></div>
+              <div style="width:10px;height:10px;border-radius:50%;background:var(--primary);"></div>
+            </div>
+          </div>
+
+          <!-- Confirm Title -->
+          <h2 style="font-size:14px;font-weight:600;text-align:center;margin:0;padding-top:8px;">Ready to join</h2>
+
+          <!-- Summary Card -->
+          <div style="border:1px solid var(--gray-200);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:8px;">
+            <div style="display:flex;justify-content:space-between;font-size:12px;">
+              <span style="color:var(--gray-400);">Gym</span>
+              <span style="font-weight:500;">Gracie Academy</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:12px;">
+              <span style="color:var(--gray-400);">Weight</span>
+              <span style="font-weight:500;">175 lbs</span>
+            </div>
+          </div>
+
+          <!-- Join Button -->
+          <button class="wf-btn primary" style="width:100%;padding:10px;border-radius:12px;">Join Lobby</button>
+
+          <!-- Back button -->
+          <button style="width:100%;padding:8px;background:transparent;border:none;font-size:11px;color:var(--gray-400);display:flex;align-items:center;justify-content:center;gap:4px;">
+            &larr; Back
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="screen-notes">
+      <span class="note-tag new">ConfirmStep</span>
+      Summary card shows gym name and confirmed weight. Calls <code>joinSessionLobby</code> mutation, then broadcasts <code>participant_joined</code> to session channel, then redirects to <code>/session/[id]/lobby</code>.
+    </div>
+  </div>
+
+</div>
+
+
+<!-- ================================================ -->
+<!-- SECTION: SESSION LOBBY -->
+<!-- ================================================ -->
+<div class="section-header">
+  <h2>Session Lobby</h2>
+  <p>Realtime participant list with in-session challenges. Participants can challenge others, find random matches, or leave the session. Bottom nav is hidden during active sessions.</p>
+</div>
+
+<div class="screen-grid">
+
+  <!-- 7. Session Lobby -->
+  <div class="screen-card">
+    <div class="screen-card-header">
+      <div>
+        <h3>7. Session Lobby</h3>
+        <div class="screen-route">/session/[id]/lobby</div>
+      </div>
+      <span class="screen-badge badge-new">New</span>
+    </div>
+    <div class="phone-frame">
+      <div class="phone-screen">
+        <div class="notch"></div>
+
+        <!-- Header -->
+        <div class="wf-header">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--gray-500)" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            <span class="header-title">Session Lobby</span>
+          </div>
+        </div>
+
+        <div class="wf-body" style="gap:10px;">
+          <!-- Gym name + count -->
+          <div style="display:flex;flex-direction:column;gap:2px;">
+            <span style="font-size:14px;font-weight:600;">Gracie Academy</span>
+            <span style="font-size:11px;color:var(--gray-400);">4 fighters in lobby</span>
+          </div>
+
+          <!-- Participant Grid (2 cols) -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+
+            <!-- Participant 1: Available -->
+            <div style="border:1px solid var(--gray-200);border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:6px;">
+              <div style="display:flex;align-items:center;gap:6px;">
+                <div class="wf-avatar" style="width:24px;height:24px;font-size:8px;">JD</div>
+                <span style="font-size:11px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">John Doe</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <span style="font-size:11px;font-weight:700;font-variant-numeric:tabular-nums;">1250</span>
+                <span style="font-size:9px;color:var(--gray-400);">180 lbs</span>
+              </div>
+              <button class="wf-btn primary" style="width:100%;padding:5px;border-radius:6px;font-size:10px;display:flex;align-items:center;justify-content:center;gap:3px;">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m14.5 17.5 3 3 3-3"/><path d="m6.5 6.5-3-3-3 3"/><path d="M2 12h20"/></svg>
+                Challenge
+              </button>
+            </div>
+
+            <!-- Participant 2: Available -->
+            <div style="border:1px solid var(--gray-200);border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:6px;">
+              <div style="display:flex;align-items:center;gap:6px;">
+                <div class="wf-avatar" style="width:24px;height:24px;font-size:8px;">AS</div>
+                <span style="font-size:11px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Ana Silva</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <span style="font-size:11px;font-weight:700;font-variant-numeric:tabular-nums;">1180</span>
+                <span style="font-size:9px;color:var(--gray-400);">135 lbs</span>
+              </div>
+              <button class="wf-btn primary" style="width:100%;padding:5px;border-radius:6px;font-size:10px;display:flex;align-items:center;justify-content:center;gap:3px;">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m14.5 17.5 3 3 3-3"/><path d="m6.5 6.5-3-3-3 3"/><path d="M2 12h20"/></svg>
+                Challenge
+              </button>
+            </div>
+
+            <!-- Participant 3: In Match -->
+            <div style="border:1px solid var(--gray-200);border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:6px;">
+              <div style="display:flex;align-items:center;gap:6px;">
+                <div class="wf-avatar" style="width:24px;height:24px;font-size:8px;">MR</div>
+                <span style="font-size:11px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Mike Ruiz</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <span style="font-size:11px;font-weight:700;font-variant-numeric:tabular-nums;">1320</span>
+                <span style="font-size:9px;color:var(--gray-400);">195 lbs</span>
+              </div>
+              <div style="width:100%;padding:5px;border-radius:6px;font-size:10px;text-align:center;background:var(--gray-100);color:var(--gray-400);">In Match</div>
+            </div>
+
+            <!-- Participant 4: Available -->
+            <div style="border:1px solid var(--gray-200);border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:6px;">
+              <div style="display:flex;align-items:center;gap:6px;">
+                <div class="wf-avatar" style="width:24px;height:24px;font-size:8px;">KL</div>
+                <span style="font-size:11px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Kim Lee</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <span style="font-size:11px;font-weight:700;font-variant-numeric:tabular-nums;">1090</span>
+                <span style="font-size:9px;color:var(--gray-400);">150 lbs</span>
+              </div>
+              <button class="wf-btn primary" style="width:100%;padding:5px;border-radius:6px;font-size:10px;display:flex;align-items:center;justify-content:center;gap:3px;">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m14.5 17.5 3 3 3-3"/><path d="m6.5 6.5-3-3-3 3"/><path d="M2 12h20"/></svg>
+                Challenge
+              </button>
+            </div>
+          </div>
+
+          <!-- Random Match Button -->
+          <button style="width:100%;padding:8px;border-radius:8px;font-size:11px;font-weight:500;background:var(--gray-100);border:1px solid var(--gray-200);display:flex;align-items:center;justify-content:center;gap:6px;color:var(--gray-600);">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 3 21 3 21 8"/><line x1="4" x2="21" y1="20" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" x2="21" y1="15" y2="21"/><line x1="4" x2="9" y1="4" y2="9"/></svg>
+            Find Random Match
+          </button>
+
+          <!-- Leave Button -->
+          <button style="width:100%;padding:8px;border-radius:8px;font-size:11px;font-weight:500;background:transparent;border:1px solid var(--gray-200);display:flex;align-items:center;justify-content:center;gap:6px;color:var(--gray-500);">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+            Leave Session
+          </button>
+        </div>
+
+        <!-- No bottom nav during active session -->
+      </div>
+    </div>
+    <div class="screen-notes">
+      <span class="note-tag new">SessionLobbyClient</span>
+      <span class="note-tag new">ParticipantList</span>
+      <span class="note-tag new">ParticipantCard</span>
+      <span class="note-tag reuse">AppHeader (custom "Leave" action)</span>
+      <span class="note-tag token">Available: badge-success</span>
+      <span class="note-tag token">In Match: badge-secondary (gray)</span>
+      <span class="note-tag token">Timekeeping: badge-info (blue)</span>
+      <span class="note-tag token">Leave: text-destructive</span>
+      <span class="note-tag token">ELO: tabular-nums default foreground</span>
+      <span class="note-tag new">RandomMatchButton (Shuffle icon)</span>
+      <span class="note-tag token">Challenge button: Swords icon</span>
+      <p style="margin-top:4px; font-size:11px; color:var(--gray-500);">Realtime via <code>useSessionLobbyRealtime</code> hook (Postgres Changes + Broadcast). 2-column grid of participant cards. Cards show avatar, name, ELO, weight, and Challenge button with Swords icon (or "In Match" badge-secondary). busyIds set disables challenge button for pending challenges. Session timer bar, Timekeeper button, and sticky Your Status card are planned but not yet shipped. No bottom nav (hidden during active session).</p>
+    </div>
+  </div>
+
+  <!-- 8. Challenge Sent Sheet -->
+  <div class="screen-card">
+    <div class="screen-card-header">
+      <div>
+        <h3>8. Challenge Sent Sheet</h3>
+        <div class="screen-route">Sheet on /session/[id]/lobby</div>
+      </div>
+      <span class="screen-badge badge-new">New</span>
+    </div>
+    <div class="phone-frame">
+      <div class="phone-screen">
+        <div class="notch"></div>
+
+        <!-- Dimmed lobby behind -->
+        <div style="flex:1;background:var(--gray-100);opacity:0.4;display:flex;flex-direction:column;padding:12px;gap:8px;">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--gray-300)" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+            <span style="font-size:12px;color:var(--gray-300);">Session Lobby</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+            <div style="height:50px;border-radius:6px;background:var(--gray-200);"></div>
+            <div style="height:50px;border-radius:6px;background:var(--gray-200);"></div>
+          </div>
+        </div>
+
+        <!-- Bottom Sheet -->
+        <div style="background:white;border-top-left-radius:16px;border-top-right-radius:16px;padding:16px;display:flex;flex-direction:column;gap:12px;box-shadow:0 -4px 20px rgba(0,0,0,0.1);">
+          <!-- Handle -->
+          <div style="width:32px;height:4px;border-radius:2px;background:var(--gray-200);margin:0 auto;"></div>
+
+          <!-- Title -->
+          <div style="display:flex;align-items:center;gap:6px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--gray-600)" stroke-width="2"><path d="m14.5 17.5 3 3 3-3"/><path d="m6.5 6.5-3-3-3 3"/><path d="M2 12h20"/></svg>
+            <span style="font-size:14px;font-weight:600;">Challenge John Doe</span>
+          </div>
+
+          <!-- Opponent Info -->
+          <p style="font-size:12px;color:var(--gray-400);margin:0;">
+            ELO <span style="font-weight:600;color:var(--gray-600);font-variant-numeric:tabular-nums;">1250</span> &middot; 180 lbs
+          </p>
+
+          <!-- Match Type Toggle -->
+          <div style="display:flex;flex-direction:column;gap:4px;">
+            <span style="font-size:11px;font-weight:500;">Match Type</span>
+            <div style="display:flex;gap:8px;">
+              <button class="wf-btn primary" style="flex:1;padding:8px;border-radius:8px;font-size:11px;">Casual</button>
+              <button style="flex:1;padding:8px;border-radius:8px;font-size:11px;border:1px solid var(--gray-200);background:transparent;color:var(--gray-500);">Ranked</button>
+            </div>
+          </div>
+
+          <!-- Send Challenge Button -->
+          <button class="wf-btn primary" style="width:100%;padding:10px;border-radius:8px;font-size:13px;">Send Challenge</button>
+        </div>
+      </div>
+    </div>
+    <div class="screen-notes">
+      <span class="note-tag new">SessionChallengeSheet</span>
+      <span class="note-tag reuse">Sheet (shadcn)</span>
+      <span class="note-tag token">Win stakes: text-success</span>
+      <span class="note-tag token">Loss stakes: text-destructive</span>
+      <span class="note-tag token">Draw stakes: text-amber-500</span>
+      <span class="note-tag token">ELO values: tabular-nums</span>
+      <p style="margin-top:4px; font-size:11px; color:var(--gray-500);">Bottom sheet with opponent ELO + weight, Casual/Ranked toggle, ELO stakes preview (shown for Ranked, via getEloStakes RPC). Stakes rows get aria-label. Sends broadcast challenge via lobby.sendChallenge().</p>
+    </div>
+  </div>
+
+  <!-- 9. Challenge Received Sheet -->
+  <div class="screen-card">
+    <div class="screen-card-header">
+      <div>
+        <h3>9. Challenge Received Sheet</h3>
+        <div class="screen-route">Sheet on /session/[id]/lobby</div>
+      </div>
+      <span class="screen-badge badge-new">New</span>
+    </div>
+    <div class="phone-frame">
+      <div class="phone-screen">
+        <div class="notch"></div>
+
+        <!-- Dimmed lobby behind -->
+        <div style="flex:1;background:var(--gray-100);opacity:0.4;display:flex;flex-direction:column;padding:12px;gap:8px;">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--gray-300)" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+            <span style="font-size:12px;color:var(--gray-300);">Session Lobby</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+            <div style="height:50px;border-radius:6px;background:var(--gray-200);"></div>
+            <div style="height:50px;border-radius:6px;background:var(--gray-200);"></div>
+          </div>
+        </div>
+
+        <!-- Bottom Sheet -->
+        <div style="background:white;border-top-left-radius:16px;border-top-right-radius:16px;padding:16px;display:flex;flex-direction:column;gap:12px;box-shadow:0 -4px 20px rgba(0,0,0,0.1);">
+          <!-- Handle -->
+          <div style="width:32px;height:4px;border-radius:2px;background:var(--gray-200);margin:0 auto;"></div>
+
+          <!-- Title -->
+          <div style="display:flex;align-items:center;gap:6px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--gray-600)" stroke-width="2"><path d="m14.5 17.5 3 3 3-3"/><path d="m6.5 6.5-3-3-3 3"/><path d="M2 12h20"/></svg>
+            <span style="font-size:14px;font-weight:600;">Challenge Received</span>
+          </div>
+
+          <!-- Challenger Info -->
+          <div style="display:flex;flex-direction:column;gap:4px;">
+            <span style="font-size:13px;font-weight:600;">John Doe</span>
+            <span style="font-size:12px;color:var(--gray-400);">
+              ELO <span style="font-weight:600;color:var(--gray-600);font-variant-numeric:tabular-nums;">1250</span>
+            </span>
+            <span class="wf-badge" style="font-size:9px;background:var(--gray-100);color:var(--gray-500);align-self:flex-start;padding:2px 8px;border-radius:999px;">Casual</span>
+          </div>
+
+          <!-- Accept / Decline buttons -->
+          <div style="display:flex;gap:8px;">
+            <button style="flex:1;padding:10px;border-radius:8px;font-size:12px;font-weight:500;border:1px solid var(--gray-200);background:transparent;color:var(--gray-500);">Decline</button>
+            <button class="wf-btn primary" style="flex:1;padding:10px;border-radius:8px;font-size:12px;">Accept</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="screen-notes">
+      <span class="note-tag new">SessionChallengeReceivedSheet</span>
+      <span class="note-tag reuse">Sheet (shadcn)</span>
+      Bottom sheet triggered by <code>lobby.incomingChallenge</code> broadcast event. Shows challenger name, ELO, and match type badge (Ranked uses default variant, Casual uses secondary). Accept calls <code>lobby.respondToChallenge(true)</code>; Decline calls with false. Accepting creates a match and redirects both athletes.
+    </div>
+  </div>
+
+</div>
+<!-- ================================================ -->
+<!-- SECTION: MATCH FLOW                             -->
+<!-- ================================================ -->
+<div class="section-header">
+  <h2>Match Flow</h2>
+  <p>8-step match wizard within session context. All steps share route <code>/session/[id]/match/[matchId]</code> with internal step state machine.</p>
+</div>
+<div class="screen-grid">
+
+  <!-- Screen 10: Timekeeper Wait -->
+  <div class="screen-card">
+    <div class="screen-card-header">
+      <div>
+        <h3>10. Match: Timekeeper Wait</h3>
+        <div class="screen-route">/session/[id]/match/[matchId] (step: timekeeper-wait)</div>
+      </div>
+      <div style="display:flex; gap:6px; flex-wrap:wrap;">
+        <span class="screen-badge badge-new">New</span>
+        <span class="screen-badge badge-flagged">Feature-Flagged</span>
+      </div>
+    </div>
+    <div class="phone-frame">
+      <div class="phone-screen">
+        <div class="notch"></div>
+        <div class="wf-body" style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:80%; gap:16px; padding:24px;">
+          <!-- Before timeout -->
+          <div style="width:40px; height:40px; border:3px solid var(--gray-400); border-top-color:transparent; border-radius:50%; margin:0 auto;"></div>
+          <p style="font-size:13px; color:var(--gray-500); text-align:center;">Waiting for timekeeper to connect...</p>
+          <div style="margin-top:16px; padding:8px 12px; border-radius:8px; background:var(--gray-100); width:100%; text-align:center;">
+            <p style="font-size:11px; color:var(--gray-500);">After 30s timeout:</p>
+            <p style="font-size:12px; color:var(--gray-600); margin-top:4px;">Timekeeper hasn't connected. Continue without?</p>
+            <div class="wf-btn primary" style="margin-top:12px;">Continue</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="screen-notes">
+      <span class="note-tag new">TimekeeperWaitStep</span>
+      <span class="note-tag reuse">useSessionMatchSync</span>
+      <span class="note-tag token">timekeeperEnabled: false (skipped)</span>
+      <p style="margin-top:6px; font-size:11px; color:var(--gray-500);">30-second timeout auto-shows "Continue" button. Listens for ready signal via broadcast. Currently feature-flagged off, so this step is skipped in production flow.</p>
+    </div>
+  </div>
+
+  <!-- Screen 11: Weight Verification -->
+  <div class="screen-card">
+    <div class="screen-card-header">
+      <div>
+        <h3>11. Match: Weight Verification</h3>
+        <div class="screen-route">/session/[id]/match/[matchId] (step: weight-verify)</div>
+      </div>
+      <span class="screen-badge badge-new">New</span>
+    </div>
+    <div class="phone-frame">
+      <div class="phone-screen">
+        <div class="notch"></div>
+        <div class="wf-body" style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:80%; gap:16px; padding:24px;">
+          <!-- Scale icon -->
+          <div style="width:32px; height:32px; border-radius:8px; background:var(--red-100); display:flex; align-items:center; justify-content:center;">
+            <span style="font-size:16px; color:var(--red-600);">&#9878;</span>
+          </div>
+          <p style="font-size:16px; font-weight:600;">Verify Weights</p>
+
+          <!-- Two weight cards side by side -->
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; width:100%;">
+            <div style="border:1px solid var(--gray-200); border-radius:12px; padding:14px 10px; text-align:center;">
+              <p style="font-size:12px; font-weight:500; color:var(--gray-700);">You</p>
+              <p style="font-size:28px; font-weight:700; font-variant-numeric:tabular-nums;">165</p>
+              <p style="font-size:11px; color:var(--gray-400);">lbs</p>
+            </div>
+            <div style="border:1px solid var(--gray-200); border-radius:12px; padding:14px 10px; text-align:center;">
+              <p style="font-size:12px; font-weight:500; color:var(--gray-700);">Opponent</p>
+              <p style="font-size:28px; font-weight:700; font-variant-numeric:tabular-nums;">182</p>
+              <p style="font-size:11px; color:var(--gray-400);">lbs</p>
+            </div>
+          </div>
+
+          <!-- Weight difference -->
+          <p style="font-size:11px; color:var(--gray-500); font-variant-numeric:tabular-nums;">Weight difference: 17 lbs</p>
+
+          <!-- Weight gap warning -->
+          <div style="display:flex; align-items:center; gap:8px; border:1px solid rgba(245,158,11,0.3); background:rgba(245,158,11,0.05); border-radius:10px; padding:8px 14px;">
+            <span style="color:#f59e0b; font-size:14px;">&#9888;</span>
+            <p style="font-size:11px; color:#f59e0b;">Weight division gap detected. Heavier athlete's ELO will be adjusted.</p>
+          </div>
+
+          <div class="wf-btn primary" style="width:100%;">Confirm Weights</div>
+        </div>
+      </div>
+    </div>
+    <div class="screen-notes">
+      <span class="note-tag new">WeightVerifyStep</span>
+      <span class="note-tag token">Scale icon: text-destructive (was text-primary, fixed)</span>
+      <span class="note-tag token">text-amber-500 (gap warning border + text)</span>
+      <span class="note-tag token">tabular-nums (weights, text-3xl font-bold)</span>
+      <p style="margin-top:6px; font-size:11px; color:var(--gray-500);">Shows both athletes' weights in side-by-side cards (grid-cols-2). Weight difference and IBJJF division gap warning only shown for ranked matches (hidden for casual). Gap threshold: 11 lbs per division.</p>
+    </div>
+  </div>
+
+  <!-- Screen 12: Ready Check -->
+  <div class="screen-card">
+    <div class="screen-card-header">
+      <div>
+        <h3>12. Match: Ready Check</h3>
+        <div class="screen-route">/session/[id]/match/[matchId] (step: ready-check)</div>
+      </div>
+      <span class="screen-badge badge-new">New</span>
+    </div>
+    <div class="phone-frame">
+      <div class="phone-screen">
+        <div class="notch"></div>
+        <div class="wf-body" style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:80%; gap:16px; padding:24px;">
+          <p style="font-size:16px; font-weight:600;">Ready Check</p>
+          <p style="font-size:12px; color:var(--gray-500);">Both athletes must tap Ready to start.</p>
+
+          <!-- Two ready panels -->
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; width:100%;">
+            <!-- You: Ready -->
+            <div style="border:1px solid var(--gray-200); border-radius:14px; padding:20px 12px; text-align:center;">
+              <div style="width:40px; height:40px; border-radius:50%; background:rgba(34,197,94,0.1); display:flex; align-items:center; justify-content:center; margin:0 auto 8px;">
+                <span style="color:#22c55e; font-size:18px;">&#10003;</span>
+              </div>
+              <p style="font-size:13px; font-weight:500;">You</p>
+            </div>
+            <!-- Opponent: Waiting -->
+            <div style="border:1px solid var(--gray-200); border-radius:14px; padding:20px 12px; text-align:center;">
+              <div style="width:40px; height:40px; border:3px solid var(--gray-300); border-top-color:transparent; border-radius:50%; margin:0 auto 8px;"></div>
+              <p style="font-size:13px; font-weight:500;">Opponent</p>
+            </div>
+          </div>
+
+          <p style="font-size:12px; color:var(--gray-500);">Waiting for opponent...</p>
+
+          <div style="width:100%; border-top:1px dashed var(--gray-200); padding-top:12px; margin-top:4px; text-align:center;">
+            <p style="font-size:10px; color:var(--gray-400);">Before tapping ready:</p>
+            <div class="wf-btn primary" style="width:100%; margin-top:8px;">Ready</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="screen-notes">
+      <span class="note-tag new">ReadyCheckStep</span>
+      <span class="note-tag reuse">useSessionMatchSync</span>
+      <span class="note-tag reuse">startMatch mutation</span>
+      <span class="note-tag token">Ready: text-success (green checkmark)</span>
+      <span class="note-tag token">Waiting: text-muted-foreground (spinner)</span>
+      <p style="margin-top:6px; font-size:11px; color:var(--gray-500);">Two-panel ready check. Each panel shows spinner (waiting) or green checkmark (ready). When both ready, auto-calls startMatch() RPC and broadcasts timer_started. "Ready" button disappears after tapping.</p>
+    </div>
+  </div>
+
+  <!-- Screen 13: Fighter Live View -->
+  <div class="screen-card">
+    <div class="screen-card-header">
+      <div>
+        <h3>13. Match: Fighter Live View</h3>
+        <div class="screen-route">/session/[id]/match/[matchId] (step: fighter-live)</div>
+      </div>
+      <span class="screen-badge badge-new">New</span>
+    </div>
+    <div class="phone-frame">
+      <div class="phone-screen" style="background:#111; color:#fff;">
+        <div class="notch"></div>
+        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:85%; gap:12px; padding:24px;">
+          <p style="font-size:10px; color:var(--gray-500); text-transform:uppercase; letter-spacing:2px;">Match in progress</p>
+
+          <!-- Big timer -->
+          <p style="font-size:56px; font-weight:700; font-family:monospace; font-variant-numeric:tabular-nums; color:#f59e0b; letter-spacing:-1px;">4:32</p>
+
+          <!-- Match type badge -->
+          <div style="display:inline-block; padding:3px 10px; border-radius:999px; background:var(--red-600); color:#fff; font-size:10px; font-weight:600;">Ranked</div>
+
+          <!-- End match button -->
+          <div style="margin-top:24px; width:100%; max-width:240px; background:#dc2626; color:#fff; text-align:center; padding:12px; border-radius:10px; font-size:14px; font-weight:600; display:flex; align-items:center; justify-content:center; gap:6px;">
+            <span style="font-size:12px;">&#9632;</span> End Match
+          </div>
+        </div>
+
+        <!-- Expired state note -->
+        <div style="position:absolute; bottom:12px; left:12px; right:12px; text-align:center;">
+          <p style="font-size:9px; color:var(--gray-600);">Timer pulses red + beep + vibrate at 0:00</p>
+        </div>
+      </div>
+    </div>
+    <div class="screen-notes">
+      <span class="note-tag new">FighterLiveStep</span>
+      <span class="note-tag reuse">useSessionMatchTimer</span>
+      <span class="note-tag reuse">useSessionMatchSync</span>
+      <span class="note-tag token">text-amber (timer running)</span>
+      <span class="note-tag token">animate-timer-expired (0:00 pulse)</span>
+      <p style="margin-top:6px; font-size:11px; color:var(--gray-500);">Minimal dark UI for face-down phone. Huge mono timer in amber. At expiry: beep via AudioContext, haptic vibrate, red pulse animation, auto-ends after 1s. Paused state shows amber "Paused" label. End Match button hidden when timekeeperEnabled.</p>
+    </div>
+  </div>
+
+  <!-- Screen 14: Timekeeper Live View -->
+  <div class="screen-card">
+    <div class="screen-card-header">
+      <div>
+        <h3>14. Match: Timekeeper Live View</h3>
+        <div class="screen-route">/session/[id]/match/[matchId] (step: timekeeper-live)</div>
+      </div>
+      <div style="display:flex; gap:6px; flex-wrap:wrap;">
+        <span class="screen-badge badge-new">New</span>
+        <span class="screen-badge badge-flagged">Feature-Flagged</span>
+      </div>
+    </div>
+    <div class="phone-frame">
+      <div class="phone-screen" style="background:#000; color:#fff;">
+        <div class="notch"></div>
+        <!-- Camera viewfinder top 60% -->
+        <div style="flex:3; background:#1a1a2e; position:relative; min-height:55%; display:flex; align-items:center; justify-content:center;">
+          <div style="width:60px; height:60px; border:2px solid rgba(255,255,255,0.2); border-radius:50%; display:flex; align-items:center; justify-content:center;">
+            <span style="font-size:20px; color:rgba(255,255,255,0.3);">&#9654;</span>
+          </div>
+          <p style="position:absolute; top:10px; left:10px; font-size:9px; color:rgba(255,255,255,0.5);">Camera viewfinder</p>
+
+          <!-- Upload spinner indicator -->
+          <div style="position:absolute; top:10px; right:10px;">
+            <div style="width:16px; height:16px; border:2px solid rgba(255,255,255,0.3); border-top-color:white; border-radius:50%;"></div>
+          </div>
+
+          <!-- Timer overlay -->
+          <div style="position:absolute; bottom:10px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.6); padding:6px 16px; border-radius:8px;">
+            <p style="font-size:24px; font-family:monospace; font-weight:700; font-variant-numeric:tabular-nums; color:#fff;">4:32</p>
+          </div>
+        </div>
+
+        <!-- Controls bottom 40% -->
+        <div style="flex:2; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; padding:16px; background:#111;">
+          <div style="display:flex; gap:10px; width:100%; max-width:240px;">
+            <div style="flex:1; border:1px solid var(--gray-600); text-align:center; padding:10px; border-radius:10px; font-size:12px; font-weight:600; color:#fff; display:flex; align-items:center; justify-content:center; gap:4px;">
+              <span style="font-size:10px;">&#10074;&#10074;</span> Pause
+            </div>
+            <div style="flex:1; background:#dc2626; text-align:center; padding:10px; border-radius:10px; font-size:12px; font-weight:600; color:#fff; display:flex; align-items:center; justify-content:center; gap:4px;">
+              <span style="font-size:10px;">&#9632;</span> End Match
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="screen-notes">
+      <span class="note-tag new">TimekeeperLiveStep</span>
+      <span class="note-tag reuse">useVideoRecorder</span>
+      <span class="note-tag reuse">useSessionMatchTimer</span>
+      <span class="note-tag token">timekeeperEnabled: false (hidden)</span>
+      <p style="margin-top:6px; font-size:11px; color:var(--gray-500);">Camera auto-starts recording on mount. Video element fills top 60%. Timer overlay on viewfinder. Controls at bottom: Pause/Resume toggle + End Match. Wake lock prevents screen sleep. Video uploads to Supabase Storage on stop.</p>
+    </div>
+  </div>
+
+  <!-- Screen 15: Result Recording -->
+  <div class="screen-card">
+    <div class="screen-card-header">
+      <div>
+        <h3>15. Match: Result Recording</h3>
+        <div class="screen-route">/session/[id]/match/[matchId] (step: result-recording)</div>
+      </div>
+      <span class="screen-badge badge-new">New</span>
+    </div>
+    <div class="phone-frame">
+      <div class="phone-screen">
+        <div class="notch"></div>
+        <div class="wf-body" style="padding:20px 16px; display:flex; flex-direction:column; gap:14px;">
+          <p style="font-size:16px; font-weight:600; text-align:center;">Record Result</p>
+
+          <!-- Result toggle: Submission | Draw -->
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; background:var(--gray-100); padding:5px; border-radius:12px;">
+            <div style="background:var(--red-600); color:#fff; text-align:center; padding:10px; border-radius:9px; font-size:12px; font-weight:600; display:flex; align-items:center; justify-content:center; gap:4px;">
+              <span style="font-size:10px;">&#9876;</span> Submission
+            </div>
+            <div style="text-align:center; padding:10px; border-radius:9px; font-size:12px; font-weight:600; color:var(--gray-500);">
+              &#129309; Draw
+            </div>
+          </div>
+
+          <!-- Winner picker -->
+          <div>
+            <p style="font-size:12px; font-weight:500; color:var(--gray-500); margin-bottom:6px;">Who won?</p>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+              <div style="border:2px solid var(--red-600); background:rgba(220,38,38,0.05); border-radius:12px; padding:10px; text-align:center; font-size:12px; font-weight:600;">You</div>
+              <div style="border:2px solid var(--gray-200); border-radius:12px; padding:10px; text-align:center; font-size:12px; font-weight:600; color:var(--gray-600);">Opponent</div>
+            </div>
+          </div>
+
+          <!-- Submission type (Select dropdown) -->
+          <div style="border:1px solid var(--gray-200); border-radius:12px; padding:12px;">
+            <p style="font-size:11px; color:var(--gray-500); margin-bottom:6px;">Submission Type</p>
+            <div style="border:1px solid var(--gray-200); border-radius:8px; padding:8px 12px; display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:12px; color:var(--gray-400);">Select technique...</span>
+              <span style="font-size:10px; color:var(--gray-400);">&#9662;</span>
+            </div>
+            <p style="font-size:10px; color:var(--gray-400); margin-top:6px; text-align:center;">23 active techniques via Select dropdown</p>
+          </div>
+
+          <!-- Finish time -->
+          <div style="border:1px solid var(--gray-200); border-radius:12px; padding:12px;">
+            <p style="font-size:11px; color:var(--gray-500); margin-bottom:4px;">Finish Time (optional)</p>
+            <div style="background:var(--gray-100); border-radius:6px; padding:8px; text-align:center; font-size:13px; color:var(--gray-500);">-- : --</div>
+          </div>
+
+          <div class="wf-btn primary" style="width:100%; padding:12px; font-size:14px; font-weight:600;">Record Result</div>
+        </div>
+      </div>
+    </div>
+    <div class="screen-notes">
+      <span class="note-tag new">ResultRecordingStep</span>
+      <span class="note-tag reuse">SubmissionFields (shared)</span>
+      <span class="note-tag reuse">recordMatchResult mutation</span>
+      <span class="note-tag token">bg-primary (submission toggle)</span>
+      <span class="note-tag token">bg-amber-500 (draw toggle)</span>
+      <p style="margin-top:6px; font-size:11px; color:var(--gray-500);">Two-option toggle: Submission or Draw. Submission shows winner picker (2 cards), submission type Select dropdown (23 active techniques via getSubmissionTypes), optional finish time (Min/Sec number inputs). Draw shows amber Handshake card. If timekeeper-locked, shows 60s countdown spinner before unlocking for fighters.</p>
+    </div>
+  </div>
+
+  <!-- Screen 16: Summary & Confirm -->
+  <div class="screen-card">
+    <div class="screen-card-header">
+      <div>
+        <h3>16. Match: Summary &amp; Confirm</h3>
+        <div class="screen-route">/session/[id]/match/[matchId] (step: match-summary)</div>
+      </div>
+      <span class="screen-badge badge-new">New</span>
+    </div>
+    <div class="phone-frame">
+      <div class="phone-screen">
+        <div class="notch"></div>
+        <div class="wf-body" style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:80%; gap:16px; padding:24px;">
+          <!-- Result banner -->
+          <div style="text-align:center;">
+            <p style="font-size:28px; font-weight:700; color:#16a34a;">Victory!</p>
+            <p style="font-size:11px; color:var(--gray-500); margin-top:4px;">Ranked match. ELO will update on confirmation.</p>
+          </div>
+
+          <!-- Confirm panels -->
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; width:100%;">
+            <!-- You: confirmed -->
+            <div style="border:1px solid var(--gray-200); border-radius:14px; padding:14px 10px; text-align:center;">
+              <div style="width:32px; height:32px; border-radius:50%; background:rgba(34,197,94,0.1); display:flex; align-items:center; justify-content:center; margin:0 auto 6px;">
+                <span style="color:#22c55e; font-size:14px;">&#10003;</span>
+              </div>
+              <p style="font-size:11px; font-weight:500;">You</p>
+            </div>
+            <!-- Opponent: waiting -->
+            <div style="border:1px solid var(--gray-200); border-radius:14px; padding:14px 10px; text-align:center;">
+              <div style="width:32px; height:32px; border:2px solid var(--gray-300); border-top-color:transparent; border-radius:50%; margin:0 auto 6px;"></div>
+              <p style="font-size:11px; font-weight:500;">Opponent</p>
+            </div>
+          </div>
+
+          <p style="font-size:12px; color:var(--gray-500);">Waiting for opponent to confirm...</p>
+
+          <!-- Buttons -->
+          <div style="width:100%; display:flex; flex-direction:column; gap:8px; margin-top:8px;">
+            <div class="wf-btn primary" style="width:100%; display:flex; align-items:center; justify-content:center; gap:6px;">
+              <span style="font-size:12px;">&#10003;</span> Confirm Result
+            </div>
+            <p style="font-size:11px; color:var(--gray-500); text-align:center; text-decoration:underline; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:4px;">
+              <span style="font-size:10px;">&#9888;</span> Dispute result
+            </p>
+          </div>
+
+          <!-- Alternative banners -->
+          <div style="width:100%; border-top:1px dashed var(--gray-200); padding-top:10px; margin-top:4px;">
+            <p style="font-size:9px; color:var(--gray-400); text-align:center;">Alternative banners: <span style="color:#dc2626; font-weight:600;">Defeat</span> (text-destructive) or <span style="color:#f59e0b; font-weight:600;">Draw</span> (text-amber-500)</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="screen-notes">
+      <span class="note-tag new">MatchSummaryStep</span>
+      <span class="note-tag reuse">confirmMatchResult mutation</span>
+      <span class="note-tag reuse">disputeMatchResult mutation</span>
+      <span class="note-tag token">text-success (Victory)</span>
+      <span class="note-tag token">text-destructive (Defeat)</span>
+      <span class="note-tag token">text-amber-500 (Draw)</span>
+      <p style="margin-top:6px; font-size:11px; color:var(--gray-500);">Result banner shows Victory/Defeat/Draw with color tokens. Two-panel confirm status (like ready check). Confirm button broadcasts result_confirmed. Dispute link calls disputeMatchResult. Listens for Postgres Changes on match status = "completed" to auto-advance.</p>
+    </div>
+  </div>
+
+  <!-- Screen 17: Match Recorded -->
+  <div class="screen-card">
+    <div class="screen-card-header">
+      <div>
+        <h3>17. Match: Recorded</h3>
+        <div class="screen-route">/session/[id]/match/[matchId] (step: match-recorded)</div>
+      </div>
+      <span class="screen-badge badge-new">New</span>
+    </div>
+    <div class="phone-frame">
+      <div class="phone-screen">
+        <div class="notch"></div>
+        <div class="wf-body" style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:80%; gap:20px; padding:24px;">
+          <!-- Checkmark -->
+          <div style="width:64px; height:64px; border-radius:50%; background:rgba(34,197,94,0.1); display:flex; align-items:center; justify-content:center;">
+            <span style="font-size:32px; color:#22c55e;">&#10003;</span>
+          </div>
+
+          <p style="font-size:18px; font-weight:700;">Match Recorded!</p>
+
+          <div style="width:100%; display:flex; flex-direction:column; gap:10px; max-width:240px;">
+            <div class="wf-btn primary" style="width:100%;">Back to Lobby</div>
+            <div class="wf-btn outline" style="width:100%;">Exit Session</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="screen-notes">
+      <span class="note-tag new">MatchRecordedStep</span>
+      <p style="margin-top:6px; font-size:11px; color:var(--gray-500);">Terminal step. Green checkmark with scale-in animation. "Back to Lobby" navigates to /session/[id]/lobby. "Exit Session" navigates to /gyms. Simple completion confirmation.</p>
+    </div>
+  </div>
+
+</div><!-- end match flow screen-grid -->
+
+
+<!-- ================================================ -->
+<!-- SECTION: MODIFIED EXISTING SCREENS               -->
+<!-- ================================================ -->
+<div class="section-header">
+  <h2>Modified Existing Screens</h2>
+  <p>Changes to existing screens for session integration.</p>
+</div>
+<div class="screen-grid">
+
+  <!-- Screen 18: Dashboard (Modified) -->
+  <div class="screen-card">
+    <div class="screen-card-header">
+      <div>
+        <h3>18. Dashboard (Modified)</h3>
+        <div class="screen-route">/ (home)</div>
+      </div>
+      <span class="screen-badge badge-modified">Modified</span>
+    </div>
+    <div class="phone-frame">
+      <div class="phone-screen">
+        <div class="notch"></div>
+
+        <!-- Header -->
+        <div class="wf-header">
+          <div class="header-title">Jits Arena</div>
+          <div class="header-action" style="display:flex; gap:8px;">
+            <div style="width:20px; height:20px; border-radius:50%; border:1px solid var(--gray-300); display:flex; align-items:center; justify-content:center; font-size:10px;">&#128276;</div>
+            <div style="width:20px; height:20px; border-radius:50%; border:1px solid var(--gray-300); display:flex; align-items:center; justify-content:center; font-size:10px;">&#9881;</div>
+          </div>
+        </div>
+
+        <div class="wf-body" style="padding:12px 16px; display:flex; flex-direction:column; gap:14px;">
+          <!-- Hero greeting -->
+          <div>
+            <p style="font-size:18px; font-weight:700;">Hey, <span style="color:var(--red-600);">Marcus</span></p>
+            <div style="display:flex; align-items:center; gap:6px; margin-top:4px;">
+              <div style="width:8px; height:8px; border-radius:50%; background:#22c55e;"></div>
+              <p style="font-size:11px; color:#16a34a; font-weight:500;">Looking for Ranked &amp; Casual matches</p>
+            </div>
+          </div>
+
+          <!-- NEW: Active Session Card -->
+          <div style="border:1px solid rgba(34,197,94,0.3); background:rgba(34,197,94,0.05); border-radius:14px; padding:12px; position:relative;">
+            <div style="position:absolute; top:-8px; left:12px; background:#fff; padding:0 4px;">
+              <span style="font-size:9px; color:var(--blue-600); font-weight:600; border:1px solid var(--blue-400); padding:1px 5px; border-radius:4px;">NEW</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:6px; margin-bottom:6px;">
+              <div style="padding:2px 7px; border-radius:999px; background:#16a34a; color:#fff; font-size:9px; font-weight:600;">Live</div>
+              <span style="font-size:12px; font-weight:600;">Session at Alliance BJJ</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:4px; font-size:11px; color:var(--gray-500); margin-bottom:8px;">
+              <span style="font-size:10px;">&#128101;</span> 8 checked in
+            </div>
+            <div class="wf-btn primary" style="width:100%; font-size:12px; padding:8px;">Go to Lobby</div>
+          </div>
+
+          <!-- Alt states note -->
+          <div style="border:1px dashed var(--gray-200); border-radius:10px; padding:8px; text-align:center;">
+            <p style="font-size:9px; color:var(--gray-400);">Alternative states: "Starts in 2h" (scheduled) | dashed "Find a session" card (no session) | "Check In" CTA (not yet joined)</p>
+          </div>
+
+          <!-- Stats (4-card grid = existing StatOverview) -->
+          <div style="opacity:0.5;">
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
+              <div style="background:var(--gray-100); border-radius:12px; padding:8px; text-align:center;">
+                <p style="font-size:9px; color:var(--gray-500);">ELO</p>
+                <p style="font-size:13px; font-weight:700; font-variant-numeric:tabular-nums;">1247</p>
+              </div>
+              <div style="background:var(--gray-100); border-radius:12px; padding:8px; text-align:center;">
+                <p style="font-size:9px; color:var(--gray-500);">Rank</p>
+                <p style="font-size:13px; font-weight:700;">#12</p>
+              </div>
+              <div style="background:var(--gray-100); border-radius:12px; padding:8px; text-align:center;">
+                <p style="font-size:9px; color:var(--gray-500);">Record</p>
+                <p style="font-size:13px; font-weight:700;"><span style="color:#16a34a;">12</span>-<span style="color:#dc2626;">3</span>-<span style="color:#f59e0b;">1</span></p>
+              </div>
+              <div style="background:var(--gray-100); border-radius:12px; padding:8px; text-align:center;">
+                <p style="font-size:9px; color:var(--gray-500);">Win Streak</p>
+                <p style="font-size:13px; font-weight:700;">4</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Recent Activity (dimmed = existing) -->
+          <div style="opacity:0.5;">
+            <p style="font-size:13px; font-weight:600; margin-bottom:6px;">Recent Activity</p>
+            <div style="display:flex; flex-direction:column; gap:4px;">
+              <div style="background:var(--gray-100); border-radius:8px; padding:8px 10px; font-size:11px; color:var(--gray-600);">Alex D. def. Chris M. via Triangle</div>
+              <div style="background:var(--gray-100); border-radius:8px; padding:8px 10px; font-size:11px; color:var(--gray-600);">You def. Sam K. via Armbar</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bottom nav -->
+        <div class="wf-bottom-nav">
+          <div class="wf-nav-item active">
+            <div class="wf-nav-dot"></div>
+            <span class="wf-nav-label">Home</span>
+          </div>
+          <div class="wf-nav-item">
+            <div class="wf-nav-dot"></div>
+            <span class="wf-nav-label">Gyms</span>
+          </div>
+          <div class="wf-nav-item">
+            <div class="wf-nav-dot"></div>
+            <span class="wf-nav-label">Rankings</span>
+          </div>
+          <div class="wf-nav-item">
+            <div class="wf-nav-dot"></div>
+            <span class="wf-nav-label">Profile</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="screen-notes">
+      <span class="note-tag new">ActiveSessionCard</span>
+      <span class="note-tag reuse">StatOverview</span>
+      <span class="note-tag reuse">RecentActivitySection</span>
+      <span class="note-tag reuse">PageHeaderActions</span>
+      <span class="note-tag token">border-green-500/30 (active session)</span>
+      <span class="note-tag token">Badge variant="success" (Live)</span>
+      <p style="margin-top:6px; font-size:11px; color:var(--gray-500);">New ActiveSessionCard added between hero greeting and stats. Three states: active (green border, "Go to Lobby" / "Check In"), scheduled ("Starts in Xh Xm"), or null (dashed card linking to /gyms). StatOverview renders 4-card grid (ELO, Rank, Record, Win Streak). RecentActivitySection has tabs. Dimmed sections are unchanged existing UI.</p>
+    </div>
+  </div>
+
+  <!-- Screen 19: Settings (Modified) -->
+  <div class="screen-card">
+    <div class="screen-card-header">
+      <div>
+        <h3>19. Settings (Modified)</h3>
+        <div class="screen-route">/settings</div>
+      </div>
+      <span class="screen-badge badge-modified">Modified</span>
+    </div>
+    <div class="phone-frame">
+      <div class="phone-screen">
+        <div class="notch"></div>
+
+        <!-- Header -->
+        <div class="wf-header">
+          <div class="back-btn">&larr;</div>
+          <div class="header-title">Settings</div>
+          <div style="width:24px;"></div>
+        </div>
+
+        <div class="wf-body" style="padding:16px; display:flex; flex-direction:column; gap:20px;">
+          <!-- Notification preferences (existing, dimmed) -->
+          <div style="opacity:0.5;">
+            <p style="font-size:12px; font-weight:500; color:var(--gray-500); margin-bottom:8px;">Notifications</p>
+            <div style="display:flex; flex-direction:column; gap:8px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 12px; border:1px solid var(--gray-200); border-radius:12px;">
+                <span style="font-size:12px;">Challenge alerts</span>
+                <div style="width:36px; height:20px; border-radius:10px; background:#22c55e;"></div>
+              </div>
+              <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 12px; border:1px solid var(--gray-200); border-radius:12px;">
+                <span style="font-size:12px;">Chat messages</span>
+                <div style="width:36px; height:20px; border-radius:10px; background:#22c55e;"></div>
+              </div>
+              <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 12px; border:1px solid var(--gray-200); border-radius:12px;">
+                <span style="font-size:12px;">Match updates</span>
+                <div style="width:36px; height:20px; border-radius:10px; background:#22c55e;"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Separator -->
+          <div style="height:1px; background:var(--gray-200);"></div>
+
+          <!-- General section (NEW items) -->
+          <div>
+            <p style="font-size:12px; font-weight:500; color:var(--gray-500); margin-bottom:8px;">General</p>
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              <!-- Video Settings -->
+              <div style="display:flex; align-items:center; justify-content:space-between; padding:12px; border:1px solid var(--gray-200); border-radius:12px; border-left:3px solid var(--blue-500);">
+                <div style="display:flex; align-items:center; gap:10px;">
+                  <span style="font-size:14px; color:var(--gray-500);">&#127909;</span>
+                  <span style="font-size:13px; font-weight:500;">Video Settings</span>
+                </div>
+                <span style="font-size:12px; color:var(--gray-400);">&rsaquo;</span>
+              </div>
+              <!-- Feedback -->
+              <div style="display:flex; align-items:center; justify-content:space-between; padding:12px; border:1px solid var(--gray-200); border-radius:12px; border-left:3px solid var(--blue-500);">
+                <div style="display:flex; align-items:center; gap:10px;">
+                  <span style="font-size:14px; color:var(--gray-500);">&#128172;</span>
+                  <span style="font-size:13px; font-weight:500;">Feedback</span>
+                </div>
+                <span style="font-size:12px; color:var(--gray-400);">&rsaquo;</span>
+              </div>
+              <!-- Help & Support -->
+              <div style="display:flex; align-items:center; justify-content:space-between; padding:12px; border:1px solid var(--gray-200); border-radius:12px; border-left:3px solid var(--blue-500);">
+                <div style="display:flex; align-items:center; gap:10px;">
+                  <span style="font-size:14px; color:var(--gray-500);">&#10067;</span>
+                  <span style="font-size:13px; font-weight:500;">Help &amp; Support</span>
+                </div>
+                <span style="font-size:12px; color:var(--gray-400);">&rsaquo;</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bottom nav -->
+        <div class="wf-bottom-nav">
+          <div class="wf-nav-item">
+            <div class="wf-nav-dot"></div>
+            <span class="wf-nav-label">Home</span>
+          </div>
+          <div class="wf-nav-item">
+            <div class="wf-nav-dot"></div>
+            <span class="wf-nav-label">Gyms</span>
+          </div>
+          <div class="wf-nav-item">
+            <div class="wf-nav-dot"></div>
+            <span class="wf-nav-label">Rankings</span>
+          </div>
+          <div class="wf-nav-item active">
+            <div class="wf-nav-dot"></div>
+            <span class="wf-nav-label">Profile</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="screen-notes">
+      <span class="note-tag reuse">NotificationPreferences (existing)</span>
+      <span class="note-tag new">SettingsLink x3</span>
+      <span class="note-tag token">New items: border-left-3px border-blue-500</span>
+      <span class="note-tag token">Icons: lucide-react (Video, MessageSquare, HelpCircle)</span>
+      <p style="margin-top:6px; font-size:11px; color:var(--gray-500);">Three new General section links with blue left-border highlight: Video Settings (/settings/video), Feedback (/settings/feedback), Help &amp; Support (/settings/help). Each uses ChevronRight icon. Notification preferences section unchanged.</p>
+    </div>
+  </div>
+
+</div><!-- end modified screens screen-grid -->
+
+
+<!-- Footer -->
+<div style="max-width:1280px; margin:64px auto 0; text-align:center; padding-top:32px; border-top:1px solid #333;">
+  <p style="font-size:13px; color:var(--gray-500);">JITS Arena Screen Inventory &middot; 19 screens &middot; 17 new, 2 modified &middot; 2 feature-flagged</p>
+  <p style="font-size:11px; color:var(--gray-600); margin-top:8px;">Generated for design review. Color tokens match the JITS Web design system (CLAUDE.md).</p>
+</div>
+
+<!-- ============================================================
+     FEEDBACK OVERLAY v2
+     Conversational design feedback with AI chat, diff preview,
+     and accept/reject flow. Requires feedback-server.mjs for
+     AI features; degrades to static pin editing when offline.
+     ============================================================ -->
+<style>
+  /* ── Toolbar ── */
+  #fb-toolbar {
+    position: fixed; bottom: 16px; right: 16px; z-index: 9999;
+    display: flex; flex-direction: column; gap: 8px; align-items: flex-end;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+  #fb-toolbar button {
+    background: #1a1a1a; color: #e5e7eb; border: 1px solid #444;
+    border-radius: 8px; padding: 8px 14px; font-size: 13px; cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  }
+  #fb-toolbar button:hover { background: #262626; border-color: #666; }
+  #fb-toolbar button.fb-active { background: var(--primary-red); border-color: var(--primary-red); color: #fff; }
+  #fb-count { font-size: 12px; color: var(--gray-400); background: #1a1a1a; padding: 4px 10px; border-radius: 6px; border: 1px solid #333; }
+  #fb-status-dot {
+    width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px;
+    background: #ef4444; transition: background 0.3s;
+  }
+  #fb-status-dot.connected { background: var(--success); }
+  #fb-server-status { font-size: 11px; color: var(--gray-500); display: flex; align-items: center; }
+
+  /* ── Feedback mode ── */
+  body.fb-mode .screen-card { cursor: crosshair; outline: 1px dashed transparent; transition: outline-color 0.15s; }
+  body.fb-mode .screen-card:hover { outline-color: var(--primary-red); }
+
+  /* ── Pins ── */
+  .fb-pin {
+    position: absolute; width: 24px; height: 24px; border-radius: 50%;
+    background: var(--primary-red); color: #fff; border: 2px solid #fff;
+    font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transform: translate(-50%, -50%); z-index: 10;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.5); transition: transform 0.1s;
+  }
+  .fb-pin:hover { transform: translate(-50%, -50%) scale(1.15); }
+  .fb-pin.status-accepted { background: var(--success); }
+  .fb-pin.status-rejected { background: var(--gray-500); opacity: 0.5; }
+
+  /* ── Chat Panel ── */
+  #fb-panel {
+    position: fixed; top: 0; right: 0; width: 420px; height: 100vh;
+    background: #121212; border-left: 1px solid #333; z-index: 10000;
+    display: none; flex-direction: column; color: #e5e7eb;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+  #fb-panel.fb-open { display: flex; }
+
+  #fb-panel header {
+    padding: 12px 16px; border-bottom: 1px solid #333;
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;
+    flex-shrink: 0;
+  }
+  #fb-panel .fb-header-left { flex: 1; min-width: 0; }
+  #fb-panel .fb-header-title { font-size: 14px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #fb-panel .fb-header-route { font-size: 11px; color: var(--gray-500); margin-top: 2px; font-family: ui-monospace, Menlo, monospace; }
+  .fb-status-badge {
+    font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 10px;
+    text-transform: uppercase; letter-spacing: 0.5px; flex-shrink: 0;
+  }
+  .fb-status-badge.open { background: var(--primary-red); color: #fff; }
+  .fb-status-badge.accepted { background: var(--success); color: #fff; }
+  .fb-status-badge.rejected { background: var(--gray-600); color: var(--gray-300); }
+  #fb-close { background: none; border: none; color: var(--gray-400); font-size: 20px; cursor: pointer; flex-shrink: 0; }
+
+  /* ── Meta ── */
+  #fb-meta {
+    padding: 8px 16px; border-bottom: 1px solid #222; font-size: 11px;
+    color: var(--gray-500); line-height: 1.6; flex-shrink: 0;
+  }
+  #fb-meta strong { color: var(--gray-300); }
+
+  /* ── Messages area ── */
+  #fb-messages {
+    flex: 1; overflow-y: auto; padding: 12px 16px; display: flex; flex-direction: column; gap: 12px;
+  }
+  .fb-msg {
+    max-width: 95%; padding: 10px 14px; border-radius: 12px; font-size: 13px;
+    line-height: 1.5; word-wrap: break-word; white-space: pre-wrap;
+  }
+  .fb-msg.user {
+    align-self: flex-end; background: #2a2a3a; border-bottom-right-radius: 4px;
+  }
+  .fb-msg.assistant {
+    align-self: flex-start; background: #1e1e1e; border: 1px solid #2a2a2a;
+    border-bottom-left-radius: 4px; max-width: 100%;
+  }
+  .fb-msg .fb-msg-time {
+    font-size: 10px; color: var(--gray-600); margin-top: 4px; display: block;
+  }
+
+  /* ── Typing indicator ── */
+  .fb-typing { display: flex; gap: 4px; padding: 10px 14px; align-self: flex-start; }
+  .fb-typing span {
+    width: 6px; height: 6px; border-radius: 50%; background: var(--gray-500);
+    animation: fb-bounce 1.2s infinite;
+  }
+  .fb-typing span:nth-child(2) { animation-delay: 0.2s; }
+  .fb-typing span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes fb-bounce {
+    0%, 60%, 100% { transform: translateY(0); }
+    30% { transform: translateY(-6px); }
+  }
+
+  /* ── Tool use indicator ── */
+  .fb-tool-use {
+    font-size: 11px; color: var(--gray-400); padding: 4px 0; font-style: italic;
+  }
+
+  /* ── Diff preview ── */
+  .fb-diff-block {
+    margin-top: 10px; border: 1px solid #333; border-radius: 6px; overflow: hidden;
+    font-size: 12px; max-height: 300px; overflow-y: auto;
+  }
+  .fb-diff-header {
+    background: #1a1a2e; padding: 6px 10px; font-size: 11px; font-weight: 600;
+    color: var(--gray-300); border-bottom: 1px solid #333;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .fb-diff-header .fb-diff-files { font-weight: 400; color: var(--gray-500); }
+  .fb-diff-content {
+    font-family: ui-monospace, Menlo, monospace; white-space: pre; overflow-x: auto;
+    line-height: 1.5;
+  }
+  .fb-diff-content .diff-add { background: #12261e; color: #4ade80; display: block; padding: 0 10px; }
+  .fb-diff-content .diff-del { background: #2d1518; color: #f87171; display: block; padding: 0 10px; }
+  .fb-diff-content .diff-hunk { background: #1a1a2e; color: #60a5fa; display: block; padding: 0 10px; font-style: italic; }
+  .fb-diff-content .diff-ctx { display: block; padding: 0 10px; color: var(--gray-400); }
+
+  /* ── Accept/Reject buttons ── */
+  .fb-ar-row { display: flex; gap: 8px; margin-top: 8px; }
+  .fb-ar-row button {
+    flex: 1; padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;
+    cursor: pointer; border: 1px solid #333;
+  }
+  .fb-ar-row .fb-accept-btn { background: var(--success); color: #fff; border-color: var(--success); }
+  .fb-ar-row .fb-reject-btn { background: transparent; color: #f87171; border-color: #f87171; }
+
+  /* ── Input area ── */
+  #fb-input-area {
+    padding: 12px 16px; border-top: 1px solid #333; flex-shrink: 0;
+  }
+  #fb-input-row { display: flex; gap: 8px; align-items: flex-end; }
+  #fb-input {
+    flex: 1; background: #0a0a0a; color: #e5e7eb; border: 1px solid #333;
+    border-radius: 8px; padding: 8px 12px; font-size: 13px; font-family: inherit;
+    resize: none; min-height: 38px; max-height: 120px; line-height: 1.4;
+  }
+  #fb-input:disabled { opacity: 0.4; cursor: not-allowed; }
+  #fb-send {
+    background: var(--primary-red); color: #fff; border: none; border-radius: 8px;
+    padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer;
+    white-space: nowrap;
+  }
+  #fb-send:disabled { opacity: 0.4; cursor: not-allowed; }
+  #fb-component-row {
+    margin-top: 6px; display: flex; align-items: center; gap: 6px;
+  }
+  #fb-component-row label { font-size: 10px; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.5px; flex-shrink: 0; }
+  #fb-component {
+    flex: 1; background: #0a0a0a; color: #e5e7eb; border: 1px solid #222;
+    border-radius: 4px; padding: 4px 8px; font-size: 11px;
+    font-family: ui-monospace, Menlo, monospace;
+  }
+  #fb-cancel-btn {
+    background: transparent; color: var(--gray-400); border: 1px solid #333;
+    border-radius: 8px; padding: 8px 12px; font-size: 12px; cursor: pointer;
+    margin-top: 6px; width: 100%; display: none;
+  }
+  #fb-delete-pin {
+    background: transparent; color: #f87171; border: none; font-size: 11px;
+    cursor: pointer; padding: 0; margin-top: 8px;
+  }
+</style>
+
+<!-- ── Toolbar ── -->
+<div id="fb-toolbar">
+  <div id="fb-server-status"><span id="fb-status-dot"></span><span id="fb-status-text">Offline</span></div>
+  <div id="fb-count">0 pins</div>
+  <button id="fb-toggle" type="button">Feedback: OFF</button>
+  <button id="fb-export" type="button">Export JSON</button>
+  <button id="fb-clear" type="button">Clear all</button>
+</div>
+
+<!-- ── Chat Panel ── -->
+<div id="fb-panel" role="dialog" aria-label="Feedback chat">
+  <header>
+    <div class="fb-header-left">
+      <div class="fb-header-title" id="fb-header-title">Pin</div>
+      <div class="fb-header-route" id="fb-header-route"></div>
+    </div>
+    <span class="fb-status-badge open" id="fb-badge">open</span>
+    <button id="fb-close" type="button" aria-label="Close">&times;</button>
+  </header>
+  <div id="fb-meta"></div>
+  <div id="fb-messages"></div>
+  <div id="fb-input-area">
+    <div id="fb-input-row">
+      <textarea id="fb-input" rows="1" placeholder="Describe the change you want..."></textarea>
+      <button id="fb-send" type="button">Send</button>
+    </div>
+    <div id="fb-component-row">
+      <label for="fb-component">Component:</label>
+      <input id="fb-component" type="text" placeholder="e.g. components/domain/match-card.tsx" />
+    </div>
+    <button id="fb-cancel-btn" type="button">Cancel</button>
+    <button id="fb-delete-pin" type="button">Delete this pin</button>
+  </div>
+</div>
+
+<script>
+(function() {
+  const SERVER_URL = location.protocol === 'file:'
+    ? 'http://localhost:3847'
+    : location.origin;
+  const STORAGE_KEY = 'jits-screen-inventory-feedback';
+  const SCHEMA_VERSION = 2;
+  let serverConnected = false;
+
+  const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
+  document.querySelectorAll('.screen-card').forEach(card => {
+    const h3 = card.querySelector('h3');
+    if (!h3) return;
+    card.dataset.screenId = slug(h3.textContent.trim());
+    card.dataset.screenTitle = h3.textContent.trim();
+    const routeEl = card.querySelector('.screen-route');
+    if (routeEl) card.dataset.screenRoute = routeEl.textContent.trim();
+  });
+
+  function migratePin(pin) {
+    if (!pin.status) pin.status = 'open';
+    if (!pin.messages) {
+      pin.messages = [];
+      if (pin.text && pin.text.trim()) {
+        pin.messages.push({ role: 'user', text: pin.text, timestamp: pin.createdAt || new Date().toISOString() });
+      }
+    }
+    if (!pin.sessionId) pin.sessionId = null;
+    return pin;
+  }
+
+  function load() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      const arr = Array.isArray(parsed) ? parsed : (parsed.pins || []);
+      return arr.map(migratePin);
+    } catch { return []; }
+  }
+
+  function persist(pins) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(pins));
+  }
+
+  let pins = load();
+  let mode = false;
+  let editingId = null;
+  let streaming = false;
+
+  const $ = (id) => document.getElementById(id);
+  const els = {
+    toolbar: $('fb-toolbar'), toggle: $('fb-toggle'), exportBtn: $('fb-export'),
+    clearBtn: $('fb-clear'), count: $('fb-count'), statusDot: $('fb-status-dot'),
+    statusText: $('fb-status-text'), panel: $('fb-panel'), close: $('fb-close'),
+    headerTitle: $('fb-header-title'), headerRoute: $('fb-header-route'),
+    badge: $('fb-badge'), meta: $('fb-meta'), messages: $('fb-messages'),
+    input: $('fb-input'), send: $('fb-send'), component: $('fb-component'),
+    cancelBtn: $('fb-cancel-btn'), deletePin: $('fb-delete-pin'),
+  };
+
+  function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  function renderPins() {
+    document.querySelectorAll('.fb-pin').forEach(el => el.remove());
+    pins.forEach((pin, idx) => {
+      const card = document.querySelector(`[data-screen-id="${pin.screenId}"]`);
+      if (!card) return;
+      const el = document.createElement('div');
+      el.className = 'fb-pin';
+      if (pin.status === 'accepted') el.classList.add('status-accepted');
+      if (pin.status === 'rejected') el.classList.add('status-rejected');
+      el.textContent = idx + 1;
+      el.style.left = (pin.xPct * 100) + '%';
+      el.style.top = (pin.yPct * 100) + '%';
+      const lastMsg = pin.messages?.[pin.messages.length - 1];
+      el.title = lastMsg?.text?.slice(0, 80) || '(empty)';
+      el.addEventListener('click', (e) => { e.stopPropagation(); openChat(pin.id); });
+      card.appendChild(el);
+    });
+    els.count.textContent = pins.length + (pins.length === 1 ? ' pin' : ' pins');
+  }
+
+  function renderDiff(diffText) {
+    if (!diffText || !diffText.trim()) return '';
+    const lines = diffText.split('\n');
+    let html = '';
+    const files = [];
+    for (const line of lines) {
+      if (line.startsWith('diff --git')) { const m = line.match(/b\/(.+)$/); if (m) files.push(m[1]); continue; }
+      if (line.startsWith('index ') || line.startsWith('---') || line.startsWith('+++') || line.startsWith('\\')) continue;
+      if (line.startsWith('@@')) html += `<span class="diff-hunk">${esc(line)}</span>`;
+      else if (line.startsWith('+')) html += `<span class="diff-add">${esc(line)}</span>`;
+      else if (line.startsWith('-')) html += `<span class="diff-del">${esc(line)}</span>`;
+      else html += `<span class="diff-ctx">${esc(line)}</span>`;
+    }
+    return `<div class="fb-diff-block"><div class="fb-diff-header"><span>Changes</span><span class="fb-diff-files">${files.join(', ')}</span></div><div class="fb-diff-content">${html}</div></div>`;
+  }
+
+  function renderMessages(pin) {
+    let html = '';
+    for (const msg of (pin.messages || [])) {
+      const time = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+      if (msg.role === 'user') {
+        html += `<div class="fb-msg user">${esc(msg.text)}<span class="fb-msg-time">${time}</span></div>`;
+      } else {
+        html += `<div class="fb-msg assistant">${esc(msg.text)}`;
+        if (msg.diff) {
+          html += renderDiff(msg.diff);
+          if (pin.status === 'open') {
+            html += `<div class="fb-ar-row"><button class="fb-accept-btn" data-pin="${pin.id}">Accept</button><button class="fb-reject-btn" data-pin="${pin.id}">Reject</button></div>`;
+          }
+        }
+        html += `<span class="fb-msg-time">${time}</span></div>`;
+      }
+    }
+    els.messages.innerHTML = html;
+    els.messages.scrollTop = els.messages.scrollHeight;
+    els.messages.querySelectorAll('.fb-accept-btn').forEach(btn => {
+      btn.addEventListener('click', () => acceptChanges(btn.dataset.pin));
+    });
+    els.messages.querySelectorAll('.fb-reject-btn').forEach(btn => {
+      btn.addEventListener('click', () => rejectChanges(btn.dataset.pin));
+    });
+  }
+
+  function updateBadge(pin) {
+    els.badge.className = 'fb-status-badge ' + (pin.status || 'open');
+    els.badge.textContent = pin.status || 'open';
+  }
+
+  function openChat(id) {
+    const pin = pins.find(p => p.id === id);
+    if (!pin) return;
+    editingId = id;
+    els.headerTitle.textContent = pin.screenTitle;
+    els.headerRoute.textContent = pin.screenRoute || '';
+    els.component.value = pin.componentPath || '';
+    els.meta.innerHTML = `<span>Pin at <strong>${(pin.xPct*100).toFixed(1)}%, ${(pin.yPct*100).toFixed(1)}%</strong></span>${pin.componentPath ? ` &middot; <strong>${esc(pin.componentPath)}</strong>` : ''}`;
+    updateBadge(pin);
+    renderMessages(pin);
+    const online = serverConnected && pin.status === 'open';
+    els.input.disabled = !online;
+    els.send.disabled = !online;
+    els.input.placeholder = online ? 'Describe the change you want...' : (pin.status !== 'open' ? 'This pin is ' + pin.status : 'Start feedback-server.mjs to enable AI chat');
+    els.panel.classList.add('fb-open');
+    if (online) setTimeout(() => els.input.focus(), 50);
+  }
+
+  function closeChat() { editingId = null; els.panel.classList.remove('fb-open'); }
+
+  async function checkServer() {
+    try {
+      const res = await fetch(SERVER_URL + '/api/status', { signal: AbortSignal.timeout(3000) });
+      if (res.ok) { serverConnected = true; els.statusDot.classList.add('connected'); els.statusText.textContent = 'Connected'; return; }
+    } catch {}
+    serverConnected = false; els.statusDot.classList.remove('connected'); els.statusText.textContent = 'Offline';
+  }
+
+  async function sendMessage() {
+    if (streaming || !editingId) return;
+    const pin = pins.find(p => p.id === editingId);
+    if (!pin) return;
+    const text = els.input.value.trim();
+    if (!text) return;
+    const comp = els.component.value.trim();
+    if (comp !== pin.componentPath) pin.componentPath = comp;
+    pin.messages.push({ role: 'user', text, timestamp: new Date().toISOString() });
+    pin.updatedAt = new Date().toISOString();
+    persist(pins);
+    renderMessages(pin);
+    els.input.value = '';
+    els.input.style.height = 'auto';
+    streaming = true;
+    els.input.disabled = true;
+    els.send.disabled = true;
+    els.cancelBtn.style.display = 'block';
+
+    const typingEl = document.createElement('div');
+    typingEl.className = 'fb-typing';
+    typingEl.innerHTML = '<span></span><span></span><span></span>';
+    els.messages.appendChild(typingEl);
+    els.messages.scrollTop = els.messages.scrollHeight;
+
+    const isFirstTurn = !pin.sessionId;
+    const body = { pinId: pin.id, sessionId: pin.sessionId, message: text };
+    if (isFirstTurn) {
+      body.context = { screenTitle: pin.screenTitle, screenRoute: pin.screenRoute, componentPath: pin.componentPath || null, xPct: pin.xPct, yPct: pin.yPct };
+    }
+
+    let assistantText = '';
+    let diffText = null;
+    let sessionId = pin.sessionId;
+
+    try {
+      const response = await fetch(SERVER_URL + '/api/chat', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({ error: 'Server error' }));
+        throw new Error(err.error || 'Server error');
+      }
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let msgEl = null;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const events = buffer.split('\n\n');
+        buffer = events.pop() || '';
+        for (const block of events) {
+          const lines = block.split('\n');
+          let eventType = '', data = '';
+          for (const line of lines) {
+            if (line.startsWith('event: ')) eventType = line.slice(7);
+            else if (line.startsWith('data: ')) data = line.slice(6);
+          }
+          if (!eventType || !data) continue;
+          let parsed;
+          try { parsed = JSON.parse(data); } catch { continue; }
+
+          if (eventType === 'status' && parsed.sessionId) { sessionId = parsed.sessionId; pin.sessionId = sessionId; persist(pins); }
+          if (eventType === 'chunk') {
+            if (typingEl.parentNode) typingEl.remove();
+            if (parsed.type === 'text') {
+              assistantText += parsed.text;
+              if (!msgEl) { msgEl = document.createElement('div'); msgEl.className = 'fb-msg assistant'; els.messages.appendChild(msgEl); }
+              msgEl.textContent = assistantText;
+              els.messages.scrollTop = els.messages.scrollHeight;
+            } else if (parsed.type === 'tool_use') {
+              const toolEl = document.createElement('div'); toolEl.className = 'fb-tool-use';
+              toolEl.textContent = `Using ${parsed.tool}...`;
+              els.messages.appendChild(toolEl);
+              els.messages.scrollTop = els.messages.scrollHeight;
+            }
+          }
+          if (eventType === 'diff' && parsed.diff) diffText = parsed.diff;
+          if (eventType === 'done' && parsed.result && parsed.result !== assistantText) assistantText = parsed.result;
+          if (eventType === 'error') { if (typingEl.parentNode) typingEl.remove(); assistantText += '\n[Error: ' + (parsed.message || 'Unknown error') + ']'; }
+        }
+      }
+    } catch (err) {
+      if (typingEl.parentNode) typingEl.remove();
+      assistantText = '[Error: ' + err.message + ']';
+    }
+
+    const aMsg = { role: 'assistant', text: assistantText, timestamp: new Date().toISOString() };
+    if (diffText) aMsg.diff = diffText;
+    pin.messages.push(aMsg);
+    pin.updatedAt = new Date().toISOString();
+    persist(pins);
+    streaming = false;
+    els.cancelBtn.style.display = 'none';
+    renderMessages(pin);
+    renderPins();
+    if (pin.status === 'open' && serverConnected) {
+      els.input.disabled = false; els.send.disabled = false;
+      setTimeout(() => els.input.focus(), 50);
+    }
+  }
+
+  async function acceptChanges(pinId) {
+    const pin = pins.find(p => p.id === pinId);
+    if (!pin) return;
+    const firstUserMsg = pin.messages.find(m => m.role === 'user');
+    const summary = firstUserMsg?.text?.slice(0, 60) || 'design feedback';
+    try {
+      const res = await fetch(SERVER_URL + '/api/accept', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: `feedback(${pin.screenId}): ${summary}` }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        pin.status = 'accepted'; pin.updatedAt = new Date().toISOString(); persist(pins);
+        updateBadge(pin); renderMessages(pin); renderPins();
+        els.input.disabled = true; els.send.disabled = true; els.input.placeholder = 'This pin is accepted';
+      } else alert('Accept failed: ' + (data.error || 'unknown'));
+    } catch (err) { alert('Accept failed: ' + err.message); }
+  }
+
+  async function rejectChanges(pinId) {
+    const pin = pins.find(p => p.id === pinId);
+    if (!pin) return;
+    try {
+      const res = await fetch(SERVER_URL + '/api/reject', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: pin.sessionId }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        pin.status = 'rejected'; pin.updatedAt = new Date().toISOString(); persist(pins);
+        updateBadge(pin); renderMessages(pin); renderPins();
+        els.input.disabled = true; els.send.disabled = true; els.input.placeholder = 'This pin is rejected';
+      } else alert('Reject failed: ' + (data.error || 'unknown'));
+    } catch (err) { alert('Reject failed: ' + err.message); }
+  }
+
+  async function cancelStream() { try { await fetch(SERVER_URL + '/api/cancel', { method: 'POST' }); } catch {} }
+
+  function setMode(on) {
+    mode = on; document.body.classList.toggle('fb-mode', on);
+    els.toggle.classList.toggle('fb-active', on);
+    els.toggle.textContent = 'Feedback: ' + (on ? 'ON' : 'OFF');
+  }
+
+  document.addEventListener('click', (e) => {
+    if (!mode) return;
+    if (e.target.closest('#fb-panel, #fb-toolbar, .fb-pin')) return;
+    const card = e.target.closest('.screen-card');
+    if (!card) return;
+    e.preventDefault(); e.stopPropagation();
+    const rect = card.getBoundingClientRect();
+    const now = new Date().toISOString();
+    const pin = {
+      id: 'fb_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7),
+      screenId: card.dataset.screenId, screenTitle: card.dataset.screenTitle,
+      screenRoute: card.dataset.screenRoute || null,
+      xPct: (e.clientX - rect.left) / rect.width, yPct: (e.clientY - rect.top) / rect.height,
+      componentPath: '', createdAt: now, updatedAt: now,
+      status: 'open', sessionId: null, messages: [],
+    };
+    pins.push(pin); persist(pins); renderPins(); openChat(pin.id);
+  }, true);
+
+  els.toggle.addEventListener('click', () => setMode(!mode));
+  els.close.addEventListener('click', closeChat);
+  els.send.addEventListener('click', sendMessage);
+  els.cancelBtn.addEventListener('click', cancelStream);
+  els.input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } });
+  els.input.addEventListener('input', () => { els.input.style.height = 'auto'; els.input.style.height = Math.min(els.input.scrollHeight, 120) + 'px'; });
+  els.deletePin.addEventListener('click', () => { if (!editingId) return; pins = pins.filter(p => p.id !== editingId); persist(pins); renderPins(); closeChat(); });
+  els.exportBtn.addEventListener('click', () => {
+    const payload = { schemaVersion: SCHEMA_VERSION, source: 'screen-inventory.html', exportedAt: new Date().toISOString(), pinCount: pins.length, pins };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob); const a = document.createElement('a');
+    a.href = url; a.download = `screen-inventory-feedback-${Date.now()}.json`; a.click(); URL.revokeObjectURL(url);
+  });
+  els.clearBtn.addEventListener('click', () => {
+    if (!pins.length) return;
+    if (!confirm(`Delete all ${pins.length} feedback pins? This cannot be undone.`)) return;
+    pins = []; persist(pins); renderPins(); closeChat();
+  });
+
+  renderPins(); checkServer(); setInterval(checkServer, 10000);
+})();
+</script>
+
+</body>
+</html>
