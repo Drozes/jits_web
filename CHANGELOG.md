@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Claude Design Prep + EloRated Rebrand (2026-04-20)
+
+**Added**
+- `DESIGN.md` -- Design system reference for Claude Design onboarding: brand identity (EloRated), color token usage rules, full component inventory (15 shadcn primitives, 29 domain components, 5 layout components), interaction patterns, and layout constraints
+- `public/logo.svg` -- Geometric E icon mark with ascending bars (rising ELO chart) and gold peak accent. Brand red container, white letterform, gold step. Three colors, ~700 bytes.
+
 ### Conversational Design Feedback Tool (2026-04-17)
 
 **Added**
