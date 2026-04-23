@@ -29,7 +29,8 @@ export async function getArenaData(
   supabase: Client,
   limit = 20,
 ): Promise<ArenaData> {
-  const { data } = await supabase.rpc("get_arena_data", { p_limit: limit });
+  const { data, error } = await supabase.rpc("get_arena_data", { p_limit: limit });
+  if (error) console.error("getArenaData:", error);
   return data as unknown as ArenaData;
 }
 
@@ -52,9 +53,10 @@ export async function getAthleteStatsRpc(
   supabase: Client,
   athleteId: string,
 ): Promise<AthleteStatsRpc> {
-  const { data } = await supabase.rpc("get_athlete_stats", {
+  const { data, error } = await supabase.rpc("get_athlete_stats", {
     p_athlete_id: athleteId,
   });
+  if (error) console.error("getAthleteStatsRpc:", error);
   const row = (data as { wins: number; losses: number; draws: number; win_streak: number; best_win_streak: number; total_matches: number }[] | null)?.[0];
   const wins = row?.wins ?? 0;
   const losses = row?.losses ?? 0;
@@ -75,9 +77,13 @@ export async function getAthletesStatsRpc(
   athleteIds: string[],
 ): Promise<Map<string, { wins: number; losses: number; draws: number; totalMatches: number }>> {
   if (athleteIds.length === 0) return new Map();
-  const { data } = await supabase.rpc("get_athletes_stats", {
+  const { data, error } = await supabase.rpc("get_athletes_stats", {
     p_athlete_ids: athleteIds,
   });
+  if (error) {
+    console.error("getAthletesStatsRpc:", error);
+    return new Map();
+  }
   const map = new Map<string, { wins: number; losses: number; draws: number; totalMatches: number }>();
   for (const row of (data ?? []) as { athlete_id: string; wins: number; losses: number; draws: number; total_matches: number }[]) {
     map.set(row.athlete_id, { wins: row.wins, losses: row.losses, draws: row.draws, totalMatches: row.total_matches });
@@ -94,9 +100,13 @@ export async function getMatchHistory(
   supabase: Client,
   athleteId: string,
 ): Promise<MatchHistoryRow[]> {
-  const { data } = await supabase.rpc("get_match_history", {
+  const { data, error } = await supabase.rpc("get_match_history", {
     p_athlete_id: athleteId,
   });
+  if (error) {
+    console.error("getMatchHistory:", error);
+    return [];
+  }
   return (data as MatchHistoryRow[]) ?? [];
 }
 
@@ -109,9 +119,13 @@ export async function getEloHistory(
   supabase: Client,
   athleteId: string,
 ): Promise<EloHistoryRow[]> {
-  const { data } = await supabase.rpc("get_elo_history", {
+  const { data, error } = await supabase.rpc("get_elo_history", {
     p_athlete_id: athleteId,
   });
+  if (error) {
+    console.error("getEloHistory:", error);
+    return [];
+  }
   return (data as EloHistoryRow[]) ?? [];
 }
 
@@ -123,12 +137,16 @@ export async function getEloStakes(
   challengerWeight?: number | null,
   opponentWeight?: number | null,
 ): Promise<EloStakes | null> {
-  const { data } = await supabase.rpc("calculate_elo_stakes", {
+  const { data, error } = await supabase.rpc("calculate_elo_stakes", {
     challenger_elo: challengerElo,
     opponent_elo: opponentElo,
     ...(challengerWeight ? { challenger_weight: challengerWeight } : {}),
     ...(opponentWeight ? { opponent_weight: opponentWeight } : {}),
   });
+  if (error) {
+    console.error("getEloStakes:", error);
+    return null;
+  }
   return (data as unknown as EloStakes) ?? null;
 }
 
@@ -140,12 +158,16 @@ export async function getEloStakes(
 export async function getSubmissionTypes(
   supabase: Client,
 ): Promise<SubmissionType[]> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("submission_types")
     .select("*")
     .eq("status", "active")
     .order("category")
     .order("sort_order");
+  if (error) {
+    console.error("getSubmissionTypes:", error);
+    return [];
+  }
   return (data as SubmissionType[]) ?? [];
 }
 
@@ -158,9 +180,13 @@ export async function canCreateChallenge(
   supabase: Client,
   opponentId?: string,
 ): Promise<boolean> {
-  const { data } = await supabase.rpc("can_create_challenge", {
+  const { data, error } = await supabase.rpc("can_create_challenge", {
     p_opponent_id: opponentId,
   });
+  if (error) {
+    console.error("canCreateChallenge:", error);
+    return false;
+  }
   return data === true;
 }
 
@@ -248,7 +274,7 @@ export async function getChallengesBetween(
   athleteA: string,
   athleteB: string,
 ): Promise<ChallengeBetween[]> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("challenges")
     .select(
       `id, status, match_type, created_at, expires_at, challenger_weight, opponent_weight,
@@ -260,6 +286,10 @@ export async function getChallengesBetween(
     )
     .order("created_at", { ascending: false });
 
+  if (error) {
+    console.error("getChallengesBetween:", error);
+    return [];
+  }
   if (!data) return [];
 
   return data.map((d) => ({
@@ -275,7 +305,7 @@ export async function getPendingChallengeBetween(
   athleteA: string,
   athleteB: string,
 ): Promise<{ id: string } | null> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("challenges")
     .select("id")
     .eq("status", "pending")
@@ -285,6 +315,10 @@ export async function getPendingChallengeBetween(
     .limit(1)
     .maybeSingle();
 
+  if (error) {
+    console.error("getPendingChallengeBetween:", error);
+    return null;
+  }
   return data ? { id: data.id } : null;
 }
 
@@ -293,7 +327,10 @@ export async function getPendingChallengeOpponentIds(
   supabase: Client,
   athleteId: string,
 ): Promise<Set<string>> {
-  const [{ data: sent }, { data: received }] = await Promise.all([
+  const [
+    { data: sent, error: sentError },
+    { data: received, error: receivedError },
+  ] = await Promise.all([
     supabase
       .from("challenges")
       .select("opponent_id")
@@ -306,6 +343,9 @@ export async function getPendingChallengeOpponentIds(
       .eq("status", "pending"),
   ]);
 
+  if (sentError) console.error("getPendingChallengeOpponentIds (sent):", sentError);
+  if (receivedError) console.error("getPendingChallengeOpponentIds (received):", receivedError);
+
   const ids = new Set<string>();
   for (const c of sent ?? []) ids.add(c.opponent_id);
   for (const c of received ?? []) ids.add(c.challenger_id);
@@ -317,7 +357,7 @@ export async function getLobbyData(
   supabase: Client,
   challengeId: string,
 ): Promise<LobbyData | null> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("challenges")
     .select(
       `*,
@@ -329,6 +369,10 @@ export async function getLobbyData(
     .in("status", ["pending", "accepted"])
     .single();
 
+  if (error) {
+    console.error("getLobbyData:", error);
+    return null;
+  }
   if (!data) return null;
 
   // Aliased FK joins return single objects (not arrays)

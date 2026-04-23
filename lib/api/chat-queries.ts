@@ -20,7 +20,11 @@ export type UnreadCountRow =
 export async function getConversations(
   supabase: Client,
 ): Promise<ConversationRow[]> {
-  const { data } = await supabase.rpc("get_conversations");
+  const { data, error } = await supabase.rpc("get_conversations");
+  if (error) {
+    console.error("getConversations:", error);
+    return [];
+  }
   return (data as ConversationRow[]) ?? [];
 }
 
@@ -28,7 +32,11 @@ export async function getConversations(
 export async function getUnreadCounts(
   supabase: Client,
 ): Promise<UnreadCountRow[]> {
-  const { data } = await supabase.rpc("get_unread_counts");
+  const { data, error } = await supabase.rpc("get_unread_counts");
+  if (error) {
+    console.error("getUnreadCounts:", error);
+    return [];
+  }
   return (data as UnreadCountRow[]) ?? [];
 }
 
@@ -55,6 +63,10 @@ export async function getMessages(
     query = query.lt("created_at", opts.before);
   }
 
-  const { data } = await query;
+  const { data, error } = await query;
+  if (error) {
+    console.error("getMessages:", error);
+    return [];
+  }
   return (data as Message[]) ?? [];
 }
