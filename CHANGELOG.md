@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+<<<<<<< HEAD
 **Removed**
 - `messagesEnabled` flag from `lib/feature-flags.ts` -- this flag was set to false and never checked anywhere in the codebase
 - `hooks/use-feature-flag.ts` -- unused hook wrapper; feature flags are accessed directly via `getFlag()`
@@ -204,6 +205,12 @@ Three-team review (PM + design + implementation). 14 ship-now items plus 6 desig
 - `lib/guards.ts` — Added `gender`, `date_of_birth`, `city` to `ATHLETE_GUARD_SELECT`.
 - `types/database.ts` — Updated generated types to include `gender`, `date_of_birth`, `city` on athletes table, plus `waivers`, `waiver_acknowledgements`, and other new tables from Phase 0 migrations.
 - `components/profile/editable-profile-header.tsx` — Added `city` to athlete prop Pick type, `EditingField` union, cancel/save logic, and render tree. Note: component is now ~430 lines (tech debt, already tracked).
+
+### Query error handling (2026-04-22)
+
+**Fixed**
+- `lib/api/queries.ts` — All query functions previously destructured `{ data }` and silently swallowed Supabase errors, making failed queries indistinguishable from empty results. All 12 affected functions now check `error`, log it via `console.error` with the function name, and return a safe empty value (`null`, `[]`, `new Map()`, or `false` depending on return type).
+- `lib/api/chat-queries.ts` — Same silent-error issue in `getConversations`, `getUnreadCounts`, and `getMessages`; all three now log and return safe defaults on error.
 
 ### Code quality audit fixes (2026-03-06)
 
