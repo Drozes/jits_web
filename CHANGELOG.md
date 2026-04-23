@@ -2,14 +2,24 @@
 
 ## [Unreleased]
 
-**Removed**
-- `messagesEnabled` flag from `lib/feature-flags.ts` -- this flag was set to false and never checked anywhere in the codebase
-- `hooks/use-feature-flag.ts` -- unused hook wrapper; feature flags are accessed directly via `getFlag()`
-
-### Help and Support Page (2026-04-22)
+### Beta Hardening Pass (2026-04-23)
 
 **Added**
-- `app/(app)/settings/help/page.tsx` -- Static FAQ page at `/settings/help` with 6 common questions (joining sessions, ELO ratings, ranked vs casual, recording results, weight changes, reporting issues) using native `<details>` elements for expandable Q&A. Includes support contact section with email link to support@elorated.com. Under 80 lines with FAQ data extracted to constant array.
+- `app/(app)/settings/help/page.tsx` -- Static FAQ page at `/settings/help` with 6 common questions covering sessions, ELO, match types, results, weight, and issue reporting. Uses native `<details>` elements with support contact section.
+- `app/(app)/settings/feedback/page.tsx` + `feedback-form.tsx` -- Real feedback form replacing placeholder. Client component with category selector (Bug Report, Feature Request, General Feedback), textarea with character counter, Supabase insert, success/error states.
+
+**Changed**
+- `app/(app)/leaderboard/page.tsx` -- Adds `highest_elo` to query, computes real `eloTrend` per athlete (up/down/neutral based on current vs peak ELO); zero new RPC calls.
+- `app/(app)/leaderboard/leaderboard-content.tsx` -- Passes computed `eloTrend` through to `AthleteCard`.
+- `components/domain/athlete-card.tsx` -- Renders `TrendingUp`, `TrendingDown`, or `Minus` icon next to ELO value using semantic color tokens.
+
+**Fixed**
+- `lib/api/queries.ts` -- All 12 query functions now check for Supabase errors, log via `console.error`, and return safe fallbacks (`null`, `[]`, `new Map()`, or `false`). Previously errors were silently swallowed.
+- `lib/api/chat-queries.ts` -- Same fix for `getConversations`, `getUnreadCounts`, and `getMessages`.
+
+**Removed**
+- `messagesEnabled` flag from `lib/feature-flags.ts` -- never checked anywhere in codebase
+- `hooks/use-feature-flag.ts` -- unused hook wrapper; flags accessed via `getFlag()` directly
 
 ### Claude Design Prep + EloRated Rebrand (2026-04-20)
 
@@ -204,25 +214,6 @@ Three-team review (PM + design + implementation). 14 ship-now items plus 6 desig
 - `lib/guards.ts` — Added `gender`, `date_of_birth`, `city` to `ATHLETE_GUARD_SELECT`.
 - `types/database.ts` — Updated generated types to include `gender`, `date_of_birth`, `city` on athletes table, plus `waivers`, `waiver_acknowledgements`, and other new tables from Phase 0 migrations.
 - `components/profile/editable-profile-header.tsx` — Added `city` to athlete prop Pick type, `EditingField` union, cancel/save logic, and render tree. Note: component is now ~430 lines (tech debt, already tracked).
-
-### Query error handling (2026-04-22)
-
-**Fixed**
-- `lib/api/queries.ts` — All query functions previously destructured `{ data }` and silently swallowed Supabase errors, making failed queries indistinguishable from empty results. All 12 affected functions now check `error`, log it via `console.error` with the function name, and return a safe empty value (`null`, `[]`, `new Map()`, or `false` depending on return type).
-- `lib/api/chat-queries.ts` — Same silent-error issue in `getConversations`, `getUnreadCounts`, and `getMessages`; all three now log and return safe defaults on error.
-
-### Feedback form at /settings/feedback (2026-04-22)
-
-**Added**
-- `app/(app)/settings/feedback/page.tsx` — Server component page with AppHeader and PageContainer wrapping the feedback form.
-- `app/(app)/settings/feedback/feedback-form.tsx` — Client component with category selector (Bug Report, Feature Request, General Feedback), message textarea (10-2000 chars), character counter, submit button, success state with option to submit again, and graceful error toast on Supabase insert failure.
-
-### Leaderboard ELO trend indicators (2026-04-22)
-
-**Changed**
-- `app/(app)/leaderboard/page.tsx` — Adds `highest_elo` to the athletes query and computes `eloTrend` ("up"/"down"/"neutral") per athlete using `current_elo` vs `highest_elo`; no new RPC calls needed.
-- `app/(app)/leaderboard/leaderboard-content.tsx` — `RankedAthlete` interface gains `eloTrend` field; passes it through to `AthleteCard`.
-- `components/domain/athlete-card.tsx` — Adds optional `eloTrend` prop and renders a `TrendingUp`, `TrendingDown`, or `Minus` icon next to the ELO value.
 
 ### Code quality audit fixes (2026-03-06)
 
