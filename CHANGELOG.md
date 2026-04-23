@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Help and Support Page (2026-04-22)
+
+**Added**
+- `app/(app)/settings/help/page.tsx` -- Static FAQ page at `/settings/help` with 6 common questions (joining sessions, ELO ratings, ranked vs casual, recording results, weight changes, reporting issues) using native `<details>` elements for expandable Q&A. Includes support contact section with email link to support@elorated.com. Under 80 lines with FAQ data extracted to constant array.
+
 ### Claude Design Prep + EloRated Rebrand (2026-04-20)
 
 **Added**
