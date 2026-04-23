@@ -2,7 +2,6 @@
 
 ## [Unreleased]
 
-<<<<<<< HEAD
 **Removed**
 - `messagesEnabled` flag from `lib/feature-flags.ts` -- this flag was set to false and never checked anywhere in the codebase
 - `hooks/use-feature-flag.ts` -- unused hook wrapper; feature flags are accessed directly via `getFlag()`
@@ -211,6 +210,12 @@ Three-team review (PM + design + implementation). 14 ship-now items plus 6 desig
 **Fixed**
 - `lib/api/queries.ts` — All query functions previously destructured `{ data }` and silently swallowed Supabase errors, making failed queries indistinguishable from empty results. All 12 affected functions now check `error`, log it via `console.error` with the function name, and return a safe empty value (`null`, `[]`, `new Map()`, or `false` depending on return type).
 - `lib/api/chat-queries.ts` — Same silent-error issue in `getConversations`, `getUnreadCounts`, and `getMessages`; all three now log and return safe defaults on error.
+
+### Feedback form at /settings/feedback (2026-04-22)
+
+**Added**
+- `app/(app)/settings/feedback/page.tsx` — Server component page with AppHeader and PageContainer wrapping the feedback form.
+- `app/(app)/settings/feedback/feedback-form.tsx` — Client component with category selector (Bug Report, Feature Request, General Feedback), message textarea (10-2000 chars), character counter, submit button, success state with option to submit again, and graceful error toast on Supabase insert failure.
 
 ### Code quality audit fixes (2026-03-06)
 
