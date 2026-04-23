@@ -42,7 +42,7 @@ async function LeaderboardData() {
   // Fetch all athletes ranked by ELO, join gym name
   const { data: athletes } = await supabase
     .from("athletes")
-    .select("id, display_name, current_elo, primary_gym_id, profile_photo_url, gyms!fk_athletes_primary_gym(name)")
+    .select("id, display_name, current_elo, highest_elo, primary_gym_id, profile_photo_url, gyms!fk_athletes_primary_gym(name)")
     .eq("status", "active")
     .order("current_elo", { ascending: false })
     .limit(50);
@@ -53,11 +53,18 @@ async function LeaderboardData() {
 
   const rankedAthletes = (athletes ?? []).map((a, i) => {
     const stats = statsMap.get(a.id) ?? { wins: 0, losses: 0, draws: 0 };
+    const eloTrend: "up" | "down" | "neutral" =
+      a.current_elo === 1000 && a.highest_elo === 1000
+        ? "neutral"
+        : a.current_elo >= a.highest_elo
+          ? "up"
+          : "down";
     return {
       id: a.id,
       rank: i + 1,
       displayName: a.display_name,
       currentElo: a.current_elo,
+      eloTrend,
       gymName: extractGymName(a.gyms as unknown as { name: string } | null) ?? undefined,
       profilePhotoUrl: a.profile_photo_url ?? undefined,
       wins: stats.wins,

@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Leaderboard ELO trend indicators (2026-04-22)
+
+**Changed**
+- `app/(app)/leaderboard/page.tsx` — Adds `highest_elo` to the athletes query and computes `eloTrend` ("up"/"down"/"neutral") per athlete using `current_elo` vs `highest_elo`; no new RPC calls needed.
+- `app/(app)/leaderboard/leaderboard-content.tsx` — `RankedAthlete` interface gains `eloTrend` field; passes it through to `AthleteCard`.
+- `components/domain/athlete-card.tsx` — Adds optional `eloTrend` prop and renders a `TrendingUp`, `TrendingDown`, or `Minus` icon next to the ELO value.
+
 ### Code quality audit fixes (2026-03-06)
 
 **Fixed**
