@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+**Removed**
+- `messagesEnabled` flag from `lib/feature-flags.ts` -- this flag was set to false and never checked anywhere in the codebase
+- `hooks/use-feature-flag.ts` -- unused hook wrapper; feature flags are accessed directly via `getFlag()`
+
 ### Help and Support Page (2026-04-22)
 
 **Added**

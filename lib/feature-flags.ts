@@ -1,6 +1,5 @@
 const FLAGS = {
   timekeeperEnabled: false,
-  messagesEnabled: false,
 } as const;
 
 export type FeatureFlag = keyof typeof FLAGS;
