@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Feedback form at /settings/feedback (2026-04-22)
+
+**Added**
+- `app/(app)/settings/feedback/page.tsx` — Server component page with AppHeader and PageContainer wrapping the feedback form.
+- `app/(app)/settings/feedback/feedback-form.tsx` — Client component with category selector (Bug Report, Feature Request, General Feedback), message textarea (10-2000 chars), character counter, submit button, success state with option to submit again, and graceful error toast on Supabase insert failure.
+
 ### Code quality audit fixes (2026-03-06)
 
 **Fixed**
