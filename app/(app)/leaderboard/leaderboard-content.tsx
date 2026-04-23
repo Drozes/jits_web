@@ -195,7 +195,6 @@ export function LeaderboardContent({
                 profilePhotoUrl={a.profilePhotoUrl}
                 isCurrentUser={a.isCurrentUser}
                 hasPendingChallenge={challengedSet.has(a.id)}
-                eloTrend="neutral"
               />
             ))}
           </div>

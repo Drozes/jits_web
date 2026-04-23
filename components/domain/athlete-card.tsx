@@ -26,12 +26,11 @@ interface AthleteCardProps {
   profilePhotoUrl?: string;
   isCurrentUser?: boolean;
   hasPendingChallenge?: boolean;
-  eloTrend?: "up" | "down" | "neutral";
 }
 
 function EloTrendIcon({ trend }: { trend: "up" | "down" | "neutral" }) {
-  if (trend === "up") return <TrendingUp className="h-3.5 w-3.5 text-green-500" aria-label="ELO trending up" />;
-  if (trend === "down") return <TrendingDown className="h-3.5 w-3.5 text-red-500" aria-label="ELO trending down" />;
+  if (trend === "up") return <TrendingUp className="h-3.5 w-3.5 text-success" aria-label="ELO trending up" />;
+  if (trend === "down") return <TrendingDown className="h-3.5 w-3.5 text-destructive" aria-label="ELO trending down" />;
   return <Minus className="h-3.5 w-3.5 text-muted-foreground" aria-label="ELO neutral" />;
 }
 
@@ -47,7 +46,6 @@ export function AthleteCard({
   profilePhotoUrl,
   isCurrentUser,
   hasPendingChallenge,
-  eloTrend,
 }: AthleteCardProps) {
   const card = (
     <Card
