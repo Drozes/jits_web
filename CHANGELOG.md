@@ -217,6 +217,13 @@ Three-team review (PM + design + implementation). 14 ship-now items plus 6 desig
 - `app/(app)/settings/feedback/page.tsx` — Server component page with AppHeader and PageContainer wrapping the feedback form.
 - `app/(app)/settings/feedback/feedback-form.tsx` — Client component with category selector (Bug Report, Feature Request, General Feedback), message textarea (10-2000 chars), character counter, submit button, success state with option to submit again, and graceful error toast on Supabase insert failure.
 
+### Leaderboard ELO trend indicators (2026-04-22)
+
+**Changed**
+- `app/(app)/leaderboard/page.tsx` — Adds `highest_elo` to the athletes query and computes `eloTrend` ("up"/"down"/"neutral") per athlete using `current_elo` vs `highest_elo`; no new RPC calls needed.
+- `app/(app)/leaderboard/leaderboard-content.tsx` — `RankedAthlete` interface gains `eloTrend` field; passes it through to `AthleteCard`.
+- `components/domain/athlete-card.tsx` — Adds optional `eloTrend` prop and renders a `TrendingUp`, `TrendingDown`, or `Minus` icon next to the ELO value.
+
 ### Code quality audit fixes (2026-03-06)
 
 **Fixed**

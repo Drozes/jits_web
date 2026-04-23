@@ -14,6 +14,7 @@ interface RankedAthlete {
   rank: number;
   displayName: string;
   currentElo: number;
+  eloTrend: "up" | "down" | "neutral";
   gymName?: string;
   profilePhotoUrl?: string;
   wins: number;
@@ -187,6 +188,7 @@ export function LeaderboardContent({
                 rank={a.rank}
                 displayName={a.displayName}
                 currentElo={a.currentElo}
+                eloTrend={a.eloTrend}
                 wins={a.wins}
                 losses={a.losses}
                 gymName={a.gymName}
