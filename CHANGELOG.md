@@ -4,6 +4,11 @@
 
 ### Added
 
+**Phase 4 Track A2 -- Mobile Live Match Wizard**
+- `apps/mobile/app/(app)/session/[id]/match/[matchId].tsx` -- Live match wizard replacing the Phase 3 stub. 8-step state machine (wait, weight, ready, live, end, result, confirm, summary) using shared `use-session-match-timer` and `use-session-match-sync` hooks.
+- `apps/mobile/components/match-flow/*` -- Step components and orchestrator. Each step under 100 lines.
+- `apps/mobile/lib/match-flow/*` -- Format/parse helpers and pure step-routing logic. `useMatchDetails` (cancellation-gated fetch), `useLiveControls` (pause/resume/end mutations + debounce), `useMatchCompletion` (postgres_changes listener for completed/disputed status), and `useRecordResult` (record + broadcast wrapper) split mutation logic out of step components.
+
 **Phase 4 Track A1 -- Mobile Session Join Wizard & Lobby**
 - `apps/mobile/app/(app)/session/[id]/join.tsx` -- 4-step session join wizard: geo check (expo-location), waiver acceptance, weight confirmation, summary. Uses shared `getSessionForJoin`, `acceptSessionWaiver`, `joinSessionLobby`. Replaces Phase 3 stub.
 - `apps/mobile/app/(app)/session/[id]/lobby.tsx` -- Realtime session lobby with participant list, "Find Random Match" button, leave session, challenge participant. Uses native `postgres_changes` + broadcast subscriptions on `session-participants:{id}` and `session:{id}` channels (mobile-local; the shared `useLobbySync` is challenge-scoped, not session-scoped). Replaces Phase 3 stub.
