@@ -6,7 +6,7 @@ import {
   Text,
   View,
 } from "react-native";
-import { Link, useRouter } from "expo-router";
+import { Link, useRouter, type Href } from "expo-router";
 import {
   Bell,
   ChevronRight,
@@ -130,19 +130,19 @@ export default function SettingsScreen() {
       <Section title="General">
         <View className="gap-2">
           <SettingsLink
-            href="/(app)/settings/video"
+            href="/settings/video"
             icon={<Video size={16} color={tokens.mutedForeground} />}
             label="Video Settings"
           />
           <SettingsLink
-            href="/(app)/settings/feedback"
+            href="/settings/feedback"
             icon={
               <MessageSquare size={16} color={tokens.mutedForeground} />
             }
             label="Feedback"
           />
           <SettingsLink
-            href="/(app)/settings/help"
+            href="/settings/help"
             icon={<HelpCircle size={16} color={tokens.mutedForeground} />}
             label="Help & Support"
           />
@@ -229,18 +229,23 @@ function PreferenceRow({
   );
 }
 
+type SettingsRoute =
+  | "/settings/video"
+  | "/settings/feedback"
+  | "/settings/help";
+
 function SettingsLink({
   href,
   icon,
   label,
 }: {
-  href: string;
+  href: SettingsRoute;
   icon: React.ReactNode;
   label: string;
 }) {
   const tokens = useThemedTokens();
   return (
-    <Link href={href as never} asChild>
+    <Link href={href as Href} asChild>
       <Pressable className="flex-row items-center justify-between rounded-xl border border-border bg-card px-4 py-3.5 active:bg-muted/40">
         <View className="flex-row items-center gap-3">
           {icon}
