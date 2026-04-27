@@ -10,6 +10,7 @@
   - `db:types` script moved to root and now writes to `packages/shared/src/types/database.ts`.
   - Husky `prepare` hook moved to root; pre-commit delegates to workspace scripts.
   - Next.js `turbopack.root` set in `apps/web/next.config.ts` to silence multi-lockfile warning.
+  - Post-merge tidy: removed dead `outside_assets` from `apps/web/tsconfig.json` exclude (path no longer reachable from apps/web), made `.husky/pre-commit` executable, removed stale root-level `.next/`, `tsconfig.tsbuildinfo`, and `next-env.d.ts` artifacts left over from pre-monorepo builds.
 
 ### Beta Hardening Pass (2026-04-23)
 

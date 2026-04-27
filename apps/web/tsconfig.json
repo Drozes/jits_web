@@ -17,5 +17,5 @@
     ".next/dev/types/**/*.ts",
     "../../packages/shared/src/**/*.ts"
   ],
-  "exclude": ["node_modules", "outside_assets"]
+  "exclude": ["node_modules"]
 }
