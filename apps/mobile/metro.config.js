@@ -3,23 +3,17 @@ const { withNativeWind } = require("nativewind/metro");
 const path = require("node:path");
 
 const projectRoot = __dirname;
-const workspaceRoot = path.resolve(projectRoot, "..", "..");
 
+// Expo SDK 52+ automatically configures Metro for npm/pnpm/yarn workspace
+// monorepos. We pass the project root and let `getDefaultConfig` discover the
+// workspace root, watch folders, and `nodeModulesPaths` itself. Manual
+// overrides (disableHierarchicalLookup, custom nodeModulesPaths) break
+// resolution of nested transitive dependencies whose versions diverge from a
+// hoisted copy at the workspace root (e.g. semver v7 nested under
+// react-native-reanimated when v6 is hoisted at root).
+//
+// See: https://docs.expo.dev/guides/monorepos/
 const config = getDefaultConfig(projectRoot);
-
-// Watch the entire monorepo so Metro picks up changes in packages/shared.
-config.watchFolders = [workspaceRoot];
-
-// Resolve modules from the app's local node_modules first, then fall back to
-// the workspace root where npm hoists shared dependencies.
-config.resolver.nodeModulesPaths = [
-  path.resolve(projectRoot, "node_modules"),
-  path.resolve(workspaceRoot, "node_modules"),
-];
-
-// Prevent Metro from walking up the filesystem looking for node_modules; the
-// list above is exhaustive in a workspace setup.
-config.resolver.disableHierarchicalLookup = true;
 
 module.exports = withNativeWind(config, {
   input: path.join(projectRoot, "global.css"),
