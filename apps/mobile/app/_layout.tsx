@@ -10,6 +10,11 @@ import { OnlinePresenceBootstrap } from "@/lib/presence/online-presence-bootstra
 import { ErrorBoundary } from "@/components/error-boundary";
 import { OfflineBanner } from "@/components/offline-banner";
 import { DeepLinkBootstrap } from "@/lib/deep-links/handler";
+import { initSentry } from "@/lib/error-tracking/sentry-init";
+
+// Initialize Sentry as early as possible so JS-bootstrap errors are captured.
+// No-op when EXPO_PUBLIC_SENTRY_DSN is unset (local dev).
+initSentry();
 
 export default function RootLayout() {
   return (

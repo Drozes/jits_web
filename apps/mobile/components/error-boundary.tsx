@@ -1,6 +1,7 @@
 import * as React from "react";
 import { Pressable, Text, View } from "react-native";
 import { useAuth } from "@/lib/auth/hooks";
+import { captureError } from "@/lib/error-tracking/sentry-init";
 
 /**
  * Root error boundary. Catches uncaught render errors anywhere below it and
@@ -29,7 +30,8 @@ export class ErrorBoundary extends React.Component<Props, State> {
       // eslint-disable-next-line no-console
       console.error("[ErrorBoundary]", error, info.componentStack);
     }
-    // Future: report to Sentry (B2 owns Sentry wiring).
+    // Forward to Sentry. No-op when Sentry isn't initialized (DSN missing).
+    captureError(error, { componentStack: info.componentStack });
   }
 
   reset = () => {
