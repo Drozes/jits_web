@@ -30,6 +30,10 @@
 
 ### Changed
 
+- `apps/mobile/lib/match-flow/use-record-result.ts` and `apps/mobile/components/match-flow/steps/confirm-step.tsx` -- Critical match-result writes (`recordMatchResult`, `confirmMatchResult`) now route through the offline-tolerant mutation queue from `lib/network/mutation-queue.ts`. When offline, the wizard advances optimistically and the result syncs on reconnect. Resolves Phase 5 W3.
+- `apps/mobile/lib/network/mutation-queue.ts` -- Added a tiny `subscribe(listener)` API so the new banner can react to queue size changes without polling. Notifies on enqueue (offline path), flush, and clear.
+- `apps/mobile/components/match-flow/queue-status-banner.tsx` (new) -- Amber warning banner mounted at the top of `match-flow-wizard.tsx`. Shows when one or more critical writes have been queued for offline replay; auto-dismisses when the queue drains on reconnect.
+
 **Phase 5 Track B2 -- Mobile EAS Build, Sentry, Store Listing Prep**
 - `apps/mobile/app.json` -- Sets `name` to `JITS`, `slug` to `jits`, `version` to `0.1.0`. Adds `ios.bundleIdentifier` (`com.jits.mobile`, placeholder), `ios.buildNumber` (`1`), `android.package` (`com.jits.mobile`, placeholder), `android.versionCode` (`1`), `runtimeVersion.policy: "appVersion"`, `updates.url` (`https://u.expo.dev/PLACEHOLDER_PROJECT_ID`), `extra.eas.projectId` (`PLACEHOLDER_PROJECT_ID`). Splash + adaptive-icon background updated to brand red `#bf1212`. `@sentry/react-native` config plugin auto-registered.
 - `apps/mobile/assets/{icon,adaptive-icon,favicon,splash-icon}.png` -- Replaced default Expo placeholders with branded EloRated logo rendered from `apps/web/public/logo.svg` via `rsvg-convert` (icon + adaptive: 1024x1024 RGBA on rounded brand-red square; favicon: 48x48; splash-icon: 1024x1024 transparent so the splash background colour shows through).

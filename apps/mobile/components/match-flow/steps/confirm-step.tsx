@@ -10,6 +10,7 @@ import {
   type BroadcastResult,
 } from "@jits/shared/hooks/use-session-match-sync";
 import { useMatchCompletion } from "@/lib/match-flow/use-match-completion";
+import { mutationQueue, isQueuedResult } from "@/lib/network/mutation-queue";
 import { ConfirmPanel, ResultBanner } from "./confirm-step-panels";
 import { DisputeForm } from "./dispute-form";
 
@@ -49,12 +50,26 @@ export function ConfirmStep(props: ConfirmStepProps) {
   async function handleConfirm() {
     if (myConfirmed) return;
     setMyConfirmed(true);
-    const res = await confirmMatchResult(supabase, matchId);
+    // Route through the offline-tolerant queue. Online runs immediately;
+    // offline queues under a stable per-athlete key and the queue auto-
+    // flushes on reconnect. Last write wins for the same key.
+    const res = await mutationQueue.enqueue(
+      `confirm-result:${matchId}:${currentAthleteId}`,
+      () => confirmMatchResult(supabase, matchId),
+    );
     if (!res.ok) {
       setMyConfirmed(false);
       toast.error({ text1: "Couldn't confirm", description: res.error.message });
       return;
     }
+    if (isQueuedResult(res.data)) {
+      toast.success({
+        text1: "Saved locally",
+        description: "Confirmation will sync when you're back online.",
+      });
+    }
+    // Broadcast is a no-op offline; opponent will see the confirmation
+    // via postgres-changes once our queued write lands on reconnect.
     sync.broadcastResultConfirmed(currentAthleteId);
   }
 
