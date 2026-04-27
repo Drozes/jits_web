@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Added
+- `apps/mobile/` -- Expo React Native app scaffold (`@jits/mobile`) on Expo SDK 54 with Expo Router, NativeWind v4, and `@gorhom/bottom-sheet`. Single placeholder screen (`app/index.tsx`) imports `getInitials` from `@jits/shared/utils` to verify cross-package imports through the npm workspace.
+- `apps/mobile/metro.config.js` -- Metro configured to watch the workspace root and resolve hoisted `node_modules` (`watchFolders` + `nodeModulesPaths` + `disableHierarchicalLookup`); wraps the config with `withNativeWind`.
+- `apps/mobile/babel.config.js`, `tailwind.config.js`, `global.css`, `nativewind-env.d.ts` -- NativeWind v4 setup using `babel-preset-expo` with `jsxImportSource: "nativewind"`, `nativewind/babel` preset, and `react-native-reanimated/plugin` last.
+- `apps/mobile/tsconfig.json` -- Extends root `tsconfig.base.json`, adds `@jits/shared`/`@jits/shared/*` path aliases and `expo-router/types`.
+- Root scripts: `start:mobile`, `typecheck:mobile`.
+- `apps/mobile/app.json` -- Adds `scheme: "jits"` for deep linking, `plugins: ["expo-router"]`, and `web.bundler: "metro"`.
+
 ### Changed
 - Restructured repo into npm monorepo: web app moved to `apps/web/`, shared data layer extracted to `packages/shared/` (`@jits/shared`).
   - Files moved: `lib/api/*`, `lib/constants.ts`, `types/*`, pure functions from `lib/utils.ts` (`getInitials`, `extractGymName`, `formatRelativeDate`, `formatRelativeTime`).
