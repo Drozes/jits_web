@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { Check, Loader2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { confirmMatchResult, disputeMatchResult } from "@jits/shared/api/mutations";
-import { useSessionMatchSync, type BroadcastResult } from "@/hooks/use-session-match-sync";
+import { useSessionMatchSync, type BroadcastResult } from "@jits/shared/hooks/use-session-match-sync";
 
 interface MatchSummaryStepProps {
   onNext: () => void;
@@ -25,7 +25,9 @@ export function MatchSummaryStep({ onNext, matchId, matchType, matchStatus, curr
   const onNextRef = useRef(onNext);
   onNextRef.current = onNext;
 
+  const supabase = useMemo(() => createClient(), []);
   const sync = useSessionMatchSync({
+    supabase,
     matchId,
     onResultConfirmed: (athleteId) => {
       if (athleteId === opponent.id) setOpponentConfirmed(true);
@@ -34,7 +36,6 @@ export function MatchSummaryStep({ onNext, matchId, matchType, matchStatus, curr
 
   // Listen for match completion via Postgres Changes
   useEffect(() => {
-    const supabase = createClient();
     const channel = supabase
       .channel(`match-complete:${matchId}`)
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "matches", filter: `id=eq.${matchId}` }, ({ new: row }) => {
@@ -43,7 +44,7 @@ export function MatchSummaryStep({ onNext, matchId, matchType, matchStatus, curr
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [matchId]);
+  }, [matchId, supabase]);
 
   // If the match is already completed on mount (e.g., after page refresh),
   // auto-advance since the PG Changes event will never fire.
@@ -58,14 +59,12 @@ export function MatchSummaryStep({ onNext, matchId, matchType, matchStatus, curr
     if (confirmedRef.current) return;
     confirmedRef.current = true;
     setMyConfirmed(true);
-    const supabase = createClient();
     await confirmMatchResult(supabase, matchId);
     sync.broadcastResultConfirmed(currentAthleteId);
   }
 
   async function handleDispute() {
     setDisputing(true);
-    const supabase = createClient();
     await disputeMatchResult(supabase, matchId);
     onNext();
   }

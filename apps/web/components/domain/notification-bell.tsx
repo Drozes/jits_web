@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { usePendingChallenges } from "@/hooks/use-pending-challenges";
+import { createClient } from "@/lib/supabase/client";
+import { usePendingChallenges } from "@jits/shared/hooks/use-pending-challenges";
 import { NotificationPanel } from "./notification-panel";
 
 interface NotificationBellProps {
@@ -12,7 +13,8 @@ interface NotificationBellProps {
 
 export function NotificationBell({ athleteId }: NotificationBellProps) {
   const [open, setOpen] = useState(false);
-  const { count, challenges } = usePendingChallenges(athleteId);
+  const supabase = useMemo(() => createClient(), []);
+  const { count, challenges } = usePendingChallenges(supabase, athleteId);
 
   return (
     <>

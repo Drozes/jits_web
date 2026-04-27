@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,7 @@ import {
   declineChallenge,
   cancelChallenge,
 } from "@jits/shared/api/mutations";
-import { useLobbySync } from "@/hooks/use-lobby-sync";
+import { useLobbySync } from "@jits/shared/hooks/use-lobby-sync";
 
 interface LobbyActionsProps {
   challengeId: string;
@@ -33,10 +33,13 @@ export function LobbyActions({ challengeId, status, isChallenger, currentAthlete
   const [weight, setWeight] = useState(currentWeight?.toString() ?? "");
   const [weightConfirmed, setWeightConfirmed] = useState(false);
 
+  const supabase = useMemo(() => createClient(), []);
   const { broadcastMatchStarted, broadcastCancelled, broadcastAccepted, opponentPresent } = useLobbySync({
+    supabase,
     challengeId,
     currentAthleteId,
     opponentId,
+    onMatchStarted: (matchId) => router.push(`/match/${matchId}/live`),
     onCancelled: () => router.push("/match/pending"),
     onAccepted: status === "pending" && isChallenger ? () => router.refresh() : undefined,
   });
@@ -44,7 +47,6 @@ export function LobbyActions({ challengeId, status, isChallenger, currentAthlete
   async function handleStart() {
     setLoading(true);
     setError(null);
-    const supabase = createClient();
     const result = await startMatchFromChallenge(supabase, challengeId);
     if (!result.ok) {
       setError(result.error.message);
@@ -59,7 +61,6 @@ export function LobbyActions({ challengeId, status, isChallenger, currentAthlete
   async function handleCancel() {
     setLoading(true);
     setError(null);
-    const supabase = createClient();
     const result = await cancelChallenge(supabase, challengeId);
     if (!result.ok) {
       setError(result.error.message);
@@ -78,7 +79,6 @@ export function LobbyActions({ challengeId, status, isChallenger, currentAthlete
     }
     setLoading(true);
     setError(null);
-    const supabase = createClient();
     const result = await acceptChallenge(supabase, { challengeId, opponentWeight: parsedWeight });
     if (!result.ok) {
       setError(result.error.message);
@@ -92,7 +92,6 @@ export function LobbyActions({ challengeId, status, isChallenger, currentAthlete
   async function handleDecline() {
     setLoading(true);
     setError(null);
-    const supabase = createClient();
     const result = await declineChallenge(supabase, challengeId);
     if (!result.ok) {
       setError(result.error.message);

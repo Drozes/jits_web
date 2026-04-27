@@ -1,14 +1,17 @@
-"use client";
-
 import { useEffect, useRef, useCallback, useState } from "react";
-import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
-import type { RealtimeChannel } from "@supabase/supabase-js";
+import type { RealtimeChannel, SupabaseClient } from "@supabase/supabase-js";
 
 interface UseLobbySyncOpts {
+  supabase: SupabaseClient;
   challengeId: string;
   currentAthleteId: string;
   opponentId: string;
+  /**
+   * Called when the opponent broadcasts that the match has started.
+   * Web should `router.push(/match/{matchId}/live)`; mobile should
+   * navigate to its match screen.
+   */
+  onMatchStarted?: (matchId: string) => void;
   onCancelled?: () => void;
   onAccepted?: () => void;
 }
@@ -20,14 +23,17 @@ interface UseLobbySyncOpts {
  * Presence: tracks which athletes are in the lobby room.
  */
 export function useLobbySync({
+  supabase,
   challengeId,
   currentAthleteId,
   opponentId,
+  onMatchStarted,
   onCancelled,
   onAccepted,
 }: UseLobbySyncOpts) {
-  const router = useRouter();
   const channelRef = useRef<RealtimeChannel | null>(null);
+  const onMatchStartedRef = useRef(onMatchStarted);
+  onMatchStartedRef.current = onMatchStarted;
   const onCancelledRef = useRef(onCancelled);
   onCancelledRef.current = onCancelled;
   const onAcceptedRef = useRef(onAccepted);
@@ -35,8 +41,6 @@ export function useLobbySync({
   const [opponentPresent, setOpponentPresent] = useState(false);
 
   useEffect(() => {
-    const supabase = createClient();
-
     function checkForOpponent(presenceState: Record<string, unknown[]>) {
       const allPresences = Object.values(presenceState).flat() as { athlete_id?: string }[];
       setOpponentPresent(allPresences.some((p) => p.athlete_id === opponentId));
@@ -47,7 +51,7 @@ export function useLobbySync({
       .on("broadcast", { event: "match_started" }, ({ payload }) => {
         const matchId = payload?.match_id as string | undefined;
         if (matchId) {
-          router.push(`/match/${matchId}/live`);
+          onMatchStartedRef.current?.(matchId);
         }
       })
       .on("broadcast", { event: "lobby_cancelled" }, () => {
@@ -70,7 +74,7 @@ export function useLobbySync({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [challengeId, currentAthleteId, opponentId, router]);
+  }, [supabase, challengeId, currentAthleteId, opponentId]);
 
   const broadcastMatchStarted = useCallback((matchId: string) => {
     channelRef.current?.send({

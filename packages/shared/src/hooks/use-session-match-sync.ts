@@ -1,8 +1,5 @@
-"use client";
-
 import { useEffect, useRef, useCallback } from "react";
-import { createClient } from "@/lib/supabase/client";
-import type { RealtimeChannel } from "@supabase/supabase-js";
+import type { RealtimeChannel, SupabaseClient } from "@supabase/supabase-js";
 
 export interface BroadcastResult {
   result: "submission" | "draw";
@@ -12,6 +9,7 @@ export interface BroadcastResult {
 }
 
 interface UseSessionMatchSyncParams {
+  supabase: SupabaseClient;
   matchId: string;
   onTimerStarted?: (startedAt: string) => void;
   onTimerPaused?: (pausedAt: string) => void;
@@ -27,10 +25,11 @@ export function useSessionMatchSync(params: UseSessionMatchSyncParams) {
   const cbRefs = useRef(params);
   cbRefs.current = params;
 
+  const { supabase, matchId } = params;
+
   useEffect(() => {
-    const supabase = createClient();
     const channel = supabase
-      .channel(`session-match:${params.matchId}`)
+      .channel(`session-match:${matchId}`)
       .on("broadcast", { event: "timer_started" }, ({ payload }) => {
         cbRefs.current.onTimerStarted?.(payload.started_at as string);
       })
@@ -55,7 +54,7 @@ export function useSessionMatchSync(params: UseSessionMatchSyncParams) {
       .subscribe();
     channelRef.current = channel;
     return () => { supabase.removeChannel(channel); };
-  }, [params.matchId]);
+  }, [supabase, matchId]);
 
   const send = useCallback((event: string, payload: Record<string, unknown>) => {
     channelRef.current?.send({ type: "broadcast", event, payload });

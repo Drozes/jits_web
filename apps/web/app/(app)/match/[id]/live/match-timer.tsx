@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Play, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { startMatch } from "@jits/shared/api/mutations";
-import { useMatchSync } from "@/hooks/use-match-sync";
+import { useMatchSync } from "@jits/shared/hooks/use-match-sync";
 
 interface MatchTimerProps {
   matchId: string;
@@ -41,7 +41,9 @@ export function MatchTimer({
     return durationSeconds;
   });
 
+  const supabase = useMemo(() => createClient(), []);
   const { broadcastTimerStarted, broadcastMatchEnded } = useMatchSync({
+    supabase,
     matchId,
     onTimerStarted: (remoteStartedAt) => {
       const elapsed = Math.floor(
@@ -82,7 +84,6 @@ export function MatchTimer({
     if (running) return;
     setLoading(true);
     setError(null);
-    const supabase = createClient();
     const result = await startMatch(supabase, matchId);
     if (!result.ok) {
       // If the other athlete already started, the broadcast will have set running

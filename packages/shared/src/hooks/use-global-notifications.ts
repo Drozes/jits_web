@@ -1,17 +1,15 @@
-"use client";
-
 import { useEffect, useRef } from "react";
-import { usePathname } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
-import { showNotification } from "@/lib/notifications";
-import { refreshUnreadCounts } from "@/hooks/use-unread-count";
-import type { RealtimePostgresInsertPayload } from "@supabase/supabase-js";
-import type { Message } from "@jits/shared/types/message";
+import type {
+  RealtimePostgresInsertPayload,
+  SupabaseClient,
+} from "@supabase/supabase-js";
+import type { Message } from "../types/message";
+import type { NotificationPayload } from "../types/notification";
 
 type SenderMeta = { name: string; avatarUrl: string | null };
 
 async function resolveSender(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient,
   senderId: string,
   cache: Map<string, SenderMeta>,
 ): Promise<SenderMeta> {
@@ -24,7 +22,7 @@ async function resolveSender(
     .eq("id", senderId)
     .single();
 
-  // Don't cache failed lookups — allow retry on next notification
+  // Don't cache failed lookups -- allow retry on next notification
   if (!data) return { name: "Someone", avatarUrl: null };
 
   const meta: SenderMeta = {
@@ -35,16 +33,59 @@ async function resolveSender(
   return meta;
 }
 
-export function useGlobalNotifications(currentAthleteId: string): void {
-  const pathname = usePathname();
-  const pathnameRef = useRef(pathname);
-  pathnameRef.current = pathname;
+export interface UseGlobalNotificationsParams {
+  supabase: SupabaseClient;
+  currentAthleteId: string;
+  /** Show a notification toast / banner. Web wraps `sonner.toast.custom`; mobile wraps `react-native-toast-message`. */
+  notify: (payload: NotificationPayload) => void;
+  /**
+   * Returns the current route (pathname) so we can suppress message toasts
+   * when the user is already viewing the conversation. Web returns the
+   * `usePathname()` value; mobile returns the active route segment.
+   * Called on every notification -- keep it cheap.
+   */
+  getCurrentRoute: () => string | null;
+  /** Optional: invoked after a new message arrives so a host-managed unread badge can re-poll. */
+  onUnreadRefresh?: () => void;
+  /** Build the deep link for a conversation -- e.g. `/messages/{id}` on web, `/(app)/messages/{id}` on mobile. */
+  buildMessageHref?: (conversationId: string) => string;
+  /** Build the deep link for an accepted challenge match lobby -- e.g. `/match/lobby/{challengeId}` on web. */
+  buildLobbyHref?: (challengeId: string) => string;
+}
+
+/**
+ * Subscribes to two global postgres-changes channels:
+ *  - `global-messages`: new messages from other athletes -> toast notifications
+ *  - `challenge-updates-{athleteId}`: challenge UPDATEs (accepted/declined/expired) -> toast notifications
+ *
+ * Platform-specific concerns are injected via callbacks so the same hook runs
+ * on Next.js (web) and React Native (mobile).
+ */
+export function useGlobalNotifications({
+  supabase,
+  currentAthleteId,
+  notify,
+  getCurrentRoute,
+  onUnreadRefresh,
+  buildMessageHref,
+  buildLobbyHref,
+}: UseGlobalNotificationsParams): void {
+  // Stash the latest callbacks in refs so the realtime subscription
+  // doesn't have to re-subscribe when they change identity.
+  const notifyRef = useRef(notify);
+  notifyRef.current = notify;
+  const getRouteRef = useRef(getCurrentRoute);
+  getRouteRef.current = getCurrentRoute;
+  const onUnreadRefreshRef = useRef(onUnreadRefresh);
+  onUnreadRefreshRef.current = onUnreadRefresh;
+  const buildMessageHrefRef = useRef(buildMessageHref);
+  buildMessageHrefRef.current = buildMessageHref;
+  const buildLobbyHrefRef = useRef(buildLobbyHref);
+  buildLobbyHrefRef.current = buildLobbyHref;
 
   const senderCache = useRef(new Map<string, SenderMeta>());
 
   useEffect(() => {
-    const supabase = createClient();
-
     const messageChannel = supabase
       .channel("global-messages")
       .on(
@@ -57,13 +98,14 @@ export function useGlobalNotifications(currentAthleteId: string): void {
           if (!msg.sender_id || msg.sender_id === currentAthleteId) return;
 
           // Refresh unread badge immediately
-          refreshUnreadCounts();
+          onUnreadRefreshRef.current?.();
 
           // Suppress toast if user is viewing this conversation
-          if (
-            pathnameRef.current === `/messages/${msg.conversation_id}`
-          )
-            return;
+          const route = getRouteRef.current();
+          const messageHref =
+            buildMessageHrefRef.current?.(msg.conversation_id) ??
+            `/messages/${msg.conversation_id}`;
+          if (route === messageHref) return;
 
           const sender = await resolveSender(
             supabase,
@@ -71,11 +113,11 @@ export function useGlobalNotifications(currentAthleteId: string): void {
             senderCache.current,
           );
 
-          showNotification({
+          notifyRef.current({
             type: "message",
             title: sender.name,
             body: msg.body ?? "Sent an image",
-            href: `/messages/${msg.conversation_id}`,
+            href: messageHref,
             avatarUrl: sender.avatarUrl,
           });
         },
@@ -106,11 +148,13 @@ export function useGlobalNotifications(currentAthleteId: string): void {
               challenge.opponent_id,
               senderCache.current,
             );
-            showNotification({
+            notifyRef.current({
               type: "challenge",
               title: "Challenge Accepted!",
               body: `${opponent.name} accepted your challenge`,
-              href: `/match/lobby/${challenge.id}`,
+              href:
+                buildLobbyHrefRef.current?.(challenge.id) ??
+                `/match/lobby/${challenge.id}`,
               avatarUrl: opponent.avatarUrl,
             });
           }
@@ -121,7 +165,7 @@ export function useGlobalNotifications(currentAthleteId: string): void {
               challenge.opponent_id,
               senderCache.current,
             );
-            showNotification({
+            notifyRef.current({
               type: "challenge",
               title: "Challenge Declined",
               body: `${opponent.name} declined your challenge`,
@@ -135,7 +179,7 @@ export function useGlobalNotifications(currentAthleteId: string): void {
               challenge.opponent_id,
               senderCache.current,
             );
-            showNotification({
+            notifyRef.current({
               type: "challenge",
               title: "Challenge Expired",
               body: `Your challenge to ${opponent.name} has expired`,
@@ -165,7 +209,7 @@ export function useGlobalNotifications(currentAthleteId: string): void {
               challenge.challenger_id,
               senderCache.current,
             );
-            showNotification({
+            notifyRef.current({
               type: "challenge",
               title: "Challenge Expired",
               body: `${challenger.name}'s challenge has expired`,
@@ -180,5 +224,5 @@ export function useGlobalNotifications(currentAthleteId: string): void {
       supabase.removeChannel(messageChannel);
       supabase.removeChannel(challengeChannel);
     };
-  }, [currentAthleteId]);
+  }, [supabase, currentAthleteId]);
 }
