@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import type { SubmissionType } from "@/types/submission-type";
+import type { SubmissionType } from "@jits/shared/types/submission-type";
 import type { BroadcastResult } from "@/hooks/use-session-match-sync";
 import { TimekeeperWaitStep } from "./steps/timekeeper-wait-step";
 import { WeightVerifyStep } from "./steps/weight-verify-step";

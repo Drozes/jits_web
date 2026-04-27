@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { requireAthlete } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
-import { getSessionForJoin } from "@/lib/api/queries";
+import { getSessionForJoin } from "@jits/shared/api/queries";
 import { SessionUnavailable } from "@/components/domain/session-unavailable";
 import { JoinWizard } from "./join-wizard";
 

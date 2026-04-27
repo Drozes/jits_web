@@ -3,14 +3,14 @@
 import { useEffect, useState } from "react";
 import { Swords, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { getEloStakes } from "@/lib/api/queries";
+import { getEloStakes } from "@jits/shared/api/queries";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { MATCH_TYPE, type MatchType } from "@/lib/constants";
-import type { EloStakes } from "@/types/composites";
-import type { LobbyParticipant } from "@/types/session";
+import { MATCH_TYPE, type MatchType } from "@jits/shared/constants";
+import type { EloStakes } from "@jits/shared/types/composites";
+import type { LobbyParticipant } from "@jits/shared/types/session";
 
 interface SessionChallengeSheetProps {
   open: boolean;

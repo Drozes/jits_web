@@ -3,7 +3,7 @@ import { MapPin, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { requireAthlete } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
-import { getGymDetail } from "@/lib/api/queries";
+import { getGymDetail } from "@jits/shared/api/queries";
 import { SessionList } from "./session-list";
 import { StartSessionButton } from "./start-session-button";
 

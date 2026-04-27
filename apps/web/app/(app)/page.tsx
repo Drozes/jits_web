@@ -8,7 +8,7 @@ import { ActiveSessionCard } from "@/components/domain/active-session-card";
 import { AppHeader } from "@/components/layout/app-header";
 import { PageContainer } from "@/components/layout/page-container";
 import { PageHeaderActions } from "@/components/layout/page-header-actions";
-import { getDashboardSummary, getActiveSession } from "@/lib/api/queries";
+import { getDashboardSummary, getActiveSession } from "@jits/shared/api/queries";
 import { Calendar, ChevronRight, Radio, MapPin } from "lucide-react";
 
 function DashboardSkeleton() {

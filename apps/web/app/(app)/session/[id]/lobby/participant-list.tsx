@@ -1,6 +1,6 @@
 "use client";
 
-import type { LobbyParticipant } from "@/types/session";
+import type { LobbyParticipant } from "@jits/shared/types/session";
 import { ParticipantCard } from "./participant-card";
 
 interface ParticipantListProps {

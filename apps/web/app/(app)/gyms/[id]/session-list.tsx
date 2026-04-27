@@ -1,6 +1,6 @@
 import { Calendar } from "lucide-react";
 import { SessionCard } from "@/components/domain/session-card";
-import type { SessionListItem } from "@/types/session";
+import type { SessionListItem } from "@jits/shared/types/session";
 
 interface SessionListProps {
   sessions: SessionListItem[];

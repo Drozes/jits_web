@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { toggleMatchPreferences } from "@/lib/api/mutations";
+import { toggleMatchPreferences } from "@jits/shared/api/mutations";
 import { joinLobby, leaveLobby } from "@/hooks/use-lobby-presence";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";

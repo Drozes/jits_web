@@ -5,11 +5,11 @@ import { LeaderboardContent } from "./leaderboard-content";
 import { AppHeader } from "@/components/layout/app-header";
 import { PageContainer } from "@/components/layout/page-container";
 import { PageHeaderActions } from "@/components/layout/page-header-actions";
-import { extractGymName } from "@/lib/utils";
+import { extractGymName } from "@jits/shared/utils";
 import {
   getPendingChallengeOpponentIds,
   getAthletesStatsRpc,
-} from "@/lib/api/queries";
+} from "@jits/shared/api/queries";
 
 function LeaderboardSkeleton() {
   return (

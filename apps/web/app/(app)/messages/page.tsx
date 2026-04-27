@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { requireAthlete } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
-import { getConversations } from "@/lib/api/chat-queries";
+import { getConversations } from "@jits/shared/api/chat-queries";
 import { AppHeader } from "@/components/layout/app-header";
 import { PageContainer } from "@/components/layout/page-container";
 import { PageHeaderActions } from "@/components/layout/page-header-actions";

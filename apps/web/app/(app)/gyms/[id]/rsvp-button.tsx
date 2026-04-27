@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { rsvpToSession, cancelRsvp } from "@/lib/api/mutations";
+import { rsvpToSession, cancelRsvp } from "@jits/shared/api/mutations";
 
 interface RsvpButtonProps {
   sessionId: string;

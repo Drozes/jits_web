@@ -6,7 +6,7 @@ import {
   MATCH_OUTCOME,
   CHALLENGE_STATUS,
   ATHLETE_STATUS,
-} from "./constants";
+} from "@jits/shared/constants";
 
 describe("MATCH_STATUS", () => {
   it("has all lifecycle states", () => {

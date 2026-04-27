@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MapPin, Users } from "lucide-react";
-import type { ActiveSessionInfo } from "@/types/session";
+import type { ActiveSessionInfo } from "@jits/shared/types/session";
 
 interface ActiveSessionCardProps {
   session: ActiveSessionInfo | null;

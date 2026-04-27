@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
-import { acceptSessionWaiver } from "@/lib/api/mutations";
+import { acceptSessionWaiver } from "@jits/shared/api/mutations";
 
 const WAIVER_TEXT =
   "By using the JITS platform to arrange and participate in Brazilian Jiu-Jitsu matches, " +

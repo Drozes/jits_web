@@ -2,8 +2,8 @@ import { redirect } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { requireAthlete } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
-import { getMatchDetails } from "@/lib/api/queries";
-import { MATCH_TYPE } from "@/lib/constants";
+import { getMatchDetails } from "@jits/shared/api/queries";
+import { MATCH_TYPE } from "@jits/shared/constants";
 import { MatchTimer } from "./match-timer";
 
 export async function LiveMatchContent({

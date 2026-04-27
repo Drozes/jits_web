@@ -10,7 +10,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Zap, ChevronRight } from "lucide-react";
-import { formatRelativeDate } from "@/lib/utils";
+import { formatRelativeDate } from "@jits/shared/utils";
 import type { PendingChallenge } from "@/hooks/use-pending-challenges";
 
 interface NotificationPanelProps {

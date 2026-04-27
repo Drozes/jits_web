@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { createChallenge } from "@/lib/api/mutations";
-import { canCreateChallenge } from "@/lib/api/queries";
+import { createChallenge } from "@jits/shared/api/mutations";
+import { canCreateChallenge } from "@jits/shared/api/queries";
 import {
   Sheet,
   SheetContent,
@@ -17,8 +17,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Swords, TrendingUp, TrendingDown, Minus, Check, AlertCircle, Loader2 } from "lucide-react";
-import type { EloStakes } from "@/types/composites";
-import { MATCH_TYPE, type MatchType } from "@/lib/constants";
+import type { EloStakes } from "@jits/shared/types/composites";
+import { MATCH_TYPE, type MatchType } from "@jits/shared/constants";
 
 interface ChallengeSheetProps {
   competitorId: string;

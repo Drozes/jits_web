@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { GymCard } from "@/components/domain/gym-card";
-import type { GymListItem } from "@/types/session";
+import type { GymListItem } from "@jits/shared/types/session";
 
 interface GymSearchProps {
   gyms: GymListItem[];

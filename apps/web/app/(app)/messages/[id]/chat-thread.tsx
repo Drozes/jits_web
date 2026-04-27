@@ -13,8 +13,8 @@ import { MessageBubble } from "@/components/domain/message-bubble";
 import { MessageInput } from "@/components/domain/message-input";
 import { TypingIndicator } from "@/components/domain/typing-indicator";
 import { DateSeparator } from "@/components/domain/date-separator";
-import { getInitials } from "@/lib/utils";
-import type { Message } from "@/types/message";
+import { getInitials } from "@jits/shared/utils";
+import type { Message } from "@jits/shared/types/message";
 
 export interface ParticipantInfo {
   displayName: string;

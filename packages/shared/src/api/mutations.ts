@@ -1,10 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/types/database";
+import type { Database } from "../types/database";
 import type {
   StartMatchResponse,
   StartMatchTimerResponse,
   RecordResultResponse,
-} from "@/types/composites";
+} from "../types/composites";
 import {
   type Result,
   mapPostgrestError,

@@ -13,7 +13,7 @@ import {
   acceptChallenge,
   declineChallenge,
   cancelChallenge,
-} from "@/lib/api/mutations";
+} from "@jits/shared/api/mutations";
 import { useLobbySync } from "@/hooks/use-lobby-sync";
 
 interface LobbyActionsProps {

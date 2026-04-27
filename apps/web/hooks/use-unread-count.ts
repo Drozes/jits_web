@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
-import type { UnreadCountRow } from "@/lib/api/chat-queries";
+import type { UnreadCountRow } from "@jits/shared/api/chat-queries";
 
 const POLL_INTERVAL_MS = 30_000;
 const REFRESH_EVENT = "unread-counts-refresh";

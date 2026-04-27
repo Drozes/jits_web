@@ -7,7 +7,8 @@ import { Card } from "@/components/ui/card";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { AthleteCard } from "@/components/domain/athlete-card";
 import { Crown, Medal, Award, Trophy, Users } from "lucide-react";
-import { cn, getInitials, getProfilePhotoUrl } from "@/lib/utils";
+import { cn, getProfilePhotoUrl } from "@/lib/utils";
+import { getInitials } from "@jits/shared/utils";
 
 interface RankedAthlete {
   id: string;

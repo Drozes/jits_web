@@ -3,8 +3,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Swords } from "lucide-react";
-import { getInitials, getProfilePhotoUrl, formatRelativeDate } from "@/lib/utils";
-import type { ChallengeStatus } from "@/lib/constants";
+import { getProfilePhotoUrl } from "@/lib/utils";
+import { getInitials, formatRelativeDate } from "@jits/shared/utils";
+import type { ChallengeStatus } from "@jits/shared/constants";
 
 interface Participant {
   id: string;

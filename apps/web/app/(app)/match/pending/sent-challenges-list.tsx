@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { cancelChallenge } from "@/lib/api/mutations";
+import { cancelChallenge } from "@jits/shared/api/mutations";
 import { MatchCard } from "@/components/domain/match-card";
 import { ExpiryBadge } from "@/components/domain/expiry-badge";
 import { Button } from "@/components/ui/button";

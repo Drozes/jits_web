@@ -3,12 +3,12 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { cancelChallenge } from "@/lib/api/mutations";
+import { cancelChallenge } from "@jits/shared/api/mutations";
 import { ChallengeResponseSheet } from "@/components/domain/challenge-response-sheet";
 import { ExpiryBadge } from "@/components/domain/expiry-badge";
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
-import type { MatchType } from "@/lib/constants";
+import type { MatchType } from "@jits/shared/constants";
 
 interface ChallengeVersusActionsProps {
   challengeId: string;

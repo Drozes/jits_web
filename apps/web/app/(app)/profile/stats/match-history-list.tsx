@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { MatchCard } from "@/components/domain/match-card";
 import { cn } from "@/lib/utils";
-import type { MatchOutcome } from "@/lib/constants";
+import type { MatchOutcome } from "@jits/shared/constants";
 import { Swords } from "lucide-react";
 
 interface MatchHistoryItem {

@@ -2,8 +2,8 @@ import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MATCH_TYPE } from "@/lib/constants";
-import type { MatchDetails } from "@/lib/api/queries";
+import { MATCH_TYPE } from "@jits/shared/constants";
+import type { MatchDetails } from "@jits/shared/api/queries";
 
 interface ResultsDisplayProps {
   match: MatchDetails;

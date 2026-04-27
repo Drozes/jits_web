@@ -5,9 +5,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { EloBadge } from "@/components/domain/elo-badge";
 import { requireAthlete } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
-import { getLobbyData, getEloStakes } from "@/lib/api/queries";
-import { getInitials, getProfilePhotoUrl } from "@/lib/utils";
-import { MATCH_TYPE } from "@/lib/constants";
+import { getLobbyData, getEloStakes } from "@jits/shared/api/queries";
+import { getProfilePhotoUrl } from "@/lib/utils";
+import { getInitials } from "@jits/shared/utils";
+import { MATCH_TYPE } from "@jits/shared/constants";
 import { LobbyActions } from "./lobby-actions";
 
 export async function LobbyContent({

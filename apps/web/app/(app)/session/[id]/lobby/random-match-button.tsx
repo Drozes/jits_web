@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Shuffle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { requestRandomMatch } from "@/lib/api/mutations";
+import { requestRandomMatch } from "@jits/shared/api/mutations";
 import { Button } from "@/components/ui/button";
 
 interface RandomMatchButtonProps {

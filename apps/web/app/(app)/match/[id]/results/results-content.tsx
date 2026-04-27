@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { requireAthlete } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
-import { getMatchDetails, getSubmissionTypes } from "@/lib/api/queries";
+import { getMatchDetails, getSubmissionTypes } from "@jits/shared/api/queries";
 import { RecordResultForm } from "./record-result-form";
 import { ResultsDisplay } from "./results-display";
 

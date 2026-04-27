@@ -16,7 +16,7 @@ import {
 import { EloBadge } from "@/components/domain/elo-badge";
 import { ProfilePhotoUpload } from "@/components/profile/profile-photo-upload";
 import { Pencil } from "lucide-react";
-import type { Athlete } from "@/types/athlete";
+import type { Athlete } from "@jits/shared/types/athlete";
 
 interface EditableProfileHeaderProps {
   athlete: Pick<Athlete, "id" | "display_name" | "current_elo" | "highest_elo" | "current_weight" | "primary_gym_id" | "profile_photo_url" | "city">;

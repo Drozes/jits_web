@@ -2,7 +2,7 @@
  * Session domain types for gym-based matchmaking events.
  */
 
-import type { Tables, TablesInsert } from "@/types/database";
+import type { Tables, TablesInsert } from "./database";
 
 export type Session = Tables<"sessions">;
 export type SessionInsert = TablesInsert<"sessions">;

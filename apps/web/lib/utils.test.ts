@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   getInitials,
   extractGymName,
-} from "./utils";
+} from "@jits/shared/utils";
 
 describe("getInitials", () => {
   it("returns two-letter initials from full name", () => {

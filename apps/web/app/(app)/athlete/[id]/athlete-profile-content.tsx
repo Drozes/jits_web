@@ -11,7 +11,7 @@ import {
   getPendingChallengeBetween,
   getAthleteStatsRpc,
   getMatchHistory,
-} from "@/lib/api/queries";
+} from "@jits/shared/api/queries";
 
 export async function AthleteProfileContent({
   paramsPromise,

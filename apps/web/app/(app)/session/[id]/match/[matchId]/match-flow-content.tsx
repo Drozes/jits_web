@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { requireAthlete } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
-import { getMatchDetails, getSubmissionTypes } from "@/lib/api/queries";
+import { getMatchDetails, getSubmissionTypes } from "@jits/shared/api/queries";
 import { getFlag } from "@/lib/feature-flags";
 import { MatchFlowWizard } from "./match-flow-wizard";
 import type { MatchFlowStep } from "./match-flow-wizard";

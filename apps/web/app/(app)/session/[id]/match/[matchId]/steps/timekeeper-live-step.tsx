@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import { Pause, Play, Square, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
-import { pauseMatch, resumeMatch } from "@/lib/api/mutations";
+import { pauseMatch, resumeMatch } from "@jits/shared/api/mutations";
 import { useSessionMatchTimer } from "@/hooks/use-session-match-timer";
 import { useSessionMatchSync } from "@/hooks/use-session-match-sync";
 import { useVideoRecorder } from "@/hooks/use-video-recorder";

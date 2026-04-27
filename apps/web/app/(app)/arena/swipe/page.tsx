@@ -3,8 +3,8 @@ import { redirect } from "next/navigation";
 import { requireAthlete } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
 import { SwipeDiscoveryClient } from "./swipe-discovery-client";
-import { extractGymName } from "@/lib/utils";
-import { getAthletesStatsRpc } from "@/lib/api/queries";
+import { extractGymName } from "@jits/shared/utils";
+import { getAthletesStatsRpc } from "@jits/shared/api/queries";
 
 export default function SwipeDiscoveryPage() {
   return (

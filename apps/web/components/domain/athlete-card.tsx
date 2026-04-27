@@ -3,7 +3,8 @@ import { Card } from "@/components/ui/card";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Crown, Medal, Award, TrendingUp, TrendingDown, Minus } from "lucide-react";
-import { getInitials, getProfilePhotoUrl } from "@/lib/utils";
+import { getProfilePhotoUrl } from "@/lib/utils";
+import { getInitials } from "@jits/shared/utils";
 import { ChallengeBadge } from "./challenge-badge";
 import { OnlineIndicator } from "./online-indicator";
 

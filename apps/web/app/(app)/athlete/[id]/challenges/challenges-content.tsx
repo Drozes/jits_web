@@ -7,9 +7,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { ChallengeVersusCard } from "@/components/domain/challenge-versus-card";
 import { ChallengeVersusActions } from "@/components/domain/challenge-versus-actions";
-import { getChallengesBetween } from "@/lib/api/queries";
+import { getChallengesBetween } from "@jits/shared/api/queries";
 import { Swords, History, Clock } from "lucide-react";
-import type { ChallengeStatus, MatchType } from "@/lib/constants";
+import type { ChallengeStatus, MatchType } from "@jits/shared/constants";
 
 export async function ChallengesContent({
   paramsPromise,

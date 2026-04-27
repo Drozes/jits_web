@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Users, Clock } from "lucide-react";
 import { RsvpButton } from "@/app/(app)/gyms/[id]/rsvp-button";
-import type { SessionListItem } from "@/types/session";
+import type { SessionListItem } from "@jits/shared/types/session";
 
 interface SessionCardProps {
   session: SessionListItem;

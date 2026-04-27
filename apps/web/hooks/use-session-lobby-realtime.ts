@@ -3,8 +3,8 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { createInSessionMatch } from "@/lib/api/mutations";
-import type { LobbyParticipant } from "@/types/session";
+import { createInSessionMatch } from "@jits/shared/api/mutations";
+import type { LobbyParticipant } from "@jits/shared/types/session";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
 /** Ephemeral in-session challenge (not persisted to DB) */

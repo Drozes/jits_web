@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
-import type { Message } from "@/types/message";
+import type { Message } from "@jits/shared/types/message";
 import type {
   RealtimeChannel,
   RealtimePostgresInsertPayload,

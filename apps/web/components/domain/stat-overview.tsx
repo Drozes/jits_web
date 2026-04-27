@@ -1,6 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { TrendingUp, Swords, Trophy, Flame } from "lucide-react";
-import type { Athlete } from "@/types/athlete";
+import type { Athlete } from "@jits/shared/types/athlete";
 
 interface AthleteStats {
   wins: number;

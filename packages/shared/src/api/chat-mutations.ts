@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/types/database";
-import type { Message } from "@/types/message";
+import type { Database } from "../types/database";
+import type { Message } from "../types/message";
 import { type Result, mapPostgrestError, mapRpcError } from "./errors";
 
 type Client = SupabaseClient<Database>;

@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
-import type { Message } from "@/types/message";
+import type { Message } from "@jits/shared/types/message";
 
 interface UseChatMessagesOpts {
   conversationId: string;

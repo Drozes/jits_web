@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { getInitials, getProfilePhotoUrl } from "@/lib/utils";
+import { getProfilePhotoUrl } from "@/lib/utils";
+import { getInitials } from "@jits/shared/utils";
 
 export async function HeaderUserButton() {
   const supabase = await createClient();

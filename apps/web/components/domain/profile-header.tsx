@@ -1,7 +1,8 @@
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { getInitials, getEloTierClass, getProfilePhotoUrl } from "@/lib/utils";
+import { getEloTierClass, getProfilePhotoUrl } from "@/lib/utils";
+import { getInitials } from "@jits/shared/utils";
 import { OnlineIndicator } from "./online-indicator";
-import type { Athlete } from "@/types/athlete";
+import type { Athlete } from "@jits/shared/types/athlete";
 
 interface ProfileHeaderProps {
   athlete: Athlete;

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/client";
-import { joinSessionLobby } from "@/lib/api/mutations";
+import { joinSessionLobby } from "@jits/shared/api/mutations";
 
 interface ConfirmStepProps {
   sessionId: string;

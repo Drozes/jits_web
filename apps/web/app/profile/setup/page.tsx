@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { requireAuth } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
-import { ATHLETE_STATUS } from "@/lib/constants";
+import { ATHLETE_STATUS } from "@jits/shared/constants";
 import { SetupWizard } from "./setup-wizard";
 
 export default function ProfileSetupPage() {

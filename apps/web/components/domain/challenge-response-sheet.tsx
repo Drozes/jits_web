@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { acceptChallenge, declineChallenge } from "@/lib/api/mutations";
+import { acceptChallenge, declineChallenge } from "@jits/shared/api/mutations";
 import {
   Sheet,
   SheetContent,
@@ -23,8 +23,8 @@ import {
   Check,
   Scale,
 } from "lucide-react";
-import type { EloStakes } from "@/types/composites";
-import { MATCH_TYPE, type MatchType } from "@/lib/constants";
+import type { EloStakes } from "@jits/shared/types/composites";
+import { MATCH_TYPE, type MatchType } from "@jits/shared/constants";
 
 interface ChallengeResponseSheetProps {
   challenge: {

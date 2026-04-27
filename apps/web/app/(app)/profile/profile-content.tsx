@@ -9,7 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { ShareProfileSheet } from "@/components/domain/share-profile-sheet";
 import { ThemeSwitcher } from "@/components/theme-switcher";
 import { AchievementsSection } from "./achievements-section";
-import { getMatchHistory } from "@/lib/api/queries";
+import { getMatchHistory } from "@jits/shared/api/queries";
 import { Trophy, Settings, Share2, Palette, UserPen } from "lucide-react";
 
 const DEMO_DATA = {

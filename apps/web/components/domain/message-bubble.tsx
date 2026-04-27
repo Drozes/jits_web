@@ -1,6 +1,7 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { cn, getInitials } from "@/lib/utils";
-import type { Message } from "@/types/message";
+import { cn } from "@/lib/utils";
+import { getInitials } from "@jits/shared/utils";
+import type { Message } from "@jits/shared/types/message";
 
 interface MessageBubbleProps {
   message: Message;

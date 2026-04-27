@@ -1,7 +1,7 @@
 "use client";
 
 import { MessageSquare } from "lucide-react";
-import type { ConversationRow } from "@/lib/api/chat-queries";
+import type { ConversationRow } from "@jits/shared/api/chat-queries";
 import { ConversationCard } from "@/components/domain/conversation-card";
 
 interface InboxContentProps {

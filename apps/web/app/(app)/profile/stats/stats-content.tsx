@@ -2,7 +2,7 @@ import { requireAthlete } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent } from "@/components/ui/card";
 import { StatsTabs } from "./stats-tabs";
-import { getMatchHistory, getEloHistory } from "@/lib/api/queries";
+import { getMatchHistory, getEloHistory } from "@jits/shared/api/queries";
 
 export async function StatsContent() {
   const { athlete } = await requireAthlete();

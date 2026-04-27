@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import type { ConversationRow } from "@/lib/api/chat-queries";
-import { cn, getInitials, getProfilePhotoUrl, formatRelativeTime } from "@/lib/utils";
+import type { ConversationRow } from "@jits/shared/api/chat-queries";
+import { cn, getProfilePhotoUrl } from "@/lib/utils";
+import { getInitials, formatRelativeTime } from "@jits/shared/utils";
 import { OnlineIndicator } from "./online-indicator";
 import { Users } from "lucide-react";
 

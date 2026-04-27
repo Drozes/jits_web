@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Loader2, Play, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
-import { startMatch } from "@/lib/api/mutations";
+import { startMatch } from "@jits/shared/api/mutations";
 import { useMatchSync } from "@/hooks/use-match-sync";
 
 interface MatchTimerProps {

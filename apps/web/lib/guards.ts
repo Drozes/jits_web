@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { ATHLETE_STATUS } from "@/lib/constants";
+import { ATHLETE_STATUS } from "@jits/shared/constants";
 
 /**
  * Explicit columns fetched by guard functions.

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { registerPushDevice } from "@/lib/api/mutations";
+import { registerPushDevice } from "@jits/shared/api/mutations";
 
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 

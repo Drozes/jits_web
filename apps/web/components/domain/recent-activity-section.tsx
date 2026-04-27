@@ -5,8 +5,9 @@ import Link from "next/link";
 import { Activity, Swords } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { MatchCard } from "@/components/domain/match-card";
-import { cn, formatRelativeDate } from "@/lib/utils";
-import type { MatchOutcome } from "@/lib/constants";
+import { cn } from "@/lib/utils";
+import { formatRelativeDate } from "@jits/shared/utils";
+import type { MatchOutcome } from "@jits/shared/constants";
 
 interface MyMatch {
   id: string;

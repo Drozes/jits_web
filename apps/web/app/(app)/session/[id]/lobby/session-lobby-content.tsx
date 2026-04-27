@@ -1,6 +1,6 @@
 import { requireSessionParticipant } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
-import { getSessionLobbyData } from "@/lib/api/queries";
+import { getSessionLobbyData } from "@jits/shared/api/queries";
 import { SessionUnavailable } from "@/components/domain/session-unavailable";
 import { SessionLobbyClient } from "./session-lobby-client";
 

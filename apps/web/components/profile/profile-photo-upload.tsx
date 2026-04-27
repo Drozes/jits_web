@@ -5,7 +5,8 @@ import { Camera, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { getInitials, getProfilePhotoUrl } from "@/lib/utils";
+import { getProfilePhotoUrl } from "@/lib/utils";
+import { getInitials } from "@jits/shared/utils";
 
 const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_SIZE = 5 * 1024 * 1024; // 5 MB

@@ -4,11 +4,11 @@ import { useState, useEffect } from "react";
 import { Swords, Handshake, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
-import { recordMatchResult } from "@/lib/api/mutations";
+import { recordMatchResult } from "@jits/shared/api/mutations";
 import { useSessionMatchSync, type BroadcastResult } from "@/hooks/use-session-match-sync";
 import { SubmissionFields } from "@/app/(app)/match/[id]/results/submission-fields";
 import { cn } from "@/lib/utils";
-import type { SubmissionType } from "@/types/submission-type";
+import type { SubmissionType } from "@jits/shared/types/submission-type";
 
 interface Participant { id: string; displayName: string }
 

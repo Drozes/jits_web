@@ -2,8 +2,9 @@ import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { cn, formatRelativeDate, getInitials, getProfilePhotoUrl } from "@/lib/utils";
-import { MATCH_OUTCOME, type MatchOutcome, type MatchType } from "@/lib/constants";
+import { cn, getProfilePhotoUrl } from "@/lib/utils";
+import { formatRelativeDate, getInitials } from "@jits/shared/utils";
+import { MATCH_OUTCOME, type MatchOutcome, type MatchType } from "@jits/shared/constants";
 
 interface MatchCardProps {
   type: "match" | "challenge";

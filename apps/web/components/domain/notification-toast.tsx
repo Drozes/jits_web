@@ -3,8 +3,8 @@
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { getInitials } from "@/lib/utils";
-import type { NotificationPayload } from "@/types/notification";
+import { getInitials } from "@jits/shared/utils";
+import type { NotificationPayload } from "@jits/shared/types/notification";
 
 interface NotificationToastProps {
   id: string | number;

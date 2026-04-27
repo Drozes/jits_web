@@ -1,13 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/types/database";
+import type { Database } from "../types/database";
 import type {
   EloStakes,
   MatchHistoryRow,
   EloHistoryRow,
   DashboardSummary,
   ArenaData,
-} from "@/types/composites";
-import type { SubmissionType } from "@/types/submission-type";
+} from "../types/composites";
+import type { SubmissionType } from "../types/submission-type";
 import type {
   GymListItem,
   GymDetail,
@@ -16,7 +16,7 @@ import type {
   SessionJoinData,
   SessionLobbyData,
   LobbyParticipant,
-} from "@/types/session";
+} from "../types/session";
 
 type Client = SupabaseClient<Database>;
 

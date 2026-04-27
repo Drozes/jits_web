@@ -5,8 +5,8 @@ import { Bell, MessageSquare, Swords } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { createClient } from "@/lib/supabase/client";
-import { updateNotificationPreferences } from "@/lib/api/mutations";
-import type { NotificationPrefs } from "@/lib/api/mutations";
+import { updateNotificationPreferences } from "@jits/shared/api/mutations";
+import type { NotificationPrefs } from "@jits/shared/api/mutations";
 
 interface NotificationPreferencesProps {
   athleteId: string;

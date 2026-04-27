@@ -6,7 +6,7 @@ import { ArenaContent } from "./arena-content";
 import { AppHeader } from "@/components/layout/app-header";
 import { PageContainer } from "@/components/layout/page-container";
 import { PageHeaderActions } from "@/components/layout/page-header-actions";
-import { getArenaData } from "@/lib/api/queries";
+import { getArenaData } from "@jits/shared/api/queries";
 
 function ArenaSkeleton() {
   return (

@@ -29,7 +29,7 @@ export const viewport: Viewport = {
 };
 
 const geistSans = localFont({
-  src: "../node_modules/geist/dist/fonts/geist-sans/Geist-Variable.woff2",
+  src: "../../../node_modules/geist/dist/fonts/geist-sans/Geist-Variable.woff2",
   variable: "--font-geist-sans",
   display: "swap",
 });

@@ -8,7 +8,8 @@ import { EloBadge } from "@/components/domain/elo-badge";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { cn, getInitials, getProfilePhotoUrl } from "@/lib/utils";
+import { cn, getProfilePhotoUrl } from "@/lib/utils";
+import { getInitials } from "@jits/shared/utils";
 import { X, Eye, Heart, Trophy, RotateCcw } from "lucide-react";
 
 interface Competitor {

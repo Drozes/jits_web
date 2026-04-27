@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { SubmissionType } from "@/types/submission-type";
+import type { SubmissionType } from "@jits/shared/types/submission-type";
 
 interface SubmissionFieldsProps {
   submissionTypes: SubmissionType[];

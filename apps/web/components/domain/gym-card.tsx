@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Users } from "lucide-react";
-import type { GymListItem } from "@/types/session";
+import type { GymListItem } from "@jits/shared/types/session";
 
 interface GymCardProps {
   gym: GymListItem;

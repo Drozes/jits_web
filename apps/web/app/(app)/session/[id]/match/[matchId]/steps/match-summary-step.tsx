@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { Check, Loader2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
-import { confirmMatchResult, disputeMatchResult } from "@/lib/api/mutations";
+import { confirmMatchResult, disputeMatchResult } from "@jits/shared/api/mutations";
 import { useSessionMatchSync, type BroadcastResult } from "@/hooks/use-session-match-sync";
 
 interface MatchSummaryStepProps {

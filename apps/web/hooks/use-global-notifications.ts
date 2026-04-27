@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { showNotification } from "@/lib/notifications";
 import { refreshUnreadCounts } from "@/hooks/use-unread-count";
 import type { RealtimePostgresInsertPayload } from "@supabase/supabase-js";
-import type { Message } from "@/types/message";
+import type { Message } from "@jits/shared/types/message";
 
 type SenderMeta = { name: string; avatarUrl: string | null };
 

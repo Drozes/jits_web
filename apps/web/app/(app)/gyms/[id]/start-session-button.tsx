@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Plus, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { createSession } from "@/lib/api/mutations";
+import { createSession } from "@jits/shared/api/mutations";
 
 interface StartSessionButtonProps {
   gymId: string;

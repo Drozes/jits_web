@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { Check, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
-import { startMatch } from "@/lib/api/mutations";
+import { startMatch } from "@jits/shared/api/mutations";
 import { useSessionMatchSync } from "@/hooks/use-session-match-sync";
 
 interface ReadyCheckStepProps {

@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { requireAthlete } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
-import { getMessages } from "@/lib/api/chat-queries";
+import { getMessages } from "@jits/shared/api/chat-queries";
 import { getProfilePhotoUrl } from "@/lib/utils";
 import { ChatThread, type ParticipantInfo } from "./chat-thread";
 

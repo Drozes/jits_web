@@ -1,6 +1,6 @@
 import { requireAthlete } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
-import { getGymsWithSessions } from "@/lib/api/queries";
+import { getGymsWithSessions } from "@jits/shared/api/queries";
 import { GymSearch } from "./gym-search";
 
 export async function GymsContent() {
