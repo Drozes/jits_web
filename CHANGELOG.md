@@ -4,6 +4,19 @@
 
 ### Added
 
+**Phase 4 Track A1 -- Mobile Session Join Wizard & Lobby**
+- `apps/mobile/app/(app)/session/[id]/join.tsx` -- 4-step session join wizard: geo check (expo-location), waiver acceptance, weight confirmation, summary. Uses shared `getSessionForJoin`, `acceptSessionWaiver`, `joinSessionLobby`. Replaces Phase 3 stub.
+- `apps/mobile/app/(app)/session/[id]/lobby.tsx` -- Realtime session lobby with participant list, "Find Random Match" button, leave session, challenge participant. Uses native `postgres_changes` + broadcast subscriptions on `session-participants:{id}` and `session:{id}` channels (mobile-local; the shared `useLobbySync` is challenge-scoped, not session-scoped). Replaces Phase 3 stub.
+- `apps/mobile/components/session/join-wizard.tsx` -- Wizard orchestrator: builds the step list dynamically (skips geo when gym lacks coords; skips waiver when already signed) and renders progress dots + Back button.
+- `apps/mobile/components/session/wizard-progress.tsx` -- Reusable horizontal-dots step indicator (sibling of profile-setup's wizard-progress).
+- `apps/mobile/components/session/wizard/{geo-step,waiver-step,weight-step,confirm-step}.tsx` -- Wizard step components mirroring `apps/web/app/(app)/session/[id]/join/steps/*`. Toast-based error surface; cancellation-safe state.
+- `apps/mobile/components/session/lobby/{lobby-header,leave-button,participant-row,challenge-action-sheet}.tsx` -- Lobby sub-components. `challenge-action-sheet` uses RN `Alert.alert` (renders as native iOS action sheet) for casual/ranked selection.
+- `apps/mobile/lib/session/distance-from-gym.ts` -- 2km proximity threshold helper wrapping `haversineKm` (matches web's lenient threshold).
+- `apps/mobile/lib/session/validate-weight.ts` -- 50-400 lbs weight validator (matches profile-setup wizard).
+- `apps/mobile/lib/session/use-session-for-join.ts` -- Hydrates `getSessionForJoin` + active waiver id + already-participant check. Cancellation-gated state writes per Phase 3 W3-4 review.
+- `apps/mobile/lib/session/use-session-lobby.ts` -- Hydrates `getSessionLobbyData` with refresh and a participants setter so realtime can mutate locally.
+- `apps/mobile/lib/session/use-session-lobby-realtime.ts` -- Mobile-local realtime hook for session lobby (postgres_changes + broadcast). Mirrors web's `apps/web/hooks/use-session-lobby-realtime.ts` pattern.
+
 **Phase 3 Track A -- Mobile Dashboard & Profile**
 - `apps/mobile/app/(app)/(home)/index.tsx` -- Dashboard with stat overview, active session card, recent matches, and recent activity. Pull-to-refresh via `RefreshControl`. Fetches `getDashboardSummary` + `getActiveSession` in parallel from `@jits/shared`.
 - `apps/mobile/app/(app)/profile/index.tsx` -- Profile screen with header (avatar via `expo-image`, name, gym, ELO, record), View Stats / Share buttons, quick stats row, and account section (Edit Profile placeholder, Settings link, Sign Out).
