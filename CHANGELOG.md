@@ -4,6 +4,13 @@
 
 ### Added
 
+**Phase 5 Track B2 -- Mobile EAS Build, Sentry, Store Listing Prep**
+- Mobile dependency: `@sentry/react-native` (~7.2.0) for error tracking. Config plugin auto-registered in `apps/mobile/app.json` via `npx expo install`.
+- `apps/mobile/eas.json` -- EAS Build configuration with `development` (developmentClient + iOS simulator), `preview` (internal distribution, APK on Android), and `production` (autoIncrement, AAB) profiles. Channel names match profile names so EAS Update OTA targeting works out of the box.
+- `apps/mobile/lib/error-tracking/sentry-init.ts` -- Sentry initialization driven by `EXPO_PUBLIC_SENTRY_DSN`. No-op when DSN absent (local dev). Exports `captureError(err, context?)` for use from non-React contexts. `tracesSampleRate: 0.1` for beta to keep volume low until we have signal.
+- `STORE_LISTING.md` (repo root) -- App Store Connect + Play Store listing draft, beta distribution plan, 18-item pre-launch checklist.
+- `PRIVACY_POLICY.md`, `TERMS.md` (repo root) -- placeholder content noting legal review is required before publishing.
+
 **Phase 5 Track A -- Mobile Video Recording, Wake-Lock, Haptics**
 - Mobile dependencies: `expo-camera`, `expo-av`, `expo-keep-awake`, `expo-haptics`, `expo-file-system` (the latter required for the upload helper's streaming `FileSystem.uploadAsync` call -- `expo-av` installed for forward compatibility although the live recorder only uses `expo-camera`).
 - `apps/mobile/lib/video/use-video-recorder.ts` -- Native video recorder hook (`useVideoRecorder`). Wraps `expo-camera`'s `CameraView` ref + `recordAsync`/`stopRecording` lifecycle, exposes a 6-state machine (`idle`/`recording`/`stopping`/`uploading`/`uploaded`/`error`), retries failed uploads once, and surfaces camera + microphone permission state.
@@ -22,6 +29,13 @@
 - `apps/mobile/lib/deep-links/handler.ts` -- Central deep link parser routing `jits://...` and `https://jits.app/...` URLs to Expo Router.
 
 ### Changed
+
+**Phase 5 Track B2 -- Mobile EAS Build, Sentry, Store Listing Prep**
+- `apps/mobile/app.json` -- Sets `name` to `JITS`, `slug` to `jits`, `version` to `0.1.0`. Adds `ios.bundleIdentifier` (`com.jits.mobile`, placeholder), `ios.buildNumber` (`1`), `android.package` (`com.jits.mobile`, placeholder), `android.versionCode` (`1`), `runtimeVersion.policy: "appVersion"`, `updates.url` (`https://u.expo.dev/PLACEHOLDER_PROJECT_ID`), `extra.eas.projectId` (`PLACEHOLDER_PROJECT_ID`). Splash + adaptive-icon background updated to brand red `#bf1212`. `@sentry/react-native` config plugin auto-registered.
+- `apps/mobile/assets/{icon,adaptive-icon,favicon,splash-icon}.png` -- Replaced default Expo placeholders with branded EloRated logo rendered from `apps/web/public/logo.svg` via `rsvg-convert` (icon + adaptive: 1024x1024 RGBA on rounded brand-red square; favicon: 48x48; splash-icon: 1024x1024 transparent so the splash background colour shows through).
+- `apps/mobile/components/error-boundary.tsx` -- `componentDidCatch` now forwards uncaught errors to Sentry via `captureError(error, { componentStack })`. No-op when Sentry isn't initialized. No fallback-UI behaviour changes.
+- `apps/mobile/app/_layout.tsx` -- Calls `initSentry()` at module load (single line, additive only) so JS-bootstrap errors are captured.
+- `apps/mobile/.env.example` -- Adds `EXPO_PUBLIC_SENTRY_DSN` placeholder.
 
 **Phase 5 Track B1 -- Mobile Deep Links, Error Boundary, Offline Handling**
 - `apps/mobile/app/_layout.tsx` -- Wraps app in ErrorBoundary; mounts OfflineBanner + deep link listener (additive only).
