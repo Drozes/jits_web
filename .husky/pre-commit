@@ -1,3 +1,2 @@
-npx tsc --noEmit
-npx eslint .
-npm test
+npm run typecheck --workspaces --if-present || exit 1
+npm run test --workspaces --if-present || exit 1

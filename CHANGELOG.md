@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Changed
+- Restructured repo into npm monorepo: web app moved to `apps/web/`, shared data layer extracted to `packages/shared/` (`@jits/shared`).
+  - Files moved: `lib/api/*`, `lib/constants.ts`, `types/*`, pure functions from `lib/utils.ts` (`getInitials`, `extractGymName`, `formatRelativeDate`, `formatRelativeTime`).
+  - Web app imports updated to reference `@jits/shared`.
+  - Web-specific utilities (`cn`, `hasEnvVars`, `getEloTierClass`, `getProfilePhotoUrl`) remain in `apps/web/lib/utils.ts`.
+  - `db:types` script moved to root and now writes to `packages/shared/src/types/database.ts`.
+  - Husky `prepare` hook moved to root; pre-commit delegates to workspace scripts.
+  - Next.js `turbopack.root` set in `apps/web/next.config.ts` to silence multi-lockfile warning.
+
 ### Beta Hardening Pass (2026-04-23)
 
 **Added**
