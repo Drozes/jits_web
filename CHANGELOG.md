@@ -4,6 +4,24 @@
 
 ### Added
 
+**Phase 3 Track A -- Mobile Dashboard & Profile**
+- `apps/mobile/app/(app)/(home)/index.tsx` -- Dashboard with stat overview, active session card, recent matches, and recent activity. Pull-to-refresh via `RefreshControl`. Fetches `getDashboardSummary` + `getActiveSession` in parallel from `@jits/shared`.
+- `apps/mobile/app/(app)/profile/index.tsx` -- Profile screen with header (avatar via `expo-image`, name, gym, ELO, record), View Stats / Share buttons, quick stats row, and account section (Edit Profile placeholder, Settings link, Sign Out).
+- `apps/mobile/app/(app)/profile/stats.tsx` -- Match history list (FlatList with ranked/casual filter, W-L-D summary) and ELO history placeholder card. Pull-to-refresh.
+- `apps/mobile/components/match-card.tsx` -- Native MatchCard mirroring web API. Outcome badges (success/destructive/secondary), ELO delta with color, formatted relative date, optional match-type label, optional `onPress` for navigation.
+- `apps/mobile/components/elo-badge.tsx` -- ELO display with `getEloTierBorderClass()` helper porting web's tier thresholds (1400+/1200/1000/<1000). Variants: `display`, `compact`, `stakes`.
+- `apps/mobile/components/share-profile-sheet.tsx` -- Bottom-sheet share dialog using gorhom + RN `Share.share`. Builds `https://jits.app/athlete/{id}` URL.
+- `apps/mobile/components/dashboard/stat-overview.tsx` -- 2x2 stat grid (ELO, Rank, Record, Win Streak) with peak labels.
+- `apps/mobile/components/dashboard/active-session-card.tsx` -- Active/scheduled session card with check-in CTA; falls back to "Find a session" prompt when no active session.
+- `apps/mobile/components/dashboard/recent-activity-section.tsx` -- Filterable activity feed with scope (All/Me) and type (All/Ranked/Casual) pills, mirroring web's variant.
+- `apps/mobile/components/profile/profile-header.tsx` -- Profile avatar (`expo-image`) with tier-colored ring, name, gym, ELO badge, W-L record, win rate.
+- `apps/mobile/components/profile/profile-quick-stats.tsx` -- 2x2 quick stats grid (Total Matches, Current Streak, Best Streak, ELO This Month).
+
+### Changed
+
+**Phase 3 Track A**
+- `apps/mobile/app/(app)/_layout.tsx` -- Tab bar now uses `lucide-react-native` icons (Home, Dumbbell, Trophy, User) with theme-aware active/inactive tint via `useThemedTokens()`.
+
 **Phase 1 -- Dark Mode + Phase 3 Native Dependencies**
 - Mobile dependencies: `lucide-react-native`, `expo-image`, `expo-image-picker`, `expo-location`. Used by Phase 3 screens (profile photo upload, gym distance, tab icons, performant images).
 - `apps/mobile/lib/theme/theme-provider.tsx`, `use-theme.ts`, `index.ts` -- Theme provider + hook wiring system color scheme into NativeWind dark variants. `ThemeProvider` mounts at the root and applies `vars()` overrides on dark mode; `useThemedTokens()` returns the right runtime token map for RN APIs that can't take className.
