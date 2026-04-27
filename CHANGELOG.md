@@ -17,6 +17,18 @@
 - `apps/mobile/lib/session/use-session-lobby.ts` -- Hydrates `getSessionLobbyData` with refresh and a participants setter so realtime can mutate locally.
 - `apps/mobile/lib/session/use-session-lobby-realtime.ts` -- Mobile-local realtime hook for session lobby (postgres_changes + broadcast). Mirrors web's `apps/web/hooks/use-session-lobby-realtime.ts` pattern.
 
+**Phase 4 Track B -- Push Notifications, Online Presence, Settings (Mobile)**
+- Mobile dependencies: `expo-notifications`, `expo-device` (push notification token + device info).
+- `apps/mobile/lib/notifications/register-push.ts` -- Push registration helper. Requests permission, fetches Expo push token (requires physical device), reads `Device.osName` / `Device.modelName` for the device label, and calls shared `registerPushDevice`. Returns a discriminated `RegisterPushResult` so callers can react to permission denial vs. actual failure.
+- `apps/mobile/lib/notifications/handlers.ts` -- `setupNotificationHandlers()` wires `Notifications.setNotificationHandler` (foreground banner display) and `addNotificationResponseReceivedListener` (tap deep-link via `router.push(payload.data.route)`).
+- `apps/mobile/lib/notifications/push-registration-bootstrap.tsx` -- Side-effect bootstrap component (renders null) mounted inside `<AuthProvider>` to register on athlete login.
+- `apps/mobile/lib/presence/use-online-presence.ts` -- AppState-aware online presence hook on the `app:online` Supabase Presence channel. Subscribes only when foreground; untracks on background to avoid phantom presence. Exposes `useOnlineStatus(athleteId)` consumer hook backed by `useSyncExternalStore` (mirrors web's pattern).
+- `apps/mobile/lib/presence/online-presence-bootstrap.tsx` -- Renders null; mounted inside `<AuthProvider>` to start the channel for the current athlete.
+- `apps/mobile/components/notifications/notification-bell.tsx` -- Bell icon with unread badge (consumes shared `usePendingChallenges`). Tapping opens `NotificationPanel`.
+- `apps/mobile/components/notifications/notification-panel.tsx` -- Bottom-sheet (gorhom) listing pending challenges. Mirrors `apps/web/components/domain/notification-panel.tsx`.
+- `apps/mobile/components/online-indicator.tsx` -- Small green dot rendered only when `useOnlineStatus` returns true.
+- `apps/mobile/hooks/use-unread-count.ts` -- AppState-aware unread polling (30s + foreground refresh + manual `refreshUnreadCounts()`). Mobile equivalent of web's window-event hook.
+
 **Phase 3 Track A -- Mobile Dashboard & Profile**
 - `apps/mobile/app/(app)/(home)/index.tsx` -- Dashboard with stat overview, active session card, recent matches, and recent activity. Pull-to-refresh via `RefreshControl`. Fetches `getDashboardSummary` + `getActiveSession` in parallel from `@jits/shared`.
 - `apps/mobile/app/(app)/profile/index.tsx` -- Profile screen with header (avatar via `expo-image`, name, gym, ELO, record), View Stats / Share buttons, quick stats row, and account section (Edit Profile placeholder, Settings link, Sign Out).
@@ -42,6 +54,15 @@
 - `apps/mobile/lib/location/use-location.ts` -- `expo-location` permission + position hook (opt-in, no auto-request) plus `haversineKm` and `formatDistanceKm` helpers.
 
 ### Changed
+
+**Phase 4 Track B -- Settings & Bell Placement (Mobile)**
+- `apps/mobile/app/(app)/settings/index.tsx` -- Real settings menu replacing Phase 2 stub. Match Preferences (looking-for-casual, looking-for-ranked toggles via `toggleMatchPreferences`), Notifications placeholder card, General links (Video / Feedback / Help), Account (Sign Out with confirm), and dev-gated Realtime smoke test. Preserves the `__DEV__` developer entry.
+- `apps/mobile/app/(app)/settings/feedback.tsx` -- Feedback form mirroring web's flow (Bug / Feature / General categories, multiline message, char counter, success state). Inserts into `feedback` table with the same row shape as `apps/web/app/(app)/settings/feedback/feedback-form.tsx`.
+- `apps/mobile/app/(app)/settings/help.tsx` -- FAQ ported from web (6 items, expandable rows). Email Support button via `Linking.openURL("mailto:...")`.
+- `apps/mobile/app/(app)/settings/video.tsx` -- Placeholder mirroring web's minimal video settings page.
+- `apps/mobile/app/_layout.tsx` -- Mounts `<PushRegistrationBootstrap />` and `<OnlinePresenceBootstrap />` inside the existing `<AuthProvider>` (additive only).
+- `apps/mobile/app/(app)/(home)/index.tsx` -- Surgical addition: `<NotificationBell athleteId={athlete.id} />` in the existing greeting header.
+- `apps/mobile/app.json` -- Adds the `expo-notifications` plugin (notification color, default channel) and iOS `UIBackgroundModes: ["remote-notification"]` for background push.
 
 **Phase 3 Track A**
 - `apps/mobile/app/(app)/_layout.tsx` -- Tab bar now uses `lucide-react-native` icons (Home, Dumbbell, Trophy, User) with theme-aware active/inactive tint via `useThemedTokens()`.

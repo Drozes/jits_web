@@ -1,12 +1,18 @@
-import { Text, View } from "react-native";
+import { ScrollView, Text, View } from "react-native";
 
 export default function SettingsVideoScreen() {
   return (
-    <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-      <Text style={{ fontSize: 18, fontWeight: "600" }}>Video Settings</Text>
-      <Text style={{ marginTop: 4, color: "#737373" }}>
-        (stub, video preferences come in Phase 3)
-      </Text>
-    </View>
+    <ScrollView
+      className="flex-1 bg-background"
+      contentContainerStyle={{ padding: 16, gap: 16, paddingBottom: 48 }}
+    >
+      <Text className="text-2xl font-bold text-foreground">Video Settings</Text>
+      <View className="rounded-lg border border-border bg-card p-4">
+        <Text className="text-sm text-muted-foreground leading-relaxed">
+          Video recording settings will be available here. Match recordings can
+          be configured for automatic or manual capture.
+        </Text>
+      </View>
+    </ScrollView>
   );
 }

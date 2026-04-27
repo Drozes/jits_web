@@ -11,6 +11,7 @@ import type { ActiveSessionInfo } from "@jits/shared/types/session";
 import { StatOverview } from "@/components/dashboard/stat-overview";
 import { ActiveSessionCard } from "@/components/dashboard/active-session-card";
 import { RecentActivitySection } from "@/components/dashboard/recent-activity-section";
+import { NotificationBell } from "@/components/notifications/notification-bell";
 import { toast } from "@/components/ui/toast";
 
 interface DashboardData {
@@ -102,10 +103,11 @@ export default function DashboardScreen() {
       contentContainerStyle={{ padding: 16, paddingBottom: 32, gap: 24 }}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={tokens.primary} />}
     >
-      <View>
+      <View className="flex-row items-center justify-between">
         <Text className="text-2xl font-bold text-foreground">
           Hey, <Text className="text-primary">{athlete.display_name}</Text>
         </Text>
+        <NotificationBell athleteId={athlete.id} />
       </View>
 
       {isLoading && !data ? (
