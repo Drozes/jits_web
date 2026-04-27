@@ -14,7 +14,10 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "UIBackgroundModes": ["remote-notification"]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -42,6 +45,13 @@
         "expo-location",
         {
           "locationWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location to show nearby gyms and verify session check-ins."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#ef4444",
+          "defaultChannel": "default"
         }
       ]
     ]

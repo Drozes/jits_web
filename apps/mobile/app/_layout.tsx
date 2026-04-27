@@ -5,6 +5,8 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider } from "@/lib/auth/auth-context";
 import { ThemeProvider } from "@/lib/theme";
 import { Toaster } from "@/components/ui/toast";
+import { PushRegistrationBootstrap } from "@/lib/notifications/push-registration-bootstrap";
+import { OnlinePresenceBootstrap } from "@/lib/presence/online-presence-bootstrap";
 
 export default function RootLayout() {
   return (
@@ -12,6 +14,8 @@ export default function RootLayout() {
       <ThemeProvider>
         <SafeAreaProvider>
           <AuthProvider>
+            <PushRegistrationBootstrap />
+            <OnlinePresenceBootstrap />
             <Stack screenOptions={{ headerShown: false }}>
               <Stack.Screen name="(auth)" />
               <Stack.Screen name="(app)" />
