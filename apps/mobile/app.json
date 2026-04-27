@@ -17,7 +17,8 @@
       "supportsTablet": true,
       "infoPlist": {
         "UIBackgroundModes": ["remote-notification"]
-      }
+      },
+      "associatedDomains": ["applinks:jits.app"]
     },
     "android": {
       "adaptiveIcon": {
@@ -25,7 +26,18 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            { "scheme": "https", "host": "jits.app", "pathPrefix": "/athlete" },
+            { "scheme": "https", "host": "jits.app", "pathPrefix": "/session" }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     },
     "web": {
       "bundler": "metro",

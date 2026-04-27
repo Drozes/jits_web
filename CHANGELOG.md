@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+### Added
+
+**Phase 5 Track B1 -- Mobile Deep Links, Error Boundary, Offline Handling**
+- Mobile dependency: `@react-native-community/netinfo`.
+- `apps/mobile/lib/network/use-network-status.ts` -- Network state hook (isConnected / isInternetReachable / type).
+- `apps/mobile/lib/network/mutation-queue.ts` -- In-memory queue for critical mutations (match result + confirm). Flushes on reconnect.
+- `apps/mobile/components/offline-banner.tsx` -- Top-of-screen banner shown when offline.
+- `apps/mobile/components/error-boundary.tsx` -- Root error boundary with retry + sign-out.
+- `apps/mobile/lib/deep-links/handler.ts` -- Central deep link parser routing `jits://...` and `https://jits.app/...` URLs to Expo Router.
+
+### Changed
+
+**Phase 5 Track B1 -- Mobile Deep Links, Error Boundary, Offline Handling**
+- `apps/mobile/app/_layout.tsx` -- Wraps app in ErrorBoundary; mounts OfflineBanner + deep link listener (additive only).
+- `apps/mobile/app.json` -- Adds iOS `associatedDomains` and Android `intentFilters` for `jits.app` universal/app links.
+- `apps/mobile/app/(app)/settings/index.tsx` -- Removes `Link href={href as never}` casts in favor of a typed `SettingsRoute` union; routes simplified to root paths.
+- `apps/mobile/lib/auth/auth-context.tsx` -- `resetPassword` now passes `redirectTo: "jits://reset-password"` so the email lands back inside the app via the new deep-link handler.
+
 ### Fixed
 
 - Workspace hoisting fix for `npx expo export` -- simplified `apps/mobile/metro.config.js` to use Expo SDK 52+ automatic monorepo configuration. Removed manual `watchFolders`, `nodeModulesPaths`, and `disableHierarchicalLookup: true` overrides. The previous config blocked Metro from walking nested `node_modules`, so transitive deps like `react-native-reanimated`'s `semver@^7.7.2` (which exposes `semver/functions/satisfies`) failed to resolve when an older `semver@6.3.1` was hoisted at the workspace root. `getDefaultConfig(projectRoot)` now discovers the workspace root and watch folders itself, with hierarchical lookup enabled so nested transitives resolve cleanly. Mobile bundle now compiles cleanly on iOS and Android. Unblocks Phase 5 EAS build setup.

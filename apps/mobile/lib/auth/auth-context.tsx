@@ -100,10 +100,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const resetPassword = React.useCallback(async (email: string) => {
-    // TODO(A2): Wire `redirectTo` to a deep link (e.g. jits://reset-password)
-    // once the deep-link handler exists. For Phase 2 simplicity we ship the
-    // email-only flow.
-    const { error } = await supabase.auth.resetPasswordForEmail(email);
+    // Phase 5 B1: deep-link handler exists -- forward the reset email back
+    // into the app via the `jits://reset-password` custom scheme. The
+    // dedicated reset-password screen is deferred (handler currently routes
+    // the token to /login). Universal-link flavor (`https://jits.app/...`)
+    // is wired in app.json but requires AASA / assetlinks.json hosting.
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: "jits://reset-password",
+    });
     return { error: error ? { message: error.message } : null };
   }, []);
 
