@@ -23,6 +23,7 @@
 - `apps/mobile/app/**` -- Expo Router navigation skeleton with stub screens. Auth group (login/signup/forgot-password), app tab navigator (Home/Gyms/Rankings/Profile), nested session and match routes, athlete profile, settings, profile-setup wizard. All screens are placeholder stubs to be filled in later phases.
 
 ### Changed
+- `apps/mobile/app/(auth)/login.tsx`, `signup.tsx`, `forgot-password.tsx` -- Replace B3 stubs with email/password forms wired to AuthProvider. Use UI primitives (Card, Input, Label, Button) and Toaster for errors. Inline validation, loading states, KeyboardAvoidingView. OAuth deferred to a later phase.
 - `apps/mobile/app/_layout.tsx` -- wraps app in `AuthProvider`; mounts `Toaster` for in-app notifications (resolves Phase 1 W2).
 - `apps/mobile/app/index.tsx` -- auth-aware routing: redirects to `/login`, `/profile-setup`, or `/(app)/(home)` based on auth state. First runtime use of `@jits/shared/types/database` and `@jits/shared/constants` from mobile (resolves Phase 1 W4).
 - Restructured repo into npm monorepo: web app moved to `apps/web/`, shared data layer extracted to `packages/shared/` (`@jits/shared`).
