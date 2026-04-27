@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Added
+- `apps/mobile/app/**` -- Expo Router navigation skeleton with stub screens. Auth group (login/signup/forgot-password), app tab navigator (Home/Gyms/Rankings/Profile), nested session and match routes, athlete profile, settings, profile-setup wizard. All screens are placeholder stubs to be filled in later phases.
 - `apps/mobile/` -- Expo React Native app scaffold (`@jits/mobile`) on Expo SDK 54 with Expo Router, NativeWind v4, and `@gorhom/bottom-sheet`. Single placeholder screen (`app/index.tsx`) imports `getInitials` from `@jits/shared/utils` to verify cross-package imports through the npm workspace.
 - `apps/mobile/metro.config.js` -- Metro configured to watch the workspace root and resolve hoisted `node_modules` (`watchFolders` + `nodeModulesPaths` + `disableHierarchicalLookup`); wraps the config with `withNativeWind`.
 - `apps/mobile/babel.config.js`, `tailwind.config.js`, `global.css`, `nativewind-env.d.ts` -- NativeWind v4 setup using `babel-preset-expo` with `jsxImportSource: "nativewind"`, `nativewind/babel` preset, and `react-native-reanimated/plugin` last.
