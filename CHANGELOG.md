@@ -3,23 +3,9 @@
 ## [Unreleased]
 
 ### Added
-- `apps/mobile/components/profile-setup/*` -- Native multi-step setup wizard components: `setup-wizard.tsx` (orchestrator), `wizard-progress.tsx`, `tos-step.tsx`, `identity-step.tsx`, `training-step.tsx`, `optional-step.tsx`, plus `types.ts`. Mirrors `apps/web/app/profile/setup/*` for parity.
-- `apps/mobile/lib/profile-setup/*` -- Wizard helpers: `validation.ts` (DOB/age/weight rules), `use-setup-data.ts` (loads athlete/gyms/waiver state), `use-setup-submit.ts` (TOS acknowledgement insert + athlete upsert + `refreshAthlete()` + redirect).
-- `packages/shared/src/utils/tos-content.ts` -- Shared `TOS_TEXT` consumed by both web and mobile setup flows. Re-exported from `@jits/shared/utils`.
 
-### Changed
-- `apps/mobile/app/profile-setup.tsx` -- Replace B3 stub with multi-step setup wizard. Step 1: TOS acceptance writes to `waiver_acknowledgements`. Step 2: identity/training/optional sub-steps with display_name, gender, DOB, weight, primary gym (picker) or free agent toggle, city. Calls `refreshAthlete()` from AuthProvider after activation, then redirects to `/`.
-- Moved `apps/web/lib/tos-content.ts` to `packages/shared/src/utils/tos-content.ts` for use by both web and mobile setup flows. Web import path updated to `@jits/shared/utils`.
-
-### Added
-- `apps/mobile/lib/supabase/client.ts` -- Supabase mobile client using `expo-secure-store` for token persistence; realtime configured with `heartbeatIntervalMs: 15_000` (no Web Worker on RN). Imports `react-native-url-polyfill/auto` for URL support.
-- `apps/mobile/lib/supabase/secure-storage.ts` -- async storage adapter wrapping `expo-secure-store` for Supabase auth (matches `SupportedStorage` interface).
-- `apps/mobile/lib/auth/auth-context.tsx` -- `AuthProvider` Context exposing `user`, `session`, `athlete`, `isLoading`, `isAthleteActive`, `signIn`, `signUp`, `signOut`, `resetPassword`, `refreshAthlete`. Subscribes to `onAuthStateChange` and keeps the athlete row in sync via inline Supabase query (mirrors `apps/web/lib/guards.ts` select list).
-- `apps/mobile/lib/auth/hooks.ts` -- `useAuth`, `useRequireAuth`, `useRequireAthlete` guard hooks. Mirrors web's `lib/guards.ts` but client-side via Expo Router `router.replace()`.
-- `apps/mobile/lib/env.ts` -- typed env access via `expo-constants` and `process.env.EXPO_PUBLIC_*`. Lazy getters so `expo export` can bundle without env vars set.
-- `apps/mobile/.env.example` -- documents `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY`.
-- Mobile dependencies: `@supabase/supabase-js@^2.94.1`, `expo-secure-store@~15.0.8`, `@react-native-async-storage/async-storage@2.2.0`, `react-native-url-polyfill@^3.0.0`.
-- `apps/mobile/` -- Expo React Native app scaffold (`@jits/mobile`) on Expo SDK 54 with Expo Router, NativeWind v4, and `@gorhom/bottom-sheet`. Single placeholder screen (`app/index.tsx`) imports `getInitials` from `@jits/shared/utils` to verify cross-package imports through the npm workspace.
+**Phase 1 -- Monorepo + Expo Scaffold**
+- `apps/mobile/` -- Expo React Native app scaffold (`@jits/mobile`) on Expo SDK 54 with Expo Router, NativeWind v4, and `@gorhom/bottom-sheet`.
 - `apps/mobile/metro.config.js` -- Metro configured to watch the workspace root and resolve hoisted `node_modules` (`watchFolders` + `nodeModulesPaths` + `disableHierarchicalLookup`); wraps the config with `withNativeWind`.
 - `apps/mobile/babel.config.js`, `tailwind.config.js`, `global.css`, `nativewind-env.d.ts` -- NativeWind v4 setup using `babel-preset-expo` with `jsxImportSource: "nativewind"`, `nativewind/babel` preset, and `react-native-reanimated/plugin` last.
 - `apps/mobile/tsconfig.json` -- Extends root `tsconfig.base.json`, adds `@jits/shared`/`@jits/shared/*` path aliases and `expo-router/types`.
@@ -29,12 +15,24 @@
 - `apps/mobile/lib/cn.ts` -- `cn()` helper for conditional classNames (clsx + tailwind-merge).
 - `apps/mobile/lib/tokens.ts` -- semantic color tokens (mirrors web globals.css).
 - `apps/mobile/tailwind.config.js` -- Theme extends with light/dark semantic tokens.
-- `apps/mobile/app/**` -- Expo Router navigation skeleton with stub screens. Auth group (login/signup/forgot-password), app tab navigator (Home/Gyms/Rankings/Profile), nested session and match routes, athlete profile, settings, profile-setup wizard. All screens are placeholder stubs to be filled in later phases.
+- `apps/mobile/app/**` -- Expo Router navigation skeleton with stub screens. Auth group (login/signup/forgot-password), app tab navigator (Home/Gyms/Rankings/Profile), nested session and match routes, athlete profile, settings, profile-setup wizard.
+
+**Phase 2 -- Auth Foundation**
+- `apps/mobile/lib/supabase/client.ts` -- Supabase mobile client using `expo-secure-store` for token persistence; realtime configured with `heartbeatIntervalMs: 15_000` (no Web Worker on RN). Imports `react-native-url-polyfill/auto` for URL support.
+- `apps/mobile/lib/supabase/secure-storage.ts` -- async storage adapter wrapping `expo-secure-store` for Supabase auth (matches `SupportedStorage` interface).
+- `apps/mobile/lib/auth/auth-context.tsx` -- `AuthProvider` Context exposing `user`, `session`, `athlete`, `isLoading`, `isAthleteActive`, `signIn`, `signUp`, `signOut`, `resetPassword`, `refreshAthlete`. Subscribes to `onAuthStateChange` and keeps the athlete row in sync via inline Supabase query (mirrors `apps/web/lib/guards.ts` select list).
+- `apps/mobile/lib/auth/hooks.ts` -- `useAuth`, `useRequireAuth`, `useRequireAthlete` guard hooks. Mirrors web's `lib/guards.ts` but client-side via Expo Router `router.replace()`.
+- `apps/mobile/lib/env.ts` -- typed env access via `expo-constants` and `process.env.EXPO_PUBLIC_*`. Lazy getters so `expo export` can bundle without env vars set.
+- `apps/mobile/.env.example` -- documents `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY`.
+- Mobile dependencies: `@supabase/supabase-js@^2.94.1`, `expo-secure-store@~15.0.8`, `@react-native-async-storage/async-storage@2.2.0`, `react-native-url-polyfill@^3.0.0`.
+- `apps/mobile/components/auth/auth-form-field.tsx` -- Shared label + input + inline error component used by login, signup, and forgot-password screens.
+- `apps/mobile/components/profile-setup/*` -- Native multi-step setup wizard: `setup-wizard.tsx` (orchestrator), `wizard-progress.tsx`, `tos-step.tsx`, `identity-step.tsx`, `training-step.tsx`, `optional-step.tsx`, plus `types.ts`. Mirrors `apps/web/app/profile/setup/*`.
+- `apps/mobile/lib/profile-setup/*` -- Wizard helpers: `validation.ts` (DOB/age/weight rules), `use-setup-data.ts` (loads athlete/gyms/waiver state), `use-setup-submit.ts` (TOS acknowledgement insert + athlete upsert + `refreshAthlete()` + redirect).
+- `packages/shared/src/utils/tos-content.ts` -- Shared `TOS_TEXT` consumed by both web and mobile setup flows. Re-exported from `@jits/shared/utils`.
 
 ### Changed
-- `apps/mobile/app/(auth)/login.tsx`, `signup.tsx`, `forgot-password.tsx` -- Replace B3 stubs with email/password forms wired to AuthProvider. Use UI primitives (Card, Input, Label, Button) and Toaster for errors. Inline validation, loading states, KeyboardAvoidingView. OAuth deferred to a later phase.
-- `apps/mobile/app/_layout.tsx` -- wraps app in `AuthProvider`; mounts `Toaster` for in-app notifications (resolves Phase 1 W2).
-- `apps/mobile/app/index.tsx` -- auth-aware routing: redirects to `/login`, `/profile-setup`, or `/(app)/(home)` based on auth state. First runtime use of `@jits/shared/types/database` and `@jits/shared/constants` from mobile (resolves Phase 1 W4).
+
+**Phase 1 -- Monorepo Restructure**
 - Restructured repo into npm monorepo: web app moved to `apps/web/`, shared data layer extracted to `packages/shared/` (`@jits/shared`).
   - Files moved: `lib/api/*`, `lib/constants.ts`, `types/*`, pure functions from `lib/utils.ts` (`getInitials`, `extractGymName`, `formatRelativeDate`, `formatRelativeTime`).
   - Web app imports updated to reference `@jits/shared`.
@@ -42,7 +40,14 @@
   - `db:types` script moved to root and now writes to `packages/shared/src/types/database.ts`.
   - Husky `prepare` hook moved to root; pre-commit delegates to workspace scripts.
   - Next.js `turbopack.root` set in `apps/web/next.config.ts` to silence multi-lockfile warning.
-  - Post-merge tidy: removed dead `outside_assets` from `apps/web/tsconfig.json` exclude (path no longer reachable from apps/web), made `.husky/pre-commit` executable, removed stale root-level `.next/`, `tsconfig.tsbuildinfo`, and `next-env.d.ts` artifacts left over from pre-monorepo builds.
+  - Post-merge tidy: removed dead `outside_assets` from `apps/web/tsconfig.json` exclude, made `.husky/pre-commit` executable, removed stale root-level build artifacts (`.next/`, `tsconfig.tsbuildinfo`, `next-env.d.ts`).
+
+**Phase 2 -- Auth Wiring**
+- `apps/mobile/app/_layout.tsx` -- Wraps app in `AuthProvider`; mounts `Toaster` for in-app notifications (resolves Phase 1 W2).
+- `apps/mobile/app/index.tsx` -- Auth-aware routing: redirects to `/login`, `/profile-setup`, or `/(app)/(home)` based on auth state. First runtime use of `@jits/shared/types/database` and `@jits/shared/constants` from mobile (resolves Phase 1 W4).
+- `apps/mobile/app/(auth)/login.tsx`, `signup.tsx`, `forgot-password.tsx` -- Replace B3 stubs with email/password forms wired to AuthProvider. Use UI primitives (Card, Input, Label, Button) and Toaster for errors. Inline validation, loading states, KeyboardAvoidingView. OAuth deferred.
+- `apps/mobile/app/profile-setup.tsx` -- Replace B3 stub with multi-step setup wizard. Step 1: TOS acceptance writes to `waiver_acknowledgements`. Step 2: identity/training/optional sub-steps with display_name, gender, DOB, weight, primary gym (picker) or free agent toggle, city. Calls `refreshAthlete()` after activation, then redirects to `/`.
+- Moved `apps/web/lib/tos-content.ts` to `packages/shared/src/utils/tos-content.ts` for use by both web and mobile setup flows. Web import path updated to `@jits/shared/utils`.
 
 ### Beta Hardening Pass (2026-04-23)
 
