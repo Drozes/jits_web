@@ -4,8 +4,13 @@ import { supabase } from "@/lib/supabase/client";
 import { useSessionMatchSync } from "@jits/shared/hooks/use-session-match-sync";
 import { useSessionMatchTimer } from "@jits/shared/hooks/use-session-match-timer";
 import { useLiveControls } from "@/lib/match-flow/use-live-controls";
+import { useMatchKeepAwake } from "@/lib/match-flow/use-keep-awake";
+import { matchHaptics } from "@/lib/match-flow/use-haptics";
+import { useVideoRecorder } from "@/lib/video/use-video-recorder";
 import { TimerDisplay } from "./timer-display";
 import { LiveControls } from "./live-controls";
+import { CameraOverlay } from "../camera-overlay";
+import { UploadProgressBanner } from "../upload-progress-banner";
 
 interface LiveStepProps {
   matchId: string;
@@ -19,20 +24,28 @@ interface LiveStepProps {
   onEnded: () => void;
 }
 
+const TIME_WARNING_SECONDS = 10;
+
 /**
- * Step 4 -- live timer with pause/resume/end controls. Uses shared timer
- * hook for tick logic, shared sync hook for cross-device broadcasts, and
- * local `useLiveControls` to encapsulate the mutation + debounce logic.
+ * Step 4 -- live timer with pause/resume/end controls. Mounts a camera
+ * preview, auto-starts recording on entry, auto-stops on end. Activates
+ * the screen wake-lock for the duration of the step and fires haptics
+ * on key events (match start, time-warning, match end).
  *
- * Note (Phase 5 polish): video recording and screen wake-lock are NOT
- * wired here. Web uses `useVideoRecorder` + `navigator.wakeLock`; mobile
- * needs `expo-camera` + `expo-keep-awake` which are not yet installed.
+ * Recording is best-effort: if the user denies camera access, the match
+ * runs as before and a small banner explains the fallback.
  */
 export function LiveStep(props: LiveStepProps) {
   const { matchId, matchType, durationSeconds, startedAt, pausedAt, totalPausedDuration, onEnded } = props;
   const endedRef = React.useRef(false);
   const expiryFiredRef = React.useRef(false);
+  const startHapticFiredRef = React.useRef(false);
+  const warnHapticFiredRef = React.useRef(false);
+  const recordingStartedRef = React.useRef(false);
 
+  useMatchKeepAwake(true);
+
+  const recorder = useVideoRecorder(matchId);
   const timer = useSessionMatchTimer({ durationSeconds, startedAt, pausedAt, totalPausedDuration });
   const sync = useSessionMatchSync({
     supabase,
@@ -42,17 +55,49 @@ export function LiveStep(props: LiveStepProps) {
     onMatchEnded: () => {
       if (endedRef.current) return;
       endedRef.current = true;
+      void recorder.stop();
       onEnded();
     },
   });
+
+  const wrappedOnEnded = React.useCallback(() => {
+    void recorder.stop();
+    void matchHaptics.matchEnd();
+    onEnded();
+  }, [recorder, onEnded]);
 
   const { busy, handleEnd, handlePauseResume } = useLiveControls({
     matchId,
     timer,
     sync,
     endedRef,
-    onEnded,
+    onEnded: wrappedOnEnded,
   });
+
+  // Fire match-start haptic once when the step mounts
+  React.useEffect(() => {
+    if (startHapticFiredRef.current) return;
+    startHapticFiredRef.current = true;
+    void matchHaptics.matchStart();
+  }, []);
+
+  // Auto-start recording once the camera ref is ready and permission is
+  // granted. We retry on permission flip via the dep array.
+  React.useEffect(() => {
+    if (recordingStartedRef.current) return;
+    if (!recorder.permission?.granted) return;
+    recordingStartedRef.current = true;
+    void recorder.start();
+  }, [recorder.permission?.granted, recorder]);
+
+  // Time-warning haptic once at <= 10s remaining
+  React.useEffect(() => {
+    if (warnHapticFiredRef.current) return;
+    if (timer.running && timer.remaining > 0 && timer.remaining <= TIME_WARNING_SECONDS) {
+      warnHapticFiredRef.current = true;
+      void matchHaptics.timeWarning();
+    }
+  }, [timer.remaining, timer.running]);
 
   // Auto-end on time expiry, mirroring web
   React.useEffect(() => {
@@ -66,7 +111,14 @@ export function LiveStep(props: LiveStepProps) {
   }, [timer.remaining, timer.running, handleEnd]);
 
   return (
-    <View className="items-center gap-5 px-1 py-6">
+    <View className="items-center gap-4 px-1 py-4">
+      <CameraOverlay
+        cameraRef={recorder.cameraRef}
+        permissionGranted={recorder.permission?.granted ?? false}
+        permissionCanAskAgain={recorder.permission?.canAskAgain ?? true}
+        onRequestPermission={() => void recorder.requestPermission()}
+        recording={recorder.state === "recording"}
+      />
       <TimerDisplay
         formatted={timer.formatted}
         remaining={timer.remaining}
@@ -79,6 +131,7 @@ export function LiveStep(props: LiveStepProps) {
         onPauseResume={handlePauseResume}
         onEnd={handleEnd}
       />
+      <UploadProgressBanner state={recorder.state} error={recorder.error} />
     </View>
   );
 }

@@ -16,7 +16,9 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "UIBackgroundModes": ["remote-notification"]
+        "UIBackgroundModes": ["remote-notification"],
+        "NSCameraUsageDescription": "Allow $(PRODUCT_NAME) to use your camera so you can record your matches.",
+        "NSMicrophoneUsageDescription": "Allow $(PRODUCT_NAME) to use your microphone so your match recordings include audio."
       }
     },
     "android": {
@@ -25,7 +27,8 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": ["android.permission.CAMERA", "android.permission.RECORD_AUDIO"]
     },
     "web": {
       "bundler": "metro",
@@ -52,6 +55,14 @@
         {
           "color": "#ef4444",
           "defaultChannel": "default"
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow $(PRODUCT_NAME) to use your camera so you can record your matches.",
+          "microphonePermission": "Allow $(PRODUCT_NAME) to use your microphone so your match recordings include audio.",
+          "recordAudioAndroid": true
         }
       ]
     ]

@@ -8,6 +8,15 @@
 
 ### Added
 
+**Phase 5 Track A -- Mobile Video Recording, Wake-Lock, Haptics**
+- Mobile dependencies: `expo-camera`, `expo-av`, `expo-keep-awake`, `expo-haptics`, `expo-file-system` (the latter required for the upload helper's streaming `FileSystem.uploadAsync` call -- `expo-av` installed for forward compatibility although the live recorder only uses `expo-camera`).
+- `apps/mobile/lib/video/use-video-recorder.ts` -- Native video recorder hook (`useVideoRecorder`). Wraps `expo-camera`'s `CameraView` ref + `recordAsync`/`stopRecording` lifecycle, exposes a 6-state machine (`idle`/`recording`/`stopping`/`uploading`/`uploaded`/`error`), retries failed uploads once, and surfaces camera + microphone permission state.
+- `apps/mobile/lib/video/upload-recording.ts` -- Streams the local file URI to Supabase Storage via `FileSystem.uploadAsync` (BINARY_CONTENT) instead of base64-loading. Bucket `match-videos`, path `matches/{matchId}/{timestamp}.mp4` -- mirrors web's bucket + path convention (web uses `.webm` because `MediaRecorder` produces WebM; native produces MP4).
+- `apps/mobile/components/match-flow/camera-overlay.tsx` -- 16:9 camera preview thumbnail mounted above the timer. Renders a permission-gate fallback when access hasn't been granted (or has been denied) so the match flow keeps running.
+- `apps/mobile/components/match-flow/upload-progress-banner.tsx` -- Compact status pill showing recording/upload state (spinner + label, success checkmark, or error). No incremental progress because `FileSystem.uploadAsync` does not emit progress for binary uploads.
+- `apps/mobile/lib/match-flow/use-keep-awake.ts` -- Wake-lock during the live match step via `expo-keep-awake`'s imperative `activateKeepAwakeAsync` / `deactivateKeepAwake` pair (keyed on an `active` flag so the lock releases on unmount).
+- `apps/mobile/lib/match-flow/use-haptics.ts` -- Centralised haptic vocabulary (`matchStart`, `matchEnd`, `resultRecorded`, `error`, `timeWarning`) wrapping `expo-haptics`. All errors silently swallowed since haptics are pure feedback.
+
 **Phase 4 Track A2 -- Mobile Live Match Wizard**
 - `apps/mobile/app/(app)/session/[id]/match/[matchId].tsx` -- Live match wizard replacing the Phase 3 stub. 8-step state machine (wait, weight, ready, live, end, result, confirm, summary) using shared `use-session-match-timer` and `use-session-match-sync` hooks.
 - `apps/mobile/components/match-flow/*` -- Step components and orchestrator. Each step under 100 lines.
@@ -63,6 +72,10 @@
 - `apps/mobile/lib/location/use-location.ts` -- `expo-location` permission + position hook (opt-in, no auto-request) plus `haversineKm` and `formatDistanceKm` helpers.
 
 ### Changed
+
+**Phase 5 Track A -- Live Step Integration (Mobile)**
+- `apps/mobile/components/match-flow/steps/live-step.tsx` -- Mounts the `<CameraOverlay />` thumbnail above the timer, auto-starts recording when permission flips to granted, auto-stops on end-match (both local end and opponent broadcast), activates the wake-lock for the duration of the step, and fires haptics on match start, time-warning (<= 10s remaining), and match end. Recording is best-effort: a permission-denied user still progresses through the wizard normally.
+- `apps/mobile/app.json` -- Adds the `expo-camera` plugin entry with iOS camera + microphone permission strings (`NSCameraUsageDescription` + `NSMicrophoneUsageDescription`) and Android `CAMERA` + `RECORD_AUDIO` permissions plus `recordAudioAndroid: true`.
 
 **Phase 4 Track B -- Settings & Bell Placement (Mobile)**
 - `apps/mobile/app/(app)/settings/index.tsx` -- Real settings menu replacing Phase 2 stub. Match Preferences (looking-for-casual, looking-for-ranked toggles via `toggleMatchPreferences`), Notifications placeholder card, General links (Video / Feedback / Help), Account (Sign Out with confirm), and dev-gated Realtime smoke test. Preserves the `__DEV__` developer entry.
