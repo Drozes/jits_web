@@ -16,7 +16,9 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "UIBackgroundModes": ["remote-notification"]
+        "UIBackgroundModes": ["remote-notification"],
+        "NSCameraUsageDescription": "Allow $(PRODUCT_NAME) to use your camera so you can record your matches.",
+        "NSMicrophoneUsageDescription": "Allow $(PRODUCT_NAME) to use your microphone so your match recordings include audio."
       },
       "associatedDomains": ["applinks:jits.app"]
     },
@@ -27,6 +29,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
+      "permissions": ["android.permission.CAMERA", "android.permission.RECORD_AUDIO"],
       "intentFilters": [
         {
           "action": "VIEW",
@@ -64,6 +67,14 @@
         {
           "color": "#ef4444",
           "defaultChannel": "default"
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow $(PRODUCT_NAME) to use your camera so you can record your matches.",
+          "microphonePermission": "Allow $(PRODUCT_NAME) to use your microphone so your match recordings include audio.",
+          "recordAudioAndroid": true
         }
       ]
     ]
