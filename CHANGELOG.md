@@ -3,6 +3,15 @@
 ## [Unreleased]
 
 ### Added
+- `apps/mobile/components/profile-setup/*` -- Native multi-step setup wizard components: `setup-wizard.tsx` (orchestrator), `wizard-progress.tsx`, `tos-step.tsx`, `identity-step.tsx`, `training-step.tsx`, `optional-step.tsx`, plus `types.ts`. Mirrors `apps/web/app/profile/setup/*` for parity.
+- `apps/mobile/lib/profile-setup/*` -- Wizard helpers: `validation.ts` (DOB/age/weight rules), `use-setup-data.ts` (loads athlete/gyms/waiver state), `use-setup-submit.ts` (TOS acknowledgement insert + athlete upsert + `refreshAthlete()` + redirect).
+- `packages/shared/src/utils/tos-content.ts` -- Shared `TOS_TEXT` consumed by both web and mobile setup flows. Re-exported from `@jits/shared/utils`.
+
+### Changed
+- `apps/mobile/app/profile-setup.tsx` -- Replace B3 stub with multi-step setup wizard. Step 1: TOS acceptance writes to `waiver_acknowledgements`. Step 2: identity/training/optional sub-steps with display_name, gender, DOB, weight, primary gym (picker) or free agent toggle, city. Calls `refreshAthlete()` from AuthProvider after activation, then redirects to `/`.
+- Moved `apps/web/lib/tos-content.ts` to `packages/shared/src/utils/tos-content.ts` for use by both web and mobile setup flows. Web import path updated to `@jits/shared/utils`.
+
+### Added
 - `apps/mobile/lib/supabase/client.ts` -- Supabase mobile client using `expo-secure-store` for token persistence; realtime configured with `heartbeatIntervalMs: 15_000` (no Web Worker on RN). Imports `react-native-url-polyfill/auto` for URL support.
 - `apps/mobile/lib/supabase/secure-storage.ts` -- async storage adapter wrapping `expo-secure-store` for Supabase auth (matches `SupportedStorage` interface).
 - `apps/mobile/lib/auth/auth-context.tsx` -- `AuthProvider` Context exposing `user`, `session`, `athlete`, `isLoading`, `isAthleteActive`, `signIn`, `signUp`, `signOut`, `resetPassword`, `refreshAthlete`. Subscribes to `onAuthStateChange` and keeps the athlete row in sync via inline Supabase query (mirrors `apps/web/lib/guards.ts` select list).

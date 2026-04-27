@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { TOS_TEXT } from "@/lib/tos-content";
+import { TOS_TEXT } from "@jits/shared/utils";
 
 interface TosStepProps {
   onAccept: () => void | Promise<void>;

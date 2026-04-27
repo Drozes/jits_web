@@ -1,6 +1,11 @@
 /**
  * Placeholder Terms of Service text for the JITS platform.
  * This will be replaced with legally reviewed copy before launch.
+ *
+ * Lives in `@jits/shared/utils` so both the web setup wizard
+ * (`apps/web/app/profile/setup/tos-step.tsx`) and the mobile setup
+ * wizard (`apps/mobile/components/profile-setup/tos-step.tsx`) render
+ * identical TOS copy.
  */
 export const TOS_TEXT = `Terms of Service and Liability Waiver
 
