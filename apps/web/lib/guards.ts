@@ -1,14 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ATHLETE_STATUS } from "@jits/shared/constants";
-
-/**
- * Explicit columns fetched by guard functions.
- * Only includes columns actually accessed by consumers — excludes
- * created_at, push_token, and role to reduce payload on every page load.
- */
-const ATHLETE_GUARD_SELECT =
-  "id, auth_user_id, display_name, current_elo, highest_elo, current_weight, primary_gym_id, profile_photo_url, looking_for_casual, looking_for_ranked, status, free_agent, gender, date_of_birth, city" as const;
+import { getCurrentAthlete } from "@jits/shared/api/queries";
 
 /**
  * Requires authentication. Returns the user if authenticated,
@@ -33,13 +26,9 @@ export async function requireAthlete() {
   const user = await requireAuth();
   const supabase = await createClient();
 
-  const { data: athlete, error } = await supabase
-    .from("athletes")
-    .select(ATHLETE_GUARD_SELECT)
-    .eq("auth_user_id", user.id)
-    .single();
+  const athlete = await getCurrentAthlete(supabase, user.id);
 
-  if (error || !athlete) {
+  if (!athlete) {
     redirect("/profile/setup");
   }
 
@@ -90,13 +79,9 @@ export async function getActiveAthlete() {
 
   if (authError || !user) return null;
 
-  const { data: athlete, error } = await supabase
-    .from("athletes")
-    .select(ATHLETE_GUARD_SELECT)
-    .eq("auth_user_id", user.id)
-    .single();
+  const athlete = await getCurrentAthlete(supabase, user.id);
 
-  if (error || !athlete || athlete.status === ATHLETE_STATUS.PENDING) {
+  if (!athlete || athlete.status === ATHLETE_STATUS.PENDING) {
     return null;
   }
 

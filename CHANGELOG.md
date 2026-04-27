@@ -38,6 +38,8 @@
 
 ### Changed
 
+- Extracted `getCurrentAthlete(supabase, authUserId)` and `ATHLETE_GUARD_SELECT` constant to `@jits/shared/api/queries`. Web's `lib/guards.ts` and mobile's `lib/auth/auth-context.tsx` now share the same source of truth, eliminating drift risk.
+
 **Phase 1 -- Monorepo Restructure**
 - Restructured repo into npm monorepo: web app moved to `apps/web/`, shared data layer extracted to `packages/shared/` (`@jits/shared`).
   - Files moved: `lib/api/*`, `lib/constants.ts`, `types/*`, pure functions from `lib/utils.ts` (`getInitials`, `extractGymName`, `formatRelativeDate`, `formatRelativeTime`).

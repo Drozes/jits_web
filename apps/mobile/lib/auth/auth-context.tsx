@@ -1,41 +1,11 @@
 import * as React from "react";
 import type { Session, User } from "@supabase/supabase-js";
-import type { Athlete } from "@jits/shared/types/athlete";
 import { ATHLETE_STATUS } from "@jits/shared/constants";
+import {
+  getCurrentAthlete,
+  type AthleteGuardRow,
+} from "@jits/shared/api/queries";
 import { supabase } from "../supabase/client";
-
-/**
- * Columns the guard hooks read off the athlete row. Mirrors the web's
- * `ATHLETE_GUARD_SELECT` in `apps/web/lib/guards.ts` — keep these aligned
- * so the two clients agree on activation state.
- */
-const ATHLETE_GUARD_SELECT =
-  "id, auth_user_id, display_name, current_elo, highest_elo, current_weight, primary_gym_id, profile_photo_url, looking_for_casual, looking_for_ranked, status, free_agent, gender, date_of_birth, city" as const;
-
-/**
- * Subset of the Athlete row guards actually consume. Phase 3 work will
- * extract a typed `getCurrentAthlete()` helper into `@jits/shared` so
- * web and mobile share one query; until then this inline query is
- * intentional (see deliverable notes).
- */
-type AthleteGuardRow = Pick<
-  Athlete,
-  | "id"
-  | "auth_user_id"
-  | "display_name"
-  | "current_elo"
-  | "highest_elo"
-  | "current_weight"
-  | "primary_gym_id"
-  | "profile_photo_url"
-  | "looking_for_casual"
-  | "looking_for_ranked"
-  | "status"
-  | "free_agent"
-  | "gender"
-  | "date_of_birth"
-  | "city"
->;
 
 type AuthError = { message: string };
 
@@ -54,19 +24,6 @@ export type AuthState = {
 
 const AuthContext = React.createContext<AuthState | null>(null);
 
-async function fetchAthleteByAuthId(
-  authUserId: string,
-): Promise<AthleteGuardRow | null> {
-  const { data, error } = await supabase
-    .from("athletes")
-    .select(ATHLETE_GUARD_SELECT)
-    .eq("auth_user_id", authUserId)
-    .maybeSingle();
-
-  if (error || !data) return null;
-  return data as AthleteGuardRow;
-}
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = React.useState<Session | null>(null);
   const [user, setUser] = React.useState<User | null>(null);
@@ -84,7 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(initialSession);
       setUser(initialSession?.user ?? null);
       if (initialSession?.user) {
-        const row = await fetchAthleteByAuthId(initialSession.user.id);
+        const row = await getCurrentAthlete(supabase, initialSession.user.id);
         if (!cancelled) setAthlete(row);
       }
       if (!cancelled) setIsLoading(false);
@@ -95,7 +52,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(nextSession);
         setUser(nextSession?.user ?? null);
         if (nextSession?.user) {
-          const row = await fetchAthleteByAuthId(nextSession.user.id);
+          const row = await getCurrentAthlete(supabase, nextSession.user.id);
           setAthlete(row);
         } else {
           setAthlete(null);
@@ -115,7 +72,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setAthlete(null);
       return;
     }
-    const row = await fetchAthleteByAuthId(user.id);
+    const row = await getCurrentAthlete(supabase, user.id);
     setAthlete(row);
   }, [user]);
 
