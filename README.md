@@ -1,192 +1,114 @@
-# Jits Arena – Web (Frontend)
+# JITS
 
-This repository contains the **mobile-first web frontend** for **Jits Arena**, a submission-only grappling competition platform.
+JITS is a Brazilian Jiu-Jitsu (BJJ) competitor matchmaking app. Athletes check in to a session at their gym, get paired with a partner near their size and skill, run a structured ranked or casual match (timer, video recording, confirm/dispute), and track their ELO rating over time.
 
-The frontend is built as a **responsive web app first**, with the intention of being wrapped as a WebView (iOS / Android) for alpha distribution. Native apps are **explicitly out of scope** at this stage.
+This repo is an npm-workspaces monorepo:
 
-This repo is optimized for:
-- fast iteration
-- correctness over polish
-- clean separation between layout and logic
-- AI-assisted development (Figma Make + Claude Code)
+- `apps/web/`, Next.js 16 web app (active beta).
+- `apps/mobile/`, Expo SDK 54 React Native app (beta-ready, EAS builds pending).
+- `packages/shared/` (`@jits/shared`), the cross-platform data layer (queries, mutations, types, hooks, utilities) consumed by both apps.
 
----
-
-## Product Context (High Level)
-
-Jits Arena allows athletes to:
-- authenticate
-- maintain an athlete profile
-- issue and accept challenges
-- compete under a simple ruleset
-- see results reflected in a global ELO ladder
-
-The frontend talks directly to Supabase for:
-- authentication
-- reading domain data
-- simple writes
-
-Critical or irreversible workflows (ranked matches, ELO updates) will eventually be handled by Supabase Edge Functions.
-
----
+The Supabase backend (Postgres + RLS + Edge Functions + Realtime + Storage) lives in a separate repo at `/Users/msponagle/code/experiments/jr_be/`.
 
 ## Tech Stack
 
-- **Framework:** Next.js (App Router)
-- **Language:** TypeScript
-- **Styling:** Tailwind CSS (mobile-first)
-- **Backend:** Supabase
-  - Auth
-  - Postgres
-  - RLS
-- **AI Tools:**
-  - Figma Make → layout & presentational components
-  - Claude Code → data wiring, logic, refactors
+- **Frontend (web):** Next.js 16 App Router (`cacheComponents`), React 19, Tailwind CSS, shadcn/ui, Geist Sans.
+- **Frontend (mobile):** Expo SDK 54, Expo Router, React Native 0.81, NativeWind v4, gluestack-style native primitives, gorhom/bottom-sheet, lucide-react-native.
+- **Backend:** Supabase (Auth, Postgres + RLS, Realtime via Postgres Changes + Broadcast + Presence, Storage for `match-videos` and `athlete-photos`).
+- **Native bits:** `expo-camera` (video), `expo-secure-store` (token persistence), `expo-notifications` (push), `expo-location`, `expo-haptics`, `expo-keep-awake`, `@react-native-community/netinfo`, `@sentry/react-native`.
+- **Testing:** Vitest + React Testing Library + Playwright (web). Mobile has no test suite yet.
+- **Tooling:** TypeScript, ESLint, Husky pre-commit (`npm run typecheck` + `npm run test` across workspaces).
 
----
+## Quick Start
 
-## Architectural Principles (Very Important)
-
-### 1. Mobile-first, always
-- Design for phone screens first
-- Touch-friendly spacing
-- No hover-only interactions
-- Desktop is secondary
-
-If it doesn’t feel good on a phone browser, it’s wrong.
-
----
-
-### 2. Separation of concerns (non-negotiable)
-
-**Figma Make**
-- Generates layout and presentational components only
-- No data fetching
-- No auth logic
-- No Supabase calls
-
-**Claude Code**
-- Wires data
-- Handles auth/session logic
-- Adds guards, redirects, and mutations
-- Must not rewrite layout unless explicitly asked
-
-Never ask both tools to solve the same problem.
-
----
-
-### 3. Auth assumptions (locked in)
-
-- Supabase Auth is the source of truth
-- Every authenticated user **already has an athlete record**
-  - Athlete records are created automatically via a backend trigger
-- The frontend may assume:
-  > “If the user is authenticated, an athlete row exists.”
-
-No onboarding state machine is required.
-
----
-
-## Repo Structure
-
-```
-/app
-  /(auth)        // login, signup, reset-password
-  /(app)         // authenticated app routes
-    page.tsx     // home
-    profile/
-    challenges/
-    gyms/
-
-/components
-  /ui            // Figma Make allowed
-  /layout        // Figma Make allowed
-  /domain        // domain-aware components (Claude only)
-
-/lib
-  supabase/
-    client.ts
-    server.ts
-  guards.ts      // auth / athlete guards
-
-/types
-  athlete.ts
-  challenge.ts
-  gym.ts
+```bash
+# Install everything (root, since it's a workspaces install)
+npm install
 ```
 
----
+Set up environment variables. Each app has its own `.env.example`.
 
-## Supabase Usage Rules
+```bash
+cp apps/web/.env.example apps/web/.env.local
+cp apps/mobile/.env.example apps/mobile/.env
+```
 
-- Use `@supabase/supabase-js`
-- Do not create ad-hoc clients inline
-- Server components use the server client
-- Client components use the browser client
+Both apps need a Supabase URL and anon key (the same project values).
 
-The frontend:
-- reads tables directly (via RLS)
-- performs simple inserts/updates
-- does **not** apply ELO logic
+### Web
 
----
+```bash
+npm run dev:web                  # next dev on apps/web (http://localhost:3000)
+npm run build:web                # next build
+npm run test:web                 # vitest
+cd apps/web && npm run test:e2e  # playwright
+```
 
-## Data Flow Pattern
+### Mobile
 
-1. Authenticated session is resolved
-2. Athlete record is fetched
-3. Page renders with typed props
-4. Mutations redirect or revalidate
+```bash
+cd apps/mobile
+npx expo start                   # dev server; press i (iOS) / a (Android) / w (web preview)
+```
 
-Components do **not** fetch their own data in alpha.
+For native modules (camera, notifications, secure-store) you need a development build, not Expo Go:
 
----
+```bash
+cd apps/mobile
+eas build --profile development --platform ios     # or android
+```
 
-## What This Repo Is NOT Responsible For
+### Shared package
 
-- ELO calculation logic
-- Match integrity enforcement
-- Dispute resolution
-- Admin tooling
-- Marketing pages
+`@jits/shared` is consumed by source (`"main": "src/index.ts"`); nothing to build. Changes are picked up by both apps automatically.
 
-Those belong to:
-- backend Edge Functions
-- separate marketing repo
+```bash
+npm run typecheck:shared
+```
 
----
+## Repo Layout
 
-## Development Philosophy
+```
+apps/web/         Next.js 16 frontend (web)
+apps/mobile/      Expo React Native frontend (iOS + Android)
+packages/shared/  @jits/shared, cross-platform data layer
+research/         architecture references and integration briefs
+specs/            feature specs
+```
 
-- Alpha-first
-- Learn fast
-- Delete freely
-- Avoid abstractions you can’t justify
-- Prefer explicit code over clever code
+For the full directory tree (per app) plus naming conventions, code-quality principles, and the data-access function inventory, see [CLAUDE.md](CLAUDE.md). For the design system (color tokens, components, interaction patterns), see [DESIGN.md](DESIGN.md).
 
-Breaking changes are acceptable during alpha.
+## Repo-Wide Scripts (root `package.json`)
 
----
+| Script | What it does |
+| --- | --- |
+| `npm run dev:web` | `next dev` in `apps/web/` |
+| `npm run build:web` | `next build` in `apps/web/` |
+| `npm run test:web` | Vitest in `apps/web/` |
+| `npm run start:mobile` | `expo start` in `apps/mobile/` |
+| `npm run typecheck` | `tsc --noEmit` across all workspaces |
+| `npm run typecheck:web` / `:mobile` / `:shared` | Per-workspace typecheck |
+| `npm run test` | `npm run test --workspaces --if-present` |
+| `npm run db:types` | Regenerate `packages/shared/src/types/database.ts` from the local Supabase instance in the backend repo |
 
-## AI Tooling Guidance (For Claude Code)
+A Husky `pre-commit` hook runs `typecheck` and `test` across workspaces. Don't bypass it.
 
-When modifying this repo:
-- Do not introduce global state without justification
-- Do not add SDK layers on top of Supabase
-- Do not refactor layout unless explicitly asked
-- Respect existing folder boundaries
-- Optimize for clarity, not extensibility
+## Beta Launch Status (2026-04-27)
 
-If uncertain, ask before acting.
+Phase 1 through 5 shipped on 2026-04-27. The mobile app is feature-complete for the beta scope: auth, dashboard, gyms, leaderboard, sessions (join wizard + lobby), live match flow with video recording, push notifications, online presence, deep links (`jits://` + universal links to `jits.app`), error boundary, offline banner + mutation queue, EAS Build config, and Sentry wiring.
 
----
+Outstanding before the first store submission:
+- Replace placeholders in `apps/mobile/app.json` (bundle identifier, package, EAS project ID, updates URL).
+- Host AASA + Android `assetlinks.json` files at `https://jits.app/.well-known/`.
+- Set Sentry `org`/`project` and a real `EXPO_PUBLIC_SENTRY_DSN`.
+- Capture screenshots from a TestFlight build.
+- Run the 18-item checklist in [STORE_LISTING.md](STORE_LISTING.md).
+- Replace [PRIVACY_POLICY.md](PRIVACY_POLICY.md) and [TERMS.md](TERMS.md) drafts with legal-reviewed copy hosted at public URLs.
 
-## Goal of the Alpha Frontend
+## Contributing
 
-The frontend is “ready” when:
-- A user can sign up and log in
-- They immediately see their athlete profile
-- They can create and accept challenges
-- State updates are reflected correctly
-
-Everything else is optional.
+See [CLAUDE.md](CLAUDE.md). Highlights:
+- Components stay short; data fetching uses the shared `@jits/shared/api` layer; no raw `.from()` / `.rpc()` calls in new code.
+- Web wraps async server components in `<Suspense>` (Next.js 16 `cacheComponents`); mobile fetches via `useEffect` + cancellation-gated state writes.
+- Color tokens (`text-success`, `text-destructive`, `text-amber-500`, default foreground for ELO) are mandatory for stat displays.
+- Always update `CHANGELOG.md` under `## [Unreleased]` on every commit.
