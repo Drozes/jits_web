@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Workspace hoisting fix for `npx expo export` -- simplified `apps/mobile/metro.config.js` to use Expo SDK 52+ automatic monorepo configuration. Removed manual `watchFolders`, `nodeModulesPaths`, and `disableHierarchicalLookup: true` overrides. The previous config blocked Metro from walking nested `node_modules`, so transitive deps like `react-native-reanimated`'s `semver@^7.7.2` (which exposes `semver/functions/satisfies`) failed to resolve when an older `semver@6.3.1` was hoisted at the workspace root. `getDefaultConfig(projectRoot)` now discovers the workspace root and watch folders itself, with hierarchical lookup enabled so nested transitives resolve cleanly. Mobile bundle now compiles cleanly on iOS and Android. Unblocks Phase 5 EAS build setup.
+
 ### Added
 
 **Phase 4 Track A2 -- Mobile Live Match Wizard**
