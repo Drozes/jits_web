@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "../types/database";
+import type { Athlete } from "../types/athlete";
 import type {
   EloStakes,
   MatchHistoryRow,
@@ -19,6 +20,72 @@ import type {
 } from "../types/session";
 
 type Client = SupabaseClient<Database>;
+
+// ---------------------------------------------------------------------------
+// Current athlete (auth-context resolution)
+// ---------------------------------------------------------------------------
+
+/**
+ * Columns selected when resolving the current athlete from auth context.
+ * Both web's `requireAthlete` (and `getActiveAthlete`) in `apps/web/lib/guards.ts`
+ * and mobile's `AuthProvider` in `apps/mobile/lib/auth/auth-context.tsx`
+ * consume this projection — keep it in sync with `AthleteGuardRow` below.
+ *
+ * Excludes `created_at`, `push_token`, `role`, `avatar_url`, `default_still_url`,
+ * and `is_scoutable` to keep payloads small on every page load.
+ */
+export const ATHLETE_GUARD_SELECT =
+  "id, auth_user_id, display_name, current_elo, highest_elo, current_weight, primary_gym_id, profile_photo_url, looking_for_casual, looking_for_ranked, status, free_agent, gender, date_of_birth, city" as const;
+
+/**
+ * The subset of the `athletes` row returned by `getCurrentAthlete`.
+ * Derived from the canonical `Athlete` type so column types stay aligned
+ * with the generated `database.ts`.
+ */
+export type AthleteGuardRow = Pick<
+  Athlete,
+  | "id"
+  | "auth_user_id"
+  | "display_name"
+  | "current_elo"
+  | "highest_elo"
+  | "current_weight"
+  | "primary_gym_id"
+  | "profile_photo_url"
+  | "looking_for_casual"
+  | "looking_for_ranked"
+  | "status"
+  | "free_agent"
+  | "gender"
+  | "date_of_birth"
+  | "city"
+>;
+
+/**
+ * Fetches the athlete row associated with the currently authenticated user.
+ * Returns `null` when no athlete row exists yet (e.g. fresh signup before
+ * the setup wizard has activated the account) or on query error.
+ *
+ * Uses `.maybeSingle()` so a missing row is non-throwing — callers decide
+ * how to handle null (web guards redirect to `/profile/setup`; mobile
+ * AuthProvider keeps `athlete = null` until refresh).
+ */
+export async function getCurrentAthlete(
+  supabase: Client,
+  authUserId: string,
+): Promise<AthleteGuardRow | null> {
+  const { data, error } = await supabase
+    .from("athletes")
+    .select(ATHLETE_GUARD_SELECT)
+    .eq("auth_user_id", authUserId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("getCurrentAthlete:", error);
+    return null;
+  }
+  return (data as AthleteGuardRow | null) ?? null;
+}
 
 // ---------------------------------------------------------------------------
 // Aggregated page RPCs (single-call replacements)
