@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Swords, Handshake, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { recordMatchResult } from "@jits/shared/api/mutations";
-import { useSessionMatchSync, type BroadcastResult } from "@/hooks/use-session-match-sync";
+import { useSessionMatchSync, type BroadcastResult } from "@jits/shared/hooks/use-session-match-sync";
 import { SubmissionFields } from "@/app/(app)/match/[id]/results/submission-fields";
 import { cn } from "@/lib/utils";
 import type { SubmissionType } from "@jits/shared/types/submission-type";
@@ -45,7 +45,9 @@ export function ResultRecordingStep({ onNext, matchId, participants, submissionT
     return () => clearInterval(id);
   }, [isLocked]);
 
+  const supabase = useMemo(() => createClient(), []);
   const sync = useSessionMatchSync({
+    supabase,
     matchId,
     onResultSubmitted: (r) => onNext({ resultData: r }),
   });
@@ -55,7 +57,6 @@ export function ResultRecordingStep({ onNext, matchId, participants, submissionT
   async function handleSubmit() {
     if (!result || !canSubmit) return;
     setLoading(true);
-    const supabase = createClient();
     const res = await recordMatchResult(supabase, {
       matchId, result,
       winnerId: result === "submission" ? winnerId : undefined,

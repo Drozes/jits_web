@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Loader2, Swords, Handshake } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { createClient } from "@/lib/supabase/client";
 import { recordMatchResult } from "@jits/shared/api/mutations";
-import { useMatchSync } from "@/hooks/use-match-sync";
+import { useMatchSync } from "@jits/shared/hooks/use-match-sync";
 import { getProfilePhotoUrl, cn } from "@/lib/utils";
 import { getInitials } from "@jits/shared/utils";
 import type { MatchParticipant } from "@jits/shared/api/queries";
@@ -28,7 +28,9 @@ export function RecordResultForm({
   elapsedSeconds,
 }: RecordResultFormProps) {
   const router = useRouter();
+  const supabase = useMemo(() => createClient(), []);
   const { broadcastResultRecorded } = useMatchSync({
+    supabase,
     matchId,
     onResultRecorded: () => router.refresh(),
   });
@@ -50,7 +52,6 @@ export function RecordResultForm({
     setLoading(true);
     setError(null);
 
-    const supabase = createClient();
     const res = await recordMatchResult(supabase, {
       matchId,
       result,

@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useSessionMatchSync } from "@/hooks/use-session-match-sync";
+import { createClient } from "@/lib/supabase/client";
+import { useSessionMatchSync } from "@jits/shared/hooks/use-session-match-sync";
 
 interface TimekeeperWaitStepProps {
   onNext: () => void;
@@ -12,8 +13,10 @@ interface TimekeeperWaitStepProps {
 
 export function TimekeeperWaitStep({ onNext, matchId }: TimekeeperWaitStepProps) {
   const [timedOut, setTimedOut] = useState(false);
+  const supabase = useMemo(() => createClient(), []);
 
   useSessionMatchSync({
+    supabase,
     matchId,
     onReadySignal: () => onNext(),
   });

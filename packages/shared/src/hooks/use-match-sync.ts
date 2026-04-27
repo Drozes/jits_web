@@ -1,10 +1,8 @@
-"use client";
-
 import { useEffect, useRef, useCallback } from "react";
-import { createClient } from "@/lib/supabase/client";
-import type { RealtimeChannel } from "@supabase/supabase-js";
+import type { RealtimeChannel, SupabaseClient } from "@supabase/supabase-js";
 
 interface UseMatchSyncOpts {
+  supabase: SupabaseClient;
   matchId: string;
   onTimerStarted?: (startedAt: string) => void;
   onMatchEnded?: () => void;
@@ -17,6 +15,7 @@ interface UseMatchSyncOpts {
  * Events: timer_started, match_ended, result_recorded.
  */
 export function useMatchSync({
+  supabase,
   matchId,
   onTimerStarted,
   onMatchEnded,
@@ -31,8 +30,6 @@ export function useMatchSync({
   onResultRecordedRef.current = onResultRecorded;
 
   useEffect(() => {
-    const supabase = createClient();
-
     const channel = supabase
       .channel(`match:${matchId}`)
       .on("broadcast", { event: "timer_started" }, ({ payload }) => {
@@ -52,7 +49,7 @@ export function useMatchSync({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [matchId]);
+  }, [supabase, matchId]);
 
   const broadcastTimerStarted = useCallback((startedAt: string) => {
     channelRef.current?.send({

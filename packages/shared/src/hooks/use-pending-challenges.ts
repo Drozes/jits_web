@@ -1,7 +1,5 @@
-"use client";
-
 import { useEffect, useState, useCallback } from "react";
-import { createClient } from "@/lib/supabase/client";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 export interface PendingChallenge {
   id: string;
@@ -36,12 +34,12 @@ interface ChallengePayload {
  * Falls back to full refetch only on initial load.
  */
 export function usePendingChallenges(
+  supabase: SupabaseClient,
   athleteId: string,
 ): UsePendingChallengesResult {
   const [challenges, setChallenges] = useState<PendingChallenge[]>([]);
 
   const fetchChallenges = useCallback(async () => {
-    const supabase = createClient();
     const now = new Date().toISOString();
 
     const { data } = await supabase
@@ -70,12 +68,10 @@ export function usePendingChallenges(
         }),
       );
     }
-  }, [athleteId]);
+  }, [supabase, athleteId]);
 
   useEffect(() => {
     fetchChallenges();
-
-    const supabase = createClient();
 
     const channel = supabase
       .channel(`challenges-${athleteId}`)
@@ -130,7 +126,7 @@ export function usePendingChallenges(
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [athleteId, fetchChallenges]);
+  }, [supabase, athleteId, fetchChallenges]);
 
   return { count: challenges.length, challenges };
 }

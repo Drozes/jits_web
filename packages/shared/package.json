@@ -13,13 +13,20 @@
     "./api/chat-queries": "./src/api/chat-queries.ts",
     "./api/chat-mutations": "./src/api/chat-mutations.ts",
     "./constants": "./src/constants.ts",
+    "./hooks": "./src/hooks/index.ts",
+    "./hooks/*": "./src/hooks/*.ts",
     "./types/*": "./src/types/*.ts",
     "./utils": "./src/utils/index.ts"
   },
   "scripts": { "typecheck": "tsc --noEmit" },
-  "peerDependencies": { "@supabase/supabase-js": "^2.94.1" },
+  "peerDependencies": {
+    "@supabase/supabase-js": "^2.94.1",
+    "react": ">=19"
+  },
   "devDependencies": {
     "@supabase/supabase-js": "^2.94.1",
+    "@types/react": "^19",
+    "react": "^19",
     "typescript": "^5"
   }
 }

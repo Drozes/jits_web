@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useMemo, useState, useRef, useEffect } from "react";
 import { Check, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { startMatch } from "@jits/shared/api/mutations";
-import { useSessionMatchSync } from "@/hooks/use-session-match-sync";
+import { useSessionMatchSync } from "@jits/shared/hooks/use-session-match-sync";
 
 interface ReadyCheckStepProps {
   onNext: (data: { startedAt: string }) => void;
@@ -22,7 +22,9 @@ export function ReadyCheckStep({ onNext, matchId, currentAthleteId, opponentId, 
   const [loading, setLoading] = useState(false);
   const startedRef = useRef(false);
 
+  const supabase = useMemo(() => createClient(), []);
   const sync = useSessionMatchSync({
+    supabase,
     matchId,
     onReadySignal: (athleteId) => {
       if (athleteId === opponentId) setOpponentReady(true);
@@ -42,7 +44,6 @@ export function ReadyCheckStep({ onNext, matchId, currentAthleteId, opponentId, 
 
     startedRef.current = true;
     setLoading(true);
-    const supabase = createClient();
     const result = await startMatch(supabase, matchId);
     if (!result.ok) {
       startedRef.current = false;

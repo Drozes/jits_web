@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useSessionMatchTimer } from "@/hooks/use-session-match-timer";
-import { useSessionMatchSync } from "@/hooks/use-session-match-sync";
+import { createClient } from "@/lib/supabase/client";
+import { useSessionMatchTimer } from "@jits/shared/hooks/use-session-match-timer";
+import { useSessionMatchSync } from "@jits/shared/hooks/use-session-match-sync";
 import { cn } from "@/lib/utils";
 
 interface FighterLiveStepProps {
@@ -56,8 +57,10 @@ export function FighterLiveStep({ onNext, matchId, durationSeconds, startedAt, p
   const [expired, setExpired] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
 
+  const supabase = useMemo(() => createClient(), []);
   const timer = useSessionMatchTimer({ durationSeconds, startedAt, pausedAt, totalPausedDuration });
   const sync = useSessionMatchSync({
+    supabase,
     matchId,
     onTimerPaused: (p) => {
       timer.syncFromBroadcast({ type: "paused", pausedAt: p });

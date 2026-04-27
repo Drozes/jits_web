@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Pause, Play, Square, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { pauseMatch, resumeMatch } from "@jits/shared/api/mutations";
-import { useSessionMatchTimer } from "@/hooks/use-session-match-timer";
-import { useSessionMatchSync } from "@/hooks/use-session-match-sync";
+import { useSessionMatchTimer } from "@jits/shared/hooks/use-session-match-timer";
+import { useSessionMatchSync } from "@jits/shared/hooks/use-session-match-sync";
 import { useVideoRecorder } from "@/hooks/use-video-recorder";
 
 interface TimekeeperLiveStepProps {
@@ -22,8 +22,9 @@ export function TimekeeperLiveStep({ onNext, matchId, durationSeconds, startedAt
   const endedRef = useRef(false);
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
 
+  const supabase = useMemo(() => createClient(), []);
   const timer = useSessionMatchTimer({ durationSeconds, startedAt, pausedAt, totalPausedDuration });
-  const sync = useSessionMatchSync({ matchId });
+  const sync = useSessionMatchSync({ supabase, matchId });
   const video = useVideoRecorder(matchId);
 
   // Auto-start camera
@@ -36,7 +37,6 @@ export function TimekeeperLiveStep({ onNext, matchId, durationSeconds, startedAt
   }, []);
 
   async function handlePauseResume() {
-    const supabase = createClient();
     if (timer.paused) {
       const res = await resumeMatch(supabase, matchId);
       if (res.ok) {

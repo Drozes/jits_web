@@ -17,6 +17,12 @@
 - `apps/mobile/tailwind.config.js` -- Theme extends with light/dark semantic tokens.
 - `apps/mobile/app/**` -- Expo Router navigation skeleton with stub screens. Auth group (login/signup/forgot-password), app tab navigator (Home/Gyms/Rankings/Profile), nested session and match routes, athlete profile, settings, profile-setup wizard.
 
+**Phase 2 -- Realtime Hooks & Smoke Test (Track B)**
+- `packages/shared/src/hooks/*` -- Ported six platform-agnostic realtime hooks from `apps/web/hooks/`: `use-session-match-timer`, `use-session-match-sync`, `use-match-sync`, `use-lobby-sync`, `use-pending-challenges`, `use-global-notifications`. Hooks now accept the Supabase client as a parameter so the same code runs on web and React Native. `use-lobby-sync` parameterizes navigation via an `onMatchStarted` callback (web `router.push`, mobile expo-router); `use-global-notifications` parameterizes toast (`notify`), current-route lookup (`getCurrentRoute`), unread refresh (`onUnreadRefresh`), and deep-link builders (`buildMessageHref`, `buildLobbyHref`).
+- `packages/shared/package.json` -- Adds `./hooks` and `./hooks/*` exports plus `react` peerDependency so the package can house React hooks.
+- `apps/mobile/app/(app)/settings/realtime-test.tsx` -- Developer-only smoke-test screen exercising all four Supabase realtime patterns (channel subscribe, presence on `app:online`, broadcast self-echo, postgres-changes on `gyms`) plus `AppState` foreground/background logging. Cleans up channels on unmount.
+- `apps/mobile/app/(app)/settings/index.tsx` -- Adds a "Realtime smoke test" entry gated by `__DEV__` so it never ships to production.
+
 **Phase 2 -- Auth Foundation**
 - `apps/mobile/lib/supabase/client.ts` -- Supabase mobile client using `expo-secure-store` for token persistence; realtime configured with `heartbeatIntervalMs: 15_000` (no Web Worker on RN). Imports `react-native-url-polyfill/auto` for URL support.
 - `apps/mobile/lib/supabase/secure-storage.ts` -- async storage adapter wrapping `expo-secure-store` for Supabase auth (matches `SupportedStorage` interface).
@@ -41,6 +47,9 @@
   - Husky `prepare` hook moved to root; pre-commit delegates to workspace scripts.
   - Next.js `turbopack.root` set in `apps/web/next.config.ts` to silence multi-lockfile warning.
   - Post-merge tidy: removed dead `outside_assets` from `apps/web/tsconfig.json` exclude, made `.husky/pre-commit` executable, removed stale root-level build artifacts (`.next/`, `tsconfig.tsbuildinfo`, `next-env.d.ts`).
+
+**Phase 2 -- Realtime Hooks (Track B)**
+- `apps/web/components/layout/global-notifications-provider.tsx`, `apps/web/components/domain/notification-bell.tsx`, `apps/web/components/domain/notification-panel.tsx`, `apps/web/app/(app)/match/lobby/[id]/lobby-actions.tsx`, `apps/web/app/(app)/match/[id]/live/match-timer.tsx`, `apps/web/app/(app)/match/[id]/results/record-result-form.tsx`, `apps/web/app/(app)/session/[id]/match/[matchId]/{match-flow-wizard,steps/*}.tsx` -- Updated imports from `@/hooks/<name>` to `@jits/shared/hooks/<name>`. Now pass the Supabase client (memoized via `useMemo(() => createClient(), [])`) and platform-specific callbacks (`onMatchStarted`, `notify`, `getCurrentRoute`, `onUnreadRefresh`, `buildMessageHref`, `buildLobbyHref`) into the shared hooks. Behavior is unchanged.
 
 **Phase 2 -- Auth Wiring**
 - `apps/mobile/app/_layout.tsx` -- Wraps app in `AuthProvider`; mounts `Toaster` for in-app notifications (resolves Phase 1 W2).
