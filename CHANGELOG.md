@@ -4,6 +4,17 @@
 
 ### Added
 
+**Phase 3 Track B -- Gyms, Leaderboard, Competitor Profile (Mobile)**
+- `apps/mobile/app/(app)/gyms/index.tsx` -- Gym finder list with text filter, location-aware distance (opt-in `expo-location`), pull-to-refresh.
+- `apps/mobile/app/(app)/gyms/[id].tsx` -- Gym detail screen with upcoming sessions list. Tapping a session navigates to the join wizard (Phase 4 stub).
+- `apps/mobile/app/(app)/leaderboard/index.tsx` -- Leaderboard with fighter/gym tabs and gender filter pills (defaults to the athlete's own gender when set).
+- `apps/mobile/app/(app)/athlete/[id].tsx` -- Competitor profile with header (avatar, ELO, record), head-to-head stats card, and Compare Stats modal. Challenge button is a Phase 4 stub (toast info).
+- `apps/mobile/components/athlete-card.tsx` -- Athlete row card with rank icon, avatar (`expo-image`), ELO trend, record, and gym (mirrors web).
+- `apps/mobile/components/session-card.tsx` -- Session row card with start time, capacity, host name; tap routes to session join.
+- `apps/mobile/components/gyms/gym-card.tsx` -- Gym row card with city, member/session counts, optional distance label.
+- `apps/mobile/components/compare-stats-modal.tsx` -- Side-by-side stats comparison built on the existing `Dialog` primitive, with All/Ranked/Casual filters.
+- `apps/mobile/lib/location/use-location.ts` -- `expo-location` permission + position hook (opt-in, no auto-request) plus `haversineKm` and `formatDistanceKm` helpers.
+
 **Phase 1 -- Dark Mode + Phase 3 Native Dependencies**
 - Mobile dependencies: `lucide-react-native`, `expo-image`, `expo-image-picker`, `expo-location`. Used by Phase 3 screens (profile photo upload, gym distance, tab icons, performant images).
 - `apps/mobile/lib/theme/theme-provider.tsx`, `use-theme.ts`, `index.ts` -- Theme provider + hook wiring system color scheme into NativeWind dark variants. `ThemeProvider` mounts at the root and applies `vars()` overrides on dark mode; `useThemedTokens()` returns the right runtime token map for RN APIs that can't take className.
