@@ -3,6 +3,13 @@
 ## [Unreleased]
 
 ### Added
+- `apps/mobile/lib/supabase/client.ts` -- Supabase mobile client using `expo-secure-store` for token persistence; realtime configured with `heartbeatIntervalMs: 15_000` (no Web Worker on RN). Imports `react-native-url-polyfill/auto` for URL support.
+- `apps/mobile/lib/supabase/secure-storage.ts` -- async storage adapter wrapping `expo-secure-store` for Supabase auth (matches `SupportedStorage` interface).
+- `apps/mobile/lib/auth/auth-context.tsx` -- `AuthProvider` Context exposing `user`, `session`, `athlete`, `isLoading`, `isAthleteActive`, `signIn`, `signUp`, `signOut`, `resetPassword`, `refreshAthlete`. Subscribes to `onAuthStateChange` and keeps the athlete row in sync via inline Supabase query (mirrors `apps/web/lib/guards.ts` select list).
+- `apps/mobile/lib/auth/hooks.ts` -- `useAuth`, `useRequireAuth`, `useRequireAthlete` guard hooks. Mirrors web's `lib/guards.ts` but client-side via Expo Router `router.replace()`.
+- `apps/mobile/lib/env.ts` -- typed env access via `expo-constants` and `process.env.EXPO_PUBLIC_*`. Lazy getters so `expo export` can bundle without env vars set.
+- `apps/mobile/.env.example` -- documents `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY`.
+- Mobile dependencies: `@supabase/supabase-js@^2.94.1`, `expo-secure-store@~15.0.8`, `@react-native-async-storage/async-storage@2.2.0`, `react-native-url-polyfill@^3.0.0`.
 - `apps/mobile/` -- Expo React Native app scaffold (`@jits/mobile`) on Expo SDK 54 with Expo Router, NativeWind v4, and `@gorhom/bottom-sheet`. Single placeholder screen (`app/index.tsx`) imports `getInitials` from `@jits/shared/utils` to verify cross-package imports through the npm workspace.
 - `apps/mobile/metro.config.js` -- Metro configured to watch the workspace root and resolve hoisted `node_modules` (`watchFolders` + `nodeModulesPaths` + `disableHierarchicalLookup`); wraps the config with `withNativeWind`.
 - `apps/mobile/babel.config.js`, `tailwind.config.js`, `global.css`, `nativewind-env.d.ts` -- NativeWind v4 setup using `babel-preset-expo` with `jsxImportSource: "nativewind"`, `nativewind/babel` preset, and `react-native-reanimated/plugin` last.
@@ -16,6 +23,8 @@
 - `apps/mobile/app/**` -- Expo Router navigation skeleton with stub screens. Auth group (login/signup/forgot-password), app tab navigator (Home/Gyms/Rankings/Profile), nested session and match routes, athlete profile, settings, profile-setup wizard. All screens are placeholder stubs to be filled in later phases.
 
 ### Changed
+- `apps/mobile/app/_layout.tsx` -- wraps app in `AuthProvider`; mounts `Toaster` for in-app notifications (resolves Phase 1 W2).
+- `apps/mobile/app/index.tsx` -- auth-aware routing: redirects to `/login`, `/profile-setup`, or `/(app)/(home)` based on auth state. First runtime use of `@jits/shared/types/database` and `@jits/shared/constants` from mobile (resolves Phase 1 W4).
 - Restructured repo into npm monorepo: web app moved to `apps/web/`, shared data layer extracted to `packages/shared/` (`@jits/shared`).
   - Files moved: `lib/api/*`, `lib/constants.ts`, `types/*`, pure functions from `lib/utils.ts` (`getInitials`, `extractGymName`, `formatRelativeDate`, `formatRelativeTime`).
   - Web app imports updated to reference `@jits/shared`.
