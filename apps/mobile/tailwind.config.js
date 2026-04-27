@@ -1,69 +1,107 @@
 /** @type {import('tailwindcss').Config} */
 //
-// Theme tokens are ported from apps/web/app/globals.css. NativeWind v4 supports
-// the `dark:` variant for class-based dark mode, but it does NOT support the
-// CSS-variable-driven HSL approach that the web app uses (because RN's style
-// system does not resolve `var()` at runtime in all places). To stay compatible,
-// we declare each token as a flat HSL string and rely on the `dark:` modifier
-// on each className to flip themes (e.g. `bg-background dark:bg-background-dark`
-// is unnecessary; we instead model light values as the default and provide
-// dark-mode aware tokens for components that explicitly want dark variants).
+// Theme tokens for the mobile app. The strategy:
 //
-// For the common case, components use the semantic tokens (`bg-background`,
-// `text-foreground`, etc.) without worrying about dark mode; NativeWind picks
-// up `useColorScheme()` from React Native and applies the dark version through
-// `darkColors` keyed on the same name (Tailwind's `dark:` variant).
+//   1. Each semantic token (background, foreground, primary, etc.) is declared
+//      in Tailwind's theme as a `var(--token)` reference. Component class names
+//      like `bg-background` therefore compile to `backgroundColor: var(--background)`.
+//   2. A Tailwind base layer plugin sets the LIGHT theme defaults on `:root`.
+//   3. The mobile root layout reads `useColorScheme()` from NativeWind and, when
+//      the system is in dark mode, applies a `vars()` style object on a top-level
+//      View that overrides each `--token` with its dark value. NativeWind's
+//      `vars()` propagates the variables to all descendants.
+//
+// This means individual screens DO NOT need to add `dark:` modifiers to every
+// className. They simply use `bg-background`, `text-foreground`, etc., and the
+// app automatically follows the system theme (or any future user override).
+//
+// For the small set of RN APIs that cannot consume className (e.g. `Switch.trackColor`,
+// `BottomSheet.backgroundStyle`, `TextInput.placeholderTextColor`), call sites
+// import `useThemedTokens()` from `lib/theme/use-theme.ts` to get the right
+// token map at runtime.
 
-const lightColors = {
-  background: "hsl(220, 20%, 97%)",
-  foreground: "hsl(222, 47%, 11%)",
+const cssVarColors = {
+  background: "var(--background)",
+  foreground: "var(--foreground)",
   card: {
-    DEFAULT: "hsl(0, 0%, 100%)",
-    foreground: "hsl(222, 47%, 11%)",
+    DEFAULT: "var(--card)",
+    foreground: "var(--card-foreground)",
   },
   popover: {
-    DEFAULT: "hsl(0, 0%, 100%)",
-    foreground: "hsl(222, 47%, 11%)",
+    DEFAULT: "var(--popover)",
+    foreground: "var(--popover-foreground)",
   },
   primary: {
-    DEFAULT: "hsl(0, 85%, 46%)",
-    foreground: "hsl(0, 0%, 100%)",
+    DEFAULT: "var(--primary)",
+    foreground: "var(--primary-foreground)",
   },
   secondary: {
-    DEFAULT: "hsl(220, 14%, 94%)",
-    foreground: "hsl(222, 47%, 11%)",
+    DEFAULT: "var(--secondary)",
+    foreground: "var(--secondary-foreground)",
   },
   muted: {
-    DEFAULT: "hsl(220, 14%, 92%)",
-    foreground: "hsl(220, 9%, 46%)",
+    DEFAULT: "var(--muted)",
+    foreground: "var(--muted-foreground)",
   },
   accent: {
-    DEFAULT: "hsl(0, 85%, 46%)",
-    foreground: "hsl(0, 0%, 100%)",
+    DEFAULT: "var(--accent)",
+    foreground: "var(--accent-foreground)",
   },
   destructive: {
-    DEFAULT: "hsl(0, 84%, 50%)",
-    foreground: "hsl(0, 0%, 100%)",
+    DEFAULT: "var(--destructive)",
+    foreground: "var(--destructive-foreground)",
   },
   success: {
-    DEFAULT: "hsl(145, 63%, 37%)",
-    foreground: "hsl(0, 0%, 100%)",
+    DEFAULT: "var(--success)",
+    foreground: "var(--success-foreground)",
   },
-  border: "hsl(220, 13%, 91%)",
-  input: "hsl(220, 13%, 87%)",
-  ring: "hsl(0, 85%, 46%)",
-  gold: "hsl(38, 92%, 50%)",
-  "brand-orange": "hsl(25, 95%, 53%)",
-  "deep-red": "hsl(0, 84%, 50%)",
+  border: "var(--border)",
+  input: "var(--input)",
+  ring: "var(--ring)",
+  gold: "var(--gold)",
+  "brand-orange": "var(--brand-orange)",
+  "deep-red": "var(--deep-red)",
+};
+
+// Light theme defaults. Mirrors `lightTokens` in `lib/tokens.ts`.
+const lightVars = {
+  "--background": "hsl(220, 20%, 97%)",
+  "--foreground": "hsl(222, 47%, 11%)",
+  "--card": "hsl(0, 0%, 100%)",
+  "--card-foreground": "hsl(222, 47%, 11%)",
+  "--popover": "hsl(0, 0%, 100%)",
+  "--popover-foreground": "hsl(222, 47%, 11%)",
+  "--primary": "hsl(0, 85%, 46%)",
+  "--primary-foreground": "hsl(0, 0%, 100%)",
+  "--secondary": "hsl(220, 14%, 94%)",
+  "--secondary-foreground": "hsl(222, 47%, 11%)",
+  "--muted": "hsl(220, 14%, 92%)",
+  "--muted-foreground": "hsl(220, 9%, 46%)",
+  "--accent": "hsl(0, 85%, 46%)",
+  "--accent-foreground": "hsl(0, 0%, 100%)",
+  "--destructive": "hsl(0, 84%, 50%)",
+  "--destructive-foreground": "hsl(0, 0%, 100%)",
+  "--success": "hsl(145, 63%, 37%)",
+  "--success-foreground": "hsl(0, 0%, 100%)",
+  "--border": "hsl(220, 13%, 91%)",
+  "--input": "hsl(220, 13%, 87%)",
+  "--ring": "hsl(0, 85%, 46%)",
+  "--gold": "hsl(38, 92%, 50%)",
+  "--brand-orange": "hsl(25, 95%, 53%)",
+  "--deep-red": "hsl(0, 84%, 50%)",
 };
 
 module.exports = {
-  darkMode: "class",
+  // Dark mode is driven by the root <View style={vars(...)}> in app/_layout.tsx,
+  // not by adding a `dark` class. The `darkMode: "media"` setting also keeps
+  // NativeWind's `dark:` variant working for the rare component that wants to
+  // override per-class.
+  darkMode: "media",
   content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}"],
   presets: [require("nativewind/preset")],
   theme: {
     extend: {
-      colors: lightColors,
+      colors: cssVarColors,
       borderRadius: {
         lg: "12px",
         md: "10px",
@@ -71,5 +109,10 @@ module.exports = {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    ({ addBase }) =>
+      addBase({
+        ":root": lightVars,
+      }),
+  ],
 };

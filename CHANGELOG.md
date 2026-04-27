@@ -4,6 +4,10 @@
 
 ### Added
 
+**Phase 1 -- Dark Mode + Phase 3 Native Dependencies**
+- Mobile dependencies: `lucide-react-native`, `expo-image`, `expo-image-picker`, `expo-location`. Used by Phase 3 screens (profile photo upload, gym distance, tab icons, performant images).
+- `apps/mobile/lib/theme/theme-provider.tsx`, `use-theme.ts`, `index.ts` -- Theme provider + hook wiring system color scheme into NativeWind dark variants. `ThemeProvider` mounts at the root and applies `vars()` overrides on dark mode; `useThemedTokens()` returns the right runtime token map for RN APIs that can't take className.
+
 **Phase 1 -- Monorepo + Expo Scaffold**
 - `apps/mobile/` -- Expo React Native app scaffold (`@jits/mobile`) on Expo SDK 54 with Expo Router, NativeWind v4, and `@gorhom/bottom-sheet`.
 - `apps/mobile/metro.config.js` -- Metro configured to watch the workspace root and resolve hoisted `node_modules` (`watchFolders` + `nodeModulesPaths` + `disableHierarchicalLookup`); wraps the config with `withNativeWind`.
@@ -39,6 +43,15 @@
 ### Changed
 
 - Extracted `getCurrentAthlete(supabase, authUserId)` and `ATHLETE_GUARD_SELECT` constant to `@jits/shared/api/queries`. Web's `lib/guards.ts` and mobile's `lib/auth/auth-context.tsx` now share the same source of truth, eliminating drift risk.
+
+**Phase 1 -- Dark Mode Wiring**
+- `apps/mobile/app.json` -- `userInterfaceStyle: "automatic"` (was `"light"`). Adds `expo-image-picker` (`photosPermission`, `cameraPermission`) and `expo-location` (`locationWhenInUsePermission`) plugin entries with iOS permission descriptions.
+- `apps/mobile/tailwind.config.js` -- Semantic color tokens now resolve to `var(--<token>)`; light values are declared on `:root` via an `addBase` plugin and `darkMode` is set to `"media"`. NativeWind classes (`bg-background`, `text-foreground`, etc.) automatically follow the system color scheme via the root `ThemeProvider`. Resolves Phase 1 W1, W5.
+- `apps/mobile/app/_layout.tsx` -- Wraps the app in `<ThemeProvider>` so dark-mode CSS variables propagate to all descendants.
+- `apps/mobile/lib/tokens.ts` -- Both `lightTokens` and `darkTokens` now share an explicit `ColorTokens` type so the dark map is assignable wherever the light map is expected (used by `useThemedTokens()`).
+- `apps/mobile/components/ui/switch.tsx` -- Reads system color scheme via `useThemedTokens()` to pick the light/dark token map for `trackColor`, `thumbColor`, and `ios_backgroundColor` (resolves Phase 1 W3).
+- `apps/mobile/components/ui/sheet.tsx` -- `BottomSheet.backgroundStyle` and `handleIndicatorStyle` now driven by `useThemedTokens()` (replaces the hardcoded `hsl(0,0%,100%)` background).
+- `apps/mobile/components/ui/input.tsx` -- `placeholderTextColor` defaults to the themed `mutedForeground` token instead of the hardcoded light HSL string.
 
 **Phase 1 -- Monorepo Restructure**
 - Restructured repo into npm monorepo: web app moved to `apps/web/`, shared data layer extracted to `packages/shared/` (`@jits/shared`).

@@ -6,6 +6,7 @@ import BottomSheet, {
   type BottomSheetBackdropProps,
 } from "@gorhom/bottom-sheet";
 import { cn } from "../../lib/cn";
+import { useThemedTokens } from "../../lib/theme/use-theme";
 
 interface SheetContextValue {
   ref: React.RefObject<BottomSheet | null>;
@@ -62,6 +63,7 @@ export interface SheetContentProps {
 
 export function SheetContent({ className, snapPoints = ["50%", "90%"], children }: SheetContentProps) {
   const { ref } = useSheetContext();
+  const tokens = useThemedTokens();
   return (
     <BottomSheet
       ref={ref}
@@ -69,7 +71,8 @@ export function SheetContent({ className, snapPoints = ["50%", "90%"], children 
       snapPoints={snapPoints}
       enablePanDownToClose
       backdropComponent={renderBackdrop}
-      backgroundStyle={{ backgroundColor: "hsl(0, 0%, 100%)" }}
+      backgroundStyle={{ backgroundColor: tokens.card }}
+      handleIndicatorStyle={{ backgroundColor: tokens.mutedForeground }}
     >
       <BottomSheetView className={cn("flex-1 px-4 pb-4", className)}>
         {children}

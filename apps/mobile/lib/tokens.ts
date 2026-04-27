@@ -8,7 +8,34 @@
  * `ActivityIndicator.color`, `react-native-toast-message` config).
  */
 
-export const lightTokens = {
+export type ColorTokens = {
+  background: string;
+  foreground: string;
+  card: string;
+  cardForeground: string;
+  popover: string;
+  popoverForeground: string;
+  primary: string;
+  primaryForeground: string;
+  secondary: string;
+  secondaryForeground: string;
+  muted: string;
+  mutedForeground: string;
+  accent: string;
+  accentForeground: string;
+  destructive: string;
+  destructiveForeground: string;
+  success: string;
+  successForeground: string;
+  border: string;
+  input: string;
+  ring: string;
+  gold: string;
+  brandOrange: string;
+  deepRed: string;
+};
+
+export const lightTokens: ColorTokens = {
   background: "hsl(220, 20%, 97%)",
   foreground: "hsl(222, 47%, 11%)",
   card: "hsl(0, 0%, 100%)",
@@ -33,9 +60,9 @@ export const lightTokens = {
   gold: "hsl(38, 92%, 50%)",
   brandOrange: "hsl(25, 95%, 53%)",
   deepRed: "hsl(0, 84%, 50%)",
-} as const;
+};
 
-export const darkTokens = {
+export const darkTokens: ColorTokens = {
   background: "hsl(224, 25%, 6%)",
   foreground: "hsl(210, 40%, 98%)",
   card: "hsl(224, 25%, 9%)",
@@ -60,6 +87,4 @@ export const darkTokens = {
   gold: "hsl(38, 92%, 50%)",
   brandOrange: "hsl(25, 95%, 53%)",
   deepRed: "hsl(0, 84%, 50%)",
-} as const;
-
-export type ColorTokens = typeof lightTokens;
+};
