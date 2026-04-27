@@ -3,6 +3,10 @@
 ## [Unreleased]
 
 ### Added
+- `apps/mobile/components/ui/*` -- Native UI primitives (Button, Card, Input, Label, Avatar, Badge with success variant, Separator, Tabs, Switch, Sheet, Dialog, Select, Toast). NativeWind v4 + class-variance-authority. API mirrors shadcn/ui where reasonable.
+- `apps/mobile/lib/cn.ts` -- `cn()` helper for conditional classNames (clsx + tailwind-merge).
+- `apps/mobile/lib/tokens.ts` -- semantic color tokens (mirrors web globals.css).
+- `apps/mobile/tailwind.config.js` -- Theme extends with light/dark semantic tokens.
 - `apps/mobile/` -- Expo React Native app scaffold (`@jits/mobile`) on Expo SDK 54 with Expo Router, NativeWind v4, and `@gorhom/bottom-sheet`. Single placeholder screen (`app/index.tsx`) imports `getInitials` from `@jits/shared/utils` to verify cross-package imports through the npm workspace.
 - `apps/mobile/metro.config.js` -- Metro configured to watch the workspace root and resolve hoisted `node_modules` (`watchFolders` + `nodeModulesPaths` + `disableHierarchicalLookup`); wraps the config with `withNativeWind`.
 - `apps/mobile/babel.config.js`, `tailwind.config.js`, `global.css`, `nativewind-env.d.ts` -- NativeWind v4 setup using `babel-preset-expo` with `jsxImportSource: "nativewind"`, `nativewind/babel` preset, and `react-native-reanimated/plugin` last.
