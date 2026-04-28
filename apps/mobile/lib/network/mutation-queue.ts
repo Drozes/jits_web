@@ -52,6 +52,8 @@ class MutationQueue {
   private subscribed = false;
   /** Cached connectivity. Optimistic default so first call doesn't queue. */
   private isConnected = true;
+  /** Listeners notified whenever the queue size changes. */
+  private listeners = new Set<() => void>();
 
   private ensureSubscribed() {
     if (this.subscribed) return;
@@ -70,6 +72,28 @@ class MutationQueue {
         void this.flush();
       }
     });
+  }
+
+  private notifyListeners() {
+    for (const listener of this.listeners) {
+      try {
+        listener();
+      } catch {
+        // Don't let a misbehaving listener break the queue.
+      }
+    }
+  }
+
+  /**
+   * Subscribe to queue size changes. Returns an unsubscribe function.
+   * Used by the queued-status banner so the UI can react when entries
+   * are added (offline write) or drained (reconnect flush).
+   */
+  subscribe(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
   }
 
   /**
@@ -101,6 +125,7 @@ class MutationQueue {
         fn: fn as QueuedFn<unknown>,
         resolve: resolve as (result: Result<unknown>) => void,
       });
+      this.notifyListeners();
       // Resolve the caller right away with a queued sentinel so UI can move on.
       resolve({ ok: true, data: { queued: true, key } });
     });
@@ -122,6 +147,7 @@ class MutationQueue {
         const entry = this.entries.get(key);
         if (!entry) continue;
         this.entries.delete(key);
+        this.notifyListeners();
         try {
           await entry.fn();
         } catch (err) {
@@ -149,6 +175,7 @@ class MutationQueue {
       entry.resolve({ ok: true, data: { queued: true, key: entry.key } });
     }
     this.entries.clear();
+    this.notifyListeners();
   }
 }
 

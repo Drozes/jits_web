@@ -16,6 +16,7 @@ import { ConfirmStep } from "./steps/confirm-step";
 import { SummaryStep } from "./steps/summary-step";
 import { WaitStep } from "./steps/wait-step";
 import { WizardError, WizardLoading } from "./wizard-status";
+import { QueueStatusBanner } from "./queue-status-banner";
 
 interface MatchFlowWizardProps {
   sessionId: string;
@@ -76,6 +77,8 @@ export function MatchFlowWizard({ sessionId, matchId, currentAthleteId }: MatchF
       <Text className="text-center text-xs text-muted-foreground">
         Step {stepIdx + 1} of {MATCH_STEPS.length} - {STEP_LABELS[step]}
       </Text>
+
+      <QueueStatusBanner />
 
       {step === "wait" ? (
         <WaitStep message="Waiting for opponent..." allowSkip onSkip={() => setStep("weight")} />
