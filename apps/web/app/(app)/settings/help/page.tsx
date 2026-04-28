@@ -58,7 +58,7 @@ export default function HelpPage() {
         <section className="border-t border-border/50 pt-6">
           <h2 className="text-base font-semibold mb-4">Need More Help?</h2>
           <p className="text-sm text-muted-foreground mb-4">
-            Have a question we didn't cover? Reach out to our support team.
+            Have a question we did not cover? Reach out to our support team.
           </p>
           <a
             href="mailto:support@elorated.com"

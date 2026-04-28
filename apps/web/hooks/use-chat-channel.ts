@@ -38,6 +38,7 @@ export function useChatChannel({
 
   useEffect(() => {
     const supabase = createClient();
+    const timers = typingTimers.current;
 
     const channel = supabase
       .channel(`chat:${conversationId}`)
@@ -63,15 +64,15 @@ export function useChatChannel({
         });
 
         // Clear existing timer for this user
-        const existing = typingTimers.current.get(userId);
+        const existing = timers.get(userId);
         if (existing) clearTimeout(existing);
 
         // Auto-dismiss after 3s
-        typingTimers.current.set(
+        timers.set(
           userId,
           setTimeout(() => {
             setTypingUsers((prev) => prev.filter((id) => id !== userId));
-            typingTimers.current.delete(userId);
+            timers.delete(userId);
           }, TYPING_DISMISS_MS),
         );
       })
@@ -82,7 +83,6 @@ export function useChatChannel({
     channelRef.current = channel;
 
     return () => {
-      const timers = typingTimers.current;
       timers.forEach((t) => clearTimeout(t));
       timers.clear();
       supabase.removeChannel(channel);
