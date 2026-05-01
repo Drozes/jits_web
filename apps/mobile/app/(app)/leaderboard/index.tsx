@@ -268,10 +268,10 @@ export default function LeaderboardScreen() {
           data={filteredAthletes}
           keyExtractor={(item) => item.id}
           contentContainerStyle={{ padding: 16, paddingTop: 8, gap: 10 }}
-          renderItem={({ item }) => (
+          renderItem={({ item, index }) => (
             <AthleteCard
               id={item.id}
-              rank={item.rank}
+              rank={index + 1}
               displayName={item.displayName}
               currentElo={item.currentElo}
               eloTrend={item.eloTrend}

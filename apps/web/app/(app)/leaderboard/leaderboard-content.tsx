@@ -182,11 +182,11 @@ export function LeaderboardContent({
 
           {/* Full Rankings */}
           <div className="flex flex-col gap-2.5">
-            {filteredAthletes.map((a) => (
+            {filteredAthletes.map((a, i) => (
               <AthleteCard
                 key={a.id}
                 id={a.id}
-                rank={a.rank}
+                rank={i + 1}
                 displayName={a.displayName}
                 currentElo={a.currentElo}
                 eloTrend={a.eloTrend}

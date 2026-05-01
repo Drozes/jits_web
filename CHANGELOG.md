@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+**Demo Prep Wave 4: Final Polish (2026-05-01)**
+
+**Fixed**
+- Leaderboard ranks now recalculate after gender filtering (web + mobile). Filtered views show sequential #1, #2, #3 instead of gaps from the full population ranking.
+
 **Demo Prep Wave 3: Consistency + Resilience (2026-05-01)**
 
 **Fixed**
