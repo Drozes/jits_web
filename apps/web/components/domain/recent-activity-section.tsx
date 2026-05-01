@@ -28,17 +28,10 @@ interface ActivityItem {
 }
 
 type Scope = "me" | "all";
-type TypeFilter = "all" | "ranked" | "casual";
 
 const scopeOptions: { value: Scope; label: string }[] = [
   { value: "all", label: "All" },
   { value: "me", label: "Me" },
-];
-
-const typeOptions: { value: TypeFilter; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "ranked", label: "Ranked" },
-  { value: "casual", label: "Casual" },
 ];
 
 function FilterPill<T extends string>({ value, label, active, onSelect }: { value: T; label: string; active: boolean; onSelect: (v: T) => void }) {
@@ -59,12 +52,8 @@ function FilterPill<T extends string>({ value, label, active, onSelect }: { valu
 
 export function RecentActivitySection({ myMatches, allActivity }: { myMatches: MyMatch[]; allActivity: ActivityItem[] }) {
   const [scope, setScope] = useState<Scope>("all");
-  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
 
-  const filteredMatches = typeFilter === "all" ? myMatches : myMatches.filter((m) => m.matchType === typeFilter);
-  const filteredActivity = typeFilter === "all" ? allActivity : allActivity.filter((a) => a.matchType === typeFilter);
-
-  const hasContent = scope === "me" ? filteredMatches.length > 0 : filteredActivity.length > 0;
+  const hasContent = scope === "me" ? myMatches.length > 0 : allActivity.length > 0;
 
   return (
     <section className="flex flex-col gap-3">
@@ -88,32 +77,26 @@ export function RecentActivitySection({ myMatches, allActivity }: { myMatches: M
             <FilterPill key={o.value} value={o.value} label={o.label} active={scope === o.value} onSelect={setScope} />
           ))}
         </div>
-        <div className="h-4 w-px bg-border" />
-        <div className="flex gap-1">
-          {typeOptions.map((o) => (
-            <FilterPill key={o.value} value={o.value} label={o.label} active={typeFilter === o.value} onSelect={setTypeFilter} />
-          ))}
-        </div>
       </div>
 
       {scope === "me" ? (
         hasContent ? (
           <div className="flex flex-col gap-2">
-            {filteredMatches.map((m) => (
-              <MatchCard key={m.id} type="match" opponentName={m.opponentName} result={m.result} matchType={m.matchType} eloDelta={m.eloDelta} date={m.date} />
+            {myMatches.map((m) => (
+              <MatchCard key={m.id} type="match" opponentName={m.opponentName} result={m.result} eloDelta={m.eloDelta} date={m.date} />
             ))}
           </div>
         ) : (
-          <EmptyState message={typeFilter === "all" ? "No matches yet" : `No ${typeFilter} matches yet`} hint="Join a session at a nearby gym to start competing." showLink />
+          <EmptyState message="No matches yet" hint="Join a session at a nearby gym to start competing." showLink />
         )
       ) : hasContent ? (
         <Card className="divide-y divide-border">
-          {filteredActivity.map((item) => (
+          {allActivity.map((item) => (
             <ActivityFeedItem key={item.id} item={item} />
           ))}
         </Card>
       ) : (
-        <EmptyState message={typeFilter === "all" ? "No recent activity" : `No recent ${typeFilter} activity`} hint="Matches from all athletes at your gym will appear here." />
+        <EmptyState message="No recent activity" hint="Matches from all athletes at your gym will appear here." />
       )}
     </section>
   );
@@ -135,7 +118,6 @@ function ActivityFeedItem({ item }: { item: ActivityItem }) {
         </p>
         <p className="mt-1 text-xs text-muted-foreground">
           {formatRelativeDate(item.date)}
-          {item.matchType && <> · {item.matchType === "ranked" ? "Ranked" : "Casual"}</>}
         </p>
       </div>
     </div>

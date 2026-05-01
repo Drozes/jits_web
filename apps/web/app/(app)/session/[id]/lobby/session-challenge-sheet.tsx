@@ -7,7 +7,6 @@ import { getEloStakes } from "@jits/shared/api/queries";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
 import { MATCH_TYPE, type MatchType } from "@jits/shared/constants";
 import type { EloStakes } from "@jits/shared/types/composites";
 import type { LobbyParticipant } from "@jits/shared/types/session";
@@ -27,11 +26,10 @@ export function SessionChallengeSheet({
   open, onOpenChange, currentAthleteElo, currentAthleteWeight,
   opponent, onSendChallenge,
 }: SessionChallengeSheetProps) {
-  const [matchType, setMatchType] = useState<MatchType>(MATCH_TYPE.CASUAL);
   const [stakes, setStakes] = useState<EloStakes | null>(null);
 
   useEffect(() => {
-    if (!open || matchType !== MATCH_TYPE.RANKED) { setStakes(null); return; }
+    if (!open) { setStakes(null); return; }
     const supabase = createClient();
     getEloStakes(
       supabase,
@@ -40,7 +38,7 @@ export function SessionChallengeSheet({
       currentAthleteWeight ?? undefined,
       opponent.currentWeight ?? undefined,
     ).then((result) => { if (result) setStakes(result); });
-  }, [open, matchType, currentAthleteElo, opponent.currentElo, currentAthleteWeight, opponent.currentWeight]);
+  }, [open, currentAthleteElo, opponent.currentElo, currentAthleteWeight, opponent.currentWeight]);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -57,15 +55,8 @@ export function SessionChallengeSheet({
               ELO <span className="tabular-nums font-semibold text-foreground">{opponent.currentElo}</span>
               {opponent.currentWeight && <> &middot; {opponent.currentWeight} lbs</>}
             </p>
-            <div className="flex flex-col gap-2">
-              <Label className="text-sm font-medium">Match Type</Label>
-              <div className="flex gap-3">
-                <Button variant={matchType === MATCH_TYPE.CASUAL ? "default" : "outline"} className="flex-1" onClick={() => setMatchType(MATCH_TYPE.CASUAL)}>Casual</Button>
-                <Button variant={matchType === MATCH_TYPE.RANKED ? "default" : "outline"} className="flex-1" onClick={() => setMatchType(MATCH_TYPE.RANKED)}>Ranked</Button>
-              </div>
-            </div>
-            {matchType === MATCH_TYPE.RANKED && stakes && <StakesPreview stakes={stakes} />}
-            <Button className="h-12 text-base" onClick={() => onSendChallenge(matchType)}>Send Challenge</Button>
+            {stakes && <StakesPreview stakes={stakes} />}
+            <Button className="h-12 text-base" onClick={() => onSendChallenge(MATCH_TYPE.RANKED)}>Send Challenge</Button>
           </div>
         </div>
       </SheetContent>

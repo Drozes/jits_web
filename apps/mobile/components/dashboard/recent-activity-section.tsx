@@ -13,7 +13,6 @@ interface MyMatch {
   opponentName: string;
   opponentPhotoUrl?: string | null;
   result: MatchOutcome;
-  matchType: "ranked" | "casual";
   eloDelta: number;
   date: string;
 }
@@ -23,22 +22,14 @@ interface ActivityItem {
   winnerName: string;
   loserName: string;
   result: string;
-  matchType: string;
   date: string;
 }
 
 type Scope = "me" | "all";
-type TypeFilter = "all" | "ranked" | "casual";
 
 const scopeOptions: { value: Scope; label: string }[] = [
   { value: "all", label: "All" },
   { value: "me", label: "Me" },
-];
-
-const typeOptions: { value: TypeFilter; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "ranked", label: "Ranked" },
-  { value: "casual", label: "Casual" },
 ];
 
 function FilterPill<T extends string>({ value, label, active, onSelect }: { value: T; label: string; active: boolean; onSelect: (v: T) => void }) {
@@ -92,7 +83,6 @@ function ActivityFeedItem({ item }: { item: ActivityItem }) {
         </Text>
         <Text className="mt-1 text-xs text-muted-foreground">
           {formatRelativeDate(item.date)}
-          {item.matchType ? ` · ${item.matchType === "ranked" ? "Ranked" : "Casual"}` : ""}
         </Text>
       </View>
     </View>
@@ -109,12 +99,8 @@ interface RecentActivitySectionProps {
 export function RecentActivitySection({ myMatches, allActivity, onPressMatch, onPressFindSession }: RecentActivitySectionProps) {
   const router = useRouter();
   const [scope, setScope] = React.useState<Scope>("all");
-  const [typeFilter, setTypeFilter] = React.useState<TypeFilter>("all");
 
-  const filteredMatches = typeFilter === "all" ? myMatches : myMatches.filter((m) => m.matchType === typeFilter);
-  const filteredActivity = typeFilter === "all" ? allActivity : allActivity.filter((a) => a.matchType === typeFilter);
-
-  const hasContent = scope === "me" ? filteredMatches.length > 0 : filteredActivity.length > 0;
+  const hasContent = scope === "me" ? myMatches.length > 0 : allActivity.length > 0;
 
   return (
     <View className="gap-3">
@@ -132,32 +118,23 @@ export function RecentActivitySection({ myMatches, allActivity, onPressMatch, on
         ) : null}
       </View>
 
-      <View className="flex-row items-center gap-2.5">
-        <View className="flex-row gap-1">
-          {scopeOptions.map((o) => (
-            <FilterPill key={o.value} value={o.value} label={o.label} active={scope === o.value} onSelect={setScope} />
-          ))}
-        </View>
-        <View className="h-4 w-px bg-border" />
-        <View className="flex-row gap-1">
-          {typeOptions.map((o) => (
-            <FilterPill key={o.value} value={o.value} label={o.label} active={typeFilter === o.value} onSelect={setTypeFilter} />
-          ))}
-        </View>
+      <View className="flex-row gap-1">
+        {scopeOptions.map((o) => (
+          <FilterPill key={o.value} value={o.value} label={o.label} active={scope === o.value} onSelect={setScope} />
+        ))}
       </View>
 
       {scope === "me" ? (
         hasContent ? (
           <View className="gap-2">
-            {filteredMatches.map((m) => (
+            {myMatches.map((m) => (
               <MatchCard
                 key={m.id}
                 type="match"
                 opponentName={m.opponentName}
                 opponentPhotoUrl={m.opponentPhotoUrl}
                 result={m.result}
-                matchType={m.matchType}
-                eloDelta={m.matchType === "ranked" ? m.eloDelta : undefined}
+                eloDelta={m.eloDelta}
                 date={m.date}
                 onPress={onPressMatch ? () => onPressMatch(m.id) : undefined}
               />
@@ -165,14 +142,14 @@ export function RecentActivitySection({ myMatches, allActivity, onPressMatch, on
           </View>
         ) : (
           <EmptyState
-            message={typeFilter === "all" ? "No matches yet. Join a session to get started!" : `No ${typeFilter} matches yet. Join a session to get started!`}
+            message="No matches yet. Join a session to get started!"
             showLink
             onPressLink={onPressFindSession ?? (() => router.push("/(app)/gyms"))}
           />
         )
       ) : hasContent ? (
         <Card>
-          {filteredActivity.map((item, idx) => (
+          {allActivity.map((item, idx) => (
             <View key={item.id}>
               {idx > 0 ? <View className="h-px bg-border" /> : null}
               <ActivityFeedItem item={item} />
@@ -180,7 +157,7 @@ export function RecentActivitySection({ myMatches, allActivity, onPressMatch, on
           ))}
         </Card>
       ) : (
-        <EmptyState message={typeFilter === "all" ? "No recent activity yet. Join a session to get started!" : `No recent ${typeFilter} activity yet`} />
+        <EmptyState message="No recent activity yet. Join a session to get started!" />
       )}
     </View>
   );

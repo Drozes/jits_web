@@ -64,7 +64,7 @@ export default function SessionLobbyScreen() {
     setTimeout(() => setRefreshing(false), 600);
   }, [refresh]);
 
-  async function handleChallenge(opponent: LobbyParticipant, matchType: "casual" | "ranked") {
+  async function handleChallenge(opponent: LobbyParticipant) {
     if (!athlete || challengeLoading) return;
     setChallengeLoading(true);
     const result = await createInSessionMatch(supabase, {
@@ -79,10 +79,6 @@ export default function SessionLobbyScreen() {
       });
       return;
     }
-    // Note: match-type selection isn't yet sent to the backend by
-    // `createInSessionMatch` (RPC takes only sessionId + opponentId).
-    // Web has the same limitation; A2 may extend the RPC.
-    void matchType;
     router.push(`/session/${id}/match/${result.data.matchId}`);
   }
 
@@ -156,8 +152,8 @@ export default function SessionLobbyScreen() {
                 key={p.athleteId}
                 participant={p}
                 onChallenge={(opponent) =>
-                  showChallengeActionSheet(opponent, (matchType) =>
-                    handleChallenge(opponent, matchType),
+                  showChallengeActionSheet(opponent, () =>
+                    handleChallenge(opponent),
                   )
                 }
                 isBusy={busyIds.has(p.athleteId)}

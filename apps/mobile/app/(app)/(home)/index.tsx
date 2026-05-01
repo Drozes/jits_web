@@ -80,7 +80,6 @@ export default function DashboardScreen() {
     id: m.match_id,
     opponentName: m.opponent_name,
     result: m.outcome,
-    matchType: m.match_type as "ranked" | "casual",
     eloDelta: m.elo_delta,
     date: m.completed_at,
   }));
@@ -90,7 +89,6 @@ export default function DashboardScreen() {
     winnerName: a.winner_name,
     loserName: a.loser_name,
     result: a.result,
-    matchType: a.match_type,
     date: a.completed_at,
   }));
 

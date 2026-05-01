@@ -115,14 +115,11 @@ function HeroSubtitle({ lookingForCasual, lookingForRanked }: { lookingForCasual
   const isLooking = lookingForCasual || lookingForRanked;
 
   if (isLooking) {
-    const label = lookingForCasual && lookingForRanked
-      ? "Ranked & Casual matches"
-      : lookingForRanked ? "Ranked matches" : "Casual matches";
     return (
       <div className="flex items-center gap-2 mt-1">
         <Radio className="h-3.5 w-3.5 text-green-500 animate-pulse" />
         <p className="text-sm font-medium text-green-600 dark:text-green-400">
-          Looking for {label}
+          Looking for matches
         </p>
       </div>
     );

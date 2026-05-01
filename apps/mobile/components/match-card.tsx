@@ -56,7 +56,6 @@ function CardInner({ type = "match", opponentName, opponentPhotoUrl, result, sta
           <Text className="text-sm font-medium text-foreground" numberOfLines={1}>{opponentName}</Text>
           <Text className="text-xs text-muted-foreground" numberOfLines={1}>
             {formatRelativeDate(date)}
-            {matchType ? ` · ${matchType === "ranked" ? "Ranked" : "Casual"}` : ""}
           </Text>
         </View>
       </View>

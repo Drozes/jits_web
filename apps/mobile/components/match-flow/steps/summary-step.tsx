@@ -42,7 +42,7 @@ export function SummaryStep(props: SummaryStepProps) {
         ) : (
           <Text className="text-2xl font-bold text-foreground">Match Recorded</Text>
         )}
-        {matchType === "ranked" && eloDelta != null && eloDelta !== 0 ? (
+        {eloDelta != null && eloDelta !== 0 ? (
           <Text
             className={cn(
               "text-base font-semibold tabular-nums",
@@ -52,9 +52,6 @@ export function SummaryStep(props: SummaryStepProps) {
             {eloDelta > 0 ? "+" : ""}
             {eloDelta} ELO
           </Text>
-        ) : null}
-        {matchType === "casual" ? (
-          <Text className="text-sm text-muted-foreground">Casual match (no ELO change).</Text>
         ) : null}
       </View>
       <View className="w-full gap-3 pt-2">

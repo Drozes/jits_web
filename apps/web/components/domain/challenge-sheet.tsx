@@ -27,6 +27,7 @@ interface ChallengeSheetProps {
   competitorWeight: number | null;
   currentAthleteElo: number;
   currentAthleteWeight: number | null;
+  /** @deprecated All matches are now ranked. Ignored. */
   defaultMatchType?: MatchType;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -44,7 +45,7 @@ export function ChallengeSheet({
   onOpenChange,
 }: ChallengeSheetProps) {
   const router = useRouter();
-  const [matchType, setMatchType] = useState<MatchType>(defaultMatchType ?? MATCH_TYPE.CASUAL);
+  const matchType = MATCH_TYPE.RANKED;
   const [weight, setWeight] = useState(currentAthleteWeight?.toString() ?? "");
   const [stakes, setStakes] = useState<EloStakes | null>(null);
   const [weightConfirmed, setWeightConfirmed] = useState(false);
@@ -67,7 +68,7 @@ export function ChallengeSheet({
   }, [open, competitorId]);
 
   useEffect(() => {
-    if (matchType !== MATCH_TYPE.RANKED || !open) {
+    if (!open) {
       setStakes(null);
       return;
     }
@@ -85,7 +86,6 @@ export function ChallengeSheet({
   }, [matchType, open, currentAthleteElo, competitorElo, currentAthleteWeight, competitorWeight]);
 
   function resetState() {
-    setMatchType(defaultMatchType ?? MATCH_TYPE.CASUAL);
     setWeight(currentAthleteWeight?.toString() ?? "");
     setStakes(null);
     setWeightConfirmed(false);
@@ -167,36 +167,8 @@ export function ChallengeSheet({
           </div>
         ) : (
           <div className="flex flex-col gap-6 pt-2">
-            {/* Match Type */}
-            <div className="flex flex-col gap-3">
-              <Label className="text-sm font-medium">Match Type</Label>
-              <div className="flex gap-3">
-                <Button
-                  variant={matchType === MATCH_TYPE.CASUAL ? "default" : "outline"}
-                  className="flex-1"
-                  onClick={() => setMatchType(MATCH_TYPE.CASUAL)}
-                  type="button"
-                >
-                  Casual
-                </Button>
-                <Button
-                  variant={matchType === MATCH_TYPE.RANKED ? "default" : "outline"}
-                  className="flex-1"
-                  onClick={() => setMatchType(MATCH_TYPE.RANKED)}
-                  type="button"
-                >
-                  Ranked
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {matchType === MATCH_TYPE.CASUAL
-                  ? "Practice match — no ELO changes"
-                  : "Competitive match — ELO at stake"}
-              </p>
-            </div>
-
             {/* ELO Stakes Preview */}
-            {matchType === MATCH_TYPE.RANKED && stakes && (
+            {stakes && (
               <Card className="bg-primary/5 border-primary/20">
                 <CardContent className="p-3">
                   <p className="text-xs font-medium mb-2">ELO Stakes</p>

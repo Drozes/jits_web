@@ -41,9 +41,6 @@ function CardInner({ type, opponentName, opponentPhotoUrl, result, status, direc
           <p className="text-sm font-medium truncate">{opponentName}</p>
           <p className="text-xs text-muted-foreground">
             {formatRelativeDate(date)}
-            {matchType && (
-              <> · <span className="font-medium">{matchType === "ranked" ? "Ranked" : "Casual"}</span></>
-            )}
           </p>
         </div>
       </div>

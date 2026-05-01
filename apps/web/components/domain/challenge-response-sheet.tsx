@@ -24,7 +24,7 @@ import {
   Scale,
 } from "lucide-react";
 import type { EloStakes } from "@jits/shared/types/composites";
-import { MATCH_TYPE, type MatchType } from "@jits/shared/constants";
+import type { MatchType } from "@jits/shared/constants";
 
 interface ChallengeResponseSheetProps {
   challenge: {
@@ -53,7 +53,7 @@ export function ChallengeResponseSheet({
   const [success, setSuccess] = useState<"accepted" | "declined" | null>(null);
 
   useEffect(() => {
-    if (challenge.matchType !== MATCH_TYPE.RANKED || !open) {
+    if (!open) {
       setStakes(null);
       return;
     }
@@ -180,16 +180,11 @@ export function ChallengeResponseSheet({
                     {challenge.challengerWeight} lbs
                   </Badge>
                 )}
-                <Badge
-                  variant={challenge.matchType === MATCH_TYPE.RANKED ? "default" : "outline"}
-                >
-                  {challenge.matchType === MATCH_TYPE.RANKED ? "Ranked" : "Casual"}
-                </Badge>
               </div>
             </div>
 
-            {/* ELO Stakes (ranked only) */}
-            {challenge.matchType === MATCH_TYPE.RANKED && stakes && (
+            {/* ELO Stakes */}
+            {stakes && (
               <Card className="bg-primary/5 border-primary/20">
                 <CardContent className="p-3">
                   <p className="text-xs font-medium mb-2">Your ELO Stakes</p>

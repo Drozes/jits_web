@@ -30,6 +30,11 @@ interface PreferencesState {
   lookingForRanked: boolean;
 }
 
+/** Collapsed into a single toggle; both flags stay in sync for backend compat. */
+function isLookingForMatches(prefs: PreferencesState): boolean {
+  return prefs.lookingForCasual || prefs.lookingForRanked;
+}
+
 export default function SettingsScreen() {
   const { athlete, signOut } = useAuth();
   useRequireAthlete();
@@ -50,14 +55,13 @@ export default function SettingsScreen() {
     });
   }, [athlete]);
 
-  const setPref = React.useCallback(
-    async (key: keyof PreferencesState, value: boolean) => {
+  const toggleLookingForMatches = React.useCallback(
+    async (value: boolean) => {
       if (!athlete) return;
-      const next: PreferencesState = { ...prefs, [key]: value };
+      const next: PreferencesState = { lookingForCasual: value, lookingForRanked: value };
       setPrefs(next);
       const result = await toggleMatchPreferences(supabase, athlete.id, next);
       if (!result.ok) {
-        // Revert on failure.
         setPrefs(prefs);
         toast.error(result.error.message);
       }
@@ -91,18 +95,10 @@ export default function SettingsScreen() {
           <CardContent className="p-0">
             <PreferenceRow
               icon={<Swords size={16} color={tokens.mutedForeground} />}
-              label="Looking for casual"
-              description="Show me to athletes seeking a casual roll"
-              value={prefs.lookingForCasual}
-              onValueChange={(v) => setPref("lookingForCasual", v)}
-            />
-            <View className="h-px bg-border" />
-            <PreferenceRow
-              icon={<Swords size={16} color={tokens.mutedForeground} />}
-              label="Looking for ranked"
-              description="Show me to athletes seeking a ranked match"
-              value={prefs.lookingForRanked}
-              onValueChange={(v) => setPref("lookingForRanked", v)}
+              label="Looking for matches"
+              description="Show me to athletes looking for a match"
+              value={isLookingForMatches(prefs)}
+              onValueChange={toggleLookingForMatches}
             />
           </CardContent>
         </Card>

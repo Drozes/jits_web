@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+**All Matches Ranked (2026-05-01)**
+
+**Removed**
+- Casual/Ranked match type selection from web session challenge sheet, direct challenge sheet, and challenge response sheet.
+- Casual/Ranked match type selection from mobile challenge action sheet (now simple "Challenge?" confirmation).
+- "Ranked"/"Casual" filter tabs from recent activity sections (web + mobile).
+- "Ranked"/"Casual" labels from match cards (web + mobile).
+- "Casual match (no ELO change)" conditional message from mobile match summary step; ELO delta always shown.
+- Separate `looking_for_casual` / `looking_for_ranked` toggles from mobile settings; collapsed to single "Looking for matches" toggle.
+- Separate casual/ranked preference display from web dashboard hero subtitle; simplified to "Looking for matches".
+
+**Changed**
+- All challenge sheets now hardcode `matchType: "ranked"` and always show ELO stakes preview.
+- Web arena toggle collapsed from two badges to single on/off toggle.
+
 **Demo Prep Wave 6: Setup + Branding Polish (2026-05-01)**
 
 **Added**
