@@ -2,9 +2,10 @@ import * as React from "react";
 import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { Settings, Share2, Trophy, UserPen } from "lucide-react-native";
+import { Monitor, Moon, Palette, Settings, Share2, Sun, Trophy, UserPen } from "lucide-react-native";
 import { useAuth, useRequireAthlete } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
+import { useThemePreference, type ThemePreference } from "@/lib/theme";
 import { supabase } from "@/lib/supabase/client";
 import { getAthleteStatsRpc, type AthleteStatsRpc } from "@jits/shared/api/queries";
 import { ProfileHeader } from "@/components/profile/profile-header";
@@ -20,6 +21,7 @@ export default function ProfileScreen() {
   const { signOut } = useAuth();
   const router = useRouter();
   const tokens = useThemedTokens();
+  const { resolved, setPreference } = useThemePreference();
 
   const [stats, setStats] = React.useState<AthleteStatsRpc | null>(null);
   const [gymName, setGymName] = React.useState<string | null>(null);
@@ -142,6 +144,7 @@ export default function ProfileScreen() {
               <CardContent className="p-4">
                 <Text className="text-base font-semibold text-foreground mb-3">Account</Text>
                 <View className="gap-1">
+                  <ThemeSwitcherRow onSelect={setPreference} />
                   <SettingsRow
                     icon={<UserPen size={16} className="text-foreground" />}
                     label="Edit Profile"
@@ -178,5 +181,56 @@ function SettingsRow({ icon, label, labelClassName, onPress }: { icon?: React.Re
       {icon ? <View className="mr-3">{icon}</View> : null}
       <Text className={`text-sm font-medium ${labelClassName ?? "text-foreground"}`}>{label}</Text>
     </Pressable>
+  );
+}
+
+const THEME_OPTIONS: { value: ThemePreference; icon: typeof Sun; label: string }[] = [
+  { value: "light", icon: Sun, label: "Light" },
+  { value: "dark", icon: Moon, label: "Dark" },
+  { value: "system", icon: Monitor, label: "System" },
+];
+
+function ThemeSwitcherRow({ onSelect }: { onSelect: (pref: ThemePreference) => void }) {
+  const { resolved } = useThemePreference();
+  const [stored, setStored] = React.useState<ThemePreference>("system");
+  const tokens = useThemedTokens();
+
+  React.useEffect(() => {
+    (async () => {
+      const AsyncStorage = (await import("@react-native-async-storage/async-storage")).default;
+      const val = await AsyncStorage.getItem("elo-rated-theme-preference");
+      if (val === "light" || val === "dark" || val === "system") setStored(val);
+    })();
+  }, [resolved]);
+
+  return (
+    <View className="flex-row items-center justify-between px-3 h-10">
+      <View className="flex-row items-center">
+        <View className="mr-3">
+          <Palette size={16} className="text-foreground" />
+        </View>
+        <Text className="text-sm font-medium text-foreground">Theme</Text>
+      </View>
+      <View className="flex-row rounded-lg overflow-hidden border border-border">
+        {THEME_OPTIONS.map(({ value, icon: Icon, label }) => {
+          const active = stored === value;
+          return (
+            <Pressable
+              key={value}
+              onPress={() => {
+                setStored(value);
+                onSelect(value);
+              }}
+              className={`flex-row items-center px-2.5 py-1.5 ${active ? "bg-muted" : ""}`}
+            >
+              <Icon size={14} color={active ? tokens.foreground : tokens.mutedForeground} />
+              <Text className={`text-xs ml-1 ${active ? "text-foreground font-medium" : "text-muted-foreground"}`}>
+                {label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
   );
 }

@@ -99,6 +99,26 @@ export default function GymDetailScreen() {
     });
   }, [location.position, coords]);
 
+  const rsvpSet = React.useMemo(
+    () => new Set(data?.rsvpSessionIds ?? []),
+    [data?.rsvpSessionIds],
+  );
+  const participantSet = React.useMemo(
+    () => new Set(data?.participantSessionIds ?? []),
+    [data?.participantSessionIds],
+  );
+
+  // Active sessions first, then upcoming sorted by closest start time
+  const sortedSessions = React.useMemo(
+    () =>
+      [...(data?.sessions ?? [])].sort((a, b) => {
+        if (a.status === "active" && b.status !== "active") return -1;
+        if (a.status !== "active" && b.status === "active") return 1;
+        return new Date(a.scheduledStart).getTime() - new Date(b.scheduledStart).getTime();
+      }),
+    [data?.sessions],
+  );
+
   if (authLoading || isLoading) {
     return (
       <SafeAreaView className="flex-1 bg-background items-center justify-center">
@@ -122,9 +142,6 @@ export default function GymDetailScreen() {
     );
   }
 
-  const rsvpSet = new Set(data.rsvpSessionIds);
-  const participantSet = new Set(data.participantSessionIds);
-
   return (
     <SafeAreaView className="flex-1 bg-background" edges={["top"]}>
       <View className="flex-row items-center px-4 py-3 border-b border-border">
@@ -135,7 +152,7 @@ export default function GymDetailScreen() {
       </View>
 
       <FlatList
-        data={data.sessions}
+        data={sortedSessions}
         keyExtractor={(s) => s.id}
         contentContainerStyle={{ padding: 16, gap: 12 }}
         ListHeaderComponent={

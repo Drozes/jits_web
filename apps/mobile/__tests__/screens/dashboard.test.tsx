@@ -128,7 +128,7 @@ jest.mock("@jits/shared/api/queries", () => ({
 jest.mock("@jits/shared/types/composites", () => ({}), { virtual: true });
 jest.mock("@jits/shared/types/session", () => ({}), { virtual: true });
 
-import DashboardScreen from "@/app/(app)/(home)/index";
+import DashboardScreen from "@/app/(app)/(tabs)/(home)/index";
 
 beforeEach(() => {
   jest.clearAllMocks();
