@@ -42,6 +42,7 @@ export interface GymDetail {
   status: string;
   sessions: SessionListItem[];
   rsvpSessionIds: string[];
+  memberCount: number;
   isMemberGym: boolean;
 }
 

@@ -589,12 +589,19 @@ export async function getGymDetail(
     createdByName: creatorNameMap.get(s.created_by) ?? "Unknown",
   }));
 
-  // 5. Check membership
-  const { data: athleteRow } = await supabase
-    .from("athletes")
-    .select("primary_gym_id")
-    .eq("id", athleteId)
-    .single();
+  // 5. Check membership + count members
+  const [{ data: athleteRow }, { count: memberCount }] = await Promise.all([
+    supabase
+      .from("athletes")
+      .select("primary_gym_id")
+      .eq("id", athleteId)
+      .single(),
+    supabase
+      .from("athletes")
+      .select("id", { count: "exact", head: true })
+      .eq("primary_gym_id", gymId)
+      .eq("status", "active"),
+  ]);
 
   const isMemberGym = athleteRow?.primary_gym_id === gymId;
 
@@ -605,6 +612,7 @@ export async function getGymDetail(
     status: gym.status,
     sessions: sessionListItems,
     rsvpSessionIds,
+    memberCount: memberCount ?? 0,
     isMemberGym,
   };
 }

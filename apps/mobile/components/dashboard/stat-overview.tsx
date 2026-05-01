@@ -50,7 +50,7 @@ export function StatOverview({ athlete, stats }: StatOverviewProps) {
             </View>
             <Text className="text-sm font-medium text-muted-foreground mb-1.5">Rank</Text>
             <Text className="text-2xl font-bold tabular-nums text-foreground">
-              {stats.rank > 0 ? `#${stats.rank}` : "—"}
+              {stats.rank > 0 ? `#${stats.rank}` : "Unranked"}
             </Text>
             {showBestRank ? <PeakLabel>best: #{stats.bestRank}</PeakLabel> : null}
           </CardContent>

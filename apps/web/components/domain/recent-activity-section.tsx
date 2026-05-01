@@ -104,7 +104,7 @@ export function RecentActivitySection({ myMatches, allActivity }: { myMatches: M
             ))}
           </div>
         ) : (
-          <EmptyState message={typeFilter === "all" ? "No matches yet" : `No ${typeFilter} matches yet`} showLink />
+          <EmptyState message={typeFilter === "all" ? "No matches yet" : `No ${typeFilter} matches yet`} hint="Join a session at a nearby gym to start competing." showLink />
         )
       ) : hasContent ? (
         <Card className="divide-y divide-border">
@@ -113,7 +113,7 @@ export function RecentActivitySection({ myMatches, allActivity }: { myMatches: M
           ))}
         </Card>
       ) : (
-        <EmptyState message={typeFilter === "all" ? "No recent activity" : `No recent ${typeFilter} activity`} />
+        <EmptyState message={typeFilter === "all" ? "No recent activity" : `No recent ${typeFilter} activity`} hint="Matches from all athletes at your gym will appear here." />
       )}
     </section>
   );
@@ -142,10 +142,11 @@ function ActivityFeedItem({ item }: { item: ActivityItem }) {
   );
 }
 
-function EmptyState({ message, showLink }: { message: string; showLink?: boolean }) {
+function EmptyState({ message, hint, showLink }: { message: string; hint?: string; showLink?: boolean }) {
   return (
     <div className="rounded-2xl border border-dashed border-border p-8 text-center">
       <p className="text-sm text-muted-foreground">{message}</p>
+      {hint && <p className="text-xs text-muted-foreground/70 mt-1">{hint}</p>}
       {showLink && (
         <Link href="/gyms" className="text-xs font-medium text-primary hover:underline mt-2 inline-block">
           Find a session

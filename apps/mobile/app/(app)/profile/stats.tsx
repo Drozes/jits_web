@@ -118,7 +118,7 @@ export default function ProfileStatsScreen() {
               </Card>
             </View>
 
-            {/* ELO history placeholder */}
+            {/* ELO history */}
             <Card>
               <CardContent className="p-4 items-center gap-2">
                 <View className="flex-row items-center gap-2">
@@ -128,8 +128,8 @@ export default function ProfileStatsScreen() {
                 <View className="h-32 w-full items-center justify-center bg-muted/40 rounded-lg">
                   <Text className="text-xs text-muted-foreground text-center px-4">
                     {data?.eloHistory.length
-                      ? `${data.eloHistory.length} rating points recorded. Chart visualization coming in polish phase.`
-                      : "ELO history chart (placeholder)"}
+                      ? `${data.eloHistory.length} rating points recorded`
+                      : "No matches yet"}
                   </Text>
                 </View>
               </CardContent>

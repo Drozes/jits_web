@@ -12,11 +12,14 @@ const tabs = [
   { href: "/profile", label: "Profile", icon: User },
 ] as const;
 
-// Hide the nav bar during session match flow, lobby, and join wizard
+// Hide the nav bar on immersive routes (match flow, lobby, join wizard, setup)
 const HIDE_PATTERNS = [
   /^\/session\/[^/]+\/match\//,
   /^\/session\/[^/]+\/lobby/,
   /^\/session\/[^/]+\/join/,
+  /^\/match\/[^/]+\/live/,
+  /^\/match\/[^/]+\/results/,
+  /^\/profile\/setup/,
 ];
 
 export function BottomNavBar() {

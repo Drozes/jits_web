@@ -118,8 +118,8 @@ export default function SettingsScreen() {
                   Push notifications
                 </Text>
                 <Text className="text-xs text-muted-foreground">
-                  Channel-specific toggles coming soon. Manage at the OS level
-                  in your device settings.
+                  Individual notification preferences are being finalized. Use
+                  your device settings to manage notifications.
                 </Text>
               </View>
             </View>

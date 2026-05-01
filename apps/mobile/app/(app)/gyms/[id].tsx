@@ -154,7 +154,7 @@ export default function GymDetailScreen() {
             ) : null}
             <View className="flex-row items-center gap-1.5">
               <Users size={14} color={tokens.mutedForeground} />
-              <Text className="text-sm text-muted-foreground">Members at this gym</Text>
+              <Text className="text-sm text-muted-foreground">{data.memberCount} {data.memberCount === 1 ? "Member" : "Members"}</Text>
             </View>
             {location.isGranted !== true ? (
               <Pressable

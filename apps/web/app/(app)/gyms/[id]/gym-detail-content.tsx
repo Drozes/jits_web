@@ -37,7 +37,7 @@ export async function GymDetailContent({ paramsPromise }: GymDetailContentProps)
         )}
         <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
           <Users className="h-3.5 w-3.5" />
-          Members at this gym
+          {gym.memberCount} {gym.memberCount === 1 ? "Member" : "Members"}
         </div>
       </div>
 

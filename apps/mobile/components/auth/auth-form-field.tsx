@@ -23,7 +23,7 @@ export function AuthFormField({
   return (
     <View className="gap-1.5">
       <Label nativeID={labelId}>{label}</Label>
-      <Input accessibilityLabelledBy={labelId} {...inputProps} />
+      <Input accessibilityLabelledBy={labelId} className={showError && error ? "border-destructive" : undefined} {...inputProps} />
       {showError && error ? (
         <Text className="text-xs text-destructive">{error}</Text>
       ) : null}

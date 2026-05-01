@@ -165,7 +165,7 @@ export function RecentActivitySection({ myMatches, allActivity, onPressMatch, on
           </View>
         ) : (
           <EmptyState
-            message={typeFilter === "all" ? "No matches yet" : `No ${typeFilter} matches yet`}
+            message={typeFilter === "all" ? "No matches yet. Join a session to get started!" : `No ${typeFilter} matches yet. Join a session to get started!`}
             showLink
             onPressLink={onPressFindSession ?? (() => router.push("/(app)/gyms"))}
           />
@@ -180,7 +180,7 @@ export function RecentActivitySection({ myMatches, allActivity, onPressMatch, on
           ))}
         </Card>
       ) : (
-        <EmptyState message={typeFilter === "all" ? "No recent activity" : `No recent ${typeFilter} activity`} />
+        <EmptyState message={typeFilter === "all" ? "No recent activity yet. Join a session to get started!" : `No recent ${typeFilter} activity yet`} />
       )}
     </View>
   );

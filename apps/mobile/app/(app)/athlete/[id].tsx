@@ -275,12 +275,13 @@ export default function AthleteProfileScreen() {
             Compare Stats
           </Button>
           <Button
-            className="flex-1"
-            leftIcon={<Swords size={16} color={tokens.primaryForeground} />}
+            variant="secondary"
+            className="flex-1 opacity-60"
+            leftIcon={<Swords size={16} color={tokens.mutedForeground} />}
             onPress={() => toast.info("Challenges coming soon")}
-            disabled={!!data.pendingChallengeId}
+            disabled
           >
-            {data.pendingChallengeId ? "Pending" : "Challenge"}
+            Challenge
           </Button>
         </View>
 

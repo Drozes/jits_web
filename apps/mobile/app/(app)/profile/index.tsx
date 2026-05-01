@@ -143,7 +143,7 @@ export default function ProfileScreen() {
                   <SettingsRow
                     icon={<UserPen size={16} className="text-foreground" />}
                     label="Edit Profile"
-                    onPress={() => Alert.alert("Coming soon", "Profile editing arrives in Phase 4.")}
+                    onPress={() => Alert.alert("Coming soon", "Profile editing coming soon.")}
                   />
                   <SettingsRow
                     icon={<Settings size={16} className="text-foreground" />}

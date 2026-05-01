@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+**Demo Prep Polish (2026-05-01)**
+
+**Fixed**
+- Mobile Jest tests now pass: fixed `react` moduleNameMapper to resolve from workspace root instead of non-existent local `node_modules/react`.
+- Web bottom nav bar now hides on `/match/*/live`, `/match/*/results`, and `/profile/setup` routes.
+- Auth error page (`apps/web/app/(auth)/error/page.tsx`) shows friendly messages instead of raw Supabase error codes, with a "Back to sign in" button.
+
+**Changed**
+- Gym detail pages (web + mobile) now show actual member count (e.g., "12 Members") instead of generic "Members at this gym" text. Added `memberCount` to `GymDetail` type and count query to `getGymDetail`.
+- Web empty states (`recent-activity-section`) now include actionable hint text guiding users to join sessions.
+- Mobile ELO history placeholder shows "N rating points recorded" or "No matches yet" instead of referencing "polish phase" or "placeholder".
+- Mobile rank display shows "Unranked" instead of em dash when rank is 0.
+- Mobile auth form fields now show red border (`border-destructive`) on validation errors.
+- Mobile "coming soon" text updated: removed outdated phase references (profile editing, video settings, notification toggles).
+- Mobile challenge button on athlete profile now looks visibly disabled (secondary variant, reduced opacity).
+- Mobile empty states (dashboard recent activity) now include actionable guidance text.
+
 ### Added
 
 **Phase 5 Track B2 -- Mobile EAS Build, Sentry, Store Listing Prep**
