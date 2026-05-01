@@ -1,8 +1,8 @@
-# CLAUDE.md, JITS Development Principles
+# CLAUDE.md, ELO RATED Development Principles
 
 ## Project Overview
 
-JITS is a BJJ competitor matchmaking app. The repo is an npm-workspaces monorepo with two apps and one shared package:
+ELO RATED is a BJJ competitor matchmaking and rating app. The repo is an npm-workspaces monorepo with two apps and one shared package:
 
 - `apps/web/` (`@jits/web`), Next.js 16 App Router + Tailwind + shadcn/ui.
 - `apps/mobile/` (`@jits/mobile`), Expo SDK 54 + Expo Router + NativeWind v4 + native UI primitives.
@@ -74,7 +74,7 @@ types/
   database.ts         GENERATED via npm run db:types
   athlete.ts, challenge.ts, gym.ts, match.ts, session.ts, message.ts, ...
 utils/
-  shared.ts           getInitials, extractGymName, formatRelativeDate, formatRelativeTime
+  shared.ts           getInitials, extractGymName, formatRelativeDate, formatRelativeTime, formatTimeUntil
   tos-content.ts      TOS_TEXT (used by both web and mobile setup wizards)
   index.ts
 index.ts              umbrella re-export
@@ -136,14 +136,17 @@ apps/mobile/
     profile-setup.tsx               multi-step activation wizard
     (auth)/                         login, signup, forgot-password
     (app)/
-      _layout.tsx                   tab bar (Home, Gyms, Rankings, Profile)
-      (home)/                       dashboard
-      gyms/                         list + detail
-      leaderboard/                  fighters + gyms tabs with gender filter
-      profile/                      profile + stats
-      athlete/[id].tsx              competitor profile
+      _layout.tsx                   Stack navigator (tabs group + push destinations)
+      (tabs)/                       bottom tab navigation group
+        _layout.tsx                 tab bar (Home, Gyms, Rankings, Profile)
+        (home)/                     dashboard
+        gyms/                       list + detail
+        leaderboard/                fighters + gyms tabs with gender filter
+        profile/                    profile + stats
+      athlete/[id].tsx              competitor profile (stack screen)
       session/[id]/
-        join.tsx                    4-step join wizard
+        _layout.tsx                 themed Stack (headerStyle matches dark theme)
+        join.tsx                    2-step join wizard (weight, confirm)
         lobby.tsx                   realtime lobby
         match/[matchId].tsx         8-step live match wizard
       settings/                     index, feedback, help, video, realtime-test (dev only)
@@ -198,7 +201,7 @@ apps/mobile/
     deep-links/                     handler (jits:// + universal links)
     video/                          use-video-recorder (expo-camera),
                                     upload-recording (FileSystem.uploadAsync)
-    error-tracking/                 sentry-init
+    error-tracking/                 (removed; Sentry not yet initialized)
   app.json, eas.json, metro.config.js, babel.config.js, tailwind.config.js, global.css
   .env.example                      EXPO_PUBLIC_SUPABASE_URL, _ANON_KEY, _SENTRY_DSN
 ```
@@ -227,7 +230,7 @@ When you see the same logic in 2+ files, extract it. Before writing a new helper
 - Mobile-only helpers (uses `expo-*`, RN APIs) go in `apps/mobile/lib/<area>/`.
 - New data-access functions go in `packages/shared/src/api/queries.ts` or `mutations.ts`.
 
-**Already extracted to `@jits/shared/utils`:** `getInitials()`, `extractGymName()`, `formatRelativeDate()`, `formatRelativeTime()`, `TOS_TEXT`.
+**Already extracted to `@jits/shared/utils`:** `getInitials()`, `extractGymName()`, `formatRelativeDate()`, `formatRelativeTime()`, `formatTimeUntil()`, `TOS_TEXT`.
 
 ### 3. Supabase FK Join Behavior
 
@@ -295,16 +298,38 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
 
 When passing 4+ related fields about the same entity, group them into an object prop. New components should follow this pattern. Existing components using granular props are tech debt, refactor when touched.
 
-### 9. Color Tokens for Stats
+### 9. Color Tokens and Brand Palette
 
 Use these consistently across all stat displays on both platforms:
-- **Wins/positive:** `text-success` (inline text) or `bg-success text-success-foreground` (badges).
-- **Losses/negative:** `text-destructive` (inline text) or `bg-destructive text-destructive-foreground` (badges).
+- **Signal Red (#E63946):** `text-primary`, CTAs and state-negative (losses, destructive actions). Never decorative.
+- **Gain Green (#22C55E dark / #15803D light):** `text-success`, rating increases only. Semantic, not decorative.
 - **Draws/pressure:** `text-amber-500`.
-- **ELO/neutral stats:** default foreground color with `tabular-nums` (NOT `text-primary`, that is brand red).
-- **Brand accent:** `text-primary`, reserved for branding, buttons, and section header icons. Never for data values.
+- **Data Gray (#6B7280 / #9CA3AF):** `text-muted-foreground`, metadata and tertiary text.
+- **ELO/neutral stats:** default foreground color with `font-mono tabular-nums`. Never `text-primary` for data values.
 
-**Theme token:** `--success` (`hsl(145 63% 37%)` light / `hsl(145 63% 49%)` dark) is available as `bg-success`, `text-success`, and Badge `variant="success"`. Mobile mirrors the same tokens via `apps/mobile/lib/tokens.ts`. Light-mode lightness is tuned to pass WCAG AA on `--background`.
+**Theme tokens:** `--success` is `hsl(142 72% 29%)` light / `hsl(142 71% 45%)` dark, available as `bg-success`, `text-success`, and Badge `variant="success"`. `--primary` is `hsl(355 78% 56%)` in both themes. Mobile mirrors the same tokens via `apps/mobile/lib/tokens.ts`.
+
+**Radius:** default `--radius` is `0.25rem` (4px). Modals get 8px max. Avatars stay circular.
+
+### Brand Typography
+
+The app uses 4 purpose-bound fonts. Each font has one job:
+- **Bebas Neue** (`font-display`): Display text, wordmarks, taglines. All caps, tight line-height (0.85).
+- **DM Sans Bold** (`font-heading`): Headings, UI labels, button text. Uppercase for labels with letter-spacing 0.08em+.
+- **Inter** (`font-body`): Body text, prose, descriptions. Default body font.
+- **JetBrains Mono** (`font-mono`): ALL numeric data, ratings, deltas, rank badges, metadata labels. Always use tabular-nums.
+
+Web fonts loaded via `next/font/google` in `apps/web/app/layout.tsx`. CSS variables: `--font-display`, `--font-heading`, `--font-body`, `--font-mono`. Tailwind classes: `font-display`, `font-heading`, `font-body`, `font-mono`.
+
+Mobile fonts loaded via `expo-font` packages in `apps/mobile/app/_layout.tsx`.
+
+### Brand Design Rules
+
+- **No drop shadows.** Hierarchy via background-color shifts (Void, Panel, Plate, Plate Bright), not elevation.
+- **Sharp corners.** Default radius 4px. Max 8px for modals only. Avatars stay circular.
+- **One primary CTA per surface.** Signal Red buttons are limited to one per screen.
+- **Minimal motion.** Only auto-animated moment: rating tick (480ms). LIVE pulse (1400ms loop). All other transitions are reactive hover/focus (100ms).
+- **No decorative color.** Signal Red for CTAs only. Gain Green for rating increases only.
 
 ### 10. MatchCard Shows Match Type
 
@@ -384,23 +409,29 @@ Mobile uses topical directories under `apps/mobile/components/` (`dashboard/`, `
 - `<PushRegistrationBootstrap>` (`apps/mobile/lib/notifications/push-registration-bootstrap.tsx`).
 - `<OnlinePresenceBootstrap>` (`apps/mobile/lib/presence/online-presence-bootstrap.tsx`).
 - Deep link handler (`apps/mobile/lib/deep-links/handler.ts`) wired in `_layout.tsx`.
-- The tab bar lives in `apps/mobile/app/(app)/_layout.tsx` and uses `lucide-react-native` icons with `useThemedTokens()`.
+- The tab bar lives in `apps/mobile/app/(app)/(tabs)/_layout.tsx` and uses `lucide-react-native` icons with `useThemedTokens()`. The parent `apps/mobile/app/(app)/_layout.tsx` is a Stack navigator that renders `(tabs)` alongside push-destination routes (`athlete/[id]`, `session/[id]`, `settings`).
 
 ## Known Tech Debt (Priority Order)
 
-**High (functional issues):** none open.
-
-**Medium (Phase 5 deferred items):**
-- [ ] `apps/mobile/lib/network/mutation-queue.ts` exists but is not yet wired into the match-flow record/confirm calls. Once a user records a result offline, replay on reconnect should run automatically.
-- [ ] Universal-link verification needs hosted Apple App Site Association and Android `assetlinks.json` files at `https://jits.app/.well-known/`. App-side intent filters are already declared in `apps/mobile/app.json`.
-- [ ] `@sentry/react-native` config plugin is registered but `org`/`project` are not set in `apps/mobile/app.json`; source maps will not upload until a real Sentry project exists.
-- [ ] `react@19.1.0` (mobile) vs `react@19.2.5` (web) version drift, pre-existing, not yet causing observable issues. Resolve when bumping web to 19.2 alignment is convenient.
+**High (pre-launch blockers):**
 - [ ] `apps/mobile/app.json` placeholders: `extra.eas.projectId`, `updates.url` (project ID), `ios.bundleIdentifier`, `android.package`. Replace before the first preview build (see `STORE_LISTING.md`).
+- [ ] Sentry error tracking not initialized: `apps/mobile/lib/error-tracking/sentry-init.ts` was removed; `@sentry/react-native` config plugin needs `org`/`project` in `apps/mobile/app.json`; error boundary has no Sentry integration.
+- [ ] Universal-link verification needs hosted Apple App Site Association and Android `assetlinks.json` files at `https://jits.app/.well-known/`. App-side intent filters are already declared in `apps/mobile/app.json`.
+
+**Medium (polish and consistency):**
+- [ ] Mobile Tailwind config (`apps/mobile/tailwind.config.js`) has no `fontFamily` entries for `font-display`, `font-heading`, `font-body`, `font-mono`. Fonts are loaded via `expo-font` but not mapped to Tailwind classes. ~60 instances of raw `font-bold`/`font-semibold` instead of semantic brand typography.
+- [ ] Mobile Stack layouts missing themed header styles: `(tabs)/gyms/_layout.tsx`, `(tabs)/profile/_layout.tsx`, `(tabs)/leaderboard/_layout.tsx`, `settings/_layout.tsx` all use bare `headerShown: false` without `useThemedTokens()` header config. Pattern established in `session/[id]/_layout.tsx`.
+- [ ] Mobile components over 80-line target: `compare-stats-modal` 184, `match-flow-wizard` 182, `recent-activity-section` 164, `notification-panel` 158, `athlete-card` 145, `join-wizard` 143. Screens over 120-line target: `realtime-test` 389, `leaderboard/index` 330, `athlete/[id]` 297, `profile/index` 236.
+- [ ] `react@19.1.0` (mobile) vs `react@19.2.5` (web) version drift, pre-existing, not yet causing observable issues. Resolve when bumping web to 19.2 alignment is convenient.
 
 **Low (code-style cleanup):**
 - [ ] Auth form components on web (`login-form`, `sign-up-form`, `forgot-password-form`) share ~70% identical code.
-- [ ] 20 non-shadcn web components exceed 80-line target. Active components over target: `login-form` 186, `sign-up-form` 169, `profile-photo-upload` 165, `recent-activity-section` 155, `match-card` 108, `forgot-password-form` 105.
-- [ ] 5 web components have props that should be grouped into objects (`message-bubble`, `chat-thread`, `lobby-actions`, `arena-content`, `looking-for-match-toggle`).
+- [ ] Web components over 80-line target: `login-form` 188, `sign-up-form` 172, `profile-photo-upload` 170, `recent-activity-section` 139, `match-card` 106, `forgot-password-form` 106.
+- [ ] Mobile test coverage gaps: only 4 test files; no tests for session join wizard, match-flow state machine, video recording, push notifications, deep linking, realtime sync hooks, or offline mutation queue.
+
+**Resolved:**
+- [x] `apps/mobile/lib/network/mutation-queue.ts` is wired into `recordMatchResult` (via `use-record-result.ts`) and `confirmMatchResult` (via `confirm-step.tsx`). Queue flushes on NetInfo reconnect; `QueueStatusBanner` shows pending state.
+- [x] Phantom tab bar items (athlete, session, settings) eliminated by restructuring routes into `(app)/(tabs)/` group (2026-05-01).
 
 ## Chat UI Patterns (web)
 
@@ -610,7 +641,7 @@ This section captures details specific to `apps/mobile/`.
 
 ### Expo SDK 54 + Expo Router
 
-Routes are file-based under `apps/mobile/app/`. The auth group `(auth)/` is reachable from `app/index.tsx`'s redirect logic; the app group `(app)/` mounts the tab bar. Dynamic segments use `[id].tsx` and `[matchId].tsx`. `expo-router/types` is included via `tsconfig.json` so route names are typed.
+Routes are file-based under `apps/mobile/app/`. The auth group `(auth)/` is reachable from `app/index.tsx`'s redirect logic; the app group `(app)/` is a Stack navigator. Inside it, `(tabs)/` is a Tabs navigator with 4 tabs (Home, Gyms, Rankings, Profile); `athlete/[id]`, `session/[id]`, and `settings` are Stack screens pushed on top of the tabs. Dynamic segments use `[id].tsx` and `[matchId].tsx`. `expo-router/types` is included via `tsconfig.json` so route names are typed.
 
 ### NativeWind v4 Theming
 
@@ -656,8 +687,8 @@ Mobile-specific realtime handling:
 
 ### Error Boundary + Sentry
 
-- `apps/mobile/components/error-boundary.tsx` renders a fallback UI with retry + sign-out and forwards errors to Sentry via `captureError(error, { componentStack })`.
-- `apps/mobile/lib/error-tracking/sentry-init.ts` initializes `@sentry/react-native` from `EXPO_PUBLIC_SENTRY_DSN`. No-op when DSN absent. Called from `apps/mobile/app/_layout.tsx` at module load.
+- `apps/mobile/components/error-boundary.tsx` renders a fallback UI with retry + sign-out. Sentry forwarding is not yet wired; errors are logged to console in `__DEV__` only.
+- `apps/mobile/lib/error-tracking/sentry-init.ts` was removed. Sentry initialization is not yet implemented; requires a real Sentry project with `org`/`project` configured in `apps/mobile/app.json`.
 
 ### Mobile-only native dependencies (key list)
 

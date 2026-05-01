@@ -2,11 +2,18 @@
 
 ## [Unreleased]
 
-**Mobile UI Fixes (2026-05-01)**
+**Mobile Route Restructure (2026-05-01)**
 
 **Fixed**
+- Phantom tab bar items (athlete/[id], session/[id], settings) eliminated by moving tab routes into a dedicated `(tabs)` group under `(app)/`. `href: null` alone did not hide them in expo-router v6.
+- Session join/lobby header now uses themed dark background instead of default white.
 - Mobile profile and home screens now wrap content in `SafeAreaView` so headers no longer overlap the status bar/notch.
-- Hidden tab routes (athlete, session, settings) no longer render as extra tab bar items; added explicit `tabBarButton` override alongside `href: null`.
+
+**Changed**
+- `apps/mobile/app/(app)/_layout.tsx` converted from `Tabs` to `Stack` navigator.
+- Tab routes (`(home)`, `gyms`, `leaderboard`, `profile`) moved to `apps/mobile/app/(app)/(tabs)/`.
+- New `apps/mobile/app/(app)/(tabs)/_layout.tsx` holds the tab bar configuration.
+- `apps/mobile/app/(app)/session/[id]/_layout.tsx` now applies themed header styles.
 
 **All Matches Ranked (2026-05-01)**
 
