@@ -45,7 +45,7 @@ export async function GymDetailContent({ paramsPromise }: GymDetailContentProps)
       {gym.isMemberGym && <StartSessionButton gymId={id} />}
 
       {/* Sessions list */}
-      <SessionList sessions={gym.sessions} rsvpSessionIds={gym.rsvpSessionIds} />
+      <SessionList sessions={gym.sessions} rsvpSessionIds={gym.rsvpSessionIds} participantSessionIds={gym.participantSessionIds} />
     </div>
   );
 }

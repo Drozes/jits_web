@@ -9,6 +9,7 @@ import type { SessionListItem } from "@jits/shared/types/session";
 interface SessionCardProps {
   session: SessionListItem;
   isRsvpd: boolean;
+  isParticipant?: boolean;
 }
 
 function formatSessionTime(start: string, end: string) {
@@ -20,7 +21,7 @@ function formatSessionTime(start: string, end: string) {
   return `${dateStr}, ${startTime} - ${endTime}`;
 }
 
-export function SessionCard({ session, isRsvpd }: SessionCardProps) {
+export function SessionCard({ session, isRsvpd, isParticipant }: SessionCardProps) {
   const title = session.title ?? "Open Mat";
   const isActive = session.status === "active";
   const capacityText = session.maxParticipants
@@ -62,8 +63,8 @@ export function SessionCard({ session, isRsvpd }: SessionCardProps) {
 
         <div className="mt-1">
           {isActive ? (
-            <Link href={`/session/${session.id}/join`}>
-              <Button size="sm" className="w-full">Join Lobby</Button>
+            <Link href={isParticipant ? `/session/${session.id}/lobby` : `/session/${session.id}/join`}>
+              <Button size="sm" className="w-full">{isParticipant ? "Return to Lobby" : "Join Lobby"}</Button>
             </Link>
           ) : (
             <RsvpButton sessionId={session.id} isRsvpd={isRsvpd} />

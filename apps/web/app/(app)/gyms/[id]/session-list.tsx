@@ -5,9 +5,10 @@ import type { SessionListItem } from "@jits/shared/types/session";
 interface SessionListProps {
   sessions: SessionListItem[];
   rsvpSessionIds: string[];
+  participantSessionIds: string[];
 }
 
-export function SessionList({ sessions, rsvpSessionIds }: SessionListProps) {
+export function SessionList({ sessions, rsvpSessionIds, participantSessionIds }: SessionListProps) {
   return (
     <section className="flex flex-col gap-3">
       <div className="flex items-center gap-2">
@@ -29,6 +30,7 @@ export function SessionList({ sessions, rsvpSessionIds }: SessionListProps) {
               key={session.id}
               session={session}
               isRsvpd={rsvpSessionIds.includes(session.id)}
+              isParticipant={participantSessionIds.includes(session.id)}
             />
           ))}
         </div>

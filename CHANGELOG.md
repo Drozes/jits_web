@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+**Demo Prep Wave 5: Web Parity Fixes (2026-05-01)**
+
+**Fixed**
+- Web: Opponent now navigates to match screen via postgres_changes fallback (same fix as mobile wave 2).
+- Web: match_started broadcast handler now navigates participants when matchId is present.
+- Web: Session cards show "Return to Lobby" and route directly to lobby for active participants (eliminates join-to-lobby redirect flash, matching mobile).
+
 **Demo Prep Wave 4: Final Polish (2026-05-01)**
 
 **Fixed**

@@ -51,8 +51,12 @@ export function useSessionLobbyRealtime(
       .channel(`session-participants:${sessionId}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "session_participants", filter: `session_id=eq.${sessionId}` }, () => {})
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "session_participants", filter: `session_id=eq.${sessionId}` }, ({ new: row }) => {
-        const r = row as { athlete_id: string; status: string; current_match_id?: string };
+        const r = row as { athlete_id: string; status: string; current_match_id?: string | null };
         setParticipants((prev) => prev.map((p) => p.athleteId === r.athlete_id ? { ...p, status: r.status, currentMatchId: r.current_match_id ?? null } : p));
+        // If this athlete was assigned a match, navigate immediately.
+        if (r.athlete_id === meRef.current && r.current_match_id) {
+          router.push(`/session/${sessionId}/match/${r.current_match_id}`);
+        }
       })
       .on("postgres_changes", { event: "DELETE", schema: "public", table: "session_participants", filter: `session_id=eq.${sessionId}` }, ({ old: row }) => {
         const r = row as { athlete_id: string };
@@ -82,9 +86,13 @@ export function useSessionLobbyRealtime(
         setBusyIds((prev) => removeBusy(prev, from, to));
       })
       .on("broadcast", { event: "match_started" }, ({ payload }) => {
-        const ids = (payload as { participants: string[] }).participants;
+        const p = payload as { participants: string[]; matchId?: string };
+        const ids = p.participants;
         setBusyIds((prev) => addBusy(prev, ...ids));
-        setParticipants((prev) => prev.map((p) => ids.includes(p.athleteId) ? { ...p, status: "in_match" } : p));
+        setParticipants((prev) => prev.map((pt) => ids.includes(pt.athleteId) ? { ...pt, status: "in_match" } : pt));
+        if (p.matchId && ids.includes(meRef.current)) {
+          router.push(`/session/${sessionId}/match/${p.matchId}`);
+        }
       })
       .on("broadcast", { event: "participant_joined" }, ({ payload }) => {
         const raw = payload as Record<string, unknown>;
