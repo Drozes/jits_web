@@ -21,12 +21,11 @@ interface MatchHistoryListProps {
   matches: MatchHistoryItem[];
 }
 
-type Filter = "all" | "ranked" | "casual";
+type Filter = "all" | "ranked";
 
 const filters: { value: Filter; label: string }[] = [
   { value: "all", label: "All" },
   { value: "ranked", label: "Ranked" },
-  { value: "casual", label: "Casual" },
 ];
 
 export function MatchHistoryList({ matches }: MatchHistoryListProps) {

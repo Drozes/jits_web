@@ -13,12 +13,11 @@ import { cn } from "@/lib/cn";
 import { toast } from "@/components/ui/toast";
 import type { MatchOutcome } from "@jits/shared/constants";
 
-type Filter = "all" | "ranked" | "casual";
+type Filter = "all" | "ranked";
 
 const filters: { value: Filter; label: string }[] = [
   { value: "all", label: "All" },
   { value: "ranked", label: "Ranked" },
-  { value: "casual", label: "Casual" },
 ];
 
 interface StatsData {

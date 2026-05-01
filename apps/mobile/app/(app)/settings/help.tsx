@@ -17,10 +17,10 @@ const FAQ_ITEMS = [
       "Your ELO starts at 1000. After each ranked match, you gain or lose points based on the match result and your opponent's rating. Beating a higher-rated opponent gains more points. Losing to a lower-rated opponent loses more points. Draws cost both athletes ELO (the pressure score penalty).",
   },
   {
-    id: "ranked-vs-casual",
-    question: "What is a ranked vs casual match?",
+    id: "ranked-matches",
+    question: "Are all matches ranked?",
     answer:
-      "Ranked matches affect your ELO rating and appear on your record. Casual matches are for practice only and don't impact your rating. Choose the match type when challenging an opponent or creating a match in the session lobby.",
+      "Yes. Every match on JITS is ranked and affects your ELO rating. This keeps competition meaningful and ensures your record accurately reflects your performance on the mats.",
   },
   {
     id: "record-result",
