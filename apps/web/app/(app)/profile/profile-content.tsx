@@ -165,7 +165,7 @@ export async function ProfileContent({
       </section>
 
       <p className="text-center text-xs text-muted-foreground pb-4">
-        JITS v0.1.0
+        JITS Beta
       </p>
     </div>
   );

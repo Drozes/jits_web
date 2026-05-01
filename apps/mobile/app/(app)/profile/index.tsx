@@ -162,7 +162,7 @@ export default function ProfileScreen() {
             </Card>
           </View>
 
-          <Text className="text-center text-xs text-muted-foreground pb-2">JITS v0.1.0</Text>
+          <Text className="text-center text-xs text-muted-foreground pb-2">JITS Beta</Text>
         </>
       )}
     </ScrollView>

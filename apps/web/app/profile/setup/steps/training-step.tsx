@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -22,28 +23,47 @@ interface TrainingStepProps {
 export function TrainingStep({ values, onChange, onNext, gyms }: TrainingStepProps) {
   const parsedWeight = values.weight ? parseFloat(values.weight) : null;
   const weightValid = !!parsedWeight && parsedWeight >= 50 && parsedWeight <= 400;
-  const canContinue = weightValid && !!values.gymId;
+  const hasGymOrFreeAgent = values.freeAgent || !!values.gymId;
+  const canContinue = weightValid && hasGymOrFreeAgent;
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-2">
-        <Label>Gym</Label>
-        <Select value={values.gymId} onValueChange={(v) => onChange({ gymId: v })}>
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder="Select your gym" />
-          </SelectTrigger>
-          <SelectContent>
-            {gyms.map((gym) => (
-              <SelectItem key={gym.id} value={gym.id}>
-                {gym.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <p className="text-xs text-muted-foreground">
-          Required to activate your profile and appear to other athletes.
-        </p>
+      <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-0.5 pr-3">
+          <Label htmlFor="free-agent">Train independently</Label>
+          <p className="text-xs text-muted-foreground">
+            No primary gym? You can update this later.
+          </p>
+        </div>
+        <Switch
+          id="free-agent"
+          checked={values.freeAgent}
+          onCheckedChange={(next) =>
+            onChange({ freeAgent: next, gymId: next ? "" : values.gymId })
+          }
+        />
       </div>
+
+      {!values.freeAgent && (
+        <div className="flex flex-col gap-2">
+          <Label>Gym</Label>
+          <Select value={values.gymId} onValueChange={(v) => onChange({ gymId: v })}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select your gym" />
+            </SelectTrigger>
+            <SelectContent>
+              {gyms.map((gym) => (
+                <SelectItem key={gym.id} value={gym.id}>
+                  {gym.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            Required to activate your profile and appear to other athletes.
+          </p>
+        </div>
+      )}
 
       <div className="flex flex-col gap-2">
         <Label htmlFor="weight">Weight (lbs)</Label>

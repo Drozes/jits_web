@@ -24,6 +24,7 @@ export interface WizardValues {
   displayName: string;
   weight: string;
   gymId: string;
+  freeAgent: boolean;
   gender: string;
   dateOfBirth: string;
   city: string;

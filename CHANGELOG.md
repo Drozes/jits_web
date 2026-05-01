@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+**Demo Prep Wave 6: Setup + Branding Polish (2026-05-01)**
+
+**Added**
+- Web: "Train independently" free agent toggle on profile setup wizard. Users without a gym can now complete activation (mirrors mobile setup flow).
+
+**Changed**
+- Version string updated from "JITS v0.1.0" to "JITS Beta" on both web and mobile profile screens.
+
 **Demo Prep Wave 5: Web Parity Fixes (2026-05-01)**
 
 **Fixed**

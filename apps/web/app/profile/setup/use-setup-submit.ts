@@ -44,7 +44,8 @@ export function useSetupSubmit({
     const payload = {
       display_name: values.displayName.trim(),
       current_weight: parseFloat(values.weight),
-      primary_gym_id: values.gymId,
+      primary_gym_id: values.freeAgent ? null : values.gymId,
+      free_agent: values.freeAgent,
       gender: values.gender,
       date_of_birth: values.dateOfBirth || null,
       city: skipOptional ? null : values.city.trim() || null,

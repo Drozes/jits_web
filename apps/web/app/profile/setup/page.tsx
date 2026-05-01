@@ -19,7 +19,7 @@ async function SetupContent() {
   const { data: athlete } = await supabase
     .from("athletes")
     .select(
-      "id, display_name, current_weight, primary_gym_id, status, profile_photo_url, gender, date_of_birth, city",
+      "id, display_name, current_weight, primary_gym_id, free_agent, status, profile_photo_url, gender, date_of_birth, city",
     )
     .eq("auth_user_id", user.id)
     .single();
@@ -70,6 +70,7 @@ async function SetupContent() {
             displayName: athlete?.display_name ?? "",
             weight: athlete?.current_weight?.toString() ?? "",
             gymId: athlete?.primary_gym_id ?? "",
+            freeAgent: athlete?.free_agent ?? false,
             gender: athlete?.gender ?? "",
             dateOfBirth: athlete?.date_of_birth ?? "",
             city: athlete?.city ?? "",
