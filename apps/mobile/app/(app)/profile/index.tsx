@@ -1,5 +1,6 @@
 import * as React from "react";
 import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Settings, Share2, Trophy, UserPen } from "lucide-react-native";
 import { useAuth, useRequireAthlete } from "@/lib/auth/hooks";
@@ -75,15 +76,16 @@ export default function ProfileScreen() {
 
   if (!athlete) {
     return (
-      <View className="flex-1 bg-background items-center justify-center">
+      <SafeAreaView className="flex-1 bg-background items-center justify-center">
         <ActivityIndicator color={tokens.primary} />
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
+    <SafeAreaView className="flex-1 bg-background" edges={["top"]}>
     <ScrollView
-      className="flex-1 bg-background"
+      className="flex-1"
       contentContainerStyle={{ padding: 16, paddingBottom: 32, gap: 24 }}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={tokens.primary} />}
     >
@@ -162,10 +164,11 @@ export default function ProfileScreen() {
             </Card>
           </View>
 
-          <Text className="text-center text-xs text-muted-foreground pb-2">JITS Beta</Text>
+          <Text className="text-center text-xs text-muted-foreground pb-2">ELO RATED Beta</Text>
         </>
       )}
     </ScrollView>
+    </SafeAreaView>
   );
 }
 

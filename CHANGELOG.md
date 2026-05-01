@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+**Mobile UI Fixes (2026-05-01)**
+
+**Fixed**
+- Mobile profile and home screens now wrap content in `SafeAreaView` so headers no longer overlap the status bar/notch.
+- Hidden tab routes (athlete, session, settings) no longer render as extra tab bar items; added explicit `tabBarButton` override alongside `href: null`.
+
 **All Matches Ranked (2026-05-01)**
 
 **Removed**

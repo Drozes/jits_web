@@ -2,6 +2,10 @@ import { Tabs } from "expo-router";
 import { Dumbbell, Home, Trophy, User } from "lucide-react-native";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 
+function HiddenTab() {
+  return null;
+}
+
 export default function AppLayout() {
   const tokens = useThemedTokens();
 
@@ -45,9 +49,9 @@ export default function AppLayout() {
           tabBarIcon: ({ color, size }) => <User color={color} size={size} />,
         }}
       />
-      <Tabs.Screen name="athlete" options={{ href: null }} />
-      <Tabs.Screen name="session" options={{ href: null }} />
-      <Tabs.Screen name="settings" options={{ href: null }} />
+      <Tabs.Screen name="athlete" options={{ href: null, tabBarButton: HiddenTab }} />
+      <Tabs.Screen name="session" options={{ href: null, tabBarButton: HiddenTab }} />
+      <Tabs.Screen name="settings" options={{ href: null, tabBarButton: HiddenTab }} />
     </Tabs>
   );
 }
