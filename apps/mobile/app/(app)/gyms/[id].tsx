@@ -123,6 +123,7 @@ export default function GymDetailScreen() {
   }
 
   const rsvpSet = new Set(data.rsvpSessionIds);
+  const participantSet = new Set(data.participantSessionIds);
 
   return (
     <SafeAreaView className="flex-1 bg-background" edges={["top"]}>
@@ -190,7 +191,7 @@ export default function GymDetailScreen() {
           </View>
         }
         renderItem={({ item }) => (
-          <SessionCard session={item} isRsvpd={rsvpSet.has(item.id)} />
+          <SessionCard session={item} isRsvpd={rsvpSet.has(item.id)} isParticipant={participantSet.has(item.id)} />
         )}
         ListEmptyComponent={
           <View className="rounded-md border border-dashed border-border p-8 items-center">

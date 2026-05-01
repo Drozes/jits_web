@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+**Demo Prep Wave 3: Consistency + Resilience (2026-05-01)**
+
+**Fixed**
+- Web: Leave session now checks result and shows error toast on failure instead of navigating blindly.
+- Web: Confirm result now checks RPC response; resets confirmed state and shows error toast on failure.
+- Web: Profile stats now include draws in total match count (consistent with mobile and RPC).
+- Mobile: Match confirm step auto-advances after both athletes confirm (1.5s delay), matching web behavior.
+- Mobile: EndStep `onAdvance` callback wrapped in `useCallback` for stable reference (prevents timeout restart on re-render).
+- Mobile: SessionCard routes directly to lobby when user is already a participant (eliminates join-to-lobby redirect flash).
+
 **Demo Prep Wave 2: Functional Fixes (2026-05-01)**
 
 **Fixed**

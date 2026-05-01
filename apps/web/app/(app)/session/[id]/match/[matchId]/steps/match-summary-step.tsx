@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useEffect, useRef } from "react";
 import { Check, Loader2, AlertTriangle } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { confirmMatchResult, disputeMatchResult } from "@jits/shared/api/mutations";
@@ -67,7 +68,13 @@ export function MatchSummaryStep({ onNext, matchId, matchType, matchStatus, curr
     if (confirmedRef.current) return;
     confirmedRef.current = true;
     setMyConfirmed(true);
-    await confirmMatchResult(supabase, matchId);
+    const res = await confirmMatchResult(supabase, matchId);
+    if (!res.ok) {
+      confirmedRef.current = false;
+      setMyConfirmed(false);
+      toast.error("Failed to confirm result. Please try again.");
+      return;
+    }
     sync.broadcastResultConfirmed(currentAthleteId);
   }
 

@@ -10,6 +10,8 @@ interface SessionCardProps {
   session: SessionListItem;
   /** Optional: if provided, shows whether the current athlete has RSVP'd. */
   isRsvpd?: boolean;
+  /** Optional: if true, routes directly to the lobby instead of the join wizard. */
+  isParticipant?: boolean;
 }
 
 function formatSessionTime(start: string, end: string) {
@@ -31,7 +33,7 @@ function formatSessionTime(start: string, end: string) {
   return `${dateStr}, ${startTime} - ${endTime}`;
 }
 
-export function SessionCard({ session, isRsvpd }: SessionCardProps) {
+export function SessionCard({ session, isRsvpd, isParticipant }: SessionCardProps) {
   const router = useRouter();
   const tokens = useThemedTokens();
   const title = session.title ?? "Open Mat";
@@ -40,9 +42,14 @@ export function SessionCard({ session, isRsvpd }: SessionCardProps) {
     ? `${session.participantCount}/${session.maxParticipants}`
     : `${session.participantCount}`;
 
+  // Already checked in: skip the join wizard and go straight to the lobby.
+  const target = isParticipant
+    ? (`/session/${session.id}/lobby` as const)
+    : (`/session/${session.id}/join` as const);
+
   return (
     <Pressable
-      onPress={() => router.push(`/session/${session.id}/join`)}
+      onPress={() => router.push(target)}
       className="active:opacity-80"
     >
       <Card className="p-4 gap-2">

@@ -42,6 +42,8 @@ export interface GymDetail {
   status: string;
   sessions: SessionListItem[];
   rsvpSessionIds: string[];
+  /** Session IDs where the current athlete is a checked-in participant. */
+  participantSessionIds: string[];
   memberCount: number;
   isMemberGym: boolean;
 }

@@ -534,7 +534,7 @@ export async function getGymDetail(
   const sessionIds = (sessions ?? []).map((s) => s.id);
 
   // Parallel fetch: participants, RSVPs, and creator names
-  const [participantsResult, rsvpsResult, creatorsResult, athleteRsvpsResult] =
+  const [participantsResult, rsvpsResult, creatorsResult, athleteRsvpsResult, athleteParticipantsResult] =
     await Promise.all([
       sessionIds.length > 0
         ? supabase.from("session_participants").select("session_id").in("session_id", sessionIds)
@@ -550,6 +550,9 @@ export async function getGymDetail(
         : Promise.resolve({ data: [] as { id: string; display_name: string }[] }),
       sessionIds.length > 0
         ? supabase.from("session_rsvps").select("session_id").eq("athlete_id", athleteId).in("session_id", sessionIds)
+        : Promise.resolve({ data: [] as { session_id: string }[] }),
+      sessionIds.length > 0
+        ? supabase.from("session_participants").select("session_id").eq("athlete_id", athleteId).in("session_id", sessionIds)
         : Promise.resolve({ data: [] as { session_id: string }[] }),
     ]);
 
@@ -574,6 +577,11 @@ export async function getGymDetail(
   // Athlete's RSVP session IDs
   const rsvpSessionIds = (athleteRsvpsResult.data ?? []).map(
     (r) => r.session_id,
+  );
+
+  // Athlete's participant (checked-in) session IDs
+  const participantSessionIds = (athleteParticipantsResult.data ?? []).map(
+    (p) => p.session_id,
   );
 
   // 4. Build SessionListItems
@@ -612,6 +620,7 @@ export async function getGymDetail(
     status: gym.status,
     sessions: sessionListItems,
     rsvpSessionIds,
+    participantSessionIds,
     memberCount: memberCount ?? 0,
     isMemberGym,
   };

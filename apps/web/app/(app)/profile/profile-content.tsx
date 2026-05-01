@@ -39,8 +39,9 @@ export async function ProfileContent({
   // Compute stats from match history
   const wins = matchHistory.filter((m) => m.athlete_outcome === "win").length;
   const losses = matchHistory.filter((m) => m.athlete_outcome === "loss").length;
-  const total = wins + losses;
-  const winRate = total > 0 ? Math.round((wins / total) * 100) : 0;
+  const draws = matchHistory.filter((m) => m.athlete_outcome === "draw").length;
+  const total = wins + losses + draws;
+  const winRate = total > 0 ? Math.round((wins / (wins + losses || 1)) * 100) : 0;
 
   // Win streak (matchHistory is newest first)
   let winStreak = 0;
@@ -81,7 +82,7 @@ export async function ProfileContent({
     .filter((m) => new Date(m.completed_at) >= startOfMonth)
     .reduce((sum, m) => sum + (m.elo_delta ?? 0), 0);
 
-  const totalMatches = wins + losses;
+  const totalMatches = wins + losses + draws;
 
   // Use demo data when ?demo=true is in the URL
   const d = isDemo ? DEMO_DATA : null;

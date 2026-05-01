@@ -47,6 +47,17 @@ export function ConfirmStep(props: ConfirmStepProps) {
     },
   });
 
+  // Auto-advance when both sides have confirmed locally. The realtime
+  // postgres_changes listener in useMatchCompletion may fire first, but
+  // if the DB update is delayed (or matchStatus prop is stale from the
+  // initial fetch), this ensures the user is never stranded.
+  React.useEffect(() => {
+    if (myConfirmed && opponentConfirmed) {
+      const t = setTimeout(advance, 1500);
+      return () => clearTimeout(t);
+    }
+  }, [myConfirmed, opponentConfirmed, advance]);
+
   async function handleConfirm() {
     if (myConfirmed) return;
     setMyConfirmed(true);

@@ -68,6 +68,11 @@ export function MatchFlowWizard({ sessionId, matchId, currentAthleteId }: MatchF
   const stepIdx = MATCH_STEPS.indexOf(step);
   const ownOutcome = computeOwnOutcome(me.outcome, resultData, currentAthleteId);
 
+  // Stable callbacks for step transitions used inside useEffect-driven
+  // auto-advance (EndStep). Without useCallback the inline arrow would
+  // cause the effect to re-fire on every render.
+  const advanceToResult = React.useCallback(() => setStep("result"), []);
+
   return (
     <ScrollView
       className="flex-1 bg-background"
@@ -119,7 +124,7 @@ export function MatchFlowWizard({ sessionId, matchId, currentAthleteId }: MatchF
         />
       ) : null}
 
-      {step === "end" ? <EndStep onAdvance={() => setStep("result")} /> : null}
+      {step === "end" ? <EndStep onAdvance={advanceToResult} /> : null}
 
       {step === "result" ? (
         <ResultStep

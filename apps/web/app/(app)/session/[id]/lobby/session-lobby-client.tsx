@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { LogOut } from "lucide-react";
+import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { leaveSessionLobby } from "@jits/shared/api/mutations";
 import { useSessionLobbyRealtime } from "@/hooks/use-session-lobby-realtime";
@@ -33,7 +34,12 @@ export function SessionLobbyClient(props: Props) {
 
   async function handleLeave() {
     setLeaving(true);
-    await leaveSessionLobby(createClient(), sessionId);
+    const result = await leaveSessionLobby(createClient(), sessionId);
+    if (!result.ok) {
+      toast.error("Failed to leave session");
+      setLeaving(false);
+      return;
+    }
     router.push("/gyms");
   }
 
