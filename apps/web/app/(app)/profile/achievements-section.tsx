@@ -46,10 +46,10 @@ export function AchievementsSection({
             </p>
             <div className="flex items-center justify-center gap-4 mt-3">
               <Link
-                href="/arena"
+                href="/gyms"
                 className="text-sm text-primary font-medium hover:underline"
               >
-                Find a match
+                Find a session
               </Link>
               <span className="text-muted-foreground">|</span>
               <Link

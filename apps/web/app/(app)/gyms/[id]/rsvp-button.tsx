@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { rsvpToSession, cancelRsvp } from "@jits/shared/api/mutations";
+import { toast } from "sonner";
 
 interface RsvpButtonProps {
   sessionId: string;
@@ -22,9 +23,11 @@ export function RsvpButton({ sessionId, isRsvpd: initialRsvpd }: RsvpButtonProps
     if (rsvpd) {
       const result = await cancelRsvp(supabase, sessionId);
       if (result.ok) setRsvpd(false);
+      else toast.error(result.error.message);
     } else {
       const result = await rsvpToSession(supabase, sessionId);
       if (result.ok) setRsvpd(true);
+      else toast.error(result.error.message);
     }
 
     setLoading(false);

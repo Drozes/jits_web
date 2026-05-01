@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Plus, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { createSession } from "@jits/shared/api/mutations";
+import { toast } from "sonner";
 
 interface StartSessionButtonProps {
   gymId: string;
@@ -22,6 +23,8 @@ export function StartSessionButton({ gymId }: StartSessionButtonProps) {
 
     if (result.ok) {
       router.refresh();
+    } else {
+      toast.error(result.error.message);
     }
     setLoading(false);
   }

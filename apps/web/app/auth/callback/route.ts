@@ -14,5 +14,5 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.redirect(`${origin}/error`);
+  return NextResponse.redirect(`${origin}/error?error=server_error`);
 }

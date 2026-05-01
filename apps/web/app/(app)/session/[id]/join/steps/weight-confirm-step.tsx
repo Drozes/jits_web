@@ -14,7 +14,7 @@ export function WeightConfirmStep({ athleteWeight, onNext }: WeightConfirmStepPr
   const [weight, setWeight] = useState(athleteWeight?.toString() ?? "");
 
   const parsedWeight = parseFloat(weight);
-  const isValid = !isNaN(parsedWeight) && parsedWeight > 0;
+  const isValid = !isNaN(parsedWeight) && parsedWeight >= 50 && parsedWeight <= 400;
 
   return (
     <div className="space-y-4 py-4">

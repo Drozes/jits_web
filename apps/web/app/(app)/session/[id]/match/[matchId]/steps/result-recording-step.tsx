@@ -8,6 +8,7 @@ import { recordMatchResult } from "@jits/shared/api/mutations";
 import { useSessionMatchSync, type BroadcastResult } from "@jits/shared/hooks/use-session-match-sync";
 import { SubmissionFields } from "@/app/(app)/match/[id]/results/submission-fields";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 import type { SubmissionType } from "@jits/shared/types/submission-type";
 
 interface Participant { id: string; displayName: string }
@@ -63,7 +64,7 @@ export function ResultRecordingStep({ onNext, matchId, participants, submissionT
       submissionTypeCode: result === "submission" ? submissionCode : undefined,
       finishTimeSeconds: result === "submission" ? finishTime : undefined,
     });
-    if (!res.ok) { setLoading(false); return; }
+    if (!res.ok) { setLoading(false); toast.error("Failed to record result. Please try again."); return; }
     const broadcast: BroadcastResult = { result, winnerId: winnerId || undefined, submissionCode: submissionCode || undefined, finishTimeSeconds: finishTime };
     sync.broadcastResultSubmitted(broadcast);
     onNext({ resultData: broadcast });

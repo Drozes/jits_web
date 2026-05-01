@@ -34,6 +34,14 @@ export function MatchSummaryStep({ onNext, matchId, matchType, matchStatus, curr
     },
   });
 
+  // Auto-advance when both athletes have confirmed
+  useEffect(() => {
+    if (myConfirmed && opponentConfirmed) {
+      const t = setTimeout(() => onNextRef.current(), 1500);
+      return () => clearTimeout(t);
+    }
+  }, [myConfirmed, opponentConfirmed]);
+
   // Listen for match completion via Postgres Changes
   useEffect(() => {
     const channel = supabase

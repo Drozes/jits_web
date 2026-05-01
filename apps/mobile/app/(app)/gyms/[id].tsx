@@ -70,7 +70,11 @@ function useGymDetailData(gymId: string | undefined, athleteId: string | undefin
   );
 
   React.useEffect(() => {
-    void fetchAll("initial");
+    let cancelled = false;
+    fetchAll("initial").then(() => {
+      if (cancelled) return;
+    });
+    return () => { cancelled = true; };
   }, [fetchAll]);
 
   return { data, coords, isLoading, isRefreshing, refresh: () => fetchAll("refresh") };

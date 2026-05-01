@@ -2,7 +2,21 @@
 
 ## [Unreleased]
 
-**Demo Prep Polish (2026-05-01)**
+**Demo Prep Wave 2: Functional Fixes (2026-05-01)**
+
+**Fixed**
+- Mobile: Opponent now navigates to match screen when challenged in session lobby (added postgres_changes, challenge_accepted, and match_started navigation paths).
+- Mobile: Double-tap guard on challenge button prevents duplicate match creation.
+- Web: Match confirm step now auto-advances to summary after both athletes confirm (1.5s delay).
+- Web: Login now redirects to dashboard (`/`) instead of `/profile`.
+- Web: Auth callback error redirect now includes error param for friendly error messages.
+- Web: Achievements "Find a match" link points to `/gyms` instead of hidden `/arena` route.
+- Web: Match card links removed from dashboard and profile (pointed to hidden `/match/*/results` route).
+- Web: Weight validation on session join tightened to 50-400 lbs range (consistent with mobile).
+- Web: Error toasts added for result recording, session creation, and RSVP failures (previously silent).
+- Mobile: Gym detail hook now uses cancellation guard on unmount.
+
+**Demo Prep Wave 1: Polish (2026-05-01)**
 
 **Fixed**
 - Mobile Jest tests now pass: fixed `react` moduleNameMapper to resolve from workspace root instead of non-existent local `node_modules/react`.

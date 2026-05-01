@@ -56,6 +56,7 @@ export default function SessionLobbyScreen() {
 
   const [refreshing, setRefreshing] = React.useState(false);
   const [randomLoading, setRandomLoading] = React.useState(false);
+  const [challengeLoading, setChallengeLoading] = React.useState(false);
 
   const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
@@ -64,12 +65,14 @@ export default function SessionLobbyScreen() {
   }, [refresh]);
 
   async function handleChallenge(opponent: LobbyParticipant, matchType: "casual" | "ranked") {
-    if (!athlete) return;
+    if (!athlete || challengeLoading) return;
+    setChallengeLoading(true);
     const result = await createInSessionMatch(supabase, {
       sessionId: id,
       opponentId: opponent.athleteId,
     });
     if (!result.ok) {
+      setChallengeLoading(false);
       toast.error({
         text1: "Could not create match",
         description: result.error.message,

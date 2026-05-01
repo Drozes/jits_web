@@ -109,7 +109,6 @@ export async function AthleteProfileContent({
                     matchType={match.matchType}
                     eloDelta={match.eloDelta ?? undefined}
                     date={match.date}
-                    href={`/match/${match.matchId}/results`}
                   />
                 ))}
               </div>

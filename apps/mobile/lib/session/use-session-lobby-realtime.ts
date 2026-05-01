@@ -79,6 +79,13 @@ export function useSessionLobbyRealtime({
                 : p,
             ),
           );
+          // If *this* athlete was assigned a match, navigate immediately.
+          if (
+            r.athlete_id === meRef.current &&
+            r.current_match_id
+          ) {
+            onMatchStartedRef.current?.(r.current_match_id);
+          }
         },
       )
       .on(
@@ -110,8 +117,8 @@ export function useSessionLobbyRealtime({
           next.delete(p.to);
           return next;
         });
-        // Whichever side initiated the challenge gets pushed to the match.
-        if (p.from === meRef.current) {
+        // Navigate both challenger and opponent to the match screen.
+        if (p.from === meRef.current || p.to === meRef.current) {
           onMatchStartedRef.current?.(p.matchId);
         }
       })
@@ -125,13 +132,19 @@ export function useSessionLobbyRealtime({
         });
       })
       .on("broadcast", { event: "match_started" }, ({ payload }) => {
-        const ids = (payload as { participants: string[] }).participants ?? [];
+        const p = payload as { participants: string[]; matchId?: string };
+        const ids = p.participants ?? [];
         setBusyIds((prev) => new Set([...prev, ...ids]));
         setParticipants((prev) =>
-          prev.map((p) =>
-            ids.includes(p.athleteId) ? { ...p, status: "in_match" } : p,
+          prev.map((pt) =>
+            ids.includes(pt.athleteId) ? { ...pt, status: "in_match" } : pt,
           ),
         );
+        // If the current athlete is a participant and we have a matchId,
+        // navigate them to the match screen.
+        if (p.matchId && ids.includes(meRef.current)) {
+          onMatchStartedRef.current?.(p.matchId);
+        }
       })
       .on("broadcast", { event: "participant_joined" }, ({ payload }) => {
         const raw = payload as Record<string, unknown>;

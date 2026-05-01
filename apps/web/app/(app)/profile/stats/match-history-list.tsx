@@ -90,7 +90,6 @@ export function MatchHistoryList({ matches }: MatchHistoryListProps) {
               matchType={m.match_type as "ranked" | "casual"}
               eloDelta={m.match_type === "ranked" ? m.elo_delta : undefined}
               date={m.completed_at}
-              href={`/match/${m.match_id}/results`}
             />
           ))}
         </div>
