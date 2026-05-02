@@ -4,6 +4,7 @@
 
 **Fixed**
 - `joinSessionLobby` now uses upsert instead of insert, preventing 23505 duplicate key errors when re-joining a session (`packages/shared/src/api/mutations.ts`).
+- Suppress noisy `[push] registration failed not_a_device` console warning on iOS Simulator (`apps/mobile/lib/notifications/push-registration-bootstrap.tsx`).
 
 **Mobile Route Restructure (2026-05-01)**
 

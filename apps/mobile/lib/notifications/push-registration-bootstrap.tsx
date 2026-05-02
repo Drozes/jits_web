@@ -27,7 +27,7 @@ export function PushRegistrationBootstrap() {
     (async () => {
       const result = await registerForPushNotifications(supabase, athleteId);
       if (cancelled) return;
-      if (!result.ok && result.reason !== "permission_denied") {
+      if (!result.ok && result.reason !== "permission_denied" && result.reason !== "not_a_device") {
         console.warn("[push] registration failed", result.reason, result.message);
       }
     })();
