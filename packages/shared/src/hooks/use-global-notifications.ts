@@ -84,10 +84,12 @@ export function useGlobalNotifications({
   buildLobbyHrefRef.current = buildLobbyHref;
 
   const senderCache = useRef(new Map<string, SenderMeta>());
+  const mountIdRef = useRef(0);
 
   useEffect(() => {
+    const mountId = ++mountIdRef.current;
     const messageChannel = supabase
-      .channel("global-messages")
+      .channel(`global-messages:${mountId}`)
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "messages" },
@@ -126,7 +128,7 @@ export function useGlobalNotifications({
 
     // Listen for updates to challenges this athlete sent (accepted/declined)
     const challengeChannel = supabase
-      .channel(`challenge-updates-${currentAthleteId}`)
+      .channel(`challenge-updates-${currentAthleteId}:${mountId}`)
       .on(
         "postgres_changes",
         {

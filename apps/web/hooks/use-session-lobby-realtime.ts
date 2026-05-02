@@ -45,10 +45,13 @@ export function useSessionLobbyRealtime(
 
   const clearChallenge = useCallback(() => setIncomingChallenge(null), []);
 
+  const mountIdRef = useRef(0);
+
   useEffect(() => {
+    const mountId = ++mountIdRef.current;
     const supabase = createClient();
     const pgChannel = supabase
-      .channel(`session-participants:${sessionId}`)
+      .channel(`session-participants:${sessionId}:${mountId}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "session_participants", filter: `session_id=eq.${sessionId}` }, () => {})
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "session_participants", filter: `session_id=eq.${sessionId}` }, ({ new: row }) => {
         const r = row as { athlete_id: string; status: string; current_match_id?: string | null };
@@ -67,7 +70,7 @@ export function useSessionLobbyRealtime(
       .subscribe();
 
     const bc = supabase
-      .channel(`session:${sessionId}`)
+      .channel(`session:${sessionId}:${mountId}`)
       .on("broadcast", { event: "challenge_sent" }, ({ payload }) => {
         const { from, fromName, fromElo, to, matchType } = payload as { from: string; fromName: string; fromElo: number; to: string; matchType: "casual" | "ranked" };
         setBusyIds((prev) => addBusy(prev, from, to));

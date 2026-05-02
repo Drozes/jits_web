@@ -61,9 +61,12 @@ export function useOnlinePresence(
   displayName: string,
   profilePhotoUrl: string | null,
 ): void {
+  const mountIdRef = React.useRef(0);
+
   React.useEffect(() => {
     if (!athleteId) return;
 
+    const mountId = ++mountIdRef.current;
     let channel: RealtimeChannel | null = null;
     let trackedRecently = false;
 
@@ -95,7 +98,7 @@ export function useOnlinePresence(
       }
     };
 
-    channel = supabase.channel("app:online", {
+    channel = supabase.channel(`app:online:${mountId}`, {
       config: { presence: { key: athleteId } },
     });
 

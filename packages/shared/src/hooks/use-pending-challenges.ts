@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 export interface PendingChallenge {
@@ -38,6 +38,7 @@ export function usePendingChallenges(
   athleteId: string,
 ): UsePendingChallengesResult {
   const [challenges, setChallenges] = useState<PendingChallenge[]>([]);
+  const mountIdRef = useRef(0);
 
   const fetchChallenges = useCallback(async () => {
     const now = new Date().toISOString();
@@ -71,10 +72,11 @@ export function usePendingChallenges(
   }, [supabase, athleteId]);
 
   useEffect(() => {
+    const mountId = ++mountIdRef.current;
     fetchChallenges();
 
     const channel = supabase
-      .channel(`challenges-${athleteId}`)
+      .channel(`challenges-${athleteId}:${mountId}`)
       .on(
         "postgres_changes",
         {

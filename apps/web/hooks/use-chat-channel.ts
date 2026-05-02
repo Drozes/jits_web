@@ -36,12 +36,15 @@ export function useChatChannel({
   const onNewMessageRef = useRef(onNewMessage);
   onNewMessageRef.current = onNewMessage;
 
+  const mountIdRef = useRef(0);
+
   useEffect(() => {
+    const mountId = ++mountIdRef.current;
     const supabase = createClient();
     const timers = typingTimers.current;
 
     const channel = supabase
-      .channel(`chat:${conversationId}`)
+      .channel(`chat:${conversationId}:${mountId}`)
       .on(
         "postgres_changes",
         {

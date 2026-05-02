@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 **Fixed**
+- Supabase realtime "Cannot add 'postgres_changes' callbacks after 'subscribe'" error caused by async `removeChannel` race with React 19 Strict Mode effect re-firing. Added unique mount-ID channel names to all affected hooks: `use-pending-challenges` (shared), `use-global-notifications` (shared), `use-session-lobby-realtime` (web), `use-chat-channel` (web), `use-online-presence` (mobile).
 - `joinSessionLobby` now uses upsert instead of insert, preventing 23505 duplicate key errors when re-joining a session (`packages/shared/src/api/mutations.ts`).
 - Suppress noisy `[push] registration failed not_a_device` console warning on iOS Simulator (`apps/mobile/lib/notifications/push-registration-bootstrap.tsx`).
 
