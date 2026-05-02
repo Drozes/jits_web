@@ -242,12 +242,15 @@ export async function joinSessionLobby(
 
   const { data, error } = await supabase
     .from("session_participants")
-    .insert({
-      session_id: params.sessionId,
-      athlete_id: authResult.data,
-      status: "checked_in",
-      weight_confirmed: params.confirmedWeight,
-    })
+    .upsert(
+      {
+        session_id: params.sessionId,
+        athlete_id: authResult.data,
+        status: "checked_in",
+        weight_confirmed: params.confirmedWeight,
+      },
+      { onConflict: "session_id,athlete_id" },
+    )
     .select("id")
     .single();
 
@@ -285,21 +288,123 @@ export async function acceptSessionWaiver(
   return { ok: true, data: undefined };
 }
 
-/** Create a 2-hour session starting now (prototype "Start Session" button) */
+interface CreateSessionParams {
+  gymId: string;
+  title?: string;
+  scheduledStart?: string;
+  scheduledEnd?: string;
+  maxParticipants?: number;
+  notes?: string;
+}
+
+/** Create a session at a gym. Defaults to a 2-hour session starting now. */
 export async function createSession(
   supabase: Client,
-  gymId: string,
+  gymIdOrParams: string | CreateSessionParams,
 ): Promise<Result<{ id: string }>> {
+  const params =
+    typeof gymIdOrParams === "string"
+      ? { gymId: gymIdOrParams }
+      : gymIdOrParams;
+
+  const now = new Date();
+  const start = params.scheduledStart ?? now.toISOString();
+  const end =
+    params.scheduledEnd ?? new Date(new Date(start).getTime() + 2 * 60 * 60 * 1000).toISOString();
+
   const { data, error } = await supabase.rpc("create_session", {
-    p_gym_id: gymId,
-    p_scheduled_start: new Date().toISOString(),
-    p_scheduled_end: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
+    p_gym_id: params.gymId,
+    p_scheduled_start: start,
+    p_scheduled_end: end,
+    p_title: params.title,
+    p_max_participants: params.maxParticipants,
+    p_notes: params.notes,
   });
 
   if (error) {
     return { ok: false, error: mapPostgrestError(error) };
   }
   return { ok: true, data: { id: data } };
+}
+
+interface UpdateSessionParams {
+  title?: string;
+  scheduledStart?: string;
+  scheduledEnd?: string;
+  maxParticipants?: number | null;
+  notes?: string | null;
+}
+
+/** Update session fields. Only the session creator can update (RLS-enforced). */
+export async function updateSession(
+  supabase: Client,
+  sessionId: string,
+  fields: UpdateSessionParams,
+): Promise<Result<void>> {
+  const update: Database["public"]["Tables"]["sessions"]["Update"] = {};
+  if (fields.title !== undefined) update.title = fields.title;
+  if (fields.scheduledStart !== undefined) update.scheduled_start = fields.scheduledStart;
+  if (fields.scheduledEnd !== undefined) update.scheduled_end = fields.scheduledEnd;
+  if (fields.maxParticipants !== undefined) update.max_participants = fields.maxParticipants;
+  if (fields.notes !== undefined) update.notes = fields.notes;
+
+  const { error } = await supabase
+    .from("sessions")
+    .update(update)
+    .eq("id", sessionId);
+
+  if (error) {
+    return { ok: false, error: mapPostgrestError(error) };
+  }
+  return { ok: true, data: undefined };
+}
+
+/** Cancel a session. Sets status to 'cancelled'. */
+export async function cancelSession(
+  supabase: Client,
+  sessionId: string,
+): Promise<Result<void>> {
+  const { error } = await supabase
+    .from("sessions")
+    .update({ status: "cancelled" })
+    .eq("id", sessionId);
+
+  if (error) {
+    return { ok: false, error: mapPostgrestError(error) };
+  }
+  return { ok: true, data: undefined };
+}
+
+/** Activate a scheduled session. Sets status to 'active'. */
+export async function activateSession(
+  supabase: Client,
+  sessionId: string,
+): Promise<Result<void>> {
+  const { error } = await supabase
+    .from("sessions")
+    .update({ status: "active" })
+    .eq("id", sessionId);
+
+  if (error) {
+    return { ok: false, error: mapPostgrestError(error) };
+  }
+  return { ok: true, data: undefined };
+}
+
+/** Complete an active session. Sets status to 'completed'. */
+export async function completeSession(
+  supabase: Client,
+  sessionId: string,
+): Promise<Result<void>> {
+  const { error } = await supabase
+    .from("sessions")
+    .update({ status: "completed" })
+    .eq("id", sessionId);
+
+  if (error) {
+    return { ok: false, error: mapPostgrestError(error) };
+  }
+  return { ok: true, data: undefined };
 }
 
 /** Create an in-session match via RPC */

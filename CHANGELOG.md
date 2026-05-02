@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+**Fixed**
+- `joinSessionLobby` now uses upsert instead of insert, preventing 23505 duplicate key errors when re-joining a session (`packages/shared/src/api/mutations.ts`).
+
 **Mobile Route Restructure (2026-05-01)**
 
 **Fixed**
