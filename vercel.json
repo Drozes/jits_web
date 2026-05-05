@@ -1,0 +1,5 @@
+{
+  "buildCommand": "npm run build --workspace=@jits/web",
+  "outputDirectory": "apps/web/.next",
+  "framework": "nextjs"
+}
