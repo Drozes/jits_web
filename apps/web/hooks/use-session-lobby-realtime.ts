@@ -52,7 +52,32 @@ export function useSessionLobbyRealtime(
     const supabase = createClient();
     const pgChannel = supabase
       .channel(`session-participants:${sessionId}:${mountId}`)
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "session_participants", filter: `session_id=eq.${sessionId}` }, () => {})
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "session_participants", filter: `session_id=eq.${sessionId}` }, async ({ new: row }) => {
+        const r = row as { athlete_id: string; status: string; weight_confirmed: number | null; current_match_id?: string | null; id: string; checked_in_at?: string };
+        if (participantsRef.current.some((p) => p.athleteId === r.athlete_id)) return;
+        const { data: ath } = await supabase.from("athletes").select("display_name, current_elo, current_weight, profile_photo_url, primary_gym_id").eq("id", r.athlete_id).single();
+        if (!ath) return;
+        const np: LobbyParticipant = {
+          participantId: r.id ?? "",
+          athleteId: r.athlete_id,
+          displayName: ath.display_name,
+          currentElo: ath.current_elo,
+          currentWeight: ath.current_weight,
+          profilePhotoUrl: ath.profile_photo_url,
+          primaryGymId: ath.primary_gym_id,
+          gymName: null,
+          status: r.status,
+          weightConfirmed: r.weight_confirmed,
+          currentMatchId: r.current_match_id ?? null,
+          checkedInAt: r.checked_in_at ?? new Date().toISOString(),
+          eloDistance: 0,
+        };
+        setParticipants((prev) => {
+          if (prev.some((x) => x.athleteId === r.athlete_id)) return prev;
+          setAnnouncement(`${ath.display_name} joined the lobby`);
+          return [...prev, np];
+        });
+      })
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "session_participants", filter: `session_id=eq.${sessionId}` }, ({ new: row }) => {
         const r = row as { athlete_id: string; status: string; current_match_id?: string | null };
         setParticipants((prev) => prev.map((p) => p.athleteId === r.athlete_id ? { ...p, status: r.status, currentMatchId: r.current_match_id ?? null } : p));
@@ -70,7 +95,7 @@ export function useSessionLobbyRealtime(
       .subscribe();
 
     const bc = supabase
-      .channel(`session:${sessionId}:${mountId}`)
+      .channel(`session:${sessionId}`)
       .on("broadcast", { event: "challenge_sent" }, ({ payload }) => {
         const { from, fromName, fromElo, to, matchType } = payload as { from: string; fromName: string; fromElo: number; to: string; matchType: "casual" | "ranked" };
         setBusyIds((prev) => addBusy(prev, from, to));
