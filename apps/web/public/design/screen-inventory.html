@@ -1,0 +1,3506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ELO RATED: Web Screen Inventory</title>
+  <style>
+  :root {
+    --green-500: #22c55e;
+    --green-600: #16a34a;
+    --green-100: #dcfce7;
+    --red-500: #ef4444;
+    --red-100: #fee2e2;
+    --amber-500: #f59e0b;
+    --amber-100: #fef3c7;
+    --primary-red: hsl(0, 72%, 51%);
+    --gray-50: #f9fafb;
+    --gray-100: #f3f4f6;
+    --gray-200: #e5e7eb;
+    --gray-300: #d1d5db;
+    --gray-400: #9ca3af;
+    --gray-500: #6b7280;
+    --gray-600: #4b5563;
+    --gray-700: #374151;
+    --gray-800: #1f2937;
+    --gray-900: #111827;
+    --blue-500: #3b82f6;
+    --blue-100: #dbeafe;
+    --success: hsl(145, 63%, 42%);
+    --success-light: hsl(145, 63%, 92%);
+    --feature-flag-border: #f59e0b;
+    /* Theme: Light (default) */
+    --phone-bg: #F2F4F7;
+    --phone-card: #DEE2E9;
+    --phone-header-bg: #E8EBF0;
+    --phone-text: #0D0F14;
+    --phone-text-secondary: #4B5563;
+    --phone-text-muted: #6B7280;
+    --phone-border: rgba(13, 15, 20, 0.14);
+    --phone-accent: #E63946;
+    --phone-success: #15803D;
+    --phone-btn-bg: #DEE2E9;
+    --phone-input-bg: #D2D7E0;
+    --phone-tab-active: #E63946;
+    --phone-tab-inactive: #6B7280;
+  }
+
+  [data-theme="dark"] {
+    --phone-bg: #0D0F14;
+    --phone-card: #1A1D24;
+    --phone-header-bg: #1A1D24;
+    --phone-text: #E8EDF2;
+    --phone-text-secondary: #9CA3AF;
+    --phone-text-muted: #6B7280;
+    --phone-border: rgba(107, 114, 128, 0.25);
+    --phone-accent: #E63946;
+    --phone-success: #22C55E;
+    --phone-btn-bg: #242832;
+    --phone-input-bg: #242832;
+    --phone-tab-active: #E63946;
+    --phone-tab-inactive: #6B7280;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #0f0f0f;
+    color: #e5e7eb;
+    padding: 32px 24px 64px;
+    line-height: 1.5;
+  }
+
+  h1 {
+    text-align: center;
+    font-size: 28px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 8px;
+    letter-spacing: -0.5px;
+  }
+
+  .subtitle {
+    text-align: center;
+    font-size: 14px;
+    color: var(--gray-400);
+    margin-bottom: 40px;
+  }
+
+  /* Legend */
+  .legend {
+    max-width: 900px;
+    margin: 0 auto 48px;
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 12px;
+    padding: 24px;
+  }
+
+  .legend h2 {
+    font-size: 16px;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 16px;
+  }
+
+  .legend-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 20px;
+  }
+
+  .legend-section h3 {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--gray-300);
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--gray-400);
+    margin-bottom: 6px;
+  }
+
+  /* Section Headers */
+  .section-header {
+    max-width: 1280px;
+    margin: 0 auto 32px;
+  }
+
+  .section-header h2 {
+    font-size: 22px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 4px;
+  }
+
+  .section-header p {
+    font-size: 14px;
+    color: var(--gray-400);
+  }
+
+  /* Screen Grid */
+  .screen-grid {
+    max-width: 1280px;
+    margin: 0 auto 56px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+    gap: 24px;
+  }
+
+  /* Screen Card */
+  .screen-card {
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .screen-card-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding: 16px;
+  }
+
+  .screen-card-header h3 {
+    font-size: 15px;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 2px;
+  }
+
+  .screen-route {
+    font-family: 'SF Mono', SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
+    font-size: 12px;
+    color: var(--gray-500);
+  }
+
+  .screen-badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 10px;
+    border-radius: 999px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .badge-shipped {
+    background: var(--green-100);
+    color: var(--green-600);
+  }
+
+  .badge-flagged {
+    background: transparent;
+    color: var(--amber-500);
+    border: 1.5px dashed var(--feature-flag-border);
+  }
+
+  .badge-hidden {
+    background: var(--gray-700);
+    color: var(--gray-400);
+  }
+
+  /* Screen Notes */
+  .screen-notes {
+    padding: 12px 16px 16px;
+    border-top: 1px solid #2a2a2a;
+    font-size: 12px;
+    color: var(--gray-500);
+    line-height: 1.6;
+  }
+
+  .note-tag {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    vertical-align: middle;
+  }
+
+  .note-tag.new {
+    background: var(--green-100);
+    color: var(--green-600);
+  }
+
+  .note-tag.reuse {
+    background: var(--blue-100);
+    color: var(--blue-500);
+  }
+
+  .note-tag.token {
+    background: var(--amber-100);
+    color: var(--amber-500);
+  }
+
+  /* Phone Frame */
+  .phone-frame {
+    max-width: 280px;
+    margin: 0 auto 4px;
+    border-radius: 24px;
+    overflow: hidden;
+    border: 2px solid #333;
+    aspect-ratio: 9 / 19.5;
+    background: var(--phone-bg);
+    position: relative;
+  }
+
+  .phone-screen {
+    background: var(--phone-bg);
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .notch {
+    width: 120px;
+    height: 28px;
+    background: #0f0f0f;
+    border-radius: 0 0 16px 16px;
+    margin: 0 auto;
+    position: relative;
+    z-index: 10;
+    flex-shrink: 0;
+  }
+
+  /* Wireframe Header */
+  .wf-header {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    background: var(--phone-header-bg);
+    border-bottom: 1px solid var(--phone-border);
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .header-icon {
+    width: 20px;
+    height: 20px;
+    background: var(--phone-btn-bg);
+    border-radius: 4px;
+    flex-shrink: 0;
+  }
+
+  .header-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--gray-900);
+    flex: 1;
+  }
+
+  .header-action {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--primary-red);
+    cursor: default;
+  }
+
+  .back-btn {
+    font-size: 16px;
+    color: var(--gray-500);
+    flex-shrink: 0;
+    line-height: 1;
+  }
+
+  /* Wireframe Body */
+  .wf-body {
+    display: flex;
+    flex-direction: column;
+    padding: 10px 12px;
+    gap: 8px;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* Search Bar */
+  .wf-search {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--gray-100);
+    border-radius: 8px;
+    padding: 7px 10px;
+    flex-shrink: 0;
+  }
+
+  .wf-search-icon {
+    width: 14px;
+    height: 14px;
+    background: var(--gray-300);
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .wf-search-text {
+    font-size: 11px;
+    color: var(--gray-400);
+  }
+
+  /* List Items */
+  .wf-list-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--gray-100);
+  }
+
+  .wf-list-text {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .wf-list-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--gray-800);
+  }
+
+  .wf-list-sub {
+    font-size: 10px;
+    color: var(--gray-400);
+  }
+
+  /* Avatar */
+  .wf-avatar {
+    width: 36px;
+    height: 36px;
+    background: var(--gray-200);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--gray-500);
+    flex-shrink: 0;
+  }
+
+  /* Badges */
+  .wf-badge {
+    font-size: 9px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 999px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .wf-badge.success {
+    background: var(--success-light);
+    color: var(--success);
+  }
+
+  .wf-badge.amber {
+    background: var(--amber-100);
+    color: var(--amber-500);
+  }
+
+  .wf-badge.info {
+    background: var(--blue-100);
+    color: var(--blue-500);
+  }
+
+  .wf-badge.destructive {
+    background: var(--red-100);
+    color: var(--red-500);
+  }
+
+  /* Blocks */
+  .wf-block {
+    border: 1px solid var(--gray-200);
+    border-radius: 8px;
+    padding: 8px 10px;
+  }
+
+  .wf-block.green {
+    background: var(--success-light);
+    border-color: var(--success);
+  }
+
+  .wf-block-label {
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--gray-400);
+    margin-bottom: 3px;
+  }
+
+  .wf-block-content {
+    font-size: 11px;
+    color: var(--gray-700);
+    line-height: 1.4;
+  }
+
+  /* Buttons */
+  .wf-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 7px 14px;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: default;
+    border: none;
+    text-align: center;
+  }
+
+  .wf-btn.primary {
+    background: var(--primary-red);
+    color: #fff;
+  }
+
+  .wf-btn.blue {
+    background: var(--blue-500);
+    color: #fff;
+  }
+
+  .wf-btn.outline {
+    background: transparent;
+    border: 1.5px solid var(--gray-300);
+    color: var(--gray-600);
+  }
+
+  .wf-btn.success {
+    background: var(--success);
+    color: #fff;
+  }
+
+  .wf-btn.ghost {
+    background: transparent;
+    border: none;
+    color: var(--gray-500);
+  }
+
+  .wf-btn-row {
+    display: flex;
+    gap: 8px;
+  }
+
+  .wf-btn-row .wf-btn {
+    flex: 1;
+  }
+
+  /* Timer Bar */
+  .wf-timer-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 10px;
+    background: var(--gray-100);
+    border-radius: 8px;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--gray-800);
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+  }
+
+  /* Separator */
+  .wf-separator {
+    height: 1px;
+    background: var(--gray-200);
+    margin: 4px 0;
+  }
+
+  /* Checkbox */
+  .wf-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--gray-700);
+  }
+
+  .wf-checkbox-dot {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    border: 2px solid var(--gray-300);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .wf-checkbox-dot.checked {
+    background: var(--success);
+    border-color: var(--success);
+  }
+
+  /* Progress Dots */
+  .wf-progress-dots {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 6px 0;
+    flex-shrink: 0;
+  }
+
+  .wf-progress-dots .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--gray-200);
+  }
+
+  .wf-progress-dots .dot.active {
+    background: var(--primary-red);
+  }
+
+  .wf-progress-dots .dot.done {
+    background: var(--success);
+  }
+
+  /* Bottom Nav */
+  .wf-bottom-nav {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    padding: 8px 0 10px;
+    background: var(--gray-50);
+    border-top: 1px solid var(--gray-200);
+    flex-shrink: 0;
+    margin-top: auto;
+  }
+
+  .wf-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .wf-nav-dot {
+    width: 18px;
+    height: 18px;
+    background: var(--gray-200);
+    border-radius: 4px;
+  }
+
+  .wf-nav-dot.active {
+    background: var(--primary-red);
+  }
+
+  .wf-nav-label {
+    font-size: 9px;
+    color: var(--gray-400);
+  }
+
+  .wf-nav-label.active {
+    color: var(--primary-red);
+    font-weight: 700;
+  }
+
+  /* Legend color swatches */
+  .swatch {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+
+  /* Stat cards grid */
+  .wf-stat-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+
+  .wf-stat-card {
+    border: 1px solid var(--gray-200);
+    border-radius: 8px;
+    padding: 8px;
+  }
+
+  .wf-stat-label {
+    font-size: 9px;
+    color: var(--gray-400);
+    font-weight: 500;
+  }
+
+  .wf-stat-value {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--gray-800);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Form fields */
+  .wf-input {
+    width: 100%;
+    border: 1px solid var(--gray-200);
+    border-radius: 6px;
+    padding: 6px 8px;
+    font-size: 11px;
+    color: var(--gray-400);
+    background: #fff;
+  }
+
+  .wf-label {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--gray-700);
+    margin-bottom: 2px;
+  }
+
+  .wf-field {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  /* Toggle */
+  .wf-toggle {
+    width: 32px;
+    height: 18px;
+    background: var(--gray-200);
+    border-radius: 9px;
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  .wf-toggle.on {
+    background: var(--primary-red);
+  }
+
+  .wf-toggle::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 14px;
+    height: 14px;
+    background: #fff;
+    border-radius: 50%;
+  }
+
+  .wf-toggle.on::after {
+    left: auto;
+    right: 2px;
+  }
+
+  /* Podium */
+  .wf-podium {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 4px;
+  }
+
+  .wf-podium-slot {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+
+  /* Card top border by status */
+  .screen-card.status-shipped { border-top: 3px solid var(--green-500); }
+  .screen-card.status-hidden { border-top: 3px solid var(--gray-600); }
+  .screen-card.status-flagged { border-top: 3px solid var(--amber-500); }
+
+  /* ── Product Health Bar ── */
+  .health-bar {
+    max-width: 1280px;
+    margin: 0 auto 24px;
+    background: linear-gradient(135deg, #111 0%, #1a1a1a 100%);
+    border: 1px solid #2a2a2a;
+    border-radius: 14px;
+    padding: 20px 28px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+
+  .health-metric {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 16px;
+    border-right: 1px solid #2a2a2a;
+    flex-shrink: 0;
+  }
+
+  .health-metric:last-child { border-right: none; }
+
+  .health-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    flex-shrink: 0;
+  }
+
+  .health-metric-text {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+
+  .health-value {
+    font-size: 15px;
+    font-weight: 700;
+    color: #fff;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.2;
+  }
+
+  .health-label {
+    font-size: 10px;
+    color: var(--gray-500);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+  }
+
+  @media (max-width: 900px) {
+    .health-bar { flex-direction: column; align-items: stretch; }
+    .health-metric { border-right: none; border-bottom: 1px solid #2a2a2a; padding: 8px 0; }
+    .health-metric:last-child { border-bottom: none; }
+  }
+
+  /* ── Progress Dashboard ── */
+  .progress-dashboard {
+    max-width: 900px;
+    margin: 0 auto 32px;
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 12px;
+    padding: 24px;
+  }
+
+  .progress-dashboard h2 {
+    font-size: 16px;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 16px;
+  }
+
+  .progress-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .progress-stat {
+    text-align: center;
+    padding: 12px 8px;
+    border-radius: 10px;
+    background: #111;
+    border: 1px solid #2a2a2a;
+  }
+
+  .progress-stat .stat-number {
+    font-size: 28px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.2;
+  }
+
+  .progress-stat .stat-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 4px;
+  }
+
+  .progress-bar-container {
+    background: #111;
+    border-radius: 8px;
+    height: 12px;
+    overflow: hidden;
+    display: flex;
+  }
+
+  .progress-bar-segment { height: 100%; transition: width 0.3s ease; }
+
+  .progress-bar-label {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 6px;
+    font-size: 11px;
+    color: var(--gray-500);
+  }
+
+  /* ── Section Progress ── */
+  .section-progress {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 6px;
+  }
+
+  .section-progress-bar {
+    flex: 1;
+    max-width: 200px;
+    height: 6px;
+    background: #333;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .section-progress-fill {
+    height: 100%;
+    border-radius: 3px;
+    background: var(--green-500);
+  }
+
+  .section-progress-text {
+    font-size: 12px;
+    color: var(--gray-400);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── Dark Theme Overrides for Phone Screens ── */
+  [data-theme="dark"] .phone-screen { color: var(--phone-text); }
+  [data-theme="dark"] .wf-header { background: var(--phone-header-bg); border-bottom-color: var(--phone-border); }
+  [data-theme="dark"] .wf-header span { color: var(--phone-text) !important; }
+  [data-theme="dark"] .notch { background: var(--phone-bg); }
+  [data-theme="dark"] .header-title { color: var(--phone-text); }
+  [data-theme="dark"] .header-action { color: var(--phone-accent); }
+  [data-theme="dark"] .back-btn { color: var(--phone-text-muted); }
+  [data-theme="dark"] .wf-body { color: var(--phone-text); }
+  [data-theme="dark"] .wf-block { border-color: var(--phone-border); background: var(--phone-card); }
+  [data-theme="dark"] .wf-block-label { color: var(--phone-text-muted); }
+  [data-theme="dark"] .wf-block-content { color: var(--phone-text-secondary); }
+  [data-theme="dark"] .wf-input { background: var(--phone-input-bg); border-color: var(--phone-border); color: var(--phone-text-muted); }
+  [data-theme="dark"] .wf-label { color: var(--phone-text-secondary); }
+  [data-theme="dark"] .wf-list-item { border-bottom-color: var(--phone-border); }
+  [data-theme="dark"] .wf-list-title { color: var(--phone-text); }
+  [data-theme="dark"] .wf-list-sub { color: var(--phone-text-muted); }
+  [data-theme="dark"] .wf-avatar { background: var(--phone-btn-bg); color: var(--phone-text-muted); }
+  [data-theme="dark"] .wf-search { background: var(--phone-input-bg); }
+  [data-theme="dark"] .wf-search-icon { background: var(--phone-text-muted); }
+  [data-theme="dark"] .wf-search-text { color: var(--phone-text-muted); }
+  [data-theme="dark"] .wf-separator { background: var(--phone-border); }
+  [data-theme="dark"] .wf-timer-bar { background: var(--phone-card); color: var(--phone-text); }
+  [data-theme="dark"] .wf-stat-card { border-color: var(--phone-border); background: var(--phone-card); }
+  [data-theme="dark"] .wf-stat-label { color: var(--phone-text-muted); }
+  [data-theme="dark"] .wf-stat-value { color: var(--phone-text); }
+  [data-theme="dark"] .wf-checkbox { color: var(--phone-text-secondary); }
+  [data-theme="dark"] .wf-checkbox-dot { border-color: var(--phone-text-muted); }
+  [data-theme="dark"] .wf-btn.outline { border-color: var(--phone-border); color: var(--phone-text-secondary); }
+  [data-theme="dark"] .wf-btn.ghost { color: var(--phone-text-muted); }
+  [data-theme="dark"] .wf-bottom-nav { background: var(--phone-header-bg); border-top-color: var(--phone-border); }
+  [data-theme="dark"] .wf-nav-dot { background: var(--phone-btn-bg); }
+  [data-theme="dark"] .wf-nav-label { color: var(--phone-tab-inactive); }
+  [data-theme="dark"] .wf-progress-dots .dot { background: var(--phone-btn-bg); }
+  [data-theme="dark"] .wf-toggle { background: var(--phone-btn-bg); }
+
+  /* Override inline styles inside phone screens for dark theme */
+  [data-theme="dark"] .phone-screen [style*="color:var(--gray-900)"] { color: var(--phone-text) !important; }
+  [data-theme="dark"] .phone-screen [style*="color:var(--gray-800)"] { color: var(--phone-text) !important; }
+  [data-theme="dark"] .phone-screen [style*="color:var(--gray-700)"] { color: var(--phone-text-secondary) !important; }
+  [data-theme="dark"] .phone-screen [style*="color:var(--gray-600)"] { color: var(--phone-text-secondary) !important; }
+  [data-theme="dark"] .phone-screen [style*="color:var(--gray-500)"] { color: var(--phone-text-muted) !important; }
+  [data-theme="dark"] .phone-screen [style*="color:var(--gray-400)"] { color: var(--phone-text-muted) !important; }
+  [data-theme="dark"] .phone-screen [style*="background:var(--gray-100)"] { background: var(--phone-card) !important; }
+  [data-theme="dark"] .phone-screen [style*="background:var(--gray-200)"] { background: var(--phone-btn-bg) !important; }
+  [data-theme="dark"] .phone-screen [style*="background:var(--gray-50)"] { background: var(--phone-header-bg) !important; }
+  [data-theme="dark"] .phone-screen [style*="background:#fff"] { background: var(--phone-card) !important; }
+  [data-theme="dark"] .phone-screen [style*="background: #fff"] { background: var(--phone-card) !important; }
+  [data-theme="dark"] .phone-screen [style*="border-color:var(--gray-200)"] { border-color: var(--phone-border) !important; }
+  [data-theme="dark"] .phone-screen [style*="border-bottom:1px solid var(--gray-200)"] { border-bottom-color: var(--phone-border) !important; }
+  [data-theme="dark"] .phone-screen [style*="border:1px solid var(--gray-200)"] { border-color: var(--phone-border) !important; }
+  [data-theme="dark"] .phone-screen [style*="border:1px solid var(--gray-100)"] { border-color: var(--phone-border) !important; }
+  </style>
+</head>
+<body>
+
+  <h1>ELO RATED: Web Screen Inventory</h1>
+  <p class="subtitle">33 screens across 9 flows + 1 hidden section. Progress board showing implementation status. Next.js 16 + Tailwind + shadcn/ui.</p>
+
+  <!-- Theme Toggle -->
+  <div style="display: flex; justify-content: center; margin-bottom: 24px;">
+    <div id="themeToggle" style="display: inline-flex; border: 1px solid #333; border-radius: 4px; overflow: hidden; cursor: pointer;">
+      <button onclick="setTheme('light')" id="btnLight" style="padding: 8px 20px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; border: none; cursor: pointer; font-family: -apple-system, sans-serif; background: #E63946; color: #fff;">Light</button>
+      <button onclick="setTheme('dark')" id="btnDark" style="padding: 8px 20px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; border: none; cursor: pointer; font-family: -apple-system, sans-serif; background: #1a1a1a; color: #6B7280;">Dark</button>
+    </div>
+  </div>
+
+  <!-- ============ PRODUCT HEALTH BAR ============ -->
+  <div class="health-bar">
+
+    <!-- Build Health -->
+    <div class="health-metric">
+      <div class="health-icon" style="background: rgba(34,197,94,0.15);">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+      <div class="health-metric-text">
+        <span class="health-value" style="color: var(--green-500);">Passing</span>
+        <span class="health-label">Typecheck + Build + Tests</span>
+      </div>
+    </div>
+
+    <!-- Test Coverage -->
+    <div class="health-metric">
+      <div class="health-icon" style="background: rgba(59,130,246,0.15);">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="m9 15 2 2 4-4"/></svg>
+      </div>
+      <div class="health-metric-text">
+        <span class="health-value">23 unit + 1 e2e</span>
+        <span class="health-label">Vitest + Playwright</span>
+      </div>
+    </div>
+
+    <!-- Screens -->
+    <div class="health-metric">
+      <div class="health-icon" style="background: rgba(34,197,94,0.15);">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      </div>
+      <div class="health-metric-text">
+        <span class="health-value">28 / 33</span>
+        <span class="health-label">Screens Shipped</span>
+      </div>
+    </div>
+
+    <!-- Shared Layer -->
+    <div class="health-metric">
+      <div class="health-icon" style="background: rgba(59,130,246,0.15);">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      </div>
+      <div class="health-metric-text">
+        <span class="health-value">7 shared hooks</span>
+        <span class="health-label">Cross-platform via @jits/shared</span>
+      </div>
+    </div>
+
+    <!-- Beta Status -->
+    <div class="health-metric">
+      <div class="health-icon" style="background: rgba(34,197,94,0.15);">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      </div>
+      <div class="health-metric-text">
+        <span class="health-value" style="color: var(--green-500);">Active Beta</span>
+        <span class="health-label">Deployed since 2026-04-27</span>
+      </div>
+    </div>
+
+    <!-- Tech Debt -->
+    <div class="health-metric">
+      <div class="health-icon" style="background: rgba(107,114,128,0.15);">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+      </div>
+      <div class="health-metric-text">
+        <span class="health-value">8 items</span>
+        <span class="health-label">Known Tech Debt</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ============ PROGRESS DASHBOARD ============ -->
+  <div class="progress-dashboard">
+    <h2>Progress Overview</h2>
+    <div class="progress-stats">
+      <div class="progress-stat">
+        <div class="stat-number" style="color: var(--green-500);">28</div>
+        <div class="stat-label" style="color: var(--green-500);">Shipped</div>
+      </div>
+      <div class="progress-stat">
+        <div class="stat-number" style="color: var(--gray-400);">5</div>
+        <div class="stat-label" style="color: var(--gray-400);">Hidden</div>
+      </div>
+      <div class="progress-stat">
+        <div class="stat-number" style="color: var(--amber-500);">0</div>
+        <div class="stat-label" style="color: var(--amber-500);">In Progress</div>
+      </div>
+      <div class="progress-stat">
+        <div class="stat-number" style="color: #fff;">33</div>
+        <div class="stat-label" style="color: var(--gray-400);">Total</div>
+      </div>
+    </div>
+    <div class="progress-bar-container">
+      <div class="progress-bar-segment" style="width: 84.8%; background: var(--green-500);"></div>
+      <div class="progress-bar-segment" style="width: 15.2%; background: var(--gray-600);"></div>
+    </div>
+    <div class="progress-bar-label">
+      <span>28 / 33 screens shipped (5 hidden routes preserved)</span>
+      <span>84.8% active</span>
+    </div>
+  </div>
+
+  <div class="legend">
+    <h2>Legend</h2>
+    <div class="legend-grid">
+      <div class="legend-section">
+        <h3>Color Tokens</h3>
+        <div class="legend-item">
+          <span class="swatch" style="background: var(--success);"></span>
+          <span><strong>text-success</strong> : wins, positive ELO</span>
+        </div>
+        <div class="legend-item">
+          <span class="swatch" style="background: var(--red-500);"></span>
+          <span><strong>text-destructive</strong> : losses, negative ELO</span>
+        </div>
+        <div class="legend-item">
+          <span class="swatch" style="background: var(--amber-500);"></span>
+          <span><strong>text-amber-500</strong> : draws, pressure</span>
+        </div>
+        <div class="legend-item">
+          <span class="swatch" style="background: var(--primary-red);"></span>
+          <span><strong>text-primary</strong> : brand accent only</span>
+        </div>
+        <div class="legend-item">
+          <span class="swatch" style="background: var(--gray-800); font-family: monospace; color: #fff; font-size: 9px; display: flex; align-items: center; justify-content: center; width: auto; padding: 0 5px;">1234</span>
+          <span><strong>tabular-nums</strong> : ELO, stats values</span>
+        </div>
+      </div>
+      <div class="legend-section">
+        <h3>Component Tags</h3>
+        <div class="legend-item">
+          <span class="note-tag new">NEW</span>
+          <span>New component for this screen</span>
+        </div>
+        <div class="legend-item">
+          <span class="note-tag reuse">REUSE</span>
+          <span>Existing component reused</span>
+        </div>
+        <div class="legend-item">
+          <span class="note-tag token">TOKEN</span>
+          <span>Uses color token from design system</span>
+        </div>
+      </div>
+      <div class="legend-section">
+        <h3>Screen Status</h3>
+        <div class="legend-item">
+          <span class="screen-badge badge-shipped">Shipped</span>
+          <span>Live in production</span>
+        </div>
+        <div class="legend-item">
+          <span class="screen-badge badge-flagged">Flagged</span>
+          <span>Behind feature flag</span>
+        </div>
+        <div class="legend-item">
+          <span class="screen-badge badge-hidden">Hidden</span>
+          <span>Route exists but no UI entry point</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<!-- ================================================ -->
+<!-- SECTION 1: AUTH FLOW -->
+<!-- ================================================ -->
+<div class="section-header">
+  <h2>1. Auth Flow</h2>
+  <p>Unauthenticated screens: login, signup, password reset. All use shadcn/ui Card components with Google OAuth option.</p>
+  <div class="section-progress">
+    <div class="section-progress-bar"><div class="section-progress-fill" style="width:100%"></div></div>
+    <span class="section-progress-text">3 / 3 shipped</span>
+  </div>
+</div>
+
+<div class="screen-grid">
+
+  <!-- 1. Login -->
+  <div class="screen-card status-shipped">
+    <div class="screen-card-header">
+      <div>
+        <h3>1. Login</h3>
+        <div class="screen-route">/login</div>
+      </div>
+      <span class="screen-badge badge-shipped">Shipped</span>
+    </div>
+    <div class="phone-frame">
+      <div class="phone-screen">
+        <div class="notch"></div>
+        <div class="wf-body" style="justify-content:center; gap:12px; padding:20px 16px;">
+          <div class="wf-block" style="padding:16px;">
+            <div style="font-size:16px;font-weight:700;color:var(--gray-900);margin-bottom:2px;">Login</div>
+            <div style="font-size:10px;color:var(--gray-400);margin-bottom:12px;">Enter your email below to login to your account</div>
+            <div class="wf-field" style="margin-bottom:8px;">
+              <span class="wf-label">Email</span>
+              <div class="wf-input">m@example.com</div>
+            </div>
+            <div class="wf-field" style="margin-bottom:4px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <span class="wf-label">Password</span>
+                <span style="font-size:9px;color:var(--gray-400);text-decoration:underline;">Forgot your password?</span>
+              </div>
+              <div class="wf-input">********</div>
+            </div>
+            <div class="wf-btn primary" style="width:100%;margin-top:8px;">Login</div>
+            <div style="text-align:center;font-size:9px;color:var(--gray-400);margin:8px 0;">or</div>
+            <div class="wf-btn outline" style="width:100%;display:flex;gap:6px;justify-content:center;">
+              <span style="font-size:10px;">G</span> Continue with Google
+            </div>
+            <div style="text-align:center;font-size:9px;color:var(--gray-400);margin-top:10px;">
+              Don't have an account? <span style="text-decoration:underline;">Sign up</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="screen-notes">
+      <span class="note-tag reuse">LoginForm</span>
+      <span class="note-tag reuse">Card</span>
+      <span class="note-tag reuse">Input</span>
+      <span class="note-tag reuse">Button</span>
+      Email + password with show/hide toggle. Google OAuth button. Links to /signup and /forgot-password. Redirects to /profile on success.
+    </div>
+  </div>
+
+  <!-- 2. Sign Up -->
+  <div class="screen-card status-shipped">
+    <div class="screen-card-header">
+      <div>
+        <h3>2. Sign Up</h3>
+        <div class="screen-route">/signup</div>
+      </div>
+      <span class="screen-badge badge-shipped">Shipped</span>
+    </div>
+    <div class="phone-frame">
+      <div class="phone-screen">
+        <div class="notch"></div>
+        <div class="wf-body" style="justify-content:center; gap:12px; padding:20px 16px;">
+          <div class="wf-block" style="padding:16px;">
+            <div style="font-size:16px;font-weight:700;color:var(--gray-900);margin-bottom:2px;">Sign up</div>
+            <div style="font-size:10px;color:var(--gray-400);margin-bottom:12px;">Create a new account</div>
+            <div class="wf-field" style="margin-bottom:8px;">
+              <span class="wf-label">Email</span>
+              <div class="wf-input">m@example.com</div>
+            </div>
+            <div class="wf-field" style="margin-bottom:8px;">
+              <span class="wf-label">Password</span>
+              <div class="wf-input">********</div>
+            </div>
+            <div class="wf-field" style="margin-bottom:4px;">
+              <span class="wf-label">Repeat Password</span>
+              <div class="wf-input">********</div>
+            </div>
+            <div class="wf-btn primary" style="width:100%;margin-top:8px;">Sign up</div>
+            <div style="text-align:center;font-size:9px;color:var(--gray-400);margin:8px 0;">or</div>
+            <div class="wf-btn outline" style="width:100%;display:flex;gap:6px;justify-content:center;">
+              <span style="font-size:10px;">G</span> Continue with Google
+            </div>
+            <div style="text-align:center;font-size:9px;color:var(--gray-400);margin-top:10px;">
+              Already have an account? <span style="text-decoration:underline;">Login</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="screen-notes">
+      <span class="note-tag reuse">SignUpForm</span>
+      <span class="note-tag reuse">Card</span>
+      Email, password, repeat password fields. Client-side password match validation. Google OAuth. Links to /login.
+    </div>
+  </div>
+
+  <!-- 3. Forgot Password -->
+  <div class="screen-card status-shipped">
+    <div class="screen-card-header">
+      <div>
+        <h3>3. Forgot Password</h3>
+        <div class="screen-route">/forgot-password</div>
+      </div>
+      <span class="screen-badge badge-shipped">Shipped</span>
+    </div>
+    <div class="phone-frame">
+      <div class="phone-screen">
+        <div class="notch"></div>
+        <div class="wf-body" style="justify-content:center; gap:12px; padding:20px 16px;">
+          <div class="wf-block" style="padding:16px;">
+            <div style="font-size:16px;font-weight:700;color:var(--gray-900);margin-bottom:2px;">Reset Your Password</div>
+            <div style="font-size:10px;color:var(--gray-400);margin-bottom:12px;">Type in your email and we'll send you a link to reset your password</div>
+            <div class="wf-field" style="margin-bottom:8px;">
+              <span class="wf-label">Email</span>
+              <div class="wf-input">m@example.com</div>
+            </div>
+            <div class="wf-btn primary" style="width:100%;margin-top:4px;">Send reset email</div>
+            <div style="text-align:center;font-size:9px;color:var(--gray-400);margin-top:10px;">
+              Already have an account? <span style="text-decoration:underline;">Login</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="screen-notes">
+      <span class="note-tag reuse">ForgotPasswordForm</span>
+      Email-only form. Success state swaps to "Check Your Email" confirmation card. Links back to /login.
+    </div>
+  </div>
+
+</div>
+
+<!-- ================================================ -->
+<!-- SECTION 2: PROFILE SETUP -->
+<!-- ================================================ -->
+<div class="section-header">
+  <h2>2. Profile Setup Wizard</h2>
+  <p>Multi-step activation wizard. Steps: TOS acceptance (first-time only), Identity (name, gender, DOB, photo), Training (gym, weight), Optional (city). Required for profile activation.</p>
+  <div class="section-progress">
+    <div class="section-progress-bar"><div class="section-progress-fill" style="width:100%"></div></div>
+    <span class="section-progress-text">3 / 3 shipped</span>
+  </div>
+</div>
+
+<div class="screen-grid">
+
+  <!-- 4. Setup: TOS -->
+  <div class="screen-card status-shipped">
+    <div class="screen-card-header">
+      <div>
+        <h3>4. Setup: TOS Step</h3>
+        <div class="screen-route">/profile/setup</div>
+      </div>
+      <span class="screen-badge badge-shipped">Shipped</span>
+    </div>
+    <div class="phone-frame">
+      <div class="phone-screen">
+        <div class="notch"></div>
+        <div class="wf-body" style="gap:10px; padding:14px 12px;">
+          <div style="text-align:center;">
+            <div style="font-size:10px;color:var(--gray-400);margin-bottom:4px;">Step 1 of 4</div>
+            <div style="font-size:13px;font-weight:600;color:var(--gray-800);">Welcome to JITS</div>
+          </div>
+          <div class="wf-progress-dots">
+            <span class="dot active"></span>
+            <span class="dot"></span>
+            <span class="dot"></span>
+            <span class="dot"></span>
+          </div>
+          <div style="border:1px solid var(--gray-200);border-radius:6px;padding:8px;flex:1;overflow:hidden;">
+            <div style="font-size:9px;color:var(--gray-400);line-height:1.5;">
+              JITS TERMS OF SERVICE<br><br>
+              1. Acceptance of Terms<br>
+              By using JITS...<br><br>
+              2. Assumption of Risk<br>
+              Brazilian Jiu-Jitsu is...<br><br>
+              (scrollable)
+            </div>
+          </div>
+          <div class="wf-checkbox">
+            <div class="wf-checkbox-dot"></div>
+            I have read and agree to the Terms of Service
+          </div>
+          <div class="wf-btn primary" style="width:100%;opacity:0.5;">Continue</div>
+        </div>
+      </div>
+    </div>
+    <div class="screen-notes">
+      <span class="note-tag reuse">SetupWizard</span>
+      <span class="note-tag new">TosStep</span>
+      <span class="note-tag reuse">WizardProgress</span>
+      Scrollable TOS text from @jits/shared/utils (TOS_TEXT). Checkbox must be checked to enable Continue. Writes to waiver_acknowledgements. Skipped for returning users.
+    </div>
+  </div>
+
+  <!-- 5. Setup: Identity -->
+  <div class="screen-card status-shipped">
+    <div class="screen-card-header">
+      <div>
+        <h3>5. Setup: Identity Step</h3>
+        <div class="screen-route">/profile/setup</div>
+      </div>
+      <span class="screen-badge badge-shipped">Shipped</span>
+    </div>
+    <div class="phone-frame">
+      <div class="phone-screen">
+        <div class="notch"></div>
+        <div class="wf-body" style="gap:10px; padding:14px 12px;">
+          <div style="text-align:center;">
+            <div style="font-size:10px;color:var(--gray-400);margin-bottom:4px;">Step 2 of 4</div>
+            <div style="font-size:13px;font-weight:600;color:var(--gray-800);">Who are you?</div>
+          </div>
+          <div class="wf-progress-dots">
+            <span class="dot done"></span>
+            <span class="dot active"></span>
+            <span class="dot"></span>
+            <span class="dot"></span>
+          </div>
+          <div style="width:60px;height:60px;border-radius:50%;background:var(--gray-200);margin:0 auto;display:flex;align-items:center;justify-content:center;">
+            <span style="font-size:16px;color:var(--gray-400);">+</span>
+          </div>
+          <div class="wf-field">
+            <span class="wf-label">Display Name</span>
+            <div class="wf-input">Enter your fighter name</div>
+          </div>
+          <div class="wf-field">
+            <span class="wf-label">Gender</span>
+            <div class="wf-input">Select gender</div>
+          </div>
+          <div class="wf-field">
+            <span class="wf-label">Date of Birth</span>
+            <div class="wf-input">YYYY-MM-DD</div>
+          </div>
+          <div style="font-size:9px;color:var(--gray-400);">You must be at least 16 to compete.</div>
+          <div class="wf-btn primary" style="width:100%;">Continue</div>
+        </div>
+      </div>
+    </div>
+    <div class="screen-notes">
+      <span class="note-tag new">IdentityStep</span>
+      <span class="note-tag reuse">ProfilePhotoUpload</span>
+      <span class="note-tag reuse">Select</span>
+      Profile photo upload (optional), display name, gender picker (M/F), date of birth with age-16 validation. Existing athletes see pre-filled values.
+    </div>
+  </div>
+
+  <!-- 6. Setup: Training -->
+  <div class="screen-card status-shipped">
+    <div class="screen-card-header">
+      <div>
+        <h3>6. Setup: Training Step</h3>
+        <div class="screen-route">/profile/setup</div>
+      </div>
+      <span class="screen-badge badge-shipped">Shipped</span>
+    </div>
+    <div class="phone-frame">
+      <div class="phone-screen">
+        <div class="notch"></div>
+        <div class="wf-body" style="gap:10px; padding:14px 12px;">
+          <div style="text-align:center;">
+            <div style="font-size:10px;color:var(--gray-400);margin-bottom:4px;">Step 3 of 4</div>
+            <div style="font-size:13px;font-weight:600;color:var(--gray-800);">Where do you train?</div>
+          </div>
+          <div class="wf-progress-dots">
+            <span class="dot done"></span>
+            <span class="dot done"></span>
+            <span class="dot active"></span>
+            <span class="dot"></span>
+          </div>
+          <div class="wf-field">
+            <span class="wf-label">Gym</span>
+            <div class="wf-input">Select your gym</div>
+          </div>
+          <div style="font-size:9px;color:var(--gray-400);">Required to activate your profile and appear to other athletes.</div>
+          <div class="wf-field">
+            <span class="wf-label">Weight (lbs)</span>
+            <div class="wf-input">e.g. 155</div>
+          </div>
+          <div style="font-size:9px;color:var(--gray-400);">Used for weight class matching.</div>
+          <div class="wf-btn primary" style="width:100%;">Continue</div>
+          <div class="wf-btn ghost" style="width:100%;">Back</div>
+        </div>
+      </div>
+    </div>
+    <div class="screen-notes">
+      <span class="note-tag new">TrainingStep</span>
+      <span class="note-tag reuse">Select</span>
+      Gym picker (from server-loaded gym list), weight input (50-400 range, lbs). Both required for activation.
+    </div>
+  </div>
+
+</div>
+
+<!-- ================================================ -->
+<!-- SECTION 3: DASHBOARD -->
+<!-- ================================================ -->
+<div class="section-header">
+  <h2>3. Dashboard</h2>
+  <p>Home screen with greeting, stat overview cards, active session card, and recent activity (my matches + community feed tabs).</p>
+  <div class="section-progress">
+    <div class="section-progress-bar"><div class="section-progress-fill" style="width:100%"></div></div>
+    <span class="section-progress-text">1 / 1 shipped</span>
+  </div>
+</div>
+
+<div class="screen-grid">
+
+  <!-- 7. Dashboard -->
+  <div class="screen-card status-shipped">
+    <div class="screen-card-header">
+      <div>
+        <h3>7. Dashboard</h3>
+        <div class="screen-route">/</div>
+      </div>
+      <span class="screen-badge badge-shipped">Shipped</span>
+    </div>
+    <div class="phone-frame">
+      <div class="phone-screen">
+        <div class="notch"></div>
+        <div class="wf-header">
+          <span class="header-title">Jits Arena</span>
+          <div style="display:flex;gap:4px;align-items:center;">
+            <div style="width:14px;height:14px;border-radius:3px;background:var(--gray-200);"></div>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--gray-400)" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            <div class="wf-avatar" style="width:22px;height:22px;font-size:8px;">MS</div>
+          </div>
+        </div>
+        <div class="wf-body" style="gap:10px;">
+          <!-- Greeting -->
+          <div>
+            <div style="font-size:16px;font-weight:700;color:var(--gray-900);">Hey, <span style="color:var(--primary-red);">Matt</span></div>
+            <div style="display:flex;align-items:center;gap:4px;margin-top:3px;padding:6px 8px;background:rgba(220,38,38,0.08);border-radius:8px;">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--primary-red)" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              <span style="font-size:10px;font-weight:500;color:var(--gray-700);">Find a session</span>
+              <span style="font-size:10px;color:var(--gray-400);margin-left:auto;">></span>
+            </div>
+          </div>
+
+          <!-- Stat overview 2x2 grid -->
+          <div class="wf-stat-grid">
+            <div class="wf-stat-card">
+              <div class="wf-stat-label">ELO Rating</div>
+              <div class="wf-stat-value">1247</div>
+            </div>
+            <div class="wf-stat-card">
+              <div class="wf-stat-label">Rank</div>
+              <div class="wf-stat-value">#3</div>
+            </div>
+            <div class="wf-stat-card">
+              <div class="wf-stat-label">Record</div>
+              <div class="wf-stat-value">
+                <span style="color:var(--success);">18</span><span style="color:var(--gray-300);">-</span><span style="color:var(--amber-500);">2</span><span style="color:var(--gray-300);">-</span><span style="color:var(--red-500);">6</span>
+              </div>
+            </div>
+            <div class="wf-stat-card">
+              <div class="wf-stat-label">Win Streak</div>
+              <div class="wf-stat-value">5</div>
+            </div>
+          </div>
+
+          <!-- Sessions section -->
+          <div style="display:flex;align-items:center;gap:4px;">
+            <div style="width:14px;height:14px;border-radius:4px;background:rgba(34,197,94,0.1);display:flex;align-items:center;justify-content:center;">
+              <span style="font-size:8px;color:var(--green-500);">C</span>
+            </div>
+            <span style="font-size:12px;font-weight:600;color:var(--gray-800);">Sessions</span>
+          </div>
+          <div style="border:1px dashed var(--gray-200);border-radius:8px;padding:10px;text-align:center;">
+            <span style="font-size:10px;font-weight:500;color:var(--gray-500);">Find a session</span><br>
+            <span style="font-size:9px;color:var(--gray-400);">Browse gyms and join an open mat</span>
+          </div>
+
+          <!-- Recent activity -->
+          <div style="font-size:12px;font-weight:600;color:var(--gray-800);">Recent Activity</div>
+          <div style="display:flex;gap:4px;">
+            <span style="font-size:9px;padding:3px 8px;background:var(--primary-red);color:#fff;border-radius:6px;">My Matches</span>
+            <span style="font-size:9px;padding:3px 8px;background:var(--gray-100);color:var(--gray-500);border-radius:6px;">Community</span>
+          </div>
+        </div>
+        <div class="wf-bottom-nav">
+          <div class="wf-nav-item"><span class="wf-nav-label active">Home</span></div>
+          <div class="wf-nav-item"><span class="wf-nav-label">Gyms</span></div>
+          <div class="wf-nav-item"><span class="wf-nav-label">Rankings</span></div>
+          <div class="wf-nav-item"><span class="wf-nav-label">Profile</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="screen-notes">
+      <span class="note-tag reuse">AppHeader</span>
+      <span class="note-tag reuse">PageHeaderActions</span>
+      <span class="note-tag reuse">StatOverview</span>
+      <span class="note-tag reuse">ActiveSessionCard</span>
+      <span class="note-tag reuse">RecentActivitySection</span>
+      <span class="note-tag reuse">BottomNavBar</span>
+      <span class="note-tag token">Record: text-success / text-amber-500 / text-destructive</span>
+      <span class="note-tag token">ELO/Rank/Streak: tabular-nums</span>
+      Header shows premium button, notification bell with badge, and user avatar. Hero greeting links to /gyms when not looking for matches. StatOverview shows 2x2 grid (ELO, Rank, Record with W-D-L, Win Streak) with peak labels. ActiveSessionCard shows live/upcoming session or empty-state link to /gyms. RecentActivitySection has My Matches / Community tabs with MatchCard list.
+    </div>
+  </div>
+
+</div>
+
+<!-- ================================================ -->
+<!-- SECTION 4: GYM FINDER -->
+<!-- ================================================ -->
+<div class="section-header">
+  <h2>4. Gym Finder</h2>
+  <p>Browse gyms, view details, and discover active sessions. Entry point for the session-based match flow.</p>
+  <div class="section-progress">
+    <div class="section-progress-bar"><div class="section-progress-fill" style="width:100%"></div></div>
+    <span class="section-progress-text">2 / 2 shipped</span>
+  </div>
+</div>
+
+<div class="screen-grid">
+
+  <!-- 8. Gym List -->
+  <div class="screen-card status-shipped">
+    <div class="screen-card-header">
+      <div>
+        <h3>8. Gym Finder</h3>
+        <div class="screen-route">/gyms</div>
+      </div>
+      <span class="screen-badge badge-shipped">Shipped</span>
+    </div>
+    <div class="phone-frame">
+      <div class="phone-screen">
+        <div class="notch"></div>
+        <div class="wf-header">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--gray-500)" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            <span class="header-title">Gyms</span>
+          </div>
+          <div class="header-action">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--gray-400)" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          </div>
+        </div>
+
+        <div class="wf-body" style="gap:12px;">
+          <div class="wf-search">
+            <span class="wf-search-icon">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--gray-400)" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+            </span>
+            <span class="wf-search-text">Search gyms...</span>
+          </div>
+
+          <div style="border:1px solid var(--gray-200);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:6px;">
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span style="font-size:13px;font-weight:600;">Gracie Academy</span>
+              <span class="wf-badge info" style="font-size:9px;">My Gym</span>
+              <span class="wf-badge success" style="font-size:9px;">Live</span>
+            </div>
+            <span style="font-size:10px;color:var(--gray-400);">Torrance, CA</span>
+            <div style="display:flex;align-items:center;gap:12px;font-size:10px;color:var(--gray-400);margin-top:2px;">
+              <span>24 members</span>
+              <span style="color:#22c55e;font-weight:500;">1 active</span>
+            </div>
+          </div>
+
+          <div style="border:1px solid var(--gray-200);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:6px;">
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span style="font-size:13px;font-weight:600;">10th Planet</span>
+            </div>
+            <span style="font-size:10px;color:var(--gray-400);">Los Angeles, CA</span>
+            <div style="display:flex;align-items:center;gap:12px;font-size:10px;color:var(--gray-400);margin-top:2px;">
+              <span>18 members</span>
+              <span>2 upcoming</span>
+            </div>
+          </div>
+
+          <div style="border:1px solid var(--gray-200);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:6px;">
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span style="font-size:13px;font-weight:600;">Atos HQ</span>
+              <span class="wf-badge success" style="font-size:9px;">Live</span>
+            </div>
+            <span style="font-size:10px;color:var(--gray-400);">San Diego, CA</span>
+            <div style="display:flex;align-items:center;gap:12px;font-size:10px;color:var(--gray-400);margin-top:2px;">
+              <span>31 members</span>
+              <span style="color:#22c55e;font-weight:500;">1 active</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="wf-bottom-nav">
+          <div class="wf-nav-item"><span class="wf-nav-label">Home</span></div>
+          <div class="wf-nav-item"><span class="wf-nav-label active">Gyms</span></div>
+          <div class="wf-nav-item"><span class="wf-nav-label">Rankings</span></div>
+          <div class="wf-nav-item"><span class="wf-nav-label">Profile</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="screen-notes">
+      <span class="note-tag new">GymSearch</span>
+      <span class="note-tag reuse">AppHeader</span>
+      <span class="note-tag reuse">BottomNavBar</span>
+      <span class="note-tag token">Session Live badge: bg-success text-success-foreground</span>
+      <span class="note-tag token">My Gym badge: bg-blue-100 text-blue-600</span>
+      Client-side search by gym name or city. Cards show "My Gym" outline badge, "Live" success badge, member count, active/upcoming session counts. Data via getGymsWithSessions().
+    </div>
+  </div>
+
+  <!-- 9. Gym Detail -->
+  <div class="screen-card status-shipped">
+    <div class="screen-card-header">
+      <div>
+        <h3>9. Gym Detail</h3>
+        <div class="screen-route">/gyms/[id]</div>
+      </div>
+      <span class="screen-badge badge-shipped">Shipped</span>
+    </div>
+    <div class="phone-frame">
+      <div class="phone-screen">
+        <div class="notch"></div>
+        <div class="wf-header">
+          <span class="back-btn">&larr;</span>
+          <span class="header-title">Gym</span>
+        </div>
+        <div class="wf-body" style="gap:12px;">
+          <div>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span style="font-size:18px;font-weight:700;">Gracie Academy</span>
+              <span class="wf-badge info" style="font-size:9px;border:1px solid var(--gray-200);background:transparent;">My Gym</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--gray-400);margin-top:4px;">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              Torrance, CA
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--gray-400);margin-top:2px;">
+              Members at this gym
+            </div>
+          </div>
+
+          <div class="wf-btn primary" style="width:100%;">Start Session</div>
+
+          <div style="font-size:12px;font-weight:600;color:var(--gray-800);">Sessions</div>
+          <div style="border:1px solid var(--gray-200);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:4px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:11px;font-weight:600;color:var(--gray-800);">Open Mat</span>
+              <span class="wf-badge success" style="font-size:8px;">Active</span>
+            </div>
+            <span style="font-size:9px;color:var(--gray-400);">Today 6:00 PM, 8 participants</span>
+            <div class="wf-btn primary" style="width:100%;font-size:10px;padding:5px 10px;">Join Session</div>
+          </div>
+          <div style="border:1px solid var(--gray-200);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:4px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:11px;font-weight:600;color:var(--gray-800);">Competition Prep</span>
+              <span class="wf-badge amber" style="font-size:8px;">Scheduled</span>
+            </div>
+            <span style="font-size:9px;color:var(--gray-400);">Tomorrow 10:00 AM</span>
+            <div class="wf-btn outline" style="width:100%;font-size:10px;padding:5px 10px;">RSVP</div>
+          </div>
+        </div>
+
+        <div class="wf-bottom-nav">
+          <div class="wf-nav-item"><span class="wf-nav-label">Home</span></div>
+          <div class="wf-nav-item"><span class="wf-nav-label active">Gyms</span></div>
+          <div class="wf-nav-item"><span class="wf-nav-label">Rankings</span></div>
+          <div class="wf-nav-item"><span class="wf-nav-label">Profile</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="screen-notes">
+      <span class="note-tag new">GymDetailContent</span>
+      <span class="note-tag new">SessionList</span>
+      <span class="note-tag new">StartSessionButton</span>
+      <span class="note-tag new">RsvpButton</span>
+      <span class="note-tag reuse">Badge</span>
+      Gym name with "My Gym" outline badge, city, member count. Members see "Start Session" button (creates session via RPC). SessionList shows active (green badge, Join button) and scheduled (amber badge, RSVP/Cancel). Data via getGymDetail().
+    </div>
+  </div>
+
+</div>
+
+<!-- ================================================ -->
+<!-- SECTION 5: JOIN WIZARD -->
+<!-- ================================================ -->
+<div class="section-header">
+  <h2>5. Join Wizard</h2>
+  <p>4-step wizard to join a session: geo-check (conditional), waiver (conditional), weight confirm, final confirm. Steps are dynamically included based on gym configuration.</p>
+  <div class="section-progress">
+    <div class="section-progress-bar"><div class="section-progress-fill" style="width:100%"></div></div>
+    <span class="section-progress-text">4 / 4 shipped</span>
+  </div>
+</div>
+
+<div class="screen-grid">
+
+  <!-- 10. Geo Check -->
+  <div class="screen-card status-shipped">
+    <div class="screen-card-header">
+      <div>
+        <h3>10. Join: Geo Check</h3>
+        <div class="screen-route">/session/[id]/join</div>
+      </div>
+      <span class="screen-badge badge-shipped">Shipped</span>
+    </div>
+    <div class="phone-frame">
+      <div class="phone-screen">
+        <div class="notch"></div>
+        <div class="wf-header">
+          <span class="back-btn">&larr;</span>
+          <span class="header-title">Join Session</span>
+        </div>
+        <div class="wf-body" style="gap:10px;">
+          <div style="text-align:center;font-size:10px;color:var(--gray-400);">Step 1 of 4</div>
+          <div class="wf-progress-dots">
+            <span class="dot active"></span>
+            <span class="dot"></span>
+            <span class="dot"></span>
+            <span class="dot"></span>
+          </div>
+          <div style="text-align:center;padding:16px 0;">
+            <div style="width:48px;height:48px;border-radius:50%;background:rgba(34,197,94,0.1);margin:0 auto 8px;display:flex;align-items:center;justify-content:center;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--green-500)" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            </div>
+            <div style="font-size:13px;font-weight:600;color:var(--gray-800);">Location Check</div>
+            <div style="font-size:10px;color:var(--gray-400);margin-top:4px;">Verifying you're near the gym...</div>
+          </div>
+          <div class="wf-btn primary" style="width:100%;">Continue</div>
+        </div>
+      </div>
+    </div>
+    <div class="screen-notes">
+      <span class="note-tag new">GeoCheckStep</span>
+      <span class="note-tag reuse">JoinWizard</span>
+      Uses browser geolocation to verify proximity to gym (haversine distance check). Shows loading state during location fetch. Skipped if gym has no lat/long coordinates.
+    </div>
+  </div>
+
+  <!-- 11. Waiver -->
+  <div class="screen-card status-shipped">
+    <div class="screen-card-header">
+      <div>
+        <h3>11. Join: Waiver</h3>
+        <div class="screen-route">/session/[id]/join</div>
+      </div>
+      <span class="screen-badge badge-shipped">Shipped</span>
+    </div>
+    <div class="phone-frame">
+      <div class="phone-screen">
+        <div class="notch"></div>
+        <div class="wf-header">
+          <span class="back-btn">&larr;</span>
+          <span class="header-title">Join Session</span>
+        </div>
+        <div class="wf-body" style="gap:10px;">
+          <div style="text-align:center;font-size:10px;color:var(--gray-400);">Step 2 of 4</div>
+          <div class="wf-progress-dots">
+            <span class="dot done"></span>
+            <span class="dot active"></span>
+            <span class="dot"></span>
+            <span class="dot"></span>
+          </div>
+          <div style="font-size:13px;font-weight:600;color:var(--gray-800);text-align:center;">Waiver</div>
+          <div style="border:1px solid var(--gray-200);border-radius:6px;padding:8px;flex:1;overflow:hidden;">
+            <div style="font-size:9px;color:var(--gray-400);line-height:1.5;">
+              By signing this waiver, you acknowledge the inherent risks of BJJ training...<br><br>(scrollable waiver text)
+            </div>
+          </div>
+          <div class="wf-btn primary" style="width:100%;">Accept Waiver</div>
+        </div>
+      </div>
+    </div>
+    <div class="screen-notes">
+      <span class="note-tag new">WaiverStep</span>
+      Scrollable waiver text. Accept button calls acceptSessionWaiver mutation. Skipped if no waiver required or already signed.
+    </div>
+  </div>
+
+  <!-- 12. Weight Confirm -->
+  <div class="screen-card status-shipped">
+    <div class="screen-card-header">
+      <div>
+        <h3>12. Join: Weight Confirm</h3>
+        <div class="screen-route">/session/[id]/join</div>
+      </div>
+      <span class="screen-badge badge-shipped">Shipped</span>
+    </div>
+    <div class="phone-frame">
+      <div class="phone-screen">
+        <div class="notch"></div>
+        <div class="wf-header">
+          <span class="back-btn">&larr;</span>
+          <span class="header-title">Join Session</span>
+        </div>
+        <div class="wf-body" style="gap:10px;">
+          <div style="text-align:center;font-size:10px;color:var(--gray-400);">Step 3 of 4</div>
+          <div class="wf-progress-dots">
+            <span class="dot done"></span>
+            <span class="dot done"></span>
+            <span class="dot active"></span>
+            <span class="dot"></span>
+          </div>
+          <div style="font-size:13px;font-weight:600;color:var(--gray-800);text-align:center;">Confirm Your Weight</div>
+          <div style="font-size:10px;color:var(--gray-400);text-align:center;">Enter your current weight for accurate matchmaking</div>
+          <div class="wf-field" style="margin-top:8px;">
+            <span class="wf-label">Weight (lbs)</span>
+            <div class="wf-input">155</div>
+          </div>
+          <div style="font-size:9px;color:var(--gray-400);">Valid range: 50-400 lbs</div>
+          <div class="wf-btn primary" style="width:100%;">Confirm Weight</div>
+          <div class="wf-btn ghost" style="width:100%;">Back</div>
+        </div>
+      </div>
+    </div>
+    <div class="screen-notes">
+      <span class="note-tag new">WeightConfirmStep</span>
+      Pre-populated with athlete's current_weight from profile. Editable number input. Validated 50-400 lbs range. Always included.
+    </div>
+  </div>
+
+  <!-- 13. Final Confirm -->
+  <div class="screen-card status-shipped">
+    <div class="screen-card-header">
+      <div>
+        <h3>13. Join: Final Confirm</h3>
+        <div class="screen-route">/session/[id]/join</div>
+      </div>
+      <span class="screen-badge badge-shipped">Shipped</span>
+    </div>
+    <div class="phone-frame">
+      <div class="phone-screen">
+        <div class="notch"></div>
+        <div class="wf-header">
+          <span class="back-btn">&larr;</span>
+          <span class="header-title">Join Session</span>
+        </div>
+        <div class="wf-body" style="gap:10px;">
+          <div style="text-align:center;font-size:10px;color:var(--gray-400);">Step 4 of 4</div>
+          <div class="wf-progress-dots">
+            <span class="dot done"></span>
+            <span class="dot done"></span>
+            <span class="dot done"></span>
+            <span class="dot active"></span>
+          </div>
+          <div style="font-size:13px;font-weight:600;color:var(--gray-800);text-align:center;">Ready to Join</div>
+          <div style="border:1px solid var(--gray-200);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:6px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div class="wf-avatar" style="width:40px;height:40px;">MS</div>
+              <div>
+                <div style="font-size:12px;font-weight:600;color:var(--gray-800);">Matt Sponagle</div>
+                <div style="font-size:10px;color:var(--gray-400);">ELO: 1247, 155 lbs</div>
+              </div>
+            </div>
+            <div class="wf-separator"></div>
+            <div style="display:flex;justify-content:space-between;font-size:10px;">
+              <span style="color:var(--gray-400);">Gym</span>
+              <span style="color:var(--gray-700);font-weight:500;">Gracie Academy</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:10px;">
+              <span style="color:var(--gray-400);">Weight</span>
+              <span style="color:var(--gray-700);font-weight:500;font-variant-numeric:tabular-nums;">155 lbs</span>
+            </div>
+          </div>
+          <div class="wf-btn primary" style="width:100%;">Join Session</div>
+          <div class="wf-btn ghost" style="width:100%;">Back</div>
+        </div>
+      </div>
+    </div>
+    <div class="screen-notes">
+      <span class="note-tag new">ConfirmStep</span>
+      Summary of athlete info (avatar, name, ELO, weight) and gym. "Join Session" calls joinSessionLobby mutation then redirects to /session/[id]/lobby. Shows loading state during submission.
+    </div>
+  </div>
+
+</div>
+
+<!-- ================================================ -->
+<!-- SECTION 6: SESSION LOBBY -->
+<!-- ================================================ -->
+<div class="section-header">
+  <h2>6. Session Lobby</h2>
+  <p>Realtime participant list with challenge and random match capabilities. Uses postgres_changes + broadcast for live updates.</p>
+  <div class="section-progress">
+    <div class="section-progress-bar"><div class="section-progress-fill" style="width:100%"></div></div>
+    <span class="section-progress-text">1 / 1 shipped</span>
+  </div>
+</div>
+
+<div class="screen-grid">
+
+  <!-- 14. Session Lobby -->
+  <div class="screen-card status-shipped">
+    <div class="screen-card-header">
+      <div>
+        <h3>14. Session Lobby</h3>
+        <div class="screen-route">/session/[id]/lobby</div>
+      </div>
+      <span class="screen-badge badge-shipped">Shipped</span>
+    </div>
+    <div class="phone-frame">
+      <div class="phone-screen">
+        <div class="notch"></div>
+        <div class="wf-header">
+          <span class="back-btn">&larr;</span>
+          <span class="header-title">Session Lobby</span>
+        </div>
+        <div class="wf-body" style="gap:10px;">
+          <div>
+            <div style="font-size:14px;font-weight:600;color:var(--gray-800);">Gracie Academy</div>
+            <div style="font-size:10px;color:var(--gray-400);">3 fighters in lobby</div>
+          </div>
+
+          <div class="wf-list-item">
+            <div class="wf-avatar">JD</div>
+            <div class="wf-list-text">
+              <span class="wf-list-title">John Doe</span>
+              <span class="wf-list-sub" style="font-variant-numeric:tabular-nums;">ELO: 1180, 170 lbs</span>
+            </div>
+            <div class="wf-btn primary" style="font-size:9px;padding:4px 10px;">Challenge</div>
+          </div>
+          <div class="wf-list-item">
+            <div class="wf-avatar">AS</div>
+            <div class="wf-list-text">
+              <span class="wf-list-title">Ana Silva</span>
+              <span class="wf-list-sub" style="font-variant-numeric:tabular-nums;">ELO: 1320, 135 lbs</span>
+            </div>
+            <div class="wf-btn primary" style="font-size:9px;padding:4px 10px;">Challenge</div>
+          </div>
+          <div class="wf-list-item" style="opacity:0.5;">
+            <div class="wf-avatar">BK</div>
+            <div class="wf-list-text">
+              <span class="wf-list-title">Ben Kim</span>
+              <span class="wf-list-sub" style="font-variant-numeric:tabular-nums;">ELO: 1050, 155 lbs</span>
+            </div>
+            <span style="font-size:9px;color:var(--gray-400);">In Match</span>
+          </div>
+
+          <div class="wf-btn blue" style="width:100%;">Random Match</div>
+
+          <div class="wf-btn outline" style="width:100%;display:flex;gap:4px;justify-content:center;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            Leave Session
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="screen-notes">
+      <span class="note-tag new">SessionLobbyClient</span>
+      <span class="note-tag new">ParticipantList</span>
+      <span class="note-tag new">ParticipantCard</span>
+      <span class="note-tag new">RandomMatchButton</span>
+      <span class="note-tag new">SessionChallengeSheet</span>
+      <span class="note-tag new">SessionChallengeReceivedSheet</span>
+      <span class="note-tag token">ELO values: tabular-nums</span>
+      Realtime participant list via useSessionLobbyRealtime. Challenge button opens bottom sheet to pick match type. "In Match" participants are dimmed (busyIds). Random Match calls random_match RPC (ELO-proximity). Leave button calls leaveSessionLobby, redirects to /gyms. Incoming challenges show as received sheet with accept/decline.
+    </div>
+  </div>
+
+</div>
+
+<!-- ================================================ -->
+<!-- SECTION 7: MATCH FLOW -->
+<!-- ================================================ -->
+<div class="section-header">
+  <h2>7. Match Flow</h2>
+  <p>8-step match wizard: weight verify, ready check, live timer, result recording, summary, confirmation. Synced via broadcast channel. Optional timekeeper role behind feature flag.</p>
+  <div class="section-progress">
+    <div class="section-progress-bar"><div class="section-progress-fill" style="width:100%"></div></div>
+    <span class="section-progress-text">6 / 6 shipped</span>
+  </div>
+</div>
+
+<div class="screen-grid">
+
+  <!-- 15. Weight Verify -->
+  <div class="screen-card status-shipped">
+    <div class="screen-card-header">
+      <div>
+        <h3>15. Match: Weight Verify</h3>
+        <div class="screen-route">/session/[id]/match/[matchId]</div>
+      </div>
+      <span class="screen-badge badge-shipped">Shipped</span>
+    </div>
+    <div class="phone-frame">
+      <div class="phone-screen">
+        <div class="notch"></div>
+        <div class="wf-header">
+          <span class="header-title">Match</span>
+          <span class="wf-badge info" style="font-size:8px;">Ranked</span>
+        </div>
+        <div class="wf-body" style="gap:12px;justify-content:center;align-items:center;">
+          <div style="font-size:14px;font-weight:600;color:var(--gray-800);text-align:center;">Weight Verify</div>
+          <div style="display:flex;gap:16px;justify-content:center;width:100%;">
+            <div style="text-align:center;">
+              <div class="wf-avatar" style="margin:0 auto 4px;">MS</div>
+              <div style="font-size:10px;font-weight:600;color:var(--gray-800);">You</div>
+              <div style="font-size:10px;color:var(--gray-400);font-variant-numeric:tabular-nums;">155 lbs</div>
+              <div style="font-size:10px;color:var(--gray-400);font-variant-numeric:tabular-nums;">ELO 1247</div>
+            </div>
+            <div style="display:flex;align-items:center;font-size:14px;font-weight:700;color:var(--gray-300);">VS</div>
+            <div style="text-align:center;">
+              <div class="wf-avatar" style="margin:0 auto 4px;">JD</div>
+              <div style="font-size:10px;font-weight:600;color:var(--gray-800);">John Doe</div>
+              <div style="font-size:10px;color:var(--gray-400);font-variant-numeric:tabular-nums;">170 lbs</div>
+              <div style="font-size:10px;color:var(--gray-400);font-variant-numeric:tabular-nums;">ELO 1180</div>
+            </div>
+          </div>
+          <div class="wf-btn primary" style="width:100%;">Continue</div>
+        </div>
+      </div>
+    </div>
+    <div class="screen-notes">
+      <span class="note-tag new">WeightVerifyStep</span>
+      Shows both athletes' weight and ELO side-by-side. Informational step; no server call. For ranked matches, shows weight division gap notice if applicable.
+    </div>
+  </div>
+
+  <!-- 16. Ready Check -->
+  <div class="screen-card status-shipped">
+    <div class="screen-card-header">
+      <div>
+        <h3>16. Match: Ready Check</h3>
+        <div class="screen-route">/session/[id]/match/[matchId]</div>
+      </div>
+      <span class="screen-badge badge-shipped">Shipped</span>
+    </div>
+    <div class="phone-frame">
+      <div class="phone-screen">
+        <div class="notch"></div>
+        <div class="wf-header">
+          <span class="header-title">Match</span>
+        </div>
+        <div class="wf-body" style="gap:12px;justify-content:center;align-items:center;">
+          <div style="font-size:14px;font-weight:600;color:var(--gray-800);text-align:center;">Ready Check</div>
+          <div style="font-size:10px;color:var(--gray-400);text-align:center;">Both athletes must tap Ready to start.</div>
+          <div style="display:flex;gap:12px;width:100%;">
+            <div style="flex:1;text-align:center;border:1px solid var(--gray-200);border-radius:8px;padding:12px;">
+              <div style="width:28px;height:28px;border-radius:50%;background:rgba(34,197,94,0.1);margin:0 auto 4px;display:flex;align-items:center;justify-content:center;">
+                <span style="color:var(--green-500);font-size:14px;">&#10003;</span>
+              </div>
+              <div style="font-size:11px;font-weight:500;">You</div>
+            </div>
+            <div style="flex:1;text-align:center;border:1px solid var(--gray-200);border-radius:8px;padding:12px;">
+              <div style="width:28px;height:28px;border-radius:50%;border:2px solid var(--gray-200);margin:0 auto 4px;display:flex;align-items:center;justify-content:center;">
+                <span style="color:var(--gray-300);font-size:12px;">...</span>
+              </div>
+              <div style="font-size:11px;font-weight:500;">Opponent</div>
+            </div>
+          </div>
+          <div style="font-size:10px;color:var(--gray-400);">Waiting for opponent...</div>
+        </div>
+      </div>
+    </div>
+    <div class="screen-notes">
+      <span class="note-tag new">ReadyCheckStep</span>
+      <span class="note-tag reuse">useSessionMatchSync</span>
+      Broadcasts ready signal via useSessionMatchSync. Both panels show check mark when ready. When both ready, calls startMatch RPC, broadcasts timer started, and advances to live step.
+    </div>
+  </div>
+
+  <!-- 17. Live Match -->
+  <div class="screen-card status-shipped">
+    <div class="screen-card-header">
+      <div>
+        <h3>17. Match: Live</h3>
+        <div class="screen-route">/session/[id]/match/[matchId]</div>
+      </div>
+      <span class="screen-badge badge-shipped">Shipped</span>
+    </div>
+    <div class="phone-frame">
+      <div class="phone-screen">
+        <div class="notch"></div>
+        <div class="wf-header" style="background:var(--gray-900);">
+          <span class="header-title" style="color:#fff;">Live Match</span>
+          <span class="wf-badge success" style="font-size:8px;">Ranked</span>
+        </div>
+        <div class="wf-body" style="gap:12px;justify-content:center;align-items:center;background:var(--gray-900);">
+          <div class="wf-timer-bar" style="font-size:32px;background:transparent;color:#fff;">05:23</div>
+          <div style="display:flex;gap:8px;width:100%;">
+            <div class="wf-btn outline" style="flex:1;color:#fff;border-color:var(--gray-600);">Pause</div>
+            <div class="wf-btn" style="flex:1;background:var(--red-500);color:#fff;">End Match</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:4px;">
+            <div style="width:6px;height:6px;border-radius:50%;background:var(--red-500);"></div>
+            <span style="font-size:9px;color:var(--gray-400);">Recording</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="screen-notes">
+      <span class="note-tag new">FighterLiveStep</span>
+      <span class="note-tag reuse">useSessionMatchTimer</span>
+      <span class="note-tag reuse">useVideoRecorder</span>
+      Dark theme during live match. Large countdown timer using useSessionMatchTimer (pause-aware). Pause/Resume toggles via pauseMatch/resumeMatch RPCs. End Match calls endMatch RPC. Optional video recording via MediaRecorder (WebM). Timer synced via broadcast.
+    </div>
+  </div>
+
+  <!-- 18. Result Recording -->
+  <div class="screen-card status-shipped">
+    <div class="screen-card-header">
+      <div>
+        <h3>18. Match: Record Result</h3>
+        <div class="screen-route">/session/[id]/match/[matchId]</div>
+      </div>
+      <span class="screen-badge badge-shipped">Shipped</span>
+    </div>
+    <div class="phone-frame">
+      <div class="phone-screen">
+        <div class="notch"></div>
+        <div class="wf-header">
+          <span class="header-title">Record Result</span>
+        </div>
+        <div class="wf-body" style="gap:10px;">
+          <div style="font-size:13px;font-weight:600;color:var(--gray-800);text-align:center;">How did the match end?</div>
+          <div style="display:flex;gap:8px;">
+            <div style="flex:1;border:2px solid var(--primary-red);border-radius:8px;padding:10px;text-align:center;">
+              <div style="font-size:10px;font-weight:600;color:var(--primary-red);margin-top:4px;">Submission</div>
+            </div>
+            <div style="flex:1;border:1px solid var(--gray-200);border-radius:8px;padding:10px;text-align:center;">
+              <div style="font-size:10px;font-weight:600;color:var(--gray-500);margin-top:4px;">Draw</div>
+            </div>
+          </div>
+          <div class="wf-field">
+            <span class="wf-label">Winner</span>
+            <div class="wf-input">Select winner</div>
+          </div>
+          <div class="wf-field">
+            <span class="wf-label">Submission Type</span>
+            <div class="wf-input">Select submission</div>
+          </div>
+          <div class="wf-field">
+            <span class="wf-label">Finish Time (optional)</span>
+            <div class="wf-input">MM:SS</div>
+          </div>
+          <div class="wf-btn primary" style="width:100%;">Submit Result</div>
+        </div>
+      </div>
+    </div>
+    <div class="screen-notes">
+      <span class="note-tag new">ResultRecordingStep</span>
+      <span class="note-tag reuse">SubmissionFields</span>
+      Toggle between Submission and Draw. Submission shows winner picker, submission type dropdown (from getSubmissionTypes), optional finish time. Calls recordMatchResult RPC. Broadcasts result via useSessionMatchSync. Timekeeper-locked fighters see a 60s countdown before unlock.
+    </div>
+  </div>
+
+  <!-- 19. Match Summary -->
+  <div class="screen-card status-shipped">
+    <div class="screen-card-header">
+      <div>
+        <h3>19. Match: Summary / Confirm</h3>
+        <div class="screen-route">/session/[id]/match/[matchId]</div>
+      </div>
+      <span class="screen-badge badge-shipped">Shipped</span>
+    </div>
+    <div class="phone-frame">
+      <div class="phone-screen">
+        <div class="notch"></div>
+        <div class="wf-header">
+          <span class="header-title">Match Summary</span>
+        </div>
+        <div class="wf-body" style="gap:10px;align-items:center;">
+          <div style="font-size:13px;font-weight:600;color:var(--gray-800);">Result Recorded</div>
+          <div style="border:1px solid var(--gray-200);border-radius:8px;padding:12px;width:100%;display:flex;flex-direction:column;gap:6px;">
+            <div style="display:flex;justify-content:space-between;font-size:10px;">
+              <span style="color:var(--gray-400);">Result</span>
+              <span style="color:var(--gray-700);font-weight:600;">Submission</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:10px;">
+              <span style="color:var(--gray-400);">Winner</span>
+              <span style="color:var(--success);font-weight:600;">You</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:10px;">
+              <span style="color:var(--gray-400);">Type</span>
+              <span style="color:var(--gray-700);">Rear Naked Choke</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:10px;">
+              <span style="color:var(--gray-400);">ELO Change</span>
+              <span style="color:var(--success);font-weight:600;font-variant-numeric:tabular-nums;">+24</span>
+            </div>
+          </div>
+          <div class="wf-btn success" style="width:100%;">Confirm Result</div>
+          <div class="wf-btn outline" style="width:100%;color:var(--red-500);border-color:var(--red-500);">Dispute Result</div>
+        </div>
+      </div>
+    </div>
+    <div class="screen-notes">
+      <span class="note-tag new">MatchSummaryStep</span>
+      <span class="note-tag token">ELO gain: text-success tabular-nums</span>
+      <span class="note-tag token">Winner: text-success</span>
+      Shows result, winner, submission type, and ELO delta. Confirm calls confirmMatchResult. Dispute opens dispute form with reason text. Both use useSessionMatchSync broadcast.
+    </div>
+  </div>
+
+  <!-- 20. Match Recorded -->
+  <div class="screen-card status-shipped">
+    <div class="screen-card-header">
+      <div>
+        <h3>20. Match: Recorded (Complete)</h3>
+        <div class="screen-route">/session/[id]/match/[matchId]</div>
+      </div>
+      <span class="screen-badge badge-shipped">Shipped</span>
+    </div>
+    <div class="phone-frame">
+      <div class="phone-screen">
+        <div class="notch"></div>
+        <div class="wf-header">
+          <span class="header-title">Match Complete</span>
+        </div>
+        <div class="wf-body" style="gap:12px;justify-content:center;align-items:center;">
+          <div style="width:48px;height:48px;border-radius:50%;background:rgba(34,197,94,0.1);display:flex;align-items:center;justify-content:center;">
+            <span style="color:var(--green-500);font-size:20px;">&#10003;</span>
+          </div>
+          <div style="font-size:14px;font-weight:600;color:var(--gray-800);text-align:center;">Match Recorded</div>
+          <div style="font-size:10px;color:var(--gray-400);text-align:center;">Both athletes confirmed the result.</div>
+          <div class="wf-btn primary" style="width:100%;">Back to Lobby</div>
+        </div>
+      </div>
+    </div>
+    <div class="screen-notes">
+      <span class="note-tag new">MatchRecordedStep</span>
+      Final confirmation screen. "Back to Lobby" links to /session/[id]/lobby. Clean end state after both athletes confirm.
+    </div>
+  </div>
+
+</div>
+
+<!-- ================================================ -->
+<!-- SECTION 8: LEADERBOARD + PROFILES -->
+<!-- ================================================ -->
+<div class="section-header">
+  <h2>8. Leaderboard, Profile, and Athlete Detail</h2>
+  <p>Rankings with fighters/gyms toggle and gender filter, personal profile with stats, and competitor profile with head-to-head history.</p>
+  <div class="section-progress">
+    <div class="section-progress-bar"><div class="section-progress-fill" style="width:100%"></div></div>
+    <span class="section-progress-text">4 / 4 shipped</span>
+  </div>
+</div>
+
+<div class="screen-grid">
+
+  <!-- 21. Leaderboard -->
+  <div class="screen-card status-shipped">
+    <div class="screen-card-header">
+      <div>
+        <h3>21. Leaderboard</h3>
+        <div class="screen-route">/leaderboard</div>
+      </div>
+      <span class="screen-badge badge-shipped">Shipped</span>
+    </div>
+    <div class="phone-frame">
+      <div class="phone-screen">
+        <div class="notch"></div>
+        <div class="wf-header">
+          <span class="header-title">Rankings</span>
+        </div>
+        <div class="wf-body" style="gap:8px;">
+          <div style="display:flex;align-items:center;justify-content:center;gap:6px;">
+            <span style="font-size:10px;font-weight:600;color:var(--gray-800);">Fighters</span>
+            <div class="wf-toggle on"></div>
+            <span style="font-size:10px;font-weight:500;color:var(--gray-400);">Gyms</span>
+          </div>
+          <div style="display:flex;justify-content:center;gap:4px;">
+            <span style="font-size:9px;padding:3px 8px;background:var(--primary-red);color:#fff;border-radius:12px;">All</span>
+            <span style="font-size:9px;padding:3px 8px;background:var(--gray-100);color:var(--gray-500);border-radius:12px;">Male</span>
+            <span style="font-size:9px;padding:3px 8px;background:var(--gray-100);color:var(--gray-500);border-radius:12px;">Female</span>
+          </div>
+          <div class="wf-podium">
+            <div class="wf-podium-slot">
+              <div style="font-size:8px;color:var(--gray-400);">2nd</div>
+              <div class="wf-avatar" style="width:30px;height:30px;font-size:9px;">AS</div>
+              <div style="font-size:9px;font-weight:600;color:var(--gray-700);">Ana</div>
+              <div style="font-size:10px;font-weight:700;font-variant-numeric:tabular-nums;">1320</div>
+            </div>
+            <div class="wf-podium-slot" style="margin-bottom:8px;">
+              <div style="font-size:8px;color:var(--amber-500);">1st</div>
+              <div class="wf-avatar" style="width:36px;height:36px;font-size:10px;background:rgba(234,179,8,0.15);">MS</div>
+              <div style="font-size:10px;font-weight:600;color:var(--gray-700);">Matt</div>
+              <div style="font-size:11px;font-weight:700;font-variant-numeric:tabular-nums;">1380</div>
+            </div>
+            <div class="wf-podium-slot">
+              <div style="font-size:8px;color:var(--gray-400);">3rd</div>
+              <div class="wf-avatar" style="width:28px;height:28px;font-size:9px;">JD</div>
+              <div style="font-size:9px;font-weight:600;color:var(--gray-700);">John</div>
+              <div style="font-size:10px;font-weight:700;font-variant-numeric:tabular-nums;">1247</div>
+            </div>
+          </div>
+          <div class="wf-list-item">
+            <span style="font-size:10px;font-weight:600;color:var(--gray-400);width:20px;text-align:center;">#4</span>
+            <div class="wf-avatar" style="width:30px;height:30px;font-size:9px;">BK</div>
+            <div class="wf-list-text">
+              <span class="wf-list-title" style="font-size:11px;">Ben Kim</span>
+              <span class="wf-list-sub">Atos HQ</span>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-size:11px;font-weight:700;font-variant-numeric:tabular-nums;">1180</div>
+              <div style="font-size:9px;color:var(--gray-400);font-variant-numeric:tabular-nums;">
+                <span style="color:var(--success);">12</span>W <span style="color:var(--red-500);">8</span>L
+              </div>
+            </div>
+          </div>
+          <div style="text-align:center;font-size:9px;color:var(--gray-400);margin-top:4px;">Rankings based on current ELO</div>
+        </div>
+        <div class="wf-bottom-nav">
+          <div class="wf-nav-item"><span class="wf-nav-label">Home</span></div>
+          <div class="wf-nav-item"><span class="wf-nav-label">Gyms</span></div>
+          <div class="wf-nav-item"><span class="wf-nav-label active">Rankings</span></div>
+          <div class="wf-nav-item"><span class="wf-nav-label">Profile</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="screen-notes">
+      <span class="note-tag new">LeaderboardContent</span>
+      <span class="note-tag reuse">AthleteCard</span>
+      <span class="note-tag reuse">Switch</span>
+      <span class="note-tag reuse">Card</span>
+      <span class="note-tag token">Wins: text-success, Losses: text-destructive</span>
+      <span class="note-tag token">ELO values: tabular-nums</span>
+      Fighters/Gyms mode toggle (Switch). Gender filter pills (All/Male/Female, URL-param driven). Top 3 podium with trophy icons and gradient backgrounds. Full rankings via AthleteCard with rank icon (Crown, Medal, Award for top 3). Gyms tab shows total ELO and average per member. Data via getAthletesStatsRpc.
+    </div>
+  </div>
+
+  <!-- 22. Profile -->
+  <div class="screen-card status-shipped">
+    <div class="screen-card-header">
+      <div>
+        <h3>22. My Profile</h3>
+        <div class="screen-route">/profile</div>
+      </div>
+      <span class="screen-badge badge-shipped">Shipped</span>
+    </div>
+    <div class="phone-frame">
+      <div class="phone-screen">
+        <div class="notch"></div>
+        <div class="wf-header">
+          <span class="header-title">Profile</span>
+        </div>
+        <div class="wf-body" style="gap:8px;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div class="wf-avatar" style="width:50px;height:50px;font-size:14px;">MS</div>
+            <div>
+              <div style="font-size:14px;font-weight:700;color:var(--gray-900);">Matt Sponagle</div>
+              <div style="font-size:10px;color:var(--gray-400);">Gracie Academy</div>
+              <div style="font-size:10px;color:var(--gray-400);font-variant-numeric:tabular-nums;">ELO 1247 | 18W 6L (75%)</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:6px;">
+            <div class="wf-btn outline" style="flex:1;font-size:10px;">View Stats</div>
+            <div class="wf-btn outline" style="width:32px;display:flex;align-items:center;justify-content:center;padding:0;">
+              <span style="font-size:10px;">&#8599;</span>
+            </div>
+          </div>
+          <div style="font-size:11px;font-weight:600;color:var(--gray-800);margin-top:4px;">Achievements</div>
+          <div style="display:flex;gap:4px;flex-wrap:wrap;">
+            <span style="font-size:9px;padding:3px 8px;background:var(--amber-100);color:var(--amber-500);border-radius:6px;font-weight:600;">5 Win Streak</span>
+            <span style="font-size:9px;padding:3px 8px;background:var(--success-light);color:var(--success);border-radius:6px;font-weight:600;">72% Sub Rate</span>
+          </div>
+          <div class="wf-separator"></div>
+          <div style="font-size:11px;font-weight:600;color:var(--gray-800);">Account</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;font-size:10px;color:var(--gray-600);padding:4px 0;">
+            <span>Theme</span>
+            <div class="wf-toggle"></div>
+          </div>
+          <div style="font-size:10px;color:var(--gray-600);padding:4px 0;">Edit Profile</div>
+          <div style="font-size:10px;color:var(--gray-600);padding:4px 0;">Settings & Privacy</div>
+          <div style="font-size:10px;color:var(--red-500);padding:4px 0;">Log Out</div>
+          <div style="text-align:center;font-size:9px;color:var(--gray-400);margin-top:4px;">JITS v0.1.0</div>
+        </div>
+        <div class="wf-bottom-nav">
+          <div class="wf-nav-item"><span class="wf-nav-label">Home</span></div>
+          <div class="wf-nav-item"><span class="wf-nav-label">Gyms</span></div>
+          <div class="wf-nav-item"><span class="wf-nav-label">Rankings</span></div>
+          <div class="wf-nav-item"><span class="wf-nav-label active">Profile</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="screen-notes">
+      <span class="note-tag reuse">ProfileContent</span>
+      <span class="note-tag reuse">EditableProfileHeader</span>
+      <span class="note-tag new">AchievementsSection</span>
+      <span class="note-tag reuse">ShareProfileSheet</span>
+      <span class="note-tag reuse">ThemeSwitcher</span>
+      <span class="note-tag reuse">LogoutButton</span>
+      Editable profile photo with header showing name, gym, ELO, W/L record. "View Stats" links to /profile/stats. Share button opens ShareProfileSheet. Achievements show win streak, fastest win, submission rate, ELO this month (supports ?demo=true for demo data). Account section: theme toggle, edit profile (to /profile/setup), settings link, logout.
+    </div>
+  </div>
+
+  <!-- 23. Profile Stats -->
+  <div class="screen-card status-shipped">
+    <div class="screen-card-header">
+      <div>
+        <h3>23. Profile Stats</h3>
+        <div class="screen-route">/profile/stats</div>
+      </div>
+      <span class="screen-badge badge-shipped">Shipped</span>
+    </div>
+    <div class="phone-frame">
+      <div class="phone-screen">
+        <div class="notch"></div>
+        <div class="wf-header">
+          <span class="back-btn">&larr;</span>
+          <span class="header-title">Stats</span>
+        </div>
+        <div class="wf-body" style="gap:8px;">
+          <div style="font-size:14px;font-weight:700;color:var(--gray-900);">Performance Stats</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;">
+            <div style="border:1px solid var(--gray-200);border-radius:8px;padding:6px;text-align:center;">
+              <div style="font-size:16px;font-weight:700;font-variant-numeric:tabular-nums;">1247</div>
+              <div style="font-size:8px;color:var(--gray-400);">Current ELO</div>
+            </div>
+            <div style="border:1px solid var(--gray-200);border-radius:8px;padding:6px;text-align:center;">
+              <div style="font-size:16px;font-weight:700;font-variant-numeric:tabular-nums;">18</div>
+              <div style="font-size:8px;color:var(--gray-400);">Total Wins</div>
+            </div>
+            <div style="border:1px solid var(--gray-200);border-radius:8px;padding:6px;text-align:center;">
+              <div style="font-size:16px;font-weight:700;color:var(--success);font-variant-numeric:tabular-nums;">75%</div>
+              <div style="font-size:8px;color:var(--gray-400);">Win Rate</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:4px;">
+            <span style="font-size:9px;padding:3px 8px;background:var(--primary-red);color:#fff;border-radius:6px;">Overview</span>
+            <span style="font-size:9px;padding:3px 8px;background:var(--gray-100);color:var(--gray-500);border-radius:6px;">ELO History</span>
+            <span style="font-size:9px;padding:3px 8px;background:var(--gray-100);color:var(--gray-500);border-radius:6px;">Match Log</span>
+          </div>
+          <div style="font-size:10px;font-weight:600;color:var(--gray-700);">Recent Performance</div>
+          <div style="display:flex;flex-direction:column;gap:4px;">
+            <div style="display:flex;justify-content:space-between;font-size:9px;padding:4px 0;border-bottom:1px solid var(--gray-100);">
+              <span style="color:var(--gray-400);">This Week</span>
+              <span><span style="color:var(--success);">3W</span> <span style="color:var(--red-500);">1L</span> <span style="color:var(--success);font-variant-numeric:tabular-nums;">+18</span></span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:9px;padding:4px 0;border-bottom:1px solid var(--gray-100);">
+              <span style="color:var(--gray-400);">This Month</span>
+              <span><span style="color:var(--success);">8W</span> <span style="color:var(--red-500);">2L</span> <span style="color:var(--success);font-variant-numeric:tabular-nums;">+45</span></span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:9px;padding:4px 0;">
+              <span style="color:var(--gray-400);">Last 3 Months</span>
+              <span><span style="color:var(--success);">15W</span> <span style="color:var(--red-500);">5L</span> <span style="color:var(--success);font-variant-numeric:tabular-nums;">+120</span></span>
+            </div>
+          </div>
+          <div style="height:40px;background:var(--gray-100);border-radius:8px;display:flex;align-items:center;justify-content:center;">
+            <span style="font-size:9px;color:var(--gray-400);">[ELO Sparkline Chart]</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="screen-notes">
+      <span class="note-tag new">StatsContent</span>
+      <span class="note-tag new">StatsTabs</span>
+      <span class="note-tag new">EloSparkline</span>
+      <span class="note-tag new">MatchHistoryList</span>
+      <span class="note-tag token">Win rate: text-success tabular-nums</span>
+      <span class="note-tag token">Period stats: text-success / text-destructive</span>
+      Quick stats header (3 cards: ELO, Wins, Win Rate). Three tabs: Overview (win streak, ELO this month, submission rate, recent performance by period), ELO History (sparkline chart from getEloHistory), Match Log (full match history from getMatchHistory). All stats computed from RPC data.
+    </div>
+  </div>
+
+  <!-- 24. Athlete Detail -->
+  <div class="screen-card status-shipped">
+    <div class="screen-card-header">
+      <div>
+        <h3>24. Athlete Detail</h3>
+        <div class="screen-route">/athlete/[id]</div>
+      </div>
+      <span class="screen-badge badge-shipped">Shipped</span>
+    </div>
+    <div class="phone-frame">
+      <div class="phone-screen">
+        <div class="notch"></div>
+        <div class="wf-header">
+          <span class="back-btn">&larr;</span>
+          <span class="header-title"></span>
+        </div>
+        <div class="wf-body" style="gap:8px;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div class="wf-avatar" style="width:50px;height:50px;font-size:14px;">JD</div>
+            <div>
+              <div style="font-size:14px;font-weight:700;color:var(--gray-900);">John Doe</div>
+              <div style="font-size:10px;color:var(--gray-400);">10th Planet</div>
+              <div style="font-size:10px;font-variant-numeric:tabular-nums;">
+                ELO <span style="font-weight:600;">1180</span> | <span style="color:var(--success);">12</span>W <span style="color:var(--red-500);">8</span>L
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:4px;">
+            <div style="width:6px;height:6px;border-radius:50%;background:var(--green-500);"></div>
+            <span style="font-size:9px;color:var(--green-500);">Looking for Ranked matches</span>
+          </div>
+          <div class="wf-btn-row">
+            <div class="wf-btn primary" style="flex:1;">Challenge</div>
+            <div class="wf-btn outline" style="flex:1;">Compare</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:4px;margin-top:4px;">
+            <span style="font-size:12px;font-weight:600;color:var(--gray-800);">Head-to-Head</span>
+          </div>
+          <div style="border:1px solid var(--gray-200);border-radius:8px;padding:8px;display:flex;align-items:center;gap:6px;">
+            <span class="wf-badge success" style="font-size:8px;">WIN</span>
+            <div style="flex:1;">
+              <div style="font-size:10px;font-weight:500;color:var(--gray-700);">vs John Doe</div>
+              <div style="font-size:9px;color:var(--gray-400);">2d ago, Ranked</div>
+            </div>
+            <span style="font-size:10px;font-weight:600;color:var(--success);font-variant-numeric:tabular-nums;">+24</span>
+          </div>
+          <div style="border:1px solid var(--gray-200);border-radius:8px;padding:8px;display:flex;align-items:center;gap:6px;">
+            <span class="wf-badge destructive" style="font-size:8px;">LOSS</span>
+            <div style="flex:1;">
+              <div style="font-size:10px;font-weight:500;color:var(--gray-700);">vs John Doe</div>
+              <div style="font-size:9px;color:var(--gray-400);">1w ago, Ranked</div>
+            </div>
+            <span style="font-size:10px;font-weight:600;color:var(--red-500);font-variant-numeric:tabular-nums;">-18</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="screen-notes">
+      <span class="note-tag new">AthleteProfileContent</span>
+      <span class="note-tag new">AthleteProfileActions</span>
+      <span class="note-tag reuse">ProfileHeader</span>
+      <span class="note-tag reuse">MatchCard</span>
+      <span class="note-tag token">Win badge: bg-success, Loss badge: bg-destructive</span>
+      <span class="note-tag token">ELO delta: text-success / text-destructive tabular-nums</span>
+      Competitor profile with avatar, name, gym, ELO, W/L stats. Online/looking status indicator. Challenge button (opens ChallengeSheet), Compare button (opens CompareStatsModal). Head-to-head section shows MatchCards from filtered match history. Empty state shows dashed border with "No history yet" message. Data via parallel queries: athlete, stats, pending challenge, match history.
+    </div>
+  </div>
+
+</div>
+
+<!-- ================================================ -->
+<!-- SECTION 9: SETTINGS -->
+<!-- ================================================ -->
+<div class="section-header">
+  <h2>9. Settings</h2>
+  <p>Settings hub with notification preferences, video settings, feedback form, and help/FAQ. Accessible from Profile > Settings & Privacy.</p>
+  <div class="section-progress">
+    <div class="section-progress-bar"><div class="section-progress-fill" style="width:100%"></div></div>
+    <span class="section-progress-text">4 / 4 shipped</span>
+  </div>
+</div>
+
+<div class="screen-grid">
+
+  <!-- 25. Settings -->
+  <div class="screen-card status-shipped">
+    <div class="screen-card-header">
+      <div>
+        <h3>25. Settings</h3>
+        <div class="screen-route">/settings</div>
+      </div>
+      <span class="screen-badge badge-shipped">Shipped</span>
+    </div>
+    <div class="phone-frame">
+      <div class="phone-screen">
+        <div class="notch"></div>
+        <div class="wf-header">
+          <span class="back-btn">&larr;</span>
+          <span class="header-title">Settings</span>
+        </div>
+        <div class="wf-body" style="gap:12px;">
+          <div>
+            <div style="font-size:10px;font-weight:600;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">Push Notifications</div>
+            <div style="border:1px solid var(--gray-200);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:8px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <div>
+                  <div style="font-size:11px;font-weight:500;color:var(--gray-700);">Challenges</div>
+                  <div style="font-size:9px;color:var(--gray-400);">New, accepted, declined</div>
+                </div>
+                <div class="wf-toggle on"></div>
+              </div>
+              <div class="wf-separator"></div>
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <div>
+                  <div style="font-size:11px;font-weight:500;color:var(--gray-700);">Chat Messages</div>
+                  <div style="font-size:9px;color:var(--gray-400);">New messages</div>
+                </div>
+                <div class="wf-toggle on"></div>
+              </div>
+              <div class="wf-separator"></div>
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <div>
+                  <div style="font-size:11px;font-weight:500;color:var(--gray-700);">Matches</div>
+                  <div style="font-size:9px;color:var(--gray-400);">Match start notifications</div>
+                </div>
+                <div class="wf-toggle on"></div>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div style="font-size:10px;font-weight:600;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">General</div>
+            <div style="display:flex;flex-direction:column;gap:4px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;border:1px solid var(--gray-200);border-left:2px solid var(--blue-500);border-radius:8px;padding:8px 10px;">
+                <span style="font-size:10px;font-weight:500;color:var(--gray-700);">Video Settings</span>
+                <span style="font-size:10px;color:var(--gray-400);">></span>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;border:1px solid var(--gray-200);border-left:2px solid var(--blue-500);border-radius:8px;padding:8px 10px;">
+                <span style="font-size:10px;font-weight:500;color:var(--gray-700);">Feedback</span>
+                <span style="font-size:10px;color:var(--gray-400);">></span>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;border:1px solid var(--gray-200);border-left:2px solid var(--blue-500);border-radius:8px;padding:8px 10px;">
+                <span style="font-size:10px;font-weight:500;color:var(--gray-700);">Help & Support</span>
+                <span style="font-size:10px;color:var(--gray-400);">></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="screen-notes">
+      <span class="note-tag new">SettingsContent</span>
+      <span class="note-tag new">NotificationPreferences</span>
+      <span class="note-tag reuse">Switch</span>
+      <span class="note-tag reuse">Card</span>
+      Push notification toggles (Challenges, Chat, Matches) with optimistic updates via updateNotificationPreferences. General links with blue left-border accent: Video Settings, Feedback, Help & Support.
+    </div>
+  </div>
+
+  <!-- 26. Feedback -->
+  <div class="screen-card status-shipped">
+    <div class="screen-card-header">
+      <div>
+        <h3>26. Feedback</h3>
+        <div class="screen-route">/settings/feedback</div>
+      </div>
+      <span class="screen-badge badge-shipped">Shipped</span>
+    </div>
+    <div class="phone-frame">
+      <div class="phone-screen">
+        <div class="notch"></div>
+        <div class="wf-header">
+          <span class="back-btn">&larr;</span>
+          <span class="header-title">Feedback</span>
+        </div>
+        <div class="wf-body" style="gap:10px;">
+          <div class="wf-field">
+            <span class="wf-label">Category</span>
+            <div style="display:flex;gap:4px;flex-wrap:wrap;">
+              <span style="font-size:9px;padding:4px 8px;border:1px solid var(--gray-200);border-radius:6px;color:var(--gray-600);">Bug Report</span>
+              <span style="font-size:9px;padding:4px 8px;border:1px solid var(--gray-200);border-radius:6px;color:var(--gray-600);">Feature Request</span>
+              <span style="font-size:9px;padding:4px 8px;background:var(--primary-red);color:#fff;border-radius:6px;border:1px solid var(--primary-red);">General Feedback</span>
+            </div>
+          </div>
+          <div class="wf-field">
+            <span class="wf-label">Message</span>
+            <div style="border:1px solid var(--gray-200);border-radius:6px;padding:8px;min-height:80px;">
+              <span style="font-size:10px;color:var(--gray-400);">Tell us what you think...</span>
+            </div>
+            <div style="text-align:right;font-size:9px;color:var(--gray-400);">0/2000</div>
+          </div>
+          <div class="wf-btn primary" style="width:100%;opacity:0.5;">Submit Feedback</div>
+        </div>
+      </div>
+    </div>
+    <div class="screen-notes">
+      <span class="note-tag new">FeedbackForm</span>
+      Category toggle (Bug Report, Feature Request, General Feedback). Textarea with 10-2000 char validation and character counter. Inserts to feedback table. Success state shows "Thank you" with option to submit more.
+    </div>
+  </div>
+
+  <!-- 27. Help -->
+  <div class="screen-card status-shipped">
+    <div class="screen-card-header">
+      <div>
+        <h3>27. Help & Support</h3>
+        <div class="screen-route">/settings/help</div>
+      </div>
+      <span class="screen-badge badge-shipped">Shipped</span>
+    </div>
+    <div class="phone-frame">
+      <div class="phone-screen">
+        <div class="notch"></div>
+        <div class="wf-header">
+          <span class="back-btn">&larr;</span>
+          <span class="header-title">Help & Support</span>
+        </div>
+        <div class="wf-body" style="gap:8px;">
+          <div style="font-size:12px;font-weight:600;color:var(--gray-800);">Frequently Asked Questions</div>
+          <div style="border:1px solid var(--gray-200);border-radius:8px;padding:8px;">
+            <div style="font-size:10px;font-weight:500;color:var(--gray-700);">How do I join a session?</div>
+          </div>
+          <div style="border:1px solid var(--gray-200);border-radius:8px;padding:8px;">
+            <div style="font-size:10px;font-weight:500;color:var(--gray-700);">How does ELO rating work?</div>
+          </div>
+          <div style="border:1px solid var(--gray-200);border-radius:8px;padding:8px;">
+            <div style="font-size:10px;font-weight:500;color:var(--gray-700);">What is ranked vs casual?</div>
+          </div>
+          <div style="border:1px solid var(--gray-200);border-radius:8px;padding:8px;">
+            <div style="font-size:10px;font-weight:500;color:var(--gray-700);">How do I record a result?</div>
+          </div>
+          <div style="border:1px solid var(--gray-200);border-radius:8px;padding:8px;">
+            <div style="font-size:10px;font-weight:500;color:var(--gray-700);">Can I change my weight?</div>
+          </div>
+          <div style="border:1px solid var(--gray-200);border-radius:8px;padding:8px;">
+            <div style="font-size:10px;font-weight:500;color:var(--gray-700);">How do I report an issue?</div>
+          </div>
+          <div class="wf-separator" style="margin-top:4px;"></div>
+          <div style="font-size:12px;font-weight:600;color:var(--gray-800);">Need More Help?</div>
+          <div class="wf-btn primary" style="width:auto;display:inline-flex;gap:4px;">Email Support</div>
+        </div>
+      </div>
+    </div>
+    <div class="screen-notes">
+      <span class="note-tag new">HelpPage</span>
+      <span class="note-tag new">FAQItem</span>
+      6 expandable FAQ items using HTML details/summary. Topics: joining sessions, ELO, ranked vs casual, recording results, changing weight, reporting issues. "Email Support" links to mailto:support@elorated.com.
+    </div>
+  </div>
+
+  <!-- 28. Video Settings -->
+  <div class="screen-card status-shipped">
+    <div class="screen-card-header">
+      <div>
+        <h3>28. Video Settings</h3>
+        <div class="screen-route">/settings/video</div>
+      </div>
+      <span class="screen-badge badge-shipped">Shipped</span>
+    </div>
+    <div class="phone-frame">
+      <div class="phone-screen">
+        <div class="notch"></div>
+        <div class="wf-header">
+          <span class="back-btn">&larr;</span>
+          <span class="header-title">Video Settings</span>
+        </div>
+        <div class="wf-body" style="gap:10px;">
+          <div style="font-size:10px;color:var(--gray-400);">Video recording settings will be available here. Match recordings can be configured for automatic or manual capture.</div>
+        </div>
+      </div>
+    </div>
+    <div class="screen-notes">
+      Placeholder page. Will contain video recording preferences (auto/manual capture, quality settings) in a future update.
+    </div>
+  </div>
+
+</div>
+
+<!-- ================================================ -->
+<!-- HIDDEN ROUTES (preserved, no UI entry point) -->
+<!-- ================================================ -->
+<div class="section-header">
+  <h2>Hidden Routes</h2>
+  <p>These routes exist in the codebase but redirect to / or have no navigation entry point. Code is preserved for future use.</p>
+  <div class="section-progress">
+    <div class="section-progress-bar" style="display:flex;overflow:hidden;">
+      <div style="width:100%;height:100%;background:var(--gray-600);border-radius:3px;"></div>
+    </div>
+    <span class="section-progress-text">5 hidden (preserved)</span>
+  </div>
+</div>
+
+<div class="screen-grid">
+
+  <!-- 29. Arena -->
+  <div class="screen-card status-hidden">
+    <div class="screen-card-header">
+      <div>
+        <h3>29. Arena (Hidden)</h3>
+        <div class="screen-route">/arena</div>
+      </div>
+      <span class="screen-badge badge-hidden">Hidden</span>
+    </div>
+    <div class="phone-frame">
+      <div class="phone-screen">
+        <div class="notch"></div>
+        <div class="wf-body" style="justify-content:center;align-items:center;gap:8px;">
+          <div style="font-size:12px;color:var(--gray-400);text-align:center;">Redirects to /</div>
+          <div style="font-size:9px;color:var(--gray-500);text-align:center;">Pre-session era arena with<br>looking-for-match toggles.<br>Code preserved.</div>
+        </div>
+      </div>
+    </div>
+    <div class="screen-notes">
+      Replaced by Gyms + Sessions flow. Contains ArenaContent with LookingForMatchToggle. Redirects to dashboard.
+    </div>
+  </div>
+
+  <!-- 30. Challenge Pending -->
+  <div class="screen-card status-hidden">
+    <div class="screen-card-header">
+      <div>
+        <h3>30. Challenge Pending (Hidden)</h3>
+        <div class="screen-route">/match/pending</div>
+      </div>
+      <span class="screen-badge badge-hidden">Hidden</span>
+    </div>
+    <div class="phone-frame">
+      <div class="phone-screen">
+        <div class="notch"></div>
+        <div class="wf-body" style="justify-content:center;align-items:center;gap:8px;">
+          <div style="font-size:12px;color:var(--gray-400);text-align:center;">Redirects to /</div>
+          <div style="font-size:9px;color:var(--gray-500);text-align:center;">Challenge inbox: sent,<br>received, active matches.<br>Pre-session flow.</div>
+        </div>
+      </div>
+    </div>
+    <div class="screen-notes">
+      Challenge-based flow replaced by session match flow. Contains PendingChallengesContent with tabs for received, sent, and active matches.
+    </div>
+  </div>
+
+  <!-- 31. Messages -->
+  <div class="screen-card status-hidden">
+    <div class="screen-card-header">
+      <div>
+        <h3>31. Messages (Hidden)</h3>
+        <div class="screen-route">/messages, /messages/[id]</div>
+      </div>
+      <span class="screen-badge badge-hidden">Hidden</span>
+    </div>
+    <div class="phone-frame">
+      <div class="phone-screen">
+        <div class="notch"></div>
+        <div class="wf-body" style="justify-content:center;align-items:center;gap:8px;">
+          <div style="font-size:12px;color:var(--gray-400);text-align:center;">No entry point</div>
+          <div style="font-size:9px;color:var(--gray-500);text-align:center;">Chat inbox + thread view.<br>Code preserved. Uses<br>@jits/shared/api/chat-*.</div>
+        </div>
+      </div>
+    </div>
+    <div class="screen-notes">
+      Chat feature with inbox (InboxContent) and thread (ChatThread). Message grouping, date separators, typing indicators. No nav entry point. Uses chat-queries and chat-mutations from shared package.
+    </div>
+  </div>
+
+  <!-- 32. Challenge Match Live -->
+  <div class="screen-card status-hidden">
+    <div class="screen-card-header">
+      <div>
+        <h3>32. Challenge Match Live (Hidden)</h3>
+        <div class="screen-route">/match/[id]/live</div>
+      </div>
+      <span class="screen-badge badge-hidden">Hidden</span>
+    </div>
+    <div class="phone-frame">
+      <div class="phone-screen">
+        <div class="notch"></div>
+        <div class="wf-body" style="justify-content:center;align-items:center;gap:8px;">
+          <div style="font-size:12px;color:var(--gray-400);text-align:center;">Redirects to /</div>
+          <div style="font-size:9px;color:var(--gray-500);text-align:center;">Old challenge-based live<br>match + results pages.<br>Replaced by session match flow.</div>
+        </div>
+      </div>
+    </div>
+    <div class="screen-notes">
+      Old challenge match live timer and results pages. Redirects non-participants. Fully replaced by /session/[id]/match/[matchId] flow.
+    </div>
+  </div>
+
+  <!-- 33. Athlete Challenges -->
+  <div class="screen-card status-hidden">
+    <div class="screen-card-header">
+      <div>
+        <h3>33. Athlete Challenges (Hidden)</h3>
+        <div class="screen-route">/athlete/[id]/challenges</div>
+      </div>
+      <span class="screen-badge badge-hidden">Hidden</span>
+    </div>
+    <div class="phone-frame">
+      <div class="phone-screen">
+        <div class="notch"></div>
+        <div class="wf-body" style="justify-content:center;align-items:center;gap:8px;">
+          <div style="font-size:12px;color:var(--gray-400);text-align:center;">No entry point</div>
+          <div style="font-size:9px;color:var(--gray-500);text-align:center;">Per-athlete challenge<br>history page. Route exists<br>but unreachable.</div>
+        </div>
+      </div>
+    </div>
+    <div class="screen-notes">
+      Challenge history between two athletes. Contains ChallengesContent. Route exists but no link points here in the current UI.
+    </div>
+  </div>
+
+</div>
+
+<!-- Footer -->
+<div style="max-width:1280px; margin:64px auto 0; text-align:center; padding-top:32px; border-top:1px solid #333;">
+  <p style="font-size:13px; color:var(--gray-500);">JITS Arena Web Progress Board &middot; 33 screens across 9 flows + 1 hidden section &middot; 28 shipped, 5 hidden</p>
+  <p style="font-size:11px; color:var(--gray-600); margin-top:8px;">Next.js 16 + Tailwind + shadcn/ui | Last updated: 2026-04-30</p>
+</div>
+
+<!-- ============================================================
+     FEEDBACK OVERLAY v2
+     Conversational design feedback with AI chat, diff preview,
+     and accept/reject flow. Requires feedback-server.mjs for
+     AI features; degrades to static pin editing when offline.
+     ============================================================ -->
+<style>
+  /* ── Toolbar ── */
+  #fb-toolbar {
+    position: fixed; bottom: 16px; right: 16px; z-index: 9999;
+    display: flex; flex-direction: column; gap: 8px; align-items: flex-end;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+  #fb-toolbar button {
+    background: #1a1a1a; color: #e5e7eb; border: 1px solid #444;
+    border-radius: 8px; padding: 8px 14px; font-size: 13px; cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  }
+  #fb-toolbar button:hover { background: #262626; border-color: #666; }
+  #fb-toolbar button.fb-active { background: var(--primary-red); border-color: var(--primary-red); color: #fff; }
+  #fb-count { font-size: 12px; color: var(--gray-400); background: #1a1a1a; padding: 4px 10px; border-radius: 6px; border: 1px solid #333; }
+  #fb-status-dot {
+    width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px;
+    background: #ef4444; transition: background 0.3s;
+  }
+  #fb-status-dot.connected { background: var(--success); }
+  #fb-server-status { font-size: 11px; color: var(--gray-500); display: flex; align-items: center; }
+
+  /* ── Feedback mode ── */
+  body.fb-mode .screen-card { cursor: crosshair; outline: 1px dashed transparent; transition: outline-color 0.15s; }
+  body.fb-mode .screen-card:hover { outline-color: var(--primary-red); }
+
+  /* ── Pins ── */
+  .fb-pin {
+    position: absolute; width: 24px; height: 24px; border-radius: 50%;
+    background: var(--primary-red); color: #fff; border: 2px solid #fff;
+    font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transform: translate(-50%, -50%); z-index: 10;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.5); transition: transform 0.1s;
+  }
+  .fb-pin:hover { transform: translate(-50%, -50%) scale(1.15); }
+  .fb-pin.status-accepted { background: var(--success); }
+  .fb-pin.status-rejected { background: var(--gray-500); opacity: 0.5; }
+
+  /* ── Chat Panel ── */
+  #fb-panel {
+    position: fixed; top: 0; right: 0; width: 420px; height: 100vh;
+    background: #121212; border-left: 1px solid #333; z-index: 10000;
+    display: none; flex-direction: column; color: #e5e7eb;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+  #fb-panel.fb-open { display: flex; }
+
+  #fb-panel header {
+    padding: 12px 16px; border-bottom: 1px solid #333;
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;
+    flex-shrink: 0;
+  }
+  #fb-panel .fb-header-left { flex: 1; min-width: 0; }
+  #fb-panel .fb-header-title { font-size: 14px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #fb-panel .fb-header-route { font-size: 11px; color: var(--gray-500); margin-top: 2px; font-family: ui-monospace, Menlo, monospace; }
+  .fb-status-badge {
+    font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 10px;
+    text-transform: uppercase; letter-spacing: 0.5px; flex-shrink: 0;
+  }
+  .fb-status-badge.open { background: var(--primary-red); color: #fff; }
+  .fb-status-badge.accepted { background: var(--success); color: #fff; }
+  .fb-status-badge.rejected { background: var(--gray-600); color: var(--gray-300); }
+  #fb-close { background: none; border: none; color: var(--gray-400); font-size: 20px; cursor: pointer; flex-shrink: 0; }
+
+  /* ── Meta ── */
+  #fb-meta {
+    padding: 8px 16px; border-bottom: 1px solid #222; font-size: 11px;
+    color: var(--gray-500); line-height: 1.6; flex-shrink: 0;
+  }
+  #fb-meta strong { color: var(--gray-300); }
+
+  /* ── Messages area ── */
+  #fb-messages {
+    flex: 1; overflow-y: auto; padding: 12px 16px; display: flex; flex-direction: column; gap: 12px;
+  }
+  .fb-msg {
+    max-width: 95%; padding: 10px 14px; border-radius: 12px; font-size: 13px;
+    line-height: 1.5; word-wrap: break-word; white-space: pre-wrap;
+  }
+  .fb-msg.user {
+    align-self: flex-end; background: #2a2a3a; border-bottom-right-radius: 4px;
+  }
+  .fb-msg.assistant {
+    align-self: flex-start; background: #1e1e1e; border: 1px solid #2a2a2a;
+    border-bottom-left-radius: 4px; max-width: 100%;
+  }
+  .fb-msg .fb-msg-time {
+    font-size: 10px; color: var(--gray-600); margin-top: 4px; display: block;
+  }
+
+  /* ── Typing indicator ── */
+  .fb-typing { display: flex; gap: 4px; padding: 10px 14px; align-self: flex-start; }
+  .fb-typing span {
+    width: 6px; height: 6px; border-radius: 50%; background: var(--gray-500);
+    animation: fb-bounce 1.2s infinite;
+  }
+  .fb-typing span:nth-child(2) { animation-delay: 0.2s; }
+  .fb-typing span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes fb-bounce {
+    0%, 60%, 100% { transform: translateY(0); }
+    30% { transform: translateY(-6px); }
+  }
+
+  /* ── Tool use indicator ── */
+  .fb-tool-use {
+    font-size: 11px; color: var(--gray-400); padding: 4px 0; font-style: italic;
+  }
+
+  /* ── Error message ── */
+  .fb-error-msg {
+    background: #2d1518 !important; border-color: #f87171 !important; color: #f87171;
+    font-size: 12px; padding: 8px 12px; border-radius: 8px; border: 1px solid #f87171;
+    align-self: flex-start; max-width: 100%;
+  }
+
+  /* ── Cost/duration footer ── */
+  .fb-cost-footer {
+    font-size: 10px; color: var(--gray-600); padding: 2px 0;
+  }
+
+  /* ── Diff preview ── */
+  .fb-diff-block {
+    margin-top: 10px; border: 1px solid #333; border-radius: 6px; overflow: hidden;
+    font-size: 12px; max-height: 300px; overflow-y: auto;
+  }
+  .fb-diff-header {
+    background: #1a1a2e; padding: 6px 10px; font-size: 11px; font-weight: 600;
+    color: var(--gray-300); border-bottom: 1px solid #333;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .fb-diff-header .fb-diff-files { font-weight: 400; color: var(--gray-500); }
+  .fb-diff-content {
+    font-family: ui-monospace, Menlo, monospace; white-space: pre; overflow-x: auto;
+    line-height: 1.5;
+  }
+  .fb-diff-content .diff-add { background: #12261e; color: #4ade80; display: block; padding: 0 10px; }
+  .fb-diff-content .diff-del { background: #2d1518; color: #f87171; display: block; padding: 0 10px; }
+  .fb-diff-content .diff-hunk { background: #1a1a2e; color: #60a5fa; display: block; padding: 0 10px; font-style: italic; }
+  .fb-diff-content .diff-ctx { display: block; padding: 0 10px; color: var(--gray-400); }
+
+  /* ── Accept/Reject buttons ── */
+  .fb-ar-row { display: flex; gap: 8px; margin-top: 8px; }
+  .fb-ar-row button {
+    flex: 1; padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;
+    cursor: pointer; border: 1px solid #333;
+  }
+  .fb-ar-row .fb-accept-btn { background: var(--success); color: #fff; border-color: var(--success); }
+  .fb-ar-row .fb-reject-btn { background: transparent; color: #f87171; border-color: #f87171; }
+
+  /* ── Input area ── */
+  #fb-input-area {
+    padding: 12px 16px; border-top: 1px solid #333; flex-shrink: 0;
+  }
+  #fb-input-row { display: flex; gap: 8px; align-items: flex-end; }
+  #fb-input {
+    flex: 1; background: #0a0a0a; color: #e5e7eb; border: 1px solid #333;
+    border-radius: 8px; padding: 8px 12px; font-size: 13px; font-family: inherit;
+    resize: none; min-height: 38px; max-height: 120px; line-height: 1.4;
+  }
+  #fb-input:disabled { opacity: 0.4; cursor: not-allowed; }
+  #fb-send {
+    background: var(--primary-red); color: #fff; border: none; border-radius: 8px;
+    padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer;
+    white-space: nowrap;
+  }
+  #fb-send:disabled { opacity: 0.4; cursor: not-allowed; }
+  #fb-component-row {
+    margin-top: 6px; display: flex; align-items: center; gap: 6px;
+  }
+  #fb-component-row label { font-size: 10px; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.5px; flex-shrink: 0; }
+  #fb-component {
+    flex: 1; background: #0a0a0a; color: #e5e7eb; border: 1px solid #222;
+    border-radius: 4px; padding: 4px 8px; font-size: 11px;
+    font-family: ui-monospace, Menlo, monospace;
+  }
+  #fb-cancel-btn {
+    background: transparent; color: var(--gray-400); border: 1px solid #333;
+    border-radius: 8px; padding: 8px 12px; font-size: 12px; cursor: pointer;
+    margin-top: 6px; width: 100%; display: none;
+  }
+  #fb-delete-pin {
+    background: transparent; color: #f87171; border: none; font-size: 11px;
+    cursor: pointer; padding: 0; margin-top: 8px;
+  }
+</style>
+
+<!-- ── Toolbar ── -->
+<div id="fb-toolbar">
+  <div id="fb-server-status"><span id="fb-status-dot"></span><span id="fb-status-text">Offline</span></div>
+  <div id="fb-count">0 pins</div>
+  <button id="fb-toggle" type="button">Feedback: OFF</button>
+  <button id="fb-export" type="button">Export JSON</button>
+  <button id="fb-clear" type="button">Clear all</button>
+</div>
+
+<!-- ── Chat Panel ── -->
+<div id="fb-panel" role="dialog" aria-label="Feedback chat">
+  <header>
+    <div class="fb-header-left">
+      <div class="fb-header-title" id="fb-header-title">Pin</div>
+      <div class="fb-header-route" id="fb-header-route"></div>
+    </div>
+    <span class="fb-status-badge open" id="fb-badge">open</span>
+    <button id="fb-close" type="button" aria-label="Close">&times;</button>
+  </header>
+  <div id="fb-meta"></div>
+  <div id="fb-messages"></div>
+  <div id="fb-input-area">
+    <div id="fb-input-row">
+      <textarea id="fb-input" rows="1" placeholder="Describe the change you want..."></textarea>
+      <button id="fb-send" type="button">Send</button>
+    </div>
+    <div id="fb-component-row">
+      <label for="fb-component">Component:</label>
+      <input id="fb-component" type="text" placeholder="e.g. components/domain/match-card.tsx" />
+    </div>
+    <button id="fb-cancel-btn" type="button">Cancel</button>
+    <button id="fb-delete-pin" type="button">Delete this pin</button>
+  </div>
+</div>
+
+<script>
+(function() {
+  const SERVER_URL = location.protocol === 'file:'
+    ? 'http://localhost:3847'
+    : location.origin;
+  const STORAGE_KEY = 'jits-screen-inventory-feedback';
+  const SCHEMA_VERSION = 2;
+  let serverConnected = false;
+
+  const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
+  document.querySelectorAll('.screen-card').forEach(card => {
+    const h3 = card.querySelector('h3');
+    if (!h3) return;
+    card.dataset.screenId = slug(h3.textContent.trim());
+    card.dataset.screenTitle = h3.textContent.trim();
+    const routeEl = card.querySelector('.screen-route');
+    if (routeEl) card.dataset.screenRoute = routeEl.textContent.trim();
+  });
+
+  function migratePin(pin) {
+    if (!pin.status) pin.status = 'open';
+    if (!pin.messages) {
+      pin.messages = [];
+      if (pin.text && pin.text.trim()) {
+        pin.messages.push({ role: 'user', text: pin.text, timestamp: pin.createdAt || new Date().toISOString() });
+      }
+    }
+    if (!pin.sessionId) pin.sessionId = null;
+    return pin;
+  }
+
+  function load() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      const arr = Array.isArray(parsed) ? parsed : (parsed.pins || []);
+      return arr.map(migratePin);
+    } catch { return []; }
+  }
+
+  function persist(pins) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(pins));
+  }
+
+  let pins = load();
+  let mode = false;
+  let editingId = null;
+  let streaming = false;
+
+  const $ = (id) => document.getElementById(id);
+  const els = {
+    toolbar: $('fb-toolbar'), toggle: $('fb-toggle'), exportBtn: $('fb-export'),
+    clearBtn: $('fb-clear'), count: $('fb-count'), statusDot: $('fb-status-dot'),
+    statusText: $('fb-status-text'), panel: $('fb-panel'), close: $('fb-close'),
+    headerTitle: $('fb-header-title'), headerRoute: $('fb-header-route'),
+    badge: $('fb-badge'), meta: $('fb-meta'), messages: $('fb-messages'),
+    input: $('fb-input'), send: $('fb-send'), component: $('fb-component'),
+    cancelBtn: $('fb-cancel-btn'), deletePin: $('fb-delete-pin'),
+  };
+
+  function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  function renderPins() {
+    document.querySelectorAll('.fb-pin').forEach(el => el.remove());
+    pins.forEach((pin, idx) => {
+      const card = document.querySelector(`[data-screen-id="${pin.screenId}"]`);
+      if (!card) return;
+      const el = document.createElement('div');
+      el.className = 'fb-pin';
+      if (pin.status === 'accepted') el.classList.add('status-accepted');
+      if (pin.status === 'rejected') el.classList.add('status-rejected');
+      el.textContent = idx + 1;
+      el.style.left = (pin.xPct * 100) + '%';
+      el.style.top = (pin.yPct * 100) + '%';
+      const lastMsg = pin.messages?.[pin.messages.length - 1];
+      el.title = lastMsg?.text?.slice(0, 80) || '(empty)';
+      el.addEventListener('click', (e) => { e.stopPropagation(); openChat(pin.id); });
+      card.appendChild(el);
+    });
+    els.count.textContent = pins.length + (pins.length === 1 ? ' pin' : ' pins');
+  }
+
+  function renderDiff(diffText) {
+    if (!diffText || !diffText.trim()) return '';
+    const lines = diffText.split('\n');
+    let html = '';
+    const files = [];
+    for (const line of lines) {
+      if (line.startsWith('diff --git')) { const m = line.match(/b\/(.+)$/); if (m) files.push(m[1]); continue; }
+      if (line.startsWith('index ') || line.startsWith('---') || line.startsWith('+++') || line.startsWith('\\')) continue;
+      if (line.startsWith('@@')) html += `<span class="diff-hunk">${esc(line)}</span>`;
+      else if (line.startsWith('+')) html += `<span class="diff-add">${esc(line)}</span>`;
+      else if (line.startsWith('-')) html += `<span class="diff-del">${esc(line)}</span>`;
+      else html += `<span class="diff-ctx">${esc(line)}</span>`;
+    }
+    return `<div class="fb-diff-block"><div class="fb-diff-header"><span>Changes</span><span class="fb-diff-files">${files.join(', ')}</span></div><div class="fb-diff-content">${html}</div></div>`;
+  }
+
+  function renderMessages(pin) {
+    let html = '';
+    for (const msg of (pin.messages || [])) {
+      const time = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+      if (msg.role === 'user') {
+        html += `<div class="fb-msg user">${esc(msg.text)}<span class="fb-msg-time">${time}</span></div>`;
+      } else {
+        html += `<div class="fb-msg assistant">${esc(msg.text)}`;
+        if (msg.diff) {
+          html += renderDiff(msg.diff);
+          if (pin.status === 'open') {
+            html += `<div class="fb-ar-row"><button class="fb-accept-btn" data-pin="${pin.id}">Accept</button><button class="fb-reject-btn" data-pin="${pin.id}">Reject</button></div>`;
+          }
+        }
+        html += `<span class="fb-msg-time">${time}</span></div>`;
+      }
+    }
+    els.messages.innerHTML = html;
+    els.messages.scrollTop = els.messages.scrollHeight;
+    els.messages.querySelectorAll('.fb-accept-btn').forEach(btn => {
+      btn.addEventListener('click', () => acceptChanges(btn.dataset.pin));
+    });
+    els.messages.querySelectorAll('.fb-reject-btn').forEach(btn => {
+      btn.addEventListener('click', () => rejectChanges(btn.dataset.pin));
+    });
+  }
+
+  function updateBadge(pin) {
+    els.badge.className = 'fb-status-badge ' + (pin.status || 'open');
+    els.badge.textContent = pin.status || 'open';
+  }
+
+  function openChat(id) {
+    const pin = pins.find(p => p.id === id);
+    if (!pin) return;
+    editingId = id;
+    els.headerTitle.textContent = pin.screenTitle;
+    els.headerRoute.textContent = pin.screenRoute || '';
+    els.component.value = pin.componentPath || '';
+    els.meta.innerHTML = `<span>Pin at <strong>${(pin.xPct*100).toFixed(1)}%, ${(pin.yPct*100).toFixed(1)}%</strong></span>${pin.componentPath ? ` &middot; <strong>${esc(pin.componentPath)}</strong>` : ''}`;
+    updateBadge(pin);
+    renderMessages(pin);
+    const closed = pin.status !== 'open';
+    els.input.disabled = closed;
+    els.send.disabled = closed;
+    els.input.placeholder = closed ? 'This pin is ' + pin.status : 'Add a comment...';
+    els.panel.classList.add('fb-open');
+    if (online) setTimeout(() => els.input.focus(), 50);
+  }
+
+  function closeChat() { editingId = null; els.panel.classList.remove('fb-open'); }
+
+  async function checkServer() {
+    try {
+      const res = await fetch(SERVER_URL + '/api/status', { signal: AbortSignal.timeout(3000) });
+      if (res.ok) { serverConnected = true; els.statusDot.classList.add('connected'); els.statusText.textContent = 'Connected'; return; }
+    } catch {}
+    serverConnected = false; els.statusDot.classList.remove('connected'); els.statusText.textContent = 'Offline';
+  }
+
+  async function sendMessage() {
+    if (streaming || !editingId) return;
+    const pin = pins.find(p => p.id === editingId);
+    if (!pin) return;
+    const text = els.input.value.trim();
+    if (!text) return;
+    const comp = els.component.value.trim();
+    if (comp !== pin.componentPath) pin.componentPath = comp;
+    pin.messages.push({ role: 'user', text, timestamp: new Date().toISOString() });
+    pin.updatedAt = new Date().toISOString();
+    persist(pins);
+    renderMessages(pin);
+    els.input.value = '';
+    els.input.style.height = 'auto';
+    streaming = true;
+    els.input.disabled = true;
+    els.send.disabled = true;
+    els.cancelBtn.style.display = 'block';
+
+    const typingEl = document.createElement('div');
+    typingEl.className = 'fb-typing';
+    typingEl.innerHTML = '<span></span><span></span><span></span>';
+    els.messages.appendChild(typingEl);
+    els.messages.scrollTop = els.messages.scrollHeight;
+
+    const isFirstTurn = !pin.sessionId;
+    const body = { pinId: pin.id, sessionId: pin.sessionId, message: text };
+    if (isFirstTurn) {
+      body.context = { screenTitle: pin.screenTitle, screenRoute: pin.screenRoute, componentPath: pin.componentPath || null, xPct: pin.xPct, yPct: pin.yPct };
+    }
+
+    let assistantText = '';
+    let diffText = null;
+    let sessionId = pin.sessionId;
+
+    try {
+      const response = await fetch(SERVER_URL + '/api/chat', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({ error: 'Server error' }));
+        if (response.status === 409) throw new Error('Claude is already processing another request. Please wait.');
+        throw new Error(err.error || 'Server error');
+      }
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let msgEl = null;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const events = buffer.split('\n\n');
+        buffer = events.pop() || '';
+        for (const block of events) {
+          const lines = block.split('\n');
+          let eventType = '', data = '';
+          for (const line of lines) {
+            if (line.startsWith('event: ')) eventType = line.slice(7);
+            else if (line.startsWith('data: ')) data = line.slice(6);
+          }
+          if (!eventType || !data) continue;
+          let parsed;
+          try { parsed = JSON.parse(data); } catch { continue; }
+
+          if (eventType === 'status' && parsed.sessionId) { sessionId = parsed.sessionId; pin.sessionId = sessionId; persist(pins); }
+          if (eventType === 'chunk') {
+            if (typingEl.parentNode) typingEl.remove();
+            if (parsed.type === 'text') {
+              assistantText += parsed.text;
+              if (!msgEl) { msgEl = document.createElement('div'); msgEl.className = 'fb-msg assistant'; els.messages.appendChild(msgEl); }
+              msgEl.textContent = assistantText;
+              els.messages.scrollTop = els.messages.scrollHeight;
+            } else if (parsed.type === 'tool_use') {
+              const toolEl = document.createElement('div'); toolEl.className = 'fb-tool-use';
+              toolEl.textContent = (parsed.tool === 'Edit' || parsed.tool === 'Write')
+                ? `Editing file...` : parsed.tool === 'Read'
+                ? `Reading file...` : `Using ${parsed.tool}...`;
+              els.messages.appendChild(toolEl);
+              els.messages.scrollTop = els.messages.scrollHeight;
+            }
+          }
+          if (eventType === 'diff' && parsed.diff) diffText = parsed.diff;
+          if (eventType === 'done') {
+            if (parsed.result && parsed.result !== assistantText) assistantText = parsed.result;
+            if (parsed.cost || parsed.duration_ms) {
+              const footerEl = document.createElement('div'); footerEl.className = 'fb-cost-footer';
+              const p = [];
+              if (parsed.duration_ms) p.push(`${(parsed.duration_ms / 1000).toFixed(1)}s`);
+              if (parsed.cost) p.push(`$${parsed.cost.toFixed(3)}`);
+              footerEl.textContent = p.join(' \u00b7 ');
+              els.messages.appendChild(footerEl);
+            }
+          }
+          if (eventType === 'error') {
+            if (typingEl.parentNode) typingEl.remove();
+            const errEl = document.createElement('div'); errEl.className = 'fb-error-msg';
+            errEl.textContent = parsed.message || 'Something went wrong';
+            els.messages.appendChild(errEl);
+            els.messages.scrollTop = els.messages.scrollHeight;
+          }
+        }
+      }
+    } catch (err) {
+      if (typingEl.parentNode) typingEl.remove();
+      const errEl = document.createElement('div'); errEl.className = 'fb-error-msg';
+      errEl.textContent = err.message || 'Connection failed';
+      els.messages.appendChild(errEl);
+      if (!assistantText) assistantText = '(error)';
+    }
+
+    const aMsg = { role: 'assistant', text: assistantText, timestamp: new Date().toISOString() };
+    if (diffText) aMsg.diff = diffText;
+    pin.messages.push(aMsg);
+    pin.updatedAt = new Date().toISOString();
+    persist(pins);
+    streaming = false;
+    els.cancelBtn.style.display = 'none';
+    renderMessages(pin);
+    renderPins();
+    if (pin.status === 'open' && serverConnected) {
+      els.input.disabled = false; els.send.disabled = false;
+      setTimeout(() => els.input.focus(), 50);
+    }
+  }
+
+  async function acceptChanges(pinId) {
+    const pin = pins.find(p => p.id === pinId);
+    if (!pin) return;
+    const firstUserMsg = pin.messages.find(m => m.role === 'user');
+    const summary = firstUserMsg?.text?.slice(0, 60) || 'design feedback';
+    try {
+      const res = await fetch(SERVER_URL + '/api/accept', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: `feedback(${pin.screenId}): ${summary}` }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        pin.status = 'accepted'; pin.updatedAt = new Date().toISOString(); persist(pins);
+        updateBadge(pin); renderMessages(pin); renderPins();
+        els.input.disabled = true; els.send.disabled = true; els.input.placeholder = 'This pin is accepted';
+      } else alert('Accept failed: ' + (data.error || 'unknown'));
+    } catch (err) { alert('Accept failed: ' + err.message); }
+  }
+
+  async function rejectChanges(pinId) {
+    const pin = pins.find(p => p.id === pinId);
+    if (!pin) return;
+    try {
+      const res = await fetch(SERVER_URL + '/api/reject', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: pin.sessionId }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        pin.status = 'rejected'; pin.updatedAt = new Date().toISOString(); persist(pins);
+        updateBadge(pin); renderMessages(pin); renderPins();
+        els.input.disabled = true; els.send.disabled = true; els.input.placeholder = 'This pin is rejected';
+      } else alert('Reject failed: ' + (data.error || 'unknown'));
+    } catch (err) { alert('Reject failed: ' + err.message); }
+  }
+
+  async function cancelStream() { try { await fetch(SERVER_URL + '/api/cancel', { method: 'POST' }); } catch {} }
+
+  function setMode(on) {
+    mode = on; document.body.classList.toggle('fb-mode', on);
+    els.toggle.classList.toggle('fb-active', on);
+    els.toggle.textContent = 'Feedback: ' + (on ? 'ON' : 'OFF');
+  }
+
+  document.addEventListener('click', (e) => {
+    if (!mode) return;
+    if (e.target.closest('#fb-panel, #fb-toolbar, .fb-pin')) return;
+    const card = e.target.closest('.screen-card');
+    if (!card) return;
+    e.preventDefault(); e.stopPropagation();
+    const rect = card.getBoundingClientRect();
+    const now = new Date().toISOString();
+    const pin = {
+      id: 'fb_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7),
+      screenId: card.dataset.screenId, screenTitle: card.dataset.screenTitle,
+      screenRoute: card.dataset.screenRoute || null,
+      xPct: (e.clientX - rect.left) / rect.width, yPct: (e.clientY - rect.top) / rect.height,
+      componentPath: '', createdAt: now, updatedAt: now,
+      status: 'open', sessionId: null, messages: [],
+    };
+    pins.push(pin); persist(pins); renderPins(); openChat(pin.id);
+  }, true);
+
+  els.toggle.addEventListener('click', () => setMode(!mode));
+  els.close.addEventListener('click', closeChat);
+  els.send.addEventListener('click', sendMessage);
+  els.cancelBtn.addEventListener('click', cancelStream);
+  els.input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } });
+  els.input.addEventListener('input', () => { els.input.style.height = 'auto'; els.input.style.height = Math.min(els.input.scrollHeight, 120) + 'px'; });
+  els.deletePin.addEventListener('click', () => { if (!editingId) return; pins = pins.filter(p => p.id !== editingId); persist(pins); renderPins(); closeChat(); });
+  els.exportBtn.addEventListener('click', () => {
+    const payload = { schemaVersion: SCHEMA_VERSION, source: 'screen-inventory.html', exportedAt: new Date().toISOString(), pinCount: pins.length, pins };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob); const a = document.createElement('a');
+    a.href = url; a.download = `screen-inventory-feedback-${Date.now()}.json`; a.click(); URL.revokeObjectURL(url);
+  });
+  els.clearBtn.addEventListener('click', () => {
+    if (!pins.length) return;
+    if (!confirm(`Delete all ${pins.length} feedback pins? This cannot be undone.`)) return;
+    pins = []; persist(pins); renderPins(); closeChat();
+  });
+
+  renderPins(); checkServer(); setInterval(checkServer, 10000);
+})();
+</script>
+
+<script>
+function setTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  const btnLight = document.getElementById('btnLight');
+  const btnDark = document.getElementById('btnDark');
+  if (theme === 'dark') {
+    btnDark.style.background = '#E63946';
+    btnDark.style.color = '#fff';
+    btnLight.style.background = '#1a1a1a';
+    btnLight.style.color = '#6B7280';
+  } else {
+    btnLight.style.background = '#E63946';
+    btnLight.style.color = '#fff';
+    btnDark.style.background = '#1a1a1a';
+    btnDark.style.color = '#6B7280';
+  }
+}
+// Default to dark
+setTheme('dark');
+</script>
+
+</body>
+</html>
