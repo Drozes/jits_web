@@ -1,0 +1,2102 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ELO RATED - App Style Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;700&family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* ================================================================
+   RESET + BASE
+   ================================================================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  /* Void (dark) tokens */
+  --void: #0D0F14;
+  --panel: #13151B;
+  --plate: #1A1D24;
+  --plate-bright: #242832;
+  --terminal-white: #E8EDF2;
+  --data-gray: #6B7280;
+  --data-gray-bright: #9CA3AF;
+  --signal-red: #E63946;
+  --signal-red-hover: #F0556B;
+  --signal-red-dark: #C42939;
+  --gain-green: #22C55E;
+  --gain-green-dark: #15803D;
+  --amber: #F59E0B;
+  --border-hairline: rgba(107, 114, 128, 0.25);
+  --border-faint: rgba(107, 114, 128, 0.12);
+
+  /* Paddock (light) tokens */
+  --paddock: #F2F4F7;
+  --paddock-panel: #E8EBF0;
+  --paddock-plate: #DEE2E9;
+  --paddock-plate-bright: #D2D7E0;
+  --paddock-text-secondary: #4B5563;
+  --paddock-border: rgba(13, 15, 20, 0.14);
+  --paddock-border-faint: rgba(13, 15, 20, 0.07);
+
+  /* Timing */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --duration-hover: 100ms;
+  --duration-fade: 240ms;
+  --duration-tick: 480ms;
+  --duration-pulse: 1400ms;
+}
+
+/* ================================================================
+   THEME: DARK (VOID) - default
+   ================================================================ */
+[data-theme="dark"] {
+  --bg: var(--void);
+  --bg-panel: var(--panel);
+  --bg-plate: var(--plate);
+  --bg-plate-bright: var(--plate-bright);
+  --fg: var(--terminal-white);
+  --fg-secondary: var(--data-gray-bright);
+  --fg-tertiary: var(--data-gray);
+  --accent: var(--signal-red);
+  --accent-hover: var(--signal-red-hover);
+  --positive: var(--gain-green);
+  --positive-text: var(--gain-green);
+  --negative: var(--signal-red);
+  --border: var(--border-hairline);
+  --border-faint: var(--border-faint);
+  --btn-secondary-bg: var(--plate);
+  --btn-secondary-border: var(--border-hairline);
+  --section-divider: rgba(255, 255, 255, 0.06);
+}
+
+/* ================================================================
+   THEME: LIGHT (PADDOCK)
+   ================================================================ */
+[data-theme="light"] {
+  --bg: var(--paddock);
+  --bg-panel: var(--paddock-panel);
+  --bg-plate: var(--paddock-plate);
+  --bg-plate-bright: var(--paddock-plate-bright);
+  --fg: var(--void);
+  --fg-secondary: var(--paddock-text-secondary);
+  --fg-tertiary: var(--data-gray);
+  --accent: var(--signal-red);
+  --accent-hover: var(--signal-red-dark);
+  --positive: var(--gain-green-dark);
+  --positive-text: var(--gain-green-dark);
+  --negative: var(--signal-red-dark);
+  --border: var(--paddock-border);
+  --border-faint: var(--paddock-border-faint);
+  --btn-secondary-bg: var(--paddock-plate);
+  --btn-secondary-border: var(--paddock-border);
+  --section-divider: rgba(0, 0, 0, 0.06);
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: 'Inter', -apple-system, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background var(--duration-fade) var(--ease-out),
+              color var(--duration-fade) var(--ease-out);
+}
+
+/* ================================================================
+   LAYOUT
+   ================================================================ */
+.container {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+@media (min-width: 768px) {
+  .container { padding: 0 48px; }
+}
+
+/* ================================================================
+   HEADER
+   ================================================================ */
+.doc-header {
+  padding: 48px 0 40px;
+  border-bottom: 1px solid var(--section-divider);
+  background: linear-gradient(180deg, var(--bg-panel) 0%, var(--bg) 100%);
+  transition: background var(--duration-fade) var(--ease-out);
+}
+
+.doc-header-inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.doc-header h1 {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 72px;
+  line-height: 0.85;
+  color: var(--fg);
+  letter-spacing: 0.02em;
+}
+
+.doc-header .subtitle {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--fg-secondary);
+  margin-top: 8px;
+}
+
+.doc-header .meta {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--accent);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-top: 12px;
+}
+
+/* Theme toggle */
+.theme-toggle {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 8px 20px;
+  border: 1px solid var(--border);
+  background: var(--bg-plate);
+  color: var(--fg-secondary);
+  cursor: pointer;
+  border-radius: 3px;
+  transition: all var(--duration-hover) ease;
+  margin-top: 8px;
+  flex-shrink: 0;
+}
+
+.theme-toggle:hover {
+  color: var(--fg);
+  border-color: var(--accent);
+}
+
+/* ================================================================
+   TABLE OF CONTENTS
+   ================================================================ */
+.toc {
+  padding: 20px 0;
+  border-bottom: 1px solid var(--section-divider);
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.toc a {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fg-tertiary);
+  text-decoration: none;
+  padding: 6px 12px;
+  border: 1px solid var(--border-faint);
+  border-radius: 2px;
+  transition: all var(--duration-hover) ease;
+}
+
+.toc a:hover {
+  color: var(--fg);
+  border-color: var(--accent);
+}
+
+/* ================================================================
+   SECTIONS
+   ================================================================ */
+.section {
+  padding: 64px 0;
+  border-bottom: 1px solid var(--section-divider);
+}
+
+.section-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+
+.section-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 48px;
+  line-height: 0.9;
+  color: var(--fg);
+  margin-bottom: 12px;
+}
+
+.section-desc {
+  font-family: 'Inter', sans-serif;
+  font-size: 15px;
+  color: var(--fg-secondary);
+  max-width: 700px;
+  margin-bottom: 40px;
+  line-height: 1.6;
+}
+
+.subsection {
+  margin-top: 48px;
+}
+
+.subsection-title {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fg);
+  margin-bottom: 20px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-faint);
+}
+
+/* ================================================================
+   BRAND NOTE CALLOUT
+   ================================================================ */
+.brand-note {
+  background: var(--bg-plate);
+  border: 1px solid var(--border-faint);
+  border-left: 3px solid var(--accent);
+  padding: 16px 20px;
+  margin-top: 24px;
+  border-radius: 0 3px 3px 0;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  color: var(--fg-secondary);
+  line-height: 1.6;
+}
+
+.brand-note strong {
+  color: var(--fg);
+}
+
+/* ================================================================
+   SECTION 1: BRAND IDENTITY
+   ================================================================ */
+.brand-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.brand-card {
+  background: var(--bg-plate);
+  border: 1px solid var(--border-faint);
+  padding: 24px;
+  border-radius: 4px;
+  transition: background var(--duration-fade) var(--ease-out);
+}
+
+.brand-card-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--fg-tertiary);
+  margin-bottom: 12px;
+}
+
+.brand-card-value {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 36px;
+  line-height: 1;
+  color: var(--fg);
+}
+
+.brand-card-value.tagline {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.brand-card-value.voice {
+  font-family: 'Inter', sans-serif;
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--fg-secondary);
+}
+
+.monogram {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 64px;
+  line-height: 1;
+  color: var(--fg);
+  letter-spacing: 0.05em;
+}
+
+.monogram .dot {
+  color: var(--accent);
+  margin: 0 2px;
+  font-size: 48px;
+  vertical-align: middle;
+}
+
+/* ================================================================
+   SECTION 2: COLOR PALETTE
+   ================================================================ */
+.palette-group {
+  margin-bottom: 32px;
+}
+
+.palette-group-title {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--fg-secondary);
+  margin-bottom: 12px;
+}
+
+.swatch-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 4px;
+}
+
+.swatch {
+  padding: 16px 12px;
+  min-height: 88px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  font-family: 'JetBrains Mono', monospace;
+  border-radius: 2px;
+  transition: transform var(--duration-hover) ease;
+}
+
+.swatch:hover { transform: scale(1.02); }
+
+.swatch .name {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.swatch .hex {
+  font-size: 10px;
+  opacity: 0.8;
+  margin-top: 4px;
+}
+
+.swatch .role {
+  font-size: 9px;
+  opacity: 0.6;
+  margin-top: auto;
+  padding-top: 8px;
+  line-height: 1.3;
+}
+
+.swatch.on-dark { color: var(--terminal-white); }
+.swatch.on-light { color: var(--void); }
+
+/* ================================================================
+   SECTION 3: TYPOGRAPHY
+   ================================================================ */
+.type-specimen {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.type-group {
+  padding: 24px;
+  background: var(--bg-plate);
+  border: 1px solid var(--border-faint);
+  border-radius: 4px;
+  margin-bottom: 16px;
+  transition: background var(--duration-fade) var(--ease-out);
+}
+
+.type-group-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-faint);
+}
+
+.type-group-name {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--fg);
+}
+
+.type-group-role {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--fg-tertiary);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.type-row {
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  gap: 20px;
+  align-items: baseline;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border-faint);
+}
+
+.type-row:last-child { border-bottom: none; }
+
+.type-size {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--fg-tertiary);
+}
+
+.type-sample { color: var(--fg); }
+
+/* ================================================================
+   SECTION 4: SPACING & RADIUS
+   ================================================================ */
+.spacing-scale {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.spacing-row {
+  display: grid;
+  grid-template-columns: 60px 1fr 60px;
+  gap: 16px;
+  align-items: center;
+}
+
+.spacing-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--fg-tertiary);
+  text-align: right;
+}
+
+.spacing-bar {
+  height: 20px;
+  background: var(--accent);
+  border-radius: 1px;
+  opacity: 0.8;
+  transition: opacity var(--duration-hover) ease;
+}
+
+.spacing-bar:hover { opacity: 1; }
+
+.spacing-px {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--fg-secondary);
+}
+
+.radius-demo {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.radius-box {
+  background: var(--bg-plate);
+  border: 1px solid var(--border);
+  height: 80px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: background var(--duration-fade) var(--ease-out);
+}
+
+.radius-box .val {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--fg);
+}
+
+.radius-box .use {
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  color: var(--fg-tertiary);
+}
+
+/* ================================================================
+   SECTION 5: COMPONENTS
+   ================================================================ */
+.component-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.component-showcase {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-faint);
+  border-radius: 4px;
+  padding: 32px;
+  margin-bottom: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+  transition: background var(--duration-fade) var(--ease-out);
+}
+
+.component-showcase.column {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.component-showcase.center {
+  justify-content: center;
+}
+
+.component-label {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fg);
+  margin-bottom: 12px;
+}
+
+/* Buttons */
+.btn {
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all var(--duration-hover) ease;
+  border-radius: 3px;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+  padding: 12px 24px;
+  font-size: 13px;
+}
+
+.btn-primary:hover { background: var(--accent-hover); }
+
+.btn-secondary {
+  background: var(--btn-secondary-bg);
+  color: var(--fg);
+  padding: 12px 24px;
+  font-size: 13px;
+  border: 1px solid var(--btn-secondary-border);
+}
+
+.btn-secondary:hover {
+  background: var(--bg-plate-bright);
+  border-color: var(--fg-tertiary);
+}
+
+.btn-tertiary {
+  background: transparent;
+  color: var(--fg-secondary);
+  padding: 12px 24px;
+  font-size: 13px;
+}
+
+.btn-tertiary:hover { color: var(--fg); }
+
+.btn-small {
+  padding: 8px 16px;
+  font-size: 11px;
+}
+
+.btn-disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.btn-arrow::after {
+  content: '\2192';
+  font-size: 14px;
+}
+
+/* Rank Badge */
+.rank-badge {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  background: var(--bg-plate);
+  color: var(--fg);
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  display: inline-block;
+  letter-spacing: 0.04em;
+  transition: background var(--duration-fade) var(--ease-out);
+}
+
+.rank-badge.leader {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Delta Indicator */
+.delta {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.delta.up { color: var(--positive-text); }
+.delta.down { color: var(--negative); }
+.delta.flat { color: var(--fg-tertiary); }
+
+/* Live Pill */
+.live-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--positive-text);
+  padding: 4px 10px;
+  border: 1px solid var(--positive-text);
+  border-radius: 2px;
+}
+
+.live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--positive-text);
+  animation: pulse var(--duration-pulse) ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
+}
+
+/* Avatar */
+.avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.avatar.lg {
+  width: 56px;
+  height: 56px;
+  font-size: 18px;
+}
+
+.avatar.sm {
+  width: 32px;
+  height: 32px;
+  font-size: 11px;
+}
+
+/* Data Plate */
+.data-plate {
+  background: var(--bg-plate);
+  border: 1px solid var(--border-faint);
+  padding: 16px 20px;
+  border-radius: 4px;
+  transition: background var(--duration-fade) var(--ease-out);
+}
+
+.data-plate.accent {
+  border-left: 3px solid var(--accent);
+  border-radius: 0 4px 4px 0;
+}
+
+.data-plate-label {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--fg-tertiary);
+  margin-bottom: 4px;
+}
+
+.data-plate-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 24px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg);
+}
+
+/* Card */
+.sg-card {
+  background: var(--bg-plate);
+  border: 1px solid var(--border-faint);
+  border-radius: 4px;
+  overflow: hidden;
+  transition: background var(--duration-fade) var(--ease-out);
+}
+
+.sg-card-header {
+  background: var(--bg-plate-bright);
+  padding: 12px 16px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--fg);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: background var(--duration-fade) var(--ease-out);
+}
+
+.sg-card-body {
+  padding: 16px;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  color: var(--fg-secondary);
+  line-height: 1.6;
+}
+
+.sg-card-footer {
+  padding: 12px 16px;
+  border-top: 1px solid var(--border-faint);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--fg-tertiary);
+  display: flex;
+  justify-content: space-between;
+}
+
+/* Match Card */
+.match-card {
+  background: var(--bg-plate);
+  border: 1px solid var(--border-faint);
+  border-radius: 4px;
+  padding: 16px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 12px;
+  align-items: center;
+  transition: background var(--duration-fade) var(--ease-out);
+}
+
+.match-card.win { border-left: 3px solid var(--positive-text); }
+.match-card.loss { border-left: 3px solid var(--negative); }
+
+.match-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.match-card-name {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--fg);
+}
+
+.match-card-detail {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  color: var(--fg-tertiary);
+}
+
+.match-card-result {
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.match-card-outcome {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 2px 8px;
+  border-radius: 2px;
+}
+
+.match-card-outcome.win-badge {
+  background: color-mix(in srgb, var(--positive-text) 15%, transparent);
+  color: var(--positive-text);
+}
+
+.match-card-outcome.loss-badge {
+  background: color-mix(in srgb, var(--negative) 15%, transparent);
+  color: var(--negative);
+}
+
+/* Rating Tile */
+.rating-tile {
+  background: var(--bg-plate);
+  border: 1px solid var(--border-faint);
+  border-radius: 4px;
+  overflow: hidden;
+  width: 100%;
+  max-width: 360px;
+  transition: background var(--duration-fade) var(--ease-out);
+}
+
+.rating-tile-header {
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.rating-tile-label {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--fg-tertiary);
+}
+
+.rating-tile-body {
+  padding: 8px 16px 16px;
+  text-align: center;
+}
+
+.rating-tile-number {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 96px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: var(--fg);
+  letter-spacing: -0.02em;
+}
+
+.rating-tile-unit {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--fg-tertiary);
+  margin-top: 4px;
+  letter-spacing: 0.04em;
+}
+
+.rating-tile-footer {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-top: 1px solid var(--border-faint);
+}
+
+.rating-tile-stat {
+  padding: 12px;
+  text-align: center;
+  border-right: 1px solid var(--border-faint);
+}
+
+.rating-tile-stat:last-child { border-right: none; }
+
+.rating-tile-stat-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--fg-tertiary);
+  margin-bottom: 2px;
+}
+
+.rating-tile-stat-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg);
+}
+
+.rating-tile-bar {
+  height: 3px;
+  background: var(--accent);
+}
+
+/* ================================================================
+   SECTION 6: MOTION
+   ================================================================ */
+.motion-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.motion-card {
+  background: var(--bg-plate);
+  border: 1px solid var(--border-faint);
+  border-radius: 4px;
+  padding: 20px;
+  transition: background var(--duration-fade) var(--ease-out);
+}
+
+.motion-card-title {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fg);
+  margin-bottom: 8px;
+}
+
+.motion-card-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+
+.motion-card-desc {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  color: var(--fg-tertiary);
+  line-height: 1.4;
+}
+
+/* Rating tick demo */
+.tick-demo {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.tick-number {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 48px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg);
+  position: relative;
+  overflow: hidden;
+  min-width: 140px;
+  text-align: center;
+}
+
+.tick-number.flash-green {
+  animation: flashGreen var(--duration-fade) ease;
+}
+
+.tick-number.flash-red {
+  animation: flashRed var(--duration-fade) ease;
+}
+
+@keyframes flashGreen {
+  0% { color: var(--positive-text); }
+  100% { color: var(--fg); }
+}
+
+@keyframes flashRed {
+  0% { color: var(--negative); }
+  100% { color: var(--fg); }
+}
+
+.tick-btn {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 8px 16px;
+  border: 1px solid var(--border);
+  background: var(--bg-plate);
+  color: var(--fg-secondary);
+  cursor: pointer;
+  border-radius: 2px;
+  transition: all var(--duration-hover) ease;
+}
+
+.tick-btn:hover {
+  border-color: var(--accent);
+  color: var(--fg);
+}
+
+/* Live pulse demo */
+.pulse-demo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pulse-ring {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--positive-text);
+  position: relative;
+}
+
+.pulse-ring::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 2px solid var(--positive-text);
+  animation: pulseRing var(--duration-pulse) ease-in-out infinite;
+}
+
+@keyframes pulseRing {
+  0%, 100% { opacity: 0.6; transform: scale(1); }
+  50% { opacity: 0; transform: scale(1.6); }
+}
+
+/* ================================================================
+   SECTION 7: TOKEN MAP TABLE
+   ================================================================ */
+.token-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+}
+
+.token-table th {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  text-align: left;
+  padding: 12px 16px;
+  background: var(--bg-plate-bright);
+  color: var(--fg-secondary);
+  border-bottom: 1px solid var(--border);
+  transition: background var(--duration-fade) var(--ease-out);
+}
+
+.token-table td {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border-faint);
+  color: var(--fg-secondary);
+  vertical-align: middle;
+}
+
+.token-table tr:hover td {
+  background: var(--bg-plate);
+}
+
+.token-name {
+  color: var(--fg);
+  font-weight: 500;
+}
+
+.token-swatch {
+  width: 16px;
+  height: 16px;
+  border-radius: 2px;
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 8px;
+  border: 1px solid var(--border-faint);
+}
+
+/* ================================================================
+   SECTION 8: ANTI-PATTERNS
+   ================================================================ */
+.anti-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.anti-list li {
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  color: var(--fg-secondary);
+  padding: 12px 16px;
+  background: var(--bg-plate);
+  border: 1px solid var(--border-faint);
+  border-radius: 3px;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  transition: background var(--duration-fade) var(--ease-out);
+}
+
+.anti-mark {
+  color: var(--negative);
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+/* ================================================================
+   FOOTER
+   ================================================================ */
+.doc-footer {
+  padding: 40px 0;
+  text-align: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--fg-tertiary);
+}
+
+.doc-footer .accent {
+  color: var(--accent);
+}
+
+/* ================================================================
+   RESPONSIVE
+   ================================================================ */
+@media (max-width: 640px) {
+  .doc-header h1 { font-size: 48px; }
+  .section-title { font-size: 36px; }
+  .section { padding: 40px 0; }
+  .swatch-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
+  .type-row { grid-template-columns: 1fr; gap: 4px; }
+  .rating-tile { max-width: 100%; }
+  .rating-tile-number { font-size: 64px; }
+  .brand-grid { grid-template-columns: 1fr; }
+  .component-showcase { padding: 20px; }
+  .token-table { font-size: 10px; }
+  .token-table th, .token-table td { padding: 8px 10px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ================================================================
+     HEADER
+     ================================================================ -->
+<div class="doc-header">
+  <div class="container">
+    <div class="doc-header-inner">
+      <div>
+        <h1>ELO RATED</h1>
+        <div class="subtitle">App Style Guide</div>
+        <div class="meta">2026-05-01 // Void + Paddock Themes</div>
+      </div>
+      <button class="theme-toggle" onclick="toggleTheme()" id="themeToggle">
+        Switch to Paddock
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ================================================================
+     TABLE OF CONTENTS
+     ================================================================ -->
+<div class="container">
+  <nav class="toc">
+    <a href="#brand">Brand</a>
+    <a href="#colors">Colors</a>
+    <a href="#typography">Typography</a>
+    <a href="#spacing">Spacing</a>
+    <a href="#components">Components</a>
+    <a href="#motion">Motion</a>
+    <a href="#tokens">Tokens</a>
+    <a href="#anti-patterns">Anti-Patterns</a>
+  </nav>
+</div>
+
+<!-- ================================================================
+     SECTION 1: BRAND IDENTITY
+     ================================================================ -->
+<div class="container">
+  <section class="section" id="brand">
+    <div class="section-label">01</div>
+    <div class="section-title">BRAND IDENTITY</div>
+    <div class="section-desc">
+      The foundation of every surface, interaction, and data display. ELO RATED is a precision instrument for competitive athletes, not a social network. Every design decision serves the data.
+    </div>
+
+    <div class="brand-grid">
+      <div class="brand-card">
+        <div class="brand-card-label">Name</div>
+        <div class="brand-card-value">ELO RATED</div>
+        <div style="font-family: 'Inter', sans-serif; font-size: 12px; color: var(--fg-tertiary); margin-top: 8px;">
+          Always all caps. Never "Elo Rated" or "elo rated".
+        </div>
+      </div>
+
+      <div class="brand-card">
+        <div class="brand-card-label">Tagline</div>
+        <div class="brand-card-value tagline">What's your number?</div>
+      </div>
+
+      <div class="brand-card">
+        <div class="brand-card-label">Voice</div>
+        <div class="brand-card-value voice">
+          Data-forward. Precise. No-BS. Every label is functional, every number is meaningful, every interaction has purpose.
+        </div>
+      </div>
+
+      <div class="brand-card">
+        <div class="brand-card-label">Monogram</div>
+        <div class="monogram">E<span class="dot">&middot;</span>R</div>
+        <div style="font-family: 'Inter', sans-serif; font-size: 12px; color: var(--fg-tertiary); margin-top: 8px;">
+          The red dot is Signal Red. It separates, it signals, it brands.
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ================================================================
+     SECTION 2: COLOR PALETTE
+     ================================================================ -->
+<div class="container">
+  <section class="section" id="colors">
+    <div class="section-label">02</div>
+    <div class="section-title">COLOR PALETTE</div>
+    <div class="section-desc">
+      Two themes built from the same logic: surfaces darken as they elevate. No pure white. No drop shadows. Hierarchy comes from layered value shifts, not lighting effects.
+    </div>
+
+    <!-- Dark / Void -->
+    <div class="subsection">
+      <div class="subsection-title">Dark Theme: Void</div>
+      <div class="palette-group">
+        <div class="palette-group-title">Surfaces</div>
+        <div class="swatch-grid">
+          <div class="swatch on-dark" style="background: #0D0F14;">
+            <div class="name">Void</div>
+            <div class="hex">#0D0F14</div>
+            <div class="role">95% of surfaces</div>
+          </div>
+          <div class="swatch on-dark" style="background: #13151B;">
+            <div class="name">Panel</div>
+            <div class="hex">#13151B</div>
+            <div class="role">Lifted surface</div>
+          </div>
+          <div class="swatch on-dark" style="background: #1A1D24;">
+            <div class="name">Plate</div>
+            <div class="hex">#1A1D24</div>
+            <div class="role">Cards, data plates</div>
+          </div>
+          <div class="swatch on-dark" style="background: #242832;">
+            <div class="name">Plate Bright</div>
+            <div class="hex">#242832</div>
+            <div class="role">Hover states</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="palette-group">
+        <div class="palette-group-title">Text</div>
+        <div class="swatch-grid">
+          <div class="swatch on-dark" style="background: #1A1D24;">
+            <div class="name" style="color: #E8EDF2;">Terminal White</div>
+            <div class="hex" style="color: #E8EDF2;">#E8EDF2</div>
+            <div class="role" style="color: #E8EDF2;">Primary text</div>
+          </div>
+          <div class="swatch on-dark" style="background: #1A1D24;">
+            <div class="name" style="color: #9CA3AF;">Data Gray Bright</div>
+            <div class="hex" style="color: #9CA3AF;">#9CA3AF</div>
+            <div class="role" style="color: #9CA3AF;">Secondary text</div>
+          </div>
+          <div class="swatch on-dark" style="background: #1A1D24;">
+            <div class="name" style="color: #6B7280;">Data Gray</div>
+            <div class="hex" style="color: #6B7280;">#6B7280</div>
+            <div class="role" style="color: #6B7280;">Tertiary / metadata</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="palette-group">
+        <div class="palette-group-title">Semantic</div>
+        <div class="swatch-grid">
+          <div class="swatch on-dark" style="background: #E63946;">
+            <div class="name">Signal Red</div>
+            <div class="hex">#E63946</div>
+            <div class="role">CTA only, never decorative</div>
+          </div>
+          <div class="swatch on-dark" style="background: #22C55E;">
+            <div class="name" style="color: #0D0F14;">Gain Green</div>
+            <div class="hex" style="color: #0D0F14;">#22C55E</div>
+            <div class="role" style="color: #0D0F14;">Rating up only, semantic</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Light / Paddock -->
+    <div class="subsection">
+      <div class="subsection-title">Light Theme: Paddock</div>
+      <div class="palette-group">
+        <div class="palette-group-title">Surfaces</div>
+        <div class="swatch-grid">
+          <div class="swatch on-light" style="background: #F2F4F7;">
+            <div class="name">Paddock</div>
+            <div class="hex">#F2F4F7</div>
+            <div class="role">Page background</div>
+          </div>
+          <div class="swatch on-light" style="background: #E8EBF0;">
+            <div class="name">Paddock Panel</div>
+            <div class="hex">#E8EBF0</div>
+            <div class="role">Nav, footer</div>
+          </div>
+          <div class="swatch on-light" style="background: #DEE2E9;">
+            <div class="name">Paddock Plate</div>
+            <div class="hex">#DEE2E9</div>
+            <div class="role">Cards</div>
+          </div>
+          <div class="swatch on-light" style="background: #D2D7E0;">
+            <div class="name">Paddock Plate Bright</div>
+            <div class="hex">#D2D7E0</div>
+            <div class="role">Hover</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="palette-group">
+        <div class="palette-group-title">Text + Semantic</div>
+        <div class="swatch-grid">
+          <div class="swatch on-light" style="background: #E8EBF0;">
+            <div class="name" style="color: #0D0F14;">Void</div>
+            <div class="hex" style="color: #0D0F14;">#0D0F14</div>
+            <div class="role" style="color: #0D0F14;">Primary text</div>
+          </div>
+          <div class="swatch on-light" style="background: #E8EBF0;">
+            <div class="name" style="color: #4B5563;">Secondary</div>
+            <div class="hex" style="color: #4B5563;">#4B5563</div>
+            <div class="role" style="color: #4B5563;">Secondary text</div>
+          </div>
+          <div class="swatch on-light" style="background: #E8EBF0;">
+            <div class="name" style="color: #6B7280;">Tertiary</div>
+            <div class="hex" style="color: #6B7280;">#6B7280</div>
+            <div class="role" style="color: #6B7280;">Metadata</div>
+          </div>
+          <div class="swatch on-light" style="background: #15803D;">
+            <div class="name" style="color: #fff;">Gain Green Dark</div>
+            <div class="hex" style="color: #fff;">#15803D</div>
+            <div class="role" style="color: #fff;">AA-passing on light</div>
+          </div>
+          <div class="swatch on-light" style="background: #C42939;">
+            <div class="name" style="color: #fff;">Signal Red Dark</div>
+            <div class="hex" style="color: #fff;">#C42939</div>
+            <div class="role" style="color: #fff;">Hover on light</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="brand-note">
+      <strong>Surface rule:</strong> Surfaces darken as they elevate in both themes. No pure white (#FFFFFF). No drop shadows, ever. Hierarchy is built through value shifts alone.
+    </div>
+  </section>
+</div>
+
+<!-- ================================================================
+     SECTION 3: TYPOGRAPHY
+     ================================================================ -->
+<div class="container">
+  <section class="section" id="typography">
+    <div class="section-label">03</div>
+    <div class="section-title">TYPOGRAPHY</div>
+    <div class="section-desc">
+      Four fonts, four jobs. No crossover. Display, headings, body, and numerics each have a dedicated typeface. All numeric data uses JetBrains Mono with tabular-nums for perfect column alignment.
+    </div>
+
+    <!-- Bebas Neue -->
+    <div class="type-group">
+      <div class="type-group-header">
+        <div class="type-group-name">Bebas Neue</div>
+        <div class="type-group-role">Display</div>
+      </div>
+      <div class="type-row">
+        <div class="type-size">48px</div>
+        <div class="type-sample" style="font-family: 'Bebas Neue', sans-serif; font-size: 48px; line-height: 0.9;">ELO RATED</div>
+      </div>
+      <div class="type-row">
+        <div class="type-size">36px</div>
+        <div class="type-sample" style="font-family: 'Bebas Neue', sans-serif; font-size: 36px; line-height: 0.9;">WHAT'S YOUR NUMBER?</div>
+      </div>
+      <div class="type-row">
+        <div class="type-size">24px</div>
+        <div class="type-sample" style="font-family: 'Bebas Neue', sans-serif; font-size: 24px; line-height: 0.95;">LEADERBOARD / MATCH RESULTS / RANKINGS</div>
+      </div>
+    </div>
+
+    <!-- DM Sans -->
+    <div class="type-group">
+      <div class="type-group-header">
+        <div class="type-group-name">DM Sans</div>
+        <div class="type-group-role">Headings + UI</div>
+      </div>
+      <div class="type-row">
+        <div class="type-size">18px / Bold</div>
+        <div class="type-sample" style="font-family: 'DM Sans', sans-serif; font-size: 18px; font-weight: 700;">Active Sessions</div>
+      </div>
+      <div class="type-row">
+        <div class="type-size">15px / Bold</div>
+        <div class="type-sample" style="font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 700;">FIND MATCH &rarr;</div>
+      </div>
+      <div class="type-row">
+        <div class="type-size">13px / Medium</div>
+        <div class="type-sample" style="font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;">Card Header Label</div>
+      </div>
+      <div class="type-row">
+        <div class="type-size">12px / Bold</div>
+        <div class="type-sample" style="font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;">BUTTON TEXT / NAVIGATION</div>
+      </div>
+    </div>
+
+    <!-- Inter -->
+    <div class="type-group">
+      <div class="type-group-header">
+        <div class="type-group-name">Inter</div>
+        <div class="type-group-role">Body</div>
+      </div>
+      <div class="type-row">
+        <div class="type-size">16px / Regular</div>
+        <div class="type-sample" style="font-family: 'Inter', sans-serif; font-size: 16px; font-weight: 400;">Prose text for descriptions, help content, and longer form copy that needs to be readable at paragraph length.</div>
+      </div>
+      <div class="type-row">
+        <div class="type-size">14px / Regular</div>
+        <div class="type-sample" style="font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 400;">Secondary body text, card descriptions, and inline explanations.</div>
+      </div>
+      <div class="type-row">
+        <div class="type-size">12px / Medium</div>
+        <div class="type-sample" style="font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 500; color: var(--fg-secondary);">Helper text, timestamps, meta information</div>
+      </div>
+    </div>
+
+    <!-- JetBrains Mono -->
+    <div class="type-group">
+      <div class="type-group-header">
+        <div class="type-group-name">JetBrains Mono</div>
+        <div class="type-group-role">Numerics</div>
+      </div>
+      <div class="type-row">
+        <div class="type-size">96px / Bold</div>
+        <div class="type-sample" style="font-family: 'JetBrains Mono', monospace; font-size: 96px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; letter-spacing: -0.02em;">1247</div>
+      </div>
+      <div class="type-row">
+        <div class="type-size">28px / Bold</div>
+        <div class="type-sample" style="font-family: 'JetBrains Mono', monospace; font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums;">+23  -15  1247  0003</div>
+      </div>
+      <div class="type-row">
+        <div class="type-size">16px / Medium</div>
+        <div class="type-sample" style="font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 500; font-variant-numeric: tabular-nums;">W 12 / L 4 / D 1 &mdash; 75% Win Rate</div>
+      </div>
+      <div class="type-row">
+        <div class="type-size">12px / Regular</div>
+        <div class="type-sample" style="font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 400; font-variant-numeric: tabular-nums; color: var(--fg-tertiary);">2026-05-01 14:32:08 UTC &middot; MATCH-0247 &middot; SESSION-0012</div>
+      </div>
+    </div>
+
+    <div class="brand-note">
+      <strong>Type rule:</strong> Each font has one job. Never substitute. All numeric data uses JetBrains Mono with <code style="font-family: 'JetBrains Mono', monospace; font-size: 12px; background: var(--bg-plate-bright); padding: 2px 6px; border-radius: 2px;">font-variant-numeric: tabular-nums</code> for perfect column alignment across all data surfaces.
+    </div>
+  </section>
+</div>
+
+<!-- ================================================================
+     SECTION 4: SPACING & RADIUS
+     ================================================================ -->
+<div class="container">
+  <section class="section" id="spacing">
+    <div class="section-label">04</div>
+    <div class="section-title">SPACING &amp; RADIUS</div>
+    <div class="section-desc">
+      An 8px base scale governs all spatial relationships. Corners are sharp by default. Anything above 4px radius is reserved for modals. Avatars are the sole exception: always circular.
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title">Spacing Scale (8px base)</div>
+      <div class="spacing-scale">
+        <div class="spacing-row">
+          <div class="spacing-label">4px</div>
+          <div><div class="spacing-bar" style="width: 4px;"></div></div>
+          <div class="spacing-px">0.25rem</div>
+        </div>
+        <div class="spacing-row">
+          <div class="spacing-label">8px</div>
+          <div><div class="spacing-bar" style="width: 8px;"></div></div>
+          <div class="spacing-px">0.5rem</div>
+        </div>
+        <div class="spacing-row">
+          <div class="spacing-label">12px</div>
+          <div><div class="spacing-bar" style="width: 12px;"></div></div>
+          <div class="spacing-px">0.75rem</div>
+        </div>
+        <div class="spacing-row">
+          <div class="spacing-label">16px</div>
+          <div><div class="spacing-bar" style="width: 16px;"></div></div>
+          <div class="spacing-px">1rem</div>
+        </div>
+        <div class="spacing-row">
+          <div class="spacing-label">20px</div>
+          <div><div class="spacing-bar" style="width: 20px;"></div></div>
+          <div class="spacing-px">1.25rem</div>
+        </div>
+        <div class="spacing-row">
+          <div class="spacing-label">24px</div>
+          <div><div class="spacing-bar" style="width: 24px;"></div></div>
+          <div class="spacing-px">1.5rem</div>
+        </div>
+        <div class="spacing-row">
+          <div class="spacing-label">32px</div>
+          <div><div class="spacing-bar" style="width: 32px;"></div></div>
+          <div class="spacing-px">2rem</div>
+        </div>
+        <div class="spacing-row">
+          <div class="spacing-label">48px</div>
+          <div><div class="spacing-bar" style="width: 48px;"></div></div>
+          <div class="spacing-px">3rem</div>
+        </div>
+        <div class="spacing-row">
+          <div class="spacing-label">64px</div>
+          <div><div class="spacing-bar" style="width: 64px;"></div></div>
+          <div class="spacing-px">4rem</div>
+        </div>
+        <div class="spacing-row">
+          <div class="spacing-label">96px</div>
+          <div><div class="spacing-bar" style="width: 96px;"></div></div>
+          <div class="spacing-px">6rem</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title">Border Radius</div>
+      <div class="radius-demo">
+        <div class="radius-box" style="border-radius: 0;">
+          <div class="val">0px</div>
+          <div class="use">Default</div>
+        </div>
+        <div class="radius-box" style="border-radius: 2px;">
+          <div class="val">2px</div>
+          <div class="use">Inputs, badges</div>
+        </div>
+        <div class="radius-box" style="border-radius: 3px;">
+          <div class="val">3px</div>
+          <div class="use">Buttons</div>
+        </div>
+        <div class="radius-box" style="border-radius: 4px;">
+          <div class="val">4px</div>
+          <div class="use">Cards</div>
+        </div>
+        <div class="radius-box" style="border-radius: 8px;">
+          <div class="val">8px</div>
+          <div class="use">Modals ONLY</div>
+        </div>
+        <div class="radius-box" style="border-radius: 50%; width: 80px; height: 80px;">
+          <div class="val">50%</div>
+          <div class="use">Avatars</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="brand-note">
+      <strong>Radius rule:</strong> Sharp corners are the default. Anything above 4px is forbidden on data surfaces. Avatars are the sole exception at <code style="font-family: 'JetBrains Mono', monospace; font-size: 12px; background: var(--bg-plate-bright); padding: 2px 6px; border-radius: 2px;">border-radius: 50%</code>.
+    </div>
+  </section>
+</div>
+
+<!-- ================================================================
+     SECTION 5: COMPONENTS
+     ================================================================ -->
+<div class="container">
+  <section class="section" id="components">
+    <div class="section-label">05</div>
+    <div class="section-title">COMPONENTS</div>
+    <div class="section-desc">
+      Every component is built from the token system. Flat surfaces, hairline borders, monospaced data, and Signal Red reserved strictly for actions and state-negative. No decoration.
+    </div>
+
+    <!-- Buttons -->
+    <div class="subsection">
+      <div class="subsection-title">Buttons</div>
+      <div class="component-showcase">
+        <button class="btn btn-primary btn-arrow">Find Match</button>
+        <button class="btn btn-primary btn-small btn-arrow">Join Session</button>
+        <button class="btn btn-secondary">View Profile</button>
+        <button class="btn btn-tertiary">Cancel</button>
+        <button class="btn btn-primary btn-disabled btn-arrow">Disabled</button>
+      </div>
+      <div class="brand-note">
+        Primary buttons use Signal Red with uppercase DM Sans Bold and an arrow suffix. Only one primary CTA per surface. Secondary uses Plate background with a border. Tertiary is transparent.
+      </div>
+    </div>
+
+    <!-- Rank Badge -->
+    <div class="subsection">
+      <div class="subsection-title">Rank Badge</div>
+      <div class="component-showcase">
+        <span class="rank-badge">1247</span>
+        <span class="rank-badge">0892</span>
+        <span class="rank-badge">0003</span>
+        <span class="rank-badge leader">1523</span>
+      </div>
+      <div class="brand-note">
+        JetBrains Mono, 4-digit padded, tabular-nums. The leader variant adds a Signal Red border for top-ranked athletes.
+      </div>
+    </div>
+
+    <!-- Delta Indicator -->
+    <div class="subsection">
+      <div class="subsection-title">Delta Indicator</div>
+      <div class="component-showcase">
+        <span class="delta up">&#9650;+23</span>
+        <span class="delta down">&#9660;-15</span>
+        <span class="delta flat">&mdash;&plusmn;0</span>
+      </div>
+      <div class="brand-note">
+        Triangle glyph + value in JetBrains Mono. Green for gains, red for losses, gray for unchanged. These are the only contexts where Gain Green and Signal Red appear in data displays.
+      </div>
+    </div>
+
+    <!-- Live Pill -->
+    <div class="subsection">
+      <div class="subsection-title">Live Pill</div>
+      <div class="component-showcase">
+        <span class="live-pill"><span class="live-dot"></span>LIVE</span>
+      </div>
+      <div class="brand-note">
+        The pulsing green dot is the only ambient animation in the entire system. 1400ms loop. Used exclusively to indicate an active, in-progress match or session.
+      </div>
+    </div>
+
+    <!-- Avatar -->
+    <div class="subsection">
+      <div class="subsection-title">Avatar</div>
+      <div class="component-showcase">
+        <div class="avatar sm">MS</div>
+        <div class="avatar">JD</div>
+        <div class="avatar lg">AK</div>
+      </div>
+      <div class="brand-note">
+        Signal Red background with initials in Terminal White (DM Sans Bold). Always circular. When a profile photo is set, it replaces the initials while maintaining the circular mask.
+      </div>
+    </div>
+
+    <!-- Data Plate -->
+    <div class="subsection">
+      <div class="subsection-title">Data Plate</div>
+      <div class="component-showcase column" style="max-width: 400px;">
+        <div class="data-plate">
+          <div class="data-plate-label">Current Rating</div>
+          <div class="data-plate-value">1247</div>
+        </div>
+        <div class="data-plate accent">
+          <div class="data-plate-label">Win Streak</div>
+          <div class="data-plate-value" style="color: var(--positive-text);">5</div>
+        </div>
+      </div>
+      <div class="brand-note">
+        Flat Plate background with hairline border. The optional 3px Signal Red left accent draws attention to key metrics. Values are always JetBrains Mono.
+      </div>
+    </div>
+
+    <!-- Card -->
+    <div class="subsection">
+      <div class="subsection-title">Card</div>
+      <div class="component-showcase column" style="max-width: 400px;">
+        <div class="sg-card">
+          <div class="sg-card-header">
+            <span>Session Details</span>
+            <span class="live-pill" style="font-size: 9px; padding: 2px 8px;"><span class="live-dot" style="width: 5px; height: 5px;"></span>LIVE</span>
+          </div>
+          <div class="sg-card-body">
+            Downtown BJJ Academy. 12 athletes checked in. Three matches in progress.
+          </div>
+          <div class="sg-card-footer">
+            <span>SESSION-0012</span>
+            <span>2026-05-01 14:00</span>
+          </div>
+        </div>
+      </div>
+      <div class="brand-note">
+        Header uses Plate Bright background. Body uses default Plate. Footer has a top border divider with monospaced metadata.
+      </div>
+    </div>
+
+    <!-- Match Card -->
+    <div class="subsection">
+      <div class="subsection-title">Match Card</div>
+      <div class="component-showcase column" style="max-width: 440px;">
+        <div class="match-card win">
+          <div class="avatar sm">JD</div>
+          <div class="match-card-info">
+            <div class="match-card-name">Jake Daniels</div>
+            <div class="match-card-detail">2d ago, Ranked</div>
+          </div>
+          <div class="match-card-result">
+            <span class="match-card-outcome win-badge">Win</span>
+            <span class="delta up" style="font-size: 12px;">&#9650;+23</span>
+          </div>
+        </div>
+        <div class="match-card loss">
+          <div class="avatar sm">RK</div>
+          <div class="match-card-info">
+            <div class="match-card-name">Riley Kim</div>
+            <div class="match-card-detail">5d ago, Ranked</div>
+          </div>
+          <div class="match-card-result">
+            <span class="match-card-outcome loss-badge">Loss</span>
+            <span class="delta down" style="font-size: 12px;">&#9660;-15</span>
+          </div>
+        </div>
+      </div>
+      <div class="brand-note">
+        Win cards have a Gain Green left border; loss cards have a Signal Red left border. Avatar, opponent name, match details, outcome badge, and delta indicator in a tight grid.
+      </div>
+    </div>
+
+    <!-- Rating Tile -->
+    <div class="subsection">
+      <div class="subsection-title">Rating Tile</div>
+      <div class="component-showcase center">
+        <div class="rating-tile">
+          <div class="rating-tile-header">
+            <span class="rating-tile-label">ELO Rating</span>
+            <span class="live-pill" style="font-size: 9px; padding: 2px 8px;"><span class="live-dot" style="width: 5px; height: 5px;"></span>LIVE</span>
+          </div>
+          <div class="rating-tile-body">
+            <div class="rating-tile-number" id="ratingDisplay">1247</div>
+            <div class="rating-tile-unit">&plusmn;32 tolerance &middot; 17 matches &middot; 90d window</div>
+          </div>
+          <div class="rating-tile-footer">
+            <div class="rating-tile-stat">
+              <div class="rating-tile-stat-label">7d Delta</div>
+              <div class="rating-tile-stat-value" style="color: var(--positive-text);">&#9650;+47</div>
+            </div>
+            <div class="rating-tile-stat">
+              <div class="rating-tile-stat-label">Rank</div>
+              <div class="rating-tile-stat-value">#12</div>
+            </div>
+            <div class="rating-tile-stat">
+              <div class="rating-tile-stat-label">W/L/D</div>
+              <div class="rating-tile-stat-value">12/4/1</div>
+            </div>
+          </div>
+          <div class="rating-tile-bar"></div>
+        </div>
+      </div>
+      <div class="brand-note">
+        The signature component. 96pt JetBrains Mono rating display, unit annotation with tolerance and match context, 3-stat footer, and Signal Red bottom bar. The LIVE pill appears only during active sessions.
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ================================================================
+     SECTION 6: MOTION
+     ================================================================ -->
+<div class="container">
+  <section class="section" id="motion">
+    <div class="section-label">06</div>
+    <div class="section-title">MOTION</div>
+    <div class="section-desc">
+      Motion is functional, never decorative. No spring physics. No glows. No bounce. Every animation serves a data-communication purpose. The easing curve is tuned for precision.
+    </div>
+
+    <div class="motion-grid">
+      <div class="motion-card">
+        <div class="motion-card-title">Rating Tick</div>
+        <div class="motion-card-value">480ms</div>
+        <div class="motion-card-desc">ease-out, no bounce. Old value slides out, new slides in. Color flash (green/red) for 240ms, settle to white.</div>
+      </div>
+      <div class="motion-card">
+        <div class="motion-card-title">Hover</div>
+        <div class="motion-card-value">100ms</div>
+        <div class="motion-card-desc">Instant feedback. Background color shift only.</div>
+      </div>
+      <div class="motion-card">
+        <div class="motion-card-title">Fades</div>
+        <div class="motion-card-value">240ms</div>
+        <div class="motion-card-desc">Theme transitions, panel reveals, content entry.</div>
+      </div>
+      <div class="motion-card">
+        <div class="motion-card-title">LIVE Pulse</div>
+        <div class="motion-card-value">1400ms</div>
+        <div class="motion-card-desc">The only ambient animation. Looping opacity cycle on the green dot.</div>
+      </div>
+      <div class="motion-card">
+        <div class="motion-card-title">Easing</div>
+        <div class="motion-card-value" style="font-size: 14px;">cubic-bezier<br>(0.22, 1, 0.36, 1)</div>
+        <div class="motion-card-desc">Fast attack, controlled settle. No overshoot.</div>
+      </div>
+    </div>
+
+    <!-- Interactive demo -->
+    <div class="subsection">
+      <div class="subsection-title">Rating Tick Demo</div>
+      <div class="component-showcase center">
+        <div class="tick-demo">
+          <div class="tick-number" id="tickNumber">1247</div>
+          <div style="display: flex; gap: 8px;">
+            <button class="tick-btn" onclick="tickUp()">Win +23</button>
+            <button class="tick-btn" onclick="tickDown()">Loss -15</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live pulse demo -->
+    <div class="subsection">
+      <div class="subsection-title">LIVE Pulse</div>
+      <div class="component-showcase center">
+        <div class="pulse-demo">
+          <div class="pulse-ring"></div>
+          <span style="font-family: 'DM Sans', sans-serif; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--positive-text);">1400ms loop, the only ambient animation</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="brand-note">
+      <strong>Motion rule:</strong> No decorative motion. No spring physics. No glows. No particle effects. Motion exists to communicate data changes and confirm interactions.
+    </div>
+  </section>
+</div>
+
+<!-- ================================================================
+     SECTION 7: APP TOKEN MAPPING
+     ================================================================ -->
+<div class="container">
+  <section class="section" id="tokens">
+    <div class="section-label">07</div>
+    <div class="section-title">APP TOKEN MAPPING</div>
+    <div class="section-desc">
+      How brand tokens map to Tailwind CSS custom properties in the app. Both web (Tailwind + shadcn/ui) and mobile (NativeWind v4) consume these identical semantic values.
+    </div>
+
+    <div style="overflow-x: auto;">
+      <table class="token-table">
+        <thead>
+          <tr>
+            <th>Token</th>
+            <th>Dark (Void)</th>
+            <th>Light (Paddock)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="token-name">--background</td>
+            <td><span class="token-swatch" style="background: #0D0F14;"></span>Void #0D0F14</td>
+            <td><span class="token-swatch" style="background: #F2F4F7;"></span>Paddock #F2F4F7</td>
+          </tr>
+          <tr>
+            <td class="token-name">--card</td>
+            <td><span class="token-swatch" style="background: #1A1D24;"></span>Plate #1A1D24</td>
+            <td><span class="token-swatch" style="background: #DEE2E9;"></span>Paddock Plate #DEE2E9</td>
+          </tr>
+          <tr>
+            <td class="token-name">--primary</td>
+            <td><span class="token-swatch" style="background: #E63946;"></span>Signal Red #E63946</td>
+            <td><span class="token-swatch" style="background: #E63946;"></span>Signal Red #E63946</td>
+          </tr>
+          <tr>
+            <td class="token-name">--primary-foreground</td>
+            <td><span class="token-swatch" style="background: #FFFFFF;"></span>#FFFFFF</td>
+            <td><span class="token-swatch" style="background: #FFFFFF;"></span>#FFFFFF</td>
+          </tr>
+          <tr>
+            <td class="token-name">--success</td>
+            <td><span class="token-swatch" style="background: #22C55E;"></span>Gain Green #22C55E</td>
+            <td><span class="token-swatch" style="background: #15803D;"></span>Gain Green Dark #15803D</td>
+          </tr>
+          <tr>
+            <td class="token-name">--destructive</td>
+            <td><span class="token-swatch" style="background: #E63946;"></span>Signal Red #E63946</td>
+            <td><span class="token-swatch" style="background: #C42939;"></span>Signal Red Dark #C42939</td>
+          </tr>
+          <tr>
+            <td class="token-name">--foreground</td>
+            <td><span class="token-swatch" style="background: #E8EDF2;"></span>Terminal White #E8EDF2</td>
+            <td><span class="token-swatch" style="background: #0D0F14;"></span>Void #0D0F14</td>
+          </tr>
+          <tr>
+            <td class="token-name">--muted</td>
+            <td><span class="token-swatch" style="background: #1A1D24;"></span>Plate #1A1D24</td>
+            <td><span class="token-swatch" style="background: #DEE2E9;"></span>Paddock Plate #DEE2E9</td>
+          </tr>
+          <tr>
+            <td class="token-name">--muted-foreground</td>
+            <td><span class="token-swatch" style="background: #9CA3AF;"></span>Data Gray Bright #9CA3AF</td>
+            <td><span class="token-swatch" style="background: #4B5563;"></span>#4B5563</td>
+          </tr>
+          <tr>
+            <td class="token-name">--accent</td>
+            <td><span class="token-swatch" style="background: #242832;"></span>Plate Bright #242832</td>
+            <td><span class="token-swatch" style="background: #D2D7E0;"></span>Paddock Plate Bright #D2D7E0</td>
+          </tr>
+          <tr>
+            <td class="token-name">--border</td>
+            <td><span class="token-swatch" style="background: rgba(107,114,128,0.25);"></span>rgba(107,114,128,0.25)</td>
+            <td><span class="token-swatch" style="background: rgba(13,15,20,0.14);"></span>rgba(13,15,20,0.14)</td>
+          </tr>
+          <tr>
+            <td class="token-name">--radius</td>
+            <td colspan="2" style="text-align: center;">0.25rem (4px)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<!-- ================================================================
+     SECTION 8: ANTI-PATTERNS
+     ================================================================ -->
+<div class="container">
+  <section class="section" id="anti-patterns">
+    <div class="section-label">08</div>
+    <div class="section-title">ANTI-PATTERNS</div>
+    <div class="section-desc">
+      What not to do. These rules keep the system tight and prevent visual entropy. Every violation dilutes the brand and reduces data clarity.
+    </div>
+
+    <ul class="anti-list">
+      <li>
+        <span class="anti-mark">&times;</span>
+        <span><strong>Drop shadows, glows, elevation effects.</strong> Hierarchy comes from value shifts between surface layers, not simulated lighting.</span>
+      </li>
+      <li>
+        <span class="anti-mark">&times;</span>
+        <span><strong>Decorative gradients or motion.</strong> Gradients are reserved for brand hero treatments. Motion serves data communication only.</span>
+      </li>
+      <li>
+        <span class="anti-mark">&times;</span>
+        <span><strong>Rounded pill badges.</strong> Use sharp 2-3px radius. Pill shapes (border-radius: 9999px) are never used on data surfaces or badges.</span>
+      </li>
+      <li>
+        <span class="anti-mark">&times;</span>
+        <span><strong>Rating numbers in anything other than JetBrains Mono.</strong> All numeric data, all the time, no exceptions.</span>
+      </li>
+      <li>
+        <span class="anti-mark">&times;</span>
+        <span><strong>Signal Red as decoration.</strong> Red is reserved for CTAs and state-negative indicators. Never for borders, backgrounds, or ambient color.</span>
+      </li>
+      <li>
+        <span class="anti-mark">&times;</span>
+        <span><strong>Gain Green as decoration.</strong> Green is exclusively for rating increases and win states. Never for "success" toasts or generic positive feedback.</span>
+      </li>
+      <li>
+        <span class="anti-mark">&times;</span>
+        <span><strong>Pure white (#FFFFFF) backgrounds.</strong> Even in Paddock (light theme), the lightest surface is #F2F4F7. Pure white breaks the tonal system.</span>
+      </li>
+      <li>
+        <span class="anti-mark">&times;</span>
+        <span><strong>More than one primary CTA button per surface.</strong> One red button per card, per modal, per visible viewport. If two actions compete, one becomes secondary.</span>
+      </li>
+    </ul>
+  </section>
+</div>
+
+<!-- ================================================================
+     FOOTER
+     ================================================================ -->
+<div class="container">
+  <footer class="doc-footer">
+    ELO RATED <span class="accent">&middot;</span> STYLE GUIDE <span class="accent">&middot;</span> 2026-05-01
+  </footer>
+</div>
+
+<!-- ================================================================
+     SCRIPTS
+     ================================================================ -->
+<script>
+// Theme toggle
+function toggleTheme() {
+  const html = document.documentElement;
+  const btn = document.getElementById('themeToggle');
+  if (html.getAttribute('data-theme') === 'dark') {
+    html.setAttribute('data-theme', 'light');
+    btn.textContent = 'Switch to Void';
+  } else {
+    html.setAttribute('data-theme', 'dark');
+    btn.textContent = 'Switch to Paddock';
+  }
+}
+
+// Rating tick demo
+let currentRating = 1247;
+
+function tickUp() {
+  currentRating += 23;
+  updateTick('flash-green');
+}
+
+function tickDown() {
+  currentRating -= 15;
+  updateTick('flash-red');
+}
+
+function updateTick(flashClass) {
+  const el = document.getElementById('tickNumber');
+  const ratingEl = document.getElementById('ratingDisplay');
+
+  // Remove any existing animation class
+  el.classList.remove('flash-green', 'flash-red');
+
+  // Force reflow
+  void el.offsetWidth;
+
+  // Apply new value and flash
+  el.textContent = currentRating;
+  el.classList.add(flashClass);
+
+  // Also update the rating tile
+  if (ratingEl) {
+    ratingEl.textContent = currentRating;
+  }
+
+  // Remove class after animation
+  setTimeout(function() {
+    el.classList.remove(flashClass);
+  }, 480);
+}
+</script>
+
+</body>
+</html>
