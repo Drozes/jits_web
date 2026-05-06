@@ -466,6 +466,53 @@ export type Database = {
           },
         ]
       }
+      session_templates: {
+        Row: {
+          id: string
+          gym_id: string
+          title: string
+          day_of_week: number
+          start_time: string
+          duration_minutes: number
+          max_participants: number | null
+          notes: string | null
+          is_active: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          gym_id: string
+          title: string
+          day_of_week: number
+          start_time: string
+          duration_minutes: number
+          max_participants?: number | null
+          notes?: string | null
+          is_active?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          gym_id?: string
+          title?: string
+          day_of_week?: number
+          start_time?: string
+          duration_minutes?: number
+          max_participants?: number | null
+          notes?: string | null
+          is_active?: boolean
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_templates_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "gyms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       gyms: {
         Row: {
           address: string | null
@@ -1463,6 +1510,13 @@ export type Database = {
       create_direct_conversation: {
         Args: { p_other_athlete_id: string }
         Returns: Json
+      }
+      create_session_from_template: {
+        Args: {
+          p_template_id: string
+          p_scheduled_start?: string
+        }
+        Returns: string
       }
       create_session: {
         Args: {

@@ -48,6 +48,18 @@ export function formatRelativeTime(iso: string): string {
   });
 }
 
+/** Returns "Today", "Yesterday", or "Earlier" for date grouping in notification feeds. */
+export function getDateGroup(iso: string): "Today" | "Yesterday" | "Earlier" {
+  const date = new Date(iso);
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfYesterday = new Date(startOfToday.getTime() - 86_400_000);
+
+  if (date >= startOfToday) return "Today";
+  if (date >= startOfYesterday) return "Yesterday";
+  return "Earlier";
+}
+
 /** Returns a "Starts in X" hint for upcoming times within 2 hours, or null. */
 export function formatTimeUntil(iso: string): string | null {
   const diffMs = new Date(iso).getTime() - Date.now();

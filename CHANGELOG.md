@@ -2,6 +2,35 @@
 
 ## [Unreleased]
 
+**Phase 6: Gym Manager Onboarding (2026-05-06)**
+
+**Added**
+- Gym creation: any active athlete can create a gym and auto-becomes its first manager (backend trigger + web dialog).
+- Gym profile editing: managers can update gym name/city via edit dialog on web.
+- Session templates: managers can save recurring session configs (day, time, duration, capacity). One-tap "Create Session" from template.
+- Backend migration: `session_templates` table, `gyms_insert_active_athlete` policy, `gyms_update_manager` policy, `auto_add_gym_manager` trigger, `create_session_from_template` RPC.
+- Shared mutations: `createGym`, `updateGym`, `createSessionTemplate`, `updateSessionTemplate`, `deleteSessionTemplate`, `createSessionFromTemplate`.
+- Web components: `create-gym-dialog`, `edit-gym-dialog`, `session-templates`, `template-card`, `template-form-dialog`.
+
+**Phase 9: Notifications + Social (2026-05-06)**
+
+**Added**
+- Push notification preferences: dedicated settings page (web) and screen (mobile) with per-channel toggles (challenges, matches, chat).
+- Notification center: full notification history built from challenges + match results. Web: `/notifications` route with date grouping. Mobile: enhanced bottom sheet panel with grouped feed.
+- Social sharing utilities: `buildShareUrl()` and `buildShareText()` in `@jits/shared/utils/share`.
+- Match result sharing: "Share Result" button on match summary (web + mobile) via native share APIs.
+- Session invite sharing: "Invite" button on session lobby (web + mobile).
+- Existing share-profile sheets migrated to shared utilities and `elorated.com` URLs.
+
+**Changed**
+- Web notification bell now links to `/notifications` page instead of opening a sheet panel.
+- Mobile notification panel rewritten to show full feed (challenges + match results) grouped by date.
+- Web settings page: notification prefs moved to dedicated `/settings/notifications` route.
+
+**Removed**
+- `apps/web/components/domain/notification-panel.tsx` (replaced by notifications page).
+- `apps/mobile/components/notifications/challenge-item.tsx` (replaced by notification-item).
+
 **Phase 7: Mobile Typography + Polish (2026-05-06)**
 
 **Added**

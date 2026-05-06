@@ -13,6 +13,7 @@ import { WaitStep } from "./steps/wait-step";
 interface MatchParticipant {
   athlete_id: string;
   display_name: string;
+  current_elo: number | null;
   current_weight: number | null;
   outcome: string | null;
   elo_delta: number | null;
@@ -139,13 +140,19 @@ export function MatchStepRenderer({
     );
   }
   if (step === "summary") {
+    const eloDelta = matchType === "ranked" ? me.elo_delta ?? null : null;
+    const currentElo =
+      me.current_elo != null && eloDelta != null
+        ? me.current_elo + eloDelta
+        : me.current_elo;
     return (
       <SummaryStep
         sessionId={sessionId}
         matchType={matchType}
         matchStatus={matchStatus}
         outcome={ownOutcome}
-        eloDelta={matchType === "ranked" ? me.elo_delta ?? null : null}
+        eloDelta={eloDelta}
+        currentElo={currentElo}
       />
     );
   }

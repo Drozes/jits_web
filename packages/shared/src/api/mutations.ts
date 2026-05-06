@@ -634,6 +634,166 @@ export async function removePushDevice(
 }
 
 // ---------------------------------------------------------------------------
+// Gym mutations
+// ---------------------------------------------------------------------------
+
+interface CreateGymParams {
+  name: string;
+  city: string;
+}
+
+/** Create a new gym. Returns the new gym ID. */
+export async function createGym(
+  supabase: Client,
+  params: CreateGymParams,
+): Promise<Result<{ id: string }>> {
+  const { data, error } = await supabase
+    .from("gyms")
+    .insert({ name: params.name, city: params.city })
+    .select("id")
+    .single();
+
+  if (error) {
+    return { ok: false, error: mapPostgrestError(error) };
+  }
+  return { ok: true, data: { id: data.id } };
+}
+
+interface UpdateGymParams {
+  name?: string;
+  city?: string;
+}
+
+/** Update gym fields. Only gym managers can update (RLS-enforced). */
+export async function updateGym(
+  supabase: Client,
+  gymId: string,
+  fields: UpdateGymParams,
+): Promise<Result<void>> {
+  const update: Database["public"]["Tables"]["gyms"]["Update"] = {};
+  if (fields.name !== undefined) update.name = fields.name;
+  if (fields.city !== undefined) update.city = fields.city;
+
+  const { error } = await supabase
+    .from("gyms")
+    .update(update)
+    .eq("id", gymId);
+
+  if (error) {
+    return { ok: false, error: mapPostgrestError(error) };
+  }
+  return { ok: true, data: undefined };
+}
+
+// ---------------------------------------------------------------------------
+// Session template mutations
+// ---------------------------------------------------------------------------
+
+interface CreateSessionTemplateParams {
+  gymId: string;
+  title: string;
+  dayOfWeek: number;
+  startTime: string;
+  durationMinutes: number;
+  maxParticipants?: number | null;
+  notes?: string | null;
+}
+
+/** Create a new session template for a gym. */
+export async function createSessionTemplate(
+  supabase: Client,
+  params: CreateSessionTemplateParams,
+): Promise<Result<{ id: string }>> {
+  const { data, error } = await supabase
+    .from("session_templates")
+    .insert({
+      gym_id: params.gymId,
+      title: params.title,
+      day_of_week: params.dayOfWeek,
+      start_time: params.startTime,
+      duration_minutes: params.durationMinutes,
+      max_participants: params.maxParticipants,
+      notes: params.notes,
+    })
+    .select("id")
+    .single();
+
+  if (error) {
+    return { ok: false, error: mapPostgrestError(error) };
+  }
+  return { ok: true, data: { id: data.id } };
+}
+
+interface UpdateSessionTemplateParams {
+  title?: string;
+  dayOfWeek?: number;
+  startTime?: string;
+  durationMinutes?: number;
+  maxParticipants?: number | null;
+  notes?: string | null;
+  isActive?: boolean;
+}
+
+/** Update a session template. */
+export async function updateSessionTemplate(
+  supabase: Client,
+  templateId: string,
+  fields: UpdateSessionTemplateParams,
+): Promise<Result<void>> {
+  const update: Database["public"]["Tables"]["session_templates"]["Update"] = {};
+  if (fields.title !== undefined) update.title = fields.title;
+  if (fields.dayOfWeek !== undefined) update.day_of_week = fields.dayOfWeek;
+  if (fields.startTime !== undefined) update.start_time = fields.startTime;
+  if (fields.durationMinutes !== undefined) update.duration_minutes = fields.durationMinutes;
+  if (fields.maxParticipants !== undefined) update.max_participants = fields.maxParticipants;
+  if (fields.notes !== undefined) update.notes = fields.notes;
+  if (fields.isActive !== undefined) update.is_active = fields.isActive;
+
+  const { error } = await supabase
+    .from("session_templates")
+    .update(update)
+    .eq("id", templateId);
+
+  if (error) {
+    return { ok: false, error: mapPostgrestError(error) };
+  }
+  return { ok: true, data: undefined };
+}
+
+/** Delete a session template. */
+export async function deleteSessionTemplate(
+  supabase: Client,
+  templateId: string,
+): Promise<Result<void>> {
+  const { error } = await supabase
+    .from("session_templates")
+    .delete()
+    .eq("id", templateId);
+
+  if (error) {
+    return { ok: false, error: mapPostgrestError(error) };
+  }
+  return { ok: true, data: undefined };
+}
+
+/** Create a live session from a template via RPC. */
+export async function createSessionFromTemplate(
+  supabase: Client,
+  templateId: string,
+  scheduledStart?: string,
+): Promise<Result<{ id: string }>> {
+  const { data, error } = await supabase.rpc("create_session_from_template", {
+    p_template_id: templateId,
+    ...(scheduledStart ? { p_scheduled_start: scheduledStart } : {}),
+  });
+
+  if (error) {
+    return { ok: false, error: mapPostgrestError(error) };
+  }
+  return { ok: true, data: { id: data } };
+}
+
+// ---------------------------------------------------------------------------
 // Notification preferences
 // ---------------------------------------------------------------------------
 

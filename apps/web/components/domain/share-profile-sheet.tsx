@@ -12,6 +12,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { EloBadge } from "@/components/domain/elo-badge";
 import { Share2, Copy, Check, Info } from "lucide-react";
+import { buildShareUrl, buildShareText } from "@jits/shared/utils";
 
 interface ShareProfileSheetProps {
   athlete: {
@@ -31,10 +32,8 @@ export function ShareProfileSheet({
   children,
 }: ShareProfileSheetProps) {
   const [copied, setCopied] = useState(false);
-  const profileUrl =
-    typeof window !== "undefined"
-      ? `${window.location.origin}/athlete/${athlete.id}`
-      : `/athlete/${athlete.id}`;
+  const profileUrl = buildShareUrl("athlete", athlete.id);
+  const shareText = buildShareText({ type: "athlete", data: { displayName: athlete.displayName } });
 
   async function handleCopy() {
     await navigator.clipboard.writeText(profileUrl);
@@ -46,7 +45,7 @@ export function ShareProfileSheet({
     if (navigator.share) {
       await navigator.share({
         title: `${athlete.displayName} on ELO RATED`,
-        text: `Check out ${athlete.displayName}'s profile on ELO RATED`,
+        text: shareText,
         url: profileUrl,
       });
     }

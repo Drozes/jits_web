@@ -3,11 +3,12 @@ import {
   ActivityIndicator,
   RefreshControl,
   ScrollView,
+  Share,
   Text,
   View,
 } from "react-native";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
-import { Shuffle } from "lucide-react-native";
+import { Shuffle, UserPlus } from "lucide-react-native";
 import { useRequireAthlete } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { supabase } from "@/lib/supabase/client";
@@ -23,6 +24,7 @@ import {
   createInSessionMatch,
   requestRandomMatch,
 } from "@jits/shared/api/mutations";
+import { buildShareUrl, buildShareText } from "@jits/shared/utils";
 import type { LobbyParticipant } from "@jits/shared/types/session";
 
 export default function SessionLobbyScreen() {
@@ -96,6 +98,17 @@ export default function SessionLobbyScreen() {
     router.push(`/session/${id}/match/${result.data.matchId}`);
   }
 
+  async function handleInvite() {
+    const gymName = data?.gymName ?? "a gym";
+    const url = buildShareUrl("session", id);
+    const text = buildShareText({ type: "session", data: { gymName } });
+    try {
+      await Share.share({ title: "Join my session on ELO RATED", message: `${text}\n${url}`, url });
+    } catch {
+      toast.error("Could not share invite");
+    }
+  }
+
   if (authLoading || isLoading) {
     return (
       <>
@@ -139,7 +152,17 @@ export default function SessionLobbyScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={tokens.primary} />
         }
       >
-        <LobbyHeader gymName={data.gymName} activeCount={visibleParticipants.length} />
+        <View className="flex-row items-center justify-between">
+          <LobbyHeader gymName={data.gymName} activeCount={visibleParticipants.length} />
+          <Button
+            variant="outline"
+            size="sm"
+            onPress={handleInvite}
+            leftIcon={<UserPlus size={14} color={tokens.foreground} />}
+          >
+            Invite
+          </Button>
+        </View>
 
         {visibleParticipants.length === 0 ? (
           <Text className="py-8 text-center text-sm text-muted-foreground">

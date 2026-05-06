@@ -66,6 +66,6 @@ export function MatchFlowWizard(props: MatchFlowWizardProps) {
     case "match-summary":
       return <MatchSummaryStep onNext={handleNext} matchId={matchId} matchType={matchType} matchStatus={matchStatus} currentAthleteId={currentAthlete.id} opponent={opponent} resultData={resultRef.current} />;
     case "match-recorded":
-      return <MatchRecordedStep sessionId={sessionId} matchId={matchId} />;
+      return <MatchRecordedStep sessionId={sessionId} matchId={matchId} currentAthleteId={currentAthlete.id} resultData={resultRef.current} />;
   }
 }

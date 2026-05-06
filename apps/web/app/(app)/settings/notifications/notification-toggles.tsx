@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import { updateNotificationPreferences } from "@jits/shared/api/mutations";
 import type { NotificationPrefs } from "@jits/shared/api/mutations";
 
-interface NotificationPreferencesProps {
+interface Props {
   athleteId: string;
   initialPrefs: NotificationPrefs;
 }
@@ -39,10 +39,7 @@ const TOGGLES: {
   },
 ];
 
-export function NotificationPreferences({
-  athleteId,
-  initialPrefs,
-}: NotificationPreferencesProps) {
+export function NotificationToggles({ athleteId, initialPrefs }: Props) {
   const [prefs, setPrefs] = useState(initialPrefs);
 
   async function handleToggle(key: keyof NotificationPrefs) {
@@ -78,6 +75,10 @@ export function NotificationPreferences({
           ))}
         </CardContent>
       </Card>
+      <p className="text-xs text-muted-foreground mt-3">
+        Changes are saved automatically. You can also manage notifications
+        through your device or browser settings.
+      </p>
     </section>
   );
 }

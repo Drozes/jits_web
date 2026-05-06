@@ -9,6 +9,32 @@ export type SessionInsert = TablesInsert<"sessions">;
 export type SessionParticipant = Tables<"session_participants">;
 export type SessionRsvp = Tables<"session_rsvps">;
 
+/** Session template for recurring sessions at a gym */
+export interface SessionTemplate {
+  id: string;
+  gym_id: string;
+  title: string;
+  day_of_week: number;
+  start_time: string;
+  duration_minutes: number;
+  max_participants: number | null;
+  notes: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+/** Params for creating a new gym */
+export interface CreateGymParams {
+  name: string;
+  city: string;
+}
+
+/** Params for updating an existing gym */
+export interface UpdateGymParams {
+  name?: string;
+  city?: string;
+}
+
 /** Shape returned by getGymsWithSessions query */
 export interface GymListItem {
   id: string;

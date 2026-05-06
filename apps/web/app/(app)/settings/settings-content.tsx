@@ -1,28 +1,15 @@
 import Link from "next/link";
-import { requireAthlete } from "@/lib/guards";
-import { createClient } from "@/lib/supabase/server";
-import { NotificationPreferences } from "./notification-preferences";
-import { ChevronRight, Video, MessageSquare, HelpCircle } from "lucide-react";
+import { ChevronRight, Bell, Video, MessageSquare, HelpCircle } from "lucide-react";
 
-export async function SettingsContent() {
-  const { athlete } = await requireAthlete();
-  const supabase = await createClient();
-
-  const { data } = await supabase
-    .from("notification_preferences")
-    .select("enable_challenges, enable_chat, enable_matches")
-    .eq("athlete_id", athlete.id)
-    .maybeSingle();
-
-  const prefs = {
-    enable_challenges: data?.enable_challenges ?? true,
-    enable_chat: data?.enable_chat ?? true,
-    enable_matches: data?.enable_matches ?? true,
-  };
-
+export function SettingsContent() {
   return (
     <div className="flex flex-col gap-6 animate-page-in">
-      <NotificationPreferences athleteId={athlete.id} initialPrefs={prefs} />
+      <div className="flex flex-col gap-2">
+        <h3 className="text-sm font-medium text-muted-foreground">Notifications</h3>
+        <div className="flex flex-col gap-1">
+          <SettingsLink href="/settings/notifications" icon={Bell} label="Notification Preferences" />
+        </div>
+      </div>
 
       <div className="flex flex-col gap-2">
         <h3 className="text-sm font-medium text-muted-foreground">General</h3>

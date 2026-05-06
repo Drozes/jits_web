@@ -17,7 +17,9 @@ import type {
   SessionJoinData,
   SessionLobbyData,
   LobbyParticipant,
+  SessionTemplate,
 } from "../types/session";
+import type { NotificationItem } from "../types/notification";
 import { mapPostgrestError, type DomainError } from "./errors";
 
 type Client = SupabaseClient<Database>;
@@ -906,6 +908,29 @@ export async function getSessionLobbyData(
 }
 
 // ---------------------------------------------------------------------------
+// Session templates
+// ---------------------------------------------------------------------------
+
+/** Fetch session templates for a gym, ordered by day of week then start time */
+export async function getSessionTemplates(
+  supabase: Client,
+  gymId: string,
+): Promise<SessionTemplate[]> {
+  const { data, error } = await supabase
+    .from("session_templates")
+    .select("*")
+    .eq("gym_id", gymId)
+    .order("day_of_week")
+    .order("start_time");
+
+  if (error) {
+    console.error("getSessionTemplates:", error);
+    return [];
+  }
+  return (data as SessionTemplate[]) ?? [];
+}
+
+// ---------------------------------------------------------------------------
 // Challenge lobby
 // ---------------------------------------------------------------------------
 
@@ -938,4 +963,151 @@ export async function getLobbyData(
   const gym = (data.gym as unknown as LobbyData["gym"]) ?? null;
 
   return { ...data, challenger, opponent, gym };
+}
+
+// ---------------------------------------------------------------------------
+// Notification history (built from challenges + match history, no new table)
+// ---------------------------------------------------------------------------
+
+/**
+ * Build a unified notification feed from existing tables:
+ * 1. Challenges involving the athlete (received: pending/accepted/declined)
+ * 2. Completed matches from get_match_history RPC
+ *
+ * Returns items sorted newest-first, capped at `limit`.
+ */
+export async function getNotificationHistory(
+  supabase: Client,
+  athleteId: string,
+  limit = 30,
+): Promise<NotificationItem[]> {
+  const [challengeItems, matchItems] = await Promise.all([
+    fetchChallengeNotifications(supabase, athleteId),
+    fetchMatchNotifications(supabase, athleteId),
+  ]);
+
+  const all = [...challengeItems, ...matchItems];
+  all.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  return all.slice(0, limit);
+}
+
+async function fetchChallengeNotifications(
+  supabase: Client,
+  athleteId: string,
+): Promise<NotificationItem[]> {
+  // Received challenges (pending, accepted, declined)
+  const { data: received } = await supabase
+    .from("challenges")
+    .select(
+      "id, status, match_type, created_at, updated_at, challenger:athletes!fk_challenges_challenger(display_name)",
+    )
+    .eq("opponent_id", athleteId)
+    .in("status", ["pending", "accepted", "declined"])
+    .order("updated_at", { ascending: false })
+    .limit(20);
+
+  // Sent challenges that were accepted or declined
+  const { data: sent } = await supabase
+    .from("challenges")
+    .select(
+      "id, status, match_type, created_at, updated_at, opponent:athletes!fk_challenges_opponent(display_name)",
+    )
+    .eq("challenger_id", athleteId)
+    .in("status", ["accepted", "declined"])
+    .order("updated_at", { ascending: false })
+    .limit(20);
+
+  const items: NotificationItem[] = [];
+
+  for (const c of received ?? []) {
+    const name = (c.challenger as unknown as { display_name: string } | null)?.display_name ?? "Unknown";
+    const typeLabel = c.match_type === "ranked" ? "Ranked" : "Casual";
+
+    if (c.status === "pending") {
+      items.push({
+        id: `challenge-recv-${c.id}`,
+        type: "challenge_received",
+        title: "Challenge Received",
+        body: `${name} sent you a ${typeLabel.toLowerCase()} challenge`,
+        createdAt: c.created_at,
+      });
+    } else if (c.status === "accepted") {
+      items.push({
+        id: `challenge-accepted-${c.id}`,
+        type: "challenge_accepted",
+        title: "Challenge Accepted",
+        body: `You accepted ${name}'s ${typeLabel.toLowerCase()} challenge`,
+        createdAt: c.updated_at,
+      });
+    } else if (c.status === "declined") {
+      items.push({
+        id: `challenge-declined-recv-${c.id}`,
+        type: "challenge_declined",
+        title: "Challenge Declined",
+        body: `You declined ${name}'s ${typeLabel.toLowerCase()} challenge`,
+        createdAt: c.updated_at,
+      });
+    }
+  }
+
+  for (const c of sent ?? []) {
+    const name = (c.opponent as unknown as { display_name: string } | null)?.display_name ?? "Unknown";
+    const typeLabel = c.match_type === "ranked" ? "Ranked" : "Casual";
+
+    if (c.status === "accepted") {
+      items.push({
+        id: `challenge-sent-accepted-${c.id}`,
+        type: "challenge_accepted",
+        title: "Challenge Accepted",
+        body: `${name} accepted your ${typeLabel.toLowerCase()} challenge`,
+        createdAt: c.updated_at,
+      });
+    } else if (c.status === "declined") {
+      items.push({
+        id: `challenge-sent-declined-${c.id}`,
+        type: "challenge_declined",
+        title: "Challenge Declined",
+        body: `${name} declined your ${typeLabel.toLowerCase()} challenge`,
+        createdAt: c.updated_at,
+      });
+    }
+  }
+
+  return items;
+}
+
+async function fetchMatchNotifications(
+  supabase: Client,
+  athleteId: string,
+): Promise<NotificationItem[]> {
+  const { data, error } = await supabase.rpc("get_match_history", {
+    p_athlete_id: athleteId,
+  });
+
+  if (error || !data) return [];
+
+  const rows = data as MatchHistoryRow[];
+  return rows.slice(0, 20).map((m) => {
+    const outcome = m.athlete_outcome;
+    const delta = m.elo_delta;
+    const sign = delta >= 0 ? "+" : "";
+    let body: string;
+
+    if (outcome === "win") {
+      body = `You defeated ${m.opponent_display_name} (${sign}${delta} ELO)`;
+    } else if (outcome === "loss") {
+      body = `${m.opponent_display_name} defeated you (${sign}${delta} ELO)`;
+    } else {
+      body = `Draw with ${m.opponent_display_name} (${sign}${delta} ELO)`;
+    }
+
+    return {
+      id: `match-${m.match_id}`,
+      type: "match_result" as const,
+      title: outcome === "win" ? "Match Won" : outcome === "loss" ? "Match Lost" : "Match Draw",
+      body,
+      route: `/session/${m.match_id}`,
+      createdAt: m.completed_at,
+    };
+  });
 }

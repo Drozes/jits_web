@@ -6,6 +6,7 @@ import { Button } from "./ui/button";
 import { EloBadge } from "./elo-badge";
 import { Info, Share2 } from "lucide-react-native";
 import { toast } from "./ui/toast";
+import { buildShareUrl, buildShareText } from "@jits/shared/utils";
 
 interface ShareProfileSheetProps {
   athlete: {
@@ -20,23 +21,15 @@ interface ShareProfileSheetProps {
   children: React.ReactElement;
 }
 
-/**
- * Builds the shareable profile URL. Uses a fixed `https://jits.app` host so
- * shared links resolve via web during the alpha period (deep-linking comes
- * later).
- */
-function profileUrl(athleteId: string) {
-  return `https://jits.app/athlete/${athleteId}`;
-}
-
 export function ShareProfileSheet({ athlete, children }: ShareProfileSheetProps) {
-  const url = profileUrl(athlete.id);
+  const url = buildShareUrl("athlete", athlete.id);
+  const text = buildShareText({ type: "athlete", data: { displayName: athlete.displayName } });
 
   async function handleShare() {
     try {
       await Share.share({
         title: `${athlete.displayName} on ELO RATED`,
-        message: `Check out ${athlete.displayName}'s profile on ELO RATED: ${url}`,
+        message: `${text}: ${url}`,
         url,
       });
     } catch (err) {

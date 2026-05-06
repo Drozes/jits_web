@@ -1,10 +1,13 @@
 import * as React from "react";
-import { Text, View } from "react-native";
+import { Share, Text, View } from "react-native";
 import { useRouter } from "expo-router";
-import { CheckCircle2 } from "lucide-react-native";
+import { CheckCircle2, Share2 } from "lucide-react-native";
 import { Button } from "@/components/ui/button";
+import { toast } from "@/components/ui/toast";
 import { useThemedTokens } from "@/lib/theme/use-theme";
+import { useAuth } from "@/lib/auth/hooks";
 import { cn } from "@/lib/cn";
+import { buildShareUrl, buildShareText } from "@jits/shared/utils";
 
 interface SummaryStepProps {
   sessionId: string;
@@ -14,6 +17,8 @@ interface SummaryStepProps {
   outcome: "win" | "loss" | "draw" | null;
   /** Own ELO delta (signed). 0 / undefined for casual matches. */
   eloDelta: number | null;
+  /** Current ELO after the match. */
+  currentElo?: number | null;
 }
 
 /**
@@ -24,8 +29,23 @@ interface SummaryStepProps {
 export function SummaryStep(props: SummaryStepProps) {
   const tokens = useThemedTokens();
   const router = useRouter();
-  const { sessionId, matchType, matchStatus, outcome, eloDelta } = props;
+  const { athlete } = useAuth();
+  const { sessionId, matchType, matchStatus, outcome, eloDelta, currentElo } = props;
   const disputed = matchStatus === "disputed";
+
+  async function handleShareResult() {
+    if (!outcome || !athlete) return;
+    const url = buildShareUrl("athlete", athlete.id);
+    const text = buildShareText({
+      type: "match-result",
+      data: { outcome, elo: currentElo, eloDelta },
+    });
+    try {
+      await Share.share({ title: "ELO RATED Match Result", message: `${text}\n${url}`, url });
+    } catch {
+      toast.error("Could not share result");
+    }
+  }
 
   return (
     <View className="items-center gap-5 px-1 py-8">
@@ -55,14 +75,20 @@ export function SummaryStep(props: SummaryStepProps) {
         ) : null}
       </View>
       <View className="w-full gap-3 pt-2">
+        {outcome && !disputed ? (
+          <Button
+            variant="secondary"
+            size="lg"
+            onPress={handleShareResult}
+            leftIcon={<Share2 size={16} color={tokens.secondaryForeground} />}
+          >
+            Share Result
+          </Button>
+        ) : null}
         <Button size="lg" onPress={() => router.replace(`/(app)/session/${sessionId}/lobby`)}>
           Back to Lobby
         </Button>
-        <Button
-          variant="outline"
-          size="lg"
-          onPress={() => router.replace("/")}
-        >
+        <Button variant="outline" size="lg" onPress={() => router.replace("/")}>
           Done
         </Button>
       </View>

@@ -18,10 +18,9 @@ import {
 } from "lucide-react-native";
 import { useAuth, useRequireAthlete } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
-import { Card, CardContent } from "@/components/ui/card";
 
 export default function SettingsScreen() {
-  const { athlete, signOut } = useAuth();
+  const { signOut } = useAuth();
   useRequireAthlete();
   const router = useRouter();
   const tokens = useThemedTokens();
@@ -48,22 +47,11 @@ export default function SettingsScreen() {
       <Text className="text-2xl font-heading text-foreground">Settings</Text>
 
       <Section title="Notifications">
-        <Card>
-          <CardContent className="p-3">
-            <View className="flex-row items-center gap-3">
-              <Bell size={16} color={tokens.mutedForeground} />
-              <View className="flex-1">
-                <Text className="text-sm text-foreground">
-                  Push notifications
-                </Text>
-                <Text className="text-xs text-muted-foreground">
-                  Individual notification preferences are being finalized. Use
-                  your device settings to manage notifications.
-                </Text>
-              </View>
-            </View>
-          </CardContent>
-        </Card>
+        <SettingsLink
+          href="/settings/notifications"
+          icon={<Bell size={16} color={tokens.mutedForeground} />}
+          label="Notification Preferences"
+        />
       </Section>
 
       <Section title="General">
@@ -144,6 +132,7 @@ function Section({
 }
 
 type SettingsRoute =
+  | "/settings/notifications"
   | "/settings/video"
   | "/settings/feedback"
   | "/settings/help";
