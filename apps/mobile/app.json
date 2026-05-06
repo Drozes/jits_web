@@ -1,9 +1,9 @@
 {
   "expo": {
     "name": "ELO RATED",
-    "slug": "jits",
+    "slug": "elo-rated",
     "version": "0.1.0",
-    "scheme": "jits",
+    "scheme": ["elorated"],
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -22,7 +22,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.jits.mobile",
+      "bundleIdentifier": "com.elorated.mobile",
       "buildNumber": "1",
       "infoPlist": {
         "UIBackgroundModes": [
@@ -32,11 +32,11 @@
         "NSMicrophoneUsageDescription": "Allow $(PRODUCT_NAME) to use your microphone so your match recordings include audio."
       },
       "associatedDomains": [
-        "applinks:jits.app"
+        "applinks:elorated.com"
       ]
     },
     "android": {
-      "package": "com.jits.mobile",
+      "package": "com.elorated.mobile",
       "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
@@ -55,12 +55,12 @@
           "data": [
             {
               "scheme": "https",
-              "host": "jits.app",
+              "host": "elorated.com",
               "pathPrefix": "/athlete"
             },
             {
               "scheme": "https",
-              "host": "jits.app",
+              "host": "elorated.com",
               "pathPrefix": "/session"
             }
           ],
@@ -104,6 +104,13 @@
           "cameraPermission": "Allow $(PRODUCT_NAME) to use your camera so you can record your matches.",
           "microphonePermission": "Allow $(PRODUCT_NAME) to use your microphone so your match recordings include audio.",
           "recordAudioAndroid": true
+        }
+      ],
+      [
+        "@sentry/react-native/expo",
+        {
+          "organization": "PLACEHOLDER_ORG",
+          "project": "PLACEHOLDER_PROJECT"
         }
       ]
     ],

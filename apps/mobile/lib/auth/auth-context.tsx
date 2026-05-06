@@ -101,12 +101,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const resetPassword = React.useCallback(async (email: string) => {
     // Phase 5 B1: deep-link handler exists -- forward the reset email back
-    // into the app via the `jits://reset-password` custom scheme. The
+    // into the app via the `elorated://reset-password` custom scheme. The
     // dedicated reset-password screen is deferred (handler currently routes
-    // the token to /login). Universal-link flavor (`https://jits.app/...`)
+    // the token to /login). Universal-link flavor (`https://elorated.com/...`)
     // is wired in app.json but requires AASA / assetlinks.json hosting.
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: "jits://reset-password",
+      redirectTo: "elorated://reset-password",
     });
     return { error: error ? { message: error.message } : null };
   }, []);

@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+**Alpha Build Phase 1: Infrastructure (2026-05-06)**
+
+**Added**
+- GitHub Actions CI/CD pipeline (`.github/workflows/ci.yml`): typecheck, test, build-web, and bundle-mobile jobs on push/PR.
+- Sentry error tracking wired for mobile: `apps/mobile/lib/error-tracking/sentry.ts` with guarded init, error boundary forwarding, and `@sentry/react-native/expo` config plugin.
+- Multi-environment configuration: `docs/environment-setup.md` covering development/staging/production Supabase project isolation.
+- Web `.env.example` with full variable list (`apps/web/.env.example`).
+
+**Changed**
+- App identity updated to ELO RATED: bundle ID `com.elorated.mobile`, slug `elo-rated`, scheme `elorated://`, associated domains `elorated.com`.
+- Deep link handler and auth redirect updated from `jits://` to `elorated://`.
+- Mobile `.env.example` updated with `EXPO_PUBLIC_APP_ENV` and `EXPO_PUBLIC_SENTRY_DSN`.
+
 **Fixed**
 - Supabase realtime "Cannot add 'postgres_changes' callbacks after 'subscribe'" error caused by async `removeChannel` race with React 19 Strict Mode effect re-firing. Added unique mount-ID channel names to all affected hooks: `use-pending-challenges` (shared), `use-global-notifications` (shared), `use-session-lobby-realtime` (web), `use-chat-channel` (web), `use-online-presence` (mobile).
 - `joinSessionLobby` now uses upsert instead of insert, preventing 23505 duplicate key errors when re-joining a session (`packages/shared/src/api/mutations.ts`).

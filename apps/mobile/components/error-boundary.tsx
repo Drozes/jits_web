@@ -1,6 +1,7 @@
 import * as React from "react";
 import { Pressable, Text, View } from "react-native";
 import { useAuth } from "@/lib/auth/hooks";
+import { captureException } from "@/lib/error-tracking/sentry";
 
 /**
  * Root error boundary. Catches uncaught render errors anywhere below it and
@@ -25,6 +26,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo): void {
+    captureException(error, { componentStack: info.componentStack ?? "" });
     if (__DEV__) {
       // eslint-disable-next-line no-console
       console.error("[ErrorBoundary]", error, info.componentStack);

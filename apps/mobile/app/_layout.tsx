@@ -1,4 +1,5 @@
 import "../global.css";
+import { initSentry } from "@/lib/error-tracking/sentry";
 import { Stack } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -26,6 +27,10 @@ import { OnlinePresenceBootstrap } from "@/lib/presence/online-presence-bootstra
 import { ErrorBoundary } from "@/components/error-boundary";
 import { OfflineBanner } from "@/components/offline-banner";
 import { DeepLinkBootstrap } from "@/lib/deep-links/handler";
+
+// Initialize Sentry before any component renders.
+// No-ops when EXPO_PUBLIC_SENTRY_DSN is not set.
+initSentry();
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({

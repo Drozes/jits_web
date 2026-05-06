@@ -3,8 +3,8 @@ import * as Linking from "expo-linking";
 import { router } from "expo-router";
 
 /**
- * Central deep link handler. Parses incoming `jits://...` (custom scheme)
- * and `https://jits.app/...` (universal/app links) URLs and routes them to
+ * Central deep link handler. Parses incoming `elorated://...` (custom scheme)
+ * and `https://elorated.com/...` (universal/app links) URLs and routes them to
  * the appropriate screen via Expo Router.
  *
  * Mounted via `<DeepLinkBootstrap />` in `_layout.tsx`. The bootstrap
@@ -18,8 +18,8 @@ import { router } from "expo-router";
  *   athlete/:id                -> /(app)/athlete/:id
  *   session/:id                -> /(app)/session/:id/lobby
  *
- * Universal link host: `jits.app`. Domain verification (AASA on iOS,
- * `assetlinks.json` on Android) is a B2/DevOps task. The custom `jits://`
+ * Universal link host: `elorated.com`. Domain verification (AASA on iOS,
+ * `assetlinks.json` on Android) is a B2/DevOps task. The custom `elorated://`
  * scheme works without verification.
  */
 
