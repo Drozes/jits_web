@@ -12,13 +12,18 @@ export async function SessionLobbyContent({
   const { id: sessionId } = await paramsPromise;
   const { athlete } = await requireSessionParticipant(sessionId);
   const supabase = await createClient();
-  const lobbyData = await getSessionLobbyData(supabase, sessionId);
+  const lobbyResult = await getSessionLobbyData(supabase, sessionId);
 
-  if (!lobbyData) {
-    return <SessionUnavailable reason="not-found" />;
+  if (!lobbyResult.ok) {
+    return (
+      <SessionUnavailable
+        reason={lobbyResult.error.code === "SESSION_NOT_FOUND" ? "not-found" : "ended"}
+      />
+    );
   }
 
-  if (lobbyData.status !== "active") {
+  const lobbyData = lobbyResult.data;
+  if (lobbyData.status !== "active" && lobbyData.status !== "scheduled") {
     return <SessionUnavailable reason="ended" />;
   }
 

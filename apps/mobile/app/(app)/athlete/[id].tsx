@@ -12,7 +12,6 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { ArrowLeft, BarChart3, Swords } from "lucide-react-native";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { CompareStatsModal, type HeadToHeadMatch } from "@/components/compare-stats-modal";
 import { useRequireAthlete } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
@@ -158,18 +157,6 @@ function ProfileHeader({
           <Text className="text-2xl font-bold tabular-nums text-amber-500">{stats.draws}</Text>
           <Text className="text-xs text-muted-foreground">Draws</Text>
         </View>
-      </View>
-      <View className="flex-row gap-2 mt-2">
-        {athlete.looking_for_ranked ? (
-          <Badge variant="default">
-            <Text className="text-[10px] font-semibold text-primary-foreground">Ranked</Text>
-          </Badge>
-        ) : null}
-        {athlete.looking_for_casual ? (
-          <Badge variant="secondary">
-            <Text className="text-[10px] font-semibold text-secondary-foreground">Casual</Text>
-          </Badge>
-        ) : null}
       </View>
     </Card>
   );

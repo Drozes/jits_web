@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "JITS",
+    "name": "ELO RATED",
     "slug": "jits",
     "version": "0.1.0",
     "scheme": "jits",
@@ -105,8 +105,7 @@
           "microphonePermission": "Allow $(PRODUCT_NAME) to use your microphone so your match recordings include audio.",
           "recordAudioAndroid": true
         }
-      ],
-      "@sentry/react-native"
+      ]
     ],
     "extra": {
       "eas": {

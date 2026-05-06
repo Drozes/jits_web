@@ -7,8 +7,6 @@ import type { Athlete } from "@jits/shared/types/athlete";
 interface ProfileHeaderProps {
   athlete: Athlete;
   gymName?: string | null;
-  lookingForCasual?: boolean;
-  lookingForRanked?: boolean;
   stats: {
     wins: number;
     losses: number;
@@ -16,9 +14,8 @@ interface ProfileHeaderProps {
   };
 }
 
-export function ProfileHeader({ athlete, gymName, lookingForCasual, lookingForRanked, stats }: ProfileHeaderProps) {
+export function ProfileHeader({ athlete, gymName, stats }: ProfileHeaderProps) {
   const metaParts = [gymName, athlete.current_weight ? `${athlete.current_weight} lbs` : null].filter(Boolean);
-  const lookingFor = [lookingForCasual && "Casual", lookingForRanked && "Ranked"].filter(Boolean).join(" & ");
 
   return (
     <section className="flex flex-col items-center text-center">
@@ -59,16 +56,6 @@ export function ProfileHeader({ athlete, gymName, lookingForCasual, lookingForRa
         <p className="mt-2 text-sm text-muted-foreground truncate max-w-full">
           {metaParts.join(" · ")}
         </p>
-      )}
-
-      {/* Looking-for badge */}
-      {lookingFor && (
-        <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-green-500/10 px-3 py-1.5 border border-green-500/20">
-          <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-          <span className="text-xs font-medium text-green-600">
-            Open to {lookingFor}
-          </span>
-        </div>
       )}
 
       {/* Stats */}

@@ -12,19 +12,7 @@ import {
 } from "@/components/ui/select";
 import { ProfilePhotoUpload } from "@/components/profile/profile-photo-upload";
 import type { WizardValues } from "../setup-wizard";
-
-function isAtLeast16(dateOfBirth: string) {
-  const dob = new Date(dateOfBirth);
-  const now = new Date();
-  const age =
-    now.getFullYear() -
-    dob.getFullYear() -
-    (now.getMonth() < dob.getMonth() ||
-    (now.getMonth() === dob.getMonth() && now.getDate() < dob.getDate())
-      ? 1
-      : 0);
-  return age >= 16;
-}
+import { DateOfBirthPicker, isAtLeast16 } from "./date-of-birth-picker";
 
 interface IdentityStepProps {
   values: WizardValues;
@@ -86,18 +74,10 @@ export function IdentityStep({
         <p className="text-xs text-muted-foreground">Used for competition brackets.</p>
       </div>
 
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="dateOfBirth">Date of Birth</Label>
-        <Input
-          id="dateOfBirth"
-          type="date"
-          value={values.dateOfBirth}
-          onChange={(e) => onChange({ dateOfBirth: e.target.value })}
-        />
-        <p className="text-xs text-muted-foreground">
-          You must be at least 16 to compete.
-        </p>
-      </div>
+      <DateOfBirthPicker
+        value={values.dateOfBirth}
+        onChange={(dateOfBirth) => onChange({ dateOfBirth })}
+      />
 
       <Button type="button" onClick={onNext} disabled={!canContinue}>
         Continue

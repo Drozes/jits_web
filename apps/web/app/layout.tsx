@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import localFont from "next/font/local";
+import { Bebas_Neue, DM_Sans, Inter, JetBrains_Mono } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
@@ -10,12 +10,12 @@ const defaultUrl = process.env.VERCEL_URL
 
 export const metadata: Metadata = {
   metadataBase: new URL(defaultUrl),
-  title: "Jits Arena",
+  title: "ELO RATED",
   description: "Track your jiu-jitsu journey",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Jits Arena",
+    title: "ELO RATED",
   },
 };
 
@@ -28,11 +28,10 @@ export const viewport: Viewport = {
   themeColor: "#dc2626",
 };
 
-const geistSans = localFont({
-  src: "../../../node_modules/geist/dist/fonts/geist-sans/Geist-Variable.woff2",
-  variable: "--font-geist-sans",
-  display: "swap",
-});
+const bebasNeue = Bebas_Neue({ weight: '400', subsets: ['latin'], variable: '--font-display' });
+const dmSans = DM_Sans({ weight: ['400', '500', '700'], subsets: ['latin'], variable: '--font-heading' });
+const inter = Inter({ subsets: ['latin'], variable: '--font-body' });
+const jetbrainsMono = JetBrains_Mono({ weight: ['400', '500', '700'], subsets: ['latin'], variable: '--font-mono' });
 
 export default function RootLayout({
   children,
@@ -41,7 +40,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${geistSans.className} antialiased`}>
+      <body className={`${inter.className} ${bebasNeue.variable} ${dmSans.variable} ${inter.variable} ${jetbrainsMono.variable} antialiased`}>
         <ThemeProvider
           attribute="class"
           defaultTheme="light"

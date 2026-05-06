@@ -16,6 +16,10 @@
     "db:types": "cd ../jr_be && supabase gen types typescript --local > ../jits_web/packages/shared/src/types/database.ts",
     "prepare": "husky"
   },
+  "overrides": {
+    "react": "19.1.0",
+    "react-dom": "19.1.0"
+  },
   "devDependencies": {
     "husky": "^9.1.7",
     "typescript": "^5"

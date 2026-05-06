@@ -9,7 +9,7 @@ import { AppHeader } from "@/components/layout/app-header";
 import { PageContainer } from "@/components/layout/page-container";
 import { PageHeaderActions } from "@/components/layout/page-header-actions";
 import { getDashboardSummary, getActiveSession } from "@jits/shared/api/queries";
-import { Calendar, ChevronRight, Radio, MapPin } from "lucide-react";
+import { Calendar, ChevronRight, MapPin } from "lucide-react";
 
 function DashboardSkeleton() {
   return (
@@ -32,7 +32,7 @@ function DashboardSkeleton() {
 export default function DashboardPage() {
   return (
     <>
-      <AppHeader title="Jits Arena" rightAction={<PageHeaderActions />} />
+      <AppHeader title="ELO RATED" rightAction={<PageHeaderActions />} />
       <PageContainer className="pt-6">
         <Suspense fallback={<DashboardSkeleton />}>
           <DashboardContent />
@@ -75,12 +75,9 @@ async function DashboardContent() {
       {/* Hero greeting */}
       <div className="rounded-2xl -mx-4 px-4 pt-2 pb-4">
         <h1 className="text-2xl font-bold tracking-tight">
-          Hey, <span className="text-gradient-primary">{athlete.display_name}</span>
+          Hey, <span className="text-primary">{athlete.display_name}</span>
         </h1>
-        <HeroSubtitle
-          lookingForCasual={athlete.looking_for_casual}
-          lookingForRanked={athlete.looking_for_ranked}
-        />
+        <HeroSubtitle />
       </div>
 
       <StatOverview
@@ -111,20 +108,7 @@ async function DashboardContent() {
   );
 }
 
-function HeroSubtitle({ lookingForCasual, lookingForRanked }: { lookingForCasual: boolean; lookingForRanked: boolean }) {
-  const isLooking = lookingForCasual || lookingForRanked;
-
-  if (isLooking) {
-    return (
-      <div className="flex items-center gap-2 mt-1">
-        <Radio className="h-3.5 w-3.5 text-green-500 animate-pulse" />
-        <p className="text-sm font-medium text-green-600 dark:text-green-400">
-          Looking for matches
-        </p>
-      </div>
-    );
-  }
-
+function HeroSubtitle() {
   return (
     <Link
       href="/gyms"

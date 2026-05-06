@@ -4,6 +4,7 @@ import { Clock, Users } from "lucide-react-native";
 import { Card } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { useThemedTokens } from "../lib/theme/use-theme";
+import { formatTimeUntil } from "@jits/shared/utils";
 import type { SessionListItem } from "@jits/shared/types/session";
 
 interface SessionCardProps {
@@ -38,6 +39,7 @@ export function SessionCard({ session, isRsvpd, isParticipant }: SessionCardProp
   const tokens = useThemedTokens();
   const title = session.title ?? "Open Mat";
   const isActive = session.status === "active";
+  const startsIn = !isActive ? formatTimeUntil(session.scheduledStart) : null;
   const capacityText = session.maxParticipants
     ? `${session.participantCount}/${session.maxParticipants}`
     : `${session.participantCount}`;
@@ -73,6 +75,9 @@ export function SessionCard({ session, isRsvpd, isParticipant }: SessionCardProp
           <Text className="text-xs text-muted-foreground">
             {formatSessionTime(session.scheduledStart, session.scheduledEnd)}
           </Text>
+          {startsIn ? (
+            <Text className="text-xs font-medium text-amber-500">{startsIn}</Text>
+          ) : null}
         </View>
 
         <View className="flex-row items-center gap-3">

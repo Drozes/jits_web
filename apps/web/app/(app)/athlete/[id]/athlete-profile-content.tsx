@@ -66,8 +66,6 @@ export async function AthleteProfileContent({
           <ProfileHeader
             athlete={competitor}
             gymName={competitorGymName}
-            lookingForCasual={competitor.looking_for_casual}
-            lookingForRanked={competitor.looking_for_ranked}
             stats={compStats}
           />
 
@@ -88,7 +86,6 @@ export async function AthleteProfileContent({
             }}
             headToHead={headToHead}
             pendingChallengeId={pendingChallenge?.id ?? null}
-            lookingForRanked={competitor.looking_for_ranked}
           />
 
           {/* Head-to-Head History */}

@@ -53,10 +53,16 @@ export default {
         "brand-orange": "hsl(var(--brand-orange))",
         "deep-red": "hsl(var(--brand-deep-red))",
       },
+      fontFamily: {
+        display: ['var(--font-display)', 'Arial Narrow', 'sans-serif'],
+        heading: ['var(--font-heading)', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+        body: ['var(--font-body)', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+        mono: ['var(--font-mono)', 'SF Mono', 'Consolas', 'monospace'],
+      },
       borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
+        lg: "0.5rem",
+        md: "calc(var(--radius))",
+        sm: "calc(var(--radius) - 2px)",
       },
       keyframes: {
         "fade-in-up": {
@@ -83,10 +89,6 @@ export default {
           from: { backgroundPosition: "200% 0" },
           to: { backgroundPosition: "-200% 0" },
         },
-        "glow-pulse": {
-          "0%, 100%": { opacity: "0.6" },
-          "50%": { opacity: "1" },
-        },
       },
       animation: {
         "fade-in-up": "fade-in-up 0.5s ease-out",
@@ -95,7 +97,6 @@ export default {
         "scale-in": "scale-in 0.3s ease-out",
         "slide-up-fade": "slide-up-fade 0.4s ease-out",
         "shimmer": "shimmer 3s ease-in-out infinite",
-        "glow-pulse": "glow-pulse 2s ease-in-out infinite",
       },
     },
   },

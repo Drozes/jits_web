@@ -31,6 +31,7 @@ export interface SessionListItem {
   participantCount: number;
   maxParticipants: number | null;
   rsvpCount: number;
+  createdBy: string;
   createdByName: string;
 }
 

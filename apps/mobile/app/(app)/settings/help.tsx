@@ -20,7 +20,7 @@ const FAQ_ITEMS = [
     id: "ranked-matches",
     question: "Are all matches ranked?",
     answer:
-      "Yes. Every match on JITS is ranked and affects your ELO rating. This keeps competition meaningful and ensures your record accurately reflects your performance on the mats.",
+      "Yes. Every match on ELO RATED is ranked and affects your ELO rating. This keeps competition meaningful and ensures your record accurately reflects your performance on the mats.",
   },
   {
     id: "record-result",

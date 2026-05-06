@@ -17,7 +17,7 @@ interface TrainingStepProps {
   values: WizardValues;
   onChange: (patch: Partial<WizardValues>) => void;
   onNext: () => void;
-  gyms: { id: string; name: string }[];
+  gyms: { id: string; name: string; city: string | null }[];
 }
 
 export function TrainingStep({ values, onChange, onNext, gyms }: TrainingStepProps) {
@@ -47,7 +47,15 @@ export function TrainingStep({ values, onChange, onNext, gyms }: TrainingStepPro
       {!values.freeAgent && (
         <div className="flex flex-col gap-2">
           <Label>Gym</Label>
-          <Select value={values.gymId} onValueChange={(v) => onChange({ gymId: v })}>
+          <Select
+            value={values.gymId}
+            onValueChange={(v) => {
+              const gym = gyms.find((g) => g.id === v);
+              const patch: Partial<WizardValues> = { gymId: v };
+              if (gym?.city && !values.city) patch.city = gym.city;
+              onChange(patch);
+            }}
+          >
             <SelectTrigger className="w-full">
               <SelectValue placeholder="Select your gym" />
             </SelectTrigger>

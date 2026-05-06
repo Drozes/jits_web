@@ -18,6 +18,7 @@ import type {
   SessionLobbyData,
   LobbyParticipant,
 } from "../types/session";
+import { mapPostgrestError, type DomainError } from "./errors";
 
 type Client = SupabaseClient<Database>;
 
@@ -594,6 +595,7 @@ export async function getGymDetail(
     participantCount: participantCountMap.get(s.id) ?? 0,
     maxParticipants: s.max_participants,
     rsvpCount: rsvpCountMap.get(s.id) ?? 0,
+    createdBy: s.created_by,
     createdByName: creatorNameMap.get(s.created_by) ?? "Unknown",
   }));
 
@@ -639,13 +641,17 @@ export async function getActiveSession(
     .neq("status", "left");
 
   if (activeParticipants && activeParticipants.length > 0) {
-    // Check if any of those sessions are active
+    // Check if any of those sessions are active. Order by created_at DESC so
+    // the most-recently-created active session wins when an athlete is
+    // checked into more than one (e.g., overlapping or stale sessions at the
+    // same gym).
     const participantSessionIds = activeParticipants.map((p) => p.session_id);
     const { data: activeSessions } = await supabase
       .from("sessions")
-      .select("id, gym_id, status, scheduled_start, scheduled_end")
+      .select("id, gym_id, status, scheduled_start, scheduled_end, created_at")
       .in("id", participantSessionIds)
       .eq("status", "active")
+      .order("created_at", { ascending: false })
       .limit(1);
 
     if (activeSessions && activeSessions.length > 0) {
@@ -807,21 +813,46 @@ export async function getSessionForJoin(
 // Session lobby
 // ---------------------------------------------------------------------------
 
-/** Fetch session lobby data (participants + session info) via RPC */
+export type GetSessionLobbyResult =
+  | { ok: true; data: SessionLobbyData }
+  | { ok: false; error: DomainError };
+
+/**
+ * Fetch session lobby data via the `get_session_lobby` RPC. The RPC validates
+ * the session exists (raising P0001/session_not_found otherwise) and returns
+ * session metadata in a single round trip, so no parallel embed query is
+ * needed.
+ */
 export async function getSessionLobbyData(
   supabase: Client,
   sessionId: string,
-): Promise<SessionLobbyData | null> {
+): Promise<GetSessionLobbyResult> {
   const { data, error } = await supabase.rpc("get_session_lobby", {
     p_session_id: sessionId,
   });
 
-  if (error || !data) return null;
+  if (error) {
+    return { ok: false, error: mapPostgrestError(error, "session_lobby") };
+  }
+  if (!data) {
+    return {
+      ok: false,
+      error: {
+        code: "UNKNOWN",
+        message: "Lobby returned no data.",
+      },
+    };
+  }
 
   const result = data as unknown as {
     session_id: string;
-    gym_name: string;
-    status: string;
+    session_status: string;
+    gym_id: string;
+    gym_name: string | null;
+    title: string | null;
+    scheduled_start: string;
+    scheduled_end: string;
+    caller_is_participant: boolean;
     participants: Array<{
       participant_id: string;
       athlete_id: string;
@@ -856,10 +887,13 @@ export async function getSessionLobbyData(
   }));
 
   return {
-    sessionId: result.session_id,
-    gymName: result.gym_name,
-    status: result.status,
-    participants,
+    ok: true,
+    data: {
+      sessionId: result.session_id,
+      gymName: result.gym_name ?? "Unknown Gym",
+      status: result.session_status,
+      participants,
+    },
   };
 }
 

@@ -12,35 +12,40 @@
 import * as React from "react";
 import { View } from "react-native";
 import { vars } from "nativewind";
-import { useResolvedColorScheme } from "./use-theme";
-import { darkTokens } from "../tokens";
+import { useResolvedColorScheme, useRestoreThemePreference } from "./use-theme";
+import { darkTokens, lightTokens } from "../tokens";
 
-const darkVars = vars({
-  "--background": darkTokens.background,
-  "--foreground": darkTokens.foreground,
-  "--card": darkTokens.card,
-  "--card-foreground": darkTokens.cardForeground,
-  "--popover": darkTokens.popover,
-  "--popover-foreground": darkTokens.popoverForeground,
-  "--primary": darkTokens.primary,
-  "--primary-foreground": darkTokens.primaryForeground,
-  "--secondary": darkTokens.secondary,
-  "--secondary-foreground": darkTokens.secondaryForeground,
-  "--muted": darkTokens.muted,
-  "--muted-foreground": darkTokens.mutedForeground,
-  "--accent": darkTokens.accent,
-  "--accent-foreground": darkTokens.accentForeground,
-  "--destructive": darkTokens.destructive,
-  "--destructive-foreground": darkTokens.destructiveForeground,
-  "--success": darkTokens.success,
-  "--success-foreground": darkTokens.successForeground,
-  "--border": darkTokens.border,
-  "--input": darkTokens.input,
-  "--ring": darkTokens.ring,
-  "--gold": darkTokens.gold,
-  "--brand-orange": darkTokens.brandOrange,
-  "--deep-red": darkTokens.deepRed,
-});
+function buildVars(t: typeof lightTokens) {
+  return vars({
+    "--background": t.background,
+    "--foreground": t.foreground,
+    "--card": t.card,
+    "--card-foreground": t.cardForeground,
+    "--popover": t.popover,
+    "--popover-foreground": t.popoverForeground,
+    "--primary": t.primary,
+    "--primary-foreground": t.primaryForeground,
+    "--secondary": t.secondary,
+    "--secondary-foreground": t.secondaryForeground,
+    "--muted": t.muted,
+    "--muted-foreground": t.mutedForeground,
+    "--accent": t.accent,
+    "--accent-foreground": t.accentForeground,
+    "--destructive": t.destructive,
+    "--destructive-foreground": t.destructiveForeground,
+    "--success": t.success,
+    "--success-foreground": t.successForeground,
+    "--border": t.border,
+    "--input": t.input,
+    "--ring": t.ring,
+    "--gold": t.gold,
+    "--brand-orange": t.brandOrange,
+    "--deep-red": t.deepRed,
+  });
+}
+
+const lightVarsStyle = buildVars(lightTokens);
+const darkVarsStyle = buildVars(darkTokens);
 
 export interface ThemeProviderProps {
   children: React.ReactNode;
@@ -48,9 +53,19 @@ export interface ThemeProviderProps {
 
 export function ThemeProvider({ children }: ThemeProviderProps) {
   const scheme = useResolvedColorScheme();
-  // In light mode the root `:root` defaults from `tailwind.config.js` apply.
-  // In dark mode we layer the `darkVars` style on top so descendants inherit
-  // the dark token values via CSS custom properties.
-  const style = scheme === "dark" ? darkVars : undefined;
-  return <View style={[{ flex: 1 }, style]}>{children}</View>;
+  const { restore } = useRestoreThemePreference();
+
+  React.useEffect(() => {
+    // Defer restore so the navigation tree finishes mounting first;
+    // calling setColorScheme synchronously during the initial layout
+    // triggers a state update on the Stack before it's ready.
+    const id = requestAnimationFrame(() => restore());
+    return () => cancelAnimationFrame(id);
+  }, []);
+
+  // Always apply a vars() style so React updates the existing View in-place
+  // rather than remounting children (which would tear down the navigation
+  // container and crash Expo Router).
+  const themeVars = scheme === "dark" ? darkVarsStyle : lightVarsStyle;
+  return <View style={[{ flex: 1 }, themeVars]}>{children}</View>;
 }

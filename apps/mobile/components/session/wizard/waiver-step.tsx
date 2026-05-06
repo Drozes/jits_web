@@ -7,9 +7,9 @@ import { acceptSessionWaiver } from "@jits/shared/api/mutations";
 import { cn } from "@/lib/cn";
 
 const WAIVER_TEXT =
-  "By using the JITS platform to arrange and participate in Brazilian Jiu-Jitsu matches, " +
+  "By using the ELO RATED platform to arrange and participate in Brazilian Jiu-Jitsu matches, " +
   "you acknowledge and accept the inherent risks of grappling, including but not limited to " +
-  "physical injury. You agree to hold the JITS platform, its creators, and operators harmless " +
+  "physical injury. You agree to hold the ELO RATED platform, its creators, and operators harmless " +
   "from any claims arising from your participation. This waiver does not replace any waiver " +
   "required by your training facility.\n\n" +
   "You confirm that you are in adequate physical condition to participate in grappling activities " +

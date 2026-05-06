@@ -11,7 +11,7 @@ import type { WizardStep, WizardValues } from "./types";
 import { WizardProgress } from "./wizard-progress";
 
 const STEP_LABELS: Record<WizardStep, string> = {
-  tos: "Welcome to JITS",
+  tos: "Welcome to ELO RATED",
   identity: "Who are you?",
   training: "Where do you train?",
   optional: "Optional details",

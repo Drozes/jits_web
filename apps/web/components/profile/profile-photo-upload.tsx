@@ -135,7 +135,7 @@ export function ProfilePhotoUpload({
           </span>
         </button>
 
-        {photoPath && !uploading && (
+        {photoPath && !uploading && !photoPath.startsWith("http") && (
           <button
             type="button"
             onClick={handleRemove}
@@ -158,7 +158,11 @@ export function ProfilePhotoUpload({
 
       {showLabel && (
         <p className="text-xs text-muted-foreground">
-          {uploading ? "Uploading\u2026" : "Tap to add photo"}
+          {uploading
+            ? "Uploading\u2026"
+            : photoPath
+              ? "Tap to change photo"
+              : "Tap to add photo"}
         </p>
       )}
     </div>

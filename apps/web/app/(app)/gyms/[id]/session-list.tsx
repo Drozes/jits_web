@@ -5,10 +5,17 @@ import type { SessionListItem } from "@jits/shared/types/session";
 interface SessionListProps {
   sessions: SessionListItem[];
   rsvpSessionIds: string[];
-  participantSessionIds: string[];
+  currentAthleteId: string;
 }
 
-export function SessionList({ sessions, rsvpSessionIds, participantSessionIds }: SessionListProps) {
+export function SessionList({ sessions, rsvpSessionIds, currentAthleteId }: SessionListProps) {
+  // Active sessions first, then upcoming sorted by closest start time
+  const sorted = [...sessions].sort((a, b) => {
+    if (a.status === "active" && b.status !== "active") return -1;
+    if (a.status !== "active" && b.status === "active") return 1;
+    return new Date(a.scheduledStart).getTime() - new Date(b.scheduledStart).getTime();
+  });
+
   return (
     <section className="flex flex-col gap-3">
       <div className="flex items-center gap-2">
@@ -25,12 +32,12 @@ export function SessionList({ sessions, rsvpSessionIds, participantSessionIds }:
 
       {sessions.length > 0 ? (
         <div className="flex flex-col gap-3">
-          {sessions.map((session) => (
+          {sorted.map((session) => (
             <SessionCard
               key={session.id}
               session={session}
               isRsvpd={rsvpSessionIds.includes(session.id)}
-              isParticipant={participantSessionIds.includes(session.id)}
+              isCreator={session.createdBy === currentAthleteId}
             />
           ))}
         </div>

@@ -13,61 +13,18 @@ import {
   HelpCircle,
   LogOut,
   MessageSquare,
-  Swords,
   TestTube2,
   Video,
 } from "lucide-react-native";
 import { useAuth, useRequireAthlete } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
-import { supabase } from "@/lib/supabase/client";
-import { toggleMatchPreferences } from "@jits/shared/api/mutations";
 import { Card, CardContent } from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
-import { toast } from "@/components/ui/toast";
-
-interface PreferencesState {
-  lookingForCasual: boolean;
-  lookingForRanked: boolean;
-}
-
-/** Collapsed into a single toggle; both flags stay in sync for backend compat. */
-function isLookingForMatches(prefs: PreferencesState): boolean {
-  return prefs.lookingForCasual || prefs.lookingForRanked;
-}
 
 export default function SettingsScreen() {
   const { athlete, signOut } = useAuth();
   useRequireAthlete();
   const router = useRouter();
   const tokens = useThemedTokens();
-
-  const [prefs, setPrefs] = React.useState<PreferencesState>({
-    lookingForCasual: athlete?.looking_for_casual ?? false,
-    lookingForRanked: athlete?.looking_for_ranked ?? false,
-  });
-
-  // Keep local state in sync if the auth athlete row changes (e.g. refresh).
-  React.useEffect(() => {
-    if (!athlete) return;
-    setPrefs({
-      lookingForCasual: athlete.looking_for_casual ?? false,
-      lookingForRanked: athlete.looking_for_ranked ?? false,
-    });
-  }, [athlete]);
-
-  const toggleLookingForMatches = React.useCallback(
-    async (value: boolean) => {
-      if (!athlete) return;
-      const next: PreferencesState = { lookingForCasual: value, lookingForRanked: value };
-      setPrefs(next);
-      const result = await toggleMatchPreferences(supabase, athlete.id, next);
-      if (!result.ok) {
-        setPrefs(prefs);
-        toast.error(result.error.message);
-      }
-    },
-    [athlete, prefs],
-  );
 
   const handleSignOut = React.useCallback(() => {
     Alert.alert("Sign out", "Are you sure you want to sign out?", [
@@ -89,20 +46,6 @@ export default function SettingsScreen() {
       contentContainerStyle={{ padding: 16, paddingBottom: 48, gap: 24 }}
     >
       <Text className="text-2xl font-bold text-foreground">Settings</Text>
-
-      <Section title="Match Preferences">
-        <Card>
-          <CardContent className="p-0">
-            <PreferenceRow
-              icon={<Swords size={16} color={tokens.mutedForeground} />}
-              label="Looking for matches"
-              description="Show me to athletes looking for a match"
-              value={isLookingForMatches(prefs)}
-              onValueChange={toggleLookingForMatches}
-            />
-          </CardContent>
-        </Card>
-      </Section>
 
       <Section title="Notifications">
         <Card>
@@ -196,31 +139,6 @@ function Section({
         {title}
       </Text>
       {children}
-    </View>
-  );
-}
-
-function PreferenceRow({
-  icon,
-  label,
-  description,
-  value,
-  onValueChange,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  description: string;
-  value: boolean;
-  onValueChange: (v: boolean) => void;
-}) {
-  return (
-    <View className="flex-row items-center gap-3 px-4 py-3">
-      <View className="w-5 items-center">{icon}</View>
-      <View className="flex-1">
-        <Text className="text-sm font-medium text-foreground">{label}</Text>
-        <Text className="text-xs text-muted-foreground">{description}</Text>
-      </View>
-      <Switch value={value} onValueChange={onValueChange} />
     </View>
   );
 }

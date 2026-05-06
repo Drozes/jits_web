@@ -63,6 +63,11 @@ export function ConfirmStep({
     setLoading(true);
     const result = await joinSessionLobby(supabase, { sessionId, confirmedWeight });
     if (!result.ok) {
+      // Already in the session — skip straight to lobby
+      if (result.error.code === "ALREADY_JOINED") {
+        router.replace(`/session/${sessionId}/lobby`);
+        return;
+      }
       setLoading(false);
       toast.error({
         text1: "Could not join",

@@ -53,7 +53,7 @@ export function FeedbackForm() {
       <div className="flex flex-col items-center gap-6 py-12 text-center">
         <p className="text-2xl">Thank you!</p>
         <p className="text-muted-foreground text-sm">
-          Your feedback helps us improve JITS.
+          Your feedback helps us improve ELO RATED.
         </p>
         <Button
           variant="outline"

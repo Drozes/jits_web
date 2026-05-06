@@ -35,8 +35,8 @@ export function ShareProfileSheet({ athlete, children }: ShareProfileSheetProps)
   async function handleShare() {
     try {
       await Share.share({
-        title: `${athlete.displayName} on Jits Arena`,
-        message: `Check out ${athlete.displayName}'s profile on Jits Arena: ${url}`,
+        title: `${athlete.displayName} on ELO RATED`,
+        message: `Check out ${athlete.displayName}'s profile on ELO RATED: ${url}`,
         url,
       });
     } catch (err) {

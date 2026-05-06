@@ -4,12 +4,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Users, Clock } from "lucide-react";
 import { RsvpButton } from "@/app/(app)/gyms/[id]/rsvp-button";
+import { SessionActions } from "@/app/(app)/gyms/[id]/session-actions";
+import { formatTimeUntil } from "@jits/shared/utils";
 import type { SessionListItem } from "@jits/shared/types/session";
 
 interface SessionCardProps {
   session: SessionListItem;
   isRsvpd: boolean;
-  isParticipant?: boolean;
+  isCreator?: boolean;
 }
 
 function formatSessionTime(start: string, end: string) {
@@ -21,9 +23,10 @@ function formatSessionTime(start: string, end: string) {
   return `${dateStr}, ${startTime} - ${endTime}`;
 }
 
-export function SessionCard({ session, isRsvpd, isParticipant }: SessionCardProps) {
+export function SessionCard({ session, isRsvpd, isCreator }: SessionCardProps) {
   const title = session.title ?? "Open Mat";
   const isActive = session.status === "active";
+  const startsIn = !isActive ? formatTimeUntil(session.scheduledStart) : null;
   const capacityText = session.maxParticipants
     ? `${session.participantCount}/${session.maxParticipants}`
     : `${session.participantCount}`;
@@ -33,16 +36,24 @@ export function SessionCard({ session, isRsvpd, isParticipant }: SessionCardProp
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
           <span className="text-[15px] font-semibold">{title}</span>
-          {isActive ? (
-            <Badge variant="success" className="text-[10px]">Live</Badge>
-          ) : (
-            <Badge variant="secondary" className="text-[10px]">Scheduled</Badge>
-          )}
+          <div className="flex items-center gap-1.5">
+            {isActive ? (
+              <Badge variant="success" className="text-[10px]">Live</Badge>
+            ) : (
+              <Badge variant="secondary" className="text-[10px]">Scheduled</Badge>
+            )}
+            {isCreator && (
+              <SessionActions sessionId={session.id} status={session.status} />
+            )}
+          </div>
         </div>
 
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <Clock className="h-3 w-3" />
-          {formatSessionTime(session.scheduledStart, session.scheduledEnd)}
+          <span>{formatSessionTime(session.scheduledStart, session.scheduledEnd)}</span>
+          {startsIn && (
+            <span className="text-amber-500 font-medium">{startsIn}</span>
+          )}
         </div>
 
         <div className="flex items-center justify-between">
@@ -63,8 +74,8 @@ export function SessionCard({ session, isRsvpd, isParticipant }: SessionCardProp
 
         <div className="mt-1">
           {isActive ? (
-            <Link href={isParticipant ? `/session/${session.id}/lobby` : `/session/${session.id}/join`}>
-              <Button size="sm" className="w-full">{isParticipant ? "Return to Lobby" : "Join Lobby"}</Button>
+            <Link href={`/session/${session.id}/join`}>
+              <Button size="sm" className="w-full">Join Lobby</Button>
             </Link>
           ) : (
             <RsvpButton sessionId={session.id} isRsvpd={isRsvpd} />

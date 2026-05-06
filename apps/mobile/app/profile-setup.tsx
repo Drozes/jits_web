@@ -58,7 +58,7 @@ export default function ProfileSetupScreen() {
             <View className="gap-8">
               <View className="items-center gap-2">
                 <Text className="text-2xl font-bold text-foreground">
-                  {data.isEditing ? "Edit Profile" : "Welcome to Jits Arena"}
+                  {data.isEditing ? "Edit Profile" : "Welcome to ELO RATED"}
                 </Text>
                 <Text className="text-center text-sm text-muted-foreground">
                   {data.isEditing

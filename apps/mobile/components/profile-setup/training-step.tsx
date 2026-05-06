@@ -57,7 +57,12 @@ export function TrainingStep({ values, onChange, onNext, gyms }: TrainingStepPro
           <Label>Gym</Label>
           <Select
             value={values.gymId || undefined}
-            onValueChange={(v) => onChange({ gymId: v })}
+            onValueChange={(v) => {
+              const gym = gyms.find((g) => g.id === v);
+              const patch: Partial<WizardValues> = { gymId: v };
+              if (gym?.city && !values.city) patch.city = gym.city;
+              onChange(patch);
+            }}
           >
             <SelectTrigger>
               <SelectValue placeholder="Select your gym" />

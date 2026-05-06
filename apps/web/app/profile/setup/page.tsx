@@ -28,7 +28,7 @@ async function SetupContent() {
 
   const { data: gyms } = await supabase
     .from("gyms")
-    .select("id, name")
+    .select("id, name, city")
     .eq("status", "active")
     .order("name");
 
@@ -56,7 +56,7 @@ async function SetupContent() {
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold tracking-tight">
-            {isEditing ? "Edit Profile" : "Welcome to Jits Arena"}
+            {isEditing ? "Edit Profile" : "Welcome to ELO RATED"}
           </h1>
           <p className="text-sm text-muted-foreground mt-2">
             {isEditing
@@ -75,7 +75,11 @@ async function SetupContent() {
             dateOfBirth: athlete?.date_of_birth ?? "",
             city: athlete?.city ?? "",
           }}
-          defaultProfilePhotoUrl={athlete?.profile_photo_url ?? null}
+          defaultProfilePhotoUrl={
+            athlete?.profile_photo_url ??
+            (user.user_metadata?.avatar_url as string | undefined) ??
+            null
+          }
           gyms={gyms ?? []}
           isEditing={isEditing}
           hasAcceptedTos={hasAcceptedTos}

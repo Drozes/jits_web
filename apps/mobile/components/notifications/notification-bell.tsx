@@ -12,7 +12,9 @@ import { Bell } from "lucide-react-native";
 import { usePendingChallenges } from "@jits/shared/hooks/use-pending-challenges";
 import { supabase } from "@/lib/supabase/client";
 import { useThemedTokens } from "@/lib/theme/use-theme";
-import { NotificationPanel } from "./notification-panel";
+const NotificationPanel = React.lazy(() =>
+  import("./notification-panel").then((m) => ({ default: m.NotificationPanel })),
+);
 
 interface NotificationBellProps {
   athleteId: string;
@@ -41,11 +43,13 @@ export function NotificationBell({ athleteId }: NotificationBellProps) {
         )}
       </Pressable>
 
-      <NotificationPanel
-        open={open}
-        onOpenChange={setOpen}
-        challenges={challenges}
-      />
+      <React.Suspense fallback={null}>
+        <NotificationPanel
+          open={open}
+          onOpenChange={setOpen}
+          challenges={challenges}
+        />
+      </React.Suspense>
     </>
   );
 }

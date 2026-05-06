@@ -61,7 +61,7 @@ function PodiumSlot({
   };
 
   const trophyBg = {
-    1: "bg-gradient-to-br from-yellow-400 to-yellow-600 shadow-glow-gold",
+    1: "bg-gradient-to-br from-yellow-400 to-yellow-600",
     2: "bg-gradient-to-br from-gray-300 to-gray-400",
     3: "bg-gradient-to-br from-amber-400 to-amber-700",
   };

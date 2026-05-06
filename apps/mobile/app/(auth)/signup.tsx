@@ -78,8 +78,9 @@ export default function SignupScreen() {
                 <AuthFormField
                   label="Password"
                   autoCapitalize="none"
-                  autoComplete="new-password"
+                  autoComplete="off"
                   autoCorrect={false}
+                  textContentType="none"
                   secureTextEntry
                   placeholder="At least 8 characters"
                   value={password}
@@ -91,8 +92,9 @@ export default function SignupScreen() {
                 <AuthFormField
                   label="Confirm password"
                   autoCapitalize="none"
-                  autoComplete="new-password"
+                  autoComplete="off"
                   autoCorrect={false}
+                  textContentType="none"
                   secureTextEntry
                   placeholder="Re-enter password"
                   value={confirmPassword}

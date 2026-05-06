@@ -45,8 +45,8 @@ export function ShareProfileSheet({
   async function handleNativeShare() {
     if (navigator.share) {
       await navigator.share({
-        title: `${athlete.displayName} on Jits Arena`,
-        text: `Check out ${athlete.displayName}'s profile on Jits Arena`,
+        title: `${athlete.displayName} on ELO RATED`,
+        text: `Check out ${athlete.displayName}'s profile on ELO RATED`,
         url: profileUrl,
       });
     }

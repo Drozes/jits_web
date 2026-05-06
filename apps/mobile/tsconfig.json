@@ -2,22 +2,34 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "jsx": "react-jsx",
-    "lib": ["esnext", "dom"],
-    "types": ["expo-router/types", "jest"],
+    "lib": [
+      "esnext",
+      "dom"
+    ],
+    "types": [
+      "expo-router/types",
+      "jest"
+    ],
     "moduleResolution": "bundler",
     "paths": {
-      "@/*": ["./*"],
-      "@jits/shared": ["../../packages/shared/src"],
-      "@jits/shared/*": ["../../packages/shared/src/*"]
+      "@/*": [
+        "./*"
+      ],
+      "@jits/shared": [
+        "../../packages/shared/src"
+      ],
+      "@jits/shared/*": [
+        "../../packages/shared/src/*"
+      ]
     }
   },
   "include": [
     "**/*.ts",
     "**/*.tsx",
     "nativewind-env.d.ts",
-    ".expo/types/**/*.ts",
-    "expo-env.d.ts",
     "../../packages/shared/src/**/*.ts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules"
+  ]
 }

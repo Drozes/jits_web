@@ -5,7 +5,7 @@ import { requireAthlete } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
 import { getGymDetail } from "@jits/shared/api/queries";
 import { SessionList } from "./session-list";
-import { StartSessionButton } from "./start-session-button";
+import { CreateSessionDialog } from "./create-session-dialog";
 
 interface GymDetailContentProps {
   paramsPromise: Promise<{ id: string }>;
@@ -37,15 +37,19 @@ export async function GymDetailContent({ paramsPromise }: GymDetailContentProps)
         )}
         <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
           <Users className="h-3.5 w-3.5" />
-          {gym.memberCount} {gym.memberCount === 1 ? "Member" : "Members"}
+          Members at this gym
         </div>
       </div>
 
       {/* Start Session button for members */}
-      {gym.isMemberGym && <StartSessionButton gymId={id} />}
+      {gym.isMemberGym && <CreateSessionDialog gymId={id} />}
 
       {/* Sessions list */}
-      <SessionList sessions={gym.sessions} rsvpSessionIds={gym.rsvpSessionIds} participantSessionIds={gym.participantSessionIds} />
+      <SessionList
+        sessions={gym.sessions}
+        rsvpSessionIds={gym.rsvpSessionIds}
+        currentAthleteId={athlete.id}
+      />
     </div>
   );
 }

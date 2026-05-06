@@ -80,7 +80,7 @@ export default function SettingsFeedbackScreen() {
       <View className="flex-1 bg-background items-center justify-center px-8 gap-6">
         <Text className="text-3xl">Thank you!</Text>
         <Text className="text-sm text-muted-foreground text-center">
-          Your feedback helps us improve JITS.
+          Your feedback helps us improve ELO RATED.
         </Text>
         <Button variant="outline" onPress={reset}>
           Submit More Feedback

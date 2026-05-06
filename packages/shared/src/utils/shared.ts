@@ -47,3 +47,22 @@ export function formatRelativeTime(iso: string): string {
     day: "numeric",
   });
 }
+
+/** Returns a "Starts in X" hint for upcoming times within 2 hours, or null. */
+export function formatTimeUntil(iso: string): string | null {
+  const diffMs = new Date(iso).getTime() - Date.now();
+  if (diffMs <= 0) return null;
+
+  const diffMin = Math.floor(diffMs / 60_000);
+  if (diffMin < 1) return "Starts now";
+  if (diffMin < 60) return `Starts in ${diffMin} min`;
+
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr <= 2) {
+    const remainMin = diffMin % 60;
+    if (remainMin === 0) return `Starts in ${diffHr} hr`;
+    return `Starts in ${diffHr} hr ${remainMin} min`;
+  }
+
+  return null;
+}

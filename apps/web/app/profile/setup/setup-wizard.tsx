@@ -14,7 +14,7 @@ import { useSetupSubmit } from "./use-setup-submit";
 type Step = "tos" | "identity" | "training" | "optional";
 
 const STEP_LABELS: Record<Step, string> = {
-  tos: "Welcome to JITS",
+  tos: "Welcome to ELO RATED",
   identity: "Who are you?",
   training: "Where do you train?",
   optional: "Optional details",
@@ -34,7 +34,7 @@ interface SetupWizardProps {
   athleteId: string | null;
   defaults: WizardValues;
   defaultProfilePhotoUrl: string | null;
-  gyms: { id: string; name: string }[];
+  gyms: { id: string; name: string; city: string | null }[];
   isEditing: boolean;
   hasAcceptedTos: boolean;
   waiverId?: string;

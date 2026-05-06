@@ -39,16 +39,21 @@ export function useSessionLobby(sessionId: string): UseSessionLobbyResult {
       try {
         const result = await getSessionLobbyData(supabase, sessionId);
         if (cancelled) return;
-        if (!result) {
-          setError("Session not found");
+        if (!result.ok) {
+          console.error("[session-lobby] lobby fetch failed", {
+            sessionId,
+            code: result.error.code,
+            message: result.error.message,
+          });
+          setError(result.error.message);
           setData(null);
           setParticipants([]);
           return;
         }
-        setData(result);
-        setParticipants(result.participants);
+        setData(result.data);
+        setParticipants(result.data.participants);
       } catch (err) {
-        console.error("[session-lobby] fetch failed", err);
+        console.error("[session-lobby] fetch threw", err);
         if (!cancelled) {
           toast.error("Could not load lobby");
           setError(err instanceof Error ? err.message : "Failed to load lobby");

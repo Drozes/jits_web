@@ -726,6 +726,10 @@ export type Database = {
           challenge_id: string | null
           completed_at: string | null
           created_at: string
+          dispute_admin_notes: string | null
+          dispute_reason: string | null
+          dispute_resolution: string | null
+          dispute_resolved_at: string | null
           duration_seconds: number
           gym_id: string | null
           id: string
@@ -743,6 +747,10 @@ export type Database = {
           challenge_id?: string | null
           completed_at?: string | null
           created_at?: string
+          dispute_admin_notes?: string | null
+          dispute_reason?: string | null
+          dispute_resolution?: string | null
+          dispute_resolved_at?: string | null
           duration_seconds?: number
           gym_id?: string | null
           id?: string
@@ -760,6 +768,10 @@ export type Database = {
           challenge_id?: string | null
           completed_at?: string | null
           created_at?: string
+          dispute_admin_notes?: string | null
+          dispute_reason?: string | null
+          dispute_resolution?: string | null
+          dispute_resolved_at?: string | null
           duration_seconds?: number
           gym_id?: string | null
           id?: string
@@ -1059,14 +1071,14 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "sessions_created_by_fkey"
+            foreignKeyName: "fk_sessions_created_by"
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "athletes"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "sessions_gym_id_fkey"
+            foreignKeyName: "fk_sessions_gym"
             columns: ["gym_id"]
             isOneToOne: false
             referencedRelation: "gyms"
@@ -1562,6 +1574,14 @@ export type Database = {
           p_result: string
           p_submission_type_code?: string
           p_winner_id?: string
+        }
+        Returns: Json
+      }
+      resolve_dispute: {
+        Args: {
+          p_admin_notes?: string
+          p_match_id: string
+          p_resolution: string
         }
         Returns: Json
       }
