@@ -104,7 +104,7 @@ export default function DashboardScreen() {
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={tokens.primary} />}
     >
       <View className="flex-row items-center justify-between">
-        <Text className="text-2xl font-bold text-foreground">
+        <Text className="text-2xl font-heading text-foreground">
           Hey, <Text className="text-primary">{athlete.display_name}</Text>
         </Text>
         <NotificationBell athleteId={athlete.id} />
@@ -137,7 +137,7 @@ export default function DashboardScreen() {
               <View className="h-7 w-7 items-center justify-center rounded-lg bg-success/10">
                 <Calendar size={16} className="text-success" />
               </View>
-              <Text className="text-lg font-semibold text-foreground">Sessions</Text>
+              <Text className="text-lg font-heading text-foreground">Sessions</Text>
             </View>
             <ActiveSessionCard session={data?.activeSession ?? null} />
           </View>

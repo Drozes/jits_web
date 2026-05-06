@@ -57,7 +57,7 @@ export default function ProfileSetupScreen() {
           {!isLoading && !error && data && user && (
             <View className="gap-8">
               <View className="items-center gap-2">
-                <Text className="text-2xl font-bold text-foreground">
+                <Text className="text-2xl font-heading text-foreground">
                   {data.isEditing ? "Edit Profile" : "Welcome to ELO RATED"}
                 </Text>
                 <Text className="text-center text-sm text-muted-foreground">

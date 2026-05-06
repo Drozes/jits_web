@@ -107,6 +107,12 @@ module.exports = {
         md: "4px",
         sm: "2px",
       },
+      fontFamily: {
+        display: ["BebasNeue_400Regular"],
+        heading: ["DMSans_700Bold"],
+        body: ["Inter_400Regular"],
+        mono: ["JetBrainsMono_400Regular"],
+      },
     },
   },
   plugins: [

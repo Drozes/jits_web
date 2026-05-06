@@ -32,20 +32,20 @@ export function SummaryStep(props: SummaryStepProps) {
       <CheckCircle2 size={64} color={tokens.success} />
       <View className="items-center gap-1">
         {disputed ? (
-          <Text className="text-2xl font-bold text-amber-500">Disputed</Text>
+          <Text className="text-2xl font-display text-amber-500">Disputed</Text>
         ) : outcome === "win" ? (
-          <Text className="text-3xl font-bold text-success">Victory!</Text>
+          <Text className="text-3xl font-display text-success">Victory!</Text>
         ) : outcome === "loss" ? (
-          <Text className="text-3xl font-bold text-destructive">Defeat</Text>
+          <Text className="text-3xl font-display text-destructive">Defeat</Text>
         ) : outcome === "draw" ? (
-          <Text className="text-3xl font-bold text-amber-500">Draw</Text>
+          <Text className="text-3xl font-display text-amber-500">Draw</Text>
         ) : (
-          <Text className="text-2xl font-bold text-foreground">Match Recorded</Text>
+          <Text className="text-2xl font-heading text-foreground">Match Recorded</Text>
         )}
         {eloDelta != null && eloDelta !== 0 ? (
           <Text
             className={cn(
-              "text-base font-semibold tabular-nums",
+              "text-base font-mono tabular-nums",
               eloDelta > 0 ? "text-success" : "text-destructive",
             )}
           >

@@ -36,7 +36,7 @@ export function NotificationBell({ athleteId }: NotificationBellProps) {
         <Bell size={20} color={tokens.foreground} />
         {count > 0 && (
           <View className="absolute top-1 right-1 h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1">
-            <Text className="text-[10px] font-bold text-primary-foreground">
+            <Text className="text-[10px] font-mono text-primary-foreground">
               {count > 99 ? "99+" : String(count)}
             </Text>
           </View>

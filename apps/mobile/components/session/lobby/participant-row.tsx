@@ -56,7 +56,7 @@ export function ParticipantRow({ participant, onChallenge, isBusy }: Participant
 
         {inMatch ? (
           <Badge variant="secondary">
-            <Text className="text-[10px] font-semibold text-secondary-foreground">
+            <Text className="text-[10px] font-heading text-secondary-foreground">
               In Match
             </Text>
           </Badge>

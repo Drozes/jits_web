@@ -45,14 +45,14 @@ export function ProfileHeader({ athlete, gymName, stats }: ProfileHeaderProps) {
               transition={150}
             />
           ) : (
-            <Text className="text-2xl font-semibold text-muted-foreground">
+            <Text className="text-2xl font-heading text-muted-foreground">
               {getInitials(athlete.display_name ?? "")}
             </Text>
           )}
         </View>
 
         <View className="items-center gap-1">
-          <Text className="text-xl font-bold text-foreground" numberOfLines={1}>
+          <Text className="text-xl font-heading text-foreground" numberOfLines={1}>
             {athlete.display_name}
           </Text>
           {gymName ? (
@@ -68,7 +68,7 @@ export function ProfileHeader({ athlete, gymName, stats }: ProfileHeaderProps) {
           <View className="h-10 w-px bg-border" />
           <View className="items-center">
             <Text className="text-xs text-muted-foreground mb-0.5">Record</Text>
-            <Text className="text-2xl font-bold tabular-nums">
+            <Text className="text-2xl font-mono tabular-nums">
               <Text className="text-success">{stats.wins}</Text>
               <Text className="text-muted-foreground"> - </Text>
               <Text className="text-destructive">{stats.losses}</Text>
@@ -77,7 +77,7 @@ export function ProfileHeader({ athlete, gymName, stats }: ProfileHeaderProps) {
           <View className="h-10 w-px bg-border" />
           <View className="items-center">
             <Text className="text-xs text-muted-foreground mb-0.5">Win Rate</Text>
-            <Text className="text-2xl font-bold tabular-nums text-success">{stats.winRate}%</Text>
+            <Text className="text-2xl font-mono tabular-nums text-success">{stats.winRate}%</Text>
           </View>
         </View>
       </CardContent>

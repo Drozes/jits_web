@@ -104,7 +104,7 @@ export function ConfirmStep({
 
   return (
     <View className="gap-4 py-2">
-      <Text className="text-center text-base font-semibold text-foreground">
+      <Text className="text-center text-base font-heading text-foreground">
         Ready to join
       </Text>
       <Card className="rounded-2xl">

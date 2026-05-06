@@ -38,9 +38,9 @@ const containerVariant: Record<Variant, string> = {
 };
 
 const numberVariant: Record<Variant, string> = {
-  display: "text-2xl font-bold tabular-nums text-foreground",
-  compact: "text-sm font-bold tabular-nums text-foreground",
-  stakes: "text-base font-bold tabular-nums text-foreground",
+  display: "text-2xl font-mono tabular-nums text-foreground",
+  compact: "text-sm font-mono tabular-nums text-foreground",
+  stakes: "text-base font-mono tabular-nums text-foreground",
 };
 
 export function EloBadge({ elo, peak, delta, variant = "display", className }: EloBadgeProps) {
@@ -49,11 +49,11 @@ export function EloBadge({ elo, peak, delta, variant = "display", className }: E
       <View className={cn("flex-row items-center gap-3", className)}>
         <View className="flex-row items-center gap-1.5 rounded-md bg-success/10 px-2.5 py-1.5">
           <TrendingUp size={16} className="text-success" />
-          <Text className="text-sm font-semibold text-success">+{Math.abs(delta)}</Text>
+          <Text className="text-sm font-mono text-success">+{Math.abs(delta)}</Text>
         </View>
         <View className="flex-row items-center gap-1.5 rounded-md bg-destructive/10 px-2.5 py-1.5">
           <TrendingDown size={16} className="text-destructive" />
-          <Text className="text-sm font-semibold text-destructive">-{Math.abs(delta)}</Text>
+          <Text className="text-sm font-mono text-destructive">-{Math.abs(delta)}</Text>
         </View>
       </View>
     );
@@ -68,7 +68,7 @@ export function EloBadge({ elo, peak, delta, variant = "display", className }: E
       {variant === "compact" && delta != null && delta !== 0 ? (
         <Text
           className={cn(
-            "text-xs font-semibold",
+            "text-xs font-mono",
             delta > 0 && "text-success",
             delta < 0 && "text-destructive",
           )}

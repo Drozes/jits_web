@@ -56,7 +56,7 @@ export function ShareProfileSheet({ athlete, children }: ShareProfileSheetProps)
         <View className="flex-col gap-4 pt-4">
           <Card className="bg-primary/5 border-primary/20">
             <CardContent className="p-4 items-center">
-              <Text className="text-lg font-bold text-foreground">{athlete.displayName}</Text>
+              <Text className="text-lg font-heading text-foreground">{athlete.displayName}</Text>
               <View className="flex-row items-center gap-2 mt-1">
                 <Text className="text-sm text-muted-foreground">ELO</Text>
                 <EloBadge elo={athlete.elo} variant="compact" />

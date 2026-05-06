@@ -114,7 +114,7 @@ export default function SessionLobbyScreen() {
       <>
         <Stack.Screen options={{ title: "Session Lobby" }} />
         <View className="flex-1 items-center justify-center bg-background px-6">
-          <Text className="text-center text-base font-semibold text-foreground">
+          <Text className="text-center text-base font-heading text-foreground">
             Lobby unavailable
           </Text>
           <Text className="mt-2 text-center text-sm text-muted-foreground">

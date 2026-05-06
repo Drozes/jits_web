@@ -71,7 +71,7 @@ function ErrorFallback({
 
   return (
     <View className="flex-1 bg-background items-center justify-center px-8 gap-6">
-      <Text className="text-3xl font-bold text-foreground">
+      <Text className="text-3xl font-display text-foreground">
         Something went wrong
       </Text>
       <Text className="text-sm text-muted-foreground text-center">
@@ -89,7 +89,7 @@ function ErrorFallback({
           onPress={onRetry}
           className="rounded-md bg-primary py-3 items-center active:opacity-80"
         >
-          <Text className="text-sm font-semibold text-primary-foreground">
+          <Text className="text-sm font-heading text-primary-foreground">
             Try again
           </Text>
         </Pressable>

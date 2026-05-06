@@ -37,7 +37,7 @@ export function OutcomeToggle({
             )}
             <Text
               className={cn(
-                "text-sm font-semibold",
+                "text-sm font-heading",
                 active ? "text-white" : "text-muted-foreground",
               )}
             >
@@ -75,7 +75,7 @@ export function WinnerPicker({
                 active ? "border-primary bg-primary/5" : "border-muted",
               )}
             >
-              <Text className="text-center text-sm font-semibold text-foreground" numberOfLines={1}>
+              <Text className="text-center text-sm font-heading text-foreground" numberOfLines={1}>
                 {p.displayName}
               </Text>
             </Pressable>

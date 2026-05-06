@@ -114,7 +114,8 @@ apps/web/
     layout/           shell components (app-header, bottom-nav-bar, page-container)
     profile/          profile-specific components
     ui/               shadcn/ui primitives, DO NOT edit manually
-    auth-button.tsx, login-form.tsx, sign-up-form.tsx, ... (auth at root for now)
+    auth/             shared auth primitives (auth-form-shell, email-input, password-input, google-oauth-button)
+    auth-button.tsx, login-form.tsx, sign-up-form.tsx, forgot-password-form.tsx
   hooks/              web-only hooks (chat, presence, recorder, deployment-check)
   lib/
     feature-flags.ts  frontend feature flags (timekeeperEnabled)
@@ -436,8 +437,7 @@ Mobile uses topical directories under `apps/mobile/components/` (`dashboard/`, `
 - [ ] `react@19.1.0` (mobile) vs `react@19.2.5` (web) version drift, pre-existing, not yet causing observable issues. Resolve when bumping web to 19.2 alignment is convenient.
 
 **Low (code-style cleanup):**
-- [ ] Auth form components on web (`login-form`, `sign-up-form`, `forgot-password-form`) share ~70% identical code.
-- [ ] Web components over 80-line target: `login-form` 188, `sign-up-form` 172, `profile-photo-upload` 170, `recent-activity-section` 139, `match-card` 106, `forgot-password-form` 106.
+- [ ] Web components over 80-line target: `profile-photo-upload` 170, `recent-activity-section` 139, `match-card` 106.
 - [ ] Mobile test coverage gaps: only 4 test files; no tests for session join wizard, match-flow state machine, video recording, push notifications, deep linking, realtime sync hooks, or offline mutation queue.
 
 **Resolved:**
@@ -448,6 +448,7 @@ Mobile uses topical directories under `apps/mobile/components/` (`dashboard/`, `
 - [x] GitHub Actions CI/CD: typecheck, test, web build, mobile bundle on push/PR (2026-05-06).
 - [x] App scheme updated from `jits://` to `elorated://`, associated domains to `elorated.com` (2026-05-06).
 - [x] Session creation restricted to gym managers via `gym_managers` junction table + RLS (2026-05-06).
+- [x] Auth form deduplication: shared `auth-form-shell`, `email-input`, `password-input`, `google-oauth-button` extracted to `apps/web/components/auth/`. Forms reduced from 188/172/106 to 72/80/76 lines (2026-05-06).
 
 ## Chat UI Patterns (web)
 

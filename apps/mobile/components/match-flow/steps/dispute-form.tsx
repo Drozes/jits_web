@@ -37,7 +37,7 @@ export function DisputeForm({ matchId, onCancel, onSubmitted }: DisputeFormProps
     <View className="gap-4 px-1 py-4">
       <View className="items-center gap-1">
         <AlertTriangle size={28} color="#f59e0b" />
-        <Text className="text-lg font-semibold text-foreground">Dispute Result</Text>
+        <Text className="text-lg font-heading text-foreground">Dispute Result</Text>
       </View>
       <Text className="text-center text-sm text-muted-foreground">
         Tell us what happened. A reviewer will follow up.

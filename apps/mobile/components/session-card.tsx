@@ -61,17 +61,17 @@ export function SessionCard({ session, isRsvpd, isParticipant, canManage, onActi
     >
       <Card className="p-4 gap-2">
         <View className="flex-row items-center justify-between">
-          <Text className="text-[15px] font-semibold text-foreground">
+          <Text className="text-[15px] font-heading text-foreground">
             {title}
           </Text>
           <View className="flex-row items-center gap-1.5">
             {isActive ? (
               <Badge variant="success">
-                <Text className="text-[10px] font-semibold text-success-foreground">Live</Text>
+                <Text className="text-[10px] font-heading text-success-foreground">Live</Text>
               </Badge>
             ) : (
               <Badge variant="secondary">
-                <Text className="text-[10px] font-semibold text-secondary-foreground">Scheduled</Text>
+                <Text className="text-[10px] font-heading text-secondary-foreground">Scheduled</Text>
               </Badge>
             )}
             {canManage && onActionComplete ? (

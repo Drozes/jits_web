@@ -45,7 +45,7 @@ export function WaiverStep({ sessionId, waiverId, onNext }: WaiverStepProps) {
 
   return (
     <View className="gap-4">
-      <Text className="text-center text-base font-semibold text-foreground">
+      <Text className="text-center text-base font-heading text-foreground">
         Liability Waiver
       </Text>
       <ScrollView

@@ -43,7 +43,7 @@ export function ResultStep({ matchId, participants, submissionTypes, onRecorded 
 
   return (
     <View className="gap-5 px-1 py-4">
-      <Text className="text-center text-lg font-semibold text-foreground">Record Result</Text>
+      <Text className="text-center text-lg font-heading text-foreground">Record Result</Text>
       <OutcomeToggle value={outcome} onChange={setOutcome} />
       {outcome === "submission" ? (
         <>
@@ -69,7 +69,7 @@ export function ResultStep({ matchId, participants, submissionTypes, onRecorded 
         {loading ? (
           <View className="flex-row items-center gap-2">
             <ActivityIndicator color={tokens.primaryForeground} size="small" />
-            <Text className="text-base font-semibold text-primary-foreground">Recording...</Text>
+            <Text className="text-base font-heading text-primary-foreground">Recording...</Text>
           </View>
         ) : (
           "Record Result"

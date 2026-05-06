@@ -51,7 +51,7 @@ export function ActiveSessionCard({ session }: ActiveSessionCardProps) {
           <View className="flex-row items-center justify-between">
             <View className="flex-row items-center gap-2">
               <Badge variant="success">Live</Badge>
-              <Text className="text-sm font-semibold text-foreground" numberOfLines={1}>
+              <Text className="text-sm font-heading text-foreground" numberOfLines={1}>
                 Session at {session.gymName}
               </Text>
             </View>
@@ -77,7 +77,7 @@ export function ActiveSessionCard({ session }: ActiveSessionCardProps) {
     <Card className="p-4">
       <View className="gap-2">
         <View className="flex-row items-center justify-between">
-          <Text className="text-sm font-semibold text-foreground flex-1" numberOfLines={1}>
+          <Text className="text-sm font-heading text-foreground flex-1" numberOfLines={1}>
             Upcoming at {session.gymName}
           </Text>
           <Badge variant="secondary">{formatStartsIn(session.scheduledStart)}</Badge>

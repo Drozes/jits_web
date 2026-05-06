@@ -73,7 +73,7 @@ export function ReadyStep(props: ReadyStepProps) {
   return (
     <View className="gap-5 px-1 py-4">
       <View className="items-center gap-1">
-        <Text className="text-lg font-semibold text-foreground">Ready Check</Text>
+        <Text className="text-lg font-heading text-foreground">Ready Check</Text>
         <Text className="text-sm text-muted-foreground">Both athletes must tap Ready to start.</Text>
       </View>
       <View className="flex-row gap-3">

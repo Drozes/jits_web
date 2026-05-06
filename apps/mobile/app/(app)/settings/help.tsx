@@ -48,12 +48,12 @@ export default function SettingsHelpScreen() {
       className="flex-1 bg-background"
       contentContainerStyle={{ padding: 16, paddingBottom: 48, gap: 24 }}
     >
-      <Text className="text-2xl font-bold text-foreground">
+      <Text className="text-2xl font-heading text-foreground">
         Help & Support
       </Text>
 
       <View className="gap-3">
-        <Text className="text-base font-semibold text-foreground">
+        <Text className="text-base font-heading text-foreground">
           Frequently Asked Questions
         </Text>
         <View className="gap-2">
@@ -68,7 +68,7 @@ export default function SettingsHelpScreen() {
       </View>
 
       <View className="border-t border-border pt-6 gap-3">
-        <Text className="text-base font-semibold text-foreground">
+        <Text className="text-base font-heading text-foreground">
           Need More Help?
         </Text>
         <Text className="text-sm text-muted-foreground">

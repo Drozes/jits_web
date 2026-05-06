@@ -31,7 +31,7 @@ export function WizardError({
   const router = useRouter();
   return (
     <View className="flex-1 items-center justify-center bg-background px-6">
-      <Text className="text-base font-semibold text-foreground">{title}</Text>
+      <Text className="text-base font-heading text-foreground">{title}</Text>
       {message ? (
         <Text className="mt-2 text-center text-sm text-muted-foreground">{message}</Text>
       ) : null}

@@ -36,7 +36,7 @@ export function StatOverview({ athlete, stats }: StatOverviewProps) {
               <TrendingUp size={20} className="text-primary" />
             </View>
             <Text className="text-sm font-medium text-muted-foreground mb-1.5">ELO Rating</Text>
-            <Text className="text-2xl font-bold tabular-nums text-foreground">{athlete.current_elo}</Text>
+            <Text className="text-2xl font-mono tabular-nums text-foreground">{athlete.current_elo}</Text>
             {showPeakElo ? <PeakLabel>peak: {athlete.highest_elo}</PeakLabel> : null}
           </CardContent>
         </Card>
@@ -49,7 +49,7 @@ export function StatOverview({ athlete, stats }: StatOverviewProps) {
               <Trophy size={20} className="text-yellow-500" />
             </View>
             <Text className="text-sm font-medium text-muted-foreground mb-1.5">Rank</Text>
-            <Text className="text-2xl font-bold tabular-nums text-foreground">
+            <Text className="text-2xl font-mono tabular-nums text-foreground">
               {stats.rank > 0 ? `#${stats.rank}` : "Unranked"}
             </Text>
             {showBestRank ? <PeakLabel>best: #{stats.bestRank}</PeakLabel> : null}
@@ -64,7 +64,7 @@ export function StatOverview({ athlete, stats }: StatOverviewProps) {
               <Swords size={20} className="text-muted-foreground" />
             </View>
             <Text className="text-sm font-medium text-muted-foreground mb-1.5">Record</Text>
-            <Text className="text-2xl font-bold tabular-nums">
+            <Text className="text-2xl font-mono tabular-nums">
               <Text className="text-success">{stats.wins}</Text>
               <Text className="text-muted-foreground"> - </Text>
               <Text className="text-amber-500">{stats.draws}</Text>
@@ -82,7 +82,7 @@ export function StatOverview({ athlete, stats }: StatOverviewProps) {
               <Flame size={20} className="text-orange-500" />
             </View>
             <Text className="text-sm font-medium text-muted-foreground mb-1.5">Win Streak</Text>
-            <Text className="text-2xl font-bold tabular-nums text-foreground">{stats.winStreak}</Text>
+            <Text className="text-2xl font-mono tabular-nums text-foreground">{stats.winStreak}</Text>
             {showBestStreak ? <PeakLabel>best: {stats.bestWinStreak}</PeakLabel> : null}
           </CardContent>
         </Card>

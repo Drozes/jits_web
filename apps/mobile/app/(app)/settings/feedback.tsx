@@ -100,7 +100,7 @@ export default function SettingsFeedbackScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <View className="gap-2">
-          <Text className="text-2xl font-bold text-foreground">
+          <Text className="text-2xl font-heading text-foreground">
             Send Feedback
           </Text>
           <Text className="text-sm text-muted-foreground">

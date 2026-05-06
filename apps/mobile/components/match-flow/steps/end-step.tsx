@@ -26,7 +26,7 @@ export function EndStep({ delayMs = 800, onAdvance }: EndStepProps) {
   return (
     <View className="items-center justify-center gap-4 px-4 py-12">
       <CheckCircle2 size={48} color={tokens.success} />
-      <Text className="text-lg font-semibold text-foreground">Match Ended</Text>
+      <Text className="text-lg font-heading text-foreground">Match Ended</Text>
       <ActivityIndicator color={tokens.mutedForeground} />
       <Text className="text-sm text-muted-foreground">Recording result...</Text>
     </View>

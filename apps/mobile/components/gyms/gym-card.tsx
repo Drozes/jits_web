@@ -27,19 +27,19 @@ export function GymCard({ gym, isMyGym, distanceLabel }: GymCardProps) {
           <View className="flex-1 min-w-0">
             <View className="flex-row items-center gap-2 flex-wrap">
               <Text
-                className="text-[15px] font-semibold text-foreground"
+                className="text-[15px] font-heading text-foreground"
                 numberOfLines={1}
               >
                 {gym.name}
               </Text>
               {isMyGym && (
                 <Badge variant="outline">
-                  <Text className="text-[10px] font-semibold text-foreground">My Gym</Text>
+                  <Text className="text-[10px] font-heading text-foreground">My Gym</Text>
                 </Badge>
               )}
               {gym.hasActiveSession && (
                 <Badge variant="success">
-                  <Text className="text-[10px] font-semibold text-success-foreground">Live</Text>
+                  <Text className="text-[10px] font-heading text-success-foreground">Live</Text>
                 </Badge>
               )}
             </View>

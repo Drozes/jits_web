@@ -85,7 +85,7 @@ export default function ProfileStatsScreen() {
         <Pressable onPress={() => router.back()} className="h-9 w-9 items-center justify-center rounded-full active:bg-muted/60" accessibilityRole="button">
           <ChevronLeft size={22} className="text-foreground" />
         </Pressable>
-        <Text className="text-lg font-semibold text-foreground">Stats</Text>
+        <Text className="text-lg font-heading text-foreground">Stats</Text>
       </View>
 
       <FlatList
@@ -99,19 +99,19 @@ export default function ProfileStatsScreen() {
             <View className="flex-row gap-3">
               <Card className="flex-1">
                 <CardContent className="py-3 px-2 items-center">
-                  <Text className="text-2xl font-bold tabular-nums text-foreground">{athlete.current_elo}</Text>
+                  <Text className="text-2xl font-mono tabular-nums text-foreground">{athlete.current_elo}</Text>
                   <Text className="text-xs text-muted-foreground">Current ELO</Text>
                 </CardContent>
               </Card>
               <Card className="flex-1">
                 <CardContent className="py-3 px-2 items-center">
-                  <Text className="text-2xl font-bold tabular-nums text-foreground">{wins}</Text>
+                  <Text className="text-2xl font-mono tabular-nums text-foreground">{wins}</Text>
                   <Text className="text-xs text-muted-foreground">Total Wins</Text>
                 </CardContent>
               </Card>
               <Card className="flex-1">
                 <CardContent className="py-3 px-2 items-center">
-                  <Text className="text-2xl font-bold tabular-nums text-success">{winRate}%</Text>
+                  <Text className="text-2xl font-mono tabular-nums text-success">{winRate}%</Text>
                   <Text className="text-xs text-muted-foreground">Win Rate</Text>
                 </CardContent>
               </Card>
@@ -122,7 +122,7 @@ export default function ProfileStatsScreen() {
               <CardContent className="p-4 items-center gap-2">
                 <View className="flex-row items-center gap-2">
                   <LineChart size={16} className="text-primary" />
-                  <Text className="text-sm font-semibold text-foreground">ELO History</Text>
+                  <Text className="text-sm font-heading text-foreground">ELO History</Text>
                 </View>
                 <View className="h-32 w-full items-center justify-center bg-muted/40 rounded-lg">
                   <Text className="text-xs text-muted-foreground text-center px-4">
@@ -153,11 +153,11 @@ export default function ProfileStatsScreen() {
                 ))}
               </View>
               <View className="flex-row items-center gap-1.5">
-                <Text className="text-xs font-semibold text-success tabular-nums">{wins}W</Text>
+                <Text className="text-xs font-mono text-success tabular-nums">{wins}W</Text>
                 <Text className="text-xs text-muted-foreground">-</Text>
-                <Text className="text-xs font-semibold text-destructive tabular-nums">{losses}L</Text>
+                <Text className="text-xs font-mono text-destructive tabular-nums">{losses}L</Text>
                 <Text className="text-xs text-muted-foreground">-</Text>
-                <Text className="text-xs font-semibold text-muted-foreground tabular-nums">{draws}D</Text>
+                <Text className="text-xs font-mono text-muted-foreground tabular-nums">{draws}D</Text>
               </View>
             </View>
           </View>

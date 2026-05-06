@@ -19,13 +19,13 @@ export function ResultBanner({
     resultData?.result === "submission" && resultData.winnerId !== currentAthleteId;
   return (
     <View className="items-center gap-1">
-      {isWinner ? <Text className="text-3xl font-bold text-success">Victory!</Text> : null}
-      {isLoser ? <Text className="text-3xl font-bold text-destructive">Defeat</Text> : null}
+      {isWinner ? <Text className="text-3xl font-display text-success">Victory!</Text> : null}
+      {isLoser ? <Text className="text-3xl font-display text-destructive">Defeat</Text> : null}
       {resultData?.result === "draw" ? (
-        <Text className="text-3xl font-bold text-amber-500">Draw</Text>
+        <Text className="text-3xl font-display text-amber-500">Draw</Text>
       ) : null}
       {!resultData ? (
-        <Text className="text-xl font-semibold text-foreground">Match Complete</Text>
+        <Text className="text-xl font-heading text-foreground">Match Complete</Text>
       ) : null}
       {matchType === "ranked" ? (
         <Text className="text-xs text-muted-foreground">

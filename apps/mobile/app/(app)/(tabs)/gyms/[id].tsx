@@ -150,7 +150,7 @@ export default function GymDetailScreen() {
         <Pressable onPress={() => router.back()} className="p-2 -ml-2">
           <ArrowLeft size={20} color={tokens.foreground} />
         </Pressable>
-        <Text className="ml-2 text-base font-semibold text-foreground">Gym</Text>
+        <Text className="ml-2 text-base font-heading text-foreground">Gym</Text>
       </View>
 
       <FlatList
@@ -160,10 +160,10 @@ export default function GymDetailScreen() {
         ListHeaderComponent={
           <View className="gap-3 mb-2">
             <View className="flex-row items-center gap-2 flex-wrap">
-              <Text className="text-2xl font-bold text-foreground">{data.name}</Text>
+              <Text className="text-2xl font-heading text-foreground">{data.name}</Text>
               {data.isMemberGym ? (
                 <Badge variant="outline">
-                  <Text className="text-[10px] font-semibold text-foreground">My Gym</Text>
+                  <Text className="text-[10px] font-heading text-foreground">My Gym</Text>
                 </Badge>
               ) : null}
             </View>
@@ -198,10 +198,10 @@ export default function GymDetailScreen() {
 
             <View className="flex-row items-center gap-2 mt-3">
               <Calendar size={18} color={tokens.primary} />
-              <Text className="text-lg font-semibold text-foreground">Sessions</Text>
+              <Text className="text-lg font-heading text-foreground">Sessions</Text>
               {data.sessions.length > 0 ? (
                 <View className="ml-1 px-2 py-0.5 rounded-full bg-muted">
-                  <Text className="text-[11px] font-bold text-muted-foreground">
+                  <Text className="text-[11px] font-mono text-muted-foreground">
                     {data.sessions.length}
                   </Text>
                 </View>

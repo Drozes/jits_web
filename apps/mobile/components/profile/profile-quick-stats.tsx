@@ -14,7 +14,7 @@ function StatCard({ label, value, valueClassName }: { label: string; value: stri
     <View className="flex-1 min-w-[45%]">
       <Card>
         <CardContent className="py-3 px-3 items-center">
-          <Text className={`text-xl font-bold tabular-nums ${valueClassName ?? "text-foreground"}`}>
+          <Text className={`text-xl font-mono tabular-nums ${valueClassName ?? "text-foreground"}`}>
             {value}
           </Text>
           <Text className="text-xs text-muted-foreground mt-0.5">{label}</Text>

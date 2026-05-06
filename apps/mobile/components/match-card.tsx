@@ -64,7 +64,7 @@ function CardInner({ type = "match", opponentName, opponentPhotoUrl, result, sta
         {type === "match" && eloDelta != null ? (
           <Text
             className={cn(
-              "text-sm font-semibold tabular-nums",
+              "text-sm font-mono tabular-nums",
               eloDelta > 0 && "text-success",
               eloDelta < 0 && "text-destructive",
               eloDelta === 0 && "text-muted-foreground",

@@ -37,7 +37,7 @@ export function WeightStep({ athleteWeight, onNext }: WeightStepProps) {
 
   return (
     <View className="gap-4 py-2">
-      <Text className="text-center text-base font-semibold text-foreground">
+      <Text className="text-center text-base font-heading text-foreground">
         Confirm your weight (lbs)
       </Text>
       <Text className="text-center text-sm text-muted-foreground">

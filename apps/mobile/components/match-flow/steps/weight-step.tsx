@@ -36,7 +36,7 @@ export function WeightStep(props: WeightStepProps) {
     <View className="gap-5 px-1 py-4">
       <View className="items-center gap-2">
         <Scale size={28} color={tokens.destructive} />
-        <Text className="text-lg font-semibold text-foreground">Verify Weights</Text>
+        <Text className="text-lg font-heading text-foreground">Verify Weights</Text>
       </View>
 
       <View className="flex-row gap-3">
@@ -73,7 +73,7 @@ function WeightCard({ name, weight }: { name: string; weight: number | null }) {
         <Text className="w-full text-center text-sm font-medium text-foreground" numberOfLines={1}>
           {name}
         </Text>
-        <Text className="text-3xl font-bold tabular-nums text-foreground">
+        <Text className="text-3xl font-mono tabular-nums text-foreground">
           {weight != null ? `${weight}` : "N/A"}
         </Text>
         {weight != null ? <Text className="text-xs text-muted-foreground">lbs</Text> : null}

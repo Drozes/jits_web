@@ -138,7 +138,7 @@ export default function GymsScreen() {
       <View className="px-4 pt-4 pb-2">
         <View className="flex-row items-center gap-2 mb-3">
           <MapPin size={20} color={tokens.primary} />
-          <Text className="text-2xl font-bold text-foreground">Gyms</Text>
+          <Text className="text-2xl font-heading text-foreground">Gyms</Text>
         </View>
         <Input
           placeholder="Search gyms..."

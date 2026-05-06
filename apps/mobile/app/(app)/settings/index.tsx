@@ -45,7 +45,7 @@ export default function SettingsScreen() {
       className="flex-1 bg-background"
       contentContainerStyle={{ padding: 16, paddingBottom: 48, gap: 24 }}
     >
-      <Text className="text-2xl font-bold text-foreground">Settings</Text>
+      <Text className="text-2xl font-heading text-foreground">Settings</Text>
 
       <Section title="Notifications">
         <Card>
@@ -135,7 +135,7 @@ function Section({
 }) {
   return (
     <View className="gap-3">
-      <Text className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+      <Text className="text-xs font-heading uppercase tracking-wider text-muted-foreground">
         {title}
       </Text>
       {children}

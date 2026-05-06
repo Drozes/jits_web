@@ -2,6 +2,33 @@
 
 ## [Unreleased]
 
+**Phase 7: Mobile Typography + Polish (2026-05-06)**
+
+**Added**
+- Mobile Tailwind font families: `font-display` (Bebas Neue), `font-heading` (DM Sans Bold), `font-body` (Inter), `font-mono` (JetBrains Mono).
+- 15 extracted component/hook files from oversized components and screens.
+
+**Changed**
+- ~100 raw `font-bold`/`font-semibold` instances replaced with semantic `font-heading`, `font-mono`, or `font-display` across 45+ mobile files.
+- 6 Stack layout files updated with themed header styles via `useThemedTokens()`.
+- Component splits: `compare-stats-modal` (184->100), `match-flow-wizard` (182->104), `recent-activity-section` (164->110), `notification-panel` (158->119), `athlete-card` (145->110).
+- Screen splits: `leaderboard/index` (330->71), `athlete/[id]` (297->108), `profile/index` (236->96).
+
+**Phase 8: Test Coverage + Auth Dedup (2026-05-06)**
+
+**Added**
+- 171 new tests across 13 new test files (27 suites, 346 total tests):
+  - Match flow: step-router (14), format-elapsed (14), parse-finish-time (17).
+  - Session: validate-weight (14), haversine distance (20).
+  - Realtime: session-match-sync (15), lobby-sync (13), pending-challenges (8), global-notifications (11).
+  - Offline: mutation-queue (17), use-unread-count (9).
+  - Mobile: CreateSessionSheet (8), SessionActions (4).
+  - Web: session-actions (8), session-list (6).
+  - Shared: GymDetail type assertions (5).
+
+**Changed**
+- Auth forms deduplicated: extracted 4 shared primitives (`auth-form-shell`, `email-input`, `password-input`, `google-oauth-button`). Forms reduced from 466 to 228 total lines (51%).
+
 **Alpha Build Verification & Hardening (2026-05-06)**
 
 **Added**

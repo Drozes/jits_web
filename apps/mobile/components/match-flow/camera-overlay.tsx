@@ -76,7 +76,7 @@ export function CameraOverlay({
         {recording ? (
           <View className="absolute right-2 top-2 flex-row items-center gap-1.5 rounded-full bg-black/60 px-2 py-1">
             <View className={cn("h-2 w-2 rounded-full bg-destructive")} />
-            <Text className="text-[10px] font-semibold uppercase tracking-wider text-white">REC</Text>
+            <Text className="text-[10px] font-heading uppercase tracking-wider text-white">REC</Text>
           </View>
         ) : null}
       </View>
