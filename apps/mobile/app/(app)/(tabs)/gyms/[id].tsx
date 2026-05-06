@@ -9,9 +9,11 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ArrowLeft, MapPin, Users, Calendar } from "lucide-react-native";
+import { ArrowLeft, MapPin, Users, Calendar, Plus } from "lucide-react-native";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { SessionCard } from "@/components/session-card";
+import { CreateSessionSheet } from "@/components/session/create-session-sheet";
 import { useRequireAthlete } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { supabase } from "@/lib/supabase/client";
@@ -205,10 +207,26 @@ export default function GymDetailScreen() {
                 </View>
               ) : null}
             </View>
+
+            {data.isGymManager ? (
+              <CreateSessionSheet gymId={data.id} onCreated={refresh}>
+                <Button
+                  leftIcon={<Plus size={16} color={tokens.primaryForeground} />}
+                >
+                  Start Session
+                </Button>
+              </CreateSessionSheet>
+            ) : null}
           </View>
         }
         renderItem={({ item }) => (
-          <SessionCard session={item} isRsvpd={rsvpSet.has(item.id)} isParticipant={participantSet.has(item.id)} />
+          <SessionCard
+            session={item}
+            isRsvpd={rsvpSet.has(item.id)}
+            isParticipant={participantSet.has(item.id)}
+            canManage={item.createdBy === athlete?.id || !!data?.isGymManager}
+            onActionComplete={refresh}
+          />
         )}
         ListEmptyComponent={
           <View className="rounded-md border border-dashed border-border p-8 items-center">

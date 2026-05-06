@@ -1,4 +1,4 @@
-# JITS Terms of Service
+# ELO RATED Terms of Service
 
 **Last updated:** 2026-04-27 (DRAFT, requires legal review before publishing)
 
@@ -6,7 +6,7 @@
 
 ## 1. Acceptance
 
-By creating an account in JITS or using the app, you accept these Terms. If you do not accept them, do not use the app.
+By creating an account in ELO RATED or using the app, you accept these Terms. If you do not accept them, do not use the app.
 
 ## 2. Eligibility
 
@@ -35,13 +35,13 @@ You agree **not** to:
 
 ## 5. User Content
 
-You retain ownership of content you upload (profile photos, match recordings). By uploading, you grant JITS a non-exclusive, royalty-free license to host, display, and transmit that content within the app, solely as needed to provide the service.
+You retain ownership of content you upload (profile photos, match recordings). By uploading, you grant ELO RATED a non-exclusive, royalty-free license to host, display, and transmit that content within the app, solely as needed to provide the service.
 
-JITS may remove content that violates these Terms or applicable law.
+ELO RATED may remove content that violates these Terms or applicable law.
 
 ## 6. Sparring Disclaimer
 
-**BJJ training carries inherent risk of physical injury.** JITS provides matchmaking, rating, and recording features, but we are not responsible for injuries sustained during sparring. You spar at your own risk and are responsible for verifying the safety of your training environment, your partner's experience level, and your own physical readiness.
+**BJJ training carries inherent risk of physical injury.** ELO RATED provides matchmaking, rating, and recording features, but we are not responsible for injuries sustained during sparring. You spar at your own risk and are responsible for verifying the safety of your training environment, your partner's experience level, and your own physical readiness.
 
 ## 7. Service Changes
 
@@ -53,11 +53,11 @@ You may delete your account at any time from Settings. We may suspend or termina
 
 ## 9. Disclaimers
 
-THE APP IS PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND. To the maximum extent permitted by law, JITS disclaims all warranties, express or implied, including merchantability, fitness for a particular purpose, and non-infringement.
+THE APP IS PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND. To the maximum extent permitted by law, ELO RATED disclaims all warranties, express or implied, including merchantability, fitness for a particular purpose, and non-infringement.
 
 ## 10. Limitation of Liability
 
-To the maximum extent permitted by law, JITS will not be liable for any indirect, incidental, consequential, or punitive damages arising from your use of the app.
+To the maximum extent permitted by law, ELO RATED will not be liable for any indirect, incidental, consequential, or punitive damages arising from your use of the app.
 
 ## 11. Governing Law
 

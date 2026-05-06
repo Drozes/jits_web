@@ -1,17 +1,17 @@
-# JITS Mobile App, Store Listing Draft
+# ELO RATED Mobile App, Store Listing Draft
 
-Last updated: 2026-04-27 (Phase 5 B2)
+Last updated: 2026-05-06 (Phase 5 B2)
 
-This document captures the metadata required to submit JITS to the Apple App Store and Google Play Store. Items marked **PLACEHOLDER** must be replaced with real values before submission.
+This document captures the metadata required to submit ELO RATED to the Apple App Store and Google Play Store. Items marked **PLACEHOLDER** must be replaced with real values before submission.
 
 ---
 
 ## App Store Connect (iOS)
 
-- **App Name:** JITS
+- **App Name:** ELO RATED
 - **Subtitle:** BJJ Competitor Matchmaking
-- **Bundle Identifier:** `com.jits.mobile` (**PLACEHOLDER**, replace with real Apple Developer account identifier)
-- **SKU:** `jits-mobile-001`
+- **Bundle Identifier:** `com.elorated.mobile` (**PLACEHOLDER**, replace with real Apple Developer account identifier)
+- **SKU:** `elorated-mobile-001`
 - **Primary Category:** Sports
 - **Secondary Category:** Health & Fitness
 - **Content Rating:** 12+ (Frequent/Intense Sports themes)
@@ -19,15 +19,15 @@ This document captures the metadata required to submit JITS to the Apple App Sto
 
 ### Description (long form, up to 4000 chars)
 
-JITS is the matchmaking app for Brazilian Jiu-Jitsu practitioners. Find sparring partners at your gym, track your skill level over time, and turn open-mat sessions into structured, ranked match lobbies.
+ELO RATED is the matchmaking app for Brazilian Jiu-Jitsu practitioners. Find sparring partners at your gym, track your skill level over time, and turn open-mat sessions into structured, ranked match lobbies.
 
-**Session-based gym lobbies.** Check in to a session at your gym to see who else is on the mats. JITS pairs you with partners at your size and skill level so you spend less time looking for a roll and more time training.
+**Session-based gym lobbies.** Check in to a session at your gym to see who else is on the mats. ELO RATED pairs you with partners at your size and skill level so you spend less time looking for a roll and more time training.
 
 **ELO-based skill rating.** Every ranked match updates your ELO rating using a weight-aware formula tuned for BJJ. Heavier opponents are weighted appropriately, draws cost both athletes some ELO (the "Pressure Score"), and your full rating history is visible from your profile.
 
 **Built-in match recording.** Record your matches in 16:9 with audio, review them after the session, and share them with training partners. Recording is opt-in per match.
 
-**Private and respectful.** JITS does not share your training data with third parties. Match recordings stay in your account unless you explicitly share them.
+**Private and respectful.** ELO RATED does not share your training data with third parties. Match recordings stay in your account unless you explicitly share them.
 
 ### Keywords (max 100 chars total, comma separated)
 
@@ -77,11 +77,11 @@ JITS is the matchmaking app for Brazilian Jiu-Jitsu practitioners. Find sparring
 
 ### Privacy Policy URL
 
-**TODO**: Host `PRIVACY_POLICY.md` at a public URL (e.g., `https://jits.app/privacy`) and put that URL here.
+**TODO**: Host `PRIVACY_POLICY.md` at a public URL (e.g., `https://elorated.com/privacy`) and put that URL here.
 
 ### Terms of Service / EULA URL
 
-**TODO**: Host `TERMS.md` at a public URL (e.g., `https://jits.app/terms`) and put that URL here. The standard Apple EULA is acceptable as a fallback while a real TOS is drafted.
+**TODO**: Host `TERMS.md` at a public URL (e.g., `https://elorated.com/terms`) and put that URL here. The standard Apple EULA is acceptable as a fallback while a real TOS is drafted.
 
 ### App Review Contact
 
@@ -95,8 +95,8 @@ JITS is the matchmaking app for Brazilian Jiu-Jitsu practitioners. Find sparring
 
 ## Google Play Console (Android)
 
-- **App Name:** JITS
-- **Package Name:** `com.jits.mobile` (**PLACEHOLDER**)
+- **App Name:** ELO RATED
+- **Package Name:** `com.elorated.mobile` (**PLACEHOLDER**)
 - **Default Language:** English (US)
 - **Category:** Sports
 - **Target Audience and Content:** Ages 13+
@@ -165,16 +165,16 @@ Mirror the iOS privacy disclosure. Declare:
 
 Items the maintainer must complete before submitting to either store. Order matches the recommended completion order.
 
-- [ ] Replace placeholder bundle ID `com.jits.mobile` with the real Apple developer account bundle ID in `apps/mobile/app.json` (`ios.bundleIdentifier`)
-- [ ] Replace placeholder Android package `com.jits.mobile` with the real Play Console package name in `apps/mobile/app.json` (`android.package`)
+- [ ] Replace placeholder bundle ID `com.elorated.mobile` with the real Apple developer account bundle ID in `apps/mobile/app.json` (`ios.bundleIdentifier`)
+- [ ] Replace placeholder Android package `com.elorated.mobile` with the real Play Console package name in `apps/mobile/app.json` (`android.package`)
 - [ ] Run `eas init` from `apps/mobile/` to create the EAS project; copy the resulting project ID into `apps/mobile/app.json` at `extra.eas.projectId` (currently `PLACEHOLDER_PROJECT_ID`)
 - [ ] Replace `https://u.expo.dev/PLACEHOLDER_PROJECT_ID` in `apps/mobile/app.json` (`updates.url`) with the real EAS Update URL after `eas init`
 - [ ] Replace placeholder app icon (`apps/mobile/assets/icon.png`) with the production-grade branded asset (App Store: 1024x1024 RGBA, no transparency on iOS; Play Store: 512x512 PNG)
 - [ ] Replace splash screen image (`apps/mobile/assets/splash-icon.png`) with the production splash artwork; verify the splash `backgroundColor` (`#bf1212`) matches brand red
 - [ ] Replace the favicon (`apps/mobile/assets/favicon.png`)
 - [ ] Replace the Android adaptive icon (`apps/mobile/assets/adaptive-icon.png`); verify the foreground asset has the correct safe zone (the inner 66% must hold the logo)
-- [ ] Host AASA file at `https://jits.app/.well-known/apple-app-site-association` (required for `applinks:jits.app` Universal Links)
-- [ ] Host `assetlinks.json` at `https://jits.app/.well-known/assetlinks.json` (required for Android App Links `autoVerify`)
+- [ ] Host AASA file at `https://elorated.com/.well-known/apple-app-site-association` (required for `applinks:elorated.com` Universal Links)
+- [ ] Host `assetlinks.json` at `https://elorated.com/.well-known/assetlinks.json` (required for Android App Links `autoVerify`)
 - [ ] Set `EXPO_PUBLIC_SENTRY_DSN` in EAS secrets (`eas secret:create --scope project --name EXPO_PUBLIC_SENTRY_DSN --value <DSN>`)
 - [ ] Set `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` in EAS secrets
 - [ ] Host `PRIVACY_POLICY.md` content at a public URL and update both store listings with the link

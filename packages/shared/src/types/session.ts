@@ -47,6 +47,7 @@ export interface GymDetail {
   participantSessionIds: string[];
   memberCount: number;
   isMemberGym: boolean;
+  isGymManager: boolean;
 }
 
 /** Dashboard active session card shape */

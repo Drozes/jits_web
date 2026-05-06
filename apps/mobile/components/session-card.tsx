@@ -3,6 +3,7 @@ import { useRouter } from "expo-router";
 import { Clock, Users } from "lucide-react-native";
 import { Card } from "./ui/card";
 import { Badge } from "./ui/badge";
+import { SessionActions } from "./session/session-actions";
 import { useThemedTokens } from "../lib/theme/use-theme";
 import { formatTimeUntil } from "@jits/shared/utils";
 import type { SessionListItem } from "@jits/shared/types/session";
@@ -13,6 +14,10 @@ interface SessionCardProps {
   isRsvpd?: boolean;
   /** Optional: if true, routes directly to the lobby instead of the join wizard. */
   isParticipant?: boolean;
+  /** Optional: if true, shows session management actions (activate, cancel, end). */
+  canManage?: boolean;
+  /** Called after a management action completes (e.g. activate, cancel). */
+  onActionComplete?: () => void;
 }
 
 function formatSessionTime(start: string, end: string) {
@@ -34,7 +39,7 @@ function formatSessionTime(start: string, end: string) {
   return `${dateStr}, ${startTime} - ${endTime}`;
 }
 
-export function SessionCard({ session, isRsvpd, isParticipant }: SessionCardProps) {
+export function SessionCard({ session, isRsvpd, isParticipant, canManage, onActionComplete }: SessionCardProps) {
   const router = useRouter();
   const tokens = useThemedTokens();
   const title = session.title ?? "Open Mat";
@@ -59,15 +64,20 @@ export function SessionCard({ session, isRsvpd, isParticipant }: SessionCardProp
           <Text className="text-[15px] font-semibold text-foreground">
             {title}
           </Text>
-          {isActive ? (
-            <Badge variant="success">
-              <Text className="text-[10px] font-semibold text-success-foreground">Live</Text>
-            </Badge>
-          ) : (
-            <Badge variant="secondary">
-              <Text className="text-[10px] font-semibold text-secondary-foreground">Scheduled</Text>
-            </Badge>
-          )}
+          <View className="flex-row items-center gap-1.5">
+            {isActive ? (
+              <Badge variant="success">
+                <Text className="text-[10px] font-semibold text-success-foreground">Live</Text>
+              </Badge>
+            ) : (
+              <Badge variant="secondary">
+                <Text className="text-[10px] font-semibold text-secondary-foreground">Scheduled</Text>
+              </Badge>
+            )}
+            {canManage && onActionComplete ? (
+              <SessionActions sessionId={session.id} status={session.status} onActionComplete={onActionComplete} />
+            ) : null}
+          </View>
         </View>
 
         <View className="flex-row items-center gap-1.5">

@@ -1,4 +1,4 @@
-# JITS Privacy Policy
+# ELO RATED Privacy Policy
 
 **Last updated:** 2026-04-27 (DRAFT, requires legal review before publishing)
 
@@ -6,7 +6,7 @@
 
 ## 1. Who We Are
 
-JITS ("we," "us," "our") is a mobile and web application that helps Brazilian Jiu-Jitsu practitioners find sparring partners, track skill ratings, and record matches at their gyms.
+ELO RATED ("we," "us," "our") is a mobile and web application that helps Brazilian Jiu-Jitsu practitioners find sparring partners, track skill ratings, and record matches at their gyms.
 
 ## 2. What We Collect
 
@@ -55,7 +55,7 @@ To exercise these rights, email **TBD** (placeholder, fill in before publishing)
 
 ## 7. Children
 
-JITS is intended for users 13 and older. We do not knowingly collect data from children under 13. If you become aware that a child under 13 has provided personal data, contact us so we can delete it.
+ELO RATED is intended for users 13 and older. We do not knowingly collect data from children under 13. If you become aware that a child under 13 has provided personal data, contact us so we can delete it.
 
 ## 8. Changes
 

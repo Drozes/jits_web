@@ -12,7 +12,7 @@
         "simulator": true
       },
       "env": {
-        "EXPO_PUBLIC_ENV": "development"
+        "EXPO_PUBLIC_APP_ENV": "development"
       }
     },
     "preview": {
@@ -25,18 +25,26 @@
         "resourceClass": "m-medium"
       },
       "env": {
-        "EXPO_PUBLIC_ENV": "preview"
+        "EXPO_PUBLIC_APP_ENV": "staging"
       }
     },
     "production": {
       "channel": "production",
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_ENV": "production"
+        "EXPO_PUBLIC_APP_ENV": "production"
       }
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "ascAppId": "PLACEHOLDER_ASC_APP_ID"
+      },
+      "android": {
+        "serviceAccountKeyPath": "PLACEHOLDER_SERVICE_ACCOUNT_KEY_PATH",
+        "track": "internal"
+      }
+    }
   }
 }

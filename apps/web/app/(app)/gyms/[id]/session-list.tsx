@@ -6,9 +6,10 @@ interface SessionListProps {
   sessions: SessionListItem[];
   rsvpSessionIds: string[];
   currentAthleteId: string;
+  isGymManager?: boolean;
 }
 
-export function SessionList({ sessions, rsvpSessionIds, currentAthleteId }: SessionListProps) {
+export function SessionList({ sessions, rsvpSessionIds, currentAthleteId, isGymManager }: SessionListProps) {
   // Active sessions first, then upcoming sorted by closest start time
   const sorted = [...sessions].sort((a, b) => {
     if (a.status === "active" && b.status !== "active") return -1;
@@ -37,7 +38,7 @@ export function SessionList({ sessions, rsvpSessionIds, currentAthleteId }: Sess
               key={session.id}
               session={session}
               isRsvpd={rsvpSessionIds.includes(session.id)}
-              isCreator={session.createdBy === currentAthleteId}
+              isCreator={session.createdBy === currentAthleteId || !!isGymManager}
             />
           ))}
         </div>

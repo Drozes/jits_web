@@ -599,8 +599,8 @@ export async function getGymDetail(
     createdByName: creatorNameMap.get(s.created_by) ?? "Unknown",
   }));
 
-  // 5. Check membership + count members
-  const [{ data: athleteRow }, { count: memberCount }] = await Promise.all([
+  // 5. Check membership, manager status, and count members
+  const [{ data: athleteRow }, { count: memberCount }, { data: managerRow }] = await Promise.all([
     supabase
       .from("athletes")
       .select("primary_gym_id")
@@ -611,9 +611,16 @@ export async function getGymDetail(
       .select("id", { count: "exact", head: true })
       .eq("primary_gym_id", gymId)
       .eq("status", "active"),
+    supabase
+      .from("gym_managers")
+      .select("id")
+      .eq("gym_id", gymId)
+      .eq("athlete_id", athleteId)
+      .maybeSingle(),
   ]);
 
   const isMemberGym = athleteRow?.primary_gym_id === gymId;
+  const isGymManager = !!managerRow;
 
   return {
     id: gym.id,
@@ -625,6 +632,7 @@ export async function getGymDetail(
     participantSessionIds,
     memberCount: memberCount ?? 0,
     isMemberGym,
+    isGymManager,
   };
 }
 

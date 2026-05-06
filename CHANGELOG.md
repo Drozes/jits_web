@@ -2,6 +2,28 @@
 
 ## [Unreleased]
 
+**Alpha Build Phase 3: Gym Manager Feature (2026-05-06)**
+
+**Added**
+- Gym manager role support: `isGymManager` check in `getGymDetail` query, `gym_managers` table type in `database.ts`.
+- Web: session creation gated behind gym manager role (was member-only). Session actions visible to gym managers and creators.
+- Mobile: `CreateSessionSheet` (`apps/mobile/components/session/create-session-sheet.tsx`) with title, time presets, duration, capacity, notes.
+- Mobile: `SessionActions` (`apps/mobile/components/session/session-actions.tsx`) with activate, end, cancel via native Alert menus.
+- Mobile: gym detail screen shows "Start Session" for gym managers and management controls on session cards.
+
+**Alpha Build Phase 4: Build Pipeline (2026-05-06)**
+
+**Added**
+- Universal link verification files: `public/.well-known/apple-app-site-association` and `assetlinks.json` for `elorated.com`.
+- EAS setup guide (`docs/eas-setup.md`): step-by-step for EAS Build, secrets, TestFlight, Play Console.
+- Universal links setup guide (`docs/universal-links-setup.md`).
+- EAS submit config for iOS (App Store Connect) and Android (Play Console internal track).
+
+**Changed**
+- EAS build profiles use `EXPO_PUBLIC_APP_ENV` (aligned with env setup docs).
+- All legal docs (PRIVACY_POLICY.md, TERMS.md) updated: "JITS" to "ELO RATED", domain to `elorated.com`.
+- STORE_LISTING.md updated: app name, bundle ID, domain, all user-facing text to ELO RATED branding.
+
 **Alpha Build Phase 1: Infrastructure (2026-05-06)**
 
 **Added**

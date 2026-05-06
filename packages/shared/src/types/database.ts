@@ -420,6 +420,52 @@ export type Database = {
           },
         ]
       }
+      gym_managers: {
+        Row: {
+          id: string
+          gym_id: string
+          athlete_id: string
+          granted_at: string
+          granted_by: string | null
+        }
+        Insert: {
+          id?: string
+          gym_id: string
+          athlete_id: string
+          granted_at?: string
+          granted_by?: string | null
+        }
+        Update: {
+          id?: string
+          gym_id?: string
+          athlete_id?: string
+          granted_at?: string
+          granted_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gym_managers_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "gyms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gym_managers_athlete_id_fkey"
+            columns: ["athlete_id"]
+            isOneToOne: false
+            referencedRelation: "athletes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gym_managers_granted_by_fkey"
+            columns: ["granted_by"]
+            isOneToOne: false
+            referencedRelation: "athletes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       gyms: {
         Row: {
           address: string | null
@@ -1448,6 +1494,10 @@ export type Database = {
       get_athlete_profile_stills: {
         Args: { p_athlete_id: string }
         Returns: Json
+      }
+      is_gym_manager: {
+        Args: { p_gym_id: string }
+        Returns: boolean
       }
       get_athlete_stats: {
         Args: { p_athlete_id: string }
