@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+**Alpha Build Verification & Hardening (2026-05-06)**
+
+**Added**
+- Automation scripts: `scripts/verify-alpha.sh` (full CI verification), `scripts/setup-supabase-env.sh` (staging/prod provisioning), `scripts/seed-gym-manager.sh` (initial manager seeding).
+- Mobile tests: `CreateSessionSheet` (8 tests) and `SessionActions` (4 tests) at `apps/mobile/__tests__/components/session/`.
+- Web tests: 6 new tests for session list gym manager gating and type assertions.
+- Shared tests: `GymDetail.isGymManager` type assertion test.
+- Backend: 17 pgTAP tests for `gym_managers` table, RLS policies, `is_gym_manager()` function, and session creation gating.
+- Total test count: 16 suites, 175 tests (up from 11/144).
+
+**Changed**
+- CLAUDE.md updated: alpha status, app identity, gym manager docs, resolved tech debt items, new directory structure.
+
 **Alpha Build Phase 3: Gym Manager Feature (2026-05-06)**
 
 **Added**

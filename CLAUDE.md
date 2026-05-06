@@ -16,7 +16,13 @@ Both apps consume `@jits/shared` for all Supabase reads, writes, and realtime su
 - Feature specs in `specs/`.
 - Read the BE repo's `README.md` and migrations when you need to understand the database schema, RLS policies, or business rules.
 
-**Status:** Phase 1 through 5 shipped on 2026-04-27. Web is in active beta. Mobile is feature-complete for the beta scope (auth, dashboard, gyms, leaderboard, sessions, live match flow with video, push, presence, deep links, offline handling, Sentry) and ready for an EAS preview build pending the manual checklist in `STORE_LISTING.md`.
+**Status:** Alpha build code-complete as of 2026-05-06. Web is in active beta. Mobile is feature-complete for alpha (auth, dashboard, gyms, leaderboard, sessions, live match flow with video, push, presence, deep links, offline handling, Sentry, gym manager role). CI/CD pipeline active. Pending: Apple/Google account enrollment, EAS init, Supabase staging/prod provisioning, then `eas build`. See `docs/eas-setup.md` for the step-by-step.
+
+**App Identity:**
+- Bundle ID: `com.elorated.mobile`
+- URL scheme: `elorated://`
+- Domain: `elorated.com`
+- App name: ELO RATED
 
 ## Architecture
 
@@ -24,13 +30,17 @@ Both apps consume `@jits/shared` for all Supabase reads, writes, and realtime su
 
 ```
 /                                root package.json + tsconfig.base.json + .husky/pre-commit
+  .github/workflows/ci.yml      GitHub Actions CI (typecheck, test, build, bundle)
   apps/web/                      Next.js 16 frontend (web app)
   apps/mobile/                   Expo SDK 54 (iOS + Android)
   packages/shared/               @jits/shared, cross-platform data layer
+  public/.well-known/            AASA + assetlinks for universal links (elorated.com)
+  docs/                          setup guides (environment, EAS, universal links)
   research/                      research docs and integration briefs
-  specs/                         feature specs
+  scripts/                       automation scripts (verify, seed, setup)
+  specs/                         feature specs (gym-manager, bot-session-commands, alpha-build)
   CHANGELOG.md, CLAUDE.md, README.md, DESIGN.md
-  STORE_LISTING.md, PRIVACY_POLICY.md, TERMS.md   (Phase 5 B2 launch docs)
+  STORE_LISTING.md, PRIVACY_POLICY.md, TERMS.md   (launch docs, branded ELO RATED)
 ```
 
 Path aliases (configured in `apps/web/tsconfig.json` and `apps/mobile/tsconfig.json`):
@@ -414,9 +424,10 @@ Mobile uses topical directories under `apps/mobile/components/` (`dashboard/`, `
 ## Known Tech Debt (Priority Order)
 
 **High (pre-launch blockers):**
-- [ ] `apps/mobile/app.json` placeholders: `extra.eas.projectId`, `updates.url` (project ID), `ios.bundleIdentifier`, `android.package`. Replace before the first preview build (see `STORE_LISTING.md`).
-- [ ] Sentry error tracking not initialized: `apps/mobile/lib/error-tracking/sentry-init.ts` was removed; `@sentry/react-native` config plugin needs `org`/`project` in `apps/mobile/app.json`; error boundary has no Sentry integration.
-- [ ] Universal-link verification needs hosted Apple App Site Association and Android `assetlinks.json` files at `https://jits.app/.well-known/`. App-side intent filters are already declared in `apps/mobile/app.json`.
+- [ ] `apps/mobile/app.json` placeholders: `extra.eas.projectId`, `updates.url` still use `PLACEHOLDER_PROJECT_ID`. Run `eas init` to replace.
+- [ ] Sentry config plugin has placeholder `organization`/`project` in `apps/mobile/app.json`. Replace with real Sentry org/project before first EAS build.
+- [ ] Universal-link files created at `public/.well-known/` but need: real Apple Team ID in AASA, real SHA256 fingerprint in assetlinks, hosted at `https://elorated.com/.well-known/`.
+- [ ] Apple Developer Program + Google Play Console enrollment required.
 
 **Medium (polish and consistency):**
 - [ ] Mobile Tailwind config (`apps/mobile/tailwind.config.js`) has no `fontFamily` entries for `font-display`, `font-heading`, `font-body`, `font-mono`. Fonts are loaded via `expo-font` but not mapped to Tailwind classes. ~60 instances of raw `font-bold`/`font-semibold` instead of semantic brand typography.
@@ -432,6 +443,11 @@ Mobile uses topical directories under `apps/mobile/components/` (`dashboard/`, `
 **Resolved:**
 - [x] `apps/mobile/lib/network/mutation-queue.ts` is wired into `recordMatchResult` (via `use-record-result.ts`) and `confirmMatchResult` (via `confirm-step.tsx`). Queue flushes on NetInfo reconnect; `QueueStatusBanner` shows pending state.
 - [x] Phantom tab bar items (athlete, session, settings) eliminated by restructuring routes into `(app)/(tabs)/` group (2026-05-01).
+- [x] Sentry error tracking wired: `apps/mobile/lib/error-tracking/sentry.ts` with guarded init, error boundary forwarding, `@sentry/react-native/expo` config plugin (2026-05-06).
+- [x] Bundle identifiers set: `com.elorated.mobile` for both iOS and Android (2026-05-06).
+- [x] GitHub Actions CI/CD: typecheck, test, web build, mobile bundle on push/PR (2026-05-06).
+- [x] App scheme updated from `jits://` to `elorated://`, associated domains to `elorated.com` (2026-05-06).
+- [x] Session creation restricted to gym managers via `gym_managers` junction table + RLS (2026-05-06).
 
 ## Chat UI Patterns (web)
 
@@ -465,7 +481,17 @@ Challenges -> Challenger:         athletes!fk_challenges_challenger(display_name
 Matches -> Participants:          matches!fk_participants_match(completed_at, status)
 Sessions -> Gyms:                 gyms!fk_sessions_gym(name, city, latitude, longitude)
 Session participants -> Athletes: athletes!fk_session_participants_athlete(display_name, current_elo, current_weight)
+Gym managers -> Gyms:             gyms (via gym_managers.gym_id)
+Gym managers -> Athletes:         athletes (via gym_managers.athlete_id)
 ```
+
+### Gym Manager Role
+
+Session creation is restricted to designated gym managers via the `gym_managers` junction table. The `is_gym_manager(p_gym_id)` RPC (SECURITY DEFINER) checks the calling athlete's status. Initial managers must be seeded via service role or Supabase dashboard; after that, existing managers can grant access to new managers.
+
+- **Query:** `getGymDetail()` returns `isGymManager: boolean` by checking `gym_managers` table.
+- **Web:** "Create Session" button gated on `isGymManager`. Session actions (activate, cancel, end) visible to creators and gym managers.
+- **Mobile:** `CreateSessionSheet` (bottom sheet) and `SessionActions` (native Alert menus) follow the same gating.
 
 ## Data Access Layer (`@jits/shared/api`)
 
