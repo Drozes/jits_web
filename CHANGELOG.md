@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+**Phase 6C: Mobile Gym Management (2026-05-06)**
+
+**Added**
+- Mobile: gym creation sheet, gym edit sheet, session templates section with full CRUD.
+- Mobile: template-card, template-form-sheet with day/time/duration pickers.
+- Gym list "Create" button and gym detail edit button (managers only).
+
+**Phase 10: Analytics + Insights (2026-05-06)**
+
+**Added**
+- Analytics queries: `getWeeklyMatchActivity`, `getSubmissionBreakdown`, `getWeightClassStats`, `getGymManagerStats`.
+- Rating milestones: 7-tier system (Newcomer to Legend) with `getCurrentMilestone`, `getNextMilestone`, `getMilestoneProgress`.
+- Web: athlete insights tab (weekly activity chart, submission breakdown, weight class stats) with CSS-only visualizations.
+- Web: gym manager stats dashboard (sessions, check-ins, matches, members) on gym detail page.
+- Mobile: submission breakdown, weekly activity, milestone progress on profile stats screen.
+- Analytics types: `WeeklyActivity`, `SubmissionBreakdown`, `WeightClassStats`, `GymManagerStats`.
+
 **Phase 6: Gym Manager Onboarding (2026-05-06)**
 
 **Added**

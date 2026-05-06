@@ -3,11 +3,12 @@ import { MapPin, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { requireAthlete } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
-import { getGymDetail, getSessionTemplates } from "@jits/shared/api/queries";
+import { getGymDetail, getSessionTemplates, getGymManagerStats } from "@jits/shared/api/queries";
 import { SessionList } from "./session-list";
 import { CreateSessionDialog } from "./create-session-dialog";
 import { EditGymDialog } from "./edit-gym-dialog";
 import { SessionTemplates } from "./session-templates";
+import { GymStats } from "./gym-stats";
 
 interface GymDetailContentProps {
   paramsPromise: Promise<{ id: string }>;
@@ -17,9 +18,10 @@ export async function GymDetailContent({ paramsPromise }: GymDetailContentProps)
   const { id } = await paramsPromise;
   const { athlete } = await requireAthlete();
   const supabase = await createClient();
-  const [gym, templates] = await Promise.all([
+  const [gym, templates, managerStats] = await Promise.all([
     getGymDetail(supabase, id, athlete.id),
     getSessionTemplates(supabase, id),
+    getGymManagerStats(supabase, id),
   ]);
 
   if (!gym) notFound();
@@ -35,6 +37,9 @@ export async function GymDetailContent({ paramsPromise }: GymDetailContentProps)
           <CreateSessionDialog gymId={id} />
         </div>
       )}
+
+      {/* Gym stats (visible to managers) */}
+      {gym.isGymManager && <GymStats stats={managerStats} />}
 
       {/* Session templates (visible to managers, create-session available to all) */}
       {(gym.isGymManager || templates.length > 0) && (

@@ -9,11 +9,13 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ArrowLeft, MapPin, Users, Calendar, Plus } from "lucide-react-native";
+import { ArrowLeft, MapPin, Users, Calendar, Plus, Pencil } from "lucide-react-native";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SessionCard } from "@/components/session-card";
 import { CreateSessionSheet } from "@/components/session/create-session-sheet";
+import { EditGymSheet } from "@/components/gyms/edit-gym-sheet";
+import { SessionTemplates } from "@/components/session/session-templates";
 import { useRequireAthlete } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { supabase } from "@/lib/supabase/client";
@@ -146,11 +148,25 @@ export default function GymDetailScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background" edges={["top"]}>
-      <View className="flex-row items-center px-4 py-3 border-b border-border">
-        <Pressable onPress={() => router.back()} className="p-2 -ml-2">
-          <ArrowLeft size={20} color={tokens.foreground} />
-        </Pressable>
-        <Text className="ml-2 text-base font-heading text-foreground">Gym</Text>
+      <View className="flex-row items-center justify-between px-4 py-3 border-b border-border">
+        <View className="flex-row items-center">
+          <Pressable onPress={() => router.back()} className="p-2 -ml-2">
+            <ArrowLeft size={20} color={tokens.foreground} />
+          </Pressable>
+          <Text className="ml-2 text-base font-heading text-foreground">Gym</Text>
+        </View>
+        {data?.isGymManager ? (
+          <EditGymSheet
+            gymId={data.id}
+            currentName={data.name}
+            currentCity={data.city}
+            onUpdated={refresh}
+          >
+            <Pressable className="p-2 -mr-2">
+              <Pencil size={18} color={tokens.foreground} />
+            </Pressable>
+          </EditGymSheet>
+        ) : null}
       </View>
 
       <FlatList
@@ -217,6 +233,8 @@ export default function GymDetailScreen() {
                 </Button>
               </CreateSessionSheet>
             ) : null}
+
+            <SessionTemplates gymId={data.id} isManager={data.isGymManager} />
           </View>
         }
         renderItem={({ item }) => (

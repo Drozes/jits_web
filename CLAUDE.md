@@ -16,7 +16,7 @@ Both apps consume `@jits/shared` for all Supabase reads, writes, and realtime su
 - Feature specs in `specs/`.
 - Read the BE repo's `README.md` and migrations when you need to understand the database schema, RLS policies, or business rules.
 
-**Status:** Alpha build code-complete as of 2026-05-06. Web is in active beta. Mobile is feature-complete for alpha (auth, dashboard, gyms, leaderboard, sessions, live match flow with video, push, presence, deep links, offline handling, Sentry, gym manager role). CI/CD pipeline active. Pending: Apple/Google account enrollment, EAS init, Supabase staging/prod provisioning, then `eas build`. See `docs/eas-setup.md` for the step-by-step.
+**Status:** Alpha build code-complete as of 2026-05-06. Phases 6 (gym onboarding: create/edit gyms, session templates) and 9 (notifications + social: notification center, push preferences, social sharing) shipped 2026-05-06. Web is in active beta. Mobile is feature-complete for alpha (auth, dashboard, gyms, leaderboard, sessions, live match flow with video, push, presence, deep links, offline handling, Sentry, gym manager role, notification preferences, social sharing). CI/CD pipeline active. Pending: Apple/Google account enrollment, EAS init, Supabase staging/prod provisioning, then `eas build`. See `docs/eas-setup.md` for the step-by-step.
 
 **App Identity:**
 - Bundle ID: `com.elorated.mobile`
@@ -59,8 +59,8 @@ Public exports (see `packages/shared/package.json#exports`):
 - `@jits/shared/constants`.
 - `@jits/shared/hooks`, the umbrella hooks export.
 - `@jits/shared/hooks/<name>`, individual hook subpaths.
-- `@jits/shared/types/<name>`, individual type modules (`athlete`, `challenge`, `gym`, `match`, `session`, `database`, etc.).
-- `@jits/shared/utils`, pure utilities (`getInitials`, `extractGymName`, `formatRelativeDate`, `formatRelativeTime`, `TOS_TEXT`).
+- `@jits/shared/types/<name>`, individual type modules (`athlete`, `challenge`, `gym`, `match`, `session`, `notification`, `notification-preference`, `database`, etc.).
+- `@jits/shared/utils`, pure utilities (`getInitials`, `extractGymName`, `formatRelativeDate`, `formatRelativeTime`, `TOS_TEXT`, `buildShareUrl`, `buildShareText`).
 
 Source layout (`packages/shared/src/`):
 ```
@@ -82,9 +82,11 @@ hooks/
   index.ts
 types/
   database.ts         GENERATED via npm run db:types
-  athlete.ts, challenge.ts, gym.ts, match.ts, session.ts, message.ts, ...
+  athlete.ts, challenge.ts, gym.ts, match.ts, session.ts, message.ts,
+  notification.ts, notification-preference.ts, ...
 utils/
   shared.ts           getInitials, extractGymName, formatRelativeDate, formatRelativeTime, formatTimeUntil
+  share.ts            buildShareUrl, buildShareText (social sharing for athlete, session, gym, match-result)
   tos-content.ts      TOS_TEXT (used by both web and mobile setup wizards)
   index.ts
 index.ts              umbrella re-export
@@ -105,6 +107,10 @@ Directory structure:
 apps/web/
   app/
     (app)/            authenticated routes (layout with nav shell)
+      notifications/  notification center (notification-list)
+      settings/notifications/  push notification preferences (notification-toggles)
+      gyms/create-gym-dialog.tsx  gym creation dialog
+      gyms/[id]/edit-gym-dialog.tsx, session-templates.tsx, template-card.tsx, template-form-dialog.tsx
     (auth)/           login, signup, forgot-password, update-password
     api/version       deployment-version probe endpoint
     auth/callback     Supabase auth callback
@@ -160,7 +166,7 @@ apps/mobile/
         join.tsx                    2-step join wizard (weight, confirm)
         lobby.tsx                   realtime lobby
         match/[matchId].tsx         8-step live match wizard
-      settings/                     index, feedback, help, video, realtime-test (dev only)
+      settings/                     index, feedback, help, video, notifications, realtime-test (dev only)
   assets/                           branded icons + splash (rendered from logo.svg)
   components/
     ui/                             native primitives (avatar, badge with success
@@ -241,7 +247,7 @@ When you see the same logic in 2+ files, extract it. Before writing a new helper
 - Mobile-only helpers (uses `expo-*`, RN APIs) go in `apps/mobile/lib/<area>/`.
 - New data-access functions go in `packages/shared/src/api/queries.ts` or `mutations.ts`.
 
-**Already extracted to `@jits/shared/utils`:** `getInitials()`, `extractGymName()`, `formatRelativeDate()`, `formatRelativeTime()`, `formatTimeUntil()`, `TOS_TEXT`.
+**Already extracted to `@jits/shared/utils`:** `getInitials()`, `extractGymName()`, `formatRelativeDate()`, `formatRelativeTime()`, `formatTimeUntil()`, `TOS_TEXT`, `buildShareUrl()`, `buildShareText()`.
 
 ### 3. Supabase FK Join Behavior
 
@@ -431,9 +437,7 @@ Mobile uses topical directories under `apps/mobile/components/` (`dashboard/`, `
 - [ ] Apple Developer Program + Google Play Console enrollment required.
 
 **Medium (polish and consistency):**
-- [ ] Mobile Tailwind config (`apps/mobile/tailwind.config.js`) has no `fontFamily` entries for `font-display`, `font-heading`, `font-body`, `font-mono`. Fonts are loaded via `expo-font` but not mapped to Tailwind classes. ~60 instances of raw `font-bold`/`font-semibold` instead of semantic brand typography.
-- [ ] Mobile Stack layouts missing themed header styles: `(tabs)/gyms/_layout.tsx`, `(tabs)/profile/_layout.tsx`, `(tabs)/leaderboard/_layout.tsx`, `settings/_layout.tsx` all use bare `headerShown: false` without `useThemedTokens()` header config. Pattern established in `session/[id]/_layout.tsx`.
-- [ ] Mobile components over 80-line target: `compare-stats-modal` 184, `match-flow-wizard` 182, `recent-activity-section` 164, `notification-panel` 158, `athlete-card` 145, `join-wizard` 143. Screens over 120-line target: `realtime-test` 389, `leaderboard/index` 330, `athlete/[id]` 297, `profile/index` 236.
+- [ ] Mobile components over 80-line target: `compare-stats-modal` 184, `match-flow-wizard` 182, `recent-activity-section` 164, `notification-panel` 158, `join-wizard` 143. Screens over 120-line target: `realtime-test` 389.
 - [ ] `react@19.1.0` (mobile) vs `react@19.2.5` (web) version drift, pre-existing, not yet causing observable issues. Resolve when bumping web to 19.2 alignment is convenient.
 
 **Low (code-style cleanup):**
@@ -448,7 +452,10 @@ Mobile uses topical directories under `apps/mobile/components/` (`dashboard/`, `
 - [x] GitHub Actions CI/CD: typecheck, test, web build, mobile bundle on push/PR (2026-05-06).
 - [x] App scheme updated from `jits://` to `elorated://`, associated domains to `elorated.com` (2026-05-06).
 - [x] Session creation restricted to gym managers via `gym_managers` junction table + RLS (2026-05-06).
-- [x] Auth form deduplication: shared `auth-form-shell`, `email-input`, `password-input`, `google-oauth-button` extracted to `apps/web/components/auth/`. Forms reduced from 188/172/106 to 72/80/76 lines (2026-05-06).
+- [x] Auth form deduplication: shared `auth-form-shell`, `email-input`, `password-input`, `google-oauth-button` extracted to `apps/web/components/auth/`. Forms reduced from 188/172/106 to 72/80/76 lines (51% reduction) (2026-05-06).
+- [x] Mobile typography: `fontFamily` entries (`font-display`, `font-heading`, `font-body`, `font-mono`) mapped in `apps/mobile/tailwind.config.js`; ~100 raw `font-bold`/`font-semibold` instances replaced with semantic classes (2026-05-06).
+- [x] Mobile themed headers: all Stack layouts (`gyms/_layout`, `profile/_layout`, `leaderboard/_layout`, `settings/_layout`) now use `useThemedTokens()` (2026-05-06).
+- [x] Mobile oversized components split: `leaderboard/index` 330->71, `athlete/[id]` 297->108, `profile/index` 236->96 (2026-05-06).
 
 ## Chat UI Patterns (web)
 
@@ -526,16 +533,24 @@ Typed wrappers for all Supabase queries and mutations. Both apps must use these 
 - `getGymDetail(supabase, gymId)`.
 - `getSessionForJoin(supabase, sessionId)`.
 - `getSessionLobbyData(supabase, sessionId)`.
+- `getSessionTemplates(supabase, gymId)`.
 
 **Match:**
 - `getMatchDetails(supabase, matchId)`.
 - `getSubmissionTypes(supabase)`.
 
+**Notifications:**
+- `getNotificationHistory(supabase, athleteId, limit?)`.
+
 ### Mutations (`packages/shared/src/api/mutations.ts`)
 
 **Challenges:** `createChallenge`, `acceptChallenge`, `declineChallenge`, `cancelChallenge`, `startMatchFromChallenge`.
 
-**Sessions:** `rsvpToSession`, `cancelRsvp`, `joinSessionLobby`, `acceptSessionWaiver`, `createSession`, `createInSessionMatch`, `leaveSessionLobby`, `requestRandomMatch`.
+**Sessions:** `rsvpToSession`, `cancelRsvp`, `joinSessionLobby`, `acceptSessionWaiver`, `createSession`, `createSessionFromTemplate`, `createInSessionMatch`, `leaveSessionLobby`, `requestRandomMatch`.
+
+**Gyms:** `createGym`, `updateGym`.
+
+**Session templates:** `createSessionTemplate`, `updateSessionTemplate`, `deleteSessionTemplate`.
 
 **Match lifecycle:** `startMatch`, `pauseMatch`, `resumeMatch`, `endMatch`, `recordMatchResult`, `confirmMatchResult`, `disputeMatchResult`.
 
@@ -624,8 +639,9 @@ Dashboard challenges section also removed.
 - `/session/[id]/lobby` (realtime participant list, challenges, random match).
 - `/session/[id]/match/[matchId]` (8-step match wizard: wait, weight, ready, live, end, result, confirm, summary).
 - `/leaderboard`.
+- `/notifications` (notification center: challenge, match, session history).
 - `/profile`, `/profile/stats`, `/profile/setup`.
-- `/settings`, `/settings/video`, `/settings/feedback`, `/settings/help`.
+- `/settings`, `/settings/video`, `/settings/feedback`, `/settings/help`, `/settings/notifications` (push notification preferences).
 - `/athlete/[id]`.
 
 Bottom nav: Home, Gyms, Rankings, Profile.

@@ -2,48 +2,52 @@ import { requireAthlete } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent } from "@/components/ui/card";
 import { StatsTabs } from "./stats-tabs";
-import { getMatchHistory, getEloHistory } from "@jits/shared/api/queries";
+import { MilestoneProgress } from "./milestone-progress";
+import {
+  getMatchHistory,
+  getEloHistory,
+  getWeeklyMatchActivity,
+  getSubmissionBreakdown,
+  getWeightClassStats,
+} from "@jits/shared/api/queries";
 
 export async function StatsContent() {
   const { athlete } = await requireAthlete();
   const supabase = await createClient();
 
-  // Fetch match history and ELO history via RPCs (bypass RLS)
-  const [matchHistory, eloHistory] = await Promise.all([
-    getMatchHistory(supabase, athlete.id),
-    getEloHistory(supabase, athlete.id),
-  ]);
+  const [matchHistory, eloHistory, weeklyActivity, submissions, weightStats] =
+    await Promise.all([
+      getMatchHistory(supabase, athlete.id),
+      getEloHistory(supabase, athlete.id),
+      getWeeklyMatchActivity(supabase, athlete.id),
+      getSubmissionBreakdown(supabase, athlete.id),
+      getWeightClassStats(supabase, athlete.id),
+    ]);
 
-  // Compute stats from match history
   const wins = matchHistory.filter((m) => m.athlete_outcome === "win").length;
   const losses = matchHistory.filter((m) => m.athlete_outcome === "loss").length;
   const draws = matchHistory.filter((m) => m.athlete_outcome === "draw").length;
   const total = wins + losses + draws;
   const winRate = total > 0 ? Math.round((wins / (wins + losses || 1)) * 100) : 0;
 
-  // Win streak (matchHistory is newest first)
   let winStreak = 0;
   for (const m of matchHistory) {
     if (m.athlete_outcome === "win") winStreak++;
     else break;
   }
 
-  // ELO change this month
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const eloThisMonth = matchHistory
     .filter((m) => new Date(m.completed_at) >= startOfMonth)
     .reduce((sum, m) => sum + (m.elo_delta ?? 0), 0);
 
-  // Recent performance periods
   const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
   const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
   const threeMonthsAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
 
   function periodStats(since: Date) {
-    const filtered = matchHistory.filter(
-      (m) => new Date(m.completed_at) >= since,
-    );
+    const filtered = matchHistory.filter((m) => new Date(m.completed_at) >= since);
     const w = filtered.filter((m) => m.athlete_outcome === "win").length;
     const l = filtered.filter((m) => m.athlete_outcome === "loss").length;
     const elo = filtered.reduce((sum, m) => sum + (m.elo_delta ?? 0), 0);
@@ -56,24 +60,19 @@ export async function StatsContent() {
     { period: "Last 3 Months", ...periodStats(threeMonthsAgo) },
   ];
 
-  // Submission stats
   const submissionWins = matchHistory.filter(
     (m) => m.athlete_outcome === "win" && m.result === "submission",
   ).length;
-  const submissionRate =
-    wins > 0 ? Math.round((submissionWins / wins) * 100) : 0;
+  const submissionRate = wins > 0 ? Math.round((submissionWins / wins) * 100) : 0;
 
   return (
     <div className="flex flex-col gap-6 animate-page-in">
       <h2 className="text-xl font-bold">Performance Stats</h2>
 
-      {/* Quick stats header */}
       <div className="grid grid-cols-3 gap-3 text-center">
         <Card>
           <CardContent className="py-3 px-2">
-            <p className="text-2xl font-bold tabular-nums">
-              {athlete.current_elo}
-            </p>
+            <p className="text-2xl font-bold tabular-nums">{athlete.current_elo}</p>
             <p className="text-xs text-muted-foreground">Current ELO</p>
           </CardContent>
         </Card>
@@ -85,13 +84,18 @@ export async function StatsContent() {
         </Card>
         <Card>
           <CardContent className="py-3 px-2">
-            <p className="text-2xl font-bold text-success tabular-nums">
-              {winRate}%
-            </p>
+            <p className="text-2xl font-bold text-success tabular-nums">{winRate}%</p>
             <p className="text-xs text-muted-foreground">Win Rate</p>
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardContent className="p-4">
+          <h3 className="font-semibold mb-3 text-sm">Rating Milestone</h3>
+          <MilestoneProgress elo={athlete.current_elo} />
+        </CardContent>
+      </Card>
 
       <StatsTabs
         winStreak={winStreak}
@@ -102,6 +106,9 @@ export async function StatsContent() {
         matchHistory={matchHistory}
         eloHistory={eloHistory}
         currentElo={athlete.current_elo}
+        weeklyActivity={weeklyActivity}
+        submissions={submissions}
+        weightClassStats={weightStats}
       />
     </div>
   );

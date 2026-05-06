@@ -20,6 +20,12 @@ import type {
   SessionTemplate,
 } from "../types/session";
 import type { NotificationItem } from "../types/notification";
+import type {
+  WeeklyActivity,
+  SubmissionBreakdown,
+  WeightClassStats,
+  GymManagerStats,
+} from "../types/analytics";
 import { mapPostgrestError, type DomainError } from "./errors";
 
 type Client = SupabaseClient<Database>;
@@ -963,6 +969,179 @@ export async function getLobbyData(
   const gym = (data.gym as unknown as LobbyData["gym"]) ?? null;
 
   return { ...data, challenger, opponent, gym };
+}
+
+// ---------------------------------------------------------------------------
+// Analytics queries (derived from existing RPCs + tables)
+// ---------------------------------------------------------------------------
+
+/** IBJJF-inspired weight division labels (lbs). Each bucket spans ~11 lbs. */
+const WEIGHT_DIVISIONS = [
+  { label: "Rooster (< 127)", max: 127 },
+  { label: "Light Feather (128-141)", max: 141 },
+  { label: "Feather (142-154)", max: 154 },
+  { label: "Light (155-167)", max: 167 },
+  { label: "Middle (168-181)", max: 181 },
+  { label: "Medium Heavy (182-195)", max: 195 },
+  { label: "Heavy (196-207)", max: 207 },
+  { label: "Super Heavy (208-221)", max: 221 },
+  { label: "Ultra Heavy (222+)", max: Infinity },
+];
+
+function getWeightDivisionLabel(weightLbs: number): string {
+  for (const d of WEIGHT_DIVISIONS) {
+    if (weightLbs <= d.max) return d.label;
+  }
+  return WEIGHT_DIVISIONS[WEIGHT_DIVISIONS.length - 1].label;
+}
+
+/**
+ * Count matches per week for the last 8 weeks.
+ * Uses get_match_history and groups client-side by ISO week.
+ */
+export async function getWeeklyMatchActivity(
+  supabase: Client,
+  athleteId: string,
+): Promise<WeeklyActivity[]> {
+  const history = await getMatchHistory(supabase, athleteId);
+
+  const now = new Date();
+  const eightWeeksAgo = new Date(now.getTime() - 8 * 7 * 24 * 60 * 60 * 1000);
+
+  // Build 8 weekly buckets (Mon-Sun)
+  const weeks: WeeklyActivity[] = [];
+  for (let i = 7; i >= 0; i--) {
+    const weekStart = new Date(now.getTime() - i * 7 * 24 * 60 * 60 * 1000);
+    const mon = new Date(weekStart);
+    mon.setDate(mon.getDate() - ((mon.getDay() + 6) % 7));
+    const label = `${mon.getMonth() + 1}/${mon.getDate()}`;
+    weeks.push({ week: label, matches: 0, wins: 0 });
+  }
+
+  for (const m of history) {
+    const d = new Date(m.completed_at);
+    if (d < eightWeeksAgo) continue;
+    const diffDays = Math.floor((now.getTime() - d.getTime()) / (24 * 60 * 60 * 1000));
+    const weekIndex = 7 - Math.floor(diffDays / 7);
+    if (weekIndex >= 0 && weekIndex < 8) {
+      weeks[weekIndex].matches++;
+      if (m.athlete_outcome === "win") weeks[weekIndex].wins++;
+    }
+  }
+
+  return weeks;
+}
+
+/**
+ * Count each submission type from match history (wins + losses by submission).
+ */
+export async function getSubmissionBreakdown(
+  supabase: Client,
+  athleteId: string,
+): Promise<SubmissionBreakdown[]> {
+  const history = await getMatchHistory(supabase, athleteId);
+
+  const map = new Map<string, SubmissionBreakdown>();
+  for (const m of history) {
+    if (m.result !== "submission" || !m.submission_type_display_name) continue;
+    const name = m.submission_type_display_name;
+    const entry = map.get(name) ?? { type: name, count: 0, asWinner: 0, asLoser: 0 };
+    entry.count++;
+    if (m.athlete_outcome === "win") entry.asWinner++;
+    else entry.asLoser++;
+    map.set(name, entry);
+  }
+
+  return Array.from(map.values()).sort((a, b) => b.count - a.count);
+}
+
+/**
+ * Wins/losses/draws grouped by opponent weight class.
+ * Looks up current weights for all opponents from match history.
+ */
+export async function getWeightClassStats(
+  supabase: Client,
+  athleteId: string,
+): Promise<WeightClassStats[]> {
+  const history = await getMatchHistory(supabase, athleteId);
+  if (history.length === 0) return [];
+
+  // Batch-fetch opponent weights
+  const opponentIds = [...new Set(history.map((m) => m.opponent_id))];
+  const { data: opponents } = await supabase
+    .from("athletes")
+    .select("id, current_weight")
+    .in("id", opponentIds);
+
+  const weightMap = new Map<string, number>();
+  for (const o of opponents ?? []) {
+    if (o.current_weight) weightMap.set(o.id, o.current_weight);
+  }
+
+  const divisionMap = new Map<string, WeightClassStats>();
+  for (const m of history) {
+    const weight = weightMap.get(m.opponent_id);
+    if (!weight) continue;
+    const label = getWeightDivisionLabel(weight);
+    const entry = divisionMap.get(label) ?? { division: label, wins: 0, losses: 0, draws: 0 };
+    if (m.athlete_outcome === "win") entry.wins++;
+    else if (m.athlete_outcome === "loss") entry.losses++;
+    else entry.draws++;
+    divisionMap.set(label, entry);
+  }
+
+  return Array.from(divisionMap.values()).sort((a, b) => {
+    const totalB = b.wins + b.losses + b.draws;
+    const totalA = a.wins + a.losses + a.draws;
+    return totalB - totalA;
+  });
+}
+
+/**
+ * Gym-level aggregate stats for manager dashboards.
+ * Builds from existing tables (sessions, session_participants, matches, athletes).
+ */
+export async function getGymManagerStats(
+  supabase: Client,
+  gymId: string,
+): Promise<GymManagerStats> {
+  const [sessionsResult, membersResult] = await Promise.all([
+    supabase
+      .from("sessions")
+      .select("id")
+      .eq("gym_id", gymId),
+    supabase
+      .from("athletes")
+      .select("id", { count: "exact", head: true })
+      .eq("primary_gym_id", gymId)
+      .eq("status", "active"),
+  ]);
+
+  const sessionIds = (sessionsResult.data ?? []).map((s) => s.id);
+  const totalSessions = sessionIds.length;
+  const activeMemberCount = membersResult.count ?? 0;
+
+  if (sessionIds.length === 0) {
+    return { totalSessions: 0, totalParticipants: 0, totalMatches: 0, activeMemberCount };
+  }
+
+  const [participantsResult, matchesResult] = await Promise.all([
+    supabase
+      .from("session_participants")
+      .select("id", { count: "exact", head: true })
+      .in("session_id", sessionIds),
+    supabase
+      .from("matches")
+      .select("id", { count: "exact", head: true })
+      .in("session_id", sessionIds),
+  ]);
+
+  return {
+    totalSessions,
+    totalParticipants: participantsResult.count ?? 0,
+    totalMatches: matchesResult.count ?? 0,
+    activeMemberCount,
+  };
 }
 
 // ---------------------------------------------------------------------------

@@ -8,10 +8,11 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { MapPin } from "lucide-react-native";
+import { MapPin, Plus } from "lucide-react-native";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { GymCard } from "@/components/gyms/gym-card";
+import { CreateGymSheet } from "@/components/gyms/create-gym-sheet";
 import { useRequireAthlete } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { supabase } from "@/lib/supabase/client";
@@ -136,9 +137,20 @@ export default function GymsScreen() {
   return (
     <SafeAreaView className="flex-1 bg-background" edges={["top"]}>
       <View className="px-4 pt-4 pb-2">
-        <View className="flex-row items-center gap-2 mb-3">
-          <MapPin size={20} color={tokens.primary} />
-          <Text className="text-2xl font-heading text-foreground">Gyms</Text>
+        <View className="flex-row items-center justify-between mb-3">
+          <View className="flex-row items-center gap-2">
+            <MapPin size={20} color={tokens.primary} />
+            <Text className="text-2xl font-heading text-foreground">Gyms</Text>
+          </View>
+          <CreateGymSheet onCreated={refresh}>
+            <Button
+              variant="outline"
+              size="sm"
+              leftIcon={<Plus size={14} color={tokens.foreground} />}
+            >
+              Create
+            </Button>
+          </CreateGymSheet>
         </View>
         <Input
           placeholder="Search gyms..."
