@@ -236,7 +236,14 @@ The end-to-end demo should show:
 
 ---
 
-## §5 Out of scope for v1 demo
+## §5 Demo runbook
+
+For the cold-start demo runbook (seed script, manual slicer workaround,
+two-browser flow, troubleshooting), see [`DEMO.md`](./DEMO.md).
+
+---
+
+## §6 Out of scope for v1 demo
 
 | Item                                       | Why deferred                                                          |
 | ------------------------------------------ | --------------------------------------------------------------------- |

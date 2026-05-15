@@ -1,34 +1,45 @@
 # 013 Video Integration — Demo Runbook
 
-> **Goal:** run the web app + mobile app locally against the local
-> Supabase instance in `jr_be` and execute a full
-> **upload → slice → analyze → merge → view** cycle end-to-end.
->
-> **Scope:** what's in v1: storage upload, `match_videos` INSERT with
-> `status='ready'`, slicer trigger via pg_net, chunked Gemini analysis,
-> merger, and the React `VideoAnalysisViewer`. Out of scope: production
-> deployment, push notifications, multi-angle UX.
+> Sequential runbook for taking the repo cold and reaching the green light:
+> full **record → upload → slice → analyze → merge → view** loop in the web
+> app, against a local Supabase backend.
 
 ---
 
-## §0 Prerequisites
+## §0 Goal
 
-| Tool                          | Version                  | Notes                                                                |
-| ----------------------------- | ------------------------ | -------------------------------------------------------------------- |
-| Node.js                       | 20.x or 22.x             | Mobile uses Expo 54.                                                 |
-| pnpm or npm (workspaces)      | npm 10+                  | `package.json` declares `workspaces`.                                |
-| Supabase CLI                  | 2.72+                    | `brew install supabase/tap/supabase`                                 |
-| Docker                        | running                  | Required by `supabase start`.                                        |
-| ffmpeg                        | 4.4+                     | Used by the slicer worker (when run locally).                        |
-| Google Cloud SDK (optional)   | for Cloud Run slicer     | Local fallback: skip the slicer; `cron_request_pending_video_slices` will re-poke. |
-| Gemini API key                | live                     | Set as `GEMINI_API_KEY` in `jr_be/supabase/.env` (edge functions read this name).       |
+By the end of this runbook you will have:
 
-You also need a working browser logged into Supabase Studio
-(http://127.0.0.1:54323) to peek at rows during the demo.
+- Two demo athletes signed in (web + a second browser, or web + mobile).
+- A live session, a challenge, an accepted match.
+- A short recording (5-15 s) uploaded to local Storage.
+- Chunks analyzed one-by-one (gray → amber-pulse → green strip).
+- `match_videos.status='analyzed'` and the **Summary / Timeline / Techniques / Tips**
+  tabs rendering in the web viewer.
+
+That is the green light.
 
 ---
 
-## §1 Start the backend (jr_be)
+## §1 Prereqs
+
+| Tool             | Version            | Notes                                                                   |
+| ---------------- | ------------------ | ----------------------------------------------------------------------- |
+| Docker           | running            | Required by `supabase start`.                                           |
+| Supabase CLI     | 2.72+              | `brew install supabase/tap/supabase`                                    |
+| ffmpeg           | 4.4+               | Used by the manual slicer in §7.                                        |
+| Node.js          | 20.x or 22.x       | Mobile uses Expo 54.                                                    |
+| `GEMINI_API_KEY` | live key           | Set in `jr_be/supabase/.env`. Edge functions read **`GEMINI_API_KEY`**, not `GOOGLE_GENERATIVE_AI_API_KEY`. |
+| Browsers         | 2 sessions         | Two browser profiles, or one browser + iOS simulator/device.            |
+
+Optional: Supabase Studio open at http://127.0.0.1:54323 to peek at rows
+during the demo.
+
+---
+
+## §2 Start the backend (jr_be)
+
+### 2.1 Start Supabase
 
 ```bash
 cd /Users/msponagle/code/EloRated/jr_be
@@ -36,232 +47,216 @@ supabase start
 # wait until you see "supabase local development setup is running"
 ```
 
-This brings up:
+This brings up Postgres (`127.0.0.1:54322`), PostgREST/Realtime/Storage
+(`127.0.0.1:54321`), Edge Functions, and Studio (`127.0.0.1:54323`).
 
-- Postgres 15 at `127.0.0.1:54322`
-- PostgREST at `127.0.0.1:54321/rest/v1`
-- Realtime at `127.0.0.1:54321/realtime/v1`
-- Storage at `127.0.0.1:54321/storage/v1` (bucket `match-videos`, 500 MiB cap locally)
-- Edge Functions at `127.0.0.1:54321/functions/v1`
-- Studio at `127.0.0.1:54323`
-
-Verify the chunked-video schema is current:
+### 2.2 Verify the chunked-video schema is current
 
 ```bash
 psql postgresql://postgres:postgres@127.0.0.1:54322/postgres \
   -c "\dt public.video_chunks public.video_chunk_analyses public.match_videos"
 ```
 
-You should see all three tables. If `video_chunks` is missing, run
-`supabase db reset` to replay all 37 migrations.
+All three tables must be present. If `video_chunks` is missing, run
+`supabase db reset` to replay all migrations.
 
-### 1.1 Wire the Edge Functions
-
-The chunk-analyze function needs the Gemini key. Edit `jr_be/supabase/.env`
-and ensure `GEMINI_API_KEY=<your-key>` is set (this is the env var the
-edge functions actually read — `Deno.env.get("GEMINI_API_KEY")` at
-`video-analyze-chunk/index.ts:121` and `video-merge-analysis/index.ts:107`).
-Then from `jr_be/`:
+### 2.3 Seed two demo athletes + a session
 
 ```bash
+cd /Users/msponagle/code/EloRated/jr_be
+./scripts/seed-demo.sh
+```
+
+The script prints two athlete credentials and the seeded `sessions.id`:
+
+```
+demo-blue@elorated.dev   Demo!Pass123
+demo-red@elorated.dev    Demo!Pass123
+session_id: <uuid>
+```
+
+Both athletes share a gym and the session is `status='open'`.
+
+### 2.4 Serve the edge functions
+
+```bash
+cd /Users/msponagle/code/EloRated/jr_be
 supabase functions serve --no-verify-jwt --env-file ./supabase/.env \
   video-analyze-chunk video-merge-analysis
 ```
 
-`Deno.cron(...)` is a no-op locally (see BE contract §4). The pg_cron
-sweeps (`finalize-pending-merges`, `request-pending-video-slices`,
+The functions read `Deno.env.get("GEMINI_API_KEY")` from
+`./supabase/.env`. `Deno.cron(...)` is a no-op locally; the pg_cron sweeps
+(`finalize-pending-merges`, `request-pending-video-slices`,
 `reap-stuck-analyzing-chunks`) run regardless.
-
-### 1.2 Wire the slicer
-
-The slicer worker lives in a separate Cloud Run service. For a local
-demo, the simplest path is to set the slicer URL to a placeholder so the
-DB trigger no-ops and rely on **manual `persist_video_chunks_and_finalize_slice` calls**
-or a local slicer build. To skip the slicer entirely for a smoke test,
-upload a video already pre-chunked.
-
-If you have a local slicer running on port `8080`:
-
-```bash
-psql postgresql://postgres:postgres@127.0.0.1:54322/postgres \
-  -c "ALTER SYSTEM SET app.settings.video_slicer_url = 'http://host.docker.internal:8080/slice';"
-psql postgresql://postgres:postgres@127.0.0.1:54322/postgres -c "SELECT pg_reload_conf();"
-```
 
 ---
 
-## §2 Start the web app
+## §3 Start the web app
+
+### 3.1 Install (first time only)
 
 ```bash
 cd /Users/msponagle/code/EloRated/jits_web
-npm install      # one-time
-npm run dev:web  # → http://127.0.0.1:4983
+npm install
 ```
 
-`.env.local` should have:
+### 3.2 Configure `apps/web/.env.local`
 
 ```
 NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321
-NEXT_PUBLIC_SUPABASE_ANON_KEY=<from `supabase status` output>
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<copy from `supabase status` output>
 ```
 
-Log in (or sign up) with a test account, then run through the profile
-setup wizard so an `athletes` row is created and activated.
-
----
-
-## §3 Start the mobile app (optional for the demo)
+### 3.3 Run dev server
 
 ```bash
-cd /Users/msponagle/code/EloRated/jits_web/apps/mobile
-npm run ios    # or `npm run android`
+cd /Users/msponagle/code/EloRated/jits_web
+npm run dev:web
+# → http://localhost:4983
 ```
 
-`app.json` already points at `http://127.0.0.1:54321`. If you're running
-on a real device, swap to the LAN IP of the dev machine.
+### 3.4 Note: dev mode only
+
+`npm run dev:web` bypasses a pre-existing `createSessionTemplate`
+typecheck error. **`npm run build:web` does NOT work yet** — out of
+scope for this demo.
 
 ---
 
-## §4 Run the demo path
+## §4 Sign in (two sessions)
 
-### 4.1 Set up a match
+Open two browser sessions/profiles (or one web + one mobile via Expo Go
+pointing at `127.0.0.1:54321`).
 
-The video flow lives inside the **session → match → live** step. You
-need:
+- **Session A:** `demo-blue@elorated.dev` / `Demo!Pass123`
+- **Session B:** `demo-red@elorated.dev` / `Demo!Pass123`
 
-1. Two active athletes (you + one other test account).
-2. A session at a gym you both belong to.
-3. A match between you, status `in_progress`.
+If either is prompted with profile setup, finish it. This flips the
+athlete `status` from `pending` → `active` (required for lobby
+visibility).
 
-The fastest path: have your test account create a session, have the
-other account join, then create a match. (For a single-user fast path,
-use Studio to flip both `auth.users` and `athletes` rows manually and
-issue a `start_match_from_challenge` RPC.)
+---
 
-### 4.2 Record + upload
+## §5 Join the session lobby
 
-- Web: navigate to the match's **timekeeper-live** step (URL pattern
-  `/session/[id]/match/[matchId]`). Recording auto-starts on entry.
-  Press **End Match** to stop; the WebM blob uploads to
-  `match-videos/<match_id>/<your_athlete_id>/<unix_ts>.webm`.
-- Mobile: same flow via the in-app match wizard. MP4 output.
+Both athletes navigate to the seeded session (from §2.3). Confirm both
+appear in the lobby roster before continuing.
 
-You'll see the `match_videos` row appear in Studio at `status='ready'`
-within a few seconds. The slicer trigger fires immediately (or the
-1-min pg_cron sweep does, if the slicer URL isn't set).
+---
 
-### 4.3 Watch the chunked pipeline
+## §6 Send a challenge → accept → record
 
-The viewer is mounted automatically on the **Match Recorded** step
-(`apps/web/.../steps/match-recorded-step.tsx`) when a `videoId` is
-threaded through from the timekeeper-live upload. The wizard
-(`match-flow-wizard.tsx`) captures the id from `TimekeeperLiveStep.onNext`
-and passes it down.
+1. **Blue** clicks **Red**'s tile, sends a challenge.
+2. **Red** sees the incoming-challenge sheet → **Accept**.
+3. Both route into the match flow.
+   - **Red** (the accepter) sees the **timekeeper-live** step with the recorder.
+   - **Blue** sees **fighter-live** (read-only timer, no recorder).
+4. **Red** presses **Start**, records ~5-15 s, presses **End**.
+5. The wizard waits for the upload to complete (status pill shows
+   "Uploading…"), then advances to **Match Recorded**.
 
-To embed the viewer on any other page that knows the `video_id`:
+A `match_videos` row appears in Studio at `status='ready'` within a few
+seconds.
 
-```tsx
-import { VideoAnalysisViewer } from "@/components/domain/video-analysis-viewer";
+---
 
-<VideoAnalysisViewer videoId={videoId} title="Match analysis" />;
+## §7 Drive the slicer manually
+
+The Cloud Run slicer doesn't run locally. Slice the uploaded video by
+hand from `jr_be`.
+
+```bash
+cd /Users/msponagle/code/EloRated/jr_be
+
+# Find the new match_videos.id and storage_path:
+psql postgresql://postgres:postgres@127.0.0.1:54322/postgres \
+  -c "SELECT id, storage_path, status FROM match_videos ORDER BY created_at DESC LIMIT 3;"
+
+# Slice it (90s segments, 5s overlap):
+./scripts/test-video/manual-slice.sh .tmp/julia_1_compressed.mp4 <video_id> 90 5
 ```
 
-Behavior:
+For demo speed prefer the smaller `slim_compressed.mp4` if it's in
+`.tmp/`. (You're not actually slicing the recorded WebM here — the
+manual slicer feeds canned chunks into the chunk-analyze pipeline so
+the FE can render real progress against a known-good source.)
 
-1. While `status ∈ {ready, slicing}` — placeholder "waiting for slicer…" bar.
-2. When the slicer reports `chunk_count` — the strip lights up with one
-   segment per chunk, gray (`ready`) initially.
-3. As chunks flow through `analyzing → completed`, the segments turn
-   amber (pulsing) then emerald.
-4. Failed chunks turn red; the latest scrubbed error message shows
-   below the strip (sourced from `get_video_progress.latest_error_message`,
-   which until BE Round 3 ships falls back to a manual aggregate
-   computed in the hook).
-5. When the final chunk lands, the merger fires (`status='merging'`);
-   ~30 s later `status='analyzed'` and the **Summary / Timeline /
-   Techniques / Tips** tabs render via `get_video_analysis(videoId)`.
+---
 
-### 4.4 Sanity checks (Studio queries)
+## §8 Watch the analysis happen
 
-```sql
--- Parent row + chunk count
-SELECT id, status, chunk_count, chunks_completed,
-       slice_started_at, slice_completed_at,
-       merge_started_at, merge_completed_at
-  FROM match_videos
- ORDER BY created_at DESC LIMIT 5;
+Back in the web app at the **Match Recorded** step, the chunk strip should:
 
--- Per-chunk status
-SELECT idx, status, start_s, end_s, chunks_completed_at,
-       LEFT(COALESCE(error_message, ''), 80) AS err
-  FROM video_chunks
- WHERE video_id = '<your-video-id>'
- ORDER BY idx;
+1. Start gray (`queued`).
+2. Transition to amber-pulse (`analyzing`) one chunk at a time.
+3. Turn green (`completed`). The **Timeline** and **Techniques** tabs start
+   showing entries as each chunk lands.
+4. Once all chunks complete, the merger fires; `status` flips to
+   `'analyzed'`; the viewer renders the unified **Summary / Timeline /
+   Techniques / Tips** tabs via `get_video_analysis(videoId)`.
 
--- Merged analysis (only when status='analyzed')
-SELECT merge_strategy, source_chunk_count, dedup_dropped_count,
-       LEFT(summary, 200) AS summary_preview
-  FROM video_analyses
- WHERE video_id = '<your-video-id>' AND status = 'completed';
+That's the green light.
+
+---
+
+## §9 Smoke checks (sanity)
+
+```bash
+# Progress aggregate (BE Round 3 RPC; falls back to manual aggregate in the hook if missing):
+psql postgresql://postgres:postgres@127.0.0.1:54322/postgres \
+  -c "SELECT public.get_video_progress('<video_id>');"
+
+# Per-chunk status:
+psql postgresql://postgres:postgres@127.0.0.1:54322/postgres \
+  -c "SELECT idx, status, start_s, end_s, LEFT(COALESCE(error_message,''),80) AS err
+        FROM video_chunks WHERE video_id='<video_id>' ORDER BY idx;"
 ```
 
----
-
-## §5 Known caveats
-
-- **`get_video_progress` RPC isn't deployed locally yet.** The hook
-  detects the 42883/404 from PostgREST and falls back to a manual
-  aggregate over `match_videos` + `video_chunks` + `video_chunk_analyses`.
-  The fallback is RLS-gated and produces the same shape as the RPC.
-  This is the **Round 3 deliverable** per the BE contract §3.4.
-- **Local storage is capped at 500 MiB.** Uploads larger than that
-  return HTTP 413 and the FE renders the "local development cap" copy.
-  Production cap is 2 GiB; the FE pre-flights at the 2 GiB boundary.
-- **Slicer cron sweep runs every 5 min.** If you don't have a slicer
-  worker reachable from Postgres, expect a 1-5 minute delay before the
-  trigger retry fires. Faster: invoke `request_video_slice(video_id)`
-  manually via `psql`.
-- **`Deno.cron` is a no-op in `supabase functions serve`.** The merger
-  + chunk-reaper rely on the pg_cron sweeps locally.
-- **One video per (match_id, uploaded_by).** Retrying after a failure
-  hits `23505`; the FE catches this and UPDATEs the existing row back
-  to `'ready'` via `upsertMatchVideo`. To force a re-slice with a brand
-  new file, DELETE the row first.
+Realtime: open Studio → **Realtime** and confirm the
+`match_videos:id=eq.<videoId>` and `video_chunks:video_id=eq.<videoId>`
+subscriptions are open while the viewer is mounted.
 
 ---
 
-## §6 Where the new code lives
+## §10 Known caveats (YELLOW — don't block GREEN)
 
-| Concern                                      | File                                                                                  |
-| -------------------------------------------- | ------------------------------------------------------------------------------------- |
-| Storage path helper + `createMatchVideo` + `upsertMatchVideo` | `packages/shared/src/api/mutations.ts`                                                |
-| Realtime progress hook                       | `packages/shared/src/hooks/use-video-progress.ts`                                     |
-| Generated DB types (chunks + new columns)    | `packages/shared/src/types/database.ts`                                               |
-| Web recorder (path fix + INSERT wiring)      | `apps/web/hooks/use-video-recorder.ts`                                                |
-| Mobile upload helper (path fix + INSERT)     | `apps/mobile/lib/video/upload-recording.ts`                                           |
-| Mobile recorder (uploaderAthleteId plumbing) | `apps/mobile/lib/video/use-video-recorder.ts`                                         |
-| Web `VideoAnalysisViewer` component          | `apps/web/components/domain/video-analysis-viewer.tsx`                                |
-| Backend contract (source of truth)           | `jr_be/specs/013-chunked-video-pipeline/INTEGRATION.md`                               |
-| Reference vanilla-JS viewer                  | `jr_be/scripts/test-video/viewer/app.js`                                              |
+- **No Cloud Run slicer locally** — use the §7 manual workaround.
+- **Push delivery doesn't work locally** — VAPID/Expo creds unset; non-blocking.
+- **Chat throttle (010 T021) is broken in production** — not exercised by this demo.
+- **Mobile viewer is a stub for v1** — web-only viewer for the demo.
+- **Referee role** exists in schema, no UI/RPC. Out of scope.
+- **Local Storage cap is 500 MiB** — record shorter clips. Production cap is 2 GiB.
+- **One video per (match_id, uploaded_by).** Retries `UPDATE` via `upsertMatchVideo`.
+- **`npm run build:web` is broken** (`createSessionTemplate` typecheck) — dev only.
 
 ---
 
-## §7 Smoke test checklist
+## §11 Troubleshooting
 
-Tick these off in order; if any step fails, fix before moving on.
+| Symptom                                       | Likely cause                                                        | Fix                                                                                                                                                |
+| --------------------------------------------- | ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Recorder doesn't appear after accepting       | `match_participants.timekeeper_id` not equal to accepter's athlete id | Check the match row in Studio; the accepter must be the timekeeper.                                                                                |
+| "Uploading…" stuck                            | Edge functions not served, or `GEMINI_API_KEY` missing              | Confirm §2.4 is running; re-check `jr_be/supabase/.env`. Note the var is `GEMINI_API_KEY`, **not** `GOOGLE_GENERATIVE_AI_API_KEY`.                  |
+| Chunks stay gray indefinitely                 | `manual-slice.sh` wasn't run                                        | Run §7 with the new `video_id`.                                                                                                                    |
+| 413 on upload                                 | File > 500 MiB local cap                                            | Record a shorter clip.                                                                                                                             |
+| Empty lobby                                   | Athletes are `status='pending'`                                     | Finish profile setup, or `psql -c "UPDATE athletes SET status='active' WHERE id='<id>';"`.                                                          |
+| Viewer says "waiting for slicer…" forever     | `chunk_count` is `NULL` on `match_videos`                            | The slicer never wrote chunks. Re-run §7 and check `SELECT count(*) FROM video_chunks WHERE video_id='<id>';`.                                     |
+| `23505` on re-upload                          | Unique `(match_id, uploaded_by)` constraint                          | Expected — the FE catches this and UPDATEs via `upsertMatchVideo`. If forcing a fresh slice, DELETE the `match_videos` row in Studio first.        |
+| `42883`/`404` from `get_video_progress`        | RPC not deployed locally (BE Round 3)                                | Hook falls back to a manual aggregate; nothing to do. Re-pull jr_be migrations if you need the RPC itself.                                         |
 
-- [ ] `supabase start` succeeds; Studio loads.
-- [ ] `\dt public.video_chunks` returns one row.
-- [ ] `npm run dev:web` boots without TS errors related to video code.
-- [ ] You can log in, run profile setup, and reach a match's live step.
-- [ ] Pressing **End Match** uploads a blob and INSERTs a `match_videos`
-      row at `status='ready'` (visible in Studio).
-- [ ] The viewer renders the chunk strip with `chunk_count` segments.
-- [ ] Chunks turn green one-by-one.
-- [ ] `status='analyzed'` flips and the merged analysis tabs render.
-- [ ] Refreshing the page rebuilds state from `get_video_analysis`.
-- [ ] Re-uploading the same match (after the first finishes) UPDATEs
-      the existing row instead of throwing `23505`.
+---
 
-When all boxes are ticked, the demo is reproducible and the team is
-clear to record a screencast.
+## §12 Where the new code lives (reference)
+
+| Concern                                                       | File                                                                  |
+| ------------------------------------------------------------- | --------------------------------------------------------------------- |
+| Storage path helper + `createMatchVideo` + `upsertMatchVideo` | `packages/shared/src/api/mutations.ts`                                |
+| Realtime progress hook                                        | `packages/shared/src/hooks/use-video-progress.ts`                     |
+| Generated DB types                                            | `packages/shared/src/types/database.ts`                               |
+| Web recorder (path fix + INSERT wiring)                       | `apps/web/hooks/use-video-recorder.ts`                                |
+| Mobile upload helper                                          | `apps/mobile/lib/video/upload-recording.ts`                           |
+| Web `VideoAnalysisViewer`                                     | `apps/web/components/domain/video-analysis-viewer.tsx`                |
+| Feature flags (`timekeeperEnabled`)                           | `apps/web/lib/feature-flags.ts`                                       |
+| Backend contract (source of truth)                            | `jr_be/specs/013-chunked-video-pipeline/INTEGRATION.md`               |
+| Reference vanilla-JS viewer                                   | `jr_be/scripts/test-video/viewer/app.js`                              |

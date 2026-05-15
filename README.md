@@ -44,6 +44,9 @@ npm run test:web                 # vitest
 cd apps/web && npm run test:e2e  # playwright
 ```
 
+For the end-to-end video-pipeline demo (record → upload → analyze → view),
+see [`specs/013-video-integration/DEMO.md`](specs/013-video-integration/DEMO.md).
+
 ### Mobile
 
 ```bash
