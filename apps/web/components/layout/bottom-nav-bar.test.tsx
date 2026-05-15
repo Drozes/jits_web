@@ -20,10 +20,15 @@ describe("BottomNavBar", () => {
     render(<BottomNavBar />);
 
     const homeLink = screen.getByText("Home").closest("a");
-    expect(homeLink).toHaveClass("text-primary");
+    // Active tab uses the design-system text-primary token via inline style.
+    expect(homeLink?.style.color).toBe("var(--text-primary)");
+    // Active tab also gets the accent-cta top border.
+    expect(homeLink?.style.borderTop).toContain("var(--accent-cta)");
 
     const rankingsLink = screen.getByText("Rankings").closest("a");
-    expect(rankingsLink).toHaveClass("text-muted-foreground");
+    // Inactive tabs use the tertiary text token and a transparent border.
+    expect(rankingsLink?.style.color).toBe("var(--text-tertiary)");
+    expect(rankingsLink?.style.borderTop).toContain("transparent");
   });
 
   it("links to the correct routes", () => {

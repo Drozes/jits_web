@@ -2,29 +2,61 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { requireAthlete } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
-import { StatOverview } from "@/components/domain/stat-overview";
 import { RecentActivitySection } from "@/components/domain/recent-activity-section";
-import { ActiveSessionCard } from "@/components/domain/active-session-card";
-import { AppHeader } from "@/components/layout/app-header";
 import { PageContainer } from "@/components/layout/page-container";
 import { PageHeaderActions } from "@/components/layout/page-header-actions";
-import { getDashboardSummary, getActiveSession } from "@jits/shared/api/queries";
-import { Calendar, ChevronRight, MapPin } from "lucide-react";
+import {
+  Plate,
+  EloTile,
+  LivePill,
+  MetaTag,
+  Avatar32,
+  Wordmark,
+} from "@/components/ui/elo-system";
+import {
+  getDashboardSummary,
+  getActiveSession,
+  type AthleteGuardRow,
+} from "@jits/shared/api/queries";
+import type { ActiveSessionInfo } from "@jits/shared/types/session";
+import { formatTimeUntil } from "@jits/shared/utils";
 
 function DashboardSkeleton() {
   return (
-    <div className="flex flex-col gap-6 animate-pulse">
-      <div className="h-10 w-48 bg-muted rounded-xl" />
-      <div className="grid grid-cols-2 gap-3">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="h-[88px] bg-muted rounded-2xl" />
-        ))}
-      </div>
-      <div className="flex flex-col gap-3">
-        <div className="h-5 w-28 bg-muted rounded" />
-        <div className="h-[52px] bg-muted rounded-2xl" />
-        <div className="h-[52px] bg-muted rounded-2xl" />
-      </div>
+    <div
+      className="flex flex-col animate-pulse"
+      style={{ gap: "var(--space-5)" }}
+    >
+      <div
+        style={{
+          height: 16,
+          width: 120,
+          background: "var(--bg-elevated)",
+          borderRadius: "var(--radius-xs)",
+        }}
+      />
+      <div
+        style={{
+          height: 28,
+          width: 200,
+          background: "var(--bg-elevated)",
+          borderRadius: "var(--radius-xs)",
+        }}
+      />
+      <div
+        style={{
+          height: 140,
+          background: "var(--bg-elevated)",
+          borderRadius: "var(--radius-md)",
+        }}
+      />
+      <div
+        style={{
+          height: 100,
+          background: "var(--bg-elevated)",
+          borderRadius: "var(--radius-md)",
+        }}
+      />
     </div>
   );
 }
@@ -32,7 +64,9 @@ function DashboardSkeleton() {
 export default function DashboardPage() {
   return (
     <>
-      <AppHeader title="ELO RATED" rightAction={<PageHeaderActions />} />
+      <Suspense fallback={<DashboardHeaderFallback />}>
+        <DashboardHeader />
+      </Suspense>
       <PageContainer className="pt-6">
         <Suspense fallback={<DashboardSkeleton />}>
           <DashboardContent />
@@ -42,11 +76,46 @@ export default function DashboardPage() {
   );
 }
 
+function DashboardHeaderFallback() {
+  return <DashboardHeaderShell avatar={null} />;
+}
+
+async function DashboardHeader() {
+  const { athlete } = await requireAthlete();
+  return (
+    <DashboardHeaderShell
+      avatar={
+        <Avatar32
+          name={athlete.display_name}
+          photoUrl={athlete.profile_photo_url}
+        />
+      }
+    />
+  );
+}
+
+function DashboardHeaderShell({ avatar }: { avatar: React.ReactNode }) {
+  return (
+    <header
+      className="sticky top-0 z-40 flex h-14 items-center justify-between px-4 pt-[env(safe-area-inset-top)]"
+      style={{
+        background: "var(--bg-secondary)",
+        borderBottom: "1px solid var(--border-hairline)",
+      }}
+    >
+      <Wordmark size="md" />
+      <div className="flex items-center" style={{ gap: "var(--space-2)" }}>
+        <PageHeaderActions />
+        {avatar}
+      </div>
+    </header>
+  );
+}
+
 async function DashboardContent() {
   const { athlete } = await requireAthlete();
   const supabase = await createClient();
 
-  // Parallel fetch: dashboard summary + active session
   const [summary, activeSession] = await Promise.all([
     getDashboardSummary(supabase),
     getActiveSession(supabase, athlete.id),
@@ -70,55 +139,318 @@ async function DashboardContent() {
     date: a.completed_at,
   }));
 
+  const hasMatches = recentMatches.length > 0 || recentActivity.length > 0;
+  const isSessionLive =
+    activeSession !== null && activeSession.status === "active";
+
   return (
-    <div className="flex flex-col gap-6 animate-page-in">
-      {/* Hero greeting */}
-      <div className="rounded-2xl -mx-4 px-4 pt-2 pb-4">
-        <h1 className="text-2xl font-bold tracking-tight">
-          Hey, <span className="text-primary">{athlete.display_name}</span>
+    <div
+      className="flex flex-col animate-page-in"
+      style={{ gap: "var(--space-5)" }}
+    >
+      <div>
+        <MetaLabel style={{ marginBottom: "var(--space-2)" }}>
+          Welcome back
+        </MetaLabel>
+        <h1
+          className="font-heading font-bold"
+          style={{
+            fontSize: "var(--size-heading-l)",
+            color: "var(--text-primary)",
+            lineHeight: "var(--lh-tight)",
+            margin: 0,
+          }}
+        >
+          {athlete.display_name}
         </h1>
-        <HeroSubtitle />
       </div>
 
-      <StatOverview
-        athlete={athlete}
-        stats={{
-          wins: summary.stats.wins,
-          losses: summary.stats.losses,
-          draws: summary.stats.draws,
-          winStreak: summary.stats.win_streak,
-          rank: summary.rank.current,
-          bestRank: summary.rank.best,
-          bestWinStreak: summary.stats.best_win_streak,
-        }}
+      <EloTile
+        size="hero"
+        label="Current ELO Rating"
+        value={athlete.current_elo}
       />
 
-      <section className="flex flex-col gap-3">
-        <div className="flex items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-green-500/10">
-            <Calendar className="h-4 w-4 text-green-500" />
-          </div>
-          <h2 className="text-lg font-semibold">Sessions</h2>
-        </div>
-        <ActiveSessionCard session={activeSession} />
-      </section>
+      {isSessionLive ? (
+        <LiveSessionPlate session={activeSession} />
+      ) : (
+        <UpcomingSessionPlate session={activeSession} athlete={athlete} />
+      )}
 
-      <RecentActivitySection myMatches={recentMatches} allActivity={recentActivity} />
+      <RecentActivityBlock
+        hasMatches={hasMatches}
+        myMatches={recentMatches}
+        allActivity={recentActivity}
+      />
+
+      <RecordBlock summary={summary.stats} />
+
+      {!isSessionLive && (
+        <Plate variant="accent">
+          <p
+            style={{
+              color: "var(--text-primary)",
+              fontFamily: "var(--font-body)",
+              fontSize: "var(--size-body)",
+              lineHeight: "var(--lh-relaxed)",
+              margin: 0,
+            }}
+          >
+            Your gym hasn&apos;t designated a live session yet. Check the
+            schedule or browse other gyms in your city.
+          </p>
+        </Plate>
+      )}
     </div>
   );
 }
 
-function HeroSubtitle() {
+function MetaLabel({
+  children,
+  style,
+}: {
+  children: React.ReactNode;
+  style?: React.CSSProperties;
+}) {
   return (
-    <Link
-      href="/gyms"
-      className="mt-2 flex items-center justify-between rounded-xl bg-primary/10 px-3.5 py-2.5 group w-full transition-colors hover:bg-primary/15 active:scale-[0.98]"
+    <div
+      className="font-mono uppercase"
+      style={{
+        fontSize: "var(--size-num-xs)",
+        letterSpacing: "var(--ls-caps-l)",
+        color: "var(--text-tertiary)",
+        fontWeight: 700,
+        ...style,
+      }}
     >
-      <div className="flex items-center gap-2">
-        <MapPin className="h-4 w-4 text-primary" />
-        <span className="text-sm font-medium">Find a session</span>
+      {children}
+    </div>
+  );
+}
+
+function LiveSessionPlate({ session }: { session: ActiveSessionInfo }) {
+  const startedAt = new Date(session.scheduledStart).getTime();
+  const minsAgo = Math.max(0, Math.floor((Date.now() - startedAt) / 60_000));
+  const href = session.isCheckedIn
+    ? `/session/${session.sessionId}/lobby`
+    : `/session/${session.sessionId}/join`;
+
+  return (
+    <Plate variant="live">
+      <div
+        className="flex items-center justify-between"
+        style={{ marginBottom: "var(--space-2)" }}
+      >
+        <h2
+          className="font-heading font-bold"
+          style={{
+            fontSize: "var(--size-heading-m)",
+            color: "var(--text-primary)",
+            margin: 0,
+            lineHeight: "var(--lh-snug)",
+          }}
+        >
+          {session.gymName}
+        </h2>
+        <LivePill label="Live" />
       </div>
-      <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
-    </Link>
+      <div
+        className="font-mono uppercase"
+        style={{
+          fontSize: "var(--size-num-xs)",
+          letterSpacing: "var(--ls-caps-l)",
+          color: "var(--text-secondary)",
+          marginBottom: "var(--space-3)",
+        }}
+      >
+        {session.participantCount} athletes in lobby · Session started{" "}
+        {minsAgo} min ago
+      </div>
+      <Link
+        href={href}
+        className="inline-flex w-full items-center justify-center font-heading font-bold uppercase transition-colors"
+        style={{
+          background: "var(--accent-cta)",
+          color: "var(--text-on-accent)",
+          padding: "var(--space-3) var(--space-5)",
+          fontSize: "var(--size-label-l)",
+          letterSpacing: "var(--ls-caps)",
+          borderRadius: "var(--radius-sm)",
+          textDecoration: "none",
+          gap: "var(--space-2)",
+        }}
+      >
+        Enter Lobby <span aria-hidden>→</span>
+      </Link>
+    </Plate>
+  );
+}
+
+function UpcomingSessionPlate({
+  session,
+  athlete,
+}: {
+  session: ActiveSessionInfo | null;
+  athlete: AthleteGuardRow;
+}) {
+  if (!session) {
+    return (
+      <Plate>
+        <div
+          className="flex items-center justify-between"
+          style={{ marginBottom: "var(--space-2)" }}
+        >
+          <h2
+            className="font-heading font-bold"
+            style={{
+              fontSize: "var(--size-heading-m)",
+              color: "var(--text-primary)",
+              margin: 0,
+              lineHeight: "var(--lh-snug)",
+            }}
+          >
+            No upcoming session
+          </h2>
+          <MetaTag>Find a gym</MetaTag>
+        </div>
+        <p
+          style={{
+            color: "var(--text-secondary)",
+            fontFamily: "var(--font-body)",
+            fontSize: "var(--size-body-s)",
+            margin: 0,
+            marginBottom: "var(--space-2)",
+          }}
+        >
+          {athlete.primary_gym_id
+            ? "Your gym hasn't scheduled a session yet."
+            : "Pick a primary gym to see upcoming open mats."}
+        </p>
+        <Link
+          href="/gyms"
+          className="font-mono uppercase"
+          style={{
+            fontSize: "var(--size-num-xs)",
+            letterSpacing: "var(--ls-caps-l)",
+            color: "var(--accent-cta)",
+            textDecoration: "none",
+          }}
+        >
+          Browse gyms →
+        </Link>
+      </Plate>
+    );
+  }
+
+  const startsHint = formatTimeUntil(session.scheduledStart);
+  const scheduledLabel = new Date(session.scheduledStart).toLocaleString(
+    undefined,
+    {
+      weekday: "long",
+      hour: "numeric",
+      minute: "2-digit",
+    },
+  );
+
+  return (
+    <Plate>
+      <div
+        className="flex items-center justify-between"
+        style={{ marginBottom: "var(--space-2)" }}
+      >
+        <h2
+          className="font-heading font-bold"
+          style={{
+            fontSize: "var(--size-heading-m)",
+            color: "var(--text-primary)",
+            margin: 0,
+            lineHeight: "var(--lh-snug)",
+          }}
+        >
+          {session.gymName}
+        </h2>
+        <MetaTag>{startsHint ?? "Upcoming"}</MetaTag>
+      </div>
+      <p
+        style={{
+          fontFamily: "var(--font-body)",
+          fontSize: "var(--size-body-s)",
+          color: "var(--text-secondary)",
+          margin: 0,
+          marginBottom: "var(--space-2)",
+        }}
+      >
+        Next session: {scheduledLabel}
+      </p>
+      <div
+        className="font-mono uppercase"
+        style={{
+          fontSize: "var(--size-num-xs)",
+          letterSpacing: "var(--ls-caps-l)",
+          color: "var(--text-tertiary)",
+        }}
+      >
+        {session.participantCount} athletes RSVP&apos;d
+      </div>
+    </Plate>
+  );
+}
+
+function RecentActivityBlock({
+  hasMatches,
+  myMatches,
+  allActivity,
+}: {
+  hasMatches: boolean;
+  myMatches: React.ComponentProps<typeof RecentActivitySection>["myMatches"];
+  allActivity: React.ComponentProps<
+    typeof RecentActivitySection
+  >["allActivity"];
+}) {
+  if (!hasMatches) {
+    return (
+      <div>
+        <MetaLabel style={{ marginBottom: "var(--space-2)" }}>
+          Recent Activity
+        </MetaLabel>
+        <p
+          style={{
+            fontFamily: "var(--font-body)",
+            fontSize: "var(--size-body)",
+            color: "var(--text-secondary)",
+            margin: 0,
+          }}
+        >
+          No matches yet, your first match is waiting.
+        </p>
+      </div>
+    );
+  }
+  return (
+    <RecentActivitySection myMatches={myMatches} allActivity={allActivity} />
+  );
+}
+
+function RecordBlock({
+  summary,
+}: {
+  summary: { wins: number; losses: number; draws: number };
+}) {
+  return (
+    <div>
+      <MetaLabel style={{ marginBottom: "var(--space-2)" }}>Record</MetaLabel>
+      <div
+        className="font-mono"
+        style={{
+          fontSize: "var(--size-num-l)",
+          color: "var(--text-primary)",
+          fontVariantNumeric: "tabular-nums",
+          fontWeight: 700,
+          letterSpacing: "-0.02em",
+        }}
+      >
+        {summary.wins}W · {summary.losses}L · {summary.draws}D
+      </div>
+    </div>
   );
 }
