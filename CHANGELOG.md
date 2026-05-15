@@ -2,6 +2,25 @@
 
 ## [Unreleased]
 
+**E1 / E2: Migrate Gym Finder + Gym Details to ELO Design System (2026-05-15)**
+
+**Added**
+- `apps/web/app/(app)/gyms/gym-finder.tsx`, `gym-row.tsx`: city-filtered finder rebuilt on Plate primitives with LivePill status, mono caps labels, and meta partner-count chrome.
+- `apps/web/app/(app)/gyms/[id]/gym-rsvp-action.tsx`: token-styled Attend / ✓ Going row action used inside ParticipantRow.
+- `apps/web/app/(app)/gyms/[id]/gym-header-manage-link.tsx`: server-checked Settings rightAction surfaced to gym managers on the gym detail header.
+- `apps/web/app/(app)/gyms/[id]/manage/page.tsx` + `manage-content.tsx`: new manager-only surface that hosts gym info, create session, and templates (redirects non-managers to the detail page).
+
+**Changed**
+- `apps/web/app/(app)/gyms/page.tsx`: AppHeader retitled to "Gym Finder" with back nav.
+- `apps/web/app/(app)/gyms/gyms-content.tsx`: now passes athlete city default into the new finder.
+- `apps/web/app/(app)/gyms/[id]/page.tsx`: AppHeader gains the Manage right-action; body renders the redesigned detail content.
+- `apps/web/app/(app)/gyms/[id]/gym-detail-content.tsx`: rebuilt to the wireframe E2 (title + meta address, Plate live session with Join Lobby CTA, ParticipantRow list of upcoming sessions, 2-up EloTile stat grid). Manager UI relocated to `/gyms/[id]/manage`.
+- `apps/web/app/(app)/gyms/create-gym-dialog.tsx`, `edit-gym-dialog.tsx`, `create-session-dialog.tsx`: dialog trigger buttons reskinned to token-driven hairline / signal-red CTAs.
+- `apps/web/app/(app)/gyms/[id]/session-templates.tsx`, `template-card.tsx`: section header + cards rebuilt on Plate with mono caps meta.
+
+**Removed**
+- `apps/web/app/(app)/gyms/gym-search.tsx`: replaced by `gym-finder.tsx`.
+
 **Phase 6C: Mobile Gym Management (2026-05-06)**
 
 **Added**

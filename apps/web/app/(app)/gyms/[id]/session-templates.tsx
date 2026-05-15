@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, CalendarClock } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Plus } from "lucide-react";
 import type { SessionTemplate } from "@jits/shared/types/session";
 import { TemplateCard } from "./template-card";
 import { TemplateFormDialog } from "./template-form-dialog";
@@ -30,36 +29,56 @@ export function SessionTemplates({ gymId, templates, isManager }: SessionTemplat
   const activeTemplates = templates.filter((t) => t.is_active);
 
   return (
-    <section className="flex flex-col gap-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10">
-            <CalendarClock className="h-4 w-4 text-primary" />
-          </div>
-          <h2 className="text-lg font-semibold">Session Templates</h2>
-          {activeTemplates.length > 0 && (
-            <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-muted px-1.5 text-[11px] font-bold text-muted-foreground">
-              {activeTemplates.length}
-            </span>
-          )}
-        </div>
-        {isManager && (
-          <Button variant="outline" size="sm" onClick={handleAdd}>
-            <Plus className="mr-1.5 h-3.5 w-3.5" />
-            Add
-          </Button>
-        )}
-      </div>
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+      {isManager && (
+        <button
+          type="button"
+          onClick={handleAdd}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "var(--space-1)",
+            fontFamily: "var(--font-heading)",
+            fontSize: "var(--size-label-s)",
+            fontWeight: 700,
+            textTransform: "uppercase",
+            letterSpacing: "var(--ls-caps)",
+            padding: "var(--space-2) var(--space-3)",
+            borderRadius: "var(--radius-xs)",
+            border: "1px solid var(--border-hairline-strong)",
+            background: "var(--bg-elevated)",
+            color: "var(--text-secondary)",
+            cursor: "pointer",
+            alignSelf: "flex-end",
+          }}
+        >
+          <Plus className="h-3.5 w-3.5" />
+          Add Template
+        </button>
+      )}
 
       {activeTemplates.length > 0 ? (
-        <div className="flex flex-col gap-2">
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
           {activeTemplates.map((t) => (
             <TemplateCard key={t.id} template={t} isManager={isManager} onEdit={handleEdit} />
           ))}
         </div>
       ) : (
-        <div className="rounded-2xl border border-dashed border-border p-6 text-center">
-          <p className="text-sm text-muted-foreground">No session templates yet</p>
+        <div
+          style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: "var(--size-num-xs)",
+            color: "var(--text-tertiary)",
+            textTransform: "uppercase",
+            letterSpacing: "var(--ls-caps-l)",
+            padding: "var(--space-4)",
+            border: "1px dashed var(--border-hairline)",
+            borderRadius: "var(--radius-xs)",
+            textAlign: "center",
+          }}
+        >
+          No Session Templates Yet
         </div>
       )}
 
@@ -69,6 +88,6 @@ export function SessionTemplates({ gymId, templates, isManager }: SessionTemplat
         open={formOpen}
         onOpenChange={setFormOpen}
       />
-    </section>
+    </div>
   );
 }

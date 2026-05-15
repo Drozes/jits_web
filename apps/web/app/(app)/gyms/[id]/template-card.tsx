@@ -4,8 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Play, Pencil, Trash2, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Plate } from "@/components/ui/elo-system";
 import { createClient } from "@/lib/supabase/client";
 import { deleteSessionTemplate, createSessionFromTemplate } from "@jits/shared/api/mutations";
 import type { SessionTemplate } from "@jits/shared/types/session";
@@ -50,35 +49,102 @@ export function TemplateCard({ template, isManager, onEdit }: TemplateCardProps)
   }
 
   const timeDisplay = template.start_time.slice(0, 5);
+  const meta = `${DAYS[template.day_of_week]} · ${timeDisplay} · ${template.duration_minutes}min${
+    template.max_participants ? ` · Max ${template.max_participants}` : ""
+  }`;
 
   return (
-    <Card>
-      <CardContent className="flex items-center justify-between gap-3 p-4">
-        <div className="flex flex-col gap-0.5 min-w-0">
-          <p className="font-heading text-sm font-semibold truncate">{template.title}</p>
-          <p className="text-xs text-muted-foreground font-mono">
-            {DAYS[template.day_of_week]} at {timeDisplay} ({template.duration_minutes}min)
-          </p>
-          {template.max_participants && (
-            <p className="text-xs text-muted-foreground">Max {template.max_participants}</p>
-          )}
+    <Plate>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "var(--space-3)",
+        }}
+      >
+        <div style={{ minWidth: 0 }}>
+          <div
+            style={{
+              fontFamily: "var(--font-heading)",
+              fontSize: "var(--size-heading-s)",
+              fontWeight: 700,
+              color: "var(--text-primary)",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              lineHeight: 1.15,
+            }}
+          >
+            {template.title}
+          </div>
+          <div
+            style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: "var(--size-num-xs)",
+              color: "var(--text-tertiary)",
+              textTransform: "uppercase",
+              letterSpacing: "var(--ls-caps-l)",
+              marginTop: 2,
+            }}
+          >
+            {meta}
+          </div>
         </div>
-        <div className="flex items-center gap-1.5 shrink-0">
-          <Button size="sm" variant="outline" onClick={handleCreateSession} disabled={creating}>
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", flexShrink: 0 }}>
+          <IconButton onClick={handleCreateSession} disabled={creating} ariaLabel="Start session from template">
             {creating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
-          </Button>
+          </IconButton>
           {isManager && (
             <>
-              <Button size="sm" variant="ghost" onClick={() => onEdit(template)}>
+              <IconButton onClick={() => onEdit(template)} ariaLabel="Edit template">
                 <Pencil className="h-3.5 w-3.5" />
-              </Button>
-              <Button size="sm" variant="ghost" onClick={handleDelete} disabled={deleting}>
+              </IconButton>
+              <IconButton onClick={handleDelete} disabled={deleting} ariaLabel="Delete template" tone="danger">
                 {deleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-              </Button>
+              </IconButton>
             </>
           )}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </Plate>
+  );
+}
+
+function IconButton({
+  children,
+  onClick,
+  disabled,
+  ariaLabel,
+  tone,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+  ariaLabel: string;
+  tone?: "danger";
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={ariaLabel}
+      style={{
+        width: 28,
+        height: 28,
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "transparent",
+        border: "1px solid var(--border-hairline)",
+        borderRadius: "var(--radius-xs)",
+        color: tone === "danger" ? "var(--state-negative)" : "var(--text-secondary)",
+        cursor: disabled ? "default" : "pointer",
+        opacity: disabled ? 0.5 : 1,
+      }}
+    >
+      {children}
+    </button>
   );
 }
