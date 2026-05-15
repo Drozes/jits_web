@@ -28,7 +28,7 @@ export default defineConfig({
   timeout: 600_000,
   reporter: [["list"]],
   use: {
-    baseURL: "http://localhost:3000",
+    baseURL: "http://localhost:4983",
     browserName: "chromium",
     viewport: { width: 390, height: 844 },
     deviceScaleFactor: 3,
@@ -40,7 +40,7 @@ export default defineConfig({
   },
   webServer: {
     command: "npm run dev",
-    url: "http://localhost:3000",
+    url: "http://localhost:4983",
     reuseExistingServer: true,
     timeout: 120_000,
   },

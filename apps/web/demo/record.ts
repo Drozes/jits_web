@@ -53,7 +53,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
 }
 
 test("Record full demo", async ({ browser }) => {
-  const baseURL = "http://localhost:3000";
+  const baseURL = "http://localhost:4983";
   const outputDir = "./demo/output";
   const tmpDir = `${outputDir}/.tmp`;
   const scenesDir = `${outputDir}/scenes`;

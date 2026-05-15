@@ -38,7 +38,7 @@ Both apps need a Supabase URL and anon key (the same project values).
 ### Web
 
 ```bash
-npm run dev:web                  # next dev on apps/web (http://localhost:3000)
+npm run dev:web                  # next dev on apps/web (http://localhost:4983)
 npm run build:web                # next build
 npm run test:web                 # vitest
 cd apps/web && npm run test:e2e  # playwright
