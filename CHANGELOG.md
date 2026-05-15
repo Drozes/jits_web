@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+**Gyms wireframe pass (2026-05-15)**
+
+**Changed**
+- Web gym detail (`apps/web/app/(app)/gyms/[id]/gym-stats.tsx`): replaced "Matches" stat tile with "Avg ELO" to match wireframe E2 (line ~1440). Placeholder "—" rendered until `getGymManagerStats` exposes `avgElo`.
+- Web gym detail (`apps/web/app/(app)/gyms/[id]/gym-detail-content.tsx`): added "Last Session" plate (4-cell DataRow grid: Attendees, Avg Matches, ELO Range, Median) below the stats tiles, per wireframe E2 lines 1444-1450. Values are "—" placeholders pending `getGymDetail` last-session aggregates.
+- Web gym list (`apps/web/components/domain/gym-card.tsx`): per-row schedule label now renders next upcoming session day+time (e.g. "Sun 11AM") via `Intl.DateTimeFormat` instead of "N upcoming". Falls back to "No sessions" when none. Live sessions still take precedence.
+- Shared (`packages/shared/src/types/session.ts`, `packages/shared/src/api/queries.ts`): `GymListItem` gains `nextSessionStart: string | null`; `getGymsWithSessions` computes the earliest future scheduled-session timestamp per gym.
+
 **Phase 6C: Mobile Gym Management (2026-05-06)**
 
 **Added**

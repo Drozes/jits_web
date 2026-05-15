@@ -9,6 +9,25 @@ interface GymCardProps {
   isMyGym: boolean;
 }
 
+/**
+ * Format an ISO timestamp as "Sun 11AM" or "Tue 7PM" (no minutes when :00).
+ * Wireframe E1 line ~1364-1365 expects this short schedule label on each row.
+ */
+function formatNextSession(iso: string): string {
+  const date = new Date(iso);
+  const day = new Intl.DateTimeFormat("en-US", { weekday: "short" }).format(date);
+  const minutes = date.getMinutes();
+  const timeOpts: Intl.DateTimeFormatOptions =
+    minutes === 0
+      ? { hour: "numeric", hour12: true }
+      : { hour: "numeric", minute: "2-digit", hour12: true };
+  const time = new Intl.DateTimeFormat("en-US", timeOpts)
+    .format(date)
+    .replace(/\s/g, "")
+    .toUpperCase();
+  return `${day} ${time}`;
+}
+
 export function GymCard({ gym, isMyGym }: GymCardProps) {
   return (
     <Link href={`/gyms/${gym.id}`}>
@@ -39,13 +58,18 @@ export function GymCard({ gym, isMyGym }: GymCardProps) {
             <Users className="h-3 w-3" />
             {gym.memberCount} {gym.memberCount === 1 ? "member" : "members"}
           </span>
-          {gym.activeSessions > 0 && (
+          {gym.activeSessions > 0 ? (
             <span className="text-green-500 font-medium">
               {gym.activeSessions} active
             </span>
-          )}
-          {gym.upcomingSessions > 0 && (
-            <span>{gym.upcomingSessions} upcoming</span>
+          ) : gym.nextSessionStart ? (
+            <span className="font-mono tabular-nums">
+              {formatNextSession(gym.nextSessionStart)}
+            </span>
+          ) : (
+            <span className="font-mono uppercase tracking-[0.16em] text-muted-foreground">
+              No sessions
+            </span>
           )}
         </div>
       </Card>
