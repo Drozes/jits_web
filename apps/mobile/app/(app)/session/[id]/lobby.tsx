@@ -44,7 +44,7 @@ export default function SessionLobbyScreen() {
 
   const onMatchStarted = React.useCallback(
     (matchId: string) => {
-      router.push(`/session/${id}/match/${matchId}`);
+      router.replace(`/session/${id}/match/${matchId}`);
     },
     [id, router],
   );
@@ -81,7 +81,7 @@ export default function SessionLobbyScreen() {
       });
       return;
     }
-    router.push(`/session/${id}/match/${result.data.matchId}`);
+    router.replace(`/session/${id}/match/${result.data.matchId}`);
   }
 
   async function handleRandomMatch() {
@@ -95,7 +95,7 @@ export default function SessionLobbyScreen() {
       });
       return;
     }
-    router.push(`/session/${id}/match/${result.data.matchId}`);
+    router.replace(`/session/${id}/match/${result.data.matchId}`);
   }
 
   async function handleInvite() {

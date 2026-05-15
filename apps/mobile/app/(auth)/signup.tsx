@@ -45,7 +45,7 @@ export default function SignupScreen() {
       toast.error(error.message);
       return;
     }
-    toast.success("Sign-up email sent");
+    toast.success("Account created");
     setSubmitted(true);
   };
 
@@ -126,13 +126,13 @@ function ConfirmEmailCard({ email, onBack }: { email: string; onBack: () => void
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Check your email</CardTitle>
+        <CardTitle>Account created</CardTitle>
         <CardDescription>
-          We sent a confirmation link to {email}. Open it to finish creating your account.
+          Your account for {email} is ready. Sign in to set up your profile.
         </CardDescription>
       </CardHeader>
       <CardFooter className="flex-col items-stretch gap-3">
-        <Button onPress={onBack}>Back to sign in</Button>
+        <Button onPress={onBack}>Sign in</Button>
       </CardFooter>
     </Card>
   );
