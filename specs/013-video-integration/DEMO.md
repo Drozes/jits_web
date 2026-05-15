@@ -182,6 +182,14 @@ For demo speed prefer the smaller `slim_compressed.mp4` if it's in
 manual slicer feeds canned chunks into the chunk-analyze pipeline so
 the FE can render real progress against a known-good source.)
 
+If `manual-slice.sh` hangs on advisory-lock acquisition (see §11),
+use the bypass driver which slices + analyzes + merges inline:
+
+```bash
+./scripts/test-video/slice-and-analyze-local.sh \
+  ./scripts/test-video/.tmp/julia_1_compressed.mp4 <video_id> 200 5
+```
+
 ---
 
 ## §8 Watch the analysis happen
@@ -244,6 +252,9 @@ subscriptions are open while the viewer is mounted.
 | Viewer says "waiting for slicer…" forever     | `chunk_count` is `NULL` on `match_videos`                            | The slicer never wrote chunks. Re-run §7 and check `SELECT count(*) FROM video_chunks WHERE video_id='<id>';`.                                     |
 | `23505` on re-upload                          | Unique `(match_id, uploaded_by)` constraint                          | Expected — the FE catches this and UPDATEs via `upsertMatchVideo`. If forcing a fresh slice, DELETE the `match_videos` row in Studio first.        |
 | `42883`/`404` from `get_video_progress`        | RPC not deployed locally (BE Round 3)                                | Hook falls back to a manual aggregate; nothing to do. Re-pull jr_be migrations if you need the RPC itself.                                         |
+| `manual-slice.sh` hangs at "Acquiring per-video advisory lock", or a second run dies with "another slicer is running" | Self-deadlock: the script holds a session-scope `pg_try_advisory_lock` AND its INSERT transaction takes an `pg_advisory_xact_lock` on the same `hashtext('manual-slice:' \|\| video_id)` key from a separate psql session. Session-vs-xact at the same key blocks across sessions. | Kill the stuck psql backends: `psql -c "SELECT pg_terminate_backend(pid) FROM pg_locks WHERE locktype='advisory';"`. As a one-shot bypass, drive the pipeline with `./scripts/test-video/slice-and-analyze-local.sh <input> <video_id>` (drops the lock dance and inlines analyze + merge). |
+| Edge function returns `404 {"error":"Chunk not found"}` for a chunk that obviously exists | `supabase functions serve` injects an SR key into the edge runtime container that differs from the one Kong/`supabase status` reports. The function's `decodeAuth` constant-time compare fails, request is treated as a user JWT, `userCanSeeVideo` fails, falls through to 404 (deliberate to avoid leaking chunk existence). | Pass the edge-runtime key explicitly: `SR=$(docker exec supabase_edge_runtime_jr_be sh -c 'echo "$SUPABASE_SERVICE_ROLE_KEY"')`, then `curl -H "Authorization: Bearer $SR" ...`. The new `slice-and-analyze-local.sh` does this automatically. |
+| Edge function returns `500 {"error":"Chunk analysis failed","detail":"Failed to sign chunk URL: Object not found"}` | `video_chunks.storage_path` includes the bucket name (e.g. `match-videos/abc/...`). The function calls `.from("match-videos").createSignedUrl(storage_path)` which prepends the bucket again, looking up `match-videos/match-videos/abc/...`. | Store storage_path bucket-RELATIVE: `UPDATE video_chunks SET storage_path = regexp_replace(storage_path, '^match-videos/', '') WHERE video_id='<id>';` and re-run analyze. |
 
 ---
 
@@ -260,3 +271,4 @@ subscriptions are open while the viewer is mounted.
 | Feature flags (`timekeeperEnabled`)                           | `apps/web/lib/feature-flags.ts`                                       |
 | Backend contract (source of truth)                            | `jr_be/specs/013-chunked-video-pipeline/INTEGRATION.md`               |
 | Reference vanilla-JS viewer                                   | `jr_be/scripts/test-video/viewer/app.js`                              |
+| Bypass slicer (workaround for §7 hang)                        | `jr_be/scripts/test-video/slice-and-analyze-local.sh`                 |
