@@ -22,9 +22,9 @@ interface SignUpFormProps {
 
 const FIELD_LABEL_STYLE: React.CSSProperties = {
   fontFamily: "var(--font-heading)",
-  fontSize: "10px",
+  fontSize: "var(--size-label-s)",
   textTransform: "uppercase",
-  letterSpacing: "0.08em",
+  letterSpacing: "var(--ls-caps-l)",
   color: "var(--text-tertiary)",
   fontWeight: 700,
 };
@@ -110,6 +110,8 @@ export function SignUpForm({ gyms, cities }: SignUpFormProps) {
           flexDirection: "column",
         }}
       >
+        <SectionHeading label="Account" showSeparator={false} />
+
         <Field label="Email">
           <input
             type="email"
@@ -129,6 +131,8 @@ export function SignUpForm({ gyms, cities }: SignUpFormProps) {
             onChange={(e) => onChange({ password: e.target.value })}
           />
         </Field>
+
+        <SectionHeading label="Profile" showSeparator />
 
         <Field label="First Name">
           <input
@@ -192,17 +196,38 @@ export function SignUpForm({ gyms, cities }: SignUpFormProps) {
           </div>
         </Field>
 
-        <Field label="Weight (kg)">
-          <input
-            type="number"
-            inputMode="decimal"
-            min={20}
-            max={300}
-            step={0.1}
-            style={FIELD_INPUT_STYLE}
-            value={values.weightKg}
-            onChange={(e) => onChange({ weightKg: e.target.value })}
-          />
+        <Field label="Weight">
+          <div
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "var(--space-2)",
+              width: "100%",
+            }}
+          >
+            <input
+              type="number"
+              inputMode="decimal"
+              min={20}
+              max={300}
+              step={0.1}
+              style={{ ...FIELD_INPUT_STYLE, flex: 1 }}
+              value={values.weightKg}
+              onChange={(e) => onChange({ weightKg: e.target.value })}
+            />
+            <span
+              style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: "var(--size-label-s)",
+                textTransform: "uppercase",
+                letterSpacing: "var(--ls-caps-l)",
+                color: "var(--text-tertiary)",
+                fontWeight: 700,
+              }}
+            >
+              KG
+            </span>
+          </div>
         </Field>
 
         <Field label="City">
@@ -290,6 +315,46 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     >
       <label style={FIELD_LABEL_STYLE}>{label}</label>
       {children}
+    </div>
+  );
+}
+
+function SectionHeading({
+  label,
+  showSeparator,
+}: {
+  label: string;
+  showSeparator: boolean;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        marginTop: showSeparator ? "var(--space-4)" : 0,
+      }}
+    >
+      {showSeparator && (
+        <div
+          style={{
+            height: "1px",
+            width: "100%",
+            background: "var(--border-hairline)",
+            marginBottom: "var(--space-4)",
+          }}
+        />
+      )}
+      <div
+        className="font-heading font-bold uppercase"
+        style={{
+          fontSize: "var(--size-label-l)",
+          letterSpacing: "var(--ls-caps-l)",
+          color: "var(--text-tertiary)",
+          marginBottom: "var(--space-2)",
+        }}
+      >
+        {label}
+      </div>
     </div>
   );
 }
