@@ -2,13 +2,10 @@
 
 import { useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Switch } from "@/components/ui/switch";
 import { Card } from "@/components/ui/card";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { AthleteCard } from "@/components/domain/athlete-card";
-import { Crown, Medal, Award, Trophy, Users } from "lucide-react";
-import { cn, getProfilePhotoUrl } from "@/lib/utils";
-import { getInitials } from "@jits/shared/utils";
+import { Users } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Chip, RankRow, LivePill } from "@/components/ui/elo-system";
 
 interface RankedAthlete {
   id: string;
@@ -33,72 +30,19 @@ interface RankedGym {
   memberCount: number;
 }
 
-function getRankIcon(rank: number) {
-  if (rank === 1) return <Crown className="h-5 w-5 text-yellow-500 drop-shadow-sm" />;
-  if (rank === 2) return <Medal className="h-5 w-5 text-gray-400" />;
-  if (rank === 3) return <Award className="h-5 w-5 text-amber-600" />;
-  return <span className="text-sm font-semibold text-muted-foreground">#{rank}</span>;
-}
+const FILTERS = ["Global", "My Gym", "−77 kg", "30-day", "Region"] as const;
 
-function PodiumSlot({
-  athlete,
-  place,
-}: {
-  athlete: RankedAthlete;
-  place: 1 | 2 | 3;
-}) {
-  const sizeMap = {
-    1: { avatar: "h-16 w-16", text: "text-sm", elo: "text-base", height: "pt-6 pb-4" },
-    2: { avatar: "h-14 w-14", text: "text-xs", elo: "text-sm", height: "pt-5 pb-3" },
-    3: { avatar: "h-12 w-12", text: "text-xs", elo: "text-xs", height: "pt-4 pb-3" },
-  };
-  const s = sizeMap[place];
-
-  const podiumBg = {
-    1: "from-yellow-400/20 to-yellow-600/10 border-yellow-500/30",
-    2: "from-gray-300/20 to-gray-400/10 border-gray-400/30",
-    3: "from-amber-400/20 to-amber-600/10 border-amber-500/30",
-  };
-
-  const trophyBg = {
-    1: "bg-gradient-to-br from-yellow-400 to-yellow-600",
-    2: "bg-gradient-to-br from-gray-300 to-gray-400",
-    3: "bg-gradient-to-br from-amber-400 to-amber-700",
-  };
-
-  const maxW = { 1: "max-w-[120px]", 2: "max-w-[110px]", 3: "max-w-[100px]" };
-
-  return (
-    <div className={`flex-1 text-center ${maxW[place]}`}>
-      <div
-        className={`${place === 1 ? "h-14 w-14" : place === 2 ? "h-11 w-11" : "h-10 w-10"} mx-auto mb-2 ${trophyBg[place]} flex items-center justify-center rounded-2xl`}
-      >
-        <Trophy className={`${place === 1 ? "h-7 w-7" : place === 2 ? "h-5 w-5" : "h-4 w-4"} text-white`} />
-      </div>
-      <div className={`rounded-2xl border bg-gradient-to-b ${podiumBg[place]} ${s.height} shadow-sm`}>
-        <Avatar className={`${s.avatar} mx-auto mb-2 border-2 border-background bg-gradient-to-br from-primary to-primary/80 text-white shadow-md`}>
-          {athlete.profilePhotoUrl && (
-            <AvatarImage src={getProfilePhotoUrl(athlete.profilePhotoUrl)!} alt={athlete.displayName} className="object-cover" />
-          )}
-          <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 font-bold text-white">
-            {getInitials(athlete.displayName)}
-          </AvatarFallback>
-        </Avatar>
-        <div className={`${s.text} truncate px-1.5 font-semibold`}>
-          {athlete.displayName}
-        </div>
-        <div className={`${s.elo} font-bold tabular-nums mt-0.5`}>
-          {athlete.currentElo}
-        </div>
-      </div>
-    </div>
-  );
+function eloDelta(athlete: RankedAthlete): number {
+  // Approximate delta from trend until backend supplies real 30-day delta.
+  if (athlete.eloTrend === "up") return Math.max(1, athlete.wins - athlete.losses);
+  if (athlete.eloTrend === "down") return -Math.max(1, athlete.losses - athlete.wins);
+  return 0;
 }
 
 export function LeaderboardContent({
   athletes,
   gyms,
-  challengedIds = [],
+  challengedIds: _challengedIds = [],
 }: {
   athletes: RankedAthlete[];
   gyms: RankedGym[];
@@ -111,111 +55,152 @@ export function LeaderboardContent({
   const rawGender = searchParams.get("gender");
   const genderFilter: "all" | "male" | "female" =
     rawGender === "male" || rawGender === "female" ? rawGender : "all";
-  const challengedSet = new Set(challengedIds);
 
   const updateParam = useCallback(
     (key: string, value: string, defaultValue: string) => {
       const params = new URLSearchParams(searchParams.toString());
-      if (value === defaultValue) {
-        params.delete(key);
-      } else {
-        params.set(key, value);
-      }
+      if (value === defaultValue) params.delete(key);
+      else params.set(key, value);
       const qs = params.toString();
       router.replace(qs ? `?${qs}` : "?", { scroll: false });
     },
     [router, searchParams],
   );
 
-  const filteredAthletes = genderFilter === "all"
-    ? athletes
-    : athletes.filter((a) => {
-        if (genderFilter === "male") return a.gender === "M";
-        if (genderFilter === "female") return a.gender === "F";
-        return true;
-      });
+  const filteredAthletes =
+    genderFilter === "all"
+      ? athletes
+      : athletes.filter((a) => {
+          if (genderFilter === "male") return a.gender === "M";
+          if (genderFilter === "female") return a.gender === "F";
+          return true;
+        });
+
+  const currentUser = filteredAthletes.find((a) => a.isCurrentUser);
 
   return (
-    <div className="flex flex-col gap-6 animate-page-in">
-      {/* Mode Toggle */}
-      <div className="flex items-center justify-center gap-3">
-        <span className={`text-sm font-medium transition-colors ${isAthleteMode ? "text-foreground" : "text-muted-foreground"}`}>
+    <div className="flex flex-col gap-6 animate-page-in" data-theme="dark" style={{ background: "var(--bg-primary)", color: "var(--text-primary)", padding: "var(--space-4)", borderRadius: "var(--radius-md)" }}>
+      {/* Mode toggle (kept compact) */}
+      <div className="flex items-center justify-center gap-2">
+        <button
+          onClick={() => updateParam("mode", "fighters", "fighters")}
+          className={cn("px-3 py-1.5 text-xs font-bold uppercase tracking-wider")}
+          style={{
+            fontFamily: "var(--font-heading)",
+            letterSpacing: "var(--ls-caps)",
+            color: isAthleteMode ? "var(--text-primary)" : "var(--text-tertiary)",
+            borderBottom: `2px solid ${isAthleteMode ? "var(--accent-cta)" : "transparent"}`,
+          }}
+        >
           Fighters
-        </span>
-        <Switch
-          checked={!isAthleteMode}
-          onCheckedChange={(checked) => updateParam("mode", checked ? "gyms" : "fighters", "fighters")}
-        />
-        <span className={`text-sm font-medium transition-colors ${!isAthleteMode ? "text-foreground" : "text-muted-foreground"}`}>
+        </button>
+        <button
+          onClick={() => updateParam("mode", "gyms", "fighters")}
+          className={cn("px-3 py-1.5 text-xs font-bold uppercase tracking-wider")}
+          style={{
+            fontFamily: "var(--font-heading)",
+            letterSpacing: "var(--ls-caps)",
+            color: !isAthleteMode ? "var(--text-primary)" : "var(--text-tertiary)",
+            borderBottom: `2px solid ${!isAthleteMode ? "var(--accent-cta)" : "transparent"}`,
+          }}
+        >
           Gyms
-        </span>
+        </button>
       </div>
 
       {isAthleteMode ? (
         <>
-          {/* Gender Filter Pills */}
-          <div className="flex justify-center gap-1.5">
+          {/* Filter chips */}
+          <div className="flex gap-2 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+            {FILTERS.map((label) => {
+              const isGenderChip = false;
+              const active = label === "Global" && genderFilter === "all" && !isGenderChip;
+              return (
+                <Chip key={label} active={active}>
+                  {label}
+                </Chip>
+              );
+            })}
+            {/* Gender pills kept as functional sub-filter */}
             {(["all", "male", "female"] as const).map((g) => (
-              <button
+              <Chip
                 key={g}
+                active={genderFilter === g}
                 onClick={() => updateParam("gender", g, "all")}
-                className={cn(
-                  "rounded-full px-3.5 py-1.5 text-xs font-medium transition-all duration-200",
-                  genderFilter === g
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "bg-muted/60 text-muted-foreground hover:bg-muted",
-                )}
               >
-                {g === "all" ? "All" : g === "male" ? "Male" : "Female"}
-              </button>
+                {g === "all" ? "All" : g === "male" ? "Men" : "Women"}
+              </Chip>
             ))}
           </div>
 
-          {/* Top 3 Podium */}
-          {filteredAthletes.length >= 3 && (
-            <div className="flex items-end justify-center gap-3">
-              <PodiumSlot athlete={filteredAthletes[1]} place={2} />
-              <PodiumSlot athlete={filteredAthletes[0]} place={1} />
-              <PodiumSlot athlete={filteredAthletes[2]} place={3} />
-            </div>
-          )}
+          {/* Meta strip */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr auto",
+              fontFamily: "var(--font-mono)",
+              fontSize: "var(--size-num-xs)",
+              color: "var(--text-tertiary)",
+              textTransform: "uppercase",
+              letterSpacing: "var(--ls-caps-xl)",
+              paddingBottom: "var(--space-2)",
+              borderBottom: "1px solid var(--border-hairline-faint)",
+            }}
+          >
+            <span>
+              <span style={{ color: "var(--text-secondary)", fontWeight: 600 }}>
+                {filteredAthletes.length.toLocaleString()}
+              </span>
+              <span> · Athletes</span>
+            </span>
+            <LivePill />
+          </div>
 
-          {/* Full Rankings */}
-          <div className="flex flex-col gap-2.5">
+          {/* Ladder */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
             {filteredAthletes.map((a, i) => (
-              <AthleteCard
+              <RankRow
                 key={a.id}
-                id={a.id}
                 rank={i + 1}
-                displayName={a.displayName}
-                currentElo={a.currentElo}
-                eloTrend={a.eloTrend}
-                wins={a.wins}
-                losses={a.losses}
-                gymName={a.gymName}
-                profilePhotoUrl={a.profilePhotoUrl}
-                isCurrentUser={a.isCurrentUser}
-                hasPendingChallenge={challengedSet.has(a.id)}
+                name={a.displayName}
+                subtitle={a.gymName ?? "Free agent"}
+                value={a.currentElo}
+                delta={eloDelta(a)}
+                leader={i === 0}
               />
             ))}
           </div>
 
           {filteredAthletes.length === 0 && (
-            <p className="text-center text-sm text-muted-foreground">
+            <p style={{ textAlign: "center", color: "var(--text-tertiary)", fontFamily: "var(--font-mono)", fontSize: "var(--size-num-xs)", textTransform: "uppercase", letterSpacing: "var(--ls-caps-xl)" }}>
               No athletes found
             </p>
+          )}
+
+          {/* Sticky YOU */}
+          {currentUser && (
+            <div style={{ position: "sticky", bottom: 0, marginTop: "var(--space-4)" }}>
+              <RankRow
+                rank={currentUser.rank}
+                name={currentUser.displayName}
+                subtitle={currentUser.gymName ?? "Free agent"}
+                value={currentUser.currentElo}
+                delta={eloDelta(currentUser)}
+                you
+              />
+            </div>
           )}
         </>
       ) : (
         <>
-          {/* Gym Rankings */}
+          {/* Gym Rankings (preserved legacy layout) */}
           <div className="flex flex-col gap-2.5">
             {gyms.map((gym) => (
               <Card key={gym.id} className="p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3.5">
                     <div className="flex w-8 justify-center">
-                      {getRankIcon(gym.rank)}
+                      <span className="font-mono tabular-nums text-sm font-bold text-muted-foreground">#{gym.rank}</span>
                     </div>
                     <div className="flex h-11 w-11 items-center justify-center rounded-xl border-2 border-border bg-gradient-to-br from-primary to-primary/80">
                       <Users className="h-5 w-5 text-white" />
@@ -223,7 +208,8 @@ export function LeaderboardContent({
                     <div>
                       <div className="font-semibold text-[15px]">{gym.name}</div>
                       <div className="text-xs text-muted-foreground">
-                        {gym.memberCount} {gym.memberCount === 1 ? "athlete" : "athletes"} · Avg: <span className="tabular-nums">{gym.averageElo}</span>
+                        {gym.memberCount} {gym.memberCount === 1 ? "athlete" : "athletes"} · Avg:{" "}
+                        <span className="tabular-nums">{gym.averageElo}</span>
                       </div>
                     </div>
                   </div>
@@ -236,18 +222,10 @@ export function LeaderboardContent({
           </div>
 
           {gyms.length === 0 && (
-            <p className="text-center text-sm text-muted-foreground">
-              No gyms found
-            </p>
+            <p className="text-center text-sm text-muted-foreground">No gyms found</p>
           )}
         </>
       )}
-
-      <p className="text-center text-xs text-muted-foreground pb-2">
-        {isAthleteMode
-          ? "Rankings based on current ELO"
-          : "Gym rankings based on total member ELO"}
-      </p>
     </div>
   );
 }
