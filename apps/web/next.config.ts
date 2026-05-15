@@ -6,9 +6,12 @@ const nextConfig: NextConfig = {
   env: {
     NEXT_PUBLIC_BUILD_ID: Date.now().toString(),
   },
-  // Resolve from workspace root (two levels up from apps/web) so Turbopack
-  // can find hoisted dependencies like `next`.
-  turbopack: { root: path.resolve(".", "..", "..") },
+  // Anchor to the config file's directory so this stays correct regardless
+  // of the dev server's cwd. `path.resolve(".", ...)` was CWD-relative and
+  // could resolve to a directory missing the hoisted `next` package, putting
+  // Turbopack into a panic loop ("Next.js package not found") that surfaced
+  // as constant browser reloads.
+  turbopack: { root: path.join(__dirname, "..", "..") },
 };
 
 export default nextConfig;
