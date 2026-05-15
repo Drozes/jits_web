@@ -1,6 +1,6 @@
 "use client";
 
-import { Card, CardContent } from "@/components/ui/card";
+import { Plate } from "@/components/ui/elo-system";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Zap, Activity, TrendingUp, Target, BarChart3, Weight } from "lucide-react";
@@ -110,8 +110,8 @@ function OverviewTab({ eloHistory, currentElo, winStreak, eloThisMonth, submissi
 }) {
   return (
     <>
-      <Card>
-        <CardContent className="p-4">
+      <Plate>
+        <div>
           <h3 className="font-semibold mb-3 flex items-center gap-2">
             <TrendingUp className="h-4 w-4 text-primary" />
             ELO Trend
@@ -120,10 +120,10 @@ function OverviewTab({ eloHistory, currentElo, winStreak, eloThisMonth, submissi
             points={eloHistory.map((e) => ({ rating: e.rating_after, delta: e.delta }))}
             currentElo={currentElo}
           />
-        </CardContent>
-      </Card>
-      <Card>
-        <CardContent className="p-4">
+        </div>
+      </Plate>
+      <Plate>
+        <div>
           <h3 className="font-semibold mb-3 flex items-center gap-2">
             <Zap className="h-4 w-4 text-orange-500" />
             Current Performance
@@ -140,10 +140,10 @@ function OverviewTab({ eloHistory, currentElo, winStreak, eloThisMonth, submissi
               <p className="text-xs text-blue-700 dark:text-blue-400">ELO This Month</p>
             </div>
           </div>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardContent className="p-4">
+        </div>
+      </Plate>
+      <Plate>
+        <div>
           <h3 className="font-semibold mb-3 flex items-center gap-2">
             <Activity className="h-4 w-4 text-primary" />
             Key Metrics
@@ -164,8 +164,8 @@ function OverviewTab({ eloHistory, currentElo, winStreak, eloThisMonth, submissi
               <Badge variant="secondary">{totalMatches}</Badge>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </Plate>
     </>
   );
 }
@@ -177,41 +177,41 @@ function InsightsTab({ weeklyActivity, submissions, weightClassStats }: {
 }) {
   return (
     <>
-      <Card>
-        <CardContent className="p-4">
+      <Plate>
+        <div>
           <h3 className="font-semibold mb-3 flex items-center gap-2">
             <BarChart3 className="h-4 w-4 text-primary" />
             Weekly Activity
           </h3>
           <WeeklyActivityChart weeks={weeklyActivity} />
-        </CardContent>
-      </Card>
-      <Card>
-        <CardContent className="p-4">
+        </div>
+      </Plate>
+      <Plate>
+        <div>
           <h3 className="font-semibold mb-3 flex items-center gap-2">
             <Target className="h-4 w-4 text-primary" />
             Top Submissions
           </h3>
           <SubmissionBreakdownList submissions={submissions} />
-        </CardContent>
-      </Card>
-      <Card>
-        <CardContent className="p-4">
+        </div>
+      </Plate>
+      <Plate>
+        <div>
           <h3 className="font-semibold mb-3 flex items-center gap-2">
             <Weight className="h-4 w-4 text-primary" />
             Record by Weight Class
           </h3>
           <WeightClassChart divisions={weightClassStats} />
-        </CardContent>
-      </Card>
+        </div>
+      </Plate>
     </>
   );
 }
 
 function PerformanceTab({ recentPerformance }: { recentPerformance: RecentPerformance[] }) {
   return (
-    <Card>
-      <CardContent className="p-4">
+    <Plate>
+      <div>
         <h3 className="font-semibold mb-3 flex items-center gap-2">
           <TrendingUp className="h-4 w-4 text-green-500" />
           Recent Performance
@@ -236,7 +236,7 @@ function PerformanceTab({ recentPerformance }: { recentPerformance: RecentPerfor
             );
           })}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </Plate>
   );
 }
