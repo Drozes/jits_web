@@ -410,11 +410,12 @@ export async function completeSession(
 /** Create an in-session match via RPC */
 export async function createInSessionMatch(
   supabase: Client,
-  params: { sessionId: string; opponentId: string },
+  params: { sessionId: string; opponentId: string; timekeeperId?: string },
 ): Promise<Result<{ matchId: string }>> {
   const { data, error } = await supabase.rpc("create_session_match", {
     p_session_id: params.sessionId,
     p_opponent_id: params.opponentId,
+    p_timekeeper_id: params.timekeeperId ?? null,
   });
 
   if (error) {

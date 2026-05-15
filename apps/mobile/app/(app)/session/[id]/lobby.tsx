@@ -72,6 +72,7 @@ export default function SessionLobbyScreen() {
     const result = await createInSessionMatch(supabase, {
       sessionId: id,
       opponentId: opponent.athleteId,
+      timekeeperId: athlete.id,
     });
     if (!result.ok) {
       setChallengeLoading(false);
