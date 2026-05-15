@@ -133,7 +133,7 @@ export function CompareStatsModal({
               <p className="text-lg font-bold tabular-nums text-center">
                 {currentAthlete.weight != null ? `${currentAthlete.weight}` : "—"}
               </p>
-              <p className="text-xs text-muted-foreground text-center">Weight (lbs)</p>
+              <p className="text-xs text-muted-foreground text-center">Weight (kg)</p>
               <p className="text-lg font-bold tabular-nums text-center">
                 {competitor.weight != null ? `${competitor.weight}` : "—"}
               </p>

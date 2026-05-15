@@ -29,7 +29,6 @@ export function EditProfileForm({
   const [weight, setWeight] = useState(weightKg?.toString() ?? "");
   const [cityValue, setCityValue] = useState(city ?? "");
   const [gymId, setGymId] = useState(primaryGymId ?? "");
-  const [bio, setBio] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,7 +40,7 @@ export function EditProfileForm({
     const supabase = createClient();
     const display = `${first.trim()} ${last.trim()}`.trim();
     const weightNum = weight.trim() ? parseFloat(weight) : null;
-    if (weightNum !== null && (isNaN(weightNum) || weightNum <= 0 || weightNum > 500)) {
+    if (weightNum !== null && (isNaN(weightNum) || weightNum <= 0 || weightNum > 250)) {
       setError("Invalid weight");
       setSaving(false);
       return;
@@ -66,9 +65,6 @@ export function EditProfileForm({
     router.refresh();
   }
 
-  // Bio is intentionally local-only for now (no DB column); kept in form per spec.
-  void bio;
-
   return (
     <form
       onSubmit={handleSave}
@@ -88,7 +84,7 @@ export function EditProfileForm({
           type="number"
           step="0.1"
           min="0"
-          max="500"
+          max="250"
         />
       </Field>
       <Field label="City">
@@ -109,20 +105,6 @@ export function EditProfileForm({
           ))}
         </select>
       </Field>
-      <Field label="Bio">
-        <textarea
-          value={bio}
-          onChange={(e) => setBio(e.target.value)}
-          rows={3}
-          className="font-body"
-          style={{
-            ...fieldStyle,
-            resize: "vertical",
-            minHeight: 72,
-          }}
-        />
-      </Field>
-
       {error && (
         <p
           className="font-mono uppercase"
