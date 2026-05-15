@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Home, MapPin, Trophy, User } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 const tabs = [
   { href: "/", label: "Home", icon: Home },
@@ -28,8 +27,20 @@ export function BottomNavBar() {
   if (HIDE_PATTERNS.some((p) => p.test(pathname))) return null;
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 px-4 pb-[env(safe-area-inset-bottom)]">
-      <div className="mx-auto mb-2 flex h-16 max-w-md items-center justify-around rounded-2xl border border-border/50 bg-card/90 shadow-lg backdrop-blur-xl">
+    <nav
+      className="fixed bottom-0 left-0 right-0 z-50"
+      style={{
+        background: "var(--bg-secondary)",
+        borderTop: "1px solid var(--border-hairline)",
+        paddingBottom: "env(safe-area-inset-bottom)",
+      }}
+    >
+      <div
+        className="mx-auto grid w-full max-w-md"
+        style={{
+          gridTemplateColumns: "repeat(4, 1fr)",
+        }}
+      >
         {tabs.map(({ href, label, icon: Icon }) => {
           const isActive =
             href === "/" ? pathname === "/" : pathname.startsWith(href);
@@ -38,22 +49,27 @@ export function BottomNavBar() {
             <Link
               key={href}
               href={href}
-              className={cn(
-                "relative flex flex-col items-center gap-0.5 px-3 py-2 text-[11px] font-medium transition-all duration-200",
-                isActive
-                  ? "text-primary"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
+              className="relative flex flex-col items-center justify-center gap-1"
+              style={{
+                paddingTop: "var(--space-3)",
+                paddingBottom: "var(--space-3)",
+                color: isActive ? "var(--text-primary)" : "var(--text-tertiary)",
+                borderTop: `2px solid ${isActive ? "var(--accent-cta)" : "transparent"}`,
+                transition: "color var(--motion-hover)",
+                textDecoration: "none",
+              }}
             >
-              <div
-                className={cn(
-                  "flex h-8 w-8 items-center justify-center rounded-xl transition-all duration-200",
-                  isActive && "bg-primary/10",
-                )}
+              <Icon className="h-[18px] w-[18px]" strokeWidth={isActive ? 2.25 : 1.75} />
+              <span
+                className="font-heading font-bold uppercase"
+                style={{
+                  fontSize: 10,
+                  letterSpacing: "var(--ls-caps-l)",
+                  lineHeight: 1,
+                }}
               >
-                <Icon className={cn("h-[18px] w-[18px] transition-all duration-200", isActive && "stroke-[2.5] scale-110")} />
-              </div>
-              <span className={cn("transition-all duration-200", isActive && "font-semibold")}>{label}</span>
+                {label}
+              </span>
             </Link>
           );
         })}

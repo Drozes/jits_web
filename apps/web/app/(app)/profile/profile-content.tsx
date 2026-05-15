@@ -10,7 +10,7 @@ import { ShareProfileSheet } from "@/components/domain/share-profile-sheet";
 import { ThemeSwitcher } from "@/components/theme-switcher";
 import { AchievementsSection } from "./achievements-section";
 import { getMatchHistory } from "@jits/shared/api/queries";
-import { Trophy, Settings, Share2, Palette, UserPen } from "lucide-react";
+import { Trophy, Settings, Share2, Palette } from "lucide-react";
 
 const DEMO_DATA = {
   wins: 18,
@@ -146,12 +146,6 @@ export async function ProfileContent({
                 </div>
                 <ThemeSwitcher />
               </div>
-              <Button variant="ghost" className="w-full justify-start rounded-xl" asChild>
-                <Link href="/profile/setup">
-                  <UserPen className="mr-3 h-4 w-4" />
-                  Edit Profile
-                </Link>
-              </Button>
               <Button variant="ghost" className="w-full justify-start rounded-xl" asChild>
                 <Link href="/settings">
                   <Settings className="mr-3 h-4 w-4" />

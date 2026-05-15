@@ -1,72 +1,111 @@
 "use client";
 
-import { createClient } from "@/lib/supabase/client";
-import { Button } from "@/components/ui/button";
-import { AuthFormShell } from "@/components/auth/auth-form-shell";
-import { EmailInput } from "@/components/auth/email-input";
-import { PasswordInput } from "@/components/auth/password-input";
-import { GoogleOAuthButton } from "@/components/auth/google-oauth-button";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { Wordmark } from "@/components/ui/elo-system";
+import { GoogleOAuthButton } from "@/components/auth/google-oauth-button";
+import { AppleOAuthButton } from "@/components/auth/apple-oauth-button";
 
-export function LoginForm({
-  className,
-  ...props
-}: React.ComponentPropsWithoutRef<"div">) {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+export function LoginForm() {
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const router = useRouter();
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError(null);
-    try {
-      const { error } = await createClient().auth.signInWithPassword({ email, password });
-      if (error) throw error;
-      router.push("/");
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "An error occurred");
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   return (
-    <AuthFormShell
-      title="Login"
-      description="Enter your email below to login to your account"
-      className={className}
-      {...props}
+    <div
+      style={{
+        minHeight: "100svh",
+        background: "var(--bg-primary)",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        padding: "var(--space-5)",
+      }}
     >
-      <form onSubmit={handleLogin}>
-        <div className="flex flex-col gap-6">
-          <EmailInput value={email} onChange={setEmail} />
-          <PasswordInput
-            id="password"
-            label="Password"
-            autoComplete="current-password"
-            value={password}
-            onChange={setPassword}
-            showToggle
-            forgotPasswordLink
-          />
-          {error && <p className="text-sm text-red-500">{error}</p>}
-          <Button type="submit" className="w-full" disabled={isLoading}>
-            {isLoading ? "Logging in..." : "Login"}
-          </Button>
-          <GoogleOAuthButton disabled={isLoading} onError={setError} />
+      <div style={{ width: "100%", maxWidth: 360, margin: "0 auto" }}>
+        <div
+          style={{
+            textAlign: "center",
+            marginBottom: "var(--space-12)",
+          }}
+        >
+          <Wordmark size="hero" />
+          <div
+            style={{
+              marginTop: "var(--space-3)",
+              fontFamily: "var(--font-mono)",
+              fontSize: "var(--size-num-xs)",
+              color: "var(--text-tertiary)",
+              textTransform: "uppercase",
+              letterSpacing: "var(--ls-caps-l)",
+            }}
+          >
+            What&apos;s your number?
+          </div>
         </div>
-        <div className="mt-4 text-center text-sm">
-          Don&apos;t have an account?{" "}
-          <Link href="/signup" className="underline underline-offset-4">
-            Sign up
+
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+          <Link
+            href="/signup"
+            className="font-heading font-bold uppercase"
+            style={{
+              background: "var(--accent-cta)",
+              color: "var(--text-on-accent)",
+              border: "1px solid transparent",
+              borderRadius: "var(--radius-sm)",
+              padding: "var(--space-3) var(--space-5)",
+              fontSize: "var(--size-label-l)",
+              letterSpacing: "var(--ls-caps)",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "var(--space-2)",
+              width: "100%",
+              textDecoration: "none",
+              transition: "background var(--motion-hover)",
+            }}
+          >
+            Register with Email
           </Link>
+
+          <GoogleOAuthButton onError={setError} />
+          <AppleOAuthButton onError={setError} />
+
+          <Link
+            href="/forgot-password"
+            className="font-heading font-bold uppercase"
+            style={{
+              background: "transparent",
+              color: "var(--text-secondary)",
+              border: "1px solid transparent",
+              borderRadius: "var(--radius-sm)",
+              padding: "var(--space-3) var(--space-5)",
+              fontSize: "var(--size-label-l)",
+              letterSpacing: "var(--ls-caps)",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: "100%",
+              textDecoration: "none",
+              transition: "color var(--motion-hover)",
+            }}
+          >
+            Forgot password?
+          </Link>
+
+          {error && (
+            <p
+              style={{
+                marginTop: "var(--space-2)",
+                fontFamily: "var(--font-body)",
+                fontSize: "var(--size-body-s)",
+                color: "var(--state-negative)",
+                textAlign: "center",
+              }}
+            >
+              {error}
+            </p>
+          )}
         </div>
-      </form>
-    </AuthFormShell>
+      </div>
+    </div>
   );
 }

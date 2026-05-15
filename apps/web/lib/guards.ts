@@ -29,13 +29,13 @@ export async function requireAthlete() {
   const athlete = await getCurrentAthlete(supabase, user.id);
 
   if (!athlete) {
-    redirect("/profile/setup");
+    redirect("/signup");
   }
 
   // Athlete exists but hasn't been activated by the backend
-  // (activation requires display_name + primary_gym_id)
+  // (activation requires display_name + primary_gym_id + EUA acceptance)
   if (athlete.status === ATHLETE_STATUS.PENDING) {
-    redirect("/profile/setup");
+    redirect("/eua");
   }
 
   return { user, athlete };
@@ -71,7 +71,7 @@ export async function requireSessionParticipant(sessionId: string) {
 /**
  * Like requireAthlete but returns null instead of redirecting.
  * Use in layouts/components that render on pages where the athlete
- * may not exist yet (e.g. /profile/setup).
+ * may not exist yet (e.g. /signup).
  */
 export async function getActiveAthlete() {
   const supabase = await createClient();

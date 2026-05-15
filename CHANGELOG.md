@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+**Auth flow migration to ELO design system (A1/A2/A3) (2026-05-15)**
+
+**Added**
+- A1 login screen: hero wordmark, "What's your number?" tagline, 4 stacked CTAs (Register with Email, Sign in with Google, Sign in with Apple, Forgot password). `apps/web/components/login-form.tsx` rewritten against design tokens.
+- A2 signup screen: single-page profile form replacing 4-step wizard. Collects email/password + first name/last name/DOB/gender/weight (kg)/city/home gym, calls `supabase.auth.signUp`, inserts athlete row, redirects to `/eua`. `apps/web/components/sign-up-form.tsx` rewritten; gyms fetched server-side via `apps/web/app/(auth)/signup/page.tsx`.
+- A3 EUA screen: new `/eua` route. Renders `TOS_TEXT` from `@jits/shared/utils` inside a `<Plate>` with section labels bolded, checkbox + Create Account button writes to `waiver_acknowledgements`. `apps/web/app/(auth)/eua/page.tsx` and `apps/web/components/auth/eua-form.tsx`.
+- Apple OAuth button: `apps/web/components/auth/apple-oauth-button.tsx` mirroring Google, wired to `signInWithOAuth({ provider: "apple" })`.
+- Signup form validation helper: `apps/web/lib/profile-setup/signup-form-validation.ts` (email/password/DOB-16+/weight-kg/gym checks).
+
+**Changed**
+- Weight: kg is canonical in signup (was lbs in old wizard).
+- Google OAuth button restyled to design tokens; no "or" divider.
+- Guards redirect: missing athlete -> `/signup`; pending athlete -> `/eua` (was `/profile/setup` for both).
+- Profile page Account section: removed Edit Profile link (no successor screen yet).
+
+**Removed**
+- 4-step profile setup wizard and all step files under `apps/web/app/profile/setup/`.
+
 **Phase 6C: Mobile Gym Management (2026-05-06)**
 
 **Added**
