@@ -560,6 +560,161 @@ export async function disputeMatchResult(
 }
 
 // ---------------------------------------------------------------------------
+// Match-video mutations (013 chunked-video pipeline)
+// ---------------------------------------------------------------------------
+
+/**
+ * Build the canonical storage path for a match-video upload per the BE
+ * contract (jr_be `specs/013-chunked-video-pipeline/INTEGRATION.md` §1.2):
+ *
+ *   match-videos/<match_id>/<uploader_athlete_id>/<unix_ts>.<ext>
+ *
+ * Returns only the key within the bucket (no `match-videos/` prefix);
+ * the bucket is supplied separately on the Storage call.
+ */
+export function buildMatchVideoStoragePath(
+  matchId: string,
+  uploaderAthleteId: string,
+  ext = "mp4",
+): string {
+  // Strip any leading dot the caller may have included.
+  const cleanExt = ext.replace(/^\./, "").toLowerCase() || "mp4";
+  return `${matchId}/${uploaderAthleteId}/${Date.now()}.${cleanExt}`;
+}
+
+/**
+ * Allowed `match_videos.requested_tier` values per BE contract §2.1.
+ * Defaults to `'standard'` v1; tier toggle UI is feature-011 follow-on.
+ */
+export type MatchVideoTier = "standard" | "premium";
+
+/**
+ * Allowed `match_videos.recording_type` values per BE contract §2.1.
+ */
+export type MatchVideoRecordingType = "self" | "timekeeper";
+
+export interface CreateMatchVideoParams {
+  /** UUID of the parent `matches` row. FE-required. */
+  matchId: string;
+  /**
+   * UUID of the uploading athlete (NOT auth_user_id) — must equal
+   * `auth_athlete_id()` under RLS. Pass `useCurrentAthlete().id` (web)
+   * or `useAuth().athlete.id` (mobile).
+   */
+  uploaderAthleteId: string;
+  /**
+   * Storage key inside the `match-videos` bucket. Should be produced via
+   * `buildMatchVideoStoragePath`. The slicer parses
+   * `<match_id>/<uploader>/<ts>.<ext>` to derive the chunks subdir.
+   */
+  storagePath: string;
+  /** Optional but recommended — saves a re-probe in the slicer. */
+  durationSeconds?: number;
+  /** Optional but recommended — slicer reads this directly. */
+  fileSizeBytes?: number;
+  /** Optional. AI auto-fills if NULL. */
+  cameraAngle?: string;
+  /** Optional. Which athlete is on the left in frame 0. */
+  athleteLeftId?: string;
+  /**
+   * Optional tier selector. v1 UI defaults to `'standard'`; no toggle.
+   */
+  requestedTier?: MatchVideoTier;
+  /**
+   * Optional. Athlete who pressed record. Defaults to `uploaderAthleteId`
+   * for `'self'` recordings; pass the timekeeper's id for `'timekeeper'`.
+   */
+  recordedBy?: string;
+  /** Optional. `'self'` or `'timekeeper'`. */
+  recordingType?: MatchVideoRecordingType;
+}
+
+/**
+ * INSERT a new `match_videos` row at `status='ready'` so the slicer
+ * trigger (`trg_match_videos_request_slice_*`) fires.
+ *
+ * BE contract: `jr_be/specs/013-chunked-video-pipeline/INTEGRATION.md`
+ * §2.1 (column list), §8.1 (RLS / `uploaded_by` resolution).
+ *
+ * Throws on PostgREST error. On `23505` (uq_match_video_uploader unique
+ * violation), callers should fall back to `upsertMatchVideo` which
+ * UPDATE-back-to-`'ready'` the existing row — preserves the row id so
+ * any open Realtime subscriptions keep working.
+ */
+export async function createMatchVideo(
+  supabase: Client,
+  params: CreateMatchVideoParams,
+): Promise<{ id: string }> {
+  const insert: Database["public"]["Tables"]["match_videos"]["Insert"] = {
+    match_id: params.matchId,
+    uploaded_by: params.uploaderAthleteId,
+    storage_path: params.storagePath,
+    status: "ready",
+    requested_tier: params.requestedTier ?? "standard",
+  };
+  if (params.durationSeconds != null) insert.duration_seconds = params.durationSeconds;
+  if (params.fileSizeBytes != null) insert.file_size_bytes = params.fileSizeBytes;
+  if (params.cameraAngle != null) insert.camera_angle = params.cameraAngle;
+  if (params.athleteLeftId != null) insert.athlete_left_id = params.athleteLeftId;
+  if (params.recordedBy != null) insert.recorded_by = params.recordedBy;
+  if (params.recordingType != null) insert.recording_type = params.recordingType;
+
+  const { data, error } = await supabase
+    .from("match_videos")
+    .insert(insert)
+    .select("id")
+    .single();
+
+  if (error) throw error;
+  return { id: data.id };
+}
+
+/**
+ * Retry-safe variant: INSERT first; on `23505` (uniq_match_video_uploader)
+ * UPDATE the existing row back to `'ready'` with the new `storage_path`.
+ *
+ * Per BE §8.6, the UPDATE re-fires `trg_match_videos_request_slice_update`
+ * only if the previous status was NOT `'ready'`. If the existing row is
+ * already `'ready'`, the trigger is a no-op — callers wanting to force a
+ * re-slice for the same row must DELETE then INSERT (not done here).
+ */
+export async function upsertMatchVideo(
+  supabase: Client,
+  params: CreateMatchVideoParams,
+): Promise<{ id: string }> {
+  try {
+    return await createMatchVideo(supabase, params);
+  } catch (err: unknown) {
+    const code = (err as { code?: string } | null)?.code;
+    if (code !== "23505") throw err;
+
+    const update: Database["public"]["Tables"]["match_videos"]["Update"] = {
+      storage_path: params.storagePath,
+      status: "ready",
+      requested_tier: params.requestedTier ?? "standard",
+      // Reset FE-owned columns; never touch chunk_count/slice_*_at etc.
+      duration_seconds: params.durationSeconds ?? null,
+      file_size_bytes: params.fileSizeBytes ?? null,
+      camera_angle: params.cameraAngle ?? null,
+      athlete_left_id: params.athleteLeftId ?? null,
+      recorded_by: params.recordedBy ?? null,
+      recording_type: params.recordingType ?? null,
+    };
+
+    const { data, error } = await supabase
+      .from("match_videos")
+      .update(update)
+      .eq("match_id", params.matchId)
+      .eq("uploaded_by", params.uploaderAthleteId)
+      .select("id")
+      .single();
+
+    if (error) throw error;
+    return { id: data.id };
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Athlete mutations
 // ---------------------------------------------------------------------------
 
