@@ -45,6 +45,8 @@ export interface GymListItem {
   activeSessions: number;
   upcomingSessions: number;
   hasActiveSession: boolean;
+  /** ISO timestamp of the earliest future scheduled session, or null. */
+  nextSessionStart: string | null;
 }
 
 /** Individual session for list views */

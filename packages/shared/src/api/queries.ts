@@ -481,6 +481,7 @@ export async function getGymsWithSessions(
 
   const activeMap = new Map<string, number>();
   const upcomingMap = new Map<string, number>();
+  const nextStartMap = new Map<string, string>();
   const now = new Date().toISOString();
 
   for (const s of sessions ?? []) {
@@ -488,6 +489,10 @@ export async function getGymsWithSessions(
       activeMap.set(s.gym_id, (activeMap.get(s.gym_id) ?? 0) + 1);
     } else if (s.status === "scheduled" && s.scheduled_start > now) {
       upcomingMap.set(s.gym_id, (upcomingMap.get(s.gym_id) ?? 0) + 1);
+      const existing = nextStartMap.get(s.gym_id);
+      if (!existing || s.scheduled_start < existing) {
+        nextStartMap.set(s.gym_id, s.scheduled_start);
+      }
     }
   }
 
@@ -503,6 +508,7 @@ export async function getGymsWithSessions(
       activeSessions,
       upcomingSessions: upcomingMap.get(g.id) ?? 0,
       hasActiveSession: activeSessions > 0,
+      nextSessionStart: nextStartMap.get(g.id) ?? null,
     };
   });
 
