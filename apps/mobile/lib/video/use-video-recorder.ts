@@ -32,6 +32,8 @@ export interface UseVideoRecorderReturn {
   requestPermission: () => Promise<void>;
   start: () => Promise<void>;
   stop: () => Promise<void>;
+  /** Populated after a successful upload + match_videos INSERT. */
+  videoId: string | null;
 }
 
 /**
@@ -45,13 +47,24 @@ export interface UseVideoRecorderReturn {
  * the match flow running regardless. A failed upload retries once
  * automatically; the second failure is final.
  */
-export function useVideoRecorder(matchId: string): UseVideoRecorderReturn {
+/**
+ * @param matchId            UUID of the parent match.
+ * @param uploaderAthleteId  Current athlete's `athletes.id`. MUST be
+ *                            present before `start()` is called; pass
+ *                            `useAuth().athlete?.id`. Recorder no-ops
+ *                            with an error state when null.
+ */
+export function useVideoRecorder(
+  matchId: string,
+  uploaderAthleteId: string | null,
+): UseVideoRecorderReturn {
   const cameraRef = React.useRef<CameraView | null>(null);
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [micPermission, requestMicPermission] = useMicrophonePermissions();
   const [state, setState] = React.useState<RecordingState>("idle");
   const [error, setError] = React.useState<string | null>(null);
   const [uploadProgress] = React.useState<number | null>(null);
+  const [videoId, setVideoId] = React.useState<string | null>(null);
   const stoppingRef = React.useRef(false);
   const recordPromiseRef = React.useRef<Promise<{ uri: string } | undefined> | null>(null);
 
@@ -61,15 +74,22 @@ export function useVideoRecorder(matchId: string): UseVideoRecorderReturn {
   }, [requestCameraPermission, requestMicPermission]);
 
   const handleUpload = React.useCallback(async (fileUri: string) => {
+    if (!uploaderAthleteId) {
+      setError("Cannot upload: current athlete not loaded yet.");
+      setState("error");
+      return;
+    }
     setState("uploading");
     setError(null);
     try {
-      await uploadRecording({ fileUri, matchId });
+      const r = await uploadRecording({ fileUri, matchId, uploaderAthleteId });
+      setVideoId(r.videoId);
       setState("uploaded");
     } catch (firstErr) {
       // Retry once before giving up.
       try {
-        await uploadRecording({ fileUri, matchId });
+        const r = await uploadRecording({ fileUri, matchId, uploaderAthleteId });
+        setVideoId(r.videoId);
         setState("uploaded");
       } catch (secondErr) {
         const msg = secondErr instanceof Error ? secondErr.message : String(secondErr);
@@ -80,7 +100,7 @@ export function useVideoRecorder(matchId: string): UseVideoRecorderReturn {
         if (firstErr instanceof Error) console.warn("[video] first upload failed:", firstErr.message);
       }
     }
-  }, [matchId]);
+  }, [matchId, uploaderAthleteId]);
 
   const start = React.useCallback(async () => {
     if (state === "recording" || state === "stopping") return;
@@ -159,5 +179,6 @@ export function useVideoRecorder(matchId: string): UseVideoRecorderReturn {
     requestPermission,
     start,
     stop,
+    videoId,
   };
 }

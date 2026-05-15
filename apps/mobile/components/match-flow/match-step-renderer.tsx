@@ -99,6 +99,7 @@ export function MatchStepRenderer({
         startedAt={startedAt}
         pausedAt={pausedAt}
         totalPausedDuration={totalPausedDuration}
+        uploaderAthleteId={me.athlete_id}
         onEnded={() => setStep("end")}
       />
     );

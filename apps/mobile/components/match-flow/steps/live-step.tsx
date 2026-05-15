@@ -19,6 +19,12 @@ interface LiveStepProps {
   startedAt: string;
   pausedAt: string | null;
   totalPausedDuration: number;
+  /**
+   * Current athlete's `athletes.id` for setting `match_videos.uploaded_by`
+   * per BE contract §2.1 + §8.1. May be null briefly during AuthProvider
+   * hydration; recorder will surface an error state until populated.
+   */
+  uploaderAthleteId: string | null;
   /** Advance to the result step. Called after end_match completes or
    * after we receive a `match_ended` broadcast from the opponent. */
   onEnded: () => void;
@@ -36,7 +42,7 @@ const TIME_WARNING_SECONDS = 10;
  * runs as before and a small banner explains the fallback.
  */
 export function LiveStep(props: LiveStepProps) {
-  const { matchId, matchType, durationSeconds, startedAt, pausedAt, totalPausedDuration, onEnded } = props;
+  const { matchId, matchType, durationSeconds, startedAt, pausedAt, totalPausedDuration, uploaderAthleteId, onEnded } = props;
   const endedRef = React.useRef(false);
   const expiryFiredRef = React.useRef(false);
   const startHapticFiredRef = React.useRef(false);
@@ -45,7 +51,7 @@ export function LiveStep(props: LiveStepProps) {
 
   useMatchKeepAwake(true);
 
-  const recorder = useVideoRecorder(matchId);
+  const recorder = useVideoRecorder(matchId, uploaderAthleteId);
   const timer = useSessionMatchTimer({ durationSeconds, startedAt, pausedAt, totalPausedDuration });
   const sync = useSessionMatchSync({
     supabase,
