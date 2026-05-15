@@ -31,11 +31,17 @@ export function MatchFlowWizard(props: MatchFlowWizardProps) {
   const { sessionId, matchId, matchType, matchStatus, durationSeconds, currentAthlete, opponent, isTimekeeper, timekeeperEnabled, submissionTypes, initialStep } = props;
   const [step, setStep] = useState<MatchFlowStep>(initialStep);
   const [startedAt, setStartedAt] = useState(props.startedAt);
+  // Captured when the timekeeper-live step finishes uploading. Persists
+  // across downstream steps so the analysis viewer (mounted in
+  // `match-summary` / `match-recorded`) can subscribe to chunked
+  // pipeline progress for the just-uploaded clip.
+  const [videoId, setVideoId] = useState<string | null>(null);
   const resultRef = useRef<BroadcastResult | null>(null);
 
-  function handleNext(data?: { resultData?: BroadcastResult; startedAt?: string }) {
+  function handleNext(data?: { resultData?: BroadcastResult; startedAt?: string; videoId?: string }) {
     if (data?.startedAt) setStartedAt(data.startedAt);
     if (data?.resultData) resultRef.current = data.resultData;
+    if (data?.videoId) setVideoId(data.videoId);
     const transitions: Record<MatchFlowStep, MatchFlowStep | null> = {
       "timekeeper-wait": "weight-verify",
       "weight-verify": "ready-check",
@@ -60,12 +66,12 @@ export function MatchFlowWizard(props: MatchFlowWizardProps) {
     case "fighter-live":
       return <FighterLiveStep onNext={handleNext} matchId={matchId} durationSeconds={durationSeconds} startedAt={startedAt ?? ""} pausedAt={props.pausedAt} totalPausedDuration={props.totalPausedDuration} matchType={matchType} timekeeperEnabled={timekeeperEnabled} />;
     case "timekeeper-live":
-      return <TimekeeperLiveStep onNext={handleNext} matchId={matchId} durationSeconds={durationSeconds} startedAt={startedAt ?? ""} pausedAt={props.pausedAt} totalPausedDuration={props.totalPausedDuration} />;
+      return <TimekeeperLiveStep onNext={handleNext} matchId={matchId} durationSeconds={durationSeconds} startedAt={startedAt ?? ""} pausedAt={props.pausedAt} totalPausedDuration={props.totalPausedDuration} currentAthleteId={currentAthlete.id} />;
     case "result-recording":
       return <ResultRecordingStep onNext={handleNext} matchId={matchId} participants={[{ id: currentAthlete.id, displayName: currentAthlete.displayName }, { id: opponent.id, displayName: opponent.displayName }]} submissionTypes={submissionTypes} timekeeperEnabled={timekeeperEnabled} isTimekeeper={isTimekeeper} />;
     case "match-summary":
-      return <MatchSummaryStep onNext={handleNext} matchId={matchId} matchType={matchType} matchStatus={matchStatus} currentAthleteId={currentAthlete.id} opponent={opponent} resultData={resultRef.current} />;
+      return <MatchSummaryStep onNext={handleNext} matchId={matchId} matchType={matchType} matchStatus={matchStatus} currentAthleteId={currentAthlete.id} opponent={opponent} resultData={resultRef.current} videoId={videoId} />;
     case "match-recorded":
-      return <MatchRecordedStep sessionId={sessionId} matchId={matchId} currentAthleteId={currentAthlete.id} resultData={resultRef.current} />;
+      return <MatchRecordedStep sessionId={sessionId} matchId={matchId} currentAthleteId={currentAthlete.id} resultData={resultRef.current} videoId={videoId} />;
   }
 }

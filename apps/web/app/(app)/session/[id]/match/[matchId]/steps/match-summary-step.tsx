@@ -16,6 +16,14 @@ interface MatchSummaryStepProps {
   currentAthleteId: string;
   opponent: { id: string; displayName: string };
   resultData: BroadcastResult | null;
+  /**
+   * `match_videos.id` for the clip uploaded during the timekeeper-live
+   * step. `null` if recording was unavailable or the user is the
+   * non-timekeeper fighter (no upload from this device). Reserved for
+   * future use; the analysis viewer is currently mounted in
+   * `match-recorded-step` where the user lingers.
+   */
+  videoId?: string | null;
 }
 
 export function MatchSummaryStep({ onNext, matchId, matchType, matchStatus, currentAthleteId, opponent, resultData }: MatchSummaryStepProps) {

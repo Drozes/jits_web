@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, Share2, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { VideoAnalysisViewer } from "@/components/domain/video-analysis-viewer";
 import type { BroadcastResult } from "@jits/shared/hooks/use-session-match-sync";
 import { buildShareUrl, buildShareText } from "@jits/shared/utils";
 
@@ -12,6 +13,12 @@ interface MatchRecordedStepProps {
   matchId: string;
   currentAthleteId: string;
   resultData: BroadcastResult | null;
+  /**
+   * `match_videos.id` from the timekeeper-live upload, threaded via the
+   * wizard. When present, mount the chunked-pipeline progress viewer so
+   * the user can watch slicing/analysis stream in.
+   */
+  videoId?: string | null;
 }
 
 function deriveOutcome(resultData: BroadcastResult | null, currentAthleteId: string): "win" | "loss" | "draw" | null {
@@ -20,7 +27,7 @@ function deriveOutcome(resultData: BroadcastResult | null, currentAthleteId: str
   return resultData.winnerId === currentAthleteId ? "win" : "loss";
 }
 
-export function MatchRecordedStep({ sessionId, currentAthleteId, resultData }: MatchRecordedStepProps) {
+export function MatchRecordedStep({ sessionId, currentAthleteId, resultData, videoId }: MatchRecordedStepProps) {
   const router = useRouter();
   const [copied, setCopied] = useState(false);
   const outcome = deriveOutcome(resultData, currentAthleteId);
@@ -44,11 +51,16 @@ export function MatchRecordedStep({ sessionId, currentAthleteId, resultData }: M
   }
 
   return (
-    <div className="flex min-h-[60vh] flex-col items-center justify-center gap-6 px-4">
+    <div className="flex min-h-[60vh] flex-col items-center justify-center gap-6 px-4 py-6">
       <div className="animate-scale-in">
         <CheckCircle2 className="h-16 w-16 text-green-500" />
       </div>
       <h2 className="text-xl font-bold">Match Recorded!</h2>
+      {videoId && (
+        <div className="w-full max-w-2xl">
+          <VideoAnalysisViewer videoId={videoId} title="Your match" />
+        </div>
+      )}
       <div className="flex flex-col gap-3 w-full max-w-sm">
         {outcome && (
           <Button variant="secondary" size="lg" onClick={handleShare}>

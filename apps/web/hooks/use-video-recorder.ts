@@ -2,6 +2,15 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { StorageApiError } from "@supabase/supabase-js";
+import {
+  buildMatchVideoStoragePath,
+  upsertMatchVideo,
+} from "@jits/shared/api/mutations";
+
+// BE contract: jr_be/specs/013-chunked-video-pipeline/INTEGRATION.md
+// §1.2 path convention + §8.5 size limits.
+const MAX_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024; // 2 GiB client-side cap
 
 interface UseVideoRecorderReturn {
   videoRef: React.RefObject<HTMLVideoElement | null>;
@@ -10,9 +19,28 @@ interface UseVideoRecorderReturn {
   stopRecording: () => void;
   uploadStatus: "idle" | "uploading" | "done" | "error";
   error: string | null;
+  /**
+   * Populated after a successful upload+INSERT. Downstream consumers
+   * (analysis viewer, progress hook) key on this id.
+   */
+  videoId: string | null;
 }
 
-export function useVideoRecorder(matchId: string): UseVideoRecorderReturn {
+/**
+ * Web video recorder. Records via MediaRecorder, uploads the WebM blob
+ * to the `match-videos` Storage bucket under the canonical
+ * `<match_id>/<uploader_athlete_id>/<unix_ts>.webm` path, then INSERTs
+ * the parent `match_videos` row at `status='ready'` so the slicer
+ * trigger fires.
+ *
+ * `uploaderAthleteId` MUST be the caller's `athletes.id` (NOT the
+ * Supabase auth user id). The RLS `match_videos_insert_participant`
+ * policy requires `uploaded_by = auth_athlete_id()`.
+ */
+export function useVideoRecorder(
+  matchId: string,
+  uploaderAthleteId: string | null,
+): UseVideoRecorderReturn {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -20,20 +48,67 @@ export function useVideoRecorder(matchId: string): UseVideoRecorderReturn {
   const [isRecording, setIsRecording] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<"idle" | "uploading" | "done" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
+  const [videoId, setVideoId] = useState<string | null>(null);
 
   const upload = useCallback(async (blob: Blob) => {
+    if (!uploaderAthleteId) {
+      setUploadStatus("error");
+      setError("Cannot upload: current athlete not loaded yet.");
+      return;
+    }
+    if (blob.size > MAX_UPLOAD_BYTES) {
+      setUploadStatus("error");
+      setError("Videos must be under 2 GB.");
+      return;
+    }
     setUploadStatus("uploading");
     try {
       const supabase = createClient();
-      const path = `matches/${matchId}/${Date.now()}.webm`;
-      const { error: uploadError } = await supabase.storage.from("match-videos").upload(path, blob);
-      setUploadStatus(uploadError ? "error" : "done");
-      if (uploadError) setError(uploadError.message);
+      const path = buildMatchVideoStoragePath(matchId, uploaderAthleteId, "webm");
+      const { error: uploadError } = await supabase.storage
+        .from("match-videos")
+        .upload(path, blob, { contentType: blob.type || "video/webm" });
+      if (uploadError) {
+        setUploadStatus("error");
+        // Local Supabase caps `match-videos` at 500 MiB and returns 413.
+        // Surface the local-dev caveat per BE §8.5. Prefer the SDK's
+        // typed `statusCode` (string) when available; fall back to a
+        // message regex for non-`StorageApiError` errors.
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+        const isLocal = /127\.0\.0\.1|localhost/.test(supabaseUrl);
+        const msg = uploadError.message ?? "";
+        const isPayloadTooLarge =
+          (uploadError instanceof StorageApiError && uploadError.statusCode === "413") ||
+          /payload too large/i.test(msg);
+        if (isLocal && isPayloadTooLarge) {
+          setError("Local development cap is 500 MiB — production cap is 2 GiB. Use a shorter clip while testing.");
+        } else {
+          setError(msg || "Upload failed");
+        }
+        return;
+      }
+      // Storage upload succeeded — INSERT the parent row.
+      try {
+        const { id } = await upsertMatchVideo(supabase, {
+          matchId,
+          uploaderAthleteId,
+          storagePath: path,
+          fileSizeBytes: blob.size,
+          recordingType: "self",
+          recordedBy: uploaderAthleteId,
+        });
+        setVideoId(id);
+        setUploadStatus("done");
+      } catch (insertErr: unknown) {
+        const m = insertErr instanceof Error ? insertErr.message : String(insertErr);
+        setError(`Upload stored but DB INSERT failed: ${m}`);
+        setUploadStatus("error");
+      }
     } catch {
       setUploadStatus("error");
       setError("Upload failed");
     }
-  }, [matchId]);
+  }, [matchId, uploaderAthleteId]);
 
   const startRecording = useCallback(async () => {
     try {
@@ -79,5 +154,5 @@ export function useVideoRecorder(matchId: string): UseVideoRecorderReturn {
     };
   }, []);
 
-  return { videoRef, isRecording, startRecording, stopRecording, uploadStatus, error };
+  return { videoRef, isRecording, startRecording, stopRecording, uploadStatus, error, videoId };
 }
