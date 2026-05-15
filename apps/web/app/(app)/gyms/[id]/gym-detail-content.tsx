@@ -1,14 +1,12 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
-import { MapPin, Users } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { Plate, LivePill, EloTile, ParticipantRow } from "@/components/ui/elo-system";
 import { requireAthlete } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
-import { getGymDetail, getSessionTemplates, getGymManagerStats } from "@jits/shared/api/queries";
-import { SessionList } from "./session-list";
-import { CreateSessionDialog } from "./create-session-dialog";
-import { EditGymDialog } from "./edit-gym-dialog";
-import { SessionTemplates } from "./session-templates";
-import { GymStats } from "./gym-stats";
+import { getGymDetail, getGymManagerStats } from "@jits/shared/api/queries";
+import type { SessionListItem } from "@jits/shared/types/session";
+import type { GymManagerStats } from "@jits/shared/types/analytics";
+import { GymRsvpAction } from "./gym-rsvp-action";
 
 interface GymDetailContentProps {
   paramsPromise: Promise<{ id: string }>;
@@ -18,62 +16,236 @@ export async function GymDetailContent({ paramsPromise }: GymDetailContentProps)
   const { id } = await paramsPromise;
   const { athlete } = await requireAthlete();
   const supabase = await createClient();
-  const [gym, templates, managerStats] = await Promise.all([
+  const [gym, managerStats] = await Promise.all([
     getGymDetail(supabase, id, athlete.id),
-    getSessionTemplates(supabase, id),
     getGymManagerStats(supabase, id),
   ]);
 
   if (!gym) notFound();
 
+  const activeSession = gym.sessions.find((s) => s.status === "active") ?? null;
+  const upcomingSessions = gym.sessions.filter((s) => s.status !== "active");
+
   return (
-    <div className="flex flex-col gap-6">
-      <GymHeader gym={gym} />
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-5)" }}>
+      <GymTitle name={gym.name} city={gym.city} isMyGym={gym.isMemberGym} />
 
-      {/* Manager actions */}
-      {gym.isGymManager && (
-        <div className="flex items-center gap-2">
-          <EditGymDialog gymId={id} currentName={gym.name} currentCity={gym.city} />
-          <CreateSessionDialog gymId={id} />
-        </div>
+      {activeSession && (
+        <ActiveSessionPlate session={activeSession} />
       )}
 
-      {/* Gym stats (visible to managers) */}
-      {gym.isGymManager && <GymStats stats={managerStats} />}
-
-      {/* Session templates (visible to managers, create-session available to all) */}
-      {(gym.isGymManager || templates.length > 0) && (
-        <SessionTemplates gymId={id} templates={templates} isManager={gym.isGymManager} />
-      )}
-
-      {/* Sessions list */}
-      <SessionList
-        sessions={gym.sessions}
+      <UpcomingSessions
+        sessions={upcomingSessions}
         rsvpSessionIds={gym.rsvpSessionIds}
-        currentAthleteId={athlete.id}
-        isGymManager={gym.isGymManager}
       />
+
+      <GymStatsGrid stats={managerStats} />
     </div>
   );
 }
 
-function GymHeader({ gym }: { gym: { name: string; city: string | null; isMemberGym: boolean } }) {
+function GymTitle({
+  name,
+  city,
+  isMyGym,
+}: {
+  name: string;
+  city: string | null;
+  isMyGym: boolean;
+}) {
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-center gap-2">
-        <h1 className="text-2xl font-bold tracking-tight">{gym.name}</h1>
-        {gym.isMemberGym && <Badge variant="outline">My Gym</Badge>}
-      </div>
-      {gym.city && (
-        <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-          <MapPin className="h-3.5 w-3.5" />
-          {gym.city}
-        </div>
-      )}
-      <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-        <Users className="h-3.5 w-3.5" />
-        Members at this gym
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-1)" }}>
+      <h1
+        style={{
+          fontFamily: "var(--font-heading)",
+          fontWeight: 700,
+          fontSize: "var(--size-heading-l)",
+          color: "var(--text-primary)",
+          margin: 0,
+          lineHeight: 1.1,
+        }}
+      >
+        {name}
+      </h1>
+      <div
+        style={{
+          fontFamily: "var(--font-mono)",
+          fontSize: "var(--size-num-xs)",
+          color: "var(--text-tertiary)",
+          textTransform: "uppercase",
+          letterSpacing: "var(--ls-caps-xl)",
+          fontWeight: 700,
+        }}
+      >
+        {city ?? "Unknown City"}
+        {isMyGym && " · My Gym"}
       </div>
     </div>
   );
 }
+
+function ActiveSessionPlate({ session }: { session: SessionListItem }) {
+  const capacity = session.maxParticipants
+    ? `${session.participantCount}/${session.maxParticipants} in lobby`
+    : `${session.participantCount} in lobby`;
+  return (
+    <Plate variant="live">
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "var(--space-3)",
+          marginBottom: "var(--space-3)",
+        }}
+      >
+        <LivePill label="Session Live" />
+        <span
+          style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: "var(--size-num-xs)",
+            color: "var(--text-tertiary)",
+            textTransform: "uppercase",
+            letterSpacing: "var(--ls-caps-l)",
+            fontWeight: 700,
+          }}
+        >
+          {capacity}
+        </span>
+      </div>
+      <Link
+        href={`/session/${session.id}/join`}
+        style={{
+          display: "inline-flex",
+          width: "100%",
+          alignItems: "center",
+          justifyContent: "center",
+          fontFamily: "var(--font-heading)",
+          fontWeight: 700,
+          fontSize: "var(--size-label-l)",
+          textTransform: "uppercase",
+          letterSpacing: "var(--ls-caps)",
+          background: "var(--accent-cta)",
+          color: "var(--text-on-accent)",
+          padding: "var(--space-3) var(--space-5)",
+          borderRadius: "var(--radius-xs)",
+          textDecoration: "none",
+        }}
+      >
+        Join Lobby
+      </Link>
+    </Plate>
+  );
+}
+
+function UpcomingSessions({
+  sessions,
+  rsvpSessionIds,
+}: {
+  sessions: SessionListItem[];
+  rsvpSessionIds: string[];
+}) {
+  return (
+    <section style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+      <SectionLabel>Upcoming ELO Sessions</SectionLabel>
+      {sessions.length === 0 ? (
+        <EmptyMeta>No sessions scheduled</EmptyMeta>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+          {sessions.map((s) => (
+            <UpcomingSessionRow
+              key={s.id}
+              session={s}
+              isRsvpd={rsvpSessionIds.includes(s.id)}
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function UpcomingSessionRow({
+  session,
+  isRsvpd,
+}: {
+  session: SessionListItem;
+  isRsvpd: boolean;
+}) {
+  const start = new Date(session.scheduledStart);
+  const dayTime = start.toLocaleString("en-US", {
+    weekday: "short",
+    hour: "numeric",
+  });
+  const fullDate = start.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
+  const attending = session.rsvpCount + session.participantCount;
+  const subtitle = `${fullDate} · ${attending} attending`;
+
+  return (
+    <ParticipantRow
+      name={dayTime}
+      subtitle={subtitle}
+      action={<GymRsvpAction sessionId={session.id} isRsvpd={isRsvpd} />}
+    />
+  );
+}
+
+function GymStatsGrid({ stats }: { stats: GymManagerStats }) {
+  const avgPerSession =
+    stats.totalSessions > 0
+      ? (stats.totalParticipants / stats.totalSessions).toFixed(1)
+      : "0";
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr",
+        gap: "var(--space-3)",
+      }}
+    >
+      <EloTile label="Avg Session" value={avgPerSession} size="medium" />
+      <EloTile label="Total Matches" value={stats.totalMatches} size="medium" />
+    </div>
+  );
+}
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <span
+      style={{
+        fontFamily: "var(--font-mono)",
+        fontSize: "var(--size-num-xs)",
+        color: "var(--text-tertiary)",
+        textTransform: "uppercase",
+        letterSpacing: "var(--ls-caps-xl)",
+        fontWeight: 700,
+      }}
+    >
+      {children}
+    </span>
+  );
+}
+
+function EmptyMeta({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      style={{
+        fontFamily: "var(--font-mono)",
+        fontSize: "var(--size-num-xs)",
+        color: "var(--text-tertiary)",
+        textTransform: "uppercase",
+        letterSpacing: "var(--ls-caps-l)",
+        padding: "var(--space-4)",
+        border: "1px dashed var(--border-hairline)",
+        borderRadius: "var(--radius-xs)",
+        textAlign: "center",
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+

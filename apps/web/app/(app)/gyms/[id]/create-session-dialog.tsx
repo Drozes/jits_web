@@ -93,10 +93,30 @@ export function CreateSessionDialog({ gymId }: CreateSessionDialogProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="w-full">
-          <Plus className="mr-2 h-4 w-4" />
+        <button
+          type="button"
+          style={{
+            display: "inline-flex",
+            width: "100%",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "var(--space-2)",
+            fontFamily: "var(--font-heading)",
+            fontSize: "var(--size-label-l)",
+            fontWeight: 700,
+            textTransform: "uppercase",
+            letterSpacing: "var(--ls-caps)",
+            padding: "var(--space-3) var(--space-5)",
+            borderRadius: "var(--radius-xs)",
+            border: "1px solid var(--accent-cta)",
+            background: "var(--accent-cta)",
+            color: "var(--text-on-accent)",
+            cursor: "pointer",
+          }}
+        >
+          <Plus className="h-4 w-4" />
           Start Session
-        </Button>
+        </button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>

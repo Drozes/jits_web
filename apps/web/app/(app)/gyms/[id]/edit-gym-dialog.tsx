@@ -55,10 +55,28 @@ export function EditGymDialog({ gymId, currentName, currentCity }: EditGymDialog
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
-          <Pencil className="mr-2 h-3.5 w-3.5" />
-          Edit Gym
-        </Button>
+        <button
+          type="button"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "var(--space-1)",
+            fontFamily: "var(--font-heading)",
+            fontSize: "var(--size-label-s)",
+            fontWeight: 700,
+            textTransform: "uppercase",
+            letterSpacing: "var(--ls-caps)",
+            padding: "var(--space-2) var(--space-3)",
+            borderRadius: "var(--radius-xs)",
+            border: "1px solid var(--border-hairline-strong)",
+            background: "var(--bg-elevated)",
+            color: "var(--text-secondary)",
+            cursor: "pointer",
+          }}
+        >
+          <Pencil className="h-3.5 w-3.5" />
+          Edit Info
+        </button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>

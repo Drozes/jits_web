@@ -51,10 +51,29 @@ export function CreateGymDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
-          <Plus className="mr-2 h-4 w-4" />
-          Create Gym
-        </Button>
+        <button
+          type="button"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "var(--space-1)",
+            fontFamily: "var(--font-heading)",
+            fontSize: "var(--size-label-s)",
+            fontWeight: 700,
+            textTransform: "uppercase",
+            letterSpacing: "var(--ls-caps)",
+            padding: "var(--space-2) var(--space-3)",
+            borderRadius: "var(--radius-xs)",
+            border: "1px solid var(--border-hairline-strong)",
+            background: "var(--bg-elevated)",
+            color: "var(--text-secondary)",
+            cursor: "pointer",
+            whiteSpace: "nowrap",
+          }}
+        >
+          <Plus className="h-3.5 w-3.5" />
+          New Gym
+        </button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
