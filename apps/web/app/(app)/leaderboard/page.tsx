@@ -22,7 +22,8 @@ function LeaderboardSkeleton() {
   );
 }
 
-export default function LeaderboardPage() {
+export default async function LeaderboardPage() {
+  await requireAthlete();
   return (
     <>
       <AppHeader title="Rankings" rightAction={<PageHeaderActions />} />

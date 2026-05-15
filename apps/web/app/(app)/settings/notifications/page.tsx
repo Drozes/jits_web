@@ -6,7 +6,8 @@ import { requireAthlete } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
 import { getNotificationPreferences } from "@jits/shared/api/mutations";
 
-export default function NotificationsPage() {
+export default async function NotificationsPage() {
+  await requireAthlete();
   return (
     <>
       <AppHeader title="Notifications" back />

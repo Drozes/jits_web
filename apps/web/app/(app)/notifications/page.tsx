@@ -22,7 +22,8 @@ function NotificationsSkeleton() {
   );
 }
 
-export default function NotificationsPage() {
+export default async function NotificationsPage() {
+  await requireAthlete();
   return (
     <>
       <AppHeader title="Notifications" back />

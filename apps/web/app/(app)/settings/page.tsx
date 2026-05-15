@@ -4,7 +4,8 @@ import { PageContainer } from "@/components/layout/page-container";
 import { SettingsContent } from "./settings-content";
 import { requireAuth } from "@/lib/guards";
 
-export default function SettingsPage() {
+export default async function SettingsPage() {
+  await requireAuth();
   return (
     <>
       <AppHeader title="Settings" back />

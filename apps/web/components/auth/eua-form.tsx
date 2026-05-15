@@ -80,6 +80,15 @@ export function EuaForm() {
         .insert({ athlete_id: athlete.id, waiver_id: waiver.id });
       if (ackError) throw ackError;
 
+      // Activate the athlete so /requireAthlete stops redirecting back to /eua.
+      // BE may also have a trigger that does this, but doing it client-side is
+      // idempotent and avoids the redirect loop if the trigger is absent.
+      const { error: activateError } = await supabase
+        .from("athletes")
+        .update({ status: "active" })
+        .eq("id", athlete.id);
+      if (activateError) throw activateError;
+
       router.push("/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to record agreement.");

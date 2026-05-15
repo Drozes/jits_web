@@ -61,7 +61,12 @@ function DashboardSkeleton() {
   );
 }
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  // Hoist the auth + activation guard out of Suspense. Next.js 16 with Cache
+  // Components doesn't propagate redirect() throws cleanly through Suspense
+  // boundaries — they get caught by the error boundary and render as
+  // "Internal Server Error" instead of doing the redirect.
+  await requireAthlete();
   return (
     <>
       <Suspense fallback={<DashboardHeaderFallback />}>
