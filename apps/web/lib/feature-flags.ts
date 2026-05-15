@@ -1,5 +1,5 @@
 const FLAGS = {
-  timekeeperEnabled: false,
+  timekeeperEnabled: true,
 } as const;
 
 export type FeatureFlag = keyof typeof FLAGS;

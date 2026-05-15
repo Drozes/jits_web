@@ -21,7 +21,7 @@
 | Docker                        | running                  | Required by `supabase start`.                                        |
 | ffmpeg                        | 4.4+                     | Used by the slicer worker (when run locally).                        |
 | Google Cloud SDK (optional)   | for Cloud Run slicer     | Local fallback: skip the slicer; `cron_request_pending_video_slices` will re-poke. |
-| Gemini API key                | live                     | Set as `GOOGLE_GENERATIVE_AI_API_KEY` or via Supabase secrets.       |
+| Gemini API key                | live                     | Set as `GEMINI_API_KEY` in `jr_be/supabase/.env` (edge functions read this name).       |
 
 You also need a working browser logged into Supabase Studio
 (http://127.0.0.1:54323) to peek at rows during the demo.
@@ -57,12 +57,15 @@ You should see all three tables. If `video_chunks` is missing, run
 
 ### 1.1 Wire the Edge Functions
 
-The chunk-analyze function needs the Gemini key. From `jr_be/`:
+The chunk-analyze function needs the Gemini key. Edit `jr_be/supabase/.env`
+and ensure `GEMINI_API_KEY=<your-key>` is set (this is the env var the
+edge functions actually read — `Deno.env.get("GEMINI_API_KEY")` at
+`video-analyze-chunk/index.ts:121` and `video-merge-analysis/index.ts:107`).
+Then from `jr_be/`:
 
 ```bash
-supabase secrets set GOOGLE_GENERATIVE_AI_API_KEY=<your-key>
-# Serve all functions used by the pipeline:
-supabase functions serve --no-verify-jwt video-analyze-chunk video-merge-analysis
+supabase functions serve --no-verify-jwt --env-file ./supabase/.env \
+  video-analyze-chunk video-merge-analysis
 ```
 
 `Deno.cron(...)` is a no-op locally (see BE contract §4). The pg_cron
