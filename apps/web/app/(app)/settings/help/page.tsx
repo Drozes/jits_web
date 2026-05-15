@@ -1,43 +1,40 @@
 import { AppHeader } from "@/components/layout/app-header";
 import { PageContainer } from "@/components/layout/page-container";
-import { Mail } from "lucide-react";
 
-const faqItems = [
+type HelpSection = {
+  title: string;
+  paragraphs: string[];
+};
+
+const HELP_SECTIONS: HelpSection[] = [
   {
-    id: "join-session",
-    question: "How do I join a session?",
-    answer:
-      "Go to the Gyms tab to find your gym. Select an upcoming session and tap the join button. Complete the 4-step wizard: confirm your location, accept any required waivers, enter your current weight, and confirm your details. You'll appear in the session lobby where you can challenge other participants.",
+    title: "Getting Started",
+    paragraphs: [
+      "ELO RATED is a participation-only ranking platform. You join a session at a partner gym, complete matches, and the system handles your rating.",
+      "Start by attending an open mat at a gym tagged as an ELO session. Geofence + waiver confirm you're on the mat before you can join the lobby.",
+    ],
   },
   {
-    id: "elo-rating",
-    question: "How does ELO rating work?",
-    answer:
-      "Your ELO starts at 1000. After each ranked match, you gain or lose points based on the match result and your opponent's rating. Beating a higher-rated opponent gains more points. Losing to a lower-rated opponent loses more points. Draws cost both athletes ELO (the pressure score penalty).",
+    title: "How ELO Works",
+    paragraphs: [
+      "Universal starting rating. No belt seeding. Weight is normalized into the exchange so heavier athletes get a small phantom-ELO offset (+50 per IBJJF division gap).",
+      "Submission-only. Tap or don't. Draws cost ELO for both fighters, equal matches get the harshest Pressure Score penalty.",
+      "Wins, losses, and draws all move your number. Your number is your number.",
+    ],
   },
   {
-    id: "ranked-matches",
-    question: "Are all matches ranked?",
-    answer:
-      "Yes. Every match on ELO RATED is ranked and affects your ELO rating. This keeps competition meaningful and ensures your record accurately reflects your performance on the mats.",
+    title: "Match Footage & Privacy",
+    paragraphs: [
+      "You own your match footage. You can always download it from your profile. Server-side retention on the free tier may be limited; access to your own data is not.",
+      "Your profile and rating are public on the global ladder. Personal data is governed by the Privacy Policy linked in the End User Agreement.",
+    ],
   },
   {
-    id: "record-result",
-    question: "How do I record a match result?",
-    answer:
-      "After the match timer ends, the result entry screen appears. Both athletes must confirm the outcome (submission, points, or draw). Once both confirm, the match is recorded. If there's a disagreement, either athlete can dispute the result.",
-  },
-  {
-    id: "change-weight",
-    question: "Can I change my weight class?",
-    answer:
-      "Yes, you can update your weight in Profile settings before each session. This ensures accurate ELO calculations, as weight divisions affect the stakes. Update your weight before joining a session.",
-  },
-  {
-    id: "report-issue",
-    question: "How do I report an issue?",
-    answer:
-      "Go to Settings > Feedback to report bugs or issues. Our team reviews all feedback and will follow up with you if needed.",
+    title: "Report a Problem",
+    paragraphs: [
+      "Spotted a wrong result, a dispute that wasn't resolved, or a participant violating gym rules? Send a feedback note from Settings, Feedback.",
+      "For urgent issues (safety, abuse, account compromise), email support@elorated.com with the match ID.",
+    ],
   },
 ];
 
@@ -45,44 +42,49 @@ export default function HelpPage() {
   return (
     <>
       <AppHeader title="Help & Support" back />
-      <PageContainer className="pt-6 space-y-6">
-        <section>
-          <h2 className="text-base font-semibold mb-4">Frequently Asked Questions</h2>
-          <div className="space-y-3">
-            {faqItems.map((item) => (
-              <FAQItem key={item.id} question={item.question} answer={item.answer} />
-            ))}
-          </div>
-        </section>
-
-        <section className="border-t border-border/50 pt-6">
-          <h2 className="text-base font-semibold mb-4">Need More Help?</h2>
-          <p className="text-sm text-muted-foreground mb-4">
-            Have a question we did not cover? Reach out to our support team.
-          </p>
-          <a
-            href="mailto:support@elorated.com"
-            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-          >
-            <Mail className="h-4 w-4" />
-            Email Support
-          </a>
-        </section>
+      <PageContainer className="pt-6">
+        <div
+          className="flex flex-col"
+          style={{ gap: "var(--space-4)" }}
+        >
+          {HELP_SECTIONS.map((section) => (
+            <Plate key={section.title} section={section} />
+          ))}
+        </div>
       </PageContainer>
     </>
   );
 }
 
-function FAQItem({ question, answer }: { question: string; answer: string }) {
+function Plate({ section }: { section: HelpSection }) {
   return (
-    <details className="group rounded-lg border border-border/50 bg-card p-4 hover:border-border/80 transition-colors">
-      <summary className="cursor-pointer font-medium text-sm flex items-center justify-between">
-        <span>{question}</span>
-        <span className="text-muted-foreground group-open:rotate-180 transition-transform ml-2">
-          ▼
-        </span>
-      </summary>
-      <p className="mt-3 text-sm text-muted-foreground leading-relaxed">{answer}</p>
-    </details>
+    <section
+      className="bg-card rounded"
+      style={{ padding: "var(--space-4)" }}
+    >
+      <h2
+        className="font-heading font-bold text-primary"
+        style={{
+          fontSize: "18px",
+          marginBottom: "var(--space-3)",
+        }}
+      >
+        {section.title}
+      </h2>
+      <div className="flex flex-col" style={{ gap: "var(--space-3)" }}>
+        {section.paragraphs.map((paragraph, index) => (
+          <p
+            key={index}
+            className="font-body text-secondary"
+            style={{
+              fontSize: "12px",
+              lineHeight: 1.6,
+            }}
+          >
+            {paragraph}
+          </p>
+        ))}
+      </div>
+    </section>
   );
 }
