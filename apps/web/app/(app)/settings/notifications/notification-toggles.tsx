@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Bell, MessageSquare, Swords } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Plate } from "@/components/ui/elo-system";
 import { Switch } from "@/components/ui/switch";
 import { createClient } from "@/lib/supabase/client";
 import { updateNotificationPreferences } from "@jits/shared/api/mutations";
@@ -17,25 +16,21 @@ const TOGGLES: {
   key: keyof NotificationPrefs;
   label: string;
   description: string;
-  icon: React.ReactNode;
 }[] = [
   {
     key: "enable_challenges",
-    label: "Challenges",
+    label: "CHALLENGES",
     description: "New, accepted, declined, and expiring challenges",
-    icon: <Swords className="h-4 w-4" />,
   },
   {
     key: "enable_chat",
-    label: "Chat Messages",
+    label: "CHAT MESSAGES",
     description: "New messages in conversations",
-    icon: <MessageSquare className="h-4 w-4" />,
   },
   {
     key: "enable_matches",
-    label: "Matches",
+    label: "MATCHES",
     description: "Match start notifications",
-    icon: <Bell className="h-4 w-4" />,
   },
 ];
 
@@ -51,34 +46,77 @@ export function NotificationToggles({ athleteId, initialPrefs }: Props) {
   }
 
   return (
-    <section>
-      <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-        Push Notifications
-      </h3>
-      <Card>
-        <CardContent className="p-0 divide-y divide-border">
-          {TOGGLES.map(({ key, label, description, icon }) => (
+    <div
+      className="flex flex-col"
+      style={{ gap: "var(--space-4)" }}
+    >
+      <Plate style={{ padding: 0 }}>
+        {TOGGLES.map(({ key, label, description }, idx) => (
+          <div key={key}>
+            {idx > 0 && (
+              <div
+                style={{
+                  height: 1,
+                  background: "var(--border-hairline-faint)",
+                }}
+              />
+            )}
             <label
-              key={key}
-              className="flex items-center gap-3 px-4 py-3 cursor-pointer"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "var(--space-3)",
+                padding: "var(--space-3) var(--space-4)",
+                cursor: "pointer",
+              }}
             >
-              <span className="text-muted-foreground">{icon}</span>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium">{label}</p>
-                <p className="text-xs text-muted-foreground">{description}</p>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p
+                  style={{
+                    fontFamily: "var(--font-mono)",
+                    fontSize: "var(--size-num-xs)",
+                    color: "var(--text-tertiary)",
+                    textTransform: "uppercase",
+                    letterSpacing: "var(--ls-caps-l)",
+                    margin: 0,
+                    marginBottom: "var(--space-1)",
+                    lineHeight: 1.2,
+                  }}
+                >
+                  {label}
+                </p>
+                <p
+                  style={{
+                    fontFamily: "var(--font-body)",
+                    fontSize: "var(--size-body-xs)",
+                    color: "var(--text-tertiary)",
+                    margin: 0,
+                    lineHeight: "var(--lh-base)",
+                  }}
+                >
+                  {description}
+                </p>
               </div>
               <Switch
                 checked={prefs[key]}
                 onCheckedChange={() => handleToggle(key)}
               />
             </label>
-          ))}
-        </CardContent>
-      </Card>
-      <p className="text-xs text-muted-foreground mt-3">
+          </div>
+        ))}
+      </Plate>
+      <p
+        style={{
+          fontFamily: "var(--font-body)",
+          fontSize: "var(--size-body-xs)",
+          color: "var(--text-tertiary)",
+          margin: 0,
+          lineHeight: "var(--lh-base)",
+        }}
+      >
         Changes are saved automatically. You can also manage notifications
         through your device or browser settings.
       </p>
-    </section>
+    </div>
   );
 }

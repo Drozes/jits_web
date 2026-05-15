@@ -1,6 +1,6 @@
 import { AppHeader } from "@/components/layout/app-header";
 import { PageContainer } from "@/components/layout/page-container";
-import { Mail } from "lucide-react";
+import { Plate } from "@/components/ui/elo-system";
 
 const faqItems = [
   {
@@ -45,44 +45,134 @@ export default function HelpPage() {
   return (
     <>
       <AppHeader title="Help & Support" back />
-      <PageContainer className="pt-6 space-y-6">
-        <section>
-          <h2 className="text-base font-semibold mb-4">Frequently Asked Questions</h2>
-          <div className="space-y-3">
-            {faqItems.map((item) => (
-              <FAQItem key={item.id} question={item.question} answer={item.answer} />
-            ))}
-          </div>
-        </section>
+      <PageContainer className="pt-6">
+        <div
+          className="flex flex-col animate-page-in"
+          style={{ gap: "var(--space-6)" }}
+        >
+          <section style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+            <SectionTitle>Frequently Asked Questions</SectionTitle>
+            <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+              {faqItems.map((item) => (
+                <FAQItem key={item.id} question={item.question} answer={item.answer} />
+              ))}
+            </div>
+          </section>
 
-        <section className="border-t border-border/50 pt-6">
-          <h2 className="text-base font-semibold mb-4">Need More Help?</h2>
-          <p className="text-sm text-muted-foreground mb-4">
-            Have a question we did not cover? Reach out to our support team.
-          </p>
-          <a
-            href="mailto:support@elorated.com"
-            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-          >
-            <Mail className="h-4 w-4" />
-            Email Support
-          </a>
-        </section>
+          <section style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+            <SectionTitle>Need More Help?</SectionTitle>
+            <Plate>
+              <p
+                style={{
+                  fontFamily: "var(--font-body)",
+                  fontSize: "var(--size-body-s)",
+                  color: "var(--text-secondary)",
+                  lineHeight: "var(--lh-loose)",
+                  margin: 0,
+                  marginBottom: "var(--space-4)",
+                }}
+              >
+                Have a question we did not cover? Reach out to our support team.
+              </p>
+              <a
+                href="mailto:support@elorated.com"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontFamily: "var(--font-heading)",
+                  fontSize: "var(--size-label-l)",
+                  fontWeight: 700,
+                  textTransform: "uppercase",
+                  letterSpacing: "var(--ls-caps)",
+                  padding: "var(--space-3) var(--space-4)",
+                  borderRadius: "var(--radius-sm)",
+                  background: "var(--accent-cta)",
+                  color: "var(--text-on-accent)",
+                  textDecoration: "none",
+                  transition: "background var(--motion-hover)",
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLElement).style.background =
+                    "var(--accent-cta-hover)";
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLElement).style.background =
+                    "var(--accent-cta)";
+                }}
+              >
+                Email Support
+              </a>
+            </Plate>
+          </section>
+        </div>
       </PageContainer>
     </>
   );
 }
 
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <h2
+      style={{
+        fontFamily: "var(--font-heading)",
+        fontSize: "var(--size-heading-m)",
+        fontWeight: 700,
+        color: "var(--text-primary)",
+        margin: 0,
+        lineHeight: "var(--lh-snug)",
+      }}
+    >
+      {children}
+    </h2>
+  );
+}
+
 function FAQItem({ question, answer }: { question: string; answer: string }) {
   return (
-    <details className="group rounded-lg border border-border/50 bg-card p-4 hover:border-border/80 transition-colors">
-      <summary className="cursor-pointer font-medium text-sm flex items-center justify-between">
-        <span>{question}</span>
-        <span className="text-muted-foreground group-open:rotate-180 transition-transform ml-2">
-          ▼
-        </span>
-      </summary>
-      <p className="mt-3 text-sm text-muted-foreground leading-relaxed">{answer}</p>
-    </details>
+    <Plate>
+      <details className="group">
+        <summary
+          style={{
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "var(--space-3)",
+            fontFamily: "var(--font-heading)",
+            fontSize: "var(--size-heading-s)",
+            fontWeight: 700,
+            color: "var(--text-primary)",
+            listStyle: "none",
+          }}
+        >
+          <span>{question}</span>
+          <span
+            aria-hidden
+            style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: "var(--size-num-s)",
+              color: "var(--text-tertiary)",
+              transition: "transform var(--motion-fade)",
+            }}
+            className="group-open:rotate-180"
+          >
+            ▼
+          </span>
+        </summary>
+        <p
+          style={{
+            marginTop: "var(--space-3)",
+            marginBottom: 0,
+            fontFamily: "var(--font-body)",
+            fontSize: "var(--size-body-s)",
+            color: "var(--text-secondary)",
+            lineHeight: "var(--lh-loose)",
+          }}
+        >
+          {answer}
+        </p>
+      </details>
+    </Plate>
   );
 }

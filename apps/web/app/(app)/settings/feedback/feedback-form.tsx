@@ -2,17 +2,15 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
+import { Plate } from "@/components/ui/elo-system";
 import { createClient } from "@/lib/supabase/client";
 
 type Category = "bug" | "feature" | "general";
 
 const CATEGORIES: { value: Category; label: string }[] = [
-  { value: "bug", label: "Bug Report" },
-  { value: "feature", label: "Feature Request" },
-  { value: "general", label: "General Feedback" },
+  { value: "bug", label: "BUG" },
+  { value: "feature", label: "FEATURE" },
+  { value: "general", label: "GENERAL" },
 ];
 
 export function FeedbackForm() {
@@ -50,50 +48,81 @@ export function FeedbackForm() {
 
   if (submitted) {
     return (
-      <div className="flex flex-col items-center gap-6 py-12 text-center">
-        <p className="text-2xl">Thank you!</p>
-        <p className="text-muted-foreground text-sm">
-          Your feedback helps us improve ELO RATED.
-        </p>
-        <Button
-          variant="outline"
-          onClick={() => {
-            setMessage("");
-            setCategory("general");
-            setSubmitted(false);
+      <Plate>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: "var(--space-4)",
+            textAlign: "center",
+            padding: "var(--space-6) 0",
           }}
         >
-          Submit More Feedback
-        </Button>
-      </div>
+          <p
+            style={{
+              fontFamily: "var(--font-heading)",
+              fontSize: "var(--size-heading-l)",
+              fontWeight: 700,
+              color: "var(--text-primary)",
+              margin: 0,
+            }}
+          >
+            THANK YOU
+          </p>
+          <p
+            style={{
+              fontFamily: "var(--font-body)",
+              fontSize: "var(--size-body-s)",
+              color: "var(--text-secondary)",
+              margin: 0,
+              lineHeight: "var(--lh-loose)",
+            }}
+          >
+            Your feedback helps us improve ELO RATED.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setMessage("");
+              setCategory("general");
+              setSubmitted(false);
+            }}
+            style={ghostButtonStyle}
+          >
+            Submit More Feedback
+          </button>
+        </div>
+      </Plate>
     );
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-      <div className="flex flex-col gap-2">
-        <Label>Category</Label>
-        <div className="flex gap-2 flex-wrap">
+    <form
+      onSubmit={handleSubmit}
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: "var(--space-5)",
+      }}
+    >
+      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+        <FieldLabel>CATEGORY</FieldLabel>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-2)" }}>
           {CATEGORIES.map(({ value, label }) => (
-            <button
+            <CategoryChip
               key={value}
-              type="button"
+              active={category === value}
               onClick={() => setCategory(value)}
-              className={cn(
-                "rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors",
-                category === value
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border bg-transparent text-foreground hover:bg-muted",
-              )}
             >
               {label}
-            </button>
+            </CategoryChip>
           ))}
         </div>
       </div>
 
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="message">Message</Label>
+      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+        <FieldLabel>MESSAGE</FieldLabel>
         <textarea
           id="message"
           value={message}
@@ -101,16 +130,134 @@ export function FeedbackForm() {
           placeholder="Tell us what you think..."
           rows={6}
           maxLength={2000}
-          className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm resize-none"
+          style={{
+            width: "100%",
+            resize: "none",
+            background: "var(--bg-elevated)",
+            border: "1px solid var(--border-hairline)",
+            borderRadius: "var(--radius-xs)",
+            padding: "var(--space-3)",
+            fontFamily: "var(--font-mono)",
+            fontSize: "var(--size-num-m)",
+            color: "var(--text-primary)",
+            lineHeight: "var(--lh-base)",
+            outline: "none",
+            transition: "border-color var(--motion-hover)",
+          }}
+          onFocus={(e) => {
+            e.currentTarget.style.borderColor = "var(--accent-cta)";
+          }}
+          onBlur={(e) => {
+            e.currentTarget.style.borderColor = "var(--border-hairline)";
+          }}
         />
-        <p className={cn("text-xs text-right", charCount > 2000 ? "text-destructive" : "text-muted-foreground")}>
+        <p
+          style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: "var(--size-num-xs)",
+            color:
+              charCount > 2000 ? "var(--state-negative)" : "var(--text-tertiary)",
+            textAlign: "right",
+            margin: 0,
+            letterSpacing: "var(--ls-caps-l)",
+          }}
+        >
           {charCount}/2000
         </p>
       </div>
 
-      <Button type="submit" disabled={!isValid || submitting} className="w-full">
+      <button
+        type="submit"
+        disabled={!isValid || submitting}
+        style={{
+          ...primaryButtonStyle,
+          opacity: !isValid || submitting ? 0.5 : 1,
+          cursor: !isValid || submitting ? "not-allowed" : "pointer",
+        }}
+      >
         {submitting ? "Submitting..." : "Submit Feedback"}
-      </Button>
+      </button>
     </form>
   );
 }
+
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <label
+      style={{
+        fontFamily: "var(--font-mono)",
+        fontSize: "var(--size-num-xs)",
+        color: "var(--text-tertiary)",
+        textTransform: "uppercase",
+        letterSpacing: "var(--ls-caps-l)",
+        lineHeight: 1.2,
+      }}
+    >
+      {children}
+    </label>
+  );
+}
+
+function CategoryChip({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        fontFamily: "var(--font-heading)",
+        fontSize: "var(--size-label-s)",
+        fontWeight: 700,
+        textTransform: "uppercase",
+        letterSpacing: "var(--ls-caps)",
+        padding: "var(--space-2) var(--space-3)",
+        borderRadius: "var(--radius-xs)",
+        border: `1px solid ${active ? "var(--accent-cta)" : "var(--border-hairline-strong)"}`,
+        background: active ? "var(--bg-elevated-hover)" : "var(--bg-elevated)",
+        color: active ? "var(--text-primary)" : "var(--text-secondary)",
+        cursor: "pointer",
+        transition:
+          "background var(--motion-hover), color var(--motion-hover), border-color var(--motion-hover)",
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+const primaryButtonStyle: React.CSSProperties = {
+  fontFamily: "var(--font-heading)",
+  fontSize: "var(--size-label-l)",
+  fontWeight: 700,
+  textTransform: "uppercase",
+  letterSpacing: "var(--ls-caps)",
+  padding: "var(--space-3) var(--space-4)",
+  borderRadius: "var(--radius-sm)",
+  background: "var(--accent-cta)",
+  color: "var(--text-on-accent)",
+  border: "none",
+  width: "100%",
+  transition: "background var(--motion-hover)",
+};
+
+const ghostButtonStyle: React.CSSProperties = {
+  fontFamily: "var(--font-heading)",
+  fontSize: "var(--size-label-l)",
+  fontWeight: 700,
+  textTransform: "uppercase",
+  letterSpacing: "var(--ls-caps)",
+  padding: "var(--space-2) var(--space-4)",
+  borderRadius: "var(--radius-sm)",
+  background: "transparent",
+  border: "1px solid var(--border-hairline-strong)",
+  color: "var(--text-primary)",
+  cursor: "pointer",
+  transition: "background var(--motion-hover)",
+};
