@@ -1,17 +1,17 @@
 import { notFound } from "next/navigation";
 import { requireAthlete } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
-import { ProfileHeader } from "@/components/domain/profile-header";
-import { MatchCard } from "@/components/domain/match-card";
 import { AppHeader } from "@/components/layout/app-header";
-import { PageContainer } from "@/components/layout/page-container";
-import { Swords } from "lucide-react";
-import { AthleteProfileActions } from "./athlete-profile-actions";
 import {
   getPendingChallengeBetween,
   getAthleteStatsRpc,
   getMatchHistory,
 } from "@jits/shared/api/queries";
+import { extractGymName, formatRelativeDate } from "@jits/shared/utils";
+import { ProfileHero } from "../../profile/profile-hero";
+import { ProfileStatsGrid } from "../../profile/profile-stats-grid";
+import { ProfileHistoryList } from "../../profile/profile-history-list";
+import { AthleteProfileActions } from "./athlete-profile-actions";
 
 export async function AthleteProfileContent({
   paramsPromise,
@@ -22,7 +22,6 @@ export async function AthleteProfileContent({
   const { athlete: currentAthlete } = await requireAthlete();
   const supabase = await createClient();
 
-  // Parallelize all independent queries (competitor fetch uses FK join for gym)
   const [
     { data: competitor },
     compStats,
@@ -43,32 +42,65 @@ export async function AthleteProfileContent({
 
   if (!competitor) notFound();
 
-  const gymsData = competitor.gyms as unknown as { name: string } | null;
-  const competitorGymName = gymsData?.name ?? null;
+  const gymsData = competitor.gyms as unknown as
+    | { name: string }
+    | { name: string }[]
+    | null;
+  const competitorGymName = extractGymName(gymsData);
 
-  // Head-to-head: filter own match history for matches against this competitor
-  const headToHead = matchHistory
-    .filter((m) => m.opponent_id === competitor.id)
-    .map((m) => ({
-      matchId: m.match_id,
-      opponentName: m.opponent_display_name,
-      result: m.athlete_outcome as "win" | "loss" | "draw" | null,
-      matchType: m.match_type as "ranked" | "casual",
-      eloDelta: m.elo_delta || null,
-      date: m.completed_at,
-    }));
+  // Rank for competitor
+  const { count: higherCount } = await supabase
+    .from("athletes")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "active")
+    .gt("current_elo", competitor.current_elo);
+  const rank = (higherCount ?? 0) + 1;
+
+  // Head-to-head from current athlete's history
+  const headToHead = matchHistory.filter((m) => m.opponent_id === competitor.id);
+  const headToHeadCompact = headToHead.map((m) => ({
+    matchType: m.match_type as "ranked" | "casual",
+    result: m.athlete_outcome as "win" | "loss" | "draw" | null,
+  }));
+
+  const recent = headToHead.slice(0, 6).map((m) => ({
+    matchId: m.match_id,
+    opponentName: m.opponent_display_name ?? competitor.display_name,
+    gymName: null as string | null,
+    outcome: (m.athlete_outcome ?? "draw") as "win" | "loss" | "draw",
+    when: formatRelativeDate(m.completed_at),
+    delta: m.elo_delta ?? 0,
+  }));
+
+  // Competitor's own win streak (computed only from H2H; best-effort)
+  const compStreak = compStats.winStreak ?? 0;
+  const compTotal = compStats.wins + compStats.losses + compStats.draws;
 
   return (
     <>
-      <AppHeader title="" back />
-      <PageContainer className="pt-6">
-        <div className="flex flex-col gap-6 animate-page-in">
-          <ProfileHeader
-            athlete={competitor}
-            gymName={competitorGymName}
-            stats={compStats}
-          />
+      <AppHeader title="Athlete" back />
+      <div className="flex flex-col animate-page-in">
+        <ProfileHero
+          name={competitor.display_name}
+          gymName={competitorGymName}
+          weightKg={competitor.current_weight}
+          photoUrl={competitor.profile_photo_url}
+          elo={competitor.current_elo}
+          rank={rank}
+        />
+        <ProfileStatsGrid
+          totalMatches={compTotal}
+          winRate={compStats.winRate}
+          peak={competitor.highest_elo}
+          streak={compStreak}
+        />
 
+        <div
+          style={{
+            padding: "var(--space-4) var(--space-4) var(--space-2)",
+            background: "var(--bg-primary)",
+          }}
+        >
           <AthleteProfileActions
             competitorId={competitor.id}
             currentAthleteId={currentAthlete.id}
@@ -84,41 +116,40 @@ export async function AthleteProfileContent({
               ...compStats,
               weight: competitor.current_weight,
             }}
-            headToHead={headToHead}
+            headToHead={headToHeadCompact}
             pendingChallengeId={pendingChallenge?.id ?? null}
           />
-
-          {/* Head-to-Head History */}
-          <section>
-            <div className="flex items-center gap-2 mb-3">
-              <Swords className="h-5 w-5 text-primary" />
-              <h3 className="text-lg font-semibold">Head-to-Head</h3>
-            </div>
-
-            {headToHead.length > 0 ? (
-              <div className="flex flex-col gap-2">
-                {headToHead.map((match) => (
-                  <MatchCard
-                    key={match.matchId}
-                    type="match"
-                    opponentName={match.opponentName}
-                    result={match.result}
-                    matchType={match.matchType}
-                    eloDelta={match.eloDelta ?? undefined}
-                    date={match.date}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-lg border border-dashed p-8 text-center">
-                <Swords className="h-8 w-8 mx-auto text-muted-foreground/30 mb-3" />
-                <p className="text-sm font-medium text-muted-foreground">No history yet</p>
-                <p className="text-xs text-muted-foreground/70 mt-1">Challenge them to your first match!</p>
-              </div>
-            )}
-          </section>
         </div>
-      </PageContainer>
+
+        <SectionLabel
+          label={recent.length > 0 ? "Head-to-Head" : "No Matches Yet"}
+          meta={recent.length > 0 ? `Last ${recent.length}` : undefined}
+        />
+        <ProfileHistoryList rows={recent} />
+      </div>
     </>
+  );
+}
+
+function SectionLabel({ label, meta }: { label: string; meta?: string }) {
+  return (
+    <div
+      className="grid grid-cols-[1fr_auto] items-center"
+      style={{
+        padding: "var(--space-5) var(--space-5) var(--space-3)",
+        fontFamily: "var(--font-mono)",
+        fontSize: "var(--size-num-xs)",
+        color: "var(--text-tertiary)",
+        textTransform: "uppercase",
+        letterSpacing: "var(--ls-caps-xl)",
+      }}
+    >
+      <span>{label}</span>
+      {meta && (
+        <span style={{ color: "var(--text-secondary)", fontWeight: 600 }}>
+          {meta}
+        </span>
+      )}
+    </div>
   );
 }

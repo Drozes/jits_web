@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { AppHeader } from "@/components/layout/app-header";
 import { AthleteProfileContent } from "./athlete-profile-content";
 
 export default function AthleteProfilePage({
@@ -15,19 +16,26 @@ export default function AthleteProfilePage({
 
 function AthleteProfileSkeleton() {
   return (
-    <div className="flex flex-col gap-6 animate-pulse">
-      <div className="h-14 bg-muted" />
-      <div className="px-4 flex flex-col gap-6">
-        <div className="h-48 rounded-lg bg-muted" />
-        <div className="flex gap-2">
-          <div className="h-10 flex-1 rounded-lg bg-muted" />
-          <div className="h-10 flex-1 rounded-lg bg-muted" />
+    <>
+      <AppHeader title="Athlete" back />
+      <div className="flex flex-col animate-pulse">
+        <div style={{ height: 240, background: "var(--bg-elevated)" }} />
+        <div
+          className="grid grid-cols-4"
+          style={{
+            gap: 1,
+            background: "var(--border-hairline)",
+            borderBottom: "1px solid var(--border-hairline)",
+          }}
+        >
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div
+              key={i}
+              style={{ height: 64, background: "var(--bg-elevated)" }}
+            />
+          ))}
         </div>
-        <div className="h-6 w-40 rounded bg-muted" />
-        <div className="h-16 rounded-lg bg-muted" />
-        <div className="h-16 rounded-lg bg-muted" />
-        <div className="h-16 rounded-lg bg-muted" />
       </div>
-    </div>
+    </>
   );
 }

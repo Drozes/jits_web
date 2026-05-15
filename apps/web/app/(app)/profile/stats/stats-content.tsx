@@ -1,6 +1,6 @@
 import { requireAthlete } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
-import { Card, CardContent } from "@/components/ui/card";
+import { Plate, EloTile } from "@/components/ui/elo-system";
 import { StatsTabs } from "./stats-tabs";
 import { MilestoneProgress } from "./milestone-progress";
 import {
@@ -37,14 +37,13 @@ export async function StatsContent() {
   }
 
   const now = new Date();
+  const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  const threeMonthsAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const eloThisMonth = matchHistory
     .filter((m) => new Date(m.completed_at) >= startOfMonth)
     .reduce((sum, m) => sum + (m.elo_delta ?? 0), 0);
-
-  const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-  const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-  const threeMonthsAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
 
   function periodStats(since: Date) {
     const filtered = matchHistory.filter((m) => new Date(m.completed_at) >= since);
@@ -66,36 +65,42 @@ export async function StatsContent() {
   const submissionRate = wins > 0 ? Math.round((submissionWins / wins) * 100) : 0;
 
   return (
-    <div className="flex flex-col gap-6 animate-page-in">
-      <h2 className="text-xl font-bold">Performance Stats</h2>
+    <div className="flex flex-col gap-4 animate-page-in">
+      <h2
+        className="font-heading uppercase"
+        style={{
+          fontFamily: "var(--font-heading)",
+          fontWeight: 700,
+          fontSize: "var(--size-label-l)",
+          letterSpacing: "var(--ls-caps-l)",
+          color: "var(--text-secondary)",
+        }}
+      >
+        Performance
+      </h2>
 
-      <div className="grid grid-cols-3 gap-3 text-center">
-        <Card>
-          <CardContent className="py-3 px-2">
-            <p className="text-2xl font-bold tabular-nums">{athlete.current_elo}</p>
-            <p className="text-xs text-muted-foreground">Current ELO</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="py-3 px-2">
-            <p className="text-2xl font-bold tabular-nums">{wins}</p>
-            <p className="text-xs text-muted-foreground">Total Wins</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="py-3 px-2">
-            <p className="text-2xl font-bold text-success tabular-nums">{winRate}%</p>
-            <p className="text-xs text-muted-foreground">Win Rate</p>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-3 gap-2">
+        <EloTile label="ELO" value={athlete.current_elo} size="medium" />
+        <EloTile label="Wins" value={wins} size="medium" />
+        <EloTile label="Win Rate" value={`${winRate}%`} size="medium" />
       </div>
 
-      <Card>
-        <CardContent className="p-4">
-          <h3 className="font-semibold mb-3 text-sm">Rating Milestone</h3>
-          <MilestoneProgress elo={athlete.current_elo} />
-        </CardContent>
-      </Card>
+      <Plate>
+        <h3
+          className="font-heading uppercase"
+          style={{
+            fontFamily: "var(--font-heading)",
+            fontWeight: 700,
+            fontSize: "var(--size-label-s)",
+            letterSpacing: "var(--ls-caps-xl)",
+            color: "var(--text-tertiary)",
+            marginBottom: "var(--space-3)",
+          }}
+        >
+          Rating Milestone
+        </h3>
+        <MilestoneProgress elo={athlete.current_elo} />
+      </Plate>
 
       <StatsTabs
         winStreak={winStreak}

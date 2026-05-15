@@ -1,7 +1,5 @@
 import { Suspense } from "react";
 import { AppHeader } from "@/components/layout/app-header";
-import { PageContainer } from "@/components/layout/page-container";
-import { PageHeaderActions } from "@/components/layout/page-header-actions";
 import { ProfileContent } from "./profile-content";
 
 export default function ProfilePage({
@@ -10,30 +8,34 @@ export default function ProfilePage({
   searchParams: Promise<{ demo?: string }>;
 }) {
   return (
-    <>
-      <AppHeader title="Profile" rightAction={<PageHeaderActions />} />
-      <PageContainer className="pt-6">
-        <Suspense fallback={<ProfileSkeleton />}>
-          <ProfileContent searchParams={searchParams} />
-        </Suspense>
-      </PageContainer>
-    </>
+    <Suspense fallback={<ProfileShell />}>
+      <ProfileContent searchParams={searchParams} />
+    </Suspense>
   );
 }
 
-function ProfileSkeleton() {
+function ProfileShell() {
   return (
-    <div className="flex flex-col gap-6 animate-pulse">
-      <div className="h-8 w-32 rounded bg-muted" />
-      <div className="h-48 rounded-2xl bg-muted" />
-      <div className="h-10 rounded-2xl bg-muted" />
-      <div className="grid grid-cols-2 gap-3">
-        <div className="h-20 rounded-2xl bg-muted" />
-        <div className="h-20 rounded-2xl bg-muted" />
-        <div className="h-20 rounded-2xl bg-muted" />
-        <div className="h-20 rounded-2xl bg-muted" />
+    <>
+      <AppHeader title="Profile" />
+      <div className="flex flex-col animate-pulse">
+        <div style={{ height: 240, background: "var(--bg-elevated)" }} />
+        <div
+          className="grid grid-cols-4"
+          style={{
+            gap: 1,
+            background: "var(--border-hairline)",
+            borderBottom: "1px solid var(--border-hairline)",
+          }}
+        >
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div
+              key={i}
+              style={{ height: 64, background: "var(--bg-elevated)" }}
+            />
+          ))}
+        </div>
       </div>
-      <div className="h-32 rounded-2xl bg-muted" />
-    </div>
+    </>
   );
 }

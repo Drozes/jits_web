@@ -1,56 +1,30 @@
 import Link from "next/link";
+import { AppHeader } from "@/components/layout/app-header";
 import { requireAthlete } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
-import { EditableProfileHeader } from "@/components/profile/editable-profile-header";
-import { LogoutButton } from "@/components/logout-button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
-import { ShareProfileSheet } from "@/components/domain/share-profile-sheet";
-import { ThemeSwitcher } from "@/components/theme-switcher";
-import { AchievementsSection } from "./achievements-section";
-import { getMatchHistory } from "@jits/shared/api/queries";
-import { Trophy, Settings, Share2, Palette, UserPen } from "lucide-react";
-
-const DEMO_DATA = {
-  wins: 18,
-  losses: 6,
-  winRate: 75,
-  winStreak: 5,
-  fastestWin: 147, // 2:27
-  submissionRate: 72,
-  eloThisMonth: 45,
-  totalMatches: 24,
-};
+import { getAthleteStatsRpc, getMatchHistory } from "@jits/shared/api/queries";
+import { formatRelativeDate } from "@jits/shared/utils";
+import { ProfileHero } from "./profile-hero";
+import { ProfileStatsGrid } from "./profile-stats-grid";
+import { ProfileHistoryList } from "./profile-history-list";
+import { ProfileFooterActions } from "./profile-footer-actions";
+import { HeaderShareButton } from "./header-share-button";
 
 export async function ProfileContent({
   searchParams,
 }: {
   searchParams: Promise<{ demo?: string }>;
 }) {
-  const { demo } = await searchParams;
-  const isDemo = demo === "true";
+  await searchParams;
   const { athlete } = await requireAthlete();
   const supabase = await createClient();
 
-  // Use RPC for match history (bypasses RLS, returns complete data)
-  const matchHistory = await getMatchHistory(supabase, athlete.id);
+  const [stats, matchHistory] = await Promise.all([
+    getAthleteStatsRpc(supabase, athlete.id),
+    getMatchHistory(supabase, athlete.id),
+  ]);
 
-  // Compute stats from match history
-  const wins = matchHistory.filter((m) => m.athlete_outcome === "win").length;
-  const losses = matchHistory.filter((m) => m.athlete_outcome === "loss").length;
-  const draws = matchHistory.filter((m) => m.athlete_outcome === "draw").length;
-  const total = wins + losses + draws;
-  const winRate = total > 0 ? Math.round((wins / (wins + losses || 1)) * 100) : 0;
-
-  // Win streak (matchHistory is newest first)
-  let winStreak = 0;
-  for (const m of matchHistory) {
-    if (m.athlete_outcome === "win") winStreak++;
-    else break;
-  }
-
-  // Fetch gym name via join
+  // Gym name
   let gymName: string | null = null;
   if (athlete.primary_gym_id) {
     const { data: gym } = await supabase
@@ -61,112 +35,105 @@ export async function ProfileContent({
     gymName = gym?.name ?? null;
   }
 
-  // Submission stats
-  const submissionWins = matchHistory.filter(
-    (m) => m.athlete_outcome === "win" && m.result === "submission",
-  ).length;
-  const submissionRate =
-    wins > 0 ? Math.round((submissionWins / wins) * 100) : 0;
+  // Rank via count of active athletes with higher ELO. Best-effort placeholder.
+  const { count: higherCount } = await supabase
+    .from("athletes")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "active")
+    .gt("current_elo", athlete.current_elo);
+  const rank = (higherCount ?? 0) + 1;
 
-  // Fastest win (finish_time_seconds from RPC)
-  const winFinishTimes = matchHistory
-    .filter((m) => m.athlete_outcome === "win" && m.finish_time_seconds > 0)
-    .map((m) => m.finish_time_seconds);
-  const fastestWin =
-    winFinishTimes.length > 0 ? Math.min(...winFinishTimes) : null;
+  let winStreak = 0;
+  for (const m of matchHistory) {
+    if (m.athlete_outcome === "win") winStreak++;
+    else break;
+  }
 
-  // ELO change this month
-  const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const eloThisMonth = matchHistory
-    .filter((m) => new Date(m.completed_at) >= startOfMonth)
-    .reduce((sum, m) => sum + (m.elo_delta ?? 0), 0);
+  const totalMatches = stats.wins + stats.losses + stats.draws;
+  const recent = matchHistory.slice(0, 6).map((m) => ({
+    matchId: m.match_id,
+    opponentName: m.opponent_display_name ?? "Opponent",
+    gymName: null as string | null,
+    outcome: (m.athlete_outcome ?? "draw") as "win" | "loss" | "draw",
+    when: formatRelativeDate(m.completed_at),
+    delta: m.elo_delta ?? 0,
+  }));
 
-  const totalMatches = wins + losses + draws;
-
-  // Use demo data when ?demo=true is in the URL
-  const d = isDemo ? DEMO_DATA : null;
-  const displayStats = d
-    ? { wins: d.wins, losses: d.losses, winRate: d.winRate }
-    : { wins, losses, winRate };
+  const shareAthlete = {
+    id: athlete.id,
+    displayName: athlete.display_name,
+    elo: athlete.current_elo,
+    wins: stats.wins,
+    losses: stats.losses,
+    weight: athlete.current_weight,
+    gymName,
+  };
 
   return (
-    <div className="flex flex-col gap-6 animate-page-in">
-      <EditableProfileHeader
-        athlete={athlete}
-        gymName={gymName}
-        stats={displayStats}
+    <>
+      <AppHeader
+        title="Profile"
+        rightAction={<HeaderShareButton athlete={shareAthlete} />}
       />
-
-      <div className="flex gap-2">
-        <Button className="flex-1 rounded-xl" variant="outline" asChild>
-          <Link href="/profile/stats">
-            <Trophy className="mr-2 h-4 w-4" />
-            View Stats
+      <div className="flex flex-col animate-page-in">
+        <ProfileHero
+          name={athlete.display_name}
+          gymName={gymName}
+          weightKg={athlete.current_weight}
+          photoUrl={athlete.profile_photo_url}
+          elo={athlete.current_elo}
+          rank={rank}
+        />
+        <ProfileStatsGrid
+          totalMatches={totalMatches}
+          winRate={stats.winRate}
+          peak={athlete.highest_elo}
+          streak={winStreak}
+        />
+        <SectionLabel label="Recent Matches" meta="Last 6" />
+        <ProfileHistoryList rows={recent} />
+        <div className="px-3 pb-2">
+          <Link
+            href="/profile/stats"
+            className="block text-center font-mono uppercase"
+            style={{
+              fontSize: "var(--size-num-xs)",
+              color: "var(--text-tertiary)",
+              letterSpacing: "var(--ls-caps-l)",
+              padding: "var(--space-3)",
+              border: "1px solid var(--border-hairline)",
+              borderRadius: "var(--radius-xs)",
+              textDecoration: "none",
+            }}
+          >
+            View Detailed Stats →
           </Link>
-        </Button>
-        <ShareProfileSheet
-          athlete={{
-            id: athlete.id,
-            displayName: athlete.display_name,
-            elo: athlete.current_elo,
-            wins: displayStats.wins,
-            losses: displayStats.losses,
-            weight: athlete.current_weight,
-            gymName,
-          }}
-        >
-          <Button variant="outline" size="icon" className="rounded-xl">
-            <Share2 className="h-4 w-4" />
-          </Button>
-        </ShareProfileSheet>
+        </div>
+        <ProfileFooterActions athlete={shareAthlete} />
       </div>
+    </>
+  );
+}
 
-      <AchievementsSection
-        totalMatches={d?.totalMatches ?? totalMatches}
-        winStreak={d?.winStreak ?? winStreak}
-        fastestWin={d?.fastestWin ?? fastestWin}
-        submissionRate={d?.submissionRate ?? submissionRate}
-        eloThisMonth={d?.eloThisMonth ?? eloThisMonth}
-        isDemo={isDemo}
-        hasRealData={totalMatches > 0}
-      />
-
-      {/* Account Section */}
-      <section>
-        <Separator className="mb-4" />
-        <Card>
-          <CardContent className="p-4">
-            <h4 className="font-semibold mb-3">Account</h4>
-            <div className="flex flex-col gap-1">
-              <div className="flex items-center justify-between h-9 px-4 py-2">
-                <div className="flex items-center gap-2">
-                  <Palette className="mr-3 h-4 w-4" />
-                  <span className="text-sm font-medium">Theme</span>
-                </div>
-                <ThemeSwitcher />
-              </div>
-              <Button variant="ghost" className="w-full justify-start rounded-xl" asChild>
-                <Link href="/profile/setup">
-                  <UserPen className="mr-3 h-4 w-4" />
-                  Edit Profile
-                </Link>
-              </Button>
-              <Button variant="ghost" className="w-full justify-start rounded-xl" asChild>
-                <Link href="/settings">
-                  <Settings className="mr-3 h-4 w-4" />
-                  Settings & Privacy
-                </Link>
-              </Button>
-              <LogoutButton />
-            </div>
-          </CardContent>
-        </Card>
-      </section>
-
-      <p className="text-center text-xs text-muted-foreground pb-4">
-        ELO RATED Beta
-      </p>
+function SectionLabel({ label, meta }: { label: string; meta?: string }) {
+  return (
+    <div
+      className="grid grid-cols-[1fr_auto] items-center"
+      style={{
+        padding: "var(--space-5) var(--space-5) var(--space-3)",
+        fontFamily: "var(--font-mono)",
+        fontSize: "var(--size-num-xs)",
+        color: "var(--text-tertiary)",
+        textTransform: "uppercase",
+        letterSpacing: "var(--ls-caps-xl)",
+      }}
+    >
+      <span>{label}</span>
+      {meta && (
+        <span style={{ color: "var(--text-secondary)", fontWeight: 600 }}>
+          {meta}
+        </span>
+      )}
     </div>
   );
 }

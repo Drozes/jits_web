@@ -2,6 +2,28 @@
 
 ## [Unreleased]
 
+**G1 / G2 / PROFILE_VIEW migration to ELO design system (web)**
+
+**Added**
+- `apps/web/app/(app)/profile/profile-hero.tsx`: G1 athlete header plate with red 3px bottom accent, hero ELO display, MetaTag strip, rank line.
+- `apps/web/app/(app)/profile/profile-stats-grid.tsx`: 4-up stat grid (Matches, Win Rate, Peak, Streak) using bg-elevated cells + hairline gaps.
+- `apps/web/app/(app)/profile/profile-history-list.tsx`: Recent matches row list using `OutcomeTag` + mono delta numbers.
+- `apps/web/app/(app)/profile/profile-footer-actions.tsx`: Full-width "Share My Number" primary CTA + Edit Profile secondary.
+- `apps/web/app/(app)/profile/header-share-button.tsx`: 32x32 icon button wired to ShareProfileSheet for G1 header right action.
+- `apps/web/app/(app)/profile/edit/page.tsx`, `edit-profile-content.tsx`, `edit-profile-form.tsx`: New `/profile/edit` dedicated screen with First/Last/Weight(kg)/City/Home Gym/Bio fields, save button.
+
+**Changed**
+- `apps/web/app/(app)/profile/page.tsx`: Removed PageContainer and PageHeaderActions; ProfileContent now renders its own AppHeader with Share button right action.
+- `apps/web/app/(app)/profile/profile-content.tsx`: Rewritten to use elo-system primitives; computes global rank from active athletes with higher ELO; recent matches now use shared formatRelativeDate.
+- `apps/web/app/(app)/athlete/[id]/athlete-profile-content.tsx`: Mirrors G1 layout (ProfileHero + ProfileStatsGrid + history) read-only; Challenge + Compare actions row replaces Message; no Share footer.
+- `apps/web/app/(app)/athlete/[id]/athlete-profile-actions.tsx`: Reskinned to tokens; removed Message button (chat hidden).
+- `apps/web/app/(app)/profile/stats/stats-content.tsx`: Overview cards now use `EloTile`, milestone wrapped in `Plate`.
+- `apps/web/components/layout/page-header-actions.tsx`: Removed PremiumButton.
+
+**Removed**
+- `apps/web/app/(app)/profile/achievements-section.tsx` (replaced by ProfileStatsGrid + recent matches list).
+- `apps/web/components/domain/premium-features-modal.tsx`.
+
 **Phase 6C: Mobile Gym Management (2026-05-06)**
 
 **Added**

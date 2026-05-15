@@ -1,0 +1,319 @@
+/* ============================================================================
+   ELO RATED — Design Tokens
+   Session E · 2026-04-24
+   Single source of truth for every value in the brand system.
+   Drop this file into any project; reference tokens via var(--token-name).
+   ========================================================================== */
+
+:root {
+
+  /* ==========================================================================
+     COLOR — Raw palette
+     The five locked brand colors plus Void-shifted neutrals for surfaces.
+     Never use raw color values inline in component CSS — always reference these.
+     ========================================================================== */
+
+  --color-void:           #0D0F14;  /* Primary background — 95% of surfaces */
+  --color-panel:          #13151B;  /* Slightly lifted surface (Instrument-style) */
+  --color-plate:          #1A1D24;  /* Card / data plate background */
+  --color-plate-bright:   #242832;  /* Hover / focused state for plates */
+  --color-terminal-white: #E8EDF2;  /* Primary text + wordmark */
+  --color-data-gray:      #6B7280;  /* Tertiary text, dividers, metadata */
+  --color-data-gray-bright: #9CA3AF; /* Secondary text, labels */
+  --color-signal-red:     #E63946;  /* CTA + state-negative + Outlaw accent */
+  --color-gain-green:     #22C55E;  /* State-positive (rating up only) */
+
+  /* Light-mode raw palette — Paddock family (mirror of Void family).
+     Surfaces shift DARKER as they elevate (inverse of Void's ladder).
+     These tokens are referenced only by the [data-theme="light"] block below;
+     never use them directly in component CSS. */
+  --color-paddock:              #F2F4F7;  /* Light base — page background */
+  --color-paddock-panel:        #E8EBF0;  /* Light lifted surface (nav, footer) */
+  --color-paddock-plate:        #DEE2E9;  /* Light card / data plate */
+  --color-paddock-plate-bright: #D2D7E0;  /* Light hover / focused state */
+  --color-gain-green-dark:      #15803D;  /* Gain Green darkened for AA on light surfaces */
+  --color-signal-red-dark:      #C42939;  /* Signal Red darkened for hover on light surfaces */
+
+  /* ==========================================================================
+     COLOR — Semantic tokens
+     Reference these in components. Never reference --color-* directly.
+     If the brand evolves a color, semantic tokens absorb the change.
+     ========================================================================== */
+
+  --bg-primary:          var(--color-void);
+  --bg-secondary:        var(--color-panel);
+  --bg-elevated:         var(--color-plate);
+  --bg-elevated-hover:   var(--color-plate-bright);
+
+  --text-primary:        var(--color-terminal-white);
+  --text-secondary:      var(--color-data-gray-bright);
+  --text-tertiary:       var(--color-data-gray);
+  --text-on-accent:      var(--color-terminal-white);
+
+  --accent-cta:          var(--color-signal-red);
+  --accent-cta-hover:    #F0556B; /* Signal Red lifted for hover */
+
+  --state-positive:      var(--color-gain-green);
+  --state-negative:      var(--color-signal-red);
+  --state-neutral:       var(--color-data-gray);
+
+  --border-hairline:        rgba(107, 114, 128, 0.25);
+  --border-hairline-faint:  rgba(107, 114, 128, 0.12);
+  --border-hairline-strong: rgba(107, 114, 128, 0.40);
+
+  /* ==========================================================================
+     TYPOGRAPHY — Font stacks
+     Bebas Neue · display
+     DM Sans · headings + UI labels
+     Inter · body + long-read
+     JetBrains Mono · all numerics, ratings, labels in caps
+     ========================================================================== */
+
+  --font-display: 'Bebas Neue', 'Arial Narrow', sans-serif;
+  --font-heading: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-body:    'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono:    'JetBrains Mono', 'SF Mono', Consolas, monospace;
+
+  /* ==========================================================================
+     TYPOGRAPHY — Type scale
+     Each size paired with a default line-height. Override line-height via
+     --lh-* tokens when needed (see below).
+     ========================================================================== */
+
+  /* Display (Bebas Neue) — for hero, marks, taglines */
+  --size-display-xxl: 200px; /* Hero wordmark */
+  --size-display-xl:  120px; /* Section hero */
+  --size-display-l:   88px;  /* Stacked wordmark large */
+  --size-display-m:   64px;  /* Card-scale wordmark */
+  --size-display-s:   48px;  /* Mobile splash */
+  --size-display-xs:  36px;  /* Sidebar / small hero */
+
+  /* Heading (DM Sans Bold) — for structural UI text */
+  --size-heading-xl:  32px;
+  --size-heading-l:   24px;
+  --size-heading-m:   18px;
+  --size-heading-s:   15px;
+
+  /* Body (Inter) — for prose */
+  --size-body-l:  16px;
+  --size-body:    14px;
+  --size-body-s:  12px;
+  --size-body-xs: 11px;
+
+  /* Numeric (JetBrains Mono) — for ratings, deltas, data */
+  --size-num-xxl: 144px; /* Rating tile hero */
+  --size-num-xl:  96px;  /* Rating display large */
+  --size-num-l:   28px;  /* Ladder row rating */
+  --size-num-m:   16px;  /* Inline data */
+  --size-num-s:   12px;  /* Metadata */
+  --size-num-xs:  10px;  /* Caps labels */
+
+  /* Label (DM Sans or JetBrains Mono, ALL CAPS) */
+  --size-label-l:  12px;
+  --size-label-m:  11px;
+  --size-label-s:  10px;
+  --size-label-xs: 9px;
+
+  /* ==========================================================================
+     TYPOGRAPHY — Line-heights
+     Display gets tight (0.85) so multi-line lockups read as one mass.
+     Body gets airy (1.5) for long-read comfort.
+     ========================================================================== */
+
+  --lh-display: 0.85;
+  --lh-tight:   1;
+  --lh-snug:    1.2;
+  --lh-base:    1.4;
+  --lh-relaxed: 1.5;
+  --lh-loose:   1.6;
+
+  /* ==========================================================================
+     TYPOGRAPHY — Letter-spacing (tracking)
+     ========================================================================== */
+
+  --ls-tight:   -0.02em; /* AVOID — only for very tight micro-typography */
+  --ls-default:  0em;
+  --ls-mark:    -0.005em; /* Wordmark default — subtle inward tightening */
+  --ls-loose:    0.04em;  /* Editorial / airy */
+  --ls-caps:     0.08em;  /* Display caps (tagline phrases) */
+  --ls-caps-l:   0.12em;  /* Section labels */
+  --ls-caps-xl:  0.18em;  /* Meta strips / vertical sidebar */
+  --ls-caps-xxl: 0.24em;  /* Smallest caps (9-10pt micro-labels) */
+
+  /* ==========================================================================
+     SPACING — 8px base, with 4px micro-step for tight chrome
+     Always reference these tokens, never raw px values.
+     ========================================================================== */
+
+  --space-px: 1px;
+  --space-0:  0;
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-7:  28px;
+  --space-8:  32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-14: 56px;
+  --space-16: 64px;
+  --space-20: 80px;
+  --space-24: 96px;
+  --space-32: 128px;
+  --space-40: 160px;
+  --space-48: 192px;
+
+  /* ==========================================================================
+     LAYOUT — Grid + breakpoints
+     ========================================================================== */
+
+  --grid-cols:   12;
+  --grid-gutter: var(--space-6);  /* 24px default */
+  --grid-margin: var(--space-8);  /* 32px page padding */
+  --content-max: 1200px;
+  --content-narrow: 880px;
+  --content-wide:   1440px;
+
+  --bp-mobile:  640px;
+  --bp-tablet:  768px;
+  --bp-desktop: 1024px;
+  --bp-wide:    1440px;
+
+  /* ==========================================================================
+     RADIUS
+     The system favors sharp corners. Anything > 4px is forbidden on data
+     surfaces. 8px reserved for modals only.
+     ========================================================================== */
+
+  --radius-none: 0;
+  --radius-xs:   2px;  /* Input chrome, tight buttons */
+  --radius-sm:   3px;  /* CTAs, tags */
+  --radius-md:   4px;  /* Plates, cards, rating tiles */
+  --radius-lg:   8px;  /* Modals only — exception, not default */
+
+  /* ==========================================================================
+     MOTION
+     The only auto-animated brand moment is the rating tick. Everything else
+     is reactive (hover, focus, click) or absent.
+     ========================================================================== */
+
+  --duration-instant:  100ms;  /* Hover, focus rings */
+  --duration-fast:     240ms;  /* Color transitions, fades */
+  --duration-base:     480ms;  /* Rating tick */
+  --duration-slow:     720ms;  /* Page transitions (sparing) */
+  --duration-pulse:    1400ms; /* LIVE indicator pulse */
+
+  /* Easing — ease-out, no overshoot, no bounce (per Sage+Outlaw archetype) */
+  --easing-default: cubic-bezier(0.22, 1, 0.36, 1);
+  --easing-linear:  linear;
+  --easing-in:      cubic-bezier(0.4, 0, 1, 1);
+  --easing-out:     cubic-bezier(0, 0, 0.2, 1);
+
+  /* Motion compounds */
+  --motion-tick:  var(--duration-base) var(--easing-default);
+  --motion-fade:  var(--duration-fast) var(--easing-default);
+  --motion-hover: var(--duration-instant) var(--easing-default);
+  --motion-pulse: var(--duration-pulse) ease-in-out infinite;
+
+  /* ==========================================================================
+     Z-INDEX — Stacking layers
+     ========================================================================== */
+
+  --z-base:     1;
+  --z-elevated: 10;
+  --z-sticky:   100;
+  --z-overlay:  1000;
+  --z-modal:    1100;
+  --z-toast:    1200;
+  --z-tooltip:  1300;
+
+  /* ==========================================================================
+     SHADOWS — None.
+     The system explicitly forbids drop shadows, glows, and elevation effects.
+     Hierarchy is built from background-color shifts (Void → Panel → Plate),
+     not from drop shadows. This token is documented to make the absence
+     explicit. If a future component needs depth, use background-color, not
+     box-shadow.
+     ========================================================================== */
+
+  --shadow-none: none;
+
+  /* ==========================================================================
+     OPACITY
+     ========================================================================== */
+
+  --opacity-disabled: 0.4;
+  --opacity-muted:    0.6;
+  --opacity-overlay:  0.8;
+
+}
+
+/* ============================================================================
+   LIGHT MODE — Paddock palette
+   Apply via <html data-theme="light">. Overrides only semantic tokens; raw
+   --color-* tokens stay locked. Hierarchy mirrors dark mode: surfaces shift
+   from base → elevated, just in the inverse luminance direction.
+   ========================================================================== */
+
+[data-theme="light"] {
+  --bg-primary:        var(--color-paddock);
+  --bg-secondary:      var(--color-paddock-panel);
+  --bg-elevated:       var(--color-paddock-plate);
+  --bg-elevated-hover: var(--color-paddock-plate-bright);
+
+  --text-primary:      var(--color-void);
+  --text-secondary:    #4B5563;                      /* Darker than dark-mode #9CA3AF for AA */
+  --text-tertiary:     var(--color-data-gray);
+  --text-on-accent:    var(--color-terminal-white);  /* CTA text stays white in both modes */
+
+  --accent-cta:        var(--color-signal-red);
+  --accent-cta-hover:  var(--color-signal-red-dark);
+
+  --state-positive:    var(--color-gain-green-dark); /* AA-passing on light surfaces */
+  --state-negative:    var(--color-signal-red);
+  --state-neutral:     var(--color-data-gray);
+
+  --border-hairline:        rgba(13, 15, 20, 0.14);
+  --border-hairline-faint:  rgba(13, 15, 20, 0.07);
+  --border-hairline-strong: rgba(13, 15, 20, 0.25);
+}
+
+/* ============================================================================
+   Reduced motion preference — overrides motion tokens to be near-instant.
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-instant: 0ms;
+    --duration-fast:    0ms;
+    --duration-base:    240ms;  /* Keep rating tick visible but minimal */
+    --duration-slow:    0ms;
+    --motion-pulse:     none;
+  }
+}
+
+/* ============================================================================
+   Utility resets — apply once at app root.
+   ========================================================================== */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: var(--size-body);
+  line-height: var(--lh-relaxed);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Tabular numerics by default on data contexts */
+.num, [data-numeric] {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}

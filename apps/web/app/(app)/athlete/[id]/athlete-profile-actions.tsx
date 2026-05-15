@@ -2,12 +2,12 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { CompareStatsModal, type HeadToHeadMatch } from "@/components/domain/compare-stats-modal";
+import { Swords, BarChart3 } from "lucide-react";
+import {
+  CompareStatsModal,
+  type HeadToHeadMatch,
+} from "@/components/domain/compare-stats-modal";
 import { ChallengeSheet } from "@/components/domain/challenge-sheet";
-import { Swords, BarChart3, MessageSquare } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 
 interface AthleteStats {
   displayName: string;
@@ -38,66 +38,46 @@ export function AthleteProfileActions({
 }: AthleteProfileActionsProps) {
   const [compareOpen, setCompareOpen] = useState(false);
   const [challengeOpen, setChallengeOpen] = useState(false);
-  const [messagingLoading, setMessagingLoading] = useState(false);
-  const router = useRouter();
-
   const isSelf = currentAthleteId === competitorId;
-
-  async function handleMessage() {
-    setMessagingLoading(true);
-    try {
-      const supabase = createClient();
-      const { data } = await supabase.rpc("create_direct_conversation", {
-        p_other_athlete_id: competitorId,
-      });
-      const result = data as unknown as { conversation_id: string } | null;
-      if (result?.conversation_id) {
-        router.push(`/messages/${result.conversation_id}`);
-      }
-    } finally {
-      setMessagingLoading(false);
-    }
-  }
 
   return (
     <>
-      <div className="flex flex-col gap-2">
-        {!isSelf && (
+      <div className="grid grid-cols-2 gap-2">
+        {!isSelf ? (
           pendingChallengeId ? (
-            <Button className="w-full bg-amber-500 hover:bg-amber-600 text-white" asChild>
-              <Link href={`/athlete/${competitorId}/challenges`}>
-                <Swords className="mr-2 h-4 w-4" />
-                View Challenge
-              </Link>
-            </Button>
-          ) : (
-            <Button className="w-full" onClick={() => setChallengeOpen(true)}>
-              <Swords className="mr-2 h-4 w-4" />
-              Challenge
-            </Button>
-          )
-        )}
-        <div className="flex gap-2">
-          {!isSelf && (
-            <Button
-              className="flex-1"
-              variant="outline"
-              onClick={handleMessage}
-              disabled={messagingLoading}
+            <Link
+              href={`/athlete/${competitorId}/challenges`}
+              className="font-heading uppercase grid items-center justify-center"
+              style={primaryBtnStyle}
             >
-              <MessageSquare className="mr-2 h-4 w-4" />
-              Message
-            </Button>
-          )}
-          <Button
-            className={isSelf ? "w-full" : "flex-1"}
-            variant="outline"
-            onClick={() => setCompareOpen(true)}
-          >
-            <BarChart3 className="mr-2 h-4 w-4" />
-            Compare Stats
-          </Button>
-        </div>
+              <span className="inline-flex items-center gap-2">
+                <Swords className="h-4 w-4" />
+                View Challenge
+              </span>
+            </Link>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setChallengeOpen(true)}
+              className="font-heading uppercase inline-flex items-center justify-center gap-2"
+              style={primaryBtnStyle}
+            >
+              <Swords className="h-4 w-4" />
+              Challenge
+            </button>
+          )
+        ) : (
+          <span />
+        )}
+        <button
+          type="button"
+          onClick={() => setCompareOpen(true)}
+          className="font-heading uppercase inline-flex items-center justify-center gap-2"
+          style={secondaryBtnStyle}
+        >
+          <BarChart3 className="h-4 w-4" />
+          Compare
+        </button>
       </div>
 
       {!isSelf && !pendingChallengeId && (
@@ -124,3 +104,30 @@ export function AthleteProfileActions({
     </>
   );
 }
+
+const primaryBtnStyle: React.CSSProperties = {
+  fontFamily: "var(--font-heading)",
+  fontWeight: 700,
+  fontSize: "var(--size-label-m)",
+  letterSpacing: "var(--ls-caps)",
+  padding: "var(--space-3) var(--space-4)",
+  background: "var(--accent-cta)",
+  color: "var(--text-on-accent)",
+  border: "1px solid transparent",
+  borderRadius: "var(--radius-sm)",
+  cursor: "pointer",
+  textDecoration: "none",
+};
+
+const secondaryBtnStyle: React.CSSProperties = {
+  fontFamily: "var(--font-heading)",
+  fontWeight: 700,
+  fontSize: "var(--size-label-m)",
+  letterSpacing: "var(--ls-caps)",
+  padding: "var(--space-3) var(--space-4)",
+  background: "transparent",
+  color: "var(--text-primary)",
+  border: "1px solid var(--border-hairline-strong)",
+  borderRadius: "var(--radius-sm)",
+  cursor: "pointer",
+};
