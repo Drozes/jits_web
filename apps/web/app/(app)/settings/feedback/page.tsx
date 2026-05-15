@@ -5,10 +5,21 @@ import { FeedbackForm } from "./feedback-form";
 export default function FeedbackPage() {
   return (
     <>
-      <AppHeader title="Send Feedback" back />
+      <AppHeader title="Feedback" back />
       <PageContainer className="pt-6">
-        <div className="flex flex-col gap-4 animate-page-in">
-          <p className="text-sm text-muted-foreground">
+        <div
+          className="flex flex-col animate-page-in"
+          style={{ gap: "var(--space-4)" }}
+        >
+          <p
+            style={{
+              fontFamily: "var(--font-body)",
+              fontSize: "var(--size-body-s)",
+              color: "var(--text-secondary)",
+              margin: 0,
+              lineHeight: "var(--lh-loose)",
+            }}
+          >
             Found a bug or have an idea? We read every submission.
           </p>
           <FeedbackForm />

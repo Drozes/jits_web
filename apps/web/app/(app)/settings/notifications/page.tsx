@@ -9,7 +9,7 @@ import { getNotificationPreferences } from "@jits/shared/api/mutations";
 export default function NotificationsPage() {
   return (
     <>
-      <AppHeader title="Notification Preferences" back />
+      <AppHeader title="Notifications" back />
       <PageContainer className="pt-6">
         <Suspense fallback={<NotificationsSkeleton />}>
           <NotificationsContent />
@@ -29,13 +29,17 @@ async function NotificationsContent() {
 
 function NotificationsSkeleton() {
   return (
-    <div className="flex flex-col gap-4 animate-pulse">
-      <div className="h-5 w-48 rounded bg-muted" />
-      <div className="flex flex-col gap-1">
-        <div className="h-16 rounded-lg bg-muted" />
-        <div className="h-16 rounded-lg bg-muted" />
-        <div className="h-16 rounded-lg bg-muted" />
-      </div>
+    <div
+      className="flex flex-col animate-pulse"
+      style={{ gap: "var(--space-3)" }}
+    >
+      <div
+        style={{
+          height: 220,
+          borderRadius: "var(--radius-md)",
+          background: "var(--bg-elevated)",
+        }}
+      />
     </div>
   );
 }
