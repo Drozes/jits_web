@@ -363,6 +363,52 @@ export type Database = {
         }
         Relationships: []
       }
+      gym_managers: {
+        Row: {
+          athlete_id: string
+          granted_at: string
+          granted_by: string | null
+          gym_id: string
+          id: string
+        }
+        Insert: {
+          athlete_id: string
+          granted_at?: string
+          granted_by?: string | null
+          gym_id: string
+          id?: string
+        }
+        Update: {
+          athlete_id?: string
+          granted_at?: string
+          granted_by?: string | null
+          gym_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gym_managers_athlete_id_fkey"
+            columns: ["athlete_id"]
+            isOneToOne: false
+            referencedRelation: "athletes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gym_managers_granted_by_fkey"
+            columns: ["granted_by"]
+            isOneToOne: false
+            referencedRelation: "athletes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gym_managers_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "gyms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       gym_schedules: {
         Row: {
           created_at: string
@@ -413,99 +459,6 @@ export type Database = {
           },
           {
             foreignKeyName: "gym_schedules_gym_id_fkey"
-            columns: ["gym_id"]
-            isOneToOne: false
-            referencedRelation: "gyms"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      gym_managers: {
-        Row: {
-          id: string
-          gym_id: string
-          athlete_id: string
-          granted_at: string
-          granted_by: string | null
-        }
-        Insert: {
-          id?: string
-          gym_id: string
-          athlete_id: string
-          granted_at?: string
-          granted_by?: string | null
-        }
-        Update: {
-          id?: string
-          gym_id?: string
-          athlete_id?: string
-          granted_at?: string
-          granted_by?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "gym_managers_gym_id_fkey"
-            columns: ["gym_id"]
-            isOneToOne: false
-            referencedRelation: "gyms"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "gym_managers_athlete_id_fkey"
-            columns: ["athlete_id"]
-            isOneToOne: false
-            referencedRelation: "athletes"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "gym_managers_granted_by_fkey"
-            columns: ["granted_by"]
-            isOneToOne: false
-            referencedRelation: "athletes"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      session_templates: {
-        Row: {
-          id: string
-          gym_id: string
-          title: string
-          day_of_week: number
-          start_time: string
-          duration_minutes: number
-          max_participants: number | null
-          notes: string | null
-          is_active: boolean
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          gym_id: string
-          title: string
-          day_of_week: number
-          start_time: string
-          duration_minutes: number
-          max_participants?: number | null
-          notes?: string | null
-          is_active?: boolean
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          gym_id?: string
-          title?: string
-          day_of_week?: number
-          start_time?: string
-          duration_minutes?: number
-          max_participants?: number | null
-          notes?: string | null
-          is_active?: boolean
-          created_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "session_templates_gym_id_fkey"
             columns: ["gym_id"]
             isOneToOne: false
             referencedRelation: "gyms"
@@ -714,17 +667,24 @@ export type Database = {
           angle_quality: number | null
           athlete_left_id: string | null
           camera_angle: string | null
+          chunk_count: number | null
+          chunks_completed: number
           created_at: string
           duration_seconds: number | null
           file_size_bytes: number | null
           id: string
           match_id: string
+          merge_completed_at: string | null
+          merge_started_at: string | null
           platform: string
           platform_asset_id: string | null
           playback_url: string | null
           primary_video_id: string | null
           recorded_by: string | null
           recording_type: string | null
+          requested_tier: string
+          slice_completed_at: string | null
+          slice_started_at: string | null
           status: string
           storage_path: string | null
           sync_offset_ms: number | null
@@ -736,17 +696,24 @@ export type Database = {
           angle_quality?: number | null
           athlete_left_id?: string | null
           camera_angle?: string | null
+          chunk_count?: number | null
+          chunks_completed?: number
           created_at?: string
           duration_seconds?: number | null
           file_size_bytes?: number | null
           id?: string
           match_id: string
+          merge_completed_at?: string | null
+          merge_started_at?: string | null
           platform?: string
           platform_asset_id?: string | null
           playback_url?: string | null
           primary_video_id?: string | null
           recorded_by?: string | null
           recording_type?: string | null
+          requested_tier?: string
+          slice_completed_at?: string | null
+          slice_started_at?: string | null
           status?: string
           storage_path?: string | null
           sync_offset_ms?: number | null
@@ -758,17 +725,24 @@ export type Database = {
           angle_quality?: number | null
           athlete_left_id?: string | null
           camera_angle?: string | null
+          chunk_count?: number | null
+          chunks_completed?: number
           created_at?: string
           duration_seconds?: number | null
           file_size_bytes?: number | null
           id?: string
           match_id?: string
+          merge_completed_at?: string | null
+          merge_started_at?: string | null
           platform?: string
           platform_asset_id?: string | null
           playback_url?: string | null
           primary_video_id?: string | null
           recorded_by?: string | null
           recording_type?: string | null
+          requested_tier?: string
+          slice_completed_at?: string | null
+          slice_started_at?: string | null
           status?: string
           storage_path?: string | null
           sync_offset_ms?: number | null
@@ -1122,6 +1096,66 @@ export type Database = {
           },
         ]
       }
+      session_templates: {
+        Row: {
+          created_at: string
+          created_by: string
+          day_of_week: number | null
+          duration_minutes: number
+          gym_id: string
+          id: string
+          is_active: boolean
+          max_participants: number | null
+          notes: string | null
+          start_time: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          day_of_week?: number | null
+          duration_minutes?: number
+          gym_id: string
+          id?: string
+          is_active?: boolean
+          max_participants?: number | null
+          notes?: string | null
+          start_time?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          day_of_week?: number | null
+          duration_minutes?: number
+          gym_id?: string
+          id?: string
+          is_active?: boolean
+          max_participants?: number | null
+          notes?: string | null
+          start_time?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_templates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "athletes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "session_templates_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "gyms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sessions: {
         Row: {
           created_at: string
@@ -1350,11 +1384,14 @@ export type Database = {
           completed_at: string | null
           cost_cents: number | null
           created_at: string
+          dedup_dropped_count: number | null
           id: string
+          merge_strategy: string | null
           model_used: string
           positions: Json | null
           recommendations: Json | null
           scoring_moments: Json | null
+          source_chunk_count: number | null
           status: string
           summary: string | null
           tokens_used: number | null
@@ -1367,11 +1404,14 @@ export type Database = {
           completed_at?: string | null
           cost_cents?: number | null
           created_at?: string
+          dedup_dropped_count?: number | null
           id?: string
+          merge_strategy?: string | null
           model_used: string
           positions?: Json | null
           recommendations?: Json | null
           scoring_moments?: Json | null
+          source_chunk_count?: number | null
           status?: string
           summary?: string | null
           tokens_used?: number | null
@@ -1384,11 +1424,14 @@ export type Database = {
           completed_at?: string | null
           cost_cents?: number | null
           created_at?: string
+          dedup_dropped_count?: number | null
           id?: string
+          merge_strategy?: string | null
           model_used?: string
           positions?: Json | null
           recommendations?: Json | null
           scoring_moments?: Json | null
+          source_chunk_count?: number | null
           status?: string
           summary?: string | null
           tokens_used?: number | null
@@ -1397,6 +1440,136 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "video_analyses_video_id_fkey"
+            columns: ["video_id"]
+            isOneToOne: false
+            referencedRelation: "match_videos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      video_chunk_analyses: {
+        Row: {
+          analysis_tier: string
+          athlete_stills: Json | null
+          biomechanical_timeline: Json | null
+          chunk_id: string
+          completed_at: string | null
+          cost_cents: number | null
+          created_at: string
+          error_message: string | null
+          id: string
+          key_frames: Json | null
+          model_used: string
+          positions: Json | null
+          recommendations: Json | null
+          scoring_moments: Json | null
+          status: string
+          summary: string | null
+          technique_tags: Json | null
+          terminal_state: Json | null
+          tokens_used: number | null
+        }
+        Insert: {
+          analysis_tier?: string
+          athlete_stills?: Json | null
+          biomechanical_timeline?: Json | null
+          chunk_id: string
+          completed_at?: string | null
+          cost_cents?: number | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          key_frames?: Json | null
+          model_used: string
+          positions?: Json | null
+          recommendations?: Json | null
+          scoring_moments?: Json | null
+          status?: string
+          summary?: string | null
+          technique_tags?: Json | null
+          terminal_state?: Json | null
+          tokens_used?: number | null
+        }
+        Update: {
+          analysis_tier?: string
+          athlete_stills?: Json | null
+          biomechanical_timeline?: Json | null
+          chunk_id?: string
+          completed_at?: string | null
+          cost_cents?: number | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          key_frames?: Json | null
+          model_used?: string
+          positions?: Json | null
+          recommendations?: Json | null
+          scoring_moments?: Json | null
+          status?: string
+          summary?: string | null
+          technique_tags?: Json | null
+          terminal_state?: Json | null
+          tokens_used?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_chunk_analyses_chunk_id_fkey"
+            columns: ["chunk_id"]
+            isOneToOne: false
+            referencedRelation: "video_chunks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      video_chunks: {
+        Row: {
+          chunks_completed_at: string | null
+          created_at: string
+          duration_seconds: number | null
+          end_s: number
+          error_message: string | null
+          file_size_bytes: number | null
+          id: string
+          idx: number
+          start_s: number
+          status: string
+          storage_path: string
+          updated_at: string
+          video_id: string
+        }
+        Insert: {
+          chunks_completed_at?: string | null
+          created_at?: string
+          duration_seconds?: number | null
+          end_s: number
+          error_message?: string | null
+          file_size_bytes?: number | null
+          id?: string
+          idx: number
+          start_s: number
+          status?: string
+          storage_path: string
+          updated_at?: string
+          video_id: string
+        }
+        Update: {
+          chunks_completed_at?: string | null
+          created_at?: string
+          duration_seconds?: number | null
+          end_s?: number
+          error_message?: string | null
+          file_size_bytes?: number | null
+          id?: string
+          idx?: number
+          start_s?: number
+          status?: string
+          storage_path?: string
+          updated_at?: string
+          video_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_chunks_video_id_fkey"
             columns: ["video_id"]
             isOneToOne: false
             referencedRelation: "match_videos"
@@ -1505,18 +1678,28 @@ export type Database = {
       can_create_challenge:
         | { Args: never; Returns: boolean }
         | { Args: { p_opponent_id?: string }; Returns: boolean }
+      claim_video_for_merging: {
+        Args: { p_stale_minutes?: number; p_video_id: string }
+        Returns: {
+          id: string
+          requested_tier: string
+        }[]
+      }
+      claim_video_for_slicing: {
+        Args: { p_stale_minutes?: number; p_video_id: string }
+        Returns: {
+          file_size_bytes: number
+          id: string
+          match_id: string
+          storage_path: string
+          uploaded_by: string
+        }[]
+      }
       clear_active_avatar: { Args: never; Returns: Json }
       confirm_match_result: { Args: { p_match_id: string }; Returns: Json }
       create_direct_conversation: {
         Args: { p_other_athlete_id: string }
         Returns: Json
-      }
-      create_session_from_template: {
-        Args: {
-          p_template_id: string
-          p_scheduled_start?: string
-        }
-        Returns: string
       }
       create_session: {
         Args: {
@@ -1527,6 +1710,10 @@ export type Database = {
           p_scheduled_start: string
           p_title?: string
         }
+        Returns: string
+      }
+      create_session_from_template: {
+        Args: { p_scheduled_start?: string; p_template_id: string }
         Returns: string
       }
       create_session_match: {
@@ -1543,15 +1730,12 @@ export type Database = {
       }
       end_match: { Args: { p_match_id: string }; Returns: Json }
       expire_pending_challenges: { Args: never; Returns: number }
+      finalize_pending_merges: { Args: never; Returns: number }
       get_arena_data: { Args: { p_limit?: number }; Returns: Json }
       get_athlete_avatars: { Args: { p_athlete_id: string }; Returns: Json }
       get_athlete_profile_stills: {
         Args: { p_athlete_id: string }
         Returns: Json
-      }
-      is_gym_manager: {
-        Args: { p_gym_id: string }
-        Returns: boolean
       }
       get_athlete_stats: {
         Args: { p_athlete_id: string }
@@ -1578,6 +1762,7 @@ export type Database = {
           wins: number
         }[]
       }
+      get_chunk_video_id: { Args: { p_chunk_id: string }; Returns: string }
       get_conversations: {
         Args: never
         Returns: {
@@ -1649,18 +1834,33 @@ export type Database = {
         }[]
       }
       get_video_analysis: { Args: { p_video_id: string }; Returns: Json }
+      get_video_progress: { Args: { p_video_id: string }; Returns: Json }
       get_weight_division: { Args: { p_weight: number }; Returns: number }
+      increment_chunks_completed: {
+        Args: { p_video_id: string }
+        Returns: boolean
+      }
       is_conversation_participant: {
         Args: { p_conversation_id: string }
         Returns: boolean
       }
+      is_gym_manager: { Args: { p_gym_id: string }; Returns: boolean }
       is_match_video_participant: {
         Args: { p_video_id: string }
         Returns: boolean
       }
+      is_video_visible: { Args: { p_video_id: string }; Returns: boolean }
       mark_conversation_read: {
         Args: { p_conversation_id: string }
         Returns: Json
+      }
+      merge_finalize: {
+        Args: { p_analysis: Json; p_technique_tags: Json; p_video_id: string }
+        Returns: string
+      }
+      notify_merge_function: {
+        Args: { p_video_id: string }
+        Returns: undefined
       }
       opponent_accepts_match_type: {
         Args: {
@@ -1670,7 +1870,12 @@ export type Database = {
         Returns: boolean
       }
       pause_match: { Args: { p_match_id: string }; Returns: Json }
+      persist_video_chunks_and_finalize_slice: {
+        Args: { p_chunks: Json; p_video_id: string }
+        Returns: Json
+      }
       random_match: { Args: { p_session_id: string }; Returns: Json }
+      reap_stuck_analyzing_chunks: { Args: never; Returns: number }
       record_match_result: {
         Args: {
           p_finish_time_seconds?: number
@@ -1681,6 +1886,8 @@ export type Database = {
         }
         Returns: Json
       }
+      request_pending_video_slices: { Args: never; Returns: number }
+      request_video_slice: { Args: { p_video_id: string }; Returns: undefined }
       resolve_dispute: {
         Args: {
           p_admin_notes?: string
