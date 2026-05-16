@@ -23,12 +23,12 @@ interface MatchFlowWizardProps {
   sessionId: string; matchId: string; matchType: "casual" | "ranked";
   durationSeconds: number; startedAt: string | null; pausedAt: string | null; totalPausedDuration: number;
   currentAthlete: AthleteInfo; opponent: AthleteInfo;
-  isTimekeeper: boolean; timekeeperEnabled: boolean;
+  isTimekeeper: boolean; hasTimekeeper: boolean; timekeeperEnabled: boolean;
   submissionTypes: SubmissionType[]; initialStep: MatchFlowStep; matchStatus: string;
 }
 
 export function MatchFlowWizard(props: MatchFlowWizardProps) {
-  const { sessionId, matchId, matchType, matchStatus, durationSeconds, currentAthlete, opponent, isTimekeeper, timekeeperEnabled, submissionTypes, initialStep } = props;
+  const { sessionId, matchId, matchType, matchStatus, durationSeconds, currentAthlete, opponent, isTimekeeper, hasTimekeeper, timekeeperEnabled, submissionTypes, initialStep } = props;
   const [step, setStep] = useState<MatchFlowStep>(initialStep);
   const [startedAt, setStartedAt] = useState(props.startedAt);
   // Captured when the timekeeper-live step finishes uploading. Persists
@@ -62,13 +62,13 @@ export function MatchFlowWizard(props: MatchFlowWizardProps) {
     case "weight-verify":
       return <WeightVerifyStep onNext={handleNext} currentAthlete={currentAthlete} opponent={opponent} matchType={matchType} />;
     case "ready-check":
-      return <ReadyCheckStep onNext={handleNext} matchId={matchId} currentAthleteId={currentAthlete.id} opponentId={opponent.id} timekeeperEnabled={timekeeperEnabled} isTimekeeper={isTimekeeper} />;
+      return <ReadyCheckStep onNext={handleNext} matchId={matchId} currentAthleteId={currentAthlete.id} opponentId={opponent.id} timekeeperEnabled={timekeeperEnabled} hasTimekeeper={hasTimekeeper} isTimekeeper={isTimekeeper} />;
     case "fighter-live":
-      return <FighterLiveStep onNext={handleNext} matchId={matchId} durationSeconds={durationSeconds} startedAt={startedAt ?? ""} pausedAt={props.pausedAt} totalPausedDuration={props.totalPausedDuration} matchType={matchType} timekeeperEnabled={timekeeperEnabled} />;
+      return <FighterLiveStep onNext={handleNext} matchId={matchId} durationSeconds={durationSeconds} startedAt={startedAt ?? ""} pausedAt={props.pausedAt} totalPausedDuration={props.totalPausedDuration} matchType={matchType} timekeeperEnabled={timekeeperEnabled} hasTimekeeper={hasTimekeeper} />;
     case "timekeeper-live":
       return <TimekeeperLiveStep onNext={handleNext} matchId={matchId} durationSeconds={durationSeconds} startedAt={startedAt ?? ""} pausedAt={props.pausedAt} totalPausedDuration={props.totalPausedDuration} currentAthleteId={currentAthlete.id} />;
     case "result-recording":
-      return <ResultRecordingStep onNext={handleNext} matchId={matchId} participants={[{ id: currentAthlete.id, displayName: currentAthlete.displayName }, { id: opponent.id, displayName: opponent.displayName }]} submissionTypes={submissionTypes} timekeeperEnabled={timekeeperEnabled} isTimekeeper={isTimekeeper} />;
+      return <ResultRecordingStep onNext={handleNext} matchId={matchId} participants={[{ id: currentAthlete.id, displayName: currentAthlete.displayName }, { id: opponent.id, displayName: opponent.displayName }]} submissionTypes={submissionTypes} timekeeperEnabled={timekeeperEnabled} hasTimekeeper={hasTimekeeper} isTimekeeper={isTimekeeper} />;
     case "match-summary":
       return <MatchSummaryStep onNext={handleNext} matchId={matchId} matchType={matchType} matchStatus={matchStatus} currentAthleteId={currentAthlete.id} opponent={opponent} resultData={resultRef.current} videoId={videoId} />;
     case "match-recorded":

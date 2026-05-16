@@ -18,6 +18,7 @@ interface FighterLiveStepProps {
   totalPausedDuration: number;
   matchType: "casual" | "ranked";
   timekeeperEnabled: boolean;
+  hasTimekeeper: boolean;
 }
 
 function fireExpirySignals() {
@@ -51,7 +52,7 @@ function fireExpirySignals() {
   }
 }
 
-export function FighterLiveStep({ onNext, matchId, durationSeconds, startedAt, pausedAt, totalPausedDuration, matchType, timekeeperEnabled }: FighterLiveStepProps) {
+export function FighterLiveStep({ onNext, matchId, durationSeconds, startedAt, pausedAt, totalPausedDuration, matchType, timekeeperEnabled, hasTimekeeper }: FighterLiveStepProps) {
   const endedRef = useRef(false);
   const hasFiredRef = useRef(false);
   const [expired, setExpired] = useState(false);
@@ -116,7 +117,7 @@ export function FighterLiveStep({ onNext, matchId, durationSeconds, startedAt, p
       {timer.paused && (
         <p className="text-sm text-amber-500 font-medium">Paused</p>
       )}
-      {!timekeeperEnabled && (
+      {(!timekeeperEnabled || !hasTimekeeper) && (
         <Button variant="destructive" size="lg" className="w-full max-w-sm mt-6" onClick={handleEnd}>
           <Square className="mr-2 h-4 w-4" />
           End Match

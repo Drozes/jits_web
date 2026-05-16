@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+**Match flow two-browser fixes (2026-05-16)**
+
+**Fixed**
+- Web `apps/web/hooks/use-session-lobby-realtime.ts`: stop passing the acceptor as `timekeeperId` on `respondToChallenge`. `create_session_match` rejects when the timekeeper is one of the competitors (`HINT invalid_timekeeper`), so accepting a challenge always failed silently for 2-fighter session matches.
+- Web `apps/web/app/(app)/session/[id]/match/[matchId]/match-flow-content.tsx` + `match-flow-wizard.tsx`: thread `hasTimekeeper` (`!!match.timekeeper_id`) through the wizard.
+- Web `steps/ready-check-step.tsx`: only require the assigned timekeeper to call `startMatch` when one actually exists. With no timekeeper (2-fighter session match), either competitor can start; `start_match` is idempotent and the broadcast `timer_started` event syncs the loser forward.
+- Web `steps/fighter-live-step.tsx`: show the "End Match" button when `timekeeperEnabled` is true but the match has no assigned timekeeper.
+- Web `steps/result-recording-step.tsx`: only lock the result form behind the timekeeper when one actually exists.
+- Web `apps/web/components/sign-up-form.tsx`: switch from `athletes.insert` to `athletes.update`. The auth `on_auth_user_created` trigger already inserts a pending athlete row, so the prior insert always hit RLS (403) and the profile fields (gym, weight, gender, DOB) were never saved — leaving every new user stranded as `pending` after signup.
+- Backend (jr_be `supabase/migrations/20260516000000_start_match_accept_session_statuses.sql`): `start_match` now accepts `pending`, `awaiting_timekeeper`, and `weight_check`. `create_session_match` parks 2-fighter session matches in `awaiting_timekeeper`, so the prior `pending`-only check made startMatch unreachable from the ready-check step.
+
 **Gyms wireframe pass (2026-05-15)**
 
 **Changed**

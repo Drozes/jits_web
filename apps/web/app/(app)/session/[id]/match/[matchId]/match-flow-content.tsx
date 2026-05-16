@@ -69,6 +69,7 @@ export async function MatchFlowContent({
       currentAthlete={{ id: me.athlete_id, displayName: me.display_name, elo: me.current_elo, weight: me.current_weight, profilePhotoUrl: me.profile_photo_url }}
       opponent={{ id: opponent.athlete_id, displayName: opponent.display_name, elo: opponent.current_elo, weight: opponent.current_weight, profilePhotoUrl: opponent.profile_photo_url }}
       isTimekeeper={isTimekeeper}
+      hasTimekeeper={!!match.timekeeper_id}
       timekeeperEnabled={timekeeperEnabled}
       submissionTypes={submissionTypes}
       initialStep={initialStep}

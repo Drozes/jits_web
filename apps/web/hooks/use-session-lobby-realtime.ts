@@ -169,7 +169,7 @@ export function useSessionLobbyRealtime(
       const { fromAthleteId } = incomingChallenge;
       if (accept) {
         const supabase = createClient();
-        const result = await createInSessionMatch(supabase, { sessionId, opponentId: fromAthleteId, timekeeperId: currentAthleteId });
+        const result = await createInSessionMatch(supabase, { sessionId, opponentId: fromAthleteId });
         if (result.ok) {
           channelRef.current?.send({ type: "broadcast", event: "challenge_accepted", payload: { from: fromAthleteId, to: currentAthleteId, matchId: result.data.matchId } });
           setIncomingChallenge(null);

@@ -19,11 +19,12 @@ interface ResultRecordingStepProps {
   participants: Participant[];
   submissionTypes: SubmissionType[];
   timekeeperEnabled: boolean;
+  hasTimekeeper: boolean;
   isTimekeeper: boolean;
 }
 
-export function ResultRecordingStep({ onNext, matchId, participants, submissionTypes, timekeeperEnabled, isTimekeeper }: ResultRecordingStepProps) {
-  const isLocked = timekeeperEnabled && !isTimekeeper;
+export function ResultRecordingStep({ onNext, matchId, participants, submissionTypes, timekeeperEnabled, hasTimekeeper, isTimekeeper }: ResultRecordingStepProps) {
+  const isLocked = timekeeperEnabled && hasTimekeeper && !isTimekeeper;
   const [unlocked, setUnlocked] = useState(!isLocked);
   const [result, setResult] = useState<"submission" | "draw" | null>(null);
   const [winnerId, setWinnerId] = useState("");

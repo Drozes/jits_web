@@ -75,7 +75,6 @@ export function SignUpForm({ gyms, cities }: SignUpFormProps) {
 
       const displayName = `${values.firstName.trim()} ${values.lastName.trim()}`.trim();
       const profilePayload = {
-        auth_user_id: signUpData.user.id,
         display_name: displayName,
         date_of_birth: values.dateOfBirth,
         gender: values.gender,
@@ -85,10 +84,11 @@ export function SignUpForm({ gyms, cities }: SignUpFormProps) {
         free_agent: false,
       };
 
-      const { error: insertError } = await supabase
+      const { error: updateError } = await supabase
         .from("athletes")
-        .insert(profilePayload);
-      if (insertError) throw insertError;
+        .update(profilePayload)
+        .eq("auth_user_id", signUpData.user.id);
+      if (updateError) throw updateError;
 
       router.push("/eua");
     } catch (err) {

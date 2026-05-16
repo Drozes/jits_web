@@ -13,10 +13,11 @@ interface ReadyCheckStepProps {
   currentAthleteId: string;
   opponentId: string;
   timekeeperEnabled: boolean;
+  hasTimekeeper: boolean;
   isTimekeeper: boolean;
 }
 
-export function ReadyCheckStep({ onNext, matchId, currentAthleteId, opponentId, timekeeperEnabled, isTimekeeper }: ReadyCheckStepProps) {
+export function ReadyCheckStep({ onNext, matchId, currentAthleteId, opponentId, timekeeperEnabled, hasTimekeeper, isTimekeeper }: ReadyCheckStepProps) {
   const [myReady, setMyReady] = useState(false);
   const [opponentReady, setOpponentReady] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -39,7 +40,12 @@ export function ReadyCheckStep({ onNext, matchId, currentAthleteId, opponentId, 
 
   async function handleBothReady() {
     if (startedRef.current) return;
-    const shouldStart = timekeeperEnabled ? isTimekeeper : true;
+    // Only block if there's an actual assigned timekeeper and it's not us.
+    // When the match has no timekeeper (session 2-fighter flow), either
+    // fighter can start; start_match is idempotent so the loser's call
+    // returns an error that we swallow, and onTimerStarted from broadcast
+    // moves them forward.
+    const shouldStart = timekeeperEnabled && hasTimekeeper ? isTimekeeper : true;
     if (!shouldStart) return;
 
     startedRef.current = true;
