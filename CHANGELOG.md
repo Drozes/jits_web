@@ -2,6 +2,26 @@
 
 ## [Unreleased]
 
+**Public design assets synced with upstream SharePoint brand kit (2026-05-19)**
+
+**Added**
+- `apps/web/public/design/tokens.css`: canonical brand tokens copied from `outside_assets/Jits Arena SharePoint/Brand/design-system/tokens.css`. Static HTML in `/public/design/` now references a single source of truth instead of duplicating raw values.
+- `apps/web/public/design/wireframe.html`: alpha wireframe (light + dark) synced from `outside_assets/.../activation-kit/app-screens/wireframe.html`. Expanded from 28 to **39 screens** to reach parity with the shipped app surface.
+- `apps/web/app/design/wireframe/page.tsx`: new `/design/wireframe` route that iframes the canonical wireframe; linked from the design hub.
+- Upstream `outside_assets/.../wireframe.html` and the synced `apps/web/public/design/wireframe.html`: 12 new screen sections added to close the gap between the wireframe and the shipped app: **A4** Forgot Password, **A5** Setup, Identity step, **A6** Setup, Training step (with Free Agent toggle), **F2** Global Ladder, Gyms tab, **G5** Profile Stats (win rate, streak, weekly activity chart, submission breakdown), **H1** Notification Center, **H2** Notification Preferences (push toggles by category), **H3** Feedback (form with category + screenshot), **H4** Video Settings (auto-record toggle, upload quality, storage), **I1** Offline Banner overlay, **I2** Error Boundary overlay, **I3** Toast overlay. Picker dropdown gains three new optgroups (Activation, Notifications, Overlays) and one renamed optgroup (Settings).
+
+**Changed**
+- `apps/web/app/design/page.tsx`: added "Canonical Wireframe" card between "UI Kit" and "Web Screens".
+- `apps/web/app/design/layout.tsx`: added "Wireframe" link to the design nav.
+- `apps/web/public/design/elo-rated-style-guide.html`: replaced inline `:root` raw-color block with `<link>` to `./tokens.css`, plus a bridge layer mapping the page's legacy names (`--void`, `--signal-red`, `--ease-out`, ...) onto canonical tokens (`--color-void`, `--color-signal-red`, `--easing-default`, ...). Eliminates drift risk against the brand system.
+- `outside_assets/.../activation-kit/app-screens/wireframe.html`: removed a stray leading `S` character before the `<!DOCTYPE html>` declaration that prevented the page from validating; updated screen-count caption from "28 Screens" to "39 Screens".
+
+**Removed**
+- `apps/web/public/design/elo-rated-rebrand.html`: 100KB pre-rebrand Visual Review comparison doc (titled "2026-05-01"). Orphan (not referenced by any route); the rebrand shipped 2026-05-06 so the comparison is no longer load-bearing. Recoverable via git history if needed.
+
+**Verified**
+- `apps/web/app/globals.css`, `apps/web/app/design-system/tokens.css`, and `apps/mobile/lib/tokens.ts` already mirror the canonical brand tokens 1:1 (HSL form on web, hex form on mobile). No app-code changes were needed to bring web and native implementations into alignment.
+
 **Match flow two-browser fixes (2026-05-16)**
 
 **Fixed**

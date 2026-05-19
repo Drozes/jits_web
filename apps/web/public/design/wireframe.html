@@ -1,0 +1,2522 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ELO RATED — Alpha Wireframe (Light + Dark)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./tokens.css">
+<style>
+  /* =====================================================================
+     ELO RATED, Alpha Wireframe (39 screens, light + dark mode)
+     Rebranded from the legacy Jits Arena JSX wireframe (Apr 2026).
+     References tokens.css; raw colors only inside [data-theme="*"] blocks.
+     ===================================================================== */
+
+  body {
+    min-height: 100vh;
+    margin: 0;
+    padding: var(--space-12) var(--space-6) var(--space-8);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    transition: background var(--motion-fade), color var(--motion-fade);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-6);
+  }
+
+  /* ---------- Top chrome (theme toggle + screen picker) ---------- */
+  .review-chrome {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: var(--z-toast);
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-hairline);
+    padding: var(--space-3) var(--space-4);
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: var(--space-4);
+    align-items: center;
+  }
+  .review-chrome .brand {
+    font-family: var(--font-display);
+    font-size: 18px;
+    color: var(--text-primary);
+    letter-spacing: var(--ls-mark);
+  }
+  .review-chrome .brand .meta {
+    font-family: var(--font-mono);
+    font-size: var(--size-num-xs);
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: var(--ls-caps-l);
+    margin-left: var(--space-3);
+  }
+
+  .picker {
+    justify-self: center;
+    display: flex;
+    gap: var(--space-2);
+    align-items: center;
+    font-family: var(--font-mono);
+    font-size: var(--size-num-xs);
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: var(--ls-caps-l);
+  }
+  .picker select {
+    background: var(--bg-elevated);
+    color: var(--text-primary);
+    border: 1px solid var(--border-hairline-strong);
+    border-radius: var(--radius-xs);
+    padding: var(--space-2) var(--space-3);
+    font-family: var(--font-mono);
+    font-size: var(--size-num-s);
+    text-transform: uppercase;
+    letter-spacing: var(--ls-caps);
+    cursor: pointer;
+  }
+
+  .theme-toggle {
+    justify-self: end;
+    display: inline-flex;
+    border: 1px solid var(--border-hairline-strong);
+    background: var(--bg-elevated);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    font-family: var(--font-mono);
+    font-size: var(--size-num-xs);
+    letter-spacing: var(--ls-caps-l);
+    text-transform: uppercase;
+  }
+  .theme-toggle button {
+    padding: var(--space-2) var(--space-3);
+    background: transparent;
+    color: var(--text-tertiary);
+    border: none;
+    cursor: pointer;
+    font: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+    transition: color var(--motion-hover), background var(--motion-hover);
+  }
+  .theme-toggle button[aria-pressed="true"] {
+    background: var(--bg-elevated-hover);
+    color: var(--text-primary);
+  }
+
+  /* ---------- Phone device frame ---------- */
+  .device {
+    width: 390px;
+    height: 844px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-hairline-strong);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    position: relative;
+    margin-top: var(--space-6);
+    display: grid;
+    grid-template-rows: auto 1fr;
+  }
+
+  /* ---------- Status bar ---------- */
+  .status-bar {
+    padding: var(--space-3) var(--space-5) var(--space-2);
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    font-family: var(--font-mono);
+    font-size: var(--size-num-xs);
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+  }
+  .status-bar .time { font-weight: 700; color: var(--text-primary); }
+  .status-bar .right { justify-self: end; letter-spacing: var(--ls-caps-l); }
+
+  /* ---------- Screen wrappers ---------- */
+  .screen { display: none; height: 100%; overflow: hidden; }
+  .screen.active { display: grid; }
+
+  .scroll {
+    overflow-y: auto;
+    height: 100%;
+  }
+  .scroll::-webkit-scrollbar { width: 0; }
+
+  /* ---------- Standard screen layouts ---------- */
+  .screen-with-tabs { grid-template-rows: auto 1fr auto; }
+  .screen-with-nav { grid-template-rows: auto 1fr; }
+  .screen-fullbody { grid-template-rows: 1fr; }
+
+  /* ---------- Top nav patterns ---------- */
+  .topbar {
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-hairline);
+    padding: var(--space-3) var(--space-4);
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: var(--space-3);
+    align-items: center;
+  }
+  .topbar .wordmark {
+    font-family: var(--font-display);
+    font-size: 22px;
+    color: var(--text-primary);
+    line-height: 1;
+    letter-spacing: var(--ls-mark);
+  }
+  .topbar .nav-title {
+    font-family: var(--font-heading);
+    font-size: var(--size-label-l);
+    text-transform: uppercase;
+    letter-spacing: var(--ls-caps-l);
+    color: var(--text-secondary);
+    font-weight: 700;
+    text-align: center;
+  }
+  .icon-btn {
+    width: 32px; height: 32px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius-xs);
+    color: var(--text-secondary);
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    font-family: var(--font-mono);
+    font-size: var(--size-num-m);
+    line-height: 1;
+    transition: color var(--motion-hover), background var(--motion-hover);
+  }
+  .icon-btn:hover { color: var(--text-primary); background: var(--bg-elevated); }
+  .avatar {
+    width: 32px; height: 32px;
+    border-radius: var(--radius-xs);
+    background: var(--bg-elevated-hover);
+    border: 1px solid var(--border-hairline-strong);
+    display: grid;
+    place-items: center;
+    font-family: var(--font-mono);
+    font-size: var(--size-num-xs);
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+
+  /* ---------- Tab bar (4 tabs) ---------- */
+  .tabbar {
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border-hairline-strong);
+    padding: var(--space-2) 0 var(--space-3);
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+  }
+  .tab {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: var(--space-2);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    color: var(--text-tertiary);
+    font-family: var(--font-mono);
+    font-size: var(--size-num-xs);
+    text-transform: uppercase;
+    letter-spacing: var(--ls-caps);
+    transition: color var(--motion-hover);
+  }
+  .tab .glyph {
+    font-family: var(--font-mono);
+    font-size: 18px;
+    line-height: 1;
+    font-weight: 700;
+  }
+  .tab.active { color: var(--accent-cta); }
+  .tab:hover { color: var(--text-primary); }
+
+  /* ---------- Buttons ---------- */
+  .btn {
+    font-family: var(--font-heading);
+    font-weight: 700;
+    font-size: var(--size-label-l);
+    text-transform: uppercase;
+    letter-spacing: var(--ls-caps);
+    padding: var(--space-3) var(--space-5);
+    border-radius: var(--radius-sm);
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: background var(--motion-hover), border-color var(--motion-hover), color var(--motion-hover);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    width: 100%;
+    text-decoration: none;
+  }
+  .btn-primary {
+    background: var(--accent-cta);
+    color: var(--text-on-accent);
+  }
+  .btn-primary:hover { background: var(--accent-cta-hover); }
+  .btn-primary::after { content: "→"; }
+  .btn-secondary {
+    background: var(--bg-elevated);
+    color: var(--text-primary);
+    border-color: var(--border-hairline-strong);
+  }
+  .btn-secondary:hover { background: var(--bg-elevated-hover); }
+  .btn-tertiary {
+    background: transparent;
+    color: var(--text-secondary);
+    border-color: transparent;
+  }
+  .btn-tertiary:hover { color: var(--text-primary); }
+  .btn-danger-outline {
+    background: transparent;
+    color: var(--state-negative);
+    border-color: var(--state-negative);
+  }
+  .btn-danger-outline:hover { background: rgba(230, 57, 70, 0.06); }
+  .btn:disabled, .btn.disabled {
+    opacity: var(--opacity-disabled);
+    cursor: not-allowed;
+  }
+  .btn-sm { padding: var(--space-2) var(--space-3); font-size: var(--size-label-m); }
+
+  /* ---------- Forms ---------- */
+  .field { display: flex; flex-direction: column; gap: var(--space-2); margin-bottom: var(--space-4); }
+  .field-label {
+    font-family: var(--font-heading);
+    font-size: var(--size-label-s);
+    text-transform: uppercase;
+    letter-spacing: var(--ls-caps-xl);
+    color: var(--text-tertiary);
+    font-weight: 700;
+  }
+  .field-input, .field-select {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-hairline-strong);
+    border-radius: var(--radius-xs);
+    padding: var(--space-3) var(--space-4);
+    color: var(--text-primary);
+    font-family: var(--font-body);
+    font-size: var(--size-body);
+    width: 100%;
+    transition: border-color var(--motion-hover);
+  }
+  .field-input:focus, .field-select:focus {
+    outline: none;
+    border-color: var(--accent-cta);
+  }
+  .field-input::placeholder { color: var(--text-tertiary); }
+  .radio-row { display: flex; gap: var(--space-4); margin-top: var(--space-2); color: var(--text-primary); font-family: var(--font-body); }
+  .radio-row label { display: flex; align-items: center; gap: var(--space-2); cursor: pointer; }
+
+  /* ---------- Display / Type helpers ---------- */
+  .h-display {
+    font-family: var(--font-display);
+    font-size: 56px;
+    line-height: 0.85;
+    color: var(--text-primary);
+    letter-spacing: var(--ls-mark);
+  }
+  .h1 {
+    font-family: var(--font-heading);
+    font-weight: 700;
+    font-size: var(--size-heading-l);
+    color: var(--text-primary);
+    line-height: 1.2;
+  }
+  .h2 {
+    font-family: var(--font-heading);
+    font-weight: 700;
+    font-size: var(--size-heading-m);
+    color: var(--text-primary);
+    line-height: 1.3;
+  }
+  .lede {
+    font-family: var(--font-body);
+    font-size: var(--size-body);
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+  .meta {
+    font-family: var(--font-mono);
+    font-size: var(--size-num-xs);
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: var(--ls-caps-xl);
+  }
+  .num-mono {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+  }
+
+  /* ---------- Plates / cards ---------- */
+  .plate {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-hairline);
+    border-radius: var(--radius-md);
+    padding: var(--space-4);
+  }
+  .plate.accent { border-left: 3px solid var(--accent-cta); }
+  .plate.live { border-left: 3px solid var(--state-positive); }
+
+  /* ---------- Live pill ---------- */
+  .live-pill {
+    font-family: var(--font-mono);
+    font-size: var(--size-label-s);
+    color: var(--state-positive);
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    text-transform: uppercase;
+    letter-spacing: var(--ls-caps-l);
+  }
+  .live-pill::before {
+    content: "";
+    display: inline-block;
+    width: 7px; height: 7px;
+    background: var(--state-positive);
+    border-radius: 50%;
+    animation: var(--motion-pulse);
+  }
+  @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.45; transform: scale(0.8); } }
+
+  /* ---------- Status badges ---------- */
+  .status {
+    font-family: var(--font-mono);
+    font-size: var(--size-num-xs);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: var(--ls-caps-l);
+    padding: 2px var(--space-2);
+    border: 1px solid;
+    border-radius: var(--radius-xs);
+    white-space: nowrap;
+  }
+  .status.available { color: var(--state-positive); border-color: var(--state-positive); }
+  .status.in-match { color: var(--state-negative); border-color: var(--state-negative); }
+  .status.timekeeping { color: var(--text-tertiary); border-color: var(--border-hairline-strong); }
+
+  /* ---------- Generic spacing ---------- */
+  .pad { padding: var(--space-5); }
+  .pad-sm { padding: var(--space-4); }
+  .stack { display: flex; flex-direction: column; gap: var(--space-3); }
+  .stack-sm { display: flex; flex-direction: column; gap: var(--space-2); }
+  .row { display: flex; gap: var(--space-3); align-items: center; }
+  .grow { flex: 1; }
+  .center { text-align: center; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
+
+  /* ---------- Spinner ---------- */
+  .spinner {
+    width: 32px; height: 32px;
+    border: 3px solid var(--border-hairline);
+    border-top-color: var(--accent-cta);
+    border-radius: 50%;
+    animation: spin 800ms linear infinite;
+    margin: 0 auto;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ---------- Modal overlay (used in C1, RSVP confirm, view-as picker) ---------- */
+  .modal-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-5);
+  }
+  [data-theme="light"] .modal-overlay { background: rgba(13, 15, 20, 0.45); }
+  .modal-card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-hairline-strong);
+    border-radius: var(--radius-md);
+    padding: var(--space-6);
+    width: 100%;
+    max-width: 320px;
+  }
+
+  /* ---------- ELO display ---------- */
+  .elo-tile {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-hairline);
+    border-radius: var(--radius-md);
+    padding: var(--space-5);
+    text-align: center;
+    position: relative;
+  }
+  .elo-tile::after {
+    content: "";
+    position: absolute; left: 0; right: 0; bottom: 0;
+    height: 3px;
+    background: var(--accent-cta);
+  }
+  .elo-tile .label {
+    font-family: var(--font-mono);
+    font-size: var(--size-num-xs);
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: var(--ls-caps-xl);
+    margin-bottom: var(--space-2);
+  }
+  .elo-tile .num {
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: 64px;
+    line-height: 1;
+    color: var(--text-primary);
+    letter-spacing: -0.04em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---------- Filter chips ---------- */
+  .chips {
+    display: flex;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+  }
+  .chip {
+    font-family: var(--font-heading);
+    font-size: var(--size-label-s);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: var(--ls-caps);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-xs);
+    border: 1px solid var(--border-hairline-strong);
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: background var(--motion-hover), color var(--motion-hover), border-color var(--motion-hover);
+  }
+  .chip:hover { background: var(--bg-elevated-hover); color: var(--text-primary); }
+  .chip.active { border-color: var(--accent-cta); color: var(--text-primary); }
+
+  /* ---------- Lobby participant rows ---------- */
+  .participant {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-hairline-faint);
+    border-radius: var(--radius-xs);
+    padding: var(--space-3);
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: var(--space-2);
+    align-items: center;
+  }
+  .participant .name {
+    font-family: var(--font-heading);
+    font-weight: 700;
+    font-size: var(--size-label-l);
+    color: var(--text-primary);
+  }
+  .participant .name:hover { color: var(--accent-cta); cursor: pointer; }
+  .participant .elo {
+    font-family: var(--font-mono);
+    font-size: var(--size-num-s);
+    color: var(--text-tertiary);
+    margin-top: 2px;
+  }
+
+  /* ---------- Ladder rows ---------- */
+  .ladder-row {
+    background: var(--bg-elevated);
+    padding: var(--space-3);
+    display: grid;
+    grid-template-columns: 32px 1fr auto;
+    gap: var(--space-3);
+    align-items: center;
+    border-left: 3px solid transparent;
+    cursor: pointer;
+    transition: background var(--motion-hover);
+  }
+  .ladder-row:hover { background: var(--bg-elevated-hover); }
+  .ladder-row.leader { border-left-color: var(--accent-cta); }
+  .ladder-row.you { border-left-color: var(--state-positive); }
+  .ladder-row .rank {
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: var(--size-num-m);
+    color: var(--text-secondary);
+    text-align: right;
+  }
+  .ladder-row .athlete-name {
+    font-family: var(--font-heading);
+    font-weight: 700;
+    font-size: var(--size-label-l);
+    color: var(--text-primary);
+    line-height: 1.1;
+  }
+  .ladder-row .athlete-gym {
+    font-family: var(--font-body);
+    font-size: var(--size-body-xs);
+    color: var(--text-tertiary);
+    margin-top: 2px;
+  }
+  .ladder-row .stat {
+    text-align: right;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+  }
+  .ladder-row .stat .num {
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: var(--size-num-l);
+    color: var(--text-primary);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .delta {
+    font-family: var(--font-mono);
+    font-size: var(--size-num-xs);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+  }
+  .delta.up { color: var(--state-positive); }
+  .delta.up::before { content: "▲"; font-size: 0.8em; }
+  .delta.down { color: var(--state-negative); }
+  .delta.down::before { content: "▼"; font-size: 0.8em; }
+  .delta.flat { color: var(--state-neutral); }
+  .delta.flat::before { content: "—"; }
+
+  /* ---------- Submission grid (D8) ---------- */
+  .sub-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-2);
+  }
+  .sub-grid button {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-hairline-strong);
+    border-radius: var(--radius-xs);
+    padding: var(--space-2) var(--space-3);
+    font-family: var(--font-heading);
+    font-size: var(--size-label-s);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: var(--ls-caps);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: border-color var(--motion-hover), color var(--motion-hover);
+  }
+  .sub-grid button:hover { color: var(--text-primary); }
+  .sub-grid button.selected { border-color: var(--accent-cta); color: var(--text-primary); background: var(--bg-elevated-hover); }
+
+  /* ---------- Match-result outcome card ---------- */
+  .outcome-banner {
+    border-radius: var(--radius-md);
+    padding: var(--space-5);
+    text-align: center;
+    border: 1px solid;
+  }
+  .outcome-banner.win {
+    background: rgba(34, 197, 94, 0.08);
+    border-color: var(--state-positive);
+  }
+  .outcome-banner.loss {
+    background: rgba(230, 57, 70, 0.08);
+    border-color: var(--state-negative);
+  }
+  .outcome-banner .verdict {
+    font-family: var(--font-display);
+    font-size: 36px;
+    line-height: 1;
+    letter-spacing: var(--ls-mark);
+  }
+  .outcome-banner.win .verdict { color: var(--state-positive); }
+  .outcome-banner.loss .verdict { color: var(--state-negative); }
+  .outcome-banner .delta {
+    display: block;
+    margin-top: var(--space-2);
+    font-size: var(--size-num-l);
+  }
+
+  /* ---------- D6 fighter view (dark always — phone goes face down) ---------- */
+  .fighter-view {
+    background: var(--color-void);
+    color: var(--color-terminal-white);
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: var(--space-6);
+    text-align: center;
+  }
+  .fighter-view .timer {
+    font-family: var(--font-mono);
+    font-size: 96px;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--color-signal-red);
+    letter-spacing: -0.04em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---------- D7 timekeeper view ---------- */
+  .tk-viewfinder {
+    background: var(--bg-elevated-hover);
+    border: 1px solid var(--border-hairline-strong);
+    border-radius: var(--radius-md);
+    flex: 1;
+    margin: var(--space-4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-tertiary);
+    position: relative;
+  }
+  .rec-pill {
+    position: absolute;
+    top: var(--space-3);
+    right: var(--space-3);
+    background: var(--state-negative);
+    color: var(--color-terminal-white);
+    padding: var(--space-1) var(--space-2);
+    font-family: var(--font-mono);
+    font-size: var(--size-num-xs);
+    font-weight: 700;
+    letter-spacing: var(--ls-caps-l);
+    text-transform: uppercase;
+    border-radius: var(--radius-xs);
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+  }
+  .rec-pill::before {
+    content: "";
+    width: 6px; height: 6px;
+    background: var(--color-terminal-white);
+    border-radius: 50%;
+    animation: var(--motion-pulse);
+  }
+
+  /* ---------- Fine print ---------- */
+  .fine {
+    font-family: var(--font-mono);
+    font-size: var(--size-num-xs);
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: var(--ls-caps-l);
+  }
+</style>
+</head>
+<body>
+
+<!-- ============== Top review chrome ============== -->
+<div class="review-chrome">
+  <div class="brand">ELO&nbsp;RATED <span class="meta">Alpha Wireframe · 39 Screens</span></div>
+  <div class="picker">
+    <span>Screen</span>
+    <select id="screenPicker">
+      <optgroup label="Auth">
+        <option value="A1">A1 · Login</option>
+        <option value="A2">A2 · Register</option>
+        <option value="A3">A3 · Terms (EUA)</option>
+        <option value="A4">A4 · Forgot Password</option>
+      </optgroup>
+      <optgroup label="Activation">
+        <option value="A5">A5 · Setup · Identity</option>
+        <option value="A6">A6 · Setup · Training</option>
+      </optgroup>
+      <optgroup label="Home">
+        <option value="B1">B1 · Home (No Session)</option>
+        <option value="B2">B2 · Home (Session Live)</option>
+      </optgroup>
+      <optgroup label="Lobby Entry">
+        <option value="C1">C1 · Geolocation Check</option>
+        <option value="C2">C2 · Waivers</option>
+        <option value="C3">C3 · Confirm Weight</option>
+        <option value="C4">C4 · Lobby</option>
+      </optgroup>
+      <optgroup label="Match Flow">
+        <option value="D1">D1 · Challenge Sent</option>
+        <option value="D2">D2 · Challenge Received</option>
+        <option value="D3">D3 · Awaiting Timekeeper</option>
+        <option value="D4">D4 · Confirm Opponent Weight</option>
+        <option value="D5">D5 · Ready Check</option>
+        <option value="D6">D6 · Match (Fighter View)</option>
+        <option value="D7">D7 · Match (Timekeeper View)</option>
+        <option value="D8">D8 · Select Winner + Submission</option>
+        <option value="D9">D9 · Match Summary</option>
+        <option value="D10">D10 · Match Recorded</option>
+      </optgroup>
+      <optgroup label="Gym Finder">
+        <option value="E1">E1 · Gym Finder</option>
+        <option value="E2">E2 · Gym Details</option>
+      </optgroup>
+      <optgroup label="Ladder">
+        <option value="F1">F1 · Global Ladder (Fighters)</option>
+        <option value="F2">F2 · Global Ladder (Gyms)</option>
+      </optgroup>
+      <optgroup label="Profile">
+        <option value="G1">G1 · My Profile</option>
+        <option value="G2">G2 · Edit Profile</option>
+        <option value="G3">G3 · Settings</option>
+        <option value="G4">G4 · Help &amp; Support</option>
+        <option value="G5">G5 · Profile Stats</option>
+        <option value="PROFILE_VIEW">P · View Athlete</option>
+      </optgroup>
+      <optgroup label="Notifications">
+        <option value="H1">H1 · Notifications</option>
+        <option value="H2">H2 · Notification Preferences</option>
+      </optgroup>
+      <optgroup label="Settings">
+        <option value="H3">H3 · Feedback</option>
+        <option value="H4">H4 · Video Settings</option>
+      </optgroup>
+      <optgroup label="Overlays">
+        <option value="I1">I1 · Offline Banner</option>
+        <option value="I2">I2 · Error Boundary</option>
+        <option value="I3">I3 · Toast</option>
+      </optgroup>
+    </select>
+  </div>
+  <div class="theme-toggle" role="group" aria-label="Theme">
+    <button id="t-dark" aria-pressed="true">Dark</button>
+    <button id="t-light" aria-pressed="false">Light</button>
+  </div>
+</div>
+
+<!-- ============== Phone device frame ============== -->
+<div class="device">
+
+  <div class="status-bar">
+    <span class="time">9:41</span>
+    <span></span>
+    <span class="right">5G · 87%</span>
+  </div>
+
+  <!-- ===== A1 · LOGIN ===== -->
+  <section class="screen screen-fullbody" data-screen="A1">
+    <div class="scroll pad" style="display: flex; flex-direction: column; justify-content: center;">
+      <div class="center" style="margin-bottom: var(--space-12);">
+        <div style="font-family: var(--font-display); font-size: 72px; line-height: 0.85; color: var(--text-primary); letter-spacing: var(--ls-mark);">ELO<br>RATED</div>
+        <div class="meta" style="margin-top: var(--space-3);">What's your number?</div>
+      </div>
+      <div class="stack">
+        <button class="btn btn-primary" data-go="A2">Register with Email</button>
+        <button class="btn btn-secondary" data-go="B2">Sign in with Google</button>
+        <button class="btn btn-secondary" data-go="B2">Sign in with Apple</button>
+        <button class="btn btn-tertiary">Forgot password?</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== A2 · REGISTER ===== -->
+  <section class="screen screen-with-nav" data-screen="A2">
+    <header class="topbar">
+      <button class="icon-btn" data-go="A1">‹</button>
+      <span class="nav-title">Create Account</span>
+      <span style="width: 32px;"></span>
+    </header>
+    <div class="scroll pad">
+      <div class="field">
+        <label class="field-label">First Name</label>
+        <input class="field-input" type="text" value="Mattie" />
+      </div>
+      <div class="field">
+        <label class="field-label">Last Name</label>
+        <input class="field-input" type="text" value="Spoons" />
+      </div>
+      <div class="field">
+        <label class="field-label">Date of Birth</label>
+        <input class="field-input" type="date" value="1995-06-15" />
+      </div>
+      <div class="field">
+        <label class="field-label">Gender</label>
+        <div class="radio-row">
+          <label><input type="radio" name="gender" /> Male</label>
+          <label><input type="radio" name="gender" checked /> Female</label>
+        </div>
+      </div>
+      <div class="field">
+        <label class="field-label">Weight (kg)</label>
+        <input class="field-input" type="number" value="77" />
+      </div>
+      <div class="field">
+        <label class="field-label">City</label>
+        <select class="field-select">
+          <option>Toronto</option>
+          <option>Vancouver</option>
+        </select>
+      </div>
+      <div class="field">
+        <label class="field-label">Home Gym</label>
+        <select class="field-select">
+          <option>10th Planet Toronto</option>
+          <option>Brasa Toronto</option>
+          <option>BJJ Globetrotters</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" data-go="A3" style="margin-top: var(--space-4);">Continue</button>
+    </div>
+  </section>
+
+  <!-- ===== A3 · TERMS / EUA ===== -->
+  <section class="screen screen-with-nav" data-screen="A3">
+    <header class="topbar">
+      <button class="icon-btn" data-go="A2">‹</button>
+      <span class="nav-title">End User Agreement</span>
+      <span style="width: 32px;"></span>
+    </header>
+    <div class="scroll pad" style="display: flex; flex-direction: column;">
+      <div class="plate" style="flex: 1; overflow-y: auto; margin-bottom: var(--space-4); font-family: var(--font-body); font-size: var(--size-body-s); color: var(--text-secondary); line-height: 1.6;">
+        <p style="margin-top: 0;"><strong style="color: var(--text-primary);">END USER AGREEMENT</strong></p>
+        <p>By using ELO RATED, you accept the terms below. ELO RATED is a participation-only ranking platform; you opt in to the global ladder by entering an open mat designated as an ELO session.</p>
+        <p><strong style="color: var(--text-primary);">1. Liability</strong> Grappling carries inherent risk. ELO RATED facilitates the signing of your gym's existing waiver and policies — it does not provide insurance, indemnity, or liability coverage. All risk and coverage stays with you and the host gym.</p>
+        <p><strong style="color: var(--text-primary);">2. Match Footage</strong> You always own and can always download your own match footage. Server-side retention on the free tier may be limited; data access is not.</p>
+        <p><strong style="color: var(--text-primary);">3. Conduct</strong> You agree to compete safely and follow the host gym's rules and the timekeeper's instructions.</p>
+        <p><strong style="color: var(--text-primary);">4. Privacy</strong> Your profile and rating are public on the global ladder. Personal data is governed by our Privacy Policy.</p>
+      </div>
+      <label style="display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-4); color: var(--text-primary); font-family: var(--font-body); font-size: var(--size-body-s); cursor: pointer;">
+        <input type="checkbox" id="tos" />
+        I agree to the End User Agreement
+      </label>
+      <button class="btn btn-primary" id="tosBtn" disabled data-go="B2">Create Account</button>
+    </div>
+  </section>
+
+  <!-- ===== B1 · HOME (NO SESSION) ===== -->
+  <section class="screen screen-with-tabs" data-screen="B1">
+    <header class="topbar">
+      <span class="wordmark">ELO&nbsp;RATED</span>
+      <span></span>
+      <span class="avatar">M·S</span>
+    </header>
+    <div class="scroll pad">
+      <div class="meta" style="margin-bottom: var(--space-2);">Welcome back</div>
+      <div class="h1" style="margin-bottom: var(--space-5);">Mattie Spoons</div>
+
+      <div class="elo-tile" style="margin-bottom: var(--space-5);">
+        <div class="label">Current ELO Rating</div>
+        <div class="num">1500</div>
+      </div>
+
+      <div class="plate" style="margin-bottom: var(--space-5);">
+        <div class="row" style="justify-content: space-between; margin-bottom: var(--space-2);">
+          <div class="h2">10th Planet Toronto</div>
+          <span class="status timekeeping">Upcoming</span>
+        </div>
+        <div class="lede" style="font-size: var(--size-body-s);">Next session: Saturday 2:00 PM</div>
+        <div class="meta" style="margin-top: var(--space-2);">3 athletes RSVP'd</div>
+      </div>
+
+      <div class="meta" style="margin-bottom: var(--space-2);">Recent Activity</div>
+      <div class="lede" style="margin-bottom: var(--space-5);">No matches yet — your first match is waiting.</div>
+
+      <div class="meta" style="margin-bottom: var(--space-2);">Record</div>
+      <div class="num-mono" style="font-size: var(--size-num-l); color: var(--text-primary); margin-bottom: var(--space-5);">0W · 0L · 0D</div>
+
+      <div class="plate accent">
+        <div class="lede" style="color: var(--text-primary);">Your gym hasn't designated a live session yet. Check the schedule or browse other gyms in your city.</div>
+      </div>
+    </div>
+    <nav class="tabbar">
+      <button class="tab active" data-tab="home" data-go="B1"><span class="glyph">⌂</span>Home</button>
+      <button class="tab" data-tab="gym" data-go="E1"><span class="glyph">◎</span>Gyms</button>
+      <button class="tab" data-tab="ladder" data-go="F1"><span class="glyph">≡</span>Ladder</button>
+      <button class="tab" data-tab="profile" data-go="G1"><span class="glyph">●</span>Profile</button>
+    </nav>
+  </section>
+
+  <!-- ===== B2 · HOME (SESSION LIVE) ===== -->
+  <section class="screen screen-with-tabs" data-screen="B2">
+    <header class="topbar">
+      <span class="wordmark">ELO&nbsp;RATED</span>
+      <span></span>
+      <span class="avatar">M·S</span>
+    </header>
+    <div class="scroll pad">
+      <div class="meta" style="margin-bottom: var(--space-2);">Welcome back</div>
+      <div class="h1" style="margin-bottom: var(--space-5);">Mattie Spoons</div>
+
+      <div class="elo-tile" style="margin-bottom: var(--space-5);">
+        <div class="label">Current ELO Rating</div>
+        <div class="num">1500</div>
+      </div>
+
+      <div class="plate live" style="margin-bottom: var(--space-5);">
+        <div class="row" style="justify-content: space-between; margin-bottom: var(--space-2);">
+          <div class="h2">10th Planet Toronto</div>
+          <span class="live-pill">Live</span>
+        </div>
+        <div class="lede" style="font-size: var(--size-body-s); margin-bottom: var(--space-3);">8 athletes in lobby · Session started 18 min ago</div>
+        <button class="btn btn-primary" data-go="C1">Enter Lobby</button>
+      </div>
+
+      <div class="meta" style="margin-bottom: var(--space-2);">Recent Activity</div>
+      <div class="lede" style="margin-bottom: var(--space-5);">No matches yet.</div>
+
+      <div class="meta" style="margin-bottom: var(--space-2);">Record</div>
+      <div class="num-mono" style="font-size: var(--size-num-l); color: var(--text-primary);">0W · 0L · 0D</div>
+    </div>
+    <nav class="tabbar">
+      <button class="tab active" data-tab="home" data-go="B2"><span class="glyph">⌂</span>Home</button>
+      <button class="tab" data-tab="gym" data-go="E1"><span class="glyph">◎</span>Gyms</button>
+      <button class="tab" data-tab="ladder" data-go="F1"><span class="glyph">≡</span>Ladder</button>
+      <button class="tab" data-tab="profile" data-go="G1"><span class="glyph">●</span>Profile</button>
+    </nav>
+  </section>
+
+  <!-- ===== C1 · GEOLOCATION CHECK ===== -->
+  <section class="screen screen-fullbody" data-screen="C1">
+    <div class="scroll" style="position: relative;">
+      <div style="height: 100%; background: var(--bg-primary);"></div>
+      <div class="modal-overlay">
+        <div class="modal-card center">
+          <div class="spinner" style="margin-bottom: var(--space-5);"></div>
+          <div class="h2" style="margin-bottom: var(--space-2);">Verifying your location</div>
+          <div class="lede" style="margin-bottom: var(--space-5);">Confirming you're at 10th Planet Toronto.</div>
+          <button class="btn btn-danger-outline" data-go="B2">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== C2 · WAIVERS ===== -->
+  <section class="screen screen-with-nav" data-screen="C2">
+    <header class="topbar">
+      <span style="width: 32px;"></span>
+      <span class="nav-title">Waivers</span>
+      <span class="meta" id="waiverCount">1 / 3</span>
+    </header>
+    <div class="scroll pad" style="display: flex; flex-direction: column;">
+      <div class="plate" style="flex: 1; overflow-y: auto; margin-bottom: var(--space-4); font-family: var(--font-body); font-size: var(--size-body-s); color: var(--text-secondary); line-height: 1.6;" id="waiverContent">
+        <div class="h2" style="margin-bottom: var(--space-3);">ELO RATED Liability Acknowledgement</div>
+        <p>I acknowledge that grappling carries inherent risks of physical injury, including sprains, strains, broken bones, dislocations, and head injuries. I assume all risks of participation and waive claims against ELO RATED, the host gym, and other participants.</p>
+        <p>I certify that I am in good health and have no medical conditions preventing safe participation.</p>
+      </div>
+      <button class="btn btn-primary" id="waiverNext">I Acknowledge</button>
+      <button class="btn btn-tertiary" data-go="B2" style="margin-top: var(--space-2);">Exit</button>
+    </div>
+  </section>
+
+  <!-- ===== C3 · CONFIRM WEIGHT ===== -->
+  <section class="screen screen-with-nav" data-screen="C3">
+    <header class="topbar">
+      <button class="icon-btn" data-go="C2">‹</button>
+      <span class="nav-title">Confirm Weight</span>
+      <span style="width: 32px;"></span>
+    </header>
+    <div class="scroll pad" style="display: flex; flex-direction: column; align-items: center; justify-content: center;">
+      <div class="lede center" style="margin-bottom: var(--space-6);">Confirm your weight for today's session</div>
+      <div class="elo-tile" style="margin-bottom: var(--space-6); width: 100%;">
+        <div class="label">Weight Today</div>
+        <div style="display: flex; align-items: baseline; justify-content: center; gap: var(--space-2);">
+          <input type="number" value="77" id="weightInput" style="font-family: var(--font-mono); font-weight: 700; font-size: 64px; line-height: 1; color: var(--text-primary); letter-spacing: -0.04em; background: transparent; border: none; width: 140px; text-align: center; -moz-appearance: textfield;" />
+          <span class="num-mono" style="font-size: var(--size-num-l); color: var(--text-tertiary);">kg</span>
+        </div>
+      </div>
+      <button class="btn btn-primary" data-go="C4">Confirm Weight</button>
+    </div>
+  </section>
+
+  <!-- ===== C4 · LOBBY ===== -->
+  <section class="screen screen-with-nav" data-screen="C4">
+    <header class="topbar">
+      <span class="wordmark" style="font-size: 18px;">10TH PLANET TO</span>
+      <span></span>
+      <button class="btn btn-tertiary btn-sm" data-go="B2" style="width: auto; padding: var(--space-2);">Leave</button>
+    </header>
+    <div class="scroll pad-sm">
+      <div class="row" style="justify-content: space-between; margin-bottom: var(--space-3);">
+        <span class="live-pill">Live · 1:42 left</span>
+        <span class="meta">12 in lobby</span>
+      </div>
+
+      <div class="row" style="margin-bottom: var(--space-4); gap: var(--space-2);">
+        <button class="btn btn-primary" data-go="D1" style="flex: 1; padding: var(--space-3);">Random Match</button>
+        <button class="btn btn-secondary" style="flex: 1; padding: var(--space-3);">⏱ Timekeeper</button>
+      </div>
+
+      <div class="meta" style="margin-bottom: var(--space-2);">In Lobby (12)</div>
+
+      <div class="stack-sm">
+        <div class="participant">
+          <div>
+            <div class="name" data-go="PROFILE_VIEW" data-name="Tristan Charbonneau" data-elo="1650" data-gym="10th Planet Toronto">Tristan Charbonneau</div>
+            <div class="elo">1650 · 77 kg</div>
+          </div>
+          <span class="status available">Available</span>
+          <button class="btn btn-primary btn-sm" data-go="D1" style="width: auto; padding: var(--space-2) var(--space-3);">Challenge</button>
+        </div>
+        <div class="participant">
+          <div>
+            <div class="name" data-go="PROFILE_VIEW" data-name="Creonte Mike" data-elo="1610" data-gym="Renzo Gracie Vancouver">Creonte Mike</div>
+            <div class="elo">1610 · 77 kg</div>
+          </div>
+          <span class="status available">Available</span>
+          <button class="btn btn-primary btn-sm" data-go="D1" style="width: auto; padding: var(--space-2) var(--space-3);">Challenge</button>
+        </div>
+        <div class="participant">
+          <div>
+            <div class="name">Slim Reaper</div>
+            <div class="elo">1590 · 83 kg</div>
+          </div>
+          <span class="status available">Available</span>
+          <button class="btn btn-primary btn-sm" data-go="D1" style="width: auto; padding: var(--space-2) var(--space-3);">Challenge</button>
+        </div>
+        <div class="participant">
+          <div>
+            <div class="name">Hideo Tanaka</div>
+            <div class="elo">1545 · 70 kg</div>
+          </div>
+          <span class="status available">Available</span>
+          <button class="btn btn-primary btn-sm" data-go="D1" style="width: auto; padding: var(--space-2) var(--space-3);">Challenge</button>
+        </div>
+        <div class="participant">
+          <div>
+            <div class="name">Devon Reyes</div>
+            <div class="elo">1520 · 83 kg</div>
+          </div>
+          <span class="status available">Available</span>
+          <button class="btn btn-primary btn-sm" data-go="D1" style="width: auto; padding: var(--space-2) var(--space-3);">Challenge</button>
+        </div>
+        <div class="participant">
+          <div>
+            <div class="name">Andre Williams</div>
+            <div class="elo">1510 · 77 kg</div>
+          </div>
+          <span class="status available">Available</span>
+          <button class="btn btn-primary btn-sm" data-go="D1" style="width: auto; padding: var(--space-2) var(--space-3);">Challenge</button>
+        </div>
+        <div class="participant">
+          <div>
+            <div class="name">Marcus Chen</div>
+            <div class="elo">1470 · 93 kg</div>
+          </div>
+          <span class="status in-match">In Match</span>
+          <span></span>
+        </div>
+        <div class="participant">
+          <div>
+            <div class="name">Carla Mendes</div>
+            <div class="elo">1580 · 64 kg</div>
+          </div>
+          <span class="status available">Available</span>
+          <span class="meta" style="font-size: 9px;">F</span>
+        </div>
+        <div class="participant">
+          <div>
+            <div class="name">Yelena Voskov</div>
+            <div class="elo">1560 · 58 kg</div>
+          </div>
+          <span class="status timekeeping">Timekeeping</span>
+          <span></span>
+        </div>
+      </div>
+
+      <div class="plate live" style="margin-top: var(--space-4); padding: var(--space-3);">
+        <div class="row" style="justify-content: space-between;">
+          <span class="meta">You</span>
+          <span class="num-mono" style="font-size: var(--size-num-m); color: var(--text-primary);">Mattie Spoons · 1500</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== D1 · CHALLENGE SENT ===== -->
+  <section class="screen screen-fullbody" data-screen="D1">
+    <div class="scroll pad" style="display: flex; flex-direction: column; justify-content: center;">
+      <div class="plate accent center" style="margin-bottom: var(--space-5);">
+        <div class="meta" style="margin-bottom: var(--space-3);">Challenge Sent</div>
+        <div class="h-display" style="font-size: 32px; margin-bottom: var(--space-2);">CREONTE MIKE</div>
+        <div class="num-mono" style="font-size: var(--size-num-m); color: var(--text-secondary); margin-bottom: var(--space-5);">1610 · 77 kg · Renzo Gracie Vancouver</div>
+        <div class="spinner" style="margin-bottom: var(--space-4);"></div>
+        <div class="lede">Waiting for response...</div>
+      </div>
+      <button class="btn btn-danger-outline" data-go="C4">Cancel Challenge</button>
+    </div>
+  </section>
+
+  <!-- ===== D2 · CHALLENGE RECEIVED ===== -->
+  <section class="screen screen-fullbody" data-screen="D2">
+    <div class="scroll pad" style="display: flex; flex-direction: column; justify-content: center;">
+      <div class="plate accent center" style="margin-bottom: var(--space-5);">
+        <div class="meta" style="margin-bottom: var(--space-3);">Challenge Received</div>
+        <div class="h-display" style="font-size: 32px; margin-bottom: var(--space-2);">MATTIE SPOONS</div>
+        <div class="num-mono" style="font-size: var(--size-num-m); color: var(--text-secondary); margin-bottom: var(--space-5);">1500 · 77 kg · 10th Planet Toronto</div>
+      </div>
+      <div class="row" style="gap: var(--space-3);">
+        <button class="btn btn-secondary" style="flex: 1;" data-go="C4">Decline</button>
+        <button class="btn btn-primary" style="flex: 1;" data-go="D3">Accept</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== D3 · AWAITING TIMEKEEPER ===== -->
+  <section class="screen screen-fullbody" data-screen="D3">
+    <div class="scroll pad" style="display: flex; flex-direction: column; justify-content: center;">
+      <div class="plate accent center" style="margin-bottom: var(--space-5);">
+        <div class="meta" style="margin-bottom: var(--space-4);">Match Paired</div>
+        <div class="h2" style="margin-bottom: var(--space-2);">Mattie Spoons <span style="color: var(--text-tertiary);">(1500)</span></div>
+        <div class="meta" style="margin-bottom: var(--space-2); color: var(--accent-cta);">VS</div>
+        <div class="h2" style="margin-bottom: var(--space-5);">Creonte Mike <span style="color: var(--text-tertiary);">(1610)</span></div>
+        <div class="spinner" style="margin-bottom: var(--space-4);"></div>
+        <div class="lede">Finding a timekeeper...</div>
+      </div>
+      <button class="btn btn-danger-outline" data-go="C4">Cancel Match</button>
+    </div>
+  </section>
+
+  <!-- ===== D4 · CONFIRM OPPONENT WEIGHT ===== -->
+  <section class="screen screen-fullbody" data-screen="D4">
+    <div class="scroll pad" style="display: flex; flex-direction: column; justify-content: center;">
+      <div class="meta center" style="margin-bottom: var(--space-3);">Opponent Weight</div>
+      <div class="h2 center" style="margin-bottom: var(--space-6);">Does this look accurate?</div>
+      <div class="elo-tile" style="margin-bottom: var(--space-6);">
+        <div class="label">Creonte Mike states</div>
+        <div class="num">82</div>
+        <div class="meta" style="margin-top: var(--space-2);">kg</div>
+      </div>
+      <div class="stack">
+        <button class="btn btn-primary" data-go="D5">Yes — Looks Accurate</button>
+        <button class="btn btn-danger-outline" data-go="C4">Dispute · Cancel Match</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== D5 · READY CHECK ===== -->
+  <section class="screen screen-fullbody" data-screen="D5">
+    <div class="scroll pad" style="display: flex; flex-direction: column;">
+      <div class="meta center" style="margin-bottom: var(--space-3);">Ready Check</div>
+      <div class="lede center" style="margin-bottom: var(--space-5);">Both fighters tap to confirm. Timekeeper starts the match.</div>
+      <div class="stack" style="margin-bottom: var(--space-5);">
+        <button class="btn" id="readyMattie" style="background: var(--bg-elevated); color: var(--text-secondary); border-color: var(--border-hairline-strong); padding: var(--space-4) var(--space-5);">Mattie Spoons — Tap When Ready</button>
+        <div class="btn" style="background: var(--bg-elevated); color: var(--state-positive); border-color: var(--state-positive); padding: var(--space-4) var(--space-5); cursor: default;">✓ Creonte Mike — Ready</div>
+      </div>
+      <div class="plate" style="margin-bottom: var(--space-5); text-align: center;">
+        <div class="meta" style="margin-bottom: var(--space-2);">Timekeeper · Yelena Voskov</div>
+        <div id="tkWaiting" class="lede">Waiting for both fighters...</div>
+        <button class="btn btn-primary" id="tkStart" style="display: none; margin-top: var(--space-3);" onclick="document.getElementById('viewModal').style.display='flex';">▶ Start Match</button>
+      </div>
+      <button class="btn btn-danger-outline" data-go="C4">Cancel · Return to Lobby</button>
+
+      <div class="modal-overlay" id="viewModal" style="display: none;">
+        <div class="modal-card">
+          <div class="h2 center" style="margin-bottom: var(--space-4);">Demo · View as</div>
+          <div class="stack">
+            <button class="btn btn-primary" data-go="D6" onclick="document.getElementById('viewModal').style.display='none';">Fighter</button>
+            <button class="btn btn-secondary" data-go="D7" onclick="document.getElementById('viewModal').style.display='none';">Timekeeper</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== D6 · MATCH IN PROGRESS — FIGHTER VIEW (always-dark, phone goes face-down) ===== -->
+  <section class="screen screen-fullbody" data-screen="D6">
+    <div class="fighter-view">
+      <div class="meta" style="margin-bottom: var(--space-4); color: var(--color-data-gray-bright);">vs CREONTE MIKE · 1610</div>
+      <div class="timer" id="timerD6">10:00</div>
+      <div class="meta" style="margin-top: var(--space-6); color: var(--color-data-gray);">Put your phone down. Compete.</div>
+      <button class="btn btn-tertiary" data-go="D8" style="margin-top: var(--space-12); color: var(--color-data-gray-bright);">Skip to End →</button>
+    </div>
+  </section>
+
+  <!-- ===== D7 · MATCH IN PROGRESS — TIMEKEEPER VIEW ===== -->
+  <section class="screen" data-screen="D7" style="grid-template-rows: 1fr auto;">
+    <div class="tk-viewfinder">
+      <div class="rec-pill">REC</div>
+      <div class="meta">Camera Viewfinder</div>
+    </div>
+    <div class="pad" style="background: var(--bg-secondary); border-top: 1px solid var(--border-hairline);">
+      <div class="num-mono center" style="font-size: 64px; line-height: 1; color: var(--state-negative); letter-spacing: -0.04em; margin-bottom: var(--space-3);" id="timerD7">10:00</div>
+      <div class="row" style="justify-content: space-between; margin-bottom: var(--space-4);">
+        <div>
+          <div class="h2">Mattie Spoons</div>
+          <div class="meta">1500 · 77 kg</div>
+        </div>
+        <div class="meta" style="color: var(--accent-cta);">VS</div>
+        <div style="text-align: right;">
+          <div class="h2">Creonte Mike</div>
+          <div class="meta">1610 · 82 kg</div>
+        </div>
+      </div>
+      <div class="row" style="gap: var(--space-2);">
+        <button class="btn btn-secondary" style="flex: 1;">⏸ Pause</button>
+        <button class="btn btn-primary" data-go="D8" style="flex: 1;">End Match</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== D8 · SELECT WINNER + SUBMISSION ===== -->
+  <section class="screen screen-with-nav" data-screen="D8">
+    <header class="topbar">
+      <span style="width: 32px;"></span>
+      <span class="nav-title">Match Ended</span>
+      <span style="width: 32px;"></span>
+    </header>
+    <div class="scroll pad">
+      <div class="lede center" style="margin-bottom: var(--space-5);">Timekeeper records the result.</div>
+
+      <div class="meta" style="margin-bottom: var(--space-2);">Winner</div>
+      <div class="row" style="gap: var(--space-2); margin-bottom: var(--space-5);">
+        <button class="btn btn-secondary winner-pick" data-pick="Mattie Spoons" style="flex: 1;">Mattie Spoons</button>
+        <button class="btn btn-secondary winner-pick" data-pick="Creonte Mike" style="flex: 1;">Creonte Mike</button>
+      </div>
+
+      <div class="meta" style="margin-bottom: var(--space-2);">Submission</div>
+      <div class="sub-grid" id="subGrid" style="margin-bottom: var(--space-5);">
+        <button data-sub="Rear Naked Choke">Rear Naked Choke</button>
+        <button data-sub="Guillotine">Guillotine</button>
+        <button data-sub="Triangle">Triangle</button>
+        <button data-sub="Armbar">Armbar</button>
+        <button data-sub="Kimura">Kimura</button>
+        <button data-sub="Americana">Americana</button>
+        <button data-sub="Heel Hook">Heel Hook</button>
+        <button data-sub="Knee Bar">Knee Bar</button>
+        <button data-sub="Ezekiel">Ezekiel</button>
+        <button data-sub="D'Arce">D'Arce</button>
+        <button data-sub="Anaconda">Anaconda</button>
+        <button data-sub="Other">Other</button>
+      </div>
+
+      <button class="btn btn-primary" id="submitResult" data-go="D9" disabled>Submit Result</button>
+    </div>
+  </section>
+
+  <!-- ===== D9 · MATCH SUMMARY ===== -->
+  <section class="screen screen-with-nav" data-screen="D9">
+    <header class="topbar">
+      <span style="width: 32px;"></span>
+      <span class="nav-title">Match Summary</span>
+      <span style="width: 32px;"></span>
+    </header>
+    <div class="scroll pad">
+      <div class="outcome-banner win" style="margin-bottom: var(--space-5);">
+        <div class="verdict">YOU WON</div>
+        <span class="delta up num-mono" data-tick-from="0" data-tick-to="22" id="d9delta">+22</span>
+      </div>
+
+      <div class="row" style="gap: var(--space-3); margin-bottom: var(--space-5);">
+        <div class="elo-tile" style="flex: 1;">
+          <div class="label">Before</div>
+          <div class="num" style="font-size: 36px;" data-tick-from="1500" data-tick-to="1500">1500</div>
+        </div>
+        <div class="elo-tile" style="flex: 1; border-color: var(--accent-cta);">
+          <div class="label">After</div>
+          <div class="num" style="font-size: 36px;" data-tick-from="1500" data-tick-to="1522" id="d9after">1500</div>
+        </div>
+      </div>
+
+      <div class="plate" style="margin-bottom: var(--space-5);">
+        <div class="stack-sm">
+          <div class="row" style="justify-content: space-between;">
+            <span class="meta">Method</span>
+            <span class="num-mono" style="font-size: var(--size-num-s); color: var(--text-primary);">SUBMISSION · ARMBAR</span>
+          </div>
+          <div class="row" style="justify-content: space-between;">
+            <span class="meta">Opponent</span>
+            <span class="num-mono" style="font-size: var(--size-num-s); color: var(--text-primary);">CREONTE MIKE · 1610</span>
+          </div>
+          <div class="row" style="justify-content: space-between;">
+            <span class="meta">Timekeeper</span>
+            <span class="num-mono" style="font-size: var(--size-num-s); color: var(--text-primary);">YELENA VOSKOV</span>
+          </div>
+          <div class="row" style="justify-content: space-between;">
+            <span class="meta">Win Probability</span>
+            <span class="num-mono" style="font-size: var(--size-num-s); color: var(--text-primary);">29%</span>
+          </div>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" data-go="D10">Confirm Result</button>
+      <button class="btn btn-tertiary" style="margin-top: var(--space-2);">Dispute</button>
+    </div>
+  </section>
+
+  <!-- ===== D10 · MATCH RECORDED ===== -->
+  <section class="screen screen-fullbody" data-screen="D10">
+    <div class="scroll pad" style="display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
+      <div style="font-family: var(--font-display); font-size: 88px; line-height: 1; color: var(--state-positive); margin-bottom: var(--space-5);">✓</div>
+      <div class="h-display" style="font-size: 40px; margin-bottom: var(--space-3);">MATCH RECORDED</div>
+      <div class="lede" style="margin-bottom: var(--space-8);">Your rating ticked from 1500 → 1522. Match footage is on your profile.</div>
+      <div class="stack" style="width: 100%;">
+        <button class="btn btn-primary" data-go="C4">Return to Lobby</button>
+        <button class="btn btn-secondary" data-go="B2">Exit Session</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== E1 · GYM FINDER ===== -->
+  <section class="screen screen-with-tabs" data-screen="E1">
+    <header class="topbar">
+      <button class="icon-btn" data-go="B2">‹</button>
+      <span class="nav-title">Gym Finder</span>
+      <span style="width: 32px;"></span>
+    </header>
+    <div class="scroll pad">
+      <div class="field">
+        <label class="field-label">City</label>
+        <select class="field-select">
+          <option>Toronto</option>
+          <option>Vancouver</option>
+        </select>
+      </div>
+      <div class="meta" style="margin-bottom: var(--space-3);">3 Partner Gyms</div>
+      <div class="stack">
+        <button class="plate live" style="text-align: left; cursor: pointer; background: var(--bg-elevated); border-color: var(--state-positive);" data-go="E2">
+          <div class="row" style="justify-content: space-between; margin-bottom: var(--space-2);">
+            <div class="h2">10th Planet Toronto</div>
+            <span class="live-pill">Live</span>
+          </div>
+          <div class="meta">123 Queen St W · 8 in lobby</div>
+        </button>
+        <button class="plate" style="text-align: left; cursor: pointer; background: var(--bg-elevated);" data-go="E2">
+          <div class="row" style="justify-content: space-between; margin-bottom: var(--space-2);">
+            <div class="h2">Brasa Toronto</div>
+            <span class="meta">Sun 11AM</span>
+          </div>
+          <div class="meta">456 Dundas St</div>
+        </button>
+        <button class="plate" style="text-align: left; cursor: pointer; background: var(--bg-elevated);" data-go="E2">
+          <div class="row" style="justify-content: space-between; margin-bottom: var(--space-2);">
+            <div class="h2">BJJ Globetrotters TO</div>
+            <span class="meta">No sessions</span>
+          </div>
+          <div class="meta">789 Yonge St</div>
+        </button>
+      </div>
+    </div>
+    <nav class="tabbar">
+      <button class="tab" data-tab="home" data-go="B2"><span class="glyph">⌂</span>Home</button>
+      <button class="tab active" data-tab="gym" data-go="E1"><span class="glyph">◎</span>Gyms</button>
+      <button class="tab" data-tab="ladder" data-go="F1"><span class="glyph">≡</span>Ladder</button>
+      <button class="tab" data-tab="profile" data-go="G1"><span class="glyph">●</span>Profile</button>
+    </nav>
+  </section>
+
+  <!-- ===== E2 · GYM DETAILS ===== -->
+  <section class="screen screen-with-tabs" data-screen="E2">
+    <header class="topbar">
+      <button class="icon-btn" data-go="E1">‹</button>
+      <span class="nav-title">Gym</span>
+      <span style="width: 32px;"></span>
+    </header>
+    <div class="scroll pad">
+      <div class="h1" style="margin-bottom: 2px;">10th Planet Toronto</div>
+      <div class="meta" style="margin-bottom: var(--space-4);">123 QUEEN ST W</div>
+
+      <div class="plate live" style="margin-bottom: var(--space-4);">
+        <div class="row" style="justify-content: space-between; margin-bottom: var(--space-2);">
+          <span class="live-pill">Session Live</span>
+          <span class="meta">8 in lobby</span>
+        </div>
+        <button class="btn btn-primary" data-go="C1">Join Lobby</button>
+      </div>
+
+      <div class="meta" style="margin-bottom: var(--space-2);">Upcoming ELO Sessions</div>
+      <div class="stack-sm" style="margin-bottom: var(--space-4);">
+        <div class="participant">
+          <div>
+            <div class="name">Tue 7PM</div>
+            <div class="elo">Apr 28 · 6 attending</div>
+          </div>
+          <span></span>
+          <button class="btn btn-secondary btn-sm" style="width: auto;">Attend</button>
+        </div>
+        <div class="participant">
+          <div>
+            <div class="name">Thu 7PM</div>
+            <div class="elo">Apr 30 · 4 attending</div>
+          </div>
+          <span></span>
+          <button class="btn btn-secondary btn-sm" style="width: auto;">Attend</button>
+        </div>
+        <div class="participant">
+          <div>
+            <div class="name">Sat 2PM</div>
+            <div class="elo">May 2 · 9 attending</div>
+          </div>
+          <span></span>
+          <button class="btn btn-primary btn-sm" style="width: auto;">✓ Going</button>
+        </div>
+      </div>
+
+      <div class="grid-2" style="margin-bottom: var(--space-4);">
+        <div class="elo-tile">
+          <div class="label">Avg Session</div>
+          <div class="num" style="font-size: 36px;">12</div>
+        </div>
+        <div class="elo-tile">
+          <div class="label">Avg ELO</div>
+          <div class="num" style="font-size: 36px;">1540</div>
+        </div>
+      </div>
+
+      <div class="plate" style="margin-bottom: var(--space-4);">
+        <div class="meta" style="margin-bottom: var(--space-3);">Last Session · Apr 22</div>
+        <div class="grid-2" style="gap: var(--space-2) var(--space-4); font-family: var(--font-mono); font-size: var(--size-num-s);">
+          <div class="row" style="justify-content: space-between;"><span class="meta">Attendees</span><span class="num-mono" style="color: var(--text-primary);">14</span></div>
+          <div class="row" style="justify-content: space-between;"><span class="meta">Avg Matches</span><span class="num-mono" style="color: var(--text-primary);">3.2</span></div>
+          <div class="row" style="justify-content: space-between;"><span class="meta">ELO Range</span><span class="num-mono" style="color: var(--text-primary);">1320–1720</span></div>
+          <div class="row" style="justify-content: space-between;"><span class="meta">Median</span><span class="num-mono" style="color: var(--text-primary);">1495</span></div>
+        </div>
+      </div>
+    </div>
+    <nav class="tabbar">
+      <button class="tab" data-tab="home" data-go="B2"><span class="glyph">⌂</span>Home</button>
+      <button class="tab active" data-tab="gym" data-go="E1"><span class="glyph">◎</span>Gyms</button>
+      <button class="tab" data-tab="ladder" data-go="F1"><span class="glyph">≡</span>Ladder</button>
+      <button class="tab" data-tab="profile" data-go="G1"><span class="glyph">●</span>Profile</button>
+    </nav>
+  </section>
+
+  <!-- ===== F1 · GLOBAL LADDER ===== -->
+  <section class="screen screen-with-tabs" data-screen="F1">
+    <header class="topbar">
+      <span class="wordmark">ELO&nbsp;RATED</span>
+      <span></span>
+      <span class="avatar">M·S</span>
+    </header>
+    <div class="scroll" style="padding: 0;">
+      <div class="pad-sm" style="border-bottom: 1px solid var(--border-hairline-faint);">
+        <div class="chips">
+          <button class="chip active">Global</button>
+          <button class="chip">My Gym</button>
+          <button class="chip">−77 kg</button>
+          <button class="chip">Female</button>
+        </div>
+      </div>
+      <div class="pad-sm" style="padding-bottom: 0;">
+        <div class="meta" style="margin-bottom: var(--space-2);">12,847 Athletes · Live</div>
+      </div>
+      <div class="stack-sm" style="padding: 0 var(--space-3) var(--space-4); display: flex; flex-direction: column; gap: 1px;">
+        <div class="ladder-row leader" data-go="PROFILE_VIEW" data-name="Tristan Charbonneau" data-elo="2487" data-gym="10th Planet Toronto">
+          <span class="rank">01</span>
+          <div>
+            <div class="athlete-name">Tristan Charbonneau</div>
+            <div class="athlete-gym">10th Planet Toronto · −77 kg</div>
+          </div>
+          <div class="stat"><span class="num">2487</span><span class="delta up">12</span></div>
+        </div>
+        <div class="ladder-row" data-go="PROFILE_VIEW" data-name="Slim Reaper" data-elo="2451" data-gym="BJJ Globetrotters">
+          <span class="rank">02</span>
+          <div>
+            <div class="athlete-name">Slim Reaper</div>
+            <div class="athlete-gym">BJJ Globetrotters · −83 kg</div>
+          </div>
+          <div class="stat"><span class="num">2451</span><span class="delta up">8</span></div>
+        </div>
+        <div class="ladder-row" data-go="PROFILE_VIEW" data-name="Carla Mendes" data-elo="2403" data-gym="Brasa Toronto">
+          <span class="rank">03</span>
+          <div>
+            <div class="athlete-name">Carla Mendes</div>
+            <div class="athlete-gym">Brasa Toronto · −64 kg</div>
+          </div>
+          <div class="stat"><span class="num">2403</span><span class="delta down">4</span></div>
+        </div>
+        <div class="ladder-row" data-go="PROFILE_VIEW" data-name="Hideo Tanaka" data-elo="2389" data-gym="Polaris BJJ Vancouver">
+          <span class="rank">04</span>
+          <div>
+            <div class="athlete-name">Hideo Tanaka</div>
+            <div class="athlete-gym">Polaris BJJ Vancouver · −70 kg</div>
+          </div>
+          <div class="stat"><span class="num">2389</span><span class="delta up">15</span></div>
+        </div>
+        <div class="ladder-row" data-go="PROFILE_VIEW" data-name="Micah Brakefield" data-elo="2367" data-gym="10th Planet Toronto">
+          <span class="rank">05</span>
+          <div>
+            <div class="athlete-name">Micah Brakefield</div>
+            <div class="athlete-gym">10th Planet Toronto · −83 kg</div>
+          </div>
+          <div class="stat"><span class="num">2367</span><span class="delta down">2</span></div>
+        </div>
+        <div class="ladder-row" data-go="PROFILE_VIEW" data-name="Creonte Mike" data-elo="2342" data-gym="Renzo Gracie Vancouver">
+          <span class="rank">06</span>
+          <div>
+            <div class="athlete-name">Creonte Mike</div>
+            <div class="athlete-gym">Renzo Gracie Vancouver · −77 kg</div>
+          </div>
+          <div class="stat"><span class="num">2342</span><span class="delta up">7</span></div>
+        </div>
+        <div class="ladder-row" data-go="PROFILE_VIEW" data-name="Devon Reyes" data-elo="2298" data-gym="Apex Submissions">
+          <span class="rank">07</span>
+          <div>
+            <div class="athlete-name">Devon Reyes</div>
+            <div class="athlete-gym">Apex Submissions · −83 kg</div>
+          </div>
+          <div class="stat"><span class="num">2298</span><span class="delta flat">0</span></div>
+        </div>
+      </div>
+      <div class="ladder-row you" style="border-top: 1px solid var(--border-hairline-strong); background: var(--bg-secondary); padding: var(--space-4); margin: 0;">
+        <span class="rank" style="color: var(--state-positive);">847</span>
+        <div>
+          <div class="athlete-name">Mattie Spoons · You</div>
+          <div class="athlete-gym">10th Planet Toronto · −77 kg</div>
+        </div>
+        <div class="stat"><span class="num">1500</span><span class="delta flat">0</span></div>
+      </div>
+    </div>
+    <nav class="tabbar">
+      <button class="tab" data-tab="home" data-go="B2"><span class="glyph">⌂</span>Home</button>
+      <button class="tab" data-tab="gym" data-go="E1"><span class="glyph">◎</span>Gyms</button>
+      <button class="tab active" data-tab="ladder" data-go="F1"><span class="glyph">≡</span>Ladder</button>
+      <button class="tab" data-tab="profile" data-go="G1"><span class="glyph">●</span>Profile</button>
+    </nav>
+  </section>
+
+  <!-- ===== G1 · MY PROFILE ===== -->
+  <section class="screen screen-with-tabs" data-screen="G1">
+    <header class="topbar">
+      <span style="width: 32px;"></span>
+      <span class="nav-title">Profile</span>
+      <button class="icon-btn" aria-label="Share">↗</button>
+    </header>
+    <div class="scroll pad">
+      <div class="center" style="margin-bottom: var(--space-5);">
+        <div style="width: 80px; height: 80px; margin: 0 auto var(--space-3); border-radius: var(--radius-md); background: var(--bg-elevated); border: 1px solid var(--border-hairline); display: grid; place-items: center; font-family: var(--font-mono); font-weight: 700; font-size: 24px; color: var(--text-primary);">M·S</div>
+        <div class="h1">Mattie Spoons</div>
+        <div class="meta" style="margin-top: var(--space-1);">10th Planet Toronto · 77 kg · Female</div>
+      </div>
+
+      <div class="elo-tile" style="margin-bottom: var(--space-4);">
+        <div class="label">ELO Rating</div>
+        <div class="num">1500</div>
+        <div class="meta" style="margin-top: var(--space-2); color: var(--accent-cta);">#847 · GLOBAL</div>
+      </div>
+
+      <div class="grid-2" style="margin-bottom: var(--space-4);">
+        <div class="elo-tile" style="padding: var(--space-3);">
+          <div class="label">Matches</div>
+          <div class="num" style="font-size: 28px;">0</div>
+        </div>
+        <div class="elo-tile" style="padding: var(--space-3);">
+          <div class="label">Win Rate</div>
+          <div class="num" style="font-size: 28px;">—</div>
+        </div>
+      </div>
+
+      <div class="stack">
+        <button class="btn btn-secondary" data-go="G2">Edit Profile</button>
+        <button class="btn btn-secondary" data-go="G3">Settings</button>
+      </div>
+    </div>
+    <nav class="tabbar">
+      <button class="tab" data-tab="home" data-go="B2"><span class="glyph">⌂</span>Home</button>
+      <button class="tab" data-tab="gym" data-go="E1"><span class="glyph">◎</span>Gyms</button>
+      <button class="tab" data-tab="ladder" data-go="F1"><span class="glyph">≡</span>Ladder</button>
+      <button class="tab active" data-tab="profile" data-go="G1"><span class="glyph">●</span>Profile</button>
+    </nav>
+  </section>
+
+  <!-- ===== G2 · EDIT PROFILE ===== -->
+  <section class="screen screen-with-nav" data-screen="G2">
+    <header class="topbar">
+      <button class="icon-btn" data-go="G1">‹</button>
+      <span class="nav-title">Edit Profile</span>
+      <span style="width: 32px;"></span>
+    </header>
+    <div class="scroll pad">
+      <div class="field">
+        <label class="field-label">First Name</label>
+        <input class="field-input" type="text" value="Mattie" />
+      </div>
+      <div class="field">
+        <label class="field-label">Last Name</label>
+        <input class="field-input" type="text" value="Spoons" />
+      </div>
+      <div class="field">
+        <label class="field-label">Weight (kg)</label>
+        <input class="field-input" type="number" value="77" />
+      </div>
+      <div class="field">
+        <label class="field-label">Home Gym</label>
+        <select class="field-select">
+          <option>10th Planet Toronto</option>
+          <option>Brasa Toronto</option>
+          <option>BJJ Globetrotters TO</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" data-go="G1" style="margin-top: var(--space-4);">Save Changes</button>
+    </div>
+  </section>
+
+  <!-- ===== G3 · SETTINGS ===== -->
+  <section class="screen screen-with-nav" data-screen="G3">
+    <header class="topbar">
+      <button class="icon-btn" data-go="G1">‹</button>
+      <span class="nav-title">Settings</span>
+      <span style="width: 32px;"></span>
+    </header>
+    <div class="scroll pad">
+      <div class="stack">
+        <button class="btn btn-secondary" style="justify-content: flex-start;">⚙ Notifications</button>
+        <button class="btn btn-secondary" style="justify-content: flex-start;">▶ Video &amp; Recording</button>
+        <button class="btn btn-secondary" style="justify-content: flex-start;">⊕ Connected Gyms</button>
+        <button class="btn btn-secondary" style="justify-content: flex-start;" data-go="G4">? Help &amp; Support</button>
+        <button class="btn btn-secondary" style="justify-content: flex-start;">✉ Feedback</button>
+        <div style="margin-top: var(--space-6);">
+          <button class="btn" style="background: var(--accent-cta); color: var(--text-on-accent);" data-go="A1">Log Out</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== G4 · HELP &amp; SUPPORT ===== -->
+  <section class="screen screen-with-nav" data-screen="G4">
+    <header class="topbar">
+      <button class="icon-btn" data-go="G3">‹</button>
+      <span class="nav-title">Help &amp; Support</span>
+      <span style="width: 32px;"></span>
+    </header>
+    <div class="scroll pad">
+      <div class="stack">
+        <div class="plate">
+          <div class="h2" style="margin-bottom: var(--space-2);">Getting Started</div>
+          <div class="lede">How to RSVP to a session, enter the lobby, and request your first match.</div>
+        </div>
+        <div class="plate">
+          <div class="h2" style="margin-bottom: var(--space-2);">How ELO Works</div>
+          <div class="lede">Submission-only. Weight-normalized. ±1 floor on every win, loss, and draw. Your number reflects current skill — match by match.</div>
+        </div>
+        <div class="plate">
+          <div class="h2" style="margin-bottom: var(--space-2);">Match Footage &amp; Privacy</div>
+          <div class="lede">You always own and can always download your own footage. Public ladder shows rating, gym, weight class — no personal data.</div>
+        </div>
+        <div class="plate">
+          <div class="h2" style="margin-bottom: var(--space-2);">Report a Problem</div>
+          <div class="lede">Disputes, technical issues, or conduct concerns. Reach support@elorated.com.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== PROFILE_VIEW · OTHER ATHLETE ===== -->
+  <section class="screen screen-with-nav" data-screen="PROFILE_VIEW">
+    <header class="topbar">
+      <button class="icon-btn" id="pvBack">‹</button>
+      <span class="nav-title">Athlete</span>
+      <button class="icon-btn" aria-label="Share">↗</button>
+    </header>
+    <div class="scroll pad">
+      <div class="center" style="margin-bottom: var(--space-5);">
+        <div style="width: 80px; height: 80px; margin: 0 auto var(--space-3); border-radius: var(--radius-md); background: var(--bg-elevated); border: 1px solid var(--border-hairline); display: grid; place-items: center; font-family: var(--font-mono); font-weight: 700; font-size: 24px; color: var(--text-primary);" id="pvInitials">T·C</div>
+        <div class="h1" id="pvName">Tristan Charbonneau</div>
+        <div class="meta" id="pvGym" style="margin-top: var(--space-1);">10TH PLANET TORONTO</div>
+      </div>
+
+      <div class="elo-tile" style="margin-bottom: var(--space-4);">
+        <div class="label">ELO Rating</div>
+        <div class="num" id="pvElo">2487</div>
+        <div class="meta" style="margin-top: var(--space-2); color: var(--accent-cta);">#01 · GLOBAL</div>
+      </div>
+
+      <div class="grid-2" style="margin-bottom: var(--space-4);">
+        <div class="elo-tile" style="padding: var(--space-3);">
+          <div class="label">Record</div>
+          <div class="num" style="font-size: 28px;">142W · 38L</div>
+        </div>
+        <div class="elo-tile" style="padding: var(--space-3);">
+          <div class="label">Win Rate</div>
+          <div class="num" style="font-size: 28px;">79%</div>
+        </div>
+      </div>
+
+      <div class="meta" style="margin-bottom: var(--space-3);">Recent Matches</div>
+      <div class="stack-sm">
+        <div class="participant">
+          <div>
+            <div class="name">vs Hideo Tanaka</div>
+            <div class="elo">Yesterday · Submission · Heel Hook</div>
+          </div>
+          <span></span>
+          <span class="delta up num-mono">12</span>
+        </div>
+        <div class="participant">
+          <div>
+            <div class="name">vs Slim Reaper</div>
+            <div class="elo">Apr 22 · Submission · RNC</div>
+          </div>
+          <span></span>
+          <span class="delta up num-mono">7</span>
+        </div>
+        <div class="participant">
+          <div>
+            <div class="name">vs Devon Reyes</div>
+            <div class="elo">Apr 18 · Decision (Time)</div>
+          </div>
+          <span></span>
+          <span class="delta down num-mono">−4</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== A4 · FORGOT PASSWORD ===== -->
+  <section class="screen screen-with-nav" data-screen="A4">
+    <header class="topbar">
+      <button class="icon-btn" data-go="A1">‹</button>
+      <span class="nav-title">Reset Password</span>
+      <span style="width: 32px;"></span>
+    </header>
+    <div class="scroll pad">
+      <div class="lede" style="margin-bottom: var(--space-5);">Enter your email and we'll send a reset link.</div>
+      <div class="field">
+        <label class="field-label">Email</label>
+        <input class="field-input" type="email" placeholder="you@example.com" />
+      </div>
+      <button class="btn btn-primary" data-go="A1" style="margin-top: var(--space-4);">Send Reset Link</button>
+      <button class="btn btn-tertiary" data-go="A1" style="margin-top: var(--space-2);">Back to sign in</button>
+    </div>
+  </section>
+
+  <!-- ===== A5 · SETUP · IDENTITY STEP ===== -->
+  <section class="screen screen-with-nav" data-screen="A5">
+    <header class="topbar">
+      <button class="icon-btn" data-go="A3">‹</button>
+      <span class="nav-title">Setup</span>
+      <span style="width: 32px;"></span>
+    </header>
+    <div class="scroll pad">
+      <div class="meta" style="margin-bottom: var(--space-4);">Step 2 / 3 · Identity</div>
+      <div class="field">
+        <label class="field-label">Display Name</label>
+        <input class="field-input" type="text" value="Mattie Spoons" />
+      </div>
+      <div class="field">
+        <label class="field-label">Date of Birth</label>
+        <input class="field-input" type="date" value="1995-06-15" />
+      </div>
+      <div class="field">
+        <label class="field-label">Gender</label>
+        <div class="radio-row" style="flex-wrap: wrap; gap: var(--space-3);">
+          <label><input type="radio" name="a5gender" /> Male</label>
+          <label><input type="radio" name="a5gender" checked /> Female</label>
+          <label><input type="radio" name="a5gender" /> Non-binary</label>
+          <label><input type="radio" name="a5gender" /> Prefer not to say</label>
+        </div>
+      </div>
+      <div class="field">
+        <label class="field-label">City</label>
+        <select class="field-select">
+          <option>Toronto</option>
+          <option>Vancouver</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" data-go="A6" style="margin-top: var(--space-4);">Continue</button>
+    </div>
+  </section>
+
+  <!-- ===== A6 · SETUP · TRAINING STEP ===== -->
+  <section class="screen screen-with-nav" data-screen="A6">
+    <header class="topbar">
+      <button class="icon-btn" data-go="A5">‹</button>
+      <span class="nav-title">Setup</span>
+      <span style="width: 32px;"></span>
+    </header>
+    <div class="scroll pad">
+      <div class="meta" style="margin-bottom: var(--space-4);">Step 3 / 3 · Training</div>
+      <div class="plate" style="margin-bottom: var(--space-4);">
+        <div class="row" style="justify-content: space-between;">
+          <div>
+            <div class="h2">Train at multiple gyms?</div>
+            <div class="lede" style="font-size: var(--size-body-s);">Free agents skip the home gym requirement.</div>
+          </div>
+          <div style="width: 36px; height: 20px; background: var(--bg-elevated-hover); border: 1px solid var(--border-hairline-strong); border-radius: var(--radius-xs); position: relative;">
+            <div style="position: absolute; top: 1px; left: 1px; width: 16px; height: 16px; background: var(--text-tertiary); border-radius: var(--radius-xs);"></div>
+          </div>
+        </div>
+      </div>
+      <div class="field">
+        <label class="field-label">Home Gym</label>
+        <select class="field-select">
+          <option>10th Planet Toronto</option>
+          <option>Brasa Toronto</option>
+          <option>BJJ Globetrotters</option>
+        </select>
+      </div>
+      <div class="field">
+        <label class="field-label">Weight (kg)</label>
+        <input class="field-input" type="number" value="77" />
+      </div>
+      <button class="btn btn-primary" data-go="B1" style="margin-top: var(--space-4);">Activate Profile</button>
+    </div>
+  </section>
+
+  <!-- ===== F2 · GLOBAL LADDER · GYMS ===== -->
+  <section class="screen screen-with-tabs" data-screen="F2">
+    <header class="topbar">
+      <span class="wordmark">ELO&nbsp;RATED</span>
+      <span></span>
+      <span class="avatar">M·S</span>
+    </header>
+    <div class="scroll" style="padding: 0;">
+      <div class="pad-sm" style="border-bottom: 1px solid var(--border-hairline-faint);">
+        <div class="chips">
+          <button class="chip" data-go="F1">Fighters</button>
+          <button class="chip active">Gyms</button>
+        </div>
+      </div>
+      <div class="pad-sm" style="padding-bottom: 0;">
+        <div class="meta" style="margin-bottom: var(--space-2);">Top Gyms by Avg ELO</div>
+      </div>
+      <div class="stack-sm" style="padding: 0 var(--space-3) var(--space-4); display: flex; flex-direction: column; gap: 1px;">
+        <div class="ladder-row leader">
+          <span class="rank">01</span>
+          <div>
+            <div class="athlete-name">10th Planet Toronto</div>
+            <div class="athlete-gym">47 members</div>
+          </div>
+          <div class="stat"><span class="num">1842</span></div>
+        </div>
+        <div class="ladder-row">
+          <span class="rank">02</span>
+          <div>
+            <div class="athlete-name">Brasa Toronto</div>
+            <div class="athlete-gym">62 members</div>
+          </div>
+          <div class="stat"><span class="num">1798</span></div>
+        </div>
+        <div class="ladder-row">
+          <span class="rank">03</span>
+          <div>
+            <div class="athlete-name">BJJ Globetrotters</div>
+            <div class="athlete-gym">38 members</div>
+          </div>
+          <div class="stat"><span class="num">1764</span></div>
+        </div>
+        <div class="ladder-row">
+          <span class="rank">04</span>
+          <div>
+            <div class="athlete-name">Polaris BJJ Vancouver</div>
+            <div class="athlete-gym">51 members</div>
+          </div>
+          <div class="stat"><span class="num">1731</span></div>
+        </div>
+        <div class="ladder-row">
+          <span class="rank">05</span>
+          <div>
+            <div class="athlete-name">Renzo Gracie Vancouver</div>
+            <div class="athlete-gym">44 members</div>
+          </div>
+          <div class="stat"><span class="num">1702</span></div>
+        </div>
+      </div>
+    </div>
+    <nav class="tabbar">
+      <button class="tab" data-tab="home" data-go="B2"><span class="glyph">⌂</span>Home</button>
+      <button class="tab" data-tab="gym" data-go="E1"><span class="glyph">◎</span>Gyms</button>
+      <button class="tab active" data-tab="ladder" data-go="F1"><span class="glyph">≡</span>Ladder</button>
+      <button class="tab" data-tab="profile" data-go="G1"><span class="glyph">●</span>Profile</button>
+    </nav>
+  </section>
+
+  <!-- ===== G5 · PROFILE STATS ===== -->
+  <section class="screen screen-with-nav" data-screen="G5">
+    <header class="topbar">
+      <button class="icon-btn" data-go="G1">‹</button>
+      <span class="nav-title">Stats</span>
+      <span style="width: 32px;"></span>
+    </header>
+    <div class="scroll pad">
+      <div class="grid-2" style="margin-bottom: var(--space-5);">
+        <div class="elo-tile" style="padding: var(--space-4);">
+          <div class="label">Win Rate</div>
+          <div class="num" style="font-size: 36px;">68%</div>
+        </div>
+        <div class="elo-tile" style="padding: var(--space-4);">
+          <div class="label">Current Streak</div>
+          <div class="num" style="font-size: 36px;">W4</div>
+        </div>
+        <div class="elo-tile" style="padding: var(--space-4);">
+          <div class="label">Total Matches</div>
+          <div class="num" style="font-size: 36px;">28</div>
+        </div>
+        <div class="elo-tile" style="padding: var(--space-4);">
+          <div class="label">Avg ELO Δ</div>
+          <div class="num" style="font-size: 36px; color: var(--state-positive);">+11</div>
+        </div>
+      </div>
+
+      <div class="meta" style="margin-bottom: var(--space-3);">Weekly Activity</div>
+      <div class="plate" style="margin-bottom: var(--space-5);">
+        <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: var(--space-2); align-items: end; height: 120px;">
+          <div style="height: 20px; background: var(--accent-cta); border-radius: var(--radius-xs);"></div>
+          <div style="height: 40px; background: var(--accent-cta); border-radius: var(--radius-xs);"></div>
+          <div style="height: 65px; background: var(--accent-cta); border-radius: var(--radius-xs);"></div>
+          <div style="height: 30px; background: var(--accent-cta); border-radius: var(--radius-xs);"></div>
+          <div style="height: 80px; background: var(--accent-cta); border-radius: var(--radius-xs);"></div>
+          <div style="height: 100px; background: var(--accent-cta); border-radius: var(--radius-xs);"></div>
+          <div style="height: 45px; background: var(--accent-cta); border-radius: var(--radius-xs);"></div>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: var(--space-2); margin-top: var(--space-2);">
+          <div class="num-mono" style="font-size: var(--size-num-xs); color: var(--text-tertiary); text-align: center;">MON</div>
+          <div class="num-mono" style="font-size: var(--size-num-xs); color: var(--text-tertiary); text-align: center;">TUE</div>
+          <div class="num-mono" style="font-size: var(--size-num-xs); color: var(--text-tertiary); text-align: center;">WED</div>
+          <div class="num-mono" style="font-size: var(--size-num-xs); color: var(--text-tertiary); text-align: center;">THU</div>
+          <div class="num-mono" style="font-size: var(--size-num-xs); color: var(--text-tertiary); text-align: center;">FRI</div>
+          <div class="num-mono" style="font-size: var(--size-num-xs); color: var(--text-tertiary); text-align: center;">SAT</div>
+          <div class="num-mono" style="font-size: var(--size-num-xs); color: var(--text-tertiary); text-align: center;">SUN</div>
+        </div>
+      </div>
+
+      <div class="meta" style="margin-bottom: var(--space-3);">Submission Breakdown</div>
+      <div class="stack-sm">
+        <div class="plate" style="padding: var(--space-3);">
+          <div class="row" style="justify-content: space-between; margin-bottom: var(--space-2);">
+            <div class="h2" style="font-size: var(--size-heading-s);">RNC</div>
+            <div class="num-mono" style="color: var(--text-primary);">12</div>
+          </div>
+          <div style="height: 4px; background: var(--bg-elevated-hover); border-radius: var(--radius-xs); overflow: hidden;"><div style="width: 100%; height: 100%; background: var(--accent-cta);"></div></div>
+        </div>
+        <div class="plate" style="padding: var(--space-3);">
+          <div class="row" style="justify-content: space-between; margin-bottom: var(--space-2);">
+            <div class="h2" style="font-size: var(--size-heading-s);">Triangle</div>
+            <div class="num-mono" style="color: var(--text-primary);">8</div>
+          </div>
+          <div style="height: 4px; background: var(--bg-elevated-hover); border-radius: var(--radius-xs); overflow: hidden;"><div style="width: 67%; height: 100%; background: var(--accent-cta);"></div></div>
+        </div>
+        <div class="plate" style="padding: var(--space-3);">
+          <div class="row" style="justify-content: space-between; margin-bottom: var(--space-2);">
+            <div class="h2" style="font-size: var(--size-heading-s);">Armbar</div>
+            <div class="num-mono" style="color: var(--text-primary);">5</div>
+          </div>
+          <div style="height: 4px; background: var(--bg-elevated-hover); border-radius: var(--radius-xs); overflow: hidden;"><div style="width: 42%; height: 100%; background: var(--accent-cta);"></div></div>
+        </div>
+        <div class="plate" style="padding: var(--space-3);">
+          <div class="row" style="justify-content: space-between; margin-bottom: var(--space-2);">
+            <div class="h2" style="font-size: var(--size-heading-s);">Heel Hook</div>
+            <div class="num-mono" style="color: var(--text-primary);">3</div>
+          </div>
+          <div style="height: 4px; background: var(--bg-elevated-hover); border-radius: var(--radius-xs); overflow: hidden;"><div style="width: 25%; height: 100%; background: var(--accent-cta);"></div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== H1 · NOTIFICATIONS ===== -->
+  <section class="screen screen-with-nav" data-screen="H1">
+    <header class="topbar">
+      <button class="icon-btn" data-go="B2">‹</button>
+      <span class="nav-title">Notifications</span>
+      <span style="width: 32px;"></span>
+    </header>
+    <div class="scroll pad">
+      <div class="stack-sm">
+        <div class="plate" style="border-left: 3px solid var(--accent-cta);">
+          <div class="meta" style="color: var(--accent-cta); margin-bottom: var(--space-2);">Challenge</div>
+          <div class="h2" style="margin-bottom: var(--space-2);">Tristan Charbonneau challenged you</div>
+          <div class="meta">2m ago</div>
+        </div>
+        <div class="plate" style="border-left: 3px solid var(--accent-cta);">
+          <div class="meta" style="color: var(--accent-cta); margin-bottom: var(--space-2);">Match</div>
+          <div class="h2" style="margin-bottom: var(--space-2);">Match recorded vs Creonte Mike: +22</div>
+          <div class="meta">14m ago</div>
+        </div>
+        <div class="plate" style="border-left: 3px solid var(--accent-cta);">
+          <div class="meta" style="color: var(--accent-cta); margin-bottom: var(--space-2);">Session</div>
+          <div class="h2" style="margin-bottom: var(--space-2);">Open mat starts in 30 min at 10th Planet Toronto</div>
+          <div class="meta">28m ago</div>
+        </div>
+        <div class="plate">
+          <div class="meta" style="margin-bottom: var(--space-2);">Match</div>
+          <div class="h2" style="margin-bottom: var(--space-2);">Result confirmed vs Slim Reaper: −14</div>
+          <div class="meta">Yesterday</div>
+        </div>
+        <div class="plate">
+          <div class="meta" style="margin-bottom: var(--space-2);">Challenge</div>
+          <div class="h2" style="margin-bottom: var(--space-2);">Carla Mendes accepted your challenge</div>
+          <div class="meta">2d ago</div>
+        </div>
+        <div class="plate">
+          <div class="meta" style="margin-bottom: var(--space-2);">Session</div>
+          <div class="h2" style="margin-bottom: var(--space-2);">Thursday open mat RSVP confirmed</div>
+          <div class="meta">3d ago</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== H2 · NOTIFICATION PREFERENCES ===== -->
+  <section class="screen screen-with-nav" data-screen="H2">
+    <header class="topbar">
+      <button class="icon-btn" data-go="G3">‹</button>
+      <span class="nav-title">Notifications</span>
+      <span style="width: 32px;"></span>
+    </header>
+    <div class="scroll pad">
+      <div class="meta" style="margin-bottom: var(--space-3);">Match Activity</div>
+      <div class="stack" style="margin-bottom: var(--space-5);">
+        <div class="plate">
+          <div class="row" style="justify-content: space-between;">
+            <div>
+              <div class="h2">Challenges</div>
+              <div class="lede" style="font-size: var(--size-body-s);">When someone challenges you to a match.</div>
+            </div>
+            <div style="width: 36px; height: 20px; background: var(--state-positive); border-radius: var(--radius-xs); position: relative;"><div style="position: absolute; top: 1px; right: 1px; width: 16px; height: 16px; background: var(--text-on-accent); border-radius: var(--radius-xs);"></div></div>
+          </div>
+        </div>
+        <div class="plate">
+          <div class="row" style="justify-content: space-between;">
+            <div>
+              <div class="h2">Match Results</div>
+              <div class="lede" style="font-size: var(--size-body-s);">Recorded results and ELO updates.</div>
+            </div>
+            <div style="width: 36px; height: 20px; background: var(--state-positive); border-radius: var(--radius-xs); position: relative;"><div style="position: absolute; top: 1px; right: 1px; width: 16px; height: 16px; background: var(--text-on-accent); border-radius: var(--radius-xs);"></div></div>
+          </div>
+        </div>
+        <div class="plate">
+          <div class="row" style="justify-content: space-between;">
+            <div>
+              <div class="h2">Session Starting</div>
+              <div class="lede" style="font-size: var(--size-body-s);">Reminder 30 min before your RSVP'd session.</div>
+            </div>
+            <div style="width: 36px; height: 20px; background: var(--state-positive); border-radius: var(--radius-xs); position: relative;"><div style="position: absolute; top: 1px; right: 1px; width: 16px; height: 16px; background: var(--text-on-accent); border-radius: var(--radius-xs);"></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="meta" style="margin-bottom: var(--space-3);">Other</div>
+      <div class="stack">
+        <div class="plate">
+          <div class="row" style="justify-content: space-between;">
+            <div>
+              <div class="h2">New Messages</div>
+              <div class="lede" style="font-size: var(--size-body-s);">Direct messages from other athletes.</div>
+            </div>
+            <div style="width: 36px; height: 20px; background: var(--state-positive); border-radius: var(--radius-xs); position: relative;"><div style="position: absolute; top: 1px; right: 1px; width: 16px; height: 16px; background: var(--text-on-accent); border-radius: var(--radius-xs);"></div></div>
+          </div>
+        </div>
+        <div class="plate">
+          <div class="row" style="justify-content: space-between;">
+            <div>
+              <div class="h2">ELO Milestones</div>
+              <div class="lede" style="font-size: var(--size-body-s);">Crossing rating thresholds (1500, 2000…).</div>
+            </div>
+            <div style="width: 36px; height: 20px; background: var(--bg-elevated-hover); border: 1px solid var(--border-hairline-strong); border-radius: var(--radius-xs); position: relative;"><div style="position: absolute; top: 1px; left: 1px; width: 16px; height: 16px; background: var(--text-tertiary); border-radius: var(--radius-xs);"></div></div>
+          </div>
+        </div>
+        <div class="plate">
+          <div class="row" style="justify-content: space-between;">
+            <div>
+              <div class="h2">Weekly Recap</div>
+              <div class="lede" style="font-size: var(--size-body-s);">Sunday summary of your training week.</div>
+            </div>
+            <div style="width: 36px; height: 20px; background: var(--bg-elevated-hover); border: 1px solid var(--border-hairline-strong); border-radius: var(--radius-xs); position: relative;"><div style="position: absolute; top: 1px; left: 1px; width: 16px; height: 16px; background: var(--text-tertiary); border-radius: var(--radius-xs);"></div></div>
+          </div>
+        </div>
+        <div class="plate">
+          <div class="row" style="justify-content: space-between;">
+            <div>
+              <div class="h2">Marketing</div>
+              <div class="lede" style="font-size: var(--size-body-s);">Product updates and partner gym news.</div>
+            </div>
+            <div style="width: 36px; height: 20px; background: var(--bg-elevated-hover); border: 1px solid var(--border-hairline-strong); border-radius: var(--radius-xs); position: relative;"><div style="position: absolute; top: 1px; left: 1px; width: 16px; height: 16px; background: var(--text-tertiary); border-radius: var(--radius-xs);"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== H3 · FEEDBACK ===== -->
+  <section class="screen screen-with-nav" data-screen="H3">
+    <header class="topbar">
+      <button class="icon-btn" data-go="G3">‹</button>
+      <span class="nav-title">Send Feedback</span>
+      <span style="width: 32px;"></span>
+    </header>
+    <div class="scroll pad">
+      <div class="lede" style="margin-bottom: var(--space-5);">Tell us what's working, what's broken, or what you wish ELO RATED could do.</div>
+      <div class="field">
+        <label class="field-label">Category</label>
+        <select class="field-select">
+          <option>Bug</option>
+          <option>Feature Request</option>
+          <option>General</option>
+          <option>Praise</option>
+        </select>
+      </div>
+      <div class="field">
+        <label class="field-label">Message</label>
+        <textarea class="field-input" rows="8" placeholder="What's on your mind?"></textarea>
+      </div>
+      <button class="btn btn-secondary" style="margin-bottom: var(--space-3);">+ Add Screenshot</button>
+      <button class="btn btn-primary" data-go="G3">Send Feedback</button>
+    </div>
+  </section>
+
+  <!-- ===== H4 · VIDEO SETTINGS ===== -->
+  <section class="screen screen-with-nav" data-screen="H4">
+    <header class="topbar">
+      <button class="icon-btn" data-go="G3">‹</button>
+      <span class="nav-title">Video &amp; Recording</span>
+      <span style="width: 32px;"></span>
+    </header>
+    <div class="scroll pad">
+      <div class="stack">
+        <div class="plate">
+          <div class="row" style="justify-content: space-between;">
+            <div>
+              <div class="h2">Auto-Record Matches</div>
+              <div class="lede" style="font-size: var(--size-body-s);">Start recording when a match goes live.</div>
+            </div>
+            <div style="width: 36px; height: 20px; background: var(--state-positive); border-radius: var(--radius-xs); position: relative;"><div style="position: absolute; top: 1px; right: 1px; width: 16px; height: 16px; background: var(--text-on-accent); border-radius: var(--radius-xs);"></div></div>
+          </div>
+        </div>
+        <div class="plate">
+          <div class="row" style="justify-content: space-between;">
+            <div>
+              <div class="h2">Save to Camera Roll</div>
+              <div class="lede" style="font-size: var(--size-body-s);">Keep a local copy after upload.</div>
+            </div>
+            <div style="width: 36px; height: 20px; background: var(--bg-elevated-hover); border: 1px solid var(--border-hairline-strong); border-radius: var(--radius-xs); position: relative;"><div style="position: absolute; top: 1px; left: 1px; width: 16px; height: 16px; background: var(--text-tertiary); border-radius: var(--radius-xs);"></div></div>
+          </div>
+        </div>
+        <div class="plate">
+          <div class="field-label" style="margin-bottom: var(--space-2);">Upload Quality</div>
+          <select class="field-select">
+            <option>720p</option>
+            <option selected>1080p</option>
+            <option>4K</option>
+          </select>
+        </div>
+        <div class="plate">
+          <div class="row" style="justify-content: space-between; margin-bottom: var(--space-3);">
+            <div class="h2">Storage Used</div>
+            <div class="num-mono" style="color: var(--text-primary);">1.2 GB / 5 GB</div>
+          </div>
+          <div style="height: 4px; background: var(--bg-elevated-hover); border-radius: var(--radius-xs); overflow: hidden;"><div style="width: 24%; height: 100%; background: var(--accent-cta);"></div></div>
+        </div>
+        <button class="btn btn-secondary" style="justify-content: flex-start;">Clear Local Cache · 1.2 GB</button>
+        <button class="btn" style="background: var(--accent-cta); color: var(--text-on-accent);">Delete All Recordings</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== I1 · OFFLINE BANNER OVERLAY ===== -->
+  <section class="screen screen-fullbody" data-screen="I1">
+    <div style="position: relative; height: 100%; overflow: hidden;">
+      <div style="opacity: 0.4; pointer-events: none; padding: var(--space-5);">
+        <div class="h2" style="margin-bottom: var(--space-4); color: var(--accent-cta); font-size: var(--size-label-l); letter-spacing: var(--ls-caps-l); text-transform: uppercase;">Offline Overlay Example</div>
+        <div class="meta" style="margin-bottom: var(--space-2);">Welcome back</div>
+        <div class="h1" style="margin-bottom: var(--space-5);">Mattie Spoons</div>
+        <div class="elo-tile" style="margin-bottom: var(--space-4);">
+          <div class="label">ELO Rating</div>
+          <div class="num">1500</div>
+          <div class="meta" style="margin-top: var(--space-2);">#847 · GLOBAL</div>
+        </div>
+        <div class="plate">
+          <div class="h2" style="margin-bottom: var(--space-2);">No active session</div>
+          <div class="lede">RSVP to an open mat to enter the ladder.</div>
+        </div>
+      </div>
+      <div style="position: absolute; bottom: 80px; left: 0; right: 0; background: var(--bg-secondary); border-top: 1px solid var(--border-hairline); padding: var(--space-3); text-align: center;">
+        <div class="meta" style="color: var(--accent-cta); margin-bottom: var(--space-1);">Offline</div>
+        <div class="lede">Some actions will sync when you reconnect.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== I2 · ERROR BOUNDARY OVERLAY ===== -->
+  <section class="screen screen-fullbody" data-screen="I2">
+    <div class="scroll pad" style="display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;">
+      <div style="font-family: var(--font-mono); font-size: 48px; line-height: 1; color: var(--accent-cta); margin-bottom: var(--space-5);">!</div>
+      <div class="h1" style="margin-bottom: var(--space-3);">Something Went Wrong</div>
+      <div class="lede" style="margin-bottom: var(--space-6); max-width: 280px;">We've logged this and the team is on it. Try again or sign out.</div>
+      <div class="stack" style="width: 100%; max-width: 280px;">
+        <button class="btn btn-primary">Try Again</button>
+        <button class="btn btn-secondary" data-go="A1">Sign Out</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== I3 · TOAST OVERLAY ===== -->
+  <section class="screen screen-fullbody" data-screen="I3">
+    <div style="position: relative; height: 100%; overflow: hidden;">
+      <div style="opacity: 0.4; pointer-events: none; padding: var(--space-5);">
+        <div class="h2" style="margin-bottom: var(--space-4); color: var(--accent-cta); font-size: var(--size-label-l); letter-spacing: var(--ls-caps-l); text-transform: uppercase;">Toast Overlay Example</div>
+        <div class="meta" style="margin-bottom: var(--space-2);">Welcome back</div>
+        <div class="h1" style="margin-bottom: var(--space-5);">Mattie Spoons</div>
+        <div class="elo-tile" style="margin-bottom: var(--space-4);">
+          <div class="label">ELO Rating</div>
+          <div class="num">1522</div>
+          <div class="meta" style="margin-top: var(--space-2);">#831 · GLOBAL</div>
+        </div>
+        <div class="plate">
+          <div class="h2" style="margin-bottom: var(--space-2);">No active session</div>
+          <div class="lede">RSVP to an open mat to enter the ladder.</div>
+        </div>
+      </div>
+      <div style="position: absolute; top: 80px; left: var(--space-4); right: var(--space-4); background: var(--bg-elevated); border: 1px solid var(--state-positive); border-left: 3px solid var(--state-positive); padding: var(--space-3) var(--space-4); border-radius: var(--radius-md);">
+        <div class="row" style="gap: var(--space-3);">
+          <div style="font-family: var(--font-mono); font-weight: 700; color: var(--state-positive); font-size: var(--size-num-m);">✓</div>
+          <div class="h2" style="font-size: var(--size-heading-s);">Match recorded · +22 ELO</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+  // =====================================================================
+  // Theme toggle (shared with the 3 individual screen mocks)
+  // =====================================================================
+  (function () {
+    const root = document.documentElement;
+    const dark = document.getElementById('t-dark');
+    const light = document.getElementById('t-light');
+    function apply(theme) {
+      root.dataset.theme = theme;
+      dark.setAttribute('aria-pressed', theme === 'dark');
+      light.setAttribute('aria-pressed', theme === 'light');
+      try { localStorage.setItem('elo-theme', theme); } catch (_) {}
+    }
+    let saved;
+    try { saved = localStorage.getItem('elo-theme'); } catch (_) {}
+    if (saved === 'light' || saved === 'dark') apply(saved);
+    dark.addEventListener('click', () => apply('dark'));
+    light.addEventListener('click', () => apply('light'));
+  })();
+
+  // =====================================================================
+  // Screen navigation — mirrors the React screen state from the original
+  // =====================================================================
+  let currentScreen = 'A1';
+  let lastTabScreen = 'B2';   // for PROFILE_VIEW back-nav
+  let timerInterval = null;
+  let timerSeconds = 600;
+
+  function renderTimer() {
+    const m = Math.floor(timerSeconds / 60);
+    const s = timerSeconds % 60;
+    const t = `${m}:${s.toString().padStart(2, '0')}`;
+    const t6 = document.getElementById('timerD6');
+    const t7 = document.getElementById('timerD7');
+    if (t6) t6.textContent = t;
+    if (t7) t7.textContent = t;
+  }
+  function startTimer() {
+    stopTimer();
+    timerSeconds = 600;
+    renderTimer();
+    timerInterval = setInterval(() => {
+      if (timerSeconds > 0) { timerSeconds--; renderTimer(); }
+    }, 1000);
+  }
+  function stopTimer() {
+    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+  }
+
+  function tickD9() {
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const dur = reduce ? 240 : 480;
+    const ease = (t) => 1 - Math.pow(1 - t, 3);
+    document.querySelectorAll('[data-screen="D9"] [data-tick-from]').forEach((el, i) => {
+      const from = parseInt(el.dataset.tickFrom, 10);
+      const to = parseInt(el.dataset.tickTo, 10);
+      if (from === to) return;
+      setTimeout(() => {
+        const start = performance.now();
+        function step(now) {
+          const t = Math.min(1, (now - start) / dur);
+          const v = Math.round(from + (to - from) * ease(t));
+          el.textContent = (el.id === 'd9delta' ? '+' : '') + v;
+          if (t < 1) requestAnimationFrame(step);
+        }
+        requestAnimationFrame(step);
+      }, 120 + i * 80);
+    });
+  }
+
+  function showScreen(id) {
+    if (!id) return;
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    const target = document.querySelector(`.screen[data-screen="${id}"]`);
+    if (!target) return;
+    target.classList.add('active');
+    currentScreen = id;
+
+    // Sync the picker
+    const sel = document.getElementById('screenPicker');
+    if (sel.value !== id) sel.value = id;
+
+    // Remember tab screen for PROFILE_VIEW back-nav
+    if (['B1','B2','C4','E1','E2','F1','G1'].includes(id)) lastTabScreen = id;
+
+    // Auto-advance timed screens (mirrors original useEffect timers)
+    if (id === 'C1') {
+      setTimeout(() => { if (currentScreen === 'C1') showScreen('C2'); }, 1500);
+    }
+    if (id === 'D1') {
+      setTimeout(() => { if (currentScreen === 'D1') showScreen('D3'); }, 2000);
+    }
+    if (id === 'D3') {
+      setTimeout(() => { if (currentScreen === 'D3') showScreen('D4'); }, 2000);
+    }
+
+    // Match timer for D6 / D7
+    if (id === 'D6' || id === 'D7') startTimer();
+    else stopTimer();
+
+    // D5 ready check — reset
+    if (id === 'D5') {
+      const r = document.getElementById('readyMattie');
+      const w = document.getElementById('tkWaiting');
+      const s = document.getElementById('tkStart');
+      if (r) {
+        r.style.background = 'var(--bg-elevated)';
+        r.style.color = 'var(--text-secondary)';
+        r.style.borderColor = 'var(--border-hairline-strong)';
+        r.textContent = 'Mattie Spoons — Tap When Ready';
+        r.dataset.ready = '';
+      }
+      if (w) w.style.display = 'block';
+      if (s) s.style.display = 'none';
+      const m = document.getElementById('viewModal');
+      if (m) m.style.display = 'none';
+    }
+
+    // D8 reset
+    if (id === 'D8') {
+      document.querySelectorAll('.winner-pick').forEach(b => b.classList.remove('selected'));
+      document.querySelectorAll('#subGrid button').forEach(b => b.classList.remove('selected'));
+      document.getElementById('submitResult').disabled = true;
+    }
+
+    // D9 rating-tick animation
+    if (id === 'D9') tickD9();
+
+    // C2 reset
+    if (id === 'C2') {
+      currentWaiver = 0;
+      renderWaiver();
+    }
+  }
+
+  // Wire all data-go elements
+  document.addEventListener('click', (e) => {
+    const el = e.target.closest('[data-go]');
+    if (!el) return;
+    if (el.tagName === 'INPUT') return;
+
+    // PROFILE_VIEW with custom data
+    if (el.dataset.go === 'PROFILE_VIEW' && el.dataset.name) {
+      const name = el.dataset.name;
+      const elo = el.dataset.elo;
+      const gym = el.dataset.gym;
+      document.getElementById('pvName').textContent = name;
+      document.getElementById('pvElo').textContent = elo;
+      document.getElementById('pvGym').textContent = gym.toUpperCase();
+      const initials = name.split(' ').map(p => p[0]).slice(0, 2).join('·');
+      document.getElementById('pvInitials').textContent = initials;
+    }
+    showScreen(el.dataset.go);
+  });
+
+  // Picker
+  document.getElementById('screenPicker').addEventListener('change', (e) => {
+    showScreen(e.target.value);
+  });
+
+  // PROFILE_VIEW back button
+  document.getElementById('pvBack').addEventListener('click', () => {
+    showScreen(lastTabScreen);
+  });
+
+  // =====================================================================
+  // Screen-specific behavior
+  // =====================================================================
+
+  // A3 — terms checkbox enables Create Account
+  const tos = document.getElementById('tos');
+  const tosBtn = document.getElementById('tosBtn');
+  if (tos && tosBtn) {
+    tos.addEventListener('change', () => {
+      tosBtn.disabled = !tos.checked;
+    });
+  }
+
+  // C2 — waiver paging
+  const waivers = [
+    { title: 'ELO RATED Liability Acknowledgement', body: 'I acknowledge that grappling carries inherent risks of physical injury, including sprains, strains, broken bones, dislocations, and head injuries. I assume all risks of participation and waive claims against ELO RATED, the host gym, and other participants. I certify that I am in good health and have no medical conditions preventing safe participation.' },
+    { title: '10th Planet Toronto · Gym Waiver', body: '10th Planet Toronto is not responsible for injuries, loss, or damage incurred during training or open mat. I have disclosed all relevant medical conditions and injuries. I will follow all safety rules and instructions provided by instructors and the timekeeper.' },
+    { title: 'Insurance Acknowledgement', body: 'I confirm I understand the risks of injury in grappling and acknowledge I may be required to provide proof of insurance. I understand my participation may be subject to verification of appropriate coverage.' },
+  ];
+  let currentWaiver = 0;
+  function renderWaiver() {
+    const cnt = document.getElementById('waiverCount');
+    const con = document.getElementById('waiverContent');
+    const btn = document.getElementById('waiverNext');
+    if (!cnt || !con || !btn) return;
+    cnt.textContent = `${currentWaiver + 1} / ${waivers.length}`;
+    con.innerHTML = `<div class="h2" style="margin-bottom: var(--space-3);">${waivers[currentWaiver].title}</div><p>${waivers[currentWaiver].body}</p>`;
+    btn.textContent = currentWaiver === waivers.length - 1 ? 'Accept All Waivers' : 'I Acknowledge';
+  }
+  const waiverBtn = document.getElementById('waiverNext');
+  if (waiverBtn) {
+    waiverBtn.addEventListener('click', () => {
+      if (currentWaiver < waivers.length - 1) {
+        currentWaiver++;
+        renderWaiver();
+      } else {
+        showScreen('C3');
+      }
+    });
+  }
+
+  // D5 — ready check toggle
+  const readyMattie = document.getElementById('readyMattie');
+  if (readyMattie) {
+    readyMattie.addEventListener('click', () => {
+      readyMattie.style.background = 'var(--bg-elevated)';
+      readyMattie.style.color = 'var(--state-positive)';
+      readyMattie.style.borderColor = 'var(--state-positive)';
+      readyMattie.textContent = '✓ Mattie Spoons — Ready';
+      readyMattie.dataset.ready = '1';
+      const w = document.getElementById('tkWaiting');
+      const s = document.getElementById('tkStart');
+      if (w) w.style.display = 'none';
+      if (s) s.style.display = 'inline-flex';
+    });
+  }
+
+  // D8 — winner + submission selection
+  let pickedWinner = null;
+  let pickedSub = null;
+  function refreshSubmitResult() {
+    const btn = document.getElementById('submitResult');
+    if (btn) btn.disabled = !(pickedWinner && pickedSub);
+  }
+  document.querySelectorAll('.winner-pick').forEach(b => {
+    b.addEventListener('click', () => {
+      document.querySelectorAll('.winner-pick').forEach(x => x.classList.remove('selected'));
+      b.classList.add('selected');
+      b.style.borderColor = 'var(--state-positive)';
+      b.style.color = 'var(--state-positive)';
+      pickedWinner = b.dataset.pick;
+      refreshSubmitResult();
+    });
+  });
+  document.querySelectorAll('#subGrid button').forEach(b => {
+    b.addEventListener('click', () => {
+      document.querySelectorAll('#subGrid button').forEach(x => x.classList.remove('selected'));
+      b.classList.add('selected');
+      pickedSub = b.dataset.sub;
+      refreshSubmitResult();
+    });
+  });
+
+  // Boot
+  showScreen('A1');
+</script>
+
+</body>
+</html>

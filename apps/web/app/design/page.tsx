@@ -15,6 +15,12 @@ const cards = [
       "Live component showcase with all variants and states.",
   },
   {
+    href: "/design/wireframe",
+    title: "Canonical Wireframe",
+    description:
+      "Alpha wireframe (28 screens, light + dark) synced from the SharePoint brand kit.",
+  },
+  {
     href: "/design/screens",
     title: "Web Screens",
     description:

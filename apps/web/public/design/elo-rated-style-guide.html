@@ -7,45 +7,50 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;700&family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./tokens.css">
 <style>
 /* ================================================================
    RESET + BASE
+   Canonical brand tokens come from ./tokens.css (single source of truth).
+   The bridge variables below map this page's local naming convention
+   (--void, --signal-red, --amber) onto the canonical --color-* tokens.
+   Do not redefine raw color values here.
    ================================================================ */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  /* Void (dark) tokens */
-  --void: #0D0F14;
-  --panel: #13151B;
-  --plate: #1A1D24;
-  --plate-bright: #242832;
-  --terminal-white: #E8EDF2;
-  --data-gray: #6B7280;
-  --data-gray-bright: #9CA3AF;
-  --signal-red: #E63946;
-  --signal-red-hover: #F0556B;
-  --signal-red-dark: #C42939;
-  --gain-green: #22C55E;
-  --gain-green-dark: #15803D;
-  --amber: #F59E0B;
-  --border-hairline: rgba(107, 114, 128, 0.25);
-  --border-faint: rgba(107, 114, 128, 0.12);
+  /* Bridge: legacy local names -> canonical tokens */
+  --void:                  var(--color-void);
+  --panel:                 var(--color-panel);
+  --plate:                 var(--color-plate);
+  --plate-bright:          var(--color-plate-bright);
+  --terminal-white:        var(--color-terminal-white);
+  --data-gray:             var(--color-data-gray);
+  --data-gray-bright:      var(--color-data-gray-bright);
+  --signal-red:            var(--color-signal-red);
+  --signal-red-hover:      #F0556B;
+  --signal-red-dark:       var(--color-signal-red-dark);
+  --gain-green:            var(--color-gain-green);
+  --gain-green-dark:       var(--color-gain-green-dark);
+  --amber:                 #F59E0B; /* project pragma for draws/pressure-score; not in canonical tokens.css */
+  --border-faint:          var(--border-hairline-faint);
 
-  /* Paddock (light) tokens */
-  --paddock: #F2F4F7;
-  --paddock-panel: #E8EBF0;
-  --paddock-plate: #DEE2E9;
-  --paddock-plate-bright: #D2D7E0;
+  /* Paddock bridge */
+  --paddock:               var(--color-paddock);
+  --paddock-panel:         var(--color-paddock-panel);
+  --paddock-plate:         var(--color-paddock-plate);
+  --paddock-plate-bright:  var(--color-paddock-plate-bright);
   --paddock-text-secondary: #4B5563;
-  --paddock-border: rgba(13, 15, 20, 0.14);
-  --paddock-border-faint: rgba(13, 15, 20, 0.07);
+  --paddock-border:        rgba(13, 15, 20, 0.14);
+  --paddock-border-faint:  rgba(13, 15, 20, 0.07);
 
-  /* Timing */
-  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
-  --duration-hover: 100ms;
-  --duration-fade: 240ms;
-  --duration-tick: 480ms;
-  --duration-pulse: 1400ms;
+  /* Timing bridge: canonical motion durations.
+     --duration-pulse and --border-hairline are not bridged because they share
+     the canonical names; the canonical tokens.css :root declarations apply. */
+  --ease-out:        var(--easing-default);
+  --duration-hover:  var(--duration-instant);
+  --duration-fade:   var(--duration-fast);
+  --duration-tick:   var(--duration-base);
 }
 
 /* ================================================================
@@ -1609,35 +1614,35 @@ body {
     <div class="subsection">
       <div class="subsection-title">Border Radius</div>
       <div class="radius-demo">
-        <div class="radius-box" style="border-radius: 0;">
-          <div class="val">0px</div>
-          <div class="use">Default</div>
-        </div>
         <div class="radius-box" style="border-radius: 2px;">
+          <div class="val" style="font-family: 'JetBrains Mono', monospace; font-size: 11px;">--radius-xs</div>
           <div class="val">2px</div>
-          <div class="use">Inputs, badges</div>
+          <div class="use">MetaTag, OutcomeTag, tight pills</div>
         </div>
         <div class="radius-box" style="border-radius: 3px;">
+          <div class="val" style="font-family: 'JetBrains Mono', monospace; font-size: 11px;">--radius-sm</div>
           <div class="val">3px</div>
-          <div class="use">Buttons</div>
+          <div class="use">Chips, secondary buttons</div>
         </div>
         <div class="radius-box" style="border-radius: 4px;">
+          <div class="val" style="font-family: 'JetBrains Mono', monospace; font-size: 11px;">--radius-md</div>
           <div class="val">4px</div>
-          <div class="use">Cards</div>
+          <div class="use">Plates, cards, primary buttons (default)</div>
         </div>
         <div class="radius-box" style="border-radius: 8px;">
+          <div class="val" style="font-family: 'JetBrains Mono', monospace; font-size: 11px;">--radius-lg</div>
           <div class="val">8px</div>
-          <div class="use">Modals ONLY</div>
+          <div class="use">Modals, sheets only (absolute cap)</div>
         </div>
         <div class="radius-box" style="border-radius: 50%; width: 80px; height: 80px;">
           <div class="val">50%</div>
-          <div class="use">Avatars</div>
+          <div class="use">Avatars (sole exception)</div>
         </div>
       </div>
     </div>
 
     <div class="brand-note">
-      <strong>Radius rule:</strong> Sharp corners are the default. Anything above 4px is forbidden on data surfaces. Avatars are the sole exception at <code style="font-family: 'JetBrains Mono', monospace; font-size: 12px; background: var(--bg-plate-bright); padding: 2px 6px; border-radius: 2px;">border-radius: 50%</code>.
+      <strong>Radius rule:</strong> Sharp corners are the default. The named scale tops out at <code style="font-family: 'JetBrains Mono', monospace; font-size: 12px; background: var(--bg-plate-bright); padding: 2px 6px; border-radius: 2px;">--radius-lg</code> (8px), reserved for modals and sheets. Avatars stay circular at <code style="font-family: 'JetBrains Mono', monospace; font-size: 12px; background: var(--bg-plate-bright); padding: 2px 6px; border-radius: 2px;">border-radius: 50%</code>; no other surface uses soft corners.
     </div>
   </section>
 </div>
@@ -1668,9 +1673,9 @@ body {
       </div>
     </div>
 
-    <!-- Rank Badge -->
+    <!-- Rank Row -->
     <div class="subsection">
-      <div class="subsection-title">Rank Badge</div>
+      <div class="subsection-title">Rank Row</div>
       <div class="component-showcase">
         <span class="rank-badge">1247</span>
         <span class="rank-badge">0892</span>
@@ -1678,7 +1683,36 @@ body {
         <span class="rank-badge leader">1523</span>
       </div>
       <div class="brand-note">
-        JetBrains Mono, 4-digit padded, tabular-nums. The leader variant adds a Signal Red border for top-ranked athletes.
+        The numeric rank cell that sits at the start of a <code style="font-family: 'JetBrains Mono', monospace; font-size: 12px; background: var(--bg-plate-bright); padding: 2px 6px; border-radius: 2px;">RankRow</code>. JetBrains Mono, 4-digit padded, tabular-nums. The leader variant tints the digit Signal Red for top-ranked athletes.
+      </div>
+      <div class="component-showcase column" style="max-width: 480px; margin-top: 16px;">
+        <div style="display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: var(--bg-plate); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 4px;">
+          <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 18px; color: var(--accent); min-width: 36px; text-align: right; font-variant-numeric: tabular-nums;">01</span>
+          <div style="width: 32px; height: 32px; border-radius: 50%; background: var(--accent); color: var(--fg); display: flex; align-items: center; justify-content: center; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 12px;">AK</div>
+          <div style="flex: 1; min-width: 0;">
+            <div style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 14px; color: var(--fg); line-height: 1.1;">Alex Kova&#269;evi&#263;</div>
+            <div style="font-family: 'Inter', sans-serif; font-size: 11px; color: var(--fg-tertiary); margin-top: 2px;">Downtown BJJ &middot; Lightweight</div>
+          </div>
+          <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px;">
+            <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 18px; color: var(--fg); font-variant-numeric: tabular-nums; line-height: 1;">1847</span>
+            <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--positive-text); font-variant-numeric: tabular-nums;">&#9650;+32</span>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: var(--bg-plate); border: 1px solid var(--border); border-radius: 4px;">
+          <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 18px; color: var(--fg-secondary); min-width: 36px; text-align: right; font-variant-numeric: tabular-nums;">02</span>
+          <div style="width: 32px; height: 32px; border-radius: 50%; background: var(--accent); color: var(--fg); display: flex; align-items: center; justify-content: center; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 12px;">MS</div>
+          <div style="flex: 1; min-width: 0;">
+            <div style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 14px; color: var(--fg); line-height: 1.1;">Matthew Sponagle</div>
+            <div style="font-family: 'Inter', sans-serif; font-size: 11px; color: var(--fg-tertiary); margin-top: 2px;">East Side BJJ &middot; Middleweight</div>
+          </div>
+          <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px;">
+            <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 18px; color: var(--fg); font-variant-numeric: tabular-nums; line-height: 1;">1782</span>
+            <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--negative); font-variant-numeric: tabular-nums;">&#9660;-12</span>
+          </div>
+        </div>
+      </div>
+      <div class="brand-note">
+        Full <code style="font-family: 'JetBrains Mono', monospace; font-size: 12px; background: var(--bg-plate-bright); padding: 2px 6px; border-radius: 2px;">RankRow</code>: rank cell, 32px avatar, name + subtitle, ELO value, signed delta. The leader gets a Signal Red left-border accent (3px); the current user is highlighted with a value-shift band (not shown here). Used on leaderboards and gym ladders.
       </div>
     </div>
 
@@ -1719,9 +1753,9 @@ body {
       </div>
     </div>
 
-    <!-- Data Plate -->
+    <!-- Plate -->
     <div class="subsection">
-      <div class="subsection-title">Data Plate</div>
+      <div class="subsection-title">Plate</div>
       <div class="component-showcase column" style="max-width: 400px;">
         <div class="data-plate">
           <div class="data-plate-label">Current Rating</div>
@@ -1731,9 +1765,13 @@ body {
           <div class="data-plate-label">Win Streak</div>
           <div class="data-plate-value" style="color: var(--positive-text);">5</div>
         </div>
+        <div class="data-plate" style="border-left: 3px solid var(--positive);">
+          <div class="data-plate-label" style="display: flex; align-items: center; gap: 8px;">Active Session <span class="live-pill" style="font-size: 9px; padding: 2px 8px;"><span class="live-dot" style="width: 5px; height: 5px;"></span>LIVE</span></div>
+          <div class="data-plate-value" style="color: var(--positive-text);">12 ON MAT</div>
+        </div>
       </div>
       <div class="brand-note">
-        Flat Plate background with hairline border. The optional 3px Signal Red left accent draws attention to key metrics. Values are always JetBrains Mono.
+        The standard content container. Variants: <code style="font-family: 'JetBrains Mono', monospace; font-size: 12px; background: var(--bg-plate-bright); padding: 2px 6px; border-radius: 2px;">default</code>, <code style="font-family: 'JetBrains Mono', monospace; font-size: 12px; background: var(--bg-plate-bright); padding: 2px 6px; border-radius: 2px;">accent</code> (Signal Red left border), <code style="font-family: 'JetBrains Mono', monospace; font-size: 12px; background: var(--bg-plate-bright); padding: 2px 6px; border-radius: 2px;">live</code> (Gain Green left border), <code style="font-family: 'JetBrains Mono', monospace; font-size: 12px; background: var(--bg-plate-bright); padding: 2px 6px; border-radius: 2px;">win</code>, <code style="font-family: 'JetBrains Mono', monospace; font-size: 12px; background: var(--bg-plate-bright); padding: 2px 6px; border-radius: 2px;">loss</code>. Flat Plate background, hairline border, JetBrains Mono values. The optional 3px left accent draws attention to key metrics.
       </div>
     </div>
 
@@ -1756,7 +1794,7 @@ body {
         </div>
       </div>
       <div class="brand-note">
-        Header uses Plate Bright background. Body uses default Plate. Footer has a top border divider with monospaced metadata.
+        Generic content card backed by <code style="font-family: 'JetBrains Mono', monospace; font-size: 12px; background: var(--bg-plate-bright); padding: 2px 6px; border-radius: 2px;">Plate</code>. Header uses Plate Bright background; body uses default Plate; footer has a top border divider with monospaced metadata. For richer surfaces (left-border accents, live state, win/loss tone), prefer <code style="font-family: 'JetBrains Mono', monospace; font-size: 12px; background: var(--bg-plate-bright); padding: 2px 6px; border-radius: 2px;">Plate</code> directly.
       </div>
     </div>
 
@@ -1792,9 +1830,9 @@ body {
       </div>
     </div>
 
-    <!-- Rating Tile -->
+    <!-- EloTile -->
     <div class="subsection">
-      <div class="subsection-title">Rating Tile</div>
+      <div class="subsection-title">EloTile</div>
       <div class="component-showcase center">
         <div class="rating-tile">
           <div class="rating-tile-header">
@@ -1823,7 +1861,110 @@ body {
         </div>
       </div>
       <div class="brand-note">
-        The signature component. 96pt JetBrains Mono rating display, unit annotation with tolerance and match context, 3-stat footer, and Signal Red bottom bar. The LIVE pill appears only during active sessions.
+        <code style="font-family: 'JetBrains Mono', monospace; font-size: 12px; background: var(--bg-plate-bright); padding: 2px 6px; border-radius: 2px;">EloTile</code> is the signature component. JetBrains Mono rating display at hero (96px), large (64px), medium (44px), or small (36px); unit annotation with tolerance and match context; 3-stat footer; Signal Red bottom bar. The LIVE pill appears only during active sessions.
+      </div>
+    </div>
+
+    <!-- Wordmark -->
+    <div class="subsection">
+      <div class="subsection-title">Wordmark</div>
+      <div class="component-showcase column" style="align-items: flex-start; gap: 20px;">
+        <span style="font-family: 'Bebas Neue', sans-serif; font-size: 16px; letter-spacing: 0.04em; line-height: 0.85; color: var(--fg); text-transform: uppercase;">ELO&nbsp;RATED</span>
+        <span style="font-family: 'Bebas Neue', sans-serif; font-size: 28px; letter-spacing: 0.04em; line-height: 0.85; color: var(--fg); text-transform: uppercase;">ELO&nbsp;RATED</span>
+        <span style="font-family: 'Bebas Neue', sans-serif; font-size: 56px; letter-spacing: 0.04em; line-height: 0.85; color: var(--fg); text-transform: uppercase;">ELO&nbsp;RATED</span>
+      </div>
+      <div class="brand-note">
+        Bebas Neue at hero, large, medium, and small. Always all-caps with 0.04em tracking. Reserved for branded surfaces (auth screens, splash, marketing). Sets the visual anchor.
+      </div>
+    </div>
+
+    <!-- MetaTag -->
+    <div class="subsection">
+      <div class="subsection-title">MetaTag</div>
+      <div class="component-showcase">
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 10px; color: var(--fg-secondary); text-transform: uppercase; letter-spacing: 0.12em; padding: 4px 8px; border: 1px solid var(--border); border-radius: 2px; display: inline-flex; align-items: center; line-height: 1;">ACTIVE</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 10px; color: var(--fg-secondary); text-transform: uppercase; letter-spacing: 0.12em; padding: 4px 8px; border: 1px solid var(--border); border-radius: 2px; display: inline-flex; align-items: center; line-height: 1;">RANKED</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 10px; color: var(--fg-secondary); text-transform: uppercase; letter-spacing: 0.12em; padding: 4px 8px; border: 1px solid var(--border); border-radius: 2px; display: inline-flex; align-items: center; line-height: 1;">LAST SESSION</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 10px; color: var(--fg-secondary); text-transform: uppercase; letter-spacing: 0.12em; padding: 4px 8px; border: 1px solid var(--border); border-radius: 2px; display: inline-flex; align-items: center; line-height: 1;">LIVE NOW</span>
+      </div>
+      <div class="brand-note">
+        Uppercase JetBrains Mono Medium with caps tracking. Reserved for metadata labels (section heads, status, taxonomy). Never apply Signal Red or Gain Green; <code style="font-family: 'JetBrains Mono', monospace; font-size: 12px; background: var(--bg-plate-bright); padding: 2px 6px; border-radius: 2px;">MetaTag</code> is structural, not signal.
+      </div>
+    </div>
+
+    <!-- Chip -->
+    <div class="subsection">
+      <div class="subsection-title">Chip</div>
+      <div class="component-showcase">
+        <span style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; padding: 6px 12px; border: 1px solid var(--border); background: var(--bg-plate); color: var(--fg-secondary); border-radius: 3px; display: inline-flex; align-items: center;">All</span>
+        <span style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; padding: 6px 12px; background: var(--bg-plate-bright); color: var(--fg); border-radius: 3px; display: inline-flex; align-items: center; border-left: 3px solid var(--accent);">Ranked</span>
+        <span style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; padding: 6px 12px; border: 1px solid var(--border); background: var(--bg-plate); color: var(--fg-secondary); border-radius: 3px; display: inline-flex; align-items: center;">Casual</span>
+      </div>
+      <div class="brand-note">
+        Tappable pill for filter and category selection. Active state is a value-shift (Plate Bright + accent indicator), not a fill change. Use in horizontal scrolling filter rows on leaderboards and activity feeds.
+      </div>
+    </div>
+
+    <!-- OutcomeTag -->
+    <div class="subsection">
+      <div class="subsection-title">OutcomeTag</div>
+      <div class="component-showcase">
+        <span style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; padding: 4px 10px; background: var(--positive); color: var(--fg); border-radius: 2px; display: inline-flex; align-items: center; line-height: 1;">WIN</span>
+        <span style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; padding: 4px 10px; background: var(--negative); color: #FFFFFF; border-radius: 2px; display: inline-flex; align-items: center; line-height: 1;">LOSS</span>
+        <span style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; padding: 4px 10px; background: transparent; color: #F59E0B; border: 1px solid #F59E0B; border-radius: 2px; display: inline-flex; align-items: center; line-height: 1;">DRAW</span>
+      </div>
+      <div class="brand-note">
+        Result indicator on match cards and history rows. Win uses Gain Green, Loss uses Signal Red, Draw uses amber outline. These three colors are the only state semantics in the system; do not invent a fourth.
+      </div>
+    </div>
+
+    <!-- ParticipantRow -->
+    <div class="subsection">
+      <div class="subsection-title">ParticipantRow</div>
+      <div class="component-showcase column" style="max-width: 440px;">
+        <div style="display: grid; grid-template-columns: 32px 1fr auto; gap: 12px; align-items: center; padding: 12px 16px; background: var(--bg-plate); border: 1px solid var(--border); border-radius: 4px;">
+          <div style="width: 32px; height: 32px; border-radius: 50%; background: var(--accent); color: var(--fg); display: flex; align-items: center; justify-content: center; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 12px;">JD</div>
+          <div style="min-width: 0;">
+            <div style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 14px; color: var(--fg); line-height: 1.1;">Jake Daniels</div>
+            <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--fg-tertiary); margin-top: 2px; font-variant-numeric: tabular-nums;">78 kg</div>
+          </div>
+          <span style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; padding: 4px 10px; background: var(--positive); color: var(--fg); border-radius: 2px; line-height: 1;">READY</span>
+        </div>
+        <div style="display: grid; grid-template-columns: 32px 1fr auto; gap: 12px; align-items: center; padding: 12px 16px; background: var(--bg-plate); border: 1px solid var(--border); border-radius: 4px; opacity: 0.7;">
+          <div style="width: 32px; height: 32px; border-radius: 50%; background: var(--accent); color: var(--fg); display: flex; align-items: center; justify-content: center; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 12px;">RK</div>
+          <div style="min-width: 0;">
+            <div style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 14px; color: var(--fg); line-height: 1.1;">Riley Kim</div>
+            <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--fg-tertiary); margin-top: 2px; font-variant-numeric: tabular-nums;">82 kg</div>
+          </div>
+          <span style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; padding: 4px 10px; background: transparent; color: var(--fg-tertiary); border: 1px solid var(--border); border-radius: 2px; line-height: 1;">WAITING</span>
+        </div>
+      </div>
+      <div class="brand-note">
+        Single-line participant entry for session lobby, match queues, and roster lists. The row is a flat Plate Bright on hover; status pill drives visual urgency.
+      </div>
+    </div>
+
+    <!-- DataRow -->
+    <div class="subsection">
+      <div class="subsection-title">DataRow</div>
+      <div class="component-showcase column" style="max-width: 440px;">
+        <div style="background: var(--bg-plate); border: 1px solid var(--border); border-radius: 4px; padding: 4px 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border);">
+            <span style="font-family: 'DM Sans', sans-serif; font-size: 11px; color: var(--fg-tertiary); text-transform: uppercase; letter-spacing: 0.08em;">Weight Class</span>
+            <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--fg); font-variant-numeric: tabular-nums;">Lightweight (-70kg)</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border);">
+            <span style="font-family: 'DM Sans', sans-serif; font-size: 11px; color: var(--fg-tertiary); text-transform: uppercase; letter-spacing: 0.08em;">Match Type</span>
+            <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--fg); font-variant-numeric: tabular-nums;">Ranked</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0;">
+            <span style="font-family: 'DM Sans', sans-serif; font-size: 11px; color: var(--fg-tertiary); text-transform: uppercase; letter-spacing: 0.08em;">Stake</span>
+            <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--fg); font-variant-numeric: tabular-nums;">+24 / -16</span>
+          </div>
+        </div>
+      </div>
+      <div class="brand-note">
+        Key-value pair for structured data lists (confirmation screens, match summaries, stat panels). Mono right column ensures alignment across rows; left column tracking matches <code style="font-family: 'JetBrains Mono', monospace; font-size: 12px; background: var(--bg-plate-bright); padding: 2px 6px; border-radius: 2px;">MetaTag</code>.
       </div>
     </div>
   </section>
@@ -1907,7 +2048,7 @@ body {
     <div class="section-label">07</div>
     <div class="section-title">APP TOKEN MAPPING</div>
     <div class="section-desc">
-      How brand tokens map to Tailwind CSS custom properties in the app. Both web (Tailwind + shadcn/ui) and mobile (NativeWind v4) consume these identical semantic values.
+      How brand tokens map to Tailwind CSS custom properties in the app. Brand primitives live in apps/web/components/ui/elo-system/ on web and apps/mobile/components/ui/elo-system/ on mobile. Form and overlay atoms use Tailwind + shadcn on web and hand-written NativeWind primitives on mobile. Both platforms consume these identical semantic values.
     </div>
 
     <div style="overflow-x: auto;">

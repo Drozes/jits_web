@@ -9,6 +9,7 @@ const navLinks = [
   { href: "/design", label: "Overview" },
   { href: "/design/style-guide", label: "Style Guide" },
   { href: "/design/ui-kit", label: "UI Kit" },
+  { href: "/design/wireframe", label: "Wireframe" },
   { href: "/design/screens", label: "Web Screens" },
   { href: "/design/screens/native", label: "Native Screens" },
 ];
