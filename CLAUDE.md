@@ -445,6 +445,7 @@ Mobile uses topical directories under `apps/mobile/components/` (`dashboard/`, `
 - [ ] Mobile test coverage gaps: only 4 test files; no tests for session join wizard, match-flow state machine, video recording, push notifications, deep linking, realtime sync hooks, or offline mutation queue.
 
 **Resolved:**
+- [x] Canonical wireframe parity (2026-05-19): expanded `outside_assets/.../wireframe.html` from 28 to 39 screens to match shipped app surface, synced canonical `tokens.css` + `wireframe.html` into `apps/web/public/design/`, refactored `elo-rated-style-guide.html` to link canonical tokens, deleted orphan `elo-rated-rebrand.html`, added `/design/wireframe` Next.js route. Verified `apps/web/app/globals.css` (HSL) and `apps/mobile/lib/tokens.ts` (hex) already mirror canonical tokens 1:1; no app code changes needed. See DESIGN.md "In-App Design Hub" section. Commit `b275ffb`.
 - [x] `apps/mobile/lib/network/mutation-queue.ts` is wired into `recordMatchResult` (via `use-record-result.ts`) and `confirmMatchResult` (via `confirm-step.tsx`). Queue flushes on NetInfo reconnect; `QueueStatusBanner` shows pending state.
 - [x] Phantom tab bar items (athlete, session, settings) eliminated by restructuring routes into `(app)/(tabs)/` group (2026-05-01).
 - [x] Sentry error tracking wired: `apps/mobile/lib/error-tracking/sentry.ts` with guarded init, error boundary forwarding, `@sentry/react-native/expo` config plugin (2026-05-06).
