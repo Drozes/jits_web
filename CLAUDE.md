@@ -39,6 +39,9 @@ Both apps consume `@jits/shared` for all Supabase reads, writes, and realtime. T
 ### Stats are computed, not stored
 The `athletes` table has NO `wins`, `losses`, `win_streak`, or `belt_rank` columns. **Do not query `match_participants` directly, RLS blocks SELECT.** Use `getMatchHistory()` (own match-by-match), `getAthleteStatsRpc()` (single athlete, `get_athlete_stats` SECURITY DEFINER), or `getAthletesStatsRpc()` (batch, leaderboard/swipe).
 
+### Athlete columns are trigger-guarded (client status writes silently no-op)
+The BE `guard_athlete_columns` trigger (BEFORE UPDATE on `athletes`) **reverts client writes** to `id`, `auth_user_id`, `current_elo`, `highest_elo`, `status`, `created_at`, `role` for the `authenticated`/`anon` roles (`NEW.col := OLD.col`). So a frontend `.update({ status: "active" })` **returns success with no error but changes nothing**, do NOT write these columns from either app. **Activation is owned by `handle_athlete_activation`** (BEFORE UPDATE): it flips `pending -> active` when an `athletes` UPDATE supplies `display_name` + `current_weight` + (`primary_gym_id` OR `free_agent`). To activate, write the profile *fields* and let the trigger do it (this is what `/signup` and `/eua` do). A directly-set `status` is the classic silent-loop bug.
+
 ### Key FK constraint names
 Hard to discover, easy to get wrong:
 ```
