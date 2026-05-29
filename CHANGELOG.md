@@ -5,10 +5,10 @@
 **Web layout concepts: full-screen desktop directions for team preview (2026-05-29)**
 
 **Added**
-- `apps/web/app/design/web-layouts/page.tsx`: new `/design/web-layouts` route. A client-side switcher (segmented tabs) previewing six full-screen desktop layout directions, each demonstrated on a different screen, in a full-bleed faux-browser frame with per-concept caption (blurb + pros/cons). Built to explore alternatives to the shipping app's centered `max-w-md` mobile column.
-- `apps/web/app/design/web-layouts/_data.ts`: shared hardcoded placeholder data (athlete, rankings, gyms, profile stats, challenge pipeline, arena) so concepts render with no Supabase/auth and stay visually consistent.
+- `apps/web/app/design/web-layouts/page.tsx`: new `/design/web-layouts` route. A client-side switcher (segmented tabs) previewing seven full-screen desktop layout directions, each demonstrated on a different screen, in a full-bleed faux-browser frame with per-concept caption (blurb + pros/cons). Built to explore alternatives to the shipping app's centered `max-w-md` mobile column.
+- `apps/web/app/design/web-layouts/_data.ts`: shared hardcoded placeholder data (athlete, rankings, gyms, profile stats, activity feed, fixtures/news, arena) so concepts render with no Supabase/auth and stay visually consistent.
 - `apps/web/app/design/web-layouts/_frame.tsx`: `ConceptFrame` (full-bleed breakout + browser chrome) and `SectionLabel` shared primitives.
-- `apps/web/app/design/web-layouts/concepts/`: six concept components built from real `elo-system`/shadcn components and brand tokens: `sidebar-home` (persistent left sidebar, Home), `topnav-rankings` (top nav + wide centered, Rankings), `three-col-gyms` (nav, list, detail rail, Gyms), `bento-profile` (asymmetric bento grid, Profile), `split-arena` (55/45 immersive split, Arena), `kanban-challenges` (multi-column pipeline board, Challenges).
+- `apps/web/app/design/web-layouts/concepts/`: seven concept components built from real `elo-system`/shadcn components and brand tokens: `sidebar-home` (persistent left sidebar, Home), `topnav-rankings` (top nav + wide centered, Rankings), `three-col-gyms` (nav, list, detail rail, Gyms), `bento-profile` (asymmetric bento grid, Profile), `split-arena` (55/45 immersive split, Arena), `strava-feed` (Strava-style social activity feed, Home/Activity), `espn-scores` (ESPN-style live scores ticker + news, Home/Live).
 
 **Changed**
 - `apps/web/app/design/page.tsx`: added "Web Layouts" card between "Canonical Wireframe" and "Web Screens".

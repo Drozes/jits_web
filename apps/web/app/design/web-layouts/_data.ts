@@ -112,56 +112,193 @@ export const PROFILE_DETAIL_STATS: ProfileStat[] = [
   { label: "Pressure Score", value: "82" },
 ];
 
-// Challenges pipeline (kanban concept)
-export type ChallengeCard = {
+// Strava-style social activity feed (concept 6)
+export type ActivityStat = { label: string; value: string };
+
+export type ActivityPost = {
   id: string;
-  opponentName: string;
-  subtitle: string; // gym · weight
-  matchType: "ranked" | "casual";
-  eloStake: number; // ELO at stake (win/loss magnitude)
-  note: string; // contextual status line
-  outcome?: "win" | "loss" | "draw"; // completed column only
-};
-
-export type ChallengeColumn = {
-  key: string;
+  athlete: string;
+  timeAgo: string;
+  kind: "match" | "training";
   title: string;
-  cards: ChallengeCard[];
+  location: string; // gym · mat
+  stats: ActivityStat[];
+  kudos: number;
+  comments: number;
+  youKudosed: boolean;
+  result?: "win" | "loss" | "draw"; // match posts
+  eloDelta?: number; // match posts
 };
 
-export const CHALLENGE_COLUMNS: ChallengeColumn[] = [
+export const ACTIVITY_FEED: ActivityPost[] = [
   {
-    key: "incoming",
-    title: "Incoming",
-    cards: [
-      { id: "c1", opponentName: "Kade Ruotolo", subtitle: "Atos · 155 lb", matchType: "ranked", eloStake: 31, note: "Wants to roll · expires 4h" },
-      { id: "c2", opponentName: "Andrew Tackett", subtitle: "Daisy Fresh · 155 lb", matchType: "casual", eloStake: 0, note: "Open mat · expires 1d" },
+    id: "f1",
+    athlete: "Marcus Reyes",
+    timeAgo: "2h ago",
+    kind: "match",
+    title: "Submitted Diego Salvatierra",
+    location: "Atos HQ · Mat A",
+    stats: [
+      { label: "Method", value: "RNC" },
+      { label: "Round", value: "2" },
+      { label: "ELO", value: "+24" },
     ],
+    kudos: 24,
+    comments: 6,
+    youKudosed: true,
+    result: "win",
+    eloDelta: 24,
   },
   {
-    key: "awaiting",
-    title: "Awaiting Response",
-    cards: [
-      { id: "c3", opponentName: "Mica Galvao", subtitle: "Fight Sports · 170 lb", matchType: "ranked", eloStake: 22, note: "Sent 2h ago" },
-      { id: "c4", opponentName: "Tye Ruotolo", subtitle: "Atos · 170 lb", matchType: "ranked", eloStake: 18, note: "Sent yesterday" },
-      { id: "c5", opponentName: "Victor Hugo", subtitle: "Six Blades · 220 lb", matchType: "casual", eloStake: 0, note: "Sent 3d ago" },
+    id: "f2",
+    athlete: "Kade Ruotolo",
+    timeAgo: "5h ago",
+    kind: "training",
+    title: "Evening Open Mat",
+    location: "Atos · Mat B",
+    stats: [
+      { label: "Rounds", value: "6" },
+      { label: "Subs", value: "3" },
+      { label: "Mat Time", value: "48m" },
     ],
+    kudos: 31,
+    comments: 12,
+    youKudosed: false,
   },
   {
-    key: "scheduled",
-    title: "Scheduled",
-    cards: [
-      { id: "c6", opponentName: "Diego Salvatierra", subtitle: "Atos HQ · 185 lb", matchType: "ranked", eloStake: 24, note: "Fri 7:00 PM · Atos HQ" },
+    id: "f3",
+    athlete: "Mica Galvao",
+    timeAgo: "Yesterday",
+    kind: "match",
+    title: "Beat Andrew Tackett on points",
+    location: "Fight Sports · Mat 1",
+    stats: [
+      { label: "Method", value: "Points" },
+      { label: "Score", value: "6-4" },
+      { label: "ELO", value: "+12" },
     ],
+    kudos: 18,
+    comments: 4,
+    youKudosed: false,
+    result: "win",
+    eloDelta: 12,
   },
   {
-    key: "completed",
-    title: "Completed",
-    cards: [
-      { id: "c7", opponentName: "Diego Salvatierra", subtitle: "Atos HQ · 185 lb", matchType: "ranked", eloStake: 24, note: "2d ago · Submission", outcome: "win" },
-      { id: "c8", opponentName: "Kade Ruotolo", subtitle: "Atos · 155 lb", matchType: "ranked", eloStake: 31, note: "5d ago · Points", outcome: "loss" },
-      { id: "c9", opponentName: "Mica Galvao", subtitle: "Fight Sports · 170 lb", matchType: "ranked", eloStake: 8, note: "1w ago · Draw", outcome: "draw" },
+    id: "f4",
+    athlete: "Nicholas Meregali",
+    timeAgo: "2d ago",
+    kind: "training",
+    title: "Morning Drilling Session",
+    location: "New Wave · Main Mat",
+    stats: [
+      { label: "Rounds", value: "8" },
+      { label: "Focus", value: "Guard" },
+      { label: "Mat Time", value: "62m" },
     ],
+    kudos: 54,
+    comments: 9,
+    youKudosed: true,
+  },
+];
+
+export const WEEKLY_SUMMARY: ActivityStat[] = [
+  { label: "Rounds", value: "22" },
+  { label: "Matches", value: "4" },
+  { label: "Submissions", value: "5" },
+  { label: "ELO", value: "+37" },
+  { label: "Mat Time", value: "3h 12m" },
+];
+
+export type SuggestedAthlete = { id: string; name: string; subtitle: string };
+
+export const SUGGESTED_ATHLETES: SuggestedAthlete[] = [
+  { id: "s1", name: "Tye Ruotolo", subtitle: "Atos · 1821 ELO" },
+  { id: "s2", name: "Andrew Tackett", subtitle: "Daisy Fresh · 1744 ELO" },
+  { id: "s3", name: "Victor Hugo", subtitle: "Six Blades · 1689 ELO" },
+];
+
+// ESPN-style scores + news (concept 7)
+export type Fixture = {
+  id: string;
+  status: "LIVE" | "FINAL" | "UPCOMING";
+  statusDetail: string; // "R2 4:12" | "Final · Sub" | "Fri 7:00"
+  a: { name: string; elo: number; score: string };
+  b: { name: string; elo: number; score: string };
+  winner?: "a" | "b";
+};
+
+export const FIXTURES: Fixture[] = [
+  {
+    id: "fx1",
+    status: "LIVE",
+    statusDetail: "R2 · 4:12",
+    a: { name: "Gordon Ryan", elo: 2412, score: "2" },
+    b: { name: "Nicholas Meregali", elo: 2288, score: "0" },
+  },
+  {
+    id: "fx2",
+    status: "FINAL",
+    statusDetail: "Final · Sub R2",
+    a: { name: "Marcus Reyes", elo: 1847, score: "SUB" },
+    b: { name: "Diego Salvatierra", elo: 1712, score: "-" },
+    winner: "a",
+  },
+  {
+    id: "fx3",
+    status: "FINAL",
+    statusDetail: "Final · Points",
+    a: { name: "Kade Ruotolo", elo: 2103, score: "8" },
+    b: { name: "Tye Ruotolo", elo: 1821, score: "2" },
+    winner: "a",
+  },
+  {
+    id: "fx4",
+    status: "UPCOMING",
+    statusDetail: "Fri · 7:00 PM",
+    a: { name: "Mica Galvao", elo: 1798, score: "-" },
+    b: { name: "Andrew Tackett", elo: 1744, score: "-" },
+  },
+  {
+    id: "fx5",
+    status: "FINAL",
+    statusDetail: "Final · Sub R1",
+    a: { name: "Victor Hugo", elo: 1689, score: "SUB" },
+    b: { name: "Felipe Pena", elo: 1655, score: "-" },
+    winner: "a",
+  },
+];
+
+export type Story = {
+  id: string;
+  tag: string;
+  headline: string;
+  dek: string;
+  timeAgo: string;
+  featured?: boolean;
+};
+
+export const STORIES: Story[] = [
+  {
+    id: "st1",
+    tag: "Featured",
+    headline: "Reyes taps Salvatierra to crack the top 5",
+    dek: "A second-round rear-naked choke vaults Marcus Reyes to #4 with his biggest ELO swing of the season.",
+    timeAgo: "2h ago",
+    featured: true,
+  },
+  {
+    id: "st2",
+    tag: "Rankings",
+    headline: "Ruotolo brothers both climb after Austin open mat",
+    dek: "Kade and Tye each banked ranked wins over the weekend, tightening the lightweight ladder.",
+    timeAgo: "5h ago",
+  },
+  {
+    id: "st3",
+    tag: "Tonight",
+    headline: "Ryan vs Meregali headlines the New Wave main mat",
+    dek: "The top two seeds meet live tonight in the most-watched matchup of the week.",
+    timeAgo: "Live now",
   },
 ];
 

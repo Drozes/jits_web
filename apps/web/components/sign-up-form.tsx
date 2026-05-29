@@ -73,9 +73,14 @@ export function SignUpForm({ gyms, cities }: SignUpFormProps) {
       if (signUpError) throw signUpError;
       if (!signUpData.user) throw new Error("Sign-up failed: no user returned.");
 
-      const displayName = `${values.firstName.trim()} ${values.lastName.trim()}`.trim();
+      const firstName = values.firstName.trim();
+      const lastName = values.lastName.trim();
       const profilePayload = {
-        display_name: displayName,
+        first_name: firstName,
+        last_name: lastName,
+        // display_name is a derived label kept in sync for the many views that
+        // render it; the backend also auto-derives it from first/last on signup.
+        display_name: `${firstName} ${lastName}`.trim(),
         date_of_birth: values.dateOfBirth,
         gender: values.gender,
         current_weight: parseFloat(values.weightKg),

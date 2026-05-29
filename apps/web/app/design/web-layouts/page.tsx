@@ -7,7 +7,8 @@ import { TopnavRankings } from "./concepts/topnav-rankings";
 import { ThreeColGyms } from "./concepts/three-col-gyms";
 import { BentoProfile } from "./concepts/bento-profile";
 import { SplitArena } from "./concepts/split-arena";
-import { KanbanChallenges } from "./concepts/kanban-challenges";
+import { StravaFeed } from "./concepts/strava-feed";
+import { EspnScores } from "./concepts/espn-scores";
 
 type Concept = {
   key: string;
@@ -77,15 +78,26 @@ const CONCEPTS: Concept[] = [
     Component: SplitArena,
   },
   {
-    key: "kanban",
-    label: "Kanban Board",
-    screen: "Challenges",
-    url: "elorated.com/challenges",
+    key: "strava",
+    label: "Activity Feed",
+    screen: "Home · Activity (Strava-style)",
+    url: "elorated.com/feed",
     blurb:
-      "A multi-column pipeline board (Incoming, Awaiting Response, Scheduled, Completed) of challenge cards that move left to right as a match progresses.",
-    pros: "Makes challenge state obvious at a glance · scales with volume · process-oriented.",
-    cons: "Only suits status-driven screens; columns can feel empty when sparse.",
-    Component: KanbanChallenges,
+      "Strava-inspired social feed: a left profile rail, a centered column of training/match cards with kudos and comments, and a right rail with your weekly summary and suggested athletes.",
+    pros: "Drives engagement and retention · social proof · familiar fitness-app feel.",
+    cons: "Feed-first puts ratings/matchmaking one layer deeper.",
+    Component: StravaFeed,
+  },
+  {
+    key: "espn",
+    label: "Scores + News",
+    screen: "Home · Live (ESPN-style)",
+    url: "elorated.com/scores",
+    blurb:
+      "ESPN-inspired: a live scores ticker across the top, a featured story plus result/scoreboard cards in the main column, and a Top-10 standings rail.",
+    pros: "Leans into the competition/ratings identity · live results up front · highly scannable.",
+    cons: "Dense and broadcast-flavored; less personal than the feed.",
+    Component: EspnScores,
   },
 ];
 
@@ -101,8 +113,9 @@ export default function WebLayoutsPage() {
           Web Layout Concepts
         </h1>
         <p className="max-w-3xl font-body text-lg text-muted-foreground">
-          Six full-screen desktop directions for the web app, each demonstrated
-          on a different screen. The shipping app is currently a centered{" "}
+          Seven full-screen desktop directions for the web app, each
+          demonstrated on a different screen. The shipping app is currently a
+          centered{" "}
           <code className="font-mono text-sm">max-w-md</code> mobile column;
           these explore how it could use the whole viewport. Previews are visual
           mockups with placeholder data; controls are non-interactive.
