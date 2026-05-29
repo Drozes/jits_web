@@ -3,20 +3,9 @@ import { Pressable, Text, View } from "react-native";
 import { Image } from "expo-image";
 import { OutcomeTag } from "./ui/elo-system";
 import { cn } from "../lib/cn";
-import { env } from "../lib/env";
+import { athletePhotoSource } from "../lib/athlete-photo";
 import { formatRelativeDate, getInitials } from "@jits/shared/utils";
 import { MATCH_OUTCOME, type MatchOutcome, type MatchType } from "@jits/shared/constants";
-
-/** Build a public Supabase storage URL or pass through an absolute URL. */
-function profilePhotoSource(profilePhotoUrl: string | null | undefined) {
-  if (!profilePhotoUrl) return null;
-  if (profilePhotoUrl.startsWith("http")) return profilePhotoUrl;
-  try {
-    return `${env.supabaseUrl}/storage/v1/object/public/athlete-photos/${profilePhotoUrl}`;
-  } catch {
-    return null;
-  }
-}
 
 interface MatchCardProps {
   type?: "match" | "challenge";
@@ -58,7 +47,7 @@ function ChallengePill({ children, accent }: { children: React.ReactNode; accent
 }
 
 function CardInner({ type = "match", opponentName, opponentPhotoUrl, result, status, direction, matchType, eloDelta, date }: MatchCardProps) {
-  const photoSrc = profilePhotoSource(opponentPhotoUrl);
+  const photoSrc = athletePhotoSource(opponentPhotoUrl);
   const matchTypeLabel = matchType ? (matchType === "ranked" ? "Ranked" : "Casual") : null;
   const dateText = formatRelativeDate(date);
   const subtitle = matchTypeLabel ? `${dateText} · ${matchTypeLabel}` : dateText;

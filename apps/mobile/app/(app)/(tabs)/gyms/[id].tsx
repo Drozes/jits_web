@@ -31,7 +31,7 @@ import {
   LastSessionPlate,
   StatsGrid,
   UpcomingSessionsSection,
-} from "./gym-detail-parts";
+} from "@/components/gyms/gym-detail-parts";
 
 interface GymCoords {
   latitude: number | null;

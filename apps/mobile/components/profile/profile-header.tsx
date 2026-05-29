@@ -2,7 +2,7 @@ import { Text, View } from "react-native";
 import { Image } from "expo-image";
 import { MetaTag } from "@/components/ui/elo-system";
 import { cn } from "../../lib/cn";
-import { env } from "../../lib/env";
+import { athletePhotoSource } from "../../lib/athlete-photo";
 import { getInitials } from "@jits/shared/utils";
 import type { AthleteGuardRow } from "@jits/shared/api/queries";
 
@@ -16,23 +16,13 @@ interface ProfileHeaderProps {
   rank?: number;
 }
 
-function profilePhotoSource(profilePhotoUrl: string | null | undefined) {
-  if (!profilePhotoUrl) return null;
-  if (profilePhotoUrl.startsWith("http")) return profilePhotoUrl;
-  try {
-    return `${env.supabaseUrl}/storage/v1/object/public/athlete-photos/${profilePhotoUrl}`;
-  } catch {
-    return null;
-  }
-}
-
 /**
  * Centered hero for the My Profile screen, matching G1 wireframe:
  * 80x80 plate avatar with large initials, name in font-heading, meta line
  * (gym, weight, gender), then a single hero ELO tile with rank caption below.
  */
 export function ProfileHeader({ athlete, gymName, rank }: ProfileHeaderProps) {
-  const photoSrc = profilePhotoSource(athlete.profile_photo_url);
+  const photoSrc = athletePhotoSource(athlete.profile_photo_url);
   const initials = getInitials(athlete.display_name ?? "");
   const metaParts = [
     gymName ?? null,

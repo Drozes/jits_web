@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+**Mobile cleanup: silence dev warnings, dedupe athlete-photo URL helper (2026-05-29)**
+
+**Changed**
+- Moved `apps/mobile/app/(app)/(tabs)/gyms/gym-detail-parts.tsx` to `apps/mobile/components/gyms/gym-detail-parts.tsx` (it is a named-export helper, not a route; living under `app/` made expo-router warn "missing the required default export"). Import in `gyms/[id].tsx` updated to `@/components/gyms/gym-detail-parts`.
+- New `apps/mobile/lib/athlete-photo.ts` (`athletePhotoSource`): single source of truth that resolves a bare Supabase storage key to a public URL, passes through absolute URLs, or returns null. `Avatar32` now routes `photoUrl` through it (previously it handed a bare key straight to `<Image>`, producing a `file://…/profile.png` "could not find image" warning). `match-card.tsx` and `profile-header.tsx` now import the shared helper instead of each carrying a private copy.
+
 **Profile tab: SWR cache + skeleton loading state (2026-05-29)**
 
 **Changed**
