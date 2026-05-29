@@ -12,9 +12,14 @@ import { ShareProfileSheet } from "@/components/share-profile-sheet";
 import { AppHeader } from "@/components/layout/app-header";
 import { PageContainer } from "@/components/layout/page-container";
 import { MetaTag, ParticipantRow, DeltaNumber } from "@/components/ui/elo-system";
-import { supabase } from "@/lib/supabase/client";
-import { getMatchHistory } from "@jits/shared/api/queries";
-import type { MatchHistoryRow } from "@jits/shared/types/composites";
+import {
+  SkeletonProvider,
+  SkeletonPlate,
+  SkeletonAvatar,
+  SkeletonText,
+  SkeletonBlock,
+  SkeletonParticipantRow,
+} from "@/components/ui/skeleton";
 import { formatRelativeDate } from "@jits/shared/utils";
 
 type ShareAthlete = {
@@ -42,29 +47,51 @@ function ShareButton({ athlete }: { athlete: ShareAthlete }) {
   );
 }
 
+/**
+ * Cold-load placeholder mirroring the real layout: header plate (avatar + two
+ * name/gym lines), a 3-tile stat strip, then four recent-match rows under the
+ * "Recent Matches" tag. Static by default per the minimal-motion brand rule.
+ */
+function ProfileSkeleton() {
+  return (
+    <SkeletonProvider>
+      <SkeletonPlate>
+        <View className="flex-row items-center gap-4">
+          <SkeletonAvatar size={80} />
+          <View className="flex-1 min-w-0">
+            <SkeletonText lines={2} lastLineWidth="50%" />
+          </View>
+        </View>
+      </SkeletonPlate>
+
+      <View className="flex-row gap-3">
+        <SkeletonBlock width="100%" height={84} className="flex-1" />
+        <SkeletonBlock width="100%" height={84} className="flex-1" />
+        <SkeletonBlock width="100%" height={84} className="flex-1" />
+      </View>
+
+      <View className="gap-3">
+        <MetaTag>Recent Matches</MetaTag>
+        <View className="gap-[1px]">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <SkeletonParticipantRow key={i} />
+          ))}
+        </View>
+      </View>
+    </SkeletonProvider>
+  );
+}
+
 export default function ProfileScreen() {
   const { athlete } = useRequireAthlete();
   const router = useRouter();
   const tokens = useThemedTokens();
-  const { stats, gymName, eloThisMonth, isLoading, refreshing, onRefresh } =
+  const { stats, gymName, eloThisMonth, history, isLoading, refreshing, onRefresh } =
     useProfileData(athlete?.id, athlete?.primary_gym_id);
 
-  const [recent, setRecent] = React.useState<MatchHistoryRow[]>([]);
-  React.useEffect(() => {
-    if (!athlete?.id) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const history = await getMatchHistory(supabase, athlete.id);
-        if (!cancelled) setRecent(history.slice(0, 5));
-      } catch (err) {
-        console.warn("[profile] recent fetch failed", err);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [athlete?.id, refreshing]);
+  // Serve recent matches from the single cached history payload fetched by
+  // useProfileData; no separate round-trip.
+  const recent = React.useMemo(() => history.slice(0, 5), [history]);
 
   if (!athlete) {
     return (
@@ -94,9 +121,7 @@ export default function ProfileScreen() {
         contentContainerStyle={{ paddingTop: 24, gap: 24 }}
       >
         {isLoading && !stats ? (
-          <View className="py-16 items-center">
-            <ActivityIndicator color={tokens.accentCta} />
-          </View>
+          <ProfileSkeleton />
         ) : (
           <>
             <ProfileHeader athlete={athlete} gymName={gymName} />

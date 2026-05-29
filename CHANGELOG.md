@@ -2,6 +2,30 @@
 
 ## [Unreleased]
 
+**Profile tab: SWR cache + skeleton loading state (2026-05-29)**
+
+**Changed**
+- `apps/mobile/lib/profile/use-profile-data.ts`: the composed `{ stats, gymName, eloThisMonth, history }` payload now flows through `useCachedResource` (cache key `profile:${athleteId}`). The fetcher keeps the single `Promise.all([getAthleteStatsRpc, gymLookup, getMatchHistory])` (all three keyed only by `athleteId`, mutually independent) and derives `eloThisMonth` from that same history array. Errors surface via the existing `toast.error` while any stale payload stays on screen; `refreshing` maps to `isStale` and `onRefresh` is `refetch()` (the 600ms `setTimeout` is gone, no manual refresh state). Same public return shape (`{ stats, gymName, eloThisMonth, history, isLoading, refreshing, onRefresh }`).
+- `apps/mobile/app/(app)/(tabs)/profile/index.tsx`: the cold-load `<ActivityIndicator>` is replaced by `ProfileSkeleton` (`<SkeletonProvider>` with a header `SkeletonPlate` (64px `SkeletonAvatar` + `SkeletonText lines={2}`), a 3-tile stat strip of `SkeletonBlock`s in a flex-row, then four `<SkeletonParticipantRow/>` under the "Recent Matches" `MetaTag`). `recent` continues to be served from the cached `history.slice(0, 5)` (no second round-trip). The remaining `<ActivityIndicator>` is the pre-auth `!athlete` guard only.
+
+**Mobile Home tab: SWR cache + skeleton loading state (2026-05-29)**
+
+**Changed**
+- `apps/mobile/app/(app)/(tabs)/(home)/index.tsx`: rewrote the inline `useDashboardData()` hook on top of `useCachedResource` (cache key `dashboard:${athleteId}`), wrapping the existing parallel `Promise.all([getDashboardSummary, getActiveSession])` as the fetcher body (shared queries untouched). Cold start now renders a `DashboardSkeleton` (a hero `SkeletonBlock` h140 rounded-md for the ELO tile, an accent `SkeletonPlate` with `SkeletonText lines={2}` for the active-session slab, and a `SkeletonPlate` holding 3 `SkeletonParticipantRow` for recent activity) that mirrors the real layout, replacing the bare `<ActivityIndicator>` branch. The real header (Wordmark/NotificationBell/Avatar32) and Welcome-back block render above the skeleton since they don't depend on dashboard data. Pull-to-refresh now calls `refetch()` and drops the artificial 600ms `setTimeout` (SWR keeps stale data on screen while revalidating; `RefreshControl.refreshing` is driven by `isStale`). Fetch errors surface via the existing toast while stale data stays on screen.
+
+**Rankings tab: SWR cache + list-body skeleton loading state (2026-05-29)**
+
+**Changed**
+- `apps/mobile/lib/leaderboard/use-leaderboard-data.ts`: routes the composed `{ athletes, gyms }` payload through `useCachedResource` (cache key `leaderboard:athletes`; the gender filter is client-side over the same payload, so it is NOT part of the key). The athletes-table SELECT and `getAthletesStatsRpc(ids)` stay strictly sequential inside the fetcher (the stats RPC genuinely depends on the returned IDs) with no wasted await between them; the fetcher checks the `CancelToken` before post-processing. Errors surface via the existing per-tab `toast.error` while any stale payload stays on screen. Hook still returns `{ athletes, gyms, isLoading, isRefreshing, refresh }` (`isRefreshing` now mapped from `isStale`).
+- `apps/mobile/app/(app)/(tabs)/leaderboard/index.tsx`: the full-screen `<ActivityIndicator>` now gates on auth only (`authLoading || !athlete`). Once the athlete resolves, the header + Fighters/Gyms chips + gender filter paint immediately and the list body carries a `RankingsSkeleton` (`<SkeletonProvider>` with 8 static `<SkeletonRankRow/>`) until BOTH the athletes and stats land — never a half-empty list. The skeleton covers both the Fighters and Gyms views; `FightersList`/`GymsList` receive real data only when not loading.
+
+**Parallelize independent sequential round-trips (latency, no behavior change) (2026-05-29)**
+
+**Changed**
+- `packages/shared/src/api/queries.ts` `getActiveSession()`: in both priority paths the gym-name lookup and the participant-count query (and, in Priority 2, the athlete check-in row) are now awaited together via `Promise.all` instead of serially. Each batched call depends only on the already-resolved session row (and `athleteId`), so none feeds another. Function signature, return shape, and every query (selects, filters, FK shapes) are unchanged.
+- `apps/mobile/lib/profile/use-profile-data.ts`: collapsed the parallel `Promise.all([getAthleteStatsRpc, gymLookup])` + sequential `getMatchHistory` leg into a single `Promise.all([getAthleteStatsRpc, gymLookup, getMatchHistory])` (all three keyed only by `athleteId`, mutually independent). `eloThisMonth` is derived from that history array; the hook now also returns `history` (typed `getMatchHistory` wrapper, replacing the prior raw `supabase.rpc`).
+- `apps/mobile/app/(app)/(tabs)/profile/index.tsx`: removed the duplicate `getMatchHistory` `useEffect` (a redundant network round-trip); `recent` is now sliced from the single cached `history` payload returned by `useProfileData`.
+
 **Mobile: first/last name at signup, native elo-system restyling, Google SSO (2026-05-29)**
 
 **Added**

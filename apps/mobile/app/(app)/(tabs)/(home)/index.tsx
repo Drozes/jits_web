@@ -14,6 +14,14 @@ import { RecentActivitySection } from "@/components/dashboard/recent-activity-se
 import { StatOverview } from "@/components/dashboard/stat-overview";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { toast } from "@/components/ui/toast";
+import {
+  SkeletonProvider,
+  SkeletonBlock,
+  SkeletonPlate,
+  SkeletonText,
+  SkeletonParticipantRow,
+} from "@/components/ui/skeleton";
+import { useCachedResource } from "@/lib/cache/use-cached-resource";
 
 interface DashboardData {
   summary: DashboardSummary;
@@ -21,40 +29,41 @@ interface DashboardData {
 }
 
 function useDashboardData(athleteId: string | undefined) {
-  const [data, setData] = React.useState<DashboardData | null>(null);
-  const [isLoading, setIsLoading] = React.useState(true);
-  const [refreshTick, setRefreshTick] = React.useState(0);
+  const { data, isLoading, isStale, error, refresh } = useCachedResource<DashboardData>(
+    `dashboard:${athleteId}`,
+    async (_signal) => {
+      // Both reads are independent and already parallel; keep the Promise.all.
+      const [summary, activeSession] = await Promise.all([
+        getDashboardSummary(supabase),
+        getActiveSession(supabase, athleteId!),
+      ]);
+      return { summary, activeSession };
+    },
+    [athleteId],
+  );
 
   React.useEffect(() => {
-    if (!athleteId) {
-      setIsLoading(false);
-      return;
-    }
-    let cancelled = false;
-    setIsLoading(true);
+    if (error) toast.error("Could not load dashboard");
+  }, [error]);
 
-    (async () => {
-      try {
-        const [summary, activeSession] = await Promise.all([
-          getDashboardSummary(supabase),
-          getActiveSession(supabase, athleteId),
-        ]);
-        if (!cancelled) setData({ summary, activeSession });
-      } catch (err) {
-        console.error("[dashboard] fetch failed", err);
-        if (!cancelled) toast.error("Could not load dashboard");
-      } finally {
-        if (!cancelled) setIsLoading(false);
-      }
-    })();
+  return { data, isLoading, isStale, refresh };
+}
 
-    return () => {
-      cancelled = true;
-    };
-  }, [athleteId, refreshTick]);
-
-  const refresh = React.useCallback(() => setRefreshTick((n) => n + 1), []);
-  return { data, isLoading, refresh };
+/** Cold-start placeholder mirroring EloTile + ActiveSessionCard + RecentActivity. */
+function DashboardSkeleton() {
+  return (
+    <SkeletonProvider>
+      <SkeletonBlock height={140} radius="md" />
+      <SkeletonPlate variant="accent" className="mt-5">
+        <SkeletonText lines={2} />
+      </SkeletonPlate>
+      <SkeletonPlate className="mt-5" style={{ gap: 8 }}>
+        <SkeletonParticipantRow />
+        <SkeletonParticipantRow />
+        <SkeletonParticipantRow />
+      </SkeletonPlate>
+    </SkeletonProvider>
+  );
 }
 
 export default function DashboardScreen() {
@@ -62,13 +71,11 @@ export default function DashboardScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const tokens = useThemedTokens();
-  const { data, isLoading, refresh } = useDashboardData(athlete?.id);
-  const [refreshing, setRefreshing] = React.useState(false);
+  const { data, isLoading, isStale, refresh } = useDashboardData(athlete?.id);
 
-  const onRefresh = React.useCallback(async () => {
-    setRefreshing(true);
+  const onRefresh = React.useCallback(() => {
+    // SWR keeps stale data on screen while revalidating; no artificial delay.
     refresh();
-    setTimeout(() => setRefreshing(false), 600);
   }, [refresh]);
 
   if (!athlete) {
@@ -124,7 +131,7 @@ export default function DashboardScreen() {
         }}
         refreshControl={
           <RefreshControl
-            refreshing={refreshing}
+            refreshing={isStale}
             onRefresh={onRefresh}
             tintColor={tokens.accentCta}
           />
@@ -137,10 +144,8 @@ export default function DashboardScreen() {
           </Text>
         </View>
 
-        {isLoading && !data ? (
-          <View className="py-16 items-center">
-            <ActivityIndicator color={tokens.accentCta} />
-          </View>
+        {isLoading ? (
+          <DashboardSkeleton />
         ) : (
           <>
             <EloTile

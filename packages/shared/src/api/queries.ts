@@ -452,21 +452,27 @@ export async function getPendingChallengeOpponentIds(
 export async function getGymsWithSessions(
   supabase: Client,
 ): Promise<GymListItem[]> {
-  // 1. Fetch active gyms
-  const { data: gyms } = await supabase
-    .from("gyms")
-    .select("id, name, city, status")
-    .eq("status", "active")
-    .order("name");
+  // Fetch gyms, member-count source, and sessions in parallel: the three
+  // reads are independent, so serializing them tripled the tab's load latency.
+  const [{ data: gyms }, { data: athletes }, { data: sessions }] =
+    await Promise.all([
+      supabase
+        .from("gyms")
+        .select("id, name, city, status")
+        .eq("status", "active")
+        .order("name"),
+      supabase
+        .from("athletes")
+        .select("primary_gym_id")
+        .eq("status", "active")
+        .not("primary_gym_id", "is", null),
+      supabase
+        .from("sessions")
+        .select("id, gym_id, status, scheduled_start")
+        .in("status", ["active", "scheduled"]),
+    ]);
 
   if (!gyms || gyms.length === 0) return [];
-
-  // 2. Fetch member counts grouped by primary_gym_id
-  const { data: athletes } = await supabase
-    .from("athletes")
-    .select("primary_gym_id")
-    .eq("status", "active")
-    .not("primary_gym_id", "is", null);
 
   const memberCountMap = new Map<string, number>();
   for (const a of athletes ?? []) {
@@ -474,12 +480,6 @@ export async function getGymsWithSessions(
       memberCountMap.set(a.primary_gym_id, (memberCountMap.get(a.primary_gym_id) ?? 0) + 1);
     }
   }
-
-  // 3. Fetch sessions that are active or upcoming scheduled
-  const { data: sessions } = await supabase
-    .from("sessions")
-    .select("id, gym_id, status, scheduled_start")
-    .in("status", ["active", "scheduled"]);
 
   const activeMap = new Map<string, number>();
   const upcomingMap = new Map<string, number>();
@@ -680,18 +680,21 @@ export async function getActiveSession(
 
     if (activeSessions && activeSessions.length > 0) {
       const session = activeSessions[0];
-      // Get gym name
-      const { data: gymRow } = await supabase
-        .from("gyms")
-        .select("name")
-        .eq("id", session.gym_id)
-        .single();
-
-      // Count participants
-      const { count } = await supabase
-        .from("session_participants")
-        .select("id", { count: "exact", head: true })
-        .eq("session_id", session.id);
+      // Gym-name lookup and participant count both depend only on the resolved
+      // session, so run them concurrently instead of serially.
+      const [{ data: gymRow }, { count }] = await Promise.all([
+        // Get gym name
+        supabase
+          .from("gyms")
+          .select("name")
+          .eq("id", session.gym_id)
+          .single(),
+        // Count participants
+        supabase
+          .from("session_participants")
+          .select("id", { count: "exact", head: true })
+          .eq("session_id", session.id),
+      ]);
 
       return {
         sessionId: session.id,
@@ -728,25 +731,28 @@ export async function getActiveSession(
 
     if (upcomingSessions && upcomingSessions.length > 0) {
       const session = upcomingSessions[0];
-      const { data: gymRow } = await supabase
-        .from("gyms")
-        .select("name")
-        .eq("id", session.gym_id)
-        .single();
-
-      const { count } = await supabase
-        .from("session_participants")
-        .select("id", { count: "exact", head: true })
-        .eq("session_id", session.id);
-
-      // Athletes with an RSVP haven't necessarily checked in; verify via session_participants
-      const { data: participantRow } = await supabase
-        .from("session_participants")
-        .select("id")
-        .eq("session_id", session.id)
-        .eq("athlete_id", athleteId)
-        .neq("status", "left")
-        .maybeSingle();
+      // Gym name, participant count, and the athlete's check-in row all depend
+      // only on the resolved session (and athleteId); none feeds another, so
+      // run all three concurrently.
+      const [{ data: gymRow }, { count }, { data: participantRow }] = await Promise.all([
+        supabase
+          .from("gyms")
+          .select("name")
+          .eq("id", session.gym_id)
+          .single(),
+        supabase
+          .from("session_participants")
+          .select("id", { count: "exact", head: true })
+          .eq("session_id", session.id),
+        // Athletes with an RSVP haven't necessarily checked in; verify via session_participants
+        supabase
+          .from("session_participants")
+          .select("id")
+          .eq("session_id", session.id)
+          .eq("athlete_id", athleteId)
+          .neq("status", "left")
+          .maybeSingle(),
+      ]);
 
       return {
         sessionId: session.id,

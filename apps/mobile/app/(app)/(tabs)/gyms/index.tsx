@@ -29,6 +29,13 @@ import {
   useLocation,
 } from "@/lib/location/use-location";
 import { toast } from "@/components/ui";
+import {
+  SkeletonProvider,
+  SkeletonPlate,
+  SkeletonBlock,
+  SkeletonText,
+} from "@/components/ui/skeleton";
+import { useCachedResource } from "@/lib/cache/use-cached-resource";
 import type { GymListItem } from "@jits/shared/types/session";
 
 interface GymCoords {
@@ -37,57 +44,41 @@ interface GymCoords {
   longitude: number | null;
 }
 
+interface GymsPayload {
+  gyms: GymListItem[];
+  coords: Record<string, GymCoords>;
+}
+
 const ALL_CITIES = "All Cities";
 
 function useGymsList() {
-  const [data, setData] = React.useState<GymListItem[] | null>(null);
-  const [coords, setCoords] = React.useState<Record<string, GymCoords>>({});
-  const [isLoading, setIsLoading] = React.useState(true);
-  const [isRefreshing, setIsRefreshing] = React.useState(false);
-
-  const fetchAll = React.useCallback(async (mode: "initial" | "refresh") => {
-    if (mode === "initial") setIsLoading(true);
-    else setIsRefreshing(true);
-    try {
-      const [gyms, { data: gymRows }] = await Promise.all([
-        getGymsWithSessions(supabase),
-        supabase
-          .from("gyms")
-          .select("id, latitude, longitude")
-          .eq("status", "active"),
-      ]);
-      setData(gyms);
-      const map: Record<string, GymCoords> = {};
-      for (const r of gymRows ?? []) {
-        map[r.id] = { id: r.id, latitude: r.latitude, longitude: r.longitude };
-      }
-      setCoords(map);
-    } catch (err) {
-      console.error("[gyms] fetch failed", err);
-      toast.error("Failed to load gyms");
-    } finally {
-      if (mode === "initial") setIsLoading(false);
-      else setIsRefreshing(false);
+  const resource = useCachedResource<GymsPayload>("gyms:list", async () => {
+    // Already parallel: getGymsWithSessions is internally parallelized and the
+    // coords SELECT is independent, so they run concurrently here.
+    const [gyms, { data: gymRows }] = await Promise.all([
+      getGymsWithSessions(supabase),
+      supabase
+        .from("gyms")
+        .select("id, latitude, longitude")
+        .eq("status", "active"),
+    ]);
+    const coords: Record<string, GymCoords> = {};
+    for (const r of gymRows ?? []) {
+      coords[r.id] = { id: r.id, latitude: r.latitude, longitude: r.longitude };
     }
-  }, []);
+    return { gyms, coords };
+  });
 
   React.useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      if (cancelled) return;
-      await fetchAll("initial");
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [fetchAll]);
+    if (resource.error) toast.error("Failed to load gyms");
+  }, [resource.error]);
 
   return {
-    data,
-    coords,
-    isLoading,
-    isRefreshing,
-    refresh: () => fetchAll("refresh"),
+    data: resource.data?.gyms ?? null,
+    coords: resource.data?.coords ?? {},
+    isLoading: resource.isLoading,
+    isRefreshing: resource.isStale,
+    refresh: resource.refetch,
   };
 }
 
@@ -202,8 +193,8 @@ export default function GymsScreen() {
       </View>
 
       {isLoading ? (
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator color={tokens.accentCta} />
+        <View className="px-4 pt-1">
+          <GymsSkeleton />
         </View>
       ) : (
         <FlatList
@@ -236,6 +227,32 @@ export default function GymsScreen() {
         />
       )}
     </View>
+  );
+}
+
+/**
+ * Cold-load placeholder for the gym list. Five default plates matching
+ * GymCard/Plate rhythm: a gym-name block + right-aligned session-count block in
+ * the header row, then a hairline-separated metadata line below. Static blocks
+ * (no pulse) per the brand minimal-motion rule.
+ */
+function GymsSkeleton() {
+  return (
+    <SkeletonProvider>
+      <View style={{ gap: 12 }}>
+        {Array.from({ length: 5 }).map((_, i) => (
+          <SkeletonPlate key={i} variant="default">
+            <View className="flex-row items-center justify-between gap-3 mb-2">
+              <SkeletonBlock width="60%" height={16} radius="xs" />
+              <SkeletonBlock width={64} height={20} radius="xs" />
+            </View>
+            <View className="border-t border-hairline pt-2">
+              <SkeletonText lineHeight={12} />
+            </View>
+          </SkeletonPlate>
+        ))}
+      </View>
+    </SkeletonProvider>
   );
 }
 

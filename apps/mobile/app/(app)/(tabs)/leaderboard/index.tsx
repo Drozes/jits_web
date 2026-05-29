@@ -2,6 +2,7 @@ import * as React from "react";
 import { ActivityIndicator, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Avatar32, Chip, MetaTag, Wordmark } from "@/components/ui/elo-system";
+import { SkeletonProvider, SkeletonRankRow } from "@/components/ui/skeleton";
 import { useRequireAthlete } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { useLeaderboardData } from "@/lib/leaderboard/use-leaderboard-data";
@@ -13,6 +14,23 @@ import { FightersList } from "@/components/leaderboard/fighters-list";
 import { GymsList } from "@/components/leaderboard/gyms-list";
 
 type TabValue = "fighters" | "gyms";
+
+/**
+ * List-body placeholder shown until BOTH the athletes SELECT and the stats RPC
+ * land. Always 8 full rows — never a half-empty list (the brief's hard rule).
+ * Static by default per the minimal-motion brand rule.
+ */
+function RankingsSkeleton() {
+  return (
+    <SkeletonProvider>
+      <View className="px-3 pt-1" style={{ gap: 1 }}>
+        {Array.from({ length: 8 }).map((_, i) => (
+          <SkeletonRankRow key={i} />
+        ))}
+      </View>
+    </SkeletonProvider>
+  );
+}
 
 export default function LeaderboardScreen() {
   const insets = useSafeAreaInsets();
@@ -41,7 +59,9 @@ export default function LeaderboardScreen() {
     return athletes.find((a) => a.isCurrentUser) ?? null;
   }, [athletes]);
 
-  if (authLoading || !athlete || isLoading) {
+  // Spinner covers AUTH ONLY. Once the athlete exists the chrome paints
+  // immediately and the list body carries the skeleton.
+  if (authLoading || !athlete) {
     return (
       <View className="flex-1 bg-surface items-center justify-center">
         <ActivityIndicator color={tokens.accentCta} />
@@ -49,8 +69,9 @@ export default function LeaderboardScreen() {
     );
   }
 
-  const countLabel =
-    tab === "fighters"
+  const countLabel = isLoading
+    ? "Loading · Live"
+    : tab === "fighters"
       ? `${filteredAthletes.length} Athletes · Live`
       : `${(gyms ?? []).length} Gyms · Live`;
 
@@ -85,7 +106,9 @@ export default function LeaderboardScreen() {
         <MetaTag>{countLabel}</MetaTag>
       </View>
 
-      {tab === "fighters" ? (
+      {isLoading ? (
+        <RankingsSkeleton />
+      ) : tab === "fighters" ? (
         <FightersList
           athletes={filteredAthletes}
           isRefreshing={isRefreshing}
