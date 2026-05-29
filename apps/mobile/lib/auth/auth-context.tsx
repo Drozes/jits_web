@@ -7,6 +7,7 @@ import {
   type AthleteGuardRow,
 } from "@jits/shared/api/queries";
 import { supabase } from "../supabase/client";
+import { setCachedElo } from "../splash/elo-cache";
 
 type AuthError = { message: string };
 
@@ -84,6 +85,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       sub.subscription.unsubscribe();
     };
   }, []);
+
+  // Persist the real ELO so the next cold-start "Climb" rolls to it, not 1481.
+  React.useEffect(() => {
+    if (athlete?.current_elo != null) {
+      void setCachedElo(athlete.current_elo);
+    }
+  }, [athlete?.current_elo]);
 
   const refreshAthlete = React.useCallback(async () => {
     if (!user) {

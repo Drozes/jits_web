@@ -1,5 +1,8 @@
 import "../global.css";
+import { useEffect, useState } from "react";
+import { View } from "react-native";
 import { initSentry } from "@/lib/error-tracking/sentry";
+import * as SplashScreen from "expo-splash-screen";
 import { Stack } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -27,10 +30,17 @@ import { OnlinePresenceBootstrap } from "@/lib/presence/online-presence-bootstra
 import { ErrorBoundary } from "@/components/error-boundary";
 import { OfflineBanner } from "@/components/offline-banner";
 import { DeepLinkBootstrap } from "@/lib/deep-links/handler";
+import { SplashReveal } from "@/components/ui/elo-system/splash-reveal";
+import { getCachedElo } from "@/lib/splash/elo-cache";
+import { SPLASH_REVEAL } from "@jits/shared/constants";
 
 // Initialize Sentry before any component renders.
 // No-ops when EXPO_PUBLIC_SENTRY_DSN is not set.
 initSentry();
+
+// Keep the native splash up until the JS "Climb" overlay is mounted, so the
+// hand-off is seamless. SplashReveal calls hideAsync() once it paints.
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -45,7 +55,29 @@ export default function RootLayout() {
     JetBrainsMono_700Bold,
   });
 
-  if (!fontsLoaded) return null;
+  const [revealDone, setRevealDone] = useState(false);
+  const [targetElo, setTargetElo] = useState<number | null>(null);
+
+  // Resolve the odometer target before mounting the overlay: the user's cached
+  // ELO if we have one, else the brand default. Best-effort, never blocks — a
+  // short max-wait guarantees the reveal mounts even if AsyncStorage hangs (the
+  // only path that could otherwise leave the native splash stuck).
+  useEffect(() => {
+    let settled = false;
+    const apply = (v: number) => {
+      if (!settled) {
+        settled = true;
+        setTargetElo(v);
+      }
+    };
+    getCachedElo().then((v) => apply(v ?? SPLASH_REVEAL.DEFAULT_ELO));
+    const fallback = setTimeout(() => apply(SPLASH_REVEAL.DEFAULT_ELO), 400);
+    return () => clearTimeout(fallback);
+  }, []);
+
+  // While fonts load, paint the Void background (matches the native splash and
+  // the reveal) so there's never a white flash if the native splash lifts early.
+  if (!fontsLoaded) return <View style={{ flex: 1, backgroundColor: "#0D0F14" }} />;
 
   return (
     <ErrorBoundary>
@@ -65,6 +97,9 @@ export default function RootLayout() {
             <OfflineBanner />
             <Toaster />
           </SafeAreaProvider>
+          {!revealDone && targetElo !== null && (
+            <SplashReveal targetElo={targetElo} onDone={() => setRevealDone(true)} />
+          )}
         </ThemeProvider>
       </GestureHandlerRootView>
     </ErrorBoundary>
