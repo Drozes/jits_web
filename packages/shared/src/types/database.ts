@@ -96,6 +96,8 @@ export type Database = {
           date_of_birth: string | null
           default_still_url: string | null
           display_name: string
+          first_name: string | null
+          last_name: string | null
           free_agent: boolean
           gender: string | null
           highest_elo: number
@@ -118,6 +120,8 @@ export type Database = {
           date_of_birth?: string | null
           default_still_url?: string | null
           display_name: string
+          first_name?: string | null
+          last_name?: string | null
           free_agent?: boolean
           gender?: string | null
           highest_elo?: number
@@ -140,6 +144,8 @@ export type Database = {
           date_of_birth?: string | null
           default_still_url?: string | null
           display_name?: string
+          first_name?: string | null
+          last_name?: string | null
           free_agent?: boolean
           gender?: string | null
           highest_elo?: number
