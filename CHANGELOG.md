@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+**Mobile: first/last name at signup, native elo-system restyling, Google SSO (2026-05-29)**
+
+**Added**
+- `apps/mobile/components/ui/elo-system/`: native ELO design-system primitive set (Plate, EloTile, Wordmark, Avatar32, LivePill, MetaTag, Chip, DataRow, DeltaNumber, OutcomeTag, ParticipantRow, RankRow), mirroring `apps/web/components/ui/elo-system/`.
+- `apps/mobile/components/layout/`: `app-header.tsx`, `elo-tab-bar.tsx`, `page-container.tsx` layout primitives.
+- `apps/mobile/components/auth/auth-buttons.tsx` (`CtaButton`/`TertiaryButton`) and `apps/mobile/components/profile-setup/elo-form-field.tsx` (`EloField`/`EloTextInput`).
+- Native Google SSO: `signInWithGoogle` in `apps/mobile/lib/auth/auth-context.tsx` via `@react-native-google-signin/google-signin` (`GoogleSignin.signIn` -> `supabase.auth.signInWithIdToken`), wired into `apps/mobile/app/(auth)/login.tsx`. `apps/mobile/app.json` gains the google-signin config plugin (`iosUrlScheme`).
+- `apps/mobile/app/(app)/(tabs)/gyms/gym-detail-parts.tsx`.
+
+**Changed**
+- Profile setup collects structured `first_name`/`last_name` (replacing single `display_name`); `display_name` kept in sync as a derived "First Last" label. Validation, submit payload, and the athlete read updated. Aligns with `jr_be` migration `20260529120000`.
+- Mobile screens/components rebuilt on the elo-system primitives + ELO tokens (home, gyms, leaderboard, profile, sessions, match-flow, settings, auth, notifications). `apps/mobile/lib/tokens.ts` adds `textSecondary`/`textTertiary` + ELO palette; `apps/mobile/tailwind.config.js` gains the ELO radius/font scale; `apps/mobile/lib/theme/theme-provider.tsx` maps the new vars.
+- `packages/shared/src/api/mutations.ts`: `createSessionTemplate` now sets `created_by` (via `auth_athlete_id`); `createInSessionMatch` timekeeper param aligned with the regenerated `database.ts`.
+
+**Removed**
+- `apps/mobile/components/athlete-card.tsx`, `athlete-card-parts.tsx`, `elo-badge.tsx` (superseded by elo-system primitives).
+
 **Internal founders Kanban board at /design/board (2026-05-29)**
 
 **Added**
