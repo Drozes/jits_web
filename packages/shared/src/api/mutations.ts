@@ -1008,7 +1008,7 @@ export async function updateNotificationPreferences(
 // Admin board (internal founder Kanban, backs web /design/board)
 // ---------------------------------------------------------------------------
 
-const ADMIN_CARD_COLS = "id, title, notes, status, created_at";
+const ADMIN_CARD_COLS = "id, title, notes, status, created_at, updated_at";
 
 /** Create an internal Kanban card (defaults to the To Do column). */
 export async function createAdminCard(

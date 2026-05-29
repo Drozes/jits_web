@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { formatRelativeDate } from "@jits/shared/utils";
 import type { AdminCard } from "@jits/shared/api/queries";
 
 interface Props {
@@ -9,6 +10,7 @@ interface Props {
   canMoveRight: boolean;
   onMove: (dir: -1 | 1) => void;
   onDelete: () => void;
+  onOpen: () => void;
 }
 
 export function KanbanCard({
@@ -17,11 +19,25 @@ export function KanbanCard({
   canMoveRight,
   onMove,
   onDelete,
+  onOpen,
 }: Props) {
   return (
-    <div className="group rounded-sm border border-border bg-background p-3">
+    <div className="group rounded-sm border border-border bg-background p-3 transition-colors hover:border-primary/40">
       <div className="flex items-start justify-between gap-2">
-        <p className="font-body text-sm text-foreground">{card.title}</p>
+        <button
+          type="button"
+          onClick={onOpen}
+          className="min-w-0 flex-1 text-left"
+        >
+          <span className="block font-body text-sm text-foreground">
+            {card.title}
+          </span>
+          {card.notes && (
+            <span className="mt-1 block truncate font-body text-xs text-muted-foreground">
+              {card.notes}
+            </span>
+          )}
+        </button>
         <button
           onClick={onDelete}
           aria-label="Delete card"
@@ -30,12 +46,8 @@ export function KanbanCard({
           <X size={15} />
         </button>
       </div>
-      {card.notes && (
-        <p className="mt-1 font-body text-xs text-muted-foreground">
-          {card.notes}
-        </p>
-      )}
-      <div className="mt-2 flex items-center gap-1">
+      <div className="mt-2 flex items-center justify-between gap-1">
+        <div className="flex items-center gap-1">
         <button
           onClick={() => onMove(-1)}
           disabled={!canMoveLeft}
@@ -52,6 +64,10 @@ export function KanbanCard({
         >
           <ChevronRight size={15} />
         </button>
+        </div>
+        <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
+          {formatRelativeDate(card.updated_at)}
+        </span>
       </div>
     </div>
   );

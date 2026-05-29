@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+**Web parity: EloTile Signal Red accent bar (2026-05-29)**
+
+**Added**
+- `apps/web/components/ui/elo-system/elo-tile.tsx`: optional `accentBar` prop matching the mobile EloTile and the canonical `.elo-tile::after` wireframe spec (3px Signal Red bottom bar via `var(--accent-cta)`, with `position: relative` + `overflow: hidden`). Enabled on the web Home "Current ELO Rating" hero (`apps/web/app/(app)/page.tsx`); the design-system showcase (`apps/web/app/design/elo-system/page.tsx`) now demonstrates the `accentBar` variant.
+
+**Web: fix /eua dead-end for incomplete (Google-SSO/seed) accounts (2026-05-29)**
+
+**Fixed**
+- `apps/web/components/auth/eua-form.tsx`: pending athletes with an incomplete profile (every Google-SSO and seed account) were stuck in an invisible loop at `/eua`. The form tried to activate via `update athletes set status='active'`, but the backend `guard_athlete_columns` BEFORE-UPDATE trigger silently reverts any client status write (`NEW.status := OLD.status`), so the UPDATE returned success with no error, `router.push("/")` ran, and `requireAthlete()` bounced the still-`pending` athlete straight back to `/eua` ("nothing happens"). Activation is owned by the `handle_athlete_activation` trigger, which flips `pending -> active` only when an `athletes` UPDATE supplies `current_weight` + (`primary_gym_id` OR `free_agent`). The form now collects the missing profile fields (weight, gender, DOB, city, gym/free-agent) when needed and writes them (triggering activation) instead of writing `status`; the dead `status` write is removed. The app-liability waiver ack insert is now idempotent (guarded by a prior select, since its `session_id` is NULL and the unique constraint won't catch repeats).
+- `apps/web/app/(auth)/eua/page.tsx`: now a server component that fetches the current athlete (via `getCurrentAthlete`, not `requireAthlete`, to avoid the redirect loop), computes `needsProfile`, and passes the profile values + active gyms/cities to `EuaForm`.
+
 **Mobile cleanup: silence dev warnings, dedupe athlete-photo URL helper (2026-05-29)**
 
 **Changed**
@@ -66,10 +77,13 @@
 - `apps/web/app/design/board/page.tsx`: new `/design/board` route. Synchronous page wraps an async `BoardContent` (server-side fetch via `getAdminCards`) in `<Suspense>` per the cacheComponents pattern.
 - `apps/web/app/design/board/kanban-board.tsx`: client board (To Do / Doing / Done columns) with add, move-between-columns, and delete, persisting via the shared mutations on the browser Supabase client.
 - `apps/web/app/design/board/kanban-card.tsx`, `apps/web/app/design/board/add-card-input.tsx`: card and quick-add primitives.
+- `apps/web/app/design/board/card-dialog.tsx`: click a card to open a detail dialog (shadcn `Dialog`) that edits the title and a description (the `notes` column) and shows `Created`/`Updated` relative times. Card faces are now clickable and show a compact "updated" timestamp.
 
 **Changed**
+- `packages/shared/src/api/queries.ts` + `mutations.ts`: `AdminCard` now exposes `updated_at` (added to the type and the select column lists) so the board can show last-updated times.
 - `apps/web/app/design/page.tsx`: added "Founders Board" card to the design hub.
 - `apps/web/app/design/layout.tsx`: added "Board" link to the design nav.
+- `apps/web/lib/supabase/proxy.ts`: removed `/design` from `publicPaths`, so the entire design section (including the board) is now gated behind login via the existing `proxy.ts` middleware (unauthenticated requests 307 to `/login`). This is also what makes the board's authenticated-only RLS write path work without weakening the policy.
 - `packages/shared/src/types/database.ts`: regenerated (`npm run db:types`) to include `admin_cards`.
 
 **Web layout concepts: full-screen desktop directions for team preview (2026-05-29)**

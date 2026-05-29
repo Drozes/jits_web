@@ -10,6 +10,7 @@ import {
 import type { AdminCard, AdminCardStatus } from "@jits/shared/api/queries";
 import { KanbanCard } from "./kanban-card";
 import { AddCardInput } from "./add-card-input";
+import { CardDialog } from "./card-dialog";
 
 const COLUMNS: { status: AdminCardStatus; label: string }[] = [
   { status: "todo", label: "To Do" },
@@ -20,6 +21,7 @@ const COLUMNS: { status: AdminCardStatus; label: string }[] = [
 export function KanbanBoard({ initialCards }: { initialCards: AdminCard[] }) {
   const [cards, setCards] = useState(initialCards);
   const [error, setError] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [supabase] = useState(() => createClient());
 
   async function handleAdd(status: AdminCardStatus, title: string) {
@@ -47,6 +49,19 @@ export function KanbanBoard({ initialCards }: { initialCards: AdminCard[] }) {
     if (!result.ok) return setError(result.error.message);
     setCards((prev) => prev.filter((c) => c.id !== id));
   }
+
+  async function handleSaveCard(
+    id: string,
+    patch: { title: string; notes: string | null },
+  ): Promise<string | null> {
+    const result = await updateAdminCard(supabase, id, patch);
+    if (!result.ok) return result.error.message;
+    setCards((prev) => prev.map((c) => (c.id === id ? result.data : c)));
+    setSelectedId(null);
+    return null;
+  }
+
+  const selectedCard = cards.find((c) => c.id === selectedId) ?? null;
 
   return (
     <div className="space-y-3">
@@ -80,6 +95,7 @@ export function KanbanBoard({ initialCards }: { initialCards: AdminCard[] }) {
                     canMoveRight={colIdx < COLUMNS.length - 1}
                     onMove={(dir) => handleMove(card, dir)}
                     onDelete={() => handleDelete(card.id)}
+                    onOpen={() => setSelectedId(card.id)}
                   />
                 ))}
               </div>
@@ -88,6 +104,13 @@ export function KanbanBoard({ initialCards }: { initialCards: AdminCard[] }) {
           );
         })}
       </div>
+      {selectedCard && (
+        <CardDialog
+          card={selectedCard}
+          onSave={(patch) => handleSaveCard(selectedCard.id, patch)}
+          onClose={() => setSelectedId(null)}
+        />
+      )}
     </div>
   );
 }

@@ -1317,13 +1317,14 @@ export interface AdminCard {
   notes: string | null;
   status: AdminCardStatus;
   created_at: string;
+  updated_at: string;
 }
 
 /** Fetch every internal Kanban card, oldest first. */
 export async function getAdminCards(supabase: Client): Promise<AdminCard[]> {
   const { data, error } = await supabase
     .from("admin_cards")
-    .select("id, title, notes, status, created_at")
+    .select("id, title, notes, status, created_at, updated_at")
     .order("created_at", { ascending: true });
 
   if (error || !data) return [];

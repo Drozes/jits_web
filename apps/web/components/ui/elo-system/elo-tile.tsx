@@ -14,15 +14,19 @@ interface EloTileProps {
   value?: number | string;
   size?: EloTileSize;
   accent?: boolean;
+  /** Render the 3px Signal Red bottom accent bar (canonical hero ELO tile). */
+  accentBar?: boolean;
   before?: string | number;
   after?: string | number;
   className?: string;
 }
 
-function Tile({ label, value, size, accent }: { label: string; value: string | number; size: EloTileSize; accent?: boolean }) {
+function Tile({ label, value, size, accent, accentBar }: { label: string; value: string | number; size: EloTileSize; accent?: boolean; accentBar?: boolean }) {
   return (
     <div
       style={{
+        position: "relative",
+        overflow: "hidden",
         background: "var(--bg-elevated)",
         border: `1px solid ${accent ? "var(--accent-cta)" : "var(--border-hairline)"}`,
         borderRadius: "var(--radius-md)",
@@ -59,11 +63,23 @@ function Tile({ label, value, size, accent }: { label: string; value: string | n
       >
         {value}
       </span>
+      {accentBar ? (
+        <span
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: 3,
+            background: "var(--accent-cta)",
+          }}
+        />
+      ) : null}
     </div>
   );
 }
 
-export function EloTile({ label, value, size = "large", accent, before, after, className }: EloTileProps) {
+export function EloTile({ label, value, size = "large", accent, accentBar, before, after, className }: EloTileProps) {
   if (before !== undefined && after !== undefined) {
     return (
       <div className={className} style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
@@ -73,5 +89,5 @@ export function EloTile({ label, value, size = "large", accent, before, after, c
       </div>
     );
   }
-  return <Tile label={label} value={value ?? ""} size={size} accent={accent} />;
+  return <Tile label={label} value={value ?? ""} size={size} accent={accent} accentBar={accentBar} />;
 }

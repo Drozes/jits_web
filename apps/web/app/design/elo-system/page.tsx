@@ -170,8 +170,8 @@ export default function EloSystemPreview() {
 
         <Section title="EloTile">
           <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-4)", alignItems: "flex-end" }}>
-            <EloTile label="ELO" value={1843} size="hero" accent />
-            <EloTile label="Peak" value={2244} size="large" />
+            <EloTile label="ELO" value={1843} size="hero" accentBar />
+            <EloTile label="Peak" value={2244} size="large" accent />
             <EloTile label="Last" value={1821} size="medium" />
             <EloTile label="Wins" value={47} size="small" />
           </div>
