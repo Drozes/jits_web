@@ -10,6 +10,7 @@ const navLinks = [
   { href: "/design/style-guide", label: "Style Guide" },
   { href: "/design/ui-kit", label: "UI Kit" },
   { href: "/design/wireframe", label: "Wireframe" },
+  { href: "/design/web-layouts", label: "Web Layouts" },
   { href: "/design/screens", label: "Web Screens" },
   { href: "/design/screens/native", label: "Native Screens" },
 ];
