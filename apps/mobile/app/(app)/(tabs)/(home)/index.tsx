@@ -152,6 +152,7 @@ export default function DashboardScreen() {
               size="hero"
               label="Current ELO Rating"
               value={athlete.current_elo}
+              accentBar
             />
 
             <ActiveSessionCard session={data?.activeSession ?? null} />

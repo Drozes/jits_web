@@ -15,6 +15,8 @@ interface EloTileProps {
   value?: number | string;
   size?: EloTileSize;
   accent?: boolean;
+  /** Render the 3px Signal Red bottom accent bar (canonical hero ELO tile). */
+  accentBar?: boolean;
   before?: string | number;
   after?: string | number;
   className?: string;
@@ -25,13 +27,15 @@ interface SingleTileProps {
   value: string | number;
   size: EloTileSize;
   accent?: boolean;
+  accentBar?: boolean;
 }
 
-function SingleTile({ label, value, size, accent }: SingleTileProps) {
+function SingleTile({ label, value, size, accent, accentBar }: SingleTileProps) {
   return (
     <View
       className={cn(
         "bg-surface-3 border rounded-md px-5 py-4 items-center min-w-[120px]",
+        accentBar && "overflow-hidden",
         accent ? "border-cta" : "border-hairline",
       )}
     >
@@ -44,13 +48,19 @@ function SingleTile({ label, value, size, accent }: SingleTileProps) {
         className="font-mono-bold text-ink"
         style={{
           fontSize: SIZE_PX[size],
-          lineHeight: SIZE_PX[size],
+          // RN crops/centers the glyph tightly when lineHeight == fontSize; give
+          // ~10% breathing room so the hero number isn't vertically clipped.
+          lineHeight: SIZE_PX[size] * 1.1,
           letterSpacing: -SIZE_PX[size] * 0.04,
           marginTop: 8,
+          fontVariant: ["tabular-nums"],
         }}
       >
         {value}
       </Text>
+      {accentBar ? (
+        <View className="absolute left-0 right-0 bottom-0 h-[3px] bg-cta" />
+      ) : null}
     </View>
   );
 }
@@ -60,6 +70,7 @@ export function EloTile({
   value,
   size = "large",
   accent,
+  accentBar,
   before,
   after,
   className,
@@ -75,7 +86,7 @@ export function EloTile({
   }
   return (
     <View className={className}>
-      <SingleTile label={label} value={value ?? ""} size={size} accent={accent} />
+      <SingleTile label={label} value={value ?? ""} size={size} accent={accent} accentBar={accentBar} />
     </View>
   );
 }

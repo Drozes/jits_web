@@ -8,6 +8,14 @@
 - Moved `apps/mobile/app/(app)/(tabs)/gyms/gym-detail-parts.tsx` to `apps/mobile/components/gyms/gym-detail-parts.tsx` (it is a named-export helper, not a route; living under `app/` made expo-router warn "missing the required default export"). Import in `gyms/[id].tsx` updated to `@/components/gyms/gym-detail-parts`.
 - New `apps/mobile/lib/athlete-photo.ts` (`athletePhotoSource`): single source of truth that resolves a bare Supabase storage key to a public URL, passes through absolute URLs, or returns null. `Avatar32` now routes `photoUrl` through it (previously it handed a bare key straight to `<Image>`, producing a `file://…/profile.png` "could not find image" warning). `match-card.tsx` and `profile-header.tsx` now import the shared helper instead of each carrying a private copy.
 
+**Home hero ELO tile: vertical clip fix + Signal Red accent bar (2026-05-29)**
+
+**Fixed**
+- `apps/mobile/components/ui/elo-system/elo-tile.tsx`: the hero number was vertically clipped because `lineHeight` equalled `fontSize` (React Native crops the glyph box, unlike CSS `line-height: 1`); bumped `lineHeight` to `1.1x` for breathing room and added the brand-required `fontVariant: ["tabular-nums"]` (was missing on mobile).
+
+**Added**
+- `apps/mobile/components/ui/elo-system/elo-tile.tsx`: optional `accentBar` prop that renders the 3px Signal Red bottom accent bar from the canonical `.elo-tile::after` wireframe spec (with `overflow-hidden` so it follows the rounded corner). Enabled on the Home "Current ELO Rating" hero in `apps/mobile/app/(app)/(tabs)/(home)/index.tsx`.
+
 **Profile tab: SWR cache + skeleton loading state (2026-05-29)**
 
 **Changed**
