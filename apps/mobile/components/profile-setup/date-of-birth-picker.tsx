@@ -1,6 +1,5 @@
 import * as React from "react";
-import { Text, View } from "react-native";
-import { Label } from "@/components/ui/label";
+import { View } from "react-native";
 import {
   Select,
   SelectContent,
@@ -9,6 +8,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { isAtLeast16 } from "@/lib/profile-setup/validation";
+import { EloField } from "./elo-form-field";
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
@@ -34,6 +34,8 @@ interface DateOfBirthPickerProps {
   value: string;
   onChange: (dateOfBirth: string) => void;
 }
+
+const TRIGGER_CLASS = "bg-surface-3 border-hairline-strong rounded-xs h-12 px-4";
 
 export function DateOfBirthPicker({ value, onChange }: DateOfBirthPickerProps) {
   const initial = parseDob(value);
@@ -72,13 +74,18 @@ export function DateOfBirthPicker({ value, onChange }: DateOfBirthPickerProps) {
     update(parts.month, parts.day, parts.year);
   };
 
+  const hasUnderageError = Boolean(
+    value && month && day && year && !isAtLeast16(value),
+  );
+  const errorMsg = hasUnderageError ? "You must be at least 16 to compete." : null;
+  const helper = !month || !day || !year ? "You must be at least 16 to compete." : undefined;
+
   return (
-    <View className="gap-2">
-      <Label>Date of Birth</Label>
+    <EloField label="Date of Birth" helper={helper} error={errorMsg}>
       <View className="flex-row gap-2">
         <View className="flex-1">
           <Select value={month || undefined} onValueChange={(v) => setDobPart("month", v)}>
-            <SelectTrigger>
+            <SelectTrigger className={TRIGGER_CLASS}>
               <SelectValue placeholder="Month" />
             </SelectTrigger>
             <SelectContent>
@@ -91,7 +98,7 @@ export function DateOfBirthPicker({ value, onChange }: DateOfBirthPickerProps) {
 
         <View className="w-20">
           <Select value={day || undefined} onValueChange={(v) => setDobPart("day", v)}>
-            <SelectTrigger>
+            <SelectTrigger className={TRIGGER_CLASS}>
               <SelectValue placeholder="Day" />
             </SelectTrigger>
             <SelectContent>
@@ -104,7 +111,7 @@ export function DateOfBirthPicker({ value, onChange }: DateOfBirthPickerProps) {
 
         <View className="w-24">
           <Select value={year || undefined} onValueChange={(v) => setDobPart("year", v)}>
-            <SelectTrigger>
+            <SelectTrigger className={TRIGGER_CLASS}>
               <SelectValue placeholder="Year" />
             </SelectTrigger>
             <SelectContent>
@@ -115,16 +122,6 @@ export function DateOfBirthPicker({ value, onChange }: DateOfBirthPickerProps) {
           </Select>
         </View>
       </View>
-      {value && !isAtLeast16(value) && month && day && year && (
-        <Text className="text-xs text-destructive">
-          You must be at least 16 to compete.
-        </Text>
-      )}
-      {(!month || !day || !year) && (
-        <Text className="text-xs text-muted-foreground">
-          You must be at least 16 to compete.
-        </Text>
-      )}
-    </View>
+    </EloField>
   );
 }

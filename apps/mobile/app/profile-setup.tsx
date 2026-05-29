@@ -1,4 +1,3 @@
-import * as React from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -7,17 +6,19 @@ import {
   Text,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { Button } from "@/components/ui/button";
+import { Wordmark } from "@/components/ui/elo-system";
+import { CtaButton } from "@/components/auth/auth-buttons";
+import { AppHeader } from "@/components/layout/app-header";
 import { SetupWizard } from "@/components/profile-setup/setup-wizard";
 import { useRequireAuth } from "@/lib/auth/hooks";
 import { useSetupData } from "@/lib/profile-setup/use-setup-data";
+import { useThemedTokens } from "@/lib/theme/use-theme";
 
 /**
- * Profile setup screen. Mirrors `apps/web/app/profile/setup/page.tsx`:
- *   1. Require auth (redirects to /login when missing).
- *   2. Load athlete row + gyms + waiver + acknowledgement state.
- *   3. Render the multi-step wizard (TOS, identity, training, optional).
+ * Profile setup screen. ELO design system:
+ *   - AppHeader (no back when activating, back when editing handled by wizard)
+ *   - Hero Wordmark + tagline
+ *   - SetupWizard plate(s) below
  *
  * On successful activation, `useSetupSubmit` calls `refreshAthlete()` and
  * routes back to `/`. The root `app/index.tsx` then redirects to
@@ -26,44 +27,50 @@ import { useSetupData } from "@/lib/profile-setup/use-setup-data";
 export default function ProfileSetupScreen() {
   const { user, isLoading: authLoading } = useRequireAuth();
   const { data, loading, error, reload } = useSetupData(user?.id ?? null);
+  const tokens = useThemedTokens();
 
   const isLoading = authLoading || loading || (!!user && !data);
+  const headerTitle = data?.isEditing ? "Edit Profile" : "Setup";
 
   return (
-    <SafeAreaView className="flex-1 bg-background" edges={["top", "bottom"]}>
+    <View className="flex-1 bg-surface">
+      <AppHeader title={headerTitle} />
       <KeyboardAvoidingView
         className="flex-1"
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
         <ScrollView
-          contentContainerClassName="flex-grow px-6 py-8"
+          contentContainerStyle={{
+            flexGrow: 1,
+            paddingHorizontal: 24,
+            paddingVertical: 24,
+            gap: 24,
+          }}
           keyboardShouldPersistTaps="handled"
         >
           {isLoading && (
             <View className="flex-1 items-center justify-center py-16">
-              <ActivityIndicator />
+              <ActivityIndicator color={tokens.accentCta} />
             </View>
           )}
 
           {!isLoading && error && (
-            <View className="flex-1 items-center justify-center gap-3 py-16">
-              <Text className="text-sm text-destructive">{error}</Text>
-              <Button variant="outline" onPress={() => reload()}>
-                Try again
-              </Button>
+            <View className="flex-1 items-center justify-center gap-4 py-16">
+              <Text className="font-body text-[14px] text-negative text-center">
+                {error}
+              </Text>
+              <CtaButton label="Try Again" onPress={() => reload()} />
             </View>
           )}
 
           {!isLoading && !error && data && user && (
-            <View className="gap-8">
+            <>
               <View className="items-center gap-2">
-                <Text className="text-2xl font-heading text-foreground">
-                  {data.isEditing ? "Edit Profile" : "Welcome to ELO RATED"}
-                </Text>
-                <Text className="text-center text-sm text-muted-foreground">
+                <Wordmark size="lg" />
+                <Text className="font-mono text-[11px] text-ink-3 uppercase tracking-caps-l text-center">
                   {data.isEditing
-                    ? "Update your athlete details"
-                    : "Set up your athlete profile to get started"}
+                    ? "Update Your Athlete Details"
+                    : "What's your number?"}
                 </Text>
               </View>
 
@@ -75,10 +82,10 @@ export default function ProfileSetupScreen() {
                 hasAcceptedTos={data.hasAcceptedTos}
                 isEditing={data.isEditing}
               />
-            </View>
+            </>
           )}
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 }

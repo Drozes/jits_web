@@ -5,7 +5,8 @@
  * agent toggle in setup; mobile does, per the A3 spec).
  */
 export interface WizardValues {
-  displayName: string;
+  firstName: string;
+  lastName: string;
   weight: string;
   gymId: string;
   gender: string;

@@ -6,8 +6,8 @@
  * propagates the dark token values to all descendants.
  *
  * Components do NOT need to add `dark:` modifiers to every className — they
- * simply use `bg-background`, `text-foreground`, etc. and the values flip
- * automatically when the system theme changes.
+ * simply use `bg-background`, `text-foreground`, `bg-elevated`, `text-tertiary`,
+ * etc. and the values flip automatically when the system theme changes.
  */
 import * as React from "react";
 import { View } from "react-native";
@@ -17,6 +17,7 @@ import { darkTokens, lightTokens } from "../tokens";
 
 function buildVars(t: typeof lightTokens) {
   return vars({
+    // Legacy shadcn-style tokens
     "--background": t.background,
     "--foreground": t.foreground,
     "--card": t.card,
@@ -41,6 +42,23 @@ function buildVars(t: typeof lightTokens) {
     "--gold": t.gold,
     "--brand-orange": t.brandOrange,
     "--deep-red": t.deepRed,
+    // ELO design system tokens
+    "--bg-primary": t.bgPrimary,
+    "--bg-secondary": t.bgSecondary,
+    "--bg-elevated": t.bgElevated,
+    "--bg-elevated-hover": t.bgElevatedHover,
+    "--text-primary": t.textPrimary,
+    "--text-secondary": t.textSecondary,
+    "--text-tertiary": t.textTertiary,
+    "--text-on-accent": t.textOnAccent,
+    "--accent-cta": t.accentCta,
+    "--accent-cta-hover": t.accentCtaHover,
+    "--state-positive": t.statePositive,
+    "--state-negative": t.stateNegative,
+    "--state-neutral": t.stateNeutral,
+    "--border-hairline": t.borderHairline,
+    "--border-hairline-faint": t.borderHairlineFaint,
+    "--border-hairline-strong": t.borderHairlineStrong,
   });
 }
 

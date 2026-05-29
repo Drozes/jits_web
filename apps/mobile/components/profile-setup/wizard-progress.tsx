@@ -1,4 +1,3 @@
-import * as React from "react";
 import { Text, View } from "react-native";
 import { cn } from "@/lib/cn";
 
@@ -8,13 +7,22 @@ interface WizardProgressProps {
   label: string;
 }
 
-/** Native port of `apps/web/app/profile/setup/wizard-progress.tsx`. */
+/**
+ * ELO design system step indicator. Mono caps step counter + label,
+ * with a track of 2x12 pips coloured cta for completed/current and
+ * hairline-strong for upcoming.
+ */
 export function WizardProgress({ currentIdx, total, label }: WizardProgressProps) {
   return (
-    <View className="gap-2">
-      <Text className="text-center text-xs text-muted-foreground">
-        Step {currentIdx + 1} of {total} - {label}
-      </Text>
+    <View className="gap-3">
+      <View className="items-center gap-1">
+        <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-xl">
+          Step {currentIdx + 1} of {total}
+        </Text>
+        <Text className="font-heading text-[14px] text-ink uppercase tracking-caps-l">
+          {label}
+        </Text>
+      </View>
       <View
         accessibilityRole="progressbar"
         accessibilityValue={{ min: 1, max: total, now: currentIdx + 1 }}
@@ -25,8 +33,8 @@ export function WizardProgress({ currentIdx, total, label }: WizardProgressProps
           <View
             key={i}
             className={cn(
-              "h-2.5 w-2.5 rounded-full",
-              i === currentIdx ? "bg-primary" : "bg-muted",
+              "h-1 w-12",
+              i <= currentIdx ? "bg-cta" : "bg-hairline-strong",
             )}
           />
         ))}
