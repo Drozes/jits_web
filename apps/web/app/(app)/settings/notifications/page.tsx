@@ -6,8 +6,10 @@ import { requireAthlete } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
 import { getNotificationPreferences } from "@jits/shared/api/mutations";
 
-export default async function NotificationsPage() {
-  await requireAthlete();
+export default function NotificationsPage() {
+  // The guard runs inside the Suspense'd <NotificationsContent/>. Awaiting it
+  // here, outside <Suspense>, accesses uncached data and breaks Next 16
+  // cacheComponents prerender (jits-v0n).
   return (
     <>
       <AppHeader title="Notifications" back />

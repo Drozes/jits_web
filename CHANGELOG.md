@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+**Web bug batch: build prerender, video pre-flight, video-progress hook (2026-05-29)**
+
+**Fixed**
+- `jits-v0n` — production `build:web` failed prerendering `/` (and, once `/` was fixed, `/leaderboard`, `/notifications`, `/settings`, `/settings/notifications`): each page's default export was `async` and awaited `requireAthlete()`/`requireAuth()` in the page body, outside `<Suspense>`, which violates Next 16 `cacheComponents` ("Uncached data accessed outside of <Suspense>"). All five pages are now synchronous; the guard already runs inside their Suspense'd content components, so auth/activation enforcement is unchanged. Verified: `build:web` generates all 51 pages; unauthed `/leaderboard`/`/notifications`/`/settings`/`/settings/notifications` return 307→`/login` (middleware) and unauthed `/` redirects to `/login` in-browser (page-level redirect streams correctly through Suspense — no 500).
+- `jits-3ng` — `apps/web/hooks/use-video-recorder.ts`: the 2 GiB `MAX_UPLOAD_BYTES` cap was only checked after recording stopped, so a user could record for minutes then be rejected. Now tracks recorded bytes live in `ondataavailable`, exposes `nearingLimit` (≥90%), and auto-stops recording at the cap with a clear error (parity with mobile's pre-flight check). The post-record check remains as a backstop. `nearingLimit` is an additive, non-breaking field on the hook's return.
+- `jits-02w` / `jits-5q6` / `jits-c67` / `jits-5uc` — `packages/shared/src/hooks/use-video-progress.ts`: (02w) the `rpcMissing→ref` mirror moved out of the render body into a `useEffect`; (5q6) removed `fetchSnapshot`/`scheduleRefresh` from the realtime-channel effect deps (version-gated via `versionRef`) so a non-memoized `supabase` no longer rebuilds the channel every render; (c67) `rpcMissing` now resets on `videoId` change and on `refresh()`, so degraded "Realtime-only" mode recovers after the RPC ships; (5uc) a transient fallback miss now signals via `error` ("Progress temporarily unavailable") instead of silently keeping stale data. Exported API unchanged.
+
 **Web parity: EloTile Signal Red accent bar (2026-05-29)**
 
 **Added**

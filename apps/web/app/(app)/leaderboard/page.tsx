@@ -22,8 +22,10 @@ function LeaderboardSkeleton() {
   );
 }
 
-export default async function LeaderboardPage() {
-  await requireAthlete();
+export default function LeaderboardPage() {
+  // The guard runs inside the Suspense'd <LeaderboardData/>. Awaiting it here,
+  // outside <Suspense>, accesses uncached data and breaks Next 16
+  // cacheComponents prerender (jits-v0n).
   return (
     <>
       <AppHeader title="Rankings" rightAction={<PageHeaderActions />} />

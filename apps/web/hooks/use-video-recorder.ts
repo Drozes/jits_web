@@ -11,6 +11,9 @@ import {
 // BE contract: jr_be/specs/013-chunked-video-pipeline/INTEGRATION.md
 // §1.2 path convention + §8.5 size limits.
 const MAX_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024; // 2 GiB client-side cap
+// Warn the user once live usage crosses this fraction of the cap so the
+// auto-stop at 100% isn't a surprise (parity with mobile's pre-flight check).
+const NEARING_LIMIT_BYTES = MAX_UPLOAD_BYTES * 0.9;
 
 interface UseVideoRecorderReturn {
   videoRef: React.RefObject<HTMLVideoElement | null>;
@@ -24,6 +27,11 @@ interface UseVideoRecorderReturn {
    * (analysis viewer, progress hook) key on this id.
    */
   videoId: string | null;
+  /**
+   * True once live recorded size crosses 90% of `MAX_UPLOAD_BYTES`.
+   * Lets consumers warn before the recorder auto-stops at the 2 GB cap.
+   */
+  nearingLimit: boolean;
 }
 
 /**
@@ -44,11 +52,13 @@ export function useVideoRecorder(
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const recordedBytesRef = useRef(0);
   const streamRef = useRef<MediaStream | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<"idle" | "uploading" | "done" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
   const [videoId, setVideoId] = useState<string | null>(null);
+  const [nearingLimit, setNearingLimit] = useState(false);
 
   const upload = useCallback(async (blob: Blob) => {
     if (!uploaderAthleteId) {
@@ -110,29 +120,6 @@ export function useVideoRecorder(
     }
   }, [matchId, uploaderAthleteId]);
 
-  const startRecording = useCallback(async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment", width: 854, height: 480 },
-        audio: false,
-      });
-      streamRef.current = stream;
-      if (videoRef.current) videoRef.current.srcObject = stream;
-
-      const mimeType = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"]
-        .find((t) => MediaRecorder.isTypeSupported(t)) ?? "video/webm";
-      const recorder = new MediaRecorder(stream, { mimeType });
-      chunksRef.current = [];
-      recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
-      recorder.start(1000);
-      recorderRef.current = recorder;
-      setIsRecording(true);
-      setError(null);
-    } catch {
-      setError("Camera access denied. You can still manage the match without video.");
-    }
-  }, []);
-
   const stopRecording = useCallback(() => {
     const recorder = recorderRef.current;
     if (recorder && recorder.state !== "inactive") {
@@ -148,11 +135,49 @@ export function useVideoRecorder(
     setIsRecording(false);
   }, [upload]);
 
+  const startRecording = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment", width: 854, height: 480 },
+        audio: false,
+      });
+      streamRef.current = stream;
+      if (videoRef.current) videoRef.current.srcObject = stream;
+
+      const mimeType = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"]
+        .find((t) => MediaRecorder.isTypeSupported(t)) ?? "video/webm";
+      const recorder = new MediaRecorder(stream, { mimeType });
+      chunksRef.current = [];
+      recordedBytesRef.current = 0;
+      setNearingLimit(false);
+      recorder.ondataavailable = (e) => {
+        if (e.data.size === 0) return;
+        chunksRef.current.push(e.data);
+        recordedBytesRef.current += e.data.size;
+        // Live size guard (parity with mobile's pre-flight check): warn at
+        // 90%, then auto-stop at the 2 GB cap so the user isn't surprised
+        // by a rejected upload after a long recording. `upload()` keeps its
+        // own post-record check as a backstop.
+        if (recordedBytesRef.current >= NEARING_LIMIT_BYTES) setNearingLimit(true);
+        if (recordedBytesRef.current >= MAX_UPLOAD_BYTES) {
+          setError("Recording stopped: 2 GB limit reached.");
+          stopRecording();
+        }
+      };
+      recorder.start(1000);
+      recorderRef.current = recorder;
+      setIsRecording(true);
+      setError(null);
+    } catch {
+      setError("Camera access denied. You can still manage the match without video.");
+    }
+  }, [stopRecording]);
+
   useEffect(() => {
     return () => {
       streamRef.current?.getTracks().forEach((t) => t.stop());
     };
   }, []);
 
-  return { videoRef, isRecording, startRecording, stopRecording, uploadStatus, error, videoId };
+  return { videoRef, isRecording, startRecording, stopRecording, uploadStatus, error, videoId, nearingLimit };
 }
