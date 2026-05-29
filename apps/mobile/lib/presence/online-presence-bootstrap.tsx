@@ -3,7 +3,6 @@
  *
  * Renders null. Place inside the existing `<AuthProvider>` in `_layout.tsx`.
  */
-import * as React from "react";
 import { useAuth } from "@/lib/auth/hooks";
 import { useOnlinePresence } from "./use-online-presence";
 

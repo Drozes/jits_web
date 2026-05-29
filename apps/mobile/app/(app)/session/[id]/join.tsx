@@ -1,10 +1,13 @@
 import * as React from "react";
-import { ActivityIndicator, ScrollView, Text, View } from "react-native";
-import { useLocalSearchParams, useRouter, Stack } from "expo-router";
+import { ActivityIndicator, Text, View } from "react-native";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useRequireAthlete } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { useSessionForJoin } from "@/lib/session/use-session-for-join";
 import { JoinWizard } from "@/components/session/join-wizard";
+import { AppHeader } from "@/components/layout/app-header";
+import { PageContainer, PageSurface } from "@/components/layout/page-container";
+import { Plate } from "@/components/ui/elo-system";
 
 export default function SessionJoinScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -24,12 +27,12 @@ export default function SessionJoinScreen() {
 
   if (authLoading || isLoading) {
     return (
-      <>
-        <Stack.Screen options={{ title: "Join Session" }} />
-        <View className="flex-1 items-center justify-center bg-background">
-          <ActivityIndicator color={tokens.primary} />
+      <PageSurface>
+        <AppHeader title="Join Session" back />
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator color={tokens.accentCta} />
         </View>
-      </>
+      </PageSurface>
     );
   }
 
@@ -39,27 +42,35 @@ export default function SessionJoinScreen() {
 
   if (error || !data) {
     return (
-      <>
-        <Stack.Screen options={{ title: "Join Session" }} />
-        <View className="flex-1 items-center justify-center bg-background px-6">
-          <Text className="text-center text-base font-heading text-foreground">
-            Session unavailable
-          </Text>
-          <Text className="mt-2 text-center text-sm text-muted-foreground">
-            {error ?? "This session has ended or doesn't exist."}
-          </Text>
+      <PageSurface>
+        <AppHeader title="Join Session" back />
+        <View className="flex-1 items-center justify-center px-6">
+          <Plate className="items-center py-8">
+            <Text className="font-heading text-[16px] text-ink text-center mb-2">
+              Session unavailable
+            </Text>
+            <Text className="font-body text-[13px] text-ink-2 text-center">
+              {error ?? "This session has ended or doesn’t exist."}
+            </Text>
+          </Plate>
         </View>
-      </>
+      </PageSurface>
     );
   }
 
   return (
-    <>
-      <Stack.Screen options={{ title: "Join Session", headerShown: true }} />
-      <ScrollView
-        className="flex-1 bg-background"
-        contentContainerStyle={{ padding: 16, paddingBottom: 48 }}
-      >
+    <PageSurface>
+      <AppHeader title="Join Session" back />
+      <PageContainer noTabBar contentContainerStyle={{ paddingTop: 20, gap: 24 }}>
+        <View>
+          <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-xl mb-1">
+            Checking In
+          </Text>
+          <Text className="font-heading text-[22px] text-ink" numberOfLines={1}>
+            {data.gymName}
+          </Text>
+        </View>
+
         <JoinWizard
           sessionId={id}
           gymName={data.gymName}
@@ -74,7 +85,7 @@ export default function SessionJoinScreen() {
           currentAthleteElo={athlete.current_elo}
           currentAthletePhotoUrl={athlete.profile_photo_url ?? null}
         />
-      </ScrollView>
-    </>
+      </PageContainer>
+    </PageSurface>
   );
 }

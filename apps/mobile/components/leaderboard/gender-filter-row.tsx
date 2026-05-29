@@ -1,5 +1,5 @@
-import { Pressable, Text, View } from "react-native";
-import { cn } from "@/lib/cn";
+import { View } from "react-native";
+import { Chip } from "@/components/ui/elo-system";
 
 export type GenderFilter = "all" | "male" | "female";
 
@@ -9,6 +9,10 @@ const GENDER_OPTIONS: { value: GenderFilter; label: string }[] = [
   { value: "female", label: "Female" },
 ];
 
+/**
+ * Gender filter rendered as ELO chips. Sits inside the chip strip on the
+ * Rankings screen alongside the Fighters/Gyms toggle.
+ */
 export function GenderFilterRow({
   current,
   onSelect,
@@ -17,27 +21,15 @@ export function GenderFilterRow({
   onSelect: (f: GenderFilter) => void;
 }) {
   return (
-    <View className="flex-row justify-center gap-1.5 mt-3">
+    <View className="flex-row flex-wrap" style={{ gap: 8 }}>
       {GENDER_OPTIONS.map((opt) => (
-        <Pressable
+        <Chip
           key={opt.value}
+          active={current === opt.value}
           onPress={() => onSelect(opt.value)}
-          className={cn(
-            "rounded-full px-3.5 py-1.5",
-            current === opt.value ? "bg-primary" : "bg-muted",
-          )}
         >
-          <Text
-            className={cn(
-              "text-xs font-medium",
-              current === opt.value
-                ? "text-primary-foreground"
-                : "text-muted-foreground",
-            )}
-          >
-            {opt.label}
-          </Text>
-        </Pressable>
+          {opt.label}
+        </Chip>
       ))}
     </View>
   );

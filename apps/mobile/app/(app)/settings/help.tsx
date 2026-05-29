@@ -1,137 +1,82 @@
-import * as React from "react";
-import { Linking, Pressable, ScrollView, Text, View } from "react-native";
-import { ChevronDown, ChevronRight, Mail } from "lucide-react-native";
-import { useThemedTokens } from "@/lib/theme/use-theme";
+import { Text, View } from "react-native";
+import { AppHeader } from "@/components/layout/app-header";
+import { PageContainer } from "@/components/layout/page-container";
+import { Plate } from "@/components/ui/elo-system";
 
-const FAQ_ITEMS = [
+/**
+ * G4 Help & Support. Static 4-plate layout per wireframe lines 1653-1680 and
+ * mirrors apps/web/app/(app)/settings/help/page.tsx 1:1. Each plate has an h2
+ * heading + lede paragraph(s).
+ */
+type HelpSection = {
+  title: string;
+  paragraphs: string[];
+};
+
+const HELP_SECTIONS: HelpSection[] = [
   {
-    id: "join-session",
-    question: "How do I join a session?",
-    answer:
-      "Go to the Gyms tab to find your gym. Select an upcoming session and tap the join button. Complete the 4-step wizard: confirm your location, accept any required waivers, enter your current weight, and confirm your details. You'll appear in the session lobby where you can challenge other participants.",
+    title: "Getting Started",
+    paragraphs: [
+      "ELO RATED is a participation-only ranking platform. You join a session at a partner gym, complete matches, and the system handles your rating.",
+      "Start by attending an open mat at a gym tagged as an ELO session. Geofence plus waiver confirm you're on the mat before you can join the lobby.",
+    ],
   },
   {
-    id: "elo-rating",
-    question: "How does ELO rating work?",
-    answer:
-      "Your ELO starts at 1000. After each ranked match, you gain or lose points based on the match result and your opponent's rating. Beating a higher-rated opponent gains more points. Losing to a lower-rated opponent loses more points. Draws cost both athletes ELO (the pressure score penalty).",
+    title: "How ELO Works",
+    paragraphs: [
+      "Universal starting rating. No belt seeding. Weight is normalized into the exchange so heavier athletes get a small phantom-ELO offset (+50 per IBJJF division gap).",
+      "Submission-only. Tap or don't. Draws cost ELO for both fighters; equal matches get the harshest Pressure Score penalty.",
+      "Wins, losses, and draws all move your number. Your number is your number.",
+    ],
   },
   {
-    id: "ranked-matches",
-    question: "Are all matches ranked?",
-    answer:
-      "Yes. Every match on ELO RATED is ranked and affects your ELO rating. This keeps competition meaningful and ensures your record accurately reflects your performance on the mats.",
+    title: "Match Footage & Privacy",
+    paragraphs: [
+      "You own your match footage. You can always download it from your profile. Server-side retention on the free tier may be limited; access to your own data is not.",
+      "Your profile and rating are public on the global ladder. Personal data is governed by the Privacy Policy linked in the End User Agreement.",
+    ],
   },
   {
-    id: "record-result",
-    question: "How do I record a match result?",
-    answer:
-      "After the match timer ends, the result entry screen appears. Both athletes must confirm the outcome (submission, points, or draw). Once both confirm, the match is recorded. If there's a disagreement, either athlete can dispute the result.",
-  },
-  {
-    id: "change-weight",
-    question: "Can I change my weight class?",
-    answer:
-      "Yes, you can update your weight in Profile settings before each session. This ensures accurate ELO calculations, as weight divisions affect the stakes. Update your weight before joining a session.",
-  },
-  {
-    id: "report-issue",
-    question: "How do I report an issue?",
-    answer:
-      "Go to Settings > Feedback to report bugs or issues. Our team reviews all feedback and will follow up with you if needed.",
+    title: "Report a Problem",
+    paragraphs: [
+      "Spotted a wrong result, a dispute that wasn't resolved, or a participant violating gym rules? Send a feedback note from Settings, Feedback.",
+      "For urgent issues (safety, abuse, account compromise), email support@elorated.com with the match ID.",
+    ],
   },
 ];
 
 export default function SettingsHelpScreen() {
   return (
-    <ScrollView
-      className="flex-1 bg-background"
-      contentContainerStyle={{ padding: 16, paddingBottom: 48, gap: 24 }}
-    >
-      <Text className="text-2xl font-heading text-foreground">
-        Help & Support
-      </Text>
-
-      <View className="gap-3">
-        <Text className="text-base font-heading text-foreground">
-          Frequently Asked Questions
-        </Text>
-        <View className="gap-2">
-          {FAQ_ITEMS.map((item) => (
-            <FAQItem
-              key={item.id}
-              question={item.question}
-              answer={item.answer}
-            />
-          ))}
-        </View>
-      </View>
-
-      <View className="border-t border-border pt-6 gap-3">
-        <Text className="text-base font-heading text-foreground">
-          Need More Help?
-        </Text>
-        <Text className="text-sm text-muted-foreground">
-          Have a question we didn't cover? Reach out to our support team.
-        </Text>
-        <EmailSupportButton />
-      </View>
-    </ScrollView>
-  );
-}
-
-function FAQItem({
-  question,
-  answer,
-}: {
-  question: string;
-  answer: string;
-}) {
-  const [open, setOpen] = React.useState(false);
-  const tokens = useThemedTokens();
-
-  return (
-    <View className="rounded-lg border border-border bg-card overflow-hidden">
-      <Pressable
-        onPress={() => setOpen((v) => !v)}
-        className="flex-row items-center justify-between px-4 py-3.5 active:bg-muted/40"
+    <>
+      <AppHeader title="Help & Support" back />
+      <PageContainer
+        noTabBar
+        contentContainerStyle={{ paddingTop: 24, gap: 16 }}
       >
-        <Text className="flex-1 text-sm font-medium text-foreground pr-3">
-          {question}
-        </Text>
-        {open ? (
-          <ChevronDown size={16} color={tokens.mutedForeground} />
-        ) : (
-          <ChevronRight size={16} color={tokens.mutedForeground} />
-        )}
-      </Pressable>
-      {open && (
-        <View className="px-4 pb-4 pt-1">
-          <Text className="text-sm leading-relaxed text-muted-foreground">
-            {answer}
-          </Text>
-        </View>
-      )}
-    </View>
+        {HELP_SECTIONS.map((section) => (
+          <HelpPlate key={section.title} section={section} />
+        ))}
+      </PageContainer>
+    </>
   );
 }
 
-function EmailSupportButton() {
-  const handlePress = React.useCallback(async () => {
-    const url = "mailto:support@elorated.com";
-    const supported = await Linking.canOpenURL(url);
-    if (supported) await Linking.openURL(url);
-  }, []);
-
+function HelpPlate({ section }: { section: HelpSection }) {
   return (
-    <Pressable
-      onPress={handlePress}
-      className="self-start flex-row items-center gap-2 rounded-lg bg-primary px-4 py-2.5 active:opacity-90"
-    >
-      <Mail size={16} color="#ffffff" />
-      <Text className="text-sm font-medium text-primary-foreground">
-        Email Support
+    <Plate>
+      <Text className="font-heading text-[16px] text-ink uppercase tracking-caps mb-3">
+        {section.title}
       </Text>
-    </Pressable>
+      <View className="gap-3">
+        {section.paragraphs.map((paragraph, index) => (
+          <Text
+            key={index}
+            className="font-body text-[12px] text-ink-2 leading-relaxed"
+          >
+            {paragraph}
+          </Text>
+        ))}
+      </View>
+    </Plate>
   );
 }

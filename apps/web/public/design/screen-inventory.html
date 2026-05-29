@@ -935,7 +935,7 @@
 <body>
 
   <h1>ELO RATED: Web Screen Inventory</h1>
-  <p class="subtitle">33 screens across 9 flows + 1 hidden section. Progress board showing implementation status. Next.js 16 + Tailwind + shadcn/ui.</p>
+  <p class="subtitle">33 screens across 9 flows + 1 hidden section. Visual catalog rendered in the ELO design system (Void/Panel/Plate surfaces, Signal Red CTA, Bebas Neue + DM Sans + Inter + JetBrains Mono). Next.js 16 + Tailwind.</p>
 
   <!-- Theme Toggle -->
   <div style="display: flex; justify-content: center; margin-bottom: 24px;">
@@ -977,7 +977,7 @@
       </div>
       <div class="health-metric-text">
         <span class="health-value">28 / 33</span>
-        <span class="health-label">Screens Shipped</span>
+        <span class="health-label">Screens Cataloged</span>
       </div>
     </div>
 
@@ -1016,61 +1016,46 @@
 
   </div>
 
-  <!-- ============ PROGRESS DASHBOARD ============ -->
-  <div class="progress-dashboard">
-    <h2>Progress Overview</h2>
-    <div class="progress-stats">
-      <div class="progress-stat">
-        <div class="stat-number" style="color: var(--green-500);">28</div>
-        <div class="stat-label" style="color: var(--green-500);">Shipped</div>
-      </div>
-      <div class="progress-stat">
-        <div class="stat-number" style="color: var(--gray-400);">5</div>
-        <div class="stat-label" style="color: var(--gray-400);">Hidden</div>
-      </div>
-      <div class="progress-stat">
-        <div class="stat-number" style="color: var(--amber-500);">0</div>
-        <div class="stat-label" style="color: var(--amber-500);">In Progress</div>
-      </div>
-      <div class="progress-stat">
-        <div class="stat-number" style="color: #fff;">33</div>
-        <div class="stat-label" style="color: var(--gray-400);">Total</div>
-      </div>
-    </div>
-    <div class="progress-bar-container">
-      <div class="progress-bar-segment" style="width: 84.8%; background: var(--green-500);"></div>
-      <div class="progress-bar-segment" style="width: 15.2%; background: var(--gray-600);"></div>
-    </div>
-    <div class="progress-bar-label">
-      <span>28 / 33 screens shipped (5 hidden routes preserved)</span>
-      <span>84.8% active</span>
-    </div>
-  </div>
-
   <div class="legend">
     <h2>Legend</h2>
     <div class="legend-grid">
       <div class="legend-section">
         <h3>Color Tokens</h3>
         <div class="legend-item">
+          <span class="swatch" style="background: #E63946;"></span>
+          <span><strong>Signal Red (#E63946)</strong> : CTAs, brand accent only</span>
+        </div>
+        <div class="legend-item">
           <span class="swatch" style="background: var(--success);"></span>
-          <span><strong>text-success</strong> : wins, positive ELO</span>
+          <span><strong>state-positive</strong> : wins, positive ELO</span>
         </div>
         <div class="legend-item">
           <span class="swatch" style="background: var(--red-500);"></span>
-          <span><strong>text-destructive</strong> : losses, negative ELO</span>
+          <span><strong>state-negative</strong> : losses, negative ELO</span>
         </div>
         <div class="legend-item">
           <span class="swatch" style="background: var(--amber-500);"></span>
-          <span><strong>text-amber-500</strong> : draws, pressure</span>
-        </div>
-        <div class="legend-item">
-          <span class="swatch" style="background: var(--primary-red);"></span>
-          <span><strong>text-primary</strong> : brand accent only</span>
+          <span><strong>amber-500</strong> : draws, pressure</span>
         </div>
         <div class="legend-item">
           <span class="swatch" style="background: var(--gray-800); font-family: monospace; color: #fff; font-size: 9px; display: flex; align-items: center; justify-content: center; width: auto; padding: 0 5px;">1234</span>
           <span><strong>tabular-nums</strong> : ELO, stats values</span>
+        </div>
+        <div class="legend-item" style="margin-top:8px;">
+          <span style="font-family: 'Bebas Neue', sans-serif; font-size: 14px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--gray-300);">ELO</span>
+          <span><strong>Bebas Neue</strong> : wordmarks, hero display</span>
+        </div>
+        <div class="legend-item">
+          <span style="font-family: 'DM Sans', sans-serif; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--gray-300);">LABEL</span>
+          <span><strong>DM Sans</strong> : headings, UI labels, buttons</span>
+        </div>
+        <div class="legend-item">
+          <span style="font-family: 'Inter', sans-serif; font-size: 12px; color: var(--gray-300);">Body</span>
+          <span><strong>Inter</strong> : body prose, descriptions</span>
+        </div>
+        <div class="legend-item">
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--gray-300); font-variant-numeric: tabular-nums;">1247</span>
+          <span><strong>JetBrains Mono</strong> : ELO, all numeric data</span>
         </div>
       </div>
       <div class="legend-section">
@@ -1089,14 +1074,13 @@
         </div>
       </div>
       <div class="legend-section">
-        <h3>Screen Status</h3>
+        <h3>Screen Surfaces</h3>
         <div class="legend-item">
-          <span class="screen-badge badge-shipped">Shipped</span>
-          <span>Live in production</span>
+          <span>Each card shows: title, route, primary ELO primitives in use, and a short behavior note.</span>
         </div>
         <div class="legend-item">
           <span class="screen-badge badge-flagged">Flagged</span>
-          <span>Behind feature flag</span>
+          <span>Behind a feature flag</span>
         </div>
         <div class="legend-item">
           <span class="screen-badge badge-hidden">Hidden</span>
@@ -1111,11 +1095,7 @@
 <!-- ================================================ -->
 <div class="section-header">
   <h2>1. Auth Flow</h2>
-  <p>Unauthenticated screens: login, signup, password reset. All use shadcn/ui Card components with Google OAuth option.</p>
-  <div class="section-progress">
-    <div class="section-progress-bar"><div class="section-progress-fill" style="width:100%"></div></div>
-    <span class="section-progress-text">3 / 3 shipped</span>
-  </div>
+  <p>Unauthenticated screens: login, signup, password reset. Built on the ELO Plate primitive and Wordmark with Google + Apple OAuth options.</p>
 </div>
 
 <div class="screen-grid">
@@ -1127,44 +1107,39 @@
         <h3>1. Login</h3>
         <div class="screen-route">/login</div>
       </div>
-      <span class="screen-badge badge-shipped">Shipped</span>
     </div>
     <div class="phone-frame">
       <div class="phone-screen">
         <div class="notch"></div>
-        <div class="wf-body" style="justify-content:center; gap:12px; padding:20px 16px;">
-          <div class="wf-block" style="padding:16px;">
-            <div style="font-size:16px;font-weight:700;color:var(--gray-900);margin-bottom:2px;">Login</div>
-            <div style="font-size:10px;color:var(--gray-400);margin-bottom:12px;">Enter your email below to login to your account</div>
-            <div class="wf-field" style="margin-bottom:8px;">
-              <span class="wf-label">Email</span>
-              <div class="wf-input">m@example.com</div>
-            </div>
-            <div class="wf-field" style="margin-bottom:4px;">
-              <div style="display:flex;justify-content:space-between;align-items:center;">
-                <span class="wf-label">Password</span>
-                <span style="font-size:9px;color:var(--gray-400);text-decoration:underline;">Forgot your password?</span>
-              </div>
-              <div class="wf-input">********</div>
-            </div>
-            <div class="wf-btn primary" style="width:100%;margin-top:8px;">Login</div>
-            <div style="text-align:center;font-size:9px;color:var(--gray-400);margin:8px 0;">or</div>
-            <div class="wf-btn outline" style="width:100%;display:flex;gap:6px;justify-content:center;">
-              <span style="font-size:10px;">G</span> Continue with Google
-            </div>
-            <div style="text-align:center;font-size:9px;color:var(--gray-400);margin-top:10px;">
-              Don't have an account? <span style="text-decoration:underline;">Sign up</span>
-            </div>
+        <div class="wf-body" style="justify-content:center; gap:14px; padding:24px 18px;">
+          <div style="text-align:center;margin-bottom:8px;">
+            <div style="font-family:'Bebas Neue', sans-serif; font-size:32px; letter-spacing:0.04em; text-transform:uppercase; color:var(--phone-text); line-height:0.9;">ELO RATED</div>
+            <div style="font-family:'DM Sans', sans-serif; font-size:10px; letter-spacing:0.12em; text-transform:uppercase; color:var(--phone-text-muted); margin-top:8px; font-weight:700;">What's Your Number?</div>
+          </div>
+          <div class="wf-field" style="margin-bottom:0;">
+            <span class="wf-label" style="color:var(--phone-text-muted);font-family:'JetBrains Mono', monospace;letter-spacing:0.08em;text-transform:uppercase;">Email</span>
+            <div class="wf-input" style="background:var(--phone-input-bg);border-color:var(--phone-border);color:var(--phone-text-muted);">m@example.com</div>
+          </div>
+          <div class="wf-field" style="margin-bottom:0;">
+            <span class="wf-label" style="color:var(--phone-text-muted);font-family:'JetBrains Mono', monospace;letter-spacing:0.08em;text-transform:uppercase;">Password</span>
+            <div class="wf-input" style="background:var(--phone-input-bg);border-color:var(--phone-border);color:var(--phone-text-muted);">********</div>
+          </div>
+          <div class="wf-btn" style="width:100%;background:var(--phone-accent);color:#fff;font-family:'DM Sans', sans-serif;text-transform:uppercase;letter-spacing:0.08em;border-radius:3px;">Login</div>
+          <div class="wf-btn outline" style="width:100%;display:flex;gap:6px;justify-content:center;border-color:var(--phone-border);color:var(--phone-text-secondary);font-family:'DM Sans', sans-serif;text-transform:uppercase;letter-spacing:0.08em;border-radius:3px;">
+            <span style="font-size:10px;">G</span> Continue with Google
+          </div>
+          <div style="text-align:center;font-size:10px;color:var(--phone-text-muted);font-family:'DM Sans', sans-serif;text-transform:uppercase;letter-spacing:0.08em;margin-top:4px;">
+            <span style="text-decoration:underline;">Forgot password?</span>
           </div>
         </div>
       </div>
     </div>
     <div class="screen-notes">
-      <span class="note-tag reuse">LoginForm</span>
-      <span class="note-tag reuse">Card</span>
+      <span class="note-tag reuse">Wordmark</span>
+      <span class="note-tag reuse">Plate</span>
       <span class="note-tag reuse">Input</span>
       <span class="note-tag reuse">Button</span>
-      Email + password with show/hide toggle. Google OAuth button. Links to /signup and /forgot-password. Redirects to /profile on success.
+      Hero Wordmark over the "What's your number?" tagline. Email + password fields styled with mono labels. Signal Red primary CTA, outlined OAuth buttons (Google + Apple). Links to /signup and /forgot-password.
     </div>
   </div>
 
@@ -1175,43 +1150,53 @@
         <h3>2. Sign Up</h3>
         <div class="screen-route">/signup</div>
       </div>
-      <span class="screen-badge badge-shipped">Shipped</span>
     </div>
     <div class="phone-frame">
       <div class="phone-screen">
         <div class="notch"></div>
-        <div class="wf-body" style="justify-content:center; gap:12px; padding:20px 16px;">
-          <div class="wf-block" style="padding:16px;">
-            <div style="font-size:16px;font-weight:700;color:var(--gray-900);margin-bottom:2px;">Sign up</div>
-            <div style="font-size:10px;color:var(--gray-400);margin-bottom:12px;">Create a new account</div>
-            <div class="wf-field" style="margin-bottom:8px;">
-              <span class="wf-label">Email</span>
-              <div class="wf-input">m@example.com</div>
-            </div>
-            <div class="wf-field" style="margin-bottom:8px;">
-              <span class="wf-label">Password</span>
-              <div class="wf-input">********</div>
-            </div>
-            <div class="wf-field" style="margin-bottom:4px;">
-              <span class="wf-label">Repeat Password</span>
-              <div class="wf-input">********</div>
-            </div>
-            <div class="wf-btn primary" style="width:100%;margin-top:8px;">Sign up</div>
-            <div style="text-align:center;font-size:9px;color:var(--gray-400);margin:8px 0;">or</div>
-            <div class="wf-btn outline" style="width:100%;display:flex;gap:6px;justify-content:center;">
-              <span style="font-size:10px;">G</span> Continue with Google
-            </div>
-            <div style="text-align:center;font-size:9px;color:var(--gray-400);margin-top:10px;">
-              Already have an account? <span style="text-decoration:underline;">Login</span>
-            </div>
+        <div class="wf-header">
+          <span class="back-btn">&larr;</span>
+          <span class="header-title" style="font-family:'DM Sans', sans-serif;text-transform:uppercase;letter-spacing:0.08em;font-size:12px;color:var(--phone-text);">Create Account</span>
+        </div>
+        <div class="wf-body" style="gap:8px; padding:14px 14px;">
+          <div style="font-family:'DM Sans', sans-serif;text-transform:uppercase;letter-spacing:0.14em;font-size:10px;color:var(--phone-text-muted);font-weight:700;">Account</div>
+          <div class="wf-field" style="margin-bottom:0;">
+            <span class="wf-label" style="color:var(--phone-text-muted);font-family:'JetBrains Mono', monospace;letter-spacing:0.08em;text-transform:uppercase;font-size:9px;">Email</span>
+            <div class="wf-input" style="background:var(--phone-input-bg);border-color:var(--phone-border);color:var(--phone-text-muted);">m@example.com</div>
           </div>
+          <div class="wf-field" style="margin-bottom:0;">
+            <span class="wf-label" style="color:var(--phone-text-muted);font-family:'JetBrains Mono', monospace;letter-spacing:0.08em;text-transform:uppercase;font-size:9px;">Password</span>
+            <div class="wf-input" style="background:var(--phone-input-bg);border-color:var(--phone-border);color:var(--phone-text-muted);">********</div>
+          </div>
+          <div class="wf-separator" style="background:var(--phone-border);margin:6px 0 4px;"></div>
+          <div style="font-family:'DM Sans', sans-serif;text-transform:uppercase;letter-spacing:0.14em;font-size:10px;color:var(--phone-text-muted);font-weight:700;">Profile</div>
+          <div class="wf-field" style="margin-bottom:0;">
+            <span class="wf-label" style="color:var(--phone-text-muted);font-family:'JetBrains Mono', monospace;letter-spacing:0.08em;text-transform:uppercase;font-size:9px;">Display Name</span>
+            <div class="wf-input" style="background:var(--phone-input-bg);border-color:var(--phone-border);color:var(--phone-text-muted);">Your name</div>
+          </div>
+          <div class="wf-field" style="margin-bottom:0;">
+            <span class="wf-label" style="color:var(--phone-text-muted);font-family:'JetBrains Mono', monospace;letter-spacing:0.08em;text-transform:uppercase;font-size:9px;">Gender</span>
+            <div class="wf-input" style="background:var(--phone-input-bg);border-color:var(--phone-border);color:var(--phone-text-muted);">M / F</div>
+          </div>
+          <div class="wf-field" style="margin-bottom:0;">
+            <span class="wf-label" style="color:var(--phone-text-muted);font-family:'JetBrains Mono', monospace;letter-spacing:0.08em;text-transform:uppercase;font-size:9px;">Date of Birth</span>
+            <div class="wf-input" style="background:var(--phone-input-bg);border-color:var(--phone-border);color:var(--phone-text-muted);">YYYY-MM-DD</div>
+          </div>
+          <div class="wf-field" style="margin-bottom:0;">
+            <span class="wf-label" style="color:var(--phone-text-muted);font-family:'JetBrains Mono', monospace;letter-spacing:0.08em;text-transform:uppercase;font-size:9px;">Weight (kg)</span>
+            <div class="wf-input" style="background:var(--phone-input-bg);border-color:var(--phone-border);color:var(--phone-text-muted);font-family:'JetBrains Mono', monospace;font-variant-numeric:tabular-nums;">70</div>
+          </div>
+          <div class="wf-btn" style="width:100%;background:var(--phone-accent);color:#fff;font-family:'DM Sans', sans-serif;text-transform:uppercase;letter-spacing:0.08em;border-radius:3px;margin-top:4px;">Continue</div>
         </div>
       </div>
     </div>
     <div class="screen-notes">
-      <span class="note-tag reuse">SignUpForm</span>
-      <span class="note-tag reuse">Card</span>
-      Email, password, repeat password fields. Client-side password match validation. Google OAuth. Links to /login.
+      <span class="note-tag reuse">Wordmark</span>
+      <span class="note-tag reuse">Plate</span>
+      <span class="note-tag reuse">Input</span>
+      <span class="note-tag reuse">Button</span>
+      <span class="note-tag reuse">MetaTag</span>
+      Two stacked sections (ACCOUNT, PROFILE) with mono uppercase labels. Email + password under ACCOUNT, then display name, gender, DOB, weight (kg) under PROFILE. Single Signal Red Continue button advances to /eua.
     </div>
   </div>
 
@@ -1222,30 +1207,31 @@
         <h3>3. Forgot Password</h3>
         <div class="screen-route">/forgot-password</div>
       </div>
-      <span class="screen-badge badge-shipped">Shipped</span>
     </div>
     <div class="phone-frame">
       <div class="phone-screen">
         <div class="notch"></div>
-        <div class="wf-body" style="justify-content:center; gap:12px; padding:20px 16px;">
-          <div class="wf-block" style="padding:16px;">
-            <div style="font-size:16px;font-weight:700;color:var(--gray-900);margin-bottom:2px;">Reset Your Password</div>
-            <div style="font-size:10px;color:var(--gray-400);margin-bottom:12px;">Type in your email and we'll send you a link to reset your password</div>
-            <div class="wf-field" style="margin-bottom:8px;">
-              <span class="wf-label">Email</span>
-              <div class="wf-input">m@example.com</div>
-            </div>
-            <div class="wf-btn primary" style="width:100%;margin-top:4px;">Send reset email</div>
-            <div style="text-align:center;font-size:9px;color:var(--gray-400);margin-top:10px;">
-              Already have an account? <span style="text-decoration:underline;">Login</span>
-            </div>
+        <div class="wf-body" style="justify-content:center; gap:14px; padding:24px 18px;">
+          <div style="text-align:center;margin-bottom:4px;">
+            <div style="font-family:'Bebas Neue', sans-serif; font-size:24px; letter-spacing:0.04em; text-transform:uppercase; color:var(--phone-text); line-height:0.9;">Reset Password</div>
+            <div style="font-family:'Inter', sans-serif; font-size:11px; color:var(--phone-text-secondary); margin-top:6px;">We'll email you a link to reset</div>
+          </div>
+          <div class="wf-field" style="margin-bottom:0;">
+            <span class="wf-label" style="color:var(--phone-text-muted);font-family:'JetBrains Mono', monospace;letter-spacing:0.08em;text-transform:uppercase;font-size:9px;">Email</span>
+            <div class="wf-input" style="background:var(--phone-input-bg);border-color:var(--phone-border);color:var(--phone-text-muted);">m@example.com</div>
+          </div>
+          <div class="wf-btn" style="width:100%;background:var(--phone-accent);color:#fff;font-family:'DM Sans', sans-serif;text-transform:uppercase;letter-spacing:0.08em;border-radius:3px;">Send Reset Email</div>
+          <div style="text-align:center;font-size:10px;color:var(--phone-text-muted);font-family:'DM Sans', sans-serif;text-transform:uppercase;letter-spacing:0.08em;margin-top:4px;">
+            <span style="text-decoration:underline;">Back to Login</span>
           </div>
         </div>
       </div>
     </div>
     <div class="screen-notes">
-      <span class="note-tag reuse">ForgotPasswordForm</span>
-      Email-only form. Success state swaps to "Check Your Email" confirmation card. Links back to /login.
+      <span class="note-tag reuse">Plate</span>
+      <span class="note-tag reuse">Input</span>
+      <span class="note-tag reuse">Button</span>
+      Email-only form. Success state swaps to "Check Your Email" confirmation. Links back to /login.
     </div>
   </div>
 
@@ -1257,10 +1243,6 @@
 <div class="section-header">
   <h2>2. Profile Setup Wizard</h2>
   <p>Multi-step activation wizard. Steps: TOS acceptance (first-time only), Identity (name, gender, DOB, photo), Training (gym, weight), Optional (city). Required for profile activation.</p>
-  <div class="section-progress">
-    <div class="section-progress-bar"><div class="section-progress-fill" style="width:100%"></div></div>
-    <span class="section-progress-text">3 / 3 shipped</span>
-  </div>
 </div>
 
 <div class="screen-grid">
@@ -1272,7 +1254,6 @@
         <h3>4. Setup: TOS Step</h3>
         <div class="screen-route">/profile/setup</div>
       </div>
-      <span class="screen-badge badge-shipped">Shipped</span>
     </div>
     <div class="phone-frame">
       <div class="phone-screen">
@@ -1280,7 +1261,7 @@
         <div class="wf-body" style="gap:10px; padding:14px 12px;">
           <div style="text-align:center;">
             <div style="font-size:10px;color:var(--gray-400);margin-bottom:4px;">Step 1 of 4</div>
-            <div style="font-size:13px;font-weight:600;color:var(--gray-800);">Welcome to JITS</div>
+            <div style="font-size:13px;font-weight:600;color:var(--gray-800);">Welcome to ELO RATED</div>
           </div>
           <div class="wf-progress-dots">
             <span class="dot active"></span>
@@ -1290,9 +1271,9 @@
           </div>
           <div style="border:1px solid var(--gray-200);border-radius:6px;padding:8px;flex:1;overflow:hidden;">
             <div style="font-size:9px;color:var(--gray-400);line-height:1.5;">
-              JITS TERMS OF SERVICE<br><br>
+              ELO RATED TERMS OF SERVICE<br><br>
               1. Acceptance of Terms<br>
-              By using JITS...<br><br>
+              By using ELO RATED...<br><br>
               2. Assumption of Risk<br>
               Brazilian Jiu-Jitsu is...<br><br>
               (scrollable)
@@ -1321,7 +1302,6 @@
         <h3>5. Setup: Identity Step</h3>
         <div class="screen-route">/profile/setup</div>
       </div>
-      <span class="screen-badge badge-shipped">Shipped</span>
     </div>
     <div class="phone-frame">
       <div class="phone-screen">
@@ -1372,7 +1352,6 @@
         <h3>6. Setup: Training Step</h3>
         <div class="screen-route">/profile/setup</div>
       </div>
-      <span class="screen-badge badge-shipped">Shipped</span>
     </div>
     <div class="phone-frame">
       <div class="phone-screen">
@@ -1394,8 +1373,8 @@
           </div>
           <div style="font-size:9px;color:var(--gray-400);">Required to activate your profile and appear to other athletes.</div>
           <div class="wf-field">
-            <span class="wf-label">Weight (lbs)</span>
-            <div class="wf-input">e.g. 155</div>
+            <span class="wf-label">Weight (kg)</span>
+            <div class="wf-input">e.g. 70</div>
           </div>
           <div style="font-size:9px;color:var(--gray-400);">Used for weight class matching.</div>
           <div class="wf-btn primary" style="width:100%;">Continue</div>
@@ -1406,7 +1385,7 @@
     <div class="screen-notes">
       <span class="note-tag new">TrainingStep</span>
       <span class="note-tag reuse">Select</span>
-      Gym picker (from server-loaded gym list), weight input (50-400 range, lbs). Both required for activation.
+      Gym picker (from server-loaded gym list), weight input (20-300 range, kg). Both required for activation.
     </div>
   </div>
 
@@ -1417,11 +1396,7 @@
 <!-- ================================================ -->
 <div class="section-header">
   <h2>3. Dashboard</h2>
-  <p>Home screen with greeting, stat overview cards, active session card, and recent activity (my matches + community feed tabs).</p>
-  <div class="section-progress">
-    <div class="section-progress-bar"><div class="section-progress-fill" style="width:100%"></div></div>
-    <span class="section-progress-text">1 / 1 shipped</span>
-  </div>
+  <p>Home screen built from a 4-Plate layout: welcome, hero EloTile (current ELO), session Plate (live or upcoming), and recent activity (my matches + community feed tabs).</p>
 </div>
 
 <div class="screen-grid">
@@ -1433,69 +1408,53 @@
         <h3>7. Dashboard</h3>
         <div class="screen-route">/</div>
       </div>
-      <span class="screen-badge badge-shipped">Shipped</span>
     </div>
     <div class="phone-frame">
       <div class="phone-screen">
         <div class="notch"></div>
         <div class="wf-header">
-          <span class="header-title">Jits Arena</span>
-          <div style="display:flex;gap:4px;align-items:center;">
-            <div style="width:14px;height:14px;border-radius:3px;background:var(--gray-200);"></div>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--gray-400)" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-            <div class="wf-avatar" style="width:22px;height:22px;font-size:8px;">MS</div>
+          <span style="font-family:'Bebas Neue', sans-serif;font-size:18px;letter-spacing:0.04em;text-transform:uppercase;color:var(--phone-text);flex:1;">ELO RATED</span>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--phone-text-muted)" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            <div class="wf-avatar" style="width:24px;height:24px;font-size:8px;background:var(--phone-btn-bg);color:var(--phone-text);">MS</div>
           </div>
         </div>
         <div class="wf-body" style="gap:10px;">
-          <!-- Greeting -->
+          <!-- Greeting (Plate) -->
           <div>
-            <div style="font-size:16px;font-weight:700;color:var(--gray-900);">Hey, <span style="color:var(--primary-red);">Matt</span></div>
-            <div style="display:flex;align-items:center;gap:4px;margin-top:3px;padding:6px 8px;background:rgba(220,38,38,0.08);border-radius:8px;">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--primary-red)" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-              <span style="font-size:10px;font-weight:500;color:var(--gray-700);">Find a session</span>
-              <span style="font-size:10px;color:var(--gray-400);margin-left:auto;">></span>
-            </div>
+            <div style="font-family:'JetBrains Mono', monospace;font-size:9px;text-transform:uppercase;letter-spacing:0.12em;color:var(--phone-text-muted);font-weight:700;">Welcome back</div>
+            <div style="font-family:'DM Sans', sans-serif;font-size:18px;font-weight:700;color:var(--phone-text);line-height:1.1;margin-top:2px;">Matt Sponagle</div>
           </div>
 
-          <!-- Stat overview 2x2 grid -->
-          <div class="wf-stat-grid">
-            <div class="wf-stat-card">
-              <div class="wf-stat-label">ELO Rating</div>
-              <div class="wf-stat-value">1247</div>
-            </div>
-            <div class="wf-stat-card">
-              <div class="wf-stat-label">Rank</div>
-              <div class="wf-stat-value">#3</div>
-            </div>
-            <div class="wf-stat-card">
-              <div class="wf-stat-label">Record</div>
-              <div class="wf-stat-value">
-                <span style="color:var(--success);">18</span><span style="color:var(--gray-300);">-</span><span style="color:var(--amber-500);">2</span><span style="color:var(--gray-300);">-</span><span style="color:var(--red-500);">6</span>
-              </div>
-            </div>
-            <div class="wf-stat-card">
-              <div class="wf-stat-label">Win Streak</div>
-              <div class="wf-stat-value">5</div>
-            </div>
+          <!-- Hero EloTile -->
+          <div style="background:var(--phone-card);border:1px solid var(--phone-border);border-radius:4px;padding:14px;">
+            <div style="font-family:'JetBrains Mono', monospace;font-size:9px;text-transform:uppercase;letter-spacing:0.12em;color:var(--phone-text-muted);font-weight:700;">Current ELO Rating</div>
+            <div style="font-family:'JetBrains Mono', monospace;font-size:36px;font-variant-numeric:tabular-nums;color:var(--phone-text);font-weight:700;letter-spacing:-0.02em;margin-top:4px;">1247</div>
           </div>
 
-          <!-- Sessions section -->
-          <div style="display:flex;align-items:center;gap:4px;">
-            <div style="width:14px;height:14px;border-radius:4px;background:rgba(34,197,94,0.1);display:flex;align-items:center;justify-content:center;">
-              <span style="font-size:8px;color:var(--green-500);">C</span>
+          <!-- Upcoming Session Plate -->
+          <div style="background:var(--phone-card);border:1px solid var(--phone-border);border-radius:4px;padding:12px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+              <span style="font-family:'DM Sans', sans-serif;font-size:13px;font-weight:700;color:var(--phone-text);">Gracie Academy</span>
+              <span style="font-family:'JetBrains Mono', monospace;font-size:9px;text-transform:uppercase;letter-spacing:0.08em;color:var(--phone-text-muted);border:1px solid var(--phone-border);padding:2px 6px;border-radius:3px;">In 2h</span>
             </div>
-            <span style="font-size:12px;font-weight:600;color:var(--gray-800);">Sessions</span>
-          </div>
-          <div style="border:1px dashed var(--gray-200);border-radius:8px;padding:10px;text-align:center;">
-            <span style="font-size:10px;font-weight:500;color:var(--gray-500);">Find a session</span><br>
-            <span style="font-size:9px;color:var(--gray-400);">Browse gyms and join an open mat</span>
+            <div style="font-family:'Inter', sans-serif;font-size:10px;color:var(--phone-text-secondary);">Next session: Tonight 6:00 PM</div>
+            <div style="font-family:'JetBrains Mono', monospace;font-size:9px;text-transform:uppercase;letter-spacing:0.12em;color:var(--phone-text-muted);margin-top:6px;">8 athletes RSVP'd</div>
           </div>
 
-          <!-- Recent activity -->
-          <div style="font-size:12px;font-weight:600;color:var(--gray-800);">Recent Activity</div>
+          <!-- Recent Activity label -->
+          <div style="font-family:'JetBrains Mono', monospace;font-size:9px;text-transform:uppercase;letter-spacing:0.12em;color:var(--phone-text-muted);font-weight:700;">Recent Activity</div>
           <div style="display:flex;gap:4px;">
-            <span style="font-size:9px;padding:3px 8px;background:var(--primary-red);color:#fff;border-radius:6px;">My Matches</span>
-            <span style="font-size:9px;padding:3px 8px;background:var(--gray-100);color:var(--gray-500);border-radius:6px;">Community</span>
+            <span style="font-family:'DM Sans', sans-serif;font-size:9px;padding:3px 8px;background:var(--phone-accent);color:#fff;border-radius:3px;text-transform:uppercase;letter-spacing:0.08em;">My Matches</span>
+            <span style="font-family:'DM Sans', sans-serif;font-size:9px;padding:3px 8px;background:var(--phone-btn-bg);color:var(--phone-text-muted);border-radius:3px;text-transform:uppercase;letter-spacing:0.08em;">Community</span>
+          </div>
+
+          <!-- Record Plate -->
+          <div>
+            <div style="font-family:'JetBrains Mono', monospace;font-size:9px;text-transform:uppercase;letter-spacing:0.12em;color:var(--phone-text-muted);font-weight:700;">Record</div>
+            <div style="font-family:'JetBrains Mono', monospace;font-size:16px;font-variant-numeric:tabular-nums;color:var(--phone-text);font-weight:700;margin-top:2px;">
+              <span style="color:var(--phone-success);">18W</span> &middot; <span style="color:var(--phone-accent);">6L</span> &middot; <span style="color:var(--amber-500);">2D</span>
+            </div>
           </div>
         </div>
         <div class="wf-bottom-nav">
@@ -1508,14 +1467,16 @@
     </div>
     <div class="screen-notes">
       <span class="note-tag reuse">AppHeader</span>
-      <span class="note-tag reuse">PageHeaderActions</span>
-      <span class="note-tag reuse">StatOverview</span>
-      <span class="note-tag reuse">ActiveSessionCard</span>
+      <span class="note-tag reuse">Wordmark</span>
+      <span class="note-tag reuse">Avatar32</span>
+      <span class="note-tag reuse">Plate</span>
+      <span class="note-tag reuse">EloTile</span>
+      <span class="note-tag reuse">MetaTag</span>
       <span class="note-tag reuse">RecentActivitySection</span>
       <span class="note-tag reuse">BottomNavBar</span>
-      <span class="note-tag token">Record: text-success / text-amber-500 / text-destructive</span>
-      <span class="note-tag token">ELO/Rank/Streak: tabular-nums</span>
-      Header shows premium button, notification bell with badge, and user avatar. Hero greeting links to /gyms when not looking for matches. StatOverview shows 2x2 grid (ELO, Rank, Record with W-D-L, Win Streak) with peak labels. ActiveSessionCard shows live/upcoming session or empty-state link to /gyms. RecentActivitySection has My Matches / Community tabs with MatchCard list.
+      <span class="note-tag token">Wins: state-positive, Losses: state-negative, Draws: amber-500</span>
+      <span class="note-tag token">ELO/Record: font-mono tabular-nums</span>
+      Sticky header with Wordmark, notification bell, and avatar. 4-Plate layout: welcome label + display name, hero EloTile (current ELO), session Plate (live or upcoming with MetaTag), and Record block (W/L/D in mono). Live state swaps the session Plate for a Plate variant="live" with LivePill + Signal Red "Enter Lobby" CTA. RecentActivitySection follows when matches exist. Data via getDashboardSummary + getActiveSession.
     </div>
   </div>
 
@@ -1527,10 +1488,6 @@
 <div class="section-header">
   <h2>4. Gym Finder</h2>
   <p>Browse gyms, view details, and discover active sessions. Entry point for the session-based match flow.</p>
-  <div class="section-progress">
-    <div class="section-progress-bar"><div class="section-progress-fill" style="width:100%"></div></div>
-    <span class="section-progress-text">2 / 2 shipped</span>
-  </div>
 </div>
 
 <div class="screen-grid">
@@ -1542,7 +1499,6 @@
         <h3>8. Gym Finder</h3>
         <div class="screen-route">/gyms</div>
       </div>
-      <span class="screen-badge badge-shipped">Shipped</span>
     </div>
     <div class="phone-frame">
       <div class="phone-screen">
@@ -1627,7 +1583,6 @@
         <h3>9. Gym Detail</h3>
         <div class="screen-route">/gyms/[id]</div>
       </div>
-      <span class="screen-badge badge-shipped">Shipped</span>
     </div>
     <div class="phone-frame">
       <div class="phone-screen">
@@ -1636,39 +1591,58 @@
           <span class="back-btn">&larr;</span>
           <span class="header-title">Gym</span>
         </div>
-        <div class="wf-body" style="gap:12px;">
+        <div class="wf-body" style="gap:10px;">
           <div>
             <div style="display:flex;align-items:center;gap:6px;">
-              <span style="font-size:18px;font-weight:700;">Gracie Academy</span>
-              <span class="wf-badge info" style="font-size:9px;border:1px solid var(--gray-200);background:transparent;">My Gym</span>
+              <span style="font-family:'DM Sans', sans-serif;font-size:18px;font-weight:700;color:var(--phone-text);">Gracie Academy</span>
+              <span style="font-family:'JetBrains Mono', monospace;font-size:9px;letter-spacing:0.08em;text-transform:uppercase;border:1px solid var(--phone-border);background:transparent;padding:2px 6px;border-radius:3px;color:var(--phone-text-muted);">My Gym</span>
             </div>
-            <div style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--gray-400);margin-top:4px;">
+            <div style="display:flex;align-items:center;gap:4px;font-family:'Inter', sans-serif;font-size:10px;color:var(--phone-text-muted);margin-top:4px;">
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
               Torrance, CA
             </div>
-            <div style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--gray-400);margin-top:2px;">
-              Members at this gym
+          </div>
+
+          <!-- Avg ELO + Avg Session EloTiles -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+            <div style="background:var(--phone-card);border:1px solid var(--phone-border);border-radius:4px;padding:10px;">
+              <div style="font-family:'JetBrains Mono', monospace;font-size:8px;text-transform:uppercase;letter-spacing:0.12em;color:var(--phone-text-muted);font-weight:700;">Avg ELO</div>
+              <div style="font-family:'JetBrains Mono', monospace;font-size:20px;font-variant-numeric:tabular-nums;color:var(--phone-text);font-weight:700;margin-top:2px;">1245</div>
+            </div>
+            <div style="background:var(--phone-card);border:1px solid var(--phone-border);border-radius:4px;padding:10px;">
+              <div style="font-family:'JetBrains Mono', monospace;font-size:8px;text-transform:uppercase;letter-spacing:0.12em;color:var(--phone-text-muted);font-weight:700;">Avg Session</div>
+              <div style="font-family:'JetBrains Mono', monospace;font-size:20px;font-variant-numeric:tabular-nums;color:var(--phone-text);font-weight:700;margin-top:2px;">12</div>
             </div>
           </div>
 
-          <div class="wf-btn primary" style="width:100%;">Start Session</div>
-
-          <div style="font-size:12px;font-weight:600;color:var(--gray-800);">Sessions</div>
-          <div style="border:1px solid var(--gray-200);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:4px;">
+          <!-- Active session Plate (live variant) -->
+          <div style="background:var(--phone-card);border:1px solid var(--phone-border);border-left:2px solid var(--phone-success);border-radius:4px;padding:10px;display:flex;flex-direction:column;gap:4px;">
             <div style="display:flex;justify-content:space-between;align-items:center;">
-              <span style="font-size:11px;font-weight:600;color:var(--gray-800);">Open Mat</span>
-              <span class="wf-badge success" style="font-size:8px;">Active</span>
+              <span style="font-family:'DM Sans', sans-serif;font-size:11px;font-weight:700;color:var(--phone-text);">Open Mat</span>
+              <span style="font-family:'JetBrains Mono', monospace;font-size:8px;letter-spacing:0.08em;text-transform:uppercase;background:var(--phone-success);color:#fff;padding:2px 6px;border-radius:3px;">Live</span>
             </div>
-            <span style="font-size:9px;color:var(--gray-400);">Today 6:00 PM, 8 participants</span>
-            <div class="wf-btn primary" style="width:100%;font-size:10px;padding:5px 10px;">Join Session</div>
+            <span style="font-family:'Inter', sans-serif;font-size:10px;color:var(--phone-text-muted);">Today 6:00 PM &middot; 8 participants</span>
+            <div class="wf-btn" style="width:100%;font-family:'DM Sans', sans-serif;text-transform:uppercase;letter-spacing:0.08em;font-size:10px;padding:5px 10px;background:var(--phone-accent);color:#fff;border-radius:3px;">Join Session</div>
           </div>
-          <div style="border:1px solid var(--gray-200);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:4px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;">
-              <span style="font-size:11px;font-weight:600;color:var(--gray-800);">Competition Prep</span>
-              <span class="wf-badge amber" style="font-size:8px;">Scheduled</span>
+
+          <!-- Last Session Plate -->
+          <div style="background:var(--phone-card);border:1px solid var(--phone-border);border-radius:4px;padding:10px;">
+            <div style="font-family:'JetBrains Mono', monospace;font-size:9px;text-transform:uppercase;letter-spacing:0.12em;color:var(--phone-text-muted);font-weight:700;margin-bottom:4px;">Last Session</div>
+            <div style="font-family:'DM Sans', sans-serif;font-size:11px;font-weight:700;color:var(--phone-text);">Wed 6:00 PM</div>
+            <div style="display:flex;justify-content:space-between;margin-top:4px;font-family:'JetBrains Mono', monospace;font-size:9px;color:var(--phone-text-muted);font-variant-numeric:tabular-nums;">
+              <span>12 athletes</span>
+              <span>8 matches</span>
             </div>
-            <span style="font-size:9px;color:var(--gray-400);">Tomorrow 10:00 AM</span>
-            <div class="wf-btn outline" style="width:100%;font-size:10px;padding:5px 10px;">RSVP</div>
+          </div>
+
+          <!-- Scheduled session -->
+          <div style="background:var(--phone-card);border:1px solid var(--phone-border);border-radius:4px;padding:10px;display:flex;flex-direction:column;gap:4px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-family:'DM Sans', sans-serif;font-size:11px;font-weight:700;color:var(--phone-text);">Competition Prep</span>
+              <span style="font-family:'JetBrains Mono', monospace;font-size:8px;letter-spacing:0.08em;text-transform:uppercase;color:var(--phone-text-muted);border:1px solid var(--phone-border);padding:2px 6px;border-radius:3px;">Scheduled</span>
+            </div>
+            <span style="font-family:'Inter', sans-serif;font-size:10px;color:var(--phone-text-muted);">Tomorrow 10:00 AM</span>
+            <div class="wf-btn outline" style="width:100%;font-family:'DM Sans', sans-serif;text-transform:uppercase;letter-spacing:0.08em;font-size:10px;padding:5px 10px;border-color:var(--phone-border);color:var(--phone-text-secondary);border-radius:3px;">RSVP</div>
           </div>
         </div>
 
@@ -1681,12 +1655,12 @@
       </div>
     </div>
     <div class="screen-notes">
-      <span class="note-tag new">GymDetailContent</span>
-      <span class="note-tag new">SessionList</span>
-      <span class="note-tag new">StartSessionButton</span>
-      <span class="note-tag new">RsvpButton</span>
-      <span class="note-tag reuse">Badge</span>
-      Gym name with "My Gym" outline badge, city, member count. Members see "Start Session" button (creates session via RPC). SessionList shows active (green badge, Join button) and scheduled (amber badge, RSVP/Cancel). Data via getGymDetail().
+      <span class="note-tag reuse">Plate</span>
+      <span class="note-tag reuse">EloTile</span>
+      <span class="note-tag reuse">SessionCard</span>
+      <span class="note-tag reuse">MetaTag</span>
+      <span class="note-tag reuse">LivePill</span>
+      Gym header with name + "My Gym" tag and city. Two EloTiles for Avg ELO and Avg Session size (W5 spec). Active session Plate (live variant with state-positive accent + LivePill, Signal Red Join button). Last Session Plate shows the most recent completed session date with athlete/match counts. Scheduled sessions render with outlined RSVP. Data via getGymDetail().
     </div>
   </div>
 
@@ -1698,10 +1672,6 @@
 <div class="section-header">
   <h2>5. Join Wizard</h2>
   <p>4-step wizard to join a session: geo-check (conditional), waiver (conditional), weight confirm, final confirm. Steps are dynamically included based on gym configuration.</p>
-  <div class="section-progress">
-    <div class="section-progress-bar"><div class="section-progress-fill" style="width:100%"></div></div>
-    <span class="section-progress-text">4 / 4 shipped</span>
-  </div>
 </div>
 
 <div class="screen-grid">
@@ -1713,7 +1683,6 @@
         <h3>10. Join: Geo Check</h3>
         <div class="screen-route">/session/[id]/join</div>
       </div>
-      <span class="screen-badge badge-shipped">Shipped</span>
     </div>
     <div class="phone-frame">
       <div class="phone-screen">
@@ -1755,7 +1724,6 @@
         <h3>11. Join: Waiver</h3>
         <div class="screen-route">/session/[id]/join</div>
       </div>
-      <span class="screen-badge badge-shipped">Shipped</span>
     </div>
     <div class="phone-frame">
       <div class="phone-screen">
@@ -1795,7 +1763,6 @@
         <h3>12. Join: Weight Confirm</h3>
         <div class="screen-route">/session/[id]/join</div>
       </div>
-      <span class="screen-badge badge-shipped">Shipped</span>
     </div>
     <div class="phone-frame">
       <div class="phone-screen">
@@ -1815,10 +1782,10 @@
           <div style="font-size:13px;font-weight:600;color:var(--gray-800);text-align:center;">Confirm Your Weight</div>
           <div style="font-size:10px;color:var(--gray-400);text-align:center;">Enter your current weight for accurate matchmaking</div>
           <div class="wf-field" style="margin-top:8px;">
-            <span class="wf-label">Weight (lbs)</span>
-            <div class="wf-input">155</div>
+            <span class="wf-label">Weight (kg)</span>
+            <div class="wf-input">70</div>
           </div>
-          <div style="font-size:9px;color:var(--gray-400);">Valid range: 50-400 lbs</div>
+          <div style="font-size:9px;color:var(--gray-400);">Valid range: 20-300 kg</div>
           <div class="wf-btn primary" style="width:100%;">Confirm Weight</div>
           <div class="wf-btn ghost" style="width:100%;">Back</div>
         </div>
@@ -1826,7 +1793,7 @@
     </div>
     <div class="screen-notes">
       <span class="note-tag new">WeightConfirmStep</span>
-      Pre-populated with athlete's current_weight from profile. Editable number input. Validated 50-400 lbs range. Always included.
+      Pre-populated with athlete's current_weight from profile. Editable number input. Validated 20-300 kg range. Always included.
     </div>
   </div>
 
@@ -1837,7 +1804,6 @@
         <h3>13. Join: Final Confirm</h3>
         <div class="screen-route">/session/[id]/join</div>
       </div>
-      <span class="screen-badge badge-shipped">Shipped</span>
     </div>
     <div class="phone-frame">
       <div class="phone-screen">
@@ -1860,7 +1826,7 @@
               <div class="wf-avatar" style="width:40px;height:40px;">MS</div>
               <div>
                 <div style="font-size:12px;font-weight:600;color:var(--gray-800);">Matt Sponagle</div>
-                <div style="font-size:10px;color:var(--gray-400);">ELO: 1247, 155 lbs</div>
+                <div style="font-size:10px;color:var(--gray-400);">ELO: 1247, 70 kg</div>
               </div>
             </div>
             <div class="wf-separator"></div>
@@ -1870,7 +1836,7 @@
             </div>
             <div style="display:flex;justify-content:space-between;font-size:10px;">
               <span style="color:var(--gray-400);">Weight</span>
-              <span style="color:var(--gray-700);font-weight:500;font-variant-numeric:tabular-nums;">155 lbs</span>
+              <span style="color:var(--gray-700);font-weight:500;font-variant-numeric:tabular-nums;">70 kg</span>
             </div>
           </div>
           <div class="wf-btn primary" style="width:100%;">Join Session</div>
@@ -1892,10 +1858,6 @@
 <div class="section-header">
   <h2>6. Session Lobby</h2>
   <p>Realtime participant list with challenge and random match capabilities. Uses postgres_changes + broadcast for live updates.</p>
-  <div class="section-progress">
-    <div class="section-progress-bar"><div class="section-progress-fill" style="width:100%"></div></div>
-    <span class="section-progress-text">1 / 1 shipped</span>
-  </div>
 </div>
 
 <div class="screen-grid">
@@ -1907,7 +1869,6 @@
         <h3>14. Session Lobby</h3>
         <div class="screen-route">/session/[id]/lobby</div>
       </div>
-      <span class="screen-badge badge-shipped">Shipped</span>
     </div>
     <div class="phone-frame">
       <div class="phone-screen">
@@ -1926,7 +1887,7 @@
             <div class="wf-avatar">JD</div>
             <div class="wf-list-text">
               <span class="wf-list-title">John Doe</span>
-              <span class="wf-list-sub" style="font-variant-numeric:tabular-nums;">ELO: 1180, 170 lbs</span>
+              <span class="wf-list-sub" style="font-variant-numeric:tabular-nums;">ELO: 1180, 77 kg</span>
             </div>
             <div class="wf-btn primary" style="font-size:9px;padding:4px 10px;">Challenge</div>
           </div>
@@ -1934,7 +1895,7 @@
             <div class="wf-avatar">AS</div>
             <div class="wf-list-text">
               <span class="wf-list-title">Ana Silva</span>
-              <span class="wf-list-sub" style="font-variant-numeric:tabular-nums;">ELO: 1320, 135 lbs</span>
+              <span class="wf-list-sub" style="font-variant-numeric:tabular-nums;">ELO: 1320, 61 kg</span>
             </div>
             <div class="wf-btn primary" style="font-size:9px;padding:4px 10px;">Challenge</div>
           </div>
@@ -1942,7 +1903,7 @@
             <div class="wf-avatar">BK</div>
             <div class="wf-list-text">
               <span class="wf-list-title">Ben Kim</span>
-              <span class="wf-list-sub" style="font-variant-numeric:tabular-nums;">ELO: 1050, 155 lbs</span>
+              <span class="wf-list-sub" style="font-variant-numeric:tabular-nums;">ELO: 1050, 70 kg</span>
             </div>
             <span style="font-size:9px;color:var(--gray-400);">In Match</span>
           </div>
@@ -1976,10 +1937,6 @@
 <div class="section-header">
   <h2>7. Match Flow</h2>
   <p>8-step match wizard: weight verify, ready check, live timer, result recording, summary, confirmation. Synced via broadcast channel. Optional timekeeper role behind feature flag.</p>
-  <div class="section-progress">
-    <div class="section-progress-bar"><div class="section-progress-fill" style="width:100%"></div></div>
-    <span class="section-progress-text">6 / 6 shipped</span>
-  </div>
 </div>
 
 <div class="screen-grid">
@@ -1991,7 +1948,6 @@
         <h3>15. Match: Weight Verify</h3>
         <div class="screen-route">/session/[id]/match/[matchId]</div>
       </div>
-      <span class="screen-badge badge-shipped">Shipped</span>
     </div>
     <div class="phone-frame">
       <div class="phone-screen">
@@ -2006,14 +1962,14 @@
             <div style="text-align:center;">
               <div class="wf-avatar" style="margin:0 auto 4px;">MS</div>
               <div style="font-size:10px;font-weight:600;color:var(--gray-800);">You</div>
-              <div style="font-size:10px;color:var(--gray-400);font-variant-numeric:tabular-nums;">155 lbs</div>
+              <div style="font-size:10px;color:var(--gray-400);font-variant-numeric:tabular-nums;">70 kg</div>
               <div style="font-size:10px;color:var(--gray-400);font-variant-numeric:tabular-nums;">ELO 1247</div>
             </div>
             <div style="display:flex;align-items:center;font-size:14px;font-weight:700;color:var(--gray-300);">VS</div>
             <div style="text-align:center;">
               <div class="wf-avatar" style="margin:0 auto 4px;">JD</div>
               <div style="font-size:10px;font-weight:600;color:var(--gray-800);">John Doe</div>
-              <div style="font-size:10px;color:var(--gray-400);font-variant-numeric:tabular-nums;">170 lbs</div>
+              <div style="font-size:10px;color:var(--gray-400);font-variant-numeric:tabular-nums;">77 kg</div>
               <div style="font-size:10px;color:var(--gray-400);font-variant-numeric:tabular-nums;">ELO 1180</div>
             </div>
           </div>
@@ -2034,7 +1990,6 @@
         <h3>16. Match: Ready Check</h3>
         <div class="screen-route">/session/[id]/match/[matchId]</div>
       </div>
-      <span class="screen-badge badge-shipped">Shipped</span>
     </div>
     <div class="phone-frame">
       <div class="phone-screen">
@@ -2077,7 +2032,6 @@
         <h3>17. Match: Live</h3>
         <div class="screen-route">/session/[id]/match/[matchId]</div>
       </div>
-      <span class="screen-badge badge-shipped">Shipped</span>
     </div>
     <div class="phone-frame">
       <div class="phone-screen">
@@ -2114,7 +2068,6 @@
         <h3>18. Match: Record Result</h3>
         <div class="screen-route">/session/[id]/match/[matchId]</div>
       </div>
-      <span class="screen-badge badge-shipped">Shipped</span>
     </div>
     <div class="phone-frame">
       <div class="phone-screen">
@@ -2162,7 +2115,6 @@
         <h3>19. Match: Summary / Confirm</h3>
         <div class="screen-route">/session/[id]/match/[matchId]</div>
       </div>
-      <span class="screen-badge badge-shipped">Shipped</span>
     </div>
     <div class="phone-frame">
       <div class="phone-screen">
@@ -2210,7 +2162,6 @@
         <h3>20. Match: Recorded (Complete)</h3>
         <div class="screen-route">/session/[id]/match/[matchId]</div>
       </div>
-      <span class="screen-badge badge-shipped">Shipped</span>
     </div>
     <div class="phone-frame">
       <div class="phone-screen">
@@ -2242,10 +2193,6 @@
 <div class="section-header">
   <h2>8. Leaderboard, Profile, and Athlete Detail</h2>
   <p>Rankings with fighters/gyms toggle and gender filter, personal profile with stats, and competitor profile with head-to-head history.</p>
-  <div class="section-progress">
-    <div class="section-progress-bar"><div class="section-progress-fill" style="width:100%"></div></div>
-    <span class="section-progress-text">4 / 4 shipped</span>
-  </div>
 </div>
 
 <div class="screen-grid">
@@ -2257,7 +2204,6 @@
         <h3>21. Leaderboard</h3>
         <div class="screen-route">/leaderboard</div>
       </div>
-      <span class="screen-badge badge-shipped">Shipped</span>
     </div>
     <div class="phone-frame">
       <div class="phone-screen">
@@ -2321,12 +2267,12 @@
       </div>
     </div>
     <div class="screen-notes">
-      <span class="note-tag new">LeaderboardContent</span>
-      <span class="note-tag reuse">AthleteCard</span>
+      <span class="note-tag reuse">LeaderboardContent</span>
+      <span class="note-tag reuse">RankRow</span>
       <span class="note-tag reuse">Switch</span>
-      <span class="note-tag reuse">Card</span>
-      <span class="note-tag token">Wins: text-success, Losses: text-destructive</span>
-      <span class="note-tag token">ELO values: tabular-nums</span>
+      <span class="note-tag reuse">Plate</span>
+      <span class="note-tag token">Wins: state-positive, Losses: state-negative</span>
+      <span class="note-tag token">ELO values: font-mono tabular-nums</span>
       Fighters/Gyms mode toggle (Switch). Gender filter pills (All/Male/Female, URL-param driven). Top 3 podium with trophy icons and gradient backgrounds. Full rankings via AthleteCard with rank icon (Crown, Medal, Award for top 3). Gyms tab shows total ELO and average per member. Data via getAthletesStatsRpc.
     </div>
   </div>
@@ -2338,7 +2284,6 @@
         <h3>22. My Profile</h3>
         <div class="screen-route">/profile</div>
       </div>
-      <span class="screen-badge badge-shipped">Shipped</span>
     </div>
     <div class="phone-frame">
       <div class="phone-screen">
@@ -2348,34 +2293,43 @@
         </div>
         <div class="wf-body" style="gap:8px;">
           <div style="display:flex;align-items:center;gap:10px;">
-            <div class="wf-avatar" style="width:50px;height:50px;font-size:14px;">MS</div>
+            <div class="wf-avatar" style="width:50px;height:50px;font-size:14px;background:var(--phone-btn-bg);color:var(--phone-text);">MS</div>
             <div>
-              <div style="font-size:14px;font-weight:700;color:var(--gray-900);">Matt Sponagle</div>
-              <div style="font-size:10px;color:var(--gray-400);">Gracie Academy</div>
-              <div style="font-size:10px;color:var(--gray-400);font-variant-numeric:tabular-nums;">ELO 1247 | 18W 6L (75%)</div>
+              <div style="font-family:'DM Sans', sans-serif;font-size:14px;font-weight:700;color:var(--phone-text);">Matt Sponagle</div>
+              <div style="font-family:'Inter', sans-serif;font-size:10px;color:var(--phone-text-muted);">Gracie Academy &middot; 70 kg</div>
+              <div style="font-family:'JetBrains Mono', monospace;font-size:10px;color:var(--phone-text-muted);font-variant-numeric:tabular-nums;">ELO 1247 &middot; 18W 6L</div>
             </div>
           </div>
+
+          <!-- Hero EloTile -->
+          <div style="background:var(--phone-card);border:1px solid var(--phone-border);border-radius:4px;padding:12px;">
+            <div style="font-family:'JetBrains Mono', monospace;font-size:9px;text-transform:uppercase;letter-spacing:0.12em;color:var(--phone-text-muted);font-weight:700;">Current ELO</div>
+            <div style="font-family:'JetBrains Mono', monospace;font-size:28px;font-variant-numeric:tabular-nums;color:var(--phone-text);font-weight:700;margin-top:2px;">1247</div>
+          </div>
+
           <div style="display:flex;gap:6px;">
-            <div class="wf-btn outline" style="flex:1;font-size:10px;">View Stats</div>
-            <div class="wf-btn outline" style="width:32px;display:flex;align-items:center;justify-content:center;padding:0;">
+            <div class="wf-btn outline" style="flex:1;font-family:'DM Sans', sans-serif;text-transform:uppercase;letter-spacing:0.08em;font-size:10px;border-color:var(--phone-border);color:var(--phone-text-secondary);border-radius:3px;">View Stats</div>
+            <div class="wf-btn outline" style="width:32px;display:flex;align-items:center;justify-content:center;padding:0;border-color:var(--phone-border);color:var(--phone-text-secondary);border-radius:3px;">
               <span style="font-size:10px;">&#8599;</span>
             </div>
           </div>
-          <div style="font-size:11px;font-weight:600;color:var(--gray-800);margin-top:4px;">Achievements</div>
+
+          <!-- RankRow style: position + label + value -->
+          <div style="font-family:'JetBrains Mono', monospace;font-size:9px;text-transform:uppercase;letter-spacing:0.12em;color:var(--phone-text-muted);font-weight:700;margin-top:4px;">Achievements</div>
           <div style="display:flex;gap:4px;flex-wrap:wrap;">
-            <span style="font-size:9px;padding:3px 8px;background:var(--amber-100);color:var(--amber-500);border-radius:6px;font-weight:600;">5 Win Streak</span>
-            <span style="font-size:9px;padding:3px 8px;background:var(--success-light);color:var(--success);border-radius:6px;font-weight:600;">72% Sub Rate</span>
+            <span style="font-family:'JetBrains Mono', monospace;font-size:9px;padding:3px 8px;border:1px solid var(--phone-border);color:var(--phone-text-secondary);border-radius:3px;text-transform:uppercase;letter-spacing:0.08em;">5 Win Streak</span>
+            <span style="font-family:'JetBrains Mono', monospace;font-size:9px;padding:3px 8px;border:1px solid var(--phone-border);color:var(--phone-text-secondary);border-radius:3px;text-transform:uppercase;letter-spacing:0.08em;">72% Sub Rate</span>
           </div>
-          <div class="wf-separator"></div>
-          <div style="font-size:11px;font-weight:600;color:var(--gray-800);">Account</div>
-          <div style="display:flex;align-items:center;justify-content:space-between;font-size:10px;color:var(--gray-600);padding:4px 0;">
+          <div class="wf-separator" style="background:var(--phone-border);"></div>
+          <div style="font-family:'JetBrains Mono', monospace;font-size:9px;text-transform:uppercase;letter-spacing:0.12em;color:var(--phone-text-muted);font-weight:700;">Account</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;font-family:'Inter', sans-serif;font-size:10px;color:var(--phone-text-secondary);padding:4px 0;">
             <span>Theme</span>
             <div class="wf-toggle"></div>
           </div>
-          <div style="font-size:10px;color:var(--gray-600);padding:4px 0;">Edit Profile</div>
-          <div style="font-size:10px;color:var(--gray-600);padding:4px 0;">Settings & Privacy</div>
-          <div style="font-size:10px;color:var(--red-500);padding:4px 0;">Log Out</div>
-          <div style="text-align:center;font-size:9px;color:var(--gray-400);margin-top:4px;">JITS v0.1.0</div>
+          <div style="font-family:'Inter', sans-serif;font-size:10px;color:var(--phone-text-secondary);padding:4px 0;">Edit Profile</div>
+          <div style="font-family:'Inter', sans-serif;font-size:10px;color:var(--phone-text-secondary);padding:4px 0;">Settings &amp; Privacy</div>
+          <div style="font-family:'Inter', sans-serif;font-size:10px;color:var(--phone-accent);padding:4px 0;">Log Out</div>
+          <div style="text-align:center;font-family:'JetBrains Mono', monospace;font-size:9px;color:var(--phone-text-muted);margin-top:4px;">ELO RATED v0.1.0</div>
         </div>
         <div class="wf-bottom-nav">
           <div class="wf-nav-item"><span class="wf-nav-label">Home</span></div>
@@ -2386,13 +2340,13 @@
       </div>
     </div>
     <div class="screen-notes">
-      <span class="note-tag reuse">ProfileContent</span>
-      <span class="note-tag reuse">EditableProfileHeader</span>
-      <span class="note-tag new">AchievementsSection</span>
+      <span class="note-tag reuse">Plate</span>
+      <span class="note-tag reuse">EloTile</span>
+      <span class="note-tag reuse">RankRow</span>
+      <span class="note-tag reuse">Avatar32</span>
       <span class="note-tag reuse">ShareProfileSheet</span>
       <span class="note-tag reuse">ThemeSwitcher</span>
-      <span class="note-tag reuse">LogoutButton</span>
-      Editable profile photo with header showing name, gym, ELO, W/L record. "View Stats" links to /profile/stats. Share button opens ShareProfileSheet. Achievements show win streak, fastest win, submission rate, ELO this month (supports ?demo=true for demo data). Account section: theme toggle, edit profile (to /profile/setup), settings link, logout.
+      Header: avatar, name, gym, weight (kg), ELO, W/L record. Hero EloTile for current ELO. "View Stats" links to /profile/stats. Share button opens ShareProfileSheet. Achievements show win streak, sub rate, ELO this month (supports ?demo=true for demo data). Account section: theme toggle, edit profile (to /profile/setup), settings link, logout.
     </div>
   </div>
 
@@ -2403,7 +2357,6 @@
         <h3>23. Profile Stats</h3>
         <div class="screen-route">/profile/stats</div>
       </div>
-      <span class="screen-badge badge-shipped">Shipped</span>
     </div>
     <div class="phone-frame">
       <div class="phone-screen">
@@ -2455,13 +2408,15 @@
       </div>
     </div>
     <div class="screen-notes">
-      <span class="note-tag new">StatsContent</span>
-      <span class="note-tag new">StatsTabs</span>
-      <span class="note-tag new">EloSparkline</span>
-      <span class="note-tag new">MatchHistoryList</span>
-      <span class="note-tag token">Win rate: text-success tabular-nums</span>
-      <span class="note-tag token">Period stats: text-success / text-destructive</span>
-      Quick stats header (3 cards: ELO, Wins, Win Rate). Three tabs: Overview (win streak, ELO this month, submission rate, recent performance by period), ELO History (sparkline chart from getEloHistory), Match Log (full match history from getMatchHistory). All stats computed from RPC data.
+      <span class="note-tag reuse">Plate</span>
+      <span class="note-tag reuse">EloTile</span>
+      <span class="note-tag reuse">RankRow</span>
+      <span class="note-tag reuse">StatsTabs</span>
+      <span class="note-tag reuse">EloSparkline</span>
+      <span class="note-tag reuse">MatchHistoryList</span>
+      <span class="note-tag token">Win rate: state-positive tabular-nums</span>
+      <span class="note-tag token">Period stats: state-positive / state-negative</span>
+      Quick stats header (3 EloTiles: ELO, Wins, Win Rate). Three tabs: Overview (win streak, ELO this month, sub rate, recent performance by period via RankRow), ELO History (sparkline chart from getEloHistory), Match Log (match history from getMatchHistory). All stats computed from RPC data. Weight displayed in kg.
     </div>
   </div>
 
@@ -2472,7 +2427,6 @@
         <h3>24. Athlete Detail</h3>
         <div class="screen-route">/athlete/[id]</div>
       </div>
-      <span class="screen-badge badge-shipped">Shipped</span>
     </div>
     <div class="phone-frame">
       <div class="phone-screen">
@@ -2541,10 +2495,6 @@
 <div class="section-header">
   <h2>9. Settings</h2>
   <p>Settings hub with notification preferences, video settings, feedback form, and help/FAQ. Accessible from Profile > Settings & Privacy.</p>
-  <div class="section-progress">
-    <div class="section-progress-bar"><div class="section-progress-fill" style="width:100%"></div></div>
-    <span class="section-progress-text">4 / 4 shipped</span>
-  </div>
 </div>
 
 <div class="screen-grid">
@@ -2556,7 +2506,6 @@
         <h3>25. Settings</h3>
         <div class="screen-route">/settings</div>
       </div>
-      <span class="screen-badge badge-shipped">Shipped</span>
     </div>
     <div class="phone-frame">
       <div class="phone-screen">
@@ -2615,11 +2564,11 @@
       </div>
     </div>
     <div class="screen-notes">
-      <span class="note-tag new">SettingsContent</span>
-      <span class="note-tag new">NotificationPreferences</span>
+      <span class="note-tag reuse">SettingsContent</span>
+      <span class="note-tag reuse">NotificationPreferences</span>
       <span class="note-tag reuse">Switch</span>
-      <span class="note-tag reuse">Card</span>
-      Push notification toggles (Challenges, Chat, Matches) with optimistic updates via updateNotificationPreferences. General links with blue left-border accent: Video Settings, Feedback, Help & Support.
+      <span class="note-tag reuse">Plate</span>
+      Push notification toggles (Challenges, Chat, Matches) with optimistic updates via updateNotificationPreferences. General links list: Video Settings, Feedback, Help & Support.
     </div>
   </div>
 
@@ -2630,7 +2579,6 @@
         <h3>26. Feedback</h3>
         <div class="screen-route">/settings/feedback</div>
       </div>
-      <span class="screen-badge badge-shipped">Shipped</span>
     </div>
     <div class="phone-frame">
       <div class="phone-screen">
@@ -2672,7 +2620,6 @@
         <h3>27. Help & Support</h3>
         <div class="screen-route">/settings/help</div>
       </div>
-      <span class="screen-badge badge-shipped">Shipped</span>
     </div>
     <div class="phone-frame">
       <div class="phone-screen">
@@ -2681,36 +2628,34 @@
           <span class="back-btn">&larr;</span>
           <span class="header-title">Help & Support</span>
         </div>
-        <div class="wf-body" style="gap:8px;">
-          <div style="font-size:12px;font-weight:600;color:var(--gray-800);">Frequently Asked Questions</div>
-          <div style="border:1px solid var(--gray-200);border-radius:8px;padding:8px;">
-            <div style="font-size:10px;font-weight:500;color:var(--gray-700);">How do I join a session?</div>
+        <div class="wf-body" style="gap:10px;">
+          <div style="background:var(--phone-card);border:1px solid var(--phone-border);border-radius:4px;padding:12px;">
+            <div style="font-family:'JetBrains Mono', monospace;font-size:9px;text-transform:uppercase;letter-spacing:0.12em;color:var(--phone-text-muted);font-weight:700;margin-bottom:4px;">FAQ</div>
+            <div style="font-family:'DM Sans', sans-serif;font-size:13px;font-weight:700;color:var(--phone-text);">Frequently Asked Questions</div>
+            <div style="font-family:'Inter', sans-serif;font-size:10px;color:var(--phone-text-secondary);margin-top:4px;">How ELO works, ranked vs casual, recording results.</div>
           </div>
-          <div style="border:1px solid var(--gray-200);border-radius:8px;padding:8px;">
-            <div style="font-size:10px;font-weight:500;color:var(--gray-700);">How does ELO rating work?</div>
+          <div style="background:var(--phone-card);border:1px solid var(--phone-border);border-radius:4px;padding:12px;">
+            <div style="font-family:'JetBrains Mono', monospace;font-size:9px;text-transform:uppercase;letter-spacing:0.12em;color:var(--phone-text-muted);font-weight:700;margin-bottom:4px;">Contact</div>
+            <div style="font-family:'DM Sans', sans-serif;font-size:13px;font-weight:700;color:var(--phone-text);">Email Support</div>
+            <div style="font-family:'Inter', sans-serif;font-size:10px;color:var(--phone-text-secondary);margin-top:4px;">support@elorated.com</div>
           </div>
-          <div style="border:1px solid var(--gray-200);border-radius:8px;padding:8px;">
-            <div style="font-size:10px;font-weight:500;color:var(--gray-700);">What is ranked vs casual?</div>
+          <div style="background:var(--phone-card);border:1px solid var(--phone-border);border-radius:4px;padding:12px;">
+            <div style="font-family:'JetBrains Mono', monospace;font-size:9px;text-transform:uppercase;letter-spacing:0.12em;color:var(--phone-text-muted);font-weight:700;margin-bottom:4px;">Legal</div>
+            <div style="font-family:'DM Sans', sans-serif;font-size:13px;font-weight:700;color:var(--phone-text);">Privacy Policy</div>
+            <div style="font-family:'Inter', sans-serif;font-size:10px;color:var(--phone-text-secondary);margin-top:4px;">How we handle your data.</div>
           </div>
-          <div style="border:1px solid var(--gray-200);border-radius:8px;padding:8px;">
-            <div style="font-size:10px;font-weight:500;color:var(--gray-700);">How do I record a result?</div>
+          <div style="background:var(--phone-card);border:1px solid var(--phone-border);border-radius:4px;padding:12px;">
+            <div style="font-family:'JetBrains Mono', monospace;font-size:9px;text-transform:uppercase;letter-spacing:0.12em;color:var(--phone-text-muted);font-weight:700;margin-bottom:4px;">Legal</div>
+            <div style="font-family:'DM Sans', sans-serif;font-size:13px;font-weight:700;color:var(--phone-text);">Terms of Service</div>
+            <div style="font-family:'Inter', sans-serif;font-size:10px;color:var(--phone-text-secondary);margin-top:4px;">Rules of the road.</div>
           </div>
-          <div style="border:1px solid var(--gray-200);border-radius:8px;padding:8px;">
-            <div style="font-size:10px;font-weight:500;color:var(--gray-700);">Can I change my weight?</div>
-          </div>
-          <div style="border:1px solid var(--gray-200);border-radius:8px;padding:8px;">
-            <div style="font-size:10px;font-weight:500;color:var(--gray-700);">How do I report an issue?</div>
-          </div>
-          <div class="wf-separator" style="margin-top:4px;"></div>
-          <div style="font-size:12px;font-weight:600;color:var(--gray-800);">Need More Help?</div>
-          <div class="wf-btn primary" style="width:auto;display:inline-flex;gap:4px;">Email Support</div>
         </div>
       </div>
     </div>
     <div class="screen-notes">
-      <span class="note-tag new">HelpPage</span>
-      <span class="note-tag new">FAQItem</span>
-      6 expandable FAQ items using HTML details/summary. Topics: joining sessions, ELO, ranked vs casual, recording results, changing weight, reporting issues. "Email Support" links to mailto:support@elorated.com.
+      <span class="note-tag reuse">Plate</span>
+      <span class="note-tag reuse">MetaTag</span>
+      Four static Plates per the G4 spec: FAQ, Contact, Privacy Policy, Terms of Service. Each Plate has a mono MetaTag header, DM Sans heading, and Inter description. No accordion, just navigation to the relevant content/links.
     </div>
   </div>
 
@@ -2721,7 +2666,6 @@
         <h3>28. Video Settings</h3>
         <div class="screen-route">/settings/video</div>
       </div>
-      <span class="screen-badge badge-shipped">Shipped</span>
     </div>
     <div class="phone-frame">
       <div class="phone-screen">
@@ -2748,12 +2692,6 @@
 <div class="section-header">
   <h2>Hidden Routes</h2>
   <p>These routes exist in the codebase but redirect to / or have no navigation entry point. Code is preserved for future use.</p>
-  <div class="section-progress">
-    <div class="section-progress-bar" style="display:flex;overflow:hidden;">
-      <div style="width:100%;height:100%;background:var(--gray-600);border-radius:3px;"></div>
-    </div>
-    <span class="section-progress-text">5 hidden (preserved)</span>
-  </div>
 </div>
 
 <div class="screen-grid">
@@ -2877,8 +2815,8 @@
 
 <!-- Footer -->
 <div style="max-width:1280px; margin:64px auto 0; text-align:center; padding-top:32px; border-top:1px solid #333;">
-  <p style="font-size:13px; color:var(--gray-500);">JITS Arena Web Progress Board &middot; 33 screens across 9 flows + 1 hidden section &middot; 28 shipped, 5 hidden</p>
-  <p style="font-size:11px; color:var(--gray-600); margin-top:8px;">Next.js 16 + Tailwind + shadcn/ui | Last updated: 2026-04-30</p>
+  <p style="font-size:13px; color:var(--gray-500);">ELO RATED Web Screen Inventory &middot; 33 screens across 9 flows + 1 hidden section</p>
+  <p style="font-size:11px; color:var(--gray-600); margin-top:8px;">Next.js 16 + Tailwind + ELO design system | Last updated: 2026-05-19</p>
 </div>
 
 <!-- ============================================================

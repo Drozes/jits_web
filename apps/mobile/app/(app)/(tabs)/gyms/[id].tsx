@@ -7,11 +7,9 @@ import {
   Text,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { ArrowLeft, MapPin, Users, Calendar, Plus, Pencil } from "lucide-react-native";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { useLocalSearchParams } from "expo-router";
+import { Pencil, Plus } from "lucide-react-native";
+import { AppHeader } from "@/components/layout/app-header";
 import { SessionCard } from "@/components/session-card";
 import { CreateSessionSheet } from "@/components/session/create-session-sheet";
 import { EditGymSheet } from "@/components/gyms/edit-gym-sheet";
@@ -27,6 +25,13 @@ import {
   haversineKm,
   useLocation,
 } from "@/lib/location/use-location";
+import {
+  ActiveSessionPlate,
+  GymTitleBlock,
+  LastSessionPlate,
+  StatsGrid,
+  UpcomingSessionsSection,
+} from "./gym-detail-parts";
 
 interface GymCoords {
   latitude: number | null;
@@ -86,7 +91,6 @@ function useGymDetailData(gymId: string | undefined, athleteId: string | undefin
 
 export default function GymDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const router = useRouter();
   const tokens = useThemedTokens();
   const { athlete, isLoading: authLoading } = useRequireAthlete();
   const { data, coords, isLoading, isRefreshing, refresh } = useGymDetailData(
@@ -112,126 +116,130 @@ export default function GymDetailScreen() {
     [data?.participantSessionIds],
   );
 
-  // Active sessions first, then upcoming sorted by closest start time
-  const sortedSessions = React.useMemo(
-    () =>
-      [...(data?.sessions ?? [])].sort((a, b) => {
-        if (a.status === "active" && b.status !== "active") return -1;
-        if (a.status !== "active" && b.status === "active") return 1;
-        return new Date(a.scheduledStart).getTime() - new Date(b.scheduledStart).getTime();
-      }),
+  const activeSession = React.useMemo(
+    () => data?.sessions.find((s) => s.status === "active") ?? null,
+    [data?.sessions],
+  );
+  const upcomingSessions = React.useMemo(
+    () => (data?.sessions ?? []).filter((s) => s.status !== "active"),
     [data?.sessions],
   );
 
   if (authLoading || isLoading) {
     return (
-      <SafeAreaView className="flex-1 bg-background items-center justify-center">
-        <ActivityIndicator color={tokens.primary} />
-      </SafeAreaView>
+      <View className="flex-1 bg-surface items-center justify-center">
+        <ActivityIndicator color={tokens.accentCta} />
+      </View>
     );
   }
 
   if (!data) {
     return (
-      <SafeAreaView className="flex-1 bg-background" edges={["top"]}>
-        <View className="flex-row items-center px-4 py-3">
-          <Pressable onPress={() => router.back()} className="p-2 -ml-2">
-            <ArrowLeft size={20} color={tokens.foreground} />
-          </Pressable>
-        </View>
+      <View className="flex-1 bg-surface">
+        <AppHeader title="Gym" back />
         <View className="flex-1 items-center justify-center px-8">
-          <Text className="text-base font-medium text-foreground">Gym not found</Text>
+          <Text className="font-heading text-[14px] text-ink uppercase tracking-caps-l">
+            Gym Not Found
+          </Text>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
+  const addressLabel = (coords?.address ?? data.city ?? "Unknown City").toString();
+  const memberLabel = `${data.memberCount} ${data.memberCount === 1 ? "Member" : "Members"}`;
+  // Analytics are not yet wired on mobile; render placeholders matching web.
+  const avgPerSession = "—";
+  const avgElo = "—";
+
   return (
-    <SafeAreaView className="flex-1 bg-background" edges={["top"]}>
-      <View className="flex-row items-center justify-between px-4 py-3 border-b border-border">
-        <View className="flex-row items-center">
-          <Pressable onPress={() => router.back()} className="p-2 -ml-2">
-            <ArrowLeft size={20} color={tokens.foreground} />
-          </Pressable>
-          <Text className="ml-2 text-base font-heading text-foreground">Gym</Text>
-        </View>
-        {data?.isGymManager ? (
-          <EditGymSheet
-            gymId={data.id}
-            currentName={data.name}
-            currentCity={data.city}
-            onUpdated={refresh}
-          >
-            <Pressable className="p-2 -mr-2">
-              <Pencil size={18} color={tokens.foreground} />
-            </Pressable>
-          </EditGymSheet>
-        ) : null}
-      </View>
-
-      <FlatList
-        data={sortedSessions}
-        keyExtractor={(s) => s.id}
-        contentContainerStyle={{ padding: 16, gap: 12 }}
-        ListHeaderComponent={
-          <View className="gap-3 mb-2">
-            <View className="flex-row items-center gap-2 flex-wrap">
-              <Text className="text-2xl font-heading text-foreground">{data.name}</Text>
-              {data.isMemberGym ? (
-                <Badge variant="outline">
-                  <Text className="text-[10px] font-heading text-foreground">My Gym</Text>
-                </Badge>
-              ) : null}
-            </View>
-            {data.city || coords?.address ? (
-              <View className="flex-row items-center gap-1.5">
-                <MapPin size={14} color={tokens.mutedForeground} />
-                <Text className="text-sm text-muted-foreground">
-                  {coords?.address ? coords.address : data.city}
-                  {distanceKm != null ? ` · ${formatDistanceKm(distanceKm)}` : ""}
-                </Text>
-              </View>
-            ) : null}
-            <View className="flex-row items-center gap-1.5">
-              <Users size={14} color={tokens.mutedForeground} />
-              <Text className="text-sm text-muted-foreground">{data.memberCount} {data.memberCount === 1 ? "Member" : "Members"}</Text>
-            </View>
-            {location.isGranted !== true ? (
+    <View className="flex-1 bg-surface">
+      <AppHeader
+        title="Gym"
+        back
+        rightAction={
+          data.isGymManager ? (
+            <EditGymSheet
+              gymId={data.id}
+              currentName={data.name}
+              currentCity={data.city}
+              onUpdated={refresh}
+            >
               <Pressable
-                onPress={() => {
-                  if (location.isLoading) return;
-                  void location.request();
-                }}
-                className="rounded-md border border-dashed border-border p-3"
+                accessibilityRole="button"
+                accessibilityLabel="Edit gym"
+                className="w-8 h-8 items-center justify-center rounded-xs"
               >
-                <Text className="text-sm font-medium text-foreground">
-                  {location.isLoading
-                    ? "Requesting location..."
-                    : "Enable location to see distance"}
-                </Text>
+                <Pencil size={16} color={tokens.textSecondary} />
               </Pressable>
+            </EditGymSheet>
+          ) : null
+        }
+      />
+
+      {/*
+        Two render paths:
+          - Non-manager: compact ParticipantRow attendance list (E2 wireframe).
+          - Manager: full SessionCard list so they retain the 3-dot
+            SessionActions menu for activate/cancel/complete per session.
+      */}
+      <FlatList
+        data={data.isGymManager ? upcomingSessions : []}
+        keyExtractor={(s) => s.id}
+        contentContainerStyle={{
+          paddingHorizontal: 16,
+          paddingTop: 20,
+          paddingBottom: 96,
+          gap: 12,
+        }}
+        ListHeaderComponent={
+          <View className="gap-5 mb-1">
+            <GymTitleBlock
+              name={data.name}
+              address={addressLabel}
+              isMyGym={data.isMemberGym}
+              distanceLabel={distanceKm != null ? formatDistanceKm(distanceKm) : null}
+              memberLabel={memberLabel}
+              showLocationCta={location.isGranted !== true}
+              locationLoading={location.isLoading}
+              onRequestLocation={() => {
+                if (location.isLoading) return;
+                void location.request();
+              }}
+            />
+
+            {activeSession ? <ActiveSessionPlate session={activeSession} /> : null}
+
+            {!data.isGymManager ? (
+              <UpcomingSessionsSection
+                sessions={upcomingSessions}
+                rsvpSet={rsvpSet}
+                participantSet={participantSet}
+              />
             ) : null}
 
-            <View className="flex-row items-center gap-2 mt-3">
-              <Calendar size={18} color={tokens.primary} />
-              <Text className="text-lg font-heading text-foreground">Sessions</Text>
-              {data.sessions.length > 0 ? (
-                <View className="ml-1 px-2 py-0.5 rounded-full bg-muted">
-                  <Text className="text-[11px] font-mono text-muted-foreground">
-                    {data.sessions.length}
-                  </Text>
-                </View>
-              ) : null}
-            </View>
+            <StatsGrid avgPerSession={avgPerSession} avgElo={avgElo} />
+
+            <LastSessionPlate />
 
             {data.isGymManager ? (
-              <CreateSessionSheet gymId={data.id} onCreated={refresh}>
-                <Button
-                  leftIcon={<Plus size={16} color={tokens.primaryForeground} />}
-                >
-                  Start Session
-                </Button>
-              </CreateSessionSheet>
+              <>
+                <CreateSessionSheet gymId={data.id} onCreated={refresh}>
+                  <Pressable
+                    accessibilityRole="button"
+                    className="bg-cta rounded-sm py-3 px-5 items-center justify-center active:bg-cta-hover flex-row gap-2"
+                  >
+                    <Plus size={16} color={tokens.textOnAccent} />
+                    <Text className="font-heading text-[13px] text-ink-on-cta uppercase tracking-caps">
+                      Start Session
+                    </Text>
+                  </Pressable>
+                </CreateSessionSheet>
+                <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-xl mt-2">
+                  Upcoming Sessions
+                  {upcomingSessions.length > 0 ? ` · ${upcomingSessions.length}` : ""}
+                </Text>
+              </>
             ) : null}
 
             <SessionTemplates gymId={data.id} isManager={data.isGymManager} />
@@ -246,19 +254,14 @@ export default function GymDetailScreen() {
             onActionComplete={refresh}
           />
         )}
-        ListEmptyComponent={
-          <View className="rounded-md border border-dashed border-border p-8 items-center">
-            <Text className="text-sm text-muted-foreground">No upcoming sessions</Text>
-          </View>
-        }
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}
             onRefresh={refresh}
-            tintColor={tokens.primary}
+            tintColor={tokens.accentCta}
           />
         }
       />
-    </SafeAreaView>
+    </View>
   );
 }

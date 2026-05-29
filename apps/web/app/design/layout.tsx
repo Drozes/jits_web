@@ -13,6 +13,7 @@ const navLinks = [
   { href: "/design/web-layouts", label: "Web Layouts" },
   { href: "/design/screens", label: "Web Screens" },
   { href: "/design/screens/native", label: "Native Screens" },
+  { href: "/design/board", label: "Board" },
 ];
 
 export default function DesignLayout({

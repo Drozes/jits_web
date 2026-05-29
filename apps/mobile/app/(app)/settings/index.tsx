@@ -1,29 +1,32 @@
 import * as React from "react";
-import {
-  Alert,
-  Pressable,
-  ScrollView,
-  Text,
-  View,
-} from "react-native";
+import { Alert, Pressable, Text, View } from "react-native";
 import { Link, useRouter, type Href } from "expo-router";
-import {
-  Bell,
-  ChevronRight,
-  HelpCircle,
-  LogOut,
-  MessageSquare,
-  TestTube2,
-  Video,
-} from "lucide-react-native";
+import { TestTube2 } from "lucide-react-native";
+import { AppHeader } from "@/components/layout/app-header";
+import { PageContainer } from "@/components/layout/page-container";
+import { Plate } from "@/components/ui/elo-system";
 import { useAuth, useRequireAthlete } from "@/lib/auth/hooks";
-import { useThemedTokens } from "@/lib/theme/use-theme";
+import { cn } from "@/lib/cn";
+
+/**
+ * G3 Settings. Mirrors the web settings index: three Plate sections grouping
+ * Account / Preferences / Support nav rows, with a sign-out row inside Account.
+ *
+ * Each row uses the same `RowLabel` + chevron pattern from the web settings
+ * page, expressed via NativeWind ELO tokens. Plates wrap section groups so
+ * sequential rows share a single hairline border, divided by RowDivider.
+ */
+
+type SettingsRoute =
+  | "/settings/notifications"
+  | "/settings/video"
+  | "/settings/feedback"
+  | "/settings/help";
 
 export default function SettingsScreen() {
-  const { signOut } = useAuth();
+  const { user, signOut } = useAuth();
   useRequireAthlete();
   const router = useRouter();
-  const tokens = useThemedTokens();
 
   const handleSignOut = React.useCallback(() => {
     Alert.alert("Sign out", "Are you sure you want to sign out?", [
@@ -39,123 +42,154 @@ export default function SettingsScreen() {
     ]);
   }, [signOut, router]);
 
+  const email = user?.email ?? "";
+
   return (
-    <ScrollView
-      className="flex-1 bg-background"
-      contentContainerStyle={{ padding: 16, paddingBottom: 48, gap: 24 }}
-    >
-      <Text className="text-2xl font-heading text-foreground">Settings</Text>
-
-      <Section title="Notifications">
-        <SettingsLink
-          href="/settings/notifications"
-          icon={<Bell size={16} color={tokens.mutedForeground} />}
-          label="Notification Preferences"
-        />
-      </Section>
-
-      <Section title="General">
-        <View className="gap-2">
-          <SettingsLink
-            href="/settings/video"
-            icon={<Video size={16} color={tokens.mutedForeground} />}
-            label="Video Settings"
-          />
-          <SettingsLink
-            href="/settings/feedback"
-            icon={
-              <MessageSquare size={16} color={tokens.mutedForeground} />
-            }
-            label="Feedback"
-          />
-          <SettingsLink
-            href="/settings/help"
-            icon={<HelpCircle size={16} color={tokens.mutedForeground} />}
-            label="Help & Support"
-          />
-        </View>
-      </Section>
-
-      <Section title="Account">
-        <Pressable
-          onPress={handleSignOut}
-          className="flex-row items-center justify-between rounded-xl border border-border bg-card px-4 py-3.5 active:bg-muted/40"
-        >
-          <View className="flex-row items-center gap-3">
-            <LogOut size={16} color={tokens.destructive} />
-            <Text className="text-sm font-medium text-destructive">
-              Sign Out
-            </Text>
-          </View>
-        </Pressable>
-      </Section>
-
-      {__DEV__ && (
-        <Section title="Developer">
-          <Link href="/(app)/settings/realtime-test" asChild>
-            <Pressable className="flex-row items-center justify-between rounded-xl border border-border bg-card px-4 py-3.5 active:bg-muted/40">
-              <View className="flex-row items-center gap-3">
-                <TestTube2 size={16} color={tokens.mutedForeground} />
-                <View>
-                  <Text className="text-sm font-medium text-foreground">
-                    Realtime smoke test
-                  </Text>
-                  <Text className="text-xs text-muted-foreground">
-                    Verify channels, presence, broadcast, postgres-changes
-                  </Text>
-                </View>
-              </View>
-              <ChevronRight size={16} color={tokens.mutedForeground} />
-            </Pressable>
-          </Link>
-        </Section>
-      )}
-    </ScrollView>
+    <>
+      <AppHeader title="Settings" back />
+      <PageContainer
+        noTabBar
+        contentContainerStyle={{ paddingTop: 24, gap: 24 }}
+      >
+        <AccountPlate email={email} onSignOut={handleSignOut} />
+        <PreferencesPlate />
+        <SupportPlate />
+        {__DEV__ ? <DeveloperPlate /> : null}
+      </PageContainer>
+    </>
   );
 }
 
-function Section({
-  title,
-  children,
+function AccountPlate({
+  email,
+  onSignOut,
 }: {
-  title: string;
-  children: React.ReactNode;
+  email: string;
+  onSignOut: () => void;
 }) {
   return (
-    <View className="gap-3">
-      <Text className="text-xs font-heading uppercase tracking-wider text-muted-foreground">
-        {title}
-      </Text>
+    <Plate className="p-0 overflow-hidden">
+      <PlateRow>
+        <RowLabel>EMAIL</RowLabel>
+        <RowValue>{email || "-"}</RowValue>
+      </PlateRow>
+      <RowDivider />
+      <Pressable
+        onPress={onSignOut}
+        accessibilityRole="button"
+        accessibilityLabel="Sign out"
+        className="flex-row items-center justify-between px-4 py-3 active:bg-surface-4"
+      >
+        <Text className="font-mono text-[10px] text-cta uppercase tracking-caps-l">
+          SIGN OUT
+        </Text>
+      </Pressable>
+    </Plate>
+  );
+}
+
+function PreferencesPlate() {
+  return (
+    <Plate className="p-0 overflow-hidden">
+      <SettingsRow href="/settings/notifications" label="NOTIFICATIONS" />
+    </Plate>
+  );
+}
+
+function SupportPlate() {
+  return (
+    <Plate className="p-0 overflow-hidden">
+      <SettingsRow href="/settings/feedback" label="FEEDBACK" />
+      <RowDivider />
+      <SettingsRow href="/settings/help" label="HELP & SUPPORT" />
+      <RowDivider />
+      <SettingsRow href="/settings/video" label="VIDEO SETTINGS" />
+    </Plate>
+  );
+}
+
+function DeveloperPlate() {
+  return (
+    <Plate className="p-0 overflow-hidden">
+      <Link href="/(app)/settings/realtime-test" asChild>
+        <Pressable
+          accessibilityRole="link"
+          className="flex-row items-center justify-between px-4 py-3 active:bg-surface-4"
+        >
+          <View className="flex-row items-center gap-3">
+            <TestTube2 size={14} className="text-ink-3" />
+            <RowLabel>REALTIME SMOKE TEST</RowLabel>
+          </View>
+          <Chevron />
+        </Pressable>
+      </Link>
+    </Plate>
+  );
+}
+
+function SettingsRow({
+  href,
+  label,
+}: {
+  href: SettingsRoute;
+  label: string;
+}) {
+  return (
+    <Link href={href as Href} asChild>
+      <Pressable
+        accessibilityRole="link"
+        className="flex-row items-center justify-between px-4 py-3 active:bg-surface-4"
+      >
+        <RowLabel>{label}</RowLabel>
+        <Chevron />
+      </Pressable>
+    </Link>
+  );
+}
+
+function PlateRow({ children }: { children: React.ReactNode }) {
+  return (
+    <View className="flex-row items-center justify-between px-4 py-3">
       {children}
     </View>
   );
 }
 
-type SettingsRoute =
-  | "/settings/notifications"
-  | "/settings/video"
-  | "/settings/feedback"
-  | "/settings/help";
-
-function SettingsLink({
-  href,
-  icon,
-  label,
-}: {
-  href: SettingsRoute;
-  icon: React.ReactNode;
-  label: string;
-}) {
-  const tokens = useThemedTokens();
+function RowLabel({ children }: { children: React.ReactNode }) {
   return (
-    <Link href={href as Href} asChild>
-      <Pressable className="flex-row items-center justify-between rounded-xl border border-border bg-card px-4 py-3.5 active:bg-muted/40">
-        <View className="flex-row items-center gap-3">
-          {icon}
-          <Text className="text-sm font-medium text-foreground">{label}</Text>
-        </View>
-        <ChevronRight size={16} color={tokens.mutedForeground} />
-      </Pressable>
-    </Link>
+    <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">
+      {children}
+    </Text>
+  );
+}
+
+function RowValue({ children }: { children: React.ReactNode }) {
+  return (
+    <Text
+      numberOfLines={1}
+      ellipsizeMode="tail"
+      className={cn(
+        "font-mono-medium text-[12px] text-ink uppercase tracking-caps-l",
+        "max-w-[60%] text-right",
+      )}
+    >
+      {children}
+    </Text>
+  );
+}
+
+function RowDivider() {
+  return <View className="h-px bg-hairline-faint" />;
+}
+
+function Chevron() {
+  return (
+    <Text
+      className="font-mono text-[14px] text-ink-3"
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+    >
+      {"›"}
+    </Text>
   );
 }

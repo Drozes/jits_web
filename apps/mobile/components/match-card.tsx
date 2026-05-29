@@ -1,8 +1,7 @@
 import * as React from "react";
 import { Pressable, Text, View } from "react-native";
-import { Card, CardContent } from "./ui/card";
-import { Badge } from "./ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
+import { Image } from "expo-image";
+import { OutcomeTag } from "./ui/elo-system";
 import { cn } from "../lib/cn";
 import { env } from "../lib/env";
 import { formatRelativeDate, getInitials } from "@jits/shared/utils";
@@ -32,30 +31,52 @@ interface MatchCardProps {
   onPress?: () => void;
 }
 
-const resultConfig: Record<MatchOutcome, { label: string; variant: "success" | "destructive" | "secondary" }> = {
-  [MATCH_OUTCOME.WIN]: { label: "Win", variant: "success" },
-  [MATCH_OUTCOME.LOSS]: { label: "Loss", variant: "destructive" },
-  [MATCH_OUTCOME.DRAW]: { label: "Draw", variant: "secondary" },
+const outcomeMap: Record<MatchOutcome, "win" | "loss" | "draw"> = {
+  [MATCH_OUTCOME.WIN]: "win",
+  [MATCH_OUTCOME.LOSS]: "loss",
+  [MATCH_OUTCOME.DRAW]: "draw",
 };
+
+function ChallengePill({ children, accent }: { children: React.ReactNode; accent?: boolean }) {
+  return (
+    <View
+      className={cn(
+        "px-2 py-1 border rounded-xs",
+        accent ? "border-cta" : "border-hairline-strong",
+      )}
+    >
+      <Text
+        className={cn(
+          "font-mono-bold text-[10px] uppercase tracking-caps-l",
+          accent ? "text-cta" : "text-ink-2",
+        )}
+      >
+        {children}
+      </Text>
+    </View>
+  );
+}
 
 function CardInner({ type = "match", opponentName, opponentPhotoUrl, result, status, direction, matchType, eloDelta, date }: MatchCardProps) {
   const photoSrc = profilePhotoSource(opponentPhotoUrl);
+  const matchTypeLabel = matchType ? (matchType === "ranked" ? "Ranked" : "Casual") : null;
+  const dateText = formatRelativeDate(date);
+  const subtitle = matchTypeLabel ? `${dateText} · ${matchTypeLabel}` : dateText;
 
   return (
-    <CardContent className="flex-row items-center justify-between py-3 px-4">
+    <View className="flex-row items-center justify-between gap-3 bg-surface-3 border border-hairline-faint rounded-xs px-4 py-3">
       <View className="flex-row items-center gap-3 flex-1 min-w-0">
-        <Avatar className="border border-border" size="default">
+        <View className="h-9 w-9 items-center justify-center rounded-xs bg-surface-4 border border-hairline-strong overflow-hidden">
           {photoSrc ? (
-            <AvatarImage source={{ uri: photoSrc }} />
-          ) : null}
-          <AvatarFallback className="bg-primary">
-            <Text className="text-xs font-medium text-primary-foreground">{getInitials(opponentName)}</Text>
-          </AvatarFallback>
-        </Avatar>
-        <View className="flex-1 min-w-0 gap-0.5">
-          <Text className="text-sm font-medium text-foreground" numberOfLines={1}>{opponentName}</Text>
-          <Text className="text-xs text-muted-foreground" numberOfLines={1}>
-            {formatRelativeDate(date)}
+            <Image source={{ uri: photoSrc }} style={{ width: "100%", height: "100%" }} contentFit="cover" />
+          ) : (
+            <Text className="font-mono-bold text-ink text-[10px] tracking-caps-l">{getInitials(opponentName)}</Text>
+          )}
+        </View>
+        <View className="flex-1 min-w-0">
+          <Text className="font-heading text-[14px] text-ink" numberOfLines={1}>{opponentName}</Text>
+          <Text className="font-mono text-[11px] text-ink-3 mt-[2px]" numberOfLines={1}>
+            {subtitle}
           </Text>
         </View>
       </View>
@@ -64,10 +85,10 @@ function CardInner({ type = "match", opponentName, opponentPhotoUrl, result, sta
         {type === "match" && eloDelta != null ? (
           <Text
             className={cn(
-              "text-sm font-mono tabular-nums",
-              eloDelta > 0 && "text-success",
-              eloDelta < 0 && "text-destructive",
-              eloDelta === 0 && "text-muted-foreground",
+              "font-mono-bold text-[16px] tabular-nums",
+              eloDelta > 0 && "text-positive",
+              eloDelta < 0 && "text-negative",
+              eloDelta === 0 && "text-ink-3",
             )}
           >
             {eloDelta > 0 ? "+" : ""}{eloDelta}
@@ -75,22 +96,20 @@ function CardInner({ type = "match", opponentName, opponentPhotoUrl, result, sta
         ) : null}
 
         {type === "match" && result ? (
-          <Badge variant={resultConfig[result].variant} className="rounded-md">{resultConfig[result].label}</Badge>
+          <OutcomeTag outcome={outcomeMap[result]} />
         ) : null}
 
         {type === "challenge" && direction ? (
-          <Badge variant={direction === "incoming" ? "secondary" : "outline"} className="rounded-md">
+          <ChallengePill accent={direction === "incoming"}>
             {direction === "incoming" ? "Incoming" : "Sent"}
-          </Badge>
+          </ChallengePill>
         ) : null}
 
         {type === "challenge" && !direction ? (
-          <Badge variant={status === "Accepted" ? "success" : "outline"} className="rounded-md">
-            {status ?? "Pending"}
-          </Badge>
+          <ChallengePill accent={status === "Accepted"}>{status ?? "Pending"}</ChallengePill>
         ) : null}
       </View>
-    </CardContent>
+    </View>
   );
 }
 
@@ -102,17 +121,10 @@ export function MatchCard(props: MatchCardProps) {
         accessibilityRole="button"
         className="active:opacity-80"
       >
-        <Card>
-          <CardInner {...props} />
-        </Card>
+        <CardInner {...props} />
       </Pressable>
     );
   }
 
-  return (
-    <Card>
-      <CardInner {...props} />
-    </Card>
-  );
+  return <CardInner {...props} />;
 }
-

@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+**Internal founders Kanban board at /design/board (2026-05-29)**
+
+**Added**
+- Backend (`/Users/msponagle/code/experiments/jr_be/supabase/migrations/20260529000000_admin_cards.sql`): new `public.admin_cards` table (`id`, `title`, `notes`, `status` checked `todo|doing|done`, `created_by` defaulting to `auth.uid()`, `created_at`, `updated_at`). Reuses the existing `set_updated_at()` trigger; RLS grants any authenticated user full CRUD (internal/undiscoverable for now). Self-contained and idempotent so it can be published to the remote project unchanged. **Applied to the LOCAL Supabase DB only** (this `jr_be` checkout has no migrations dir / git / config.toml, so `psql` was used directly; remote/prod application is a separate manual step).
+- `packages/shared/src/api/queries.ts`: `AdminCard`/`AdminCardStatus` types and `getAdminCards()` query.
+- `packages/shared/src/api/mutations.ts`: `createAdminCard()`, `updateAdminCard()`, `deleteAdminCard()` (all return `Result<T>`).
+- `apps/web/app/design/board/page.tsx`: new `/design/board` route. Synchronous page wraps an async `BoardContent` (server-side fetch via `getAdminCards`) in `<Suspense>` per the cacheComponents pattern.
+- `apps/web/app/design/board/kanban-board.tsx`: client board (To Do / Doing / Done columns) with add, move-between-columns, and delete, persisting via the shared mutations on the browser Supabase client.
+- `apps/web/app/design/board/kanban-card.tsx`, `apps/web/app/design/board/add-card-input.tsx`: card and quick-add primitives.
+
+**Changed**
+- `apps/web/app/design/page.tsx`: added "Founders Board" card to the design hub.
+- `apps/web/app/design/layout.tsx`: added "Board" link to the design nav.
+- `packages/shared/src/types/database.ts`: regenerated (`npm run db:types`) to include `admin_cards`.
+
 **Web layout concepts: full-screen desktop directions for team preview (2026-05-29)**
 
 **Added**

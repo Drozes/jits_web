@@ -1,6 +1,6 @@
 import { Text, View } from "react-native";
 import type { SubmissionBreakdown } from "@jits/shared/types/analytics";
-import { Card, CardContent } from "@/components/ui/card";
+import { Plate } from "@/components/ui/elo-system";
 
 interface SubmissionBreakdownSectionProps {
   submissions: SubmissionBreakdown[];
@@ -12,36 +12,48 @@ export function SubmissionBreakdownSection({ submissions }: SubmissionBreakdownS
 
   if (top5.length === 0) {
     return (
-      <Card>
-        <CardContent className="p-4 items-center">
-          <Text className="text-sm font-heading text-foreground mb-2">Top Submissions</Text>
-          <Text className="text-xs text-muted-foreground">No submissions recorded yet</Text>
-        </CardContent>
-      </Card>
+      <Plate>
+        <Text className="font-heading text-[12px] text-ink uppercase tracking-caps mb-2">
+          Top Submissions
+        </Text>
+        <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">
+          No submissions recorded yet
+        </Text>
+      </Plate>
     );
   }
 
   return (
-    <Card>
-      <CardContent className="p-4 gap-3">
-        <Text className="text-sm font-heading text-foreground">Top Submissions</Text>
+    <Plate>
+      <Text className="font-heading text-[12px] text-ink uppercase tracking-caps mb-3">
+        Top Submissions
+      </Text>
+      <View className="gap-3">
         {top5.map((s) => {
           const pct = Math.round((s.count / maxCount) * 100);
           return (
             <View key={s.type} className="gap-1">
               <View className="flex-row items-center justify-between">
-                <Text className="text-xs font-medium text-foreground" numberOfLines={1}>{s.type}</Text>
-                <Text className="text-xs font-mono text-muted-foreground tabular-nums">
-                  {s.asWinner}W / {s.asLoser}L
+                <Text className="font-body text-[12px] text-ink" numberOfLines={1}>
+                  {s.type}
                 </Text>
+                <View className="flex-row items-center gap-1">
+                  <Text className="font-mono-bold text-positive text-[11px] tabular-nums">
+                    {s.asWinner}W
+                  </Text>
+                  <Text className="font-mono text-ink-3 text-[11px]">·</Text>
+                  <Text className="font-mono-bold text-negative text-[11px] tabular-nums">
+                    {s.asLoser}L
+                  </Text>
+                </View>
               </View>
-              <View className="h-2 rounded-full bg-muted overflow-hidden">
-                <View className="h-full rounded-full bg-primary/70" style={{ width: `${pct}%` }} />
+              <View className="h-1.5 rounded-xs bg-surface-4 overflow-hidden">
+                <View className="h-full bg-cta" style={{ width: `${pct}%` }} />
               </View>
             </View>
           );
         })}
-      </CardContent>
-    </Card>
+      </View>
+    </Plate>
   );
 }

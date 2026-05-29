@@ -1,23 +1,24 @@
-import * as React from "react";
 import { Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
-import { MapPin, Users } from "lucide-react-native";
-import { Card } from "../ui/card";
-import { Button } from "../ui/button";
-import { Badge } from "../ui/badge";
+import { LivePill, MetaTag, Plate } from "@/components/ui/elo-system";
+import { formatTimeUntil } from "@jits/shared/utils";
 import type { ActiveSessionInfo } from "@jits/shared/types/session";
 
 interface ActiveSessionCardProps {
   session: ActiveSessionInfo | null;
 }
 
-function formatStartsIn(scheduledStart: string) {
-  const diff = new Date(scheduledStart).getTime() - Date.now();
-  if (diff <= 0) return "Starting now";
-  const mins = Math.floor(diff / 60000);
-  if (mins < 60) return `Starts in ${mins}m`;
-  const hours = Math.floor(mins / 60);
-  return `Starts in ${hours}h ${mins % 60}m`;
+function formatNextLabel(scheduledStart: string): string {
+  return new Date(scheduledStart).toLocaleString(undefined, {
+    weekday: "long",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function minutesSince(scheduledStart: string): number {
+  const startMs = new Date(scheduledStart).getTime();
+  return Math.max(0, Math.floor((Date.now() - startMs) / 60_000));
 }
 
 export function ActiveSessionCard({ session }: ActiveSessionCardProps) {
@@ -25,19 +26,26 @@ export function ActiveSessionCard({ session }: ActiveSessionCardProps) {
 
   if (!session) {
     return (
-      <Pressable
-        onPress={() => router.push("/(app)/gyms")}
-        className="active:opacity-80"
-        accessibilityRole="button"
-      >
-        <Card className="border-dashed p-6 items-center">
-          <MapPin size={24} className="text-muted-foreground mb-2" />
-          <Text className="text-sm font-medium text-foreground">Find a session</Text>
-          <Text className="text-xs text-muted-foreground mt-1">
-            Browse gyms and join an open mat
+      <Plate>
+        <View className="flex-row items-center justify-between mb-2">
+          <Text className="font-heading text-[18px] text-ink flex-1" numberOfLines={1}>
+            No upcoming session
           </Text>
-        </Card>
-      </Pressable>
+          <MetaTag>Find a gym</MetaTag>
+        </View>
+        <Text className="font-body text-[13px] text-ink-2 mb-2">
+          Browse gyms in your city to see scheduled open mats.
+        </Text>
+        <Pressable
+          onPress={() => router.push("/(app)/gyms")}
+          accessibilityRole="button"
+          hitSlop={6}
+        >
+          <Text className="font-mono-bold text-[10px] text-cta uppercase tracking-caps-l">
+            Browse gyms →
+          </Text>
+        </Pressable>
+      </Plate>
     );
   }
 
@@ -45,50 +53,50 @@ export function ActiveSessionCard({ session }: ActiveSessionCardProps) {
     const target = session.isCheckedIn
       ? `/(app)/session/${session.sessionId}/lobby`
       : `/(app)/session/${session.sessionId}/join`;
+    const mins = minutesSince(session.scheduledStart);
     return (
-      <Card className="border-success/30 bg-success/5 p-4">
-        <View className="gap-2">
-          <View className="flex-row items-center justify-between">
-            <View className="flex-row items-center gap-2">
-              <Badge variant="success">Live</Badge>
-              <Text className="text-sm font-heading text-foreground" numberOfLines={1}>
-                Session at {session.gymName}
-              </Text>
-            </View>
-          </View>
-          <View className="flex-row items-center gap-1.5">
-            <Users size={12} className="text-muted-foreground" />
-            <Text className="text-xs text-muted-foreground">
-              {session.participantCount} checked in
-            </Text>
-          </View>
-          <Button size="sm" className="mt-1" onPress={() => router.push(target)}>
-            <Text className="text-sm font-medium text-primary-foreground">
-              {session.isCheckedIn ? "Go to Lobby" : "Check In"}
-            </Text>
-          </Button>
+      <Plate variant="live">
+        <View className="flex-row items-center justify-between mb-2">
+          <Text
+            className="font-heading text-[18px] text-ink flex-1"
+            numberOfLines={1}
+          >
+            {session.gymName}
+          </Text>
+          <LivePill />
         </View>
-      </Card>
+        <Text className="font-mono text-[10px] text-ink-2 uppercase tracking-caps-l mb-3">
+          {session.participantCount} athletes in lobby · Session started{" "}
+          {mins} min ago
+        </Text>
+        <Pressable
+          onPress={() => router.push(target)}
+          accessibilityRole="button"
+          className="bg-cta rounded-sm py-3 px-5 items-center justify-center active:bg-cta-hover"
+        >
+          <Text className="font-heading text-[13px] text-ink-on-cta uppercase tracking-caps">
+            {session.isCheckedIn ? "Enter Lobby" : "Check In"} →
+          </Text>
+        </Pressable>
+      </Plate>
     );
   }
 
-  // Scheduled
+  const startsHint = formatTimeUntil(session.scheduledStart);
   return (
-    <Card className="p-4">
-      <View className="gap-2">
-        <View className="flex-row items-center justify-between">
-          <Text className="text-sm font-heading text-foreground flex-1" numberOfLines={1}>
-            Upcoming at {session.gymName}
-          </Text>
-          <Badge variant="secondary">{formatStartsIn(session.scheduledStart)}</Badge>
-        </View>
-        <View className="flex-row items-center gap-1.5">
-          <Users size={12} className="text-muted-foreground" />
-          <Text className="text-xs text-muted-foreground">
-            {session.participantCount} checked in
-          </Text>
-        </View>
+    <Plate>
+      <View className="flex-row items-center justify-between mb-2">
+        <Text className="font-heading text-[18px] text-ink flex-1" numberOfLines={1}>
+          {session.gymName}
+        </Text>
+        <MetaTag>{startsHint ?? "Upcoming"}</MetaTag>
       </View>
-    </Card>
+      <Text className="font-body text-[13px] text-ink-2 mb-2">
+        Next session: {formatNextLabel(session.scheduledStart)}
+      </Text>
+      <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">
+        {session.participantCount} athletes RSVP{"’"}d
+      </Text>
+    </Plate>
   );
 }

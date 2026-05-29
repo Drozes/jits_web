@@ -34,6 +34,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_cards: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       athlete_avatars: {
         Row: {
           athlete_id: string
@@ -96,11 +126,13 @@ export type Database = {
           date_of_birth: string | null
           default_still_url: string | null
           display_name: string
+          first_name: string | null
           free_agent: boolean
           gender: string | null
           highest_elo: number
           id: string
           is_scoutable: boolean
+          last_name: string | null
           looking_for_casual: boolean
           looking_for_ranked: boolean
           primary_gym_id: string | null
@@ -118,11 +150,13 @@ export type Database = {
           date_of_birth?: string | null
           default_still_url?: string | null
           display_name: string
+          first_name?: string | null
           free_agent?: boolean
           gender?: string | null
           highest_elo?: number
           id?: string
           is_scoutable?: boolean
+          last_name?: string | null
           looking_for_casual?: boolean
           looking_for_ranked?: boolean
           primary_gym_id?: string | null
@@ -140,11 +174,13 @@ export type Database = {
           date_of_birth?: string | null
           default_still_url?: string | null
           display_name?: string
+          first_name?: string | null
           free_agent?: boolean
           gender?: string | null
           highest_elo?: number
           id?: string
           is_scoutable?: boolean
+          last_name?: string | null
           looking_for_casual?: boolean
           looking_for_ranked?: boolean
           primary_gym_id?: string | null

@@ -3,25 +3,25 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  ScrollView,
   Text,
   TextInput,
   View,
 } from "react-native";
-import { useAuth } from "@/lib/auth/hooks";
-import { supabase } from "@/lib/supabase/client";
-import { useThemedTokens } from "@/lib/theme/use-theme";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+import { AppHeader } from "@/components/layout/app-header";
+import { PageContainer } from "@/components/layout/page-container";
+import { Plate, Chip } from "@/components/ui/elo-system";
 import { toast } from "@/components/ui/toast";
+import { useAuth } from "@/lib/auth/hooks";
+import { useThemedTokens } from "@/lib/theme/use-theme";
+import { supabase } from "@/lib/supabase/client";
 import { cn } from "@/lib/cn";
 
 type Category = "bug" | "feature" | "general";
 
 const CATEGORIES: { value: Category; label: string }[] = [
-  { value: "bug", label: "Bug Report" },
-  { value: "feature", label: "Feature Request" },
-  { value: "general", label: "General Feedback" },
+  { value: "bug", label: "BUG" },
+  { value: "feature", label: "FEATURE" },
+  { value: "general", label: "GENERAL" },
 ];
 
 const MIN_LEN = 10;
@@ -44,7 +44,7 @@ export default function SettingsFeedbackScreen() {
 
     // The `feedback` table isn't in the generated `Database` type yet; cast to
     // `unknown` to bypass the schema check. Keep the row shape aligned with
-    // `apps/web/app/(app)/settings/feedback/feedback-form.tsx`.
+    // apps/web/app/(app)/settings/feedback/feedback-form.tsx.
     const { error } = await (
       supabase.from("feedback" as never) as unknown as {
         insert: (row: {
@@ -75,104 +75,130 @@ export default function SettingsFeedbackScreen() {
     setSubmitted(false);
   }, []);
 
-  if (submitted) {
-    return (
-      <View className="flex-1 bg-background items-center justify-center px-8 gap-6">
-        <Text className="text-3xl">Thank you!</Text>
-        <Text className="text-sm text-muted-foreground text-center">
-          Your feedback helps us improve ELO RATED.
-        </Text>
-        <Button variant="outline" onPress={reset}>
-          Submit More Feedback
-        </Button>
-      </View>
-    );
-  }
-
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <ScrollView
-        className="flex-1 bg-background"
-        contentContainerStyle={{ padding: 16, gap: 20, paddingBottom: 64 }}
+      <AppHeader title="Feedback" back />
+      <PageContainer
+        noTabBar
+        contentContainerStyle={{ paddingTop: 24, gap: 20 }}
         keyboardShouldPersistTaps="handled"
       >
-        <View className="gap-2">
-          <Text className="text-2xl font-heading text-foreground">
-            Send Feedback
-          </Text>
-          <Text className="text-sm text-muted-foreground">
-            Found a bug or have an idea? We read every submission.
-          </Text>
-        </View>
+        {submitted ? (
+          <SuccessPlate onReset={reset} />
+        ) : (
+          <>
+            <Text className="font-body text-[12px] text-ink-2 leading-relaxed">
+              Found a bug or have an idea? We read every submission.
+            </Text>
 
-        <View className="gap-2">
-          <Label>Category</Label>
-          <View className="flex-row flex-wrap gap-2">
-            {CATEGORIES.map(({ value, label }) => {
-              const selected = category === value;
-              return (
-                <Pressable
-                  key={value}
-                  onPress={() => setCategory(value)}
-                  className={cn(
-                    "rounded-lg border px-3 py-1.5",
-                    selected
-                      ? "border-primary bg-primary"
-                      : "border-border bg-transparent",
-                  )}
-                >
-                  <Text
-                    className={cn(
-                      "text-sm font-medium",
-                      selected
-                        ? "text-primary-foreground"
-                        : "text-foreground",
-                    )}
+            <View className="gap-2">
+              <FieldLabel>CATEGORY</FieldLabel>
+              <View className="flex-row flex-wrap gap-2">
+                {CATEGORIES.map(({ value, label }) => (
+                  <Chip
+                    key={value}
+                    active={category === value}
+                    onPress={() => setCategory(value)}
                   >
                     {label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
+                  </Chip>
+                ))}
+              </View>
+            </View>
 
-        <View className="gap-2">
-          <Label>Message</Label>
-          <TextInput
-            value={message}
-            onChangeText={setMessage}
-            placeholder="Tell us what you think..."
-            placeholderTextColor={tokens.mutedForeground}
-            multiline
-            maxLength={MAX_LEN}
-            textAlignVertical="top"
-            className="min-h-32 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
-            style={{ minHeight: 128 }}
-          />
-          <Text
-            className={cn(
-              "text-xs text-right",
-              charCount > MAX_LEN
-                ? "text-destructive"
-                : "text-muted-foreground",
-            )}
-          >
-            {charCount}/{MAX_LEN}
-          </Text>
-        </View>
+            <View className="gap-2">
+              <FieldLabel>MESSAGE</FieldLabel>
+              <TextInput
+                value={message}
+                onChangeText={setMessage}
+                placeholder="Tell us what you think..."
+                placeholderTextColor={tokens.textTertiary}
+                multiline
+                maxLength={MAX_LEN}
+                textAlignVertical="top"
+                className="font-mono text-[12px] text-ink bg-surface-3 border border-hairline rounded-xs p-3"
+                style={{ minHeight: 144 }}
+              />
+              <Text
+                className={cn(
+                  "font-mono text-[10px] text-right uppercase tracking-caps-l",
+                  charCount > MAX_LEN ? "text-negative" : "text-ink-3",
+                )}
+              >
+                {charCount}/{MAX_LEN}
+              </Text>
+            </View>
 
-        <Button
-          onPress={handleSubmit}
-          disabled={!isValid || submitting}
-          className="w-full"
-        >
-          {submitting ? "Submitting..." : "Submit Feedback"}
-        </Button>
-      </ScrollView>
+            <SubmitButton
+              disabled={!isValid || submitting}
+              onPress={handleSubmit}
+              label={submitting ? "SUBMITTING..." : "SUBMIT FEEDBACK"}
+            />
+          </>
+        )}
+      </PageContainer>
     </KeyboardAvoidingView>
+  );
+}
+
+function SuccessPlate({ onReset }: { onReset: () => void }) {
+  return (
+    <Plate>
+      <View className="items-center gap-4 py-6">
+        <Text className="font-heading text-[24px] text-ink uppercase tracking-caps">
+          THANK YOU
+        </Text>
+        <Text className="font-body text-[12px] text-ink-2 text-center leading-relaxed">
+          Your feedback helps us improve ELO RATED.
+        </Text>
+        <Pressable
+          onPress={onReset}
+          accessibilityRole="button"
+          className="px-4 py-2 rounded-sm border border-hairline-strong active:bg-surface-4"
+        >
+          <Text className="font-heading text-[12px] text-ink uppercase tracking-caps">
+            SUBMIT MORE FEEDBACK
+          </Text>
+        </Pressable>
+      </View>
+    </Plate>
+  );
+}
+
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">
+      {children}
+    </Text>
+  );
+}
+
+function SubmitButton({
+  disabled,
+  onPress,
+  label,
+}: {
+  disabled: boolean;
+  onPress: () => void;
+  label: string;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityState={{ disabled }}
+      className={cn(
+        "w-full items-center justify-center rounded-sm px-4 py-3",
+        disabled ? "bg-cta opacity-50" : "bg-cta active:bg-cta-hover",
+      )}
+    >
+      <Text className="font-heading text-[14px] text-ink-on-cta uppercase tracking-caps">
+        {label}
+      </Text>
+    </Pressable>
   );
 }

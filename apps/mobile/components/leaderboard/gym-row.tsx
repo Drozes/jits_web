@@ -1,53 +1,21 @@
-import { Text, View } from "react-native";
-import { Trophy, Users } from "lucide-react-native";
-import { Card } from "@/components/ui/card";
-import { useThemedTokens } from "@/lib/theme/use-theme";
+import { RankRow } from "@/components/ui/elo-system";
 import type { RankedGym } from "@/lib/leaderboard/use-leaderboard-data";
 
+/**
+ * Single gym in the gyms tab of the Rankings screen. Reuses RankRow so the
+ * gyms ladder visually matches the fighters ladder (dense stacked rows with
+ * accent-cta left border on the leader).
+ */
 export function GymRow({ gym }: { gym: RankedGym }) {
-  const tokens = useThemedTokens();
+  const memberSuffix = gym.memberCount === 1 ? "Athlete" : "Athletes";
   return (
-    <Card className="p-4">
-      <View className="flex-row items-center justify-between">
-        <View className="flex-row items-center gap-3 flex-1 min-w-0">
-          <View className="w-8 items-center">
-            {gym.rank <= 3 ? (
-              <Trophy
-                size={20}
-                color={
-                  gym.rank === 1
-                    ? tokens.gold
-                    : gym.rank === 2
-                      ? tokens.mutedForeground
-                      : tokens.brandOrange
-                }
-              />
-            ) : (
-              <Text className="text-sm font-mono text-muted-foreground">
-                #{gym.rank}
-              </Text>
-            )}
-          </View>
-          <View className="h-11 w-11 items-center justify-center rounded-xl bg-primary">
-            <Users size={20} color={tokens.primaryForeground} />
-          </View>
-          <View className="flex-1 min-w-0">
-            <Text
-              className="text-[15px] font-heading text-foreground"
-              numberOfLines={1}
-            >
-              {gym.name}
-            </Text>
-            <Text className="text-xs text-muted-foreground">
-              {gym.memberCount} {gym.memberCount === 1 ? "athlete" : "athletes"} · Avg{" "}
-              {gym.averageElo}
-            </Text>
-          </View>
-        </View>
-        <Text className="text-lg font-mono tabular-nums text-foreground">
-          {gym.totalElo}
-        </Text>
-      </View>
-    </Card>
+    <RankRow
+      rank={gym.rank}
+      name={gym.name}
+      subtitle={`${gym.memberCount} ${memberSuffix} · Avg ${gym.averageElo}`}
+      value={gym.totalElo}
+      delta={0}
+      leader={gym.rank === 1}
+    />
   );
 }

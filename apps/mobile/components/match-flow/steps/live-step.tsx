@@ -33,16 +33,29 @@ interface LiveStepProps {
 const TIME_WARNING_SECONDS = 10;
 
 /**
- * Step 4 -- live timer with pause/resume/end controls. Mounts a camera
- * preview, auto-starts recording on entry, auto-stops on end. Activates
- * the screen wake-lock for the duration of the step and fires haptics
- * on key events (match start, time-warning, match end).
+ * Step 4: live timer with pause / resume / end controls. Mounts a
+ * camera preview, auto-starts recording on entry, auto-stops on end.
+ * Activates the screen wake-lock for the duration of the step and fires
+ * haptics on key events (match start, time-warning, match end).
  *
  * Recording is best-effort: if the user denies camera access, the match
  * runs as before and a small banner explains the fallback.
+ *
+ * ELO design system: timekeeper-view (D7 wireframe lines 1213-1238).
+ * The camera viewfinder sits up top, then the hero mono timer, then
+ * pause / end controls, then the upload status banner.
  */
 export function LiveStep(props: LiveStepProps) {
-  const { matchId, matchType, durationSeconds, startedAt, pausedAt, totalPausedDuration, uploaderAthleteId, onEnded } = props;
+  const {
+    matchId,
+    matchType,
+    durationSeconds,
+    startedAt,
+    pausedAt,
+    totalPausedDuration,
+    uploaderAthleteId,
+    onEnded,
+  } = props;
   const endedRef = React.useRef(false);
   const expiryFiredRef = React.useRef(false);
   const startHapticFiredRef = React.useRef(false);
@@ -57,7 +70,8 @@ export function LiveStep(props: LiveStepProps) {
     supabase,
     matchId,
     onTimerPaused: (p) => timer.syncFromBroadcast({ type: "paused", pausedAt: p }),
-    onTimerResumed: (d) => timer.syncFromBroadcast({ type: "resumed", totalPausedDuration: d }),
+    onTimerResumed: (d) =>
+      timer.syncFromBroadcast({ type: "resumed", totalPausedDuration: d }),
     onMatchEnded: () => {
       if (endedRef.current) return;
       endedRef.current = true;
@@ -117,7 +131,7 @@ export function LiveStep(props: LiveStepProps) {
   }, [timer.remaining, timer.running, handleEnd]);
 
   return (
-    <View className="items-center gap-4 px-1 py-4">
+    <View className="items-center gap-5 px-1 py-2">
       <CameraOverlay
         cameraRef={recorder.cameraRef}
         permissionGranted={recorder.permission?.granted ?? false}

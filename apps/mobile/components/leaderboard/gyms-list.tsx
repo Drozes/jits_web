@@ -15,15 +15,20 @@ export function GymsList({ gyms, isRefreshing, onRefresh }: GymsListProps) {
     <FlatList
       data={gyms}
       keyExtractor={(item) => item.id}
-      contentContainerStyle={{ padding: 16, paddingTop: 8, gap: 10 }}
+      contentContainerStyle={{
+        paddingHorizontal: 12,
+        paddingTop: 4,
+        paddingBottom: 16,
+        gap: 1,
+      }}
       renderItem={({ item }) => <GymRow gym={item} />}
       ListEmptyComponent={
-        <View className="rounded-md border border-dashed border-border p-8 items-center">
-          <Text className="text-sm text-muted-foreground">No gyms found</Text>
+        <View className="rounded-md border border-dashed border-hairline p-8 items-center mx-1">
+          <Text className="font-body text-[13px] text-ink-3">No gyms found</Text>
         </View>
       }
       ListFooterComponent={
-        <Text className="text-center text-xs text-muted-foreground py-3">
+        <Text className="text-center font-mono text-[10px] text-ink-3 uppercase tracking-caps-l pt-3">
           Gym rankings based on total member ELO
         </Text>
       }
@@ -31,7 +36,7 @@ export function GymsList({ gyms, isRefreshing, onRefresh }: GymsListProps) {
         <RefreshControl
           refreshing={isRefreshing}
           onRefresh={onRefresh}
-          tintColor={tokens.primary}
+          tintColor={tokens.accentCta}
         />
       }
     />

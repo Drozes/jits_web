@@ -1,5 +1,5 @@
 import * as React from "react";
-import { ActivityIndicator, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, Text, TextInput, View } from "react-native";
 import {
   Sheet,
   SheetContent,
@@ -7,9 +7,6 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -17,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Plate } from "@/components/ui/elo-system";
 import { toast } from "@/components/ui/toast";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { supabase } from "@/lib/supabase/client";
@@ -92,133 +90,146 @@ export function TemplateFormSheet({
   return (
     <Sheet>
       <SheetTrigger asChild>{children}</SheetTrigger>
-      <SheetContent snapPoints={["85%"]}>
+      <SheetContent snapPoints={["88%"]}>
         <SheetHeader>
-          <SheetTitle>{isEdit ? "Edit Template" : "New Template"}</SheetTitle>
+          <SheetTitle className="font-heading text-[18px] text-ink uppercase tracking-caps">
+            {isEdit ? "Edit Template" : "New Template"}
+          </SheetTitle>
         </SheetHeader>
-        <TemplateFormFields
-          title={title}
-          setTitle={setTitle}
-          dayOfWeek={dayOfWeek}
-          setDayOfWeek={setDayOfWeek}
-          startTime={startTime}
-          setStartTime={setStartTime}
-          duration={duration}
-          setDuration={setDuration}
-          maxParticipants={maxParticipants}
-          setMaxParticipants={setMaxParticipants}
-          notes={notes}
-          setNotes={setNotes}
-          loading={loading}
-          isEdit={isEdit}
-          onSubmit={handleSubmit}
-          tokens={tokens}
-        />
+
+        <Plate className="gap-4 mt-2">
+          <Field label="Title">
+            <ElevatedInput value={title} onChangeText={setTitle} placeholder="Open Mat" tokens={tokens} />
+          </Field>
+
+          <Field label="Day of Week">
+            <Select value={dayOfWeek} onValueChange={setDayOfWeek}>
+              <SelectTrigger className="h-11 px-4 rounded-xs bg-surface-4 border border-hairline">
+                <SelectValue placeholder="Select day" className="font-mono uppercase tracking-caps-l text-ink text-[14px]" />
+              </SelectTrigger>
+              <SelectContent>
+                {DAYS.map((d, i) => (
+                  <SelectItem key={i} value={String(i)}>{d}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+
+          <Field label="Start Time">
+            <ElevatedInput
+              value={startTime}
+              onChangeText={setStartTime}
+              placeholder="10:00"
+              keyboardType="numbers-and-punctuation"
+              tokens={tokens}
+            />
+          </Field>
+
+          <Field label="Duration">
+            <View className="flex-row gap-2">
+              {DURATION_PRESETS.map((d) => {
+                const selected = duration === d.value;
+                return (
+                  <Pressable
+                    key={d.value}
+                    onPress={() => setDuration(d.value)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    className={
+                      selected
+                        ? "flex-1 h-10 items-center justify-center rounded-xs bg-cta active:bg-cta-hover"
+                        : "flex-1 h-10 items-center justify-center rounded-xs bg-surface-4 border border-hairline-strong"
+                    }
+                  >
+                    <Text
+                      className={
+                        selected
+                          ? "font-heading text-[12px] text-ink-on-cta uppercase tracking-caps"
+                          : "font-heading text-[12px] text-ink uppercase tracking-caps"
+                      }
+                    >
+                      {d.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </Field>
+
+          <Field label="Max Participants (optional)">
+            <ElevatedInput
+              value={maxParticipants}
+              onChangeText={setMaxParticipants}
+              keyboardType="number-pad"
+              placeholder="20"
+              tokens={tokens}
+            />
+          </Field>
+
+          <Field label="Notes (optional)">
+            <ElevatedInput
+              value={notes}
+              onChangeText={setNotes}
+              placeholder="Any details..."
+              multiline
+              numberOfLines={2}
+              tokens={tokens}
+              className="h-16"
+              style={{ textAlignVertical: "top", paddingTop: 10 }}
+            />
+          </Field>
+        </Plate>
+
+        <Pressable
+          onPress={handleSubmit}
+          disabled={loading || !title.trim()}
+          accessibilityRole="button"
+          className={
+            loading || !title.trim()
+              ? "mt-4 bg-cta rounded-sm py-3 px-5 items-center justify-center opacity-50"
+              : "mt-4 bg-cta rounded-sm py-3 px-5 items-center justify-center active:bg-cta-hover"
+          }
+        >
+          {loading ? (
+            <ActivityIndicator size="small" color={tokens.textOnAccent} />
+          ) : (
+            <Text className="font-heading text-[13px] text-ink-on-cta uppercase tracking-caps">
+              {isEdit ? "Save Changes" : "Create Template"}
+            </Text>
+          )}
+        </Pressable>
       </SheetContent>
     </Sheet>
   );
 }
 
-interface FieldsProps {
-  title: string;
-  setTitle: (v: string) => void;
-  dayOfWeek: string;
-  setDayOfWeek: (v: string) => void;
-  startTime: string;
-  setStartTime: (v: string) => void;
-  duration: number;
-  setDuration: (v: number) => void;
-  maxParticipants: string;
-  setMaxParticipants: (v: string) => void;
-  notes: string;
-  setNotes: (v: string) => void;
-  loading: boolean;
-  isEdit: boolean;
-  onSubmit: () => void;
-  tokens: ReturnType<typeof useThemedTokens>;
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <View className="gap-1.5">
+      <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-xl">
+        {label}
+      </Text>
+      {children}
+    </View>
+  );
 }
 
-function TemplateFormFields(p: FieldsProps) {
+function ElevatedInput({
+  tokens,
+  className,
+  ...props
+}: React.ComponentProps<typeof TextInput> & {
+  tokens: ReturnType<typeof useThemedTokens>;
+  className?: string;
+}) {
   return (
-    <View className="gap-4">
-      <View className="gap-1.5">
-        <Label>Title</Label>
-        <Input value={p.title} onChangeText={p.setTitle} placeholder="Open Mat" />
-      </View>
-
-      <View className="gap-1.5">
-        <Label>Day of Week</Label>
-        <Select value={p.dayOfWeek} onValueChange={p.setDayOfWeek}>
-          <SelectTrigger>
-            <SelectValue placeholder="Select day" />
-          </SelectTrigger>
-          <SelectContent>
-            {DAYS.map((d, i) => (
-              <SelectItem key={i} value={String(i)}>{d}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </View>
-
-      <View className="gap-1.5">
-        <Label>Start Time</Label>
-        <Input
-          value={p.startTime}
-          onChangeText={p.setStartTime}
-          placeholder="10:00"
-          keyboardType="numbers-and-punctuation"
-        />
-      </View>
-
-      <View className="gap-1.5">
-        <Label>Duration</Label>
-        <View className="flex-row gap-2">
-          {DURATION_PRESETS.map((d) => (
-            <Button
-              key={d.value}
-              variant={p.duration === d.value ? "default" : "outline"}
-              size="sm"
-              onPress={() => p.setDuration(d.value)}
-              className="flex-1"
-            >
-              {d.label}
-            </Button>
-          ))}
-        </View>
-      </View>
-
-      <View className="gap-1.5">
-        <Label>Max Participants (optional)</Label>
-        <Input
-          value={p.maxParticipants}
-          onChangeText={p.setMaxParticipants}
-          keyboardType="number-pad"
-          placeholder="20"
-        />
-      </View>
-
-      <View className="gap-1.5">
-        <Label>Notes (optional)</Label>
-        <Input
-          value={p.notes}
-          onChangeText={p.setNotes}
-          placeholder="Any details..."
-          multiline
-          numberOfLines={2}
-          className="h-16"
-          style={{ textAlignVertical: "top" }}
-        />
-      </View>
-
-      <Button onPress={p.onSubmit} disabled={p.loading || !p.title.trim()} className="mt-2">
-        {p.loading ? (
-          <ActivityIndicator size="small" color={p.tokens.primaryForeground} />
-        ) : (
-          <Text className="text-sm font-medium text-primary-foreground">
-            {p.isEdit ? "Save Changes" : "Create Template"}
-          </Text>
-        )}
-      </Button>
-    </View>
+    <TextInput
+      placeholderTextColor={tokens.textTertiary}
+      className={[
+        "h-11 px-4 rounded-xs bg-surface-4 border border-hairline text-ink font-mono text-[14px]",
+        className ?? "",
+      ].join(" ")}
+      {...props}
+    />
   );
 }

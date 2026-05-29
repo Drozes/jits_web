@@ -1,5 +1,4 @@
 import * as React from "react";
-import { Text, View } from "react-native";
 import { render, waitFor } from "@testing-library/react-native";
 
 // ---- mocks ----
@@ -27,9 +26,20 @@ jest.mock("lucide-react-native", () => {
   );
 });
 
-// Theme tokens
+// Stub safe area: new dashboard reads insets directly via useSafeAreaInsets
+jest.mock("react-native-safe-area-context", () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+  SafeAreaProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
+
+// Theme tokens — include the ELO keys the new dashboard reads
 jest.mock("@/lib/theme/use-theme", () => ({
-  useThemedTokens: () => ({ primary: "#ff0000", foreground: "#000000" }),
+  useThemedTokens: () => ({
+    primary: "#ff0000",
+    foreground: "#000000",
+    accentCta: "#E63946",
+    textOnAccent: "#E8EDF2",
+  }),
 }));
 
 // Supabase client
@@ -42,7 +52,7 @@ jest.mock("@/components/ui/toast", () => ({
   toast: { error: jest.fn(), info: jest.fn() },
 }));
 
-// Mock all heavy child components to isolate the screen
+// Mock heavy child components to isolate the screen
 jest.mock("@/components/notifications/notification-bell", () => ({
   NotificationBell: () => {
     const R = require("react");
@@ -51,25 +61,21 @@ jest.mock("@/components/notifications/notification-bell", () => ({
   },
 }));
 
+// New StatOverview signature is { wins, losses, draws } only — no rank/streak.
 jest.mock("@/components/dashboard/stat-overview", () => ({
   StatOverview: ({
-    athlete,
     stats,
   }: {
-    athlete: { current_elo: number };
-    stats: { wins: number; losses: number; draws: number; winStreak: number; rank: number };
+    stats: { wins: number; losses: number; draws: number };
   }) => {
     const R = require("react");
     const RN = require("react-native");
     return R.createElement(
       RN.View,
       { testID: "stat-overview" },
-      R.createElement(RN.Text, {}, String(athlete.current_elo)),
-      R.createElement(RN.Text, {}, `#${stats.rank}`),
-      R.createElement(RN.Text, {}, String(stats.wins)),
-      R.createElement(RN.Text, {}, String(stats.losses)),
-      R.createElement(RN.Text, {}, String(stats.draws)),
-      R.createElement(RN.Text, {}, String(stats.winStreak)),
+      R.createElement(RN.Text, {}, `${stats.wins}W`),
+      R.createElement(RN.Text, {}, `${stats.losses}L`),
+      R.createElement(RN.Text, {}, `${stats.draws}D`),
     );
   },
 }));
@@ -97,6 +103,7 @@ const mockAthlete = {
   current_elo: 1200,
   highest_elo: 1250,
   status: "active",
+  profile_photo_url: null,
 };
 
 jest.mock("@/lib/auth/hooks", () => ({
@@ -149,33 +156,28 @@ describe("DashboardScreen", () => {
     });
   });
 
-  it("renders ELO from stat overview after data loads", async () => {
+  it("renders ELO from the hero tile after data loads", async () => {
     const { getByText } = render(React.createElement(DashboardScreen));
     await waitFor(() => {
+      // EloTile renders the value as a Text node. The hero ELO comes from
+      // the active athlete (not the summary), so it always renders.
       expect(getByText("1200")).toBeTruthy();
-    });
-  });
-
-  it("renders rank from stat overview after data loads", async () => {
-    const { getByText } = render(React.createElement(DashboardScreen));
-    await waitFor(() => {
-      expect(getByText("#7")).toBeTruthy();
     });
   });
 
   it("renders record stats after data loads", async () => {
     const { getByText } = render(React.createElement(DashboardScreen));
     await waitFor(() => {
-      expect(getByText("5")).toBeTruthy(); // wins
-      expect(getByText("2")).toBeTruthy(); // losses
-      expect(getByText("1")).toBeTruthy(); // draws
+      expect(getByText("5W")).toBeTruthy();
+      expect(getByText("2L")).toBeTruthy();
+      expect(getByText("1D")).toBeTruthy();
     });
   });
 
-  it("renders the sessions section header", async () => {
+  it("renders the recent activity section", async () => {
     const { getByText } = render(React.createElement(DashboardScreen));
     await waitFor(() => {
-      expect(getByText("Sessions")).toBeTruthy();
+      expect(getByText("RecentActivitySection")).toBeTruthy();
     });
   });
 });
@@ -193,11 +195,12 @@ describe("DashboardScreen (zero state)", () => {
       recent_activity: [],
     });
 
-    const { getByText, getAllByText } = render(React.createElement(DashboardScreen));
+    const { getByText } = render(React.createElement(DashboardScreen));
     await waitFor(() => {
       expect(getByText("1200")).toBeTruthy(); // ELO from athlete
-      // Multiple stats default to 0 (wins, losses, draws, winStreak)
-      expect(getAllByText("0").length).toBeGreaterThanOrEqual(1);
+      expect(getByText("0W")).toBeTruthy();
+      expect(getByText("0L")).toBeTruthy();
+      expect(getByText("0D")).toBeTruthy();
     });
   });
 });

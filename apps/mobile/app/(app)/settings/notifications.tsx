@@ -1,8 +1,9 @@
 import * as React from "react";
-import { ScrollView, Text, View } from "react-native";
-import { Bell, MessageSquare, Swords } from "lucide-react-native";
+import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { AppHeader } from "@/components/layout/app-header";
+import { PageContainer } from "@/components/layout/page-container";
+import { Plate } from "@/components/ui/elo-system";
 import { Switch } from "@/components/ui/switch";
-import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { supabase } from "@/lib/supabase/client";
@@ -16,25 +17,21 @@ const TOGGLES: {
   key: keyof NotificationPrefs;
   label: string;
   description: string;
-  Icon: React.ComponentType<{ size: number; color: string }>;
 }[] = [
   {
     key: "enable_challenges",
-    label: "Challenges",
+    label: "CHALLENGES",
     description: "New, accepted, declined, and expiring challenges",
-    Icon: Swords,
   },
   {
     key: "enable_chat",
-    label: "Chat Messages",
+    label: "CHAT MESSAGES",
     description: "New messages in conversations",
-    Icon: MessageSquare,
   },
   {
     key: "enable_matches",
-    label: "Matches",
+    label: "MATCHES",
     description: "Match start notifications",
-    Icon: Bell,
   },
 ];
 
@@ -48,7 +45,9 @@ export default function NotificationsScreen() {
     getNotificationPreferences(supabase).then((p) => {
       if (!cancelled) setPrefs(p);
     });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const handleToggle = React.useCallback(
@@ -63,54 +62,71 @@ export default function NotificationsScreen() {
     [prefs, athlete],
   );
 
-  if (!prefs) {
-    return (
-      <View className="flex-1 items-center justify-center bg-background">
-        <Text className="text-sm text-muted-foreground">Loading...</Text>
-      </View>
-    );
-  }
-
   return (
-    <ScrollView
-      className="flex-1 bg-background"
-      contentContainerStyle={{ padding: 16, gap: 16, paddingBottom: 48 }}
-    >
-      <Text className="text-2xl font-heading text-foreground">
-        Notification Preferences
-      </Text>
-
-      <Card>
-        <CardContent className="p-0">
-          {TOGGLES.map(({ key, label, description, Icon }, i) => (
-            <View
-              key={key}
-              className={`flex-row items-center gap-3 px-4 py-3 ${
-                i < TOGGLES.length - 1 ? "border-b border-border" : ""
-              }`}
-            >
-              <Icon size={16} color={tokens.mutedForeground} />
-              <View className="flex-1">
-                <Text className="text-sm font-medium text-foreground">
-                  {label}
-                </Text>
-                <Text className="text-xs text-muted-foreground">
-                  {description}
-                </Text>
+    <>
+      <AppHeader title="Notifications" back />
+      <PageContainer
+        noTabBar
+        contentContainerStyle={{ paddingTop: 24, gap: 16 }}
+      >
+        {prefs ? (
+          <Plate className="p-0 overflow-hidden">
+            {TOGGLES.map(({ key, label, description }, idx) => (
+              <View key={key}>
+                {idx > 0 ? (
+                  <View className="h-px bg-hairline-faint" />
+                ) : null}
+                <ToggleRow
+                  label={label}
+                  description={description}
+                  value={prefs[key]}
+                  onToggle={() => handleToggle(key)}
+                />
               </View>
-              <Switch
-                value={prefs[key]}
-                onValueChange={() => handleToggle(key)}
-              />
-            </View>
-          ))}
-        </CardContent>
-      </Card>
+            ))}
+          </Plate>
+        ) : (
+          <View className="items-center py-16">
+            <ActivityIndicator color={tokens.textTertiary} />
+          </View>
+        )}
 
-      <Text className="text-xs text-muted-foreground">
-        Changes are saved automatically. You can also manage notifications
-        through your device settings.
-      </Text>
-    </ScrollView>
+        <Text className="font-body text-[12px] text-ink-3 leading-relaxed">
+          Changes are saved automatically. You can also manage notifications
+          through your device settings.
+        </Text>
+      </PageContainer>
+    </>
+  );
+}
+
+function ToggleRow({
+  label,
+  description,
+  value,
+  onToggle,
+}: {
+  label: string;
+  description: string;
+  value: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onToggle}
+      accessibilityRole="switch"
+      accessibilityState={{ checked: value }}
+      className="flex-row items-center gap-3 px-4 py-3 active:bg-surface-4"
+    >
+      <View className="flex-1 min-w-0">
+        <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l mb-1">
+          {label}
+        </Text>
+        <Text className="font-body text-[12px] text-ink-3 leading-snug">
+          {description}
+        </Text>
+      </View>
+      <Switch value={value} onValueChange={onToggle} />
+    </Pressable>
   );
 }

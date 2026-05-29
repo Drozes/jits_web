@@ -38,6 +38,12 @@ const cards = [
     description:
       "React Native mobile app screen inventory.",
   },
+  {
+    href: "/design/board",
+    title: "Founders Board",
+    description:
+      "Internal shared Kanban for tracking our work. Supabase-backed; the seed for a future admin dashboard.",
+  },
 ];
 
 export default function DesignOverviewPage() {

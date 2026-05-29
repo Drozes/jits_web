@@ -1,8 +1,7 @@
 import * as React from "react";
-import { ActivityIndicator, RefreshControl, ScrollView, Text, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { ActivityIndicator, Pressable, RefreshControl, Text, View } from "react-native";
 import { useRouter } from "expo-router";
-import { Share2, Trophy } from "lucide-react-native";
+import { ArrowUpRight } from "lucide-react-native";
 import { useRequireAthlete } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { useProfileData } from "@/lib/profile/use-profile-data";
@@ -10,7 +9,38 @@ import { ProfileHeader } from "@/components/profile/profile-header";
 import { ProfileQuickStats } from "@/components/profile/profile-quick-stats";
 import { AccountSection } from "@/components/profile/account-section";
 import { ShareProfileSheet } from "@/components/share-profile-sheet";
-import { Button } from "@/components/ui/button";
+import { AppHeader } from "@/components/layout/app-header";
+import { PageContainer } from "@/components/layout/page-container";
+import { MetaTag, ParticipantRow, DeltaNumber } from "@/components/ui/elo-system";
+import { supabase } from "@/lib/supabase/client";
+import { getMatchHistory } from "@jits/shared/api/queries";
+import type { MatchHistoryRow } from "@jits/shared/types/composites";
+import { formatRelativeDate } from "@jits/shared/utils";
+
+type ShareAthlete = {
+  id: string;
+  displayName: string;
+  elo: number;
+  wins: number;
+  losses: number;
+  weight: number | null;
+  gymName?: string | null;
+};
+
+function ShareButton({ athlete }: { athlete: ShareAthlete }) {
+  const tokens = useThemedTokens();
+  return (
+    <ShareProfileSheet athlete={athlete}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Share"
+        className="w-8 h-8 items-center justify-center rounded-xs active:bg-surface-3"
+      >
+        <ArrowUpRight size={18} color={tokens.textSecondary} />
+      </Pressable>
+    </ShareProfileSheet>
+  );
+}
 
 export default function ProfileScreen() {
   const { athlete } = useRequireAthlete();
@@ -19,78 +49,112 @@ export default function ProfileScreen() {
   const { stats, gymName, eloThisMonth, isLoading, refreshing, onRefresh } =
     useProfileData(athlete?.id, athlete?.primary_gym_id);
 
+  const [recent, setRecent] = React.useState<MatchHistoryRow[]>([]);
+  React.useEffect(() => {
+    if (!athlete?.id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const history = await getMatchHistory(supabase, athlete.id);
+        if (!cancelled) setRecent(history.slice(0, 5));
+      } catch (err) {
+        console.warn("[profile] recent fetch failed", err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [athlete?.id, refreshing]);
+
   if (!athlete) {
     return (
-      <SafeAreaView className="flex-1 bg-background items-center justify-center">
-        <ActivityIndicator color={tokens.primary} />
-      </SafeAreaView>
+      <View className="flex-1 bg-surface items-center justify-center">
+        <ActivityIndicator color={tokens.accentCta} />
+      </View>
     );
   }
 
-  return (
-    <SafeAreaView className="flex-1 bg-background" edges={["top"]}>
-      <ScrollView
-        className="flex-1"
-        contentContainerStyle={{ padding: 16, paddingBottom: 32, gap: 24 }}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={tokens.primary} />
-        }
-      >
-        <Text className="text-2xl font-heading text-foreground">Profile</Text>
+  const shareAthlete: ShareAthlete = {
+    id: athlete.id,
+    displayName: athlete.display_name ?? "",
+    elo: athlete.current_elo,
+    wins: stats?.wins ?? 0,
+    losses: stats?.losses ?? 0,
+    weight: athlete.current_weight,
+    gymName,
+  };
 
+  return (
+    <View className="flex-1 bg-surface">
+      <AppHeader title="Profile" rightAction={<ShareButton athlete={shareAthlete} />} />
+      <PageContainer
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={tokens.accentCta} />
+        }
+        contentContainerStyle={{ paddingTop: 24, gap: 24 }}
+      >
         {isLoading && !stats ? (
           <View className="py-16 items-center">
-            <ActivityIndicator color={tokens.primary} />
+            <ActivityIndicator color={tokens.accentCta} />
           </View>
         ) : (
           <>
-            <ProfileHeader
-              athlete={athlete}
-              gymName={gymName}
-              stats={{
-                wins: stats?.wins ?? 0,
-                losses: stats?.losses ?? 0,
-                winRate: stats?.winRate ?? 0,
-              }}
-            />
-
-            <View className="flex-row gap-2">
-              <Button variant="outline" className="flex-1" onPress={() => router.push("/(app)/profile/stats")}>
-                <Trophy size={16} className="text-foreground" />
-                <Text className="text-sm font-medium text-foreground ml-2">View Stats</Text>
-              </Button>
-              <ShareProfileSheet
-                athlete={{
-                  id: athlete.id,
-                  displayName: athlete.display_name ?? "",
-                  elo: athlete.current_elo,
-                  wins: stats?.wins ?? 0,
-                  losses: stats?.losses ?? 0,
-                  weight: athlete.current_weight,
-                  gymName,
-                }}
-              >
-                <Button variant="outline" size="icon">
-                  <Share2 size={16} className="text-foreground" />
-                </Button>
-              </ShareProfileSheet>
-            </View>
+            <ProfileHeader athlete={athlete} gymName={gymName} />
 
             <ProfileQuickStats
               totalMatches={stats?.totalMatches ?? 0}
               winStreak={stats?.winStreak ?? 0}
               bestWinStreak={stats?.bestWinStreak ?? 0}
               eloThisMonth={eloThisMonth}
+              winRate={stats?.winRate}
             />
+
+            <View className="gap-3">
+              <MetaTag>Recent Matches</MetaTag>
+              {recent.length === 0 ? (
+                <View className="bg-surface-3 border border-hairline-faint rounded-xs px-4 py-6 items-center">
+                  <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">
+                    No Matches Yet
+                  </Text>
+                </View>
+              ) : (
+                <View className="gap-[1px]">
+                  {recent.map((m) => (
+                    <ParticipantRow
+                      key={m.match_id}
+                      name={`vs ${m.opponent_display_name ?? "Opponent"}`}
+                      subtitle={formatRelativeDate(m.completed_at)}
+                      action={
+                        m.match_type === "ranked" && m.elo_delta != null ? (
+                          <DeltaNumber value={m.elo_delta} size="m" showSign />
+                        ) : undefined
+                      }
+                    />
+                  ))}
+                </View>
+              )}
+            </View>
+
+            <View className="gap-2">
+              <Pressable
+                onPress={() => router.push("/(app)/profile/stats")}
+                accessibilityRole="button"
+                className="bg-surface-3 border border-hairline-strong rounded-sm px-5 py-4 items-center active:bg-surface-4"
+              >
+                <Text className="font-heading text-[12px] text-ink uppercase tracking-caps">
+                  View Detailed Stats
+                </Text>
+              </Pressable>
+            </View>
 
             <AccountSection />
 
-            <Text className="text-center text-xs text-muted-foreground pb-2">
+            <Text className="text-center font-mono text-[10px] text-ink-3 uppercase tracking-caps-l py-2">
               ELO RATED Beta
             </Text>
           </>
         )}
-      </ScrollView>
-    </SafeAreaView>
+      </PageContainer>
+    </View>
   );
 }

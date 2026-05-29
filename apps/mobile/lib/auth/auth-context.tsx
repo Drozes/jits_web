@@ -1,4 +1,5 @@
 import * as React from "react";
+import { Platform } from "react-native";
 import type { Session, User } from "@supabase/supabase-js";
 import { ATHLETE_STATUS } from "@jits/shared/constants";
 import {
@@ -16,11 +17,28 @@ export type AuthState = {
   isLoading: boolean;
   isAthleteActive: boolean;
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
-  signUp: (email: string, password: string) => Promise<{ error: AuthError | null }>;
+  signInWithGoogle: () => Promise<{ error: AuthError | null; cancelled?: boolean }>;
+  signUp: (
+    email: string,
+    password: string,
+  ) => Promise<{ error: AuthError | null; needsEmailConfirmation: boolean }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: AuthError | null }>;
   refreshAthlete: () => Promise<void>;
 };
+
+let googleConfigured = false;
+async function ensureGoogleConfigured() {
+  if (googleConfigured || Platform.OS === "web") return;
+  const { GoogleSignin } = await import(
+    "@react-native-google-signin/google-signin"
+  );
+  GoogleSignin.configure({
+    iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
+    webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+  });
+  googleConfigured = true;
+}
 
 const AuthContext = React.createContext<AuthState | null>(null);
 
@@ -84,11 +102,55 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [],
   );
 
+  const signInWithGoogle = React.useCallback(async () => {
+    if (Platform.OS === "web") {
+      return { error: { message: "Google sign-in on web is not wired yet." } };
+    }
+    try {
+      await ensureGoogleConfigured();
+      const { GoogleSignin, statusCodes } = await import(
+        "@react-native-google-signin/google-signin"
+      );
+      await GoogleSignin.hasPlayServices().catch(() => undefined);
+      const result = await GoogleSignin.signIn();
+      const idToken =
+        (result as { idToken?: string; data?: { idToken?: string } }).idToken ??
+        (result as { data?: { idToken?: string } }).data?.idToken ??
+        null;
+      if (!idToken) {
+        return { error: { message: "Google did not return an ID token." } };
+      }
+      const { error } = await supabase.auth.signInWithIdToken({
+        provider: "google",
+        token: idToken,
+      });
+      return { error: error ? { message: error.message } : null };
+    } catch (e) {
+      const code = (e as { code?: string }).code;
+      if (
+        code === "SIGN_IN_CANCELLED" ||
+        code === "-5" ||
+        code === "12501"
+      ) {
+        return { error: null, cancelled: true };
+      }
+      const msg = (e as Error).message ?? "Google sign-in failed.";
+      return { error: { message: msg } };
+    }
+  }, []);
+
   const signUp = React.useCallback(async (email: string, password: string) => {
     // We deliberately do NOT auto-create an athlete row here.
     // The profile-setup wizard (A3) handles activation.
-    const { error } = await supabase.auth.signUp({ email, password });
-    return { error: error ? { message: error.message } : null };
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { emailRedirectTo: "elorated://login" },
+    });
+    return {
+      error: error ? { message: error.message } : null,
+      needsEmailConfirmation: !error && !data.session,
+    };
   }, []);
 
   const signOut = React.useCallback(async () => {
@@ -121,6 +183,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isLoading,
       isAthleteActive,
       signIn,
+      signInWithGoogle,
       signUp,
       signOut,
       resetPassword,
@@ -133,6 +196,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isLoading,
       isAthleteActive,
       signIn,
+      signInWithGoogle,
       signUp,
       signOut,
       resetPassword,

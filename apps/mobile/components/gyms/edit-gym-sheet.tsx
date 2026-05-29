@@ -1,5 +1,5 @@
 import * as React from "react";
-import { ActivityIndicator, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, Text, TextInput, View } from "react-native";
 import {
   Sheet,
   SheetContent,
@@ -7,9 +7,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Plate } from "@/components/ui/elo-system";
 import { toast } from "@/components/ui/toast";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { supabase } from "@/lib/supabase/client";
@@ -53,36 +51,72 @@ export function EditGymSheet({
     setLoading(false);
   }
 
+  const isValid = name.trim().length > 0;
+
   return (
     <Sheet>
       <SheetTrigger asChild>{children}</SheetTrigger>
-      <SheetContent snapPoints={["50%"]}>
+      <SheetContent snapPoints={["55%"]}>
         <SheetHeader>
-          <SheetTitle>Edit Gym</SheetTitle>
+          <SheetTitle className="font-heading text-[18px] text-ink uppercase tracking-caps">
+            Edit Gym
+          </SheetTitle>
         </SheetHeader>
 
-        <View className="gap-4">
-          <View className="gap-1.5">
-            <Label>Name</Label>
-            <Input value={name} onChangeText={setName} />
-          </View>
-          <View className="gap-1.5">
-            <Label>City</Label>
-            <Input value={city} onChangeText={setCity} />
-          </View>
-          <Button
-            onPress={handleSave}
-            disabled={loading || !name.trim()}
-            className="mt-2"
-          >
-            {loading ? (
-              <ActivityIndicator size="small" color={tokens.primaryForeground} />
-            ) : (
-              <Text className="text-sm font-medium text-primary-foreground">Save Changes</Text>
-            )}
-          </Button>
-        </View>
+        <Plate className="gap-4 mt-2">
+          <FieldLabeled label="Gym Name">
+            <ElevatedInput value={name} onChangeText={setName} tokens={tokens} />
+          </FieldLabeled>
+          <FieldLabeled label="City">
+            <ElevatedInput value={city} onChangeText={setCity} tokens={tokens} />
+          </FieldLabeled>
+        </Plate>
+
+        <Pressable
+          onPress={handleSave}
+          disabled={loading || !isValid}
+          accessibilityRole="button"
+          className={
+            loading || !isValid
+              ? "mt-4 bg-cta rounded-sm py-3 px-5 items-center justify-center opacity-50"
+              : "mt-4 bg-cta rounded-sm py-3 px-5 items-center justify-center active:bg-cta-hover"
+          }
+        >
+          {loading ? (
+            <ActivityIndicator size="small" color={tokens.textOnAccent} />
+          ) : (
+            <Text className="font-heading text-[13px] text-ink-on-cta uppercase tracking-caps">
+              Save Changes
+            </Text>
+          )}
+        </Pressable>
       </SheetContent>
     </Sheet>
+  );
+}
+
+function FieldLabeled({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <View className="gap-1.5">
+      <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-xl">
+        {label}
+      </Text>
+      {children}
+    </View>
+  );
+}
+
+function ElevatedInput({
+  tokens,
+  ...props
+}: React.ComponentProps<typeof TextInput> & {
+  tokens: ReturnType<typeof useThemedTokens>;
+}) {
+  return (
+    <TextInput
+      placeholderTextColor={tokens.textTertiary}
+      className="h-11 px-4 rounded-xs bg-surface-4 border border-hairline text-ink font-mono text-[14px]"
+      {...props}
+    />
   );
 }

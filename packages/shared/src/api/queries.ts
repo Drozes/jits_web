@@ -44,7 +44,7 @@ type Client = SupabaseClient<Database>;
  * and `is_scoutable` to keep payloads small on every page load.
  */
 export const ATHLETE_GUARD_SELECT =
-  "id, auth_user_id, display_name, current_elo, highest_elo, current_weight, primary_gym_id, profile_photo_url, looking_for_casual, looking_for_ranked, status, free_agent, gender, date_of_birth, city" as const;
+  "id, auth_user_id, display_name, first_name, last_name, current_elo, highest_elo, current_weight, primary_gym_id, profile_photo_url, looking_for_casual, looking_for_ranked, status, free_agent, gender, date_of_birth, city" as const;
 
 /**
  * The subset of the `athletes` row returned by `getCurrentAthlete`.
@@ -56,6 +56,8 @@ export type AthleteGuardRow = Pick<
   | "id"
   | "auth_user_id"
   | "display_name"
+  | "first_name"
+  | "last_name"
   | "current_elo"
   | "highest_elo"
   | "current_weight"
@@ -1295,4 +1297,29 @@ async function fetchMatchNotifications(
       createdAt: m.completed_at,
     };
   });
+}
+
+// ---------------------------------------------------------------------------
+// Admin board (internal founder Kanban, backs web /design/board)
+// ---------------------------------------------------------------------------
+
+export type AdminCardStatus = "todo" | "doing" | "done";
+
+export interface AdminCard {
+  id: string;
+  title: string;
+  notes: string | null;
+  status: AdminCardStatus;
+  created_at: string;
+}
+
+/** Fetch every internal Kanban card, oldest first. */
+export async function getAdminCards(supabase: Client): Promise<AdminCard[]> {
+  const { data, error } = await supabase
+    .from("admin_cards")
+    .select("id, title, notes, status, created_at")
+    .order("created_at", { ascending: true });
+
+  if (error || !data) return [];
+  return data as AdminCard[];
 }

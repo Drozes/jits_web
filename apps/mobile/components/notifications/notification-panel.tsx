@@ -68,11 +68,11 @@ export function NotificationPanel({
       enablePanDownToClose
       onChange={handleSheetChange}
       backdropComponent={renderBackdrop}
-      backgroundStyle={{ backgroundColor: tokens.card }}
-      handleIndicatorStyle={{ backgroundColor: tokens.mutedForeground }}
+      backgroundStyle={{ backgroundColor: tokens.bgSecondary }}
+      handleIndicatorStyle={{ backgroundColor: tokens.textTertiary }}
     >
-      <View className="border-b border-border px-4 pb-3">
-        <Text className="text-base font-heading text-foreground">
+      <View className="border-b border-hairline px-4 pb-3">
+        <Text className="font-heading text-[14px] text-ink uppercase tracking-caps-l">
           Notifications
         </Text>
       </View>
@@ -80,14 +80,14 @@ export function NotificationPanel({
       <BottomSheetScrollView contentContainerStyle={{ paddingBottom: 24 }}>
         {items.length === 0 ? (
           <View className="items-center py-12">
-            <Text className="text-sm text-muted-foreground">
+            <Text className="font-body text-[13px] text-ink-2">
               No notifications yet
             </Text>
           </View>
         ) : (
           groups.map((g) => (
             <View key={g.label}>
-              <Text className="px-4 pb-1 pt-4 text-xs font-heading uppercase tracking-wider text-muted-foreground">
+              <Text className="px-4 pb-1 pt-4 font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-l">
                 {g.label}
               </Text>
               {g.items.map((item) => (

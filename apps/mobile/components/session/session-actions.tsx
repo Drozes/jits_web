@@ -74,12 +74,18 @@ export function SessionActions({ sessionId, status, onActionComplete }: SessionA
   }
 
   if (loading) {
-    return <ActivityIndicator size="small" color={tokens.mutedForeground} />;
+    return <ActivityIndicator size="small" color={tokens.textSecondary} />;
   }
 
   return (
-    <Pressable onPress={showMenu} hitSlop={8} className="p-1">
-      <MoreVertical size={16} color={tokens.mutedForeground} />
+    <Pressable
+      onPress={showMenu}
+      hitSlop={8}
+      accessibilityRole="button"
+      accessibilityLabel="Session actions"
+      className="w-7 h-7 items-center justify-center rounded-xs"
+    >
+      <MoreVertical size={16} color={tokens.textSecondary} />
     </Pressable>
   );
 }

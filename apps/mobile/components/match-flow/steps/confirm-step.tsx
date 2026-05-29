@@ -1,8 +1,8 @@
 import * as React from "react";
 import { Pressable, Text, View } from "react-native";
 import { Check } from "lucide-react-native";
-import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
+import { useThemedTokens } from "@/lib/theme/use-theme";
 import { supabase } from "@/lib/supabase/client";
 import { confirmMatchResult } from "@jits/shared/api/mutations";
 import {
@@ -13,6 +13,7 @@ import { useMatchCompletion } from "@/lib/match-flow/use-match-completion";
 import { mutationQueue, isQueuedResult } from "@/lib/network/mutation-queue";
 import { ConfirmPanel, ResultBanner } from "./confirm-step-panels";
 import { DisputeForm } from "./dispute-form";
+import { cn } from "@/lib/cn";
 
 interface ConfirmStepProps {
   matchId: string;
@@ -26,13 +27,27 @@ interface ConfirmStepProps {
 }
 
 /**
- * Step 7 -- both athletes confirm the recorded result. Either side can
+ * Step 7: both athletes confirm the recorded result. Either side can
  * dispute (which surfaces a reason input). When the matches row flips
  * to `completed` or `disputed` we advance to the summary so the user
  * isn't stranded.
+ *
+ * ELO design system: hero ResultBanner verdict, two ConfirmPanels, a
+ * Signal Red confirm cta, and an underlined dispute escape. Mirrors D9
+ * wireframe (lines 1275-1323).
  */
 export function ConfirmStep(props: ConfirmStepProps) {
-  const { matchId, matchType, matchStatus, currentAthleteId, opponentId, opponentDisplayName, resultData, onCompleted } = props;
+  const tokens = useThemedTokens();
+  const {
+    matchId,
+    matchType,
+    matchStatus,
+    currentAthleteId,
+    opponentId,
+    opponentDisplayName,
+    resultData,
+    onCompleted,
+  } = props;
   const [myConfirmed, setMyConfirmed] = React.useState(false);
   const [opponentConfirmed, setOpponentConfirmed] = React.useState(false);
   const [showDispute, setShowDispute] = React.useState(false);
@@ -101,22 +116,41 @@ export function ConfirmStep(props: ConfirmStepProps) {
         currentAthleteId={currentAthleteId}
         matchType={matchType}
       />
+
       <View className="flex-row gap-3">
         <ConfirmPanel label="You" confirmed={myConfirmed} />
         <ConfirmPanel label={opponentDisplayName} confirmed={opponentConfirmed} />
       </View>
+
       {!myConfirmed ? (
-        <Button onPress={handleConfirm} size="lg" leftIcon={<Check size={16} color="white" />}>
-          Confirm Result
-        </Button>
+        <Pressable
+          accessibilityRole="button"
+          onPress={handleConfirm}
+          className="bg-cta items-center justify-center py-3 rounded-sm active:bg-cta-hover flex-row gap-2"
+        >
+          <Check size={16} color={tokens.textOnAccent} />
+          <Text className="font-heading text-[13px] text-ink-on-cta uppercase tracking-caps">
+            Confirm Result
+          </Text>
+        </Pressable>
       ) : !opponentConfirmed ? (
-        <Text className="text-center text-sm text-muted-foreground">
+        <Text className="text-center font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">
           Waiting for opponent to confirm...
         </Text>
       ) : null}
+
       {!myConfirmed ? (
-        <Pressable onPress={() => setShowDispute(true)}>
-          <Text className="text-center text-xs text-muted-foreground underline">
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => setShowDispute(true)}
+          className="items-center py-2"
+        >
+          <Text
+            className={cn(
+              "font-mono text-[10px] text-ink-3 uppercase tracking-caps-l",
+              "underline",
+            )}
+          >
             Dispute result
           </Text>
         </Pressable>

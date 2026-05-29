@@ -49,6 +49,8 @@ export function EditProfileForm({
     const { error: dbError } = await supabase
       .from("athletes")
       .update({
+        first_name: first.trim(),
+        last_name: last.trim(),
         display_name: display || initialFirst,
         current_weight: weightNum,
         city: cityValue.trim() || null,

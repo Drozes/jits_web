@@ -9,6 +9,7 @@ import {
   type Result,
   mapPostgrestError,
 } from "./errors";
+import type { AdminCard, AdminCardStatus } from "./queries";
 
 type Client = SupabaseClient<Database>;
 
@@ -415,7 +416,7 @@ export async function createInSessionMatch(
   const { data, error } = await supabase.rpc("create_session_match", {
     p_session_id: params.sessionId,
     p_opponent_id: params.opponentId,
-    p_timekeeper_id: params.timekeeperId ?? null,
+    p_timekeeper_id: params.timekeeperId,
   });
 
   if (error) {
@@ -860,6 +861,14 @@ export async function createSessionTemplate(
   supabase: Client,
   params: CreateSessionTemplateParams,
 ): Promise<Result<{ id: string }>> {
+  const authResult = await supabase.rpc("auth_athlete_id");
+  if (authResult.error || !authResult.data) {
+    return {
+      ok: false,
+      error: { code: "UNKNOWN" as const, message: "Could not identify current athlete" },
+    };
+  }
+
   const { data, error } = await supabase
     .from("session_templates")
     .insert({
@@ -870,6 +879,7 @@ export async function createSessionTemplate(
       duration_minutes: params.durationMinutes,
       max_participants: params.maxParticipants,
       notes: params.notes,
+      created_by: authResult.data,
     })
     .select("id")
     .single();
@@ -992,4 +1002,63 @@ export async function updateNotificationPreferences(
     return { ok: false, error: mapPostgrestError(error) };
   }
   return { ok: true, data: undefined };
+}
+
+// ---------------------------------------------------------------------------
+// Admin board (internal founder Kanban, backs web /design/board)
+// ---------------------------------------------------------------------------
+
+const ADMIN_CARD_COLS = "id, title, notes, status, created_at";
+
+/** Create an internal Kanban card (defaults to the To Do column). */
+export async function createAdminCard(
+  supabase: Client,
+  params: { title: string; notes?: string | null; status?: AdminCardStatus },
+): Promise<Result<AdminCard>> {
+  const { data, error } = await supabase
+    .from("admin_cards")
+    .insert({
+      title: params.title,
+      notes: params.notes ?? null,
+      status: params.status ?? "todo",
+    })
+    .select(ADMIN_CARD_COLS)
+    .single();
+
+  if (error) {
+    return { ok: false, error: mapPostgrestError(error, "admin_card_create") };
+  }
+  return { ok: true, data: data as AdminCard };
+}
+
+/** Update an internal Kanban card's title, notes, and/or status. */
+export async function updateAdminCard(
+  supabase: Client,
+  id: string,
+  patch: { title?: string; notes?: string | null; status?: AdminCardStatus },
+): Promise<Result<AdminCard>> {
+  const { data, error } = await supabase
+    .from("admin_cards")
+    .update(patch)
+    .eq("id", id)
+    .select(ADMIN_CARD_COLS)
+    .single();
+
+  if (error) {
+    return { ok: false, error: mapPostgrestError(error, "admin_card_update") };
+  }
+  return { ok: true, data: data as AdminCard };
+}
+
+/** Delete an internal Kanban card. */
+export async function deleteAdminCard(
+  supabase: Client,
+  id: string,
+): Promise<Result<{ id: string }>> {
+  const { error } = await supabase.from("admin_cards").delete().eq("id", id);
+
+  if (error) {
+    return { ok: false, error: mapPostgrestError(error, "admin_card_delete") };
+  }
+  return { ok: true, data: { id } };
 }

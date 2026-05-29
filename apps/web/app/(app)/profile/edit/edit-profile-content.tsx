@@ -12,9 +12,11 @@ export async function EditProfileContent() {
     .eq("status", "active")
     .order("name");
 
-  // Split display_name into first/last best-effort
-  const [firstName, ...lastParts] = (athlete.display_name ?? "").trim().split(/\s+/);
-  const lastName = lastParts.join(" ");
+  // Prefer the structured columns; fall back to splitting display_name for any
+  // legacy row not yet backfilled.
+  const [splitFirst, ...lastParts] = (athlete.display_name ?? "").trim().split(/\s+/);
+  const firstName = athlete.first_name ?? splitFirst ?? "";
+  const lastName = athlete.last_name ?? lastParts.join(" ");
 
   return (
     <EditProfileForm

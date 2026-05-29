@@ -3,7 +3,9 @@
     "name": "ELO RATED",
     "slug": "elo-rated",
     "version": "0.1.0",
-    "scheme": ["elorated"],
+    "scheme": [
+      "elorated"
+    ],
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -25,6 +27,7 @@
       "bundleIdentifier": "com.elorated.mobile",
       "buildNumber": "1",
       "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
         "UIBackgroundModes": [
           "remote-notification"
         ],
@@ -46,7 +49,9 @@
       "predictiveBackGestureEnabled": false,
       "permissions": [
         "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO"
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
       ],
       "intentFilters": [
         {
@@ -107,17 +112,18 @@
         }
       ],
       [
-        "@sentry/react-native/expo",
+        "@react-native-google-signin/google-signin",
         {
-          "organization": "PLACEHOLDER_ORG",
-          "project": "PLACEHOLDER_PROJECT"
+          "iosUrlScheme": "com.googleusercontent.apps.353209338104-h02rm11vkas4ko5rs4uodiefotpv72gp"
         }
       ]
     ],
     "extra": {
       "eas": {
-        "projectId": "PLACEHOLDER_PROJECT_ID"
-      }
-    }
+        "projectId": "146416ac-fdf5-4fa2-b58f-2ed7c00e0f42"
+      },
+      "router": {}
+    },
+    "owner": "drozes18"
   }
 }
