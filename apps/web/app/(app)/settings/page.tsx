@@ -4,8 +4,10 @@ import { PageContainer } from "@/components/layout/page-container";
 import { SettingsContent } from "./settings-content";
 import { requireAuth } from "@/lib/guards";
 
-export default async function SettingsPage() {
-  await requireAuth();
+export default function SettingsPage() {
+  // The guard runs inside the Suspense'd <SettingsData/>. Awaiting it here,
+  // outside <Suspense>, accesses uncached data and breaks Next 16
+  // cacheComponents prerender (jits-v0n).
   return (
     <>
       <AppHeader title="Settings" back />

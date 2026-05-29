@@ -208,7 +208,12 @@ export function useVideoProgress(
   const versionRef = useRef(0);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rpcMissingRef = useRef(false);
-  rpcMissingRef.current = rpcMissing;
+  // Mirror `rpcMissing` into a ref so `fetchSnapshot` reads the latest
+  // value without being recreated. Done in an effect, not the render
+  // body, to avoid mutating a ref during render.
+  useEffect(() => {
+    rpcMissingRef.current = rpcMissing;
+  }, [rpcMissing]);
 
   const fetchSnapshot = useCallback(
     async (vId: string, myVersion: number) => {
@@ -245,6 +250,10 @@ export function useVideoProgress(
         if (snapshot) {
           setData(snapshot);
           setError(null);
+        } else {
+          // Transient miss (RLS lag / row not yet readable). Signal the
+          // staleness instead of silently keeping prior data.
+          setError("Progress temporarily unavailable");
         }
       } catch (err) {
         if (myVersion !== versionRef.current) return;
@@ -271,6 +280,9 @@ export function useVideoProgress(
   const refresh = useCallback(() => {
     if (!videoId) return;
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    // Allow recovery from degraded mode: retry the RPC on manual refresh.
+    setRpcMissing(false);
+    rpcMissingRef.current = false;
     void fetchSnapshot(videoId, versionRef.current);
   }, [videoId, fetchSnapshot]);
 
@@ -284,6 +296,9 @@ export function useVideoProgress(
     const myVersion = versionRef.current;
     setLoading(true);
     setError(null);
+    // New videoId: retry the RPC fresh rather than stay degraded.
+    setRpcMissing(false);
+    rpcMissingRef.current = false;
     void fetchSnapshot(videoId, myVersion);
 
     const channel: RealtimeChannel = supabase
@@ -307,7 +322,12 @@ export function useVideoProgress(
       }
       void supabase.removeChannel(channel);
     };
-  }, [supabase, videoId, fetchSnapshot, scheduleRefresh]);
+    // `fetchSnapshot`/`scheduleRefresh` are stable closures reading current
+    // values; the run is version-gated via `versionRef`. Excluding them
+    // prevents a non-memoized `supabase` from rebuilding the channel every
+    // render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supabase, videoId]);
 
   return useMemo(
     () => ({ data, loading, error, rpcMissing, refresh }),
