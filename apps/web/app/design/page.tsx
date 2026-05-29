@@ -21,6 +21,12 @@ const cards = [
       "Alpha wireframe (28 screens, light + dark) synced from the SharePoint brand kit.",
   },
   {
+    href: "/design/web-layouts",
+    title: "Web Layouts",
+    description:
+      "Six full-screen desktop layout concepts (one per screen) for previewing how the web app could use the whole viewport.",
+  },
+  {
     href: "/design/screens",
     title: "Web Screens",
     description:
