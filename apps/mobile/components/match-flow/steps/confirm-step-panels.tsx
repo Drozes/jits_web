@@ -1,9 +1,15 @@
-import * as React from "react";
 import { ActivityIndicator, Text, View } from "react-native";
 import { Check } from "lucide-react-native";
 import { useThemedTokens } from "@/lib/theme/use-theme";
+import { Plate } from "@/components/ui/elo-system";
+import { cn } from "@/lib/cn";
 import type { BroadcastResult } from "@jits/shared/hooks/use-session-match-sync";
 
+/**
+ * Hero verdict banner for the confirm step. Mirrors D9's outcome-banner
+ * (wireframe lines 1283-1286): win = positive plate, loss = negative
+ * plate, draw = hairline plate. Display-typography verdict.
+ */
 export function ResultBanner({
   resultData,
   currentAthleteId,
@@ -17,25 +23,47 @@ export function ResultBanner({
     resultData?.result === "submission" && resultData.winnerId === currentAthleteId;
   const isLoser =
     resultData?.result === "submission" && resultData.winnerId !== currentAthleteId;
+  const isDraw = resultData?.result === "draw";
+
+  const variant = isWinner ? "win" : isLoser ? "loss" : "default";
+  const verdictColor = isWinner
+    ? "text-positive"
+    : isLoser
+      ? "text-negative"
+      : "text-ink";
+  const verdictText = isWinner
+    ? "YOU WON"
+    : isLoser
+      ? "YOU LOST"
+      : isDraw
+        ? "DRAW"
+        : "MATCH COMPLETE";
+
   return (
-    <View className="items-center gap-1">
-      {isWinner ? <Text className="text-3xl font-display text-success">Victory!</Text> : null}
-      {isLoser ? <Text className="text-3xl font-display text-destructive">Defeat</Text> : null}
-      {resultData?.result === "draw" ? (
-        <Text className="text-3xl font-display text-amber-500">Draw</Text>
-      ) : null}
-      {!resultData ? (
-        <Text className="text-xl font-heading text-foreground">Match Complete</Text>
-      ) : null}
+    <Plate variant={variant} className="items-center gap-2">
+      <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-xl">
+        Match Recorded
+      </Text>
+      <Text
+        className={cn("font-display text-[36px] tracking-mark", verdictColor)}
+      >
+        {verdictText}
+      </Text>
       {matchType === "ranked" ? (
-        <Text className="text-xs text-muted-foreground">
-          Ranked match. ELO will update on confirmation.
+        <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">
+          Ranked. ELO updates on confirmation.
         </Text>
       ) : null}
-    </View>
+    </Plate>
   );
 }
 
+/**
+ * Single athlete confirm-state panel used in the confirm step.
+ *
+ * ELO design system: hairline-bordered plate, swaps to positive border
+ * + check glyph once the athlete has confirmed.
+ */
 export function ConfirmPanel({
   label,
   confirmed,
@@ -45,15 +73,26 @@ export function ConfirmPanel({
 }) {
   const tokens = useThemedTokens();
   return (
-    <View className="flex-1 items-center gap-2 rounded-xl border border-border p-4">
+    <View
+      className={cn(
+        "flex-1 items-center gap-2 rounded-md bg-surface-3 border px-3 py-4",
+        confirmed ? "border-positive" : "border-hairline-strong",
+      )}
+    >
       {confirmed ? (
-        <View className="h-8 w-8 items-center justify-center rounded-full bg-success/10">
-          <Check size={18} color={tokens.success} />
+        <View className="h-8 w-8 items-center justify-center rounded-full border border-positive">
+          <Check size={16} color={tokens.statePositive} />
         </View>
       ) : (
-        <ActivityIndicator color={tokens.mutedForeground} />
+        <ActivityIndicator color={tokens.textSecondary} />
       )}
-      <Text className="w-full text-center text-xs font-medium text-foreground" numberOfLines={1}>
+      <Text
+        className={cn(
+          "w-full text-center font-heading text-[11px] uppercase tracking-caps",
+          confirmed ? "text-positive" : "text-ink-2",
+        )}
+        numberOfLines={1}
+      >
         {label}
       </Text>
     </View>

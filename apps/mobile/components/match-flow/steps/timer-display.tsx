@@ -1,6 +1,5 @@
-import * as React from "react";
 import { Text, View } from "react-native";
-import { Badge } from "@/components/ui/badge";
+import { LivePill } from "@/components/ui/elo-system";
 import { cn } from "@/lib/cn";
 
 interface TimerDisplayProps {
@@ -11,27 +10,38 @@ interface TimerDisplayProps {
 }
 
 /**
- * Big timer + match-type badge + paused indicator. Mirrors the visual
- * layout of the web fighter-live-step's hero block.
+ * Big timer + match-type meta + paused indicator. Used by the
+ * timekeeper-style live view (D7 wireframe lines 1213-1238): hero
+ * mono numeric timer, LivePill, and ranked / casual meta tag below.
+ *
+ * Color rule: signal-red (negative) when remaining hits 0, otherwise
+ * primary ink so the numeric reads as data, not a warning.
  */
 export function TimerDisplay({ formatted, remaining, paused, matchType }: TimerDisplayProps) {
   return (
-    <View className="items-center gap-2">
-      <Text className="text-xs uppercase tracking-widest text-muted-foreground">
-        Match in progress
-      </Text>
+    <View className="items-center gap-3">
+      <LivePill label="LIVE" />
       <Text
         className={cn(
-          "font-mono text-7xl font-bold tracking-tight tabular-nums",
-          remaining === 0 ? "text-destructive" : "text-amber-500",
+          "font-mono-bold tabular-nums",
+          remaining === 0 ? "text-negative" : "text-ink",
         )}
+        style={{
+          fontSize: 72,
+          lineHeight: 72,
+          letterSpacing: -72 * 0.04,
+        }}
       >
         {formatted}
       </Text>
-      <Badge variant={matchType === "ranked" ? "default" : "secondary"}>
-        {matchType === "ranked" ? "Ranked" : "Casual"}
-      </Badge>
-      {paused ? <Text className="text-sm font-medium text-amber-500">Paused</Text> : null}
+      <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-xl">
+        {matchType === "ranked" ? "Ranked Match" : "Casual Match"}
+      </Text>
+      {paused ? (
+        <Text className="font-mono-bold text-[10px] text-negative uppercase tracking-caps-l">
+          Paused
+        </Text>
+      ) : null}
     </View>
   );
 }

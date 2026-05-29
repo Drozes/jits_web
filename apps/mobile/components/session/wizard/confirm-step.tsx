@@ -1,12 +1,12 @@
 import * as React from "react";
 import { useRouter } from "expo-router";
-import { Text, View } from "react-native";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Pressable, Text, View } from "react-native";
 import { toast } from "@/components/ui/toast";
+import { DataRow, Plate } from "@/components/ui/elo-system";
 import { supabase } from "@/lib/supabase/client";
 import { joinSessionLobby } from "@jits/shared/api/mutations";
 import type { DomainErrorCode } from "@jits/shared/api/errors";
+import { cn } from "@/lib/cn";
 
 interface ConfirmStepProps {
   sessionId: string;
@@ -41,6 +41,9 @@ function joinErrorMessage(code: DomainErrorCode): string {
 /**
  * Native port of `apps/web/app/(app)/session/[id]/join/steps/confirm-step.tsx`.
  *
+ * ELO design system: review Plate with two DataRows (gym + weight) and a
+ * primary "Join Lobby" cta. Matches the data-strip pattern from C3 / D-flow.
+ *
  * On submit:
  *   1. Calls `joinSessionLobby` (inserts into `session_participants`).
  *   2. Broadcasts `participant_joined` so existing lobby members see the new
@@ -63,7 +66,7 @@ export function ConfirmStep({
     setLoading(true);
     const result = await joinSessionLobby(supabase, { sessionId, confirmedWeight });
     if (!result.ok) {
-      // Already in the session — skip straight to lobby
+      // Already in the session, skip straight to lobby
       if (result.error.code === "ALREADY_JOINED") {
         router.replace(`/session/${sessionId}/lobby`);
         return;
@@ -103,28 +106,33 @@ export function ConfirmStep({
   }
 
   return (
-    <View className="gap-4 py-2">
-      <Text className="text-center text-base font-heading text-foreground">
+    <View className="gap-4">
+      <Text className="font-heading text-[18px] text-ink text-center">
         Ready to join
       </Text>
-      <Card className="rounded-2xl">
-        <CardContent className="gap-2 p-4 pb-4">
-          <View className="flex-row items-center justify-between">
-            <Text className="text-sm text-muted-foreground">Gym</Text>
-            <Text className="text-sm font-medium text-foreground">{gymName}</Text>
-          </View>
-          <View className="flex-row items-center justify-between">
-            <Text className="text-sm text-muted-foreground">Weight</Text>
-            <Text className="text-sm font-medium text-foreground">
-              {confirmedWeight} lbs
-            </Text>
-          </View>
-        </CardContent>
-      </Card>
 
-      <Button onPress={handleJoin} disabled={loading}>
-        {loading ? "Joining..." : "Join Lobby"}
-      </Button>
+      <Plate>
+        <View className="gap-3">
+          <DataRow label="Gym" value={gymName} valueMono={false} />
+          <View className="h-[1px] bg-hairline-faint" />
+          <DataRow label="Weight" value={`${confirmedWeight} lbs`} />
+        </View>
+      </Plate>
+
+      <Pressable
+        accessibilityRole="button"
+        onPress={handleJoin}
+        disabled={loading}
+        className={cn(
+          "bg-cta items-center justify-center py-3 rounded-sm",
+          loading && "opacity-50",
+          "active:bg-cta-hover",
+        )}
+      >
+        <Text className="font-heading text-[13px] text-ink-on-cta uppercase tracking-caps">
+          {loading ? "Joining..." : "Join Lobby"}
+        </Text>
+      </Pressable>
     </View>
   );
 }

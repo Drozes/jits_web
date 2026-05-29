@@ -1,10 +1,7 @@
 import { Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
-import { Clock, Users } from "lucide-react-native";
-import { Card } from "./ui/card";
-import { Badge } from "./ui/badge";
+import { LivePill, MetaTag, Plate } from "./ui/elo-system";
 import { SessionActions } from "./session/session-actions";
-import { useThemedTokens } from "../lib/theme/use-theme";
 import { formatTimeUntil } from "@jits/shared/utils";
 import type { SessionListItem } from "@jits/shared/types/session";
 
@@ -39,9 +36,14 @@ function formatSessionTime(start: string, end: string) {
   return `${dateStr}, ${startTime} - ${endTime}`;
 }
 
-export function SessionCard({ session, isRsvpd, isParticipant, canManage, onActionComplete }: SessionCardProps) {
+export function SessionCard({
+  session,
+  isRsvpd,
+  isParticipant,
+  canManage,
+  onActionComplete,
+}: SessionCardProps) {
   const router = useRouter();
-  const tokens = useThemedTokens();
   const title = session.title ?? "Open Mat";
   const isActive = session.status === "active";
   const startsIn = !isActive ? formatTimeUntil(session.scheduledStart) : null;
@@ -54,63 +56,56 @@ export function SessionCard({ session, isRsvpd, isParticipant, canManage, onActi
     ? (`/session/${session.id}/lobby` as const)
     : (`/session/${session.id}/join` as const);
 
+  // Build metadata strip lines kept short and uppercase/mono for ELO style.
+  const timeLine = formatSessionTime(session.scheduledStart, session.scheduledEnd);
+  const checkedInLine = `${capacityText} checked in${
+    session.rsvpCount > 0 ? ` · ${session.rsvpCount} RSVP` : ""
+  }`;
+
   return (
     <Pressable
       onPress={() => router.push(target)}
+      accessibilityRole="button"
       className="active:opacity-80"
     >
-      <Card className="p-4 gap-2">
-        <View className="flex-row items-center justify-between">
-          <Text className="text-[15px] font-heading text-foreground">
+      <Plate variant={isActive ? "live" : "default"} className="gap-2">
+        <View className="flex-row items-center justify-between gap-2">
+          <Text
+            className="font-heading text-[16px] text-ink flex-1"
+            numberOfLines={1}
+          >
             {title}
           </Text>
-          <View className="flex-row items-center gap-1.5">
+          <View className="flex-row items-center gap-2">
             {isActive ? (
-              <Badge variant="success">
-                <Text className="text-[10px] font-heading text-success-foreground">Live</Text>
-              </Badge>
+              <LivePill label="Live" />
             ) : (
-              <Badge variant="secondary">
-                <Text className="text-[10px] font-heading text-secondary-foreground">Scheduled</Text>
-              </Badge>
+              <MetaTag>Scheduled</MetaTag>
             )}
             {canManage && onActionComplete ? (
-              <SessionActions sessionId={session.id} status={session.status} onActionComplete={onActionComplete} />
+              <SessionActions
+                sessionId={session.id}
+                status={session.status}
+                onActionComplete={onActionComplete}
+              />
             ) : null}
           </View>
         </View>
 
-        <View className="flex-row items-center gap-1.5">
-          <Clock size={12} color={tokens.mutedForeground} />
-          <Text className="text-xs text-muted-foreground">
-            {formatSessionTime(session.scheduledStart, session.scheduledEnd)}
-          </Text>
-          {startsIn ? (
-            <Text className="text-xs font-medium text-amber-500">{startsIn}</Text>
-          ) : null}
-        </View>
+        <Text className="font-mono text-[11px] text-ink-3 uppercase tracking-caps-l">
+          {timeLine}
+          {startsIn ? ` · ${startsIn}` : ""}
+        </Text>
 
-        <View className="flex-row items-center gap-3">
-          <View className="flex-row items-center gap-1">
-            <Users size={12} color={tokens.mutedForeground} />
-            <Text className="text-xs text-muted-foreground">
-              {capacityText} checked in
-            </Text>
-          </View>
-          {session.rsvpCount > 0 ? (
-            <Text className="text-xs text-muted-foreground">
-              {session.rsvpCount} RSVP
-            </Text>
-          ) : null}
-          {isRsvpd ? (
-            <Text className="text-xs font-medium text-primary">You RSVP'd</Text>
-          ) : null}
-        </View>
+        <Text className="font-mono text-[11px] text-ink-3 uppercase tracking-caps-l">
+          {checkedInLine}
+          {isRsvpd ? " · You RSVP’d" : ""}
+        </Text>
 
-        <Text className="text-xs text-muted-foreground">
+        <Text className="font-body text-[12px] text-ink-3 mt-1">
           Hosted by {session.createdByName}
         </Text>
-      </Card>
+      </Plate>
     </Pressable>
   );
 }

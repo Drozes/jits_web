@@ -1,4 +1,5 @@
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
+import { Chip } from "./ui/elo-system";
 import { cn } from "../lib/cn";
 
 export interface AthleteStats {
@@ -41,22 +42,22 @@ export function StatRow({
   const rightWins = higherIsBetter ? right > left : right < left;
   const fmt = format ?? String;
   return (
-    <View className="flex-row items-center py-2 border-b border-border">
+    <View className="flex-row items-center py-3 border-b border-hairline-faint">
       <Text
         className={cn(
-          "flex-1 text-center text-lg font-mono tabular-nums text-foreground",
-          leftWins && "text-success",
+          "flex-1 text-center font-mono-bold text-[20px] tabular-nums",
+          leftWins ? "text-positive" : "text-ink",
         )}
       >
         {fmt(left)}
       </Text>
-      <Text className="flex-1 text-center text-xs text-muted-foreground">
+      <Text className="flex-1 text-center font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">
         {label}
       </Text>
       <Text
         className={cn(
-          "flex-1 text-center text-lg font-mono tabular-nums text-foreground",
-          rightWins && "text-success",
+          "flex-1 text-center font-mono-bold text-[20px] tabular-nums",
+          rightWins ? "text-positive" : "text-ink",
         )}
       >
         {fmt(right)}
@@ -84,27 +85,15 @@ export function FilterPillRow({
   onSelect: (f: Filter) => void;
 }) {
   return (
-    <View className="flex-row justify-center gap-1 pt-2">
+    <View className="flex-row justify-center gap-2 pt-3">
       {FILTERS.map((f) => (
-        <Pressable
+        <Chip
           key={f.value}
+          active={current === f.value}
           onPress={() => onSelect(f.value)}
-          className={cn(
-            "rounded-full px-3 py-1",
-            current === f.value ? "bg-primary" : "bg-muted",
-          )}
         >
-          <Text
-            className={cn(
-              "text-xs font-medium",
-              current === f.value
-                ? "text-primary-foreground"
-                : "text-muted-foreground",
-            )}
-          >
-            {f.label}
-          </Text>
-        </Pressable>
+          {f.label}
+        </Chip>
       ))}
     </View>
   );

@@ -7,10 +7,16 @@ import {
   Text,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { MapPin, Plus } from "lucide-react-native";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { Plus } from "lucide-react-native";
+import { AppHeader } from "@/components/layout/app-header";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { MetaTag } from "@/components/ui/elo-system";
 import { GymCard } from "@/components/gyms/gym-card";
 import { CreateGymSheet } from "@/components/gyms/create-gym-sheet";
 import { useRequireAthlete } from "@/lib/auth/hooks";
@@ -30,6 +36,8 @@ interface GymCoords {
   latitude: number | null;
   longitude: number | null;
 }
+
+const ALL_CITIES = "All Cities";
 
 function useGymsList() {
   const [data, setData] = React.useState<GymListItem[] | null>(null);
@@ -88,18 +96,36 @@ export default function GymsScreen() {
   const tokens = useThemedTokens();
   const { data, coords, isLoading, isRefreshing, refresh } = useGymsList();
   const location = useLocation();
-  const [query, setQuery] = React.useState("");
+
+  // Build the city set from loaded gyms.
+  const cities = React.useMemo(() => {
+    if (!data) return [] as string[];
+    const set = new Set<string>();
+    for (const g of data) if (g.city) set.add(g.city);
+    return Array.from(set).sort();
+  }, [data]);
+
+  // Default city to the athlete's own city when it matches a known gym city.
+  const defaultCity = React.useMemo(() => {
+    const c = athlete?.city ?? null;
+    return c && cities.includes(c) ? c : ALL_CITIES;
+  }, [athlete?.city, cities]);
+
+  const [city, setCity] = React.useState<string>(ALL_CITIES);
+  // When defaults arrive after the first render, hydrate the city once.
+  const hydratedRef = React.useRef(false);
+  React.useEffect(() => {
+    if (!hydratedRef.current && cities.length > 0) {
+      hydratedRef.current = true;
+      setCity(defaultCity);
+    }
+  }, [cities.length, defaultCity]);
 
   const filtered = React.useMemo(() => {
     if (!data) return [];
-    const q = query.trim().toLowerCase();
-    if (!q) return data;
-    return data.filter(
-      (g) =>
-        g.name.toLowerCase().includes(q) ||
-        (g.city && g.city.toLowerCase().includes(q)),
-    );
-  }, [data, query]);
+    if (city === ALL_CITIES) return data;
+    return data.filter((g) => (g.city ?? "") === city);
+  }, [data, city]);
 
   // Compute distances from user position; sort by distance when available.
   const enriched = React.useMemo(() => {
@@ -128,65 +154,62 @@ export default function GymsScreen() {
 
   if (authLoading || !athlete) {
     return (
-      <SafeAreaView className="flex-1 bg-background items-center justify-center">
-        <ActivityIndicator color={tokens.primary} />
-      </SafeAreaView>
+      <View className="flex-1 bg-surface items-center justify-center">
+        <ActivityIndicator color={tokens.accentCta} />
+      </View>
     );
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-background" edges={["top"]}>
-      <View className="px-4 pt-4 pb-2">
-        <View className="flex-row items-center justify-between mb-3">
-          <View className="flex-row items-center gap-2">
-            <MapPin size={20} color={tokens.primary} />
-            <Text className="text-2xl font-heading text-foreground">Gyms</Text>
-          </View>
+    <View className="flex-1 bg-surface">
+      <AppHeader
+        title="Gym Finder"
+        rightAction={
           <CreateGymSheet onCreated={refresh}>
-            <Button
-              variant="outline"
-              size="sm"
-              leftIcon={<Plus size={14} color={tokens.foreground} />}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Create gym"
+              className="w-8 h-8 items-center justify-center rounded-xs border border-hairline-strong bg-surface-3"
             >
-              Create
-            </Button>
+              <Plus size={16} color={tokens.textSecondary} />
+            </Pressable>
           </CreateGymSheet>
+        }
+      />
+
+      <View className="px-4 pt-4 pb-3 gap-3">
+        <CityField cities={cities} value={city} onChange={setCity} />
+
+        <View className="flex-row items-center justify-between">
+          <MetaTag>
+            {enriched.length} Partner {enriched.length === 1 ? "Gym" : "Gyms"}
+          </MetaTag>
+          {location.isGranted !== true ? (
+            <Pressable
+              onPress={() => {
+                if (location.isLoading) return;
+                void location.request();
+              }}
+              accessibilityRole="button"
+              hitSlop={6}
+            >
+              <Text className="font-mono-bold text-[10px] text-cta uppercase tracking-caps-l">
+                {location.isLoading ? "Locating..." : "Enable Location"}
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
-        <Input
-          placeholder="Search gyms..."
-          value={query}
-          onChangeText={setQuery}
-          autoCorrect={false}
-          autoCapitalize="none"
-        />
-        {location.isGranted !== true ? (
-          <Pressable
-            onPress={() => {
-              if (location.isLoading) return;
-              void location.request();
-            }}
-            className="mt-3 rounded-md border border-dashed border-border p-3"
-          >
-            <Text className="text-sm font-medium text-foreground">
-              {location.isLoading
-                ? "Requesting location..."
-                : location.isGranted === false
-                  ? "Location denied. Enable in Settings to see distance."
-                  : "Enable location to see distance to each gym"}
-            </Text>
-          </Pressable>
-        ) : null}
       </View>
 
       {isLoading ? (
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator color={tokens.primary} />
+          <ActivityIndicator color={tokens.accentCta} />
         </View>
       ) : (
         <FlatList
           data={enriched}
           keyExtractor={(item) => item.gym.id}
-          contentContainerStyle={{ padding: 16, paddingTop: 8, gap: 12 }}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 4, paddingBottom: 96, gap: 12 }}
           renderItem={({ item }) => (
             <GymCard
               gym={item.gym}
@@ -197,19 +220,52 @@ export default function GymsScreen() {
             />
           )}
           ListEmptyComponent={
-            <View className="rounded-md border border-dashed border-border p-8 items-center">
-              <Text className="text-sm text-muted-foreground">No gyms found</Text>
+            <View className="rounded-xs border border-dashed border-hairline p-8 items-center bg-surface-3">
+              <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-l">
+                No Gyms Found
+              </Text>
             </View>
           }
           refreshControl={
             <RefreshControl
               refreshing={isRefreshing}
               onRefresh={refresh}
-              tintColor={tokens.primary}
+              tintColor={tokens.accentCta}
             />
           }
         />
       )}
-    </SafeAreaView>
+    </View>
+  );
+}
+
+function CityField({
+  cities,
+  value,
+  onChange,
+}: {
+  cities: string[];
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <View className="gap-2">
+      <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-xl">
+        City
+      </Text>
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger className="bg-surface-3 border border-hairline rounded-xs h-11 px-4">
+          <SelectValue placeholder={ALL_CITIES} className="font-mono uppercase tracking-caps-l text-ink" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={ALL_CITIES}>{ALL_CITIES}</SelectItem>
+          {cities.map((c) => (
+            <SelectItem key={c} value={c}>
+              {c}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </View>
   );
 }

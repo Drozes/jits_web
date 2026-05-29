@@ -1,25 +1,55 @@
 import * as React from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { TOS_TEXT } from "@jits/shared/utils";
-import { Button } from "@/components/ui/button";
+import { Plate } from "@/components/ui/elo-system";
+import { CtaButton, TertiaryButton } from "@/components/auth/auth-buttons";
 import { cn } from "@/lib/cn";
 
 interface TosStepProps {
   onAccept: () => void | Promise<void>;
+  onExit?: () => void;
   submittingExternal?: boolean;
 }
 
+interface ParsedBlock {
+  type: "title" | "section" | "paragraph";
+  label?: string;
+  body: string;
+}
+
+function parseEuaBody(raw: string): ParsedBlock[] {
+  const lines = raw.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+  const blocks: ParsedBlock[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (i === 0) {
+      blocks.push({ type: "title", body: line });
+      continue;
+    }
+    const sectionMatch = /^(\d+\.\s+[^\n]+)/.exec(line);
+    if (sectionMatch) {
+      const firstLine = sectionMatch[1];
+      const rest = line.slice(firstLine.length).trim();
+      blocks.push({ type: "section", label: firstLine, body: rest });
+    } else {
+      blocks.push({ type: "paragraph", body: line });
+    }
+  }
+  return blocks;
+}
+
 /**
- * Native port of `apps/web/app/profile/setup/tos-step.tsx`. Renders the
- * shared TOS body in a scroll view with a checkbox + Continue button. The
- * actual `waiver_acknowledgements` insert lives in `useSetupSubmit.acceptTos`.
+ * EUA / TOS step. Wireframe A3 visual: Plate-wrapped TOS body (scrollable),
+ * checkbox row, primary "I Acknowledge" CTA, secondary "Exit" link.
  */
-export function TosStep({ onAccept, submittingExternal }: TosStepProps) {
+export function TosStep({ onAccept, onExit, submittingExternal }: TosStepProps) {
   const [agreed, setAgreed] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
   const isBusy = submitting || submittingExternal;
+  const blocks = React.useMemo(() => parseEuaBody(TOS_TEXT), []);
 
   async function handleContinue() {
+    if (!agreed || isBusy) return;
     setSubmitting(true);
     try {
       await onAccept();
@@ -30,41 +60,80 @@ export function TosStep({ onAccept, submittingExternal }: TosStepProps) {
 
   return (
     <View className="gap-4">
-      <ScrollView
-        className="max-h-80 rounded-md border border-border p-4"
-        nestedScrollEnabled
-      >
-        <Text className="text-xs leading-relaxed text-muted-foreground">
-          {TOS_TEXT}
-        </Text>
-      </ScrollView>
+      <Plate style={{ maxHeight: 360 }}>
+        <ScrollView
+          nestedScrollEnabled
+          showsVerticalScrollIndicator
+          contentContainerStyle={{ paddingBottom: 4 }}
+        >
+          {blocks.map((block, i) => {
+            if (block.type === "title") {
+              return (
+                <Text
+                  key={i}
+                  className="font-heading text-[14px] text-ink uppercase tracking-caps mb-3"
+                >
+                  {block.body.toUpperCase()}
+                </Text>
+              );
+            }
+            if (block.type === "section") {
+              return (
+                <View key={i} className="mb-3">
+                  <Text className="font-heading-medium text-[13px] text-ink leading-6">
+                    {block.label}
+                  </Text>
+                  {block.body ? (
+                    <Text className="font-body text-[13px] text-ink-2 leading-6">
+                      {block.body}
+                    </Text>
+                  ) : null}
+                </View>
+              );
+            }
+            return (
+              <Text
+                key={i}
+                className="font-body text-[13px] text-ink-2 leading-6 mb-3"
+              >
+                {block.body}
+              </Text>
+            );
+          })}
+        </ScrollView>
+      </Plate>
 
       <Pressable
         accessibilityRole="checkbox"
         accessibilityState={{ checked: agreed }}
         onPress={() => setAgreed((v) => !v)}
-        className="flex-row items-start gap-2"
+        className="flex-row items-center gap-3 px-1"
       >
         <View
           className={cn(
-            "mt-0.5 h-4 w-4 items-center justify-center rounded border border-input",
-            agreed && "bg-primary",
+            "h-5 w-5 items-center justify-center rounded-xs border",
+            agreed ? "bg-cta border-cta" : "border-hairline-strong",
           )}
         >
           {agreed && (
-            <Text className="text-[10px] font-bold text-primary-foreground">
+            <Text className="text-[11px] font-mono-bold text-ink-on-cta leading-none">
               {"✓"}
             </Text>
           )}
         </View>
-        <Text className="text-sm text-foreground flex-1">
-          I have read and agree to the Terms of Service
+        <Text className="font-body text-[14px] text-ink flex-1">
+          I agree to the End User Agreement
         </Text>
       </Pressable>
 
-      <Button onPress={handleContinue} disabled={!agreed || isBusy}>
-        {isBusy ? "Saving..." : "Continue"}
-      </Button>
+      <CtaButton
+        label={isBusy ? "Saving..." : "I Acknowledge"}
+        onPress={handleContinue}
+        disabled={!agreed || isBusy}
+      />
+      {onExit ? (
+        <TertiaryButton label="Exit" onPress={onExit} disabled={isBusy} />
+      ) : null}
     </View>
   );
 }

@@ -9,9 +9,11 @@ export default function HomeLayout() {
       screenOptions={{
         headerShown: false,
         presentation: "card",
-        headerStyle: { backgroundColor: tokens.background },
-        headerTintColor: tokens.foreground,
-        headerTitleStyle: { color: tokens.foreground },
+        // Headers are hidden, but these set the fallback colors if a child
+        // ever re-enables one. Use the ELO surface family.
+        headerStyle: { backgroundColor: tokens.bgSecondary },
+        headerTintColor: tokens.textPrimary,
+        headerTitleStyle: { color: tokens.textPrimary },
       }}
     />
   );

@@ -1,7 +1,12 @@
 import * as React from "react";
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, Text, View } from "react-native";
-import { useRouter } from "expo-router";
-import { ChevronLeft, Swords } from "lucide-react-native";
+import {
+  ActivityIndicator,
+  FlatList,
+  RefreshControl,
+  Text,
+  View,
+} from "react-native";
+import { Swords } from "lucide-react-native";
 import { useRequireAthlete } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { supabase } from "@/lib/supabase/client";
@@ -13,12 +18,12 @@ import {
 } from "@jits/shared/api/queries";
 import type { EloHistoryRow, MatchHistoryRow } from "@jits/shared/types/composites";
 import type { WeeklyActivity, SubmissionBreakdown } from "@jits/shared/types/analytics";
-import { Card, CardContent } from "@/components/ui/card";
 import { MatchCard } from "@/components/match-card";
 import { SubmissionBreakdownSection } from "@/components/profile/submission-breakdown";
 import { WeeklyActivitySection } from "@/components/profile/weekly-activity";
 import { MilestoneProgress } from "@/components/profile/milestone-progress";
-import { cn } from "@/lib/cn";
+import { AppHeader } from "@/components/layout/app-header";
+import { MetaTag, Chip } from "@/components/ui/elo-system";
 import { toast } from "@/components/ui/toast";
 import type { MatchOutcome } from "@jits/shared/constants";
 
@@ -38,7 +43,6 @@ interface StatsData {
 
 export default function ProfileStatsScreen() {
   const { athlete } = useRequireAthlete();
-  const router = useRouter();
   const tokens = useThemedTokens();
   const [data, setData] = React.useState<StatsData | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -85,26 +89,21 @@ export default function ProfileStatsScreen() {
 
   if (!athlete) {
     return (
-      <View className="flex-1 bg-background items-center justify-center">
-        <ActivityIndicator color={tokens.primary} />
+      <View className="flex-1 bg-surface items-center justify-center">
+        <ActivityIndicator color={tokens.accentCta} />
       </View>
     );
   }
 
   return (
-    <View className="flex-1 bg-background">
-      <View className="flex-row items-center px-4 pt-12 pb-3 gap-2">
-        <Pressable onPress={() => router.back()} className="h-9 w-9 items-center justify-center rounded-full active:bg-muted/60" accessibilityRole="button">
-          <ChevronLeft size={22} className="text-foreground" />
-        </Pressable>
-        <Text className="text-lg font-heading text-foreground">Stats</Text>
-      </View>
+    <View className="flex-1 bg-surface">
+      <AppHeader title="Stats" back />
 
       <FlatList
         data={filtered}
         keyExtractor={(m) => m.match_id}
-        contentContainerStyle={{ padding: 16, paddingBottom: 32, gap: 12 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={tokens.primary} />}
+        contentContainerStyle={{ padding: 16, paddingBottom: 120, gap: 8 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={tokens.accentCta} />}
         ListHeaderComponent={
           <StatsHeader
             athlete={athlete}
@@ -119,12 +118,12 @@ export default function ProfileStatsScreen() {
         }
         ListEmptyComponent={
           isLoading ? (
-            <View className="py-12 items-center"><ActivityIndicator color={tokens.primary} /></View>
+            <View className="py-12 items-center"><ActivityIndicator color={tokens.accentCta} /></View>
           ) : (
-            <View className="py-12 items-center">
-              <Swords size={32} className="text-muted-foreground" />
-              <Text className="font-medium text-foreground mt-2">No matches yet</Text>
-              <Text className="text-sm text-muted-foreground mt-1">
+            <View className="py-12 items-center gap-2">
+              <Swords size={28} color={tokens.textTertiary} />
+              <Text className="font-heading text-[14px] text-ink uppercase tracking-caps">No matches yet</Text>
+              <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">
                 {filter === "all" ? "Complete a match to see your history" : `No ${filter} matches yet`}
               </Text>
             </View>
@@ -145,6 +144,28 @@ export default function ProfileStatsScreen() {
   );
 }
 
+interface StatTileProps {
+  label: string;
+  value: string | number;
+  valueClassName?: string;
+}
+
+function StatTile({ label, value, valueClassName }: StatTileProps) {
+  return (
+    <View className="flex-1 bg-surface-3 border border-hairline rounded-md px-3 py-3 items-center">
+      <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-xl">
+        {label}
+      </Text>
+      <Text
+        className={`font-mono-bold tabular-nums mt-1 ${valueClassName ?? "text-ink"}`}
+        style={{ fontSize: 22, lineHeight: 24 }}
+      >
+        {value}
+      </Text>
+    </View>
+  );
+}
+
 function StatsHeader({ athlete, data, filter, setFilter, wins, losses, draws, winRate }: {
   athlete: { current_elo: number };
   data: StatsData | null;
@@ -158,24 +179,9 @@ function StatsHeader({ athlete, data, filter, setFilter, wins, losses, draws, wi
   return (
     <View className="gap-4 mb-2">
       <View className="flex-row gap-3">
-        <Card className="flex-1">
-          <CardContent className="py-3 px-2 items-center">
-            <Text className="text-2xl font-mono tabular-nums text-foreground">{athlete.current_elo}</Text>
-            <Text className="text-xs text-muted-foreground">Current ELO</Text>
-          </CardContent>
-        </Card>
-        <Card className="flex-1">
-          <CardContent className="py-3 px-2 items-center">
-            <Text className="text-2xl font-mono tabular-nums text-foreground">{wins}</Text>
-            <Text className="text-xs text-muted-foreground">Total Wins</Text>
-          </CardContent>
-        </Card>
-        <Card className="flex-1">
-          <CardContent className="py-3 px-2 items-center">
-            <Text className="text-2xl font-mono tabular-nums text-success">{winRate}%</Text>
-            <Text className="text-xs text-muted-foreground">Win Rate</Text>
-          </CardContent>
-        </Card>
+        <StatTile label="ELO" value={athlete.current_elo} />
+        <StatTile label="Wins" value={wins} valueClassName="text-positive" />
+        <StatTile label="Win Rate" value={`${winRate}%`} />
       </View>
 
       <MilestoneProgress elo={athlete.current_elo} />
@@ -184,27 +190,27 @@ function StatsHeader({ athlete, data, filter, setFilter, wins, losses, draws, wi
       {data?.submissions && <SubmissionBreakdownSection submissions={data.submissions} />}
 
       <View className="flex-row items-center justify-between">
-        <View className="flex-row gap-1">
+        <View className="flex-row gap-2">
           {filters.map((f) => (
-            <Pressable
+            <Chip
               key={f.value}
+              active={filter === f.value}
               onPress={() => setFilter(f.value)}
-              className={cn("rounded-full px-3 py-1", filter === f.value ? "bg-primary" : "bg-muted")}
             >
-              <Text className={cn("text-xs font-medium", filter === f.value ? "text-primary-foreground" : "text-muted-foreground")}>
-                {f.label}
-              </Text>
-            </Pressable>
+              {f.label}
+            </Chip>
           ))}
         </View>
-        <View className="flex-row items-center gap-1.5">
-          <Text className="text-xs font-mono text-success tabular-nums">{wins}W</Text>
-          <Text className="text-xs text-muted-foreground">-</Text>
-          <Text className="text-xs font-mono text-destructive tabular-nums">{losses}L</Text>
-          <Text className="text-xs text-muted-foreground">-</Text>
-          <Text className="text-xs font-mono text-muted-foreground tabular-nums">{draws}D</Text>
+        <View className="flex-row items-center gap-2">
+          <Text className="font-mono-bold text-[11px] text-positive tabular-nums">{wins}W</Text>
+          <Text className="font-mono text-[11px] text-ink-3">·</Text>
+          <Text className="font-mono-bold text-[11px] text-negative tabular-nums">{losses}L</Text>
+          <Text className="font-mono text-[11px] text-ink-3">·</Text>
+          <Text className="font-mono text-[11px] text-ink-3 tabular-nums">{draws}D</Text>
         </View>
       </View>
+
+      <MetaTag>Match History</MetaTag>
     </View>
   );
 }

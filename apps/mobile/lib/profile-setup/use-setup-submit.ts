@@ -58,8 +58,14 @@ export function useSetupSubmit({
       setError(null);
 
       const trimmedCity = values.city.trim();
+      const firstName = values.firstName.trim();
+      const lastName = values.lastName.trim();
       const basePayload = {
-        display_name: values.displayName.trim(),
+        first_name: firstName,
+        last_name: lastName,
+        // display_name is a derived label kept in sync for the many screens
+        // that render it; the backend also derives it from first/last on signup.
+        display_name: `${firstName} ${lastName}`.trim(),
         current_weight: parseFloat(values.weight),
         gender: values.gender,
         date_of_birth: values.dateOfBirth || null,

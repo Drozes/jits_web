@@ -1,4 +1,9 @@
 import * as SecureStore from "expo-secure-store";
+import { Platform } from "react-native";
+
+// On web there is no native SecureStore module, so fall back to localStorage.
+// Native (iOS/Android) is unchanged and continues to use expo-secure-store.
+const isWeb = Platform.OS === "web";
 
 /**
  * Storage adapter for Supabase auth that wraps `expo-secure-store`.
@@ -16,12 +21,23 @@ import * as SecureStore from "expo-secure-store";
  */
 export const SecureStoreAdapter = {
   async getItem(key: string): Promise<string | null> {
+    if (isWeb) {
+      return typeof localStorage !== "undefined" ? localStorage.getItem(key) : null;
+    }
     return SecureStore.getItemAsync(key);
   },
   async setItem(key: string, value: string): Promise<void> {
+    if (isWeb) {
+      if (typeof localStorage !== "undefined") localStorage.setItem(key, value);
+      return;
+    }
     await SecureStore.setItemAsync(key, value);
   },
   async removeItem(key: string): Promise<void> {
+    if (isWeb) {
+      if (typeof localStorage !== "undefined") localStorage.removeItem(key);
+      return;
+    }
     await SecureStore.deleteItemAsync(key);
   },
 };

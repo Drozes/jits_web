@@ -1,11 +1,10 @@
 import * as React from "react";
-import { Share, Text, View } from "react-native";
+import { Pressable, Share, Text, View } from "react-native";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "./ui/sheet";
-import { Card, CardContent } from "./ui/card";
-import { Button } from "./ui/button";
-import { EloBadge } from "./elo-badge";
 import { Info, Share2 } from "lucide-react-native";
 import { toast } from "./ui/toast";
+import { Plate } from "./ui/elo-system";
+import { useThemedTokens } from "@/lib/theme/use-theme";
 import { buildShareUrl, buildShareText } from "@jits/shared/utils";
 
 interface ShareProfileSheetProps {
@@ -22,6 +21,7 @@ interface ShareProfileSheetProps {
 }
 
 export function ShareProfileSheet({ athlete, children }: ShareProfileSheetProps) {
+  const tokens = useThemedTokens();
   const url = buildShareUrl("athlete", athlete.id);
   const text = buildShareText({ type: "athlete", data: { displayName: athlete.displayName } });
 
@@ -47,31 +47,50 @@ export function ShareProfileSheet({ athlete, children }: ShareProfileSheetProps)
         </SheetHeader>
 
         <View className="flex-col gap-4 pt-4">
-          <Card className="bg-primary/5 border-primary/20">
-            <CardContent className="p-4 items-center">
-              <Text className="text-lg font-heading text-foreground">{athlete.displayName}</Text>
-              <View className="flex-row items-center gap-2 mt-1">
-                <Text className="text-sm text-muted-foreground">ELO</Text>
-                <EloBadge elo={athlete.elo} variant="compact" />
-              </View>
-              <Text className="text-sm text-muted-foreground mt-1">
-                {athlete.wins}W - {athlete.losses}L
-                {athlete.weight != null ? ` · ${athlete.weight} lbs` : ""}
+          <Plate variant="accent">
+            <View className="items-center gap-2">
+              <Text className="font-heading text-[16px] text-ink uppercase tracking-caps">
+                {athlete.displayName}
               </Text>
+              <View className="items-center">
+                <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-xl">
+                  ELO Rating
+                </Text>
+                <Text className="font-mono-bold text-ink text-[36px]" style={{ lineHeight: 38 }}>
+                  {athlete.elo}
+                </Text>
+              </View>
+              <View className="flex-row items-center gap-2">
+                <Text className="font-mono text-positive text-[12px] tabular-nums">{athlete.wins}W</Text>
+                <Text className="font-mono text-ink-3 text-[12px]">·</Text>
+                <Text className="font-mono text-negative text-[12px] tabular-nums">{athlete.losses}L</Text>
+                {athlete.weight != null ? (
+                  <>
+                    <Text className="font-mono text-ink-3 text-[12px]">·</Text>
+                    <Text className="font-mono text-ink-2 text-[12px] tabular-nums">{athlete.weight} lbs</Text>
+                  </>
+                ) : null}
+              </View>
               {athlete.gymName ? (
-                <Text className="text-xs text-muted-foreground mt-0.5">{athlete.gymName}</Text>
+                <Text className="font-body text-[11px] text-ink-3">{athlete.gymName}</Text>
               ) : null}
-            </CardContent>
-          </Card>
+            </View>
+          </Plate>
 
-          <Button onPress={handleShare}>
-            <Share2 size={16} className="text-primary-foreground" />
-            <Text className="text-sm font-medium text-primary-foreground ml-2">Share Profile</Text>
-          </Button>
+          <Pressable
+            onPress={handleShare}
+            accessibilityRole="button"
+            className="flex-row items-center justify-center gap-2 bg-cta rounded-sm px-5 py-4 active:bg-cta-hover"
+          >
+            <Share2 size={16} color={tokens.textOnAccent} />
+            <Text className="font-heading text-[12px] text-ink-on-cta uppercase tracking-caps">
+              Share My Number
+            </Text>
+          </Pressable>
 
           <View className="flex-row items-start gap-2">
-            <Info size={14} className="text-muted-foreground mt-0.5" />
-            <Text className="flex-1 text-xs text-muted-foreground">
+            <Info size={14} color={tokens.textTertiary} style={{ marginTop: 2 }} />
+            <Text className="flex-1 font-body text-[11px] text-ink-3">
               Shared profiles show your display name, ELO rating, and win/loss record. No personal information is included.
             </Text>
           </View>

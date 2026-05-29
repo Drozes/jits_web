@@ -5,6 +5,8 @@ import { supabase } from "@/lib/supabase/client";
 export interface SetupAthleteRow {
   id: string;
   display_name: string | null;
+  first_name: string | null;
+  last_name: string | null;
   current_weight: number | null;
   primary_gym_id: string | null;
   status: string;
@@ -59,7 +61,7 @@ export function useSetupData(authUserId: string | null) {
           supabase
             .from("athletes")
             .select(
-              "id, display_name, current_weight, primary_gym_id, status, gender, date_of_birth, city, free_agent",
+              "id, display_name, first_name, last_name, current_weight, primary_gym_id, status, gender, date_of_birth, city, free_agent",
             )
             .eq("auth_user_id", authUserId)
             .maybeSingle(),

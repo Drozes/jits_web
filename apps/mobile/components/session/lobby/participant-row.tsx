@@ -1,10 +1,8 @@
-import { Pressable, Text, View } from "react-native";
+import { Pressable, Text } from "react-native";
 import { Swords } from "lucide-react-native";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
+import { ParticipantRow as ParticipantRowPrimitive } from "@/components/ui/elo-system";
 import { useThemedTokens } from "@/lib/theme/use-theme";
-import { getInitials } from "@jits/shared/utils";
+import { cn } from "@/lib/cn";
 import type { LobbyParticipant } from "@jits/shared/types/session";
 
 interface ParticipantRowProps {
@@ -14,69 +12,50 @@ interface ParticipantRowProps {
 }
 
 /**
- * Single row in the lobby's participant list. Shows display name, ELO,
- * weight, and a "Challenge" pill that opens the challenge action sheet.
+ * Single row in the lobby's participant list. Wraps the shared ELO
+ * `ParticipantRow` primitive and feeds it the lobby-specific challenge
+ * action and busy-state logic.
  *
- * Disabled when the athlete is in a match or marked busy
- * (e.g. mid-handshake on a sent challenge).
+ * Per C4 wireframe (lines 1031-1062): name + "ELO · weight" subtitle, a
+ * status badge (Available / In Match), and a small "Challenge" cta. Disabled
+ * when the athlete is in a match or marked busy (mid-handshake on a sent
+ * challenge).
  */
 export function ParticipantRow({ participant, onChallenge, isBusy }: ParticipantRowProps) {
   const tokens = useThemedTokens();
   const inMatch = participant.status === "in_match";
   const disabled = isBusy || inMatch;
 
+  const subtitle = participant.currentWeight
+    ? `${participant.currentElo} · ${participant.currentWeight} lbs`
+    : `${participant.currentElo}`;
+
+  const action = inMatch ? null : (
+    <Pressable
+      onPress={() => onChallenge(participant)}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={`Challenge ${participant.displayName}`}
+      className={cn(
+        "flex-row items-center gap-1.5 rounded-sm bg-cta px-3 py-1.5",
+        disabled && "opacity-50",
+        "active:bg-cta-hover",
+      )}
+      hitSlop={4}
+    >
+      <Swords size={12} color={tokens.textOnAccent} />
+      <Text className="font-heading text-[10px] text-ink-on-cta uppercase tracking-caps">
+        {isBusy ? "..." : "Challenge"}
+      </Text>
+    </Pressable>
+  );
+
   return (
-    <Card className="p-3">
-      <View className="flex-row items-center gap-3">
-        <Avatar>
-          {participant.profilePhotoUrl ? (
-            <AvatarImage source={{ uri: participant.profilePhotoUrl }} />
-          ) : null}
-          <AvatarFallback>{getInitials(participant.displayName)}</AvatarFallback>
-        </Avatar>
-
-        <View className="flex-1 gap-0.5">
-          <Text
-            className="text-sm font-medium text-foreground"
-            numberOfLines={1}
-          >
-            {participant.displayName}
-          </Text>
-          <View className="flex-row items-center gap-2">
-            <Text className="text-xs tabular-nums text-foreground">
-              {participant.currentElo}
-            </Text>
-            {participant.currentWeight ? (
-              <Text className="text-xs text-muted-foreground">
-                · {participant.currentWeight} lbs
-              </Text>
-            ) : null}
-          </View>
-        </View>
-
-        {inMatch ? (
-          <Badge variant="secondary">
-            <Text className="text-[10px] font-heading text-secondary-foreground">
-              In Match
-            </Text>
-          </Badge>
-        ) : (
-          <Pressable
-            onPress={() => onChallenge(participant)}
-            disabled={disabled}
-            accessibilityRole="button"
-            accessibilityLabel={`Challenge ${participant.displayName}`}
-            className={`flex-row items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 ${
-              disabled ? "opacity-50" : ""
-            }`}
-          >
-            <Swords size={14} color={tokens.primaryForeground} />
-            <Text className="text-xs font-medium text-primary-foreground">
-              {isBusy ? "..." : "Challenge"}
-            </Text>
-          </Pressable>
-        )}
-      </View>
-    </Card>
+    <ParticipantRowPrimitive
+      name={participant.displayName}
+      subtitle={subtitle}
+      status={inMatch ? "busy" : "available"}
+      action={action}
+    />
   );
 }

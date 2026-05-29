@@ -73,12 +73,12 @@ export function CompareStatsModal({
           <DialogTitle className="text-center">Compare Stats</DialogTitle>
         </DialogHeader>
 
-        <View className="flex-row items-center mb-2">
-          <Text className="flex-1 text-center text-sm font-heading text-foreground" numberOfLines={1}>
+        <View className="flex-row items-center mb-2 px-2">
+          <Text className="flex-1 text-center font-heading text-[14px] text-ink" numberOfLines={1}>
             {currentAthlete.displayName}
           </Text>
-          <Text className="flex-1 text-center text-xs text-muted-foreground">vs</Text>
-          <Text className="flex-1 text-center text-sm font-heading text-foreground" numberOfLines={1}>
+          <Text className="flex-1 text-center font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">vs</Text>
+          <Text className="flex-1 text-center font-heading text-[14px] text-ink" numberOfLines={1}>
             {competitor.displayName}
           </Text>
         </View>

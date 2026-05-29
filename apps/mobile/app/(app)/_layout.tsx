@@ -9,9 +9,10 @@ export default function AppLayout() {
       screenOptions={{
         headerShown: false,
         presentation: "card",
-        headerStyle: { backgroundColor: tokens.background },
-        headerTintColor: tokens.foreground,
-        headerTitleStyle: { color: tokens.foreground },
+        contentStyle: { backgroundColor: tokens.bgPrimary },
+        headerStyle: { backgroundColor: tokens.bgSecondary },
+        headerTintColor: tokens.textPrimary,
+        headerTitleStyle: { color: tokens.textPrimary },
       }}
     >
       <Stack.Screen name="(tabs)" />

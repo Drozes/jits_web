@@ -39,7 +39,10 @@
   "submit": {
     "production": {
       "ios": {
-        "ascAppId": "PLACEHOLDER_ASC_APP_ID"
+        "ascAppId": "6774629438",
+        "ascApiKeyPath": "/Users/msponagle/.appstoreconnect/private_keys/AuthKey_T6FCD76M5B.p8",
+        "ascApiKeyId": "T6FCD76M5B",
+        "ascApiKeyIssuerId": "69a6de71-088c-47e3-e053-5b8c7c11a4d1"
       },
       "android": {
         "serviceAccountKeyPath": "PLACEHOLDER_SERVICE_ACCOUNT_KEY_PATH",

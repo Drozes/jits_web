@@ -1,6 +1,6 @@
 import { Text, View } from "react-native";
 import { getCurrentMilestone, getNextMilestone, getMilestoneProgress } from "@jits/shared/utils";
-import { Card, CardContent } from "@/components/ui/card";
+import { Plate } from "@/components/ui/elo-system";
 
 interface MilestoneProgressProps {
   elo: number;
@@ -12,32 +12,34 @@ export function MilestoneProgress({ elo }: MilestoneProgressProps) {
   const progress = getMilestoneProgress(elo);
 
   return (
-    <Card>
-      <CardContent className="p-4 gap-2">
-        <View className="flex-row items-center justify-between">
-          <Text className="text-sm font-heading text-foreground">{current.name}</Text>
-          {next ? (
-            <Text className="text-xs font-mono text-muted-foreground tabular-nums">
-              {next.threshold - elo} pts to {next.name}
-            </Text>
-          ) : (
-            <Text className="text-xs font-medium text-success">Max rank</Text>
-          )}
-        </View>
-        <View className="h-2.5 rounded-full bg-muted overflow-hidden">
-          <View className="h-full rounded-full bg-primary" style={{ width: `${progress}%` }} />
-        </View>
-        {next && (
-          <View className="flex-row justify-between">
-            <Text className="text-[10px] font-mono text-muted-foreground tabular-nums">
-              {current.threshold}
-            </Text>
-            <Text className="text-[10px] font-mono text-muted-foreground tabular-nums">
-              {next.threshold}
-            </Text>
-          </View>
+    <Plate>
+      <View className="flex-row items-center justify-between mb-2">
+        <Text className="font-heading text-[12px] text-ink uppercase tracking-caps">
+          {current.name}
+        </Text>
+        {next ? (
+          <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l tabular-nums">
+            {next.threshold - elo} to {next.name}
+          </Text>
+        ) : (
+          <Text className="font-mono-bold text-[10px] text-positive uppercase tracking-caps-l">
+            Max Rank
+          </Text>
         )}
-      </CardContent>
-    </Card>
+      </View>
+      <View className="h-1.5 rounded-xs bg-surface-4 overflow-hidden">
+        <View className="h-full bg-cta" style={{ width: `${progress}%` }} />
+      </View>
+      {next && (
+        <View className="flex-row justify-between mt-2">
+          <Text className="font-mono text-[10px] text-ink-3 tabular-nums">
+            {current.threshold}
+          </Text>
+          <Text className="font-mono text-[10px] text-ink-3 tabular-nums">
+            {next.threshold}
+          </Text>
+        </View>
+      )}
+    </Plate>
   );
 }

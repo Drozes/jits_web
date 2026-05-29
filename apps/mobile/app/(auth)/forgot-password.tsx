@@ -2,25 +2,23 @@ import * as React from "react";
 import {
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   ScrollView,
   Text,
+  View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import {
-  Button,
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-  toast,
-} from "@/components/ui";
+import { Plate, Wordmark } from "@/components/ui/elo-system";
+import { toast } from "@/components/ui";
+import { AppHeader } from "@/components/layout/app-header";
 import { AuthFormField } from "@/components/auth/auth-form-field";
+import { CtaButton, TertiaryButton } from "@/components/auth/auth-buttons";
 import { useAuth } from "@/lib/auth/hooks";
 
+/**
+ * Forgot-password screen. ELO design system: hero Wordmark + Plate form +
+ * primary CTA. After submission, show a confirmation Plate explaining the
+ * email handoff.
+ */
 export default function ForgotPasswordScreen() {
   const router = useRouter();
   const { user, isLoading: authLoading, resetPassword } = useAuth();
@@ -53,67 +51,71 @@ export default function ForgotPasswordScreen() {
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={{ flex: 1 }}
+      className="bg-surface"
     >
-      <SafeAreaView style={{ flex: 1 }} className="bg-background">
+      <View style={{ flex: 1 }} className="bg-surface">
+        <AppHeader title="Reset Password" back />
         <ScrollView
-          contentContainerStyle={{ padding: 24, gap: 16 }}
+          contentContainerStyle={{
+            flexGrow: 1,
+            paddingHorizontal: 24,
+            paddingVertical: 24,
+            gap: 24,
+          }}
           keyboardShouldPersistTaps="handled"
         >
+          <View className="items-center gap-2">
+            <Wordmark size="lg" />
+            <Text className="font-mono text-[11px] text-ink-3 uppercase tracking-caps-l">
+              {submitted ? "Check Your Email" : "Send Reset Link"}
+            </Text>
+          </View>
+
           {submitted ? (
-            <Card>
-              <CardHeader>
-                <CardTitle>Check your email</CardTitle>
-                <CardDescription>
-                  If an account exists for {email}, we sent a password reset
-                  link. Follow the instructions to choose a new password.
-                </CardDescription>
-              </CardHeader>
-              <CardFooter className="flex-col items-stretch gap-3">
-                <Button onPress={() => router.replace("/login")}>
-                  Back to sign in
-                </Button>
-              </CardFooter>
-            </Card>
+            <Plate className="gap-4">
+              <Text className="font-body text-[14px] text-ink leading-6">
+                If an account exists for {email}, we sent a password reset link.
+                Follow the instructions to choose a new password.
+              </Text>
+              <CtaButton
+                label="Back to Sign In"
+                onPress={() => router.replace("/login")}
+              />
+            </Plate>
           ) : (
-            <Card>
-              <CardHeader>
-                <CardTitle>Reset your password</CardTitle>
-                <CardDescription>
-                  Enter your email and we&apos;ll send you a reset link
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="gap-4">
+            <>
+              <Plate className="gap-5">
+                <Text className="font-body text-[14px] text-ink-2 leading-6">
+                  Enter the email address linked to your account. We&apos;ll send
+                  you a link to reset your password.
+                </Text>
                 <AuthFormField
                   label="Email"
                   autoCapitalize="none"
                   autoComplete="email"
                   autoCorrect={false}
                   keyboardType="email-address"
-                  placeholder="m@example.com"
+                  placeholder="you@example.com"
                   value={email}
                   onChangeText={setEmail}
                   onBlur={() => setTouched(true)}
                   error={emailError}
                   showError={touched}
                 />
-              </CardContent>
-              <CardFooter className="flex-col items-stretch gap-3">
-                <Button
+                <CtaButton
+                  label={submitting ? "Sending..." : "Send Reset Email"}
                   onPress={onSubmit}
                   disabled={submitting || (touched && Boolean(emailError))}
-                >
-                  {submitting ? "Sending..." : "Send reset email"}
-                </Button>
-                <Pressable onPress={() => router.replace("/login")} hitSlop={8}>
-                  <Text className="text-center text-sm text-muted-foreground">
-                    Back to sign in
-                  </Text>
-                </Pressable>
-              </CardFooter>
-            </Card>
+                />
+              </Plate>
+              <TertiaryButton
+                label="Back to Sign In"
+                onPress={() => router.replace("/login")}
+              />
+            </>
           )}
         </ScrollView>
-      </SafeAreaView>
+      </View>
     </KeyboardAvoidingView>
   );
 }

@@ -1,7 +1,6 @@
 import * as React from "react";
+import { Pressable, Text, View } from "react-native";
 import { ChevronLeft } from "lucide-react-native";
-import { View } from "react-native";
-import { Button } from "@/components/ui/button";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { ConfirmStep } from "./wizard/confirm-step";
 import { GeoStep } from "./wizard/geo-step";
@@ -42,7 +41,7 @@ interface JoinWizardProps {
  *   - weight + confirm: always
  *
  * Navigation is forward-only inside each step (each step renders its own
- * Continue button) plus a Back button rendered here for everything past
+ * primary cta) plus a small "Back" link rendered here for everything past
  * the first step.
  */
 export function JoinWizard(props: JoinWizardProps) {
@@ -130,13 +129,17 @@ export function JoinWizard(props: JoinWizardProps) {
       )}
 
       {currentIdx > 0 && (
-        <Button
-          variant="ghost"
+        <Pressable
+          accessibilityRole="button"
           onPress={goBack}
-          leftIcon={<ChevronLeft size={16} color={tokens.foreground} />}
+          className="flex-row items-center justify-center gap-1 py-2"
+          hitSlop={6}
         >
-          Back
-        </Button>
+          <ChevronLeft size={16} color={tokens.textSecondary} />
+          <Text className="font-mono-bold text-[10px] text-ink-2 uppercase tracking-caps-l">
+            Back
+          </Text>
+        </Pressable>
       )}
     </View>
   );

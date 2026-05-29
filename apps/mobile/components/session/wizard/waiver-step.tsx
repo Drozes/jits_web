@@ -1,7 +1,7 @@
 import * as React from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
-import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
+import { Plate } from "@/components/ui/elo-system";
 import { supabase } from "@/lib/supabase/client";
 import { acceptSessionWaiver } from "@jits/shared/api/mutations";
 import { cn } from "@/lib/cn";
@@ -25,6 +25,10 @@ interface WaiverStepProps {
 /**
  * Native port of `apps/web/app/(app)/session/[id]/join/steps/waiver-step.tsx`.
  *
+ * ELO design system: wireframe C2 (lines 972-989). Scrollable Plate holds the
+ * TOS body text (font-body, ink-2) with a heading; a checkbox row + primary
+ * "I Acknowledge" cta sits below.
+ *
  * Calls `acceptSessionWaiver` which inserts into `waiver_acknowledgements`.
  * Errors surface via toast so the user can retry.
  */
@@ -45,17 +49,16 @@ export function WaiverStep({ sessionId, waiverId, onNext }: WaiverStepProps) {
 
   return (
     <View className="gap-4">
-      <Text className="text-center text-base font-heading text-foreground">
-        Liability Waiver
-      </Text>
-      <ScrollView
-        className="max-h-72 rounded-md border border-border p-4"
-        nestedScrollEnabled
-      >
-        <Text className="text-xs leading-relaxed text-muted-foreground">
-          {WAIVER_TEXT}
+      <Plate className="max-h-[360px]">
+        <Text className="font-heading text-[16px] text-ink mb-3">
+          ELO RATED Liability Acknowledgement
         </Text>
-      </ScrollView>
+        <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={false}>
+          <Text className="font-body text-[13px] text-ink-2 leading-[22px]">
+            {WAIVER_TEXT}
+          </Text>
+        </ScrollView>
+      </Plate>
 
       <Pressable
         accessibilityRole="checkbox"
@@ -65,24 +68,35 @@ export function WaiverStep({ sessionId, waiverId, onNext }: WaiverStepProps) {
       >
         <View
           className={cn(
-            "mt-0.5 h-4 w-4 items-center justify-center rounded border border-input",
-            agreed && "bg-primary",
+            "mt-0.5 h-4 w-4 items-center justify-center rounded-xs border",
+            agreed ? "bg-cta border-cta" : "border-hairline-strong bg-surface-3",
           )}
         >
           {agreed && (
-            <Text className="text-[10px] font-bold text-primary-foreground">
+            <Text className="font-mono-bold text-[10px] text-ink-on-cta">
               {"✓"}
             </Text>
           )}
         </View>
-        <Text className="flex-1 text-sm text-foreground">
+        <Text className="flex-1 font-body text-[13px] text-ink-2">
           I have read and agree to this waiver
         </Text>
       </Pressable>
 
-      <Button onPress={handleAccept} disabled={!agreed || loading}>
-        {loading ? "Accepting..." : "Continue"}
-      </Button>
+      <Pressable
+        accessibilityRole="button"
+        onPress={handleAccept}
+        disabled={!agreed || loading}
+        className={cn(
+          "bg-cta items-center justify-center py-3 rounded-sm",
+          (!agreed || loading) && "opacity-50",
+          "active:bg-cta-hover",
+        )}
+      >
+        <Text className="font-heading text-[13px] text-ink-on-cta uppercase tracking-caps">
+          {loading ? "Accepting..." : "I Acknowledge"}
+        </Text>
+      </Pressable>
     </View>
   );
 }

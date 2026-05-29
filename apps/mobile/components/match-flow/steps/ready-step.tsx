@@ -1,12 +1,12 @@
 import * as React from "react";
-import { ActivityIndicator, Text, View } from "react-native";
-import { Button } from "@/components/ui/button";
+import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { toast } from "@/components/ui/toast";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { supabase } from "@/lib/supabase/client";
 import { startMatch } from "@jits/shared/api/mutations";
 import { useSessionMatchSync } from "@jits/shared/hooks/use-session-match-sync";
 import { ReadyPanel } from "./ready-panel";
+import { cn } from "@/lib/cn";
 
 interface ReadyStepProps {
   matchId: string;
@@ -17,9 +17,13 @@ interface ReadyStepProps {
 }
 
 /**
- * Step 3 -- both athletes tap Ready, then the *initiator* fires
+ * Step 3: both athletes tap Ready, then the *initiator* fires
  * `start_match` and broadcasts `timer_started`. The other client
  * receives the broadcast and advances. Mirrors web's ready-check-step.
+ *
+ * ELO design system: meta-strip header, two ReadyPanels side by side,
+ * primary cta in Signal Red. Waiting copy uses mono caps. Mirrors D5
+ * wireframe (lines 1175-1202).
  */
 export function ReadyStep(props: ReadyStepProps) {
   const tokens = useThemedTokens();
@@ -72,22 +76,48 @@ export function ReadyStep(props: ReadyStepProps) {
 
   return (
     <View className="gap-5 px-1 py-4">
-      <View className="items-center gap-1">
-        <Text className="text-lg font-heading text-foreground">Ready Check</Text>
-        <Text className="text-sm text-muted-foreground">Both athletes must tap Ready to start.</Text>
+      <View className="items-center gap-2">
+        <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-xl">
+          Ready Check
+        </Text>
+        <Text className="font-body text-[13px] text-ink-2 text-center">
+          Both athletes must tap Ready to start.
+        </Text>
       </View>
+
       <View className="flex-row gap-3">
         <ReadyPanel label="You" ready={myReady} />
         <ReadyPanel label="Opponent" ready={opponentReady} />
       </View>
+
       {!myReady ? (
-        <Button size="lg" onPress={handleTapReady} disabled={loading}>
-          Ready
-        </Button>
+        <Pressable
+          accessibilityRole="button"
+          onPress={handleTapReady}
+          disabled={loading}
+          className={cn(
+            "bg-cta items-center justify-center py-3 rounded-sm active:bg-cta-hover",
+            loading && "opacity-50",
+          )}
+        >
+          <Text className="font-heading text-[13px] text-ink-on-cta uppercase tracking-caps">
+            Ready
+          </Text>
+        </Pressable>
       ) : !opponentReady ? (
-        <Text className="text-center text-sm text-muted-foreground">Waiting for opponent...</Text>
+        <Text className="text-center font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">
+          Waiting for opponent...
+        </Text>
       ) : null}
-      {loading ? <ActivityIndicator color={tokens.primary} /> : null}
+
+      {loading ? (
+        <View className="items-center gap-2">
+          <ActivityIndicator color={tokens.textSecondary} />
+          <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">
+            Starting match...
+          </Text>
+        </View>
+      ) : null}
     </View>
   );
 }

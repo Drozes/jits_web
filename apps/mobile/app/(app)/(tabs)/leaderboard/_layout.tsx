@@ -9,9 +9,9 @@ export default function LeaderboardLayout() {
       screenOptions={{
         headerShown: false,
         presentation: "card",
-        headerStyle: { backgroundColor: tokens.background },
-        headerTintColor: tokens.foreground,
-        headerTitleStyle: { color: tokens.foreground },
+        headerStyle: { backgroundColor: tokens.bgSecondary },
+        headerTintColor: tokens.textPrimary,
+        headerTitleStyle: { color: tokens.textPrimary },
       }}
     />
   );

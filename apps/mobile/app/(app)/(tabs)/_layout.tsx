@@ -1,20 +1,13 @@
 import { Tabs } from "expo-router";
 import { Dumbbell, Home, Trophy, User } from "lucide-react-native";
-import { useThemedTokens } from "@/lib/theme/use-theme";
+import { EloTabBar } from "@/components/layout/elo-tab-bar";
 
 export default function TabsLayout() {
-  const tokens = useThemedTokens();
-
   return (
     <Tabs
+      tabBar={(props) => <EloTabBar {...props} />}
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: tokens.primary,
-        tabBarInactiveTintColor: tokens.mutedForeground,
-        tabBarStyle: {
-          backgroundColor: tokens.card,
-          borderTopColor: tokens.border,
-        },
       }}
     >
       <Tabs.Screen

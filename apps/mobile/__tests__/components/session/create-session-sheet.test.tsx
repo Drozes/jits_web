@@ -25,6 +25,9 @@ jest.mock("@/lib/theme/use-theme", () => ({
     foreground: "#000000",
     mutedForeground: "#6B7280",
     primaryForeground: "#ffffff",
+    accentCta: "#E63946",
+    textOnAccent: "#E8EDF2",
+    textTertiary: "#6B7280",
   }),
 }));
 
@@ -57,35 +60,6 @@ jest.mock("@/components/ui/sheet", () => {
   };
 });
 
-// Mock the Button to render text directly
-jest.mock("@/components/ui/button", () => {
-  const R = require("react");
-  const RN = require("react-native");
-  return {
-    Button: ({ children, ...props }: { children: React.ReactNode; onPress?: () => void }) =>
-      R.createElement(
-        RN.View,
-        { ...props, testID: "button", accessible: false },
-        typeof children === "string"
-          ? R.createElement(RN.Text, {}, children)
-          : children,
-      ),
-  };
-});
-
-// Mock the Input to render a TextInput
-jest.mock("@/components/ui/input", () => {
-  const R = require("react");
-  const RN = require("react-native");
-  return {
-    Input: (props: Record<string, unknown>) =>
-      R.createElement(RN.TextInput, {
-        testID: `input-${props.placeholder ?? "default"}`,
-        ...props,
-      }),
-  };
-});
-
 import { CreateSessionSheet } from "@/components/session/create-session-sheet";
 
 describe("CreateSessionSheet", () => {
@@ -99,19 +73,20 @@ describe("CreateSessionSheet", () => {
         </Pressable>
       </CreateSessionSheet>,
     );
-    // "Create Session" appears in both the sheet title and the submit button
+    // The sheet header reads "New Session" and the submit button "Create Session".
+    expect(getAllByText("New Session").length).toBeGreaterThanOrEqual(1);
     expect(getAllByText("Create Session").length).toBeGreaterThanOrEqual(1);
   });
 
   it("renders the Title field with default value", () => {
-    const { getByTestId } = render(
+    const { getByPlaceholderText } = render(
       <CreateSessionSheet gymId="g1" onCreated={onCreated}>
         <Pressable>
           <Text>Trigger</Text>
         </Pressable>
       </CreateSessionSheet>,
     );
-    const titleInput = getByTestId("input-Open Mat");
+    const titleInput = getByPlaceholderText("Open Mat");
     expect(titleInput.props.value).toBe("Open Mat");
   });
 
@@ -124,8 +99,9 @@ describe("CreateSessionSheet", () => {
       </CreateSessionSheet>,
     );
     expect(getByText("Now")).toBeTruthy();
-    expect(getByText("+30 min")).toBeTruthy();
-    expect(getByText("+1 hour")).toBeTruthy();
+    // ELO compact labels: "+30m", "+1h"
+    expect(getByText("+30m")).toBeTruthy();
+    expect(getByText("+1h")).toBeTruthy();
   });
 
   it("renders duration preset buttons", () => {
@@ -142,26 +118,26 @@ describe("CreateSessionSheet", () => {
   });
 
   it("renders the max participants field", () => {
-    const { getByTestId } = render(
+    const { getByPlaceholderText } = render(
       <CreateSessionSheet gymId="g1" onCreated={onCreated}>
         <Pressable>
           <Text>Trigger</Text>
         </Pressable>
       </CreateSessionSheet>,
     );
-    const maxInput = getByTestId("input-20");
+    const maxInput = getByPlaceholderText("20");
     expect(maxInput.props.value).toBe("20");
   });
 
   it("renders the notes field", () => {
-    const { getByTestId } = render(
+    const { getByPlaceholderText } = render(
       <CreateSessionSheet gymId="g1" onCreated={onCreated}>
         <Pressable>
           <Text>Trigger</Text>
         </Pressable>
       </CreateSessionSheet>,
     );
-    expect(getByTestId("input-Any details for participants...")).toBeTruthy();
+    expect(getByPlaceholderText("Details for participants...")).toBeTruthy();
   });
 
   it("renders field labels", () => {
@@ -187,8 +163,6 @@ describe("CreateSessionSheet", () => {
         </Pressable>
       </CreateSessionSheet>,
     );
-    // "Create Session" appears in the sheet title and possibly the submit button
-    const matches = getAllByText("Create Session");
-    expect(matches.length).toBeGreaterThanOrEqual(1);
+    expect(getAllByText("Create Session").length).toBeGreaterThanOrEqual(1);
   });
 });

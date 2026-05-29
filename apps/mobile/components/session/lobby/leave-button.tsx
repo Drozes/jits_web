@@ -1,30 +1,36 @@
 import * as React from "react";
 import { useRouter } from "expo-router";
-import { Alert } from "react-native";
-import { LogOut } from "lucide-react-native";
-import { Button } from "@/components/ui/button";
+import { Alert, Pressable, Text } from "react-native";
 import { toast } from "@/components/ui/toast";
 import { supabase } from "@/lib/supabase/client";
-import { useThemedTokens } from "@/lib/theme/use-theme";
 import { leaveSessionLobby } from "@jits/shared/api/mutations";
+import { cn } from "@/lib/cn";
 
 interface LeaveButtonProps {
   sessionId: string;
+  /**
+   * "compact": small tertiary text button (mounts in the AppHeader right slot).
+   * "block":   full-width outlined cta (mounts at the bottom of the lobby).
+   */
+  variant?: "compact" | "block";
 }
 
 /**
- * Leave-session button. Confirms via Alert before mutating the lobby
- * row to `status = 'left'`. Mirrors the web flow (which uses `window.confirm`).
+ * Leave-session button. Confirms via Alert before mutating the lobby row to
+ * `status = 'left'`. Mirrors the web flow (which uses `window.confirm`).
+ *
+ * The compact variant matches the C4 wireframe (line 1015): a small tertiary
+ * "Leave" link sitting in the topbar's right slot. The block variant is the
+ * fallback CTA shape used at the bottom of the lobby.
  */
-export function LeaveButton({ sessionId }: LeaveButtonProps) {
+export function LeaveButton({ sessionId, variant = "compact" }: LeaveButtonProps) {
   const router = useRouter();
-  const tokens = useThemedTokens();
   const [leaving, setLeaving] = React.useState(false);
 
   function handlePress() {
     Alert.alert(
       "Leave session?",
-      "You'll be removed from the lobby. You can rejoin if the session is still active.",
+      "You’ll be removed from the lobby. You can rejoin if the session is still active.",
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -48,14 +54,38 @@ export function LeaveButton({ sessionId }: LeaveButtonProps) {
     );
   }
 
+  if (variant === "block") {
+    return (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Leave session"
+        onPress={handlePress}
+        disabled={leaving}
+        className={cn(
+          "border border-negative rounded-sm py-3 items-center",
+          leaving && "opacity-50",
+          "active:bg-surface-3",
+        )}
+      >
+        <Text className="font-heading text-[12px] text-negative uppercase tracking-caps">
+          {leaving ? "Leaving..." : "Leave Session"}
+        </Text>
+      </Pressable>
+    );
+  }
+
   return (
-    <Button
-      variant="outline"
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Leave session"
       onPress={handlePress}
       disabled={leaving}
-      leftIcon={<LogOut size={16} color={tokens.foreground} />}
+      className={cn("px-2 py-2", leaving && "opacity-50")}
+      hitSlop={6}
     >
-      {leaving ? "Leaving..." : "Leave Session"}
-    </Button>
+      <Text className="font-heading text-[11px] text-negative uppercase tracking-caps">
+        {leaving ? "Leaving..." : "Leave"}
+      </Text>
+    </Pressable>
   );
 }

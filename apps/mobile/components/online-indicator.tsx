@@ -3,7 +3,6 @@
  * athlete is not currently in the `app:online` Presence set, so it's safe to
  * drop into avatars / list rows unconditionally.
  */
-import * as React from "react";
 import { View } from "react-native";
 import { cn } from "../lib/cn";
 import { useOnlineStatus } from "../lib/presence/use-online-presence";

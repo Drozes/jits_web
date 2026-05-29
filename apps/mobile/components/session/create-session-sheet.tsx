@@ -7,10 +7,8 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Plate } from "@/components/ui/elo-system";
 import { toast } from "@/components/ui/toast";
-import { Plus } from "lucide-react-native";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { supabase } from "@/lib/supabase/client";
 import { createSession } from "@jits/shared/api/mutations";
@@ -20,8 +18,8 @@ type DurationPreset = 1 | 2 | 3;
 
 const START_PRESETS: { value: StartPreset; label: string }[] = [
   { value: "now", label: "Now" },
-  { value: "+30", label: "+30 min" },
-  { value: "+60", label: "+1 hour" },
+  { value: "+30", label: "+30m" },
+  { value: "+60", label: "+1h" },
 ];
 const DURATION_PRESETS: { value: DurationPreset; label: string }[] = [
   { value: 1, label: "1h" },
@@ -78,70 +76,87 @@ export function CreateSessionSheet({ gymId, onCreated, children }: CreateSession
   return (
     <Sheet>
       <SheetTrigger asChild>{children}</SheetTrigger>
-      <SheetContent snapPoints={["75%"]}>
+      <SheetContent snapPoints={["80%"]}>
         <SheetHeader>
-          <SheetTitle>Create Session</SheetTitle>
+          <SheetTitle className="font-heading text-[18px] text-ink uppercase tracking-caps">
+            New Session
+          </SheetTitle>
         </SheetHeader>
 
-        <View className="gap-4">
-          <FieldLabel label="Title">
-            <Input value={title} onChangeText={setTitle} placeholder="Open Mat" />
-          </FieldLabel>
+        <Plate className="gap-4 mt-2">
+          <Field label="Title">
+            <ElevatedInput value={title} onChangeText={setTitle} placeholder="Open Mat" tokens={tokens} />
+          </Field>
 
-          <FieldLabel label="Start Time">
+          <Field label="Start Time">
             <PresetRow
               options={START_PRESETS}
               selected={startPreset}
               onSelect={setStartPreset}
             />
-          </FieldLabel>
+          </Field>
 
-          <FieldLabel label="Duration">
+          <Field label="Duration">
             <PresetRow
               options={DURATION_PRESETS}
               selected={duration}
               onSelect={setDuration}
             />
-          </FieldLabel>
+          </Field>
 
-          <FieldLabel label="Max Participants">
-            <Input
+          <Field label="Max Participants">
+            <ElevatedInput
               value={maxParticipants}
               onChangeText={setMaxParticipants}
               keyboardType="number-pad"
               placeholder="20"
+              tokens={tokens}
             />
-          </FieldLabel>
+          </Field>
 
-          <FieldLabel label="Notes (optional)">
-            <Input
+          <Field label="Notes (optional)">
+            <ElevatedInput
               value={notes}
               onChangeText={setNotes}
-              placeholder="Any details for participants..."
+              placeholder="Details for participants..."
               multiline
               numberOfLines={2}
+              tokens={tokens}
               className="h-16"
-              style={{ textAlignVertical: "top" }}
+              style={{ textAlignVertical: "top", paddingTop: 10 }}
             />
-          </FieldLabel>
+          </Field>
+        </Plate>
 
-          <Button onPress={handleCreate} disabled={loading} className="mt-2">
-            {loading ? (
-              <ActivityIndicator size="small" color={tokens.primaryForeground} />
-            ) : (
-              <Text className="text-sm font-medium text-primary-foreground">Create Session</Text>
-            )}
-          </Button>
-        </View>
+        <Pressable
+          onPress={handleCreate}
+          disabled={loading}
+          accessibilityRole="button"
+          className={
+            loading
+              ? "mt-4 bg-cta rounded-sm py-3 px-5 items-center justify-center opacity-50"
+              : "mt-4 bg-cta rounded-sm py-3 px-5 items-center justify-center active:bg-cta-hover"
+          }
+        >
+          {loading ? (
+            <ActivityIndicator size="small" color={tokens.textOnAccent} />
+          ) : (
+            <Text className="font-heading text-[13px] text-ink-on-cta uppercase tracking-caps">
+              Create Session
+            </Text>
+          )}
+        </Pressable>
       </SheetContent>
     </Sheet>
   );
 }
 
-function FieldLabel({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <View className="gap-1.5">
-      <Text className="text-sm font-medium text-foreground">{label}</Text>
+      <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-xl">
+        {label}
+      </Text>
       {children}
     </View>
   );
@@ -158,17 +173,52 @@ function PresetRow<T extends string | number>({
 }) {
   return (
     <View className="flex-row gap-2">
-      {options.map((o) => (
-        <Button
-          key={String(o.value)}
-          variant={selected === o.value ? "default" : "outline"}
-          size="sm"
-          onPress={() => onSelect(o.value)}
-          className="flex-1"
-        >
-          {o.label}
-        </Button>
-      ))}
+      {options.map((o) => {
+        const isSel = selected === o.value;
+        return (
+          <Pressable
+            key={String(o.value)}
+            onPress={() => onSelect(o.value)}
+            accessibilityRole="button"
+            accessibilityState={{ selected: isSel }}
+            className={
+              isSel
+                ? "flex-1 h-10 items-center justify-center rounded-xs bg-cta active:bg-cta-hover"
+                : "flex-1 h-10 items-center justify-center rounded-xs bg-surface-4 border border-hairline-strong"
+            }
+          >
+            <Text
+              className={
+                isSel
+                  ? "font-heading text-[12px] text-ink-on-cta uppercase tracking-caps"
+                  : "font-heading text-[12px] text-ink uppercase tracking-caps"
+              }
+            >
+              {o.label}
+            </Text>
+          </Pressable>
+        );
+      })}
     </View>
+  );
+}
+
+function ElevatedInput({
+  tokens,
+  className,
+  ...props
+}: React.ComponentProps<typeof TextInput> & {
+  tokens: ReturnType<typeof useThemedTokens>;
+  className?: string;
+}) {
+  return (
+    <TextInput
+      placeholderTextColor={tokens.textTertiary}
+      className={[
+        "h-11 px-4 rounded-xs bg-surface-4 border border-hairline text-ink font-mono text-[14px]",
+        className ?? "",
+      ].join(" ")}
+      {...props}
+    />
   );
 }

@@ -1,8 +1,6 @@
-import * as React from "react";
-import { Text, View } from "react-native";
-import { AlertTriangle, Scale } from "lucide-react-native";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Pressable, Text, View } from "react-native";
+import { AlertTriangle } from "lucide-react-native";
+import { EloTile, Plate } from "@/components/ui/elo-system";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 
 interface WeightStepProps {
@@ -21,13 +19,24 @@ function divisionGap(a: number, b: number): number {
 }
 
 /**
- * Step 2 -- both athletes confirm scale weights before the ready check.
+ * Step 2: both athletes confirm scale weights before the ready check.
  * Mirrors `apps/web/.../steps/weight-verify-step.tsx`, including the
  * weight-division-gap warning for ranked matches.
+ *
+ * ELO design system: hero meta + h2-ish heading, two EloTile values for
+ * each athlete's weight, hairline warning plate when divisions differ,
+ * and a Signal Red confirm cta.
  */
 export function WeightStep(props: WeightStepProps) {
   const tokens = useThemedTokens();
-  const { currentDisplayName, currentWeight, opponentDisplayName, opponentWeight, matchType, onConfirm } = props;
+  const {
+    currentDisplayName,
+    currentWeight,
+    opponentDisplayName,
+    opponentWeight,
+    matchType,
+    onConfirm,
+  } = props;
   const both = currentWeight != null && opponentWeight != null;
   const diff = both ? Math.abs(currentWeight! - opponentWeight!) : 0;
   const gap = both ? divisionGap(currentWeight!, opponentWeight!) : 0;
@@ -35,49 +44,61 @@ export function WeightStep(props: WeightStepProps) {
   return (
     <View className="gap-5 px-1 py-4">
       <View className="items-center gap-2">
-        <Scale size={28} color={tokens.destructive} />
-        <Text className="text-lg font-heading text-foreground">Verify Weights</Text>
+        <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-xl">
+          Verify Weights
+        </Text>
+        <Text className="font-display text-[28px] text-ink text-center tracking-mark">
+          ON THE SCALE
+        </Text>
       </View>
 
-      <View className="flex-row gap-3">
-        <WeightCard name={currentDisplayName} weight={currentWeight} />
-        <WeightCard name={opponentDisplayName} weight={opponentWeight} />
+      <View className="flex-row gap-3 justify-center">
+        <WeightTile name={currentDisplayName} weight={currentWeight} />
+        <WeightTile name={opponentDisplayName} weight={opponentWeight} />
       </View>
 
       {both && matchType === "ranked" && diff > 0 ? (
-        <Text className="text-center text-xs tabular-nums text-muted-foreground">
+        <Text className="text-center font-mono text-[12px] text-ink-3 tracking-caps-l uppercase">
           Weight difference: {diff} lbs
         </Text>
       ) : null}
 
       {matchType === "ranked" && gap > 0 ? (
-        <View className="flex-row items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2">
-          <AlertTriangle size={14} color="#f59e0b" />
-          <Text className="flex-1 text-xs text-amber-500">
+        <Plate variant="loss" className="flex-row items-center gap-2">
+          <AlertTriangle size={16} color={tokens.stateNegative} />
+          <Text className="flex-1 font-body text-[12px] text-ink-2">
             Weight division gap detected. Heavier athlete{"’"}s ELO will be adjusted.
           </Text>
-        </View>
+        </Plate>
       ) : null}
 
-      <Button size="lg" onPress={onConfirm}>
-        Confirm Weights
-      </Button>
+      <Pressable
+        accessibilityRole="button"
+        onPress={onConfirm}
+        className="bg-cta items-center justify-center py-3 rounded-sm active:bg-cta-hover"
+      >
+        <Text className="font-heading text-[13px] text-ink-on-cta uppercase tracking-caps">
+          Confirm Weights
+        </Text>
+      </Pressable>
     </View>
   );
 }
 
-function WeightCard({ name, weight }: { name: string; weight: number | null }) {
+function WeightTile({ name, weight }: { name: string; weight: number | null }) {
   return (
-    <Card className="flex-1">
-      <CardContent className="items-center gap-1 px-3 py-4">
-        <Text className="w-full text-center text-sm font-medium text-foreground" numberOfLines={1}>
-          {name}
-        </Text>
-        <Text className="text-3xl font-mono tabular-nums text-foreground">
-          {weight != null ? `${weight}` : "N/A"}
-        </Text>
-        {weight != null ? <Text className="text-xs text-muted-foreground">lbs</Text> : null}
-      </CardContent>
-    </Card>
+    <View className="flex-1 items-center gap-2">
+      <Text
+        className="font-heading text-[11px] text-ink-2 uppercase tracking-caps text-center"
+        numberOfLines={1}
+      >
+        {name}
+      </Text>
+      <EloTile
+        label="lbs"
+        value={weight != null ? weight : "N/A"}
+        size="medium"
+      />
+    </View>
   );
 }

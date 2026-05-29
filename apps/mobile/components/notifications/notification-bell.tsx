@@ -38,15 +38,16 @@ export function NotificationBell({ athleteId }: NotificationBellProps) {
   return (
     <>
       <Pressable
+        accessibilityRole="button"
         accessibilityLabel="Notifications"
         onPress={handleOpen}
-        className="relative h-10 w-10 items-center justify-center rounded-full active:bg-accent/40"
+        className="relative w-8 h-8 items-center justify-center rounded-xs active:bg-surface-4"
         hitSlop={8}
       >
-        <Bell size={20} color={tokens.foreground} />
+        <Bell size={18} color={tokens.textPrimary} />
         {count > 0 && (
-          <View className="absolute top-1 right-1 h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1">
-            <Text className="text-[10px] font-mono text-primary-foreground">
+          <View className="absolute top-0 right-0 h-4 min-w-4 items-center justify-center rounded-full bg-cta px-1">
+            <Text className="font-mono-bold text-[9px] text-ink-on-cta">
               {count > 99 ? "99+" : String(count)}
             </Text>
           </View>

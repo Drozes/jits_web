@@ -1,21 +1,27 @@
 import * as React from "react";
-import { ActivityIndicator, Text, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ActivityIndicator, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Avatar32, Chip, MetaTag, Wordmark } from "@/components/ui/elo-system";
 import { useRequireAthlete } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { useLeaderboardData } from "@/lib/leaderboard/use-leaderboard-data";
-import { GenderFilterRow, type GenderFilter } from "@/components/leaderboard/gender-filter-row";
+import {
+  GenderFilterRow,
+  type GenderFilter,
+} from "@/components/leaderboard/gender-filter-row";
 import { FightersList } from "@/components/leaderboard/fighters-list";
 import { GymsList } from "@/components/leaderboard/gyms-list";
 
+type TabValue = "fighters" | "gyms";
+
 export default function LeaderboardScreen() {
+  const insets = useSafeAreaInsets();
   const { athlete, isLoading: authLoading } = useRequireAthlete();
   const tokens = useThemedTokens();
   const { athletes, gyms, isLoading, isRefreshing, refresh } = useLeaderboardData(
     athlete?.id,
   );
-  const [tab, setTab] = React.useState<"fighters" | "gyms">("fighters");
+  const [tab, setTab] = React.useState<TabValue>("fighters");
   const [genderFilter, setGenderFilter] = React.useState<GenderFilter>(() => {
     if (athlete?.gender === "M") return "male";
     if (athlete?.gender === "F") return "female";
@@ -30,27 +36,53 @@ export default function LeaderboardScreen() {
     );
   }, [athletes, genderFilter]);
 
+  const currentUserAthlete = React.useMemo(() => {
+    if (!athletes) return null;
+    return athletes.find((a) => a.isCurrentUser) ?? null;
+  }, [athletes]);
+
   if (authLoading || !athlete || isLoading) {
     return (
-      <SafeAreaView className="flex-1 bg-background items-center justify-center">
-        <ActivityIndicator color={tokens.primary} />
-      </SafeAreaView>
+      <View className="flex-1 bg-surface items-center justify-center">
+        <ActivityIndicator color={tokens.accentCta} />
+      </View>
     );
   }
 
+  const countLabel =
+    tab === "fighters"
+      ? `${filteredAthletes.length} Athletes · Live`
+      : `${(gyms ?? []).length} Gyms · Live`;
+
   return (
-    <SafeAreaView className="flex-1 bg-background" edges={["top"]}>
-      <View className="px-4 pt-4 pb-2">
-        <Text className="text-2xl font-heading text-foreground mb-3">Rankings</Text>
-        <Tabs value={tab} onValueChange={(v) => setTab(v as "fighters" | "gyms")}>
-          <TabsList>
-            <TabsTrigger value="fighters">Fighters</TabsTrigger>
-            <TabsTrigger value="gyms">Gyms</TabsTrigger>
-          </TabsList>
-        </Tabs>
+    <View className="flex-1 bg-surface">
+      <View
+        className="bg-surface-2 border-b border-hairline flex-row items-center justify-between px-4"
+        style={{ paddingTop: insets.top, height: 56 + insets.top }}
+      >
+        <Wordmark size="md" />
+        <Avatar32
+          name={athlete.display_name}
+          photoUrl={athlete.profile_photo_url}
+        />
+      </View>
+
+      <View className="px-4 py-3 border-b border-hairline-faint" style={{ gap: 8 }}>
+        <View className="flex-row flex-wrap" style={{ gap: 8 }}>
+          <Chip active={tab === "fighters"} onPress={() => setTab("fighters")}>
+            Fighters
+          </Chip>
+          <Chip active={tab === "gyms"} onPress={() => setTab("gyms")}>
+            Gyms
+          </Chip>
+        </View>
         {tab === "fighters" ? (
           <GenderFilterRow current={genderFilter} onSelect={setGenderFilter} />
         ) : null}
+      </View>
+
+      <View className="px-4 pt-3 pb-2">
+        <MetaTag>{countLabel}</MetaTag>
       </View>
 
       {tab === "fighters" ? (
@@ -58,6 +90,7 @@ export default function LeaderboardScreen() {
           athletes={filteredAthletes}
           isRefreshing={isRefreshing}
           onRefresh={refresh}
+          currentUser={currentUserAthlete}
         />
       ) : (
         <GymsList
@@ -66,6 +99,6 @@ export default function LeaderboardScreen() {
           onRefresh={refresh}
         />
       )}
-    </SafeAreaView>
+    </View>
   );
 }

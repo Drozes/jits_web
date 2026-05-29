@@ -415,7 +415,7 @@ export async function createInSessionMatch(
   const { data, error } = await supabase.rpc("create_session_match", {
     p_session_id: params.sessionId,
     p_opponent_id: params.opponentId,
-    p_timekeeper_id: params.timekeeperId ?? null,
+    p_timekeeper_id: params.timekeeperId,
   });
 
   if (error) {
@@ -860,6 +860,14 @@ export async function createSessionTemplate(
   supabase: Client,
   params: CreateSessionTemplateParams,
 ): Promise<Result<{ id: string }>> {
+  const authResult = await supabase.rpc("auth_athlete_id");
+  if (authResult.error || !authResult.data) {
+    return {
+      ok: false,
+      error: { code: "UNKNOWN" as const, message: "Could not identify current athlete" },
+    };
+  }
+
   const { data, error } = await supabase
     .from("session_templates")
     .insert({
@@ -870,6 +878,7 @@ export async function createSessionTemplate(
       duration_minutes: params.durationMinutes,
       max_participants: params.maxParticipants,
       notes: params.notes,
+      created_by: authResult.data,
     })
     .select("id")
     .single();

@@ -1,7 +1,7 @@
 import * as React from "react";
-import { ActivityIndicator, Text, View } from "react-native";
-import { Button } from "@/components/ui/button";
+import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { useThemedTokens } from "@/lib/theme/use-theme";
+import { Plate } from "@/components/ui/elo-system";
 
 interface WaitStepProps {
   /** Optional headline message (defaults to "Waiting..."). */
@@ -15,9 +15,13 @@ interface WaitStepProps {
 }
 
 /**
- * Step 1 -- generic "waiting on something" screen. Used as a fallback
+ * Step 1: generic "waiting on something" screen. Used as a fallback
  * while we wait for the opponent to ready up or for a broadcast to land.
  * Mirrors the web's `timekeeper-wait-step` but is opponent-agnostic.
+ *
+ * ELO design system: centered plate with meta strip + spinner. After the
+ * timeout fires, swap the spinner for a Continue cta so the user is
+ * never stranded.
  */
 export function WaitStep({ message, allowSkip, onSkip, timeoutMs = 30_000 }: WaitStepProps) {
   const tokens = useThemedTokens();
@@ -30,22 +34,40 @@ export function WaitStep({ message, allowSkip, onSkip, timeoutMs = 30_000 }: Wai
   }, [allowSkip, timeoutMs]);
 
   return (
-    <View className="items-center justify-center gap-4 px-4 py-12">
-      {!timedOut ? (
-        <>
-          <ActivityIndicator size="large" color={tokens.mutedForeground} />
-          <Text className="text-center text-sm text-muted-foreground">
-            {message ?? "Waiting..."}
-          </Text>
-        </>
-      ) : (
-        <>
-          <Text className="text-center text-sm text-muted-foreground">
-            Still waiting. Continue without?
-          </Text>
-          {onSkip ? <Button onPress={onSkip}>Continue</Button> : null}
-        </>
-      )}
+    <View className="px-1 py-8">
+      <Plate className="items-center gap-4 py-8">
+        {!timedOut ? (
+          <>
+            <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-xl">
+              Waiting
+            </Text>
+            <ActivityIndicator size="large" color={tokens.textSecondary} />
+            <Text className="text-center font-body text-[13px] text-ink-2">
+              {message ?? "Waiting..."}
+            </Text>
+          </>
+        ) : (
+          <>
+            <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-xl">
+              Still waiting
+            </Text>
+            <Text className="text-center font-body text-[13px] text-ink-2">
+              Continue without?
+            </Text>
+            {onSkip ? (
+              <Pressable
+                accessibilityRole="button"
+                onPress={onSkip}
+                className="mt-2 bg-cta items-center justify-center py-3 px-5 rounded-sm active:bg-cta-hover"
+              >
+                <Text className="font-heading text-[13px] text-ink-on-cta uppercase tracking-caps">
+                  Continue
+                </Text>
+              </Pressable>
+            ) : null}
+          </>
+        )}
+      </Plate>
     </View>
   );
 }

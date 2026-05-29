@@ -1,4 +1,3 @@
-import * as React from "react";
 import RNToast, { type ToastShowParams } from "react-native-toast-message";
 
 /**

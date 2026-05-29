@@ -1,8 +1,7 @@
-import * as React from "react";
-import { View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { Pause, Play, Square } from "lucide-react-native";
-import { Button } from "@/components/ui/button";
 import { useThemedTokens } from "@/lib/theme/use-theme";
+import { cn } from "@/lib/cn";
 
 interface LiveControlsProps {
   paused: boolean;
@@ -12,39 +11,47 @@ interface LiveControlsProps {
 }
 
 /**
- * Pause/Resume + End match button row used by the live step. Splitting
- * this out keeps the live step itself near the 100-line target.
+ * Pause / Resume + End match button row used by the live step.
+ *
+ * ELO design system: secondary outline for Pause / Resume, Signal Red
+ * primary for End Match. Mirrors D7 wireframe (lines 1232-1235).
  */
 export function LiveControls({ paused, disabled, onPauseResume, onEnd }: LiveControlsProps) {
   const tokens = useThemedTokens();
   return (
     <View className="w-full flex-row gap-3 pt-4">
-      <Button
-        variant="outline"
-        size="lg"
-        className="flex-1"
+      <Pressable
+        accessibilityRole="button"
         onPress={onPauseResume}
         disabled={disabled}
-        leftIcon={
-          paused ? (
-            <Play size={16} color={tokens.foreground} />
-          ) : (
-            <Pause size={16} color={tokens.foreground} />
-          )
-        }
+        className={cn(
+          "flex-1 flex-row items-center justify-center gap-2 border border-hairline-strong rounded-sm bg-surface-3 py-3 active:bg-surface-4",
+          disabled && "opacity-50",
+        )}
       >
-        {paused ? "Resume" : "Pause"}
-      </Button>
-      <Button
-        variant="destructive"
-        size="lg"
-        className="flex-1"
+        {paused ? (
+          <Play size={16} color={tokens.textPrimary} />
+        ) : (
+          <Pause size={16} color={tokens.textPrimary} />
+        )}
+        <Text className="font-heading text-[12px] text-ink uppercase tracking-caps">
+          {paused ? "Resume" : "Pause"}
+        </Text>
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
         onPress={onEnd}
         disabled={disabled}
-        leftIcon={<Square size={16} color={tokens.destructiveForeground} />}
+        className={cn(
+          "flex-1 flex-row items-center justify-center gap-2 bg-cta rounded-sm py-3 active:bg-cta-hover",
+          disabled && "opacity-50",
+        )}
       >
-        End Match
-      </Button>
+        <Square size={16} color={tokens.textOnAccent} />
+        <Text className="font-heading text-[12px] text-ink-on-cta uppercase tracking-caps">
+          End Match
+        </Text>
+      </Pressable>
     </View>
   );
 }

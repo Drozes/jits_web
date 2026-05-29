@@ -1,15 +1,9 @@
 import * as React from "react";
 import { Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
-import { Activity } from "lucide-react-native";
-import { Card } from "../ui/card";
+import { Chip, MetaTag } from "@/components/ui/elo-system";
 import { MatchCard } from "../match-card";
-import {
-  ActivityFeedItem,
-  type ActivityItem,
-  FilterPill,
-  EmptyState,
-} from "./activity-feed-item";
+import { ActivityFeedItem, type ActivityItem } from "./activity-feed-item";
 import type { MatchOutcome } from "@jits/shared/constants";
 
 export type { ActivityItem } from "./activity-feed-item";
@@ -37,6 +31,31 @@ interface RecentActivitySectionProps {
   onPressFindSession?: () => void;
 }
 
+function EmptyState({
+  message,
+  showLink,
+  onPressLink,
+}: {
+  message: string;
+  showLink?: boolean;
+  onPressLink?: () => void;
+}) {
+  return (
+    <View className="border border-dashed border-hairline-strong rounded-md p-6 items-center">
+      <Text className="font-body text-[13px] text-ink-2 text-center">
+        {message}
+      </Text>
+      {showLink ? (
+        <Pressable onPress={onPressLink} accessibilityRole="button" hitSlop={6}>
+          <Text className="font-mono-bold text-[10px] text-cta uppercase tracking-caps-l mt-2">
+            Find a session →
+          </Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
 export function RecentActivitySection({
   myMatches,
   allActivity,
@@ -50,23 +69,30 @@ export function RecentActivitySection({
 
   return (
     <View className="gap-3">
-      <View className="flex-row items-center justify-between">
-        <View className="flex-row items-center gap-2">
-          <View className="h-7 w-7 items-center justify-center rounded-lg bg-primary/10">
-            <Activity size={16} className="text-primary" />
-          </View>
-          <Text className="text-lg font-heading text-foreground">Recent Activity</Text>
-        </View>
+      <View className="flex-row items-end justify-between">
+        <MetaTag>Recent Activity</MetaTag>
         {scope === "me" && myMatches.length > 0 ? (
-          <Pressable onPress={() => router.push("/(app)/profile/stats")}>
-            <Text className="text-xs font-medium text-muted-foreground">View all</Text>
+          <Pressable
+            onPress={() => router.push("/(app)/profile/stats")}
+            accessibilityRole="button"
+            hitSlop={6}
+          >
+            <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-l">
+              View all
+            </Text>
           </Pressable>
         ) : null}
       </View>
 
-      <View className="flex-row gap-1">
+      <View className="flex-row gap-2">
         {scopeOptions.map((o) => (
-          <FilterPill key={o.value} value={o.value} label={o.label} active={scope === o.value} onSelect={setScope} />
+          <Chip
+            key={o.value}
+            active={scope === o.value}
+            onPress={() => setScope(o.value)}
+          >
+            {o.label}
+          </Chip>
         ))}
       </View>
 
@@ -88,22 +114,22 @@ export function RecentActivitySection({
           </View>
         ) : (
           <EmptyState
-            message="No matches yet. Join a session to get started!"
+            message="No matches yet, your first match is waiting."
             showLink
             onPressLink={onPressFindSession ?? (() => router.push("/(app)/gyms"))}
           />
         )
       ) : hasContent ? (
-        <Card>
+        <View className="bg-surface-3 border border-hairline rounded-md overflow-hidden">
           {allActivity.map((item, idx) => (
             <View key={item.id}>
-              {idx > 0 ? <View className="h-px bg-border" /> : null}
+              {idx > 0 ? <View className="h-px bg-hairline-faint" /> : null}
               <ActivityFeedItem item={item} />
             </View>
           ))}
-        </Card>
+        </View>
       ) : (
-        <EmptyState message="No recent activity yet. Join a session to get started!" />
+        <EmptyState message="No recent activity yet, join a session to get started." />
       )}
     </View>
   );

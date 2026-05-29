@@ -1,8 +1,7 @@
 import * as React from "react";
-import { ActivityIndicator, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { Play, Pencil, Trash2 } from "lucide-react-native";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Plate } from "@/components/ui/elo-system";
 import { toast } from "@/components/ui/toast";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { supabase } from "@/lib/supabase/client";
@@ -49,55 +48,87 @@ export function TemplateCard({ template, isManager, gymId, onChanged }: Template
   }
 
   const timeDisplay = template.start_time.slice(0, 5);
+  const meta = `${DAYS[template.day_of_week]} · ${timeDisplay} · ${template.duration_minutes}m${
+    template.max_participants ? ` · Max ${template.max_participants}` : ""
+  }`;
 
   return (
-    <Card className="p-3">
+    <Plate>
       <View className="flex-row items-center justify-between gap-3">
-        <TemplateInfo title={template.title} day={DAYS[template.day_of_week]} time={timeDisplay} duration={template.duration_minutes} max={template.max_participants} />
-        <TemplateActions
-          template={template}
-          isManager={isManager}
-          gymId={gymId}
-          creating={creating}
-          deleting={deleting}
-          onCreateSession={handleCreateSession}
-          onDelete={handleDelete}
-          onChanged={onChanged}
-          tokens={tokens}
-        />
+        <View className="flex-1 min-w-0 gap-1">
+          <Text
+            className="font-heading text-[14px] text-ink"
+            numberOfLines={1}
+          >
+            {template.title}
+          </Text>
+          <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-l">
+            {meta}
+          </Text>
+        </View>
+        <View className="flex-row items-center gap-1.5">
+          <IconButton
+            onPress={handleCreateSession}
+            disabled={creating}
+            ariaLabel="Start session from template"
+          >
+            {creating ? (
+              <ActivityIndicator size={14} color={tokens.textSecondary} />
+            ) : (
+              <Play size={14} color={tokens.textSecondary} />
+            )}
+          </IconButton>
+          {isManager ? (
+            <>
+              <TemplateFormSheet gymId={gymId} template={template} onSaved={onChanged}>
+                <IconButton ariaLabel="Edit template">
+                  <Pencil size={14} color={tokens.textSecondary} />
+                </IconButton>
+              </TemplateFormSheet>
+              <IconButton
+                onPress={handleDelete}
+                disabled={deleting}
+                ariaLabel="Delete template"
+                tone="danger"
+              >
+                {deleting ? (
+                  <ActivityIndicator size={14} color={tokens.stateNegative} />
+                ) : (
+                  <Trash2 size={14} color={tokens.stateNegative} />
+                )}
+              </IconButton>
+            </>
+          ) : null}
+        </View>
       </View>
-    </Card>
+    </Plate>
   );
 }
 
-function TemplateInfo({ title, day, time, duration, max }: { title: string; day: string; time: string; duration: number; max: number | null }) {
-  return (
-    <View className="flex-1 min-w-0 gap-0.5">
-      <Text className="text-sm font-heading text-foreground" numberOfLines={1}>{title}</Text>
-      <Text className="text-xs font-mono text-muted-foreground">{day} at {time} ({duration}min)</Text>
-      {max ? <Text className="text-xs text-muted-foreground">Max {max}</Text> : null}
-    </View>
-  );
+interface IconButtonProps {
+  children: React.ReactNode;
+  onPress?: () => void;
+  disabled?: boolean;
+  ariaLabel: string;
+  tone?: "danger";
 }
 
-function TemplateActions({ template, isManager, gymId, creating, deleting, onCreateSession, onDelete, onChanged, tokens }: { template: SessionTemplate; isManager: boolean; gymId: string; creating: boolean; deleting: boolean; onCreateSession: () => void; onDelete: () => void; onChanged: () => void; tokens: ReturnType<typeof useThemedTokens> }) {
+function IconButton({ children, onPress, disabled, ariaLabel, tone }: IconButtonProps) {
+  // Border tone differentiates destructive (delete) from neutral icon buttons.
+  // We intentionally keep the surface the same so the action stays subdued.
+  const base =
+    "w-8 h-8 items-center justify-center rounded-xs bg-surface-4 active:bg-surface-3";
+  const borderClass =
+    tone === "danger" ? "border border-negative" : "border border-hairline";
   return (
-    <View className="flex-row items-center gap-1.5">
-      <Button size="sm" variant="outline" onPress={onCreateSession} disabled={creating}>
-        {creating ? <ActivityIndicator size={14} color={tokens.foreground} /> : <Play size={14} color={tokens.foreground} />}
-      </Button>
-      {isManager ? (
-        <>
-          <TemplateFormSheet gymId={gymId} template={template} onSaved={onChanged}>
-            <Button size="sm" variant="ghost">
-              <Pencil size={14} color={tokens.foreground} />
-            </Button>
-          </TemplateFormSheet>
-          <Button size="sm" variant="ghost" onPress={onDelete} disabled={deleting}>
-            {deleting ? <ActivityIndicator size={14} color={tokens.foreground} /> : <Trash2 size={14} color={tokens.foreground} />}
-          </Button>
-        </>
-      ) : null}
-    </View>
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={ariaLabel}
+      className={[base, borderClass, disabled ? "opacity-50" : ""].join(" ")}
+    >
+      {children}
+    </Pressable>
   );
 }

@@ -1,7 +1,13 @@
 import * as React from "react";
-import { Pressable, Text, View, type TextInputProps } from "react-native";
+import {
+  Pressable,
+  Text,
+  TextInput,
+  View,
+  type TextInputProps,
+} from "react-native";
 import { Eye, EyeOff } from "lucide-react-native";
-import { Input, Label } from "@/components/ui";
+import { cn } from "@/lib/cn";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 
 type AuthFormFieldProps = TextInputProps & {
@@ -11,9 +17,12 @@ type AuthFormFieldProps = TextInputProps & {
 };
 
 /**
- * Labelled text input with inline validation message used by the auth
- * screens (login / signup / forgot-password). Keeps the screen files
- * focused on flow logic instead of boilerplate field markup.
+ * Labelled text input matching the ELO design system field pattern.
+ * Used by the auth screens (login / signup / forgot-password).
+ *
+ * Visual targets (wireframe A2 .field/.field-label/.field-input):
+ *   - Label: font-heading bold, uppercase, tracking-caps-xl, text-ink-3
+ *   - Input: bg-surface-3, border-hairline-strong, rounded-xs, focus = border-cta
  *
  * When `secureTextEntry` is passed, renders a show/hide toggle button
  * inside the input row.
@@ -28,17 +37,41 @@ export function AuthFormField({
   const labelId = React.useId();
   const tokens = useThemedTokens();
   const [hidden, setHidden] = React.useState(true);
+  const [focused, setFocused] = React.useState(false);
   const isPassword = secureTextEntry !== undefined;
+  const hasError = !!showError && !!error;
 
   return (
-    <View className="gap-1.5">
-      <Label nativeID={labelId}>{label}</Label>
+    <View className="gap-2">
+      <Text
+        nativeID={labelId}
+        className="font-heading text-[10px] text-ink-3 uppercase tracking-caps-xl"
+      >
+        {label}
+      </Text>
       <View className="relative justify-center">
-        <Input
+        <TextInput
           accessibilityLabelledBy={labelId}
-          className={showError && error ? "border-destructive pr-10" : isPassword ? "pr-10" : undefined}
-          secureTextEntry={isPassword ? hidden : undefined}
+          placeholderTextColor={tokens.textTertiary}
           {...inputProps}
+          secureTextEntry={isPassword ? hidden : undefined}
+          onFocus={(e) => {
+            setFocused(true);
+            inputProps.onFocus?.(e);
+          }}
+          onBlur={(e) => {
+            setFocused(false);
+            inputProps.onBlur?.(e);
+          }}
+          className={cn(
+            "bg-surface-3 border rounded-xs px-4 py-3 text-[14px] font-body text-ink",
+            hasError
+              ? "border-negative"
+              : focused
+                ? "border-cta"
+                : "border-hairline-strong",
+            isPassword ? "pr-11" : undefined,
+          )}
         />
         {isPassword ? (
           <Pressable
@@ -49,15 +82,15 @@ export function AuthFormField({
             accessibilityRole="button"
           >
             {hidden ? (
-              <Eye size={18} color={tokens.mutedForeground} />
+              <Eye size={18} color={tokens.textTertiary} />
             ) : (
-              <EyeOff size={18} color={tokens.mutedForeground} />
+              <EyeOff size={18} color={tokens.textTertiary} />
             )}
           </Pressable>
         ) : null}
       </View>
-      {showError && error ? (
-        <Text className="text-xs text-destructive">{error}</Text>
+      {hasError ? (
+        <Text className="font-body text-[12px] text-negative">{error}</Text>
       ) : null}
     </View>
   );

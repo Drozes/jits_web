@@ -1,6 +1,8 @@
 import * as React from "react";
 import { Text, View } from "react-native";
-import { Button } from "@/components/ui/button";
+import { useRouter } from "expo-router";
+import { TertiaryButton } from "@/components/auth/auth-buttons";
+import { useAuth } from "@/lib/auth/hooks";
 import { useSetupSubmit } from "@/lib/profile-setup/use-setup-submit";
 import type { GymOption, SetupAthleteRow } from "@/lib/profile-setup/use-setup-data";
 import { IdentityStep } from "./identity-step";
@@ -11,10 +13,10 @@ import type { WizardStep, WizardValues } from "./types";
 import { WizardProgress } from "./wizard-progress";
 
 const STEP_LABELS: Record<WizardStep, string> = {
-  tos: "Welcome to ELO RATED",
-  identity: "Who are you?",
-  training: "Where do you train?",
-  optional: "Optional details",
+  tos: "End User Agreement",
+  identity: "Who Are You",
+  training: "Where You Train",
+  optional: "Optional Details",
 };
 
 interface SetupWizardProps {
@@ -26,7 +28,7 @@ interface SetupWizardProps {
   isEditing: boolean;
 }
 
-/** Native port of `apps/web/app/profile/setup/setup-wizard.tsx`. */
+/** ELO-styled multi-step setup wizard. */
 export function SetupWizard({
   authUserId,
   athlete,
@@ -35,6 +37,9 @@ export function SetupWizard({
   hasAcceptedTos,
   isEditing,
 }: SetupWizardProps) {
+  const router = useRouter();
+  const { signOut } = useAuth();
+
   const steps = React.useMemo<WizardStep[]>(() => {
     const list: WizardStep[] = [];
     if (!hasAcceptedTos) list.push("tos");
@@ -44,7 +49,8 @@ export function SetupWizard({
 
   const [currentStep, setCurrentStep] = React.useState<WizardStep>(steps[0]);
   const [values, setValues] = React.useState<WizardValues>({
-    displayName: athlete?.display_name ?? "",
+    firstName: athlete?.first_name ?? "",
+    lastName: athlete?.last_name ?? "",
     weight: athlete?.current_weight?.toString() ?? "",
     gymId: athlete?.primary_gym_id ?? "",
     gender: athlete?.gender ?? "",
@@ -73,6 +79,11 @@ export function SetupWizard({
     onAfterTos: goNext,
   });
 
+  const handleExit = React.useCallback(async () => {
+    await signOut();
+    router.replace("/login");
+  }, [signOut, router]);
+
   return (
     <View className="gap-6">
       <WizardProgress
@@ -81,7 +92,9 @@ export function SetupWizard({
         label={STEP_LABELS[currentStep]}
       />
 
-      {currentStep === "tos" && <TosStep onAccept={acceptTos} />}
+      {currentStep === "tos" && (
+        <TosStep onAccept={acceptTos} onExit={handleExit} />
+      )}
       {currentStep === "identity" && (
         <IdentityStep values={values} onChange={onChange} onNext={goNext} />
       )}
@@ -98,12 +111,14 @@ export function SetupWizard({
         />
       )}
 
-      {error ? <Text className="text-sm text-destructive">{error}</Text> : null}
+      {error ? (
+        <Text className="font-body text-[13px] text-negative text-center">
+          {error}
+        </Text>
+      ) : null}
 
-      {currentIdx > 0 && (
-        <Button variant="ghost" onPress={goBack} disabled={loading}>
-          Back
-        </Button>
+      {currentIdx > 0 && currentStep !== "tos" && (
+        <TertiaryButton label="Back" onPress={goBack} disabled={loading} />
       )}
     </View>
   );

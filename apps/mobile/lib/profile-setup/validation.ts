@@ -41,12 +41,14 @@ export function isValidWeight(value: string): boolean {
 }
 
 export function isIdentityComplete(values: {
-  displayName: string;
+  firstName: string;
+  lastName: string;
   gender: string;
   dateOfBirth: string;
 }): boolean {
   return (
-    !!values.displayName.trim() &&
+    !!values.firstName.trim() &&
+    !!values.lastName.trim() &&
     !!values.gender &&
     isAtLeast16(values.dateOfBirth)
   );

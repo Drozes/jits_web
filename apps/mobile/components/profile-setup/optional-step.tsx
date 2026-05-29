@@ -1,9 +1,7 @@
-import * as React from "react";
-import { Text, View } from "react-native";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Plate } from "@/components/ui/elo-system";
+import { CtaButton, TertiaryButton } from "@/components/auth/auth-buttons";
 import type { WizardValues } from "./types";
+import { EloField, EloTextInput } from "./elo-form-field";
 
 interface OptionalStepProps {
   values: WizardValues;
@@ -14,9 +12,9 @@ interface OptionalStepProps {
 }
 
 /**
- * Native port of `apps/web/app/profile/setup/steps/optional-step.tsx`.
- * Web includes a theme picker; mobile does not yet have a theme switcher
- * (system-only via NativeWind), so this step collects `city` only.
+ * ELO-styled optional details step. Web includes a theme picker; mobile does
+ * not yet have a theme switcher (system-only via NativeWind), so this step
+ * collects `city` only.
  */
 export function OptionalStep({
   values,
@@ -26,31 +24,29 @@ export function OptionalStep({
   isEditing,
 }: OptionalStepProps) {
   return (
-    <View className="gap-4">
-      <View className="gap-2">
-        <Label nativeID="cityLabel">City</Label>
-        <Input
-          accessibilityLabelledBy="cityLabel"
+    <Plate className="gap-5">
+      <EloField
+        label="City"
+        helper="Helps you find local sessions and gyms."
+      >
+        <EloTextInput
           placeholder="e.g. Austin, TX"
           value={values.city}
           onChangeText={(text) => onChange({ city: text })}
           maxLength={100}
         />
-        <Text className="text-xs text-muted-foreground">
-          Helps you find local sessions and gyms.
-        </Text>
-      </View>
+      </EloField>
 
-      <Button onPress={() => onSubmit(false)} disabled={loading}>
-        {loading ? "Saving..." : isEditing ? "Save Changes" : "Get Started"}
-      </Button>
-      <Button
-        variant="ghost"
+      <CtaButton
+        label={loading ? "Saving..." : isEditing ? "Save Changes" : "Get Started"}
+        onPress={() => onSubmit(false)}
+        disabled={loading}
+      />
+      <TertiaryButton
+        label="Skip for now"
         onPress={() => onSubmit(true)}
         disabled={loading}
-      >
-        Skip for now
-      </Button>
-    </View>
+      />
+    </Plate>
   );
 }

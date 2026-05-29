@@ -5,27 +5,33 @@ import { Monitor, Moon, Palette, Settings, Sun, UserPen } from "lucide-react-nat
 import { useAuth } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { useThemePreference, type ThemePreference } from "@/lib/theme";
-import { Card, CardContent } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
+import { Plate, MetaTag } from "@/components/ui/elo-system";
+import { cn } from "@/lib/cn";
 
 function SettingsRow({
   icon,
   label,
-  labelClassName,
+  destructive,
   onPress,
 }: {
   icon?: React.ReactNode;
   label: string;
-  labelClassName?: string;
+  destructive?: boolean;
   onPress?: () => void;
 }) {
   return (
     <Pressable
       onPress={onPress}
-      className="flex-row items-center px-3 h-10 rounded-lg active:bg-muted/60"
+      accessibilityRole="button"
+      className="flex-row items-center px-4 h-12 border-t border-hairline-faint active:bg-surface-4"
     >
       {icon ? <View className="mr-3">{icon}</View> : null}
-      <Text className={`text-sm font-medium ${labelClassName ?? "text-foreground"}`}>
+      <Text
+        className={cn(
+          "font-heading text-[12px] uppercase tracking-caps",
+          destructive ? "text-cta" : "text-ink",
+        )}
+      >
         {label}
       </Text>
     </Pressable>
@@ -52,14 +58,14 @@ function ThemeSwitcherRow({ onSelect }: { onSelect: (pref: ThemePreference) => v
   }, [resolved]);
 
   return (
-    <View className="flex-row items-center justify-between px-3 h-10">
+    <View className="flex-row items-center justify-between px-4 h-12">
       <View className="flex-row items-center">
         <View className="mr-3">
-          <Palette size={16} className="text-foreground" />
+          <Palette size={16} color={tokens.textPrimary} />
         </View>
-        <Text className="text-sm font-medium text-foreground">Theme</Text>
+        <Text className="font-heading text-[12px] text-ink uppercase tracking-caps">Theme</Text>
       </View>
-      <View className="flex-row rounded-lg overflow-hidden border border-border">
+      <View className="flex-row rounded-xs overflow-hidden border border-hairline-strong">
         {THEME_OPTIONS.map(({ value, icon: Icon, label }) => {
           const active = stored === value;
           return (
@@ -69,11 +75,17 @@ function ThemeSwitcherRow({ onSelect }: { onSelect: (pref: ThemePreference) => v
                 setStored(value);
                 onSelect(value);
               }}
-              className={`flex-row items-center px-2.5 py-1.5 ${active ? "bg-muted" : ""}`}
+              className={cn(
+                "flex-row items-center px-2.5 py-1.5",
+                active ? "bg-surface-4" : "bg-surface-3",
+              )}
             >
-              <Icon size={14} color={active ? tokens.foreground : tokens.mutedForeground} />
+              <Icon size={12} color={active ? tokens.textPrimary : tokens.textTertiary} />
               <Text
-                className={`text-xs ml-1 ${active ? "text-foreground font-medium" : "text-muted-foreground"}`}
+                className={cn(
+                  "font-mono-bold text-[10px] ml-1 uppercase tracking-caps-l",
+                  active ? "text-ink" : "text-ink-3",
+                )}
               >
                 {label}
               </Text>
@@ -88,36 +100,32 @@ function ThemeSwitcherRow({ onSelect }: { onSelect: (pref: ThemePreference) => v
 export function AccountSection() {
   const { signOut } = useAuth();
   const router = useRouter();
+  const tokens = useThemedTokens();
   const { setPreference } = useThemePreference();
 
   return (
-    <View>
-      <Separator className="mb-4" />
-      <Card>
-        <CardContent className="p-4">
-          <Text className="text-base font-heading text-foreground mb-3">Account</Text>
-          <View className="gap-1">
-            <ThemeSwitcherRow onSelect={setPreference} />
-            <SettingsRow
-              icon={<UserPen size={16} className="text-foreground" />}
-              label="Edit Profile"
-              onPress={() => Alert.alert("Coming soon", "Profile editing coming soon.")}
-            />
-            <SettingsRow
-              icon={<Settings size={16} className="text-foreground" />}
-              label="Settings & Privacy"
-              onPress={() => router.push("/(app)/settings")}
-            />
-            <SettingsRow
-              label="Sign Out"
-              labelClassName="text-destructive"
-              onPress={async () => {
-                await signOut();
-              }}
-            />
-          </View>
-        </CardContent>
-      </Card>
+    <View className="gap-3">
+      <MetaTag>Account</MetaTag>
+      <Plate className="p-0 overflow-hidden">
+        <ThemeSwitcherRow onSelect={setPreference} />
+        <SettingsRow
+          icon={<UserPen size={16} color={tokens.textPrimary} />}
+          label="Edit Profile"
+          onPress={() => Alert.alert("Coming soon", "Profile editing coming soon.")}
+        />
+        <SettingsRow
+          icon={<Settings size={16} color={tokens.textPrimary} />}
+          label="Settings & Privacy"
+          onPress={() => router.push("/(app)/settings")}
+        />
+        <SettingsRow
+          label="Sign Out"
+          destructive
+          onPress={async () => {
+            await signOut();
+          }}
+        />
+      </Plate>
     </View>
   );
 }

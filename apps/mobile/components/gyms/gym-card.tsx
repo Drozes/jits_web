@@ -1,9 +1,6 @@
 import { Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
-import { Users } from "lucide-react-native";
-import { Card } from "../ui/card";
-import { Badge } from "../ui/badge";
-import { useThemedTokens } from "../../lib/theme/use-theme";
+import { LivePill, MetaTag, Plate } from "@/components/ui/elo-system";
 import type { GymListItem } from "@jits/shared/types/session";
 
 interface GymCardProps {
@@ -11,70 +8,76 @@ interface GymCardProps {
   isMyGym: boolean;
   /** Optional formatted distance ("1.2 km"); shown when location is available. */
   distanceLabel?: string | null;
+  /**
+   * Optional schedule hint (e.g. "Sun 11AM"). Replaces the right side of the
+   * header on non-live gyms when supplied.
+   */
+  scheduleLabel?: string | null;
 }
 
-export function GymCard({ gym, isMyGym, distanceLabel }: GymCardProps) {
+/**
+ * E1 GYM FINDER row.
+ *
+ * Live gyms get a Plate `variant="live"` with the LivePill on the right and a
+ * subtitle reading "{city} · {n} in lobby". Non-live gyms get a default Plate
+ * with either a schedule MetaTag (e.g. "Sun 11AM"), an upcoming-count tag, or
+ * a "No Sessions" placeholder, and a subtitle showing the city.
+ */
+export function GymCard({ gym, isMyGym, distanceLabel, scheduleLabel }: GymCardProps) {
   const router = useRouter();
-  const tokens = useThemedTokens();
+  const live = gym.hasActiveSession;
+
+  // Subtitle: city, then "(n) in lobby" when live.
+  const subtitleParts: string[] = [];
+  if (gym.city) subtitleParts.push(gym.city);
+  if (live) {
+    subtitleParts.push(
+      `${gym.memberCount} in lobby`,
+    );
+  }
+  if (distanceLabel) subtitleParts.push(distanceLabel);
+  const subtitle = subtitleParts.join(" · ");
+
+  // Right-side tag for non-live rows: prefer caller-provided schedule, then
+  // fall back to upcoming-session count, then "No Sessions".
+  const fallbackSchedule = !live
+    ? scheduleLabel ??
+      (gym.upcomingSessions > 0
+        ? `${gym.upcomingSessions} Upcoming`
+        : "No Sessions")
+    : null;
 
   return (
     <Pressable
       onPress={() => router.push(`/gyms/${gym.id}`)}
+      accessibilityRole="button"
       className="active:opacity-80"
     >
-      <Card className="p-4">
-        <View className="flex-row items-start justify-between gap-3">
-          <View className="flex-1 min-w-0">
-            <View className="flex-row items-center gap-2 flex-wrap">
-              <Text
-                className="text-[15px] font-heading text-foreground"
-                numberOfLines={1}
-              >
-                {gym.name}
-              </Text>
-              {isMyGym && (
-                <Badge variant="outline">
-                  <Text className="text-[10px] font-heading text-foreground">My Gym</Text>
-                </Badge>
-              )}
-              {gym.hasActiveSession && (
-                <Badge variant="success">
-                  <Text className="text-[10px] font-heading text-success-foreground">Live</Text>
-                </Badge>
-              )}
-            </View>
-            {gym.city ? (
-              <Text className="mt-0.5 text-xs text-muted-foreground">
-                {gym.city}
+      <Plate variant={live ? "live" : "default"}>
+        <View className="flex-row items-center justify-between gap-3 mb-2">
+          <View className="flex-1 min-w-0 flex-row items-center flex-wrap gap-x-2">
+            <Text
+              numberOfLines={1}
+              className="font-heading text-[18px] text-ink"
+            >
+              {gym.name}
+            </Text>
+            {isMyGym ? (
+              <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-l">
+                · My Gym
               </Text>
             ) : null}
           </View>
-          {distanceLabel ? (
-            <Text className="text-xs text-muted-foreground tabular-nums">
-              {distanceLabel}
-            </Text>
+          {live ? (
+            <LivePill label="Live" />
+          ) : fallbackSchedule ? (
+            <MetaTag>{fallbackSchedule}</MetaTag>
           ) : null}
         </View>
-
-        <View className="mt-2 flex-row items-center gap-4">
-          <View className="flex-row items-center gap-1">
-            <Users size={12} color={tokens.mutedForeground} />
-            <Text className="text-xs text-muted-foreground">
-              {gym.memberCount} {gym.memberCount === 1 ? "member" : "members"}
-            </Text>
-          </View>
-          {gym.activeSessions > 0 ? (
-            <Text className="text-xs font-medium text-success">
-              {gym.activeSessions} active
-            </Text>
-          ) : null}
-          {gym.upcomingSessions > 0 ? (
-            <Text className="text-xs text-muted-foreground">
-              {gym.upcomingSessions} upcoming
-            </Text>
-          ) : null}
-        </View>
-      </Card>
+        {subtitle ? (
+          <Text className="font-body text-[12px] text-ink-3">{subtitle}</Text>
+        ) : null}
+      </Plate>
     </Pressable>
   );
 }
