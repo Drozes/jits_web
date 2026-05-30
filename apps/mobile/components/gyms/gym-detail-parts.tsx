@@ -198,8 +198,13 @@ export function StatsGrid({
 }) {
   return (
     <View className="flex-row gap-3">
+      {/*
+        E2 Signal Red accent bar marks the populated, real-data tile only.
+        Avg ELO is still a "—" placeholder, so it gets no accent (brand rule:
+        no decorative color).
+      */}
       <View className="flex-1">
-        <EloTile label="Avg Session" value={avgPerSession} size="medium" />
+        <EloTile label="Avg Session" value={avgPerSession} size="medium" accentBar />
       </View>
       <View className="flex-1">
         <EloTile label="Avg ELO" value={avgElo} size="medium" />

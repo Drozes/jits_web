@@ -17,7 +17,7 @@ import { SessionTemplates } from "@/components/session/session-templates";
 import { useRequireAthlete } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { supabase } from "@/lib/supabase/client";
-import { getGymDetail } from "@jits/shared/api/queries";
+import { getGymDetail, getGymManagerStats } from "@jits/shared/api/queries";
 import { toast } from "@/components/ui";
 import type { GymDetail } from "@jits/shared/types/session";
 import {
@@ -42,6 +42,8 @@ interface GymCoords {
 function useGymDetailData(gymId: string | undefined, athleteId: string | undefined) {
   const [data, setData] = React.useState<GymDetail | null>(null);
   const [coords, setCoords] = React.useState<GymCoords | null>(null);
+  // Ready-to-render Avg Session value (web-parity formula). Defaults to "0".
+  const [avgPerSession, setAvgPerSession] = React.useState("0");
   const [isLoading, setIsLoading] = React.useState(true);
   const [isRefreshing, setIsRefreshing] = React.useState(false);
 
@@ -51,13 +53,19 @@ function useGymDetailData(gymId: string | undefined, athleteId: string | undefin
       if (mode === "initial") setIsLoading(true);
       else setIsRefreshing(true);
       try {
-        const [detail, { data: gymRow }] = await Promise.all([
+        const [detail, { data: gymRow }, stats] = await Promise.all([
           getGymDetail(supabase, gymId, athleteId),
           supabase
             .from("gyms")
             .select("latitude, longitude, address")
             .eq("id", gymId)
             .maybeSingle(),
+          // Stats are non-critical: a slow/failed fetch must not break the gym
+          // render, so swallow its rejection and fall back to the empty value.
+          getGymManagerStats(supabase, gymId).catch((err) => {
+            console.error("[gym-detail] stats fetch failed", err);
+            return null;
+          }),
         ]);
         setData(detail);
         if (gymRow) {
@@ -67,6 +75,12 @@ function useGymDetailData(gymId: string | undefined, athleteId: string | undefin
             address: gymRow.address,
           });
         }
+        // Web parity: participants / sessions to 1dp; "0" when no sessions.
+        setAvgPerSession(
+          stats && stats.totalSessions > 0
+            ? (stats.totalParticipants / stats.totalSessions).toFixed(1)
+            : "0",
+        );
       } catch (err) {
         console.error("[gym-detail] fetch failed", err);
         toast.error("Failed to load gym");
@@ -86,14 +100,14 @@ function useGymDetailData(gymId: string | undefined, athleteId: string | undefin
     return () => { cancelled = true; };
   }, [fetchAll]);
 
-  return { data, coords, isLoading, isRefreshing, refresh: () => fetchAll("refresh") };
+  return { data, coords, avgPerSession, isLoading, isRefreshing, refresh: () => fetchAll("refresh") };
 }
 
 export default function GymDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const tokens = useThemedTokens();
   const { athlete, isLoading: authLoading } = useRequireAthlete();
-  const { data, coords, isLoading, isRefreshing, refresh } = useGymDetailData(
+  const { data, coords, avgPerSession, isLoading, isRefreshing, refresh } = useGymDetailData(
     id,
     athlete?.id,
   );
@@ -148,8 +162,8 @@ export default function GymDetailScreen() {
 
   const addressLabel = (coords?.address ?? data.city ?? "Unknown City").toString();
   const memberLabel = `${data.memberCount} ${data.memberCount === 1 ? "Member" : "Members"}`;
-  // Analytics are not yet wired on mobile; render placeholders matching web.
-  const avgPerSession = "—";
+  // Avg Session is wired (web parity); Avg ELO stays a placeholder until its
+  // backing query lands (shared/BE work, out of scope here).
   const avgElo = "—";
 
   return (
