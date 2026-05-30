@@ -12,7 +12,7 @@ const ROW_STYLE = {
 
 /**
  * Sidebar-rail user footer. Fetches the active athlete null-safely (NEVER
- * requireAthlete — this shell must tolerate /eua and /signup where no active
+ * requireAthlete; this shell must tolerate /eua and /signup where no active
  * athlete exists). Renders nothing when there is no active athlete.
  */
 export async function SidebarFooter() {

@@ -19,8 +19,8 @@ export const NAV_TABS: readonly NavTab[] = [
 ] as const;
 
 // Immersive routes (match flow, lobby, join wizard, setup) hide BOTH navs.
-// Kept verbatim from the original BottomNavBar list — do not expand scope.
-// Note: /profile/setup is a dead pattern (no such route — web activation is
+// Kept verbatim from the original BottomNavBar list; do not expand scope.
+// Note: /profile/setup is a dead pattern (no such route; web activation is
 // /eua); kept for parity, do not chase it.
 const HIDE_PATTERNS = [
   /^\/session\/[^/]+\/match\//,

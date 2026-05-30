@@ -18,6 +18,8 @@ type Concept = {
   blurb: string;
   pros: string;
   cons: string;
+  /** True for the direction that has shipped as the real authed web shell. */
+  shipped?: boolean;
   Component: React.ComponentType;
 };
 
@@ -31,6 +33,7 @@ const CONCEPTS: Concept[] = [
       "Classic SaaS shell. A fixed left nav rail replaces the bottom tab bar; the dashboard spreads into a two-column layout.",
     pros: "Most natural migration from the bottom nav · scales to many destinations · familiar.",
     cons: "Nav rail eats horizontal space on smaller laptops.",
+    shipped: true,
     Component: SidebarHome,
   },
   {
@@ -114,10 +117,13 @@ export default function WebLayoutsPage() {
         </h1>
         <p className="max-w-3xl font-body text-lg text-muted-foreground">
           Seven full-screen desktop directions for the web app, each
-          demonstrated on a different screen. The shipping app is currently a
-          centered{" "}
-          <code className="font-mono text-sm">max-w-md</code> mobile column;
-          these explore how it could use the whole viewport. Previews are visual
+          demonstrated on a different screen. Concept 01 (Persistent Sidebar) has
+          shipped as the authed web shell; at{" "}
+          <code className="font-mono text-sm">lg</code> and up the app now uses a
+          persistent left rail with a widened content column, keeping the
+          centered <code className="font-mono text-sm">max-w-md</code> mobile
+          column below <code className="font-mono text-sm">lg</code>. The rest
+          explore other ways it could use the whole viewport. Previews are visual
           mockups with placeholder data; controls are non-interactive.
         </p>
       </section>
@@ -139,6 +145,11 @@ export default function WebLayoutsPage() {
             >
               <span className="mr-2 font-mono">{String(i + 1).padStart(2, "0")}</span>
               {c.label}
+              {c.shipped && (
+                <span className="ml-2 rounded-sm border border-border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                  Shipped
+                </span>
+              )}
             </button>
           );
         })}
@@ -154,6 +165,11 @@ export default function WebLayoutsPage() {
             <span className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
               {concept.screen}
             </span>
+            {concept.shipped && (
+              <span className="rounded-sm border border-border px-2 py-0.5 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                Shipped · authed web shell
+              </span>
+            )}
           </div>
           <p className="max-w-2xl font-body text-sm text-muted-foreground">
             {concept.blurb}
