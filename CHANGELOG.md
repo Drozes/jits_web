@@ -2,7 +2,6 @@
 
 ## [Unreleased]
 
-<<<<<<< HEAD
 **Web: Persistent Sidebar authed shell (2026-05-29)**
 
 **Added**
@@ -17,7 +16,7 @@
 - Widened only the 4 in-scope page bodies at `>= lg`: `apps/web/app/(app)/page.tsx`, `/leaderboard/page.tsx`, `/gyms/page.tsx` pass `wide` to `PageContainer`; `apps/web/app/(app)/profile/profile-content.tsx` (no `PageContainer`) gets `lg:max-w-3xl lg:mx-auto` on its content wrapper. No page internals were restructured (the Bento home redesign remains out of scope).
 - `apps/web/components/layout/page-container.test.tsx`: adds assertions that the default stays narrow (no `lg:max-w-3xl`) and that `wide` adds the responsive widening classes while preserving the below-`lg` column.
 - Design board freshness (now that concept 01 shipped): `apps/web/app/design/web-layouts/page.tsx` replaces the stale "the shipping app is currently a centered `max-w-md` mobile column" intro with the real adopted-shell description, adds a `shipped` flag + a neutral "Shipped" badge on the concept-01 tab and caption; `apps/web/app/design/page.tsx` corrects the Web Layouts card from "Six" to "Seven" concepts and notes concept 01 has shipped. Mock files (`web-layouts/concepts/*`, `_data.ts`) are pure layout and left untouched.
-=======
+
 **Mobile launch reveal: "The Statement" splash + splash-variant flag (2026-05-29)**
 
 **Added**
@@ -45,7 +44,6 @@
   short fallback so the native splash never hangs) and renders `<SplashStatement/>` (default,
   catch-all for any non-Climb value) or the parked `<SplashReveal/>` ("The Climb", still wired
   and ELO-fed). The Climb is parked, never deleted.
->>>>>>> 3aeb709 (feat(mobile): "The Statement" launch splash + splash-variant flag (jits-abt, jits-ic3))
 
 **Mobile: fix TestFlight launch crash from missing EAS build env (2026-05-29)**
 
