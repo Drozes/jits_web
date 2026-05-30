@@ -9,6 +9,24 @@
 - `jits-3ng` — `apps/web/hooks/use-video-recorder.ts`: the 2 GiB `MAX_UPLOAD_BYTES` cap was only checked after recording stopped, so a user could record for minutes then be rejected. Now tracks recorded bytes live in `ondataavailable`, exposes `nearingLimit` (≥90%), and auto-stops recording at the cap with a clear error (parity with mobile's pre-flight check). The post-record check remains as a backstop. `nearingLimit` is an additive, non-breaking field on the hook's return.
 - `jits-02w` / `jits-5q6` / `jits-c67` / `jits-5uc` — `packages/shared/src/hooks/use-video-progress.ts`: (02w) the `rpcMissing→ref` mirror moved out of the render body into a `useEffect`; (5q6) removed `fetchSnapshot`/`scheduleRefresh` from the realtime-channel effect deps (version-gated via `versionRef`) so a non-memoized `supabase` no longer rebuilds the channel every render; (c67) `rpcMissing` now resets on `videoId` change and on `refresh()`, so degraded "Realtime-only" mode recovers after the RPC ships; (5uc) a transient fallback miss now signals via `error` ("Progress temporarily unavailable") instead of silently keeping stale data. Exported API unchanged.
 
+**Mobile launch reveal: "The Climb" animated splash (2026-05-29)**
+
+**Added**
+- `apps/mobile/components/ui/elo-system/splash-reveal.tsx`: new cold-start brand reveal (concept "The Climb"). On a dark Void background, the logo's bars rise one-by-one like a rating climbing, an ELO odometer rolls up (JS rAF + easeOutCubic), the gold "breakthrough" peak pops, the `Wordmark` locks in, and a Signal Red accent rule wipes left→right. Reanimated (mirrors the LIVE-pill idiom) + `expo-haptics` heavy impact on the lock beat. Honors `AccessibilityInfo.isReduceMotionEnabled()` (renders a static resting frame, no motion, then dismisses). Theme-independent (always the Void "arena" palette).
+- `packages/shared/src/constants.ts` `SPLASH_REVEAL`: single source of truth for the reveal timings/sequence (bar stagger/rise, peak pop, number roll, wordmark/rule timing, holds, `DEFAULT_ELO = 1481`, brand `EASING_BEZIER`). Consumed by mobile now; reserved for the future web intro.
+- `apps/mobile/lib/splash/elo-cache.ts` (`getCachedElo` / `setCachedElo`): best-effort AsyncStorage cache (key `elo-rated:last-elo`) so a returning user watches *their own* rating climb. Falls back to `DEFAULT_ELO` on any miss/failure.
+- `expo-splash-screen` dependency (SDK-pinned) wired in `apps/mobile/app/_layout.tsx`: `preventAutoHideAsync()` keeps the native splash up until `SplashReveal` paints and calls `hideAsync()`, for a seamless native→JS hand-off. The overlay mounts once per cold start after the cached ELO resolves.
+
+**Changed**
+- `apps/mobile/app.json`: native splash `backgroundColor` `#bf1212` → `#0D0F14` (Void) so the static native splash matches the reveal's background (no seam). Launcher adaptive-icon background stays Signal Red.
+- `apps/mobile/lib/auth/auth-context.tsx`: persists `athlete.current_elo` to the device cache whenever it changes, feeding the next launch reveal.
+
+**Mobile gym detail: wire Avg Session stat + Signal Red accent bar (2026-05-29)**
+
+**Changed**
+- `apps/mobile/app/(app)/(tabs)/gyms/[id].tsx`: `useGymDetailData` now fetches `getGymManagerStats` inside the existing `fetchAll` `Promise.all` and returns a ready-to-render `avgPerSession` string, replacing the hardcoded `"—"` placeholder. Uses the exact web-parity formula (`totalSessions > 0 ? (totalParticipants / totalSessions).toFixed(1) : "0"`, see `apps/web/app/(app)/gyms/[id]/gym-detail-content.tsx`). The stats fetch is wrapped in `.catch(() => null)` so a slow/failed analytics query degrades the tile to `"0"` and never blocks the gym render. Avg ELO stays `"—"` (its backing query is unbuilt; tracked in jits-ycq).
+- `apps/mobile/components/gyms/gym-detail-parts.tsx`: `StatsGrid` now renders the wireframe E2 Signal Red `accentBar` on the populated Avg Session tile only. Per the brand "no decorative color" rule, the still-placeholder Avg ELO tile gets no accent until its data lands.
+
 **Web parity: EloTile Signal Red accent bar (2026-05-29)**
 
 **Added**
