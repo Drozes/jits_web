@@ -107,3 +107,54 @@ export const SPLASH_REVEAL = {
   /** = RULE_DELAY_MS (1180) + RULE_MS (500) + HOLD_AFTER_MS (260). */
   TOTAL_MS: 1940,
 } as const;
+
+/** Which launch splash plays. 'climb' = the data-viz rating climb (parked, on
+ * TestFlight); 'statement' = the cinematic 'WE ARE / ELO RATED / ARE YOU?' reveal. */
+export const SPLASH_VARIANT = {
+  CLIMB: "climb",
+  STATEMENT: "statement",
+} as const;
+
+export type SplashVariant = (typeof SPLASH_VARIANT)[keyof typeof SPLASH_VARIANT];
+
+/** Default splash on a fresh device (no local override). */
+export const DEFAULT_SPLASH_VARIANT: SplashVariant = SPLASH_VARIANT.STATEMENT;
+
+/**
+ * "The Statement" launch reveal — timing + sequence (single source of truth).
+ * All values in ms. Reuses SPLASH_REVEAL.EASING_BEZIER for the brand ease-out.
+ * Sequence: WE ARE eyebrow fades up; ELO RATED ignites (opacity+scale 1.04->1,
+ * no flash); ARE YOU? fades up on the beat + a Heavy haptic; then ELO RATED
+ * settles into a gentle, even glow breathe loop. Reduced-motion shows the resting
+ * frame and dismisses after a short hold.
+ */
+export const SPLASH_STATEMENT = {
+  /** "WE ARE" gray eyebrow fades up first. */
+  WEARE_DELAY_MS: 250,
+  WEARE_MS: 680,
+
+  /** "ELO RATED" locks/ignites in (opacity 0->1 + scale 1.04->1), no bright flash. */
+  IGNITE_DELAY_MS: 430,
+  IGNITE_MS: 900,
+
+  /** "ARE YOU?" (Signal Red) fades up on the ignite beat. */
+  AREYOU_DELAY_MS: 1180,
+  AREYOU_MS: 700,
+
+  /** Felt "lock" — Heavy haptic on the ARE YOU beat (suppressed under reduced-motion). */
+  HAPTIC_DELAY_MS: 1180,
+
+  /** Gentle even glow breathe on ELO RATED — full up-and-back cycle, loops forever
+   * until the overlay unmounts at handoff. Low amplitude (a calm glow, not a pulse). */
+  GLOW_BREATHE_MS: 6000,
+
+  /** Hold the landed frame before dismissing to the app. */
+  HOLD_AFTER_MS: 260,
+
+  /** Reduced-motion: show the resting frame, hold briefly, dismiss. No motion. */
+  REDUCED_MOTION_HOLD_MS: 260,
+
+  /** Total time from mount to onDone() in the full-motion path.
+   *  = AREYOU_DELAY_MS (1180) + AREYOU_MS (700) + HOLD_AFTER_MS (260). */
+  TOTAL_MS: 2140,
+} as const;

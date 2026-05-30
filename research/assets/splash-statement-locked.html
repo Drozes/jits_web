@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ELO RATED — "The Statement" splash (LOCKED)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@700;800&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --void:#0D0F14; --white:#E8EDF2; --red:#E63946; --gray:#9CA3AF;
+    --ease:cubic-bezier(.16,1,.3,1);
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:#15171c; color:#6b7280; font-family:"DM Sans",system-ui,sans-serif;
+    min-height:100vh; padding:28px 16px 48px; display:flex; flex-direction:column; align-items:center; gap:18px; }
+  h1 { font-size:14px; font-weight:700; color:#cbd5e1; letter-spacing:.14em; text-transform:uppercase; }
+  .controls { display:flex; gap:10px; }
+  button { font-family:"DM Sans"; font-size:13px; font-weight:600; color:#fff;
+    background:var(--red); border:none; padding:9px 16px; border-radius:6px; cursor:pointer; }
+  .toggle { font-family:"DM Sans"; font-size:13px; font-weight:600; color:#e5e7eb;
+    background:#23262e; border:1px solid #353a45; padding:9px 14px; border-radius:6px; cursor:pointer; user-select:none; }
+  .toggle.on { background:#2f3742; border-color:#4b5563; }
+
+  /* ===== phone frame ===== */
+  .phone { position:relative; width:330px; height:700px; border-radius:40px; background:#000;
+    box-shadow:0 0 0 10px #1c1f26, 0 22px 54px rgba(0,0,0,.6); overflow:hidden; cursor:pointer; }
+  .notch { position:absolute; top:11px; left:50%; transform:translateX(-50%); width:104px; height:25px; background:#000; border-radius:13px; z-index:50; }
+
+  /* ===== splash ===== */
+  .stage { position:absolute; inset:0; background:var(--void); overflow:hidden; }
+  /* cinematic depth: grayscale luminance shaping (no hue) + faint grain */
+  .stage::before { content:""; position:absolute; inset:0; z-index:0;
+    background:
+      radial-gradient(120% 80% at 72% 22%, rgba(160,168,180,.10) 0%, rgba(0,0,0,0) 42%),
+      radial-gradient(90% 60% at 30% 35%, rgba(120,128,140,.06) 0%, rgba(0,0,0,0) 55%),
+      linear-gradient(180deg, rgba(0,0,0,0) 40%, rgba(0,0,0,.5) 100%); }
+  .stage::after { content:""; position:absolute; inset:-50%; opacity:.04; z-index:1; pointer-events:none;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"); }
+
+  .hero { position:absolute; z-index:20; top:50%; left:50%; transform:translate(-50%,-50%); display:inline-block; }
+  .weare { display:block; font-weight:700; color:var(--gray); font-size:15px; letter-spacing:.42em; margin-bottom:14px; padding-left:3px; opacity:0; }
+  .wordmark { font-family:"Bebas Neue"; letter-spacing:.02em; }
+  .wordmark .ln { display:block; font-size:66px; line-height:.92; white-space:nowrap; color:var(--white); opacity:0; transform-origin:center; }
+  .areyou { margin-top:12px; text-align:right; font-weight:800; font-size:24px; letter-spacing:.15em; color:var(--red); opacity:0; }
+
+  /* ===== reveal ===== */
+  @keyframes weareIn   { from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:translateY(0)} }
+  @keyframes areYouIn  { from{opacity:0; transform:translateY(6px)} to{opacity:1; transform:translateY(0)} }
+  /* ELO RATED locks in (blur->sharp, scale 1.05->1) and eases straight into the gentle
+     glow — no bright flash. Brightness rises smoothly to the resting glow level only. */
+  @keyframes ignite {
+    0%   { opacity:0; transform:scale(1.04); filter:blur(7px) brightness(1);    text-shadow:0 0 0 rgba(255,255,255,0) }
+    65%  { opacity:1; transform:scale(1);    filter:blur(0)   brightness(1);    text-shadow:0 0 4px rgba(255,255,255,.25) }
+    100% { opacity:1; transform:scale(1);    filter:blur(0)   brightness(1.10); text-shadow:0 0 8px rgba(255,255,255,.5) }
+  }
+  /* gentle, even glow breathe — low amplitude, smooth, seamless loop (LOCKED) */
+  @keyframes gentleGlow {
+    0%   { filter:brightness(1.10); text-shadow:0 0 8px rgba(255,255,255,.5) }
+    50%  { filter:brightness(1.20); text-shadow:0 0 14px rgba(255,255,255,.7) }
+    100% { filter:brightness(1.10); text-shadow:0 0 8px rgba(255,255,255,.5) }
+  }
+
+  .play .weare  { animation:weareIn 680ms var(--ease) 250ms forwards; }
+  .play .ln     { animation:ignite 900ms var(--ease) 430ms forwards, gentleGlow 6000ms ease-in-out 1330ms infinite; }
+  .play .areyou { animation:areYouIn 700ms var(--ease) 1180ms forwards; }
+
+  /* reduced motion: static resting frame, no animation */
+  .reduced .weare,.reduced .ln,.reduced .areyou { opacity:1 !important; animation:none !important; transform:none !important; filter:none !important; text-shadow:none !important; }
+</style>
+</head>
+<body>
+  <h1>"The Statement" — locked</h1>
+
+  <div class="phone" id="phone">
+    <div class="notch"></div>
+    <div class="stage play" id="stage">
+      <div class="hero">
+        <div class="weare">WE ARE</div>
+        <div class="wordmark"><span class="ln">ELO RATED</span></div>
+        <div class="areyou">ARE YOU?</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button id="replay">↻ Replay</button>
+    <div class="toggle" id="t-reduced">Reduced motion</div>
+  </div>
+
+<script>
+  const stage = document.getElementById('stage');
+  let reduced = false;
+  function play(){ stage.classList.remove('play'); void stage.offsetWidth; if(!reduced) stage.classList.add('play'); }
+  document.getElementById('replay').onclick = play;
+  document.getElementById('phone').onclick = play;
+  document.getElementById('t-reduced').onclick = function(){
+    reduced = this.classList.toggle('on');
+    stage.classList.toggle('reduced', reduced);
+    play();
+  };
+  window.addEventListener('load', () => setTimeout(play, 250));
+</script>
+</body>
+</html>
