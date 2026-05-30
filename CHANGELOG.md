@@ -17,6 +17,15 @@
 - `apps/web/components/layout/page-container.test.tsx`: adds assertions that the default stays narrow (no `lg:max-w-3xl`) and that `wide` adds the responsive widening classes while preserving the below-`lg` column.
 - Design board freshness (now that concept 01 shipped): `apps/web/app/design/web-layouts/page.tsx` replaces the stale "the shipping app is currently a centered `max-w-md` mobile column" intro with the real adopted-shell description, adds a `shipped` flag + a neutral "Shipped" badge on the concept-01 tab and caption; `apps/web/app/design/page.tsx` corrects the Web Layouts card from "Six" to "Seven" concepts and notes concept 01 has shipped. Mock files (`web-layouts/concepts/*`, `_data.ts`) are pure layout and left untouched.
 
+**Mobile: fix TestFlight launch crash from missing EAS build env (2026-05-29)**
+
+**Fixed**
+- `jits-00q` — cloud EAS builds (preview/production → TestFlight) crashed on app open. The Supabase client is constructed at module load (`apps/mobile/lib/supabase/client.ts`) and `apps/mobile/lib/env.ts` throws when `EXPO_PUBLIC_SUPABASE_URL`/`EXPO_PUBLIC_SUPABASE_ANON_KEY` are absent. The `apps/mobile/eas.json` profiles defined only `EXPO_PUBLIC_APP_ENV`, and `.env` (the sole place the creds live) is gitignored and not uploaded to cloud builds → uncaught startup throw → instant crash. Worked in dev because the local `.env` is present.
+
+**Changed**
+- `apps/mobile/eas.json`: added an `environment` (`development`/`preview`/`production`) to each build profile so the build loads that EAS environment's server-side variables. The Supabase + Google `EXPO_PUBLIC_*` credentials are provisioned as EAS Environment Variables (server-side, not committed — honors the repo JWT secret-scan guard), not hardcoded in `eas.json`.
+- `apps/mobile/app.json`: corrected `updates.url` from the `PLACEHOLDER_PROJECT_ID` placeholder to the real EAS projectId (`146416ac-…`) so `expo-updates` targets the actual project (secondary correctness fix; not the crash cause).
+
 **Web bug batch: build prerender, video pre-flight, video-progress hook (2026-05-29)**
 
 **Fixed**
