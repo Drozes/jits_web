@@ -75,7 +75,7 @@ export async function ProfileContent({
         title="Profile"
         rightAction={<HeaderShareButton athlete={shareAthlete} />}
       />
-      <div className="flex flex-col animate-page-in">
+      <div className="flex flex-col animate-page-in lg:mx-auto lg:w-full lg:max-w-3xl">
         <ProfileHero
           name={athlete.display_name}
           gymName={gymName}
