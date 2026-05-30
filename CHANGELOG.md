@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+**Web: Persistent Sidebar authed shell (2026-05-29)**
+
+**Added**
+- `apps/web/components/layout/nav-config.ts`: single source of truth for the authed-shell nav, shared by both navs so they cannot drift. Exports `NAV_TABS` (Home `/`, Gyms `/gyms`, Rankings `/leaderboard`, Profile `/profile`), `isImmersiveRoute(pathname)` + the underlying `HIDE_PATTERNS` (extracted verbatim from `bottom-nav-bar.tsx`, scope unchanged), and `isActiveTab(href, pathname)`.
+- `apps/web/components/layout/sidebar-rail.tsx`: new client component rendering the persistent left rail at `>= lg` only (`hidden lg:flex`, sticky full-height). `Wordmark` + the 4 `NAV_TABS` links (concept "01 Persistent Sidebar" active styling: Signal Red left accent + elevated bg) + a server-rendered footer slot. Returns `null` on immersive routes (same list as the bottom nav).
+- `apps/web/components/layout/sidebar-footer.tsx`: `SidebarFooter` (async) fetches the active athlete null-safely via `getActiveAthlete()` (never `requireAthlete`; the shell wraps `/eua` and `/signup` and must not redirect), rendering a circular shadcn `Avatar` link to `/profile` + name + `current_elo` in `font-mono tabular-nums`. Renders nothing when there is no active athlete. Ships with `SidebarFooterSkeleton` for its Suspense fallback.
+
+**Changed**
+- `apps/web/app/(app)/layout.tsx`: wires the rail beside `{children}` in a `lg:flex` row so immersive routes (rail returns `null`) reflow to full width with no gutter. The footer fetch lives inside its own `<Suspense fallback={<SidebarFooterSkeleton/>}>`, and the rail itself is wrapped in `<Suspense>` (its `usePathname` is dynamic under Next 16 `cacheComponents`, same as `BottomNavBar`). Layout stays synchronous; all existing bootstraps and their Suspense boundaries (incl. the bare `DeploymentCheckBootstrap`) are unchanged. The shell root now paints the brand dark surface (`var(--bg-primary)`) instead of the shadcn `bg-background bg-gradient-subtle`, which resolved to a light gray with no `.dark` class active: with the desktop rail and a centered, width-capped column, that light layout background showed through the gutters and below short pages as a gray "box" around the dark content column. Painting the brand surface keeps the whole authed shell uniformly dark at every breakpoint (the content column was already `var(--bg-primary)`).
+- `apps/web/components/layout/bottom-nav-bar.tsx`: now imports `NAV_TABS`/`isActiveTab`/`isImmersiveRoute` from `nav-config.ts` (rendered output unchanged) and gains `lg:hidden` so the bottom nav and the rail are never shown together.
+- `apps/web/components/layout/page-container.tsx`: opt-in `wide?: boolean` prop. Default is unchanged (`max-w-md`; the ~24 other consumers are untouched); when set, the column widens to `lg:max-w-3xl lg:px-6` at `>= lg` while keeping the comfortable mobile column below `lg`.
+- Widened only the 4 in-scope page bodies at `>= lg`: `apps/web/app/(app)/page.tsx`, `/leaderboard/page.tsx`, `/gyms/page.tsx` pass `wide` to `PageContainer`; `apps/web/app/(app)/profile/profile-content.tsx` (no `PageContainer`) gets `lg:max-w-3xl lg:mx-auto` on its content wrapper. No page internals were restructured (the Bento home redesign remains out of scope).
+- `apps/web/components/layout/page-container.test.tsx`: adds assertions that the default stays narrow (no `lg:max-w-3xl`) and that `wide` adds the responsive widening classes while preserving the below-`lg` column.
+- Design board freshness (now that concept 01 shipped): `apps/web/app/design/web-layouts/page.tsx` replaces the stale "the shipping app is currently a centered `max-w-md` mobile column" intro with the real adopted-shell description, adds a `shipped` flag + a neutral "Shipped" badge on the concept-01 tab and caption; `apps/web/app/design/page.tsx` corrects the Web Layouts card from "Six" to "Seven" concepts and notes concept 01 has shipped. Mock files (`web-layouts/concepts/*`, `_data.ts`) are pure layout and left untouched.
+
 **Mobile: fix TestFlight launch crash from missing EAS build env (2026-05-29)**
 
 **Fixed**

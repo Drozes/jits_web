@@ -8,7 +8,7 @@ export default function GymsPage() {
   return (
     <>
       <AppHeader title="Gym Finder" back />
-      <PageContainer className="pt-6">
+      <PageContainer wide className="pt-6">
         <Suspense fallback={<GymsListSkeleton />}>
           <GymsContent />
         </Suspense>

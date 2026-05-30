@@ -2,33 +2,16 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, MapPin, Trophy, User } from "lucide-react";
-
-const tabs = [
-  { href: "/", label: "Home", icon: Home },
-  { href: "/gyms", label: "Gyms", icon: MapPin },
-  { href: "/leaderboard", label: "Rankings", icon: Trophy },
-  { href: "/profile", label: "Profile", icon: User },
-] as const;
-
-// Hide the nav bar on immersive routes (match flow, lobby, join wizard, setup)
-const HIDE_PATTERNS = [
-  /^\/session\/[^/]+\/match\//,
-  /^\/session\/[^/]+\/lobby/,
-  /^\/session\/[^/]+\/join/,
-  /^\/match\/[^/]+\/live/,
-  /^\/match\/[^/]+\/results/,
-  /^\/profile\/setup/,
-];
+import { NAV_TABS, isActiveTab, isImmersiveRoute } from "./nav-config";
 
 export function BottomNavBar() {
   const pathname = usePathname();
 
-  if (HIDE_PATTERNS.some((p) => p.test(pathname))) return null;
+  if (isImmersiveRoute(pathname)) return null;
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-50"
+      className="fixed bottom-0 left-0 right-0 z-50 lg:hidden"
       style={{
         background: "var(--bg-secondary)",
         borderTop: "1px solid var(--border-hairline)",
@@ -41,9 +24,8 @@ export function BottomNavBar() {
           gridTemplateColumns: "repeat(4, 1fr)",
         }}
       >
-        {tabs.map(({ href, label, icon: Icon }) => {
-          const isActive =
-            href === "/" ? pathname === "/" : pathname.startsWith(href);
+        {NAV_TABS.map(({ href, label, icon: Icon }) => {
+          const isActive = isActiveTab(href, pathname);
 
           return (
             <Link

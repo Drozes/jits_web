@@ -72,7 +72,7 @@ export default function DashboardPage() {
       <Suspense fallback={<DashboardHeaderFallback />}>
         <DashboardHeader />
       </Suspense>
-      <PageContainer className="pt-6">
+      <PageContainer wide className="pt-6">
         <Suspense fallback={<DashboardSkeleton />}>
           <DashboardContent />
         </Suspense>

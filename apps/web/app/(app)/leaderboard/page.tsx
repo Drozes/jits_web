@@ -29,7 +29,7 @@ export default function LeaderboardPage() {
   return (
     <>
       <AppHeader title="Rankings" rightAction={<PageHeaderActions />} />
-      <PageContainer className="pt-6">
+      <PageContainer wide className="pt-6">
         <Suspense fallback={<LeaderboardSkeleton />}>
           <LeaderboardData />
         </Suspense>

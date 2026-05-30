@@ -24,7 +24,7 @@ const cards = [
     href: "/design/web-layouts",
     title: "Web Layouts",
     description:
-      "Six full-screen desktop layout concepts (one per screen) for previewing how the web app could use the whole viewport.",
+      "Seven full-screen desktop layout concepts (one per screen). Concept 01 (Persistent Sidebar) has shipped as the authed web shell; the rest preview other ways the web app could use the whole viewport.",
   },
   {
     href: "/design/screens",
