@@ -17,7 +17,7 @@ export default function AppLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-background bg-gradient-subtle">
+    <div className="min-h-screen" style={{ background: "var(--bg-primary)" }}>
       {/* >= lg: persistent left rail beside the content column. The rail is a
           real flex item, so on immersive routes (rail returns null) the content
           reflows to full width with no leftover gutter. */}
