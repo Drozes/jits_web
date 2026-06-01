@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect x="0" y="0" width="1024" height="1024" fill="#E63946"/>
+
+  <!-- Winged Victory: an abstract striding figure (a single bold vertical mass)
+       with one great sweeping wing arcing up behind it. Red-on-void inverted to
+       give a monumental statue silhouette. Background is Signal Red. -->
+
+  <!-- Void disc to seat the monolith -->
+  <circle cx="512" cy="512" r="400" fill="#0D0F14"/>
+
+  <!-- The single great wing: a broad swept arc of layered feathers behind the figure,
+       sweeping up to the right. Built as a heavy crescent with feather notches. -->
+  <path d="M 470 720
+           C 470 540 540 360 720 260
+           C 760 238 808 222 856 218
+           C 800 300 760 360 730 430
+           C 700 500 686 580 690 680
+           C 612 660 540 680 470 720 Z" fill="#E8EDF2"/>
+
+  <!-- Feather separation notches cut into the wing using Void wedges -->
+  <polygon points="690,680 730,430 706,440 668,672" fill="#0D0F14"/>
+  <polygon points="660,672 700,452 676,464 638,664" fill="#0D0F14"/>
+  <polygon points="628,662 672,486 648,498 610,650" fill="#0D0F14"/>
+  <polygon points="596,650 644,520 620,532 580,636" fill="#0D0F14"/>
+
+  <!-- The figure: a tall tapering monolith (the goddess body) standing in front of the wing -->
+  <polygon points="430,760 504,760 482,360 452,360" fill="#E63946"/>
+  <!-- Raised forward arm / laurel offering, a short heavy bar -->
+  <polygon points="466,400 466,348 380,330 376,382" fill="#E63946"/>
+
+  <!-- Gold laurel held aloft at the tip of the arm, the breakthrough accent -->
+  <polygon points="376,360 332,330 348,392 376,382" fill="#f59e0b"/>
+</svg>

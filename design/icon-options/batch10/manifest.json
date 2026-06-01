@@ -1,0 +1,178 @@
+{
+  "batch": "batch10",
+  "num": 10,
+  "label": "Vintage Crest",
+  "date": "2026-06-01",
+  "themes": [
+    {
+      "key": "mark",
+      "title": "The E / ER Mark"
+    },
+    {
+      "key": "belt",
+      "title": "The Belt"
+    },
+    {
+      "key": "lock",
+      "title": "The Lock"
+    },
+    {
+      "key": "climb",
+      "title": "The Climb"
+    },
+    {
+      "key": "match",
+      "title": "The Match"
+    },
+    {
+      "key": "champion",
+      "title": "The Champion"
+    }
+  ],
+  "icons": [
+    {
+      "theme": "mark",
+      "themeTitle": "The E / ER Mark",
+      "file": "theme1-mark-a",
+      "name": "Shield Varsity",
+      "concept": "Heraldic oxblood shield with laurel ring, EST 2026 stars and an ELO RATED banner, bold cream E with ascending bars as the central charge.",
+      "score": 5
+    },
+    {
+      "theme": "mark",
+      "themeTitle": "The E / ER Mark",
+      "file": "theme1-mark-b",
+      "name": "Medallion Seal",
+      "concept": "Circular collegiate medallion: navy disc, gold rim, ELO RATED / EST 2026 ring lettering, interlocked cream-and-gold ER monogram over an oxblood core with a RANKED ribbon.",
+      "score": 4
+    },
+    {
+      "theme": "mark",
+      "themeTitle": "The E / ER Mark",
+      "file": "theme1-mark-c",
+      "name": "Pennant Crest",
+      "concept": "Vertical navy pennant-shield with a Signal Red ELO RATED top banner, antique-gold EST 2026 chief, ascending gold E with a momentum triangle, oxblood point and apex star.",
+      "score": 4
+    },
+    {
+      "theme": "belt",
+      "themeTitle": "The Belt",
+      "file": "theme2-belt-a",
+      "name": "Knot Shield",
+      "concept": "Heraldic maroon shield with laurel branches, top banner ribbon and EST 2026 scroll, charged with a tied BJJ belt knot bearing gold rank stripes.",
+      "score": 5
+    },
+    {
+      "theme": "belt",
+      "themeTitle": "The Belt",
+      "file": "theme2-belt-b",
+      "name": "Varsity Medallion",
+      "concept": "Circular antique-gold coin with rope-knurl edge and arced ELO RATED / EST 2026 serif lettering around a maroon belt band with four gold rank stripes.",
+      "score": 4
+    },
+    {
+      "theme": "belt",
+      "themeTitle": "The Belt",
+      "file": "theme2-belt-c",
+      "name": "Crossed Belts Pennant",
+      "concept": "Navy pennant-shield with cream field and maroon chevron banner, centered on crossed maroon and gold rank belts joined by a tied cream knot.",
+      "score": 5
+    },
+    {
+      "theme": "lock",
+      "themeTitle": "The Lock",
+      "file": "theme3-lock-a",
+      "name": "Triangle Shield",
+      "concept": "Heraldic cream shield with an oxblood triangle-choke charge, gold cinch rivet, EST 2026 chief band and ELO RATED ribbon banner over crossed laurels.",
+      "score": 5
+    },
+    {
+      "theme": "lock",
+      "themeTitle": "The Lock",
+      "file": "theme3-lock-b",
+      "name": "Clinch Seal",
+      "concept": "Collegiate gold-and-navy medallion with curved ELO RATED / EST 2026 seal lettering ringing two interlocked clinch figures locked by a gold tie-up knot on a cream disc.",
+      "score": 4
+    },
+    {
+      "theme": "lock",
+      "themeTitle": "The Lock",
+      "file": "theme3-lock-c",
+      "name": "Varsity Lock Badge",
+      "concept": "Rounded varsity badge plate on forest ground, bold triangle-choke lock built from interlocking navy/oxblood limb bars with gold apex medallion, top ELO RATED scroll and EST 2026 base banner.",
+      "score": 5
+    },
+    {
+      "theme": "climb",
+      "themeTitle": "The Climb",
+      "file": "theme4-climb-a",
+      "name": "Ascendant Shield",
+      "concept": "Maroon varsity shield charged with ascending podium bars and a climbing arrow, ringed by gold laurels with ELO RATED ribbon and EST. 2026.",
+      "score": 4
+    },
+    {
+      "theme": "climb",
+      "themeTitle": "The Climb",
+      "file": "theme4-climb-b",
+      "name": "Rank Medallion Roundel",
+      "concept": "Navy collegiate roundel with a gold rank-medallion bearing a Signal Red up-arrow over ascending chevrons, flanked by EST. 2026 and twin ELO RATED / THE CLIMB banners.",
+      "score": 5
+    },
+    {
+      "theme": "climb",
+      "themeTitle": "The Climb",
+      "file": "theme4-climb-c",
+      "name": "Summit Crest",
+      "concept": "Cream vintage-stamp shield framing a maroon mountain peak with summit flag and switchback climbing path, crossed laurels, EST. 2026 chief and ELO RATED banner.",
+      "score": 5
+    },
+    {
+      "theme": "match",
+      "themeTitle": "The Match",
+      "file": "theme5-match-a",
+      "name": "Faceoff Shield",
+      "concept": "Navy varsity shield crest with an EST 2026 chief, two facing oxblood/navy profile fighters around a gold VS roundel, laurels and an ELO RATED ribbon.",
+      "score": 4
+    },
+    {
+      "theme": "match",
+      "themeTitle": "The Match",
+      "file": "theme5-match-b",
+      "name": "Clash Medallion",
+      "concept": "Antique-gold ring medallion over a split oxblood/navy disc, two cream fists bumping at a Signal Red impact point, ELO RATED and EST 2026 straight banners.",
+      "score": 3
+    },
+    {
+      "theme": "match",
+      "themeTitle": "The Match",
+      "file": "theme5-match-c",
+      "name": "Crossed Blades Crest",
+      "concept": "Heraldic badge with a diagonally quartered navy/oxblood field (two zones meeting), crossed swords, a central VS roundel, laurel sprigs and EST 2026 + ELO RATED banners.",
+      "score": 5
+    },
+    {
+      "theme": "champion",
+      "themeTitle": "The Champion",
+      "file": "theme6-champion-a",
+      "name": "Trophy Escutcheon",
+      "concept": "Oxblood varsity shield with a gold champion's trophy cup on a cream field, laurel flanks, EST 2026 scroll and ELO RATED banner ribbon.",
+      "score": 5
+    },
+    {
+      "theme": "champion",
+      "themeTitle": "The Champion",
+      "file": "theme6-champion-b",
+      "name": "Champion Roundel",
+      "concept": "Circular heraldic badge: navy ring arched with ELO RATED / EST 2026, gold stars, oxblood laurel wreath cradling a Signal-Red No.1 star medallion.",
+      "score": 4
+    },
+    {
+      "theme": "champion",
+      "themeTitle": "The Champion",
+      "file": "theme6-champion-c",
+      "name": "Crown Crest",
+      "concept": "Gold-bordered navy heater shield with a cream chief and a jeweled antique-gold champion's crown as the central charge, over a draped ELO RATED banner.",
+      "score": 5
+    }
+  ]
+}

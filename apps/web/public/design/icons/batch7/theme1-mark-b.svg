@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect x="0" y="0" width="1024" height="1024" fill="#F2F4F7"/>
+  <!-- ER monogram in single-weight monoline. Dark E, Signal Red R, sharing an axis. -->
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="30">
+    <!-- E (dark line) -->
+    <path d="M 470 280 L 230 280 L 230 744 L 470 744" stroke="#0D0F14"/>
+    <line x1="230" y1="512" x2="430" y2="512" stroke="#0D0F14"/>
+    <!-- R (Signal Red): stem, bowl, and leg -->
+    <path d="M 560 744 L 560 280 L 700 280
+             Q 800 280 800 400
+             Q 800 520 700 520 L 560 520"
+          stroke="#E63946"/>
+    <line x1="640" y1="520" x2="800" y2="744" stroke="#E63946"/>
+  </g>
+</svg>

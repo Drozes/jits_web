@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Full-bleed Void background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- Subtle scanline darker checker frame for arcade feel -->
+  <g fill="#11141b">
+    <rect x="0" y="0" width="64" height="64"/>
+    <rect x="128" y="0" width="64" height="64"/>
+    <rect x="256" y="0" width="64" height="64"/>
+    <rect x="384" y="0" width="64" height="64"/>
+    <rect x="576" y="0" width="64" height="64"/>
+    <rect x="704" y="0" width="64" height="64"/>
+    <rect x="832" y="0" width="64" height="64"/>
+    <rect x="960" y="0" width="64" height="64"/>
+    <rect x="0" y="960" width="64" height="64"/>
+    <rect x="128" y="960" width="64" height="64"/>
+    <rect x="256" y="960" width="64" height="64"/>
+    <rect x="384" y="960" width="64" height="64"/>
+    <rect x="576" y="960" width="64" height="64"/>
+    <rect x="704" y="960" width="64" height="64"/>
+    <rect x="832" y="960" width="64" height="64"/>
+    <rect x="960" y="960" width="64" height="64"/>
+  </g>
+
+  <!-- ================================================================
+       PIXEL SPRITE: tied BJJ belt knot with two hanging tails.
+       Grid = 64px cells (16x16). Each <rect> is one pixel cell.
+       Red belt = #E63946, dark outline = #0D0F14 baked via gaps,
+       highlight = #E8EDF2, gold buckle-stripe accent = #f59e0b.
+       ================================================================ -->
+
+  <!-- Dark 1px outline layer (drawn slightly larger, behind) -->
+  <g fill="#070809">
+    <!-- left tail band -->
+    <rect x="128" y="640" width="256" height="320"/>
+    <!-- right tail band -->
+    <rect x="640" y="640" width="256" height="320"/>
+    <!-- horizontal belt band across middle -->
+    <rect x="64"  y="384" width="896" height="192"/>
+    <!-- center knot block -->
+    <rect x="384" y="320" width="256" height="384"/>
+  </g>
+
+  <!-- Horizontal belt band (the wrap), red -->
+  <g fill="#E63946">
+    <rect x="64"  y="448" width="896" height="64"/>  <!-- main band row -->
+    <rect x="64"  y="512" width="896" height="64"/>  <!-- band row 2 -->
+  </g>
+  <!-- band top highlight row -->
+  <rect x="64" y="448" width="896" height="32" fill="#f06470"/>
+
+  <!-- Center KNOT (overlapping square) red -->
+  <g fill="#E63946">
+    <rect x="384" y="384" width="256" height="256"/>
+  </g>
+  <!-- knot left-over loop (slightly lighter) -->
+  <rect x="384" y="384" width="128" height="256" fill="#f06470"/>
+  <!-- knot shadow split -->
+  <rect x="512" y="384" width="128" height="256" fill="#c32f3b"/>
+  <!-- knot center cinch (dark vertical seam) -->
+  <rect x="496" y="384" width="32" height="256" fill="#070809"/>
+
+  <!-- LEFT hanging tail -->
+  <g fill="#E63946">
+    <rect x="192" y="640" width="192" height="64"/>  <!-- tail top under knot -->
+    <rect x="192" y="704" width="128" height="256"/> <!-- tail body -->
+  </g>
+  <rect x="192" y="704" width="32" height="256" fill="#f06470"/> <!-- tail highlight -->
+  <rect x="288" y="704" width="32" height="256" fill="#c32f3b"/> <!-- tail shade -->
+
+  <!-- RIGHT hanging tail -->
+  <g fill="#E63946">
+    <rect x="640" y="640" width="192" height="64"/>  <!-- tail top under knot -->
+    <rect x="704" y="704" width="128" height="256"/> <!-- tail body -->
+  </g>
+  <rect x="704" y="704" width="32" height="256" fill="#f06470"/> <!-- tail highlight -->
+  <rect x="800" y="704" width="32" height="256" fill="#c32f3b"/> <!-- tail shade -->
+
+  <!-- GOLD RANK STRIPES on right tail tip (black-belt bar style) -->
+  <g fill="#0D0F14">
+    <rect x="704" y="832" width="128" height="128"/> <!-- dark rank bar -->
+  </g>
+  <g fill="#f59e0b">
+    <rect x="720" y="848" width="16" height="96"/>
+    <rect x="752" y="848" width="16" height="96"/>
+    <rect x="784" y="848" width="16" height="96"/>
+  </g>
+
+  <!-- white pixel glint top-left of knot -->
+  <rect x="400" y="400" width="32" height="32" fill="#E8EDF2"/>
+</svg>

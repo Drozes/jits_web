@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- TRIANGLE CHOKE: heavy red triangle (the legs) clamping a trapped white arm -->
+
+  <!-- Outer red triangle, thick legs forming the choke frame -->
+  <polygon points="512,196 828,748 196,748" fill="#E63946"/>
+
+  <!-- Void cutout inside the triangle to read it as a heavy frame (the locked gap) -->
+  <polygon points="512,372 700,700 324,700" fill="#0D0F14"/>
+
+  <!-- Trapped arm: a heavy white bar driven through/down the triangle (the head+arm caught in the choke) -->
+  <!-- Upper arm segment angling in from top-left -->
+  <polygon points="392,236 472,196 660,536 580,576" fill="#E8EDF2"/>
+  <!-- Forearm/wrist segment continuing down through the cutout -->
+  <rect x="540" y="540" width="92" height="232" fill="#E8EDF2"/>
+
+  <!-- Gold lock-knot at the apex: where the legs cinch (the finish) -->
+  <polygon points="512,196 556,272 468,272" fill="#f59e0b"/>
+
+  <!-- Heavy white clamp band crossing the trapped arm = the cinch point -->
+  <rect x="452" y="612" width="268" height="64" fill="#E8EDF2"/>
+</svg>

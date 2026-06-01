@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- THE SHOT: a single bold shooter silhouette dropping his level and
+       driving forward-left into the opponent's legs. The body is one
+       readable arrow-shaped figure: head down, back flat, legs exploding
+       off the floor. Opponent legs = white posts being penetrated. -->
+
+  <!-- Opponent's legs (the target of the shot) -->
+  <rect x="170" y="250" width="84" height="430" fill="#E8EDF2"/>
+  <rect x="276" y="250" width="84" height="430" fill="#E8EDF2"/>
+  <rect x="150" y="680" width="232" height="34" fill="#E8EDF2"/>
+
+  <!-- Shooter, the flat driving back (torso) leaning hard into the legs -->
+  <polygon points="360,396 720,300 760,440 400,536" fill="#E63946"/>
+
+  <!-- Head down, level dropped, buried into the hip/legs -->
+  <rect x="300" y="430" width="120" height="120" rx="6" fill="#E63946"/>
+
+  <!-- Lead arm reaching to wrap behind the legs (penetration grip) -->
+  <rect x="150" y="500" width="270" height="78" fill="#E63946"/>
+
+  <!-- Hips loaded, the bend of the shooter folding under the opponent -->
+  <polygon points="640,360 760,330 820,560 690,590" fill="#E63946"/>
+
+  <!-- Drive legs exploding off the mat, the power behind the shot -->
+  <polygon points="690,540 820,510 920,820 800,820" fill="#E63946"/>
+  <polygon points="610,560 720,560 690,820 560,820" fill="#E63946"/>
+
+  <!-- Gold penetration spark, the breakthrough at contact -->
+  <polygon points="130,500 232,500 180,578 130,578" fill="#f59e0b"/>
+</svg>

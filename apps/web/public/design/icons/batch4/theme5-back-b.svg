@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Full-bleed background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- CONCEPT B: THE HOOKS
+       Back control is defined by two hooks: the feet/legs wrapped around the
+       opponent's thighs from behind. Two heavy red hook shapes clamp a central
+       white waistline bar = "the hooks are in." -->
+
+  <!-- Central waist/torso bar of the opponent (controlled from behind) -->
+  <rect x="372" y="392" width="280" height="240" rx="20" fill="#1A1D24"/>
+  <!-- Spine / center line read of a back being taken -->
+  <rect x="496" y="392" width="32" height="240" fill="#242832"/>
+
+  <!-- Left hook: heavy J-shape clamping under from the left -->
+  <path d="M372 360
+           h-150
+           a120 120 0 0 0 -120 120
+           v220
+           a120 120 0 0 0 120 120
+           h150
+           v-100
+           h-150
+           a20 20 0 0 1 -20 -20
+           v-220
+           a20 20 0 0 1 20 -20
+           h150
+           z" fill="#E63946"/>
+
+  <!-- Right hook: mirrored heavy J-shape clamping under from the right -->
+  <path d="M652 360
+           h150
+           a120 120 0 0 1 120 120
+           v220
+           a120 120 0 0 1 -120 120
+           h-150
+           v-100
+           h150
+           a20 20 0 0 0 20 -20
+           v-220
+           a20 20 0 0 0 -20 -20
+           h-150
+           z" fill="#E63946"/>
+
+  <!-- Gold dominance pip at the top center: control established -->
+  <rect x="476" y="280" width="72" height="72" rx="8" fill="#f59e0b"/>
+</svg>

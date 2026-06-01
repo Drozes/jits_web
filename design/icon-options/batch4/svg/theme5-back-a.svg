@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Full-bleed background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- CONCEPT A: THE SEATBELT HARNESS
+       The iconic seatbelt grip: one arm over the shoulder, one under the armpit,
+       forming a bold X of red straps across a defender's torso. -->
+
+  <!-- Defender torso block (the controlled body) -->
+  <rect x="332" y="300" width="360" height="468" rx="24" fill="#1A1D24"/>
+  <!-- Head -->
+  <circle cx="512" cy="246" r="92" fill="#242832"/>
+  <!-- Neck -->
+  <rect x="472" y="300" width="80" height="44" fill="#242832"/>
+
+  <!-- Seatbelt strap 1: over the shoulder (top-right to bottom-left) -->
+  <polygon points="624,250 712,338 400,768 312,768 312,720" fill="#E63946"/>
+  <!-- Seatbelt strap 2: under the armpit (top-left to bottom-right) -->
+  <polygon points="400,250 312,338 624,768 712,768 712,720" fill="#E63946"/>
+
+  <!-- Center knot/clinch where the grip locks: heavy white seatbelt buckle -->
+  <rect x="462" y="462" width="100" height="100" rx="10" fill="#E8EDF2"/>
+  <!-- Re-assert strap crossing over the buckle for the locked-hands read -->
+  <polygon points="512,420 560,468 512,516 464,468" fill="#E63946"/>
+
+  <!-- Gold control pip: the dominant-position marker, top-right -->
+  <circle cx="724" cy="300" r="40" fill="#f59e0b"/>
+</svg>

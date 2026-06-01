@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- THE SHOT as pure directional force: a massive level-change arrow.
+       The arrow drops DOWN then drives FORWARD = the explosive
+       penetration step of a double-leg. Emblematic, reads at 48px. -->
+
+  <!-- Opponent stance: a heavy vertical post the drive penetrates through -->
+  <rect x="724" y="200" width="104" height="624" fill="#E8EDF2"/>
+  <rect x="690" y="790" width="172" height="34" fill="#E8EDF2"/>
+
+  <!-- The shot path: chevron stack descending (the level change) -->
+  <polygon points="180,250 320,250 470,430 330,430" fill="#E63946"/>
+  <polygon points="300,360 440,360 590,540 450,540" fill="#E63946"/>
+
+  <!-- The drive: huge forward arrow slamming into the post, low and level -->
+  <polygon points="170,560 600,560 600,470 824,640 600,810 600,720 170,720" fill="#E63946"/>
+
+  <!-- Gold leading edge of the arrowhead: the breakthrough / contact -->
+  <polygon points="600,490 600,790 808,640" fill="#f59e0b"/>
+
+  <!-- Penetration line: arrow tip drives PAST the post -->
+  <rect x="690" y="612" width="200" height="56" fill="#E63946"/>
+</svg>

@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- ===== ARES: HELM + SPEAR (frontal war helm over upright spear) ===== -->
+
+  <!-- Upright spear running through the icon -->
+  <!-- Shaft -->
+  <rect x="498" y="120" width="28" height="784" fill="#E8EDF2"/>
+  <!-- Spearhead (leaf blade) at top -->
+  <polygon points="512,66 560,170 512,206 464,170" fill="#E8EDF2"/>
+  <!-- Socket collar under blade -->
+  <rect x="482" y="206" width="60" height="24" fill="#E8EDF2"/>
+  <!-- Butt-spike (sauroter) at base -->
+  <polygon points="512,958 540,886 484,886" fill="#E8EDF2"/>
+
+  <!-- Tall red crest plume rising above the dome -->
+  <path d="M 432 432
+           C 388 320, 452 236, 512 196
+           C 572 236, 636 320, 592 432
+           C 560 384, 464 384, 432 432 Z"
+        fill="#E63946"/>
+  <!-- Crest base block tying plume to dome -->
+  <rect x="468" y="408" width="88" height="60" fill="#E63946"/>
+
+  <!-- Helm dome -->
+  <path d="M 336 560
+           C 336 470, 414 412, 512 412
+           C 610 412, 688 470, 688 560 Z"
+        fill="#E8EDF2"/>
+
+  <!-- Face / cheek guard block -->
+  <path d="M 336 560 L 688 560 L 688 700
+           C 688 752, 648 788, 588 788
+           L 436 788
+           C 376 788, 336 752, 336 700 Z"
+        fill="#E8EDF2"/>
+
+  <!-- Eye slots -->
+  <path d="M 384 600 L 470 600 L 470 654 L 420 654 Z" fill="#0D0F14"/>
+  <path d="M 640 600 L 554 600 L 554 654 L 604 654 Z" fill="#0D0F14"/>
+
+  <!-- Mouth/breath slit -->
+  <rect x="436" y="704" width="152" height="20" fill="#0D0F14"/>
+
+  <!-- Gold brow chevron -->
+  <polygon points="512,540 548,576 526,576 512,562 498,576 476,576" fill="#f59e0b"/>
+</svg>

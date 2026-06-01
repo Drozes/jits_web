@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <radialGradient id="bgA" cx="50%" cy="42%" r="72%">
+      <stop offset="0%" stop-color="#24365A"/>
+      <stop offset="100%" stop-color="#1B2A41"/>
+    </radialGradient>
+    <linearGradient id="shieldA" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F2ECDD"/>
+      <stop offset="100%" stop-color="#E2D8C1"/>
+    </linearGradient>
+    <linearGradient id="goldA" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#E0C173"/>
+      <stop offset="50%" stop-color="#C9A24B"/>
+      <stop offset="100%" stop-color="#9C7A2E"/>
+    </linearGradient>
+  </defs>
+
+  <!-- full-bleed background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="url(#bgA)"/>
+
+  <!-- outer thin gold ring framing the badge -->
+  <circle cx="512" cy="490" r="420" fill="none" stroke="#C9A24B" stroke-width="6" opacity="0.55"/>
+
+  <!-- laurel branches -->
+  <g fill="#C9A24B" opacity="0.9">
+    <g transform="translate(512 510)">
+      <!-- left laurel -->
+      <g transform="translate(-300 0)">
+        <path d="M0 150 C -60 90 -78 0 -52 -120" fill="none" stroke="#C9A24B" stroke-width="10" stroke-linecap="round"/>
+        <g fill="#C9A24B">
+          <path d="M-50 -100 q -42 -8 -58 18 q 32 18 58 -18 z"/>
+          <path d="M-44 -56 q -44 -10 -60 14 q 33 20 60 -14 z"/>
+          <path d="M-36 -12 q -46 -12 -62 10 q 34 22 62 -10 z"/>
+          <path d="M-24 32 q -46 -14 -62 6 q 34 23 62 -6 z"/>
+          <path d="M-8 74 q -46 -16 -60 0 q 35 24 60 0 z"/>
+        </g>
+      </g>
+      <!-- right laurel (mirrored) -->
+      <g transform="translate(300 0) scale(-1 1)">
+        <path d="M0 150 C -60 90 -78 0 -52 -120" fill="none" stroke="#C9A24B" stroke-width="10" stroke-linecap="round"/>
+        <g fill="#C9A24B">
+          <path d="M-50 -100 q -42 -8 -58 18 q 32 18 58 -18 z"/>
+          <path d="M-44 -56 q -44 -10 -60 14 q 33 20 60 -14 z"/>
+          <path d="M-36 -12 q -46 -12 -62 10 q 34 22 62 -10 z"/>
+          <path d="M-24 32 q -46 -14 -62 6 q 34 23 62 -6 z"/>
+          <path d="M-8 74 q -46 -16 -60 0 q 35 24 60 0 z"/>
+        </g>
+      </g>
+    </g>
+  </g>
+
+  <!-- SHIELD body -->
+  <path d="M512 170
+           C 640 210 720 218 760 210
+           L 760 470
+           C 760 620 660 720 512 800
+           C 364 720 264 620 264 470
+           L 264 210
+           C 304 218 384 210 512 170 Z"
+        fill="url(#shieldA)" stroke="#7A1F2B" stroke-width="18"/>
+  <!-- inner shield rule -->
+  <path d="M512 200
+           C 632 236 706 244 742 238
+           L 742 470
+           C 742 600 652 696 512 770
+           C 372 696 282 600 282 470
+           L 282 238
+           C 318 244 392 236 512 200 Z"
+        fill="none" stroke="#C9A24B" stroke-width="6" opacity="0.8"/>
+
+  <!-- top chief band with EST 2026 in serif -->
+  <path d="M282 258 C 392 250 632 250 742 258 L 742 318 C 632 312 392 312 282 318 Z" fill="#7A1F2B"/>
+  <text x="512" y="302" font-family="serif" font-size="44" font-weight="bold" letter-spacing="10" fill="#EDE6D6" text-anchor="middle">EST 2026</text>
+
+  <!-- CENTRAL CHARGE: triangle choke lock, strong & simple -->
+  <g transform="translate(512 510)">
+    <!-- triangle of the choke (the locked leg triangle) -->
+    <path d="M0 -118 L 132 112 L -132 112 Z"
+          fill="none" stroke="#7A1F2B" stroke-width="34" stroke-linejoin="round"/>
+    <!-- inner navy triangle echo -->
+    <path d="M0 -78 L 92 92 L -92 92 Z"
+          fill="none" stroke="#1B2A41" stroke-width="10" stroke-linejoin="round" opacity="0.5"/>
+    <!-- the trapped arm/neck bar crossing the apex (the "lock") -->
+    <rect x="-58" y="-26" width="116" height="40" rx="6" fill="#1B2A41"/>
+    <!-- gold rivet at the cinch point -->
+    <circle cx="0" cy="-6" r="20" fill="url(#goldA)" stroke="#7A1F2B" stroke-width="6"/>
+    <circle cx="0" cy="-6" r="7" fill="#1B2A41"/>
+  </g>
+
+  <!-- BANNER RIBBON across the bottom -->
+  <g>
+    <path d="M150 800 L 224 776 L 224 836 L 150 860 Z" fill="#5E1620"/>
+    <path d="M874 800 L 800 776 L 800 836 L 874 860 Z" fill="#5E1620"/>
+    <path d="M214 766 C 380 740 644 740 810 766 L 810 856 C 644 830 380 830 214 856 Z" fill="#7A1F2B" stroke="#C9A24B" stroke-width="5"/>
+    <text x="512" y="826" font-family="serif" font-size="58" font-weight="bold" letter-spacing="12" fill="#EDE6D6" text-anchor="middle">ELO RATED</text>
+  </g>
+</svg>

@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Full-bleed Void background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- 16x16 grid, cell = 64px. Subject: ascending staircase of bars + up-arrow sprite.
+       Coordinates are column*64, row*64. -->
+
+  <!-- ===== Ascending podium bars (staircase, pixel steps) ===== -->
+  <!-- Bar 1 (shortest, far left) cols 1-2, rows 11-14 : white -->
+  <g fill="#E8EDF2">
+    <rect x="64"  y="704" width="128" height="256"/>
+  </g>
+  <!-- Bar 2 cols 4-5, rows 9-14 : gold accent -->
+  <g fill="#f59e0b">
+    <rect x="256" y="576" width="128" height="384"/>
+  </g>
+  <!-- Bar 3 cols 7-8, rows 7-14 : white -->
+  <g fill="#E8EDF2">
+    <rect x="448" y="448" width="128" height="512"/>
+  </g>
+  <!-- Bar 4 (tallest, winner) cols 10-11, rows 4-14 : Signal Red -->
+  <g fill="#E63946">
+    <rect x="640" y="256" width="128" height="704"/>
+  </g>
+
+  <!-- 1-pixel dark separators between bars (grid lines, keep blocky) -->
+  <g fill="#0D0F14">
+    <rect x="192" y="704" width="8" height="256"/>
+    <rect x="384" y="576" width="8" height="384"/>
+    <rect x="576" y="448" width="8" height="512"/>
+  </g>
+
+  <!-- top "cap" pixels darker shade on each bar for that 8-bit shading -->
+  <g fill="#0D0F14" opacity="0.18">
+    <rect x="64"  y="704" width="128" height="64"/>
+    <rect x="256" y="576" width="128" height="64"/>
+    <rect x="448" y="448" width="128" height="64"/>
+    <rect x="640" y="256" width="128" height="64"/>
+  </g>
+
+  <!-- ===== Up-arrow pixel sprite rising over the tallest bar (cyan accent) ===== -->
+  <!-- arrowhead: staircased pixel chevron, centered around col 11-12, top rows -->
+  <g fill="#36D1DC">
+    <!-- tip pixel -->
+    <rect x="768" y="64"  width="64" height="64"/>
+    <!-- row 2 -->
+    <rect x="704" y="128" width="64" height="64"/>
+    <rect x="768" y="128" width="64" height="64"/>
+    <rect x="832" y="128" width="64" height="64"/>
+    <!-- row 3 -->
+    <rect x="640" y="192" width="64" height="64"/>
+    <rect x="704" y="192" width="64" height="64"/>
+    <rect x="768" y="192" width="64" height="64"/>
+    <rect x="832" y="192" width="64" height="64"/>
+    <rect x="896" y="192" width="64" height="64"/>
+    <!-- shaft -->
+    <rect x="768" y="256" width="64" height="64"/>
+    <rect x="768" y="320" width="64" height="64"/>
+  </g>
+
+  <!-- 1-pixel dark outline accents on arrow tip for crispness -->
+  <g fill="#0D0F14" opacity="0.25">
+    <rect x="768" y="64" width="64" height="16"/>
+  </g>
+</svg>

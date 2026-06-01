@@ -1,0 +1,115 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="aCream" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F2ECDD"/>
+      <stop offset="1" stop-color="#E3DBC6"/>
+    </linearGradient>
+    <linearGradient id="aShield" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#22344F"/>
+      <stop offset="1" stop-color="#16243A"/>
+    </linearGradient>
+    <radialGradient id="aVig" cx="0.5" cy="0.42" r="0.75">
+      <stop offset="0.6" stop-color="#1B2A41" stop-opacity="0"/>
+      <stop offset="1" stop-color="#0E1828" stop-opacity="0.55"/>
+    </radialGradient>
+  </defs>
+
+  <!-- full-bleed background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#1B2A41"/>
+  <rect x="0" y="0" width="1024" height="1024" fill="url(#aVig)"/>
+
+  <!-- outer gold ring frame -->
+  <circle cx="512" cy="512" r="452" fill="none" stroke="#C9A24B" stroke-width="14"/>
+  <circle cx="512" cy="512" r="426" fill="none" stroke="#C9A24B" stroke-width="4"/>
+
+  <!-- shield body -->
+  <g>
+    <path d="M512 116
+             C 640 176, 760 196, 820 196
+             L 820 470
+             C 820 660, 700 800, 512 902
+             C 324 800, 204 660, 204 470
+             L 204 196
+             C 264 196, 384 176, 512 116 Z"
+          fill="url(#aShield)" stroke="#C9A24B" stroke-width="12"/>
+    <path d="M512 150
+             C 632 206, 742 224, 796 224
+             L 796 466
+             C 796 642, 686 772, 512 868
+             C 338 772, 228 642, 228 466
+             L 228 224
+             C 282 224, 392 206, 512 150 Z"
+          fill="none" stroke="#C9A24B" stroke-width="3" opacity="0.7"/>
+  </g>
+
+  <!-- top chief band -->
+  <path d="M228 224 C 282 224, 392 206, 512 150 C 632 206, 742 224, 796 224 L 796 318 L 228 318 Z"
+        fill="#7A1F2B"/>
+  <path d="M228 318 L 796 318" stroke="#C9A24B" stroke-width="6"/>
+
+  <!-- EST 2026 in chief, generic serif -->
+  <text x="512" y="296" font-family="serif" font-size="74" font-weight="700"
+        fill="#EDE6D6" text-anchor="middle" letter-spacing="10">EST 2026</text>
+
+  <!-- central charge: two facing profile silhouettes -->
+  <g>
+    <!-- cream disc behind heads -->
+    <circle cx="512" cy="520" r="186" fill="url(#aCream)" stroke="#C9A24B" stroke-width="8"/>
+    <circle cx="512" cy="520" r="172" fill="none" stroke="#7A1F2B" stroke-width="3"/>
+
+    <!-- left fighter profile (facing right) -->
+    <path d="M430 430
+             c -34 8 -54 36 -54 74
+             c 0 26 12 44 12 60
+             c 0 14 -10 22 -10 34
+             c 0 16 16 24 36 24
+             l 0 -30
+             c 16 -6 30 -20 38 -38
+             c 8 -18 8 -40 4 -60
+             c -4 -22 -16 -40 -8 -56
+             c 4 -8 0 -14 -18 -12 Z"
+          fill="#1B2A41"/>
+    <!-- right fighter profile (facing left) mirror -->
+    <path d="M594 430
+             c 34 8 54 36 54 74
+             c 0 26 -12 44 -12 60
+             c 0 14 10 22 10 34
+             c 0 16 -16 24 -36 24
+             l 0 -30
+             c -16 -6 -30 -20 -38 -38
+             c -8 -18 -8 -40 -4 -60
+             c 4 -22 16 -40 8 -56
+             c -4 -8 0 -14 18 -12 Z"
+          fill="#7A1F2B"/>
+
+    <!-- central VS -->
+    <g>
+      <circle cx="512" cy="540" r="46" fill="#1B2A41" stroke="#C9A24B" stroke-width="5"/>
+      <text x="512" y="558" font-family="serif" font-size="50" font-weight="700"
+            fill="#C9A24B" text-anchor="middle">VS</text>
+    </g>
+  </g>
+
+  <!-- laurel branches -->
+  <g stroke="#C9A24B" stroke-width="6" fill="none" opacity="0.9">
+    <path d="M356 720 C 320 760, 312 806, 332 846"/>
+    <path d="M668 720 C 704 760, 712 806, 692 846"/>
+  </g>
+  <g fill="#C9A24B" opacity="0.9">
+    <ellipse cx="334" cy="748" rx="12" ry="6" transform="rotate(40 334 748)"/>
+    <ellipse cx="324" cy="780" rx="12" ry="6" transform="rotate(60 324 780)"/>
+    <ellipse cx="324" cy="814" rx="12" ry="6" transform="rotate(80 324 814)"/>
+    <ellipse cx="690" cy="748" rx="12" ry="6" transform="rotate(-40 690 748)"/>
+    <ellipse cx="700" cy="780" rx="12" ry="6" transform="rotate(-60 700 780)"/>
+    <ellipse cx="700" cy="814" rx="12" ry="6" transform="rotate(-80 700 814)"/>
+  </g>
+
+  <!-- bottom banner ribbon -->
+  <g>
+    <path d="M196 818 L 160 856 L 196 854 L 188 892 L 280 854 Z" fill="#5E1620"/>
+    <path d="M828 818 L 864 856 L 828 854 L 836 892 L 744 854 Z" fill="#5E1620"/>
+    <path d="M268 808 L 756 808 L 736 902 L 288 902 Z" fill="#7A1F2B" stroke="#C9A24B" stroke-width="6"/>
+    <text x="512" y="878" font-family="serif" font-size="58" font-weight="700"
+          fill="#EDE6D6" text-anchor="middle" letter-spacing="6">ELO RATED</text>
+  </g>
+</svg>

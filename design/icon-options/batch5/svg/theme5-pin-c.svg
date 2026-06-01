@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- The floor: heavy red baseline the figure is driven into -->
+  <rect x="112" y="788" width="800" height="72" fill="#E63946"/>
+
+  <!-- The flattened figure pressed to the floor (white, horizontal) -->
+  <rect x="248" y="688" width="528" height="92" fill="#E8EDF2"/>
+  <circle cx="276" cy="668" r="64" fill="#E8EDF2"/>
+
+  <!-- THE PRESS: a heavy downward double-chevron driving the figure to the floor (red) -->
+  <polygon points="512,168 800,464 672,464 512,300 352,464 224,464" fill="#E63946"/>
+  <polygon points="512,372 800,668 672,668 512,504 352,668 224,668" fill="#E63946"/>
+
+  <!-- IMPACT: gold marks bursting from the point of the pin -->
+  <rect x="156" y="724" width="92" height="22" transform="rotate(-20 156 724)" fill="#f59e0b"/>
+  <rect x="776" y="724" width="92" height="22" transform="rotate(20 868 724)" fill="#f59e0b"/>
+  <polygon points="512,612 540,672 484,672" fill="#f59e0b"/>
+</svg>

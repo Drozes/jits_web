@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- 24x24 pixel grid, cell = 42.6667px. Subject: INTERLOCKED ARMS / FIGURE-FOUR LOCK knot -->
+  <!-- Full-bleed Void background FIRST -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- dim checker arena tiles behind (subtle) using 2 dark tones, 4x4 super-cells -->
+  <g fill="#13171F">
+    <rect x="0"   y="0"   width="256" height="256"/>
+    <rect x="512" y="0"   width="256" height="256"/>
+    <rect x="256" y="256" width="256" height="256"/>
+    <rect x="768" y="256" width="256" height="256"/>
+    <rect x="0"   y="512" width="256" height="256"/>
+    <rect x="512" y="512" width="256" height="256"/>
+    <rect x="256" y="768" width="256" height="256"/>
+    <rect x="768" y="768" width="256" height="256"/>
+  </g>
+
+  <!-- ============================================================ -->
+  <!-- Coordinates snapped to 42.6667px grid. Helper: col*42.6667.   -->
+  <!-- We use width/x in multiples of ~42.6667 (use 128=3cells etc). -->
+  <!-- For crisp blocks we use 85.3333 (2 cells) chunks.             -->
+  <!-- ============================================================ -->
+
+  <!-- ===== RED ARM (horizontal, comes from left, hooks down-right) ===== -->
+  <g fill="#E63946">
+    <!-- forearm horizontal band rows 9-10 (y=384..469) spanning cols 1-13 -->
+    <rect x="42.6667" y="384"     width="554.6667" height="42.6667"/>
+    <rect x="42.6667" y="426.6667" width="554.6667" height="42.6667"/>
+    <!-- elbow turn down: cols 12-13 rows 11-15 -->
+    <rect x="512" y="469.3333" width="85.3333" height="42.6667"/>
+    <rect x="512" y="512"     width="85.3333" height="42.6667"/>
+    <rect x="554.6667" y="554.6667" width="85.3333" height="42.6667"/>
+    <rect x="554.6667" y="597.3333" width="85.3333" height="42.6667"/>
+    <!-- fist/grip block cols 13-15 rows 15-16 -->
+    <rect x="597.3333" y="640" width="128" height="85.3333"/>
+  </g>
+
+  <!-- ===== WHITE ARM (vertical, comes from top, hooks across-left) ===== -->
+  <g fill="#E8EDF2">
+    <!-- upper arm vertical band cols 10-11 (x=384..469) rows 1-9 -->
+    <rect x="384"     y="42.6667" width="42.6667" height="554.6667"/>
+    <rect x="426.6667" y="42.6667" width="42.6667" height="554.6667"/>
+    <!-- elbow turn left: rows 9-10 cols 5-10 -->
+    <rect x="213.3333" y="469.3333" width="213.3333" height="42.6667"/>
+    <rect x="170.6667" y="512"     width="256" height="42.6667"/>
+    <!-- wrist down-left cols 4-5 rows 11-14 -->
+    <rect x="170.6667" y="554.6667" width="85.3333" height="42.6667"/>
+    <rect x="170.6667" y="597.3333" width="85.3333" height="42.6667"/>
+    <!-- fist/grip block cols 3-5 rows 14-15 -->
+    <rect x="128" y="640" width="128" height="85.3333"/>
+  </g>
+
+  <!-- ===== INTERLOCK KNOT at crossing (cols 9-12, rows 8-11) ===== -->
+  <!-- where the two arms cross: alternate red/white "over-under" weave -->
+  <g fill="#E63946">
+    <rect x="384" y="384" width="85.3333" height="42.6667"/>
+    <rect x="426.6667" y="426.6667" width="42.6667" height="42.6667"/>
+  </g>
+  <g fill="#E8EDF2">
+    <rect x="384" y="426.6667" width="42.6667" height="42.6667"/>
+    <rect x="469.3333" y="384" width="42.6667" height="42.6667"/>
+  </g>
+
+  <!-- ===== CYAN PRESSURE SPARKS at the lock point ===== -->
+  <g fill="#22D3EE">
+    <rect x="469.3333" y="469.3333" width="42.6667" height="42.6667"/>
+    <rect x="341.3333" y="341.3333" width="42.6667" height="42.6667"/>
+    <rect x="554.6667" y="341.3333" width="42.6667" height="42.6667"/>
+  </g>
+  <!-- gold "tap" pixel emphasis at center -->
+  <rect x="426.6667" y="384" width="42.6667" height="42.6667" fill="#f59e0b"/>
+
+  <!-- ===== knuckle accents on the fists (gold) ===== -->
+  <g fill="#f59e0b">
+    <rect x="640" y="640" width="42.6667" height="42.6667"/>
+    <rect x="170.6667" y="640" width="42.6667" height="42.6667"/>
+  </g>
+</svg>

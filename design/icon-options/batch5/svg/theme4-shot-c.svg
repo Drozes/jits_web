@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- THE SHOT, the clamp: the moment the shooter's arms lock around
+       both of the opponent's legs and drives. Two white legs gripped by
+       a heavy red horseshoe (the clinched arms) pulling them together,
+       a forward drive wedge underneath. -->
+
+  <!-- Opponent's two legs (the captured target) -->
+  <rect x="392" y="150" width="92" height="470" fill="#E8EDF2"/>
+  <rect x="540" y="150" width="92" height="470" fill="#E8EDF2"/>
+
+  <!-- The lock: a bold red horseshoe wrapping BEHIND both legs and
+       clamping them. Outer block minus inner notch = the clinch. -->
+  <path d="M250 470
+           L250 700
+           L774 700
+           L774 470
+           L662 470
+           L662 588
+           L362 588
+           L362 470
+           Z" fill="#E63946"/>
+
+  <!-- Arms reaching up the back of the legs (the grip), heavy red bars -->
+  <rect x="250" y="360" width="112" height="240" fill="#E63946"/>
+  <rect x="662" y="360" width="112" height="240" fill="#E63946"/>
+
+  <!-- Hands clasped at the back: the connected clamp behind the legs -->
+  <rect x="250" y="360" width="524" height="92" fill="#E63946"/>
+
+  <!-- The drive: a forward-thrust wedge launching off the floor,
+       the explosive finish of the shot tipping the opponent over -->
+  <polygon points="250,720 774,720 920,872 104,872" fill="#E63946"/>
+
+  <!-- Gold drive spark: the breakthrough point of the takedown -->
+  <polygon points="462,720 562,720 512,820" fill="#f59e0b"/>
+</svg>

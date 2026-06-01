@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="cBg" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#b71d2e"/>
+      <stop offset="0.4" stop-color="#E63946"/>
+      <stop offset="1" stop-color="#fbbf24"/>
+    </linearGradient>
+    <radialGradient id="cGloss" cx="0.5" cy="-0.05" r="0.95">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.6"/>
+      <stop offset="0.5" stop-color="#ffffff" stop-opacity="0.12"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="cWhite" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#f0e6e6"/>
+    </linearGradient>
+    <filter id="cShadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="20" stdDeviation="24" flood-color="#7a0d16" flood-opacity="0.45"/>
+    </filter>
+  </defs>
+
+  <rect width="1024" height="1024" rx="180" fill="url(#cBg)"/>
+  <rect width="1024" height="1024" rx="180" fill="url(#cGloss)"/>
+
+  <g filter="url(#cShadow)">
+    <!-- laurel left -->
+    <g fill="url(#cWhite)">
+      <path d="M298 766 C252 666 262 536 366 462" stroke="url(#cWhite)" stroke-width="28" fill="none" stroke-linecap="round"/>
+      <ellipse cx="298" cy="712" rx="34" ry="18" transform="rotate(-58 298 712)"/>
+      <ellipse cx="284" cy="646" rx="34" ry="18" transform="rotate(-50 284 646)"/>
+      <ellipse cx="286" cy="580" rx="34" ry="18" transform="rotate(-38 286 580)"/>
+      <ellipse cx="312" cy="520" rx="32" ry="17" transform="rotate(-24 312 520)"/>
+      <ellipse cx="352" cy="478" rx="30" ry="16" transform="rotate(-10 352 478)"/>
+    </g>
+    <!-- laurel right (mirror) -->
+    <g fill="url(#cWhite)">
+      <path d="M726 766 C772 666 762 536 658 462" stroke="url(#cWhite)" stroke-width="28" fill="none" stroke-linecap="round"/>
+      <ellipse cx="726" cy="712" rx="34" ry="18" transform="rotate(58 726 712)"/>
+      <ellipse cx="740" cy="646" rx="34" ry="18" transform="rotate(50 740 646)"/>
+      <ellipse cx="738" cy="580" rx="34" ry="18" transform="rotate(38 738 580)"/>
+      <ellipse cx="712" cy="520" rx="32" ry="17" transform="rotate(24 712 520)"/>
+      <ellipse cx="672" cy="478" rx="30" ry="16" transform="rotate(10 672 478)"/>
+    </g>
+
+    <!-- crown -->
+    <path d="M360 560 L388 392 L460 480 L512 350 L564 480 L636 392 L664 560 Z" fill="url(#cWhite)"/>
+    <rect x="360" y="560" width="304" height="58" rx="10" fill="url(#cWhite)"/>
+    <!-- crown jewels -->
+    <circle cx="388" cy="392" r="20" fill="#E63946"/>
+    <circle cx="512" cy="350" r="22" fill="#E63946"/>
+    <circle cx="636" cy="392" r="20" fill="#E63946"/>
+    <circle cx="512" cy="589" r="16" fill="#E63946"/>
+  </g>
+</svg>

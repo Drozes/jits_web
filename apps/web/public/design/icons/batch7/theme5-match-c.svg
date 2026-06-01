@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+  <g fill="none" stroke-width="32" stroke-linecap="round" stroke-linejoin="round">
+    <!-- LEFT figure (white): head + leaning torso + extended grip arm -->
+    <g stroke="#E8EDF2">
+      <circle cx="296" cy="296" r="80"/>
+      <path d="M 296 388
+               C 296 466 318 516 376 552"/>
+      <!-- grip arm reaching to center knot -->
+      <path d="M 320 472 L 462 542"/>
+    </g>
+    <!-- RIGHT figure (Signal Red): mirrored -->
+    <g stroke="#E63946">
+      <circle cx="728" cy="296" r="80"/>
+      <path d="M 728 388
+               C 728 466 706 516 648 552"/>
+      <path d="M 704 472 L 562 542"/>
+    </g>
+    <!-- center clasp KNOT: two interlocking hooks meeting -->
+    <g stroke="#E8EDF2">
+      <path d="M 462 542 C 500 520 510 566 540 548"/>
+    </g>
+    <g stroke="#E63946">
+      <path d="M 562 542 C 524 564 514 518 484 536"/>
+    </g>
+    <!-- mat baseline anchoring the match -->
+    <g stroke="#E8EDF2">
+      <path d="M 368 688 L 656 688"/>
+    </g>
+  </g>
+</svg>

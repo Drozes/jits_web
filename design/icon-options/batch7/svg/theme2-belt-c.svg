@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <!-- A single continuous belt ribbon coiled into a looping spiral,
+         drawn as one unbroken monoline that doubles back over itself -->
+    <path d="M 300 300
+             C 520 220, 760 280, 760 460
+             C 760 600, 600 660, 460 640
+             C 340 622, 300 540, 360 480
+             C 420 420, 540 440, 560 520
+             C 574 580, 520 620, 470 612"
+          stroke="#E8EDF2" stroke-width="30"/>
+
+    <!-- Free hanging end of the ribbon swooping down with rank tip -->
+    <path d="M 470 612
+             C 440 700, 440 780, 500 840
+             C 540 880, 620 882, 680 850"
+          stroke="#E63946" stroke-width="32"/>
+
+    <!-- Rank stripes across the hanging end (Signal Red tip) -->
+    <g stroke="#E8EDF2" stroke-width="20">
+      <line x1="488" y1="772" x2="540" y2="800"/>
+      <line x1="516" y1="744" x2="568" y2="772"/>
+      <line x1="544" y1="720" x2="596" y2="748"/>
+    </g>
+  </g>
+</svg>

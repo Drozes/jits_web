@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Full-bleed Void background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- ================================================================
+       VARIANT C: a belt tied as a SQUARE-KNOT LOOP, drawn as a
+       staircased pixel diagonal "infinity / pretzel" sprite.
+       Coarse grid: 64px cells (16x16). Diagonals are stepped pixels.
+       Two red belt strands cross over a central knot; stair-stepped
+       corners give the chunky 8-bit curve. Gold rank-stripe accent.
+       ================================================================ -->
+
+  <!-- corner void-dither cells -->
+  <g fill="#141821">
+    <rect x="64"  y="64"  width="64" height="64"/>
+    <rect x="896" y="64"  width="64" height="64"/>
+    <rect x="64"  y="896" width="64" height="64"/>
+    <rect x="896" y="896" width="64" height="64"/>
+  </g>
+
+  <!-- ============ OUTLINE LAYER (dark, drawn first/behind) ============ -->
+  <g fill="#070809">
+    <!-- top-left to center diagonal strand outline -->
+    <rect x="128" y="192" width="192" height="128"/>
+    <rect x="256" y="256" width="192" height="128"/>
+    <rect x="384" y="320" width="256" height="384"/>
+    <!-- top-right to center -->
+    <rect x="704" y="192" width="192" height="128"/>
+    <rect x="576" y="256" width="192" height="128"/>
+    <!-- bottom-left strand -->
+    <rect x="128" y="704" width="192" height="128"/>
+    <rect x="256" y="640" width="192" height="128"/>
+    <!-- bottom-right strand -->
+    <rect x="704" y="704" width="192" height="128"/>
+    <rect x="576" y="640" width="192" height="128"/>
+  </g>
+
+  <!-- ============ RED BELT STRANDS (staircased diagonals) ============ -->
+  <!-- Upper-left strand stepping down toward center -->
+  <g fill="#E63946">
+    <rect x="160" y="224" width="128" height="64"/>
+    <rect x="224" y="288" width="128" height="64"/>
+    <rect x="288" y="352" width="128" height="64"/>
+    <rect x="352" y="416" width="128" height="64"/>
+  </g>
+  <!-- Upper-right strand stepping down toward center -->
+  <g fill="#E63946">
+    <rect x="736" y="224" width="128" height="64"/>
+    <rect x="672" y="288" width="128" height="64"/>
+    <rect x="608" y="352" width="128" height="64"/>
+    <rect x="544" y="416" width="128" height="64"/>
+  </g>
+  <!-- Lower-left strand stepping up toward center -->
+  <g fill="#E63946">
+    <rect x="160" y="736" width="128" height="64"/>
+    <rect x="224" y="672" width="128" height="64"/>
+    <rect x="288" y="608" width="128" height="64"/>
+    <rect x="352" y="544" width="128" height="64"/>
+  </g>
+  <!-- Lower-right strand stepping up toward center -->
+  <g fill="#E63946">
+    <rect x="736" y="736" width="128" height="64"/>
+    <rect x="672" y="672" width="128" height="64"/>
+    <rect x="608" y="608" width="128" height="64"/>
+    <rect x="544" y="544" width="128" height="64"/>
+  </g>
+
+  <!-- ============ CENTER KNOT block ============ -->
+  <rect x="384" y="384" width="256" height="256" fill="#E63946"/>
+  <!-- knot light half -->
+  <rect x="384" y="384" width="128" height="256" fill="#f06470"/>
+  <!-- knot dark half -->
+  <rect x="512" y="384" width="128" height="256" fill="#c32f3b"/>
+  <!-- knot dark cinch seam -->
+  <rect x="496" y="384" width="32" height="256" fill="#070809"/>
+  <!-- white pixel glint -->
+  <rect x="408" y="408" width="40" height="40" fill="#E8EDF2"/>
+
+  <!-- ============ GOLD rank stripes on the four strand TIPS ============ -->
+  <g fill="#f59e0b">
+    <rect x="160" y="240" width="48" height="32"/>   <!-- UL tip -->
+    <rect x="816" y="240" width="48" height="32"/>   <!-- UR tip -->
+    <rect x="160" y="752" width="48" height="32"/>   <!-- LL tip -->
+    <rect x="816" y="752" width="48" height="32"/>   <!-- LR tip -->
+  </g>
+
+  <!-- highlight pixel run along upper-left strand for sheen -->
+  <g fill="#f06470">
+    <rect x="160" y="224" width="128" height="16"/>
+    <rect x="224" y="288" width="128" height="16"/>
+    <rect x="736" y="224" width="128" height="16"/>
+    <rect x="672" y="288" width="128" height="16"/>
+  </g>
+</svg>

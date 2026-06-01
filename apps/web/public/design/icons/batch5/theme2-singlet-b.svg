@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- Singlet as one continuous garment: straps rise from the body, deep scoop, bold E on the chest -->
+  <path fill="#E63946" d="
+    M 312 220
+    L 404 220
+    L 404 320
+    L 620 320
+    L 620 220
+    L 712 220
+    L 712 544
+    L 648 544
+    L 648 804
+    L 552 804
+    L 552 560
+    L 472 560
+    L 472 804
+    L 376 804
+    L 376 544
+    L 312 544
+    Z"/>
+
+  <!-- Deep chest scoop between the straps (Void) -->
+  <path fill="#0D0F14" d="
+    M 404 320
+    L 620 320
+    L 620 360
+    L 560 360
+    L 512 416
+    L 464 360
+    L 404 360
+    Z"/>
+
+  <!-- Leg / crotch cutout (Void) -->
+  <rect x="472" y="560" width="80" height="244" fill="#0D0F14"/>
+
+  <!-- Bold E mark on the chest (white) = brand + rising-bars idea -->
+  <rect x="464" y="430" width="46" height="104" fill="#E8EDF2"/>
+  <rect x="464" y="430" width="96" height="22" fill="#E8EDF2"/>
+  <rect x="464" y="471" width="80" height="22" fill="#E8EDF2"/>
+  <rect x="464" y="512" width="112" height="22" fill="#E8EDF2"/>
+  <!-- Gold top-bar peak step -->
+  <rect x="464" y="408" width="96" height="22" fill="#f59e0b"/>
+</svg>

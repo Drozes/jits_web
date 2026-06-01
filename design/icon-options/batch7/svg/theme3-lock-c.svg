@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect x="0" y="0" width="1024" height="1024" fill="#F2F4F7"/>
+  <g fill="none" stroke="#0D0F14" stroke-linecap="round" stroke-linejoin="round" stroke-width="46">
+    <!-- The Lock as two genuinely interlocked arm-loops / chain links forming a knot.
+         Single dark monoline on light bg. Two closed rings overlap so neither can
+         be pulled free, like two arms in a clinch that cannot separate. -->
+
+    <!-- Upper-left link: full closed loop, tilted -->
+    <ellipse cx="424" cy="424" rx="150" ry="190" transform="rotate(-32 424 424)"/>
+
+    <!-- Lower-right link: full closed loop, tilted the other way, threaded through the first -->
+    <ellipse cx="600" cy="600" rx="150" ry="190" transform="rotate(-32 600 600)"/>
+
+    <!-- Over-under break so the two links read as interlocked (knock out the
+         lower-right link where the upper-left passes in front) -->
+    <g stroke="#F2F4F7" stroke-width="64">
+      <path d="M 470 470 L 560 560"/>
+    </g>
+    <!-- redraw the upper-left link's crossing segment on top so it weaves over -->
+    <path d="M 446 446
+             C 472 472, 500 500, 528 528"
+          stroke="#0D0F14" stroke-width="46"/>
+  </g>
+
+  <!-- Single Signal Red accent: the pressure point where the lock bites -->
+  <circle cx="512" cy="512" r="34" fill="#E63946" stroke="none"/>
+</svg>

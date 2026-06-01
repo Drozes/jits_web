@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Full-bleed background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- Concept B: the SLEEVE-AND-COLLAR two-grip.
+       Two heavy red fists clamp two crossing white gi strips,
+       forming a strong X composition (the classic control grip). -->
+
+  <!-- Two crossing gi strips: one collar (top-left to bottom-right),
+       one sleeve (top-right to bottom-left) -->
+  <polygon points="150,180 290,180 874,764 734,764" fill="#E8EDF2"/>
+  <polygon points="874,180 734,180 150,764 290,764" fill="#E8EDF2"/>
+
+  <!-- Re-cross: redraw a slice of the first strip ON TOP at the center
+       so it reads as an over/under weave -->
+  <polygon points="150,180 290,180 540,430 470,500" fill="#E8EDF2"/>
+  <polygon points="734,764 874,764 624,514 554,584" fill="#E8EDF2"/>
+
+  <!-- TOP-LEFT fist gripping the collar strip -->
+  <g>
+    <rect x="208" y="300" width="190" height="150" rx="26" fill="#E63946"/>
+    <rect x="226" y="248" width="52" height="92" rx="16" fill="#E63946"/>
+    <rect x="288" y="240" width="52" height="100" rx="16" fill="#E63946"/>
+    <rect x="350" y="248" width="52" height="92" rx="16" fill="#E63946"/>
+    <rect x="282" y="266" width="10" height="70" fill="#0D0F14"/>
+    <rect x="344" y="266" width="10" height="70" fill="#0D0F14"/>
+    <!-- thumb -->
+    <rect x="180" y="392" width="110" height="64" rx="30" fill="#E63946"/>
+  </g>
+
+  <!-- BOTTOM-RIGHT fist gripping the sleeve strip -->
+  <g>
+    <rect x="626" y="494" width="190" height="150" rx="26" fill="#E63946"/>
+    <rect x="622" y="604" width="52" height="92" rx="16" fill="#E63946"/>
+    <rect x="684" y="604" width="52" height="100" rx="16" fill="#E63946"/>
+    <rect x="746" y="604" width="52" height="92" rx="16" fill="#E63946"/>
+    <rect x="676" y="608" width="10" height="70" fill="#0D0F14"/>
+    <rect x="738" y="608" width="10" height="70" fill="#0D0F14"/>
+    <!-- thumb -->
+    <rect x="734" y="488" width="110" height="64" rx="30" fill="#E63946"/>
+  </g>
+
+  <!-- Gold center diamond: the point of contested control where grips meet -->
+  <polygon points="512,452 560,500 512,548 464,500" fill="#f59e0b"/>
+</svg>

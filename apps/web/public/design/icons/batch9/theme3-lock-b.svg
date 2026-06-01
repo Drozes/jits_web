@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- 16x16 pixel grid, cell = 64px. Subject: TWO INTERLOCKED FIGHTERS / CLINCH -->
+  <!-- Full-bleed background FIRST: vertical arcade gradient on Void -->
+  <defs>
+    <linearGradient id="bgB" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#12161F"/>
+      <stop offset="1" stop-color="#0A0C11"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="1024" height="1024" fill="url(#bgB)"/>
+
+  <!-- arcade floor line (2 dark pixel rows at bottom) -->
+  <rect x="0" y="896" width="1024" height="64" fill="#161B24"/>
+  <rect x="0" y="960" width="1024" height="64" fill="#1E2530"/>
+
+  <!-- ===== RED FIGHTER (left), facing right, grappling ===== -->
+  <g fill="#E63946">
+    <!-- head x2..x3 y2 (128..256, 128..192) -->
+    <rect x="128" y="128" width="128" height="64"/>
+    <!-- neck/shoulders x2..x4 y3 -->
+    <rect x="128" y="192" width="192" height="64"/>
+    <!-- torso x2..x4 y4..y6 -->
+    <rect x="128" y="256" width="192" height="64"/>
+    <rect x="128" y="320" width="192" height="64"/>
+    <rect x="128" y="384" width="192" height="64"/>
+    <!-- reaching arm across center (the grip) y4 -->
+    <rect x="320" y="256" width="256" height="64"/>
+    <!-- second arm lower clinch y5 -->
+    <rect x="320" y="320" width="192" height="64"/>
+    <!-- hips x2..x4 y7 -->
+    <rect x="128" y="448" width="192" height="64"/>
+    <!-- bent legs (staircase) -->
+    <rect x="128" y="512" width="64" height="64"/>
+    <rect x="192" y="576" width="64" height="64"/>
+    <rect x="256" y="512" width="64" height="64"/>
+    <rect x="256" y="576" width="64" height="64"/>
+    <!-- feet planted y10 -->
+    <rect x="192" y="640" width="64" height="64"/>
+    <rect x="320" y="640" width="64" height="64"/>
+  </g>
+  <!-- red fighter eye (void) -->
+  <rect x="192" y="128" width="64" height="64" fill="#0D0F14"/>
+
+  <!-- ===== WHITE FIGHTER (right), facing left, mirrored clinch ===== -->
+  <g fill="#E8EDF2">
+    <!-- head x12..x13 y2 (768..896) -->
+    <rect x="768" y="128" width="128" height="64"/>
+    <!-- neck/shoulders x10..x13 y3 -->
+    <rect x="704" y="192" width="192" height="64"/>
+    <!-- torso x10..x13 y4..y6 -->
+    <rect x="704" y="256" width="192" height="64"/>
+    <rect x="704" y="320" width="192" height="64"/>
+    <rect x="704" y="384" width="192" height="64"/>
+    <!-- reaching arm across center y5 (interlocks under red's arm) -->
+    <rect x="448" y="320" width="256" height="64"/>
+    <!-- second arm clinch over y4 -->
+    <rect x="576" y="256" width="128" height="64"/>
+    <!-- hips x10..x13 y7 -->
+    <rect x="704" y="448" width="192" height="64"/>
+    <!-- bent legs (staircase, mirrored) -->
+    <rect x="832" y="512" width="64" height="64"/>
+    <rect x="768" y="576" width="64" height="64"/>
+    <rect x="704" y="512" width="64" height="64"/>
+    <rect x="704" y="576" width="64" height="64"/>
+    <!-- feet planted y10 -->
+    <rect x="640" y="640" width="64" height="64"/>
+    <rect x="768" y="640" width="64" height="64"/>
+  </g>
+  <!-- white fighter eye (void) -->
+  <rect x="768" y="128" width="64" height="64" fill="#0D0F14"/>
+
+  <!-- ===== INTERLOCK / GRIP CLASH at center (gold spark pixels) ===== -->
+  <g fill="#f59e0b">
+    <rect x="448" y="256" width="64" height="64"/>
+    <rect x="512" y="320" width="64" height="64"/>
+    <rect x="448" y="384" width="64" height="64"/>
+    <rect x="576" y="384" width="64" height="64"/>
+  </g>
+  <!-- central clash pixel (white hot) -->
+  <rect x="512" y="256" width="64" height="64" fill="#E8EDF2"/>
+</svg>

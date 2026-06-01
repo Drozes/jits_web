@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- Red emblem disc backdrop -->
+  <circle cx="512" cy="512" r="340" fill="#E63946"/>
+
+  <!-- Mjolnir hammer, bold vertical emblem, white -->
+  <!-- Hammer head (heavy squat block) -->
+  <rect x="332" y="300" width="360" height="200" fill="#E8EDF2"/>
+  <!-- Head face plates (flat tone notch ends for chunky read) -->
+  <rect x="332" y="300" width="44" height="200" fill="#0D0F14"/>
+  <rect x="648" y="300" width="44" height="200" fill="#0D0F14"/>
+
+  <!-- Collar joining head to handle -->
+  <rect x="452" y="500" width="120" height="46" fill="#E8EDF2"/>
+
+  <!-- Handle (thick short shaft) -->
+  <rect x="476" y="546" width="72" height="200" fill="#E8EDF2"/>
+
+  <!-- Pommel grip cap -->
+  <rect x="436" y="746" width="152" height="56" fill="#E8EDF2"/>
+
+  <!-- Gold rune slash across head = "breakthrough" accent -->
+  <rect x="404" y="378" width="216" height="44" fill="#f59e0b"/>
+</svg>

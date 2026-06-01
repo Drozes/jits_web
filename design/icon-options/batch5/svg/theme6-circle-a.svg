@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- full-bleed background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- outer mat boundary ring (the bounded combat zone) -->
+  <circle cx="512" cy="512" r="372" fill="none" stroke="#E63946" stroke-width="44"/>
+
+  <!-- inner wrestling circle (the central restart zone) -->
+  <circle cx="512" cy="512" r="208" fill="none" stroke="#E8EDF2" stroke-width="34"/>
+
+  <!-- center restart cross: the two starting lines wrestlers set on -->
+  <!-- horizontal bar -->
+  <rect x="392" y="490" width="240" height="44" fill="#E63946"/>
+  <!-- vertical bar -->
+  <rect x="490" y="392" width="44" height="240" fill="#E63946"/>
+
+  <!-- center hub -->
+  <circle cx="512" cy="512" r="40" fill="#f59e0b"/>
+</svg>

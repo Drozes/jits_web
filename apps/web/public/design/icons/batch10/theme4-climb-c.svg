@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="cBg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#EDE6D6"/>
+      <stop offset="1" stop-color="#DDD2BB"/>
+    </linearGradient>
+    <linearGradient id="cSky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#243A57"/>
+      <stop offset="1" stop-color="#1B2A41"/>
+    </linearGradient>
+    <linearGradient id="cMtn" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#9A2A36"/>
+      <stop offset="1" stop-color="#7A1F2B"/>
+    </linearGradient>
+  </defs>
+
+  <!-- full-bleed background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="url(#cBg)"/>
+
+  <!-- subtle pinstripe border frame -->
+  <rect x="40" y="40" width="944" height="944" fill="none" stroke="#7A1F2B" stroke-width="6"/>
+  <rect x="58" y="58" width="908" height="908" fill="none" stroke="#C9A24B" stroke-width="3"/>
+
+  <!-- corner diamonds -->
+  <g fill="#7A1F2B">
+    <polygon points="40,40 78,40 40,78"/>
+    <polygon points="984,40 946,40 984,78"/>
+    <polygon points="40,984 78,984 40,946"/>
+    <polygon points="984,984 946,984 984,946"/>
+  </g>
+
+  <!-- crossed laurel behind shield -->
+  <g fill="none" stroke="#7A1F2B" stroke-width="12" stroke-linecap="round">
+    <path d="M 280 300 Q 200 480 300 700"/>
+    <path d="M 744 300 Q 824 480 724 700"/>
+  </g>
+  <g fill="#7A1F2B">
+    <path d="M286 340 q-44 0 -56 -38 q42 -6 56 38 z"/>
+    <path d="M268 410 q-46 4 -56 -34 q44 -8 56 34 z"/>
+    <path d="M258 482 q-46 8 -52 -30 q44 -8 52 30 z"/>
+    <path d="M258 554 q-44 14 -46 -26 q42 -8 46 26 z"/>
+    <path d="M270 624 q-40 18 -38 -22 q38 -6 38 22 z"/>
+    <path d="M738 340 q44 0 56 -38 q-42 -6 -56 38 z"/>
+    <path d="M756 410 q46 4 56 -34 q-44 -8 -56 34 z"/>
+    <path d="M766 482 q46 8 52 -30 q-44 -8 -52 30 z"/>
+    <path d="M766 554 q44 14 46 -26 q-42 -8 -46 26 z"/>
+    <path d="M754 624 q40 18 38 -22 q-38 -6 -38 22 z"/>
+  </g>
+
+  <!-- shield body -->
+  <path d="M 512 158 L 738 224 L 738 480 Q 738 660 512 800 Q 286 660 286 480 L 286 224 Z"
+        fill="#EDE6D6" stroke="#7A1F2B" stroke-width="14"/>
+  <path d="M 512 184 L 716 244 L 716 478 Q 716 642 512 770 Q 308 642 308 478 L 308 244 Z"
+        fill="none" stroke="#C9A24B" stroke-width="5"/>
+
+  <!-- inner sky scene (clipped roughly to shield middle) -->
+  <path d="M 322 254 L 706 254 L 706 478 Q 706 626 512 748 Q 318 626 318 478 L 318 254 Z"
+        fill="url(#cSky)"/>
+
+  <!-- CENTRAL CHARGE: climbing mountain with summit flag + ascending switchback path -->
+  <!-- back ridge -->
+  <polygon points="318,560 430,396 512,496 600,360 706,560 706,478 318,478" fill="#1B2A41" opacity="0.5"/>
+  <!-- main peak -->
+  <polygon points="512,300 648,560 376,560" fill="url(#cMtn)" stroke="#C9A24B" stroke-width="5"/>
+  <!-- snow cap -->
+  <polygon points="512,300 558,388 524,372 504,400 472,374 466,388" fill="#EDE6D6"/>
+  <!-- switchback climbing path -->
+  <path d="M 430 560 L 478 500 L 446 470 L 500 416 L 478 392 L 512 348"
+        fill="none" stroke="#EDE6D6" stroke-width="9" stroke-linecap="round" stroke-dasharray="2 20"/>
+  <!-- summit flag -->
+  <line x1="512" y1="300" x2="512" y2="248" stroke="#C9A24B" stroke-width="7"/>
+  <polygon points="512,250 566,266 512,284" fill="#E63946" stroke="#C9A24B" stroke-width="3"/>
+  <!-- up arrow rising from peak -->
+  <g opacity="0.9">
+    <polygon points="512,224 540,260 524,260 524,292 500,292 500,260 484,260" fill="#C9A24B"/>
+  </g>
+
+  <!-- horizon baseline -->
+  <rect x="318" y="556" width="388" height="8" fill="#C9A24B"/>
+
+  <!-- chief banner with EST 2026 -->
+  <path d="M 308 244 L 716 244 L 716 250 L 308 250 Z" fill="#7A1F2B"/>
+  <text x="512" y="232" font-family="serif" font-size="34" font-weight="bold"
+        fill="#7A1F2B" text-anchor="middle" letter-spacing="10">EST. 2026</text>
+
+  <!-- lower banner ribbon ELO RATED -->
+  <path d="M 168 802 L 168 876 L 236 850 L 236 890 L 788 890 L 788 850 L 856 876 L 856 802
+           L 772 840 L 772 802 L 252 802 L 252 840 Z"
+        fill="#7A1F2B" stroke="#C9A24B" stroke-width="7"/>
+  <text x="512" y="862" font-family="serif" font-size="50" font-weight="bold"
+        fill="#EDE6D6" text-anchor="middle" letter-spacing="9">ELO RATED</text>
+</svg>

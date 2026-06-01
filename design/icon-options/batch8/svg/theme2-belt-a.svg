@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="bgA" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff5a67"/>
+      <stop offset="0.45" stop-color="#E63946"/>
+      <stop offset="1" stop-color="#b21f2c"/>
+    </linearGradient>
+    <radialGradient id="glossA" cx="0.5" cy="0.18" r="0.85">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.55"/>
+      <stop offset="0.35" stop-color="#ffffff" stop-opacity="0.16"/>
+      <stop offset="0.7" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="beltShadeA" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#e7eaf0"/>
+    </linearGradient>
+    <filter id="dropA" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#5e0d15" flood-opacity="0.45"/>
+    </filter>
+  </defs>
+
+  <!-- full-bleed tile background -->
+  <rect x="0" y="0" width="1024" height="1024" rx="180" fill="url(#bgA)"/>
+  <rect x="0" y="0" width="1024" height="1024" rx="180" fill="url(#glossA)"/>
+
+  <!-- tied belt knot, floating white -->
+  <g filter="url(#dropA)">
+    <!-- left band passing under -->
+    <path d="M150 470 L430 470 Q470 470 470 510 L470 560 Q470 600 430 600 L150 600 Q120 600 120 560 L120 510 Q120 470 150 470 Z" fill="url(#beltShadeA)"/>
+    <!-- right band passing under -->
+    <path d="M594 470 L874 470 Q904 470 904 510 L904 560 Q904 600 874 600 L594 600 Q554 600 554 510 Q554 470 594 470 Z" fill="url(#beltShadeA)"/>
+    <!-- left hanging tail -->
+    <path d="M408 560 Q470 560 470 640 L470 868 Q470 900 438 900 L350 900 Q318 900 318 868 L380 600 Q388 560 408 560 Z" fill="url(#beltShadeA)"/>
+    <!-- right hanging tail -->
+    <path d="M616 560 Q554 560 554 640 L554 868 Q554 900 586 900 L674 900 Q706 900 706 868 L644 600 Q636 560 616 560 Z" fill="url(#beltShadeA)"/>
+    <!-- central knot loop (over everything) -->
+    <path d="M404 432 Q512 392 620 432 Q668 452 668 535 Q668 618 620 638 Q512 678 404 638 Q356 618 356 535 Q356 452 404 432 Z" fill="#ffffff"/>
+    <!-- knot inner shading groove -->
+    <path d="M512 410 L512 660" stroke="#d3d8e2" stroke-width="20" stroke-linecap="round" fill="none"/>
+    <!-- subtle stripe accent on knot (red rank stripe) -->
+    <rect x="455" y="500" width="114" height="22" rx="6" fill="#E63946"/>
+    <rect x="455" y="540" width="114" height="22" rx="6" fill="#E63946"/>
+  </g>
+</svg>

@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="cBg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1f3149"/>
+      <stop offset="100%" stop-color="#16223a"/>
+    </linearGradient>
+    <linearGradient id="cGold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#E6C97C"/>
+      <stop offset="50%" stop-color="#C9A24B"/>
+      <stop offset="100%" stop-color="#90702c"/>
+    </linearGradient>
+    <linearGradient id="cCream" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F4EEDF"/>
+      <stop offset="100%" stop-color="#DDD0B5"/>
+    </linearGradient>
+    <linearGradient id="cBelt" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#9b2a37"/>
+      <stop offset="100%" stop-color="#7A1F2B"/>
+    </linearGradient>
+  </defs>
+
+  <!-- full-bleed navy background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="url(#cBg)"/>
+  <!-- faint pinstripe frame -->
+  <rect x="56" y="56" width="912" height="912" rx="10" fill="none" stroke="#C9A24B" stroke-width="4" opacity="0.4"/>
+  <rect x="78" y="78" width="868" height="868" rx="8" fill="none" stroke="#C9A24B" stroke-width="2" opacity="0.25"/>
+
+  <!-- ===== PENNANT / SHIELD-PENNANT BADGE ===== -->
+  <!-- cream pennant body, pointed bottom -->
+  <path d="M512 150
+           L820 232
+           L820 560
+           C820 690 700 800 512 884
+           C324 800 204 690 204 560
+           L204 232 Z" fill="url(#cCream)"/>
+  <!-- gold border -->
+  <path d="M512 150
+           L820 232
+           L820 560
+           C820 690 700 800 512 884
+           C324 800 204 690 204 560
+           L204 232 Z" fill="none" stroke="url(#cGold)" stroke-width="16"/>
+  <!-- maroon chevron top band -->
+  <path d="M204 232 L820 232 L820 336 L512 290 L204 336 Z" fill="url(#cBelt)"/>
+  <path d="M204 336 L512 290 L820 336" fill="none" stroke="#C9A24B" stroke-width="5"/>
+
+  <!-- ELO RATED on the chevron band -->
+  <text x="512" y="286" font-family="serif" font-size="58" font-weight="bold" fill="#EDE6D6" text-anchor="middle" letter-spacing="7">ELO RATED</text>
+
+  <!-- ===== CENTRAL CHARGE: crossed tied belt knots ===== -->
+  <g transform="translate(512 520)">
+    <!-- belt A (\) maroon band -->
+    <g transform="rotate(38)">
+      <rect x="-200" y="-30" width="400" height="60" rx="8" fill="url(#cBelt)"/>
+      <rect x="-200" y="-30" width="400" height="60" rx="8" fill="none" stroke="#5e1822" stroke-width="4"/>
+      <!-- rank stripes near one end -->
+      <rect x="120" y="-30" width="70" height="60" fill="#14202f"/>
+      <rect x="130" y="-24" width="9" height="48" fill="url(#cGold)"/>
+      <rect x="146" y="-24" width="9" height="48" fill="url(#cGold)"/>
+      <rect x="162" y="-24" width="9" height="48" fill="url(#cGold)"/>
+    </g>
+    <!-- belt B (/) gold band -->
+    <g transform="rotate(-38)">
+      <rect x="-200" y="-30" width="400" height="60" rx="8" fill="url(#cGold)"/>
+      <rect x="-200" y="-30" width="400" height="60" rx="8" fill="none" stroke="#7d6228" stroke-width="4"/>
+      <rect x="-190" y="-30" width="70" height="60" fill="#14202f"/>
+      <rect x="-182" y="-24" width="9" height="48" fill="#EDE6D6"/>
+      <rect x="-166" y="-24" width="9" height="48" fill="#EDE6D6"/>
+      <rect x="-150" y="-24" width="9" height="48" fill="#EDE6D6"/>
+    </g>
+
+    <!-- central knot wrap over the cross -->
+    <rect x="-56" y="-58" width="112" height="116" rx="12" fill="url(#cCream)"/>
+    <rect x="-56" y="-58" width="112" height="116" rx="12" fill="none" stroke="#C9A24B" stroke-width="6"/>
+    <path d="M-56 0 L56 0" stroke="#bcae8e" stroke-width="5" opacity="0.6"/>
+    <circle cx="0" cy="0" r="14" fill="url(#cGold)"/>
+  </g>
+
+  <!-- bottom EST 2026 ribbon scroll -->
+  <g transform="translate(512 824)">
+    <path d="M-170 0 L170 0 L186 -22 L186 40 L150 30 L-150 30 L-186 40 L-186 -22 Z" fill="url(#cGold)"/>
+    <path d="M-186 -22 L-150 30 M186 -22 L150 30" stroke="#7d6228" stroke-width="3" fill="none"/>
+    <rect x="-150" y="0" width="300" height="30" fill="url(#cGold)"/>
+    <text x="0" y="24" font-family="serif" font-size="34" font-weight="bold" fill="#1B2A41" text-anchor="middle" letter-spacing="8">EST 2026</text>
+  </g>
+
+  <!-- gold star at the tip -->
+  <path d="M512 150 l9 20 l9 -20 z" fill="#C9A24B" opacity="0"/>
+</svg>

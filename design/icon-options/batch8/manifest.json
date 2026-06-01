@@ -1,0 +1,178 @@
+{
+  "batch": "batch8",
+  "num": 8,
+  "label": "Glossy Gradient",
+  "date": "2026-06-01",
+  "themes": [
+    {
+      "key": "mark",
+      "title": "The E / ER Mark"
+    },
+    {
+      "key": "belt",
+      "title": "The Belt"
+    },
+    {
+      "key": "lock",
+      "title": "The Lock"
+    },
+    {
+      "key": "climb",
+      "title": "The Climb"
+    },
+    {
+      "key": "match",
+      "title": "The Match"
+    },
+    {
+      "key": "champion",
+      "title": "The Champion"
+    }
+  ],
+  "icons": [
+    {
+      "theme": "mark",
+      "themeTitle": "The E / ER Mark",
+      "file": "theme1-mark-a",
+      "name": "Rising E",
+      "concept": "Floating white E on a red-to-gold glossy tile, with a gold staircase of rising-rating bars climbing off the top arm.",
+      "score": 5
+    },
+    {
+      "theme": "mark",
+      "themeTitle": "The E / ER Mark",
+      "file": "theme1-mark-b",
+      "name": "ER Monogram",
+      "concept": "Clean knockout-white ER monogram on a glossy red-to-crimson/magenta radial tile with a bright upper gloss highlight.",
+      "score": 4
+    },
+    {
+      "theme": "mark",
+      "themeTitle": "The E / ER Mark",
+      "file": "theme1-mark-c",
+      "name": "Beveled E Sheen",
+      "concept": "Bold dimensional beveled white E with a soft float shadow and a diagonal glossy sheen sweep over a red-to-magenta gradient.",
+      "score": 4
+    },
+    {
+      "theme": "belt",
+      "themeTitle": "The Belt",
+      "file": "theme2-belt-a",
+      "name": "Tied Knot",
+      "concept": "A tied BJJ belt knot with two hanging tails in glossy white over a red-to-crimson gradient tile, red rank stripes on the knot.",
+      "score": 3
+    },
+    {
+      "theme": "belt",
+      "themeTitle": "The Belt",
+      "file": "theme2-belt-b",
+      "name": "Rank Band",
+      "concept": "A straight white belt band tilted across a red-to-magenta gradient tile, with a black rank bar carrying three Signal Red stripes.",
+      "score": 5
+    },
+    {
+      "theme": "belt",
+      "themeTitle": "The Belt",
+      "file": "theme2-belt-c",
+      "name": "Coiled Loop",
+      "concept": "A BJJ belt coiled into a dimensional white ring over a red-to-gold radial gradient, with a striped knot crossing at the bottom.",
+      "score": 4
+    },
+    {
+      "theme": "lock",
+      "themeTitle": "The Lock",
+      "file": "theme3-lock-a",
+      "name": "Triangle Choke",
+      "concept": "Glossy red-to-crimson tile with a white knockout triangle choke, crossed limb bars, and a gold trapped-arm at the apex.",
+      "score": 4
+    },
+    {
+      "theme": "lock",
+      "themeTitle": "The Lock",
+      "file": "theme3-lock-b",
+      "name": "Clinch",
+      "concept": "Two interlocked white grappler figures locked in a clinch with reaching grip-arms, floating on a vivid red-to-magenta gradient with soft shadow.",
+      "score": 4
+    },
+    {
+      "theme": "lock",
+      "themeTitle": "The Lock",
+      "file": "theme3-lock-c",
+      "name": "Interlocked Links",
+      "concept": "Two interwoven chain-link rings, white and gold, weaving over each other as a lock motif on a glossy red radial-gradient tile.",
+      "score": 4
+    },
+    {
+      "theme": "climb",
+      "themeTitle": "The Climb",
+      "file": "theme4-climb-a",
+      "name": "Ascent Arrow",
+      "concept": "A bold white diagonal up-right arrow floating with a soft drop-shadow on a glossy red-to-gold gradient tile.",
+      "score": 3
+    },
+    {
+      "theme": "climb",
+      "themeTitle": "The Climb",
+      "file": "theme4-climb-b",
+      "name": "Rising Ranks",
+      "concept": "Three ascending white bars with a gold trend arrow climbing over their tops on a glossy red-to-crimson tile.",
+      "score": 3
+    },
+    {
+      "theme": "climb",
+      "themeTitle": "The Climb",
+      "file": "theme4-climb-c",
+      "name": "Rank Medallion",
+      "concept": "A dimensional gold rank medallion with double up-chevrons and ribbon tails on a glossy red radial-gradient tile.",
+      "score": 4
+    },
+    {
+      "theme": "match",
+      "themeTitle": "The Match",
+      "file": "theme5-match-a",
+      "name": "Face-Off",
+      "concept": "Two white competitor profiles facing off across a gold lightning seam on a glossy red-to-gold gradient tile",
+      "score": 4
+    },
+    {
+      "theme": "match",
+      "themeTitle": "The Match",
+      "file": "theme5-match-b",
+      "name": "VS Zones",
+      "concept": "Geometry-built VS floating with a drop shadow over two diagonal red/gold zones meeting at a glowing seam",
+      "score": 5
+    },
+    {
+      "theme": "match",
+      "themeTitle": "The Match",
+      "file": "theme5-match-c",
+      "name": "Grapple Disc",
+      "concept": "Two mirrored white fighters in a facing stance over a glossy gold disc with a soft depth halo on a radial red tile",
+      "score": 3
+    },
+    {
+      "theme": "champion",
+      "themeTitle": "The Champion",
+      "file": "theme6-champion-a",
+      "name": "Trophy Cup",
+      "concept": "Floating white two-handled championship trophy with a Signal Red star, on a red-to-gold glossy gradient tile.",
+      "score": 4
+    },
+    {
+      "theme": "champion",
+      "themeTitle": "The Champion",
+      "file": "theme6-champion-b",
+      "name": "Star Medal",
+      "concept": "White championship medal disc with a red star and ribbon, on a crimson-to-magenta radial gloss tile.",
+      "score": 4
+    },
+    {
+      "theme": "champion",
+      "themeTitle": "The Champion",
+      "file": "theme6-champion-c",
+      "name": "Crown & Laurel",
+      "concept": "Regal white crown with red jewels framed by a laurel wreath, on a red-to-amber diagonal glossy gradient.",
+      "score": 3
+    }
+  ]
+}

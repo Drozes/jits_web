@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- full-bleed background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- outer mat boundary ring -->
+  <circle cx="512" cy="512" r="378" fill="none" stroke="#E8EDF2" stroke-width="30"/>
+
+  <!-- the active red zone: a heavy red ring = the rating sweep -->
+  <circle cx="512" cy="512" r="300" fill="none" stroke="#E63946" stroke-width="92"/>
+  <!-- void wedge cut into the upper-right of the red ring (the "remaining" gap) -->
+  <polygon points="512,512 512,140 884,512" fill="#0D0F14"/>
+
+  <!-- rising ELO needle pointing up to the peak (top), heavy white shaft -->
+  <polygon points="486,520 538,520 524,206 500,206" fill="#E8EDF2"/>
+
+  <!-- center hub over the needle base -->
+  <circle cx="512" cy="512" r="82" fill="#E63946"/>
+  <circle cx="512" cy="512" r="34" fill="#0D0F14"/>
+
+  <!-- gold peak notch at the top of the boundary = the breakthrough -->
+  <polygon points="512,108 566,196 458,196" fill="#f59e0b"/>
+</svg>

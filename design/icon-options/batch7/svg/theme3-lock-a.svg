@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <!-- The triangle-choke: a clean closed triangle of limbs (white) with the choking leg-loop in Signal Red -->
+
+    <!-- Outer locking triangle (the legs forming the figure-four triangle) -->
+    <path d="M 512 196
+             L 800 700
+             L 224 700
+             Z"
+          stroke="#E8EDF2" stroke-width="34"/>
+
+    <!-- Inner trapped neck/head loop: the captured head inside the triangle -->
+    <circle cx="512" cy="540" r="96" stroke="#E8EDF2" stroke-width="30"/>
+
+    <!-- The choking leg crossing over: Signal Red accent line cutting across the lock -->
+    <path d="M 296 612
+             C 420 470, 600 470, 740 596"
+          stroke="#E63946" stroke-width="34"/>
+
+    <!-- Locked ankle hook at the cross point (red) -->
+    <path d="M 700 560
+             q 70 18, 64 92"
+          stroke="#E63946" stroke-width="34"/>
+
+    <!-- Apex knee joint accent -->
+    <circle cx="512" cy="196" r="20" fill="#E8EDF2" stroke="none"/>
+  </g>
+</svg>

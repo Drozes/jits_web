@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- Nike / Victory: a single bold wing as a fan of separated feathers
+       radiating from a hub at lower-left, sweeping up and to the right.
+       Distinct gaps of Void between feathers so the silhouette reads as a
+       wing, not a solid bar. Flat, brutalist. Gold breakthrough tip. -->
+
+  <!-- Hub / shoulder of the wing (heavy anchor block, lower-left) -->
+  <polygon points="232,800 360,740 392,856 264,896" fill="#E63946"/>
+
+  <!-- Feathers radiate from hub center ~ (320,800). Each is a tapered blade.
+       Lower feathers are long and shallow; upper feathers shorter and steeper.
+       Alternating Signal Red / bone-white. Clear Void gaps between each. -->
+
+  <!-- Feather 1 (lowest, longest, shallow) -->
+  <polygon points="312,808 760,560 800,620 332,860" fill="#E63946"/>
+  <!-- Feather 2 -->
+  <polygon points="308,776 720,452 752,516 332,800" fill="#E8EDF2"/>
+  <!-- Feather 3 -->
+  <polygon points="304,744 676,360 700,428 324,772" fill="#E63946"/>
+  <!-- Feather 4 -->
+  <polygon points="300,712 632,288 648,360 316,744" fill="#E8EDF2"/>
+  <!-- Feather 5 -->
+  <polygon points="298,680 588,236 596,312 308,716" fill="#E63946"/>
+  <!-- Feather 6 (top, steepest, shortest) -->
+  <polygon points="296,648 552,208 552,288 300,684" fill="#E8EDF2"/>
+
+  <!-- Gold breakthrough tip at the apex of the top feather -->
+  <polygon points="552,208 596,236 624,176 580,148" fill="#f59e0b"/>
+</svg>

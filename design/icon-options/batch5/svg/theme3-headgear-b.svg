@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Full-bleed background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#E63946"/>
+
+  <!-- CONCEPT B: Single ear-cup hero. One massive wrestling ear guard shown in
+       3/4 profile, with the radiating strap web. Red field, Void cup, white straps. -->
+
+  <!-- The ear-cup plate: heavy rounded shield (Void on the red field) -->
+  <path d="M 512 232
+           C 668 232 776 360 776 532
+           C 776 712 660 808 512 808
+           C 364 808 248 712 248 532
+           C 248 360 356 232 512 232 Z"
+        fill="#0D0F14"/>
+
+  <!-- Inner cup recess (white ring) -->
+  <path d="M 512 312
+           C 632 312 700 416 700 540
+           C 700 676 612 740 512 740
+           C 412 740 324 676 324 540
+           C 324 416 392 312 512 312 Z"
+        fill="#E8EDF2"/>
+
+  <!-- Deep vent well at the center of the cup (Void) -->
+  <path d="M 512 392
+           C 596 392 640 466 640 548
+           C 640 638 584 676 512 676
+           C 440 676 384 638 384 548
+           C 384 466 428 392 512 392 Z"
+        fill="#0D0F14"/>
+
+  <!-- Four radiating straps anchoring the cup (white spokes over the Void shield) -->
+  <!-- top strap -->
+  <polygon points="468,232 556,232 540,150 484,150" fill="#E8EDF2"/>
+  <!-- upper-left strap -->
+  <polygon points="300,300 360,360 282,420 226,360" fill="#E8EDF2"/>
+  <!-- upper-right strap -->
+  <polygon points="724,300 798,360 742,420 664,360" fill="#E8EDF2"/>
+  <!-- bottom strap -->
+  <polygon points="468,808 556,808 540,890 484,890" fill="#E8EDF2"/>
+
+  <!-- Strap anchor studs (gold) where straps meet the cup -->
+  <rect x="492" y="244" width="40" height="28" fill="#f59e0b"/>
+  <rect x="492" y="768" width="40" height="28" fill="#f59e0b"/>
+
+  <!-- Side anchor straps reaching to canvas edges (white) -->
+  <polygon points="248,500 320,500 320,572 248,572" fill="#E8EDF2"/>
+  <polygon points="704,500 776,500 776,572 704,572" fill="#E8EDF2"/>
+</svg>

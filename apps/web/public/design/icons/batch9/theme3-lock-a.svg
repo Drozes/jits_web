@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- 16x16 pixel grid, cell = 64px. Subject: TRIANGLE CHOKE sprite -->
+  <!-- Full-bleed Void background FIRST -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- subtle scanline-free dark border ring of pixels (gold accent corners) -->
+  <g fill="#1A1E26">
+    <rect x="0" y="0" width="64" height="64"/>
+    <rect x="960" y="0" width="64" height="64"/>
+    <rect x="0" y="960" width="64" height="64"/>
+    <rect x="960" y="960" width="64" height="64"/>
+  </g>
+
+  <!-- ===== TRIANGLE CHOKE: big red triangle (the lock), apex down ===== -->
+  <!-- Built as staircased pixel rows. Each row is a horizontal band of cells. -->
+  <!-- Outline pixels (dark) drawn under, red fill on top -->
+
+  <!-- DARK OUTLINE of triangle (1px border) -->
+  <g fill="#0D0F14">
+    <!-- top edge row y=2 (128-192) spans full inner width -->
+    <rect x="128" y="128" width="768" height="64"/>
+  </g>
+
+  <!-- RED triangle body, row by row narrowing toward apex (pointing down) -->
+  <g fill="#E63946">
+    <!-- row 2: x2..x13  (128..896) -->
+    <rect x="128" y="128" width="768" height="64"/>
+    <!-- row 3: x3..x12 (192..832) -->
+    <rect x="192" y="192" width="640" height="64"/>
+    <!-- row 4: x3..x12 -->
+    <rect x="192" y="256" width="640" height="64"/>
+    <!-- row 5: x4..x11 (256..768) -->
+    <rect x="256" y="320" width="512" height="64"/>
+    <!-- row 6: x4..x11 -->
+    <rect x="256" y="384" width="512" height="64"/>
+    <!-- row 7: x5..x10 (320..704) -->
+    <rect x="320" y="448" width="384" height="64"/>
+    <!-- row 8: x6..x9 (384..640) -->
+    <rect x="384" y="512" width="256" height="64"/>
+    <!-- row 9: x6..x9 -->
+    <rect x="384" y="576" width="256" height="64"/>
+    <!-- row 10: x7..x8 (448..576) apex -->
+    <rect x="448" y="640" width="128" height="64"/>
+    <!-- row 11: apex single -->
+    <rect x="448" y="704" width="128" height="64"/>
+  </g>
+
+  <!-- staircase dark step pixels on the two diagonal edges for crisp 8-bit edge -->
+  <g fill="#0D0F14">
+    <!-- left diagonal steps -->
+    <rect x="128" y="192" width="64" height="64"/>
+    <rect x="192" y="320" width="64" height="64"/>
+    <rect x="256" y="448" width="64" height="64"/>
+    <rect x="320" y="512" width="64" height="64"/>
+    <rect x="384" y="640" width="64" height="64"/>
+    <!-- right diagonal steps -->
+    <rect x="832" y="192" width="64" height="64"/>
+    <rect x="768" y="320" width="64" height="64"/>
+    <rect x="704" y="448" width="64" height="64"/>
+    <rect x="640" y="512" width="64" height="64"/>
+    <rect x="576" y="640" width="64" height="64"/>
+  </g>
+
+  <!-- ===== TRAPPED HEAD sprite (white) inside the triangle ===== -->
+  <g fill="#E8EDF2">
+    <!-- head block x6..x9 , y6..y8 (384..576, 384..512) -->
+    <rect x="384" y="384" width="256" height="64"/>
+    <rect x="384" y="448" width="256" height="64"/>
+  </g>
+  <!-- eyes (void) -->
+  <g fill="#0D0F14">
+    <rect x="448" y="384" width="64" height="64"/>
+    <rect x="512" y="384" width="64" height="64"/>
+  </g>
+  <!-- gold gi-collar pixel accents crossing the throat (the choke pressure) -->
+  <g fill="#f59e0b">
+    <rect x="384" y="448" width="64" height="64"/>
+    <rect x="576" y="448" width="64" height="64"/>
+  </g>
+
+  <!-- ===== GRIPPING ARM pixels wrapping the apex (white, staircased) ===== -->
+  <g fill="#E8EDF2">
+    <rect x="320" y="704" width="64" height="64"/>
+    <rect x="384" y="768" width="64" height="64"/>
+    <rect x="448" y="768" width="128" height="64"/>
+    <rect x="576" y="768" width="64" height="64"/>
+    <rect x="640" y="704" width="64" height="64"/>
+  </g>
+</svg>

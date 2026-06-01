@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- The heavy world-sphere borne overhead -->
+  <circle cx="512" cy="248" r="172" fill="#E63946"/>
+  <!-- gold meridian band hint = the peak / breakthrough -->
+  <rect x="340" y="232" width="344" height="34" fill="#0D0F14"/>
+  <rect x="495" y="92" width="34" height="312" fill="#0D0F14"/>
+  <rect x="340" y="232" width="344" height="14" fill="#f59e0b"/>
+
+  <!-- Atlas: frontal straining figure, white -->
+  <!-- head -->
+  <circle cx="512" cy="470" r="56" fill="#E8EDF2"/>
+
+  <!-- raised arms pressing up into the sphere -->
+  <polygon points="456,452 392,372 348,408 432,512" fill="#E8EDF2"/>
+  <polygon points="568,452 632,372 676,408 592,512" fill="#E8EDF2"/>
+  <!-- hands flattening against the globe -->
+  <rect x="360" y="368" width="92" height="42" fill="#E8EDF2"/>
+  <rect x="572" y="368" width="92" height="42" fill="#E8EDF2"/>
+
+  <!-- broad straining torso (trapezoid, wide shoulders) -->
+  <polygon points="404,516 620,516 596,748 428,748" fill="#E8EDF2"/>
+  <!-- chest split line for weight -->
+  <rect x="496" y="540" width="32" height="200" fill="#0D0F14"/>
+
+  <!-- planted braced legs -->
+  <polygon points="428,748 496,748 470,936 404,936" fill="#E8EDF2"/>
+  <polygon points="528,748 596,748 620,936 554,936" fill="#E8EDF2"/>
+  <!-- ground line -->
+  <rect x="360" y="936" width="304" height="30" fill="#E63946"/>
+</svg>

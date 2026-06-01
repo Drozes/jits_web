@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <radialGradient id="bBg" cx="0.35" cy="0.25" r="1.05">
+      <stop offset="0" stop-color="#ff4d6d"/>
+      <stop offset="0.5" stop-color="#E63946"/>
+      <stop offset="1" stop-color="#7a1230"/>
+    </radialGradient>
+    <radialGradient id="bGloss" cx="0.5" cy="0.05" r="0.85">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.5"/>
+      <stop offset="0.5" stop-color="#ffffff" stop-opacity="0.1"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="bMedal" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#e9dcc4"/>
+    </linearGradient>
+    <radialGradient id="bMedalShine" cx="0.35" cy="0.3" r="0.8">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.9"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="bShadow" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="24" stdDeviation="28" flood-color="#4d0a1c" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+
+  <rect width="1024" height="1024" rx="180" fill="url(#bBg)"/>
+  <rect width="1024" height="1024" rx="180" fill="url(#bGloss)"/>
+
+  <g filter="url(#bShadow)">
+    <!-- ribbons -->
+    <path d="M430 250 L512 540 L560 520 L478 250 Z" fill="#ffffff" opacity="0.92"/>
+    <path d="M594 250 L512 540 L464 520 L546 250 Z" fill="#f2dede" opacity="0.92"/>
+    <!-- medal disc -->
+    <circle cx="512" cy="660" r="170" fill="url(#bMedal)"/>
+    <circle cx="512" cy="660" r="170" fill="url(#bMedalShine)"/>
+    <circle cx="512" cy="660" r="170" fill="none" stroke="#c9b18a" stroke-width="10" opacity="0.5"/>
+    <circle cx="512" cy="660" r="132" fill="none" stroke="#E63946" stroke-width="14"/>
+    <!-- star -->
+    <path d="M512 560 l30 62 68 10 -49 48 11 68 -60 -32 -60 32 11 -68 -49 -48 68 -10 Z" fill="#E63946"/>
+  </g>
+</svg>

@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Full-bleed background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- Concept C: a single frontal HEAVY FIST clamping a vertical lapel.
+       Knuckle-bar fist as the hero shape, grabbing a white gi strip
+       that runs top-to-bottom through the grip. Most emblematic. -->
+
+  <!-- Vertical white gi lapel running through the whole canvas -->
+  <rect x="452" y="96" width="120" height="832" fill="#E8EDF2"/>
+  <!-- lapel seam (void groove down the middle) -->
+  <rect x="506" y="96" width="12" height="832" fill="#0D0F14"/>
+
+  <!-- The FIST: a big red back-of-hand block, centered, gripping the lapel -->
+  <rect x="300" y="396" width="424" height="232" rx="34" fill="#E63946"/>
+
+  <!-- Four knuckle bars (fingers wrapping over the front of the lapel),
+       sitting on top of the fist block as a heavy ridge -->
+  <rect x="316" y="356" width="92" height="150" rx="24" fill="#E63946"/>
+  <rect x="418" y="346" width="92" height="160" rx="24" fill="#E63946"/>
+  <rect x="514" y="346" width="92" height="160" rx="24" fill="#E63946"/>
+  <rect x="616" y="356" width="92" height="150" rx="24" fill="#E63946"/>
+
+  <!-- Void slivers between knuckles -->
+  <rect x="408" y="360" width="14" height="130" fill="#0D0F14"/>
+  <rect x="606" y="360" width="14" height="130" fill="#0D0F14"/>
+  <!-- center knuckle gap straddles the lapel; keep lapel visible there -->
+  <rect x="506" y="360" width="12" height="130" fill="#E8EDF2"/>
+
+  <!-- Thumb hooking up from the bottom, opposing the knuckles -->
+  <rect x="300" y="560" width="150" height="92" rx="40" fill="#E63946"/>
+  <rect x="300" y="500" width="92" height="150" rx="40" fill="#E63946"/>
+
+  <!-- Gold tension wedge: where the grip crushes the lapel -->
+  <polygon points="512,470 552,512 512,554 472,512" fill="#f59e0b"/>
+</svg>

@@ -1,0 +1,106 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Full-bleed Void background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- 24x24 pixel grid: each cell = 1024/24 = 42.6667 -->
+  <!-- Subtle split-floor backdrop: red zone left, void zone right (faint) -->
+  <g fill="#16191F">
+    <!-- top scoreboard band -->
+    <rect x="0"   y="0"   width="1024" height="85.333"/>
+  </g>
+
+  <!-- Top scoreboard pixel bars (two fighters' health: red full vs cyan full) -->
+  <g>
+    <rect x="42.667"  y="21.333" width="384"  height="42.667" fill="#E63946"/>
+    <rect x="597.333" y="21.333" width="384"  height="42.667" fill="#37c0d6"/>
+    <!-- pixel ticks in bars -->
+    <g fill="#0D0F14">
+      <rect x="170.667" y="21.333" width="5.333" height="42.667"/>
+      <rect x="298.667" y="21.333" width="5.333" height="42.667"/>
+      <rect x="725.333" y="21.333" width="5.333" height="42.667"/>
+      <rect x="853.333" y="21.333" width="5.333" height="42.667"/>
+    </g>
+  </g>
+
+  <!-- ===================== LEFT FIGHTER SPRITE (RED) ===================== -->
+  <!-- Built on coarse pixels, ~42.6667 cell -->
+  <g fill="#E63946">
+    <!-- head -->
+    <rect x="170.667" y="298.667" width="128"    height="128"/>
+    <!-- torso -->
+    <rect x="128"     y="426.667" width="213.333" height="170.667"/>
+    <!-- raised front arm (staircase to fist toward center) -->
+    <rect x="341.333" y="426.667" width="85.333"  height="42.667"/>
+    <rect x="384"     y="469.333" width="85.333"  height="42.667"/>
+    <!-- fist -->
+    <rect x="426.667" y="469.333" width="42.667"  height="85.333"/>
+    <!-- back arm down -->
+    <rect x="85.333"  y="469.333" width="42.667"  height="128"/>
+    <!-- legs (staggered stance) -->
+    <rect x="128"     y="597.333" width="85.333"  height="170.667"/>
+    <rect x="256"     y="597.333" width="85.333"  height="128"/>
+    <!-- front foot -->
+    <rect x="298.667" y="725.333" width="85.333"  height="42.667"/>
+  </g>
+  <!-- left fighter belt accent (gold) -->
+  <rect x="128" y="554.667" width="213.333" height="42.667" fill="#f59e0b"/>
+  <!-- left fighter eye pixel -->
+  <rect x="256" y="341.333" width="42.667" height="42.667" fill="#0D0F14"/>
+
+  <!-- ===================== RIGHT FIGHTER SPRITE (WHITE/CYAN) ===================== -->
+  <g fill="#E8EDF2">
+    <!-- head -->
+    <rect x="725.333" y="298.667" width="128"    height="128"/>
+    <!-- torso -->
+    <rect x="682.667" y="426.667" width="213.333" height="170.667"/>
+    <!-- raised front arm (staircase to fist toward center) -->
+    <rect x="597.333" y="426.667" width="85.333"  height="42.667"/>
+    <rect x="554.667" y="469.333" width="85.333"  height="42.667"/>
+    <!-- fist -->
+    <rect x="554.667" y="469.333" width="42.667"  height="85.333"/>
+    <!-- back arm down -->
+    <rect x="896"     y="469.333" width="42.667"  height="128"/>
+    <!-- legs -->
+    <rect x="810.667" y="597.333" width="85.333"  height="170.667"/>
+    <rect x="682.667" y="597.333" width="85.333"  height="128"/>
+    <!-- front foot -->
+    <rect x="640"     y="725.333" width="85.333"  height="42.667"/>
+  </g>
+  <!-- right fighter belt accent (cyan) -->
+  <rect x="682.667" y="554.667" width="213.333" height="42.667" fill="#37c0d6"/>
+  <!-- right fighter eye pixel -->
+  <rect x="725.333" y="341.333" width="42.667" height="42.667" fill="#0D0F14"/>
+
+  <!-- ===================== CENTER "VS" (pixel geometry) ===================== -->
+  <!-- center void plate so VS reads -->
+  <rect x="448" y="448" width="128" height="170.667" fill="#0D0F14"/>
+
+  <!-- V (gold pixels) -->
+  <g fill="#f59e0b">
+    <rect x="448"     y="448"     width="21.333" height="106.667"/>
+    <rect x="469.333" y="554.667" width="21.333" height="21.333"/>
+    <rect x="490.667" y="576"     width="21.333" height="21.333"/>
+    <rect x="512"     y="554.667" width="21.333" height="21.333"/>
+    <rect x="533.333" y="448"     width="21.333" height="106.667"/>
+  </g>
+  <!-- S (gold pixels) -->
+  <g fill="#f59e0b">
+    <rect x="490.667" y="448"     width="64"     height="21.333"/>
+    <rect x="469.333" y="448"     width="21.333" height="42.667"/>
+    <rect x="469.333" y="490.667" width="64"     height="21.333"/>
+    <rect x="512"     y="512"     width="21.333" height="42.667"/>
+    <rect x="448"     y="533.333" width="85.333" height="21.333"/>
+  </g>
+
+  <!-- spark pixels where fists nearly meet -->
+  <g fill="#f59e0b">
+    <rect x="490.667" y="384" width="42.667" height="42.667"/>
+    <rect x="448"     y="640" width="42.667" height="42.667"/>
+    <rect x="533.333" y="640" width="42.667" height="42.667"/>
+  </g>
+
+  <!-- chunky 1-cell frame around the whole thing -->
+  <g fill="#E63946">
+    <rect x="0" y="0" width="1024" height="0"/>
+  </g>
+</svg>

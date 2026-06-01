@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- TWO GRAPPLERS AS AN INTERLOCKED PINWHEEL CLINCH.
+       Each grappler = a heavy hook (head block + bent arm) that wraps
+       around the other. The two are 180deg rotations about a gold lock:
+       chaos spinning into a single controlled mark. -->
+
+  <!-- RED grappler: head at upper-left, arm hooks down through center -->
+  <polygon fill="#E63946" points="
+    256,256
+    448,256
+    448,420
+    592,420
+    592,560
+    448,560
+    448,448
+    384,448
+    384,592
+    256,592
+  "/>
+
+  <!-- WHITE grappler: 180deg rotation, head at lower-right, arm hooks up -->
+  <polygon fill="#E8EDF2" points="
+    768,768
+    576,768
+    576,604
+    432,604
+    432,464
+    576,464
+    576,576
+    640,576
+    640,432
+    768,432
+  "/>
+
+  <!-- Gold lock: the single point of control where the two interlock -->
+  <rect x="476" y="476" width="72" height="72" fill="#f59e0b"/>
+</svg>

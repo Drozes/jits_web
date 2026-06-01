@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- full-bleed background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- the mat circle as a solid red disc (the zone) -->
+  <circle cx="512" cy="512" r="370" fill="#E63946"/>
+
+  <!-- inner void disc carves the boundary ring -->
+  <circle cx="512" cy="512" r="288" fill="#0D0F14"/>
+
+  <!-- two opposing wrestler chevrons facing off across the center line -->
+  <!-- top combatant (points down toward center) -->
+  <polygon points="512,236 660,392 590,392 590,452 434,452 434,392 364,392" fill="#E8EDF2"/>
+  <!-- bottom combatant (points up toward center) -->
+  <polygon points="512,788 364,632 434,632 434,572 590,572 590,632 660,632" fill="#E8EDF2"/>
+
+  <!-- center clash dot -->
+  <rect x="476" y="494" width="72" height="36" fill="#f59e0b"/>
+</svg>

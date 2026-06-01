@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="aTile" x1="0" y1="0" x2="1024" y2="1024" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#E63946"/>
+      <stop offset="0.55" stop-color="#ef5b39"/>
+      <stop offset="1" stop-color="#f59e0b"/>
+    </linearGradient>
+    <radialGradient id="aGloss" cx="0.5" cy="0.12" r="0.85" gradientUnits="objectBoundingBox">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.55"/>
+      <stop offset="0.45" stop-color="#ffffff" stop-opacity="0.12"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="aBarShade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#f4f4f5"/>
+    </linearGradient>
+    <filter id="aShadow" x="-25%" y="-25%" width="150%" height="150%">
+      <feDropShadow dx="0" dy="16" stdDeviation="20" flood-color="#7a1018" flood-opacity="0.45"/>
+    </filter>
+  </defs>
+
+  <!-- full-bleed tile -->
+  <rect x="0" y="0" width="1024" height="1024" rx="180" fill="url(#aTile)"/>
+  <!-- glossy highlight -->
+  <rect x="0" y="0" width="1024" height="1024" rx="180" fill="url(#aGloss)"/>
+
+  <!-- floating E with ascending bars -->
+  <g filter="url(#aShadow)">
+    <!-- vertical spine -->
+    <rect x="318" y="300" width="118" height="424" rx="14" fill="url(#aBarShade)"/>
+    <!-- bottom bar (longest, lowest height baseline) -->
+    <rect x="318" y="630" width="392" height="94" rx="14" fill="url(#aBarShade)"/>
+    <!-- middle bar (ascending) -->
+    <rect x="318" y="466" width="320" height="92" rx="14" fill="url(#aBarShade)"/>
+    <!-- top bar (ascending shorter, lifted) -->
+    <rect x="318" y="300" width="248" height="92" rx="14" fill="url(#aBarShade)"/>
+  </g>
+
+  <!-- rising rating accent: stepped gold notches climbing off the top bar -->
+  <g filter="url(#aShadow)">
+    <rect x="606" y="386" width="46" height="58" rx="10" fill="#fff3d6"/>
+    <rect x="668" y="338" width="46" height="106" rx="10" fill="#ffe9b0"/>
+    <rect x="730" y="278" width="46" height="166" rx="10" fill="#ffd97a"/>
+  </g>
+</svg>

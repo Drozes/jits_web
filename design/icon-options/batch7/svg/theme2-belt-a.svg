@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <!-- The two belt bands passing behind the knot -->
+    <!-- Left band coming in from lower-left, up behind knot -->
+    <path d="M 150 720
+             C 250 660, 360 640, 440 600
+             L 470 580"
+          stroke="#E8EDF2" stroke-width="30"/>
+    <!-- Right band coming in from upper-right, down behind knot -->
+    <path d="M 874 360
+             C 770 420, 660 440, 580 480
+             L 550 500"
+          stroke="#E8EDF2" stroke-width="30"/>
+
+    <!-- The square knot: two interlocking loops, signal red -->
+    <!-- Loop 1 (front loop) -->
+    <path d="M 470 580
+             C 410 540, 410 460, 470 430
+             C 530 400, 600 430, 610 500
+             C 618 558, 580 600, 540 612
+             C 600 630, 640 600, 660 560"
+          stroke="#E63946" stroke-width="32"/>
+    <!-- Loop 2 (back loop, interlocking) -->
+    <path d="M 550 500
+             C 612 460, 612 380, 552 350
+             C 492 320, 422 352, 414 422
+             C 408 478, 446 520, 486 532"
+          stroke="#E63946" stroke-width="32"/>
+
+    <!-- Hanging tail ends below the knot -->
+    <path d="M 486 532
+             C 470 600, 450 700, 440 800
+             L 436 860"
+          stroke="#E8EDF2" stroke-width="30"/>
+    <path d="M 540 612
+             C 558 680, 572 760, 580 840
+             L 584 880"
+          stroke="#E8EDF2" stroke-width="30"/>
+
+    <!-- Rank stripes on the right hanging tail (white tail bar) -->
+    <line x1="556" y1="700" x2="600" y2="700" stroke="#E63946" stroke-width="20"/>
+    <line x1="560" y1="745" x2="604" y2="745" stroke="#E63946" stroke-width="20"/>
+    <line x1="564" y1="790" x2="608" y2="790" stroke="#E63946" stroke-width="20"/>
+  </g>
+</svg>

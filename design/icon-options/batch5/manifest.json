@@ -1,0 +1,178 @@
+{
+  "batch": "batch5",
+  "num": 5,
+  "label": "Wrestler",
+  "date": "2026-06-01",
+  "themes": [
+    {
+      "key": "stance",
+      "title": "The Stance"
+    },
+    {
+      "key": "singlet",
+      "title": "The Singlet"
+    },
+    {
+      "key": "headgear",
+      "title": "Headgear"
+    },
+    {
+      "key": "shot",
+      "title": "The Shot"
+    },
+    {
+      "key": "pin",
+      "title": "The Pin"
+    },
+    {
+      "key": "circle",
+      "title": "The Circle"
+    }
+  ],
+  "icons": [
+    {
+      "theme": "stance",
+      "themeTitle": "The Stance",
+      "file": "theme1-stance-a",
+      "name": "Coiled Shooter",
+      "concept": "Solid Signal-Red full-figure silhouette sunk into a low staggered ready-stance, head ducked and lead arm reaching to level-change, with a gold coiled-energy seam down the back.",
+      "score": 4
+    },
+    {
+      "theme": "stance",
+      "themeTitle": "The Stance",
+      "file": "theme1-stance-b",
+      "name": "Hex Cutout Stance",
+      "concept": "Heavy red hexagon plate with the low staggered wrestler stance carved out as a Void negative-space figure, topped by a single gold energy notch on the edge.",
+      "score": 4
+    },
+    {
+      "theme": "stance",
+      "themeTitle": "The Stance",
+      "file": "theme1-stance-c",
+      "name": "Poster Crest Stance",
+      "concept": "Inverted palette fight-poster badge: bold Terminal-White wrestler in a wide planted crouch on a Void panel inside a heavy frame, over a dominant red field with a gold belt line.",
+      "score": 2
+    },
+    {
+      "theme": "singlet",
+      "themeTitle": "The Singlet",
+      "file": "theme2-singlet-a",
+      "name": "Classic Singlet",
+      "concept": "Front-view wrestling singlet in Signal Red with deep V-neck straps, white side stripes, gold waistband, and leg cutouts on Void.",
+      "score": 4
+    },
+    {
+      "theme": "singlet",
+      "themeTitle": "The Singlet",
+      "file": "theme2-singlet-b",
+      "name": "E-Singlet",
+      "concept": "Continuous-strap singlet with the brand E (rising bars + gold peak) emblazoned across the chest on Void.",
+      "score": 3
+    },
+    {
+      "theme": "singlet",
+      "themeTitle": "The Singlet",
+      "file": "theme2-singlet-c",
+      "name": "Rated Flat-Lay",
+      "concept": "Inverted palette: a Void singlet flat-lay on a Signal Red field with a bold geometric '1024' rating number, last digit in gold, across the chest.",
+      "score": 4
+    },
+    {
+      "theme": "headgear",
+      "themeTitle": "Headgear",
+      "file": "theme3-headgear-a",
+      "name": "Front Cradle",
+      "concept": "Front-on wrestling headgear: white head dome flanked by two heavy red ear cups, crown and chin straps, gold buckle.",
+      "score": 5
+    },
+    {
+      "theme": "headgear",
+      "themeTitle": "Headgear",
+      "file": "theme3-headgear-b",
+      "name": "Cup Hero",
+      "concept": "Single massive ear-guard cup as a Void shield on a Signal Red field, with radiating white anchor straps and gold studs.",
+      "score": 3
+    },
+    {
+      "theme": "headgear",
+      "themeTitle": "Headgear",
+      "file": "theme3-headgear-c",
+      "name": "Profile Wrap",
+      "concept": "Side-profile white head wearing one bold red ear cup with crown and chin straps wrapping around it, gold buckle accent.",
+      "score": 2
+    },
+    {
+      "theme": "shot",
+      "themeTitle": "The Shot",
+      "file": "theme4-shot-a",
+      "name": "Drive In",
+      "concept": "A red shooter silhouette drops its level and drives forward-left into the opponent's white legs, drive legs exploding off the mat with a gold penetration spark at contact.",
+      "score": 4
+    },
+    {
+      "theme": "shot",
+      "themeTitle": "The Shot",
+      "file": "theme4-shot-b",
+      "name": "Level Change",
+      "concept": "Pure directional force: a descending chevron stack into a massive forward drive-arrow that penetrates a white opponent post, gold arrowhead marking the breakthrough.",
+      "score": 3
+    },
+    {
+      "theme": "shot",
+      "themeTitle": "The Shot",
+      "file": "theme4-shot-c",
+      "name": "The Clamp",
+      "concept": "The finish of the shot: heavy red arms lock around both white legs in a horseshoe clinch while a forward drive wedge launches off the floor, gold spark at the tipping point.",
+      "score": 2
+    },
+    {
+      "theme": "pin",
+      "themeTitle": "The Pin",
+      "file": "theme5-pin-a",
+      "name": "Top Pin",
+      "concept": "Red dominant wrestler flattening a white opponent into the red mat \u2014 classic top-position pin silhouette.",
+      "score": 4
+    },
+    {
+      "theme": "pin",
+      "themeTitle": "The Pin",
+      "file": "theme5-pin-b",
+      "name": "The Slap",
+      "concept": "Referee's open red hand striking the mat as a white figure lies pinned, gold impact marks \u2014 the moment of the fall.",
+      "score": 5
+    },
+    {
+      "theme": "pin",
+      "themeTitle": "The Pin",
+      "file": "theme5-pin-c",
+      "name": "The Press",
+      "concept": "Heavy downward double-chevron driving a flattened white figure into the red floor, gold impact burst \u2014 the pin as raw force.",
+      "score": 3
+    },
+    {
+      "theme": "circle",
+      "themeTitle": "The Circle",
+      "file": "theme6-circle-a",
+      "name": "Restart Mat",
+      "concept": "Top-down concentric wrestling mat with a Signal Red center restart cross and a gold center hub.",
+      "score": 3
+    },
+    {
+      "theme": "circle",
+      "themeTitle": "The Circle",
+      "file": "theme6-circle-b",
+      "name": "Face-Off Zone",
+      "concept": "Bold red boundary ring with two opposing wrestler chevrons converging across a gold center clash mark.",
+      "score": 2
+    },
+    {
+      "theme": "circle",
+      "themeTitle": "The Circle",
+      "file": "theme6-circle-c",
+      "name": "Mat Gauge",
+      "concept": "The mat circle as a rating gauge: heavy red sweep ring, rising white needle, and a gold breakthrough peak notch.",
+      "score": 2
+    }
+  ]
+}

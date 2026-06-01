@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- TWO GRAPPLERS CLAMPED HEAD-TO-HEAD.
+       Each grappler = a heavy bracket [ that reaches in and hooks the
+       opponent's limb. Their arms interleave at center: a two-body lock. -->
+
+  <!-- RED grappler on the left: bracket opening right, top arm reaches in -->
+  <polygon fill="#E63946" points="
+    232,272
+    520,272
+    520,400
+    392,400
+    392,624
+    520,624
+    520,752
+    232,752
+  "/>
+
+  <!-- WHITE grappler on the right: bracket opening left, mirrored -->
+  <polygon fill="#E8EDF2" points="
+    792,752
+    504,752
+    504,624
+    632,624
+    632,400
+    504,400
+    504,272
+    792,272
+  "/>
+
+  <!-- RED top arm reaches across into the white side (interlock) -->
+  <rect x="392" y="400" width="296" height="96" fill="#E63946"/>
+  <!-- WHITE bottom arm reaches across into the red side (interlock) -->
+  <rect x="336" y="528" width="296" height="96" fill="#E8EDF2"/>
+
+  <!-- Gold lock at the dead center of the tangle -->
+  <rect x="476" y="476" width="72" height="72" fill="#f59e0b"/>
+</svg>

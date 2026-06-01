@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="aBg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff5566"/>
+      <stop offset="0.45" stop-color="#E63946"/>
+      <stop offset="1" stop-color="#f59e0b"/>
+    </linearGradient>
+    <radialGradient id="aGloss" cx="0.5" cy="0.0" r="0.9">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.55"/>
+      <stop offset="0.45" stop-color="#ffffff" stop-opacity="0.12"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="aCup" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#f2dede"/>
+    </linearGradient>
+    <filter id="aShadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="22" stdDeviation="26" flood-color="#7a0d16" flood-opacity="0.45"/>
+    </filter>
+  </defs>
+
+  <rect width="1024" height="1024" rx="180" fill="url(#aBg)"/>
+  <rect width="1024" height="1024" rx="180" fill="url(#aGloss)"/>
+
+  <g filter="url(#aShadow)">
+    <!-- trophy handles -->
+    <path d="M360 340 C270 340 250 470 360 500 L388 500 L388 452 C330 442 330 388 388 388 Z" fill="url(#aCup)"/>
+    <path d="M664 340 C754 340 774 470 664 500 L636 500 L636 452 C694 442 694 388 636 388 Z" fill="url(#aCup)"/>
+    <!-- cup bowl -->
+    <path d="M360 320 L664 320 L664 430 C664 560 590 632 512 632 C434 632 360 560 360 430 Z" fill="url(#aCup)"/>
+    <!-- stem -->
+    <rect x="486" y="632" width="52" height="80" fill="url(#aCup)"/>
+    <!-- base plates -->
+    <rect x="430" y="712" width="164" height="34" rx="8" fill="url(#aCup)"/>
+    <rect x="392" y="746" width="240" height="46" rx="12" fill="url(#aCup)"/>
+    <!-- star emblem on cup -->
+    <path d="M512 388 l24 49 54 8 -39 38 9 54 -48 -25 -48 25 9 -54 -39 -38 54 -8 Z" fill="#E63946"/>
+  </g>
+</svg>

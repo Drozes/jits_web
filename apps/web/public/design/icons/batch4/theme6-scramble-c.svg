@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- TWO GRAPPLERS AS TWO HEAVY LIMBS WOVEN INTO A KNOT.
+       Each grappler is a bent diagonal limb (forearm + hand-hook).
+       They cross at the center and weave over/under each other:
+       two bodies tangled into one interlocked scramble mark. -->
+
+  <!-- RED limb: sweeps from top-left down to bottom-right, bent at the
+       center, ending in a hook that grips back upward. -->
+  <polygon fill="#E63946" points="
+    256,272
+    400,272
+    560,480
+    700,332
+    768,400
+    572,608
+    608,716
+    480,752
+    432,560
+  "/>
+
+  <!-- WHITE limb: sweeps from bottom-left up to top-right, bent at the
+       center, woven across the red, ending in a hook gripping back down. -->
+  <polygon fill="#E8EDF2" points="
+    256,728
+    324,660
+    464,540
+    624,748
+    768,748
+    768,604
+    560,396
+    400,544
+    324,432
+  "/>
+
+  <!-- RED over-strap: the red limb passes OVER the white at the crossing -->
+  <polygon fill="#E63946" points="
+    452,452
+    572,452
+    572,540
+    452,540
+  "/>
+
+  <!-- Gold lock at the woven center: the point of control -->
+  <rect x="476" y="476" width="72" height="72" fill="#f59e0b"/>
+</svg>

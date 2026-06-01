@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+  <g fill="none" stroke-width="34" stroke-linecap="round" stroke-linejoin="round">
+    <!-- LEFT bracket pair pointing right (white) -->
+    <g stroke="#E8EDF2">
+      <path d="M 150 250 L 360 512 L 150 774"/>
+      <path d="M 290 330 L 432 512 L 290 694"/>
+    </g>
+    <!-- RIGHT bracket pair pointing left (Signal Red) -->
+    <g stroke="#E63946">
+      <path d="M 874 250 L 664 512 L 874 774"/>
+      <path d="M 734 330 L 592 512 L 734 694"/>
+    </g>
+    <!-- center contact node: a small diamond where the two sides meet -->
+    <g stroke="#E8EDF2">
+      <path d="M 512 444 L 560 512 L 512 580 L 464 512 Z"/>
+    </g>
+  </g>
+</svg>

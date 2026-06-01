@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="aTile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff5a67"/>
+      <stop offset="0.45" stop-color="#E63946"/>
+      <stop offset="1" stop-color="#f59e0b"/>
+    </linearGradient>
+    <radialGradient id="aGloss" cx="0.5" cy="0.16" r="0.85">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.55"/>
+      <stop offset="0.45" stop-color="#ffffff" stop-opacity="0.12"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="aShine" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="aDrop" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="14" stdDeviation="20" flood-color="#5a0c12" flood-opacity="0.45"/>
+    </filter>
+  </defs>
+
+  <!-- full-bleed tile -->
+  <rect x="0" y="0" width="1024" height="1024" rx="180" fill="url(#aTile)"/>
+  <!-- glossy top highlight -->
+  <rect x="0" y="0" width="1024" height="1024" rx="180" fill="url(#aGloss)"/>
+  <!-- soft upper shine band -->
+  <path d="M180 12 H844 a168 168 0 0 1 168 168 V300 C760 420 264 420 12 300 V180 A168 168 0 0 1 180 12 Z" fill="url(#aShine)" opacity="0.6"/>
+
+  <!-- two facing competitor profiles, white knockout, floating with drop-shadow -->
+  <g filter="url(#aDrop)">
+    <!-- left profile facing right -->
+    <path fill="#ffffff" d="M300 760
+      C300 700 318 656 352 626
+      C336 612 326 590 326 566
+      C326 512 364 470 418 470
+      C470 470 506 510 506 564
+      C506 588 498 606 486 622
+      L486 760 Z" />
+    <!-- right profile facing left (mirror) -->
+    <path fill="#ffffff" d="M724 760
+      C724 700 706 656 672 626
+      C688 612 698 590 698 566
+      C698 512 660 470 606 470
+      C554 470 518 510 518 564
+      C518 588 526 606 538 622
+      L538 760 Z" />
+  </g>
+
+  <!-- central VS divide: lightning bolt seam in gold -->
+  <path d="M512 300 L470 540 L516 540 L500 720 L572 470 L524 470 L556 300 Z"
+        fill="#fff7e6" opacity="0.95"/>
+  <path d="M512 300 L470 540 L516 540 L500 720 L572 470 L524 470 L556 300 Z"
+        fill="url(#aShine)" />
+</svg>

@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="tileB" x1="120" y1="80" x2="900" y2="980" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ff5d8f"/>
+      <stop offset="0.5" stop-color="#E63946"/>
+      <stop offset="1" stop-color="#8e0e2a"/>
+    </linearGradient>
+    <radialGradient id="glossB" cx="0.5" cy="0.1" r="0.9" gradientUnits="objectBoundingBox">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.5"/>
+      <stop offset="0.4" stop-color="#ffffff" stop-opacity="0.14"/>
+      <stop offset="0.75" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="barB" x1="0" y1="300" x2="0" y2="800" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#ffd9df"/>
+    </linearGradient>
+    <filter id="shadowB" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="22" stdDeviation="26" flood-color="#4d0716" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+
+  <rect x="0" y="0" width="1024" height="1024" rx="180" fill="url(#tileB)"/>
+  <rect x="0" y="0" width="1024" height="1024" rx="180" fill="url(#glossB)"/>
+
+  <g filter="url(#shadowB)" fill="url(#barB)">
+    <!-- three ascending bars (the climb) -->
+    <rect x="232" y="640" width="150" height="200" rx="34"/>
+    <rect x="437" y="512" width="150" height="328" rx="34"/>
+    <rect x="642" y="360" width="150" height="480" rx="34"/>
+  </g>
+
+  <!-- ascending arrow accent skating over the bar tops -->
+  <g filter="url(#shadowB)" fill="#fff5b0">
+    <path d="M298 600 L520 470 L728 296 L766 320 L530 510 L308 642 Z"/>
+    <polygon points="700,240 800,260 762,352"/>
+  </g>
+</svg>

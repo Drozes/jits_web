@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <!-- LEFT competitor profile, white line -->
+    <g stroke="#E8EDF2" stroke-width="30">
+      <path d="M 300 250
+               C 220 250 168 312 168 392
+               C 168 452 198 492 222 514
+               C 236 526 244 540 244 560
+               L 244 624
+               C 244 668 280 700 326 700
+               L 384 700"/>
+      <!-- ear -->
+      <path d="M 222 430 q -34 6 -34 38 q 0 30 32 36"/>
+      <!-- eye -->
+      <circle cx="278" cy="396" r="13" fill="#E8EDF2" stroke="none"/>
+      <!-- brow -->
+      <path d="M 248 360 q 30 -18 60 -8"/>
+    </g>
+    <!-- RIGHT competitor profile, Signal Red line (mirrored) -->
+    <g stroke="#E63946" stroke-width="30">
+      <path d="M 724 250
+               C 804 250 856 312 856 392
+               C 856 452 826 492 802 514
+               C 788 526 780 540 780 560
+               L 780 624
+               C 780 668 744 700 698 700
+               L 640 700"/>
+      <path d="M 802 430 q 34 6 34 38 q 0 30 -32 36"/>
+      <circle cx="746" cy="396" r="13" fill="#E63946" stroke="none"/>
+      <path d="M 776 360 q -30 -18 -60 -8"/>
+    </g>
+    <!-- center VS: two stacked chevrons clashing toward the midline -->
+    <g stroke="#E8EDF2" stroke-width="28">
+      <path d="M 462 318 L 512 446 L 562 318"/>
+      <path d="M 462 706 L 512 578 L 562 706"/>
+    </g>
+  </g>
+</svg>

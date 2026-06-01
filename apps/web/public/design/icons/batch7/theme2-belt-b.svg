@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect x="0" y="0" width="1024" height="1024" fill="#F2F4F7"/>
+  <g fill="none" stroke="#0D0F14" stroke-linecap="round" stroke-linejoin="round" stroke-width="30">
+    <!-- Horizontal belt band, drawn as a wide rounded outline strip -->
+    <rect x="150" y="430" width="724" height="164" rx="20"/>
+
+    <!-- Rank bar block: the contrasting end-tip where stripes sit -->
+    <line x1="640" y1="430" x2="640" y2="594"/>
+
+    <!-- Stitch line running along the belt (top inner seam) -->
+    <line x1="186" y1="470" x2="610" y2="470"/>
+    <!-- Stitch line (bottom inner seam) -->
+    <line x1="186" y1="554" x2="610" y2="554"/>
+  </g>
+
+  <!-- Rank stripes inside the rank bar, in Signal Red -->
+  <g fill="none" stroke="#E63946" stroke-linecap="round" stroke-width="26">
+    <line x1="678" y1="466" x2="678" y2="558"/>
+    <line x1="724" y1="466" x2="724" y2="558"/>
+    <line x1="770" y1="466" x2="770" y2="558"/>
+    <line x1="816" y1="466" x2="816" y2="558"/>
+  </g>
+</svg>

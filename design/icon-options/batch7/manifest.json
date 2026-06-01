@@ -1,0 +1,178 @@
+{
+  "batch": "batch7",
+  "num": 7,
+  "label": "Monoline",
+  "date": "2026-06-01",
+  "themes": [
+    {
+      "key": "mark",
+      "title": "The E / ER Mark"
+    },
+    {
+      "key": "belt",
+      "title": "The Belt"
+    },
+    {
+      "key": "lock",
+      "title": "The Lock"
+    },
+    {
+      "key": "climb",
+      "title": "The Climb"
+    },
+    {
+      "key": "match",
+      "title": "The Match"
+    },
+    {
+      "key": "champion",
+      "title": "The Champion"
+    }
+  ],
+  "icons": [
+    {
+      "theme": "mark",
+      "themeTitle": "The E / ER Mark",
+      "file": "theme1-mark-a",
+      "name": "Rising E",
+      "concept": "Monoline E whose top bar extends into a Signal Red rising arrow, signalling rating ascent (white + red on Void)",
+      "score": 5
+    },
+    {
+      "theme": "mark",
+      "themeTitle": "The E / ER Mark",
+      "file": "theme1-mark-b",
+      "name": "ER Monogram",
+      "concept": "Clean ER letter mark in uniform line-art, dark E paired with a Signal Red R on a light premium-icon background",
+      "score": 5
+    },
+    {
+      "theme": "mark",
+      "themeTitle": "The E / ER Mark",
+      "file": "theme1-mark-c",
+      "name": "Badge E",
+      "concept": "Stepped Signal Red monoline E enclosed in a thin white rounded-square badge frame on Void",
+      "score": 4
+    },
+    {
+      "theme": "belt",
+      "themeTitle": "The Belt",
+      "file": "theme2-belt-a",
+      "name": "Tied Knot",
+      "concept": "A square-knotted BJJ belt in continuous monoline, Signal Red knot loops over white bands with red rank stripes on the hanging tail (void background).",
+      "score": 3
+    },
+    {
+      "theme": "belt",
+      "themeTitle": "The Belt",
+      "file": "theme2-belt-b",
+      "name": "Rank Band",
+      "concept": "A horizontal belt band drawn as a thin dark outline strip with seam lines and a rank bar holding four Signal Red stripes (light background).",
+      "score": 5
+    },
+    {
+      "theme": "belt",
+      "themeTitle": "The Belt",
+      "file": "theme2-belt-c",
+      "name": "Coiled Ribbon",
+      "concept": "A single unbroken belt ribbon coiled into a looping spiral, swooping into a Signal Red hanging end crossed by white rank stripes (void background).",
+      "score": 2
+    },
+    {
+      "theme": "lock",
+      "themeTitle": "The Lock",
+      "file": "theme3-lock-a",
+      "name": "Triangle Choke",
+      "concept": "Monoline white triangle of locked limbs trapping a head-circle, with a Signal Red choking-arm arc cutting across, on Void background.",
+      "score": 3
+    },
+    {
+      "theme": "lock",
+      "themeTitle": "The Lock",
+      "file": "theme3-lock-b",
+      "name": "Clinch",
+      "concept": "Two interlocked continuous-line figures (white + Signal Red) wrapping arms around each other in a standing clinch, on Void background.",
+      "score": 4
+    },
+    {
+      "theme": "lock",
+      "themeTitle": "The Lock",
+      "file": "theme3-lock-c",
+      "name": "Interlock",
+      "concept": "Two open arm-hooks linked into an unbreakable knot, single dark line on light background, with one Signal Red pressure-point at the bite.",
+      "score": 4
+    },
+    {
+      "theme": "climb",
+      "themeTitle": "The Climb",
+      "file": "theme4-climb-a",
+      "name": "Rising Bars",
+      "concept": "Monoline ascending podium bars with a red trend line and arrowhead climbing across them, white on void.",
+      "score": 4
+    },
+    {
+      "theme": "climb",
+      "themeTitle": "The Climb",
+      "file": "theme4-climb-b",
+      "name": "Rank Medallion",
+      "concept": "Line-art rank medal: concentric rings, ascending chevrons, and ribbon tails signalling a rank-up.",
+      "score": 4
+    },
+    {
+      "theme": "climb",
+      "themeTitle": "The Climb",
+      "file": "theme4-climb-c",
+      "name": "Summit Arrow",
+      "concept": "Bold red up-arrow on light ground flanked by dark zigzag ELO lines climbing to a summit dot.",
+      "score": 5
+    },
+    {
+      "theme": "match",
+      "themeTitle": "The Match",
+      "file": "theme5-match-a",
+      "name": "Face-Off",
+      "concept": "Two facing monoline profile heads (white vs Signal Red) flanking a clashing double-chevron VS in the negative space.",
+      "score": 5
+    },
+    {
+      "theme": "match",
+      "themeTitle": "The Match",
+      "file": "theme5-match-b",
+      "name": "Bracket Clash",
+      "concept": "Two opposing bracket/chevron pairs converging on a central diamond node, a geometric head-to-head matchmaking bracket.",
+      "score": 4
+    },
+    {
+      "theme": "match",
+      "themeTitle": "The Match",
+      "file": "theme5-match-c",
+      "name": "The Grip",
+      "concept": "Two minimal line competitors leaning in to clasp at a central interlocking grip knot over a mat baseline.",
+      "score": 3
+    },
+    {
+      "theme": "champion",
+      "themeTitle": "The Champion",
+      "file": "theme6-champion-a",
+      "name": "Laurel Star",
+      "concept": "Monoline laurel wreath cradling a victory star, Signal Red lines on void",
+      "score": 4
+    },
+    {
+      "theme": "champion",
+      "themeTitle": "The Champion",
+      "file": "theme6-champion-b",
+      "name": "Champion Cup",
+      "concept": "Line-art trophy with handles and a red star accent, dark stroke on light",
+      "score": 5
+    },
+    {
+      "theme": "champion",
+      "themeTitle": "The Champion",
+      "file": "theme6-champion-c",
+      "name": "Star Medal",
+      "concept": "Ribbon-hung medal with concentric rings and a center star, white ribbon over red disc",
+      "score": 4
+    }
+  ]
+}

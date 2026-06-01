@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- full-bleed Signal Red background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#E63946"/>
+
+  <!-- darker red checker tiles for pixel-grid texture -->
+  <g fill="#cf2d3b">
+    <rect x="0" y="0" width="128" height="128"/>
+    <rect x="256" y="0" width="128" height="128"/>
+    <rect x="512" y="0" width="128" height="128"/>
+    <rect x="768" y="0" width="128" height="128"/>
+    <rect x="128" y="128" width="128" height="128"/>
+    <rect x="384" y="128" width="128" height="128"/>
+    <rect x="640" y="128" width="128" height="128"/>
+    <rect x="896" y="128" width="128" height="128"/>
+    <rect x="0" y="896" width="128" height="128"/>
+    <rect x="256" y="896" width="128" height="128"/>
+    <rect x="512" y="896" width="128" height="128"/>
+    <rect x="768" y="896" width="128" height="128"/>
+    <rect x="128" y="768" width="128" height="128"/>
+    <rect x="384" y="768" width="128" height="128"/>
+    <rect x="640" y="768" width="128" height="128"/>
+    <rect x="896" y="768" width="128" height="128"/>
+  </g>
+
+  <!-- 16x16 grid, cell = 64px. Pixel CROWN sprite, centered.
+       Dark void plate behind crown for contrast. -->
+  <rect x="192" y="320" width="640" height="384" fill="#0D0F14"/>
+
+  <!-- ===== gold pixel crown ===== -->
+  <!-- 1px dark outline plate already provides backing; build crown in gold -->
+  <g fill="#f59e0b">
+    <!-- three peaks top row -->
+    <rect x="256" y="384" width="64" height="64"/>
+    <rect x="480" y="384" width="64" height="64"/>
+    <rect x="704" y="384" width="64" height="64"/>
+
+    <!-- peak shoulders row -->
+    <rect x="256" y="448" width="64" height="64"/>
+    <rect x="384" y="448" width="64" height="64"/>
+    <rect x="480" y="448" width="64" height="64"/>
+    <rect x="576" y="448" width="64" height="64"/>
+    <rect x="704" y="448" width="64" height="64"/>
+
+    <!-- crown body solid rows -->
+    <rect x="256" y="512" width="512" height="64"/>
+    <rect x="256" y="576" width="512" height="64"/>
+
+    <!-- crown base band -->
+    <rect x="256" y="640" width="512" height="64"/>
+  </g>
+
+  <!-- gold highlight (lighter) on left of each peak -->
+  <g fill="#fcd34d">
+    <rect x="256" y="384" width="64" height="64"/>
+    <rect x="480" y="384" width="64" height="64"/>
+    <rect x="704" y="384" width="64" height="64"/>
+    <rect x="256" y="512" width="64" height="64"/>
+  </g>
+
+  <!-- gold shade (darker) along bottom band -->
+  <g fill="#b45309">
+    <rect x="256" y="640" width="512" height="32"/>
+  </g>
+
+  <!-- ===== gems on the base band ===== -->
+  <g fill="#E63946">
+    <rect x="320" y="576" width="64" height="64"/>
+    <rect x="640" y="576" width="64" height="64"/>
+  </g>
+  <g fill="#22d3ee">
+    <rect x="480" y="576" width="64" height="64"/>
+  </g>
+  <!-- gem highlights -->
+  <g fill="#E8EDF2">
+    <rect x="320" y="576" width="32" height="32"/>
+    <rect x="480" y="576" width="32" height="32"/>
+    <rect x="640" y="576" width="32" height="32"/>
+  </g>
+
+  <!-- ===== white sparkles around crown ===== -->
+  <g fill="#E8EDF2">
+    <rect x="160" y="416" width="48" height="48"/>
+    <rect x="816" y="416" width="48" height="48"/>
+    <rect x="384" y="288" width="48" height="48"/>
+    <rect x="592" y="288" width="48" height="48"/>
+  </g>
+</svg>

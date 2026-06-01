@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Full-bleed Void background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- ================================================================
+       VARIANT B: BELT BAND with RANK STRIPES, straight-on arcade
+       HUD style. Coarse 64px pixel grid (16x16).
+       A thick red belt band runs horizontally; its right end has the
+       black rank bar with 4 white stripes (a competitor's rank).
+       A cyan + gold double-stripe runs the belt length like a label.
+       ================================================================ -->
+
+  <!-- Background pixel-dither: a few faint void-blue cells for texture -->
+  <g fill="#141821">
+    <rect x="64"  y="128" width="64" height="64"/>
+    <rect x="256" y="64"  width="64" height="64"/>
+    <rect x="640" y="128" width="64" height="64"/>
+    <rect x="896" y="192" width="64" height="64"/>
+    <rect x="128" y="832" width="64" height="64"/>
+    <rect x="448" y="896" width="64" height="64"/>
+    <rect x="768" y="832" width="64" height="64"/>
+    <rect x="896" y="768" width="64" height="64"/>
+  </g>
+
+  <!-- Dark outline slab behind the whole belt -->
+  <rect x="64" y="320" width="896" height="384" fill="#070809"/>
+
+  <!-- BELT BAND body (red) rows -->
+  <g fill="#E63946">
+    <rect x="96" y="352" width="832" height="64"/>
+    <rect x="96" y="416" width="832" height="64"/>
+    <rect x="96" y="480" width="832" height="64"/>
+    <rect x="96" y="544" width="832" height="64"/>
+    <rect x="96" y="608" width="832" height="64"/>
+  </g>
+
+  <!-- Top highlight row (lighter red) -->
+  <rect x="96" y="352" width="832" height="32" fill="#f06470"/>
+  <!-- Bottom shade row (darker red) -->
+  <rect x="96" y="640" width="832" height="32" fill="#a8262f"/>
+
+  <!-- CYAN length stripe (decorative label line) -->
+  <rect x="96" y="416" width="832" height="32" fill="#22d3ee"/>
+  <!-- GOLD length stripe under it -->
+  <rect x="96" y="576" width="832" height="32" fill="#f59e0b"/>
+
+  <!-- ===== RANK BAR (black) at the belt's right tip ===== -->
+  <rect x="704" y="352" width="224" height="320" fill="#0D0F14"/>
+  <!-- thin red seam where rank bar meets belt -->
+  <rect x="704" y="352" width="16" height="320" fill="#a8262f"/>
+
+  <!-- 4 WHITE rank stripes on the black bar -->
+  <g fill="#E8EDF2">
+    <rect x="736" y="384" width="32" height="256"/>
+    <rect x="784" y="384" width="32" height="256"/>
+    <rect x="832" y="384" width="32" height="256"/>
+    <rect x="880" y="384" width="32" height="256"/>
+  </g>
+
+  <!-- ===== LEFT BUCKLE / TIP block (the wrapped end) ===== -->
+  <rect x="96" y="320" width="128" height="384" fill="#c32f3b"/>
+  <rect x="96" y="320" width="32" height="384" fill="#070809"/> <!-- left edge outline -->
+  <!-- buckle pixel glint -->
+  <rect x="144" y="368" width="48" height="48" fill="#E8EDF2"/>
+  <rect x="144" y="608" width="48" height="48" fill="#f06470"/>
+</svg>

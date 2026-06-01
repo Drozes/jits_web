@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- The mat: heavy red baseline the bottom wrestler is pinned to -->
+  <rect x="112" y="752" width="800" height="64" fill="#E63946"/>
+
+  <!-- BOTTOM wrestler: flattened, pinned to the mat (white, horizontal) -->
+  <!-- torso slab lying flat -->
+  <rect x="208" y="664" width="560" height="88" fill="#E8EDF2"/>
+  <!-- head pressed to the mat (left) -->
+  <circle cx="232" cy="640" r="64" fill="#E8EDF2"/>
+  <!-- splayed legs -->
+  <rect x="724" y="664" width="120" height="52" fill="#E8EDF2"/>
+  <rect x="724" y="716" width="92" height="40" fill="#E8EDF2"/>
+
+  <!-- TOP wrestler: dominant, pressing down on top (Signal Red) -->
+  <!-- driving torso -->
+  <polygon points="296,664 632,664 560,432 360,432" fill="#E63946"/>
+  <!-- head of the dominant wrestler -->
+  <circle cx="448" cy="356" r="84" fill="#E63946"/>
+  <!-- driving arm hooking across, controlling the pinned head -->
+  <rect x="232" y="556" width="220" height="76" transform="rotate(28 232 556)" fill="#E63946"/>
+</svg>

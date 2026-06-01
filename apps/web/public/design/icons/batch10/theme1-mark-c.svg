@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="creamC" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#EDE6D6"/>
+      <stop offset="100%" stop-color="#DACFB6"/>
+    </linearGradient>
+    <linearGradient id="navyC" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#27395C"/>
+      <stop offset="100%" stop-color="#1B2A41"/>
+    </linearGradient>
+    <linearGradient id="oxC" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#8E2530"/>
+      <stop offset="100%" stop-color="#7A1F2B"/>
+    </linearGradient>
+    <linearGradient id="goldC" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#E8CC82"/>
+      <stop offset="55%" stop-color="#C9A24B"/>
+      <stop offset="100%" stop-color="#9C7B30"/>
+    </linearGradient>
+    <linearGradient id="bnrC" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#E63946"/>
+      <stop offset="100%" stop-color="#B5232F"/>
+    </linearGradient>
+    <pattern id="hatchC" width="22" height="22" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <rect width="22" height="22" fill="none"/>
+      <rect width="3" height="22" fill="#C9A24B" opacity="0.10"/>
+    </pattern>
+  </defs>
+
+  <!-- full-bleed background: cream with vintage hatch -->
+  <rect x="0" y="0" width="1024" height="1024" fill="url(#creamC)"/>
+  <rect x="0" y="0" width="1024" height="1024" fill="url(#hatchC)"/>
+
+  <!-- decorative corner frame -->
+  <rect x="56" y="56" width="912" height="912" rx="6" fill="none" stroke="#1B2A41" stroke-width="7" opacity="0.4"/>
+  <rect x="74" y="74" width="876" height="876" rx="4" fill="none" stroke="#7A1F2B" stroke-width="3" opacity="0.55"/>
+
+  <!-- pennant / shield body -->
+  <path d="M306 264 L718 264 L718 620 L512 812 L306 620 Z"
+        fill="url(#navyC)" stroke="url(#goldC)" stroke-width="14"/>
+  <!-- oxblood lower pennant point -->
+  <path d="M306 560 L512 812 L718 560 L718 620 L512 812 L306 620 Z" fill="url(#oxC)"/>
+  <path d="M306 596 L512 812 L718 596" fill="none" stroke="url(#oxC)" stroke-width="0"/>
+  <path d="M512 812 L306 620 L306 596 L512 786 L718 596 L718 620 Z" fill="url(#oxC)"/>
+  <!-- inner keyline -->
+  <path d="M330 288 L694 288 L694 612 L512 782 L330 612 Z"
+        fill="none" stroke="#C9A24B" stroke-width="3" opacity="0.6"/>
+
+  <!-- chief band (top) with EST 2026 -->
+  <rect x="306" y="264" width="412" height="78" fill="url(#goldC)"/>
+  <line x1="306" y1="342" x2="718" y2="342" stroke="#9C7B30" stroke-width="4"/>
+  <text x="512" y="322" font-family="serif" font-size="44" font-weight="bold" fill="#1B2A41" text-anchor="middle" letter-spacing="10">EST 2026</text>
+
+  <!-- central charge: bold ascending E in antique gold -->
+  <g fill="url(#goldC)">
+    <rect x="416" y="392" width="50" height="248"/>
+    <!-- ascending bars: each higher + longer than the last -->
+    <rect x="466" y="392" width="104" height="46"/>
+    <rect x="466" y="488" width="124" height="46"/>
+    <rect x="466" y="600" width="142" height="46"/>
+  </g>
+  <!-- rising momentum triangle -->
+  <polygon points="466,628 612,628 612,400" fill="#E63946" opacity="0.22"/>
+  <!-- chevrons hinting upward rank movement -->
+  <g fill="#C9A24B" opacity="0.85">
+    <polygon points="380,470 400,450 400,470 380,490"/>
+    <polygon points="380,520 400,500 400,520 380,540"/>
+  </g>
+
+  <!-- top banner ribbon (ELO RATED) over the chief -->
+  <g>
+    <polygon points="150,196 240,224 224,290 138,266" fill="#5E1822"/>
+    <polygon points="874,196 784,224 800,290 886,266" fill="#5E1822"/>
+    <path d="M226 188 L798 188 L826 232 L798 286 L226 286 L198 232 Z" fill="url(#bnrC)" stroke="url(#goldC)" stroke-width="6"/>
+    <text x="512" y="252" font-family="serif" font-size="58" font-weight="bold" fill="#EDE6D6" text-anchor="middle" letter-spacing="8">ELO RATED</text>
+  </g>
+
+  <!-- laurel sprig accents at base -->
+  <g fill="#C9A24B">
+    <polygon points="430,700 450,712 470,700 470,720 450,732 430,720"/>
+    <polygon points="554,700 574,712 594,700 594,720 574,732 554,720"/>
+  </g>
+
+  <!-- star at apex of point -->
+  <polygon points="512,742 519,762 540,762 523,775 530,796 512,783 494,796 501,775 484,762 505,762" fill="#C9A24B"/>
+</svg>

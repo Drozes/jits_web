@@ -1,0 +1,103 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <radialGradient id="bgA" cx="50%" cy="42%" r="72%">
+      <stop offset="0%" stop-color="#23375A"/>
+      <stop offset="60%" stop-color="#1B2A41"/>
+      <stop offset="100%" stop-color="#121B2C"/>
+    </radialGradient>
+    <linearGradient id="shieldA" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#9A2A38"/>
+      <stop offset="100%" stop-color="#7A1F2B"/>
+    </linearGradient>
+    <linearGradient id="goldA" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#E2C173"/>
+      <stop offset="50%" stop-color="#C9A24B"/>
+      <stop offset="100%" stop-color="#A07E33"/>
+    </linearGradient>
+    <linearGradient id="ribA" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#E63946"/>
+      <stop offset="100%" stop-color="#B5232F"/>
+    </linearGradient>
+  </defs>
+
+  <!-- full-bleed background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="url(#bgA)"/>
+
+  <!-- outer ring -->
+  <circle cx="512" cy="492" r="372" fill="none" stroke="url(#goldA)" stroke-width="14"/>
+  <circle cx="512" cy="492" r="346" fill="none" stroke="#C9A24B" stroke-width="3" opacity="0.7"/>
+
+  <!-- laurel branches -->
+  <g fill="url(#goldA)">
+    <!-- left laurel -->
+    <g transform="translate(180,492)">
+      <path d="M0 200 C-40 120 -40 40 -10 -120 L4 -118 C-22 30 -18 110 16 196 Z"/>
+      <g fill="#C9A24B">
+        <ellipse cx="-26" cy="120" rx="26" ry="13" transform="rotate(-40 -26 120)"/>
+        <ellipse cx="-30" cy="70" rx="27" ry="13" transform="rotate(-45 -30 70)"/>
+        <ellipse cx="-30" cy="18" rx="28" ry="13" transform="rotate(-52 -30 18)"/>
+        <ellipse cx="-26" cy="-34" rx="27" ry="13" transform="rotate(-60 -26 -34)"/>
+        <ellipse cx="-18" cy="-82" rx="25" ry="12" transform="rotate(-68 -18 -82)"/>
+      </g>
+    </g>
+    <!-- right laurel (mirrored) -->
+    <g transform="translate(844,492) scale(-1,1)">
+      <path d="M0 200 C-40 120 -40 40 -10 -120 L4 -118 C-22 30 -18 110 16 196 Z"/>
+      <g fill="#C9A24B">
+        <ellipse cx="-26" cy="120" rx="26" ry="13" transform="rotate(-40 -26 120)"/>
+        <ellipse cx="-30" cy="70" rx="27" ry="13" transform="rotate(-45 -30 70)"/>
+        <ellipse cx="-30" cy="18" rx="28" ry="13" transform="rotate(-52 -30 18)"/>
+        <ellipse cx="-26" cy="-34" rx="27" ry="13" transform="rotate(-60 -26 -34)"/>
+        <ellipse cx="-18" cy="-82" rx="25" ry="12" transform="rotate(-68 -18 -82)"/>
+      </g>
+    </g>
+  </g>
+
+  <!-- shield -->
+  <path d="M512 222
+           L716 282
+           L716 470
+           C716 612 632 700 512 752
+           C392 700 308 612 308 470
+           L308 282 Z"
+        fill="url(#shieldA)" stroke="url(#goldA)" stroke-width="14"/>
+  <path d="M512 246
+           L692 299
+           L692 470
+           C692 598 618 678 512 726
+           C406 678 332 598 332 470
+           L332 299 Z"
+        fill="none" stroke="#C9A24B" stroke-width="3" opacity="0.55"/>
+
+  <!-- central charge: bold ascending E (bars rising left->right) -->
+  <g fill="#EDE6D6">
+    <!-- vertical spine -->
+    <rect x="430" y="368" width="46" height="290"/>
+    <!-- top bar (shortest, lowest start) -->
+    <rect x="476" y="368" width="110" height="44"/>
+    <!-- middle bar (longer, raised) -->
+    <rect x="476" y="471" width="130" height="44"/>
+    <!-- bottom bar (longest, highest reach) -->
+    <rect x="476" y="614" width="150" height="44"/>
+  </g>
+  <!-- rising accent triangle behind the bars -->
+  <polygon points="476,640 638,640 638,378" fill="#E63946" opacity="0.16"/>
+
+  <!-- banner ribbon -->
+  <g>
+    <polygon points="170,742 250,762 235,838 150,818" fill="#5E1822"/>
+    <polygon points="854,742 774,762 789,838 874,818" fill="#5E1822"/>
+    <path d="M232 728 L792 728 L820 762 L792 824 L232 824 L204 762 Z" fill="url(#ribA)" stroke="url(#goldA)" stroke-width="6"/>
+    <!-- ELO RATED in generic serif -->
+    <text x="512" y="792" font-family="serif" font-size="58" font-weight="bold" fill="#EDE6D6" text-anchor="middle" letter-spacing="6">ELO RATED</text>
+  </g>
+
+  <!-- EST 2026 -->
+  <text x="512" y="166" font-family="serif" font-size="38" font-weight="bold" fill="#C9A24B" text-anchor="middle" letter-spacing="8">EST 2026</text>
+
+  <!-- star flanks -->
+  <g fill="#C9A24B">
+    <polygon points="356,176 364,196 386,196 368,209 375,230 356,217 337,230 344,209 326,196 348,196"/>
+    <polygon points="668,176 676,196 698,196 680,209 687,230 668,217 649,230 656,209 638,196 660,196"/>
+  </g>
+</svg>

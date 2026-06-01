@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+  <!-- Enclosing monoline badge frame (sharp 8px-feel corners via small radius) -->
+  <rect x="232" y="232" width="560" height="560" rx="28" ry="28"
+        fill="none" stroke="#E8EDF2" stroke-width="24"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Stepped E inside, single Signal Red monoline. Bars ascend left-to-right rhythm. -->
+  <g fill="none" stroke="#E63946" stroke-width="32"
+     stroke-linecap="round" stroke-linejoin="round">
+    <!-- spine -->
+    <line x1="400" y1="360" x2="400" y2="664"/>
+    <!-- top bar (longest) -->
+    <line x1="400" y1="360" x2="640" y2="360"/>
+    <!-- middle bar (medium) -->
+    <line x1="400" y1="512" x2="592" y2="512"/>
+    <!-- bottom bar (shortest) -->
+    <line x1="400" y1="664" x2="544" y2="664"/>
+  </g>
+</svg>

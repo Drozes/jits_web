@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- THE TAKEDOWN B: Hip-toss arc. A heavy circular sweep rotates a white
+       body-block up and over a red pivot fulcrum. Bold curved throw geometry. -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- The throw arc: a fat red ring-sweep showing the rotation of the toss.
+       Built as two concentric circle arcs joined into a thick crescent. -->
+  <path d="M 512 200
+           A 312 312 0 1 1 200 512
+           L 320 512
+           A 192 192 0 1 0 512 320
+           Z"
+        fill="#E63946"/>
+
+  <!-- The red pivot fulcrum (the hip): a heavy bar the body rotates over -->
+  <rect x="452" y="476" width="120" height="120" fill="#E63946"/>
+
+  <!-- The body being thrown: a white block flung off the top of the arc,
+       tumbling over. Torso + head, tilted past horizontal. -->
+  <polygon points="560,150 800,210 770,330 530,270" fill="#E8EDF2"/>
+  <rect x="556" y="120" width="92" height="92" fill="#E8EDF2"/>
+
+  <!-- Gold motion accent: the launch direction at the apex of the arc -->
+  <polygon points="812,196 900,176 856,288" fill="#f59e0b"/>
+
+  <!-- Slamming target: white ground impact zone at the bottom of the rotation -->
+  <rect x="180" y="700" width="200" height="160" fill="#E8EDF2"/>
+</svg>

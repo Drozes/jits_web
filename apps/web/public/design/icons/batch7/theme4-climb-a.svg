@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <!-- baseline -->
+    <line x1="180" y1="788" x2="844" y2="788" stroke="#E8EDF2" stroke-width="28"/>
+    <!-- ascending bars (podium), white outline only -->
+    <rect x="216" y="606" width="156" height="182" rx="6" stroke="#E8EDF2" stroke-width="28"/>
+    <rect x="434" y="478" width="156" height="310" rx="6" stroke="#E8EDF2" stroke-width="28"/>
+    <rect x="652" y="338" width="156" height="450" rx="6" stroke="#E8EDF2" stroke-width="28"/>
+    <!-- rising trend line tracing the climb -->
+    <polyline points="248,650 512,432 776,256" stroke="#E63946" stroke-width="34" fill="none"/>
+    <!-- arrowhead at the top of the climb -->
+    <polyline points="688,272 776,256 760,344" stroke="#E63946" stroke-width="34" fill="none"/>
+    <!-- node dots on the trend line, hollow -->
+    <circle cx="248" cy="650" r="20" stroke="#E63946" stroke-width="22"/>
+    <circle cx="512" cy="432" r="20" stroke="#E63946" stroke-width="22"/>
+  </g>
+</svg>

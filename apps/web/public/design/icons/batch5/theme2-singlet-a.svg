@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- Classic front-view wrestling singlet: tall shoulder straps, deep V chest scoop, leg cutouts -->
+  <path fill="#E63946" d="
+    M 300 214
+    L 420 214
+    L 512 392
+    L 604 214
+    L 724 214
+    L 724 472
+    L 780 472
+    L 780 828
+    L 566 828
+    L 566 600
+    L 458 600
+    L 458 828
+    L 244 828
+    L 244 472
+    L 300 472
+    Z"/>
+
+  <!-- Deep V-neck chest scoop carved out (Void) to separate the two shoulder straps -->
+  <path fill="#0D0F14" d="
+    M 420 214
+    L 512 392
+    L 604 214
+    L 560 214
+    L 512 306
+    L 464 214
+    Z"/>
+
+  <!-- Inner leg cutout under the crotch (Void) -->
+  <rect x="458" y="600" width="108" height="228" fill="#0D0F14"/>
+
+  <!-- Brand stripes down the outer side of each leg (white) -->
+  <rect x="278" y="508" width="36" height="296" fill="#E8EDF2"/>
+  <rect x="710" y="508" width="36" height="296" fill="#E8EDF2"/>
+
+  <!-- Gold waistband across the singlet = peak / breakthrough accent -->
+  <rect x="244" y="556" width="536" height="28" fill="#f59e0b"/>
+  <rect x="458" y="556" width="108" height="28" fill="#0D0F14"/>
+</svg>

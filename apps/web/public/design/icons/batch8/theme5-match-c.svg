@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <radialGradient id="cTile" cx="0.32" cy="0.26" r="1.05">
+      <stop offset="0" stop-color="#ff6470"/>
+      <stop offset="0.5" stop-color="#E63946"/>
+      <stop offset="1" stop-color="#9b1330"/>
+    </radialGradient>
+    <radialGradient id="cGloss" cx="0.5" cy="0.12" r="0.9">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.5"/>
+      <stop offset="0.5" stop-color="#ffffff" stop-opacity="0.1"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="cFig" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#ffe9d6"/>
+    </linearGradient>
+    <radialGradient id="cDisc" cx="0.5" cy="0.4" r="0.7">
+      <stop offset="0" stop-color="#fde68a"/>
+      <stop offset="1" stop-color="#f59e0b"/>
+    </radialGradient>
+    <filter id="cDrop" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="16" stdDeviation="22" flood-color="#4a0814" flood-opacity="0.5"/>
+    </filter>
+    <filter id="cSoft" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="14"/>
+    </filter>
+  </defs>
+
+  <!-- full-bleed tile -->
+  <rect x="0" y="0" width="1024" height="1024" rx="180" fill="url(#cTile)"/>
+  <!-- glossy highlight -->
+  <rect x="0" y="0" width="1024" height="1024" rx="180" fill="url(#cGloss)"/>
+
+  <!-- central gold disc behind fighters for depth -->
+  <ellipse cx="512" cy="540" rx="318" ry="318" fill="#3a0810" opacity="0.35" filter="url(#cSoft)"/>
+  <circle cx="512" cy="520" r="252" fill="url(#cDisc)" opacity="0.92"/>
+  <circle cx="512" cy="520" r="252" fill="url(#cGloss)"/>
+
+  <!-- two mirrored fighters in grappling/facing stance, white, floating -->
+  <g filter="url(#cDrop)">
+    <!-- left fighter (lunging right) -->
+    <g fill="url(#cFig)">
+      <circle cx="356" cy="430" r="48"/>
+      <path d="M356 488
+        C402 488 432 516 444 560
+        L508 600 L484 642 L420 606
+        C418 640 410 676 392 706
+        L420 770 L372 786 L344 716
+        L312 786 L266 766 L300 700
+        C284 666 280 626 288 588
+        C264 600 236 600 212 588 L228 542
+        C262 556 300 552 322 530
+        C330 506 340 492 356 488 Z"/>
+    </g>
+    <!-- right fighter (lunging left, mirror) -->
+    <g fill="url(#cFig)">
+      <circle cx="668" cy="430" r="48"/>
+      <path d="M668 488
+        C622 488 592 516 580 560
+        L516 600 L540 642 L604 606
+        C606 640 614 676 632 706
+        L604 770 L652 786 L680 716
+        L712 786 L758 766 L724 700
+        C740 666 744 626 736 588
+        C760 600 788 600 812 588 L796 542
+        C762 556 724 552 702 530
+        C694 506 684 492 668 488 Z"/>
+    </g>
+  </g>
+
+  <!-- small central spark where they meet -->
+  <polygon points="512,470 498,540 512,540 502,612 540,524 518,524 528,470"
+           fill="#E63946" opacity="0.9"/>
+</svg>

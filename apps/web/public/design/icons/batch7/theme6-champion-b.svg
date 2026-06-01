@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect x="0" y="0" width="1024" height="1024" fill="#F2F4F7"/>
+  <g fill="none" stroke="#0D0F14" stroke-width="30" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Cup bowl -->
+    <path d="M 372 250 L 652 250 L 652 360 C 652 470 596 540 512 540 C 428 540 372 470 372 360 Z"/>
+    <!-- Left handle -->
+    <path d="M 372 280 C 296 280 268 320 268 366 C 268 420 312 452 372 456"/>
+    <!-- Right handle -->
+    <path d="M 652 280 C 728 280 756 320 756 366 C 756 420 712 452 652 456"/>
+    <!-- Stem -->
+    <path d="M 512 540 L 512 628"/>
+    <!-- Base disc -->
+    <path d="M 440 632 L 584 632"/>
+    <!-- Plinth -->
+    <path d="M 420 700 L 604 700 L 604 760 L 420 760 Z"/>
+    <!-- Pedestal neck -->
+    <path d="M 470 632 L 470 700"/>
+    <path d="M 554 632 L 554 700"/>
+  </g>
+  <!-- Star inside cup, accent -->
+  <g fill="none" stroke="#E63946" stroke-width="26" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M 512 318 L 533 376 L 595 378 L 546 416 L 563 476 L 512 442 L 461 476 L 478 416 L 429 378 L 491 376 Z"/>
+  </g>
+</svg>

@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- CLOSED GUARD (top-down view): an opponent (white head + torso) is pulled
+       in and squeezed by two heavy red legs that wrap around the back and
+       lock with crossed ankles. The gold knot = the closed-guard lock. -->
+
+  <!-- Opponent head (white) -->
+  <circle cx="512" cy="276" r="78" fill="#E8EDF2"/>
+  <!-- Opponent torso pulled into the guard (white) -->
+  <rect x="424" y="338" width="176" height="252" rx="10" fill="#E8EDF2"/>
+
+  <!-- LEFT thigh + shin wrapping IN behind the opponent's back.
+       Comes down the left side then hooks across the back toward center. -->
+  <path d="M 236 392
+           L 372 392
+           L 372 590
+           L 512 590
+           L 512 690
+           L 372 690
+           L 236 690
+           Z" fill="#E63946"/>
+  <!-- RIGHT thigh + shin (mirror) -->
+  <path d="M 788 392
+           L 652 392
+           L 652 590
+           L 512 590
+           L 512 690
+           L 652 690
+           L 788 690
+           Z" fill="#E63946"/>
+
+  <!-- Crossed shins/ankles meeting BEHIND the torso, locking the guard.
+       Two heavy red bars cross at center. -->
+  <polygon points="312,690 430,690 712,876 594,876" fill="#E63946"/>
+  <polygon points="712,690 594,690 312,876 430,876" fill="#E63946"/>
+
+  <!-- Gold lock knot exactly where the ankles cross (the closed lock) -->
+  <rect x="466" y="734" width="92" height="92" rx="8" fill="#f59e0b" transform="rotate(45 512 780)"/>
+  <rect x="490" y="758" width="44" height="44" rx="4" fill="#0D0F14" transform="rotate(45 512 780)"/>
+</svg>

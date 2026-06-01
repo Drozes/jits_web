@@ -1,0 +1,111 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <radialGradient id="aBg" cx="50%" cy="42%" r="70%">
+      <stop offset="0%" stop-color="#243450"/>
+      <stop offset="100%" stop-color="#1B2A41"/>
+    </radialGradient>
+    <linearGradient id="aShield" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#8E2733"/>
+      <stop offset="100%" stop-color="#7A1F2B"/>
+    </linearGradient>
+    <linearGradient id="aGold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#E2C778"/>
+      <stop offset="50%" stop-color="#C9A24B"/>
+      <stop offset="100%" stop-color="#A07E33"/>
+    </linearGradient>
+    <linearGradient id="aCup" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#E9D08A"/>
+      <stop offset="100%" stop-color="#B68E3C"/>
+    </linearGradient>
+  </defs>
+
+  <!-- full-bleed background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="url(#aBg)"/>
+
+  <!-- outer ring of decorative dots -->
+  <circle cx="512" cy="512" r="470" fill="none" stroke="#C9A24B" stroke-width="6" opacity="0.45"/>
+  <g fill="#C9A24B" opacity="0.5">
+    <circle cx="512" cy="42" r="9"/><circle cx="512" cy="982" r="9"/>
+    <circle cx="42" cy="512" r="9"/><circle cx="982" cy="512" r="9"/>
+    <circle cx="180" cy="180" r="7"/><circle cx="844" cy="180" r="7"/>
+    <circle cx="180" cy="844" r="7"/><circle cx="844" cy="844" r="7"/>
+  </g>
+
+  <!-- laurel branches -->
+  <g fill="#C9A24B" opacity="0.92">
+    <g>
+      <path d="M300 690 Q255 560 300 430" fill="none" stroke="#C9A24B" stroke-width="14" stroke-linecap="round"/>
+      <g>
+        <ellipse cx="270" cy="470" rx="30" ry="14" transform="rotate(-50 270 470)"/>
+        <ellipse cx="262" cy="520" rx="32" ry="15" transform="rotate(-35 262 520)"/>
+        <ellipse cx="262" cy="572" rx="33" ry="15" transform="rotate(-20 262 572)"/>
+        <ellipse cx="270" cy="624" rx="32" ry="15" transform="rotate(-8 270 624)"/>
+        <ellipse cx="284" cy="672" rx="30" ry="14" transform="rotate(8 284 672)"/>
+      </g>
+    </g>
+    <g transform="translate(1024,0) scale(-1,1)">
+      <path d="M300 690 Q255 560 300 430" fill="none" stroke="#C9A24B" stroke-width="14" stroke-linecap="round"/>
+      <g>
+        <ellipse cx="270" cy="470" rx="30" ry="14" transform="rotate(-50 270 470)"/>
+        <ellipse cx="262" cy="520" rx="32" ry="15" transform="rotate(-35 262 520)"/>
+        <ellipse cx="262" cy="572" rx="33" ry="15" transform="rotate(-20 262 572)"/>
+        <ellipse cx="270" cy="624" rx="32" ry="15" transform="rotate(-8 270 624)"/>
+        <ellipse cx="284" cy="672" rx="30" ry="14" transform="rotate(8 284 672)"/>
+      </g>
+    </g>
+  </g>
+
+  <!-- shield -->
+  <path d="M512 250
+           C 660 250 700 260 730 270
+           L 730 540
+           C 730 660 640 740 512 800
+           C 384 740 294 660 294 540
+           L 294 270
+           C 324 260 364 250 512 250 Z"
+        fill="url(#aShield)" stroke="url(#aGold)" stroke-width="16"/>
+  <!-- inner shield keyline -->
+  <path d="M512 282
+           C 642 282 678 291 705 299
+           L 705 538
+           C 705 642 628 712 512 766
+           C 396 712 319 642 319 538
+           L 319 299
+           C 346 291 382 282 512 282 Z"
+        fill="none" stroke="#EDE6D6" stroke-width="5" opacity="0.55"/>
+
+  <!-- cream field behind cup -->
+  <ellipse cx="512" cy="500" rx="150" ry="172" fill="#EDE6D6"/>
+
+  <!-- TROPHY CUP central charge (strong, simplified) -->
+  <g>
+    <!-- handles -->
+    <path d="M408 430 C 360 430 360 510 414 512" fill="none" stroke="#9A7730" stroke-width="20"/>
+    <path d="M616 430 C 664 430 664 510 610 512" fill="none" stroke="#9A7730" stroke-width="20"/>
+    <!-- bowl -->
+    <path d="M404 418 L 620 418 C 620 510 575 560 512 560 C 449 560 404 510 404 418 Z" fill="url(#aCup)" stroke="#9A7730" stroke-width="8"/>
+    <!-- rim -->
+    <rect x="398" y="404" width="228" height="22" rx="6" fill="url(#aGold)" stroke="#9A7730" stroke-width="6"/>
+    <!-- star on bowl -->
+    <polygon points="512,440 524,470 556,470 530,489 540,520 512,501 484,520 494,489 468,470 500,470" fill="#7A1F2B"/>
+    <!-- stem -->
+    <rect x="498" y="560" width="28" height="36" fill="url(#aCup)" stroke="#9A7730" stroke-width="6"/>
+    <!-- base -->
+    <rect x="460" y="596" width="104" height="20" rx="5" fill="url(#aGold)" stroke="#9A7730" stroke-width="6"/>
+    <rect x="440" y="616" width="144" height="26" rx="6" fill="url(#aGold)" stroke="#9A7730" stroke-width="6"/>
+  </g>
+
+  <!-- top scroll badge "EST 2026" via serif font -->
+  <g>
+    <rect x="424" y="232" width="176" height="44" rx="8" fill="#1B2A41" stroke="url(#aGold)" stroke-width="5"/>
+    <text x="512" y="263" font-family="serif" font-size="28" font-weight="bold" fill="#EDE6D6" text-anchor="middle" letter-spacing="3">EST 2026</text>
+  </g>
+
+  <!-- bottom banner ribbon -->
+  <g>
+    <path d="M232 740 L 200 700 L 232 716 L 252 700 Z" fill="#5A1620"/>
+    <path d="M792 740 L 824 700 L 792 716 L 772 700 Z" fill="#5A1620"/>
+    <path d="M236 712 L 788 712 L 812 756 L 788 800 L 236 800 L 212 756 Z" fill="url(#aShield)" stroke="url(#aGold)" stroke-width="6"/>
+    <text x="512" y="772" font-family="serif" font-size="50" font-weight="bold" fill="#EDE6D6" text-anchor="middle" letter-spacing="6">ELO RATED</text>
+  </g>
+</svg>

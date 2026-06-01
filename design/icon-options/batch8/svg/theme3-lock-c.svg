@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <radialGradient id="tileC" cx="0.42" cy="0.3" r="1.0" gradientUnits="objectBoundingBox">
+      <stop offset="0" stop-color="#ff6470"/>
+      <stop offset="0.5" stop-color="#e63946"/>
+      <stop offset="1" stop-color="#7e0f1b"/>
+    </radialGradient>
+    <radialGradient id="glossC" cx="0.5" cy="0.12" r="0.8" gradientUnits="objectBoundingBox">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.55"/>
+      <stop offset="0.4" stop-color="#ffffff" stop-opacity="0.14"/>
+      <stop offset="0.72" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="ringWhite" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#ffe2e5"/>
+    </linearGradient>
+    <linearGradient id="ringGold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffe08a"/>
+      <stop offset="1" stop-color="#f59e0b"/>
+    </linearGradient>
+    <filter id="dropC" x="-25%" y="-25%" width="150%" height="150%">
+      <feDropShadow dx="0" dy="20" stdDeviation="22" flood-color="#3f060d" flood-opacity="0.55"/>
+    </filter>
+  </defs>
+
+  <!-- full-bleed tile -->
+  <rect x="0" y="0" width="1024" height="1024" rx="180" fill="url(#tileC)"/>
+  <rect x="0" y="0" width="1024" height="1024" rx="180" fill="url(#glossC)"/>
+
+  <!-- Two interlocked links = "The Lock".
+       White link sits on the LEFT, gold link on the RIGHT, overlapping in the middle.
+       Weave: white passes over at top crossing, gold passes over at bottom crossing. -->
+
+  <!-- 1. GOLD link (full ring) -->
+  <g filter="url(#dropC)">
+    <ellipse cx="600" cy="512" rx="150" ry="210" fill="none" stroke="url(#ringGold)" stroke-width="86"/>
+  </g>
+
+  <!-- 2. WHITE link (full ring) drawn over gold -->
+  <g filter="url(#dropC)">
+    <ellipse cx="424" cy="512" rx="150" ry="210" fill="none" stroke="url(#ringWhite)" stroke-width="86"/>
+  </g>
+
+  <!-- 3. Re-stitch: gold passes OVER white at the BOTTOM crossing -->
+  <path d="M548 636
+           Q600 712 652 636"
+        fill="none" stroke="url(#ringGold)" stroke-width="86" stroke-linecap="round"/>
+
+  <!-- top gloss streak -->
+  <ellipse cx="470" cy="320" rx="220" ry="68" fill="#ffffff" opacity="0.14" transform="rotate(-16 470 320)"/>
+</svg>

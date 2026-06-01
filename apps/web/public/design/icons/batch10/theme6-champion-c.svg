@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="cBg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#7A1F2B"/>
+      <stop offset="100%" stop-color="#561620"/>
+    </linearGradient>
+    <linearGradient id="cGold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#E5CB7E"/>
+      <stop offset="55%" stop-color="#C9A24B"/>
+      <stop offset="100%" stop-color="#977630"/>
+    </linearGradient>
+    <linearGradient id="cNavy" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#243650"/>
+      <stop offset="100%" stop-color="#1B2A41"/>
+    </linearGradient>
+  </defs>
+
+  <!-- full-bleed background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="url(#cBg)"/>
+
+  <!-- decorative corner laurel sprigs / pinstripe frame -->
+  <rect x="36" y="36" width="952" height="952" rx="14" fill="none" stroke="#C9A24B" stroke-width="6" opacity="0.5"/>
+  <rect x="58" y="58" width="908" height="908" rx="10" fill="none" stroke="#C9A24B" stroke-width="2" opacity="0.35"/>
+
+  <!-- crossed laurel behind shield -->
+  <g fill="#C9A24B" opacity="0.85">
+    <g>
+      <path d="M512 760 Q360 720 330 560" fill="none" stroke="#C9A24B" stroke-width="12" stroke-linecap="round"/>
+      <ellipse cx="330" cy="560" rx="30" ry="13" transform="rotate(-60 330 560)"/>
+      <ellipse cx="345" cy="610" rx="32" ry="14" transform="rotate(-42 345 610)"/>
+      <ellipse cx="378" cy="660" rx="33" ry="14" transform="rotate(-25 378 660)"/>
+      <ellipse cx="424" cy="700" rx="31" ry="13" transform="rotate(-12 424 700)"/>
+    </g>
+    <g transform="translate(1024,0) scale(-1,1)">
+      <path d="M512 760 Q360 720 330 560" fill="none" stroke="#C9A24B" stroke-width="12" stroke-linecap="round"/>
+      <ellipse cx="330" cy="560" rx="30" ry="13" transform="rotate(-60 330 560)"/>
+      <ellipse cx="345" cy="610" rx="32" ry="14" transform="rotate(-42 345 610)"/>
+      <ellipse cx="378" cy="660" rx="33" ry="14" transform="rotate(-25 378 660)"/>
+      <ellipse cx="424" cy="700" rx="31" ry="13" transform="rotate(-12 424 700)"/>
+    </g>
+  </g>
+
+  <!-- pointed heater shield -->
+  <path d="M300 256 L 724 256 L 724 470 C 724 612 632 700 512 752 C 392 700 300 612 300 470 Z"
+        fill="url(#cGold)"/>
+  <path d="M320 276 L 704 276 L 704 468 C 704 596 622 676 512 724 C 402 676 320 596 320 468 Z"
+        fill="url(#cNavy)" stroke="#EDE6D6" stroke-width="4"/>
+
+  <!-- cream chief band at top of shield -->
+  <path d="M320 276 L 704 276 L 704 350 L 320 350 Z" fill="#EDE6D6"/>
+  <!-- three pips on the chief -->
+  <g fill="#7A1F2B">
+    <circle cx="420" cy="313" r="16"/>
+    <circle cx="512" cy="313" r="16"/>
+    <circle cx="604" cy="313" r="16"/>
+  </g>
+
+  <!-- CENTRAL CHAMPION CROWN (strong, simplified) -->
+  <g>
+    <!-- crown band base -->
+    <rect x="408" y="560" width="208" height="40" rx="6" fill="url(#cGold)" stroke="#977630" stroke-width="6"/>
+    <!-- jewels on band -->
+    <circle cx="448" cy="580" r="11" fill="#E63946"/>
+    <circle cx="512" cy="580" r="11" fill="#E63946"/>
+    <circle cx="576" cy="580" r="11" fill="#E63946"/>
+    <!-- crown body with 5 points -->
+    <path d="M404 560
+             L 432 440 L 472 510 L 512 422 L 552 510 L 592 440 L 620 560 Z"
+          fill="url(#cGold)" stroke="#977630" stroke-width="8" stroke-linejoin="round"/>
+    <!-- ball finials on the points -->
+    <circle cx="432" cy="440" r="16" fill="#EDE6D6" stroke="#977630" stroke-width="5"/>
+    <circle cx="512" cy="422" r="18" fill="#EDE6D6" stroke="#977630" stroke-width="5"/>
+    <circle cx="592" cy="440" r="16" fill="#EDE6D6" stroke="#977630" stroke-width="5"/>
+    <!-- center jewel highlight -->
+    <polygon points="512,470 522,492 512,514 502,492" fill="#E63946"/>
+  </g>
+
+  <!-- top crest emblem with EST 2026 -->
+  <g>
+    <ellipse cx="512" cy="226" rx="120" ry="34" fill="#1B2A41" stroke="url(#cGold)" stroke-width="5"/>
+    <text x="512" y="237" font-family="serif" font-size="30" font-weight="bold" fill="#EDE6D6" text-anchor="middle" letter-spacing="4">EST 2026</text>
+  </g>
+
+  <!-- draped banner ribbon -->
+  <g>
+    <!-- tail flags -->
+    <path d="M196 716 L 168 678 L 196 690 L 214 676 Z" fill="#977630"/>
+    <path d="M828 716 L 856 678 L 828 690 L 810 676 Z" fill="#977630"/>
+    <!-- folds -->
+    <path d="M200 686 L 268 700 L 248 752 L 200 740 Z" fill="#977630"/>
+    <path d="M824 686 L 756 700 L 776 752 L 824 740 Z" fill="#977630"/>
+    <!-- main band -->
+    <path d="M250 696 L 774 696 L 800 748 L 774 800 L 250 800 L 224 748 Z"
+          fill="url(#cGold)" stroke="#977630" stroke-width="6"/>
+    <path d="M268 712 L 756 712 L 776 748 L 756 784 L 268 784 L 248 748 Z"
+          fill="none" stroke="#561620" stroke-width="3" opacity="0.6"/>
+    <text x="512" y="766" font-family="serif" font-size="56" font-weight="bold" fill="#561620" text-anchor="middle" letter-spacing="6">ELO RATED</text>
+  </g>
+</svg>

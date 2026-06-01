@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- CLUB + LION COMBINED: a crossed emblem -->
+  <!-- vertical heavy club rising through center; lion-pelt head crowning the top -->
+
+  <!-- club shaft (vertical heavy bar) -->
+  <rect x="464" y="500" width="96" height="360" fill="#E8EDF2"/>
+
+  <!-- grip wrap bands -->
+  <rect x="464" y="640" width="96" height="22" fill="#9CA3AF"/>
+  <rect x="464" y="700" width="96" height="22" fill="#9CA3AF"/>
+  <rect x="464" y="760" width="96" height="22" fill="#9CA3AF"/>
+
+  <!-- pommel base -->
+  <rect x="436" y="852" width="152" height="44" rx="6" fill="#9CA3AF"/>
+
+  <!-- club head bulb (red) sitting above the grip, behind the lion -->
+  <circle cx="512" cy="470" r="150" fill="#bf1212"/>
+  <!-- knots on the bulb -->
+  <rect x="408" y="420" width="56" height="56" rx="8" transform="rotate(45 436 448)" fill="#0D0F14"/>
+  <rect x="560" y="420" width="56" height="56" rx="8" transform="rotate(45 588 448)" fill="#0D0F14"/>
+  <rect x="484" y="540" width="56" height="56" rx="8" transform="rotate(45 512 568)" fill="#0D0F14"/>
+
+  <!-- LION PELT MANE crowning the top: heavy spike sunburst -->
+  <g fill="#E63946">
+    <polygon points="512,96 552,236 472,236"/>
+    <polygon points="680,140 600,256 552,224"/>
+    <polygon points="808,260 668,310 648,250"/>
+    <polygon points="344,140 424,256 472,224"/>
+    <polygon points="216,260 356,310 376,250"/>
+    <polygon points="828,420 700,378 720,326"/>
+    <polygon points="196,420 324,378 304,326"/>
+  </g>
+
+  <!-- mane ring solid -->
+  <circle cx="512" cy="300" r="170" fill="#E63946"/>
+
+  <!-- lion face void plate -->
+  <circle cx="512" cy="312" r="118" fill="#0D0F14"/>
+
+  <!-- muzzle -->
+  <polygon points="512,312 576,372 544,432 480,432 448,372" fill="#E8EDF2"/>
+  <!-- nose -->
+  <polygon points="512,350 542,388 482,388" fill="#bf1212"/>
+  <!-- mouth -->
+  <rect x="502" y="388" width="20" height="44" fill="#0D0F14"/>
+
+  <!-- gold predator eyes -->
+  <polygon points="452,300 504,286 504,320 452,332" fill="#f59e0b"/>
+  <polygon points="572,300 520,286 520,320 572,332" fill="#f59e0b"/>
+
+  <!-- ears (tucked onto the mane ring, red so they read as tufts not white blobs) -->
+  <polygon points="392,232 452,232 412,288" fill="#bf1212"/>
+  <polygon points="632,232 572,232 612,288" fill="#bf1212"/>
+</svg>

@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- The mat baseline -->
+  <rect x="96" y="824" width="832" height="56" fill="#E63946"/>
+
+  <!-- The pinned figure flattened on the mat (white, low and horizontal) -->
+  <rect x="176" y="744" width="672" height="80" fill="#E8EDF2"/>
+  <circle cx="200" cy="724" r="60" fill="#E8EDF2"/>
+
+  <!-- THE REFEREE'S SLAP: a heavy open hand striking down toward the mat (red) -->
+  <!-- palm -->
+  <rect x="400" y="392" width="224" height="248" rx="16" fill="#E63946"/>
+  <!-- four fingers -->
+  <rect x="408" y="232" width="44" height="176" rx="14" fill="#E63946"/>
+  <rect x="464" y="216" width="44" height="192" rx="14" fill="#E63946"/>
+  <rect x="520" y="224" width="44" height="184" rx="14" fill="#E63946"/>
+  <rect x="576" y="248" width="44" height="160" rx="14" fill="#E63946"/>
+  <!-- thumb -->
+  <rect x="344" y="448" width="120" height="48" rx="14" transform="rotate(-32 344 448)" fill="#E63946"/>
+
+  <!-- IMPACT lines radiating from the slap point on the mat (gold accent) -->
+  <polygon points="512,648 540,712 484,712" fill="#f59e0b"/>
+  <rect x="300" y="688" width="84" height="20" transform="rotate(-22 300 688)" fill="#f59e0b"/>
+  <rect x="640" y="688" width="84" height="20" transform="rotate(22 724 688)" fill="#f59e0b"/>
+</svg>

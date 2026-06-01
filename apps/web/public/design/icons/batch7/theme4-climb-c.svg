@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect x="0" y="0" width="1024" height="1024" fill="#F2F4F7"/>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <!-- ascending staircase climb, left flight rising toward the summit -->
+    <polyline points="150,820 274,820 274,724 398,724 398,628 522,628"
+              stroke="#0D0F14" stroke-width="34"/>
+    <!-- ascending staircase climb, right flight mirrored -->
+    <polyline points="874,820 750,820 750,724 626,724 626,628 522,628"
+              stroke="#0D0F14" stroke-width="34"/>
+    <!-- summit flag pole rising from the top step -->
+    <line x1="522" y1="628" x2="522" y2="250" stroke="#E63946" stroke-width="34"/>
+    <!-- summit arrowhead crowning the climb -->
+    <polyline points="430,338 522,242 614,338" stroke="#E63946" stroke-width="34"/>
+    <!-- summit marker dot above the peak -->
+    <circle cx="522" cy="190" r="30" stroke="#E63946" stroke-width="26"/>
+  </g>
+</svg>

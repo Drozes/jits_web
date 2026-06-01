@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- ===== ARES: CROSSED SPEARS EMBLEM (X of war) ===== -->
+
+  <!-- Heavy red roundel disc behind the crossed spears -->
+  <circle cx="512" cy="512" r="372" fill="#E63946"/>
+  <!-- Inner void ring to keep it emblematic, not solid -->
+  <circle cx="512" cy="512" r="300" fill="#0D0F14"/>
+
+  <!-- Spear 1: top-left to bottom-right -->
+  <g>
+    <!-- shaft -->
+    <polygon points="246,234 290,202 822,778 778,810" fill="#E8EDF2"/>
+    <!-- spearhead leaf blade (bottom-right) -->
+    <polygon points="800,720 904,872 752,768 778,810 822,778" fill="#E8EDF2"/>
+    <!-- butt cap (top-left) -->
+    <polygon points="246,234 290,202 244,170 200,202" fill="#E8EDF2"/>
+  </g>
+
+  <!-- Spear 2: top-right to bottom-left -->
+  <g>
+    <!-- shaft -->
+    <polygon points="778,234 734,202 202,778 246,810" fill="#E8EDF2"/>
+    <!-- spearhead leaf blade (bottom-left) -->
+    <polygon points="224,720 120,872 272,768 246,810 202,778" fill="#E8EDF2"/>
+    <!-- butt cap (top-right) -->
+    <polygon points="778,234 734,202 780,170 824,202" fill="#E8EDF2"/>
+  </g>
+
+  <!-- Central gold ELO chevron where the spears cross -->
+  <polygon points="512,438 576,560 512,524 448,560" fill="#f59e0b"/>
+</svg>

@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- ATLAS EMBLEM: heraldic gridded world borne on two shoulder pillars -->
+
+  <!-- The world sphere (white globe) with red graticule -->
+  <circle cx="512" cy="392" r="220" fill="#E8EDF2"/>
+  <!-- equator + meridians as heavy red bands -->
+  <rect x="292" y="376" width="440" height="34" fill="#E63946"/>
+  <rect x="495" y="172" width="34" height="440" fill="#E63946"/>
+  <!-- upper / lower latitude lines -->
+  <rect x="330" y="288" width="364" height="22" fill="#E63946"/>
+  <rect x="330" y="476" width="364" height="22" fill="#E63946"/>
+  <!-- side meridian arcs as vertical bands -->
+  <rect x="392" y="200" width="22" height="384" fill="#E63946"/>
+  <rect x="610" y="200" width="22" height="384" fill="#E63946"/>
+  <!-- gold polar cap = peak / breakthrough -->
+  <rect x="448" y="180" width="128" height="26" fill="#f59e0b"/>
+
+  <!-- Two heavy Atlas arms/shoulders rising to bear the globe -->
+  <!-- left bearing arm -->
+  <polygon points="300,612 396,560 452,648 372,940 268,940" fill="#E63946"/>
+  <!-- right bearing arm -->
+  <polygon points="724,612 628,560 572,648 652,940 756,940" fill="#E63946"/>
+  <!-- shoulder caps cradling the sphere -->
+  <rect x="344" y="566" width="120" height="48" fill="#E63946"/>
+  <rect x="560" y="566" width="120" height="48" fill="#E63946"/>
+
+  <!-- white knuckle highlights where hands grip -->
+  <rect x="372" y="558" width="64" height="20" fill="#E8EDF2"/>
+  <rect x="588" y="558" width="64" height="20" fill="#E8EDF2"/>
+
+  <!-- ground plinth -->
+  <rect x="248" y="940" width="528" height="34" fill="#E8EDF2"/>
+</svg>

@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- REAR-NAKED CHOKE: seatbelt grip, two hook arms interlocking around a neck column -->
+
+  <!-- Neck column (the trapped neck), heavy white vertical -->
+  <rect x="456" y="180" width="112" height="664" fill="#E8EDF2"/>
+
+  <!-- Choking arm: a thick red hook wrapping the front of the neck (the blade across the throat) -->
+  <!-- Horizontal bicep bar across the throat -->
+  <rect x="232" y="436" width="396" height="104" fill="#E63946"/>
+  <!-- Hook turning up the far side (the gripping hand) -->
+  <rect x="556" y="300" width="100" height="240" fill="#E63946"/>
+
+  <!-- Second (seatbelt) arm: white hook coming from below, clasping the first -->
+  <!-- Lower horizontal bar across, the seatbelt strap -->
+  <rect x="396" y="588" width="396" height="100" fill="#E63946"/>
+  <!-- Hook turning up near side, clasping (the locked hands) -->
+  <rect x="368" y="540" width="96" height="148" fill="#E63946"/>
+
+  <!-- The CLASP: gold square where the two hands lock = the finish point -->
+  <rect x="380" y="500" width="96" height="96" fill="#f59e0b"/>
+
+  <!-- Top of neck cut by the choke band for clarity (void notch) -->
+  <rect x="456" y="436" width="112" height="0" fill="#0D0F14"/>
+</svg>

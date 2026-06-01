@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="bgB" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#8A2531"/>
+      <stop offset="100%" stop-color="#6A1822"/>
+    </linearGradient>
+    <radialGradient id="discB" cx="50%" cy="40%" r="70%">
+      <stop offset="0%" stop-color="#F3EDDE"/>
+      <stop offset="100%" stop-color="#DFD4BC"/>
+    </radialGradient>
+    <linearGradient id="goldB" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#E4C77A"/>
+      <stop offset="100%" stop-color="#A07E32"/>
+    </linearGradient>
+  </defs>
+
+  <!-- full-bleed background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="url(#bgB)"/>
+  <rect x="0" y="0" width="1024" height="1024" fill="#1B2A41" opacity="0.12"/>
+
+  <!-- outer medallion ring -->
+  <circle cx="512" cy="512" r="438" fill="url(#goldB)"/>
+  <circle cx="512" cy="512" r="438" fill="none" stroke="#5E1620" stroke-width="10"/>
+  <!-- navy text-ring -->
+  <circle cx="512" cy="512" r="408" fill="#1B2A41"/>
+  <circle cx="512" cy="512" r="408" fill="none" stroke="#C9A24B" stroke-width="4"/>
+  <circle cx="512" cy="512" r="328" fill="none" stroke="#C9A24B" stroke-width="4"/>
+
+  <!-- curved seal lettering (per-glyph; renders without <textPath>) -->
+  <!-- TOP ARC: ELO RATED -->
+  <g>
+    <text x="178.6" y="363.5" transform="rotate(-66.0 178.6 363.5)" font-family="serif" font-size="64" font-weight="bold" fill="#EDE6D6" text-anchor="middle" dominant-baseline="central">E</text>
+    <text x="234.5" y="275.0" transform="rotate(-49.5 234.5 275.0)" font-family="serif" font-size="64" font-weight="bold" fill="#EDE6D6" text-anchor="middle" dominant-baseline="central">L</text>
+    <text x="313.2" y="205.9" transform="rotate(-33.0 313.2 205.9)" font-family="serif" font-size="64" font-weight="bold" fill="#EDE6D6" text-anchor="middle" dominant-baseline="central">O</text>
+    <text x="512.0" y="147.0" transform="rotate(0.0 512.0 147.0)" font-family="serif" font-size="64" font-weight="bold" fill="#EDE6D6" text-anchor="middle" dominant-baseline="central">R</text>
+    <text x="615.7" y="162.0" transform="rotate(16.5 615.7 162.0)" font-family="serif" font-size="64" font-weight="bold" fill="#EDE6D6" text-anchor="middle" dominant-baseline="central">A</text>
+    <text x="710.8" y="205.9" transform="rotate(33.0 710.8 205.9)" font-family="serif" font-size="64" font-weight="bold" fill="#EDE6D6" text-anchor="middle" dominant-baseline="central">T</text>
+    <text x="789.5" y="275.0" transform="rotate(49.5 789.5 275.0)" font-family="serif" font-size="64" font-weight="bold" fill="#EDE6D6" text-anchor="middle" dominant-baseline="central">E</text>
+    <text x="845.4" y="363.5" transform="rotate(66.0 845.4 363.5)" font-family="serif" font-size="64" font-weight="bold" fill="#EDE6D6" text-anchor="middle" dominant-baseline="central">D</text>
+  </g>
+  <!-- BOTTOM ARC: EST 2026 -->
+  <g>
+    <text x="760.9" y="760.9" transform="rotate(-45.0 760.9 760.9)" font-family="serif" font-size="46" font-weight="bold" fill="#C9A24B" text-anchor="middle" dominant-baseline="central">E</text>
+    <text x="699.3" y="810.0" transform="rotate(-32.1 699.3 810.0)" font-family="serif" font-size="46" font-weight="bold" fill="#C9A24B" text-anchor="middle" dominant-baseline="central">S</text>
+    <text x="628.3" y="844.2" transform="rotate(-19.3 628.3 844.2)" font-family="serif" font-size="46" font-weight="bold" fill="#C9A24B" text-anchor="middle" dominant-baseline="central">T</text>
+    <text x="472.6" y="861.8" transform="rotate(6.4 472.6 861.8)" font-family="serif" font-size="46" font-weight="bold" fill="#C9A24B" text-anchor="middle" dominant-baseline="central">2</text>
+    <text x="395.7" y="844.2" transform="rotate(19.3 395.7 844.2)" font-family="serif" font-size="46" font-weight="bold" fill="#C9A24B" text-anchor="middle" dominant-baseline="central">0</text>
+    <text x="324.7" y="810.0" transform="rotate(32.1 324.7 810.0)" font-family="serif" font-size="46" font-weight="bold" fill="#C9A24B" text-anchor="middle" dominant-baseline="central">2</text>
+    <text x="263.1" y="760.9" transform="rotate(45.0 263.1 760.9)" font-family="serif" font-size="46" font-weight="bold" fill="#C9A24B" text-anchor="middle" dominant-baseline="central">6</text>
+  </g>
+  <!-- separator stars at 3 & 9 o'clock -->
+  <g fill="#C9A24B">
+    <path d="M156 512 l 7 -18 l 7 18 l 18 7 l -18 7 l -7 18 l -7 -18 l -18 -7 z"/>
+    <path d="M868 512 l 7 -18 l 7 18 l 18 7 l -18 7 l -7 18 l -7 -18 l -18 -7 z"/>
+  </g>
+
+  <!-- inner cream disc -->
+  <circle cx="512" cy="490" r="252" fill="url(#discB)" stroke="#7A1F2B" stroke-width="14"/>
+
+  <!-- CENTRAL CHARGE: triangle-choke lock (the locked triangle + trapped arm) -->
+  <g transform="translate(512 490)">
+    <!-- closed triangle of the choke -->
+    <path d="M0 -150 L 150 120 L -150 120 Z"
+          fill="none" stroke="#7A1F2B" stroke-width="40" stroke-linejoin="round"/>
+    <!-- navy inner echo triangle -->
+    <path d="M0 -104 L 104 90 L -104 90 Z"
+          fill="none" stroke="#1B2A41" stroke-width="12" stroke-linejoin="round" opacity="0.55"/>
+    <!-- trapped arm/neck bar locked across the apex -->
+    <rect x="-66" y="-34" width="132" height="46" rx="6" fill="#1B2A41"/>
+    <!-- the cinching figure-four ankle bar across the base -->
+    <rect x="-150" y="98" width="300" height="44" rx="10" fill="#1B2A41"/>
+    <!-- gold cinch medallion where the lock closes -->
+    <circle cx="0" cy="-10" r="28" fill="url(#goldB)" stroke="#5E1620" stroke-width="7"/>
+    <circle cx="0" cy="-10" r="10" fill="#1B2A41"/>
+    <!-- gold rivets at the base corners -->
+    <circle cx="-150" cy="120" r="16" fill="url(#goldB)" stroke="#5E1620" stroke-width="4"/>
+    <circle cx="150" cy="120" r="16" fill="url(#goldB)" stroke="#5E1620" stroke-width="4"/>
+  </g>
+</svg>

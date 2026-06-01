@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- THE TAKEDOWN A: Double-leg shot. A heavy red drive-arrow level-changing
+       diagonally down into a white standing torso block. -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- The standing opponent: heavy white vertical torso slab being driven into.
+       Tall, centered to the right, its base is the target of the shot. -->
+  <rect x="676" y="176" width="158" height="600" fill="#E8EDF2"/>
+  <!-- head block -->
+  <rect x="694" y="92" width="122" height="100" fill="#E8EDF2"/>
+
+  <!-- The level-change drive arrow: a thick red wedge shooting low and forward.
+       Shaft drops from upper-left (the level change) then drives horizontally
+       into the legs/base of the standing figure. -->
+  <polygon points="150,288 348,288 500,572 500,724 302,724 150,452" fill="#E63946"/>
+
+  <!-- Arrowhead penetrating the opponent's base (the shot connecting at the legs).
+       Tip lands INTO the white slab, not past it. -->
+  <polygon points="470,520 660,520 660,452 760,624 660,796 660,728 470,728" fill="#E63946"/>
+
+  <!-- Gold impact spark at the point of contact = the breakthrough moment -->
+  <polygon points="676,584 752,624 676,664" fill="#f59e0b"/>
+
+  <!-- Ground line: the takedown finishing surface -->
+  <rect x="150" y="852" width="724" height="40" fill="#E8EDF2"/>
+</svg>

@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Full-bleed background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- CONCEPT C: FULL BACK-TAKE SILHOUETTE
+       One grappler (red) riding the back of another (white), reduced to two
+       heavy stacked figures: red head + arms wrapping the front white torso. -->
+
+  <!-- Defender (front, being controlled): white body block -->
+  <rect x="356" y="430" width="312" height="430" rx="28" fill="#E8EDF2"/>
+  <!-- Defender head -->
+  <circle cx="512" cy="400" r="100" fill="#E8EDF2"/>
+
+  <!-- Attacker red arms wrapping around from behind: left wrap -->
+  <path d="M268 470
+           a90 90 0 0 1 90 -90
+           h60 v110 h-60
+           a20 20 0 0 0 -20 20
+           v300 h-110 v-300
+           a40 40 0 0 1 40 -40 z" fill="#E63946"/>
+  <!-- Attacker red arms wrapping around from behind: right wrap (the choke arm crossing the neck) -->
+  <polygon points="356,470 668,470 668,580 356,580" fill="#E63946"/>
+  <!-- Right side wrap column -->
+  <path d="M756 470
+           a90 90 0 0 0 -90 -90
+           h-60 v110 h60
+           a20 20 0 0 1 20 20
+           v300 h110 v-300
+           a40 40 0 0 0 -40 -40 z" fill="#E63946"/>
+
+  <!-- Attacker head riding above/behind: red -->
+  <circle cx="512" cy="250" r="86" fill="#E63946"/>
+
+  <!-- Gold seatbelt buckle locked on the chest: the control seal -->
+  <rect x="466" y="496" width="92" height="92" rx="10" fill="#f59e0b"/>
+</svg>

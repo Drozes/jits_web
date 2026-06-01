@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Full-bleed Void background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- 16x16 grid, cell = 64. Two profile heads facing each other across centre VS diamond -->
+
+  <!-- chunky character-select panels (faint) -->
+  <g fill="#16191F">
+    <rect x="64"  y="192" width="384" height="640"/>
+    <rect x="576" y="192" width="384" height="640"/>
+  </g>
+
+  <!-- ============ LEFT HEAD IN PROFILE (RED), facing right ============ -->
+  <g fill="#E63946">
+    <!-- back of skull -->
+    <rect x="128" y="320" width="64"  height="320"/>
+    <rect x="192" y="256" width="64"  height="64"/>
+    <rect x="192" y="640" width="64"  height="64"/>
+    <!-- crown -->
+    <rect x="256" y="256" width="128" height="64"/>
+    <!-- face mass -->
+    <rect x="192" y="320" width="192" height="320"/>
+    <!-- brow / forehead jut -->
+    <rect x="384" y="320" width="64"  height="64"/>
+    <!-- nose staircase forward -->
+    <rect x="384" y="448" width="64"  height="64"/>
+    <rect x="448" y="448" width="64"  height="64"/>
+    <!-- jaw forward -->
+    <rect x="384" y="576" width="64"  height="64"/>
+    <rect x="256" y="640" width="128" height="64"/>
+  </g>
+  <!-- left eye (void) -->
+  <rect x="320" y="384" width="64" height="64" fill="#0D0F14"/>
+  <!-- left mouth (void slit) -->
+  <rect x="384" y="512" width="64" height="64" fill="#0D0F14"/>
+  <!-- left headband (gold) -->
+  <rect x="192" y="320" width="256" height="64" fill="#f59e0b"/>
+  <!-- re-cut the eye over the band so it still reads -->
+  <rect x="320" y="320" width="64" height="64" fill="#0D0F14"/>
+
+  <!-- ============ RIGHT HEAD IN PROFILE (WHITE), facing left ============ -->
+  <g fill="#E8EDF2">
+    <!-- back of skull -->
+    <rect x="832" y="320" width="64"  height="320"/>
+    <rect x="768" y="256" width="64"  height="64"/>
+    <rect x="768" y="640" width="64"  height="64"/>
+    <!-- crown -->
+    <rect x="640" y="256" width="128" height="64"/>
+    <!-- face mass -->
+    <rect x="640" y="320" width="192" height="320"/>
+    <!-- brow / forehead jut -->
+    <rect x="576" y="320" width="64"  height="64"/>
+    <!-- nose staircase forward -->
+    <rect x="576" y="448" width="64"  height="64"/>
+    <rect x="512" y="448" width="64"  height="64"/>
+    <!-- jaw forward -->
+    <rect x="576" y="576" width="64"  height="64"/>
+    <rect x="640" y="640" width="128" height="64"/>
+  </g>
+  <!-- right eye (void) -->
+  <rect x="640" y="384" width="64" height="64" fill="#0D0F14"/>
+  <!-- right mouth (void slit) -->
+  <rect x="576" y="512" width="64" height="64" fill="#0D0F14"/>
+  <!-- right headband (cyan) -->
+  <rect x="576" y="320" width="256" height="64" fill="#37c0d6"/>
+  <!-- re-cut the eye over the band -->
+  <rect x="640" y="320" width="64" height="64" fill="#0D0F14"/>
+
+  <!-- ============ CENTRE VS DIAMOND (red pixel diamond + gold V S) ============ -->
+  <!-- pixel diamond made of stacked rects -->
+  <g fill="#E63946">
+    <rect x="480" y="384" width="64"  height="64"/>
+    <rect x="448" y="448" width="128" height="64"/>
+    <rect x="416" y="512" width="192" height="64"/>
+    <rect x="448" y="576" width="128" height="64"/>
+    <rect x="480" y="640" width="64"  height="64"/>
+  </g>
+
+  <!-- tiny gold "VS" pixels inside the diamond -->
+  <g fill="#f59e0b">
+    <!-- V -->
+    <rect x="448" y="512" width="21.333" height="42.667"/>
+    <rect x="469.333" y="554.667" width="21.333" height="21.333"/>
+    <rect x="490.667" y="512" width="21.333" height="42.667"/>
+    <!-- S -->
+    <rect x="533.333" y="512" width="42.667" height="21.333"/>
+    <rect x="533.333" y="533.333" width="21.333" height="21.333"/>
+    <rect x="554.667" y="554.667" width="21.333" height="21.333"/>
+    <rect x="533.333" y="554.667" width="42.667" height="21.333"/>
+  </g>
+
+  <!-- top & bottom pixel accents marking the matchup line -->
+  <g fill="#f59e0b">
+    <rect x="480" y="256" width="64" height="64"/>
+    <rect x="480" y="704" width="64" height="64"/>
+  </g>
+</svg>

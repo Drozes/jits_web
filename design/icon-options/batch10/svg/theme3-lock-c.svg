@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="bgC" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#243A2E"/>
+      <stop offset="100%" stop-color="#16241B"/>
+    </linearGradient>
+    <linearGradient id="badgeC" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F2ECDD"/>
+      <stop offset="100%" stop-color="#E1D6BE"/>
+    </linearGradient>
+    <linearGradient id="goldC" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#E2C474"/>
+      <stop offset="100%" stop-color="#9E7C30"/>
+    </linearGradient>
+    <linearGradient id="oxC" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#8A2531"/>
+      <stop offset="100%" stop-color="#5E1620"/>
+    </linearGradient>
+  </defs>
+
+  <!-- full-bleed background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="url(#bgC)"/>
+
+  <!-- decorative corner rules -->
+  <g stroke="#C9A24B" stroke-width="5" opacity="0.4" fill="none">
+    <path d="M70 70 L 70 200 M70 70 L 200 70"/>
+    <path d="M954 70 L 954 200 M954 70 L 824 70"/>
+    <path d="M70 954 L 70 824 M70 954 L 200 954"/>
+    <path d="M954 954 L 954 824 M954 954 L 824 954"/>
+  </g>
+
+  <!-- crossed laurel behind badge -->
+  <g stroke="#C9A24B" stroke-width="9" fill="none" stroke-linecap="round" opacity="0.85">
+    <path d="M512 860 C 360 820 300 700 318 540"/>
+    <path d="M512 860 C 664 820 724 700 706 540"/>
+  </g>
+  <g fill="#C9A24B" opacity="0.85">
+    <path d="M322 560 q -42 -16 -64 6 q 30 26 64 -6 z"/>
+    <path d="M332 612 q -44 -16 -66 6 q 31 27 66 -6 z"/>
+    <path d="M350 664 q -44 -16 -66 6 q 31 27 66 -6 z"/>
+    <path d="M702 560 q 42 -16 64 6 q -30 26 -64 -6 z"/>
+    <path d="M692 612 q 44 -16 66 6 q -31 27 -66 -6 z"/>
+    <path d="M674 664 q 44 -16 66 6 q -31 27 -66 -6 z"/>
+  </g>
+
+  <!-- TOP SCROLL BANNER -->
+  <g>
+    <path d="M132 188 L 196 158 L 196 232 L 132 262 Z" fill="#3D0D14"/>
+    <path d="M892 188 L 828 158 L 828 232 L 892 262 Z" fill="#3D0D14"/>
+    <path d="M186 150 C 380 122 644 122 838 150 L 838 242 C 644 214 380 214 186 242 Z" fill="url(#oxC)" stroke="#C9A24B" stroke-width="6"/>
+    <text x="512" y="212" font-family="serif" font-size="62" font-weight="bold" letter-spacing="14" fill="#EDE6D6" text-anchor="middle">ELO RATED</text>
+  </g>
+
+  <!-- rounded-corner badge plate (varsity rounded square) -->
+  <rect x="262" y="300" width="500" height="500" rx="40" fill="url(#badgeC)" stroke="#7A1F2B" stroke-width="18"/>
+  <rect x="288" y="326" width="448" height="448" rx="28" fill="none" stroke="#C9A24B" stroke-width="6"/>
+
+  <!-- CENTRAL CHARGE: bold triangle-choke lock built from interlocking limb bars -->
+  <g transform="translate(512 540)">
+    <!-- two thick limb bars forming the closed triangle of the choke -->
+    <g stroke-linecap="round" stroke-linejoin="round" fill="none">
+      <!-- left leg bar -->
+      <path d="M-2 -150 L -150 130" stroke="#1B2A41" stroke-width="46"/>
+      <!-- right leg bar overlapping at apex -->
+      <path d="M2 -150 L 150 130" stroke="#7A1F2B" stroke-width="46"/>
+      <!-- the locking ankle bar across the base (figure-four cinch) -->
+      <path d="M-150 130 L 150 130" stroke="#1B2A41" stroke-width="46"/>
+    </g>
+    <!-- trapped arm crossing through (oxblood) -->
+    <path d="M-86 -30 L 96 64" stroke="#8A2531" stroke-width="30" stroke-linecap="round"/>
+    <!-- gold cinch medallion at the apex lock -->
+    <circle cx="0" cy="-118" r="34" fill="url(#goldC)" stroke="#5E1620" stroke-width="7"/>
+    <circle cx="0" cy="-118" r="12" fill="#1B2A41"/>
+    <!-- gold rivets at the corners -->
+    <circle cx="-150" cy="130" r="16" fill="url(#goldC)" stroke="#5E1620" stroke-width="4"/>
+    <circle cx="150" cy="130" r="16" fill="url(#goldC)" stroke="#5E1620" stroke-width="4"/>
+  </g>
+
+  <!-- EST 2026 small banner at base of badge -->
+  <g>
+    <path d="M352 760 C 440 748 584 748 672 760 L 672 808 C 584 796 440 796 352 808 Z" fill="url(#oxC)" stroke="#C9A24B" stroke-width="4"/>
+    <text x="512" y="794" font-family="serif" font-size="34" font-weight="bold" letter-spacing="10" fill="#EDE6D6" text-anchor="middle">EST 2026</text>
+  </g>
+</svg>

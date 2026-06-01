@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <!-- ribbon tails of the rank medallion -->
+    <polyline points="430,628 388,860 480,800" stroke="#E8EDF2" stroke-width="30"/>
+    <polyline points="594,628 636,860 544,800" stroke="#E8EDF2" stroke-width="30"/>
+    <!-- outer medal ring -->
+    <circle cx="512" cy="424" r="236" stroke="#E8EDF2" stroke-width="32"/>
+    <!-- inner ring -->
+    <circle cx="512" cy="424" r="170" stroke="#E63946" stroke-width="26"/>
+    <!-- ascending chevrons inside (the climb / rank-up) -->
+    <polyline points="408,478 512,398 616,478" stroke="#E63946" stroke-width="30"/>
+    <polyline points="408,538 512,458 616,538" stroke="#E63946" stroke-width="30"/>
+    <!-- top apex notch / arrow tip -->
+    <polyline points="466,360 512,318 558,360" stroke="#E8EDF2" stroke-width="30"/>
+  </g>
+</svg>

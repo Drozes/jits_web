@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- THE NEMEAN LION PELT: front-facing emblematic maned lion head -->
+
+  <!-- the mane: heavy radial flat spikes forming a sunburst ring -->
+  <g fill="#E63946">
+    <polygon points="512,120 556,300 468,300"/>
+    <polygon points="704,150 642,318 576,272"/>
+    <polygon points="848,272 720,366 690,300"/>
+    <polygon points="912,460 752,440 760,366"/>
+    <polygon points="888,672 736,560 786,500"/>
+    <polygon points="320,150 382,318 448,272"/>
+    <polygon points="176,272 304,366 334,300"/>
+    <polygon points="112,460 272,440 264,366"/>
+    <polygon points="136,672 288,560 238,500"/>
+    <polygon points="512,920 444,748 580,748"/>
+    <polygon points="700,860 600,720 668,690"/>
+    <polygon points="324,860 424,720 356,690"/>
+  </g>
+
+  <!-- mane inner ring (solid red disc) -->
+  <circle cx="512" cy="468" r="232" fill="#E63946"/>
+
+  <!-- the face plate (void) -->
+  <circle cx="512" cy="486" r="168" fill="#0D0F14"/>
+
+  <!-- snout / muzzle -->
+  <polygon points="512,486 600,560 560,648 464,648 424,560" fill="#E8EDF2"/>
+
+  <!-- nose -->
+  <polygon points="512,540 552,588 472,588" fill="#E63946"/>
+
+  <!-- mouth split -->
+  <rect x="500" y="588" width="24" height="60" fill="#0D0F14"/>
+
+  <!-- bared fangs -->
+  <polygon points="476,612 500,612 488,660" fill="#0D0F14"/>
+  <polygon points="524,612 548,612 536,660" fill="#0D0F14"/>
+
+  <!-- eyes: hard angular slits, gold = predator menace -->
+  <polygon points="424,470 488,452 488,494 424,508" fill="#f59e0b"/>
+  <polygon points="600,470 536,452 536,494 600,508" fill="#f59e0b"/>
+
+  <!-- ears -->
+  <polygon points="372,330 444,372 392,420" fill="#E8EDF2"/>
+  <polygon points="652,330 580,372 632,420" fill="#E8EDF2"/>
+
+  <!-- brow ridge -->
+  <rect x="448" y="430" width="128" height="20" fill="#0D0F14"/>
+</svg>

@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="bgB" x1="0.1" y1="0" x2="0.9" y2="1">
+      <stop offset="0" stop-color="#E63946"/>
+      <stop offset="0.55" stop-color="#c41e3a"/>
+      <stop offset="1" stop-color="#7a0f3f"/>
+    </linearGradient>
+    <radialGradient id="glossB" cx="0.32" cy="0.12" r="0.95">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.6"/>
+      <stop offset="0.4" stop-color="#ffffff" stop-opacity="0.14"/>
+      <stop offset="0.75" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="bandB" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.5" stop-color="#fbfcfe"/>
+      <stop offset="1" stop-color="#dde1ea"/>
+    </linearGradient>
+    <linearGradient id="barB" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1d1f24"/>
+      <stop offset="1" stop-color="#000000"/>
+    </linearGradient>
+    <filter id="dropB" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="20" stdDeviation="26" flood-color="#3d0820" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+
+  <!-- full-bleed tile background -->
+  <rect x="0" y="0" width="1024" height="1024" rx="180" fill="url(#bgB)"/>
+  <rect x="0" y="0" width="1024" height="1024" rx="180" fill="url(#glossB)"/>
+
+  <!-- belt band across the middle, slight diagonal tilt -->
+  <g filter="url(#dropB)" transform="rotate(-8 512 512)">
+    <!-- main white band -->
+    <rect x="96" y="392" width="832" height="240" rx="26" fill="url(#bandB)"/>
+    <!-- top sheen line on band -->
+    <rect x="120" y="416" width="784" height="40" rx="20" fill="#ffffff" opacity="0.7"/>
+    <!-- black rank bar -->
+    <rect x="612" y="392" width="180" height="240" fill="url(#barB)"/>
+    <!-- red rank stripes on the black bar -->
+    <rect x="648" y="430" width="22" height="164" rx="6" fill="#E63946"/>
+    <rect x="688" y="430" width="22" height="164" rx="6" fill="#E63946"/>
+    <rect x="728" y="430" width="22" height="164" rx="6" fill="#E63946"/>
+    <!-- subtle bottom groove on white band -->
+    <rect x="120" y="572" width="468" height="14" rx="7" fill="#cfd4de" opacity="0.8"/>
+  </g>
+</svg>

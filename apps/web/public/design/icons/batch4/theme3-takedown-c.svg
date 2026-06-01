@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- THE TAKEDOWN C: Sprawl vs shot collision. Two heavy opposing wedges meet
+       head-on: a red shooting wedge driving UP from below, a white sprawl wedge
+       dropping DOWN to stuff it. Brutal directional clash on the center seam. -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- The SHOT: red wedge driving upward and forward (penetrating low to high) -->
+  <polygon points="120,904 540,904 720,512 540,512 540,640 120,640" fill="#E63946"/>
+  <!-- shot drive-tip spearing toward the collision -->
+  <polygon points="540,560 760,560 600,470 760,380 540,380" fill="#E63946"/>
+
+  <!-- The SPRAWL: white wedge dropping down to stuff the shot (heavy, hips back) -->
+  <polygon points="904,120 484,120 304,512 484,512 484,384 904,384" fill="#E8EDF2"/>
+  <!-- sprawl base flattening over the top of the shot -->
+  <polygon points="484,464 264,464 424,554 264,644 484,644" fill="#E8EDF2"/>
+
+  <!-- The collision seam: gold impact bar where the two forces jam together -->
+  <rect x="448" y="452" width="128" height="120" fill="#f59e0b"/>
+
+  <!-- Center void notch so the two wedges read as locked, not overlapping mush -->
+  <polygon points="512,452 576,512 512,572 448,512" fill="#0D0F14"/>
+</svg>

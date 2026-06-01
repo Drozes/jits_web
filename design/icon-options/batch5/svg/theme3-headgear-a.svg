@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Full-bleed background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- CONCEPT A: Front-on headgear emblem. Central cradle band over the head,
+       two heavy ear cups flanking, three connecting straps. Symmetric, brutalist. -->
+
+  <!-- Head dome silhouette (white) behind the gear -->
+  <path d="M 512 252
+           C 392 252 312 348 312 472
+           L 312 600
+           L 712 600
+           L 712 472
+           C 712 348 632 252 512 252 Z"
+        fill="#E8EDF2"/>
+
+  <!-- Void notch carved from the dome to give the head a chin/jaw read -->
+  <path d="M 372 560
+           L 652 560
+           L 652 600
+           L 372 600 Z"
+        fill="#0D0F14"/>
+
+  <!-- Top crown strap (Signal Red) arcing over the dome -->
+  <path d="M 332 372
+           C 392 268 632 268 692 372
+           L 656 392
+           C 604 304 420 304 368 392 Z"
+        fill="#E63946"/>
+
+  <!-- LEFT ear cup (Signal Red) -->
+  <path d="M 232 388
+           L 380 412
+           L 380 612
+           L 232 636
+           C 196 580 196 444 232 388 Z"
+        fill="#E63946"/>
+  <!-- Left ear cup inner vent hole (void) -->
+  <ellipse cx="300" cy="512" rx="38" ry="74" fill="#0D0F14"/>
+
+  <!-- RIGHT ear cup (Signal Red) -->
+  <path d="M 792 388
+           L 644 412
+           L 644 612
+           L 792 636
+           C 828 580 828 444 792 388 Z"
+        fill="#E63946"/>
+  <!-- Right ear cup inner vent hole (void) -->
+  <ellipse cx="724" cy="512" rx="38" ry="74" fill="#0D0F14"/>
+
+  <!-- Lower chin strap connecting the two cups (Signal Red) -->
+  <path d="M 268 636
+           C 360 720 664 720 756 636
+           L 720 612
+           C 636 676 388 676 304 612 Z"
+        fill="#E63946"/>
+
+  <!-- Gold buckle accent on the chin strap (peak/breakthrough) -->
+  <rect x="476" y="678" width="72" height="44" fill="#f59e0b"/>
+  <rect x="496" y="690" width="32" height="20" fill="#0D0F14"/>
+</svg>

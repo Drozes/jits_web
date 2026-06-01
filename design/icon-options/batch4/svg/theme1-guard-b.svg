@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- BUTTERFLY / OPEN GUARD: a bold symmetric open-V frame.
+       Central hips, two legs splayed open with butterfly "hooks" turned up,
+       framing the space where the opponent is controlled. -->
+
+  <!-- Central hips / seat block -->
+  <rect x="432" y="612" width="160" height="120" rx="10" fill="#E8EDF2"/>
+
+  <!-- LEFT butterfly leg: thigh up-out, then the hook curls back up (the foot hook) -->
+  <path d="M 432 672
+           L 224 372
+           L 320 304
+           L 470 520
+           Z" fill="#E63946"/>
+  <!-- LEFT foot hook (turned-up butterfly hook) -->
+  <polygon points="224,372 320,304 360,360 264,428" fill="#f59e0b"/>
+
+  <!-- RIGHT butterfly leg: mirror -->
+  <path d="M 592 672
+           L 800 372
+           L 704 304
+           L 554 520
+           Z" fill="#E63946"/>
+  <!-- RIGHT foot hook -->
+  <polygon points="800,372 704,304 664,360 760,428" fill="#f59e0b"/>
+
+  <!-- Two open underhook arms reaching up into the frame (white) -->
+  <rect x="380" y="232" width="72" height="300" rx="12" fill="#E8EDF2" transform="rotate(-18 416 382)"/>
+  <rect x="572" y="232" width="72" height="300" rx="12" fill="#E8EDF2" transform="rotate(18 608 382)"/>
+
+  <!-- Base bar under the seat (the floor / posted base) -->
+  <rect x="300" y="756" width="424" height="56" rx="8" fill="#E63946"/>
+</svg>

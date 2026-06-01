@@ -1,0 +1,102 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="bGold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#E0C273"/>
+      <stop offset="0.5" stop-color="#C9A24B"/>
+      <stop offset="1" stop-color="#9C7A30"/>
+    </linearGradient>
+    <radialGradient id="bGlow" cx="0.5" cy="0.42" r="0.7">
+      <stop offset="0" stop-color="#F4EEDF"/>
+      <stop offset="1" stop-color="#E1D8C2"/>
+    </radialGradient>
+  </defs>
+
+  <!-- full-bleed background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#EDE6D6"/>
+  <rect x="0" y="0" width="1024" height="1024" fill="#1B2A41" opacity="0.06"/>
+
+  <!-- outer ring medallion -->
+  <circle cx="512" cy="512" r="468" fill="url(#bGold)"/>
+  <circle cx="512" cy="512" r="468" fill="none" stroke="#7A1F2B" stroke-width="10"/>
+  <circle cx="512" cy="512" r="420" fill="#7A1F2B"/>
+  <circle cx="512" cy="512" r="420" fill="none" stroke="#C9A24B" stroke-width="6"/>
+  <circle cx="512" cy="512" r="372" fill="#1B2A41"/>
+  <circle cx="512" cy="512" r="372" fill="none" stroke="#C9A24B" stroke-width="4"/>
+
+  <!-- top straight banner: ELO RATED -->
+  <g>
+    <path d="M250 150 L 774 150 L 800 214 L 224 214 Z" fill="#7A1F2B" stroke="#C9A24B" stroke-width="6"/>
+    <text x="512" y="198" font-family="serif" font-size="56" font-weight="700"
+          fill="#EDE6D6" text-anchor="middle" letter-spacing="8">ELO RATED</text>
+  </g>
+
+  <!-- star separators -->
+  <g fill="#C9A24B">
+    <path d="M112 512 l12 26 28 3 -21 19 7 28 -26 -15 -26 15 7 -28 -21 -19 28 -3 z"/>
+    <path d="M912 512 l12 26 28 3 -21 19 7 28 -26 -15 -26 15 7 -28 -21 -19 28 -3 z"/>
+  </g>
+
+  <!-- inner split disc: oxblood / cream halves on navy -->
+  <circle cx="512" cy="500" r="232" fill="url(#bGlow)" stroke="#C9A24B" stroke-width="10"/>
+  <clipPath id="bClip"><circle cx="512" cy="500" r="226"/></clipPath>
+  <g clip-path="url(#bClip)">
+    <rect x="286" y="274" width="226" height="452" fill="#7A1F2B"/>
+    <rect x="512" y="274" width="226" height="452" fill="#2C3E5A"/>
+  </g>
+  <circle cx="512" cy="500" r="226" fill="none" stroke="#C9A24B" stroke-width="3"/>
+  <line x1="512" y1="274" x2="512" y2="726" stroke="#C9A24B" stroke-width="8"/>
+
+  <!-- central charge: two bold fists bumping at center -->
+  <g transform="translate(512 500)">
+    <!-- left fist (cream) facing right -->
+    <path d="M-44 -76
+             c -64 0 -110 32 -110 70
+             c 0 40 40 62 80 62
+             l 0 26
+             c 0 16 16 26 36 26
+             c 22 0 36 -12 36 -30
+             l 0 -36
+             c 22 -12 30 -32 30 -56
+             c 0 -40 -32 -64 -68 -64 Z"
+          fill="#EDE6D6" stroke="#1B2A41" stroke-width="8" stroke-linejoin="round"/>
+    <g stroke="#1B2A41" stroke-width="6" stroke-linecap="round">
+      <line x1="-126" y1="2" x2="-72" y2="2"/>
+      <line x1="-124" y1="30" x2="-78" y2="30"/>
+    </g>
+    <!-- right fist (cream) facing left -->
+    <path d="M44 -76
+             c 64 0 110 32 110 70
+             c 0 40 -40 62 -80 62
+             l 0 26
+             c 0 16 -16 26 -36 26
+             c -22 0 -36 -12 -36 -30
+             l 0 -36
+             c -22 -12 -30 -32 -30 -56
+             c 0 -40 32 -64 68 -64 Z"
+          fill="#EDE6D6" stroke="#1B2A41" stroke-width="8" stroke-linejoin="round"/>
+    <g stroke="#1B2A41" stroke-width="6" stroke-linecap="round">
+      <line x1="126" y1="2" x2="72" y2="2"/>
+      <line x1="124" y1="30" x2="78" y2="30"/>
+    </g>
+    <!-- impact burst between fists -->
+    <g fill="#C9A24B">
+      <polygon points="0,-102 14,-48 0,-30 -14,-48"/>
+      <polygon points="0,102 14,48 0,30 -14,48"/>
+    </g>
+    <g stroke="#C9A24B" stroke-width="6" stroke-linecap="round">
+      <line x1="-26" y1="-26" x2="-52" y2="-52"/>
+      <line x1="26" y1="-26" x2="52" y2="-52"/>
+      <line x1="-26" y1="26" x2="-52" y2="52"/>
+      <line x1="26" y1="26" x2="52" y2="52"/>
+    </g>
+    <circle cx="0" cy="0" r="20" fill="#E63946" stroke="#C9A24B" stroke-width="5"/>
+  </g>
+
+  <!-- bottom banner ribbon: EST 2026 / VS -->
+  <g>
+    <path d="M512 760 L 286 790 L 318 830 L 286 870 L 512 840 L 738 870 L 706 830 L 738 790 Z"
+          fill="#7A1F2B" stroke="#C9A24B" stroke-width="6"/>
+    <text x="512" y="833" font-family="serif" font-size="46" font-weight="700"
+          fill="#EDE6D6" text-anchor="middle" letter-spacing="6">EST 2026</text>
+  </g>
+</svg>

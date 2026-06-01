@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- Laurel wreath framing a bold V (Victory).
+       Two symmetric curved branches of heavy leaves arc up from the bottom. -->
+
+  <!-- LEFT laurel branch: thick arc -->
+  <path d="M 512 880
+           C 320 880 200 720 196 520
+           C 194 400 230 300 300 232
+           L 348 280
+           C 290 340 262 424 264 520
+           C 268 690 372 824 524 824
+           Z" fill="#E63946"/>
+
+  <!-- LEFT leaves, heavy ovals along the outside of the arc -->
+  <polygon points="296,238 240,210 262,288" fill="#E63946"/>
+  <polygon points="244,330 184,318 224,378" fill="#E63946"/>
+  <polygon points="216,440 154,448 208,494" fill="#E63946"/>
+  <polygon points="214,556 152,584 218,610" fill="#E63946"/>
+  <polygon points="244,672 188,716 254,720" fill="#E63946"/>
+  <polygon points="316,772 274,824 340,810" fill="#E63946"/>
+
+  <!-- RIGHT laurel branch: mirror of the left -->
+  <path d="M 512 880
+           C 704 880 824 720 828 520
+           C 830 400 794 300 724 232
+           L 676 280
+           C 734 340 762 424 760 520
+           C 756 690 652 824 500 824
+           Z" fill="#E63946"/>
+
+  <!-- RIGHT leaves -->
+  <polygon points="728,238 784,210 762,288" fill="#E63946"/>
+  <polygon points="780,330 840,318 800,378" fill="#E63946"/>
+  <polygon points="808,440 870,448 816,494" fill="#E63946"/>
+  <polygon points="810,556 872,584 806,610" fill="#E63946"/>
+  <polygon points="780,672 836,716 770,720" fill="#E63946"/>
+  <polygon points="708,772 750,824 684,810" fill="#E63946"/>
+
+  <!-- Bold V (Victory) in the center: a single heavy chevron drawn as one closed outline.
+       Perimeter: outer-left-top -> outer bottom point -> outer-right-top -> inner-right-top -> inner bottom point -> inner-left-top -->
+  <polygon points="356,312 512,712 668,312 540,312 512,560 484,312" fill="#E8EDF2"/>
+
+  <!-- Gold crown leaf at the very top center, the breakthrough accent -->
+  <polygon points="512,196 478,262 512,294 546,262" fill="#f59e0b"/>
+</svg>

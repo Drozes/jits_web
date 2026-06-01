@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- floor / mat band the stance plants on -->
+  <rect x="160" y="800" width="704" height="40" fill="#1A1D24"/>
+
+  <!-- ========== WRESTLER: LOW COILED READY-STANCE (solid Signal Red) ========== -->
+  <!-- Built as a single emblematic silhouette: head ducked, shoulders square,
+       arms reaching forward low, weight sunk over a wide staggered base. -->
+
+  <!-- head, ducked forward and low -->
+  <circle cx="455" cy="318" r="74" fill="#E63946"/>
+
+  <!-- torso: heavy hunched mass tilted forward over the lead leg -->
+  <polygon points="392,360 600,330 648,520 470,560 410,470" fill="#E63946"/>
+
+  <!-- lead (forward) arm reaching low to control/level-change -->
+  <polygon points="560,360 740,452 712,520 540,452" fill="#E63946"/>
+  <!-- lead hand -->
+  <circle cx="738" cy="486" r="46" fill="#E63946"/>
+
+  <!-- trail arm cocked, elbow tight to ribs -->
+  <polygon points="436,392 372,470 430,560 484,494" fill="#E63946"/>
+  <circle cx="394" cy="528" r="42" fill="#E63946"/>
+
+  <!-- hips, the coiled pivot of the stance -->
+  <polygon points="470,520 660,510 700,640 500,672 452,600" fill="#E63946"/>
+
+  <!-- LEAD leg: bent deep, knee driving forward, foot planted wide front -->
+  <polygon points="612,592 712,612 700,760 612,772 600,672" fill="#E63946"/>
+  <!-- lead foot -->
+  <rect x="586" y="760" width="150" height="44" fill="#E63946"/>
+
+  <!-- TRAIL leg: staggered back, long, posted behind for the wide base -->
+  <polygon points="500,612 588,640 432,760 356,752 432,648" fill="#E63946"/>
+  <!-- trail foot -->
+  <rect x="300" y="760" width="148" height="44" fill="#E63946"/>
+
+  <!-- gold flash: the coiled-energy line across the back, "ready to fire" -->
+  <polygon points="600,330 648,520 624,524 580,338" fill="#f59e0b"/>
+</svg>

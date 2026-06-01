@@ -1,0 +1,178 @@
+{
+  "batch": "batch9",
+  "num": 9,
+  "label": "Retro Pixel",
+  "date": "2026-06-01",
+  "themes": [
+    {
+      "key": "mark",
+      "title": "The E / ER Mark"
+    },
+    {
+      "key": "belt",
+      "title": "The Belt"
+    },
+    {
+      "key": "lock",
+      "title": "The Lock"
+    },
+    {
+      "key": "climb",
+      "title": "The Climb"
+    },
+    {
+      "key": "match",
+      "title": "The Match"
+    },
+    {
+      "key": "champion",
+      "title": "The Champion"
+    }
+  ],
+  "icons": [
+    {
+      "theme": "mark",
+      "themeTitle": "The E / ER Mark",
+      "file": "theme1-mark-a",
+      "name": "Rising E",
+      "concept": "Pixel E whose three bars step upward left-to-right with gold rating caps and a red staircase trail climbing behind, the rating literally rising.",
+      "score": 4
+    },
+    {
+      "theme": "mark",
+      "themeTitle": "The E / ER Mark",
+      "file": "theme1-mark-b",
+      "name": "ER Plate",
+      "concept": "Chunky arcade ER monogram in white pixels knocked onto a Signal Red sprite plate with gold sparkle pixels, fight-game select-screen feel.",
+      "score": 5
+    },
+    {
+      "theme": "mark",
+      "themeTitle": "The E / ER Mark",
+      "file": "theme1-mark-c",
+      "name": "Knockout E Block",
+      "concept": "Bold red sprite block with the E carved out in Void, a white top rim and cyan scanline accents plus gold UI bracket corners.",
+      "score": 4
+    },
+    {
+      "theme": "belt",
+      "themeTitle": "The Belt",
+      "file": "theme2-belt-a",
+      "name": "Knot Sprite",
+      "concept": "8-bit red BJJ belt tied in a front knot with two hanging tails and gold rank stripes on the Void background",
+      "score": 5
+    },
+    {
+      "theme": "belt",
+      "themeTitle": "The Belt",
+      "file": "theme2-belt-b",
+      "name": "Rank Bar",
+      "concept": "Straight-on pixel belt band with cyan and gold label stripes and a black rank bar carrying four white rank stripes",
+      "score": 4
+    },
+    {
+      "theme": "belt",
+      "themeTitle": "The Belt",
+      "file": "theme2-belt-c",
+      "name": "Square Knot",
+      "concept": "Crossed square-knot belt built from four staircased pixel-diagonal strands meeting at a central knot, gold stripe tips",
+      "score": 5
+    },
+    {
+      "theme": "lock",
+      "themeTitle": "The Lock",
+      "file": "theme3-lock-a",
+      "name": "Triangle Sprite",
+      "concept": "8-bit inverted red triangle-choke locking a white trapped-head sprite with gold collar-pressure pixels",
+      "score": 3
+    },
+    {
+      "theme": "lock",
+      "themeTitle": "The Lock",
+      "file": "theme3-lock-b",
+      "name": "Clinch Clash",
+      "concept": "Two interlocked arcade fighter sprites (red vs white) gripping in a clinch with a gold spark at the center clash",
+      "score": 2
+    },
+    {
+      "theme": "lock",
+      "themeTitle": "The Lock",
+      "file": "theme3-lock-c",
+      "name": "Figure-Four Knot",
+      "concept": "Top-down pixel figure-four arm-lock: red and white arms weaving over-under with cyan pressure sparks",
+      "score": 3
+    },
+    {
+      "theme": "climb",
+      "themeTitle": "The Climb",
+      "file": "theme4-climb-a",
+      "name": "Pixel Climb Chart",
+      "concept": "Staircased 8-bit podium bars ascending left-to-right (white, gold, white, tall Signal Red) topped by a cyan pixel up-arrow rising off the winner bar.",
+      "score": 4
+    },
+    {
+      "theme": "climb",
+      "themeTitle": "The Climb",
+      "file": "theme4-climb-b",
+      "name": "Arcade Up-Arrow",
+      "concept": "One bold chunky Signal Red up-arrow sprite with a 1-pixel Void outline, white left-edge highlight stripe and gold ELO-spark pixels flanking the tip.",
+      "score": 5
+    },
+    {
+      "theme": "climb",
+      "themeTitle": "The Climb",
+      "file": "theme4-climb-c",
+      "name": "Rank Medallion",
+      "concept": "Pixel-circle gold rank medal with a red rim and ribbon tails, centered on a crisp white up-arrow for the climb in rating.",
+      "score": 3
+    },
+    {
+      "theme": "match",
+      "themeTitle": "The Match",
+      "file": "theme5-match-a",
+      "name": "Fight Select",
+      "concept": "Two chunky 8-bit fighter sprites (red vs white) squaring up with raised fists, gold pixel VS and health bars overhead, arcade character-select style.",
+      "score": 5
+    },
+    {
+      "theme": "match",
+      "themeTitle": "The Match",
+      "file": "theme5-match-b",
+      "name": "Split Seam",
+      "concept": "Red and white pixel territories collide along a staircased center with a gold lightning-bolt seam and cyan impact sparks, an abstract two-zones-meeting matchup.",
+      "score": 2
+    },
+    {
+      "theme": "match",
+      "themeTitle": "The Match",
+      "file": "theme5-match-c",
+      "name": "Profile Off",
+      "concept": "Two pixel-sprite heads in profile (red headband vs cyan) facing each other across a bold red VS diamond, fight-game roster matchup.",
+      "score": 3
+    },
+    {
+      "theme": "champion",
+      "themeTitle": "The Champion",
+      "file": "theme6-champion-a",
+      "name": "Pixel Trophy",
+      "concept": "8-bit gold trophy cup with a red No.1 emblem on a white podium over a Void scanline background",
+      "score": 4
+    },
+    {
+      "theme": "champion",
+      "themeTitle": "The Champion",
+      "file": "theme6-champion-b",
+      "name": "Pixel Crown",
+      "concept": "Blocky gold champion crown with red and cyan gems on a dark plate over a Signal Red checker field",
+      "score": 5
+    },
+    {
+      "theme": "champion",
+      "themeTitle": "The Champion",
+      "file": "theme6-champion-c",
+      "name": "Pixel Medal",
+      "concept": "8-bit gold winner's medal with a Signal Red star, hung on staircased red and white ribbon",
+      "score": 4
+    }
+  ]
+}

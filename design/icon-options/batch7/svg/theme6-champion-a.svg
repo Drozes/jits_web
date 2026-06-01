@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+  <g fill="none" stroke="#E63946" stroke-width="30" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Left laurel branch: stem -->
+    <path d="M 350 760 C 300 620 318 470 430 372"/>
+    <!-- Left laurel leaves -->
+    <path d="M 332 700 C 282 690 250 658 246 612 C 296 614 332 644 348 690 Z"/>
+    <path d="M 322 626 C 276 610 250 572 252 526 C 300 538 330 574 340 620 Z"/>
+    <path d="M 326 550 C 286 526 270 482 282 438 C 326 462 348 504 348 548 Z"/>
+    <path d="M 350 478 C 318 446 312 400 332 360 C 368 392 380 436 372 480 Z"/>
+    <path d="M 390 416 C 366 378 372 332 402 300 C 428 340 426 386 408 422 Z"/>
+    <!-- Right laurel branch: stem (mirror) -->
+    <path d="M 674 760 C 724 620 706 470 594 372"/>
+    <!-- Right laurel leaves -->
+    <path d="M 692 700 C 742 690 774 658 778 612 C 728 614 692 644 676 690 Z"/>
+    <path d="M 702 626 C 748 610 774 572 772 526 C 724 538 694 574 684 620 Z"/>
+    <path d="M 698 550 C 738 526 754 482 742 438 C 698 462 676 504 676 548 Z"/>
+    <path d="M 674 478 C 706 446 712 400 692 360 C 656 392 644 436 652 480 Z"/>
+    <path d="M 634 416 C 658 378 652 332 622 300 C 596 340 598 386 616 422 Z"/>
+    <!-- Central star (champion mark) -->
+    <path d="M 512 470 L 540 558 L 632 558 L 558 612 L 586 700 L 512 646 L 438 700 L 466 612 L 392 558 L 484 558 Z"/>
+  </g>
+</svg>

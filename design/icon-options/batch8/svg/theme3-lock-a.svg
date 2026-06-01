@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="tileA" x1="0" y1="0" x2="1024" y2="1024" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ff5a67"/>
+      <stop offset="0.45" stop-color="#e63946"/>
+      <stop offset="1" stop-color="#b41f2e"/>
+    </linearGradient>
+    <radialGradient id="glossA" cx="0.5" cy="0.16" r="0.9" gradientUnits="objectBoundingBox">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.55"/>
+      <stop offset="0.35" stop-color="#ffffff" stop-opacity="0.18"/>
+      <stop offset="0.7" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <!-- glossy gold body gradient -->
+    <linearGradient id="bodyA" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff4cf"/>
+      <stop offset="0.4" stop-color="#ffd56b"/>
+      <stop offset="1" stop-color="#e58a06"/>
+    </linearGradient>
+    <!-- bright top sheen on the body -->
+    <linearGradient id="bodyGlossA" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.85"/>
+      <stop offset="0.5" stop-color="#ffffff" stop-opacity="0.0"/>
+    </linearGradient>
+    <!-- shackle metal gradient -->
+    <linearGradient id="shackleA" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.5" stop-color="#e9eef3"/>
+      <stop offset="1" stop-color="#9aa7b3"/>
+    </linearGradient>
+    <filter id="dropA" x="-25%" y="-25%" width="150%" height="150%">
+      <feDropShadow dx="0" dy="20" stdDeviation="24" flood-color="#5c0d16" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+
+  <!-- full-bleed tile -->
+  <rect x="0" y="0" width="1024" height="1024" rx="180" fill="url(#tileA)"/>
+  <!-- glossy highlight -->
+  <rect x="0" y="0" width="1024" height="1024" rx="180" fill="url(#glossA)"/>
+
+  <!-- The Lock: a padlock -->
+  <g filter="url(#dropA)">
+    <!-- shackle (the U arch), drawn behind the body -->
+    <path d="M376 470
+             L376 360
+             A136 136 0 0 1 648 360
+             L648 470
+             L572 470
+             L572 360
+             A60 60 0 0 0 452 360
+             L452 470
+             Z"
+          fill="url(#shackleA)"/>
+
+    <!-- lock body -->
+    <rect x="300" y="452" width="424" height="372" rx="64" fill="url(#bodyA)"/>
+    <!-- top sheen on body for gloss -->
+    <rect x="300" y="452" width="424" height="372" rx="64" fill="url(#bodyGlossA)"/>
+
+    <!-- keyhole knockout -->
+    <circle cx="512" cy="600" r="58" fill="#b06400"/>
+    <path d="M488 632 L536 632 L556 752 L468 752 Z" fill="#b06400"/>
+  </g>
+
+  <!-- crisp specular dot on the body shoulder -->
+  <ellipse cx="392" cy="512" rx="58" ry="30" fill="#ffffff" opacity="0.4" transform="rotate(-30 392 512)"/>
+</svg>

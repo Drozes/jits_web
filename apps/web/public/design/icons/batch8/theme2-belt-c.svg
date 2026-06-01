@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <radialGradient id="bgC" cx="0.5" cy="0.42" r="0.85">
+      <stop offset="0" stop-color="#ffae3d"/>
+      <stop offset="0.4" stop-color="#f5732e"/>
+      <stop offset="0.78" stop-color="#E63946"/>
+      <stop offset="1" stop-color="#a81e2e"/>
+    </radialGradient>
+    <radialGradient id="glossC" cx="0.5" cy="0.16" r="0.8">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.5"/>
+      <stop offset="0.45" stop-color="#ffffff" stop-opacity="0.12"/>
+      <stop offset="0.75" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="ringC" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#dadfe9"/>
+    </linearGradient>
+    <filter id="dropC" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="16" stdDeviation="20" flood-color="#5a0d12" flood-opacity="0.45"/>
+    </filter>
+    <filter id="softShadowC" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="18"/>
+    </filter>
+  </defs>
+
+  <!-- full-bleed tile background -->
+  <rect x="0" y="0" width="1024" height="1024" rx="180" fill="url(#bgC)"/>
+  <rect x="0" y="0" width="1024" height="1024" rx="180" fill="url(#glossC)"/>
+
+  <!-- soft blurred shadow beneath the looped belt -->
+  <ellipse cx="512" cy="540" rx="300" ry="300" fill="#5a0d12" opacity="0.30" filter="url(#softShadowC)"/>
+
+  <!-- belt coiled into a ring (the belt as an O) -->
+  <g filter="url(#dropC)">
+    <!-- outer ring band -->
+    <circle cx="512" cy="512" r="280" fill="none" stroke="url(#ringC)" stroke-width="96"/>
+    <!-- highlight sheen on top of ring -->
+    <path d="M312 350 A280 280 0 0 1 712 350" fill="none" stroke="#ffffff" stroke-width="22" stroke-linecap="round" opacity="0.65"/>
+    <!-- inner groove on ring -->
+    <circle cx="512" cy="512" r="280" fill="none" stroke="#cdd3de" stroke-width="6" opacity="0.7"/>
+
+    <!-- the crossing knot where the belt overlaps, bottom -->
+    <g transform="translate(512 760)">
+      <rect x="-118" y="-58" width="236" height="116" rx="28" fill="url(#ringC)"/>
+      <rect x="-94" y="-44" width="188" height="22" rx="11" fill="#ffffff" opacity="0.7"/>
+      <!-- red rank stripes on the knot -->
+      <rect x="-58" y="-30" width="22" height="60" rx="6" fill="#E63946"/>
+      <rect x="-18" y="-30" width="22" height="60" rx="6" fill="#E63946"/>
+      <rect x="22" y="-30" width="22" height="60" rx="6" fill="#E63946"/>
+    </g>
+  </g>
+</svg>

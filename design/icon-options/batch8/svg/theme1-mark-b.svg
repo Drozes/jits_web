@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <radialGradient id="bTile" cx="0.3" cy="0.25" r="1.05" gradientUnits="objectBoundingBox">
+      <stop offset="0" stop-color="#ff5566"/>
+      <stop offset="0.42" stop-color="#E63946"/>
+      <stop offset="1" stop-color="#8c1130"/>
+    </radialGradient>
+    <linearGradient id="bMagenta" x1="0" y1="0" x2="1024" y2="1024" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#E63946" stop-opacity="0"/>
+      <stop offset="1" stop-color="#b21266" stop-opacity="0.65"/>
+    </linearGradient>
+    <radialGradient id="bGloss" cx="0.5" cy="0.08" r="0.78" gradientUnits="objectBoundingBox">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.6"/>
+      <stop offset="0.5" stop-color="#ffffff" stop-opacity="0.1"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="bSoft" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="14" stdDeviation="22" flood-color="#5a0a22" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+
+  <!-- full-bleed tile -->
+  <rect x="0" y="0" width="1024" height="1024" rx="180" fill="url(#bTile)"/>
+  <rect x="0" y="0" width="1024" height="1024" rx="180" fill="url(#bMagenta)"/>
+  <!-- glossy top sheen -->
+  <rect x="0" y="0" width="1024" height="1024" rx="180" fill="url(#bGloss)"/>
+
+  <!-- ER monogram, knockout white, floating -->
+  <g filter="url(#bSoft)" fill="#ffffff">
+    <!-- E spine -->
+    <rect x="250" y="312" width="104" height="400" rx="12"/>
+    <!-- E top bar -->
+    <rect x="250" y="312" width="248" height="92" rx="12"/>
+    <!-- E middle bar -->
+    <rect x="250" y="466" width="206" height="88" rx="12"/>
+    <!-- E bottom bar -->
+    <rect x="250" y="620" width="248" height="92" rx="12"/>
+
+    <!-- R: spine + bowl + leg as one connected glyph (even-odd counter) -->
+    <path fill-rule="evenodd" d="M 548 312
+      H 686
+      a 124 124 0 0 1 0 248
+      H 652
+      l 108 152
+      h -126
+      l -82 -116
+      v 116
+      h -104
+      Z
+      M 652 396
+      v 80
+      h 34
+      a 40 40 0 0 0 0 -80
+      Z"/>
+  </g>
+</svg>

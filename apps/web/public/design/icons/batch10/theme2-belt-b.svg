@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="bBg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F2EBDB"/>
+      <stop offset="100%" stop-color="#E1D8C2"/>
+    </linearGradient>
+    <radialGradient id="bDisc" cx="50%" cy="40%" r="65%">
+      <stop offset="0%" stop-color="#22344e"/>
+      <stop offset="100%" stop-color="#1B2A41"/>
+    </radialGradient>
+    <linearGradient id="bGold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#E6C97C"/>
+      <stop offset="50%" stop-color="#C9A24B"/>
+      <stop offset="100%" stop-color="#977730"/>
+    </linearGradient>
+    <linearGradient id="bBelt" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#9b2a37"/>
+      <stop offset="100%" stop-color="#7A1F2B"/>
+    </linearGradient>
+  </defs>
+
+  <!-- full-bleed cream background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="url(#bBg)"/>
+
+  <!-- subtle corner laurel marks -->
+  <g fill="#C9A24B" opacity="0.28">
+    <circle cx="120" cy="120" r="10"/>
+    <circle cx="904" cy="120" r="10"/>
+    <circle cx="120" cy="904" r="10"/>
+    <circle cx="904" cy="904" r="10"/>
+  </g>
+
+  <!-- outer gold ring -->
+  <circle cx="512" cy="512" r="392" fill="url(#bGold)"/>
+  <!-- rope-knurl ring (dashed) -->
+  <circle cx="512" cy="512" r="392" fill="none" stroke="#7d6228" stroke-width="10"
+          stroke-dasharray="6 22" stroke-linecap="round"/>
+  <!-- navy disc -->
+  <circle cx="512" cy="512" r="350" fill="url(#bDisc)"/>
+  <!-- thin gold inner ring -->
+  <circle cx="512" cy="512" r="318" fill="none" stroke="#C9A24B" stroke-width="5" opacity="0.8"/>
+
+  <!-- ===== CREST LETTERING (straight baseline, librsvg-safe) ===== -->
+  <text x="512" y="290" font-family="serif" font-size="74" font-weight="bold" fill="#EDE6D6"
+        text-anchor="middle" letter-spacing="14">ELO RATED</text>
+  <text x="512" y="772" font-family="serif" font-size="44" font-weight="bold" fill="#C9A24B"
+        text-anchor="middle" letter-spacing="20">EST 2026</text>
+
+  <!-- side star separators -->
+  <g fill="#C9A24B">
+    <path d="M236 512 l10 -22 l10 22 l22 10 l-22 10 l-10 22 l-10 -22 l-22 -10 z"/>
+    <path d="M788 512 l10 -22 l10 22 l22 10 l-22 10 l-10 22 l-10 -22 l-22 -10 z"/>
+  </g>
+
+  <!-- ===== CENTRAL CHARGE: belt band with rank stripes ===== -->
+  <g transform="translate(512 488)">
+    <!-- main belt band -->
+    <rect x="-216" y="-46" width="432" height="92" rx="8" fill="url(#bBelt)"/>
+    <!-- top and bottom edge highlight -->
+    <rect x="-216" y="-46" width="432" height="14" rx="6" fill="#b23a47" opacity="0.6"/>
+    <rect x="-216" y="-46" width="432" height="92" rx="8" fill="none" stroke="#5e1822" stroke-width="5"/>
+
+    <!-- black rank bar -->
+    <rect x="70" y="-46" width="146" height="92" rx="0" fill="#14202f"/>
+    <rect x="70" y="-46" width="146" height="92" fill="none" stroke="#5e1822" stroke-width="4"/>
+    <!-- four gold rank stripes -->
+    <rect x="86" y="-40" width="14" height="80" fill="url(#bGold)"/>
+    <rect x="112" y="-40" width="14" height="80" fill="url(#bGold)"/>
+    <rect x="138" y="-40" width="14" height="80" fill="url(#bGold)"/>
+    <rect x="164" y="-40" width="14" height="80" fill="url(#bGold)"/>
+
+    <!-- left end notch / wear lines -->
+    <rect x="-200" y="-30" width="6" height="60" fill="#5e1822" opacity="0.5"/>
+    <rect x="-180" y="-30" width="4" height="60" fill="#5e1822" opacity="0.35"/>
+  </g>
+
+  <!-- small banner under belt -->
+  <g transform="translate(512 612)">
+    <path d="M-150 0 L150 0 L130 30 L150 60 L-150 60 L-130 30 Z" fill="url(#bGold)"/>
+    <path d="M-150 0 L150 0 L130 30 L150 60 L-150 60 L-130 30 Z" fill="none" stroke="#977730" stroke-width="3"/>
+    <text x="0" y="42" font-family="serif" font-size="34" font-weight="bold" fill="#1B2A41" text-anchor="middle" letter-spacing="6">RANKED</text>
+  </g>
+</svg>

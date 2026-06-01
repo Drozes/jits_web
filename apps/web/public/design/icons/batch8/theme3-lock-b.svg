@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="tileB" x1="0" y1="0" x2="900" y2="1024" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ff4d6d"/>
+      <stop offset="0.5" stop-color="#e63946"/>
+      <stop offset="1" stop-color="#9b1d4a"/>
+    </linearGradient>
+    <radialGradient id="glossB" cx="0.32" cy="0.14" r="0.95" gradientUnits="objectBoundingBox">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.5"/>
+      <stop offset="0.4" stop-color="#ffffff" stop-opacity="0.12"/>
+      <stop offset="0.75" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <!-- glossy white/silver lock body -->
+    <linearGradient id="bodyB" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.5" stop-color="#f3f6fa"/>
+      <stop offset="1" stop-color="#cdd6e0"/>
+    </linearGradient>
+    <linearGradient id="bodyGlossB" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.95"/>
+      <stop offset="0.45" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <!-- gold shackle -->
+    <linearGradient id="shackleB" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff1c6"/>
+      <stop offset="0.5" stop-color="#ffcf5e"/>
+      <stop offset="1" stop-color="#e08a05"/>
+    </linearGradient>
+    <filter id="softB" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="22" result="b"/>
+      <feOffset in="b" dx="0" dy="20" result="o"/>
+      <feFlood flood-color="#5e0c20" flood-opacity="0.5"/>
+      <feComposite in2="o" operator="in" result="sh"/>
+      <feMerge>
+        <feMergeNode in="sh"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- full-bleed tile -->
+  <rect x="0" y="0" width="1024" height="1024" rx="180" fill="url(#tileB)"/>
+  <rect x="0" y="0" width="1024" height="1024" rx="180" fill="url(#glossB)"/>
+
+  <!-- The Lock: padlock with gold shackle + white glossy body -->
+  <g filter="url(#softB)">
+    <!-- shackle (open-ended U) behind the body -->
+    <path d="M388 466
+             L388 356
+             A124 124 0 0 1 636 356
+             L636 466
+             L566 466
+             L566 356
+             A54 54 0 0 0 458 356
+             L458 466
+             Z"
+          fill="url(#shackleB)"/>
+
+    <!-- rounded lock body -->
+    <rect x="304" y="448" width="416" height="384" rx="96" fill="url(#bodyB)"/>
+    <!-- top sheen -->
+    <rect x="304" y="448" width="416" height="384" rx="96" fill="url(#bodyGlossB)"/>
+
+    <!-- keyhole knockout in brand red -->
+    <circle cx="512" cy="592" r="56" fill="#e63946"/>
+    <path d="M490 622 L534 622 L552 740 L472 740 Z" fill="#e63946"/>
+  </g>
+
+  <!-- specular streak on the body -->
+  <ellipse cx="408" cy="520" rx="64" ry="26" fill="#ffffff" opacity="0.7" transform="rotate(-28 408 520)"/>
+</svg>

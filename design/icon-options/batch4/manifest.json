@@ -1,0 +1,178 @@
+{
+  "batch": "batch4",
+  "num": 4,
+  "label": "Grappling",
+  "date": "2026-06-01",
+  "themes": [
+    {
+      "key": "guard",
+      "title": "The Guard"
+    },
+    {
+      "key": "submission",
+      "title": "The Submission"
+    },
+    {
+      "key": "takedown",
+      "title": "The Takedown"
+    },
+    {
+      "key": "grip",
+      "title": "The Grip"
+    },
+    {
+      "key": "back",
+      "title": "Back Control"
+    },
+    {
+      "key": "scramble",
+      "title": "The Scramble"
+    }
+  ],
+  "icons": [
+    {
+      "theme": "guard",
+      "themeTitle": "The Guard",
+      "file": "theme1-guard-a",
+      "name": "Closed Guard",
+      "concept": "A trapped white opponent squeezed by two heavy red legs that cross below into a gold ankle-lock knot, the closed-guard leg lock.",
+      "score": 4
+    },
+    {
+      "theme": "guard",
+      "themeTitle": "The Guard",
+      "file": "theme1-guard-b",
+      "name": "Butterfly Frame",
+      "concept": "A bold symmetric open-guard V-frame: red butterfly legs splayed with upturned gold foot hooks framing the controlled space.",
+      "score": 3
+    },
+    {
+      "theme": "guard",
+      "themeTitle": "The Guard",
+      "file": "theme1-guard-c",
+      "name": "Guard Cage",
+      "concept": "Four interlocking red-and-white brackets pinwheel shut around a gold locked core, guard reduced to pure containment.",
+      "score": 4
+    },
+    {
+      "theme": "submission",
+      "themeTitle": "The Submission",
+      "file": "theme2-submission-a",
+      "name": "Triangle Lock",
+      "concept": "Heavy red triangle-choke frame clamping a trapped white arm, gold cinch knot at the apex.",
+      "score": 4
+    },
+    {
+      "theme": "submission",
+      "themeTitle": "The Submission",
+      "file": "theme2-submission-b",
+      "name": "Armbar Break",
+      "concept": "A white arm levered into a hard inverted-V over a red fulcrum block, gold stress wedge marking the break point at the elbow.",
+      "score": 3
+    },
+    {
+      "theme": "submission",
+      "themeTitle": "The Submission",
+      "file": "theme2-submission-c",
+      "name": "Seatbelt Choke",
+      "concept": "Two interlocking red arm-hooks (the rear-naked-choke seatbelt grip) clasped around a white neck column with a gold clasp at the lock.",
+      "score": 4
+    },
+    {
+      "theme": "takedown",
+      "themeTitle": "The Takedown",
+      "file": "theme3-takedown-a",
+      "name": "Drive Shot",
+      "concept": "A red level-change drive-arrow shoots low and penetrates the base of a standing white figure on the mat \u2014 the double-leg, with a gold impact spark at contact.",
+      "score": 4
+    },
+    {
+      "theme": "takedown",
+      "themeTitle": "The Takedown",
+      "file": "theme3-takedown-b",
+      "name": "Hip Toss",
+      "concept": "A heavy red rotational sweep-arc flings a white body-block up and over a red pivot fulcrum into a ground-slam zone \u2014 the throw rotation, gold launch accent at the apex.",
+      "score": 2
+    },
+    {
+      "theme": "takedown",
+      "themeTitle": "The Takedown",
+      "file": "theme3-takedown-c",
+      "name": "Shot & Sprawl",
+      "concept": "Two opposing brutalist wedges collide head-on \u2014 a red shot driving up, a white sprawl dropping down to stuff it \u2014 locked on a gold impact seam.",
+      "score": 3
+    },
+    {
+      "theme": "grip",
+      "themeTitle": "The Grip",
+      "file": "theme4-grip-a",
+      "name": "Collar Clamp",
+      "concept": "A heavy red fist clamps a white gi lapel-V, four knuckle bars wrapping over the collar with a gold tension spark at the bite.",
+      "score": 4
+    },
+    {
+      "theme": "grip",
+      "themeTitle": "The Grip",
+      "file": "theme4-grip-b",
+      "name": "Two-Grip Cross",
+      "concept": "Sleeve-and-collar control: two red fists clamp two crossing white gi strips forming an X, gold diamond marking the contested center.",
+      "score": 3
+    },
+    {
+      "theme": "grip",
+      "themeTitle": "The Grip",
+      "file": "theme4-grip-c",
+      "name": "Lapel Fist",
+      "concept": "Frontal emblem of a single brutal red fist gripping a vertical white lapel that runs the full canvas, gold wedge where the grip crushes.",
+      "score": 5
+    },
+    {
+      "theme": "back",
+      "themeTitle": "Back Control",
+      "file": "theme5-back-a",
+      "name": "Seatbelt",
+      "concept": "Bold red seatbelt-harness X crossing a defender's torso, locked by a white buckle = the back-control grip.",
+      "score": 4
+    },
+    {
+      "theme": "back",
+      "themeTitle": "Back Control",
+      "file": "theme5-back-b",
+      "name": "Hooks In",
+      "concept": "Two heavy red hook-clamps gripping a central torso bar from behind = both hooks inserted, control sealed.",
+      "score": 2
+    },
+    {
+      "theme": "back",
+      "themeTitle": "Back Control",
+      "file": "theme5-back-c",
+      "name": "Back Take",
+      "concept": "Stacked two-figure silhouette: a red grappler riding the back of a white defender, gold buckle on the chest.",
+      "score": 5
+    },
+    {
+      "theme": "scramble",
+      "themeTitle": "The Scramble",
+      "file": "theme6-scramble-a",
+      "name": "Clinch Pinwheel",
+      "concept": "Two hook-shaped grappler bodies rotated 180 degrees about a gold lock, spiraling into each other like a clinch caught mid-spin.",
+      "score": 3
+    },
+    {
+      "theme": "scramble",
+      "themeTitle": "The Scramble",
+      "file": "theme6-scramble-b",
+      "name": "Locked Halves",
+      "concept": "Red and white grapplers fused into one tight square block, arms reaching across and meeting at a gold center: two bodies interlocked into a single brutalist mark.",
+      "score": 4
+    },
+    {
+      "theme": "scramble",
+      "themeTitle": "The Scramble",
+      "file": "theme6-scramble-c",
+      "name": "Woven Limbs",
+      "concept": "Two heavy angular limbs sweeping in opposite diagonals, weaving over and under each other into a centered gold-locked knot: chaos of the roll tangled into one form.",
+      "score": 4
+    }
+  ]
+}

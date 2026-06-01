@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="bTile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#E63946"/>
+      <stop offset="0.5" stop-color="#c41e2f"/>
+      <stop offset="1" stop-color="#7a0f1e"/>
+    </linearGradient>
+    <linearGradient id="bZoneTop" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff7b86"/>
+      <stop offset="1" stop-color="#E63946"/>
+    </linearGradient>
+    <linearGradient id="bZoneBot" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#f59e0b"/>
+      <stop offset="1" stop-color="#fbbf24"/>
+    </linearGradient>
+    <radialGradient id="bGloss" cx="0.5" cy="0.14" r="0.9">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.5"/>
+      <stop offset="0.5" stop-color="#ffffff" stop-opacity="0.08"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="bSeam" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="8"/>
+    </filter>
+    <filter id="bDrop" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="10" stdDeviation="16" flood-color="#3a060c" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+
+  <!-- full-bleed tile -->
+  <rect x="0" y="0" width="1024" height="1024" rx="180" fill="url(#bTile)"/>
+
+  <!-- two zones meeting on a diagonal, clipped to the tile -->
+  <clipPath id="bClip"><rect x="0" y="0" width="1024" height="1024" rx="180"/></clipPath>
+  <g clip-path="url(#bClip)">
+    <polygon points="0,0 1024,0 1024,420 0,640" fill="url(#bZoneTop)"/>
+    <polygon points="0,640 1024,420 1024,1024 0,1024" fill="url(#bZoneBot)"/>
+    <!-- glowing seam where zones meet -->
+    <polygon points="0,640 1024,420 1024,452 0,672" fill="#ffffff" opacity="0.85" filter="url(#bSeam)"/>
+    <polygon points="0,640 1024,420 1024,440 0,660" fill="#ffffff" opacity="0.95"/>
+  </g>
+
+  <!-- glossy highlight on top -->
+  <rect x="0" y="0" width="1024" height="1024" rx="180" fill="url(#bGloss)"/>
+
+  <!-- VS lettering built from geometry, white, floating -->
+  <g filter="url(#bDrop)">
+    <!-- V -->
+    <polygon fill="#ffffff" points="312,372 372,372 432,560 380,560"/>
+    <polygon fill="#ffffff" points="432,560 492,372 552,372 484,580 396,580"/>
+    <!-- S built from rects/paths -->
+    <path fill="#ffffff" d="M712 372
+      C636 372 596 410 596 462
+      C596 510 632 532 692 544
+      C726 551 740 558 740 574
+      C740 592 722 602 692 602
+      C656 602 632 590 614 568
+      L578 612
+      C606 644 648 660 696 660
+      C772 660 814 620 814 564
+      C814 514 778 492 716 480
+      C682 473 670 466 670 452
+      C670 436 686 428 712 428
+      C742 428 762 438 778 456
+      L814 414
+      C788 388 754 372 712 372 Z"/>
+  </g>
+</svg>

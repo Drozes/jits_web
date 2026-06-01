@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect x="0" y="0" width="1024" height="1024" fill="#E63946"/>
+
+  <!-- ========== POSTER BADGE: WHITE STANCE FIGURE ON RED, VOID FRAME ========== -->
+  <!-- Inverted palette take: dominant Signal Red field, a heavy Void frame,
+       and the wrestler's low coiled stance rendered as a bold Terminal-White silhouette.
+       Reads like a stamped fight-poster crest. -->
+
+  <!-- void border frame (brutalist heavy outline) -->
+  <rect x="120" y="120" width="784" height="784" fill="none" stroke="#0D0F14" stroke-width="44"/>
+
+  <!-- inner void panel that the white figure stands on -->
+  <rect x="180" y="180" width="664" height="664" fill="#0D0F14"/>
+
+  <!-- ground bar -->
+  <rect x="180" y="772" width="664" height="36" fill="#E63946"/>
+
+  <!-- ===== WHITE WRESTLER, LOW STAGGERED READY-STANCE (front-facing crouch) ===== -->
+  <!-- head ducked, shoulders rolled, both arms hanging low/forward, wide planted base -->
+
+  <!-- head -->
+  <circle cx="512" cy="300" r="64" fill="#E8EDF2"/>
+
+  <!-- broad hunched shoulders/torso (trapezoid, wider at shoulders) -->
+  <polygon points="396,372 628,372 588,556 436,556" fill="#E8EDF2"/>
+
+  <!-- left arm sweeping down-forward to a low hand -->
+  <polygon points="404,392 318,520 372,556 452,452" fill="#E8EDF2"/>
+  <circle cx="334" cy="540" r="40" fill="#E8EDF2"/>
+
+  <!-- right arm sweeping down-forward to a low hand -->
+  <polygon points="620,392 706,520 652,556 572,452" fill="#E8EDF2"/>
+  <circle cx="690" cy="540" r="40" fill="#E8EDF2"/>
+
+  <!-- hips block -->
+  <polygon points="438,540 586,540 612,640 412,640" fill="#E8EDF2"/>
+
+  <!-- LEAD leg (staggered forward-left), bent, planted wide -->
+  <polygon points="438,624 520,624 470,772 372,772" fill="#E8EDF2"/>
+  <rect x="346" y="772" width="150" height="40" fill="#E8EDF2"/>
+
+  <!-- TRAIL leg (staggered back-right), bent, planted wide -->
+  <polygon points="540,624 622,624 696,772 580,772" fill="#E8EDF2"/>
+  <rect x="560" y="772" width="150" height="40" fill="#E8EDF2"/>
+
+  <!-- gold belt line across the hips: rank / peak accent -->
+  <rect x="430" y="556" width="164" height="22" fill="#f59e0b"/>
+</svg>

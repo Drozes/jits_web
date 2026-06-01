@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- Heraldic shield emblem of Zeus -->
+  <polygon fill="#E63946" points="
+    512,170
+    790,260
+    790,560
+    512,854
+    234,560
+    234,260
+  "/>
+  <!-- Inset void to make shield a bold frame -->
+  <polygon fill="#0D0F14" points="
+    512,232
+    742,306
+    742,548
+    512,786
+    282,548
+    282,306
+  "/>
+
+  <!-- Bolt-in-emblem: classic two-pronged Greek thunderbolt (horizontal) -->
+  <!-- Central diamond core -->
+  <polygon fill="#f59e0b" points="
+    512,372
+    600,512
+    512,652
+    424,512
+  "/>
+
+  <!-- Left wing prongs -->
+  <polygon fill="#E63946" points="
+    424,512
+    300,430
+    372,500
+    300,470
+    400,540
+  "/>
+  <polygon fill="#E63946" points="
+    424,512
+    300,594
+    372,524
+    300,554
+    400,484
+  "/>
+
+  <!-- Right wing prongs -->
+  <polygon fill="#E63946" points="
+    600,512
+    724,430
+    652,500
+    724,470
+    624,540
+  "/>
+  <polygon fill="#E63946" points="
+    600,512
+    724,594
+    652,524
+    724,554
+    624,484
+  "/>
+
+  <!-- White hot center spark -->
+  <polygon fill="#E8EDF2" points="
+    512,442
+    556,512
+    512,582
+    468,512
+  "/>
+</svg>

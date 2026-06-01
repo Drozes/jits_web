@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Full-bleed Void background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- =========================================================
+       RANK MEDALLION pixel sprite. 16x16 grid, 64px cells.
+       A blocky "circle" badge (pixel-approximated) in gold with a
+       Signal-Red ring, a white up-chevron in the center, and a
+       ribbon below. Pure square pixels, staircased edges.
+       ========================================================= -->
+
+  <!-- ===== Ribbon (behind medallion), two tails, Signal Red ===== -->
+  <g fill="#E63946">
+    <!-- left tail -->
+    <rect x="320" y="704" width="64" height="64"/>
+    <rect x="320" y="768" width="64" height="64"/>
+    <rect x="320" y="832" width="64" height="64"/>
+    <rect x="384" y="832" width="64" height="64"/>
+    <!-- right tail -->
+    <rect x="576" y="704" width="64" height="64"/>
+    <rect x="640" y="768" width="64" height="64"/>
+    <rect x="640" y="832" width="64" height="64"/>
+    <rect x="576" y="832" width="64" height="64"/>
+  </g>
+  <!-- ribbon notch shading -->
+  <g fill="#0D0F14">
+    <rect x="384" y="896" width="64" height="64"/>
+    <rect x="576" y="896" width="64" height="64"/>
+  </g>
+
+  <!-- ===== Dark outline ring of the medallion (pixel circle) ===== -->
+  <g fill="#06080B">
+    <!-- row 2 (top) cols 6-9 -->
+    <rect x="384" y="128" width="256" height="64"/>
+    <!-- row 3 cols 4-11 -->
+    <rect x="256" y="192" width="512" height="64"/>
+    <!-- row 4 cols 3-12 -->
+    <rect x="192" y="256" width="640" height="64"/>
+    <!-- rows 5-8 cols 2-13 -->
+    <rect x="128" y="320" width="768" height="64"/>
+    <rect x="128" y="384" width="768" height="64"/>
+    <rect x="128" y="448" width="768" height="64"/>
+    <rect x="128" y="512" width="768" height="64"/>
+    <!-- row 9 cols 3-12 -->
+    <rect x="192" y="576" width="640" height="64"/>
+    <!-- row 10 cols 4-11 -->
+    <rect x="256" y="640" width="512" height="64"/>
+    <!-- row 11 (bottom) cols 6-9 -->
+    <rect x="384" y="704" width="256" height="64"/>
+  </g>
+
+  <!-- ===== Gold medallion face (inset one pixel from outline) ===== -->
+  <g fill="#f59e0b">
+    <rect x="384" y="192" width="256" height="64"/>   <!-- top -->
+    <rect x="256" y="256" width="512" height="64"/>
+    <rect x="192" y="320" width="640" height="64"/>
+    <rect x="192" y="384" width="640" height="64"/>
+    <rect x="192" y="448" width="640" height="64"/>
+    <rect x="256" y="512" width="512" height="64"/>
+    <rect x="384" y="576" width="256" height="64"/>   <!-- bottom -->
+  </g>
+
+  <!-- ===== Signal Red inner ring accent (a few rim pixels) ===== -->
+  <g fill="#E63946">
+    <rect x="384" y="192" width="64" height="64"/>
+    <rect x="576" y="192" width="64" height="64"/>
+    <rect x="256" y="256" width="64" height="64"/>
+    <rect x="704" y="256" width="64" height="64"/>
+    <rect x="192" y="384" width="64" height="64"/>
+    <rect x="768" y="384" width="64" height="64"/>
+    <rect x="256" y="512" width="64" height="64"/>
+    <rect x="704" y="512" width="64" height="64"/>
+    <rect x="384" y="576" width="64" height="64"/>
+    <rect x="576" y="576" width="64" height="64"/>
+  </g>
+
+  <!-- ===== White up-arrow in the center (the "climb"), single crisp sprite ===== -->
+  <g fill="#E8EDF2">
+    <!-- tip -->
+    <rect x="480" y="256" width="64" height="64"/>
+    <!-- arrowhead row 2 -->
+    <rect x="416" y="320" width="64" height="64"/>
+    <rect x="480" y="320" width="64" height="64"/>
+    <rect x="544" y="320" width="64" height="64"/>
+    <!-- arrowhead row 3 (full wings) -->
+    <rect x="352" y="384" width="64" height="64"/>
+    <rect x="416" y="384" width="64" height="64"/>
+    <rect x="480" y="384" width="64" height="64"/>
+    <rect x="544" y="384" width="64" height="64"/>
+    <rect x="608" y="384" width="64" height="64"/>
+    <!-- shaft -->
+    <rect x="480" y="448" width="64" height="64"/>
+  </g>
+
+  <!-- ===== Gold sparkle pixels around the badge ===== -->
+  <g fill="#f59e0b">
+    <rect x="64"  y="128" width="64" height="64"/>
+    <rect x="896" y="192" width="64" height="64"/>
+    <rect x="832" y="64"  width="64" height="64"/>
+  </g>
+</svg>

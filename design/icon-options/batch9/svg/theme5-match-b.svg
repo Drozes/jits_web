@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Full-bleed Void background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- 16x16 pixel grid: each cell = 64 -->
+
+  <!-- ===== LEFT ZONE (RED) : staircased pixel territory ===== -->
+  <g fill="#E63946">
+    <rect x="0"   y="0"   width="320" height="64"/>
+    <rect x="0"   y="64"  width="320" height="64"/>
+    <rect x="0"   y="128" width="384" height="64"/>
+    <rect x="0"   y="192" width="384" height="64"/>
+    <rect x="0"   y="256" width="448" height="64"/>
+    <rect x="0"   y="320" width="448" height="64"/>
+    <rect x="0"   y="384" width="512" height="64"/>
+    <rect x="0"   y="448" width="448" height="64"/>
+    <rect x="0"   y="512" width="448" height="64"/>
+    <rect x="0"   y="576" width="384" height="64"/>
+    <rect x="0"   y="640" width="384" height="64"/>
+    <rect x="0"   y="704" width="448" height="64"/>
+    <rect x="0"   y="768" width="448" height="64"/>
+    <rect x="0"   y="832" width="384" height="64"/>
+    <rect x="0"   y="896" width="320" height="64"/>
+    <rect x="0"   y="960" width="320" height="64"/>
+  </g>
+
+  <!-- ===== RIGHT ZONE (WHITE) : mirrored staircased territory ===== -->
+  <g fill="#E8EDF2">
+    <rect x="704" y="0"   width="320" height="64"/>
+    <rect x="704" y="64"  width="320" height="64"/>
+    <rect x="640" y="128" width="384" height="64"/>
+    <rect x="640" y="192" width="384" height="64"/>
+    <rect x="576" y="256" width="448" height="64"/>
+    <rect x="576" y="320" width="448" height="64"/>
+    <rect x="512" y="384" width="512" height="64"/>
+    <rect x="576" y="448" width="448" height="64"/>
+    <rect x="576" y="512" width="448" height="64"/>
+    <rect x="640" y="576" width="384" height="64"/>
+    <rect x="640" y="640" width="384" height="64"/>
+    <rect x="576" y="704" width="448" height="64"/>
+    <rect x="576" y="768" width="448" height="64"/>
+    <rect x="640" y="832" width="384" height="64"/>
+    <rect x="704" y="896" width="320" height="64"/>
+    <rect x="704" y="960" width="320" height="64"/>
+  </g>
+
+  <!-- ===== CENTRE COLLISION SEAM (gold pixel lightning bolt / VS spark) ===== -->
+  <g fill="#f59e0b">
+    <!-- bolt top -->
+    <rect x="512" y="0"   width="64" height="64"/>
+    <rect x="448" y="64"  width="64" height="64"/>
+    <rect x="512" y="64"  width="64" height="64"/>
+    <rect x="448" y="128" width="64" height="64"/>
+    <rect x="512" y="128" width="64" height="64"/>
+    <!-- widen at impact -->
+    <rect x="448" y="192" width="128" height="64"/>
+    <rect x="512" y="256" width="64" height="64"/>
+    <rect x="448" y="320" width="64" height="64"/>
+    <rect x="512" y="320" width="64" height="64"/>
+    <!-- impact burst centre -->
+    <rect x="448" y="448" width="128" height="64"/>
+    <rect x="512" y="384" width="64" height="64"/>
+    <rect x="448" y="512" width="64" height="64"/>
+    <!-- bolt bottom -->
+    <rect x="512" y="576" width="64" height="64"/>
+    <rect x="448" y="640" width="64" height="64"/>
+    <rect x="512" y="640" width="64" height="64"/>
+    <rect x="448" y="704" width="128" height="64"/>
+    <rect x="512" y="768" width="64" height="64"/>
+    <rect x="448" y="832" width="64" height="64"/>
+    <rect x="512" y="832" width="64" height="64"/>
+    <rect x="512" y="896" width="64" height="64"/>
+    <rect x="448" y="960" width="64" height="64"/>
+  </g>
+
+  <!-- impact spark pixels radiating from centre -->
+  <g fill="#37c0d6">
+    <rect x="384" y="448" width="64" height="64"/>
+    <rect x="576" y="448" width="64" height="64"/>
+    <rect x="448" y="384" width="64" height="64"/>
+    <rect x="512" y="512" width="64" height="64"/>
+    <rect x="320" y="448" width="64" height="64"/>
+    <rect x="640" y="448" width="64" height="64"/>
+  </g>
+</svg>

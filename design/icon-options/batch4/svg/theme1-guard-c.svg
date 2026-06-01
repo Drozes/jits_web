@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- ABSTRACT GUARD 'CAGE': four heavy interlocking brackets close around
+       a central locked core. Guard = containment. Two red brackets (the guard
+       player's frame) interlock over two white brackets (the opponent), gold
+       lock at the center where control is established. -->
+
+  <!-- TOP-LEFT red bracket -->
+  <path d="M 196 196 L 512 196 L 512 312 L 312 312 L 312 512 L 196 512 Z" fill="#E63946"/>
+  <!-- BOTTOM-RIGHT red bracket (mirror, interlocking) -->
+  <path d="M 828 828 L 512 828 L 512 712 L 712 712 L 712 512 L 828 512 Z" fill="#E63946"/>
+
+  <!-- TOP-RIGHT white bracket (opponent frame) -->
+  <path d="M 828 196 L 828 512 L 712 512 L 712 312 L 512 312 L 512 196 Z" fill="#E8EDF2"/>
+  <!-- BOTTOM-LEFT white bracket (mirror) -->
+  <path d="M 196 828 L 196 512 L 312 512 L 312 712 L 512 712 L 512 828 Z" fill="#E8EDF2"/>
+
+  <!-- Central locked core (gold diamond = guard secured) -->
+  <rect x="450" y="450" width="124" height="124" rx="8" fill="#f59e0b" transform="rotate(45 512 512)"/>
+  <!-- void notch in the core to keep it crisp at small size -->
+  <rect x="479" y="479" width="66" height="66" rx="4" fill="#0D0F14" transform="rotate(45 512 512)"/>
+</svg>

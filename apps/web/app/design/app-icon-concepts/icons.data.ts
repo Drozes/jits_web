@@ -174,6 +174,1154 @@ export const BATCHES: Batch[] = [
     ]
   },
   {
+    "batch": "batch10",
+    "num": 10,
+    "label": "Vintage Crest",
+    "date": "2026-06-01",
+    "themes": [
+      {
+        "title": "The E / ER Mark",
+        "icons": [
+          {
+            "id": "B10-01",
+            "file": "theme1-mark-a",
+            "name": "Shield Varsity",
+            "concept": "Heraldic oxblood shield with laurel ring, EST 2026 stars and an ELO RATED banner, bold cream E with ascending bars as the central charge.",
+            "score": 5
+          },
+          {
+            "id": "B10-02",
+            "file": "theme1-mark-b",
+            "name": "Medallion Seal",
+            "concept": "Circular collegiate medallion: navy disc, gold rim, ELO RATED / EST 2026 ring lettering, interlocked cream-and-gold ER monogram over an oxblood core with a RANKED ribbon.",
+            "score": 4
+          },
+          {
+            "id": "B10-03",
+            "file": "theme1-mark-c",
+            "name": "Pennant Crest",
+            "concept": "Vertical navy pennant-shield with a Signal Red ELO RATED top banner, antique-gold EST 2026 chief, ascending gold E with a momentum triangle, oxblood point and apex star.",
+            "score": 4
+          }
+        ]
+      },
+      {
+        "title": "The Belt",
+        "icons": [
+          {
+            "id": "B10-04",
+            "file": "theme2-belt-a",
+            "name": "Knot Shield",
+            "concept": "Heraldic maroon shield with laurel branches, top banner ribbon and EST 2026 scroll, charged with a tied BJJ belt knot bearing gold rank stripes.",
+            "score": 5
+          },
+          {
+            "id": "B10-05",
+            "file": "theme2-belt-b",
+            "name": "Varsity Medallion",
+            "concept": "Circular antique-gold coin with rope-knurl edge and arced ELO RATED / EST 2026 serif lettering around a maroon belt band with four gold rank stripes.",
+            "score": 4
+          },
+          {
+            "id": "B10-06",
+            "file": "theme2-belt-c",
+            "name": "Crossed Belts Pennant",
+            "concept": "Navy pennant-shield with cream field and maroon chevron banner, centered on crossed maroon and gold rank belts joined by a tied cream knot.",
+            "score": 5
+          }
+        ]
+      },
+      {
+        "title": "The Lock",
+        "icons": [
+          {
+            "id": "B10-07",
+            "file": "theme3-lock-a",
+            "name": "Triangle Shield",
+            "concept": "Heraldic cream shield with an oxblood triangle-choke charge, gold cinch rivet, EST 2026 chief band and ELO RATED ribbon banner over crossed laurels.",
+            "score": 5
+          },
+          {
+            "id": "B10-08",
+            "file": "theme3-lock-b",
+            "name": "Clinch Seal",
+            "concept": "Collegiate gold-and-navy medallion with curved ELO RATED / EST 2026 seal lettering ringing two interlocked clinch figures locked by a gold tie-up knot on a cream disc.",
+            "score": 4
+          },
+          {
+            "id": "B10-09",
+            "file": "theme3-lock-c",
+            "name": "Varsity Lock Badge",
+            "concept": "Rounded varsity badge plate on forest ground, bold triangle-choke lock built from interlocking navy/oxblood limb bars with gold apex medallion, top ELO RATED scroll and EST 2026 base banner.",
+            "score": 5
+          }
+        ]
+      },
+      {
+        "title": "The Climb",
+        "icons": [
+          {
+            "id": "B10-10",
+            "file": "theme4-climb-a",
+            "name": "Ascendant Shield",
+            "concept": "Maroon varsity shield charged with ascending podium bars and a climbing arrow, ringed by gold laurels with ELO RATED ribbon and EST. 2026.",
+            "score": 4
+          },
+          {
+            "id": "B10-11",
+            "file": "theme4-climb-b",
+            "name": "Rank Medallion Roundel",
+            "concept": "Navy collegiate roundel with a gold rank-medallion bearing a Signal Red up-arrow over ascending chevrons, flanked by EST. 2026 and twin ELO RATED / THE CLIMB banners.",
+            "score": 5
+          },
+          {
+            "id": "B10-12",
+            "file": "theme4-climb-c",
+            "name": "Summit Crest",
+            "concept": "Cream vintage-stamp shield framing a maroon mountain peak with summit flag and switchback climbing path, crossed laurels, EST. 2026 chief and ELO RATED banner.",
+            "score": 5
+          }
+        ]
+      },
+      {
+        "title": "The Match",
+        "icons": [
+          {
+            "id": "B10-13",
+            "file": "theme5-match-a",
+            "name": "Faceoff Shield",
+            "concept": "Navy varsity shield crest with an EST 2026 chief, two facing oxblood/navy profile fighters around a gold VS roundel, laurels and an ELO RATED ribbon.",
+            "score": 4
+          },
+          {
+            "id": "B10-14",
+            "file": "theme5-match-b",
+            "name": "Clash Medallion",
+            "concept": "Antique-gold ring medallion over a split oxblood/navy disc, two cream fists bumping at a Signal Red impact point, ELO RATED and EST 2026 straight banners.",
+            "score": 3
+          },
+          {
+            "id": "B10-15",
+            "file": "theme5-match-c",
+            "name": "Crossed Blades Crest",
+            "concept": "Heraldic badge with a diagonally quartered navy/oxblood field (two zones meeting), crossed swords, a central VS roundel, laurel sprigs and EST 2026 + ELO RATED banners.",
+            "score": 5
+          }
+        ]
+      },
+      {
+        "title": "The Champion",
+        "icons": [
+          {
+            "id": "B10-16",
+            "file": "theme6-champion-a",
+            "name": "Trophy Escutcheon",
+            "concept": "Oxblood varsity shield with a gold champion's trophy cup on a cream field, laurel flanks, EST 2026 scroll and ELO RATED banner ribbon.",
+            "score": 5
+          },
+          {
+            "id": "B10-17",
+            "file": "theme6-champion-b",
+            "name": "Champion Roundel",
+            "concept": "Circular heraldic badge: navy ring arched with ELO RATED / EST 2026, gold stars, oxblood laurel wreath cradling a Signal-Red No.1 star medallion.",
+            "score": 4
+          },
+          {
+            "id": "B10-18",
+            "file": "theme6-champion-c",
+            "name": "Crown Crest",
+            "concept": "Gold-bordered navy heater shield with a cream chief and a jeweled antique-gold champion's crown as the central charge, over a draped ELO RATED banner.",
+            "score": 5
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "batch": "batch9",
+    "num": 9,
+    "label": "Retro Pixel",
+    "date": "2026-06-01",
+    "themes": [
+      {
+        "title": "The E / ER Mark",
+        "icons": [
+          {
+            "id": "B9-01",
+            "file": "theme1-mark-a",
+            "name": "Rising E",
+            "concept": "Pixel E whose three bars step upward left-to-right with gold rating caps and a red staircase trail climbing behind, the rating literally rising.",
+            "score": 4
+          },
+          {
+            "id": "B9-02",
+            "file": "theme1-mark-b",
+            "name": "ER Plate",
+            "concept": "Chunky arcade ER monogram in white pixels knocked onto a Signal Red sprite plate with gold sparkle pixels, fight-game select-screen feel.",
+            "score": 5
+          },
+          {
+            "id": "B9-03",
+            "file": "theme1-mark-c",
+            "name": "Knockout E Block",
+            "concept": "Bold red sprite block with the E carved out in Void, a white top rim and cyan scanline accents plus gold UI bracket corners.",
+            "score": 4
+          }
+        ]
+      },
+      {
+        "title": "The Belt",
+        "icons": [
+          {
+            "id": "B9-04",
+            "file": "theme2-belt-a",
+            "name": "Knot Sprite",
+            "concept": "8-bit red BJJ belt tied in a front knot with two hanging tails and gold rank stripes on the Void background",
+            "score": 5
+          },
+          {
+            "id": "B9-05",
+            "file": "theme2-belt-b",
+            "name": "Rank Bar",
+            "concept": "Straight-on pixel belt band with cyan and gold label stripes and a black rank bar carrying four white rank stripes",
+            "score": 4
+          },
+          {
+            "id": "B9-06",
+            "file": "theme2-belt-c",
+            "name": "Square Knot",
+            "concept": "Crossed square-knot belt built from four staircased pixel-diagonal strands meeting at a central knot, gold stripe tips",
+            "score": 5
+          }
+        ]
+      },
+      {
+        "title": "The Lock",
+        "icons": [
+          {
+            "id": "B9-07",
+            "file": "theme3-lock-a",
+            "name": "Triangle Sprite",
+            "concept": "8-bit inverted red triangle-choke locking a white trapped-head sprite with gold collar-pressure pixels",
+            "score": 3
+          },
+          {
+            "id": "B9-08",
+            "file": "theme3-lock-b",
+            "name": "Clinch Clash",
+            "concept": "Two interlocked arcade fighter sprites (red vs white) gripping in a clinch with a gold spark at the center clash",
+            "score": 2
+          },
+          {
+            "id": "B9-09",
+            "file": "theme3-lock-c",
+            "name": "Figure-Four Knot",
+            "concept": "Top-down pixel figure-four arm-lock: red and white arms weaving over-under with cyan pressure sparks",
+            "score": 3
+          }
+        ]
+      },
+      {
+        "title": "The Climb",
+        "icons": [
+          {
+            "id": "B9-10",
+            "file": "theme4-climb-a",
+            "name": "Pixel Climb Chart",
+            "concept": "Staircased 8-bit podium bars ascending left-to-right (white, gold, white, tall Signal Red) topped by a cyan pixel up-arrow rising off the winner bar.",
+            "score": 4
+          },
+          {
+            "id": "B9-11",
+            "file": "theme4-climb-b",
+            "name": "Arcade Up-Arrow",
+            "concept": "One bold chunky Signal Red up-arrow sprite with a 1-pixel Void outline, white left-edge highlight stripe and gold ELO-spark pixels flanking the tip.",
+            "score": 5
+          },
+          {
+            "id": "B9-12",
+            "file": "theme4-climb-c",
+            "name": "Rank Medallion",
+            "concept": "Pixel-circle gold rank medal with a red rim and ribbon tails, centered on a crisp white up-arrow for the climb in rating.",
+            "score": 3
+          }
+        ]
+      },
+      {
+        "title": "The Match",
+        "icons": [
+          {
+            "id": "B9-13",
+            "file": "theme5-match-a",
+            "name": "Fight Select",
+            "concept": "Two chunky 8-bit fighter sprites (red vs white) squaring up with raised fists, gold pixel VS and health bars overhead, arcade character-select style.",
+            "score": 5
+          },
+          {
+            "id": "B9-14",
+            "file": "theme5-match-b",
+            "name": "Split Seam",
+            "concept": "Red and white pixel territories collide along a staircased center with a gold lightning-bolt seam and cyan impact sparks, an abstract two-zones-meeting matchup.",
+            "score": 2
+          },
+          {
+            "id": "B9-15",
+            "file": "theme5-match-c",
+            "name": "Profile Off",
+            "concept": "Two pixel-sprite heads in profile (red headband vs cyan) facing each other across a bold red VS diamond, fight-game roster matchup.",
+            "score": 3
+          }
+        ]
+      },
+      {
+        "title": "The Champion",
+        "icons": [
+          {
+            "id": "B9-16",
+            "file": "theme6-champion-a",
+            "name": "Pixel Trophy",
+            "concept": "8-bit gold trophy cup with a red No.1 emblem on a white podium over a Void scanline background",
+            "score": 4
+          },
+          {
+            "id": "B9-17",
+            "file": "theme6-champion-b",
+            "name": "Pixel Crown",
+            "concept": "Blocky gold champion crown with red and cyan gems on a dark plate over a Signal Red checker field",
+            "score": 5
+          },
+          {
+            "id": "B9-18",
+            "file": "theme6-champion-c",
+            "name": "Pixel Medal",
+            "concept": "8-bit gold winner's medal with a Signal Red star, hung on staircased red and white ribbon",
+            "score": 4
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "batch": "batch8",
+    "num": 8,
+    "label": "Glossy Gradient",
+    "date": "2026-06-01",
+    "themes": [
+      {
+        "title": "The E / ER Mark",
+        "icons": [
+          {
+            "id": "B8-01",
+            "file": "theme1-mark-a",
+            "name": "Rising E",
+            "concept": "Floating white E on a red-to-gold glossy tile, with a gold staircase of rising-rating bars climbing off the top arm.",
+            "score": 5
+          },
+          {
+            "id": "B8-02",
+            "file": "theme1-mark-b",
+            "name": "ER Monogram",
+            "concept": "Clean knockout-white ER monogram on a glossy red-to-crimson/magenta radial tile with a bright upper gloss highlight.",
+            "score": 4
+          },
+          {
+            "id": "B8-03",
+            "file": "theme1-mark-c",
+            "name": "Beveled E Sheen",
+            "concept": "Bold dimensional beveled white E with a soft float shadow and a diagonal glossy sheen sweep over a red-to-magenta gradient.",
+            "score": 4
+          }
+        ]
+      },
+      {
+        "title": "The Belt",
+        "icons": [
+          {
+            "id": "B8-04",
+            "file": "theme2-belt-a",
+            "name": "Tied Knot",
+            "concept": "A tied BJJ belt knot with two hanging tails in glossy white over a red-to-crimson gradient tile, red rank stripes on the knot.",
+            "score": 3
+          },
+          {
+            "id": "B8-05",
+            "file": "theme2-belt-b",
+            "name": "Rank Band",
+            "concept": "A straight white belt band tilted across a red-to-magenta gradient tile, with a black rank bar carrying three Signal Red stripes.",
+            "score": 5
+          },
+          {
+            "id": "B8-06",
+            "file": "theme2-belt-c",
+            "name": "Coiled Loop",
+            "concept": "A BJJ belt coiled into a dimensional white ring over a red-to-gold radial gradient, with a striped knot crossing at the bottom.",
+            "score": 4
+          }
+        ]
+      },
+      {
+        "title": "The Lock",
+        "icons": [
+          {
+            "id": "B8-07",
+            "file": "theme3-lock-a",
+            "name": "Triangle Choke",
+            "concept": "Glossy red-to-crimson tile with a white knockout triangle choke, crossed limb bars, and a gold trapped-arm at the apex.",
+            "score": 4
+          },
+          {
+            "id": "B8-08",
+            "file": "theme3-lock-b",
+            "name": "Clinch",
+            "concept": "Two interlocked white grappler figures locked in a clinch with reaching grip-arms, floating on a vivid red-to-magenta gradient with soft shadow.",
+            "score": 4
+          },
+          {
+            "id": "B8-09",
+            "file": "theme3-lock-c",
+            "name": "Interlocked Links",
+            "concept": "Two interwoven chain-link rings, white and gold, weaving over each other as a lock motif on a glossy red radial-gradient tile.",
+            "score": 4
+          }
+        ]
+      },
+      {
+        "title": "The Climb",
+        "icons": [
+          {
+            "id": "B8-10",
+            "file": "theme4-climb-a",
+            "name": "Ascent Arrow",
+            "concept": "A bold white diagonal up-right arrow floating with a soft drop-shadow on a glossy red-to-gold gradient tile.",
+            "score": 3
+          },
+          {
+            "id": "B8-11",
+            "file": "theme4-climb-b",
+            "name": "Rising Ranks",
+            "concept": "Three ascending white bars with a gold trend arrow climbing over their tops on a glossy red-to-crimson tile.",
+            "score": 3
+          },
+          {
+            "id": "B8-12",
+            "file": "theme4-climb-c",
+            "name": "Rank Medallion",
+            "concept": "A dimensional gold rank medallion with double up-chevrons and ribbon tails on a glossy red radial-gradient tile.",
+            "score": 4
+          }
+        ]
+      },
+      {
+        "title": "The Match",
+        "icons": [
+          {
+            "id": "B8-13",
+            "file": "theme5-match-a",
+            "name": "Face-Off",
+            "concept": "Two white competitor profiles facing off across a gold lightning seam on a glossy red-to-gold gradient tile",
+            "score": 4
+          },
+          {
+            "id": "B8-14",
+            "file": "theme5-match-b",
+            "name": "VS Zones",
+            "concept": "Geometry-built VS floating with a drop shadow over two diagonal red/gold zones meeting at a glowing seam",
+            "score": 5
+          },
+          {
+            "id": "B8-15",
+            "file": "theme5-match-c",
+            "name": "Grapple Disc",
+            "concept": "Two mirrored white fighters in a facing stance over a glossy gold disc with a soft depth halo on a radial red tile",
+            "score": 3
+          }
+        ]
+      },
+      {
+        "title": "The Champion",
+        "icons": [
+          {
+            "id": "B8-16",
+            "file": "theme6-champion-a",
+            "name": "Trophy Cup",
+            "concept": "Floating white two-handled championship trophy with a Signal Red star, on a red-to-gold glossy gradient tile.",
+            "score": 4
+          },
+          {
+            "id": "B8-17",
+            "file": "theme6-champion-b",
+            "name": "Star Medal",
+            "concept": "White championship medal disc with a red star and ribbon, on a crimson-to-magenta radial gloss tile.",
+            "score": 4
+          },
+          {
+            "id": "B8-18",
+            "file": "theme6-champion-c",
+            "name": "Crown & Laurel",
+            "concept": "Regal white crown with red jewels framed by a laurel wreath, on a red-to-amber diagonal glossy gradient.",
+            "score": 3
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "batch": "batch7",
+    "num": 7,
+    "label": "Monoline",
+    "date": "2026-06-01",
+    "themes": [
+      {
+        "title": "The E / ER Mark",
+        "icons": [
+          {
+            "id": "B7-01",
+            "file": "theme1-mark-a",
+            "name": "Rising E",
+            "concept": "Monoline E whose top bar extends into a Signal Red rising arrow, signalling rating ascent (white + red on Void)",
+            "score": 5
+          },
+          {
+            "id": "B7-02",
+            "file": "theme1-mark-b",
+            "name": "ER Monogram",
+            "concept": "Clean ER letter mark in uniform line-art, dark E paired with a Signal Red R on a light premium-icon background",
+            "score": 5
+          },
+          {
+            "id": "B7-03",
+            "file": "theme1-mark-c",
+            "name": "Badge E",
+            "concept": "Stepped Signal Red monoline E enclosed in a thin white rounded-square badge frame on Void",
+            "score": 4
+          }
+        ]
+      },
+      {
+        "title": "The Belt",
+        "icons": [
+          {
+            "id": "B7-04",
+            "file": "theme2-belt-a",
+            "name": "Tied Knot",
+            "concept": "A square-knotted BJJ belt in continuous monoline, Signal Red knot loops over white bands with red rank stripes on the hanging tail (void background).",
+            "score": 3
+          },
+          {
+            "id": "B7-05",
+            "file": "theme2-belt-b",
+            "name": "Rank Band",
+            "concept": "A horizontal belt band drawn as a thin dark outline strip with seam lines and a rank bar holding four Signal Red stripes (light background).",
+            "score": 5
+          },
+          {
+            "id": "B7-06",
+            "file": "theme2-belt-c",
+            "name": "Coiled Ribbon",
+            "concept": "A single unbroken belt ribbon coiled into a looping spiral, swooping into a Signal Red hanging end crossed by white rank stripes (void background).",
+            "score": 2
+          }
+        ]
+      },
+      {
+        "title": "The Lock",
+        "icons": [
+          {
+            "id": "B7-07",
+            "file": "theme3-lock-a",
+            "name": "Triangle Choke",
+            "concept": "Monoline white triangle of locked limbs trapping a head-circle, with a Signal Red choking-arm arc cutting across, on Void background.",
+            "score": 3
+          },
+          {
+            "id": "B7-08",
+            "file": "theme3-lock-b",
+            "name": "Clinch",
+            "concept": "Two interlocked continuous-line figures (white + Signal Red) wrapping arms around each other in a standing clinch, on Void background.",
+            "score": 4
+          },
+          {
+            "id": "B7-09",
+            "file": "theme3-lock-c",
+            "name": "Interlock",
+            "concept": "Two open arm-hooks linked into an unbreakable knot, single dark line on light background, with one Signal Red pressure-point at the bite.",
+            "score": 4
+          }
+        ]
+      },
+      {
+        "title": "The Climb",
+        "icons": [
+          {
+            "id": "B7-10",
+            "file": "theme4-climb-a",
+            "name": "Rising Bars",
+            "concept": "Monoline ascending podium bars with a red trend line and arrowhead climbing across them, white on void.",
+            "score": 4
+          },
+          {
+            "id": "B7-11",
+            "file": "theme4-climb-b",
+            "name": "Rank Medallion",
+            "concept": "Line-art rank medal: concentric rings, ascending chevrons, and ribbon tails signalling a rank-up.",
+            "score": 4
+          },
+          {
+            "id": "B7-12",
+            "file": "theme4-climb-c",
+            "name": "Summit Arrow",
+            "concept": "Bold red up-arrow on light ground flanked by dark zigzag ELO lines climbing to a summit dot.",
+            "score": 5
+          }
+        ]
+      },
+      {
+        "title": "The Match",
+        "icons": [
+          {
+            "id": "B7-13",
+            "file": "theme5-match-a",
+            "name": "Face-Off",
+            "concept": "Two facing monoline profile heads (white vs Signal Red) flanking a clashing double-chevron VS in the negative space.",
+            "score": 5
+          },
+          {
+            "id": "B7-14",
+            "file": "theme5-match-b",
+            "name": "Bracket Clash",
+            "concept": "Two opposing bracket/chevron pairs converging on a central diamond node, a geometric head-to-head matchmaking bracket.",
+            "score": 4
+          },
+          {
+            "id": "B7-15",
+            "file": "theme5-match-c",
+            "name": "The Grip",
+            "concept": "Two minimal line competitors leaning in to clasp at a central interlocking grip knot over a mat baseline.",
+            "score": 3
+          }
+        ]
+      },
+      {
+        "title": "The Champion",
+        "icons": [
+          {
+            "id": "B7-16",
+            "file": "theme6-champion-a",
+            "name": "Laurel Star",
+            "concept": "Monoline laurel wreath cradling a victory star, Signal Red lines on void",
+            "score": 4
+          },
+          {
+            "id": "B7-17",
+            "file": "theme6-champion-b",
+            "name": "Champion Cup",
+            "concept": "Line-art trophy with handles and a red star accent, dark stroke on light",
+            "score": 5
+          },
+          {
+            "id": "B7-18",
+            "file": "theme6-champion-c",
+            "name": "Star Medal",
+            "concept": "Ribbon-hung medal with concentric rings and a center star, white ribbon over red disc",
+            "score": 4
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "batch": "batch6",
+    "num": 6,
+    "label": "Historic Gods",
+    "date": "2026-06-01",
+    "themes": [
+      {
+        "title": "Zeus, the Thunderbolt",
+        "icons": [
+          {
+            "id": "B6-01",
+            "file": "theme1-zeus-a",
+            "name": "Forked Bolt",
+            "concept": "A single bold red-and-gold forked thunderbolt striking through a red charge ring.",
+            "score": 5
+          },
+          {
+            "id": "B6-02",
+            "file": "theme1-zeus-b",
+            "name": "Bolt Grip",
+            "concept": "Zeus's clenched red fist gripping a gold thunderbolt that bursts out top and bottom.",
+            "score": 4
+          },
+          {
+            "id": "B6-03",
+            "file": "theme1-zeus-c",
+            "name": "Thunder Crest",
+            "concept": "A winged Greek thunderbolt emblem framed inside a heraldic Signal Red shield.",
+            "score": 3
+          }
+        ]
+      },
+      {
+        "title": "Herakles, Strength",
+        "icons": [
+          {
+            "id": "B6-04",
+            "file": "theme2-herakles-a",
+            "name": "The Club",
+            "concept": "Herakles' gnarled knotted war-club struck diagonally across the void, crowned by a gold breakthrough spark.",
+            "score": 3
+          },
+          {
+            "id": "B6-05",
+            "file": "theme2-herakles-b",
+            "name": "Nemean Lion",
+            "concept": "Front-facing maned lion head as a red sunburst pelt with gold predator eyes and bared fangs.",
+            "score": 5
+          },
+          {
+            "id": "B6-06",
+            "file": "theme2-herakles-c",
+            "name": "Club & Pelt",
+            "concept": "Lion-pelt head crowning a heavy knotted club shaft, fused into one vertical Herakles totem emblem.",
+            "score": 2
+          }
+        ]
+      },
+      {
+        "title": "Atlas, the Weight",
+        "icons": [
+          {
+            "id": "B6-07",
+            "file": "theme3-atlas-a",
+            "name": "The Bearer",
+            "concept": "Frontal monumental Atlas, arms raised overhead pressing a heavy red world-sphere with gold meridian, braced legs planted on a red ground line.",
+            "score": 5
+          },
+          {
+            "id": "B6-08",
+            "file": "theme3-atlas-b",
+            "name": "Kneeling Strain",
+            "concept": "Side-profile titan down on one knee, bowed back straining beneath a massive banded red sphere crowned with a gold sliver.",
+            "score": 4
+          },
+          {
+            "id": "B6-09",
+            "file": "theme3-atlas-c",
+            "name": "Atlas Emblem",
+            "concept": "Heraldic badge: a gridded white-and-red world globe with gold polar cap cradled on two heavy red bearing arms rising from a white plinth.",
+            "score": 3
+          }
+        ]
+      },
+      {
+        "title": "Ares, War",
+        "icons": [
+          {
+            "id": "B6-10",
+            "file": "theme4-ares-a",
+            "name": "War Helm",
+            "concept": "Frontal Corinthian battle helm with a bold red mohawk crest, eye slots and a gold ELO brow chevron.",
+            "score": 5
+          },
+          {
+            "id": "B6-11",
+            "file": "theme4-ares-b",
+            "name": "Helm & Spear",
+            "concept": "Frontal crested war helm impaled on an upright spear, leaf blade above and butt-spike below.",
+            "score": 3
+          },
+          {
+            "id": "B6-12",
+            "file": "theme4-ares-c",
+            "name": "Crossed Spears",
+            "concept": "Two white spears crossed in an X inside a red war roundel, gold ELO chevron at the cross point.",
+            "score": 4
+          }
+        ]
+      },
+      {
+        "title": "Thor, Mjolnir",
+        "icons": [
+          {
+            "id": "B6-13",
+            "file": "theme5-thor-a",
+            "name": "Mjolnir Disc",
+            "concept": "Bold squat Norse warhammer centered on a Signal Red disc with a gold rune slash across the head.",
+            "score": 4
+          },
+          {
+            "id": "B6-14",
+            "file": "theme5-thor-b",
+            "name": "Thunderstrike",
+            "concept": "Red Mjolnir hammer struck by a heavy gold lightning bolt for a kinetic thunder-god emblem.",
+            "score": 3
+          },
+          {
+            "id": "B6-15",
+            "file": "theme5-thor-c",
+            "name": "Hammer Crest",
+            "concept": "White Mjolnir enclosed in a heraldic Signal Red shield with a small gold spark on the head.",
+            "score": 4
+          }
+        ]
+      },
+      {
+        "title": "Nike, Victory",
+        "icons": [
+          {
+            "id": "B6-16",
+            "file": "theme6-nike-a",
+            "name": "Single Wing",
+            "concept": "One bold wing of stacked chevron feathers rising to a gold tip, the winged-victory mark.",
+            "score": 3
+          },
+          {
+            "id": "B6-17",
+            "file": "theme6-nike-b",
+            "name": "Laurel Victory",
+            "concept": "A red laurel wreath framing a heavy white V for Victory, crowned by a gold leaf.",
+            "score": 5
+          },
+          {
+            "id": "B6-18",
+            "file": "theme6-nike-c",
+            "name": "Winged Goddess",
+            "concept": "The Winged Victory statue silhouette with one sweeping wing, raising a gold laurel aloft on a Signal Red field.",
+            "score": 4
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "batch": "batch5",
+    "num": 5,
+    "label": "Wrestler",
+    "date": "2026-06-01",
+    "themes": [
+      {
+        "title": "The Stance",
+        "icons": [
+          {
+            "id": "B5-01",
+            "file": "theme1-stance-a",
+            "name": "Coiled Shooter",
+            "concept": "Solid Signal-Red full-figure silhouette sunk into a low staggered ready-stance, head ducked and lead arm reaching to level-change, with a gold coiled-energy seam down the back.",
+            "score": 4
+          },
+          {
+            "id": "B5-02",
+            "file": "theme1-stance-b",
+            "name": "Hex Cutout Stance",
+            "concept": "Heavy red hexagon plate with the low staggered wrestler stance carved out as a Void negative-space figure, topped by a single gold energy notch on the edge.",
+            "score": 4
+          },
+          {
+            "id": "B5-03",
+            "file": "theme1-stance-c",
+            "name": "Poster Crest Stance",
+            "concept": "Inverted palette fight-poster badge: bold Terminal-White wrestler in a wide planted crouch on a Void panel inside a heavy frame, over a dominant red field with a gold belt line.",
+            "score": 2
+          }
+        ]
+      },
+      {
+        "title": "The Singlet",
+        "icons": [
+          {
+            "id": "B5-04",
+            "file": "theme2-singlet-a",
+            "name": "Classic Singlet",
+            "concept": "Front-view wrestling singlet in Signal Red with deep V-neck straps, white side stripes, gold waistband, and leg cutouts on Void.",
+            "score": 4
+          },
+          {
+            "id": "B5-05",
+            "file": "theme2-singlet-b",
+            "name": "E-Singlet",
+            "concept": "Continuous-strap singlet with the brand E (rising bars + gold peak) emblazoned across the chest on Void.",
+            "score": 3
+          },
+          {
+            "id": "B5-06",
+            "file": "theme2-singlet-c",
+            "name": "Rated Flat-Lay",
+            "concept": "Inverted palette: a Void singlet flat-lay on a Signal Red field with a bold geometric '1024' rating number, last digit in gold, across the chest.",
+            "score": 4
+          }
+        ]
+      },
+      {
+        "title": "Headgear",
+        "icons": [
+          {
+            "id": "B5-07",
+            "file": "theme3-headgear-a",
+            "name": "Front Cradle",
+            "concept": "Front-on wrestling headgear: white head dome flanked by two heavy red ear cups, crown and chin straps, gold buckle.",
+            "score": 5
+          },
+          {
+            "id": "B5-08",
+            "file": "theme3-headgear-b",
+            "name": "Cup Hero",
+            "concept": "Single massive ear-guard cup as a Void shield on a Signal Red field, with radiating white anchor straps and gold studs.",
+            "score": 3
+          },
+          {
+            "id": "B5-09",
+            "file": "theme3-headgear-c",
+            "name": "Profile Wrap",
+            "concept": "Side-profile white head wearing one bold red ear cup with crown and chin straps wrapping around it, gold buckle accent.",
+            "score": 2
+          }
+        ]
+      },
+      {
+        "title": "The Shot",
+        "icons": [
+          {
+            "id": "B5-10",
+            "file": "theme4-shot-a",
+            "name": "Drive In",
+            "concept": "A red shooter silhouette drops its level and drives forward-left into the opponent's white legs, drive legs exploding off the mat with a gold penetration spark at contact.",
+            "score": 4
+          },
+          {
+            "id": "B5-11",
+            "file": "theme4-shot-b",
+            "name": "Level Change",
+            "concept": "Pure directional force: a descending chevron stack into a massive forward drive-arrow that penetrates a white opponent post, gold arrowhead marking the breakthrough.",
+            "score": 3
+          },
+          {
+            "id": "B5-12",
+            "file": "theme4-shot-c",
+            "name": "The Clamp",
+            "concept": "The finish of the shot: heavy red arms lock around both white legs in a horseshoe clinch while a forward drive wedge launches off the floor, gold spark at the tipping point.",
+            "score": 2
+          }
+        ]
+      },
+      {
+        "title": "The Pin",
+        "icons": [
+          {
+            "id": "B5-13",
+            "file": "theme5-pin-a",
+            "name": "Top Pin",
+            "concept": "Red dominant wrestler flattening a white opponent into the red mat, classic top-position pin silhouette.",
+            "score": 4
+          },
+          {
+            "id": "B5-14",
+            "file": "theme5-pin-b",
+            "name": "The Slap",
+            "concept": "Referee's open red hand striking the mat as a white figure lies pinned, gold impact marks, the moment of the fall.",
+            "score": 5
+          },
+          {
+            "id": "B5-15",
+            "file": "theme5-pin-c",
+            "name": "The Press",
+            "concept": "Heavy downward double-chevron driving a flattened white figure into the red floor, gold impact burst, the pin as raw force.",
+            "score": 3
+          }
+        ]
+      },
+      {
+        "title": "The Circle",
+        "icons": [
+          {
+            "id": "B5-16",
+            "file": "theme6-circle-a",
+            "name": "Restart Mat",
+            "concept": "Top-down concentric wrestling mat with a Signal Red center restart cross and a gold center hub.",
+            "score": 3
+          },
+          {
+            "id": "B5-17",
+            "file": "theme6-circle-b",
+            "name": "Face-Off Zone",
+            "concept": "Bold red boundary ring with two opposing wrestler chevrons converging across a gold center clash mark.",
+            "score": 2
+          },
+          {
+            "id": "B5-18",
+            "file": "theme6-circle-c",
+            "name": "Mat Gauge",
+            "concept": "The mat circle as a rating gauge: heavy red sweep ring, rising white needle, and a gold breakthrough peak notch.",
+            "score": 2
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "batch": "batch4",
+    "num": 4,
+    "label": "Grappling",
+    "date": "2026-06-01",
+    "themes": [
+      {
+        "title": "The Guard",
+        "icons": [
+          {
+            "id": "B4-01",
+            "file": "theme1-guard-a",
+            "name": "Closed Guard",
+            "concept": "A trapped white opponent squeezed by two heavy red legs that cross below into a gold ankle-lock knot, the closed-guard leg lock.",
+            "score": 4
+          },
+          {
+            "id": "B4-02",
+            "file": "theme1-guard-b",
+            "name": "Butterfly Frame",
+            "concept": "A bold symmetric open-guard V-frame: red butterfly legs splayed with upturned gold foot hooks framing the controlled space.",
+            "score": 3
+          },
+          {
+            "id": "B4-03",
+            "file": "theme1-guard-c",
+            "name": "Guard Cage",
+            "concept": "Four interlocking red-and-white brackets pinwheel shut around a gold locked core, guard reduced to pure containment.",
+            "score": 4
+          }
+        ]
+      },
+      {
+        "title": "The Submission",
+        "icons": [
+          {
+            "id": "B4-04",
+            "file": "theme2-submission-a",
+            "name": "Triangle Lock",
+            "concept": "Heavy red triangle-choke frame clamping a trapped white arm, gold cinch knot at the apex.",
+            "score": 4
+          },
+          {
+            "id": "B4-05",
+            "file": "theme2-submission-b",
+            "name": "Armbar Break",
+            "concept": "A white arm levered into a hard inverted-V over a red fulcrum block, gold stress wedge marking the break point at the elbow.",
+            "score": 3
+          },
+          {
+            "id": "B4-06",
+            "file": "theme2-submission-c",
+            "name": "Seatbelt Choke",
+            "concept": "Two interlocking red arm-hooks (the rear-naked-choke seatbelt grip) clasped around a white neck column with a gold clasp at the lock.",
+            "score": 4
+          }
+        ]
+      },
+      {
+        "title": "The Takedown",
+        "icons": [
+          {
+            "id": "B4-07",
+            "file": "theme3-takedown-a",
+            "name": "Drive Shot",
+            "concept": "A red level-change drive-arrow shoots low and penetrates the base of a standing white figure on the mat, the double-leg, with a gold impact spark at contact.",
+            "score": 4
+          },
+          {
+            "id": "B4-08",
+            "file": "theme3-takedown-b",
+            "name": "Hip Toss",
+            "concept": "A heavy red rotational sweep-arc flings a white body-block up and over a red pivot fulcrum into a ground-slam zone, the throw rotation, gold launch accent at the apex.",
+            "score": 2
+          },
+          {
+            "id": "B4-09",
+            "file": "theme3-takedown-c",
+            "name": "Shot & Sprawl",
+            "concept": "Two opposing brutalist wedges collide head-on, a red shot driving up, a white sprawl dropping down to stuff it, locked on a gold impact seam.",
+            "score": 3
+          }
+        ]
+      },
+      {
+        "title": "The Grip",
+        "icons": [
+          {
+            "id": "B4-10",
+            "file": "theme4-grip-a",
+            "name": "Collar Clamp",
+            "concept": "A heavy red fist clamps a white gi lapel-V, four knuckle bars wrapping over the collar with a gold tension spark at the bite.",
+            "score": 4
+          },
+          {
+            "id": "B4-11",
+            "file": "theme4-grip-b",
+            "name": "Two-Grip Cross",
+            "concept": "Sleeve-and-collar control: two red fists clamp two crossing white gi strips forming an X, gold diamond marking the contested center.",
+            "score": 3
+          },
+          {
+            "id": "B4-12",
+            "file": "theme4-grip-c",
+            "name": "Lapel Fist",
+            "concept": "Frontal emblem of a single brutal red fist gripping a vertical white lapel that runs the full canvas, gold wedge where the grip crushes.",
+            "score": 5
+          }
+        ]
+      },
+      {
+        "title": "Back Control",
+        "icons": [
+          {
+            "id": "B4-13",
+            "file": "theme5-back-a",
+            "name": "Seatbelt",
+            "concept": "Bold red seatbelt-harness X crossing a defender's torso, locked by a white buckle = the back-control grip.",
+            "score": 4
+          },
+          {
+            "id": "B4-14",
+            "file": "theme5-back-b",
+            "name": "Hooks In",
+            "concept": "Two heavy red hook-clamps gripping a central torso bar from behind = both hooks inserted, control sealed.",
+            "score": 2
+          },
+          {
+            "id": "B4-15",
+            "file": "theme5-back-c",
+            "name": "Back Take",
+            "concept": "Stacked two-figure silhouette: a red grappler riding the back of a white defender, gold buckle on the chest.",
+            "score": 5
+          }
+        ]
+      },
+      {
+        "title": "The Scramble",
+        "icons": [
+          {
+            "id": "B4-16",
+            "file": "theme6-scramble-a",
+            "name": "Clinch Pinwheel",
+            "concept": "Two hook-shaped grappler bodies rotated 180 degrees about a gold lock, spiraling into each other like a clinch caught mid-spin.",
+            "score": 3
+          },
+          {
+            "id": "B4-17",
+            "file": "theme6-scramble-b",
+            "name": "Locked Halves",
+            "concept": "Red and white grapplers fused into one tight square block, arms reaching across and meeting at a gold center: two bodies interlocked into a single brutalist mark.",
+            "score": 4
+          },
+          {
+            "id": "B4-18",
+            "file": "theme6-scramble-c",
+            "name": "Woven Limbs",
+            "concept": "Two heavy angular limbs sweeping in opposite diagonals, weaving over and under each other into a centered gold-locked knot: chaos of the roll tangled into one form.",
+            "score": 4
+          }
+        ]
+      }
+    ]
+  },
+  {
     "batch": "batch3",
     "num": 3,
     "label": "Round 3",

@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="30">
+    <!-- Two interlocked figures in a clinch, drawn as continuous monoline.
+         Left figure white, right figure Signal Red, arms wrapping each other. -->
+
+    <!-- LEFT figure (white) -->
+    <!-- head -->
+    <circle cx="372" cy="276" r="68" stroke="#E8EDF2"/>
+    <!-- torso leaning into the clinch -->
+    <path d="M 372 344
+             C 378 430, 392 500, 430 556" stroke="#E8EDF2"/>
+    <!-- left figure's wrapping arm reaching over opponent's shoulder/neck -->
+    <path d="M 372 396
+             C 470 372, 580 372, 660 320" stroke="#E8EDF2"/>
+    <!-- left figure's lower arm gripping under -->
+    <path d="M 392 470
+             C 488 488, 576 488, 648 452" stroke="#E8EDF2"/>
+    <!-- left leg / base -->
+    <path d="M 430 556
+             C 412 640, 392 720, 348 792" stroke="#E8EDF2"/>
+    <path d="M 430 556
+             C 470 636, 506 706, 540 770" stroke="#E8EDF2"/>
+
+    <!-- RIGHT figure (Signal Red) -->
+    <!-- head -->
+    <circle cx="652" cy="276" r="68" stroke="#E63946"/>
+    <!-- torso -->
+    <path d="M 652 344
+             C 646 430, 632 500, 594 556" stroke="#E63946"/>
+    <!-- right figure's wrapping arm over the other -->
+    <path d="M 652 396
+             C 554 372, 444 372, 364 320" stroke="#E63946"/>
+    <!-- right figure's lower clinching arm -->
+    <path d="M 632 470
+             C 536 488, 448 488, 376 452" stroke="#E63946"/>
+    <!-- right legs / base -->
+    <path d="M 594 556
+             C 612 640, 632 720, 676 792" stroke="#E63946"/>
+    <path d="M 594 556
+             C 554 636, 518 706, 484 770" stroke="#E63946"/>
+  </g>
+</svg>

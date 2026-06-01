@@ -1,0 +1,178 @@
+{
+  "batch": "batch6",
+  "num": 6,
+  "label": "Historic Gods",
+  "date": "2026-06-01",
+  "themes": [
+    {
+      "key": "zeus",
+      "title": "Zeus, the Thunderbolt"
+    },
+    {
+      "key": "herakles",
+      "title": "Herakles, Strength"
+    },
+    {
+      "key": "atlas",
+      "title": "Atlas, the Weight"
+    },
+    {
+      "key": "ares",
+      "title": "Ares, War"
+    },
+    {
+      "key": "thor",
+      "title": "Thor, Mjolnir"
+    },
+    {
+      "key": "nike",
+      "title": "Nike, Victory"
+    }
+  ],
+  "icons": [
+    {
+      "theme": "zeus",
+      "themeTitle": "Zeus, the Thunderbolt",
+      "file": "theme1-zeus-a",
+      "name": "Forked Bolt",
+      "concept": "A single bold red-and-gold forked thunderbolt striking through a red charge ring.",
+      "score": 5
+    },
+    {
+      "theme": "zeus",
+      "themeTitle": "Zeus, the Thunderbolt",
+      "file": "theme1-zeus-b",
+      "name": "Bolt Grip",
+      "concept": "Zeus's clenched red fist gripping a gold thunderbolt that bursts out top and bottom.",
+      "score": 4
+    },
+    {
+      "theme": "zeus",
+      "themeTitle": "Zeus, the Thunderbolt",
+      "file": "theme1-zeus-c",
+      "name": "Thunder Crest",
+      "concept": "A winged Greek thunderbolt emblem framed inside a heraldic Signal Red shield.",
+      "score": 3
+    },
+    {
+      "theme": "herakles",
+      "themeTitle": "Herakles, Strength",
+      "file": "theme2-herakles-a",
+      "name": "The Club",
+      "concept": "Herakles' gnarled knotted war-club struck diagonally across the void, crowned by a gold breakthrough spark.",
+      "score": 3
+    },
+    {
+      "theme": "herakles",
+      "themeTitle": "Herakles, Strength",
+      "file": "theme2-herakles-b",
+      "name": "Nemean Lion",
+      "concept": "Front-facing maned lion head as a red sunburst pelt with gold predator eyes and bared fangs.",
+      "score": 5
+    },
+    {
+      "theme": "herakles",
+      "themeTitle": "Herakles, Strength",
+      "file": "theme2-herakles-c",
+      "name": "Club & Pelt",
+      "concept": "Lion-pelt head crowning a heavy knotted club shaft, fused into one vertical Herakles totem emblem.",
+      "score": 2
+    },
+    {
+      "theme": "atlas",
+      "themeTitle": "Atlas, the Weight",
+      "file": "theme3-atlas-a",
+      "name": "The Bearer",
+      "concept": "Frontal monumental Atlas, arms raised overhead pressing a heavy red world-sphere with gold meridian, braced legs planted on a red ground line.",
+      "score": 5
+    },
+    {
+      "theme": "atlas",
+      "themeTitle": "Atlas, the Weight",
+      "file": "theme3-atlas-b",
+      "name": "Kneeling Strain",
+      "concept": "Side-profile titan down on one knee, bowed back straining beneath a massive banded red sphere crowned with a gold sliver.",
+      "score": 4
+    },
+    {
+      "theme": "atlas",
+      "themeTitle": "Atlas, the Weight",
+      "file": "theme3-atlas-c",
+      "name": "Atlas Emblem",
+      "concept": "Heraldic badge: a gridded white-and-red world globe with gold polar cap cradled on two heavy red bearing arms rising from a white plinth.",
+      "score": 3
+    },
+    {
+      "theme": "ares",
+      "themeTitle": "Ares, War",
+      "file": "theme4-ares-a",
+      "name": "War Helm",
+      "concept": "Frontal Corinthian battle helm with a bold red mohawk crest, eye slots and a gold ELO brow chevron.",
+      "score": 5
+    },
+    {
+      "theme": "ares",
+      "themeTitle": "Ares, War",
+      "file": "theme4-ares-b",
+      "name": "Helm & Spear",
+      "concept": "Frontal crested war helm impaled on an upright spear, leaf blade above and butt-spike below.",
+      "score": 3
+    },
+    {
+      "theme": "ares",
+      "themeTitle": "Ares, War",
+      "file": "theme4-ares-c",
+      "name": "Crossed Spears",
+      "concept": "Two white spears crossed in an X inside a red war roundel, gold ELO chevron at the cross point.",
+      "score": 4
+    },
+    {
+      "theme": "thor",
+      "themeTitle": "Thor, Mjolnir",
+      "file": "theme5-thor-a",
+      "name": "Mjolnir Disc",
+      "concept": "Bold squat Norse warhammer centered on a Signal Red disc with a gold rune slash across the head.",
+      "score": 4
+    },
+    {
+      "theme": "thor",
+      "themeTitle": "Thor, Mjolnir",
+      "file": "theme5-thor-b",
+      "name": "Thunderstrike",
+      "concept": "Red Mjolnir hammer struck by a heavy gold lightning bolt for a kinetic thunder-god emblem.",
+      "score": 3
+    },
+    {
+      "theme": "thor",
+      "themeTitle": "Thor, Mjolnir",
+      "file": "theme5-thor-c",
+      "name": "Hammer Crest",
+      "concept": "White Mjolnir enclosed in a heraldic Signal Red shield with a small gold spark on the head.",
+      "score": 4
+    },
+    {
+      "theme": "nike",
+      "themeTitle": "Nike, Victory",
+      "file": "theme6-nike-a",
+      "name": "Single Wing",
+      "concept": "One bold wing of stacked chevron feathers rising to a gold tip, the winged-victory mark.",
+      "score": 3
+    },
+    {
+      "theme": "nike",
+      "themeTitle": "Nike, Victory",
+      "file": "theme6-nike-b",
+      "name": "Laurel Victory",
+      "concept": "A red laurel wreath framing a heavy white V for Victory, crowned by a gold leaf.",
+      "score": 5
+    },
+    {
+      "theme": "nike",
+      "themeTitle": "Nike, Victory",
+      "file": "theme6-nike-c",
+      "name": "Winged Goddess",
+      "concept": "The Winged Victory statue silhouette with one sweeping wing, raising a gold laurel aloft on a Signal Red field.",
+      "score": 4
+    }
+  ]
+}

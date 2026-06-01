@@ -1,0 +1,98 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="cBg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#7A1F2B"/>
+      <stop offset="1" stop-color="#5A141E"/>
+    </linearGradient>
+    <linearGradient id="cBadge" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F2ECDD"/>
+      <stop offset="1" stop-color="#DDD3BC"/>
+    </linearGradient>
+  </defs>
+
+  <!-- full-bleed background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="url(#cBg)"/>
+  <!-- pinstripe texture -->
+  <g stroke="#C9A24B" stroke-width="2" opacity="0.12">
+    <line x1="0" y1="120" x2="1024" y2="120"/>
+    <line x1="0" y1="240" x2="1024" y2="240"/>
+    <line x1="0" y1="360" x2="1024" y2="360"/>
+    <line x1="0" y1="664" x2="1024" y2="664"/>
+    <line x1="0" y1="784" x2="1024" y2="784"/>
+    <line x1="0" y1="904" x2="1024" y2="904"/>
+  </g>
+
+  <!-- outer scalloped gold frame -->
+  <circle cx="512" cy="486" r="392" fill="#C9A24B"/>
+  <circle cx="512" cy="486" r="392" fill="none" stroke="#1B2A41" stroke-width="8"/>
+  <circle cx="512" cy="486" r="356" fill="url(#cBadge)" stroke="#7A1F2B" stroke-width="6"/>
+
+  <!-- quartered shield split into two opposing diagonal zones -->
+  <clipPath id="cClip"><circle cx="512" cy="486" r="352"/></clipPath>
+  <g clip-path="url(#cClip)">
+    <!-- two zones meeting on a diagonal -->
+    <polygon points="160,134 600,134 380,838 160,838" fill="#1B2A41"/>
+    <polygon points="600,134 864,134 864,838 380,838" fill="#7A1F2B"/>
+    <!-- gold seam where zones meet -->
+    <polygon points="588,134 612,134 392,838 368,838" fill="#C9A24B"/>
+  </g>
+
+  <!-- two crossed swords (the match: opposition) -->
+  <g>
+    <!-- blade 1 (top-left to bottom-right) -->
+    <g transform="rotate(38 512 486)">
+      <rect x="500" y="226" width="24" height="430" fill="#EDE6D6" stroke="#1B2A41" stroke-width="5"/>
+      <polygon points="500,226 512,196 524,226" fill="#EDE6D6" stroke="#1B2A41" stroke-width="5"/>
+      <rect x="468" y="656" width="88" height="22" fill="#C9A24B" stroke="#1B2A41" stroke-width="5"/>
+      <rect x="504" y="678" width="16" height="70" fill="#7A1F2B" stroke="#1B2A41" stroke-width="5"/>
+      <circle cx="512" cy="756" r="16" fill="#C9A24B" stroke="#1B2A41" stroke-width="5"/>
+    </g>
+    <!-- blade 2 (top-right to bottom-left) -->
+    <g transform="rotate(-38 512 486)">
+      <rect x="500" y="226" width="24" height="430" fill="#EDE6D6" stroke="#7A1F2B" stroke-width="5"/>
+      <polygon points="500,226 512,196 524,226" fill="#EDE6D6" stroke="#7A1F2B" stroke-width="5"/>
+      <rect x="468" y="656" width="88" height="22" fill="#C9A24B" stroke="#7A1F2B" stroke-width="5"/>
+      <rect x="504" y="678" width="16" height="70" fill="#1B2A41" stroke="#7A1F2B" stroke-width="5"/>
+      <circle cx="512" cy="756" r="16" fill="#C9A24B" stroke="#7A1F2B" stroke-width="5"/>
+    </g>
+  </g>
+
+  <!-- central VS roundel where swords cross -->
+  <circle cx="512" cy="486" r="92" fill="url(#cBadge)" stroke="#C9A24B" stroke-width="10"/>
+  <circle cx="512" cy="486" r="76" fill="#1B2A41"/>
+  <circle cx="512" cy="486" r="76" fill="none" stroke="#7A1F2B" stroke-width="4"/>
+  <text x="512" y="514" font-family="serif" font-size="92" font-weight="700"
+        fill="#C9A24B" text-anchor="middle">VS</text>
+
+  <!-- laurel sprigs flanking the badge -->
+  <g stroke="#C9A24B" stroke-width="7" fill="none">
+    <path d="M168 486 C 150 420, 158 350, 200 300"/>
+    <path d="M856 486 C 874 420, 866 350, 824 300"/>
+  </g>
+  <g fill="#C9A24B">
+    <ellipse cx="170" cy="430" rx="16" ry="8" transform="rotate(-20 170 430)"/>
+    <ellipse cx="178" cy="386" rx="16" ry="8" transform="rotate(-35 178 386)"/>
+    <ellipse cx="192" cy="344" rx="16" ry="8" transform="rotate(-50 192 344)"/>
+    <ellipse cx="854" cy="430" rx="16" ry="8" transform="rotate(20 854 430)"/>
+    <ellipse cx="846" cy="386" rx="16" ry="8" transform="rotate(35 846 386)"/>
+    <ellipse cx="832" cy="344" rx="16" ry="8" transform="rotate(50 832 344)"/>
+  </g>
+
+  <!-- top arched banner: EST 2026 -->
+  <g>
+    <path d="M312 150 Q 512 90 712 150 L 712 206 Q 512 150 312 206 Z"
+          fill="#1B2A41" stroke="#C9A24B" stroke-width="5"/>
+    <text x="512" y="190" font-family="serif" font-size="42" font-weight="700"
+          fill="#EDE6D6" text-anchor="middle" letter-spacing="8">EST 2026</text>
+  </g>
+
+  <!-- bottom banner ribbon: ELO RATED -->
+  <g>
+    <path d="M150 836 L 110 880 L 156 876 L 146 922 L 268 882 Z" fill="#3F0E16"/>
+    <path d="M874 836 L 914 880 L 868 876 L 878 922 L 756 882 Z" fill="#3F0E16"/>
+    <path d="M236 826 L 788 826 L 760 936 L 264 936 Z"
+          fill="#1B2A41" stroke="#C9A24B" stroke-width="6"/>
+    <text x="512" y="908" font-family="serif" font-size="62" font-weight="700"
+          fill="#EDE6D6" text-anchor="middle" letter-spacing="6">ELO RATED</text>
+  </g>
+</svg>

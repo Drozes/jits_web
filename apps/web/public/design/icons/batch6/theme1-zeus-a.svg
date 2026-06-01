@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- Heavy circular charge field behind the bolt -->
+  <circle cx="512" cy="512" r="360" fill="#13151B"/>
+  <circle cx="512" cy="512" r="360" fill="none" stroke="#E63946" stroke-width="26"/>
+
+  <!-- Single forked thunderbolt, gold core for "peak/breakthrough" -->
+  <!-- Main jagged bolt body -->
+  <polygon fill="#E63946" points="
+    600,150
+    372,520
+    492,520
+    340,874
+    690,460
+    548,460
+    700,150
+  "/>
+
+  <!-- Gold leading edge slice down the bolt -->
+  <polygon fill="#f59e0b" points="
+    700,150
+    600,150
+    372,520
+    448,520
+  "/>
+
+  <!-- White hot inner spark notch -->
+  <polygon fill="#E8EDF2" points="
+    548,460
+    690,460
+    540,640
+  "/>
+</svg>
