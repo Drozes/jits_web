@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect x="0" y="0" width="1024" height="1024" fill="#bf1212"/>
+
+  <!-- Stepped podium / ascending staircase, dark steps climbing right -->
+  <!-- Step 1 (lowest, left) -->
+  <rect x="168" y="664" width="184" height="200" fill="#13151B"/>
+  <!-- Step 2 -->
+  <rect x="352" y="540" width="184" height="324" fill="#1A1D24"/>
+  <!-- Step 3 -->
+  <rect x="536" y="416" width="184" height="448" fill="#13151B"/>
+  <!-- Top tier, highlighted (Terminal White) -->
+  <rect x="720" y="292" width="184" height="572" fill="#E8EDF2"/>
+
+  <!-- Bold up-arrow carved on the highlighted top tier (Void) pointing to the peak -->
+  <polygon points="812,332 894,438 838,438 838,556 786,556 786,438 730,438" fill="#0D0F14"/>
+
+  <!-- Ground bar unifying the podium base -->
+  <rect x="152" y="864" width="752" height="40" fill="#0D0F14"/>
+</svg>

@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Full-bleed background (Signal Red field for max impact) -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#E63946"/>
+
+  <!-- NESTED-SQUARE IMPACT EMBLEM: concentric rotated squares collapsing to a core.
+       Two forces colliding to a single point = matchmaking / clash. -->
+
+  <!-- Outer diamond (Void) -->
+  <polygon points="512,80 944,512 512,944 80,512" fill="#0D0F14"/>
+  <!-- Red gap ring -->
+  <polygon points="512,192 832,512 512,832 192,512" fill="#E63946"/>
+  <!-- Inner diamond (Void) -->
+  <polygon points="512,288 736,512 512,736 288,512" fill="#0D0F14"/>
+
+  <!-- COLLISION WEDGES: two heavy halves driving in from opposite sides to the core.
+       Left half = Terminal White force, Right half = Gold breakthrough force. -->
+  <polygon points="512,288 512,736 288,512" fill="#E8EDF2"/>
+  <polygon points="512,288 736,512 512,736" fill="#f59e0b"/>
+
+  <!-- Impact seam: a hard Void vertical line where the two forces meet at the center -->
+  <rect x="498" y="288" width="28" height="448" fill="#0D0F14"/>
+
+  <!-- Core impact block knocked out at the dead center -->
+  <rect x="456" y="456" width="112" height="112" fill="#0D0F14"/>
+</svg>

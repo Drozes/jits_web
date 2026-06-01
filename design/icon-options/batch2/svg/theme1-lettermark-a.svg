@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- ELO RATED — Lettermark A: Ascending-bar E (letter E + rising ELO chart) with gold breakthrough peak -->
+
+  <!-- Full-bleed background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- Red spine: the vertical stem of the E -->
+  <rect x="216" y="216" width="112" height="592" fill="#E63946"/>
+
+  <!-- Three E arms whose lengths ASCEND bottom -> top (rising-chart read).
+       Bottom arm shortest, middle longer, top longest. -->
+  <!-- Bottom arm (shortest) -->
+  <rect x="328" y="696" width="232" height="112" fill="#E8EDF2"/>
+  <!-- Middle arm (medium) -->
+  <rect x="328" y="456" width="320" height="112" fill="#E8EDF2"/>
+  <!-- Top arm (longest) -->
+  <rect x="328" y="216" width="408" height="112" fill="#E8EDF2"/>
+
+  <!-- Gold breakthrough peak: a step rising ABOVE the top arm at its right end -->
+  <rect x="736" y="120" width="112" height="208" fill="#f59e0b"/>
+</svg>

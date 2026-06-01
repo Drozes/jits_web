@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- ELO RATED — Lettermark C: Abstract negative-space E. A red stem with three cantilevered
+       arms of ASCENDING length carved on a Void field; each arm end is capped in Terminal White,
+       and a gold breakthrough cap rides the longest (top) arm = modern stepped lettermark. -->
+
+  <!-- Full-bleed Void background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- Red stem (left vertical of the E) -->
+  <rect x="248" y="200" width="128" height="624" fill="#E63946"/>
+
+  <!-- Three red arms, ascending length top -> bottom-most is shortest (rising-chart read). -->
+  <!-- Top arm (longest) -->
+  <rect x="376" y="200" width="320" height="128" fill="#E63946"/>
+  <!-- Middle arm (medium) -->
+  <rect x="376" y="448" width="248" height="128" fill="#E63946"/>
+  <!-- Bottom arm (shortest) -->
+  <rect x="376" y="696" width="176" height="128" fill="#E63946"/>
+
+  <!-- White cantilever caps flush at each arm's right end (modern accent + step rhythm) -->
+  <rect x="696" y="200" width="56" height="128" fill="#E8EDF2"/>
+  <rect x="624" y="448" width="56" height="128" fill="#E8EDF2"/>
+  <rect x="552" y="696" width="56" height="128" fill="#E8EDF2"/>
+
+  <!-- Gold breakthrough cap rising above the longest (top) arm at its tip -->
+  <rect x="696" y="136" width="56" height="64" fill="#f59e0b"/>
+</svg>

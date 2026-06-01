@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!--
+    ELO RATED — Team 1, Take C
+    Abstract departure. A clean upward STAIRCASE: four ascending columns
+    sharing a baseline, each taller than the last, climbing left-to-right.
+    The leftmost column is the heavy spine and the rising treads imply the
+    bars of an E read sideways as a climb, while the form primarily reads
+    as a rating breakthrough. The Gold final step crowns the peak.
+    Built from flat rects only. Void #0D0F14 bg | Signal Red #E63946 |
+    Gold #f59e0b peak.
+  -->
+
+  <!-- Full-bleed Void background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- Step 1 (spine / shortest column, far left) -->
+  <rect x="216" y="568" width="132" height="224" fill="#E63946"/>
+
+  <!-- Step 2 -->
+  <rect x="364" y="472" width="132" height="320" fill="#E63946"/>
+
+  <!-- Step 3 -->
+  <rect x="512" y="376" width="132" height="416" fill="#E63946"/>
+
+  <!-- Step 4 (tallest red step) -->
+  <rect x="660" y="280" width="132" height="512" fill="#E63946"/>
+
+  <!-- Gold peak: final breakthrough step, highest of all, stepping past
+       the red climb to crown it. -->
+  <rect x="676" y="184" width="132" height="96" fill="#f59e0b"/>
+</svg>

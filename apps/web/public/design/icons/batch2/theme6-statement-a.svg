@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Full-bleed background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- THE CUT: one bold diagonal slash divides the tile. Lower-right wedge is Signal Red. -->
+  <polygon points="1024,0 1024,1024 0,1024" fill="#E63946"/>
+
+  <!-- Hard razor edge of the cut: a thin void band runs the diagonal for a clean brutalist slice -->
+  <polygon points="0,1024 80,1024 1024,80 1024,0 944,0" fill="#0D0F14"/>
+
+  <!-- Bold condensed "E" planted in the upper-left VOID field, clear of the slash -->
+  <!-- Vertical spine -->
+  <rect x="190" y="232" width="104" height="436" fill="#E8EDF2"/>
+  <!-- Top bar -->
+  <rect x="190" y="232" width="320" height="96" fill="#E8EDF2"/>
+  <!-- Middle bar (shorter) -->
+  <rect x="190" y="388" width="252" height="96" fill="#E8EDF2"/>
+  <!-- Bottom bar -->
+  <rect x="190" y="572" width="320" height="96" fill="#E8EDF2"/>
+  <!-- Gold breakthrough step rising off the top bar = ascending ELO peak -->
+  <rect x="414" y="136" width="96" height="192" fill="#f59e0b"/>
+
+  <!-- Bold condensed "R" planted in the lower-right RED field, in void, mirroring the E across the cut -->
+  <!-- R spine (left vertical) -->
+  <rect x="588" y="556" width="96" height="404" fill="#0D0F14"/>
+  <!-- R bowl: top bar -->
+  <rect x="588" y="556" width="252" height="92" fill="#0D0F14"/>
+  <!-- R bowl: right vertical -->
+  <rect x="744" y="556" width="96" height="240" fill="#0D0F14"/>
+  <!-- R bowl: bottom bar (closes the counter) -->
+  <rect x="588" y="704" width="252" height="92" fill="#0D0F14"/>
+  <!-- R diagonal leg kicking out to lower-right -->
+  <polygon points="684,724 780,724 904,960 808,960" fill="#0D0F14"/>
+</svg>

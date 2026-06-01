@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!--
+    ELO RATED — Team 4 (Grapple / the lock), Take B
+    "Two locked competitors" — two heavy angular hooks reaching past each
+    other in a pinwheel lock, point-symmetric about the center. The Red hook
+    grips from the top, its arm hooking DOWN into the core; the White hook
+    grips from the bottom, arm hooking UP, and the two arms interlock at the
+    center seam (woven cross). Equal mass Red vs White = matched opponents.
+    Brutalist, not soft. Void #0D0F14 bg. ~120px bars read at 48px.
+  -->
+
+  <!-- Full-bleed Void background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!--
+    RED hook (grips from TOP-LEFT): horizontal arm across the top, then an
+    elbow turning DOWN through center, ending in a tooth that hooks RIGHT
+    below the seam. One closed polygon, bar weight ~136px.
+        top arm:   x 232..676 at y 232..368
+        down stem: x 540..676 at y 368..640
+        bottom tooth (hooks right): x 540..792 at y 568..704? -> kept compact
+  -->
+  <polygon fill="#E63946" points="
+    232,232
+    676,232
+    676,568
+    792,568
+    792,704
+    540,704
+    540,368
+    232,368
+  "/>
+
+  <!--
+    WHITE hook: 180deg rotation about (512,512). Grips from BOTTOM-RIGHT,
+    horizontal arm across the bottom, elbow turning UP through center, tooth
+    hooking LEFT above the seam. Drawn last; its up-stem crosses OVER the red
+    down-stem at the core = the interlock.
+  -->
+  <polygon fill="#E8EDF2" points="
+    792,792
+    348,792
+    348,456
+    232,456
+    232,320
+    484,320
+    484,656
+    792,656
+  "/>
+</svg>

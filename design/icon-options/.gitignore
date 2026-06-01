@@ -1,0 +1,10 @@
+# Regenerable render scratch — reproduce with rsvg-convert + build-registry.py.
+# Keep: BRIEF.md, *.py, batch*/manifest.json, batch*/svg/, batch*/contact-sheet.png,
+# the top-level contact-sheet.png and home-preview.png references.
+/svg/
+png/
+tiles/
+rounded/
+_incoming/
+contact.svg
+home.svg

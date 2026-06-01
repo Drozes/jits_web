@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+**Mobile: smooth "The Statement" launch splash hand-offs (2026-06-01)**
+
+A screen recording showed two ungraceful seams in the launch sequence: after the native F-logo splash dissolved there was a ~150ms dead-black gap before "WE ARE" appeared, and at the end the statement vanished in a single hard-cut frame straight to the home screen.
+
+**Changed**
+- `apps/mobile/components/ui/elo-system/splash-statement.tsx`: the overlay now cross-dissolves into the live app underneath (new `farewell` shared value drives the whole overlay's opacity 1->0 over `FADEOUT_MS`) instead of unmounting on a hard cut. `onDone()` now fires from the fade's completion callback (via `runOnJS`), in both the full-motion and reduced-motion paths. The outer overlay is now an `Animated.View` so its Void backdrop fades with it.
+- `packages/shared/src/constants.ts` (`SPLASH_STATEMENT`): shifted the whole choreography 100ms earlier (`WEARE_DELAY_MS` 250->150, `IGNITE_DELAY_MS` 430->330, `AREYOU_DELAY_MS`/`HAPTIC_DELAY_MS` 1180->1080) so "WE ARE" rises right as the native splash finishes dissolving, closing the dead-black gap while preserving the internal rhythm; added `FADEOUT_MS: 300` for the dissolve; `TOTAL_MS` 2140->2040 now marks when the fade-out begins (onDone fires `FADEOUT_MS` later).
+
 **Mobile: fix TestFlight launch crash from missing Supabase env (2026-06-01)**
 
 Production/TestFlight builds 0.1.0 (3) and (4) crashed ~400ms after launch with `EXC_CRASH (SIGABRT)`: a native TurboModule exception (`ObjCTurboModule::performVoidMethodInvocation -> objc_exception_rethrow -> std::terminate`). Root cause recovered by reproducing the crash in a local Release simulator build: `lib/env.ts` threw `Missing env var: EXPO_PUBLIC_SUPABASE_URL` at module-load (read by `lib/supabase/client.ts` during expo-router boot); RN surfaced it via `ExceptionsManager.reportException` (a void TurboModule method) which rethrew uncaught -> abort. The Supabase URL/anon key were not embedded in the release JS bundle (confirmed: 0 occurrences in build 4's `main.jsbundle`). Debug builds were unaffected because Metro inlines `.env` at serve-time; release bundles need the value baked in at build-time.
@@ -28,11 +36,14 @@ Production/TestFlight builds 0.1.0 (3) and (4) crashed ~400ms after launch with 
 **Added (icon-generation workflow + batches)**
 - `.claude/workflows/generate-app-icons.js`: reusable multi-agent workflow that generates 18 app-icon SVGs across 6 themes (one designer per theme, 3 distinct SVGs each), then an *independent* curator per theme renders, validates, brand-scores (1-5), and repairs any broken SVG. Parameterized by `batch` (and optionally `themes`) via `args`; output goes to `design/icon-options/<batch>/`.
 - `design/icon-options/batch1/` + `batch2/`: the two icon batches so far, each a normalized working dir (`svg/`, `manifest.json` with `batch`/`num`/`label`/`date`/`themes`/`icons`). Batch 2 also has rendered PNGs + `contact-sheet.png`.
-- `design/icon-options/build-registry.py`: idempotent, additive generator. Scans every `batch*/manifest.json`, copies each batch's SVGs to `apps/web/public/design/icons/<batch>/`, assigns each icon a stable stakeholder ID (`B<num>-NN`, numbered in theme-display order), sanitizes banned em-dashes out of concept text, and regenerates `icons.data.ts`. Rerunning after a new workflow batch appends it as a new dated section; nothing is removed.
-- `apps/web/app/design/app-icon-concepts/icons.data.ts` (auto-generated) + `apps/web/public/design/icons/batch{1,2}/*.svg`.
+- `design/icon-options/build-registry.py`: idempotent, additive generator. Scans every `batch*/manifest.json`, copies each batch's SVGs to `apps/web/public/design/icons/<batch>/`, assigns each icon a stable stakeholder ID (`B<num>-NN`, numbered in theme-display order), sanitizes banned em-dashes out of concept text, and regenerates `icons.data.ts`. Rerunning after a new workflow batch appends it as a new section; nothing is removed.
+- `design/icon-options/finalize-batch.py`: promotes a staged workflow run (`design/icon-options/_incoming/svg/`) into the next `batch<N>/` (moves SVGs, writes its `manifest.json` from the workflow result, runs `build-registry.py`). Makes reruns one safe command.
+- `design/icon-options/batch1/` + `batch2/` + `batch3/`: the three icon batches (Foundations / Themed Territories / Round 3), each a normalized working dir (`svg/`, `manifest.json`); batches 2 and 3 also have rendered PNGs + `contact-sheet.png`.
+- `apps/web/app/design/app-icon-concepts/icons.data.ts` (auto-generated) + `apps/web/public/design/icons/batch{1,2,3}/*.svg` (54 icons).
 
 **Changed (accumulating, ID-labeled gallery)**
-- `apps/web/app/design/app-icon-concepts/page.tsx`: reworked from a single-batch gallery into an accumulating, multi-batch one. Renders `BATCHES` (newest first); each batch is its own dated `<section>` (batch number + label + ISO date formatted, e.g. "June 1, 2026", + icon count + ID range) above its six theme sub-groups. Every icon tile now shows a prominent stable ID chip (e.g. `B2-07`) for stakeholder discussion, plus name, optional `QA n/5` curator score, and concept. Both batch 1 ("Foundations", 2026-05-31) and batch 2 ("Themed Territories", 2026-06-01) are preserved on the page (36 icons).
+- `apps/web/app/design/app-icon-concepts/page.tsx`: an accumulating, multi-batch gallery. Renders `BATCHES`; the Foundations batch is pinned at the top as the reference set and every other batch follows newest-first. Each batch is its own dated `<section>` (batch number + label + formatted date + icon count + ID range) above its six theme sub-groups. Icons render as compact ~96px tiles (down from full-column width) in a `flex flex-wrap` grid; each tile shows a stable ID chip (e.g. `B2-07`), the name, and an optional `QA n/5` curator score, with the full concept on hover. Three batches preserved (54 icons).
+- `.claude/workflows/generate-app-icons.js`: output now defaults to a neutral `_incoming/` staging dir instead of an existing batch, so a rerun whose `batch` arg does not propagate (it does not when launched by name) can never overwrite a published batch. Promotion to a numbered batch is handled by `finalize-batch.py`.
 
 **Web: Persistent Sidebar authed shell (2026-05-29)**
 

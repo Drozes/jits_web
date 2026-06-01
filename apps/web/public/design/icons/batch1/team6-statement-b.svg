@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!--
+    ELO RATED — Team 6 "The Statement", Take B
+    THE MONOLITH / FLAG — a heavy vertical Signal Red bar planted on Void,
+    stoic and iconic, like a flag staked or a stark monolith. One geometric
+    accent: a swallowtail flag-notch cut into the right edge, plus a single
+    Gold cap stripe marking the "peak / breakthrough". Reads as a banner.
+    Void #0D0F14 ground | Signal Red #E63946 monolith | Gold #f59e0b cap.
+  -->
+
+  <!-- Full-bleed Void background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- The monolith body: heavy vertical Signal Red bar with a swallowtail
+       flag-notch chevroned into the right edge (the one geometric accent) -->
+  <polygon points="380,168 644,168 644,512 560,608 644,704 644,856 380,856"
+           fill="#E63946"/>
+
+  <!-- Gold cap stripe: the breakthrough peak crowning the monolith -->
+  <rect x="380" y="168" width="264" height="72" fill="#f59e0b"/>
+</svg>

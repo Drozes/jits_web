@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- ELO RATED — Theme 4 "Ascend" B: ascending podium / step-chart, gold-crowned top tier with an up-arrow -->
+
+  <!-- Full-bleed background (FIRST element) -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- Three ascending podium tiers, low (left) to high (right) -->
+  <rect x="168" y="628" width="216" height="230" fill="#242832"/>
+  <rect x="404" y="492" width="216" height="366" fill="#6B7280"/>
+  <rect x="640" y="356" width="216" height="502" fill="#E63946"/>
+
+  <!-- Gold breakthrough cap crowning the winner (top) tier -->
+  <rect x="640" y="300" width="216" height="56" fill="#f59e0b"/>
+
+  <!-- Bold up-arrow knocked out of the top tier in Void -->
+  <polygon points="748,398 842,500 788,500 788,596 708,596 708,500 654,500" fill="#0D0F14"/>
+
+  <!-- Tier markers built as geometry, Void knockouts on the lower steps -->
+  <!-- "1" on the lowest tier -->
+  <rect x="262" y="704" width="30" height="98" fill="#0D0F14"/>
+  <polygon points="262,704 262,728 230,728" fill="#0D0F14"/>
+  <!-- "2"-ish chevron tick on the middle tier (rising marker) -->
+  <polygon points="512,560 560,610 488,610" fill="#0D0F14"/>
+  <rect x="498" y="600" width="28" height="92" fill="#0D0F14"/>
+</svg>

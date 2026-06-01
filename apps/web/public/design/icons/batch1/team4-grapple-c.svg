@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!--
+    ELO RATED — Team 4 (Grapple / the lock), Take C
+    "The grip" — a heavy abstract fist clamping a gi lapel. The grip is the
+    foundation of jiu-jitsu. A thick diagonal Red band = the gi lapel; a bold
+    White fist-block (4 knuckle notches + a thumb bar) clamps across it.
+    High-contrast, minimal, iconic. Void #0D0F14 bg.
+  -->
+
+  <!-- Full-bleed Void background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!--
+    GI LAPEL: a thick Signal Red diagonal band running top-left to bottom-right,
+    width ~150px, kept inside the safe zone. Drawn first so the fist clamps over it.
+  -->
+  <polygon fill="#E63946" points="
+    300,176
+    476,176
+    824,848
+    648,848
+  "/>
+
+  <!--
+    FIST: a heavy white block gripping across the lapel, slightly rotated to
+    follow the hand wrapping the cloth. Built as the palm/back-of-hand block
+    plus four knuckle bars on top and a thumb bar on the lower edge.
+    Main block centered ~ (512,520), ~470 wide x ~210 tall.
+  -->
+  <!-- Knuckle row (4 heavy fingers gripping over the top edge of the fist) -->
+  <rect x="300" y="356" width="92" height="150" rx="14" fill="#E8EDF2"/>
+  <rect x="408" y="356" width="92" height="150" rx="14" fill="#E8EDF2"/>
+  <rect x="516" y="356" width="92" height="150" rx="14" fill="#E8EDF2"/>
+  <rect x="624" y="356" width="92" height="150" rx="14" fill="#E8EDF2"/>
+
+  <!-- Back-of-hand / palm mass: the solid clamp -->
+  <rect x="288" y="480" width="440" height="196" rx="20" fill="#E8EDF2"/>
+
+  <!-- Thumb: a heavy bar wrapping up the lower-left, locking the grip -->
+  <rect x="252" y="556" width="150" height="92" rx="20" fill="#E8EDF2"/>
+
+  <!--
+    Knuckle separations: punch thin Void slots between fingers so the fist
+    reads as fingers, not a single slab. Kept narrow but visible at 48px.
+  -->
+  <rect x="392" y="368" width="16" height="120" fill="#0D0F14"/>
+  <rect x="500" y="368" width="16" height="120" fill="#0D0F14"/>
+  <rect x="608" y="368" width="16" height="120" fill="#0D0F14"/>
+</svg>

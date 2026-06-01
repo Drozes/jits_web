@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- ELO RATED — Lettermark B: Heavy "ER" monogram tile, white letters on Signal Red -->
+
+  <!-- Full-bleed red background tile -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#E63946"/>
+
+  <!-- Void inner plate to seat the monogram (flat 2-tone, no gradient) -->
+  <rect x="96" y="96" width="832" height="832" rx="16" ry="16" fill="#0D0F14"/>
+
+  <!-- ========== E (left), bold condensed, white ==========
+       stem + three arms, all sharp geometry. -->
+  <!-- E stem -->
+  <rect x="200" y="288" width="92" height="448" fill="#E8EDF2"/>
+  <!-- E top arm -->
+  <rect x="292" y="288" width="224" height="92" fill="#E8EDF2"/>
+  <!-- E middle arm (shorter) -->
+  <rect x="292" y="466" width="172" height="84" fill="#E8EDF2"/>
+  <!-- E bottom arm -->
+  <rect x="292" y="644" width="224" height="92" fill="#E8EDF2"/>
+
+  <!-- ========== R (right), bold, white, sharp leg ==========
+       Built from: stem, top bar, bowl (notch carved with red), diagonal leg. -->
+  <!-- R stem -->
+  <rect x="560" y="288" width="92" height="448" fill="#E8EDF2"/>
+  <!-- R bowl: solid block forming the top loop (stem to right edge) -->
+  <rect x="652" y="288" width="180" height="92" fill="#E8EDF2"/>
+  <!-- right vertical of the bowl -->
+  <rect x="740" y="288" width="92" height="240" fill="#E8EDF2"/>
+  <!-- waist bar closing the bottom of the bowl -->
+  <rect x="652" y="436" width="180" height="92" fill="#E8EDF2"/>
+  <!-- counter (the hole inside the bowl) punched with the Void plate color -->
+  <rect x="652" y="380" width="88" height="56" fill="#0D0F14"/>
+  <!-- R diagonal leg (kicks down-right from the waist) -->
+  <polygon points="660,528 752,528 844,736 752,736" fill="#E8EDF2"/>
+</svg>

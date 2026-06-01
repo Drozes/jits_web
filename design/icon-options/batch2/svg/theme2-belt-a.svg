@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Full-bleed background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- THEME A: Clean head-on tied gi belt knot, centered.
+       Two belt bands cross behind a central knot; the knot is the
+       brand-red focal point. Belt is black with a red rank bar. -->
+
+  <!-- Left band of the belt (behind knot) -->
+  <rect x="96" y="452" width="372" height="120" fill="#242832"/>
+  <!-- Right band of the belt (behind knot) -->
+  <rect x="556" y="452" width="372" height="120" fill="#242832"/>
+  <!-- Lower edge accents give the band weight + separation from void -->
+  <rect x="96" y="560" width="372" height="12" fill="#13151B"/>
+  <rect x="556" y="560" width="372" height="12" fill="#13151B"/>
+
+  <!-- Rank bar on the right band (the stripes block on a real belt) -->
+  <rect x="700" y="452" width="120" height="120" fill="#13151B"/>
+  <!-- Four stripes within the rank bar -->
+  <rect x="716" y="470" width="14" height="84" fill="#E8EDF2"/>
+  <rect x="740" y="470" width="14" height="84" fill="#E8EDF2"/>
+  <rect x="764" y="470" width="14" height="84" fill="#E8EDF2"/>
+  <rect x="788" y="470" width="14" height="84" fill="#E63946"/>
+
+  <!-- The KNOT: two loops crossing, drawn as bold geometry.
+       Loop 1 (vertical-ish leaning left) -->
+  <polygon points="436,388 552,388 588,636 472,636" fill="#E63946"/>
+  <!-- Loop 2 (leaning right), overlaps loop 1 to read as a tie -->
+  <polygon points="472,388 588,388 552,636 436,636" fill="#bf1212"/>
+
+  <!-- Center seam of the knot (the gap where the belt folds) -->
+  <rect x="500" y="388" width="24" height="248" fill="#0D0F14"/>
+
+  <!-- The two hanging tails of the belt below the knot -->
+  <rect x="438" y="636" width="78" height="200" fill="#1A1D24"/>
+  <rect x="508" y="636" width="78" height="200" fill="#242832"/>
+  <!-- Red rank-tip on one hanging tail (the rank end) -->
+  <rect x="438" y="772" width="78" height="64" fill="#E63946"/>
+</svg>

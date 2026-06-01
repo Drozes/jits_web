@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!--
+    ELO RATED — Team 1, Take A
+    "Rising-rating E" — confident heavy brutalist lettermark.
+    A bold letter E built from a vertical spine + 4 horizontal bars whose
+    lengths increase top-to-bottom is the classic E; here we INVERT to read
+    as a climb: the bars step UP and OUT to the right, longest (peak) bar
+    at top in Gold. Reads as letter E AND a rising ELO chart.
+    Void #0D0F14 bg | Signal Red #E63946 bars | Gold #f59e0b peak.
+  -->
+
+  <!-- Full-bleed Void background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- Vertical spine of the E (left stem) -->
+  <rect x="232" y="232" width="116" height="560" fill="#E63946"/>
+
+  <!-- Bottom bar (shortest) -->
+  <rect x="232" y="676" width="300" height="116" fill="#E63946"/>
+
+  <!-- Middle bar (medium, slightly higher reach) -->
+  <rect x="232" y="454" width="404" height="116" fill="#E63946"/>
+
+  <!-- Top bar (long) -->
+  <rect x="232" y="232" width="508" height="116" fill="#E63946"/>
+
+  <!-- Gold peak step: ascending tier extending highest/longest at the top -->
+  <rect x="676" y="148" width="116" height="200" fill="#f59e0b"/>
+</svg>

@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Full-bleed background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- MATCHMAKING mark: the competition circle split into two zones that
+       INTERLOCK along a bold dovetail seam. Two athletes, one arena,
+       meeting at the line. Top-down, brutalist, cartographic.
+
+       Construction: fill the whole circle white, then lay the RED left
+       zone as a single dovetailed polygon. The Void seam is one band whose
+       two edges trace the SAME dovetail, so red and white interlock with a
+       clean dark gap between them. No floating fragments. -->
+
+  <clipPath id="arena">
+    <circle cx="512" cy="512" r="336"/>
+  </clipPath>
+
+  <!-- Base: whole circle Terminal White (the right athlete's zone) -->
+  <circle cx="512" cy="512" r="336" fill="#E8EDF2"/>
+
+  <g clip-path="url(#arena)">
+    <!-- RED left zone: dovetail boundary stepping toward the right at mid,
+         interlocking like two puzzle tabs (one tab per zone). -->
+    <polygon points="176,176 540,176 540,396 460,396 460,512
+                     584,512 584,628 460,628 460,848 176,848"
+             fill="#E63946"/>
+
+    <!-- Void seam band: same dovetail path, drawn as a heavy stroke so a
+         clean dark gap sits exactly on the red/white boundary. -->
+    <polyline points="540,176 540,396 460,396 460,512 584,512
+                       584,628 460,628 460,848"
+              fill="none" stroke="#0D0F14" stroke-width="34"
+              stroke-linejoin="miter"/>
+  </g>
+
+  <!-- Arena outer ring (Void) to crisp the circle edge -->
+  <circle cx="512" cy="512" r="336" fill="none" stroke="#0D0F14" stroke-width="30"/>
+
+  <!-- Two engagement dots: one athlete in each zone -->
+  <circle cx="344" cy="512" r="50" fill="#E8EDF2"/>
+  <circle cx="680" cy="512" r="50" fill="#E63946"/>
+</svg>

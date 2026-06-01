@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Full-bleed background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- THEME B: A horizontal belt band across the icon whose rank-bar
+       stripes double as an ELO / progress meter. The black rank bar
+       sits on the right; its stripes "fill up" left-to-right toward a
+       gold breakthrough stripe = climbing the ranks. -->
+
+  <!-- The belt band (full width, heavy) -->
+  <rect x="0" y="412" width="1024" height="200" fill="#1A1D24"/>
+  <!-- Top + bottom edge accents to give the band weight -->
+  <rect x="0" y="412" width="1024" height="20" fill="#242832"/>
+  <rect x="0" y="592" width="1024" height="20" fill="#13151B"/>
+
+  <!-- The rank bar block (the black tab that holds the stripes) -->
+  <rect x="220" y="412" width="584" height="200" fill="#0D0F14"/>
+
+  <!-- PROGRESS-METER STRIPES: 5 slots. Filled stripes = current rating.
+       4 filled red, climbing, then a gold "peak" stripe = breakthrough.
+       Each slot 88 wide with a 24 gap. -->
+  <!-- slot 1 (filled) -->
+  <rect x="252" y="452" width="88" height="120" fill="#E63946"/>
+  <!-- slot 2 (filled) -->
+  <rect x="364" y="452" width="88" height="120" fill="#E63946"/>
+  <!-- slot 3 (filled) -->
+  <rect x="476" y="452" width="88" height="120" fill="#E63946"/>
+  <!-- slot 4 (filled) -->
+  <rect x="588" y="452" width="88" height="120" fill="#E63946"/>
+  <!-- slot 5 (the gold breakthrough / peak stripe) -->
+  <rect x="700" y="452" width="88" height="120" fill="#f59e0b"/>
+
+  <!-- Ascending "meter" notch on top of each stripe so they read as a
+       rising progress chart, not just stripes. Heights climb. -->
+  <rect x="252" y="412" width="88" height="16" fill="#9CA3AF"/>
+  <rect x="364" y="412" width="88" height="16" fill="#9CA3AF"/>
+  <rect x="476" y="412" width="88" height="16" fill="#9CA3AF"/>
+  <rect x="588" y="412" width="88" height="16" fill="#9CA3AF"/>
+  <rect x="700" y="412" width="88" height="16" fill="#E8EDF2"/>
+</svg>

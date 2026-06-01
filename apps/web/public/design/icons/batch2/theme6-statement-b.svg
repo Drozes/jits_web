@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Full-bleed background: deep-red field, planted-flag energy -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#bf1212"/>
+
+  <!-- The ground / base plate the monolith is driven into -->
+  <rect x="0" y="800" width="1024" height="224" fill="#0D0F14"/>
+
+  <!-- THE MONOLITH: a single heavy vertical slab planted dead-center, driven into the ground -->
+  <rect x="404" y="120" width="216" height="752" fill="#0D0F14"/>
+
+  <!-- Gold breakthrough cap on top of the monolith: the peak -->
+  <rect x="404" y="120" width="216" height="60" fill="#f59e0b"/>
+
+  <!-- ONE GEOMETRIC ACCENT: a big Signal Red flag blade flying off the monolith near the top -->
+  <polygon points="620,240 868,348 620,456" fill="#E63946"/>
+  <!-- Flag stripe notch (void) cutting back into the blade for a crisp brutalist fold -->
+  <polygon points="620,456 868,348 760,348 620,420" fill="#bf1212"/>
+
+  <!-- Terminal-white impact band where the monolith strikes the ground = the planted moment -->
+  <rect x="404" y="800" width="216" height="40" fill="#E8EDF2"/>
+</svg>

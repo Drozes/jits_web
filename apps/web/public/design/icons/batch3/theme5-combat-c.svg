@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Full-bleed Void background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- TWO CLINCHED FIGURES matched into one balanced mark.
+       Mirror-symmetric heavy grapplers lean into each other; a narrow Void
+       channel splits them and a Signal Red seam binds them = the lock. The
+       left fighter is Terminal White, the right is Signal Red: a matched,
+       evenly-weighted pair reading as a single heraldic unit. -->
+
+  <!-- Heads: two heavy circles, the matched pair -->
+  <circle cx="360" cy="284" r="92" fill="#E8EDF2"/>
+  <circle cx="664" cy="284" r="92" fill="#E63946"/>
+
+  <!-- Left figure body: solid white wedge leaning right into the clinch -->
+  <path fill="#E8EDF2"
+        d="M188 800
+           C 188 590 252 470 392 426
+           L 496 426
+           L 496 800 Z"/>
+
+  <!-- Right figure body: solid red wedge leaning left (matched opponent) -->
+  <path fill="#E63946"
+        d="M836 800
+           C 836 590 772 470 632 426
+           L 528 426
+           L 528 800 Z"/>
+
+  <!-- The LOCK seam: a tight Void channel splitting the matched pair -->
+  <rect x="496" y="376" width="32" height="424" fill="#0D0F14"/>
+
+  <!-- Interlocked clinching arms crossing the seam (over/under weave).
+       Each arm springs from its own body and reaches across to grip the
+       opponent's far shoulder, so the pair reads as a true clinch. -->
+  <!-- white arm reaches right, OVER the seam, gripping the red shoulder -->
+  <rect x="360" y="446" width="304" height="60" rx="14" fill="#E8EDF2"/>
+  <!-- red arm reaches left, UNDER, gripping the white shoulder -->
+  <rect x="360" y="520" width="304" height="60" rx="14" fill="#E63946"/>
+  <!-- seam re-asserted so the bind between the two arms stays visible -->
+  <rect x="496" y="446" width="32" height="134" fill="#0D0F14"/>
+
+  <!-- Shared base mat: one heavy line both stand on (matched footing) -->
+  <rect x="188" y="800" width="648" height="68" fill="#E8EDF2"/>
+  <rect x="512" y="800" width="324" height="68" fill="#E63946"/>
+  <!-- Center tick on the base marks perfect balance -->
+  <rect x="496" y="800" width="32" height="68" fill="#0D0F14"/>
+</svg>

@@ -1,0 +1,178 @@
+{
+  "batch": "batch2",
+  "themes": [
+    {
+      "key": "lettermark",
+      "title": "Lettermark E / ER Monogram"
+    },
+    {
+      "key": "belt",
+      "title": "The Belt & Rank"
+    },
+    {
+      "key": "mat",
+      "title": "The Mat & Guard"
+    },
+    {
+      "key": "ascend",
+      "title": "Rating & Ascension"
+    },
+    {
+      "key": "combat",
+      "title": "The Lock (Combat)"
+    },
+    {
+      "key": "statement",
+      "title": "Brutalist Statement"
+    }
+  ],
+  "icons": [
+    {
+      "theme": "lettermark",
+      "themeTitle": "Lettermark E / ER Monogram",
+      "file": "theme1-lettermark-a",
+      "name": "Ascending-Bar E",
+      "concept": "Red-spine letter E with white arms of ascending length (E + rising ELO chart) and a gold breakthrough peak stepping above the top bar, on Void.",
+      "score": 3
+    },
+    {
+      "theme": "lettermark",
+      "themeTitle": "Lettermark E / ER Monogram",
+      "file": "theme1-lettermark-b",
+      "name": "ER Monogram Tile",
+      "concept": "Heavy white ER monogram (bold condensed E plus an R with proper bowl, counter, and diagonal leg) seated on a Void plate inside a full-bleed Signal Red tile.",
+      "score": 5
+    },
+    {
+      "theme": "lettermark",
+      "themeTitle": "Lettermark E / ER Monogram",
+      "file": "theme1-lettermark-c",
+      "name": "Staircase E Lettermark",
+      "concept": "Abstract modern E rendered as a solid Signal Red stem with three cantilevered arms of ascending length, white tip-caps marking each arm, and a gold breakthrough cap rising above the longest arm.",
+      "score": 4
+    },
+    {
+      "theme": "belt",
+      "themeTitle": "The Belt & Rank",
+      "file": "theme2-belt-a",
+      "name": "Tied Knot",
+      "concept": "Head-on tied gi belt knot crossing a dark belt band, with a four-stripe rank bar and a red rank-tipped hanging tail.",
+      "score": 4
+    },
+    {
+      "theme": "belt",
+      "themeTitle": "The Belt & Rank",
+      "file": "theme2-belt-b",
+      "name": "Rank Meter Belt",
+      "concept": "Horizontal belt band whose black rank-tab stripes fill left-to-right as a red-to-gold ELO progress meter, climbing to a gold breakthrough stripe.",
+      "score": 3
+    },
+    {
+      "theme": "belt",
+      "themeTitle": "The Belt & Rank",
+      "file": "theme2-belt-c",
+      "name": "Diagonal Rank Mark",
+      "concept": "Abstract modern belt: a heavy black band sweeps diagonally across a deep-red ground with an inset rank tab of three white stripes and one red, edged in Signal Red.",
+      "score": 4
+    },
+    {
+      "theme": "mat",
+      "themeTitle": "The Mat & Guard",
+      "file": "theme3-mat-a",
+      "name": "Tatami Arena",
+      "concept": "Top-down brutalist competition mat: tatami tile grid framing a central Signal Red contest zone with a referee cross and engagement dot.",
+      "score": 4
+    },
+    {
+      "theme": "mat",
+      "themeTitle": "The Mat & Guard",
+      "file": "theme3-mat-b",
+      "name": "Closed Guard",
+      "concept": "Abstract closed-guard position glyph: red legs wrap and lock with a crossed-ankle X over a controlled white torso gripped by two bars.",
+      "score": 3
+    },
+    {
+      "theme": "mat",
+      "themeTitle": "The Mat & Guard",
+      "file": "theme3-mat-c",
+      "name": "Two Zones",
+      "concept": "Matchmaking mark: the arena circle split into red and white zones interlocking on a bold dovetail seam, one athlete dot per side.",
+      "score": 5
+    },
+    {
+      "theme": "ascend",
+      "themeTitle": "Rating & Ascension",
+      "file": "theme4-ascend-a",
+      "name": "Breakthrough Trend",
+      "concept": "Ascending bar chart with a heavy Signal Red trend arrow surging over a gold breakthrough bar to an up-arrowhead peak.",
+      "score": 5
+    },
+    {
+      "theme": "ascend",
+      "themeTitle": "Rating & Ascension",
+      "file": "theme4-ascend-b",
+      "name": "Podium Climb",
+      "concept": "Ascending staircase podium on brand red with a highlighted white top tier carved with an upward arrow.",
+      "score": 3
+    },
+    {
+      "theme": "ascend",
+      "themeTitle": "Rating & Ascension",
+      "file": "theme4-ascend-c",
+      "name": "ELO Ascent Lettermark",
+      "concept": "Bold geometric ELO lettermark whose letters rise in height, the tallest O a red ring capped with a gold peak.",
+      "score": 3
+    },
+    {
+      "theme": "combat",
+      "themeTitle": "The Lock (Combat)",
+      "file": "theme5-combat-a",
+      "name": "Triangle Lock",
+      "concept": "Two interlocking triangles (triangle choke / closed guard) woven over-under with a locked red center node.",
+      "score": 3
+    },
+    {
+      "theme": "combat",
+      "themeTitle": "The Lock (Combat)",
+      "file": "theme5-combat-b",
+      "name": "Lapel Grip",
+      "concept": "A heavy white fist with four knuckles and a wrapping thumb clamping a bold diagonal Signal Red gi lapel.",
+      "score": 4
+    },
+    {
+      "theme": "combat",
+      "themeTitle": "The Lock (Combat)",
+      "file": "theme5-combat-c",
+      "name": "Matched Clinch",
+      "concept": "Two mirror-symmetric figures (white vs void) clinched and bound by a red seam into one balanced, evenly-weighted mark.",
+      "score": 3
+    },
+    {
+      "theme": "statement",
+      "themeTitle": "Brutalist Statement",
+      "file": "theme6-statement-a",
+      "name": "The Cut",
+      "concept": "A bold diagonal slash divides the tile into void and Signal Red, with a brutalist E (gold breakthrough peak) carved in the dark half and a mirrored void glyph in the red half.",
+      "score": 4
+    },
+    {
+      "theme": "statement",
+      "themeTitle": "Brutalist Statement",
+      "file": "theme6-statement-b",
+      "name": "Planted Monolith",
+      "concept": "A single heavy black slab driven into a deep-red ground, capped in gold with a Signal Red flag blade flying off it and a white impact band at the strike point.",
+      "score": 3
+    },
+    {
+      "theme": "statement",
+      "themeTitle": "Brutalist Statement",
+      "file": "theme6-statement-c",
+      "name": "Impact Nest",
+      "concept": "Concentric squares collapsing toward a white core with gold and Signal Red collision wedges driving in from opposing corners: two athletes meeting at the center.",
+      "score": 4
+    }
+  ],
+  "num": 2,
+  "label": "Themed Territories",
+  "date": "2026-06-01"
+}

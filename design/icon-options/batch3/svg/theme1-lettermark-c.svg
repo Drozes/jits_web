@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Background: Void -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- Lettermark E: a left spine binds three ascending arms so the
+       shape reads unambiguously as the letter E while the staggered
+       arm lengths still evoke a rising bar chart. -->
+
+  <!-- Spine (left edge of the E) -->
+  <rect x="248" y="272" width="104" height="532" fill="#E8EDF2"/>
+
+  <!-- Top arm (longest) -->
+  <rect x="352" y="272" width="400" height="104" fill="#E8EDF2"/>
+
+  <!-- Middle arm (Signal Red accent) -->
+  <rect x="352" y="486" width="268" height="104" fill="#E63946"/>
+
+  <!-- Bottom arm (shortest) -->
+  <rect x="352" y="700" width="136" height="104" fill="#E8EDF2"/>
+
+  <!-- Gold breakthrough column: a tall standalone bar rising past the
+       top arm on the right = the peak / breakthrough moment -->
+  <rect x="788" y="184" width="104" height="620" fill="#f59e0b"/>
+</svg>

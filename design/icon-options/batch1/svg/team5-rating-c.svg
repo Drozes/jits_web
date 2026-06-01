@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!--
+    ELO RATED — Team 5 (The Rating / the climb), Take C
+    "Rank medallion + delta" — a bold circular rank medallion (heavy ring)
+    in Signal Red, with a solid up-arrow / delta punched at its center to
+    signal a climbing ELO rating. Heavy geometry, Signal Red dominant,
+    on a Void tile. Reads as an award / rank that is leveling up.
+    Void #0D0F14 bg | Signal Red ring + arrow | Void negative space.
+  -->
+
+  <!-- Full-bleed Void background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- Medallion: heavy Signal Red ring (outer disc minus Void inner disc) -->
+  <circle cx="512" cy="512" r="304" fill="#E63946"/>
+  <circle cx="512" cy="512" r="216" fill="#0D0F14"/>
+
+  <!-- Bold up-arrow / delta inside the medallion: rating climbs -->
+  <!-- Solid triangular arrowhead -->
+  <polygon points="512,344 644,512 380,512" fill="#E63946"/>
+  <!-- Arrow shaft -->
+  <rect x="468" y="512" width="88" height="164" fill="#E63946"/>
+</svg>

@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Full-bleed background (deep brand red) -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#bf1212"/>
+
+  <!-- THEME C: Abstract, modern belt mark. A single thick diagonal belt
+       "stripe" sweeps across the canvas; a black rank-tab with four white
+       stripes is set into it. Minimal, brutalist, reads instantly. -->
+
+  <!-- The diagonal belt band: a heavy bar running corner-to-corner. -->
+  <polygon points="96,624 400,320 928,400 624,704" fill="#0D0F14"/>
+
+  <!-- Terminal-white inner edge highlight along the top of the band
+       (single flat tone, gives the abstract belt definition). -->
+  <polygon points="96,624 400,320 432,352 128,656" fill="#1A1D24"/>
+
+  <!-- The rank tab (black square set into the band, rotated to match). -->
+  <polygon points="560,408 700,428 668,576 528,556" fill="#13151B"/>
+
+  <!-- Four diagonal rank stripes within the tab. Three white, one red. -->
+  <polygon points="572,430 596,433 568,558 544,555" fill="#E8EDF2"/>
+  <polygon points="608,436 632,439 604,564 580,561" fill="#E8EDF2"/>
+  <polygon points="644,442 668,445 640,570 616,567" fill="#E8EDF2"/>
+  <polygon points="680,448 704,451 676,576 652,573" fill="#E63946"/>
+
+  <!-- A single bold accent: the band's leading tip squared off in
+       Signal Red, the brand's unmistakable mark. -->
+  <polygon points="624,704 928,400 928,520 744,704" fill="#E63946"/>
+</svg>

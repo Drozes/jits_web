@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Full-bleed background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- THE LOCK: two interlocking triangles (triangle choke / closed guard).
+       Down-triangle in Terminal White, up-triangle in Signal Red, woven so
+       the bars cross over/under to read as a true interlock. -->
+
+  <!-- Up-pointing triangle (Signal Red), drawn as a thick frame via even-odd -->
+  <path fill="#E63946" fill-rule="evenodd"
+        d="M512 196
+           L818 726 L206 726 Z
+           M512 344
+           L690 652 L334 652 Z"/>
+
+  <!-- Down-pointing triangle (Terminal White), thick frame via even-odd -->
+  <path fill="#E8EDF2" fill-rule="evenodd"
+        d="M512 828
+           L206 298 L818 298 Z
+           M512 680
+           L334 372 L690 372 Z"/>
+
+  <!-- Weave: re-paint the RED bar segments that should pass OVER the white,
+       restoring the interlock illusion at the three crossing zones. -->
+  <!-- left crossing (red over white) -->
+  <polygon fill="#E63946" points="304,488 360,488 304,584 248,584"/>
+  <!-- right crossing (red over white) -->
+  <polygon fill="#E63946" points="720,488 664,488 720,584 776,584"/>
+  <!-- bottom crossing (red over white) -->
+  <polygon fill="#E63946" points="456,652 568,652 540,700 484,700"/>
+
+  <!-- Locked center node: a small solid diamond where forces meet -->
+  <polygon fill="#E8EDF2" points="512,470 556,512 512,554 468,512"/>
+  <polygon fill="#E63946" points="512,488 538,512 512,536 486,512"/>
+</svg>

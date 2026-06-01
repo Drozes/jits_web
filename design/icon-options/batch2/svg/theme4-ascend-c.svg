@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- Baseline plate: all marks sit on a common ground -->
+  <rect x="150" y="788" width="724" height="34" fill="#6B7280"/>
+
+  <!-- "E L O" as bold block letters ASCENDING in height left-to-right.
+       Each letter is taller than the last = a rising rank. -->
+
+  <!-- ===== E (shortest) : x 168..340, top at y 520, bottom y 788 ===== -->
+  <!-- vertical spine -->
+  <rect x="168" y="520" width="62" height="268" fill="#E8EDF2"/>
+  <!-- top bar -->
+  <rect x="168" y="520" width="172" height="60" fill="#E8EDF2"/>
+  <!-- middle bar -->
+  <rect x="168" y="624" width="146" height="60" fill="#E8EDF2"/>
+  <!-- bottom bar -->
+  <rect x="168" y="728" width="172" height="60" fill="#E8EDF2"/>
+
+  <!-- ===== L (mid) : x 392..560, top at y 392, bottom y 788 ===== -->
+  <!-- vertical spine -->
+  <rect x="392" y="392" width="62" height="396" fill="#E8EDF2"/>
+  <!-- foot -->
+  <rect x="392" y="728" width="168" height="60" fill="#E8EDF2"/>
+
+  <!-- ===== O (tallest, breakthrough) : x 596..872, top y 288, bottom y 788, Signal Red ===== -->
+  <!-- outer block via four bars forming a rectangle ring -->
+  <rect x="596" y="288" width="276" height="64" fill="#E63946"/>   <!-- top -->
+  <rect x="596" y="724" width="276" height="64" fill="#E63946"/>   <!-- bottom -->
+  <rect x="596" y="288" width="64" height="500" fill="#E63946"/>   <!-- left -->
+  <rect x="808" y="288" width="64" height="500" fill="#E63946"/>   <!-- right -->
+
+  <!-- Gold breakthrough cap on the tallest letter's peak -->
+  <rect x="596" y="252" width="276" height="36" fill="#f59e0b"/>
+</svg>

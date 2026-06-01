@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Full-bleed background MUST be first -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- ===================================================================
+       CONCEPT A: Head-on tied gi belt KNOT, centered.
+       Two heavy belt bands wrap horizontally and cross at a square knot.
+       Black belt; the cinch wrap carries the Signal Red brand accent.
+       The right band holds a classic BJJ red rank bar with stripes.
+       =================================================================== -->
+
+  <!-- Horizontal belt bands passing behind the knot -->
+  <!-- Left band -->
+  <rect x="96" y="436" width="340" height="152" fill="#1A1D24"/>
+  <rect x="96" y="572" width="340" height="16" fill="#13151B"/>
+  <!-- Right band -->
+  <rect x="588" y="436" width="340" height="152" fill="#1A1D24"/>
+  <rect x="588" y="572" width="340" height="16" fill="#13151B"/>
+
+  <!-- Classic BJJ rank bar on the right band -->
+  <rect x="828" y="436" width="100" height="152" fill="#E63946"/>
+  <rect x="848" y="462" width="16" height="100" fill="#E8EDF2"/>
+  <rect x="874" y="462" width="16" height="100" fill="#E8EDF2"/>
+  <rect x="900" y="462" width="16" height="100" fill="#f59e0b"/>
+
+  <!-- The two hanging tails dropping below the knot -->
+  <polygon points="438,560 540,560 516,892 452,892" fill="#13151B"/>
+  <polygon points="484,560 586,560 572,892 508,892" fill="#242832"/>
+  <!-- Red rank tip on the lighter tail -->
+  <polygon points="508,800 572,800 560,892 508,892" fill="#E63946"/>
+
+  <!-- THE KNOT: two crossed over-straps reading as a tie -->
+  <!-- Back loop slab -->
+  <rect x="392" y="372" width="240" height="240" rx="8" fill="#242832"/>
+  <!-- Left-over strap (under) -->
+  <polygon points="372,392 528,392 500,624 372,624" fill="#13151B"/>
+  <!-- Right-over strap (crossing on top) -->
+  <polygon points="496,392 652,392 652,624 524,624" fill="#1A1D24"/>
+
+  <!-- Central cinch wrap that ties the knot -->
+  <rect x="466" y="344" width="92" height="296" rx="6" fill="#E8EDF2"/>
+  <!-- Signal Red center stripe down the cinch = brand mark -->
+  <rect x="496" y="344" width="32" height="296" fill="#E63946"/>
+</svg>

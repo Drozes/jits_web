@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Full-bleed deep Brand Red tile -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#bf1212"/>
+
+  <!-- Single dominant condensed "E" slab, Terminal White, centered & monolithic.
+       Cap box: y 224 -> 736 (cap height 512). Stem width 150.
+       Wide, slab arms for a stamped/premium feel. x 352..672. -->
+  <rect x="352" y="224" width="150" height="512" fill="#E8EDF2"/>
+  <rect x="352" y="224" width="320" height="148" fill="#E8EDF2"/>
+  <rect x="352" y="446" width="276" height="148" fill="#E8EDF2"/>
+  <rect x="352" y="588" width="320" height="148" fill="#E8EDF2"/>
+
+  <!-- Thin Gold baseline accent bar — premium "peak / breakthrough" cue.
+       Sits centered under the mark, full-width within the safe zone. -->
+  <rect x="262" y="812" width="500" height="22" fill="#f59e0b"/>
+</svg>

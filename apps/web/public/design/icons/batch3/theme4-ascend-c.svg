@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- ELO RATED — Theme 4 "Ascend" C: rank medallion (hexagon) carrying a bold up-arrow over an ascending step-base -->
+
+  <!-- Full-bleed background (FIRST element) -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- Ascending step base under the medallion (rank ladder feel) -->
+  <rect x="232" y="836" width="180" height="44" fill="#242832"/>
+  <rect x="412" y="800" width="200" height="80" fill="#6B7280"/>
+  <rect x="612" y="836" width="180" height="44" fill="#242832"/>
+
+  <!-- Rank medallion: bold hexagon plate (Signal Red) -->
+  <polygon points="512,128 792,290 792,614 512,776 232,614 232,290" fill="#E63946"/>
+
+  <!-- Inner Void hex bevel for a heavy plate read -->
+  <polygon points="512,196 734,324 734,580 512,708 290,580 290,324" fill="#0D0F14"/>
+
+  <!-- Bold up-arrow inside the medallion = ascension -->
+  <polygon points="512,256 666,452 588,452 588,612 436,612 436,452 358,452" fill="#E8EDF2"/>
+
+  <!-- Gold breakthrough crown notch at the medallion's top vertex -->
+  <polygon points="512,128 568,160 512,196 456,160" fill="#f59e0b"/>
+</svg>

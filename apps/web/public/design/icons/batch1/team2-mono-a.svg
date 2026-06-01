@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Full-bleed Signal Red tile -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#E63946"/>
+
+  <!-- Stamped "ER" monogram in Terminal White, heavy condensed caps.
+       Cap box: y 252 -> 772 (cap height 520). Stem width 116.
+       E occupies x 246..480, R occupies x 520..778. Tight tracking. -->
+
+  <!-- ===== E ===== -->
+  <!-- Left stem -->
+  <rect x="246" y="252" width="116" height="520" fill="#E8EDF2"/>
+  <!-- Top arm -->
+  <rect x="246" y="252" width="234" height="112" fill="#E8EDF2"/>
+  <!-- Middle arm (slightly shorter, classic E) -->
+  <rect x="246" y="456" width="196" height="112" fill="#E8EDF2"/>
+  <!-- Bottom arm -->
+  <rect x="246" y="660" width="234" height="112" fill="#E8EDF2"/>
+
+  <!-- ===== R ===== -->
+  <!-- Left stem -->
+  <rect x="520" y="252" width="116" height="520" fill="#E8EDF2"/>
+  <!-- Bowl: outer block from stem to right edge, top half -->
+  <rect x="520" y="252" width="258" height="112" fill="#E8EDF2"/>
+  <!-- Right vertical of the bowl -->
+  <rect x="662" y="252" width="116" height="280" fill="#E8EDF2"/>
+  <!-- Bowl bottom bar closing the loop -->
+  <rect x="520" y="420" width="258" height="112" fill="#E8EDF2"/>
+  <!-- Diagonal leg, condensed: from bowl junction down to baseline right -->
+  <polygon points="636,500 752,500 778,772 662,772" fill="#E8EDF2"/>
+</svg>

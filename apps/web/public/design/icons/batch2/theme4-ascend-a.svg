@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- Ascending bar chart: four columns rising left-to-right -->
+  <rect x="160" y="600" width="132" height="248" fill="#242832"/>
+  <rect x="324" y="512" width="132" height="336" fill="#1A1D24"/>
+  <rect x="488" y="408" width="132" height="440" fill="#242832"/>
+  <!-- Tallest bar is the breakthrough: gold -->
+  <rect x="652" y="288" width="132" height="560" fill="#f59e0b"/>
+
+  <!-- Baseline plate -->
+  <rect x="144" y="848" width="736" height="38" fill="#6B7280"/>
+
+  <!-- Heavy upward trend line rising across the bars (Signal Red) -->
+  <polygon points="160,640 480,468 720,300 720,420 480,588 160,760" fill="#E63946"/>
+
+  <!-- Bold up-arrowhead at the breakthrough tip -->
+  <polygon points="718,168 868,318 762,318 762,420 642,420 642,318 568,318" fill="#E63946"/>
+</svg>

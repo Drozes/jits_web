@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Full-bleed background MUST be first (brand Void field) -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- ===================================================================
+       CONCEPT C: Abstract, modern BELT mark on the brand Void field.
+       A single heavy belt band sweeps diagonally corner-to-corner.
+       A black rank tab with bold rank stripes is set into it. Minimal,
+       brutalist, instantly legible. Distinct from A/B: diagonal motion,
+       no knot, no meter. Signal Red leading tip = brand accent.
+       Palette: Void #0D0F14 + Signal Red #E63946 only.
+       =================================================================== -->
+
+  <!-- The diagonal belt band (heavy dark bar, readable above Void) -->
+  <polygon points="64,672 352,384 960,352 672,640" fill="#242832"/>
+  <!-- Lower band edge running parallel = the belt's thickness -->
+  <polygon points="64,672 672,640 960,352 960,472 352,504" fill="#1A1D24"/>
+
+  <!-- Bright top edge of the band for crisp definition -->
+  <polygon points="64,672 352,384 384,416 96,704" fill="#363B47"/>
+
+  <!-- The rank tab: a bold near-black block set across the band -->
+  <polygon points="512,432 696,422 712,558 528,568" fill="#13151B"/>
+
+  <!-- Rank stripes within the tab: three white, one signal red -->
+  <rect x="540" y="438" width="22" height="130" fill="#E8EDF2" transform="rotate(-3 551 503)"/>
+  <rect x="582" y="436" width="22" height="130" fill="#E8EDF2" transform="rotate(-3 593 501)"/>
+  <rect x="624" y="434" width="22" height="130" fill="#E8EDF2" transform="rotate(-3 635 499)"/>
+  <rect x="666" y="432" width="22" height="130" fill="#E63946" transform="rotate(-3 677 497)"/>
+
+  <!-- The leading tip of the belt squared off in Signal Red = brand mark -->
+  <polygon points="64,672 672,640 672,728 96,760" fill="#E63946"/>
+</svg>

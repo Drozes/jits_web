@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Full-bleed background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- Top-down tatami mat: brutalist competition arena.
+       Outer mat field of interlocking tiles framing a central red contest zone. -->
+
+  <!-- Mat field (the tatami border ring) -->
+  <rect x="152" y="152" width="720" height="720" fill="#1A1D24"/>
+
+  <!-- Tatami tile seams: heavy grid lines on the mat field (Void gaps) -->
+  <!-- vertical seams -->
+  <rect x="296" y="152" width="16" height="720" fill="#0D0F14"/>
+  <rect x="440" y="152" width="16" height="720" fill="#0D0F14"/>
+  <rect x="568" y="152" width="16" height="720" fill="#0D0F14"/>
+  <rect x="712" y="152" width="16" height="720" fill="#0D0F14"/>
+  <!-- horizontal seams -->
+  <rect x="152" y="296" width="720" height="16" fill="#0D0F14"/>
+  <rect x="152" y="440" width="720" height="16" fill="#0D0F14"/>
+  <rect x="152" y="568" width="720" height="16" fill="#0D0F14"/>
+  <rect x="152" y="712" width="720" height="16" fill="#0D0F14"/>
+
+  <!-- Central contest zone: the red competition square (Signal Red) -->
+  <rect x="312" y="312" width="400" height="400" fill="#E63946"/>
+
+  <!-- Inner safety boundary line of the contest zone (Void inset) -->
+  <rect x="356" y="356" width="312" height="312" fill="none" stroke="#0D0F14" stroke-width="22"/>
+
+  <!-- Center referee mark: a bold cross dividing the two starting halves -->
+  <rect x="500" y="356" width="24" height="312" fill="#0D0F14"/>
+  <rect x="356" y="500" width="312" height="24" fill="#0D0F14"/>
+
+  <!-- Center engagement dot -->
+  <rect x="476" y="476" width="72" height="72" fill="#E8EDF2"/>
+</svg>

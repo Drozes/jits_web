@@ -1,0 +1,178 @@
+{
+  "batch": "batch3",
+  "num": 3,
+  "label": "Round 3",
+  "date": "2026-06-01",
+  "themes": [
+    {
+      "key": "lettermark",
+      "title": "Lettermark E / ER Monogram"
+    },
+    {
+      "key": "belt",
+      "title": "The Belt & Rank"
+    },
+    {
+      "key": "mat",
+      "title": "The Mat & Guard"
+    },
+    {
+      "key": "ascend",
+      "title": "Rating & Ascension"
+    },
+    {
+      "key": "combat",
+      "title": "The Lock (Combat)"
+    },
+    {
+      "key": "statement",
+      "title": "Brutalist Statement"
+    }
+  ],
+  "icons": [
+    {
+      "theme": "lettermark",
+      "themeTitle": "Lettermark E / ER Monogram",
+      "file": "theme1-lettermark-a",
+      "name": "Ascending E",
+      "concept": "Heavy slab letter E whose three rungs grow in length into a rising ELO chart, capped by a gold breakthrough peak on deep brand red.",
+      "score": 4
+    },
+    {
+      "theme": "lettermark",
+      "themeTitle": "Lettermark E / ER Monogram",
+      "file": "theme1-lettermark-b",
+      "name": "ER Monogram Tile",
+      "concept": "Bold locked E+R monogram in white on a Signal Red rounded tile over Void, the heavy brand signature.",
+      "score": 5
+    },
+    {
+      "theme": "lettermark",
+      "themeTitle": "Lettermark E / ER Monogram",
+      "file": "theme1-lettermark-c",
+      "name": "Floating-Bar E",
+      "concept": "Abstract spineless E built from three free-floating ascending bars reading as a bar chart, with a tall gold breakthrough column.",
+      "score": 4
+    },
+    {
+      "theme": "belt",
+      "themeTitle": "The Belt & Rank",
+      "file": "theme2-belt-a",
+      "name": "Tied Knot",
+      "concept": "Head-on tied gi belt knot with a white-and-red cinch, hanging tails with a red rank tip, and a striped red rank bar.",
+      "score": 3
+    },
+    {
+      "theme": "belt",
+      "themeTitle": "The Belt & Rank",
+      "file": "theme2-belt-b",
+      "name": "Rank Meter",
+      "concept": "Belt band whose rank stripes become a climbing segmented ELO meter rising to a gold breakthrough segment.",
+      "score": 3
+    },
+    {
+      "theme": "belt",
+      "themeTitle": "The Belt & Rank",
+      "file": "theme2-belt-c",
+      "name": "Diagonal Belt",
+      "concept": "Abstract brutalist black belt sweeping diagonally across a red field, with a striped rank tab and red leading tip.",
+      "score": 4
+    },
+    {
+      "theme": "mat",
+      "themeTitle": "The Mat & Guard",
+      "file": "theme3-mat-a",
+      "name": "Tatami Arena",
+      "concept": "Top-down competition mat: Signal Red safety apron, gridded dark combat area, white center circle with a red live-match node.",
+      "score": 5
+    },
+    {
+      "theme": "mat",
+      "themeTitle": "The Mat & Guard",
+      "file": "theme3-mat-b",
+      "name": "Closed Guard",
+      "concept": "Abstract closed-guard position diagram: a red wrapping frame with the crossed-ankle X lock at top, clamping the trapped white torso.",
+      "score": 3
+    },
+    {
+      "theme": "mat",
+      "themeTitle": "The Mat & Guard",
+      "file": "theme3-mat-c",
+      "name": "The Match",
+      "concept": "Matchmaking mark of two zones (red vs white) interlocking along a dovetail void seam, each holding one engagement node.",
+      "score": 4
+    },
+    {
+      "theme": "ascend",
+      "themeTitle": "Rating & Ascension",
+      "file": "theme4-ascend-a",
+      "name": "Delta Climb",
+      "concept": "Heavy stacked upward chevron-delta launching out of an ascending bar chart, gold breakthrough cap at the apex.",
+      "score": 5
+    },
+    {
+      "theme": "ascend",
+      "themeTitle": "Rating & Ascension",
+      "file": "theme4-ascend-b",
+      "name": "Podium Tiers",
+      "concept": "Three ascending podium steps low-to-high with a gold-crowned Signal Red top tier carrying a knocked-out up-arrow.",
+      "score": 3
+    },
+    {
+      "theme": "ascend",
+      "themeTitle": "Rating & Ascension",
+      "file": "theme4-ascend-c",
+      "name": "Rank Medallion",
+      "concept": "Bold hexagonal rank medallion holding an up-arrow over an ascending step-base, gold crown notch at the peak.",
+      "score": 4
+    },
+    {
+      "theme": "combat",
+      "themeTitle": "The Lock (Combat)",
+      "file": "theme5-combat-a",
+      "name": "Triangle Lock",
+      "concept": "Two heavy interlocking triangle frames woven over/under (Signal Red up, Terminal White down) with a central choke node, reading as a triangle choke / closed guard.",
+      "score": 5
+    },
+    {
+      "theme": "combat",
+      "themeTitle": "The Lock (Combat)",
+      "file": "theme5-combat-b",
+      "name": "Gi Grip",
+      "concept": "A solid white fist with blocky knuckles and a wrapping thumb clamping a bold diagonal Signal Red gi lapel corner to corner.",
+      "score": 4
+    },
+    {
+      "theme": "combat",
+      "themeTitle": "The Lock (Combat)",
+      "file": "theme5-combat-c",
+      "name": "Matched Clinch",
+      "concept": "Two mirror-symmetric figures (white vs red) clinched at interlocking arms across a central Void seam, a balanced, evenly-weighted heraldic pair.",
+      "score": 3
+    },
+    {
+      "theme": "statement",
+      "themeTitle": "Brutalist Statement",
+      "file": "theme6-statement-a",
+      "name": "The Cut",
+      "concept": "A bold diagonal slash splits the tile Void-over-Signal-Red, with a white E (plus gold breakthrough step) above the cut and a mirrored knocked-out E below it.",
+      "score": 4
+    },
+    {
+      "theme": "statement",
+      "themeTitle": "Brutalist Statement",
+      "file": "theme6-statement-b",
+      "name": "Planted Flag",
+      "concept": "A heavy white monolith planted dead-center with a gold breakthrough cap, a massive Signal Red flag blade flying off it, and a red base wedge driving it into the ground.",
+      "score": 3
+    },
+    {
+      "theme": "statement",
+      "themeTitle": "Brutalist Statement",
+      "file": "theme6-statement-c",
+      "name": "Impact Diamond",
+      "concept": "Nested rotated Void/Red squares collapsing to a core, with two opposing force halves (Terminal White vs Gold) colliding at a hard Void seam and central impact block.",
+      "score": 5
+    }
+  ]
+}

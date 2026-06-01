@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!--
+    ELO RATED — Team 3, Take B
+    "Belt = Rating Bar" — a bold horizontal BJJ belt band spans the tile.
+    Its dark rank-bar segment (a distinct Plate tone, NOT the background, so
+    the belt stays one continuous ribbon) is filled with ascending stripes
+    that double as an ELO / progress meter: white stripes step UP left-to-
+    right, the tallest "next rank" stripe in Gold = the breakthrough.
+    Void #0D0F14 bg | belt Signal Red #E63946 | rank bar Plate #1A1D24 | stripes White + Gold.
+  -->
+
+  <!-- Full-bleed Void background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- ===== The belt band across the tile ===== -->
+  <rect x="80" y="372" width="864" height="280" fill="#E63946"/>
+  <!-- Belt edge ribs (deep red) for ribbon weight -->
+  <rect x="80" y="372" width="864" height="28" fill="#bf1212"/>
+  <rect x="80" y="624" width="864" height="28" fill="#bf1212"/>
+
+  <!-- ===== Dark rank bar (centered segment, Plate tone so belt reads whole) ===== -->
+  <rect x="300" y="400" width="424" height="224" fill="#1A1D24"/>
+
+  <!-- ===== Ascending rank stripes = ELO / progress meter ===== -->
+  <!-- Stripes share a common baseline (y=584) and grow taller left to right -->
+  <!-- Stripe 1 (shortest) -->
+  <rect x="336" y="496" width="52" height="88" fill="#FFFFFF"/>
+  <!-- Stripe 2 -->
+  <rect x="416" y="464" width="52" height="120" fill="#FFFFFF"/>
+  <!-- Stripe 3 -->
+  <rect x="496" y="432" width="52" height="152" fill="#FFFFFF"/>
+  <!-- Stripe 4 -->
+  <rect x="576" y="440" width="52" height="144" fill="#FFFFFF"/>
+  <!-- Gold "next rank" stripe (tallest, the breakthrough step) -->
+  <rect x="656" y="424" width="40" height="160" fill="#f59e0b"/>
+</svg>

@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Full-bleed background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- ABSTRACT CLOSED-GUARD POSITION DIAGRAM.
+       Top-down map of the guard: the bottom athlete's legs (red ring) wrap
+       and LOCK around the top athlete's trapped torso (white block).
+       The crossed-ankle closure sits at the top. Brutalist position glyph. -->
+
+  <!-- Faint mat field behind the position -->
+  <rect x="160" y="160" width="704" height="704" fill="#13151B"/>
+
+  <!-- The closed guard: a heavy red ring (the wrapping legs/locked frame) -->
+  <rect x="248" y="248" width="528" height="528" fill="none" stroke="#E63946" stroke-width="120"/>
+
+  <!-- Crossed-ankle LOCK at top: a Void notch carved into the red ring -->
+  <polygon points="452,188 512,278 572,188 632,188 542,323 632,458 572,458 512,368 452,458 392,458 482,323 392,188"
+           fill="#0D0F14"/>
+
+  <!-- Top athlete: the trapped torso held inside the guard (Terminal White) -->
+  <rect x="416" y="416" width="192" height="192" fill="#E8EDF2"/>
+
+  <!-- Control seam across the trapped torso (Void) -->
+  <rect x="416" y="500" width="192" height="24" fill="#0D0F14"/>
+</svg>

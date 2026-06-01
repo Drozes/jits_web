@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!--
+    ELO RATED — Team 4 (Grapple / the lock), Take A
+    "Interlocked triangles" — the triangle choke / closed guard is THE iconic
+    BJJ shape. Two heavy HOLLOW triangles (Signal Red point-up, White
+    point-down) mesh into one tight symmetric star/knot. Each triangle is a
+    thick ring (outer polygon minus inner hole, even-odd). A six-point weave:
+    on each crossing the bars alternate over/under so it reads as locked, not
+    stacked. Void #0D0F14 bg. Reads as a lock at 48px.
+  -->
+
+  <!-- Full-bleed Void background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- RED triangle ring (point UP) -->
+  <path fill="#E63946" fill-rule="evenodd"
+        d="M512 232 L818 758 L206 758 Z
+           M512 404 L659 656 L365 656 Z"/>
+
+  <!-- WHITE triangle ring (point DOWN), drawn over the red.
+       Its three bars sit ON TOP of the red ring everywhere it crosses. -->
+  <path fill="#E8EDF2" fill-rule="evenodd"
+        d="M512 792 L206 266 L818 266 Z
+           M512 620 L365 368 L659 368 Z"/>
+
+  <!--
+    WEAVE: re-assert the RED ring's bars on 3 of the 6 crossings so the lock
+    alternates over/under (true interlock). We redraw short red parallelogram
+    patches exactly on the red bar segments where they should pass OVER white.
+    Patches are clipped to the red bars (no protruding spikes).
+  -->
+  <!-- Red LEFT bar passes over white at the lower-left crossing -->
+  <polygon fill="#E63946" points="305,650 366,650 318,734 257,734"/>
+  <!-- Red RIGHT bar passes over white at the lower-right crossing -->
+  <polygon fill="#E63946" points="658,650 719,650 767,734 706,734"/>
+  <!-- Red BASE bar passes over white at the bottom-center crossing -->
+  <polygon fill="#E63946" points="441,656 583,656 583,758 441,758"/>
+</svg>

@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!--
+    ELO RATED — Team 6 "The Statement", Take A
+    THE SLASH / CUT — one brutal diagonal cleaves the tile in two. The
+    upper-right half is Signal Red, the lower-left stays Void, and a thin
+    Gold seam rides the fault line. "Draw the line. Are you?" Extremely
+    minimal, extremely strong: a full-bleed corner-to-corner cut that holds
+    its weight at 48px because the division spans the entire tile.
+    Void #0D0F14 ground | Signal Red #E63946 half | Gold #f59e0b seam.
+  -->
+
+  <!-- Full-bleed Void background (this IS the lower-left half) -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- Signal Red upper-right half: a corner-to-corner diagonal cut.
+       The cut runs from lower-left toward upper-right, offset to the
+       upper-right so red dominates that corner. -->
+  <polygon points="1024,0 1024,1024 256,0" fill="#E63946"/>
+
+  <!-- Gold seam riding the fault line (thin parallel band on the cut) -->
+  <polygon points="256,0 1024,1024 1024,944 322,0" fill="#f59e0b"/>
+</svg>

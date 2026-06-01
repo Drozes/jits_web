@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!--
+    ELO RATED — Team 5 (The Rating / the climb), Take A
+    "Your rating climbs" — a heavy triangular UP-arrow (delta / chevron)
+    in Gain Green sitting atop a short ascending bar chart.
+    Reads instantly as "rating going UP." Sharp, data-driven, competitive.
+    Void #0D0F14 bg | Gain Green #22C55E arrow | bars green w/ Gold peak.
+  -->
+
+  <!-- Full-bleed Void background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- Ascending bar chart base: 3 bars stepping up left-to-right -->
+  <rect x="276" y="700" width="120" height="124" fill="#22C55E"/>
+  <rect x="452" y="636" width="120" height="188" fill="#22C55E"/>
+  <rect x="628" y="572" width="120" height="252" fill="#f59e0b"/>
+
+  <!-- Bold upward delta / chevron arrow (rating going UP) -->
+  <!-- Solid triangular arrowhead -->
+  <polygon points="512,176 740,452 540,452 540,452 484,452 284,452" fill="#22C55E"/>
+  <!-- Arrow shaft -->
+  <rect x="448" y="452" width="128" height="120" fill="#22C55E"/>
+</svg>

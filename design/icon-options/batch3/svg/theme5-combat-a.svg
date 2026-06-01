@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Full-bleed Void background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- THE LOCK: two interlocking triangles (triangle choke / closed guard).
+       Two heavy triangular frames woven into a single locked mark. The
+       down-triangle is Terminal White, the up-triangle is Signal Red.
+       Even-odd fill cuts each into a thick open frame; weave segments
+       restore the over/under crossing so the pair reads as truly bound. -->
+
+  <!-- Down-pointing triangle (Terminal White) as a thick frame -->
+  <path fill="#E8EDF2" fill-rule="evenodd"
+        d="M 196 300
+           L 828 300
+           L 512 848
+           Z
+           M 360 392
+           L 664 392
+           L 512 656
+           Z"/>
+
+  <!-- Up-pointing triangle (Signal Red) as a thick frame -->
+  <path fill="#E63946" fill-rule="evenodd"
+        d="M 512 176
+           L 828 724
+           L 196 724
+           Z
+           M 512 368
+           L 664 632
+           L 360 632
+           Z"/>
+
+  <!-- WEAVE: re-lay the segments that pass OVER, alternating per crossing.
+       Left crossing -> RED over white. -->
+  <polygon fill="#E63946" points="276,468 372,468 420,552 324,552"/>
+  <!-- Right crossing -> RED over white. -->
+  <polygon fill="#E63946" points="748,468 652,468 604,552 700,552"/>
+  <!-- Bottom crossing -> WHITE over red. -->
+  <polygon fill="#E8EDF2" points="444,632 580,632 548,708 476,708"/>
+
+  <!-- Central choke node: a small solid diamond where the frames bind -->
+  <polygon fill="#E8EDF2" points="512,452 568,512 512,572 456,512"/>
+  <polygon fill="#E63946" points="512,476 544,512 512,548 480,512"/>
+</svg>

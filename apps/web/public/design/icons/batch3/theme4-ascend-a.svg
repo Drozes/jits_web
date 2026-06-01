@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- ELO RATED — Theme 4 "Ascend" A: heavy upward delta/chevron launching out of an ascending bar chart -->
+
+  <!-- Full-bleed background (FIRST element) -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- Ascending bar chart = the data the rating climbs from -->
+  <rect x="214" y="704" width="116" height="150" fill="#242832"/>
+  <rect x="362" y="620" width="116" height="234" fill="#242832"/>
+  <rect x="510" y="536" width="116" height="318" fill="#6B7280"/>
+  <rect x="658" y="452" width="116" height="402" fill="#9CA3AF"/>
+
+  <!-- Two stacked upward chevrons = momentum / acceleration (Signal Red) -->
+  <polygon points="512,128 776,440 642,440 512,272 382,440 248,440" fill="#E63946"/>
+  <polygon points="512,318 712,556 600,556 512,448 424,556 312,556" fill="#bf1212"/>
+
+  <!-- Gold breakthrough cap on the apex = peak rating reached -->
+  <polygon points="512,128 572,200 452,200" fill="#f59e0b"/>
+</svg>

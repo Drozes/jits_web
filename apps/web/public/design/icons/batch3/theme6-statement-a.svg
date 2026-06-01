@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Full-bleed background (Void) -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- THE CUT: one bold diagonal slash divides the tile. Lower-right half is Signal Red. -->
+  <polygon points="1024,0 1024,1024 0,1024" fill="#E63946"/>
+
+  <!-- Razor gap: a hard Void band runs along the diagonal for a clean brutalist slice -->
+  <polygon points="0,1024 96,1024 1024,96 1024,0 928,0" fill="#0D0F14"/>
+
+  <!-- Bold condensed "E" planted in the upper-left VOID field, clear of the slash -->
+  <!-- spine -->
+  <rect x="196" y="236" width="108" height="452" fill="#E8EDF2"/>
+  <!-- top arm -->
+  <rect x="196" y="236" width="332" height="100" fill="#E8EDF2"/>
+  <!-- middle arm (shorter) -->
+  <rect x="196" y="394" width="256" height="100" fill="#E8EDF2"/>
+  <!-- bottom arm -->
+  <rect x="196" y="588" width="332" height="100" fill="#E8EDF2"/>
+  <!-- Gold "breakthrough" step rising off the top arm = ascending ELO peak -->
+  <rect x="432" y="132" width="96" height="204" fill="#f59e0b"/>
+
+  <!-- Mirrored counter-"E" knocked OUT of the red field (Void cutouts) below the cut.
+       Sits within the safe zone, balancing the white E across the slash. -->
+  <!-- spine -->
+  <rect x="720" y="540" width="100" height="352" fill="#0D0F14"/>
+  <!-- top arm -->
+  <rect x="540" y="540" width="280" height="84" fill="#0D0F14"/>
+  <!-- middle arm (shorter) -->
+  <rect x="612" y="664" width="208" height="84" fill="#0D0F14"/>
+  <!-- bottom arm -->
+  <rect x="540" y="808" width="280" height="84" fill="#0D0F14"/>
+</svg>

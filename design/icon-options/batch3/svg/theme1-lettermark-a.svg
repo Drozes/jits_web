@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Background: Signal Red -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#E63946"/>
+
+  <!-- Heavy slab "E", white geometry -->
+  <!-- Spine -->
+  <rect x="300" y="220" width="124" height="584" fill="#E8EDF2"/>
+  <!-- Bottom arm -->
+  <rect x="424" y="684" width="186" height="120" fill="#E8EDF2"/>
+  <!-- Middle arm (shorter) -->
+  <rect x="424" y="452" width="268" height="120" fill="#E8EDF2"/>
+  <!-- Top arm -->
+  <rect x="424" y="220" width="348" height="120" fill="#E8EDF2"/>
+
+  <!-- Gold accent: a terminal cap riding the top arm's right edge,
+       locked flush to the arm so it reads as part of the letter -->
+  <rect x="772" y="220" width="44" height="120" fill="#f59e0b"/>
+</svg>

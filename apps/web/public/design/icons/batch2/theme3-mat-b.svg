@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Full-bleed background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- Abstract CLOSED-GUARD position diagram (top-down).
+       The bottom athlete's legs (red) wrap UP and lock in a closed ring
+       around the top athlete's trapped torso (white). The crossed-ankle
+       LOCK sits at the top, closing the guard. Brutalist position glyph. -->
+
+  <!-- Bottom athlete: hips/base block at the bottom (red) -->
+  <rect x="336" y="700" width="352" height="124" fill="#E63946"/>
+
+  <!-- Two thighs rising from the hips, wrapping the trapped torso (red) -->
+  <rect x="248" y="300" width="120" height="448" fill="#E63946"/>
+  <rect x="656" y="300" width="120" height="448" fill="#E63946"/>
+
+  <!-- The CLOSED LOCK: ankles cross and clamp across the top (red bar) -->
+  <rect x="248" y="248" width="528" height="120" fill="#E63946"/>
+
+  <!-- Crossed-ankle X carved into the lock (Void) to read as the closure -->
+  <polygon points="468,248 512,308 556,248 596,248 528,338 596,368
+                   556,368 512,338 468,368 428,368 496,338 428,248"
+           fill="#0D0F14"/>
+
+  <!-- Top athlete: trapped torso inside the guard (Terminal White) -->
+  <rect x="412" y="388" width="200" height="312" fill="#E8EDF2"/>
+
+  <!-- Spine seam down the trapped torso (Void) -->
+  <rect x="500" y="388" width="24" height="312" fill="#0D0F14"/>
+
+  <!-- Two control grips clamping across the trapped torso (red) -->
+  <rect x="412" y="452" width="200" height="44" fill="#E63946"/>
+  <rect x="412" y="568" width="200" height="44" fill="#E63946"/>
+</svg>

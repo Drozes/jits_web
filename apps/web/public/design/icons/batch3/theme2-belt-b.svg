@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Full-bleed background MUST be first -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- ===================================================================
+       CONCEPT B: Belt band as an ELO / PROGRESS METER.
+       A heavy black belt band crosses the icon. Set into it is the rank
+       bar, but the rank stripes are reinterpreted as a segmented meter
+       that "fills" left-to-right: red filled segments climbing toward a
+       gold BREAKTHROUGH segment = ranking up.
+       =================================================================== -->
+
+  <!-- Belt band: full-bleed wide, heavy weight -->
+  <rect x="0" y="392" width="1024" height="240" fill="#1A1D24"/>
+  <!-- Edge accents give the band physical weight -->
+  <rect x="0" y="392" width="1024" height="22" fill="#242832"/>
+  <rect x="0" y="610" width="1024" height="22" fill="#13151B"/>
+
+  <!-- The rank-bar tab: the black field that frames the meter -->
+  <rect x="160" y="392" width="704" height="240" fill="#0D0F14"/>
+  <rect x="160" y="392" width="704" height="22" fill="#13151B"/>
+  <rect x="160" y="610" width="704" height="22" fill="#13151B"/>
+
+  <!-- PROGRESS-METER SEGMENTS (the rank stripes).
+       6 slots, each 96 wide with 16 gaps, vertically centered ~y460..560.
+       Filled segments rise in height to read as a climbing meter. -->
+
+  <!-- empty track guides (unfilled rungs) -->
+  <rect x="200" y="540" width="96" height="20" fill="#242832"/>
+  <rect x="312" y="540" width="96" height="20" fill="#242832"/>
+  <rect x="424" y="540" width="96" height="20" fill="#242832"/>
+  <rect x="536" y="540" width="96" height="20" fill="#242832"/>
+  <rect x="648" y="540" width="96" height="20" fill="#242832"/>
+  <rect x="760" y="540" width="96" height="20" fill="#242832"/>
+
+  <!-- filled segments, climbing height left to right = ELO rising -->
+  <rect x="200" y="500" width="96" height="60"  fill="#E63946"/>
+  <rect x="312" y="476" width="96" height="84"  fill="#E63946"/>
+  <rect x="424" y="452" width="96" height="108" fill="#E63946"/>
+  <rect x="536" y="436" width="96" height="124" fill="#E63946"/>
+  <rect x="648" y="424" width="96" height="136" fill="#E63946"/>
+  <!-- the GOLD breakthrough / peak segment, highest of all -->
+  <rect x="760" y="424" width="96" height="136" fill="#f59e0b"/>
+  <!-- white cap on the peak to mark "the breakthrough" -->
+  <rect x="760" y="424" width="96" height="22" fill="#FFFFFF"/>
+</svg>

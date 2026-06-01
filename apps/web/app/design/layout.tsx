@@ -14,6 +14,7 @@ const navLinks = [
   { href: "/design/screens", label: "Web Screens" },
   { href: "/design/screens/native", label: "Native Screens" },
   { href: "/design/board", label: "Board" },
+  { href: "/design/app-icon-concepts", label: "App Icons" },
 ];
 
 export default function DesignLayout({

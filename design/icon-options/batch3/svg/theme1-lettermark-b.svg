@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Background: Void -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- Signal Red tile holding the locked ER monogram -->
+  <rect x="172" y="172" width="680" height="680" rx="16" fill="#E63946"/>
+
+  <!-- Heavy "E" (left), all-caps condensed slab. White geometry. -->
+  <!-- E spine -->
+  <rect x="244" y="300" width="92" height="424" fill="#E8EDF2"/>
+  <!-- E top bar -->
+  <rect x="336" y="300" width="184" height="92" fill="#E8EDF2"/>
+  <!-- E middle bar (shorter) -->
+  <rect x="336" y="466" width="140" height="92" fill="#E8EDF2"/>
+  <!-- E bottom bar -->
+  <rect x="336" y="632" width="184" height="92" fill="#E8EDF2"/>
+
+  <!-- Heavy "R" (right), locked tight to the E -->
+  <!-- R spine -->
+  <rect x="560" y="300" width="92" height="424" fill="#E8EDF2"/>
+  <!-- R bowl top bar -->
+  <rect x="652" y="300" width="120" height="92" fill="#E8EDF2"/>
+  <!-- R bowl right edge -->
+  <rect x="700" y="300" width="92" height="240" fill="#E8EDF2"/>
+  <!-- R bowl bottom bar (closes the bowl) -->
+  <rect x="652" y="448" width="140" height="92" fill="#E8EDF2"/>
+  <!-- R diagonal leg -->
+  <polygon points="652,512 744,512 792,724 700,724" fill="#E8EDF2"/>
+</svg>

@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Full-bleed background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- NESTED-SQUARE IMPACT: concentric squares collapsing inward = collision / two athletes meeting -->
+  <!-- Outer ring (deep red) -->
+  <rect x="160" y="160" width="704" height="704" fill="#bf1212"/>
+  <!-- Void gap -->
+  <rect x="236" y="236" width="552" height="552" fill="#0D0F14"/>
+  <!-- Middle ring (Signal Red, the dominant accent) -->
+  <rect x="312" y="312" width="400" height="400" fill="#E63946"/>
+  <!-- Void gap -->
+  <rect x="388" y="388" width="248" height="248" fill="#0D0F14"/>
+  <!-- Core impact block (Terminal White) -->
+  <rect x="448" y="448" width="128" height="128" fill="#E8EDF2"/>
+
+  <!-- Two collision wedges driving the diagonal from opposing corners through the rings -->
+  <!-- Top-left aggressor (gold breakthrough) drives toward core -->
+  <polygon points="160,160 512,512 160,512" fill="#f59e0b"/>
+  <!-- Bottom-right aggressor (Signal Red) drives toward core -->
+  <polygon points="864,864 512,512 864,512" fill="#E63946"/>
+
+  <!-- Re-assert the white core on top so the impact point stays crisp at the center -->
+  <rect x="448" y="448" width="128" height="128" fill="#E8EDF2"/>
+</svg>

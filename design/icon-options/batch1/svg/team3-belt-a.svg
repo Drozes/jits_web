@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!--
+    ELO RATED — Team 3, Take A
+    "The Belt Knot" — a clean, head-on BJJ tied-belt knot, the single most
+    recognizable jiu-jitsu symbol, rendered as bold flat geometry.
+    Two horizontal belt bands wrap behind a central square knot; two tails
+    drop below it, the front tail carrying a Void rank bar with rank stripes
+    (white) plus one Gold "peak / next rank" stripe.
+    Void #0D0F14 bg | belt Signal Red #E63946 | knot/tail deep #bf1212 | stripes White + Gold.
+  -->
+
+  <!-- Full-bleed Void background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- ===== Tails hanging down from the knot (drawn first = behind) ===== -->
+  <!-- Back tail (left) -->
+  <rect x="416" y="540" width="100" height="300" fill="#bf1212"/>
+  <!-- Front tail (right) -->
+  <rect x="508" y="540" width="100" height="332" fill="#E63946"/>
+
+  <!-- ===== Horizontal belt bands wrapping the waist ===== -->
+  <!-- Upper band -->
+  <rect x="120" y="300" width="784" height="116" fill="#E63946"/>
+  <!-- Lower band -->
+  <rect x="120" y="432" width="784" height="116" fill="#E63946"/>
+  <!-- Deep-red edge ribs give the wraps ribbon weight -->
+  <rect x="120" y="300" width="784" height="20" fill="#bf1212"/>
+  <rect x="120" y="528" width="784" height="20" fill="#bf1212"/>
+
+  <!-- ===== Central square knot (drawn last over the bands = in front) ===== -->
+  <rect x="420" y="316" width="184" height="216" fill="#E63946"/>
+  <!-- Knot fold lines (deep red) read as a tied square knot -->
+  <rect x="420" y="408" width="184" height="32" fill="#bf1212"/>
+  <rect x="496" y="316" width="32" height="216" fill="#bf1212"/>
+
+  <!-- ===== Rank bar on the front tail (Plate so the belt stays visible) ===== -->
+  <rect x="508" y="660" width="100" height="200" fill="#13151B"/>
+  <!-- Rank stripes (white) -->
+  <rect x="528" y="688" width="60" height="24" fill="#FFFFFF"/>
+  <rect x="528" y="728" width="60" height="24" fill="#FFFFFF"/>
+  <rect x="528" y="768" width="60" height="24" fill="#FFFFFF"/>
+  <!-- Gold "peak / next rank" stripe -->
+  <rect x="528" y="808" width="60" height="24" fill="#f59e0b"/>
+</svg>

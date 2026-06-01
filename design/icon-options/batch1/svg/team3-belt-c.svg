@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!--
+    ELO RATED — Team 3, Take C
+    "The Sash" — abstract, modern take on the belt. A single bold solid sash
+    crosses the tile diagonally (bottom-left to top-right) on deep Brand Red.
+    One heavy Void knot band cuts across it where it ties; a minimal cluster
+    of rank stripes (Void) plus one Gold "next rank" stripe sits on the upper
+    segment. Very few elements, heavy weight, sleek and contemporary.
+    Brand Red #bf1212 bg | sash White | knot + stripes Void | one stripe Gold.
+  -->
+
+  <!-- Full-bleed Brand Red background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#bf1212"/>
+
+  <!-- ===== The diagonal sash (solid white band, within the safe zone) ===== -->
+  <polygon points="148,716 308,876 876,308 716,148" fill="#E8EDF2"/>
+
+  <!-- ===== Knot band: one bold Void bar across the sash where it ties ===== -->
+  <polygon points="404,544 544,404 620,480 480,620" fill="#0D0F14"/>
+  <!-- A thin white split down the knot reads as a tied loop -->
+  <polygon points="478,532 532,478 546,492 492,546" fill="#E8EDF2"/>
+
+  <!-- ===== Rank stripes on the upper sash segment (perpendicular bars) ===== -->
+  <!-- Stripe 1 (Void) -->
+  <polygon points="612,396 668,340 700,372 644,428" fill="#0D0F14"/>
+  <!-- Stripe 2 (Void) -->
+  <polygon points="676,332 732,276 764,308 708,364" fill="#0D0F14"/>
+  <!-- Gold "next rank" stripe -->
+  <polygon points="740,268 796,212 828,244 772,300" fill="#f59e0b"/>
+</svg>

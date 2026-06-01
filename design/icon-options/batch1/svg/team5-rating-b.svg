@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!--
+    ELO RATED — Team 5 (The Rating / the climb), Take B
+    "Ranking ladder / podium" — 3 ascending blocks forming a podium /
+    step-chart. The top (tallest) block is the Gold winner's tier; a small
+    Signal Red up-chevron crowns the peak block to signal "rank climbing."
+    Reads as ranking / leaderboard. Minimal and confident.
+    Void #0D0F14 bg | Plate blocks | Gold peak | Signal Red crown.
+  -->
+
+  <!-- Full-bleed Void background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- Podium / step-chart: 3 ascending blocks, tallest in the middle-right
+       arrangement reading left(low) -> right(high) as a leaderboard climb -->
+
+  <!-- Block 1 (shortest, 3rd place) — bronze tier, kept bright enough to
+       survive the Void background at 48px -->
+  <rect x="208" y="616" width="180" height="240" fill="#B0703A"/>
+
+  <!-- Block 2 (medium, 2nd place) -->
+  <rect x="422" y="496" width="180" height="360" fill="#9CA3AF"/>
+
+  <!-- Block 3 (tallest, 1st place) — Gold winner's tier -->
+  <rect x="636" y="352" width="180" height="504" fill="#f59e0b"/>
+
+  <!-- Signal Red up-chevron crowning the peak block: rank climbing -->
+  <polygon points="726,196 818,312 634,312" fill="#E63946"/>
+</svg>

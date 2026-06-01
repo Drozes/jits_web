@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!--
+    ELO RATED — Team 6 "The Statement", Take C
+    CONCENTRIC / IMPACT MARK — a bold diamond-in-square shockwave emblem:
+    two athletes matched, a collision radiating out. Heavy nested rings of
+    Signal Red and White on Void, brutalist not decorative, premium feel.
+    Outer red square ring -> white square ring -> red diamond core, all
+    concentric and centered. Reads as a single impact emblem at 48px.
+    Void #0D0F14 ground | Signal Red #E63946 | Pure White #FFFFFF.
+    Rings drawn as filled-square-minus-inner via even-odd fill rule.
+  -->
+
+  <!-- Full-bleed Void background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- Outer Signal Red square ring (heavy frame) -->
+  <path fill="#E63946" fill-rule="evenodd"
+        d="M 176 176 H 848 V 848 H 176 Z
+           M 264 264 V 760 H 760 V 264 Z"/>
+
+  <!-- White solid plate (the second shockwave step) -->
+  <rect x="296" y="296" width="432" height="432" fill="#FFFFFF"/>
+
+  <!-- Signal Red diamond core (the point of impact) sitting directly on the
+       white plate so the collision-point reads as a deliberate, filled mark -->
+  <polygon points="512,372 652,512 512,652 372,512" fill="#E63946"/>
+</svg>

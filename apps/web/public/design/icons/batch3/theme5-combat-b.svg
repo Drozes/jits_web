@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Full-bleed Void background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- THE GRIP: a heavy white fist clamping a diagonal Signal Red gi lapel.
+       The lapel runs corner-to-corner as one bold band; the fist is a
+       single solid block with four blocky knuckles and a wrapping thumb.
+       Designed as two big silhouettes that read instantly at 48px. -->
+
+  <!-- Gi lapel: thick red band, top-left to bottom-right -->
+  <polygon fill="#E63946"
+           points="270,138 462,138 754,886 562,886"/>
+  <!-- Lapel inner fold (deeper red) gives the textile a folded edge -->
+  <polygon fill="#bf1212"
+           points="382,138 462,138 754,886 674,886"/>
+
+  <!-- Fabric bunched above the grip (red bulges where the hand crushes it) -->
+  <polygon fill="#E63946" points="338,300 486,300 520,386 318,386"/>
+
+  <!-- Fist palm: a solid clamping block crossing the lapel -->
+  <rect x="300" y="486" width="424" height="184" rx="20" fill="#E8EDF2"/>
+
+  <!-- Four heavy knuckles rising off the palm -->
+  <rect x="338" y="384" width="86" height="148" rx="18" fill="#E8EDF2"/>
+  <rect x="436" y="384" width="86" height="148" rx="18" fill="#E8EDF2"/>
+  <rect x="534" y="384" width="86" height="148" rx="18" fill="#E8EDF2"/>
+  <rect x="632" y="384" width="80" height="148" rx="18" fill="#E8EDF2"/>
+
+  <!-- Finger-separation grooves (Void slots) split the knuckles -->
+  <rect x="424" y="384" width="14" height="168" fill="#0D0F14"/>
+  <rect x="522" y="384" width="14" height="168" fill="#0D0F14"/>
+  <rect x="620" y="384" width="14" height="168" fill="#0D0F14"/>
+
+  <!-- Thumb: a heavy block wrapping the lower-left, clamping the palm edge -->
+  <path fill="#E8EDF2"
+        d="M300 532
+           L300 670
+           L246 716
+           C 214 690 206 644 222 606
+           C 236 572 266 544 300 532 Z"/>
+  <!-- Thumb knuckle crease -->
+  <rect x="284" y="590" width="64" height="16" rx="8" fill="#0D0F14"/>
+</svg>

@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!--
+    ELO RATED — Team 1, Take B
+    Negative-space inverse of Take A. A solid Signal Red tile fills the
+    canvas; the rising-rating E (spine + 3 ascending bars) is KNOCKED OUT
+    in Void so the letter reads as the dark background showing through.
+    A single Gold peak step sits at the top as the breakthrough accent.
+    Signal Red #E63946 tile | Void #0D0F14 knockout | Gold #f59e0b peak.
+  -->
+
+  <!-- Full-bleed Void background (shows through the knockout) -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- Solid Signal Red tile, small radius keeps brand crisp -->
+  <rect x="96" y="96" width="832" height="832" rx="32" ry="32" fill="#E63946"/>
+
+  <!-- E knocked out in Void via a single path:
+       vertical spine on the left + 3 ascending bars (bottom shortest,
+       top longest) stepping up and out to the right. evenodd not needed,
+       this is one closed outline of the E silhouette. -->
+  <path fill="#0D0F14" d="
+    M 268 248
+    L 268 776
+    L 552 776
+    L 552 668
+    L 384 668
+    L 384 612
+    L 644 612
+    L 644 504
+    L 384 504
+    L 384 448
+    L 736 448
+    L 736 248
+    Z
+  "/>
+
+  <!-- Gold peak step: the next ascending tier, stepping up and to the
+       right of the top bar so it crowns the climb cleanly (no overlap
+       into the knockout). The breakthrough accent. -->
+  <rect x="736" y="160" width="120" height="208" fill="#f59e0b"/>
+</svg>

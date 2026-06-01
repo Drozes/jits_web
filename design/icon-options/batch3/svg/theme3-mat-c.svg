@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Full-bleed background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- MATCHMAKING MARK: one square arena split into TWO opposing zones that
+       INTERLOCK along a bold dovetail seam. Two athletes click together into
+       one match. Brutalist, cartographic, two territories meeting. -->
+
+  <!-- Arena field: Terminal White is the right athlete's zone (base) -->
+  <rect x="160" y="160" width="704" height="704" fill="#E8EDF2"/>
+
+  <!-- RED left zone: a dovetail/jigsaw tab that locks into the white zone.
+       The boundary pushes a tab right at center; white pushes back above/below. -->
+  <polygon points="160,160 540,160 540,392 452,392 452,512
+                   612,512 612,632 452,632 452,864 160,864"
+           fill="#E63946"/>
+
+  <!-- Void interlock seam: heavy dark band tracing the same dovetail boundary,
+       so the two zones read as physically clicked together. -->
+  <polyline points="540,160 540,392 452,392 452,512 612,512
+                     612,632 452,632 452,864"
+            fill="none" stroke="#0D0F14" stroke-width="36"
+            stroke-linejoin="miter"/>
+
+  <!-- Two engagement nodes: one athlete locked into each zone -->
+  <rect x="280" y="296" width="88" height="88" fill="#E8EDF2"/>
+  <rect x="688" y="640" width="88" height="88" fill="#E63946"/>
+</svg>

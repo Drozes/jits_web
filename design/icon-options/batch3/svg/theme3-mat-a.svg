@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Full-bleed background -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- TOP-DOWN TATAMI MAT: the arena seen from above.
+       Signal Red safety apron, dark combat area, panel grid, center circle. -->
+
+  <!-- Outer mat: Signal Red safety zone -->
+  <rect x="112" y="112" width="800" height="800" fill="#E63946"/>
+
+  <!-- Inner combat area (Void) -->
+  <rect x="208" y="208" width="608" height="608" fill="#0D0F14"/>
+
+  <!-- Tatami panel seams: vertical (Plate Bright on void) -->
+  <rect x="309" y="208" width="14" height="608" fill="#242832"/>
+  <rect x="411" y="208" width="14" height="608" fill="#242832"/>
+  <rect x="505" y="208" width="14" height="608" fill="#242832"/>
+  <rect x="599" y="208" width="14" height="608" fill="#242832"/>
+  <rect x="701" y="208" width="14" height="608" fill="#242832"/>
+
+  <!-- Tatami panel seams: horizontal -->
+  <rect x="208" y="309" width="608" height="14" fill="#242832"/>
+  <rect x="208" y="411" width="608" height="14" fill="#242832"/>
+  <rect x="208" y="505" width="608" height="14" fill="#242832"/>
+  <rect x="208" y="599" width="608" height="14" fill="#242832"/>
+  <rect x="208" y="701" width="608" height="14" fill="#242832"/>
+
+  <!-- Central competition circle ring (Terminal White) -->
+  <circle cx="512" cy="512" r="152" fill="none" stroke="#E8EDF2" stroke-width="36"/>
+
+  <!-- Center node: the live match -->
+  <rect x="474" y="474" width="76" height="76" fill="#E63946"/>
+</svg>

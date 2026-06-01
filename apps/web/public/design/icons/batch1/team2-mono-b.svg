@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Full-bleed Void tile -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- "ELO" set as one heavy condensed line, centered in the safe zone.
+       Cap box: y 332 -> 692 (cap height 360). Stem width 92.
+       E: x 150..330 | L: x 366..548 | O: medallion centered 718, r 168.
+       O right edge = 886 (inside the ~922 safe-zone edge). -->
+
+  <!-- ===== E (white) ===== -->
+  <rect x="150" y="332" width="92"  height="360" fill="#E8EDF2"/>
+  <rect x="150" y="332" width="180" height="88"  fill="#E8EDF2"/>
+  <rect x="150" y="468" width="152" height="88"  fill="#E8EDF2"/>
+  <rect x="150" y="604" width="180" height="88"  fill="#E8EDF2"/>
+
+  <!-- ===== L (white) ===== -->
+  <rect x="366" y="332" width="92"  height="360" fill="#E8EDF2"/>
+  <rect x="366" y="604" width="190" height="88"  fill="#E8EDF2"/>
+
+  <!-- ===== O as Signal Red medallion / rating dial =====
+       Outer red disc, knocked-out Void center, leaving a heavy ring.
+       This O doubles as a circular rating dial. -->
+  <circle cx="718" cy="512" r="168" fill="#E63946"/>
+  <circle cx="718" cy="512" r="86"  fill="#0D0F14"/>
+  <!-- Dial tick at top of the ring (12 o'clock), white, like a gauge marker -->
+  <rect x="698" y="356" width="40" height="54" fill="#E8EDF2"/>
+</svg>

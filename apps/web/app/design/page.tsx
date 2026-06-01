@@ -44,6 +44,12 @@ const cards = [
     description:
       "Internal shared Kanban for tracking our work. Supabase-backed; the seed for a future admin dashboard.",
   },
+  {
+    href: "/design/app-icon-concepts",
+    title: "App Icon Concepts",
+    description:
+      "Eighteen concept directions for the ELO RATED app icon, grouped into six creative territories.",
+  },
 ];
 
 export default function DesignOverviewPage() {

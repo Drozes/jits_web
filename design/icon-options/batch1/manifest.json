@@ -1,0 +1,178 @@
+{
+  "batch": "batch1",
+  "num": 1,
+  "label": "Foundations",
+  "date": "2026-05-31",
+  "themes": [
+    {
+      "key": "e",
+      "title": "The E / Rising-Rating Chart"
+    },
+    {
+      "key": "mono",
+      "title": "Typographic Monogram"
+    },
+    {
+      "key": "belt",
+      "title": "The BJJ Belt"
+    },
+    {
+      "key": "grapple",
+      "title": "Grappling / The Lock"
+    },
+    {
+      "key": "rating",
+      "title": "Rating / The Climb"
+    },
+    {
+      "key": "statement",
+      "title": "The Statement (Brutalist)"
+    }
+  ],
+  "icons": [
+    {
+      "theme": "e",
+      "themeTitle": "The E / Rising-Rating Chart",
+      "file": "team1-e-a",
+      "name": "Ascending bars + gold peak",
+      "concept": "Heavy red E from ascending bars with a gold breakthrough peak, on Void.",
+      "score": null
+    },
+    {
+      "theme": "e",
+      "themeTitle": "The E / Rising-Rating Chart",
+      "file": "team1-e-b",
+      "name": "Negative-space red tile",
+      "concept": "An E knocked out of a solid Signal Red tile in negative space.",
+      "score": null
+    },
+    {
+      "theme": "e",
+      "themeTitle": "The E / Rising-Rating Chart",
+      "file": "team1-e-c",
+      "name": "Abstract step-climb",
+      "concept": "An abstract step-chart staircase that implies the E's ascending bars.",
+      "score": null
+    },
+    {
+      "theme": "mono",
+      "themeTitle": "Typographic Monogram",
+      "file": "team2-mono-a",
+      "name": "ER stamped monogram",
+      "concept": "Stamped white ER monogram on a full-bleed Signal Red tile.",
+      "score": null
+    },
+    {
+      "theme": "mono",
+      "themeTitle": "Typographic Monogram",
+      "file": "team2-mono-b",
+      "name": "ELO (O = rating dial)",
+      "concept": "ELO wordmark with the O rendered as a red rating dial / medallion.",
+      "score": null
+    },
+    {
+      "theme": "mono",
+      "themeTitle": "Typographic Monogram",
+      "file": "team2-mono-c",
+      "name": "Monolithic E slab",
+      "concept": "Monolithic white E on deep brand red with a thin gold baseline.",
+      "score": null
+    },
+    {
+      "theme": "belt",
+      "themeTitle": "The BJJ Belt",
+      "file": "team3-belt-a",
+      "name": "BJJ belt knot",
+      "concept": "Head-on tied gi belt knot with white rank stripes and a gold next-rank stripe.",
+      "score": null
+    },
+    {
+      "theme": "belt",
+      "themeTitle": "The BJJ Belt",
+      "file": "team3-belt-b",
+      "name": "Belt = rating bar",
+      "concept": "A belt band whose rank-bar stripes double as an ELO progress meter.",
+      "score": null
+    },
+    {
+      "theme": "belt",
+      "themeTitle": "The BJJ Belt",
+      "file": "team3-belt-c",
+      "name": "Diagonal belt sash",
+      "concept": "An abstract white belt sash crossing a deep-red tile.",
+      "score": null
+    },
+    {
+      "theme": "grapple",
+      "themeTitle": "Grappling / The Lock",
+      "file": "team4-grapple-a",
+      "name": "Interlocked triangles",
+      "concept": "Two interlocking triangles: the triangle choke / closed guard.",
+      "score": null
+    },
+    {
+      "theme": "grapple",
+      "themeTitle": "Grappling / The Lock",
+      "file": "team4-grapple-b",
+      "name": "Clinched / matched",
+      "concept": "Two clinched angular hooks reading as two matched competitors.",
+      "score": null
+    },
+    {
+      "theme": "grapple",
+      "themeTitle": "Grappling / The Lock",
+      "file": "team4-grapple-c",
+      "name": "Fist on gi lapel",
+      "concept": "A bold white fist gripping a diagonal Signal Red gi lapel.",
+      "score": null
+    },
+    {
+      "theme": "rating",
+      "themeTitle": "Rating / The Climb",
+      "file": "team5-rating-a",
+      "name": "Up-delta + bar chart",
+      "concept": "A Gain-Green upward delta rising out of an ascending bar chart.",
+      "score": null
+    },
+    {
+      "theme": "rating",
+      "themeTitle": "Rating / The Climb",
+      "file": "team5-rating-b",
+      "name": "Podium + chevron",
+      "concept": "Bronze/silver/gold podium crowned by a Signal-Red up-chevron.",
+      "score": null
+    },
+    {
+      "theme": "rating",
+      "themeTitle": "Rating / The Climb",
+      "file": "team5-rating-c",
+      "name": "Medallion up-arrow",
+      "concept": "A Signal-Red rank medallion with an up-arrow in negative space.",
+      "score": null
+    },
+    {
+      "theme": "statement",
+      "themeTitle": "The Statement (Brutalist)",
+      "file": "team6-statement-a",
+      "name": "Diagonal slash",
+      "concept": "A bold diagonal Signal-Red slash with a thin gold seam.",
+      "score": null
+    },
+    {
+      "theme": "statement",
+      "themeTitle": "The Statement (Brutalist)",
+      "file": "team6-statement-b",
+      "name": "Monolith / flag",
+      "concept": "A planted red monolith / flag with a swallowtail notch and gold cap.",
+      "score": null
+    },
+    {
+      "theme": "statement",
+      "themeTitle": "The Statement (Brutalist)",
+      "file": "team6-statement-c",
+      "name": "Impact emblem",
+      "concept": "A nested-square impact emblem with a Signal-Red diamond core.",
+      "score": null
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Full-bleed background (Void) -->
+  <rect x="0" y="0" width="1024" height="1024" fill="#0D0F14"/>
+
+  <!-- THE MONOLITH: a single heavy vertical slab planted dead-center, full-height presence -->
+  <rect x="396" y="96" width="232" height="832" fill="#E8EDF2"/>
+
+  <!-- ONE GEOMETRIC ACCENT: a massive Signal Red flag blade flying off the monolith.
+       Half-tile triangular sweep = pure planted-flag statement. -->
+  <polygon points="628,176 980,352 628,528" fill="#E63946"/>
+
+  <!-- Hard brutalist fold: a Void notch slicing back into the flag for a crisp double-edge -->
+  <polygon points="628,528 980,352 832,352 628,440" fill="#0D0F14"/>
+
+  <!-- Gold "breakthrough" cap driven into the top of the monolith = the peak step -->
+  <rect x="396" y="96" width="232" height="72" fill="#f59e0b"/>
+
+  <!-- Signal Red base wedge: the monolith planted / driven into the ground -->
+  <polygon points="396,820 628,820 628,928 396,928" fill="#E63946"/>
+  <!-- Void score line across the base for a brutalist seam -->
+  <rect x="396" y="868" width="232" height="16" fill="#0D0F14"/>
+</svg>
