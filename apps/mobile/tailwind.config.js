@@ -157,11 +157,12 @@ const lightVars = {
 };
 
 module.exports = {
-  // Dark mode is driven by the root <View style={vars(...)}> in app/_layout.tsx,
-  // not by adding a `dark` class. The `darkMode: "media"` setting also keeps
-  // NativeWind's `dark:` variant working for the rare component that wants to
-  // override per-class.
-  darkMode: "media",
+  // Dark mode is driven by the root <View style={vars(...)}> in app/_layout.tsx
+  // (via useResolvedColorScheme), not by adding a `dark` class. `darkMode: "class"`
+  // is required so NativeWind's setColorScheme() works for the in-app Light/Dark/
+  // System toggle and for ThemeProvider's restore() — under "media" those throw.
+  // The app uses no `dark:` variants, so the class itself drives nothing visual.
+  darkMode: "class",
   content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}"],
   presets: [require("nativewind/preset")],
   theme: {

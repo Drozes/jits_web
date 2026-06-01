@@ -2,13 +2,25 @@
 
 ## [Unreleased]
 
-**Mobile: smooth "The Statement" launch splash hand-offs (2026-06-01)**
-
-A screen recording showed two ungraceful seams in the launch sequence: after the native F-logo splash dissolved there was a ~150ms dead-black gap before "WE ARE" appeared, and at the end the statement vanished in a single hard-cut frame straight to the home screen.
+**Mobile: adopt the "Podium Tiers" (B3-11) app icon (2026-06-01)**
 
 **Changed**
-- `apps/mobile/components/ui/elo-system/splash-statement.tsx`: the overlay now cross-dissolves into the live app underneath (new `farewell` shared value drives the whole overlay's opacity 1->0 over `FADEOUT_MS`) instead of unmounting on a hard cut. `onDone()` now fires from the fade's completion callback (via `runOnJS`), in both the full-motion and reduced-motion paths. The outer overlay is now an `Animated.View` so its Void backdrop fades with it.
-- `packages/shared/src/constants.ts` (`SPLASH_STATEMENT`): shifted the whole choreography 100ms earlier (`WEARE_DELAY_MS` 250->150, `IGNITE_DELAY_MS` 430->330, `AREYOU_DELAY_MS`/`HAPTIC_DELAY_MS` 1180->1080) so "WE ARE" rises right as the native splash finishes dissolving, closing the dead-black gap while preserving the internal rhythm; added `FADEOUT_MS: 300` for the dissolve; `TOTAL_MS` 2140->2040 now marks when the fade-out begins (onDone fires `FADEOUT_MS` later).
+- `apps/mobile/assets/icon.png` + `apps/mobile/assets/adaptive-icon.png`: replaced the red "F" monogram with concept B3-11 "Podium Tiers" (from `design/icon-options/batch3/svg/theme4-ascend-b.svg`): three ascending podium tiers (Void → gray → Signal Red) on a `#0D0F14` Void field, with a gold breakthrough cap and a knocked-out up-arrow crowning the winner tier. Rendered to 1024×1024 via `rsvg-convert` and flattened to opaque RGB (no alpha) for App Store compliance.
+- `apps/mobile/app.json`: Android `adaptiveIcon.backgroundColor` `#bf1212` -> `#0D0F14` to match the new icon's Void field (was tuned for the old red mark). Requires a native rebuild to take effect.
+
+**Mobile: dark theme by default (2026-06-01)**
+
+**Changed**
+- `apps/mobile/app/_layout.tsx`: call NativeWind's `colorScheme.set("dark")` at module scope (before first paint) so the app is dark-first instead of following the OS scheme (which defaulted light). A stored user preference is still re-applied at launch by `ThemeProvider`'s `restore()`.
+- `apps/mobile/tailwind.config.js`: `darkMode` `"media"` -> `"class"`. Required so NativeWind's `setColorScheme()` works: under `"media"` it throws, which silently broke `ThemeProvider`'s `restore()` and the profile Light/Dark/System toggle (they had never actually worked). The app uses no `dark:` variants, so the change is invisible to rendering but makes the in-app theme toggle functional and the dark default reversible. Verified on the simulator: default launch is dark, a stored "light" preference is honored, and switching themes no longer throws.
+
+**Mobile: smooth "The Statement" launch splash hand-offs (2026-06-01)**
+
+A screen recording showed two ungraceful seams in the launch sequence: after the native F-logo splash dissolved there was a ~150ms dead-black gap before "WE ARE" appeared, and at the end the statement vanished in a single hard-cut frame straight to the home screen. The reduced-motion fallback also popped the statement in at full opacity.
+
+**Changed**
+- `apps/mobile/components/ui/elo-system/splash-statement.tsx`: the overlay now cross-dissolves into the live app underneath (new `farewell` shared value drives the whole overlay's opacity 1->0 over `FADEOUT_MS`) instead of unmounting on a hard cut. `onDone()` now fires from the fade's completion callback (via `runOnJS`), in both the full-motion and reduced-motion paths. The outer overlay is now an `Animated.View` so its Void backdrop fades with it. Reduced-motion now fades the resting frame IN via a new `intro` (text-group opacity) value — opacity only, no transform/scale/glow motion — then dwells and cross-fades out, instead of popping in.
+- `packages/shared/src/constants.ts` (`SPLASH_STATEMENT`): shifted the whole choreography 100ms earlier (`WEARE_DELAY_MS` 250->150, `IGNITE_DELAY_MS` 430->330, `AREYOU_DELAY_MS`/`HAPTIC_DELAY_MS` 1180->1080) so "WE ARE" rises right as the native splash finishes dissolving, closing the dead-black gap while preserving the internal rhythm; added `FADEOUT_MS: 300` for the dissolve; `TOTAL_MS` 2140->2040 now marks when the fade-out begins (onDone fires `FADEOUT_MS` later); added `REDUCED_MOTION_FADEIN_MS: 260` and set `REDUCED_MOTION_HOLD_MS` to 700 (readable dwell before the reduced-motion cross-fade).
 
 **Mobile: fix TestFlight launch crash from missing Supabase env (2026-06-01)**
 

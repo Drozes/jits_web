@@ -4,6 +4,7 @@ import { View } from "react-native";
 import { initSentry } from "@/lib/error-tracking/sentry";
 import * as SplashScreen from "expo-splash-screen";
 import { Stack } from "expo-router";
+import { colorScheme } from "nativewind";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useFonts } from "expo-font";
@@ -48,6 +49,11 @@ initSentry();
 // Keep the native splash up until the JS "Climb" overlay is mounted, so the
 // hand-off is seamless. SplashReveal calls hideAsync() once it paints.
 SplashScreen.preventAutoHideAsync().catch(() => {});
+
+// Brand is dark-first: open in dark by default (before first paint, so there's
+// no light flash). A stored user preference (light/dark/system) is re-applied at
+// launch by ThemeProvider's restore(); the Light/Dark/System toggle still works.
+colorScheme.set("dark");
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({

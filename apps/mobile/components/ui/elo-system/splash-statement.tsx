@@ -1,8 +1,9 @@
 import * as React from "react";
-import { AccessibilityInfo, Dimensions, StyleSheet, Text, View } from "react-native";
+import { AccessibilityInfo, Dimensions, StyleSheet, Text } from "react-native";
 import Animated, {
   Easing,
   interpolate,
+  runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
@@ -61,6 +62,13 @@ export function SplashStatement({ onDone }: SplashStatementProps) {
   const ignite = useSharedValue(0);
   const glow = useSharedValue(0);
   const areyou = useSharedValue(0);
+  // Text-group opacity. Full-motion sets it to 1 immediately (each line fades in
+  // on its own); reduced-motion fades the whole resting frame in via this single
+  // value so the statement appears gently instead of popping.
+  const intro = useSharedValue(0);
+  // Whole-overlay opacity. Starts at 1; the dismissal cross-dissolves it to 0 so
+  // the live app underneath is revealed smoothly instead of a hard cut.
+  const farewell = useSharedValue(1);
 
   React.useEffect(() => {
     let mounted = true;
@@ -68,6 +76,13 @@ export function SplashStatement({ onDone }: SplashStatementProps) {
 
     // Hand the native splash off to this overlay (identical Void bg → no seam).
     SplashScreen.hideAsync().catch(() => {});
+
+    // Cross-dissolve the overlay out, then signal done once the fade lands.
+    const dismiss = () => {
+      farewell.value = withTiming(0, { duration: S.FADEOUT_MS, easing: EASE }, (finished) => {
+        if (finished) runOnJS(onDone)();
+      });
+    };
 
     (async () => {
       let reduce = false;
@@ -77,14 +92,19 @@ export function SplashStatement({ onDone }: SplashStatementProps) {
       if (!mounted) return;
 
       if (reduce) {
-        // Static resting frame, no motion, no haptic. Still dismisses.
+        // Resting frame at final positions (no transform/scale/glow motion), but
+        // fade the group IN via opacity so it doesn't pop, then cross-fade out.
         weare.value = 1;
         ignite.value = 1;
         areyou.value = 1;
         glow.value = GLOW_BASELINE;
-        timers.push(setTimeout(onDone, S.REDUCED_MOTION_HOLD_MS));
+        intro.value = withTiming(1, { duration: S.REDUCED_MOTION_FADEIN_MS, easing: EASE });
+        timers.push(setTimeout(dismiss, S.REDUCED_MOTION_FADEIN_MS + S.REDUCED_MOTION_HOLD_MS));
         return;
       }
+
+      // Full motion: each line reveals itself, so the group is fully opaque.
+      intro.value = 1;
 
       // "WE ARE" rises + fades in.
       weare.value = withDelay(S.WEARE_DELAY_MS, withTiming(1, { duration: S.WEARE_MS, easing: EASE }));
@@ -120,7 +140,7 @@ export function SplashStatement({ onDone }: SplashStatementProps) {
         }, S.HAPTIC_DELAY_MS),
       );
 
-      timers.push(setTimeout(onDone, S.TOTAL_MS));
+      timers.push(setTimeout(dismiss, S.TOTAL_MS));
     })();
 
     return () => {
@@ -144,13 +164,15 @@ export function SplashStatement({ onDone }: SplashStatementProps) {
     opacity: areyou.value,
     transform: [{ translateY: interpolate(areyou.value, [0, 1], [6, 0]) }],
   }));
+  const introStyle = useAnimatedStyle(() => ({ opacity: intro.value }));
+  const farewellStyle = useAnimatedStyle(() => ({ opacity: farewell.value }));
 
   // Both wordmark layers share these exact text props → identical layout.
   const wordStyle = { fontSize: FITTED_SIZE, lineHeight: FITTED_SIZE, maxWidth: BLOCK_W };
 
   return (
-    <View style={styles.overlay} pointerEvents="none">
-      <View style={styles.hero}>
+    <Animated.View style={[styles.overlay, farewellStyle]} pointerEvents="none">
+      <Animated.View style={[styles.hero, introStyle]}>
         <Animated.View style={weareStyle}>
           <Text className="font-heading" style={styles.weare}>
             WE ARE
@@ -171,8 +193,8 @@ export function SplashStatement({ onDone }: SplashStatementProps) {
             ARE YOU?
           </Text>
         </Animated.View>
-      </View>
-    </View>
+      </Animated.View>
+    </Animated.View>
   );
 }
 

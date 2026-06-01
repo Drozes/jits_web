@@ -129,32 +129,43 @@ export const DEFAULT_SPLASH_VARIANT: SplashVariant = SPLASH_VARIANT.STATEMENT;
  * frame and dismisses after a short hold.
  */
 export const SPLASH_STATEMENT = {
-  /** "WE ARE" gray eyebrow fades up first. */
-  WEARE_DELAY_MS: 250,
+  /** "WE ARE" gray eyebrow fades up first. Kept tight to the native-splash
+   *  hand-off so the F-logo dissolve flows straight into this with no dead-black
+   *  gap between them. */
+  WEARE_DELAY_MS: 150,
   WEARE_MS: 680,
 
   /** "ELO RATED" locks/ignites in (opacity 0->1 + scale 1.04->1), no bright flash. */
-  IGNITE_DELAY_MS: 430,
+  IGNITE_DELAY_MS: 330,
   IGNITE_MS: 900,
 
   /** "ARE YOU?" (Signal Red) fades up on the ignite beat. */
-  AREYOU_DELAY_MS: 1180,
+  AREYOU_DELAY_MS: 1080,
   AREYOU_MS: 700,
 
   /** Felt "lock" — Heavy haptic on the ARE YOU beat (suppressed under reduced-motion). */
-  HAPTIC_DELAY_MS: 1180,
+  HAPTIC_DELAY_MS: 1080,
 
   /** Gentle even glow breathe on ELO RATED — full up-and-back cycle, loops forever
    * until the overlay unmounts at handoff. Low amplitude (a calm glow, not a pulse). */
   GLOW_BREATHE_MS: 6000,
 
-  /** Hold the landed frame before dismissing to the app. */
+  /** Hold the landed frame before the cross-fade out. */
   HOLD_AFTER_MS: 260,
 
-  /** Reduced-motion: show the resting frame, hold briefly, dismiss. No motion. */
-  REDUCED_MOTION_HOLD_MS: 260,
+  /** Cross-dissolve the whole overlay (incl. its Void backdrop) into the live app
+   *  underneath instead of a hard cut. onDone() fires when this completes. */
+  FADEOUT_MS: 300,
 
-  /** Total time from mount to onDone() in the full-motion path.
-   *  = AREYOU_DELAY_MS (1180) + AREYOU_MS (700) + HOLD_AFTER_MS (260). */
-  TOTAL_MS: 2140,
+  /** Reduced-motion: gently fade the resting frame IN (opacity only — no
+   *  transform/scale/glow motion, which is what reduce-motion actually forbids),
+   *  dwell long enough to read, then cross-fade out. Dismiss begins at
+   *  REDUCED_MOTION_FADEIN_MS + REDUCED_MOTION_HOLD_MS. */
+  REDUCED_MOTION_FADEIN_MS: 260,
+  REDUCED_MOTION_HOLD_MS: 700,
+
+  /** Time from mount until the cross-fade BEGINS in the full-motion path.
+   *  = AREYOU_DELAY_MS (1080) + AREYOU_MS (700) + HOLD_AFTER_MS (260).
+   *  onDone() fires FADEOUT_MS (300) later, once the dissolve finishes. */
+  TOTAL_MS: 2040,
 } as const;
