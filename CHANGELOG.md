@@ -13,6 +13,8 @@ Multi-agent discovery (recon both platforms + external best-practice research + 
 
 Finishes the mobile Sentry wiring and turns the existing text-only feedback box into an impactful, screenshot-backed flow that lands in Sentry, where it can drive AI triage (the connected Sentry MCP reads it; Seer can analyze). Decision: Sentry-native User Feedback over a third-party SDK or a custom build (tightest AI loop, no new vendor; tradeoff: the RN form is screenshot-attach only, no freehand annotation). Mobile only. Uses the SDK's built-in shake + screenshot, so no `expo-sensors`/`react-native-view-shot` added.
 
+Shipped as iOS v0.1.0 **build 10** to TestFlight (2026-06-02, EAS build `4a6836c9`, commit `3ea3f9c`). Verified before shipping with a local iOS Release build: the embedded Release bundle (`__DEV__` false, Sentry enabled) launched clean, so `Sentry.init`/`feedbackIntegration`/`Sentry.wrap` run on the release path without the launch crash that hit builds 3-4. Build 10 ships **without** source maps (the `SENTRY_AUTH_TOKEN` was added to EAS after it started); source-map upload activates automatically from the next build (`app.config.js` adds the `@sentry/react-native/expo` plugin once org+project+token are all on EAS).
+
 **Added**
 - `apps/mobile/lib/error-tracking/sentry-user-bootstrap.tsx`: side-effect component (mounted in `app/_layout.tsx` alongside the other bootstraps) that keeps Sentry's user context (`id`/`email`/`display_name`) in sync with the signed-in athlete so reports are attributed and the feedback form prefills name/email; clears on sign-out. No-ops until Sentry is initialized.
 
