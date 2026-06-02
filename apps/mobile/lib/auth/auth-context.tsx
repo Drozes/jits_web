@@ -19,7 +19,6 @@ export type AuthState = {
   isAthleteActive: boolean;
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
   signInWithGoogle: () => Promise<{ error: AuthError | null; cancelled?: boolean }>;
-  signInWithApple: () => Promise<{ error: AuthError | null; cancelled?: boolean }>;
   signUp: (
     email: string,
     password: string,
@@ -148,40 +147,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const signInWithApple = React.useCallback(async () => {
-    // Apple sign-in is iOS-only. The native module does not exist on
-    // Android/web, so callers also gate the button (appleAvailable). We
-    // dynamic-import so non-iOS bundles never eagerly resolve it.
-    if (Platform.OS !== "ios") {
-      return { error: { message: "Apple sign-in is only available on iOS." } };
-    }
-    try {
-      const AppleAuthentication = await import("expo-apple-authentication");
-      const credential = await AppleAuthentication.signInAsync({
-        requestedScopes: [
-          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
-          AppleAuthentication.AppleAuthenticationScope.EMAIL,
-        ],
-      });
-      const idToken = credential.identityToken;
-      if (!idToken) {
-        return { error: { message: "Apple did not return an ID token." } };
-      }
-      const { error } = await supabase.auth.signInWithIdToken({
-        provider: "apple",
-        token: idToken,
-      });
-      return { error: error ? { message: error.message } : null };
-    } catch (e) {
-      const code = (e as { code?: string }).code;
-      if (code === "ERR_REQUEST_CANCELED" || code === "ERR_CANCELED") {
-        return { error: null, cancelled: true };
-      }
-      const msg = (e as Error).message ?? "Apple sign-in failed.";
-      return { error: { message: msg } };
-    }
-  }, []);
-
   const signUp = React.useCallback(async (email: string, password: string) => {
     // We deliberately do NOT auto-create an athlete row here.
     // The profile-setup wizard (A3) handles activation.
@@ -227,7 +192,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isAthleteActive,
       signIn,
       signInWithGoogle,
-      signInWithApple,
       signUp,
       signOut,
       resetPassword,
@@ -241,7 +205,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isAthleteActive,
       signIn,
       signInWithGoogle,
-      signInWithApple,
       signUp,
       signOut,
       resetPassword,
