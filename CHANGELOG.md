@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+**Research: app-wide safe UI/UX polish backlog (jits-4zp, 2026-06-02)**
+
+10-agent audit (8 per-surface scanners + a safety/design critic + a synthesizer) for high-value, client-only, design-system-compliant UI/UX wins that need no backend and no new EAS build, excluding FTUE (jits-r75). No feature code; analysis + tracked work.
+
+**Added**
+- `research/013-ux-polish-backlog.md`: 8 prioritized items (4 P1: tappable leaderboard rows, non-red live timer, dead web filter chips + fabricated deltas, branded toasts; plus touch-target/a11y/haptics/red-number sweeps) + 2 deferred P3 batches. Filed as epic `jits-4zp` with 10 children; recommends three batched PRs (hitSlop, a11y labels, design-system numeric/color).
+
 **Research: First-Time User Experience (FTUE) discovery + prioritized roadmap (jits-r75, 2026-06-02)**
 
 Multi-agent discovery (recon both platforms + external best-practice research + a 4-expert consensus panel with an adversarial critic) into the new-user journey from first open to activation. No feature code; deliverable is analysis + tracked work.
