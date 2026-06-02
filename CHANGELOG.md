@@ -2,14 +2,13 @@
 
 ## [Unreleased]
 
-**Mobile: native signup pickers, required city, free-agent in gym dropdown, Sign in with Apple (2026-06-02)**
+**Mobile: native signup pickers, required city, free-agent in gym dropdown (2026-06-02)**
 
-Aligning the native signup flow with web ahead of the first test invite, and replacing the custom bottom-sheet dropdowns with true platform pickers.
+Aligning the native signup flow with web ahead of the first test invite, and replacing the custom bottom-sheet dropdowns with true platform pickers. Shipped as iOS v0.1.0 build 8 to TestFlight (2026-06-02, EAS build `fbfd3a59`).
 
 **Added**
 - `apps/mobile/components/ui/native-select.tsx`: reusable native option picker (built on `@react-native-picker/picker`), a pressable field that opens a modal with the native wheel (iOS) / control (Android) and a Done button. A leading placeholder row (value `""`) keeps an un-scrolled "Done" from silently committing a value (no pre-selection). Replaces the custom bottom-sheet `Select` for the gym and city fields.
-- `apps/mobile/lib/auth/auth-context.tsx`, `app/(auth)/login.tsx`, `app/(auth)/signup.tsx`: "Sign in with Apple" (iOS-only), mirroring the existing Google SSO via `expo-apple-authentication` + `supabase.auth.signInWithIdToken({ provider: "apple" })`. Hidden on Android/web; user-cancel is silent. Requires the Supabase Apple provider + Apple Developer capability + a new build (tracked in jits-rag).
-- Dependencies `expo-apple-authentication`, `@react-native-community/datetimepicker`, `@react-native-picker/picker` (SDK 54 pinned). `apps/mobile/app.json`: added the apple-authentication + datetimepicker plugins and `ios.usesAppleSignIn`.
+- Dependencies `@react-native-community/datetimepicker`, `@react-native-picker/picker` (SDK 54 pinned); `apps/mobile/app.json`: added the datetimepicker plugin.
 
 **Changed**
 - `apps/mobile/components/profile-setup/date-of-birth-picker.tsx`: replaced the three custom month/day/year dropdowns with native `@react-native-community/datetimepicker` (iOS spinner / Android dialog). Enforces 16+ via `maximumDate`; a `touched` guard stops "Done" from silently committing the default date.
@@ -18,6 +17,7 @@ Aligning the native signup flow with web ahead of the first test invite, and rep
 
 **Removed**
 - `apps/mobile/components/profile-setup/optional-step.tsx` and the `skipOptional` path (city moved into the required Training step).
+- Sign in with Apple: it was implemented (auth-context + login + signup, `expo-apple-authentication`) but removed before shipping because the package injects the `com.apple.developer.applesignin` entitlement and the App ID's provisioning profile does not support it yet. The full implementation is preserved in commit `844b16d`; re-enable is tracked in jits-rag.
 
 **Web: capture athlete weight in pounds to match the backend canonical unit (jits-7ry, 2026-06-02)**
 
