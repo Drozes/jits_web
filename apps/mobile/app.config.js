@@ -34,12 +34,42 @@ module.exports = ({ config }) => {
     console.warn(`[app.config] Missing env (local build): ${missing.join(", ")}`);
   }
 
+  // Sentry source-map / dSYM upload is configured from the environment so no
+  // org/project/token live in the repo. The native SDK is autolinked
+  // regardless (crash + feedback capture works without this), so the Expo
+  // plugin (which only adds the build-time symbol upload) is added ONLY when
+  // ALL of org + project + auth token are present. Requiring the token too
+  // means a credential-less build never attempts (and can't fail on) an
+  // upload, and `expo export` stays clean before the values are provided.
+  const plugins = [...(config.plugins ?? [])];
+  if (
+    process.env.SENTRY_ORG &&
+    process.env.SENTRY_PROJECT &&
+    process.env.SENTRY_AUTH_TOKEN
+  ) {
+    plugins.push([
+      "@sentry/react-native/expo",
+      {
+        organization: process.env.SENTRY_ORG,
+        project: process.env.SENTRY_PROJECT,
+        url: process.env.SENTRY_URL || "https://sentry.io/",
+      },
+    ]);
+  }
+
   return {
     ...config,
+    plugins,
     extra: {
       ...config.extra,
       SUPABASE_URL: process.env.EXPO_PUBLIC_SUPABASE_URL,
       SUPABASE_ANON_KEY: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
+      // Bake the Sentry runtime config into the manifest (EXConstants) so it is
+      // embedded reliably in release bundles, independent of the flaky
+      // EXPO_PUBLIC_* Metro inlining (same hardening as the Supabase values
+      // above). sentry.ts reads these from Constants.expoConfig.extra first.
+      SENTRY_DSN: process.env.EXPO_PUBLIC_SENTRY_DSN,
+      APP_ENV: process.env.EXPO_PUBLIC_APP_ENV,
     },
   };
 };

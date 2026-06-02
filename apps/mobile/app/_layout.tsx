@@ -1,6 +1,7 @@
 import "../global.css";
 import { useEffect, useState } from "react";
 import { View } from "react-native";
+import * as Sentry from "@sentry/react-native";
 import { initSentry } from "@/lib/error-tracking/sentry";
 import * as SplashScreen from "expo-splash-screen";
 import { Stack } from "expo-router";
@@ -27,6 +28,7 @@ import { AuthProvider } from "@/lib/auth/auth-context";
 import { ThemeProvider } from "@/lib/theme";
 import { Toaster } from "@/components/ui/toast";
 import { PushRegistrationBootstrap } from "@/lib/notifications/push-registration-bootstrap";
+import { SentryUserBootstrap } from "@/lib/error-tracking/sentry-user-bootstrap";
 import { OnlinePresenceBootstrap } from "@/lib/presence/online-presence-bootstrap";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { OfflineBanner } from "@/components/offline-banner";
@@ -55,7 +57,7 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
 // launch by ThemeProvider's restore(); the Light/Dark/System toggle still works.
 colorScheme.set("dark");
 
-export default function RootLayout() {
+function RootLayout() {
   const [fontsLoaded] = useFonts({
     BebasNeue_400Regular,
     DMSans_400Regular,
@@ -116,6 +118,7 @@ export default function RootLayout() {
           <SafeAreaProvider>
             <AuthProvider>
               <PushRegistrationBootstrap />
+              <SentryUserBootstrap />
               <OnlinePresenceBootstrap />
               <DeepLinkBootstrap />
               <Stack screenOptions={{ headerShown: false }}>
@@ -138,3 +141,8 @@ export default function RootLayout() {
     </ErrorBoundary>
   );
 }
+
+// Wrap the root so Sentry can mount the feedback form provider (the
+// shake-to-report form renders from here) and capture touch context. No-ops
+// safely when Sentry is not initialized.
+export default Sentry.wrap(RootLayout);

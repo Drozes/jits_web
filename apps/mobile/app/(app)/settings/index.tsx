@@ -6,6 +6,7 @@ import { AppHeader } from "@/components/layout/app-header";
 import { PageContainer } from "@/components/layout/page-container";
 import { Plate } from "@/components/ui/elo-system";
 import { useAuth, useRequireAthlete } from "@/lib/auth/hooks";
+import { isSentryEnabled, showFeedback } from "@/lib/error-tracking/sentry";
 import { cn } from "@/lib/cn";
 
 /**
@@ -54,6 +55,12 @@ export default function SettingsScreen() {
         <AccountPlate email={email} onSignOut={handleSignOut} />
         <PreferencesPlate />
         <SupportPlate />
+        {isSentryEnabled() ? (
+          <Text className="font-body text-[11px] text-ink-3 leading-relaxed px-1">
+            Tip: shake your phone on any screen to report a bug with a
+            screenshot.
+          </Text>
+        ) : null}
         {__DEV__ ? <DeveloperPlate /> : null}
       </PageContainer>
     </>
@@ -99,7 +106,7 @@ function PreferencesPlate() {
 function SupportPlate() {
   return (
     <Plate className="p-0 overflow-hidden">
-      <SettingsRow href="/settings/feedback" label="FEEDBACK" />
+      <FeedbackRow />
       <RowDivider />
       <SettingsRow href="/settings/help" label="HELP & SUPPORT" />
       <RowDivider />
@@ -124,6 +131,34 @@ function DeveloperPlate() {
         </Pressable>
       </Link>
     </Plate>
+  );
+}
+
+/**
+ * Feedback entry point. When Sentry is live, opens the rich in-app feedback
+ * form (description + "Capture this screen" screenshot, attributed to the
+ * athlete) so reports flow into Sentry for triage. Otherwise (e.g. local dev
+ * with no DSN) falls back to the existing text-only feedback screen.
+ */
+function FeedbackRow() {
+  const router = useRouter();
+  const onPress = React.useCallback(() => {
+    if (isSentryEnabled()) {
+      showFeedback();
+      return;
+    }
+    router.push("/settings/feedback" as Href);
+  }, [router]);
+
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      className="flex-row items-center justify-between px-4 py-3 active:bg-surface-4"
+    >
+      <RowLabel>FEEDBACK</RowLabel>
+      <Chevron />
+    </Pressable>
   );
 }
 
