@@ -2,6 +2,29 @@
 
 ## [Unreleased]
 
+**Research: First-Time User Experience (FTUE) discovery + prioritized roadmap (jits-r75, 2026-06-02)**
+
+Multi-agent discovery (recon both platforms + external best-practice research + a 4-expert consensus panel with an adversarial critic) into the new-user journey from first open to activation. No feature code; deliverable is analysis + tracked work.
+
+**Added**
+- `research/012-ftue-discovery-roadmap.md`: the report. Defines the aha moment (first ranked match that moves ELO off 1000) and the instrumentable activation milestone, maps current time-to-value and friction with `file:line` cites, and gives a prioritized roadmap (9 client-only quick wins, 3 medium, 4 bigger bets) with sequencing and open questions. Filed as epic `jits-r75` + 15 children; Apple Sign In cross-referenced to existing `jits-rag`.
+
+**Mobile: Sentry user feedback (shake-to-report + screenshot) for the wider TestFlight rollout (jits-rls, 2026-06-02)**
+
+Finishes the mobile Sentry wiring and turns the existing text-only feedback box into an impactful, screenshot-backed flow that lands in Sentry, where it can drive AI triage (the connected Sentry MCP reads it; Seer can analyze). Decision: Sentry-native User Feedback over a third-party SDK or a custom build (tightest AI loop, no new vendor; tradeoff: the RN form is screenshot-attach only, no freehand annotation). Mobile only. Uses the SDK's built-in shake + screenshot, so no `expo-sensors`/`react-native-view-shot` added.
+
+**Added**
+- `apps/mobile/lib/error-tracking/sentry-user-bootstrap.tsx`: side-effect component (mounted in `app/_layout.tsx` alongside the other bootstraps) that keeps Sentry's user context (`id`/`email`/`display_name`) in sync with the signed-in athlete so reports are attributed and the feedback form prefills name/email; clears on sign-out. No-ops until Sentry is initialized.
+
+**Changed**
+- `apps/mobile/lib/error-tracking/sentry.ts`: `Sentry.init` now sets `attachScreenshot`/`attachStacktrace` and registers `Sentry.feedbackIntegration({ enableShakeToReport, enableTakeScreenshot, ... })` with on-brand dark styling (Signal Red submit, 4px corners, no Sentry branding). Name/email prefill comes from the Sentry user scope (`setSentryUser()` sets `name` + `username`), NOT the `useSentryUser` option, whose values are used verbatim in 8.11.1 and would have prefilled the literal strings `"email"`/`"username"`. New exports: `isSentryEnabled()`, `showFeedback()` (opens `Sentry.showFeedbackForm()`), `setSentryUser()`/`clearSentryUser()`.
+- `apps/mobile/app/_layout.tsx`: root is now wrapped in `Sentry.wrap()` (required: `Sentry.wrap` mounts the feedback form provider, so the shake/manual form can render) and mounts `<SentryUserBootstrap />`.
+- `apps/mobile/app/(app)/settings/index.tsx`: the FEEDBACK row opens the Sentry feedback form when Sentry is live (falls back to the existing `/settings/feedback` text screen otherwise); added a tip that shaking the phone reports a bug. The legacy Supabase `feedback.tsx` screen is preserved as the no-DSN fallback.
+- `apps/mobile/app.config.js`: conditionally appends the `@sentry/react-native/expo` config plugin when `SENTRY_ORG` + `SENTRY_PROJECT` env are present (the plugin only adds build-time source-map/dSYM upload; the native SDK is autolinked regardless). Keeps all secrets/slugs in the environment, nothing in the repo.
+- `apps/mobile/.env.example`: documented the runtime `EXPO_PUBLIC_SENTRY_DSN` and the optional build-time `SENTRY_ORG`/`SENTRY_PROJECT`/`SENTRY_AUTH_TOKEN` (source-map upload).
+- `apps/mobile/lib/error-tracking/sentry.ts` + `apps/mobile/app.config.js`: the DSN and `APP_ENV` are now baked into the config manifest (`extra.SENTRY_DSN`/`extra.APP_ENV`) and read from `Constants.expoConfig.extra` first, with a `process.env.EXPO_PUBLIC_*` fallback. Same hardening as `lib/env.ts`: relying on `EXPO_PUBLIC_*` Metro inlining alone silently dropped values from release bundles (builds 3-4), which would have made Sentry no-op on TestFlight.
+- `apps/mobile/eas.json`: the `production` build profile now tags Sentry `environment: staging` (`EXPO_PUBLIC_APP_ENV` = `staging`) so the wider TestFlight rollout reports into a non-production Sentry bucket, separate from real users. The EAS `environment: production` scope is unchanged, so production Supabase creds still inject and TestFlight keeps using the production backend. Flip `EXPO_PUBLIC_APP_ENV` back to `production` at the real App Store launch.
+
 **Mobile: native signup pickers, required city, free-agent in gym dropdown (2026-06-02)**
 
 Aligning the native signup flow with web ahead of the first test invite, and replacing the custom bottom-sheet dropdowns with true platform pickers. Shipped as iOS v0.1.0 build 8 to TestFlight (2026-06-02, EAS build `fbfd3a59`).
