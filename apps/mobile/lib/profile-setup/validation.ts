@@ -54,11 +54,17 @@ export function isIdentityComplete(values: {
   );
 }
 
+/**
+ * Training step is complete when the weight is valid, a gym is selected (a real
+ * gym id OR the free-agent sentinel), and a city has been chosen. An empty
+ * `gymId` means the picker is still on its placeholder.
+ */
 export function isTrainingComplete(values: {
   weight: string;
   gymId: string;
-  freeAgent: boolean;
+  city: string;
 }): boolean {
   if (!isValidWeight(values.weight)) return false;
-  return values.freeAgent || !!values.gymId;
+  if (!values.gymId) return false;
+  return !!values.city.trim();
 }

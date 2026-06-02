@@ -6,23 +6,22 @@ import { useAuth } from "@/lib/auth/hooks";
 import { useSetupSubmit } from "@/lib/profile-setup/use-setup-submit";
 import type { GymOption, SetupAthleteRow } from "@/lib/profile-setup/use-setup-data";
 import { IdentityStep } from "./identity-step";
-import { OptionalStep } from "./optional-step";
 import { TosStep } from "./tos-step";
 import { TrainingStep } from "./training-step";
-import type { WizardStep, WizardValues } from "./types";
+import { FREE_AGENT_OPTION, type WizardStep, type WizardValues } from "./types";
 import { WizardProgress } from "./wizard-progress";
 
 const STEP_LABELS: Record<WizardStep, string> = {
   tos: "End User Agreement",
   identity: "Who Are You",
   training: "Where You Train",
-  optional: "Optional Details",
 };
 
 interface SetupWizardProps {
   authUserId: string;
   athlete: SetupAthleteRow | null;
   gyms: GymOption[];
+  cities: string[];
   waiverId: string | null;
   hasAcceptedTos: boolean;
   isEditing: boolean;
@@ -33,6 +32,7 @@ export function SetupWizard({
   authUserId,
   athlete,
   gyms,
+  cities,
   waiverId,
   hasAcceptedTos,
   isEditing,
@@ -43,7 +43,7 @@ export function SetupWizard({
   const steps = React.useMemo<WizardStep[]>(() => {
     const list: WizardStep[] = [];
     if (!hasAcceptedTos) list.push("tos");
-    list.push("identity", "training", "optional");
+    list.push("identity", "training");
     return list;
   }, [hasAcceptedTos]);
 
@@ -52,11 +52,15 @@ export function SetupWizard({
     firstName: athlete?.first_name ?? "",
     lastName: athlete?.last_name ?? "",
     weight: athlete?.current_weight?.toString() ?? "",
-    gymId: athlete?.primary_gym_id ?? "",
+    // No pre-selection for new signups: gymId starts empty so the user must
+    // actively pick a real gym or free agent. The edit flow seeds the existing
+    // gym, or the free-agent sentinel when the athlete is already a free agent.
+    gymId: athlete?.free_agent
+      ? FREE_AGENT_OPTION
+      : (athlete?.primary_gym_id ?? ""),
     gender: athlete?.gender ?? "",
     dateOfBirth: athlete?.date_of_birth ?? "",
     city: athlete?.city ?? "",
-    freeAgent: athlete?.free_agent ?? false,
   });
   const currentIdx = steps.indexOf(currentStep);
 
@@ -99,15 +103,14 @@ export function SetupWizard({
         <IdentityStep values={values} onChange={onChange} onNext={goNext} />
       )}
       {currentStep === "training" && (
-        <TrainingStep values={values} onChange={onChange} onNext={goNext} gyms={gyms} />
-      )}
-      {currentStep === "optional" && (
-        <OptionalStep
+        <TrainingStep
           values={values}
           onChange={onChange}
-          onSubmit={(skip) => submit(values, skip)}
+          onSubmit={(v) => submit(v)}
           loading={loading}
           isEditing={isEditing}
+          gyms={gyms}
+          cities={cities}
         />
       )}
 

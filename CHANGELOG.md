@@ -2,6 +2,30 @@
 
 ## [Unreleased]
 
+**Mobile: native signup pickers, required city, free-agent in gym dropdown, Sign in with Apple (2026-06-02)**
+
+Aligning the native signup flow with web ahead of the first test invite, and replacing the custom bottom-sheet dropdowns with true platform pickers.
+
+**Added**
+- `apps/mobile/components/ui/native-select.tsx`: reusable native option picker (built on `@react-native-picker/picker`), a pressable field that opens a modal with the native wheel (iOS) / control (Android) and a Done button. A leading placeholder row (value `""`) keeps an un-scrolled "Done" from silently committing a value (no pre-selection). Replaces the custom bottom-sheet `Select` for the gym and city fields.
+- `apps/mobile/lib/auth/auth-context.tsx`, `app/(auth)/login.tsx`, `app/(auth)/signup.tsx`: "Sign in with Apple" (iOS-only), mirroring the existing Google SSO via `expo-apple-authentication` + `supabase.auth.signInWithIdToken({ provider: "apple" })`. Hidden on Android/web; user-cancel is silent. Requires the Supabase Apple provider + Apple Developer capability + a new build (tracked in jits-rag).
+- Dependencies `expo-apple-authentication`, `@react-native-community/datetimepicker`, `@react-native-picker/picker` (SDK 54 pinned). `apps/mobile/app.json`: added the apple-authentication + datetimepicker plugins and `ios.usesAppleSignIn`.
+
+**Changed**
+- `apps/mobile/components/profile-setup/date-of-birth-picker.tsx`: replaced the three custom month/day/year dropdowns with native `@react-native-community/datetimepicker` (iOS spinner / Android dialog). Enforces 16+ via `maximumDate`; a `touched` guard stops "Done" from silently committing the default date.
+- `apps/mobile/components/profile-setup/training-step.tsx`: gym is now a native picker with "Free agent (no gym)" folded in as a sentinel option (no pre-selection, user must actively pick a gym or free agent), replacing the separate `Switch`. City is now a **required** native picker sourced from active gyms' cities (auto-filled when a gym is chosen). Training is the final wizard step.
+- `apps/mobile/lib/profile-setup/{validation.ts,use-setup-submit.ts,use-setup-data.ts}`, `components/profile-setup/{setup-wizard.tsx,types.ts}`: city is required and always written (never null); `free_agent` derived from the gym sentinel (removed the `freeAgent` field from `WizardValues`); added a distinct/sorted `cities` list to the setup bootstrap.
+
+**Removed**
+- `apps/mobile/components/profile-setup/optional-step.tsx` and the `skipOptional` path (city moved into the required Training step).
+
+**Web: capture athlete weight in pounds to match the backend canonical unit (jits-7ry, 2026-06-02)**
+
+The backend stores `athletes.current_weight` in pounds (`get_weight_division()` hard-codes IBJJF division boundaries in lbs), but web labeled the field "kg", validated 20-300, and wrote the raw number into the lbs column, so web-created weights were ~2.2x off and corrupted weight-division / ELO-stakes math. Mobile already stored lbs.
+
+**Fixed**
+- `apps/web/lib/profile-setup/signup-form-validation.ts`, `components/sign-up-form.tsx`, `components/auth/eua-form.tsx`, `app/(auth)/eua/page.tsx`, `app/(app)/profile/edit/{edit-profile-form.tsx,edit-profile-content.tsx}`, `app/(app)/profile/profile-hero.tsx`, `components/domain/compare-stats-modal.tsx`: relabeled weight inputs kg -> lbs, widened validation to 50-400 (matching mobile), with no conversion math (the raw value was always written to the lbs column). Renamed `weightKg` -> `weight` and `isWeightKgValid` -> `isValidWeight` across web consumers. Existing web-created rows still need a one-time data backfill (tracked in jits-1qj).
+
 **Mobile: adopt the "Podium Tiers" (B3-11) app icon (2026-06-01)**
 
 **Changed**

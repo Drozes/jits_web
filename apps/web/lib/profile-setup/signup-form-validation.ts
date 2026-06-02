@@ -1,6 +1,7 @@
 /**
  * Validation for the consolidated A2 signup form.
- * KG IS CANONICAL: weight is captured in kilograms (20-300 range).
+ * POUNDS IS CANONICAL: the backend stores athletes.current_weight in lbs, so
+ * weight is captured in pounds (50-400 range) with no conversion.
  */
 
 export interface SignupFormValues {
@@ -10,7 +11,7 @@ export interface SignupFormValues {
   lastName: string;
   dateOfBirth: string;
   gender: "M" | "F" | "";
-  weightKg: string;
+  weight: string;
   city: string;
   gymId: string;
 }
@@ -22,7 +23,7 @@ export const EMPTY_SIGNUP_VALUES: SignupFormValues = {
   lastName: "",
   dateOfBirth: "",
   gender: "",
-  weightKg: "",
+  weight: "",
   city: "",
   gymId: "",
 };
@@ -48,9 +49,9 @@ export function isPasswordValid(password: string): boolean {
   return password.length >= 8;
 }
 
-export function isWeightKgValid(weightKg: string): boolean {
-  const n = parseFloat(weightKg);
-  return Number.isFinite(n) && n >= 20 && n <= 300;
+export function isValidWeight(weight: string): boolean {
+  const n = parseFloat(weight);
+  return Number.isFinite(n) && n >= 50 && n <= 400;
 }
 
 export function validateSignupForm(values: SignupFormValues): {
@@ -72,8 +73,8 @@ export function validateSignupForm(values: SignupFormValues): {
   if (values.gender !== "M" && values.gender !== "F") {
     return { valid: false, error: "Select a gender." };
   }
-  if (!isWeightKgValid(values.weightKg)) {
-    return { valid: false, error: "Enter a valid weight in kilograms (20-300)." };
+  if (!isValidWeight(values.weight)) {
+    return { valid: false, error: "Enter a valid weight in pounds (50-400)." };
   }
   if (!values.city.trim()) {
     return { valid: false, error: "Select a city." };

@@ -4,7 +4,10 @@ import { ATHLETE_STATUS } from "@jits/shared/constants";
 import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth/hooks";
 import { toast } from "@/components/ui/toast";
-import type { WizardValues } from "../../components/profile-setup/types";
+import {
+  FREE_AGENT_OPTION,
+  type WizardValues,
+} from "../../components/profile-setup/types";
 
 interface UseSetupSubmitArgs {
   athleteId: string | null;
@@ -53,13 +56,15 @@ export function useSetupSubmit({
   }, [athleteId, waiverId, onAfterTos]);
 
   const submit = React.useCallback(
-    async (values: WizardValues, skipOptional: boolean) => {
+    async (values: WizardValues) => {
       setLoading(true);
       setError(null);
 
-      const trimmedCity = values.city.trim();
       const firstName = values.firstName.trim();
       const lastName = values.lastName.trim();
+      // Free-agent is derived from the gym picker sentinel; never send the
+      // sentinel as a primary_gym_id. City is required, always written trimmed.
+      const freeAgent = values.gymId === FREE_AGENT_OPTION;
       const basePayload = {
         first_name: firstName,
         last_name: lastName,
@@ -69,9 +74,9 @@ export function useSetupSubmit({
         current_weight: parseFloat(values.weight),
         gender: values.gender,
         date_of_birth: values.dateOfBirth || null,
-        city: skipOptional ? null : trimmedCity || null,
-        free_agent: values.freeAgent,
-        primary_gym_id: values.freeAgent ? null : values.gymId || null,
+        city: values.city.trim(),
+        free_agent: freeAgent,
+        primary_gym_id: freeAgent ? null : values.gymId || null,
       };
 
       let resolvedAthleteId = athleteId;

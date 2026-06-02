@@ -78,6 +78,7 @@ export default function ProfileSetupScreen() {
                 authUserId={user.id}
                 athlete={data.athlete}
                 gyms={data.gyms}
+                cities={data.cities}
                 waiverId={data.waiverId}
                 hasAcceptedTos={data.hasAcceptedTos}
                 isEditing={data.isEditing}

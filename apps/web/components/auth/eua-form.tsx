@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { TOS_TEXT } from "@jits/shared/utils";
 import {
   isAtLeast16,
-  isWeightKgValid,
+  isValidWeight,
 } from "@/lib/profile-setup/signup-form-validation";
 import { AppHeader } from "@/components/layout/app-header";
 import { Plate } from "@/components/ui/elo-system";
@@ -19,7 +19,7 @@ interface ParsedBlock {
 }
 
 interface ProfileValues {
-  weightKg: string;
+  weight: string;
   gender: "M" | "F" | "";
   dateOfBirth: string;
   city: string;
@@ -56,8 +56,8 @@ function parseEuaBody(raw: string): ParsedBlock[] {
 }
 
 function validateProfile(v: ProfileValues): string | null {
-  if (!isWeightKgValid(v.weightKg)) {
-    return "Enter a valid weight in kilograms (20-300).";
+  if (!isValidWeight(v.weight)) {
+    return "Enter a valid weight in pounds (50-400).";
   }
   if (v.gender !== "M" && v.gender !== "F") {
     return "Select a gender.";
@@ -128,7 +128,7 @@ export function EuaForm({
         const { error: updateError } = await supabase
           .from("athletes")
           .update({
-            current_weight: parseFloat(profile.weightKg),
+            current_weight: parseFloat(profile.weight),
             gender: profile.gender,
             date_of_birth: profile.dateOfBirth,
             city: profile.city.trim(),
@@ -196,12 +196,12 @@ export function EuaForm({
                 <input
                   type="number"
                   inputMode="decimal"
-                  min={20}
-                  max={300}
+                  min={50}
+                  max={400}
                   step={0.1}
                   style={{ ...FIELD_INPUT_STYLE, flex: 1 }}
-                  value={profile.weightKg}
-                  onChange={(e) => onChange({ weightKg: e.target.value })}
+                  value={profile.weight}
+                  onChange={(e) => onChange({ weight: e.target.value })}
                 />
                 <span
                   style={{
@@ -213,7 +213,7 @@ export function EuaForm({
                     fontWeight: 700,
                   }}
                 >
-                  KG
+                  LBS
                 </span>
               </div>
             </Field>

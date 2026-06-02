@@ -52,7 +52,7 @@ async function EuaContent() {
       gyms={(gyms ?? []).map((g) => ({ id: g.id, name: g.name }))}
       cities={cities.length > 0 ? cities : ["Toronto", "Vancouver"]}
       initialProfile={{
-        weightKg: athlete.current_weight?.toString() ?? "",
+        weight: athlete.current_weight?.toString() ?? "",
         gender: athlete.gender === "M" || athlete.gender === "F" ? athlete.gender : "",
         dateOfBirth: athlete.date_of_birth ?? "",
         city: athlete.city ?? "",

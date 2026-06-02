@@ -12,8 +12,9 @@ import { Plate, Wordmark } from "@/components/ui/elo-system";
 import { toast } from "@/components/ui";
 import { AppHeader } from "@/components/layout/app-header";
 import { AuthFormField } from "@/components/auth/auth-form-field";
-import { CtaButton } from "@/components/auth/auth-buttons";
+import { CtaButton, SecondaryButton } from "@/components/auth/auth-buttons";
 import { useAuth } from "@/lib/auth/hooks";
+import { APPLE_SIGN_IN_ENABLED } from "@/lib/auth/feature-flags";
 
 /**
  * Mobile signup screen. Mirrors wireframe A2 in spirit (account creation),
@@ -23,11 +24,13 @@ import { useAuth } from "@/lib/auth/hooks";
  */
 export default function SignupScreen() {
   const router = useRouter();
-  const { user, isLoading: authLoading, signUp } = useAuth();
+  const { user, isLoading: authLoading, signUp, signInWithApple } = useAuth();
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [confirmPassword, setConfirmPassword] = React.useState("");
   const [submitting, setSubmitting] = React.useState(false);
+  const [appleSubmitting, setAppleSubmitting] = React.useState(false);
+  const [appleAvailable, setAppleAvailable] = React.useState(false);
   const [submitted, setSubmitted] = React.useState(false);
   const [needsConfirmation, setNeedsConfirmation] = React.useState(false);
   const [touched, setTouched] = React.useState({
@@ -40,6 +43,21 @@ export default function SignupScreen() {
     if (!authLoading && user) router.replace("/");
   }, [user, authLoading, router]);
 
+  // Apple sign-in is iOS-only; probe availability and gate the button.
+  // Dynamic import keeps the native module out of Android/web bundles.
+  React.useEffect(() => {
+    if (Platform.OS !== "ios") return;
+    let cancelled = false;
+    (async () => {
+      const AppleAuthentication = await import("expo-apple-authentication");
+      const available = await AppleAuthentication.isAvailableAsync();
+      if (!cancelled) setAppleAvailable(available);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const emailError =
     !email.trim() || !email.includes("@") ? "Enter a valid email" : null;
   const passwordError = password.length < 8 ? "At least 8 characters" : null;
@@ -50,7 +68,7 @@ export default function SignupScreen() {
 
   const onSubmit = async () => {
     setTouched({ email: true, password: true, confirm: true });
-    if (formInvalid || submitting) return;
+    if (formInvalid || submitting || appleSubmitting) return;
     setSubmitting(true);
     const { error, needsEmailConfirmation } = await signUp(email.trim(), password);
     setSubmitting(false);
@@ -63,6 +81,19 @@ export default function SignupScreen() {
       needsEmailConfirmation ? "Check your email to confirm" : "Account created",
     );
     setSubmitted(true);
+  };
+
+  const onApplePress = async () => {
+    if (appleSubmitting || submitting) return;
+    setAppleSubmitting(true);
+    const { error, cancelled } = await signInWithApple();
+    setAppleSubmitting(false);
+    if (cancelled) return;
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    router.replace("/");
   };
 
   return (
@@ -142,8 +173,21 @@ export default function SignupScreen() {
                 <CtaButton
                   label={submitting ? "Creating account..." : "Continue"}
                   onPress={onSubmit}
-                  disabled={submitting || (allTouched && formInvalid)}
+                  disabled={
+                    submitting || appleSubmitting || (allTouched && formInvalid)
+                  }
                 />
+                {appleAvailable && APPLE_SIGN_IN_ENABLED ? (
+                  <SecondaryButton
+                    label={
+                      appleSubmitting
+                        ? "Opening Apple..."
+                        : "Continue with Apple"
+                    }
+                    onPress={onApplePress}
+                    disabled={appleSubmitting || submitting}
+                  />
+                ) : null}
               </Plate>
 
               <Pressable onPress={() => router.push("/login")} hitSlop={8}>

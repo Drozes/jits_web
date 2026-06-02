@@ -1,83 +1,71 @@
-import { Text, View } from "react-native";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
+import * as React from "react";
+import { NativeSelect } from "@/components/ui/native-select";
 import { Plate } from "@/components/ui/elo-system";
 import { CtaButton } from "@/components/auth/auth-buttons";
 import type { GymOption } from "@/lib/profile-setup/use-setup-data";
 import { isTrainingComplete, isValidWeight } from "@/lib/profile-setup/validation";
-import type { WizardValues } from "./types";
+import { FREE_AGENT_OPTION, type WizardValues } from "./types";
 import { EloField, EloTextInput } from "./elo-form-field";
 
 interface TrainingStepProps {
   values: WizardValues;
   onChange: (patch: Partial<WizardValues>) => void;
-  onNext: () => void;
+  onSubmit: (values: WizardValues) => void;
+  loading: boolean;
+  isEditing: boolean;
   gyms: GymOption[];
+  cities: string[];
 }
 
 /**
- * ELO-styled training step. Extends web's training step with a free-agent
- * toggle (per A3 spec). When `freeAgent` is on the gym picker is hidden and
- * `gymId` is cleared so the submit payload sends `primary_gym_id: null`.
+ * ELO-styled training step, now the final submitting step of the wizard.
+ * Collects weight, gym (with free-agent folded in as the first picker option),
+ * and the required city. Free-agent status is derived from the gym picker:
+ * selecting "Free agent (no gym)" sets `gymId` to the FREE_AGENT_OPTION
+ * sentinel; selecting a real gym auto-fills city if empty.
  */
-export function TrainingStep({ values, onChange, onNext, gyms }: TrainingStepProps) {
+export function TrainingStep({
+  values,
+  onChange,
+  onSubmit,
+  loading,
+  isEditing,
+  gyms,
+  cities,
+}: TrainingStepProps) {
   const weightAttempted = values.weight.length > 0;
   const weightValid = !weightAttempted || isValidWeight(values.weight);
-  const canContinue = isTrainingComplete(values);
+  const canSubmit = isTrainingComplete(values) && !loading;
+
+  const gymOptions = React.useMemo(
+    () => [
+      { label: "Free agent (no gym)", value: FREE_AGENT_OPTION },
+      ...gyms.map((g) => ({
+        label: g.city ? `${g.name} (${g.city})` : g.name,
+        value: g.id,
+      })),
+    ],
+    [gyms],
+  );
+
+  const cityOptions = React.useMemo(
+    () => cities.map((c) => ({ label: c, value: c })),
+    [cities],
+  );
+
+  const onGymChange = (next: string) => {
+    if (next === FREE_AGENT_OPTION) {
+      onChange({ gymId: FREE_AGENT_OPTION });
+      return;
+    }
+    const gym = gyms.find((g) => g.id === next);
+    const patch: Partial<WizardValues> = { gymId: next };
+    if (gym?.city && !values.city) patch.city = gym.city;
+    onChange(patch);
+  };
 
   return (
     <Plate className="gap-5">
-      <View className="flex-row items-center justify-between gap-3">
-        <View className="flex-1">
-          <Text className="font-heading text-[10px] text-ink-3 uppercase tracking-caps-xl">
-            Free Agent
-          </Text>
-          <Text className="font-body text-[12px] text-ink-3 mt-1">
-            No primary gym yet? You can update this later.
-          </Text>
-        </View>
-        <Switch
-          value={values.freeAgent}
-          onValueChange={(next) =>
-            onChange({ freeAgent: next, gymId: next ? "" : values.gymId })
-          }
-        />
-      </View>
-
-      {!values.freeAgent && (
-        <EloField
-          label="Home Gym"
-          helper="Required to activate your profile and appear to other athletes."
-        >
-          <Select
-            value={values.gymId || undefined}
-            onValueChange={(v) => {
-              const gym = gyms.find((g) => g.id === v);
-              const patch: Partial<WizardValues> = { gymId: v };
-              if (gym?.city && !values.city) patch.city = gym.city;
-              onChange(patch);
-            }}
-          >
-            <SelectTrigger className="bg-surface-3 border-hairline-strong rounded-xs h-12 px-4">
-              <SelectValue placeholder="Select your gym" />
-            </SelectTrigger>
-            <SelectContent>
-              {gyms.map((gym) => (
-                <SelectItem key={gym.id} value={gym.id}>
-                  {gym.city ? `${gym.name} (${gym.city})` : gym.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </EloField>
-      )}
-
       <EloField
         label="Weight (lbs)"
         helper="Used for weight class matching."
@@ -93,7 +81,32 @@ export function TrainingStep({ values, onChange, onNext, gyms }: TrainingStepPro
         />
       </EloField>
 
-      <CtaButton label="Continue" onPress={onNext} disabled={!canContinue} />
+      <EloField
+        label="Home Gym"
+        helper="Required to activate your profile and appear to other athletes."
+      >
+        <NativeSelect
+          value={values.gymId}
+          onValueChange={onGymChange}
+          options={gymOptions}
+          placeholder="Select your gym"
+        />
+      </EloField>
+
+      <EloField label="City" helper="Helps you find local sessions and gyms.">
+        <NativeSelect
+          value={values.city}
+          onValueChange={(v) => onChange({ city: v })}
+          options={cityOptions}
+          placeholder="Select your city"
+        />
+      </EloField>
+
+      <CtaButton
+        label={loading ? "Saving..." : isEditing ? "Save Changes" : "Get Started"}
+        onPress={() => onSubmit(values)}
+        disabled={!canSubmit}
+      />
     </Plate>
   );
 }

@@ -23,7 +23,7 @@ export async function EditProfileContent() {
       athleteId={athlete.id}
       firstName={firstName ?? ""}
       lastName={lastName ?? ""}
-      weightKg={athlete.current_weight}
+      weight={athlete.current_weight}
       city={athlete.city}
       primaryGymId={athlete.primary_gym_id}
       gyms={gyms ?? []}

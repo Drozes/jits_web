@@ -8,7 +8,7 @@ interface EditProfileFormProps {
   athleteId: string;
   firstName: string;
   lastName: string;
-  weightKg: number | null;
+  weight: number | null;
   city: string | null;
   primaryGymId: string | null;
   gyms: { id: string; name: string }[];
@@ -18,7 +18,7 @@ export function EditProfileForm({
   athleteId,
   firstName: initialFirst,
   lastName: initialLast,
-  weightKg,
+  weight: initialWeight,
   city,
   primaryGymId,
   gyms,
@@ -26,7 +26,7 @@ export function EditProfileForm({
   const router = useRouter();
   const [first, setFirst] = useState(initialFirst);
   const [last, setLast] = useState(initialLast);
-  const [weight, setWeight] = useState(weightKg?.toString() ?? "");
+  const [weight, setWeight] = useState(initialWeight?.toString() ?? "");
   const [cityValue, setCityValue] = useState(city ?? "");
   const [gymId, setGymId] = useState(primaryGymId ?? "");
   const [saving, setSaving] = useState(false);
@@ -40,7 +40,7 @@ export function EditProfileForm({
     const supabase = createClient();
     const display = `${first.trim()} ${last.trim()}`.trim();
     const weightNum = weight.trim() ? parseFloat(weight) : null;
-    if (weightNum !== null && (isNaN(weightNum) || weightNum <= 0 || weightNum > 250)) {
+    if (weightNum !== null && (isNaN(weightNum) || weightNum < 50 || weightNum > 400)) {
       setError("Invalid weight");
       setSaving(false);
       return;
@@ -79,14 +79,14 @@ export function EditProfileForm({
       <Field label="Last Name">
         <FieldInput value={last} onChange={setLast} />
       </Field>
-      <Field label="Weight (kg)">
+      <Field label="Weight (lbs)">
         <FieldInput
           value={weight}
           onChange={setWeight}
           type="number"
           step="0.1"
-          min="0"
-          max="250"
+          min="50"
+          max="400"
         />
       </Field>
       <Field label="City">

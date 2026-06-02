@@ -18,6 +18,7 @@ import {
   TertiaryButton,
 } from "@/components/auth/auth-buttons";
 import { useAuth } from "@/lib/auth/hooks";
+import { APPLE_SIGN_IN_ENABLED } from "@/lib/auth/feature-flags";
 
 /**
  * Mobile login screen. Mirrors the wireframe A1 visual pattern:
@@ -27,16 +28,39 @@ import { useAuth } from "@/lib/auth/hooks";
  */
 export default function LoginScreen() {
   const router = useRouter();
-  const { user, isLoading: authLoading, signIn, signInWithGoogle } = useAuth();
+  const {
+    user,
+    isLoading: authLoading,
+    signIn,
+    signInWithGoogle,
+    signInWithApple,
+  } = useAuth();
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [submitting, setSubmitting] = React.useState(false);
   const [googleSubmitting, setGoogleSubmitting] = React.useState(false);
+  const [appleSubmitting, setAppleSubmitting] = React.useState(false);
+  const [appleAvailable, setAppleAvailable] = React.useState(false);
   const [touched, setTouched] = React.useState({ email: false, password: false });
 
   React.useEffect(() => {
     if (!authLoading && user) router.replace("/");
   }, [user, authLoading, router]);
+
+  // Apple sign-in is iOS-only; probe availability and gate the button.
+  // Dynamic import keeps the native module out of Android/web bundles.
+  React.useEffect(() => {
+    if (Platform.OS !== "ios") return;
+    let cancelled = false;
+    (async () => {
+      const AppleAuthentication = await import("expo-apple-authentication");
+      const available = await AppleAuthentication.isAvailableAsync();
+      if (!cancelled) setAppleAvailable(available);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const emailError =
     !email.trim() || !email.includes("@") ? "Enter a valid email" : null;
@@ -58,10 +82,23 @@ export default function LoginScreen() {
   };
 
   const onGooglePress = async () => {
-    if (googleSubmitting || submitting) return;
+    if (googleSubmitting || appleSubmitting || submitting) return;
     setGoogleSubmitting(true);
     const { error, cancelled } = await signInWithGoogle();
     setGoogleSubmitting(false);
+    if (cancelled) return;
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    router.replace("/");
+  };
+
+  const onApplePress = async () => {
+    if (appleSubmitting || googleSubmitting || submitting) return;
+    setAppleSubmitting(true);
+    const { error, cancelled } = await signInWithApple();
+    setAppleSubmitting(false);
     if (cancelled) return;
     if (error) {
       toast.error(error.message);
@@ -130,8 +167,17 @@ export default function LoginScreen() {
                 googleSubmitting ? "Opening Google..." : "Continue with Google"
               }
               onPress={onGooglePress}
-              disabled={googleSubmitting || submitting}
+              disabled={googleSubmitting || appleSubmitting || submitting}
             />
+            {appleAvailable && APPLE_SIGN_IN_ENABLED ? (
+              <SecondaryButton
+                label={
+                  appleSubmitting ? "Opening Apple..." : "Continue with Apple"
+                }
+                onPress={onApplePress}
+                disabled={appleSubmitting || googleSubmitting || submitting}
+              />
+            ) : null}
           </Plate>
 
           <View className="gap-3">

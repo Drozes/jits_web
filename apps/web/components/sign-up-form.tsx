@@ -83,7 +83,7 @@ export function SignUpForm({ gyms, cities }: SignUpFormProps) {
         display_name: `${firstName} ${lastName}`.trim(),
         date_of_birth: values.dateOfBirth,
         gender: values.gender,
-        current_weight: parseFloat(values.weightKg),
+        current_weight: parseFloat(values.weight),
         city: values.city.trim(),
         primary_gym_id: values.gymId,
         free_agent: false,
@@ -213,12 +213,12 @@ export function SignUpForm({ gyms, cities }: SignUpFormProps) {
             <input
               type="number"
               inputMode="decimal"
-              min={20}
-              max={300}
+              min={50}
+              max={400}
               step={0.1}
               style={{ ...FIELD_INPUT_STYLE, flex: 1 }}
-              value={values.weightKg}
-              onChange={(e) => onChange({ weightKg: e.target.value })}
+              value={values.weight}
+              onChange={(e) => onChange({ weight: e.target.value })}
             />
             <span
               style={{
@@ -230,7 +230,7 @@ export function SignUpForm({ gyms, cities }: SignUpFormProps) {
                 fontWeight: 700,
               }}
             >
-              KG
+              LBS
             </span>
           </div>
         </Field>

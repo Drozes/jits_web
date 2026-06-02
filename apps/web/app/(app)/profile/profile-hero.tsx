@@ -25,7 +25,7 @@ export function ProfileHero({
   tags,
 }: ProfileHeroProps) {
   const metaTags = tags ?? [
-    weightKg ? `${weightKg} kg` : null,
+    weightKg ? `${weightKg} lbs` : null,
     "No-Gi",
     "Sub-only",
   ].filter(Boolean) as string[];

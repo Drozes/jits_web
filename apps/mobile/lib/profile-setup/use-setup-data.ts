@@ -25,9 +25,26 @@ export interface GymOption {
 export interface SetupBootstrap {
   athlete: SetupAthleteRow | null;
   gyms: GymOption[];
+  cities: string[];
   waiverId: string | null;
   hasAcceptedTos: boolean;
   isEditing: boolean;
+}
+
+/**
+ * Distinct, sorted list of cities sourced from the active gyms. Mirrors the web
+ * signup page (`apps/web/app/(auth)/signup/page.tsx`): falls back to a small
+ * default list when no gym has a city set so the required picker is never empty.
+ */
+function buildCityList(gyms: GymOption[]): string[] {
+  const cities = Array.from(
+    new Set(
+      gyms
+        .map((g) => g.city?.trim())
+        .filter((c): c is string => !!c),
+    ),
+  ).sort();
+  return cities.length > 0 ? cities : ["Toronto", "Vancouver"];
 }
 
 /**
@@ -90,9 +107,11 @@ export function useSetupData(authUserId: string | null) {
         hasAcceptedTos = !!ack;
       }
 
+      const gymList = (gyms as GymOption[] | null) ?? [];
       setData({
         athlete: (athlete as SetupAthleteRow | null) ?? null,
-        gyms: (gyms as GymOption[] | null) ?? [],
+        gyms: gymList,
+        cities: buildCityList(gymList),
         waiverId: waiver?.id ?? null,
         hasAcceptedTos,
         isEditing: !!athlete && athlete.status !== ATHLETE_STATUS.PENDING,
