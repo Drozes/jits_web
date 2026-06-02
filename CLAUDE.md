@@ -55,8 +55,8 @@ Session participants -> Athletes: athletes!fk_session_participants_athlete(displ
 ### Metro config (regression trap)
 `apps/mobile/metro.config.js` relies on Expo SDK 52+ built-in monorepo support. **Do NOT add manual `watchFolders`, `nodeModulesPaths`, or `disableHierarchicalLookup`**, they break resolution of nested transitive dependencies (this regressed Phase 5).
 
-### Weight units unresolved
-`athletes.current_weight` spec says kg; `challenges` spec says lbs. Both apps currently treat the join-wizard weight input as lbs (50-400). Verify against the BE before relying on units.
+### Weight units: pounds is canonical
+`athletes.current_weight` is stored in **pounds (lbs)**. The BE `get_weight_division()` hard-codes IBJJF division boundaries in lbs and the column is commented "in lbs"; `challenges` weights are lbs too. Both apps now capture/store lbs (50-400); web was fixed from a kg-mislabel in `844b16d` (jits-7ry) with NO conversion math at any write site. Pre-fix web-created rows still hold kg-magnitude values and need a one-time backfill (jits-1qj). Do NOT add kg<->lbs conversion when writing `current_weight`.
 
 ## Async & Component Boundaries
 
