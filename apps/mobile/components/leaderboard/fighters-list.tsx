@@ -1,4 +1,5 @@
 import { FlatList, RefreshControl, Text, View } from "react-native";
+import { useRouter } from "expo-router";
 import { RankRow } from "@/components/ui/elo-system";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import type { RankedAthlete } from "@/lib/leaderboard/use-leaderboard-data";
@@ -32,6 +33,7 @@ export function FightersList({
   currentUser,
 }: FightersListProps) {
   const tokens = useThemedTokens();
+  const router = useRouter();
   return (
     <View className="flex-1">
       <FlatList
@@ -51,6 +53,7 @@ export function FightersList({
             value={item.currentElo}
             delta={trendToDelta(item.eloTrend)}
             leader={index === 0}
+            onPress={() => router.push(`/(app)/athlete/${item.id}`)}
           />
         )}
         ListEmptyComponent={
