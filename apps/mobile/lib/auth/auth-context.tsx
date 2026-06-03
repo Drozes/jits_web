@@ -49,42 +49,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [athlete, setAthlete] = React.useState<AthleteGuardRow | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
 
-  // Hydrate from stored session on mount, then subscribe to auth changes.
+  // Subscribe to auth state. Supabase emits INITIAL_SESSION on mount with the
+  // restored (or null) session, so this also performs cold-start hydration.
+  //
+  // The callback MUST stay synchronous: Supabase runs it while holding the
+  // GoTrue auth lock (`processLock`, see supabase/client.ts), so awaiting any
+  // Supabase call here would deadlock and wedge the app on the "Loading..."
+  // gate. The athlete row is loaded in the user-keyed effect below, outside the
+  // lock.
   React.useEffect(() => {
-    let cancelled = false;
-
-    (async () => {
-      const { data } = await supabase.auth.getSession();
-      if (cancelled) return;
-      const initialSession = data.session;
-      setSession(initialSession);
-      setUser(initialSession?.user ?? null);
-      if (initialSession?.user) {
-        const row = await getCurrentAthlete(supabase, initialSession.user.id);
-        if (!cancelled) setAthlete(row);
-      }
-      if (!cancelled) setIsLoading(false);
-    })();
-
-    const { data: sub } = supabase.auth.onAuthStateChange(
-      async (_event, nextSession) => {
-        setSession(nextSession);
-        setUser(nextSession?.user ?? null);
-        if (nextSession?.user) {
-          const row = await getCurrentAthlete(supabase, nextSession.user.id);
-          setAthlete(row);
-        } else {
-          setAthlete(null);
-        }
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession);
+      setUser(nextSession?.user ?? null);
+      if (!nextSession?.user) {
+        setAthlete(null);
         setIsLoading(false);
-      },
-    );
+      }
+    });
+    return () => sub.subscription.unsubscribe();
+  }, []);
 
+  // Load the athlete guard row whenever the signed-in user changes. Runs outside
+  // the auth-state callback (no lock held) so it can't deadlock, and keeps
+  // `isLoading` true until the first fetch resolves so Index() doesn't flash the
+  // profile-setup redirect for an already-active athlete.
+  React.useEffect(() => {
+    const uid = user?.id;
+    if (!uid) return;
+    let cancelled = false;
+    void (async () => {
+      const row = await getCurrentAthlete(supabase, uid);
+      if (!cancelled) {
+        setAthlete(row);
+        setIsLoading(false);
+      }
+    })();
     return () => {
       cancelled = true;
-      sub.subscription.unsubscribe();
     };
-  }, []);
+  }, [user?.id]);
 
   // Persist the real ELO so the next cold-start "Climb" rolls to it, not 1481.
   React.useEffect(() => {

@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+**Mobile: fix intermittent cold-start hang on the "Loading…" screen (Supabase auth lock, 2026-06-03)**
+
+User-reported: first open often stuck on a light "Loading…" screen until a force-quit + reopen. Root cause: supabase-js 2.105.4 on React Native has no `navigator.locks`, so auth-js fell back to a no-op lock — the mount-time `getSession()`, the `autoRefreshToken` timer, and the `INITIAL_SESSION` emission raced on the stored session and intermittently stalled the auth gate (`isLoading` never flipped false, so `app/index.tsx` sat on "Loading…" forever). The old `onAuthStateChange` callback also `await`ed a DB query inside the callback (a deadlock footgun once a real lock is active).
+
+**Fixed**
+- `apps/mobile/lib/supabase/client.ts`: added `lock: processLock` to the auth config (the required React Native setting; serializes concurrent session access, and its 5s `lockAcquireTimeout` means a stalled storage read now rejects instead of hanging the gate).
+- `apps/mobile/lib/auth/auth-context.tsx`: made the `onAuthStateChange` callback synchronous (no awaited Supabase calls inside the lock) and moved the athlete-guard fetch into a separate effect keyed on `user.id`, which runs outside the lock. `isLoading` still gates on the first athlete fetch, so an active athlete never flashes the profile-setup redirect. Relies on auth-js emitting `INITIAL_SESSION` for cold-start hydration (verified in the installed version). Independent review confirmed no deadlock path and `isLoading` reaches false on every route. Quality gate green: typecheck, 366 tests, iOS `expo export`.
+
 **Mobile: shipped to TestFlight build 12 (v0.1.0, 2026-06-03)**
 
 Promoted iOS build 12 to TestFlight (EAS build `e7a2ef8f`, auto-submitted to App Store Connect app `6774629438`; remote build number 11 → 12). Bundles the two mobile fixes below: tap-through icons inside buttons, and un-clipped JetBrains Mono numbers. Quality gate green before build: typecheck (all workspaces), 366 tests, iOS `expo export`. Tester "What to Test" note (icons now tappable + numbers no longer clipped) must be set in App Store Connect; EAS submit does not push it.
