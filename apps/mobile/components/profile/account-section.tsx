@@ -84,7 +84,9 @@ function ThemeSwitcherRow({ onSelect }: { onSelect: (pref: ThemePreference) => v
                 active ? "bg-surface-4" : "bg-surface-3",
               )}
             >
-              <Icon size={12} color={active ? tokens.textPrimary : tokens.textTertiary} />
+              <View pointerEvents="none">
+                <Icon size={12} color={active ? tokens.textPrimary : tokens.textTertiary} />
+              </View>
               <Text
                 className={cn(
                   "font-mono-bold text-[10px] ml-1 uppercase tracking-caps-l",

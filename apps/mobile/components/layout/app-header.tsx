@@ -46,7 +46,9 @@ export function AppHeader({
             hitSlop={10}
             className="w-8 h-8 items-center justify-center rounded-xs active:bg-surface-3"
           >
-            <ChevronLeft size={20} color={tokens.textSecondary} />
+            <View pointerEvents="none">
+              <ChevronLeft size={20} color={tokens.textSecondary} />
+            </View>
           </Pressable>
         ) : null}
       </View>

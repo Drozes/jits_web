@@ -49,7 +49,9 @@ function ShareButton({
       hitSlop={10}
       className="w-8 h-8 items-center justify-center rounded-xs active:bg-surface-3"
     >
-      <ArrowUpRight size={18} color={tokens.textSecondary} />
+      <View pointerEvents="none">
+        <ArrowUpRight size={18} color={tokens.textSecondary} />
+      </View>
     </Pressable>
   );
 }
@@ -128,7 +130,9 @@ export default function AthleteProfileScreen() {
             disabled
             className="flex-row items-center justify-center gap-2 bg-cta rounded-sm px-5 py-4 opacity-60"
           >
-            <Swords size={16} color={tokens.textOnAccent} />
+            <View pointerEvents="none">
+              <Swords size={16} color={tokens.textOnAccent} />
+            </View>
             <Text className="font-heading text-[12px] text-ink-on-cta uppercase tracking-caps">
               Challenge
             </Text>
@@ -138,7 +142,9 @@ export default function AthleteProfileScreen() {
             onPress={() => setCompareOpen(true)}
             className="flex-row items-center justify-center gap-2 bg-surface-3 border border-hairline-strong rounded-sm px-5 py-4 active:bg-surface-4"
           >
-            <BarChart3 size={16} color={tokens.textPrimary} />
+            <View pointerEvents="none">
+              <BarChart3 size={16} color={tokens.textPrimary} />
+            </View>
             <Text className="font-heading text-[12px] text-ink uppercase tracking-caps">
               Compare Stats
             </Text>

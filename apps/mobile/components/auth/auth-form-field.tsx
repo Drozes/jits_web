@@ -81,11 +81,13 @@ export function AuthFormField({
             accessibilityLabel={hidden ? "Show password" : "Hide password"}
             accessibilityRole="button"
           >
-            {hidden ? (
-              <Eye size={18} color={tokens.textTertiary} />
-            ) : (
-              <EyeOff size={18} color={tokens.textTertiary} />
-            )}
+            <View pointerEvents="none">
+              {hidden ? (
+                <Eye size={18} color={tokens.textTertiary} />
+              ) : (
+                <EyeOff size={18} color={tokens.textTertiary} />
+              )}
+            </View>
           </Pressable>
         ) : null}
       </View>

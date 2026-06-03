@@ -48,7 +48,7 @@ export function NotificationRow({
       accessibilityRole={onPress ? "button" : undefined}
       className="flex-row items-start gap-3 rounded-xs px-3 py-3 active:bg-surface-3"
     >
-      <View className="w-8 h-8 items-center justify-center rounded-xs border border-hairline bg-surface-3">
+      <View pointerEvents="none" className="w-8 h-8 items-center justify-center rounded-xs border border-hairline bg-surface-3">
         <Icon size={14} color={iconColor} />
       </View>
       <View className="flex-1 min-w-0 gap-1">

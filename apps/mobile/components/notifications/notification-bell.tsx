@@ -44,7 +44,9 @@ export function NotificationBell({ athleteId }: NotificationBellProps) {
         className="relative w-8 h-8 items-center justify-center rounded-xs active:bg-surface-4"
         hitSlop={8}
       >
-        <Bell size={18} color={tokens.textPrimary} />
+        <View pointerEvents="none">
+          <Bell size={18} color={tokens.textPrimary} />
+        </View>
         {count > 0 && (
           <View className="absolute top-0 right-0 h-4 min-w-4 items-center justify-center rounded-full bg-cta px-1">
             <Text className="font-mono-bold text-[9px] text-ink-on-cta">

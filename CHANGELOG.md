@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+**Mobile: fix icons swallowing taps inside buttons (SVG hit-test fall-through, 2026-06-03)**
+
+User-reported: bottom-tab icons felt dead, the header back arrow had a "tiny/weird hit radius", and the profile share arrow appeared to do nothing. Root cause: `lucide-react-native` icons render as `react-native-svg`, which hit-tests against the drawn path; a tap landing on the icon's pixels was consumed by the SVG (no `onPress`) instead of bubbling to the parent `Pressable`, so only taps on empty space inside the button registered. The prior touch-target sweep added `hitSlop`/pressed-states but did not address this.
+
+**Fixed**
+- Wrapped every decorative icon that sits inside a touchable in `<View pointerEvents="none">` so the tap always falls through to the button. 21 sites across 20 files: `components/layout/{elo-tab-bar,app-header}.tsx`, `components/notifications/{notification-bell,notification-item}.tsx`, `components/session/{session-actions,session-templates,template-card,join-wizard}.tsx`, `components/session/lobby/participant-row.tsx`, `components/profile/account-section.tsx`, `components/auth/auth-form-field.tsx`, `components/share-profile-sheet.tsx`, `components/match-flow/steps/{live-controls,summary-step}.tsx`, `app/(app)/athlete/[id].tsx`, `app/(app)/(tabs)/{gyms/index,gyms/[id],profile/index}.tsx`, `app/(app)/session/[id]/lobby.tsx`, `app/(app)/settings/index.tsx`. Layout unchanged (wrapper shrinks to the icon; Text siblings untouched). Quality gate green (typecheck all workspaces, 366 tests).
+
 **Mobile: leaderboard real-data + navigation + app-wide touch-target/UX polish, shipped to TestFlight build 11 (PR #27, 2026-06-03)**
 
 Merged PR #27 to `development` and promoted iOS build 11 (v0.1.0) to TestFlight (EAS build `fa149447`, auto-submitted to App Store Connect app `6774629438`). Net of three reviewer-agent SHIP passes; quality gate green (typecheck, 366 tests, `expo export`).

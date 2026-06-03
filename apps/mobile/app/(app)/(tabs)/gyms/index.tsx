@@ -163,7 +163,9 @@ export default function GymsScreen() {
               hitSlop={10}
               className="w-8 h-8 items-center justify-center rounded-xs border border-hairline-strong bg-surface-3 active:bg-surface-4"
             >
-              <Plus size={16} color={tokens.textSecondary} />
+              <View pointerEvents="none">
+                <Plus size={16} color={tokens.textSecondary} />
+              </View>
             </Pressable>
           </CreateGymSheet>
         }

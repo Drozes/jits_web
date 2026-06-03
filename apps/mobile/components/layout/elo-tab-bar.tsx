@@ -65,7 +65,7 @@ export function EloTabBar({ state, descriptors, navigation }: BottomTabBarProps)
               isActive ? "border-cta" : "border-transparent",
             )}
           >
-            {iconNode}
+            <View pointerEvents="none">{iconNode}</View>
             <Text
               className={cn(
                 "font-heading text-[10px] uppercase tracking-caps-l",

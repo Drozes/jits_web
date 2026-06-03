@@ -124,7 +124,9 @@ function DeveloperPlate() {
           className="flex-row items-center justify-between px-4 py-3 active:bg-surface-4"
         >
           <View className="flex-row items-center gap-3">
-            <TestTube2 size={14} className="text-ink-3" />
+            <View pointerEvents="none">
+              <TestTube2 size={14} className="text-ink-3" />
+            </View>
             <RowLabel>REALTIME SMOKE TEST</RowLabel>
           </View>
           <Chevron />

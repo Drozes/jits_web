@@ -50,7 +50,9 @@ export function SessionTemplates({ gymId, isManager }: SessionTemplatesProps) {
               hitSlop={10}
               className="flex-row items-center gap-1 px-3 py-1.5 rounded-xs border border-hairline-strong bg-surface-3 active:bg-surface-4"
             >
-              <Plus size={12} color={tokens.textSecondary} />
+              <View pointerEvents="none">
+                <Plus size={12} color={tokens.textSecondary} />
+              </View>
               <Text className="font-heading text-[10px] text-ink-2 uppercase tracking-caps">
                 Add
               </Text>

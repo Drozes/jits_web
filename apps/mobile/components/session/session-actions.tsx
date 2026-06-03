@@ -1,5 +1,5 @@
 import * as React from "react";
-import { ActivityIndicator, Alert, Pressable } from "react-native";
+import { ActivityIndicator, Alert, Pressable, View } from "react-native";
 import { MoreVertical } from "lucide-react-native";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { toast } from "@/components/ui/toast";
@@ -85,7 +85,9 @@ export function SessionActions({ sessionId, status, onActionComplete }: SessionA
       accessibilityLabel="Session actions"
       className="w-7 h-7 items-center justify-center rounded-xs active:bg-surface-3"
     >
-      <MoreVertical size={16} color={tokens.textSecondary} />
+      <View pointerEvents="none">
+        <MoreVertical size={16} color={tokens.textSecondary} />
+      </View>
     </Pressable>
   );
 }

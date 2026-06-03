@@ -185,7 +185,9 @@ export default function GymDetailScreen() {
                 hitSlop={10}
                 className="w-8 h-8 items-center justify-center rounded-xs active:bg-surface-3"
               >
-                <Pencil size={16} color={tokens.textSecondary} />
+                <View pointerEvents="none">
+                  <Pencil size={16} color={tokens.textSecondary} />
+                </View>
               </Pressable>
             </EditGymSheet>
           ) : null
@@ -245,7 +247,9 @@ export default function GymDetailScreen() {
                     accessibilityLabel="Start session"
                     className="bg-cta rounded-sm py-3 px-5 items-center justify-center active:bg-cta-hover flex-row gap-2"
                   >
-                    <Plus size={16} color={tokens.textOnAccent} />
+                    <View pointerEvents="none">
+                      <Plus size={16} color={tokens.textOnAccent} />
+                    </View>
                     <Text className="font-heading text-[13px] text-ink-on-cta uppercase tracking-caps">
                       Start Session
                     </Text>

@@ -1,4 +1,4 @@
-import { Pressable, Text } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { Swords } from "lucide-react-native";
 import { ParticipantRow as ParticipantRowPrimitive } from "@/components/ui/elo-system";
 import { useThemedTokens } from "@/lib/theme/use-theme";
@@ -43,7 +43,9 @@ export function ParticipantRow({ participant, onChallenge, isBusy }: Participant
       )}
       hitSlop={{ top: 11, bottom: 11, left: 6, right: 6 }}
     >
-      <Swords size={12} color={tokens.textOnAccent} />
+      <View pointerEvents="none">
+        <Swords size={12} color={tokens.textOnAccent} />
+      </View>
       <Text className="font-heading text-[10px] text-ink-on-cta uppercase tracking-caps">
         {isBusy ? "..." : "Challenge"}
       </Text>

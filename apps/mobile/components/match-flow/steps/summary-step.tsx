@@ -130,7 +130,9 @@ export function SummaryStep(props: SummaryStepProps) {
             onPress={handleShareResult}
             className="flex-row items-center justify-center gap-2 border border-hairline-strong rounded-sm bg-surface-3 py-3 active:bg-surface-4"
           >
-            <Share2 size={14} color={tokens.textPrimary} />
+            <View pointerEvents="none">
+              <Share2 size={14} color={tokens.textPrimary} />
+            </View>
             <Text className="font-heading text-[13px] text-ink uppercase tracking-caps">
               Share Result
             </Text>

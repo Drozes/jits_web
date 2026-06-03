@@ -198,7 +198,9 @@ export default function SessionLobbyScreen() {
               "active:bg-cta-hover",
             )}
           >
-            <Shuffle size={14} color={tokens.textOnAccent} />
+            <View pointerEvents="none">
+              <Shuffle size={14} color={tokens.textOnAccent} />
+            </View>
             <Text className="font-heading text-[12px] text-ink-on-cta uppercase tracking-caps">
               {randomLoading ? "Finding..." : "Random Match"}
             </Text>
@@ -208,7 +210,9 @@ export default function SessionLobbyScreen() {
             onPress={handleInvite}
             className="flex-1 flex-row items-center justify-center gap-2 bg-surface-3 border border-hairline-strong py-3 rounded-sm active:bg-surface-4"
           >
-            <UserPlus size={14} color={tokens.textPrimary} />
+            <View pointerEvents="none">
+              <UserPlus size={14} color={tokens.textPrimary} />
+            </View>
             <Text className="font-heading text-[12px] text-ink uppercase tracking-caps">
               Invite
             </Text>

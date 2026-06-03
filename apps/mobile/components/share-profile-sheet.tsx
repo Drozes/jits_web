@@ -82,7 +82,9 @@ export function ShareProfileSheet({ athlete, children }: ShareProfileSheetProps)
             accessibilityRole="button"
             className="flex-row items-center justify-center gap-2 bg-cta rounded-sm px-5 py-4 active:bg-cta-hover"
           >
-            <Share2 size={16} color={tokens.textOnAccent} />
+            <View pointerEvents="none">
+              <Share2 size={16} color={tokens.textOnAccent} />
+            </View>
             <Text className="font-heading text-[12px] text-ink-on-cta uppercase tracking-caps">
               Share My Number
             </Text>

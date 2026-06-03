@@ -135,7 +135,9 @@ export function JoinWizard(props: JoinWizardProps) {
           className="flex-row items-center justify-center gap-1 py-2 active:opacity-70"
           hitSlop={6}
         >
-          <ChevronLeft size={16} color={tokens.textSecondary} />
+          <View pointerEvents="none">
+            <ChevronLeft size={16} color={tokens.textSecondary} />
+          </View>
           <Text className="font-mono-bold text-[10px] text-ink-2 uppercase tracking-caps-l">
             Back
           </Text>

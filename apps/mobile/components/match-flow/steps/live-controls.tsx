@@ -29,11 +29,13 @@ export function LiveControls({ paused, disabled, onPauseResume, onEnd }: LiveCon
           disabled && "opacity-50",
         )}
       >
-        {paused ? (
-          <Play size={16} color={tokens.textPrimary} />
-        ) : (
-          <Pause size={16} color={tokens.textPrimary} />
-        )}
+        <View pointerEvents="none">
+          {paused ? (
+            <Play size={16} color={tokens.textPrimary} />
+          ) : (
+            <Pause size={16} color={tokens.textPrimary} />
+          )}
+        </View>
         <Text className="font-heading text-[12px] text-ink uppercase tracking-caps">
           {paused ? "Resume" : "Pause"}
         </Text>
@@ -47,7 +49,9 @@ export function LiveControls({ paused, disabled, onPauseResume, onEnd }: LiveCon
           disabled && "opacity-50",
         )}
       >
-        <Square size={16} color={tokens.textOnAccent} />
+        <View pointerEvents="none">
+          <Square size={16} color={tokens.textOnAccent} />
+        </View>
         <Text className="font-heading text-[12px] text-ink-on-cta uppercase tracking-caps">
           End Match
         </Text>

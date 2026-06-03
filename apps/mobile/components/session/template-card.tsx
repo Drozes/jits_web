@@ -129,7 +129,7 @@ function IconButton({ children, onPress, disabled, ariaLabel, tone }: IconButton
       hitSlop={{ top: 10, bottom: 10, left: 5, right: 5 }}
       className={[base, borderClass, disabled ? "opacity-50" : ""].join(" ")}
     >
-      {children}
+      <View pointerEvents="none">{children}</View>
     </Pressable>
   );
 }

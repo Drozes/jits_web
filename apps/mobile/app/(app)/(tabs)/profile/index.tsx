@@ -42,7 +42,9 @@ function ShareButton({ athlete }: { athlete: ShareAthlete }) {
         hitSlop={10}
         className="w-8 h-8 items-center justify-center rounded-xs active:bg-surface-3"
       >
-        <ArrowUpRight size={18} color={tokens.textSecondary} />
+        <View pointerEvents="none">
+          <ArrowUpRight size={18} color={tokens.textSecondary} />
+        </View>
       </Pressable>
     </ShareProfileSheet>
   );
