@@ -39,6 +39,7 @@ function ShareButton({ athlete }: { athlete: ShareAthlete }) {
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Share"
+        hitSlop={10}
         className="w-8 h-8 items-center justify-center rounded-xs active:bg-surface-3"
       >
         <ArrowUpRight size={18} color={tokens.textSecondary} />

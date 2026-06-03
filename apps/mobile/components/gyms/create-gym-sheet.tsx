@@ -79,6 +79,7 @@ export function CreateGymSheet({ onCreated, children }: CreateGymSheetProps) {
           onPress={handleCreate}
           disabled={loading || !isValid}
           accessibilityRole="button"
+          accessibilityLabel="Create gym"
           className={
             loading || !isValid
               ? "mt-4 bg-cta rounded-sm py-3 px-5 items-center justify-center opacity-50"

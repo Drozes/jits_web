@@ -66,6 +66,8 @@ export function DialogContent({
     >
       <Pressable
         onPress={() => setOpen(false)}
+        accessibilityRole="button"
+        accessibilityLabel="Close"
         className="flex-1 items-center justify-center bg-black/50 px-6"
       >
         <Pressable onPress={(e) => e.stopPropagation()} className="w-full max-w-md">

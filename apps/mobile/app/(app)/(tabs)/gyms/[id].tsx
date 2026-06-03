@@ -182,7 +182,8 @@ export default function GymDetailScreen() {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Edit gym"
-                className="w-8 h-8 items-center justify-center rounded-xs"
+                hitSlop={10}
+                className="w-8 h-8 items-center justify-center rounded-xs active:bg-surface-3"
               >
                 <Pencil size={16} color={tokens.textSecondary} />
               </Pressable>
@@ -241,6 +242,7 @@ export default function GymDetailScreen() {
                 <CreateSessionSheet gymId={data.id} onCreated={refresh}>
                   <Pressable
                     accessibilityRole="button"
+                    accessibilityLabel="Start session"
                     className="bg-cta rounded-sm py-3 px-5 items-center justify-center active:bg-cta-hover flex-row gap-2"
                   >
                     <Plus size={16} color={tokens.textOnAccent} />

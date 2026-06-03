@@ -43,7 +43,7 @@ export function DeltaNumber({ value, size = "m", showSign = false, className }: 
       }}
     >
       {!showSign && <span style={{ fontSize: "0.8em" }}>{glyph}</span>}
-      {numericText}
+      {(showSign || value !== 0) && numericText}
     </span>
   );
 }

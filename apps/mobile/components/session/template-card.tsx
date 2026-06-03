@@ -126,6 +126,7 @@ function IconButton({ children, onPress, disabled, ariaLabel, tone }: IconButton
       disabled={disabled}
       accessibilityRole="button"
       accessibilityLabel={ariaLabel}
+      hitSlop={{ top: 10, bottom: 10, left: 5, right: 5 }}
       className={[base, borderClass, disabled ? "opacity-50" : ""].join(" ")}
     >
       {children}

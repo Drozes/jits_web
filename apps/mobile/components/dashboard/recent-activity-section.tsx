@@ -46,7 +46,12 @@ function EmptyState({
         {message}
       </Text>
       {showLink ? (
-        <Pressable onPress={onPressLink} accessibilityRole="button" hitSlop={6}>
+        <Pressable
+          onPress={onPressLink}
+          accessibilityRole="button"
+          hitSlop={{ top: 14, bottom: 14, left: 8, right: 8 }}
+          className="active:opacity-70"
+        >
           <Text className="font-mono-bold text-[10px] text-cta uppercase tracking-caps-l mt-2">
             Find a session →
           </Text>
@@ -75,7 +80,8 @@ export function RecentActivitySection({
           <Pressable
             onPress={() => router.push("/(app)/profile/stats")}
             accessibilityRole="button"
-            hitSlop={6}
+            hitSlop={{ top: 14, bottom: 14, left: 8, right: 8 }}
+            className="active:opacity-70"
           >
             <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-l">
               View all

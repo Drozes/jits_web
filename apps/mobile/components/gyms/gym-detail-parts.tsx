@@ -58,7 +58,8 @@ export function GymTitleBlock({
         <Pressable
           onPress={onRequestLocation}
           accessibilityRole="button"
-          className="mt-2 rounded-xs border border-dashed border-hairline p-3 bg-surface-3"
+          accessibilityLabel="Enable location"
+          className="mt-2 rounded-xs border border-dashed border-hairline p-3 bg-surface-3 active:bg-surface-4"
         >
           <Text className="font-mono-bold text-[10px] text-cta uppercase tracking-caps-l">
             {locationLoading ? "Locating..." : "Enable Location"}
@@ -86,6 +87,7 @@ export function ActiveSessionPlate({ session }: { session: SessionListItem }) {
       <Pressable
         onPress={() => router.push(target)}
         accessibilityRole="button"
+        accessibilityLabel="Join lobby"
         className="bg-cta rounded-sm py-3 px-5 items-center justify-center active:bg-cta-hover"
       >
         <Text className="font-heading text-[13px] text-ink-on-cta uppercase tracking-caps">

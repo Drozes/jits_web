@@ -43,7 +43,8 @@ export function AppHeader({
             accessibilityRole="button"
             accessibilityLabel="Go back"
             onPress={() => router.back()}
-            className="w-8 h-8 items-center justify-center rounded-xs"
+            hitSlop={10}
+            className="w-8 h-8 items-center justify-center rounded-xs active:bg-surface-3"
           >
             <ChevronLeft size={20} color={tokens.textSecondary} />
           </Pressable>

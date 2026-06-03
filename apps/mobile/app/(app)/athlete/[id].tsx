@@ -46,6 +46,7 @@ function ShareButton({
       accessibilityRole="button"
       accessibilityLabel="Share"
       onPress={handleShare}
+      hitSlop={10}
       className="w-8 h-8 items-center justify-center rounded-xs active:bg-surface-3"
     >
       <ArrowUpRight size={18} color={tokens.textSecondary} />
@@ -107,7 +108,7 @@ export default function AthleteProfileScreen() {
   return (
     <View className="flex-1 bg-surface">
       <AppHeader
-        title="Athlete"
+        title={data.competitor.display_name ?? "Athlete"}
         back
         rightAction={<ShareButton athleteId={data.competitor.id} displayName={data.competitor.display_name} />}
       />

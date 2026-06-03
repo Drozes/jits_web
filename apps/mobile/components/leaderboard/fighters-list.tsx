@@ -1,4 +1,5 @@
 import { FlatList, RefreshControl, Text, View } from "react-native";
+import { useRouter } from "expo-router";
 import { RankRow } from "@/components/ui/elo-system";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import type { RankedAthlete } from "@/lib/leaderboard/use-leaderboard-data";
@@ -15,12 +16,6 @@ interface FightersListProps {
   currentUser: RankedAthlete | null;
 }
 
-function trendToDelta(trend: RankedAthlete["eloTrend"]): number {
-  if (trend === "up") return 1;
-  if (trend === "down") return -1;
-  return 0;
-}
-
 function buildSubtitle(athlete: RankedAthlete): string {
   return athlete.gymName ?? "Free agent";
 }
@@ -32,6 +27,11 @@ export function FightersList({
   currentUser,
 }: FightersListProps) {
   const tokens = useThemedTokens();
+  const router = useRouter();
+  // Rows pass delta={0} (renders a neutral muted "—"): there is no real per-row
+  // recent-ELO-delta source yet (needs a batch elo_history RPC; get_elo_history is
+  // own-profile only), and we never fabricate rating movement. Wire a real value
+  // once that RPC lands. See research/013 + jits-4zp.
   return (
     <View className="flex-1">
       <FlatList
@@ -49,8 +49,9 @@ export function FightersList({
             name={item.displayName}
             subtitle={buildSubtitle(item)}
             value={item.currentElo}
-            delta={trendToDelta(item.eloTrend)}
+            delta={0}
             leader={index === 0}
+            onPress={() => router.push(`/(app)/athlete/${item.id}`)}
           />
         )}
         ListEmptyComponent={
@@ -79,7 +80,8 @@ export function FightersList({
           name={`${currentUser.displayName} · You`}
           subtitle={buildSubtitle(currentUser)}
           value={currentUser.currentElo}
-          delta={trendToDelta(currentUser.eloTrend)}
+          delta={0}
+          onPress={() => router.push(`/(app)/athlete/${currentUser.id}`)}
           you
         />
       ) : null}

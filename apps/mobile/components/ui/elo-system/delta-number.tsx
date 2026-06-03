@@ -40,23 +40,28 @@ export function DeltaNumber({
     : `${Math.abs(value)}`;
 
   const px = SIZE_PX[size];
+  // Flat placeholder (no real delta, e.g. leaderboard rows passing 0): show only
+  // the muted em-dash, not a redundant "0".
+  const showNumber = showSign || value !== 0;
 
   return (
     <View className={cn("flex-row items-center", className)}>
       {!showSign && (
         <Text
-          className={cn("font-mono-bold mr-[2px]", colorClass)}
+          className={cn("font-mono-bold", colorClass, showNumber && "mr-[2px]")}
           style={{ fontSize: Math.round(px * 0.8), lineHeight: px }}
         >
           {glyph}
         </Text>
       )}
-      <Text
-        className={cn("font-mono-bold", colorClass)}
-        style={{ fontSize: px, lineHeight: px }}
-      >
-        {numericText}
-      </Text>
+      {showNumber && (
+        <Text
+          className={cn("font-mono-bold", colorClass)}
+          style={{ fontSize: px, lineHeight: px }}
+        >
+          {numericText}
+        </Text>
+      )}
     </View>
   );
 }

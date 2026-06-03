@@ -10,7 +10,6 @@ export interface RankedAthlete {
   rank: number;
   displayName: string;
   currentElo: number;
-  eloTrend: "up" | "down" | "neutral";
   gymName?: string;
   profilePhotoUrl?: string | null;
   wins: number;
@@ -48,7 +47,7 @@ async function fetchLeaderboard(
   const { data, error } = await supabase
     .from("athletes")
     .select(
-      "id, display_name, current_elo, highest_elo, primary_gym_id, profile_photo_url, gender, gyms!fk_athletes_primary_gym(name)",
+      "id, display_name, current_elo, primary_gym_id, profile_photo_url, gender, gyms!fk_athletes_primary_gym(name)",
     )
     .eq("status", "active")
     .order("current_elo", { ascending: false })
@@ -63,18 +62,11 @@ async function fetchLeaderboard(
 
   const athletes: RankedAthlete[] = rows.map((a, i) => {
     const stats = statsMap.get(a.id) ?? { wins: 0, losses: 0, draws: 0 };
-    const eloTrend: "up" | "down" | "neutral" =
-      a.current_elo === 1000 && a.highest_elo === 1000
-        ? "neutral"
-        : a.current_elo >= a.highest_elo
-          ? "up"
-          : "down";
     return {
       id: a.id,
       rank: i + 1,
       displayName: a.display_name,
       currentElo: a.current_elo,
-      eloTrend,
       gymName:
         extractGymName(a.gyms as unknown as { name: string } | null) ?? undefined,
       profilePhotoUrl: a.profile_photo_url,

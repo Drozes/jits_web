@@ -66,6 +66,7 @@ export function SessionCard({
     <Pressable
       onPress={() => router.push(target)}
       accessibilityRole="button"
+      accessibilityLabel={title}
       className="active:opacity-80"
     >
       <Plate variant={isActive ? "live" : "default"} className="gap-2">

@@ -41,7 +41,7 @@ export function ParticipantRow({ participant, onChallenge, isBusy }: Participant
         disabled && "opacity-50",
         "active:bg-cta-hover",
       )}
-      hitSlop={4}
+      hitSlop={{ top: 11, bottom: 11, left: 6, right: 6 }}
     >
       <Swords size={12} color={tokens.textOnAccent} />
       <Text className="font-heading text-[10px] text-ink-on-cta uppercase tracking-caps">

@@ -138,7 +138,7 @@ export function TemplateFormSheet({
                     className={
                       selected
                         ? "flex-1 h-10 items-center justify-center rounded-xs bg-cta active:bg-cta-hover"
-                        : "flex-1 h-10 items-center justify-center rounded-xs bg-surface-4 border border-hairline-strong"
+                        : "flex-1 h-10 items-center justify-center rounded-xs bg-surface-4 border border-hairline-strong active:bg-surface-3"
                     }
                   >
                     <Text

@@ -70,11 +70,11 @@ export function NativeSelect({
 
   return (
     <>
-      <Pressable onPress={open} disabled={disabled}>
+      <Pressable onPress={open} disabled={disabled} accessibilityRole="button">
         <View
           className={cn(
             TRIGGER_CLASS,
-            "border-hairline-strong",
+            "border-hairline-strong active:opacity-70",
             disabled && "opacity-50",
           )}
         >
@@ -126,7 +126,12 @@ export function NativeSelect({
                   paddingVertical: 8,
                 }}
               >
-                <Pressable onPress={confirm} hitSlop={8} accessibilityRole="button">
+                <Pressable
+                  onPress={confirm}
+                  hitSlop={{ top: 14, bottom: 14, left: 12, right: 12 }}
+                  accessibilityRole="button"
+                  className="active:opacity-70"
+                >
                   <Text className="font-heading text-[14px] text-cta uppercase tracking-caps-l">
                     Done
                   </Text>

@@ -143,7 +143,8 @@ export function ConfirmStep(props: ConfirmStepProps) {
         <Pressable
           accessibilityRole="button"
           onPress={() => setShowDispute(true)}
-          className="items-center py-2"
+          className="items-center py-2 active:opacity-70"
+          hitSlop={8}
         >
           <Text
             className={cn(

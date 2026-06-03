@@ -75,8 +75,12 @@ function ThemeSwitcherRow({ onSelect }: { onSelect: (pref: ThemePreference) => v
                 setStored(value);
                 onSelect(value);
               }}
+              hitSlop={{ top: 10, bottom: 10 }}
+              accessibilityRole="button"
+              accessibilityLabel={`${label} theme`}
+              accessibilityState={{ selected: active }}
               className={cn(
-                "flex-row items-center px-2.5 py-1.5",
+                "flex-row items-center px-2.5 py-1.5 active:opacity-70",
                 active ? "bg-surface-4" : "bg-surface-3",
               )}
             >

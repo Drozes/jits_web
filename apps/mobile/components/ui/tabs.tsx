@@ -71,8 +71,11 @@ export function TabsTrigger({ value, className, textClassName, children, disable
     <Pressable
       disabled={disabled}
       onPress={() => ctx.onValueChange(value)}
+      accessibilityRole="tab"
+      accessibilityState={{ selected: active }}
+      hitSlop={{ top: 10, bottom: 10 }}
       className={cn(
-        "flex-1 items-center justify-center rounded-sm px-3 py-1.5",
+        "flex-1 items-center justify-center rounded-sm px-3 py-1.5 active:opacity-70",
         active && "bg-background",
         disabled && "opacity-50",
         className,

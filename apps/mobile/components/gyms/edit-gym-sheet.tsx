@@ -76,6 +76,7 @@ export function EditGymSheet({
           onPress={handleSave}
           disabled={loading || !isValid}
           accessibilityRole="button"
+          accessibilityLabel="Save changes"
           className={
             loading || !isValid
               ? "mt-4 bg-cta rounded-sm py-3 px-5 items-center justify-center opacity-50"

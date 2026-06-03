@@ -46,6 +46,8 @@ export function SessionTemplates({ gymId, isManager }: SessionTemplatesProps) {
           <TemplateFormSheet gymId={gymId} onSaved={fetchTemplates}>
             <Pressable
               accessibilityRole="button"
+              accessibilityLabel="Add session template"
+              hitSlop={10}
               className="flex-row items-center gap-1 px-3 py-1.5 rounded-xs border border-hairline-strong bg-surface-3 active:bg-surface-4"
             >
               <Plus size={12} color={tokens.textSecondary} />
