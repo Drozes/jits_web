@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+**Mobile: shipped to TestFlight build 13 (v0.1.0, 2026-06-03)**
+
+Promoted iOS build 13 to TestFlight (EAS build `9951131e`, auto-submitted to App Store Connect app `6774629438`; remote build number 12 → 13). Carries all three of the day's mobile fixes: tap-through icons, un-clipped JetBrains Mono numbers, and the cold-start "Loading…" auth-lock hang. Quality gate green before build: typecheck (all workspaces), 366 tests, iOS `expo export`. Tester "What to Test" note (add: first-open no longer stuck on "Loading…") must be set in App Store Connect; EAS submit does not push it.
+
 **Mobile: fix intermittent cold-start hang on the "Loading…" screen (Supabase auth lock, 2026-06-03)**
 
 User-reported: first open often stuck on a light "Loading…" screen until a force-quit + reopen. Root cause: supabase-js 2.105.4 on React Native has no `navigator.locks`, so auth-js fell back to a no-op lock — the mount-time `getSession()`, the `autoRefreshToken` timer, and the `INITIAL_SESSION` emission raced on the stored session and intermittently stalled the auth gate (`isLoading` never flipped false, so `app/index.tsx` sat on "Loading…" forever). The old `onAuthStateChange` callback also `await`ed a DB query inside the callback (a deadlock footgun once a real lock is active).
