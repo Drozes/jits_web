@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+**Mobile: shipped to TestFlight build 12 (v0.1.0, 2026-06-03)**
+
+Promoted iOS build 12 to TestFlight (EAS build `e7a2ef8f`, auto-submitted to App Store Connect app `6774629438`; remote build number 11 → 12). Bundles the two mobile fixes below: tap-through icons inside buttons, and un-clipped JetBrains Mono numbers. Quality gate green before build: typecheck (all workspaces), 366 tests, iOS `expo export`. Tester "What to Test" note (icons now tappable + numbers no longer clipped) must be set in App Store Connect; EAS submit does not push it.
+
 **Mobile: fix vertical clipping of JetBrains Mono numbers (lineHeight too tight, 2026-06-03)**
 
 User-reported: big ELO numbers and stat-tile digits ("1000", "0", "0%") were cut off top and bottom on Profile, Rankings, and Athlete screens (and historically Home). Root cause: hand-rolled numeric `<Text>` set `lineHeight` ≈ `fontSize` (1.0–1.09x), and iOS crops the glyph to the line box. The shared `EloTile` primitive already used the correct `fontSize * 1.1`, which is why Home stopped clipping.
