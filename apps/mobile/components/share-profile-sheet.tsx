@@ -56,7 +56,7 @@ export function ShareProfileSheet({ athlete, children }: ShareProfileSheetProps)
                 <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-xl">
                   ELO Rating
                 </Text>
-                <Text className="font-mono-bold text-ink text-[36px]" style={{ lineHeight: 38 }}>
+                <Text className="font-mono-bold text-ink text-[36px]" style={{ lineHeight: 43 }}>
                   {athlete.elo}
                 </Text>
               </View>

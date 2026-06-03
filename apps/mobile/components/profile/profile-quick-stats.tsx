@@ -29,7 +29,7 @@ function StatTile({
           "font-mono-bold mt-2 tabular-nums",
           valueClassName ?? "text-ink",
         )}
-        style={{ fontSize: 28, lineHeight: 30 }}
+        style={{ fontSize: 28, lineHeight: 34 }}
       >
         {value}
       </Text>

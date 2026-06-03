@@ -63,7 +63,7 @@ export function WeightStep({ athleteWeight, onNext }: WeightStepProps) {
             className="font-mono-bold text-ink"
             style={{
               fontSize: 64,
-              lineHeight: 64,
+              lineHeight: 77,
               letterSpacing: -2.5,
               width: 160,
               textAlign: "center",

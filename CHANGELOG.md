@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+**Mobile: fix vertical clipping of JetBrains Mono numbers (lineHeight too tight, 2026-06-03)**
+
+User-reported: big ELO numbers and stat-tile digits ("1000", "0", "0%") were cut off top and bottom on Profile, Rankings, and Athlete screens (and historically Home). Root cause: hand-rolled numeric `<Text>` set `lineHeight` ≈ `fontSize` (1.0–1.09x), and iOS crops the glyph to the line box. The shared `EloTile` primitive already used the correct `fontSize * 1.1`, which is why Home stopped clipping.
+
+**Fixed**
+- Bumped `lineHeight` to ~1.2x `fontSize` on every clipping numeric display (12 spots / 10 files): `components/profile/{profile-header,profile-quick-stats}.tsx`, `components/athlete/{competitor-header (x3),head-to-head-card}.tsx`, `app/(app)/(tabs)/profile/stats.tsx`, `components/ui/elo-system/{rank-row,delta-number}.tsx`, `components/share-profile-sheet.tsx`, `components/match-flow/steps/timer-display.tsx`, `components/session/wizard/weight-step.tsx`. Only `lineHeight` changed (fontSize/letterSpacing untouched). Left the already-correct `EloTile` (1.1x) and the tuned splash animation alone. Quality gate green (typecheck + 366 tests).
+
 **Mobile: fix icons swallowing taps inside buttons (SVG hit-test fall-through, 2026-06-03)**
 
 User-reported: bottom-tab icons felt dead, the header back arrow had a "tiny/weird hit radius", and the profile share arrow appeared to do nothing. Root cause: `lucide-react-native` icons render as `react-native-svg`, which hit-tests against the drawn path; a tap landing on the icon's pixels was consumed by the SVG (no `onPress`) instead of bubbling to the parent `Pressable`, so only taps on empty space inside the button registered. The prior touch-target sweep added `hitSlop`/pressed-states but did not address this.

@@ -158,7 +158,7 @@ function StatTile({ label, value, valueClassName }: StatTileProps) {
       </Text>
       <Text
         className={`font-mono-bold tabular-nums mt-1 ${valueClassName ?? "text-ink"}`}
-        style={{ fontSize: 22, lineHeight: 24 }}
+        style={{ fontSize: 22, lineHeight: 26 }}
       >
         {value}
       </Text>

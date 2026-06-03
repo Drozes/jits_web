@@ -25,7 +25,7 @@ function StatColumn({
     <View className="items-center flex-1">
       <Text
         className={`font-mono-bold ${tone_} tabular-nums`}
-        style={{ fontSize: 24, lineHeight: 26 }}
+        style={{ fontSize: 24, lineHeight: 29 }}
       >
         {value}
       </Text>

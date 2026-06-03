@@ -57,7 +57,7 @@ export function DeltaNumber({
       {showNumber && (
         <Text
           className={cn("font-mono-bold", colorClass)}
-          style={{ fontSize: px, lineHeight: px }}
+          style={{ fontSize: px, lineHeight: Math.round(px * 1.2) }}
         >
           {numericText}
         </Text>

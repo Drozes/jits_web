@@ -69,7 +69,7 @@ export function ProfileHeader({ athlete, gymName, rank }: ProfileHeaderProps) {
           </Text>
           <Text
             className="font-mono-bold text-ink mt-2"
-            style={{ fontSize: 72, lineHeight: 72, letterSpacing: -2.8 }}
+            style={{ fontSize: 72, lineHeight: 86, letterSpacing: -2.8 }}
           >
             {athlete.current_elo}
           </Text>

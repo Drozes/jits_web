@@ -64,7 +64,7 @@ export function RankRow({
         </Text>
       </View>
       <View className="items-end gap-[2px]">
-        <Text className="font-mono-bold text-[28px] text-ink" style={{ lineHeight: 28 }}>
+        <Text className="font-mono-bold text-[28px] text-ink" style={{ lineHeight: 34 }}>
           {value}
         </Text>
         <DeltaNumber value={delta} size="s" />

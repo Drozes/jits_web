@@ -65,7 +65,7 @@ export function CompetitorHeader({ athlete, gymName, stats, rank }: CompetitorHe
         </Text>
         <Text
           className="font-mono-bold text-ink mt-2"
-          style={{ fontSize: 72, lineHeight: 72, letterSpacing: -2.8 }}
+          style={{ fontSize: 72, lineHeight: 86, letterSpacing: -2.8 }}
         >
           {athlete.current_elo}
         </Text>
@@ -81,7 +81,7 @@ export function CompetitorHeader({ athlete, gymName, stats, rank }: CompetitorHe
           <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-xl">
             Record
           </Text>
-          <Text className="font-mono-bold text-ink mt-2" style={{ fontSize: 22, lineHeight: 24 }}>
+          <Text className="font-mono-bold text-ink mt-2" style={{ fontSize: 22, lineHeight: 26 }}>
             {record}
           </Text>
         </View>
@@ -89,7 +89,7 @@ export function CompetitorHeader({ athlete, gymName, stats, rank }: CompetitorHe
           <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-xl">
             Win Rate
           </Text>
-          <Text className="font-mono-bold text-ink mt-2" style={{ fontSize: 28, lineHeight: 30 }}>
+          <Text className="font-mono-bold text-ink mt-2" style={{ fontSize: 28, lineHeight: 34 }}>
             {winRate}
           </Text>
         </View>

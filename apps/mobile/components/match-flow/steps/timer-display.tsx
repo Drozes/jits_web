@@ -28,7 +28,7 @@ export function TimerDisplay({ formatted, remaining, paused, matchType }: TimerD
         )}
         style={{
           fontSize: 72,
-          lineHeight: 72,
+          lineHeight: 86,
           letterSpacing: -72 * 0.04,
         }}
       >
