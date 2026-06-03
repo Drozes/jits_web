@@ -75,7 +75,7 @@ function ThemeSwitcherRow({ onSelect }: { onSelect: (pref: ThemePreference) => v
                 setStored(value);
                 onSelect(value);
               }}
-              hitSlop={{ top: 10, bottom: 10, left: 4, right: 4 }}
+              hitSlop={{ top: 10, bottom: 10 }}
               accessibilityRole="button"
               accessibilityLabel={`${label} theme`}
               accessibilityState={{ selected: active }}
