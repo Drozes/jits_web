@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+**Mobile: leaderboard real-data + navigation + app-wide touch-target/UX polish, shipped to TestFlight build 11 (PR #27, 2026-06-03)**
+
+Merged PR #27 to `development` and promoted iOS build 11 (v0.1.0) to TestFlight (EAS build `fa149447`, auto-submitted to App Store Connect app `6774629438`). Net of three reviewer-agent SHIP passes; quality gate green (typecheck, 366 tests, `expo export`).
+
+**Changed**
+- `apps/mobile/components/leaderboard/fighters-list.tsx`, `lib/leaderboard/use-leaderboard-data.ts`: every fighter row + the sticky "You" row now navigate to the athlete profile; removed the FABRICATED ELO trend/delta (was `current_elo` vs `highest_elo` rendered as fake green/red) — rows show a neutral `—`. Rank/ELO/name/gym/gender remain real; a real per-row 30-day delta needs a backend RPC (`jits-4zp.11`).
+- `apps/mobile/app/(app)/athlete/[id].tsx`: profile header shows the athlete's name instead of the literal "ATHLETE".
+- `apps/mobile/components/ui/elo-system/delta-number.tsx` + web twin: flat placeholder renders a clean `—` (not `— 0`).
+- **App-wide touch-target / hit-area + pressed-state sweep** (from a multi-agent audit of all 102 mobile tappables, 60 substandard): primitives `components/ui/button.tsx`, `select.tsx`, `native-select.tsx`, `tabs.tsx`, `elo-system/{participant-row,rank-row,chip}.tsx`, `dialog.tsx`, plus `layout/{app-header,elo-tab-bar}.tsx` and ~24 per-site controls across auth, dashboard, gyms, session/match-flow, profile, settings — all now ≥44pt effective (hitSlop), with reactive `active:` pressed feedback and icon-button accessibility labels. Reactive press states only (no animation). Closes `jits-4zp.1`, `jits-4zp.5`; advances `jits-4zp.6`/`jits-4zp.10`.
+
 **Research: app-wide safe UI/UX polish backlog (jits-4zp, 2026-06-02)**
 
 10-agent audit (8 per-surface scanners + a safety/design critic + a synthesizer) for high-value, client-only, design-system-compliant UI/UX wins that need no backend and no new EAS build, excluding FTUE (jits-r75). No feature code; analysis + tracked work.
