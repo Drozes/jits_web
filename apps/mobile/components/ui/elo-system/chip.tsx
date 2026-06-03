@@ -13,8 +13,9 @@ export function Chip({ active = false, className, children, ...rest }: ChipProps
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
+      hitSlop={{ top: 10, bottom: 10, left: 4, right: 4 }}
       className={cn(
-        "flex-row items-center self-start px-3 py-2 border rounded-xs bg-surface-3",
+        "flex-row items-center self-start px-3 py-2 border rounded-xs bg-surface-3 active:opacity-70",
         active ? "border-cta" : "border-hairline-strong",
         className,
       )}

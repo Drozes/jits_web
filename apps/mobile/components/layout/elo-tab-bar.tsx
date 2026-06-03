@@ -61,7 +61,7 @@ export function EloTabBar({ state, descriptors, navigation }: BottomTabBarProps)
             onPress={onPress}
             onLongPress={onLongPress}
             className={cn(
-              "flex-1 items-center justify-center gap-1 py-3 border-t-[2px]",
+              "flex-1 items-center justify-center gap-1 py-3 border-t-[2px] active:bg-surface-3",
               isActive ? "border-cta" : "border-transparent",
             )}
           >
