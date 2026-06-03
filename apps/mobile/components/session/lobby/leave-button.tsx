@@ -80,8 +80,8 @@ export function LeaveButton({ sessionId, variant = "compact" }: LeaveButtonProps
       accessibilityLabel="Leave session"
       onPress={handlePress}
       disabled={leaving}
-      className={cn("px-2 py-2", leaving && "opacity-50")}
-      hitSlop={6}
+      className={cn("px-2 py-2", leaving && "opacity-50", "active:opacity-70")}
+      hitSlop={8}
     >
       <Text className="font-heading text-[11px] text-negative uppercase tracking-caps">
         {leaving ? "Leaving..." : "Leave"}

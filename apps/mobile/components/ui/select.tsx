@@ -70,12 +70,18 @@ export function SelectTrigger({
   children,
   ...props
 }: ViewProps & { className?: string; children?: React.ReactNode }) {
-  const { open } = useSelectContext();
+  const { open, value, labels } = useSelectContext();
+  const selectedLabel = value !== undefined ? (labels[value] ?? value) : undefined;
   return (
-    <Pressable onPress={open}>
+    <Pressable
+      onPress={open}
+      accessibilityRole="button"
+      accessibilityLabel={selectedLabel}
+      hitSlop={{ top: 6, bottom: 6 }}
+    >
       <View
         className={cn(
-          "h-10 flex-row items-center justify-between rounded-md border border-input bg-background px-3",
+          "h-10 flex-row items-center justify-between rounded-md border border-input bg-background px-3 active:opacity-70",
           className,
         )}
         {...props}
@@ -175,7 +181,9 @@ export function SelectItem({ value, className, textClassName, children }: Select
   return (
     <Pressable
       onPress={() => ctx.setValue(value)}
-      className={cn("px-4 py-3", active && "bg-muted", className)}
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+      className={cn("px-4 py-3 active:bg-muted", active && "bg-muted", className)}
     >
       {typeof children === "string" ? (
         <Text className={cn("text-base text-foreground", active && "font-semibold", textClassName)}>

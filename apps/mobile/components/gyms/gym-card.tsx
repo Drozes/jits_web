@@ -51,6 +51,7 @@ export function GymCard({ gym, isMyGym, distanceLabel, scheduleLabel }: GymCardP
     <Pressable
       onPress={() => router.push(`/gyms/${gym.id}`)}
       accessibilityRole="button"
+      accessibilityLabel={`${gym.name} gym`}
       className="active:opacity-80"
     >
       <Plate variant={live ? "live" : "default"}>

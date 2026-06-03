@@ -10,6 +10,7 @@ interface ParticipantRowProps {
   status?: ParticipantStatus;
   action?: React.ReactNode;
   onPress?: () => void;
+  accessibilityLabel?: string;
   className?: string;
 }
 
@@ -52,6 +53,7 @@ export function ParticipantRow({
   status,
   action,
   onPress,
+  accessibilityLabel,
   className,
 }: ParticipantRowProps) {
   const Wrapper: any = onPress ? Pressable : View;
@@ -59,8 +61,10 @@ export function ParticipantRow({
     <Wrapper
       onPress={onPress}
       accessibilityRole={onPress ? "button" : undefined}
+      accessibilityLabel={accessibilityLabel}
       className={cn(
         "flex-row items-center gap-3 bg-surface-3 border border-hairline-faint rounded-xs px-4 py-3",
+        onPress && "active:bg-surface-4",
         className,
       )}
     >

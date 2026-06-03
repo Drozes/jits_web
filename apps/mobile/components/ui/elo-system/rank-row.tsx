@@ -35,6 +35,7 @@ export function RankRow({
       className={cn(
         "flex-row items-center gap-3 border-l-[3px]",
         you ? "bg-surface-2 px-5 py-4 border-t border-hairline-strong" : "bg-surface-3 px-4 py-3",
+        onPress && (you ? "active:bg-surface-3" : "active:bg-surface-4"),
         leader ? "border-l-cta" : "border-l-transparent",
         className,
       )}

@@ -37,7 +37,7 @@ export function OutcomeToggle({
               onPress={() => onChange(opt)}
               className={cn(
                 "flex-1 flex-row items-center justify-center gap-2 rounded-xs py-3",
-                active ? "bg-surface-4 border border-cta" : "border border-transparent",
+                active ? "bg-surface-4 border border-cta" : "border border-transparent active:bg-surface-4",
               )}
             >
               {opt === "submission" ? (

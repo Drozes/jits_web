@@ -146,7 +146,12 @@ export default function SignupScreen() {
                 />
               </Plate>
 
-              <Pressable onPress={() => router.push("/login")} hitSlop={8}>
+              <Pressable
+                onPress={() => router.push("/login")}
+                hitSlop={8}
+                accessibilityRole="button"
+                className="active:opacity-70"
+              >
                 <Text className="text-center font-mono text-[11px] text-ink-2 uppercase tracking-caps-l">
                   Already have an account?{" "}
                   <Text className="text-cta">Sign in</Text>

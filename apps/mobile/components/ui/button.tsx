@@ -4,7 +4,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "../../lib/cn";
 
 const buttonVariants = cva(
-  "flex-row items-center justify-center gap-2 rounded-md",
+  "flex-row items-center justify-center gap-2 rounded-md active:opacity-70",
   {
     variants: {
       variant: {
@@ -64,6 +64,8 @@ export const Button = React.forwardRef<View, ButtonProps>(
         disabled && "opacity-50",
         className,
       )}
+      accessibilityRole="button"
+      hitSlop={size === "sm" || size === "icon" ? 8 : undefined}
       {...props}
     >
       {leftIcon}

@@ -132,7 +132,7 @@ export function JoinWizard(props: JoinWizardProps) {
         <Pressable
           accessibilityRole="button"
           onPress={goBack}
-          className="flex-row items-center justify-center gap-1 py-2"
+          className="flex-row items-center justify-center gap-1 py-2 active:opacity-70"
           hitSlop={6}
         >
           <ChevronLeft size={16} color={tokens.textSecondary} />

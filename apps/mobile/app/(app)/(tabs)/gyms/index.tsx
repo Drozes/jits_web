@@ -160,7 +160,8 @@ export default function GymsScreen() {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Create gym"
-              className="w-8 h-8 items-center justify-center rounded-xs border border-hairline-strong bg-surface-3"
+              hitSlop={10}
+              className="w-8 h-8 items-center justify-center rounded-xs border border-hairline-strong bg-surface-3 active:bg-surface-4"
             >
               <Plus size={16} color={tokens.textSecondary} />
             </Pressable>
@@ -182,7 +183,9 @@ export default function GymsScreen() {
                 void location.request();
               }}
               accessibilityRole="button"
-              hitSlop={6}
+              accessibilityLabel="Enable location"
+              hitSlop={{ top: 14, bottom: 14, left: 8, right: 8 }}
+              className="active:opacity-70"
             >
               <Text className="font-mono-bold text-[10px] text-cta uppercase tracking-caps-l">
                 {location.isLoading ? "Locating..." : "Enable Location"}

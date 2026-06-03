@@ -64,7 +64,8 @@ export function WaiverStep({ sessionId, waiverId, onNext }: WaiverStepProps) {
         accessibilityRole="checkbox"
         accessibilityState={{ checked: agreed }}
         onPress={() => setAgreed((v) => !v)}
-        className="flex-row items-start gap-2"
+        className="flex-row items-start gap-2 py-2 active:opacity-70"
+        hitSlop={6}
       >
         <View
           className={cn(

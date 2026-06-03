@@ -80,10 +80,10 @@ export function SessionActions({ sessionId, status, onActionComplete }: SessionA
   return (
     <Pressable
       onPress={showMenu}
-      hitSlop={8}
+      hitSlop={10}
       accessibilityRole="button"
       accessibilityLabel="Session actions"
-      className="w-7 h-7 items-center justify-center rounded-xs"
+      className="w-7 h-7 items-center justify-center rounded-xs active:bg-surface-3"
     >
       <MoreVertical size={16} color={tokens.textSecondary} />
     </Pressable>

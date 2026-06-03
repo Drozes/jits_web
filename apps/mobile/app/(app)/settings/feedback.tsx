@@ -157,6 +157,7 @@ function SuccessPlate({ onReset }: { onReset: () => void }) {
         <Pressable
           onPress={onReset}
           accessibilityRole="button"
+          hitSlop={10}
           className="px-4 py-2 rounded-sm border border-hairline-strong active:bg-surface-4"
         >
           <Text className="font-heading text-[12px] text-ink uppercase tracking-caps">

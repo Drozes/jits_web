@@ -77,7 +77,8 @@ export function DisputeForm({ matchId, onCancel, onSubmitted }: DisputeFormProps
         accessibilityRole="button"
         onPress={onCancel}
         disabled={submitting}
-        className="items-center py-2"
+        className="items-center py-2 active:opacity-70"
+        hitSlop={8}
       >
         <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l underline">
           Back

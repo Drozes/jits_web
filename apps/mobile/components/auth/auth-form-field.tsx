@@ -76,8 +76,8 @@ export function AuthFormField({
         {isPassword ? (
           <Pressable
             onPress={() => setHidden((h) => !h)}
-            hitSlop={8}
-            className="absolute right-3"
+            hitSlop={{ top: 13, bottom: 13, left: 13, right: 8 }}
+            className="absolute right-3 active:opacity-60"
             accessibilityLabel={hidden ? "Show password" : "Hide password"}
             accessibilityRole="button"
           >

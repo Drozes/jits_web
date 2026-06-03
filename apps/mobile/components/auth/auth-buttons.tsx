@@ -22,7 +22,7 @@ export function CtaButton({ label, onPress, disabled, className }: CtaButtonProp
       onPress={onPress}
       disabled={disabled}
       className={cn(
-        "bg-cta items-center justify-center rounded-sm px-5 py-4",
+        "bg-cta items-center justify-center rounded-sm px-5 py-4 active:opacity-90",
         disabled && "opacity-50",
         className,
       )}
@@ -54,7 +54,7 @@ export function SecondaryButton({
       onPress={onPress}
       disabled={disabled}
       className={cn(
-        "bg-surface-3 border border-hairline-strong items-center justify-center rounded-sm px-5 py-4",
+        "bg-surface-3 border border-hairline-strong items-center justify-center rounded-sm px-5 py-4 active:opacity-70",
         disabled && "opacity-50",
         className,
       )}
@@ -86,7 +86,7 @@ export function TertiaryButton({
       onPress={onPress}
       disabled={disabled}
       hitSlop={8}
-      className={cn("items-center justify-center px-5 py-3", className)}
+      className={cn("items-center justify-center px-5 py-3 active:opacity-70", className)}
     >
       <Text className="font-heading text-[14px] text-ink-2 uppercase tracking-caps-l">
         {label}

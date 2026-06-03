@@ -54,6 +54,7 @@ export function CameraOverlay({
           <Pressable
             accessibilityRole="button"
             onPress={onRequestPermission}
+            hitSlop={10}
             className="mt-3 self-start flex-row items-center gap-2 border border-hairline-strong rounded-xs bg-surface-3 px-3 py-2 active:bg-surface-4"
           >
             <Camera size={14} color={tokens.textPrimary} />
