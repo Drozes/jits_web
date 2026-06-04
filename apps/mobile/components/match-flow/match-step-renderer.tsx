@@ -80,6 +80,7 @@ export function MatchStepRenderer({
   if (step === "ready") {
     return (
       <ReadyStep
+        sessionId={sessionId}
         matchId={matchId}
         currentAthleteId={me.athlete_id}
         opponentId={opponent.athlete_id}

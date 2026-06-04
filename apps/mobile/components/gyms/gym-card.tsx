@@ -19,7 +19,8 @@ interface GymCardProps {
  * E1 GYM FINDER row.
  *
  * Live gyms get a Plate `variant="live"` with the LivePill on the right and a
- * subtitle reading "{city} · {n} in lobby". Non-live gyms get a default Plate
+ * subtitle reading "{city} · {n} members" (the gym's active-member count, not
+ * live-session occupancy). Non-live gyms get a default Plate
  * with either a schedule MetaTag (e.g. "Sun 11AM"), an upcoming-count tag, or
  * a "No Sessions" placeholder, and a subtitle showing the city.
  */
@@ -27,12 +28,14 @@ export function GymCard({ gym, isMyGym, distanceLabel, scheduleLabel }: GymCardP
   const router = useRouter();
   const live = gym.hasActiveSession;
 
-  // Subtitle: city, then "(n) in lobby" when live.
+  // Subtitle: city, then the gym's member count when live. (memberCount is the
+  // count of active athletes who claim this gym as home, NOT live-session
+  // occupancy, so it must not read as "in lobby"; the LivePill is the live cue.)
   const subtitleParts: string[] = [];
   if (gym.city) subtitleParts.push(gym.city);
   if (live) {
     subtitleParts.push(
-      `${gym.memberCount} in lobby`,
+      `${gym.memberCount} ${gym.memberCount === 1 ? "member" : "members"}`,
     );
   }
   if (distanceLabel) subtitleParts.push(distanceLabel);

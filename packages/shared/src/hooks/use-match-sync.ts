@@ -22,6 +22,10 @@ export function useMatchSync({
   onResultRecorded,
 }: UseMatchSyncOpts) {
   const channelRef = useRef<RealtimeChannel | null>(null);
+  // True once the websocket JOIN completes. Until then, fire-and-forget
+  // broadcasts go through httpSend (REST) to avoid realtime-js's
+  // "send() falling back to REST" warning.
+  const subscribedRef = useRef(false);
   const onTimerStartedRef = useRef(onTimerStarted);
   onTimerStartedRef.current = onTimerStarted;
   const onMatchEndedRef = useRef(onMatchEnded);
@@ -30,6 +34,7 @@ export function useMatchSync({
   onResultRecordedRef.current = onResultRecorded;
 
   useEffect(() => {
+    subscribedRef.current = false;
     const channel = supabase
       .channel(`match:${matchId}`)
       .on("broadcast", { event: "timer_started" }, ({ payload }) => {
@@ -42,38 +47,36 @@ export function useMatchSync({
       .on("broadcast", { event: "result_recorded" }, () => {
         onResultRecordedRef.current?.();
       })
-      .subscribe();
+      .subscribe((status) => {
+        subscribedRef.current = status === "SUBSCRIBED";
+      });
 
     channelRef.current = channel;
 
     return () => {
+      subscribedRef.current = false;
       supabase.removeChannel(channel);
     };
   }, [supabase, matchId]);
 
-  const broadcastTimerStarted = useCallback((startedAt: string) => {
-    channelRef.current?.send({
-      type: "broadcast",
-      event: "timer_started",
-      payload: { started_at: startedAt },
-    });
+  const send = useCallback((event: string, payload: Record<string, unknown>) => {
+    const channel = channelRef.current;
+    if (!channel) return;
+    if (subscribedRef.current) {
+      channel.send({ type: "broadcast", event, payload });
+    } else {
+      void channel.httpSend(event, payload);
+    }
   }, []);
 
-  const broadcastMatchEnded = useCallback(() => {
-    channelRef.current?.send({
-      type: "broadcast",
-      event: "match_ended",
-      payload: {},
-    });
-  }, []);
+  const broadcastTimerStarted = useCallback(
+    (startedAt: string) => send("timer_started", { started_at: startedAt }),
+    [send],
+  );
 
-  const broadcastResultRecorded = useCallback(() => {
-    channelRef.current?.send({
-      type: "broadcast",
-      event: "result_recorded",
-      payload: {},
-    });
-  }, []);
+  const broadcastMatchEnded = useCallback(() => send("match_ended", {}), [send]);
+
+  const broadcastResultRecorded = useCallback(() => send("result_recorded", {}), [send]);
 
   return { broadcastTimerStarted, broadcastMatchEnded, broadcastResultRecorded };
 }

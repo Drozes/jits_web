@@ -62,7 +62,7 @@ export function MatchFlowWizard(props: MatchFlowWizardProps) {
     case "weight-verify":
       return <WeightVerifyStep onNext={handleNext} currentAthlete={currentAthlete} opponent={opponent} matchType={matchType} />;
     case "ready-check":
-      return <ReadyCheckStep onNext={handleNext} matchId={matchId} currentAthleteId={currentAthlete.id} opponentId={opponent.id} timekeeperEnabled={timekeeperEnabled} hasTimekeeper={hasTimekeeper} isTimekeeper={isTimekeeper} />;
+      return <ReadyCheckStep onNext={handleNext} sessionId={sessionId} matchId={matchId} currentAthleteId={currentAthlete.id} opponentId={opponent.id} timekeeperEnabled={timekeeperEnabled} hasTimekeeper={hasTimekeeper} isTimekeeper={isTimekeeper} />;
     case "fighter-live":
       return <FighterLiveStep onNext={handleNext} matchId={matchId} durationSeconds={durationSeconds} startedAt={startedAt ?? ""} pausedAt={props.pausedAt} totalPausedDuration={props.totalPausedDuration} matchType={matchType} timekeeperEnabled={timekeeperEnabled} hasTimekeeper={hasTimekeeper} />;
     case "timekeeper-live":

@@ -427,6 +427,25 @@ export async function createInSessionMatch(
   return { ok: true, data: { matchId: result.match_id } };
 }
 
+/**
+ * Cancel a still-pending session match (ready-check abort). Marks the match
+ * cancelled and releases BOTH session participants back to 'available'. Caller
+ * must be one of the two competitors and the match must still be 'pending'.
+ */
+export async function cancelSessionMatch(
+  supabase: Client,
+  matchId: string,
+): Promise<Result<void>> {
+  const { error } = await supabase.rpc("cancel_session_match", {
+    p_match_id: matchId,
+  });
+
+  if (error) {
+    return { ok: false, error: mapPostgrestError(error) };
+  }
+  return { ok: true, data: undefined };
+}
+
 /** Leave a session lobby by setting status to 'left' */
 export async function leaveSessionLobby(
   supabase: Client,

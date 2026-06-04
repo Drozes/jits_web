@@ -11,9 +11,14 @@ interface GymRowProps {
 
 export function GymRow({ gym, isMyGym, scheduleLabel }: GymRowProps) {
   const live = gym.hasActiveSession;
+  // memberCount is the gym's active-member count (athletes who claim this gym
+  // as home), NOT live-session occupancy, so it must read as "members", not
+  // "in lobby"; the LivePill is the live cue.
   const subtitle = [
     gym.city,
-    live ? `${gym.memberCount} in lobby` : null,
+    live
+      ? `${gym.memberCount} ${gym.memberCount === 1 ? "member" : "members"}`
+      : null,
   ]
     .filter(Boolean)
     .join(" · ");

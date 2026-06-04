@@ -11,10 +11,12 @@ type BroadcastHandler = (payload: { payload: Record<string, unknown> }) => void;
 type PresenceHandler = () => void;
 type SubscribeCallback = (status: string) => void | Promise<void>;
 
-function createMockChannel() {
+function createMockChannel(opts: { autoSubscribe?: boolean } = {}) {
+  const { autoSubscribe = true } = opts;
   const broadcastHandlers = new Map<string, BroadcastHandler>();
   const presenceHandlers = new Map<string, PresenceHandler>();
   const sentMessages: { event: string; payload: Record<string, unknown> }[] = [];
+  const httpSentMessages: { event: string; payload: Record<string, unknown> }[] = [];
   let subscribeCallback: SubscribeCallback | null = null;
   let trackedPayload: Record<string, unknown> | null = null;
   let presenceState: Record<string, unknown[]> = {};
@@ -34,10 +36,17 @@ function createMockChannel() {
     },
     subscribe(cb?: SubscribeCallback) {
       subscribeCallback = cb ?? null;
+      // Mirror realtime-js: the status callback fires asynchronously once JOIN
+      // completes (after the hook has assigned its channel ref), not inline.
+      if (cb && autoSubscribe) queueMicrotask(() => void cb("SUBSCRIBED"));
       return channel;
     },
     send(msg: { type: string; event: string; payload: Record<string, unknown> }) {
       sentMessages.push({ event: msg.event, payload: msg.payload });
+    },
+    httpSend(event: string, payload: Record<string, unknown>) {
+      httpSentMessages.push({ event, payload });
+      return Promise.resolve({ success: true as const });
     },
     track(payload: Record<string, unknown>) {
       trackedPayload = payload;
@@ -53,6 +62,7 @@ function createMockChannel() {
     broadcastHandlers,
     presenceHandlers,
     sentMessages,
+    httpSentMessages,
     /** Trigger the subscribe callback as if the channel connected. */
     async triggerSubscribed() {
       if (subscribeCallback) await subscribeCallback("SUBSCRIBED");
@@ -226,8 +236,11 @@ describe("useLobbySync", () => {
     expect(result.current.opponentPresent).toBe(false);
   });
 
-  it("sends match_started broadcast via broadcastMatchStarted", () => {
+  it("sends match_started broadcast via broadcastMatchStarted", async () => {
     const { result } = renderHook(() => useLobbySync(defaultProps()));
+    await act(async () => {
+      await mockChannel.triggerSubscribed();
+    });
 
     act(() => {
       result.current.broadcastMatchStarted("m-777");
@@ -239,8 +252,11 @@ describe("useLobbySync", () => {
     });
   });
 
-  it("sends lobby_cancelled broadcast via broadcastCancelled", () => {
+  it("sends lobby_cancelled broadcast via broadcastCancelled", async () => {
     const { result } = renderHook(() => useLobbySync(defaultProps()));
+    await act(async () => {
+      await mockChannel.triggerSubscribed();
+    });
 
     act(() => {
       result.current.broadcastCancelled();
@@ -252,8 +268,11 @@ describe("useLobbySync", () => {
     });
   });
 
-  it("sends challenge_accepted broadcast via broadcastAccepted", () => {
+  it("sends challenge_accepted broadcast via broadcastAccepted", async () => {
     const { result } = renderHook(() => useLobbySync(defaultProps()));
+    await act(async () => {
+      await mockChannel.triggerSubscribed();
+    });
 
     act(() => {
       result.current.broadcastAccepted();
@@ -262,6 +281,25 @@ describe("useLobbySync", () => {
     expect(mockChannel.sentMessages).toContainEqual({
       event: "challenge_accepted",
       payload: {},
+    });
+  });
+
+  it("uses httpSend when broadcasting before JOIN completes", () => {
+    const pendingChannel = createMockChannel({ autoSubscribe: false });
+    const pendingSupabase = createMockSupabase(pendingChannel);
+
+    const { result } = renderHook(() =>
+      useLobbySync({ ...defaultProps(), supabase: pendingSupabase as never }),
+    );
+
+    act(() => {
+      result.current.broadcastMatchStarted("m-777");
+    });
+
+    expect(pendingChannel.sentMessages).toHaveLength(0);
+    expect(pendingChannel.httpSentMessages).toContainEqual({
+      event: "match_started",
+      payload: { match_id: "m-777" },
     });
   });
 

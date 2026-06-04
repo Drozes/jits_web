@@ -8,10 +8,14 @@ import { useSessionMatchSync } from "./use-session-match-sync";
 // ---------------------------------------------------------------------------
 
 type BroadcastHandler = (payload: { payload: Record<string, unknown> }) => void;
+type SubscribeCallback = (status: string) => void | Promise<void>;
 
-function createMockChannel() {
+function createMockChannel(opts: { autoSubscribe?: boolean } = {}) {
+  const { autoSubscribe = true } = opts;
   const handlers = new Map<string, BroadcastHandler>();
   const sentMessages: { event: string; payload: Record<string, unknown> }[] = [];
+  const httpSentMessages: { event: string; payload: Record<string, unknown> }[] = [];
+  let subscribeCallback: SubscribeCallback | null = null;
 
   const channel = {
     on(type: string, opts: { event: string }, handler: BroadcastHandler) {
@@ -20,11 +24,21 @@ function createMockChannel() {
       }
       return channel;
     },
-    subscribe() {
+    subscribe(cb?: SubscribeCallback) {
+      subscribeCallback = cb ?? null;
+      // Fire SUBSCRIBED inline so the synchronous broadcast assertions below see
+      // the websocket path. The async JOIN-window transition (a broadcast sent
+      // before SUBSCRIBED falls back to httpSend) is covered deterministically
+      // here via autoSubscribe:false, and end-to-end in use-lobby-sync.test.ts.
+      if (cb && autoSubscribe) void cb("SUBSCRIBED");
       return channel;
     },
     send(msg: { type: string; event: string; payload: Record<string, unknown> }) {
       sentMessages.push({ event: msg.event, payload: msg.payload });
+    },
+    httpSend(event: string, payload: Record<string, unknown>) {
+      httpSentMessages.push({ event, payload });
+      return Promise.resolve({ success: true as const });
     },
   };
 
@@ -32,6 +46,11 @@ function createMockChannel() {
     channel,
     handlers,
     sentMessages,
+    httpSentMessages,
+    /** Trigger the subscribe callback as if the channel connected. */
+    async triggerSubscribed() {
+      if (subscribeCallback) await subscribeCallback("SUBSCRIBED");
+    },
     /** Simulate an incoming broadcast event. */
     simulateBroadcast(event: string, payload: Record<string, unknown>) {
       const handler = handlers.get(event);
@@ -78,7 +97,7 @@ describe("useSessionMatchSync", () => {
     expect(mockSupabase.lastChannelName).toBe("session-match:m-123");
   });
 
-  it("registers handlers for all 7 broadcast events", () => {
+  it("registers handlers for all 8 broadcast events", () => {
     renderHook(() =>
       useSessionMatchSync({
         supabase: mockSupabase as never,
@@ -94,11 +113,30 @@ describe("useSessionMatchSync", () => {
       "ready_signal",
       "result_submitted",
       "result_confirmed",
+      "match_cancelled",
     ];
 
     for (const event of expectedEvents) {
       expect(mockChannel.handlers.has(event)).toBe(true);
     }
+  });
+
+  it("fires onMatchCancelled when match_cancelled is broadcast", () => {
+    const onMatchCancelled = vi.fn();
+
+    renderHook(() =>
+      useSessionMatchSync({
+        supabase: mockSupabase as never,
+        matchId: "m-123",
+        onMatchCancelled,
+      }),
+    );
+
+    act(() => {
+      mockChannel.simulateBroadcast("match_cancelled", {});
+    });
+
+    expect(onMatchCancelled).toHaveBeenCalledOnce();
   });
 
   it("fires onTimerStarted when timer_started is broadcast", () => {
@@ -312,6 +350,73 @@ describe("useSessionMatchSync", () => {
     expect(mockChannel.sentMessages).toContainEqual({
       event: "result_confirmed",
       payload: { athlete_id: "a-2" },
+    });
+  });
+
+  it("sends broadcast via broadcastMatchCancelled", () => {
+    const { result } = renderHook(() =>
+      useSessionMatchSync({
+        supabase: mockSupabase as never,
+        matchId: "m-123",
+      }),
+    );
+
+    act(() => {
+      result.current.broadcastMatchCancelled();
+    });
+
+    expect(mockChannel.sentMessages).toContainEqual({
+      event: "match_cancelled",
+      payload: {},
+    });
+  });
+
+  it("uses httpSend (not send) when broadcasting before JOIN completes", () => {
+    // A channel whose subscribe callback never reports SUBSCRIBED.
+    const pendingChannel = createMockChannel({ autoSubscribe: false });
+    const pendingSupabase = createMockSupabase(pendingChannel);
+
+    const { result } = renderHook(() =>
+      useSessionMatchSync({
+        supabase: pendingSupabase as never,
+        matchId: "m-123",
+      }),
+    );
+
+    act(() => {
+      result.current.broadcastReady("a-1");
+      result.current.broadcastMatchCancelled();
+    });
+
+    // Falls back to the explicit REST path, not the warning-prone send().
+    expect(pendingChannel.sentMessages).toHaveLength(0);
+    expect(pendingChannel.httpSentMessages).toContainEqual({
+      event: "ready_signal",
+      payload: { athlete_id: "a-1" },
+    });
+    expect(pendingChannel.httpSentMessages).toContainEqual({
+      event: "match_cancelled",
+      payload: {},
+    });
+  });
+
+  it("uses websocket send (not httpSend) once SUBSCRIBED", () => {
+    const { result } = renderHook(() =>
+      useSessionMatchSync({
+        supabase: mockSupabase as never,
+        matchId: "m-123",
+      }),
+    );
+
+    act(() => {
+      result.current.broadcastReady("a-1");
+    });
+
+    // autoSubscribe mock reports SUBSCRIBED, so the WS path is used.
+    expect(mockChannel.httpSentMessages).toHaveLength(0);
+    expect(mockChannel.sentMessages).toContainEqual({
+      event: "ready_signal",
+      payload: { athlete_id: "a-1" },
     });
   });
 

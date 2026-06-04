@@ -32,6 +32,10 @@ export function useLobbySync({
   onAccepted,
 }: UseLobbySyncOpts) {
   const channelRef = useRef<RealtimeChannel | null>(null);
+  // True once the websocket JOIN completes. Until then, fire-and-forget
+  // broadcasts go through httpSend (REST) to avoid realtime-js's
+  // "send() falling back to REST" warning.
+  const subscribedRef = useRef(false);
   const onMatchStartedRef = useRef(onMatchStarted);
   onMatchStartedRef.current = onMatchStarted;
   const onCancelledRef = useRef(onCancelled);
@@ -41,6 +45,7 @@ export function useLobbySync({
   const [opponentPresent, setOpponentPresent] = useState(false);
 
   useEffect(() => {
+    subscribedRef.current = false;
     function checkForOpponent(presenceState: Record<string, unknown[]>) {
       const allPresences = Object.values(presenceState).flat() as { athlete_id?: string }[];
       setOpponentPresent(allPresences.some((p) => p.athlete_id === opponentId));
@@ -64,6 +69,7 @@ export function useLobbySync({
         checkForOpponent(channel.presenceState());
       })
       .subscribe(async (status) => {
+        subscribedRef.current = status === "SUBSCRIBED";
         if (status === "SUBSCRIBED") {
           await channel.track({ athlete_id: currentAthleteId });
         }
@@ -72,33 +78,29 @@ export function useLobbySync({
     channelRef.current = channel;
 
     return () => {
+      subscribedRef.current = false;
       supabase.removeChannel(channel);
     };
   }, [supabase, challengeId, currentAthleteId, opponentId]);
 
-  const broadcastMatchStarted = useCallback((matchId: string) => {
-    channelRef.current?.send({
-      type: "broadcast",
-      event: "match_started",
-      payload: { match_id: matchId },
-    });
+  const send = useCallback((event: string, payload: Record<string, unknown>) => {
+    const channel = channelRef.current;
+    if (!channel) return;
+    if (subscribedRef.current) {
+      channel.send({ type: "broadcast", event, payload });
+    } else {
+      void channel.httpSend(event, payload);
+    }
   }, []);
 
-  const broadcastCancelled = useCallback(() => {
-    channelRef.current?.send({
-      type: "broadcast",
-      event: "lobby_cancelled",
-      payload: {},
-    });
-  }, []);
+  const broadcastMatchStarted = useCallback(
+    (matchId: string) => send("match_started", { match_id: matchId }),
+    [send],
+  );
 
-  const broadcastAccepted = useCallback(() => {
-    channelRef.current?.send({
-      type: "broadcast",
-      event: "challenge_accepted",
-      payload: {},
-    });
-  }, []);
+  const broadcastCancelled = useCallback(() => send("lobby_cancelled", {}), [send]);
+
+  const broadcastAccepted = useCallback(() => send("challenge_accepted", {}), [send]);
 
   return { broadcastMatchStarted, broadcastCancelled, broadcastAccepted, opponentPresent };
 }

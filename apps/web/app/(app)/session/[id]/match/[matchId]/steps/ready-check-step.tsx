@@ -1,14 +1,17 @@
 "use client";
 
 import { useMemo, useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Check, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
-import { startMatch } from "@jits/shared/api/mutations";
+import { cancelSessionMatch, startMatch } from "@jits/shared/api/mutations";
 import { useSessionMatchSync } from "@jits/shared/hooks/use-session-match-sync";
 
 interface ReadyCheckStepProps {
   onNext: (data: { startedAt: string }) => void;
+  sessionId: string;
   matchId: string;
   currentAthleteId: string;
   opponentId: string;
@@ -17,11 +20,14 @@ interface ReadyCheckStepProps {
   isTimekeeper: boolean;
 }
 
-export function ReadyCheckStep({ onNext, matchId, currentAthleteId, opponentId, timekeeperEnabled, hasTimekeeper, isTimekeeper }: ReadyCheckStepProps) {
+export function ReadyCheckStep({ onNext, sessionId, matchId, currentAthleteId, opponentId, timekeeperEnabled, hasTimekeeper, isTimekeeper }: ReadyCheckStepProps) {
+  const router = useRouter();
   const [myReady, setMyReady] = useState(false);
   const [opponentReady, setOpponentReady] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const startedRef = useRef(false);
+  const cancelledRef = useRef(false);
 
   const supabase = useMemo(() => createClient(), []);
   const sync = useSessionMatchSync({
@@ -35,6 +41,13 @@ export function ReadyCheckStep({ onNext, matchId, currentAthleteId, opponentId, 
         startedRef.current = true;
         onNext({ startedAt });
       }
+    },
+    onMatchCancelled: () => {
+      // Opponent cancelled: abort and return to the lobby.
+      if (cancelledRef.current || startedRef.current) return;
+      cancelledRef.current = true;
+      toast.info("Match cancelled. Your opponent left the ready check.");
+      router.replace(`/session/${sessionId}/lobby`);
     },
   });
 
@@ -66,6 +79,23 @@ export function ReadyCheckStep({ onNext, matchId, currentAthleteId, opponentId, 
     sync.broadcastReady(currentAthleteId);
   }
 
+  async function handleCancel() {
+    if (cancelling || loading || startedRef.current || cancelledRef.current) return;
+    if (!window.confirm("Cancel match? Your opponent will be returned to the lobby.")) return;
+    cancelledRef.current = true;
+    setCancelling(true);
+    const result = await cancelSessionMatch(supabase, matchId);
+    if (!result.ok) {
+      cancelledRef.current = false;
+      setCancelling(false);
+      toast.error(result.error.message || "Could not cancel the match.");
+      return;
+    }
+    // Tell the opponent's ready step to abort too, then return to the lobby.
+    sync.broadcastMatchCancelled();
+    router.replace(`/session/${sessionId}/lobby`);
+  }
+
   // Trigger start when both are ready
   useEffect(() => {
     if (myReady && opponentReady && !startedRef.current && !loading) {
@@ -92,6 +122,17 @@ export function ReadyCheckStep({ onNext, matchId, currentAthleteId, opponentId, 
         <p className="text-sm text-muted-foreground">Waiting for opponent...</p>
       )}
       {loading && <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />}
+      {!startedRef.current && !loading && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-primary hover:text-primary"
+          onClick={handleCancel}
+          disabled={cancelling}
+        >
+          {cancelling ? "Cancelling..." : "Cancel Match"}
+        </Button>
+      )}
     </div>
   );
 }

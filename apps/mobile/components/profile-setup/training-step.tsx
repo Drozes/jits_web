@@ -93,7 +93,10 @@ export function TrainingStep({
         />
       </EloField>
 
-      <EloField label="City" helper="Helps you find local sessions and gyms.">
+      <EloField
+        label="City"
+        helper="Required to activate your profile. Helps you find local sessions and gyms."
+      >
         <NativeSelect
           value={values.city}
           onValueChange={(v) => onChange({ city: v })}

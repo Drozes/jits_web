@@ -79,21 +79,19 @@ export function ConfirmStep({
       return;
     }
 
-    // Broadcast participant_joined so existing lobby members see the new athlete
+    // Broadcast participant_joined so existing lobby members see the new athlete.
+    // This is a one-shot fire-and-forget on a transient channel, so use the
+    // explicit httpSend REST path (no JOIN wait, no "send() falling back to
+    // REST" warning).
     try {
       const channel = supabase.channel(`session:${sessionId}`);
-      await channel.subscribe();
-      await channel.send({
-        type: "broadcast",
-        event: "participant_joined",
-        payload: {
-          athleteId: currentAthleteId,
-          displayName: currentAthleteName,
-          currentElo: currentAthleteElo,
-          currentWeight: confirmedWeight,
-          profilePhotoUrl: currentAthletePhotoUrl,
-          status: "checked_in",
-        },
+      await channel.httpSend("participant_joined", {
+        athleteId: currentAthleteId,
+        displayName: currentAthleteName,
+        currentElo: currentAthleteElo,
+        currentWeight: confirmedWeight,
+        profilePhotoUrl: currentAthletePhotoUrl,
+        status: "checked_in",
       });
       await supabase.removeChannel(channel);
     } catch (e) {

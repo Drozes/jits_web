@@ -1714,6 +1714,7 @@ export type Database = {
       can_create_challenge:
         | { Args: never; Returns: boolean }
         | { Args: { p_opponent_id?: string }; Returns: boolean }
+      cancel_session_match: { Args: { p_match_id: string }; Returns: Json }
       claim_video_for_merging: {
         Args: { p_stale_minutes?: number; p_video_id: string }
         Returns: {

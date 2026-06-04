@@ -468,7 +468,7 @@ export async function getGymsWithSessions(
         .not("primary_gym_id", "is", null),
       supabase
         .from("sessions")
-        .select("id, gym_id, status, scheduled_start")
+        .select("id, gym_id, status, scheduled_start, scheduled_end")
         .in("status", ["active", "scheduled"]),
     ]);
 
@@ -487,7 +487,12 @@ export async function getGymsWithSessions(
   const now = new Date().toISOString();
 
   for (const s of sessions ?? []) {
-    if (s.status === "active") {
+    // A session is "live/joinable" iff status='active' AND scheduled_end is in
+    // the future. This matches getGymDetail's filter (.gt("scheduled_end", now))
+    // so a gym never shows LIVE on the list while detail shows no sessions. We
+    // use the same ISO-string `now` basis the detail query uses to avoid a new
+    // inconsistency.
+    if (s.status === "active" && s.scheduled_end > now) {
       activeMap.set(s.gym_id, (activeMap.get(s.gym_id) ?? 0) + 1);
     } else if (s.status === "scheduled" && s.scheduled_start > now) {
       upcomingMap.set(s.gym_id, (upcomingMap.get(s.gym_id) ?? 0) + 1);

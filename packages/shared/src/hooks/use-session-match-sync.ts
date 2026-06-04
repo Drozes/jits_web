@@ -18,16 +18,22 @@ interface UseSessionMatchSyncParams {
   onReadySignal?: (athleteId: string) => void;
   onResultSubmitted?: (result: BroadcastResult) => void;
   onResultConfirmed?: (athleteId: string) => void;
+  onMatchCancelled?: () => void;
 }
 
 export function useSessionMatchSync(params: UseSessionMatchSyncParams) {
   const channelRef = useRef<RealtimeChannel | null>(null);
+  // Tracks whether the websocket JOIN has completed. Broadcasts fired before
+  // this is true would otherwise trip realtime-js's REST fallback warning, so
+  // we route them through the explicit httpSend REST path instead.
+  const subscribedRef = useRef(false);
   const cbRefs = useRef(params);
   cbRefs.current = params;
 
   const { supabase, matchId } = params;
 
   useEffect(() => {
+    subscribedRef.current = false;
     const channel = supabase
       .channel(`session-match:${matchId}`)
       .on("broadcast", { event: "timer_started" }, ({ payload }) => {
@@ -51,13 +57,31 @@ export function useSessionMatchSync(params: UseSessionMatchSyncParams) {
       .on("broadcast", { event: "result_confirmed" }, ({ payload }) => {
         cbRefs.current.onResultConfirmed?.(payload.athlete_id as string);
       })
-      .subscribe();
+      .on("broadcast", { event: "match_cancelled" }, () => {
+        cbRefs.current.onMatchCancelled?.();
+      })
+      .subscribe((status) => {
+        subscribedRef.current = status === "SUBSCRIBED";
+      });
     channelRef.current = channel;
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      subscribedRef.current = false;
+      supabase.removeChannel(channel);
+    };
   }, [supabase, matchId]);
 
+  // Use the websocket push once joined; otherwise use the explicit httpSend
+  // REST path. Both deliver to subscribers; httpSend avoids the realtime-js
+  // "send() falling back to REST" warning that fires when send() is called
+  // before JOIN completes.
   const send = useCallback((event: string, payload: Record<string, unknown>) => {
-    channelRef.current?.send({ type: "broadcast", event, payload });
+    const channel = channelRef.current;
+    if (!channel) return;
+    if (subscribedRef.current) {
+      channel.send({ type: "broadcast", event, payload });
+    } else {
+      void channel.httpSend(event, payload);
+    }
   }, []);
 
   return {
@@ -68,5 +92,6 @@ export function useSessionMatchSync(params: UseSessionMatchSyncParams) {
     broadcastReady: useCallback((athleteId: string) => send("ready_signal", { athlete_id: athleteId }), [send]),
     broadcastResultSubmitted: useCallback((r: BroadcastResult) => send("result_submitted", r as unknown as Record<string, unknown>), [send]),
     broadcastResultConfirmed: useCallback((athleteId: string) => send("result_confirmed", { athlete_id: athleteId }), [send]),
+    broadcastMatchCancelled: useCallback(() => send("match_cancelled", {}), [send]),
   };
 }
