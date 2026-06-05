@@ -61,7 +61,7 @@ export function HeadToHeadCard({ matches }: { matches: HeadToHeadMatch[] }) {
         </View>
       ) : (
         <View className="flex-row">
-          <StatColumn value={wins} label="Wins" tone="positive" />
+          <StatColumn value={wins} label="Wins" tone="ink" />
           <StatColumn value={losses} label="Losses" tone="negative" />
           <StatColumn value={draws} label="Draws" tone="neutral" />
           <StatColumn value={matches.length} label="Total" tone="ink" />

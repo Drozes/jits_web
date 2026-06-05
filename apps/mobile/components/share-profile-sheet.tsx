@@ -61,7 +61,7 @@ export function ShareProfileSheet({ athlete, children }: ShareProfileSheetProps)
                 </Text>
               </View>
               <View className="flex-row items-center gap-2">
-                <Text className="font-mono text-positive text-[12px] tabular-nums">{athlete.wins}W</Text>
+                <Text className="font-mono text-ink text-[12px] tabular-nums">{athlete.wins}W</Text>
                 <Text className="font-mono text-ink-3 text-[12px]">·</Text>
                 <Text className="font-mono text-negative text-[12px] tabular-nums">{athlete.losses}L</Text>
                 {athlete.weight != null ? (

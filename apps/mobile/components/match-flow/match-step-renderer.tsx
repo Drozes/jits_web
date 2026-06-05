@@ -16,6 +16,8 @@ interface MatchParticipant {
   current_elo: number | null;
   current_weight: number | null;
   outcome: string | null;
+  elo_before: number | null;
+  elo_after: number | null;
   elo_delta: number | null;
 }
 
@@ -142,11 +144,14 @@ export function MatchStepRenderer({
     );
   }
   if (step === "summary") {
-    const eloDelta = matchType === "ranked" ? me.elo_delta ?? null : null;
-    const currentElo =
-      me.current_elo != null && eloDelta != null
-        ? me.current_elo + eloDelta
-        : me.current_elo;
+    // For ranked matches the BE stamps authoritative elo_before / elo_after on
+    // the participant when the result is recorded; `current_elo` is already the
+    // post-match rating after refresh(), so we use the stamped fields directly
+    // rather than re-deriving them (which would double-count the delta).
+    const isRanked = matchType === "ranked";
+    const eloBefore = isRanked ? me.elo_before : null;
+    const eloAfter = isRanked ? me.elo_after : null;
+    const eloDelta = isRanked ? me.elo_delta ?? null : null;
     return (
       <SummaryStep
         sessionId={sessionId}
@@ -154,7 +159,8 @@ export function MatchStepRenderer({
         matchStatus={matchStatus}
         outcome={ownOutcome}
         eloDelta={eloDelta}
-        currentElo={currentElo}
+        eloBefore={eloBefore}
+        eloAfter={eloAfter ?? me.current_elo}
       />
     );
   }

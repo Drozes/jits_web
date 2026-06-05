@@ -43,14 +43,14 @@ export function FightersList({
           paddingBottom: 16,
           gap: 1,
         }}
-        renderItem={({ item, index }) => (
+        renderItem={({ item }) => (
           <RankRow
-            rank={index + 1}
+            rank={item.rank}
             name={item.displayName}
             subtitle={buildSubtitle(item)}
             value={item.currentElo}
             delta={0}
-            leader={index === 0}
+            leader={item.rank === 1}
             onPress={() => router.push(`/(app)/athlete/${item.id}`)}
           />
         )}

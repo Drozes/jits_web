@@ -180,7 +180,7 @@ function StatsHeader({ athlete, data, filter, setFilter, wins, losses, draws, wi
     <View className="gap-4 mb-2">
       <View className="flex-row gap-3">
         <StatTile label="ELO" value={athlete.current_elo} />
-        <StatTile label="Wins" value={wins} valueClassName="text-positive" />
+        <StatTile label="Wins" value={wins} />
         <StatTile label="Win Rate" value={`${winRate}%`} />
       </View>
 
@@ -202,7 +202,7 @@ function StatsHeader({ athlete, data, filter, setFilter, wins, losses, draws, wi
           ))}
         </View>
         <View className="flex-row items-center gap-2">
-          <Text className="font-mono-bold text-[11px] text-positive tabular-nums">{wins}W</Text>
+          <Text className="font-mono-bold text-[11px] text-ink tabular-nums">{wins}W</Text>
           <Text className="font-mono text-[11px] text-ink-3">·</Text>
           <Text className="font-mono-bold text-[11px] text-negative tabular-nums">{losses}L</Text>
           <Text className="font-mono text-[11px] text-ink-3">·</Text>

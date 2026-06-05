@@ -46,7 +46,7 @@ export function StatRow({
       <Text
         className={cn(
           "flex-1 text-center font-mono-bold text-[20px] tabular-nums",
-          leftWins ? "text-positive" : "text-ink",
+          leftWins ? "text-ink" : "text-ink-3",
         )}
       >
         {fmt(left)}
@@ -57,7 +57,7 @@ export function StatRow({
       <Text
         className={cn(
           "flex-1 text-center font-mono-bold text-[20px] tabular-nums",
-          rightWins ? "text-positive" : "text-ink",
+          rightWins ? "text-ink" : "text-ink-3",
         )}
       >
         {fmt(right)}

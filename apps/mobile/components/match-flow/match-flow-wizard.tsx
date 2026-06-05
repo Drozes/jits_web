@@ -17,6 +17,8 @@ interface MatchFlowWizardProps {
   sessionId: string;
   matchId: string;
   currentAthleteId: string;
+  /** Reports the active wizard step so the screen can guard back-nav. */
+  onStepChange?: (step: MatchStep | null) => void;
 }
 
 const STEP_LABELS: Record<MatchStep, string> = {
@@ -57,6 +59,7 @@ export function MatchFlowWizard({
   sessionId,
   matchId,
   currentAthleteId,
+  onStepChange,
 }: MatchFlowWizardProps) {
   const insets = useSafeAreaInsets();
   const { match, submissionTypes, isLoading, error, refresh } = useMatchDetails(matchId);
@@ -69,6 +72,10 @@ export function MatchFlowWizard({
     setStep((prev) => prev ?? getCurrentStep(match));
     setStartedAt((prev) => prev ?? match.started_at);
   }, [match]);
+
+  React.useEffect(() => {
+    onStepChange?.(step);
+  }, [step, onStepChange]);
 
   const advanceToResult = React.useCallback(() => setStep("result"), []);
 

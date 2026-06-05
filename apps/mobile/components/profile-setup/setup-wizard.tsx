@@ -123,6 +123,15 @@ export function SetupWizard({
       {currentIdx > 0 && currentStep !== "tos" && (
         <TertiaryButton label="Back" onPress={goBack} disabled={loading} />
       )}
+
+      {/* Sign-out escape hatch on the identity/training steps. The TOS step
+          renders its own "Exit" affordance, so it is excluded here to avoid a
+          duplicate. Without this, a pending athlete who accepted TOS in a prior
+          session lands on the identity step (which has no Back) and is trapped
+          with no way to switch accounts. */}
+      {currentStep !== "tos" && (
+        <TertiaryButton label="Sign Out" onPress={handleExit} disabled={loading} />
+      )}
     </View>
   );
 }

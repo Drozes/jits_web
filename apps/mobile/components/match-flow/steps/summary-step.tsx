@@ -14,10 +14,12 @@ interface SummaryStepProps {
   matchStatus: string;
   /** "win" | "loss" | "draw"; null when no result was recorded yet. */
   outcome: "win" | "loss" | "draw" | null;
-  /** Own ELO delta (signed). 0 / undefined for casual matches. */
+  /** Own ELO delta (signed). null for casual matches. */
   eloDelta: number | null;
-  /** Current ELO after the match. */
-  currentElo?: number | null;
+  /** Authoritative pre-match rating (ranked only; null for casual). */
+  eloBefore?: number | null;
+  /** Authoritative post-match rating; falls back to current_elo. */
+  eloAfter?: number | null;
 }
 
 /**
@@ -34,19 +36,20 @@ export function SummaryStep(props: SummaryStepProps) {
   const tokens = useThemedTokens();
   const router = useRouter();
   const { athlete } = useAuth();
-  const { sessionId, matchType, matchStatus, outcome, eloDelta, currentElo } = props;
+  const { sessionId, matchType, matchStatus, outcome, eloDelta, eloBefore, eloAfter } =
+    props;
   const disputed = matchStatus === "disputed";
 
-  const before =
-    currentElo != null && eloDelta != null ? currentElo - eloDelta : currentElo;
-  const after = currentElo ?? null;
+  // Authoritative ratings from the BE; no arithmetic re-derivation.
+  const before = eloBefore ?? null;
+  const after = eloAfter ?? null;
 
   async function handleShareResult() {
     if (!outcome || !athlete) return;
     const url = buildShareUrl("athlete", athlete.id);
     const text = buildShareText({
       type: "match-result",
-      data: { outcome, elo: currentElo, eloDelta },
+      data: { outcome, elo: after, eloDelta },
     });
     try {
       await Share.share({
@@ -117,9 +120,9 @@ export function SummaryStep(props: SummaryStepProps) {
             accent
           />
         </View>
-      ) : currentElo != null ? (
+      ) : after != null ? (
         <View className="items-center">
-          <EloTile label="ELO Rating" value={currentElo} size="large" />
+          <EloTile label="ELO Rating" value={after} size="large" />
         </View>
       ) : null}
 

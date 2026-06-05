@@ -70,16 +70,16 @@ function ErrorFallback({
   }, [signOut, onRetry]);
 
   return (
-    <View className="flex-1 bg-background items-center justify-center px-8 gap-6">
-      <Text className="text-3xl font-display text-foreground">
-        Something went wrong
+    <View className="flex-1 bg-surface items-center justify-center px-8 gap-6">
+      <Text className="text-3xl font-display text-ink tracking-mark">
+        SOMETHING WENT WRONG
       </Text>
-      <Text className="text-sm text-muted-foreground text-center">
+      <Text className="text-sm font-body text-ink-3 text-center">
         The app hit an unexpected error. Try again, or sign out and back in if
         the problem persists.
       </Text>
       {__DEV__ ? (
-        <Text className="text-xs text-destructive text-center font-mono">
+        <Text className="text-xs text-negative text-center font-mono">
           {error.message}
         </Text>
       ) : null}
@@ -87,9 +87,9 @@ function ErrorFallback({
       <View className="gap-3 w-full">
         <Pressable
           onPress={onRetry}
-          className="rounded-md bg-primary py-3 items-center active:opacity-80"
+          className="rounded-md bg-cta py-3 items-center active:bg-cta-hover"
         >
-          <Text className="text-sm font-heading text-primary-foreground">
+          <Text className="text-sm font-heading text-ink-on-cta">
             Try again
           </Text>
         </Pressable>
@@ -97,9 +97,9 @@ function ErrorFallback({
         {signOut ? (
           <Pressable
             onPress={handleSignOut}
-            className="rounded-md border border-border py-3 items-center active:bg-muted/40"
+            className="rounded-md border border-hairline py-3 items-center active:bg-surface-3"
           >
-            <Text className="text-sm font-medium text-foreground">
+            <Text className="text-sm font-heading text-ink">
               Sign out
             </Text>
           </Pressable>

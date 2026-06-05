@@ -41,15 +41,29 @@ export function useSetupSubmit({
   const [error, setError] = React.useState<string | null>(null);
 
   const acceptTos = React.useCallback(async () => {
+    // Only the edit/re-setup path reaches here with an existing athlete row;
+    // brand-new signups have no row yet, so the ack is written in `submit()`
+    // once the athlete is created. Idempotent check-then-insert (the app-level
+    // waiver's null `session_id` is distinct under the unique constraint, so a
+    // duplicate insert would not be rejected).
     if (athleteId && waiverId) {
-      const { error: tosError } = await supabase
+      const { data: existingAck } = await supabase
         .from("waiver_acknowledgements")
-        .insert({ athlete_id: athleteId, waiver_id: waiverId });
-      if (tosError) {
-        setError(
-          "Failed to save Terms of Service acceptance. Please try again.",
-        );
-        return;
+        .select("id")
+        .eq("athlete_id", athleteId)
+        .eq("waiver_id", waiverId)
+        .is("session_id", null)
+        .maybeSingle();
+      if (!existingAck) {
+        const { error: tosError } = await supabase
+          .from("waiver_acknowledgements")
+          .insert({ athlete_id: athleteId, waiver_id: waiverId });
+        if (tosError) {
+          setError(
+            "Failed to save Terms of Service acceptance. Please try again.",
+          );
+          return;
+        }
       }
     }
     onAfterTos();
@@ -109,6 +123,35 @@ export function useSetupSubmit({
         resolvedAthleteId = inserted.id;
       }
 
+      // Record the TOS/waiver acknowledgement. On the primary signup path the
+      // athlete row does not exist until the insert above, so `acceptTos` (which
+      // only fires when an athlete row already exists) skips it and the legal
+      // agreement would be saved for nobody. Mirror web `eua-form.tsx`: the
+      // app-level waiver has a null `session_id`, and Postgres treats NULLs as
+      // distinct in the `uq_waiver_ack` unique constraint, so a repeat insert
+      // would NOT be caught. Check before inserting to stay idempotent.
+      if (waiverId && resolvedAthleteId) {
+        const { data: existingAck } = await supabase
+          .from("waiver_acknowledgements")
+          .select("id")
+          .eq("athlete_id", resolvedAthleteId)
+          .eq("waiver_id", waiverId)
+          .is("session_id", null)
+          .maybeSingle();
+        if (!existingAck) {
+          const { error: ackError } = await supabase
+            .from("waiver_acknowledgements")
+            .insert({ athlete_id: resolvedAthleteId, waiver_id: waiverId });
+          if (ackError) {
+            setError(
+              "Failed to save Terms of Service acceptance. Please try again.",
+            );
+            setLoading(false);
+            return;
+          }
+        }
+      }
+
       const { data: updated } = await supabase
         .from("athletes")
         .select("status")
@@ -129,7 +172,7 @@ export function useSetupSubmit({
         router.replace("/");
       }
     },
-    [athleteId, authUserId, isEditing, refreshAthlete, router],
+    [athleteId, authUserId, waiverId, isEditing, refreshAthlete, router],
   );
 
   return { loading, error, acceptTos, submit };

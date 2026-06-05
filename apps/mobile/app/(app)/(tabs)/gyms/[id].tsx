@@ -48,7 +48,11 @@ function useGymDetailData(gymId: string | undefined, athleteId: string | undefin
   const [isRefreshing, setIsRefreshing] = React.useState(false);
 
   const fetchAll = React.useCallback(
-    async (mode: "initial" | "refresh") => {
+    // `isCancelled` reads the live effect flag so a resolved promise from an
+    // unmounted / param-changed mount never writes state (stale flash +
+    // setState-after-unmount). Defaults to "never cancelled" for the
+    // pull-to-refresh path, which has no teardown to race.
+    async (mode: "initial" | "refresh", isCancelled: () => boolean = () => false) => {
       if (!gymId || !athleteId) return;
       if (mode === "initial") setIsLoading(true);
       else setIsRefreshing(true);
@@ -67,6 +71,7 @@ function useGymDetailData(gymId: string | undefined, athleteId: string | undefin
             return null;
           }),
         ]);
+        if (isCancelled()) return;
         setData(detail);
         if (gymRow) {
           setCoords({
@@ -83,10 +88,12 @@ function useGymDetailData(gymId: string | undefined, athleteId: string | undefin
         );
       } catch (err) {
         console.error("[gym-detail] fetch failed", err);
-        toast.error("Failed to load gym");
+        if (!isCancelled()) toast.error("Failed to load gym");
       } finally {
-        if (mode === "initial") setIsLoading(false);
-        else setIsRefreshing(false);
+        if (!isCancelled()) {
+          if (mode === "initial") setIsLoading(false);
+          else setIsRefreshing(false);
+        }
       }
     },
     [gymId, athleteId],
@@ -94,10 +101,10 @@ function useGymDetailData(gymId: string | undefined, athleteId: string | undefin
 
   React.useEffect(() => {
     let cancelled = false;
-    fetchAll("initial").then(() => {
-      if (cancelled) return;
-    });
-    return () => { cancelled = true; };
+    void fetchAll("initial", () => cancelled);
+    return () => {
+      cancelled = true;
+    };
   }, [fetchAll]);
 
   return { data, coords, avgPerSession, isLoading, isRefreshing, refresh: () => fetchAll("refresh") };

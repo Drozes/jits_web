@@ -43,7 +43,7 @@ export function RankRow({
       <Text
         className={cn(
           "font-mono-bold text-[16px] text-right",
-          leader ? "text-cta" : you ? "text-positive" : "text-ink-2",
+          leader ? "text-cta" : "text-ink-2",
         )}
         style={{ width: 36 }}
       >

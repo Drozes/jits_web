@@ -98,11 +98,18 @@ export function useOnlinePresence(
       }
     };
 
-    channel = supabase.channel(`app:online:${mountId}`, {
+    // MUST be the shared constant topic: Supabase Presence only syncs members
+    // of the SAME topic, so a per-mount name (`app:online:${mountId}`) would
+    // isolate this client and never see web's members. `mountId` is kept only
+    // as a stale-write guard below.
+    channel = supabase.channel("app:online", {
       config: { presence: { key: athleteId } },
     });
 
     channel.on("presence", { event: "sync" }, () => {
+      // Ignore a late sync from a superseded mount so it can't clobber the
+      // store after cleanup/re-mount.
+      if (mountId !== mountIdRef.current) return;
       const state = channel!.presenceState<AppOnlinePayload>();
       onlineIds = new Set(Object.keys(state));
       emitChange();
