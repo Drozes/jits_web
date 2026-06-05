@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+**Mobile gym-owner portal: H9 gym ladder (epic jits-7xv.5, 2026-06-05)**
+
+**Added**
+- Gym Manager gym ladder screen (`apps/mobile/app/(app)/(tabs)/gym-manager/ladder.tsx`): H9 cross-gym ranking (gyms by avg member ELO) reached from the hub's "Gym Ladder" shortcut. A horizontal city filter chip row ("All Cities" + the cities present on the ladder) defaults to the manager's own gym city; a summary meta-line ("12 Partner Gyms · 90d") plus a right-aligned green "Your Gym #N · +12" callout when the own gym is in view. Each row shows a zero-padded rank, the gym name (+ "· You"), a mono-caps meta line (city · athletes · matches), and a right-aligned avg ELO + momentum arrow; the leader gets a Signal Red left rail and the manager's own gym a Gain Green left rail + tinted background. Pull-to-refresh; tapping a row opens the gym detail. The ladder is aggregate-only (not manager-gated), so it loads via the `getGymLadder` wrapper (no direct `.rpc()`); city filtering is client-side off the full row set for instant chip switching.
+- `apps/mobile/lib/gym-manager/use-gym-ladder.ts`: cancelled-ref hook (W3-4 standard) keyed on the range that re-fetches on range change and follows the plain read style ([] on error) the aggregate-only ladder uses, unlike the `Result`-gated roster/stats hooks.
+- `apps/mobile/components/gym-manager/ladder-row.tsx`: the H9 row, reusing the `DeltaNumber` elo-system primitive; all numeric values `font-mono` tabular-nums; Signal Red only for the leader rail, Gain Green for the own-gym rail, no drop shadows, 4px radius.
+- `apps/mobile/lib/gym-manager/ladder-format.ts`: pure RN-free helpers (`formatGymMeta` with singular/plural + null-city handling, `deriveCities` distinct + case-insensitive sort, `formatLadderSummary`, `findOwnGym` 1-based rank lookup) shared by the screen + row.
+- Tests: `apps/mobile/__tests__/lib/gym-manager/ladder-format.test.ts` (15 cases: meta-line join + singularization + null/blank-city drop, city dedupe/sort/trim, summary singularization, own-gym rank lookup + absent/undefined fallbacks).
+
 **Mobile gym-owner portal: H8 gym stats + H10 per-ELO bracket drill-down (epic jits-7xv.4, 2026-06-05)**
 
 **Added**
