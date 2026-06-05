@@ -43,6 +43,15 @@ export function useGymHub(
   const [data, setData] = React.useState<GymHubData | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const [isRefreshing, setIsRefreshing] = React.useState(false);
+  // Backs the refresh path's cancellation so a pull-to-refresh in flight at
+  // unmount never writes state (W3-4 cancelled-ref standard).
+  const mountedRef = React.useRef(true);
+  React.useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   const fetchAll = React.useCallback(
     async (mode: "initial" | "refresh", isCancelled: () => boolean = () => false) => {
@@ -103,5 +112,10 @@ export function useGymHub(
     };
   }, [fetchAll]);
 
-  return { data, isLoading, isRefreshing, refresh: () => fetchAll("refresh") };
+  return {
+    data,
+    isLoading,
+    isRefreshing,
+    refresh: () => fetchAll("refresh", () => !mountedRef.current),
+  };
 }
