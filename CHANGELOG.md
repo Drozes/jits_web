@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+**Mobile gym-owner portal: H8 gym stats + H10 per-ELO bracket drill-down (epic jits-7xv.4, 2026-06-05)**
+
+**Added**
+- Gym Manager gym stats screen (`apps/mobile/app/(app)/(tabs)/gym-manager/stats.tsx`): H8 manager-gated aggregate dashboard reached from the hub's "Gym Stats" shortcut. A 30d/90d/all range chip row drives the whole screen; sections are Gym Rating (avg ELO hero + signed momentum), Submission Rate (big percent + two-segment split meter for submission vs time-expiry), Draws (draw rate + avg ELO on draw with a `Pressure Score` amber note), Winning/Losing Submissions (ranked share lists), Match Duration (avg win/loss finish-time tiles, green/red), and an ELO Trend sparkline. A full-width drill-down tile opens H10, seeding it with the current range.
+- Gym Manager stats-by-ELO screen (`apps/mobile/app/(app)/(tabs)/gym-manager/stats-by-elo.tsx`): H10 per-ELO-bracket breakdown (1900+/1700–1900/1500–1700/1300–1500). Seeds its range from the H8 nav param, then owns its own chip toggle; a header meta-line totals athletes/matches/brackets. Each bracket renders as a card (range + tier label, athlete/match counts, six-cell stat grid, top winning/losing subs).
+- `apps/mobile/lib/gym-manager/use-gym-stats.ts` + `use-gym-bracket-stats.ts`: cancelled-ref hooks (W3-4 standard) keyed on `(gymId, range)` that re-fetch on range change and map the `NOT_GYM_MANAGER` gating code onto an `isManager` flag for the not-authorized fallback. Load via the `getGymStats` / `getGymStatsByEloRange` wrappers (no direct `.rpc()`).
+- `apps/mobile/components/gym-manager/stats-parts.tsx` (`SectionLabel`, `RangeChips`, `DrillDownTile`, `StatHero`, `RatePlate`, `SplitMeter`, `SubRankList`, `DurationGrid`), `gym-stats-trend.tsx` (a `react-native-svg`-free column chart of the running cumulative net-ELO change, newest column Signal Red), and `bracket-card.tsx`. Reuses the `Chip` and `DeltaNumber` elo-system primitives; all numeric values `font-mono` tabular-nums; Signal Red only for accent/negative, draws amber, no drop shadows, 4px radius.
+- `apps/mobile/lib/gym-manager/stats-format.ts`: pure RN-free formatters (`formatRangeLabel`, `formatRangeSuffix`, `formatPct`, `formatFinishTime`, `formatMomentum`, `formatTierLabel`, `formatBracketRange`) shared by the screens + parts.
+- Tests: `apps/mobile/__tests__/lib/gym-manager/stats-format.test.ts` (19 cases: range labels/suffixes, percent rounding + clamp + non-finite guard, m:ss finish-time formatting + em-dash for no data, signed momentum with the unicode minus glyph, tier labels + bracket en-dash normalization).
+
 **Mobile gym-owner portal: H6 roster + H7 athlete detail (epic jits-7xv.3, 2026-06-05)**
 
 **Added**
