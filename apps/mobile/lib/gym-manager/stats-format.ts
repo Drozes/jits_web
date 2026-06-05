@@ -43,6 +43,17 @@ export function formatFinishTime(seconds: number): string {
 }
 
 /**
+ * Aggregate ELO -> whole-number string. The BE returns avg-ELO values as
+ * round(x, 1) NUMERIC (one decimal), but individual-athlete ELO is an integer
+ * everywhere else in the app, so display aggregate ELO rounded to match.
+ * Non-finite -> "0".
+ */
+export function formatElo(value: number): string {
+  if (!Number.isFinite(value)) return "0";
+  return String(Math.round(value));
+}
+
+/**
  * Signed momentum -> "+12" / "−7" / "0". Uses the U+2212 minus glyph to match
  * the brand mono numerals; rounds to a whole number. Non-finite -> "0".
  */

@@ -8,6 +8,7 @@
 
 import {
   formatBracketRange,
+  formatElo,
   formatFinishTime,
   formatMomentum,
   formatPct,
@@ -72,6 +73,22 @@ describe("formatFinishTime", () => {
     expect(formatFinishTime(0)).toBe("—");
     expect(formatFinishTime(-5)).toBe("—");
     expect(formatFinishTime(NaN)).toBe("—");
+  });
+});
+
+describe("formatElo", () => {
+  it("rounds a one-decimal aggregate ELO to a whole number", () => {
+    expect(formatElo(1487.3)).toBe("1487");
+    expect(formatElo(1502.6)).toBe("1503");
+  });
+
+  it("leaves an already-integer value untouched", () => {
+    expect(formatElo(1500)).toBe("1500");
+  });
+
+  it("guards non-finite input", () => {
+    expect(formatElo(NaN)).toBe("0");
+    expect(formatElo(Infinity)).toBe("0");
   });
 });
 

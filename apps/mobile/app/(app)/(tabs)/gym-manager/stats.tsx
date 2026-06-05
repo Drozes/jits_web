@@ -17,7 +17,11 @@ import {
   StatHero,
   SubRankList,
 } from "@/components/gym-manager/stats-parts";
-import { formatPct, formatRangeSuffix } from "@/lib/gym-manager/stats-format";
+import {
+  formatElo,
+  formatPct,
+  formatRangeSuffix,
+} from "@/lib/gym-manager/stats-format";
 import type { GymStatsRange } from "@jits/shared/api/queries";
 
 /**
@@ -117,7 +121,7 @@ export default function GymManagerStatsScreen() {
             <RatePlate
               headline={formatPct(stats.drawRate)}
               headlineSub="Matches Ending In Draw"
-              asideValue={String(stats.avgEloOnDraw)}
+              asideValue={formatElo(stats.avgEloOnDraw)}
               asideLabel="Avg ELO · Equal Match"
               tone="negative"
             >

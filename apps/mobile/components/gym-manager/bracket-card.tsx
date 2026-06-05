@@ -7,6 +7,7 @@
 import { Text, View } from "react-native";
 import {
   formatBracketRange,
+  formatElo,
   formatFinishTime,
   formatMomentum,
   formatPct,
@@ -69,7 +70,7 @@ export function BracketCard({ bracket }: { bracket: GymEloBracketStats }) {
       </View>
 
       <View className="flex-row flex-wrap">
-        <StatCell label="Avg ELO" value={String(bracket.avgElo)} />
+        <StatCell label="Avg ELO" value={formatElo(bracket.avgElo)} />
         <StatCell
           label="Momentum"
           value={formatMomentum(bracket.momentum)}

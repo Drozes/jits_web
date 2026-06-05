@@ -11,6 +11,7 @@ import { ChevronRight } from "lucide-react-native";
 import { DeltaNumber } from "@/components/ui/elo-system";
 import { Chip } from "@/components/ui/elo-system";
 import {
+  formatElo,
   formatFinishTime,
   formatPct,
   formatRangeLabel,
@@ -88,10 +89,10 @@ export function StatHero({ label, value, momentum, caption }: StatHeroProps) {
         className="font-mono-bold text-ink text-[44px] leading-none mt-2"
         style={TABULAR}
       >
-        {value}
+        {formatElo(value)}
       </Text>
       <View className="flex-row items-center gap-2 mt-3">
-        <DeltaNumber value={momentum} size="s" showSign />
+        <DeltaNumber value={Math.round(momentum)} size="s" showSign />
         <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">
           {caption}
         </Text>
@@ -107,7 +108,11 @@ interface RatePlateProps {
   /** Right-aligned secondary number + caption. */
   asideValue: string;
   asideLabel: string;
-  /** Primary number color: "accent" (red, submissions) or "negative" (draws). */
+  /**
+   * Primary number color. "accent" is a neutral aggregate (submission rate) and
+   * renders in default foreground per the brand rule (Signal Red is reserved for
+   * CTAs/negative); "negative" is the sanctioned state-negative draw tile.
+   */
   tone: "accent" | "negative";
   children?: React.ReactNode;
 }
@@ -125,7 +130,7 @@ export function RatePlate({
   tone,
   children,
 }: RatePlateProps) {
-  const toneClass = tone === "accent" ? "text-primary" : "text-negative";
+  const toneClass = tone === "accent" ? "text-ink" : "text-negative";
   return (
     <View className="bg-surface-3 border border-hairline rounded-md p-4 mb-5">
       <View className="flex-row items-baseline justify-between mb-3">
@@ -187,7 +192,7 @@ export function SplitMeter({ fraction, leftLabel, rightLabel }: SplitMeterProps)
 
 interface SubRankListProps {
   subs: GymSubmissionStat[];
-  /** "winning" colors the share red-tinted; "losing" stays muted. */
+  /** "winning" uses default foreground for the share; "losing" stays muted. */
   variant: "winning" | "losing";
 }
 
@@ -202,7 +207,9 @@ export function SubRankList({ subs, variant }: SubRankListProps) {
       </View>
     );
   }
-  const pctClass = variant === "winning" ? "text-primary" : "text-ink-2";
+  // Both variants render the % as a neutral data value (default/secondary
+  // foreground), never Signal Red, per the brand rule for numeric data.
+  const pctClass = variant === "winning" ? "text-ink" : "text-ink-2";
   return (
     <View className="gap-[1px] mb-5">
       {subs.map((s, i) => (

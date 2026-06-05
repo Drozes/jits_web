@@ -33,8 +33,21 @@ export default function GymManagerStatsByEloScreen() {
   );
   const { brackets, isManager, isLoading } = useGymBracketStats(gymId, range);
 
-  const totalAthletes = brackets.reduce((sum, b) => sum + b.athleteCount, 0);
-  const totalMatches = brackets.reduce((sum, b) => sum + b.matchCount, 0);
+  // The BE always returns all four fixed brackets, even when empty. Drop the
+  // zero-population ones so the bracket count and empty-state branch below stay
+  // meaningful (an empty gym shows the friendly empty state, not four 0/0 cards).
+  const populatedBrackets = brackets.filter(
+    (b) => b.athleteCount > 0 || b.matchCount > 0,
+  );
+
+  const totalAthletes = populatedBrackets.reduce(
+    (sum, b) => sum + b.athleteCount,
+    0,
+  );
+  const totalMatches = populatedBrackets.reduce(
+    (sum, b) => sum + b.matchCount,
+    0,
+  );
 
   if (authLoading || !managedReady || (gymId && isLoading && brackets.length === 0)) {
     return (
@@ -74,12 +87,15 @@ export default function GymManagerStatsByEloScreen() {
         <RangeChips value={range} onChange={setRange} />
 
         <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l -mt-1">
-          {totalAthletes} ATHLETES · {totalMatches} MATCHES · {brackets.length}{" "}
-          BRACKET{brackets.length === 1 ? "" : "S"}
+          {totalAthletes} ATHLETES · {totalMatches} MATCHES ·{" "}
+          {populatedBrackets.length} BRACKET
+          {populatedBrackets.length === 1 ? "" : "S"}
         </Text>
 
-        {brackets.length > 0 ? (
-          brackets.map((b) => <BracketCard key={b.bracket} bracket={b} />)
+        {populatedBrackets.length > 0 ? (
+          populatedBrackets.map((b) => (
+            <BracketCard key={b.bracket} bracket={b} />
+          ))
         ) : (
           <View className="bg-surface-3 border border-hairline rounded-md px-4 py-12 items-center">
             <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-l">
