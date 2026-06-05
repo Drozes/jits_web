@@ -523,7 +523,15 @@ export async function resumeMatch(
   return { ok: true, data: { total_paused_duration: response.total_paused_duration } };
 }
 
-/** End an in-progress match (stops timer, transitions to completed). */
+/**
+ * End an in-progress match (stops timer, transitions to `completed`).
+ *
+ * NOTE: do NOT call this from the live match flow before recording a result.
+ * `record_match_result` requires `status='in_progress'` and is what completes
+ * the match + applies ELO; calling `end_match` first leaves the result
+ * unrecorded with no ELO (jits-ait). The live flow goes start -> record.
+ * This wrapper is retained for a future "abandon / no-result" path only.
+ */
 export async function endMatch(
   supabase: Client,
   matchId: string,

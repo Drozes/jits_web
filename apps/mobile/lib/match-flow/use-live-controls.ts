@@ -1,13 +1,13 @@
 import * as React from "react";
 import { toast } from "@/components/ui/toast";
 import { supabase } from "@/lib/supabase/client";
-import { endMatch, pauseMatch, resumeMatch } from "@jits/shared/api/mutations";
+import { pauseMatch, resumeMatch } from "@jits/shared/api/mutations";
 import type { useSessionMatchSync } from "@jits/shared/hooks/use-session-match-sync";
 import type { useSessionMatchTimer } from "@jits/shared/hooks/use-session-match-timer";
 
 type Sync = ReturnType<typeof useSessionMatchSync>;
 type Timer = ReturnType<typeof useSessionMatchTimer>;
-type Action = "pause" | "resume" | "end";
+type Action = "pause" | "resume";
 
 interface UseLiveControlsParams {
   matchId: string;
@@ -25,20 +25,21 @@ interface UseLiveControlsParams {
 export function useLiveControls({ matchId, timer, sync, endedRef, onEnded }: UseLiveControlsParams) {
   const [busy, setBusy] = React.useState<Action | null>(null);
 
-  const handleEnd = React.useCallback(async () => {
+  const handleEnd = React.useCallback(() => {
     if (endedRef.current || busy) return;
     endedRef.current = true;
-    setBusy("end");
-    const res = await endMatch(supabase, matchId);
-    setBusy(null);
-    if (!res.ok) {
-      endedRef.current = false;
-      toast.error({ text1: "Couldn't end match", description: res.error.message });
-      return;
-    }
+    // Do NOT call end_match here. end_match flips the match to 'completed',
+    // but record_match_result (the next step) requires status='in_progress'
+    // and would fail with invalid_status, so the result + ELO would never be
+    // recorded (jits-ait). The match stays 'in_progress' through result entry;
+    // record_match_result is what completes it (and the
+    // trg_release_session_participants trigger still releases participants on
+    // the in_progress -> completed transition). This mirrors the web flow,
+    // which goes start -> record with no end_match in between. We only need to
+    // stop the local timer, tell the opponent, and advance to result entry.
     sync.broadcastMatchEnded();
     onEnded();
-  }, [busy, endedRef, matchId, onEnded, sync]);
+  }, [busy, endedRef, onEnded, sync]);
 
   const handlePauseResume = React.useCallback(async () => {
     if (busy || endedRef.current) return;

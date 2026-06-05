@@ -57,7 +57,7 @@ export function SubmissionFields({
 
       <View className="gap-2">
         <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-xl">
-          Finish Time (optional)
+          Finish Time
         </Text>
         <TextInput
           placeholder="mm:ss or seconds"

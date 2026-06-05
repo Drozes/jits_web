@@ -47,15 +47,20 @@ export function ResultStep({
   const [finishTimeStr, setFinishTimeStr] = React.useState("");
   const { loading, submit } = useRecordResult({ matchId, onRecorded });
 
-  // Optional finish time; when present it must parse and fall within the
-  // match length (a submission can't land after the bout ended).
+  // Finish time is REQUIRED for submissions: the BE `record_match_result`
+  // rejects a submission without `finish_time_seconds` (`missing_fields`),
+  // so allowing an empty value here produced a silent "couldn't record"
+  // failure (jits-ait follow-up). When present it must also parse and fall
+  // within the match length (a submission can't land after the bout ended).
   const finishTimeValid = isFinishTimeValid(finishTimeStr, durationSeconds);
+  const finishTimeProvided = finishTimeStr.trim() !== "";
 
   const canSubmit =
     outcome === "draw" ||
     (outcome === "submission" &&
       winnerId !== "" &&
       submissionCode !== "" &&
+      finishTimeProvided &&
       finishTimeValid);
 
   function handleSubmit() {
