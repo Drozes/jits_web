@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+**Mobile: shipped to TestFlight build 15 (v0.1.0, 2026-06-05)**
+
+Promoted iOS build 15 to TestFlight (EAS build `7294749a`, IPA `f9CBAXH4XdH2VzUejtgdoe`, auto-submitted to App Store Connect app `6774629438`; remote build number auto-incremented to 15). Carries today's mobile QA + Design QA sweep (epic `jits-a8y`): the P0 presence-channel fix, all eight P1 fixes (`jits-a8y.2`–`.9`), and the six P2 correctness fixes (`jits-a8y.10`/`.11`/`.12`/`.14`/`.15`/`.21`). Quality gate green before build: typecheck (all workspaces), 401 tests (mobile 204, web 39, shared 158), iOS `expo export`. Targets the current/staging backend (`EXPO_PUBLIC_APP_ENV=staging`); the production backend cutover is the separate `jits-i1n` task. Tester "What to Test" note must be set in App Store Connect (EAS submit does not push it).
+
 **Mobile QA + Design QA sweep: P0 + P1 fixes (epic jits-a8y, 2026-06-05)**
 
 A 5-agent mobile-only review (3 functional QA, 2 design QA) surfaced 33 findings (filed under epic `jits-a8y`); the P0 and all P1 items were fixed, independently reviewed, and shipped green (typecheck all workspaces; mobile 192, web 39, shared 158 tests).
