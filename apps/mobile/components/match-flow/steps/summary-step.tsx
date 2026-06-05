@@ -1,6 +1,6 @@
 import { Pressable, Share, Text, View } from "react-native";
 import { useRouter } from "expo-router";
-import { Share2 } from "lucide-react-native";
+import { Share2, Scale } from "lucide-react-native";
 import { toast } from "@/components/ui/toast";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { useAuth } from "@/lib/auth/hooks";
@@ -20,6 +20,8 @@ interface SummaryStepProps {
   eloBefore?: number | null;
   /** Authoritative post-match rating; falls back to current_elo. */
   eloAfter?: number | null;
+  /** BE-stamped IBJJF division gap. Shown (informational) when > 0. */
+  weightDivisionGap?: number | null;
 }
 
 /**
@@ -36,9 +38,18 @@ export function SummaryStep(props: SummaryStepProps) {
   const tokens = useThemedTokens();
   const router = useRouter();
   const { athlete } = useAuth();
-  const { sessionId, matchType, matchStatus, outcome, eloDelta, eloBefore, eloAfter } =
-    props;
+  const {
+    sessionId,
+    matchType,
+    matchStatus,
+    outcome,
+    eloDelta,
+    eloBefore,
+    eloAfter,
+    weightDivisionGap,
+  } = props;
   const disputed = matchStatus === "disputed";
+  const gap = weightDivisionGap ?? 0;
 
   // Authoritative ratings from the BE; no arithmetic re-derivation.
   const before = eloBefore ?? null;
@@ -123,6 +134,17 @@ export function SummaryStep(props: SummaryStepProps) {
       ) : after != null ? (
         <View className="items-center">
           <EloTile label="ELO Rating" value={after} size="large" />
+        </View>
+      ) : null}
+
+      {matchType === "ranked" && gap > 0 ? (
+        <View className="flex-row items-center gap-2 rounded-xs bg-surface-3 border border-hairline-strong px-3 py-2">
+          <Scale size={14} color={tokens.textSecondary} />
+          <Text className="flex-1 font-mono text-[10px] text-ink-2 uppercase tracking-caps-l">
+            <Text className="tabular-nums">{gap}</Text> weight
+            {gap > 1 ? " classes" : " class"} apart. Heavier athlete{"’"}s ELO
+            was adjusted.
+          </Text>
         </View>
       ) : null}
 

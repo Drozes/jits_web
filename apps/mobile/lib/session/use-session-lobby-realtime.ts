@@ -67,7 +67,7 @@ export function useSessionLobbyRealtime({
         },
         async ({ new: row }) => {
           const r = row as { athlete_id: string; status: string; weight_confirmed: number | null; current_match_id?: string | null; id: string; checked_in_at?: string };
-          const { data: ath } = await supabase.from("athletes").select("display_name, current_elo, current_weight, profile_photo_url, primary_gym_id").eq("id", r.athlete_id).single();
+          const { data: ath } = await supabase.from("athletes").select("display_name, current_elo, current_weight, profile_photo_url, primary_gym_id").eq("id", r.athlete_id).maybeSingle();
           if (!ath) return;
           const np: LobbyParticipant = {
             participantId: r.id ?? "",

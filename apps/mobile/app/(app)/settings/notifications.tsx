@@ -4,6 +4,7 @@ import { AppHeader } from "@/components/layout/app-header";
 import { PageContainer } from "@/components/layout/page-container";
 import { Plate } from "@/components/ui/elo-system";
 import { Switch } from "@/components/ui/switch";
+import { toast } from "@/components/ui/toast";
 import { useAuth } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { supabase } from "@/lib/supabase/client";
@@ -53,11 +54,16 @@ export default function NotificationsScreen() {
   const handleToggle = React.useCallback(
     async (key: keyof NotificationPrefs) => {
       if (!prefs || !athlete) return;
-      const next = !prefs[key];
-      setPrefs((prev) => (prev ? { ...prev, [key]: next } : prev));
-      await updateNotificationPreferences(supabase, athlete.id, {
+      const prev = prefs[key];
+      const next = !prev;
+      setPrefs((p) => (p ? { ...p, [key]: next } : p));
+      const result = await updateNotificationPreferences(supabase, athlete.id, {
         [key]: next,
       });
+      if (!result.ok) {
+        setPrefs((p) => (p ? { ...p, [key]: prev } : p));
+        toast.error("Could not save notification settings. Please try again.");
+      }
     },
     [prefs, athlete],
   );

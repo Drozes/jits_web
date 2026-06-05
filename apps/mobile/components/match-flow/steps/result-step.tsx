@@ -4,6 +4,7 @@ import { Handshake } from "lucide-react-native";
 import { Plate } from "@/components/ui/elo-system";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { useRecordResult } from "@/lib/match-flow/use-record-result";
+import { isFinishTimeValid } from "@/lib/match-flow/parse-finish-time";
 import type { BroadcastResult } from "@jits/shared/hooks/use-session-match-sync";
 import type { SubmissionType } from "@jits/shared/types/submission-type";
 import {
@@ -16,6 +17,8 @@ import { cn } from "@/lib/cn";
 
 interface ResultStepProps {
   matchId: string;
+  /** Match length in seconds; finish time can't exceed it. */
+  durationSeconds: number;
   participants: ResultParticipant[];
   submissionTypes: SubmissionType[];
   onRecorded: (result: BroadcastResult) => void;
@@ -32,6 +35,7 @@ interface ResultStepProps {
  */
 export function ResultStep({
   matchId,
+  durationSeconds,
   participants,
   submissionTypes,
   onRecorded,
@@ -43,8 +47,16 @@ export function ResultStep({
   const [finishTimeStr, setFinishTimeStr] = React.useState("");
   const { loading, submit } = useRecordResult({ matchId, onRecorded });
 
+  // Optional finish time; when present it must parse and fall within the
+  // match length (a submission can't land after the bout ended).
+  const finishTimeValid = isFinishTimeValid(finishTimeStr, durationSeconds);
+
   const canSubmit =
-    outcome === "draw" || (outcome === "submission" && winnerId !== "" && submissionCode !== "");
+    outcome === "draw" ||
+    (outcome === "submission" &&
+      winnerId !== "" &&
+      submissionCode !== "" &&
+      finishTimeValid);
 
   function handleSubmit() {
     if (!outcome || !canSubmit) return;
@@ -76,6 +88,8 @@ export function ResultStep({
               submissionTypes={submissionTypes}
               submissionCode={submissionCode}
               finishTimeStr={finishTimeStr}
+              durationSeconds={durationSeconds}
+              finishTimeInvalid={!finishTimeValid}
               onSubmissionChange={setSubmissionCode}
               onFinishTimeChange={setFinishTimeStr}
             />

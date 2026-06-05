@@ -1,12 +1,18 @@
 import { Text, TextInput, View } from "react-native";
 import { Chip } from "@/components/ui/elo-system";
 import { useThemedTokens } from "@/lib/theme/use-theme";
+import { formatElapsed } from "@/lib/match-flow/format-elapsed";
+import { cn } from "@/lib/cn";
 import type { SubmissionType } from "@jits/shared/types/submission-type";
 
 interface SubmissionFieldsProps {
   submissionTypes: SubmissionType[];
   submissionCode: string;
   finishTimeStr: string;
+  /** Match length in seconds; finish time can't exceed it. */
+  durationSeconds: number;
+  /** True when the entered finish time is malformed or past the duration. */
+  finishTimeInvalid: boolean;
   onSubmissionChange: (v: string) => void;
   onFinishTimeChange: (v: string) => void;
 }
@@ -20,6 +26,8 @@ export function SubmissionFields({
   submissionTypes,
   submissionCode,
   finishTimeStr,
+  durationSeconds,
+  finishTimeInvalid,
   onSubmissionChange,
   onFinishTimeChange,
 }: SubmissionFieldsProps) {
@@ -58,8 +66,17 @@ export function SubmissionFields({
           onChangeText={onFinishTimeChange}
           keyboardType="numeric"
           maxLength={5}
-          className="h-11 rounded-sm border border-hairline-strong bg-surface-3 px-3 font-mono text-[14px] text-ink"
+          className={cn(
+            "h-11 rounded-sm border bg-surface-3 px-3 font-mono text-[14px] text-ink",
+            finishTimeInvalid ? "border-negative" : "border-hairline-strong",
+          )}
         />
+        {finishTimeInvalid ? (
+          <Text className="font-mono text-[10px] text-negative uppercase tracking-caps-l">
+            Must be within match length (
+            <Text className="tabular-nums">{formatElapsed(durationSeconds)}</Text>)
+          </Text>
+        ) : null}
       </View>
     </View>
   );

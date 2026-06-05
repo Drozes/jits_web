@@ -85,7 +85,7 @@ function AccountPlate({
         onPress={onSignOut}
         accessibilityRole="button"
         accessibilityLabel="Sign out"
-        className="flex-row items-center justify-between px-4 py-3 active:bg-surface-4"
+        className="flex-row items-center justify-between px-4 py-3 min-h-11 active:bg-surface-4"
       >
         <Text className="font-mono text-[10px] text-cta uppercase tracking-caps-l">
           SIGN OUT
@@ -121,7 +121,7 @@ function DeveloperPlate() {
       <Link href="/(app)/settings/realtime-test" asChild>
         <Pressable
           accessibilityRole="link"
-          className="flex-row items-center justify-between px-4 py-3 active:bg-surface-4"
+          className="flex-row items-center justify-between px-4 py-3 min-h-11 active:bg-surface-4"
         >
           <View className="flex-row items-center gap-3">
             <View pointerEvents="none">
@@ -156,7 +156,7 @@ function FeedbackRow() {
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      className="flex-row items-center justify-between px-4 py-3 active:bg-surface-4"
+      className="flex-row items-center justify-between px-4 py-3 min-h-11 active:bg-surface-4"
     >
       <RowLabel>FEEDBACK</RowLabel>
       <Chevron />
@@ -175,7 +175,7 @@ function SettingsRow({
     <Link href={href as Href} asChild>
       <Pressable
         accessibilityRole="link"
-        className="flex-row items-center justify-between px-4 py-3 active:bg-surface-4"
+        className="flex-row items-center justify-between px-4 py-3 min-h-11 active:bg-surface-4"
       >
         <RowLabel>{label}</RowLabel>
         <Chevron />

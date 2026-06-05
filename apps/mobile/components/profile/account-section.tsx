@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Alert, Pressable, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { Monitor, Moon, Palette, Settings, Sun, UserPen } from "lucide-react-native";
 import { useAuth } from "@/lib/auth/hooks";
@@ -117,7 +117,7 @@ export function AccountSection() {
         <SettingsRow
           icon={<UserPen size={16} color={tokens.textPrimary} />}
           label="Edit Profile"
-          onPress={() => Alert.alert("Coming soon", "Profile editing coming soon.")}
+          onPress={() => router.push("/profile-setup")}
         />
         <SettingsRow
           icon={<Settings size={16} color={tokens.textPrimary} />}

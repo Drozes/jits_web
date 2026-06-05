@@ -19,6 +19,8 @@ interface MatchParticipant {
   elo_before: number | null;
   elo_after: number | null;
   elo_delta: number | null;
+  /** BE-stamped IBJJF division gap used for the phantom-ELO adjustment. */
+  weight_division_gap: number | null;
 }
 
 interface MatchStepRendererProps {
@@ -114,6 +116,7 @@ export function MatchStepRenderer({
     return (
       <ResultStep
         matchId={matchId}
+        durationSeconds={durationSeconds}
         participants={[
           { id: me.athlete_id, displayName: me.display_name },
           { id: opponent.athlete_id, displayName: opponent.display_name },
@@ -152,6 +155,9 @@ export function MatchStepRenderer({
     const eloBefore = isRanked ? me.elo_before : null;
     const eloAfter = isRanked ? me.elo_after : null;
     const eloDelta = isRanked ? me.elo_delta ?? null : null;
+    // BE-stamped IBJJF division gap (same value for both athletes). Surfaced
+    // only for ranked matches where it actually adjusts the phantom ELO.
+    const weightDivisionGap = isRanked ? me.weight_division_gap ?? null : null;
     return (
       <SummaryStep
         sessionId={sessionId}
@@ -161,6 +167,7 @@ export function MatchStepRenderer({
         eloDelta={eloDelta}
         eloBefore={eloBefore}
         eloAfter={eloAfter ?? me.current_elo}
+        weightDivisionGap={weightDivisionGap}
       />
     );
   }

@@ -5,7 +5,10 @@
  * Source: apps/mobile/lib/match-flow/parse-finish-time.ts
  */
 
-import { parseFinishTime } from "@/lib/match-flow/parse-finish-time";
+import {
+  parseFinishTime,
+  isFinishTimeValid,
+} from "@/lib/match-flow/parse-finish-time";
 
 describe("parseFinishTime", () => {
   describe("mm:ss format", () => {
@@ -94,6 +97,68 @@ describe("parseFinishTime", () => {
 
     it("returns null when seconds part is non-numeric", () => {
       expect(parseFinishTime("1:abc")).toBeNull();
+    });
+  });
+});
+
+describe("isFinishTimeValid", () => {
+  const DURATION = 600; // 10:00 bout
+
+  describe("optional / default behavior", () => {
+    it("treats an empty string as valid (finish time is optional)", () => {
+      expect(isFinishTimeValid("", DURATION)).toBe(true);
+    });
+
+    it("treats a whitespace-only string as valid", () => {
+      expect(isFinishTimeValid("   ", DURATION)).toBe(true);
+    });
+  });
+
+  describe("in-bounds times are accepted", () => {
+    it("accepts a plain-seconds time within the duration", () => {
+      expect(isFinishTimeValid("270", DURATION)).toBe(true);
+    });
+
+    it("accepts an mm:ss time within the duration", () => {
+      expect(isFinishTimeValid("4:30", DURATION)).toBe(true);
+    });
+
+    it("accepts a time exactly equal to the duration (boundary)", () => {
+      expect(isFinishTimeValid("10:00", DURATION)).toBe(true);
+      expect(isFinishTimeValid("600", DURATION)).toBe(true);
+    });
+
+    it("accepts 0", () => {
+      expect(isFinishTimeValid("0", DURATION)).toBe(true);
+      expect(isFinishTimeValid("0:00", DURATION)).toBe(true);
+    });
+  });
+
+  describe("over-duration times are rejected", () => {
+    it("rejects a plain-seconds time past the duration", () => {
+      expect(isFinishTimeValid("601", DURATION)).toBe(false);
+    });
+
+    it("rejects an mm:ss time past the duration", () => {
+      expect(isFinishTimeValid("11:00", DURATION)).toBe(false);
+    });
+
+    it("rejects an unbounded mm:ss time (e.g. 59:59)", () => {
+      expect(isFinishTimeValid("59:59", DURATION)).toBe(false);
+    });
+  });
+
+  describe("malformed input is rejected", () => {
+    it("rejects non-numeric input", () => {
+      expect(isFinishTimeValid("abc", DURATION)).toBe(false);
+    });
+
+    it("rejects seconds > 59 in mm:ss (parser failure)", () => {
+      expect(isFinishTimeValid("1:60", DURATION)).toBe(false);
+    });
+
+    it("rejects negative input", () => {
+      expect(isFinishTimeValid("-10", DURATION)).toBe(false);
     });
   });
 });
