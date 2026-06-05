@@ -25,9 +25,12 @@ export function useGymRoster(gymId: string | undefined): UseGymRosterResult {
   const [isManager, setIsManager] = React.useState(true);
   const [isLoading, setIsLoading] = React.useState(true);
   const [isRefreshing, setIsRefreshing] = React.useState(false);
+  // Toggled true on unmount so both the initial and refresh paths share one
+  // cancellation flag (W3-4): no post-unmount state writes from either.
+  const cancelledRef = React.useRef(false);
 
   const fetchAll = React.useCallback(
-    async (mode: "initial" | "refresh", isCancelled: () => boolean = () => false) => {
+    async (mode: "initial" | "refresh", isCancelled: () => boolean = () => cancelledRef.current) => {
       if (!gymId) return;
       if (mode === "initial") setIsLoading(true);
       else setIsRefreshing(true);
@@ -62,10 +65,10 @@ export function useGymRoster(gymId: string | undefined): UseGymRosterResult {
   );
 
   React.useEffect(() => {
-    let cancelled = false;
-    void fetchAll("initial", () => cancelled);
+    cancelledRef.current = false;
+    void fetchAll("initial");
     return () => {
-      cancelled = true;
+      cancelledRef.current = true;
     };
   }, [fetchAll]);
 
@@ -74,6 +77,8 @@ export function useGymRoster(gymId: string | undefined): UseGymRosterResult {
     isManager,
     isLoading,
     isRefreshing,
+    // Shares cancelledRef via fetchAll's default isCancelled, so a refresh that
+    // resolves after unmount writes no state.
     refresh: () => fetchAll("refresh"),
   };
 }

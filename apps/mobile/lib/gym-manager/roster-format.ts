@@ -27,11 +27,13 @@ export function formatWinRate(winRate: number, totalMatches: number): string {
 
 /**
  * Match-history sub-label for the H7 last-5 list: relative date plus the finish
- * type. Submission finishes name the technique ("Submission · Armbar"); a null
- * submission is a time-expiry decision.
+ * type. A draw (a first-class outcome here, Pressure Score) is labeled "Draw";
+ * otherwise submission finishes name the technique ("Submission · Armbar") and a
+ * null submission is a time-expiry decision.
  */
 export function formatFinish(match: GymAthleteRecentMatch): string {
   const when = formatRelativeDate(match.occurred_at);
+  if (match.result === "draw") return `${when} · Draw`;
   if (match.submission) return `${when} · Submission · ${match.submission}`;
   return `${when} · Decision (Time)`;
 }

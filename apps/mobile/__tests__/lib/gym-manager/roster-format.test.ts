@@ -98,4 +98,10 @@ describe("formatFinish", () => {
       "2d ago · Decision (Time)",
     );
   });
+
+  it('labels a draw as "Draw", not a decision', () => {
+    expect(formatFinish(match({ result: "draw", submission: null }))).toBe(
+      "2d ago · Draw",
+    );
+  });
 });
