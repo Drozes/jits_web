@@ -6,6 +6,7 @@ import {
   SheetHeader,
   SheetTitle,
   SheetTrigger,
+  type SheetController,
 } from "@/components/ui/sheet";
 import { Plate } from "@/components/ui/elo-system";
 import { toast } from "@/components/ui/toast";
@@ -42,6 +43,7 @@ interface CreateSessionSheetProps {
 
 export function CreateSessionSheet({ gymId, onCreated, children }: CreateSessionSheetProps) {
   const tokens = useThemedTokens();
+  const sheet = React.useRef<SheetController | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [title, setTitle] = React.useState("Open Mat");
   const [startPreset, setStartPreset] = React.useState<StartPreset>("now");
@@ -67,6 +69,7 @@ export function CreateSessionSheet({ gymId, onCreated, children }: CreateSession
     if (result.ok) {
       toast.success("Session created");
       onCreated();
+      sheet.current?.close();
     } else {
       toast.error(result.error.message);
     }
@@ -74,7 +77,7 @@ export function CreateSessionSheet({ gymId, onCreated, children }: CreateSession
   }
 
   return (
-    <Sheet>
+    <Sheet controllerRef={sheet}>
       <SheetTrigger asChild>{children}</SheetTrigger>
       <SheetContent snapPoints={["80%"]}>
         <SheetHeader>

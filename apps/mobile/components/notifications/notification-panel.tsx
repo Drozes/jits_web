@@ -6,7 +6,8 @@
  */
 import * as React from "react";
 import { Text, View } from "react-native";
-import BottomSheet, {
+import {
+  BottomSheetModal,
   BottomSheetBackdrop,
   BottomSheetScrollView,
   type BottomSheetBackdropProps,
@@ -31,12 +32,12 @@ export function NotificationPanel({
   onOpenChange,
   items,
 }: NotificationPanelProps) {
-  const ref = React.useRef<BottomSheet | null>(null);
+  const ref = React.useRef<BottomSheetModal | null>(null);
   const tokens = useThemedTokens();
 
   React.useEffect(() => {
-    if (open) ref.current?.expand();
-    else ref.current?.close();
+    if (open) ref.current?.present();
+    else ref.current?.dismiss();
   }, [open]);
 
   const handleSheetChange = React.useCallback(
@@ -61,9 +62,8 @@ export function NotificationPanel({
   }, [items]);
 
   return (
-    <BottomSheet
+    <BottomSheetModal
       ref={ref}
-      index={-1}
       snapPoints={["65%"]}
       enablePanDownToClose
       onChange={handleSheetChange}
@@ -99,6 +99,6 @@ export function NotificationPanel({
           ))
         )}
       </BottomSheetScrollView>
-    </BottomSheet>
+    </BottomSheetModal>
   );
 }

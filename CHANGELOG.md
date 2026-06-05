@@ -2,6 +2,28 @@
 
 ## [Unreleased]
 
+**Mobile: close create/edit bottom sheets after a successful mutation (jits-f95, 2026-06-04)**
+
+**Fixed**
+- After creating a session (and likewise creating a gym, editing a gym, or saving a session template) the bottom sheet stayed open on success — the form just sat there after the "created" toast. Root cause: the submit handlers live in the component that renders `<Sheet>`, which sits above the `SheetContext` provider and so couldn't call `close()`.
+  - `apps/mobile/components/ui/sheet.tsx`: added an imperative `controllerRef?: React.Ref<SheetController>` to `<Sheet>` (exposes `{ open, close }` via `useImperativeHandle`) so a parent can dismiss its own sheet.
+  - `apps/mobile/components/session/create-session-sheet.tsx`, `components/gyms/create-gym-sheet.tsx`, `components/gyms/edit-gym-sheet.tsx`, `components/session/template-form-sheet.tsx`: hold a `sheet` ref, pass `controllerRef={sheet}`, and call `sheet.current?.close()` after the mutation succeeds (the sheet's content unmounts on dismiss, so the form also resets for next open).
+
+**Mobile: fix top-right accessory sheets collapsing into a tiny corner box (jits-utl, 2026-06-04)**
+
+**Fixed**
+- Tapping a header right-action accessory (gym-detail Edit pencil, gym-list Create `+`, profile/athlete Share, Home notifications bell) rendered a tiny ~half-height box pinned to the top-right corner (just the drag handle visible) instead of a full-width bottom sheet. Root cause: `apps/mobile/components/ui/sheet.tsx` and `apps/mobile/components/notifications/notification-panel.tsx` used the **non-modal** `@gorhom/bottom-sheet` `<BottomSheet>`, which is rendered inline in the React tree and measures its immediate parent to compute the window height. Mounted inside `AppHeader`'s ~32px `rightAction` slot, the sheet sized itself to that slot — hence the collapsed corner box. Affected every sheet triggered from a constrained container, i.e. all top-right accessories.
+  - `apps/mobile/components/ui/sheet.tsx`: converted the shared `Sheet` primitive to `<BottomSheetModal>` (portals into a root host, always measures the full window). `open()`/`close()` now map to `present()`/`dismiss()`. Consumers (`EditGymSheet`, `CreateGymSheet`, `CreateSessionSheet`, `TemplateFormSheet`, `ShareProfileSheet`) are unchanged — they only compose `<Sheet>` and inherit the fix.
+  - `apps/mobile/components/notifications/notification-panel.tsx`: same non-modal → `<BottomSheetModal>` conversion (`expand()`/`close()` → `present()`/`dismiss()`).
+  - `apps/mobile/app/_layout.tsx`: mounted `<BottomSheetModalProvider>` (from `@gorhom/bottom-sheet`) inside `GestureHandlerRootView` / `SafeAreaProvider`, wrapping the app screen tree, so the modal sheets have a full-screen portal host. `OfflineBanner` + `Toaster` stay above it so they stack over an open sheet.
+
+**Mobile: fix dead back chevron on the gym detail (and other deep-link/reload entry routes) (jits-jg4, 2026-06-04)**
+
+**Fixed**
+- The gym-detail header's top-left back chevron did nothing when `/gyms/[id]` was the *entry* route (a full JS reload, a `/gyms/*` universal link, or OS state restoration), because the custom `AppHeader` calls `router.back()`, which silently no-ops when the stack has no screen to pop. No nested navigator declared an `initialRouteName`, so the deep screen was the only entry on its stack.
+  - `apps/mobile/app/(app)/(tabs)/gyms/_layout.tsx`, `apps/mobile/app/(app)/_layout.tsx`, `apps/mobile/app/(app)/(tabs)/profile/_layout.tsx`: added `export const unstable_settings = { initialRouteName: ... }` anchors (`index` / `(tabs)` / `index`) so the list/tab navigator is always placed beneath the pushed detail screen (`gyms/[id]`, `athlete/[id]`, `session/[id]`, `settings`, `profile/stats`) — back then pops to a real parent even on deep-link/reload entry. No effect on the normal in-app push flow (the anchor is already the first screen there).
+  - `apps/mobile/components/layout/app-header.tsx`: hardened the back chevron with a `router.canGoBack()` guard plus an optional `backFallback?: Href` prop — when there is genuinely no history to pop, it `router.replace(backFallback)` instead of being a dead button. `apps/mobile/app/(app)/(tabs)/gyms/[id].tsx` passes `backFallback="/gyms"` on both its headers (main + not-found) as the explicit safety net.
+
 **Match flow: Ready-Check Cancel/Leave so a stuck athlete can abort cleanly (jits-3ie.1, 2026-06-04)**
 
 **Added**

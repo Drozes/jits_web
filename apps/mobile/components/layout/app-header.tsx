@@ -2,13 +2,20 @@ import * as React from "react";
 import { View, Text, Pressable } from "react-native";
 import { ChevronLeft } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { useRouter, type Href } from "expo-router";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { cn } from "@/lib/cn";
 
 interface AppHeaderProps {
   title?: string;
   back?: boolean;
+  /**
+   * Where the back chevron goes when there is no history to pop (i.e. the screen
+   * was the entry route via deep link or reload). Stack `initialRouteName`
+   * anchors handle the common case; this is the explicit safety net so the
+   * chevron can never become a dead, no-op button.
+   */
+  backFallback?: Href;
   icon?: React.ReactNode;
   rightAction?: React.ReactNode;
   className?: string;
@@ -21,6 +28,7 @@ interface AppHeaderProps {
 export function AppHeader({
   title,
   back = false,
+  backFallback,
   icon,
   rightAction,
   className,
@@ -28,6 +36,14 @@ export function AppHeader({
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const tokens = useThemedTokens();
+
+  const handleBack = React.useCallback(() => {
+    if (router.canGoBack()) {
+      router.back();
+    } else if (backFallback) {
+      router.replace(backFallback);
+    }
+  }, [router, backFallback]);
 
   return (
     <View
@@ -42,7 +58,7 @@ export function AppHeader({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Go back"
-            onPress={() => router.back()}
+            onPress={handleBack}
             hitSlop={10}
             className="w-8 h-8 items-center justify-center rounded-xs active:bg-surface-3"
           >

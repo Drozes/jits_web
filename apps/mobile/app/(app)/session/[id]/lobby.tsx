@@ -137,7 +137,7 @@ export default function SessionLobbyScreen() {
   if (error || !data) {
     return (
       <PageSurface>
-        <AppHeader title="Session Lobby" back />
+        <AppHeader title="Session Lobby" back backFallback="/gyms" />
         <View className="flex-1 items-center justify-center px-6">
           <Plate className="items-center py-8">
             <Text className="font-heading text-[16px] text-ink text-center mb-2">
@@ -161,6 +161,7 @@ export default function SessionLobbyScreen() {
       <AppHeader
         title="Session Lobby"
         back
+        backFallback="/gyms"
         rightAction={<LeaveButton sessionId={id} variant="compact" />}
       />
 

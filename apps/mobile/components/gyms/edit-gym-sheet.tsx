@@ -6,6 +6,7 @@ import {
   SheetHeader,
   SheetTitle,
   SheetTrigger,
+  type SheetController,
 } from "@/components/ui/sheet";
 import { Plate } from "@/components/ui/elo-system";
 import { toast } from "@/components/ui/toast";
@@ -29,6 +30,7 @@ export function EditGymSheet({
   children,
 }: EditGymSheetProps) {
   const tokens = useThemedTokens();
+  const sheet = React.useRef<SheetController | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [name, setName] = React.useState(currentName);
   const [city, setCity] = React.useState(currentCity ?? "");
@@ -45,6 +47,7 @@ export function EditGymSheet({
     if (result.ok) {
       toast.success("Gym updated");
       onUpdated();
+      sheet.current?.close();
     } else {
       toast.error(result.error.message);
     }
@@ -54,7 +57,7 @@ export function EditGymSheet({
   const isValid = name.trim().length > 0;
 
   return (
-    <Sheet>
+    <Sheet controllerRef={sheet}>
       <SheetTrigger asChild>{children}</SheetTrigger>
       <SheetContent snapPoints={["55%"]}>
         <SheetHeader>

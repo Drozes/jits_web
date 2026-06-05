@@ -150,7 +150,7 @@ export default function GymDetailScreen() {
   if (!data) {
     return (
       <View className="flex-1 bg-surface">
-        <AppHeader title="Gym" back />
+        <AppHeader title="Gym" back backFallback="/gyms" />
         <View className="flex-1 items-center justify-center px-8">
           <Text className="font-heading text-[14px] text-ink uppercase tracking-caps-l">
             Gym Not Found
@@ -171,6 +171,7 @@ export default function GymDetailScreen() {
       <AppHeader
         title="Gym"
         back
+        backFallback="/gyms"
         rightAction={
           data.isGymManager ? (
             <EditGymSheet

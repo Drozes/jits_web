@@ -7,6 +7,7 @@ import * as SplashScreen from "expo-splash-screen";
 import { Stack } from "expo-router";
 import { colorScheme } from "nativewind";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useFonts } from "expo-font";
 import { BebasNeue_400Regular } from "@expo-google-fonts/bebas-neue";
@@ -116,17 +117,25 @@ function RootLayout() {
       <GestureHandlerRootView style={{ flex: 1 }}>
         <ThemeProvider>
           <SafeAreaProvider>
-            <AuthProvider>
-              <PushRegistrationBootstrap />
-              <SentryUserBootstrap />
-              <OnlinePresenceBootstrap />
-              <DeepLinkBootstrap />
-              <Stack screenOptions={{ headerShown: false }}>
-                <Stack.Screen name="(auth)" />
-                <Stack.Screen name="(app)" />
-                <Stack.Screen name="profile-setup" options={{ presentation: "modal" }} />
-              </Stack>
-            </AuthProvider>
+            {/*
+              BottomSheetModalProvider hosts the portal that all <BottomSheetModal>
+              sheets (gym edit/create, share, notifications, etc.) render into, so
+              they measure the full window regardless of where their trigger sits.
+              OfflineBanner + Toaster stay above it so they stack over an open sheet.
+            */}
+            <BottomSheetModalProvider>
+              <AuthProvider>
+                <PushRegistrationBootstrap />
+                <SentryUserBootstrap />
+                <OnlinePresenceBootstrap />
+                <DeepLinkBootstrap />
+                <Stack screenOptions={{ headerShown: false }}>
+                  <Stack.Screen name="(auth)" />
+                  <Stack.Screen name="(app)" />
+                  <Stack.Screen name="profile-setup" options={{ presentation: "modal" }} />
+                </Stack>
+              </AuthProvider>
+            </BottomSheetModalProvider>
             <OfflineBanner />
             <Toaster />
           </SafeAreaProvider>

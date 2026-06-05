@@ -1,6 +1,7 @@
 import * as React from "react";
 import { Pressable, Text, View, type ViewProps } from "react-native";
-import BottomSheet, {
+import {
+  BottomSheetModal,
   BottomSheetBackdrop,
   BottomSheetView,
   type BottomSheetBackdropProps,
@@ -9,7 +10,7 @@ import { cn } from "../../lib/cn";
 import { useThemedTokens } from "../../lib/theme/use-theme";
 
 interface SheetContextValue {
-  ref: React.RefObject<BottomSheet | null>;
+  ref: React.RefObject<BottomSheetModal | null>;
   open: () => void;
   close: () => void;
 }
@@ -22,14 +23,33 @@ function useSheetContext() {
   return ctx;
 }
 
-export interface SheetProps {
-  children?: React.ReactNode;
+export interface SheetController {
+  open: () => void;
+  close: () => void;
 }
 
-export function Sheet({ children }: SheetProps) {
-  const ref = React.useRef<BottomSheet | null>(null);
-  const open = React.useCallback(() => ref.current?.expand(), []);
-  const close = React.useCallback(() => ref.current?.close(), []);
+export interface SheetProps {
+  children?: React.ReactNode;
+  /**
+   * Optional handle for the PARENT that renders <Sheet>. The parent sits above
+   * the SheetContext provider so it can't call useSheetContext(); this lets it
+   * imperatively close the sheet after a successful mutation (e.g. dismiss the
+   * "New Session" form once the session is created). Children should still use
+   * <SheetTrigger>/<SheetClose>/useSheetContext() instead.
+   */
+  controllerRef?: React.Ref<SheetController>;
+}
+
+export function Sheet({ children, controllerRef }: SheetProps) {
+  const ref = React.useRef<BottomSheetModal | null>(null);
+  // BottomSheetModal portals its content to the root <BottomSheetModalProvider>,
+  // so the sheet always measures the full window and snaps correctly no matter
+  // where the trigger sits. The old inline (non-modal) <BottomSheet> measured its
+  // immediate parent, so a trigger placed in AppHeader's ~32px right-action slot
+  // collapsed the sheet into a tiny box pinned to the top-right corner.
+  const open = React.useCallback(() => ref.current?.present(), []);
+  const close = React.useCallback(() => ref.current?.dismiss(), []);
+  React.useImperativeHandle(controllerRef, () => ({ open, close }), [open, close]);
   return (
     <SheetContext.Provider value={{ ref, open, close }}>
       {children}
@@ -65,9 +85,8 @@ export function SheetContent({ className, snapPoints = ["50%", "90%"], children 
   const { ref } = useSheetContext();
   const tokens = useThemedTokens();
   return (
-    <BottomSheet
+    <BottomSheetModal
       ref={ref}
-      index={-1}
       snapPoints={snapPoints}
       enablePanDownToClose
       backdropComponent={renderBackdrop}
@@ -77,7 +96,7 @@ export function SheetContent({ className, snapPoints = ["50%", "90%"], children 
       <BottomSheetView className={cn("flex-1 px-4 pb-4", className)}>
         {children}
       </BottomSheetView>
-    </BottomSheet>
+    </BottomSheetModal>
   );
 }
 

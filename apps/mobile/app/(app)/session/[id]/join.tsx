@@ -28,7 +28,7 @@ export default function SessionJoinScreen() {
   if (authLoading || isLoading) {
     return (
       <PageSurface>
-        <AppHeader title="Join Session" back />
+        <AppHeader title="Join Session" back backFallback="/gyms" />
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator color={tokens.accentCta} />
         </View>
@@ -43,7 +43,7 @@ export default function SessionJoinScreen() {
   if (error || !data) {
     return (
       <PageSurface>
-        <AppHeader title="Join Session" back />
+        <AppHeader title="Join Session" back backFallback="/gyms" />
         <View className="flex-1 items-center justify-center px-6">
           <Plate className="items-center py-8">
             <Text className="font-heading text-[16px] text-ink text-center mb-2">
@@ -60,7 +60,7 @@ export default function SessionJoinScreen() {
 
   return (
     <PageSurface>
-      <AppHeader title="Join Session" back />
+      <AppHeader title="Join Session" back backFallback="/gyms" />
       <PageContainer noTabBar contentContainerStyle={{ paddingTop: 20, gap: 24 }}>
         <View>
           <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-xl mb-1">

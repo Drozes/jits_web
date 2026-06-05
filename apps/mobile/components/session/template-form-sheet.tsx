@@ -6,6 +6,7 @@ import {
   SheetHeader,
   SheetTitle,
   SheetTrigger,
+  type SheetController,
 } from "@/components/ui/sheet";
 import {
   Select,
@@ -43,6 +44,7 @@ export function TemplateFormSheet({
   children,
 }: TemplateFormSheetProps) {
   const tokens = useThemedTokens();
+  const sheet = React.useRef<SheetController | null>(null);
   const isEdit = !!template;
   const [loading, setLoading] = React.useState(false);
   const [title, setTitle] = React.useState(template?.title ?? "Open Mat");
@@ -81,6 +83,7 @@ export function TemplateFormSheet({
     if (result.ok) {
       toast.success(isEdit ? "Template updated" : "Template created");
       onSaved();
+      sheet.current?.close();
     } else {
       toast.error(result.error.message);
     }
@@ -88,7 +91,7 @@ export function TemplateFormSheet({
   }
 
   return (
-    <Sheet>
+    <Sheet controllerRef={sheet}>
       <SheetTrigger asChild>{children}</SheetTrigger>
       <SheetContent snapPoints={["88%"]}>
         <SheetHeader>
