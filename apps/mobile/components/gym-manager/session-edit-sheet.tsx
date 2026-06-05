@@ -44,6 +44,13 @@ const DURATION_PRESETS: { value: DurationPreset; label: string }[] = [
   { value: 3, label: "3h" },
 ];
 
+/**
+ * Client mirror of the backend "no sessions in the past" rule
+ * (create_session rejects starts older than now()-5min). We allow the same
+ * grace so a save that takes a moment doesn't trip on its own latency.
+ */
+const PAST_GRACE_MS = 5 * 60_000;
+
 /** A start time rounded up to the next half hour, used as the create default. */
 function defaultStart(): Date {
   const d = new Date();
@@ -78,30 +85,80 @@ export function SessionEditSheet({
   const sheet = React.useRef<SheetController | null>(null);
   const isEdit = !!session;
 
-  const initialStart = session ? new Date(session.scheduledStart) : defaultStart();
-  const initialDuration = session
-    ? (Math.min(3, Math.max(1, durationHours(
-        new Date(session.scheduledStart),
-        new Date(session.scheduledEnd),
-      ))) as DurationPreset)
-    : 2;
+  const seedStart = React.useCallback(
+    () => (session ? new Date(session.scheduledStart) : defaultStart()),
+    [session],
+  );
+  const seedDuration = React.useCallback(
+    () =>
+      session
+        ? (Math.min(3, Math.max(1, durationHours(
+            new Date(session.scheduledStart),
+            new Date(session.scheduledEnd),
+          ))) as DurationPreset)
+        : (2 as DurationPreset),
+    [session],
+  );
 
   const [loading, setLoading] = React.useState(false);
   const [title, setTitle] = React.useState(session?.title ?? "Open Mat");
-  const [start, setStart] = React.useState<Date>(initialStart);
-  const [duration, setDuration] = React.useState<DurationPreset>(initialDuration);
+  const [start, setStart] = React.useState<Date>(seedStart);
+  const [duration, setDuration] = React.useState<DurationPreset>(seedDuration);
   const [maxParticipants, setMaxParticipants] = React.useState(
     session?.maxParticipants?.toString() ?? "20",
   );
   const [iosDateOpen, setIosDateOpen] = React.useState(false);
   const [iosTimeOpen, setIosTimeOpen] = React.useState(false);
+  // Track whether the manager actually moved the schedule. On edit we only send
+  // scheduledStart/scheduledEnd when one of these is true; otherwise we leave
+  // the row's real times untouched. This prevents a title-only edit (or any
+  // edit of a session whose real length isn't 1/2/3h) from silently coercing
+  // the end to a rounded preset (e.g. truncating a 4h session to 3h).
+  const startTouched = React.useRef(false);
+  const durationTouched = React.useRef(false);
+
+  /** Recompute the draft from the source session (or fresh defaults) on open. */
+  function resetDraft() {
+    setTitle(session?.title ?? "Open Mat");
+    setStart(seedStart());
+    setDuration(seedDuration());
+    setMaxParticipants(session?.maxParticipants?.toString() ?? "20");
+    setIosDateOpen(false);
+    setIosTimeOpen(false);
+    startTouched.current = false;
+    durationTouched.current = false;
+  }
 
   function applyDate(picked: Date) {
+    startTouched.current = true;
     setStart((prev) => combineDateAndTime(picked, prev));
   }
   function applyTime(picked: Date) {
+    startTouched.current = true;
     setStart((prev) => combineDateAndTime(prev, picked));
   }
+
+  function selectDuration(value: DurationPreset) {
+    durationTouched.current = true;
+    setDuration(value);
+  }
+
+  // The trigger lives mounted for the whole screen lifetime, so the draft must
+  // be re-seeded each time the sheet opens, not just at first mount; otherwise a
+  // "New Session" prefill goes stale (and can land in the past). SheetTrigger
+  // fires the child's own onPress before presenting, so resetting here runs
+  // first.
+  const trigger = React.isValidElement(children)
+    ? React.cloneElement(
+        children as React.ReactElement<{ onPress?: () => void }>,
+        {
+          onPress: () => {
+            (children.props as { onPress?: () => void }).onPress?.();
+            resetDraft();
+          },
+        },
+      )
+    : children;
 
   function openPicker(mode: "date" | "time") {
     if (Platform.OS === "android") {
@@ -125,24 +182,40 @@ export function SessionEditSheet({
 
   async function handleSave() {
     if (!title.trim()) return;
+
+    // On edit, only treat the schedule as changing when the manager moved the
+    // start or duration; a title/max-only edit must preserve the row's real
+    // times (which may not be a 1/2/3h preset).
+    const scheduleChanged = !isEdit || startTouched.current || durationTouched.current;
+
+    // Guard against the backend "no sessions in the past" rule client-side so
+    // the manager gets a clear message instead of a raw Postgres error. Only
+    // enforce when we're actually about to (re)write the start.
+    if (scheduleChanged && start.getTime() < Date.now() - PAST_GRACE_MS) {
+      toast.error("Start time can't be in the past");
+      return;
+    }
+
     setLoading(true);
-    const scheduledStart = start.toISOString();
-    const scheduledEnd = addHours(start, duration).toISOString();
     const max = parseInt(maxParticipants, 10);
     const maxValue = max > 0 ? max : null;
 
     const result = isEdit
       ? await updateSession(supabase, session!.id, {
           title: title.trim(),
-          scheduledStart,
-          scheduledEnd,
           maxParticipants: maxValue,
+          ...(scheduleChanged
+            ? {
+                scheduledStart: start.toISOString(),
+                scheduledEnd: addHours(start, duration).toISOString(),
+              }
+            : {}),
         })
       : await createSession(supabase, {
           gymId,
           title: title.trim() || undefined,
-          scheduledStart,
-          scheduledEnd,
+          scheduledStart: start.toISOString(),
+          scheduledEnd: addHours(start, duration).toISOString(),
           maxParticipants: maxValue ?? undefined,
         });
 
@@ -189,7 +262,7 @@ export function SessionEditSheet({
 
   return (
     <Sheet controllerRef={sheet}>
-      <SheetTrigger asChild>{children}</SheetTrigger>
+      <SheetTrigger asChild>{trigger}</SheetTrigger>
       <SheetContent snapPoints={["85%"]}>
         <SheetHeader>
           <SheetTitle className="font-heading text-[18px] text-ink uppercase tracking-caps">
@@ -249,7 +322,7 @@ export function SessionEditSheet({
                 return (
                   <Pressable
                     key={d.value}
-                    onPress={() => setDuration(d.value)}
+                    onPress={() => selectDuration(d.value)}
                     accessibilityRole="button"
                     accessibilityState={{ selected }}
                     className={

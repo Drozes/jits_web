@@ -41,6 +41,11 @@
 - `apps/mobile/lib/gym-manager/session-datetime.ts`: pure RN-free date/time helpers (`combineDateAndTime`, `addHours`, `durationHours`, `formatSessionRowParts`, `formatSessionRowDate`) shared by the edit sheet + row.
 - Tests: `apps/mobile/__tests__/lib/gym-manager/session-datetime.test.ts` (11 cases: date/time combine, duration add/derive/round/floor, row label formatting).
 
+**Fixed** (jits-7xv.2 adversarial review)
+- `apps/mobile/components/gym-manager/session-edit-sheet.tsx`: editing a session no longer silently rewrites its end time. The edit sheet now tracks whether the manager actually moved the start or duration and only sends `scheduledStart`/`scheduledEnd` to `updateSession` when one of them changed; a title- or max-only edit (and any session whose real length isn't a 1/2/3h preset, e.g. a 4h or 90-minute session) keeps the row's true times instead of coercing the end to a rounded preset.
+- `apps/mobile/components/gym-manager/session-edit-sheet.tsx`: the create/edit draft is now re-seeded every time the sheet opens (the trigger lives mounted for the screen's lifetime), so a "New Session" prefill can no longer go stale and land in the past. A client-side guard mirrors the backend "no sessions in the past" rule (now − 5min grace) and surfaces a clear toast instead of a raw Postgres error when a schedule write would start in the past.
+- Tests: `apps/mobile/__tests__/components/gym-manager/session-edit-sheet.test.tsx` (3 cases: title-only edit omits schedule fields, duration change rewrites schedule, past-start schedule write is blocked with a toast).
+
 **Mobile gym-owner portal: H1 hub + manager-gated tab (epic jits-7xv.1, 2026-06-05)**
 
 **Added**
