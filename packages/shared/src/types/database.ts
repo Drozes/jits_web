@@ -1700,6 +1700,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      _gym_range_cutoff: { Args: { p_range: string }; Returns: string }
       auth_athlete_id: { Args: never; Returns: string }
       calculate_elo_stakes: {
         Args: {
@@ -1827,6 +1828,44 @@ export type Database = {
           rating_after: number
           rating_before: number
         }[]
+      }
+      get_gym_athlete_detail: {
+        Args: { p_athlete_id: string; p_gym_id: string }
+        Returns: Json
+      }
+      get_gym_ladder: {
+        Args: { p_city?: string; p_range?: string }
+        Returns: {
+          athlete_count: number
+          avg_elo: number
+          city: string
+          gym_id: string
+          gym_name: string
+          match_count: number
+          momentum: number
+        }[]
+      }
+      get_gym_roster: {
+        Args: { p_gym_id: string }
+        Returns: {
+          athlete_id: string
+          current_elo: number
+          display_name: string
+          draws: number
+          elo_delta: number
+          is_provisional: boolean
+          last_active: string
+          losses: number
+          wins: number
+        }[]
+      }
+      get_gym_stats: {
+        Args: { p_gym_id: string; p_range?: string }
+        Returns: Json
+      }
+      get_gym_stats_by_elo_range: {
+        Args: { p_gym_id: string; p_range?: string }
+        Returns: Json
       }
       get_match_details: { Args: { p_match_id: string }; Returns: Json }
       get_match_history: {
