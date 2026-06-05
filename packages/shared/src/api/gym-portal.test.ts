@@ -169,7 +169,8 @@ describe("getGymStats", () => {
         submission_rate: 0.55,
         draw_rate: 0.1,
         avg_elo_on_draw: 1600,
-        winning_submissions: [{ name: "Armbar", count: 5, pct: 0.5 }],
+        // BE aliases COUNT(*) AS cnt (not count) in the row_to_json subquery.
+        winning_submissions: [{ name: "Armbar", cnt: 5, pct: 0.5 }],
         losing_submissions: [],
         avg_win_time: 120.5,
         avg_loss_time: 120.5,
@@ -191,7 +192,9 @@ describe("getGymStats", () => {
       expect(result.data.submissionRate).toBe(0.55);
       expect(result.data.drawRate).toBe(0.1);
       expect(result.data.avgEloOnDraw).toBe(1600);
+      // Wrapper must remap the BE cnt key to count for the consumer.
       expect(result.data.winningSubmissions).toEqual([{ name: "Armbar", count: 5, pct: 0.5 }]);
+      expect(result.data.winningSubmissions[0].count).toBe(5);
       expect(result.data.losingSubmissions).toEqual([]);
       expect(result.data.eloTrend).toEqual([{ day: "2026-06-01", net_delta: 30 }]);
     }

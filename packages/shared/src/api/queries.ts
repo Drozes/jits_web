@@ -30,6 +30,7 @@ import type {
   GymRosterRow,
   GymAthleteDetail,
   GymStats,
+  GymSubmissionStat,
   GymEloBracketStats,
   GymLadderRow,
 } from "../types/gym-portal";
@@ -1265,14 +1266,21 @@ export async function getGymStats(
   });
   if (error) return { ok: false, error: mapPostgrestError(error) };
 
+  // The BE builds each submission row via row_to_json over a subquery that
+  // aliases COUNT(*) AS cnt (not count), so remap cnt -> count here rather than
+  // passing the raw key through.
+  type RawSubmissionStat = { name: string; cnt: number; pct: number };
+  const mapSubs = (rows: RawSubmissionStat[] | undefined): GymSubmissionStat[] =>
+    (rows ?? []).map((s) => ({ name: s.name, count: Number(s.cnt), pct: s.pct }));
+
   const raw = (data ?? {}) as {
     avg_elo?: number;
     momentum?: number;
     submission_rate?: number;
     draw_rate?: number;
     avg_elo_on_draw?: number;
-    winning_submissions?: GymStats["winningSubmissions"];
-    losing_submissions?: GymStats["losingSubmissions"];
+    winning_submissions?: RawSubmissionStat[];
+    losing_submissions?: RawSubmissionStat[];
     avg_win_time?: number;
     avg_loss_time?: number;
     elo_trend?: GymStats["eloTrend"];
@@ -1285,8 +1293,8 @@ export async function getGymStats(
       submissionRate: raw.submission_rate ?? 0,
       drawRate: raw.draw_rate ?? 0,
       avgEloOnDraw: raw.avg_elo_on_draw ?? 0,
-      winningSubmissions: raw.winning_submissions ?? [],
-      losingSubmissions: raw.losing_submissions ?? [],
+      winningSubmissions: mapSubs(raw.winning_submissions),
+      losingSubmissions: mapSubs(raw.losing_submissions),
       avgWinTime: raw.avg_win_time ?? 0,
       avgLossTime: raw.avg_loss_time ?? 0,
       eloTrend: raw.elo_trend ?? [],
