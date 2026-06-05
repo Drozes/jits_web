@@ -11,6 +11,11 @@
 - `apps/mobile/lib/gym-manager/ladder-format.ts`: pure RN-free helpers (`formatGymMeta` with singular/plural + null-city handling, `deriveCities` distinct + case-insensitive sort, `formatLadderSummary`, `findOwnGym` 1-based rank lookup) shared by the screen + row.
 - Tests: `apps/mobile/__tests__/lib/gym-manager/ladder-format.test.ts` (15 cases: meta-line join + singularization + null/blank-city drop, city dedupe/sort/trim, summary singularization, own-gym rank lookup + absent/undefined fallbacks).
 
+**Fixed** (epic jits-7xv.5 review)
+- Stopped the own-gym-city default from stranding the user on an empty ladder (`apps/mobile/app/(app)/(tabs)/gym-manager/ladder.tsx`): the city default now only applies when the manager's own gym city is actually present in the loaded ladder rows (gated on rows resolving, depends on `cities`); if the own gym is small/new and absent from `get_gym_ladder` (which only lists gyms with active members), the filter stays on "All Cities" instead of scoping to a city with no rows and no active chip. The empty-state copy now reads "No Gyms In {city}" under a city filter rather than the misleading "No Partner Gyms Yet".
+- Unified momentum precision in the `getGymLadder` shared wrapper (`packages/shared/src/api/queries.ts`): the BE returns momentum as one-decimal NUMERIC, so the wrapper now rounds it to a whole number (`Math.round`), making the ladder row's `DeltaNumber` arrow and the "Your Gym #N" `formatMomentum` callout agree, matching how the H8 stats screen renders momentum. Added a wrapper test (`packages/shared/src/api/gym-portal.test.ts`).
+- Wired up the dead range filter (`apps/mobile/app/(app)/(tabs)/gym-manager/ladder.tsx`): replaced the setter-less `const [range]` with a `RangeChips` control (30d/90d/all) reused from `stats-parts.tsx` for parity with the H8 stats screen, so the windows the hook + BE already support are now selectable instead of the UI implying a control that did not exist.
+
 **Mobile gym-owner portal: H8 gym stats + H10 per-ELO bracket drill-down (epic jits-7xv.4, 2026-06-05)**
 
 **Added**

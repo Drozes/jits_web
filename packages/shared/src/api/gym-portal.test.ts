@@ -290,6 +290,8 @@ describe("getGymLadder", () => {
           athlete_count: "20",
           match_count: "100",
           avg_elo: 1620,
+          // BE returns one-decimal momentum; the wrapper rounds to a whole number
+          // so the ladder row arrow and the "Your Gym" callout agree.
           momentum: 3.5,
         },
       ],
@@ -307,9 +309,30 @@ describe("getGymLadder", () => {
         athleteCount: 20,
         matchCount: 100,
         avgElo: 1620,
-        momentum: 3.5,
+        momentum: 4,
       },
     ]);
+  });
+
+  it("rounds fractional momentum to a whole number", async () => {
+    const { client } = mockClientWithRpc({
+      data: [
+        {
+          gym_id: "g2",
+          gym_name: "Alliance",
+          city: "Denver",
+          athlete_count: "12",
+          match_count: "40",
+          avg_elo: 1555,
+          momentum: -7.4,
+        },
+      ],
+      error: null,
+    });
+
+    const result = await getGymLadder(client);
+
+    expect(result[0].momentum).toBe(-7);
   });
 
   it("forwards an explicit city + range filter", async () => {

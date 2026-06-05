@@ -1373,7 +1373,11 @@ export async function getGymLadder(
     athleteCount: Number(r.athlete_count),
     matchCount: Number(r.match_count),
     avgElo: r.avg_elo,
-    momentum: r.momentum,
+    // BE returns momentum as round(AVG(member_delta), 1) (one decimal). Round to a
+    // whole number here so the ladder row arrow (DeltaNumber) and the "Your Gym"
+    // callout (formatMomentum, also Math.round) agree, matching how the stats
+    // screen renders momentum. Avoids a fractional ELO-change arrow.
+    momentum: Math.round(r.momentum),
   }));
 }
 

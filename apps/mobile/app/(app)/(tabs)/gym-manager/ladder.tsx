@@ -14,6 +14,7 @@ import { useThemedTokens } from "@/lib/theme/use-theme";
 import { useManagedGyms } from "@/lib/gym-manager/use-managed-gyms";
 import { useGymLadder } from "@/lib/gym-manager/use-gym-ladder";
 import { LadderRow } from "@/components/gym-manager/ladder-row";
+import { RangeChips } from "@/components/gym-manager/stats-parts";
 import {
   deriveCities,
   findOwnGym,
@@ -31,7 +32,13 @@ const ALL_CITIES = "all";
  * arrows. Aggregate-only, so it loads via useGymLadder (not manager-gated);
  * resolves the own gym from useManagedGyms to drive the highlight and the
  * default city. City filtering is client-side off the full row set so the chips
- * switch instantly; the range filter re-fetches.
+ * switch instantly; the range filter (30d/90d/all, RangeChips) re-fetches.
+ *
+ * The default-city effect only auto-scopes to the manager's own gym city when
+ * that city is actually present in the loaded ladder rows; if the own gym is
+ * small/new (absent from get_gym_ladder, which only lists gyms with active
+ * members) the filter stays on "All Cities" so the user is never stuck on a
+ * falsely-empty list with no active chip.
  */
 export default function GymManagerLadderScreen() {
   const router = useRouter();
@@ -40,21 +47,26 @@ export default function GymManagerLadderScreen() {
   const { gyms, isReady: managedReady } = useManagedGyms();
   const ownGym = gyms[0];
 
-  const [range] = React.useState<GymStatsRange>("90d");
+  const [range, setRange] = React.useState<GymStatsRange>("90d");
   const { rows, isLoading, isRefreshing, refresh } = useGymLadder(range);
 
-  // Default the city filter to the manager's own gym city once resolved, so the
-  // ladder opens scoped to the local scene; "All Cities" widens it.
+  const cities = React.useMemo(() => deriveCities(rows), [rows]);
+
+  // Default the city filter to the manager's own gym city once the ladder rows
+  // have resolved, so the ladder opens scoped to the local scene; "All Cities"
+  // widens it. Only apply the default when that city actually exists in the
+  // loaded rows (a chip will exist and the filter will match); otherwise leave
+  // it on "All Cities" so a small/new own gym never strands the user on an empty
+  // list with no active chip.
   const [city, setCity] = React.useState<string>(ALL_CITIES);
   const cityInitialized = React.useRef(false);
   React.useEffect(() => {
     if (cityInitialized.current) return;
-    if (!managedReady) return;
+    if (!managedReady || isLoading) return;
     cityInitialized.current = true;
-    if (ownGym?.city) setCity(ownGym.city);
-  }, [managedReady, ownGym?.city]);
-
-  const cities = React.useMemo(() => deriveCities(rows), [rows]);
+    const ownCity = ownGym?.city?.trim();
+    if (ownCity && cities.includes(ownCity)) setCity(ownCity);
+  }, [managedReady, isLoading, ownGym?.city, cities]);
 
   const filtered = React.useMemo(() => {
     if (city === ALL_CITIES) return rows;
@@ -83,7 +95,11 @@ export default function GymManagerLadderScreen() {
     <View className="flex-1 bg-surface">
       <AppHeader title="Gym Ladder" back backFallback="/gym-manager" />
 
-      <View className="px-4 py-3 border-b border-hairline-faint">
+      <View className="px-4 pt-3">
+        <RangeChips value={range} onChange={setRange} />
+      </View>
+
+      <View className="px-4 pb-3 border-b border-hairline-faint">
         <FlatList
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -130,7 +146,7 @@ export default function GymManagerLadderScreen() {
         ListEmptyComponent={
           <View className="items-center py-12 px-8">
             <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-l text-center">
-              No Partner Gyms Yet
+              {city === ALL_CITIES ? "No Partner Gyms Yet" : `No Gyms In ${city}`}
             </Text>
           </View>
         }
