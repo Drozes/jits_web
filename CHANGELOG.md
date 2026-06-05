@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+**Mobile gym-owner portal: H1 hub + manager-gated tab (epic jits-7xv.1, 2026-06-05)**
+
+**Added**
+- Gym Manager tab + route group (`apps/mobile/app/(app)/(tabs)/gym-manager/_layout.tsx`, `index.tsx`): a fifth bottom-nav tab shown only to athletes who manage at least one gym. The H1 hub shows a next-session plate (live session, else soonest upcoming, with a "3H 14M"-style countdown + RSVP/cap meta), This-Month metric tiles (active athletes, matches), and shortcut tiles to Sessions, Athletes (Roster), Gym Stats, and Gym Ladder (Documents + Session Stats are toast placeholders for now). Reuses `getGymDetail` + `getGymManagerStats`; no new RPC.
+- `apps/mobile/lib/gym-manager/use-managed-gyms.ts` (resolves the athlete's managed gym(s), gates the tab + drives the hub gym id), `use-gym-hub.ts` (loads the hub data with a cancelled-ref guard), `format-countdown.ts` (pure "3H 14M"/"2D 5H"/"0M" formatter with no 2-hour ceiling, unlike shared `formatTimeUntil`), and `components/gym-manager/hub-parts.tsx` (NextSessionPlate, MetricTile/Grid, ShortcutTile/Grid, SectionLabel; all data values `font-mono` tabular-nums, accent plate, no shadows).
+- `getManagedGyms(supabase, athleteId)` + `ManagedGym` in `packages/shared/src/api/queries.ts`: typed read of `gym_managers` joined to `gyms` (name/city) for portal entry resolution.
+- Tests: `apps/mobile/__tests__/lib/gym-manager/format-countdown.test.ts` (10 cases: minutes/hours/days/at-or-past-start).
+
+**Changed**
+- `apps/mobile/components/layout/elo-tab-bar.tsx`: honor a tab whose `tabBarButton` renders null (hidden-but-mounted), so the gym-manager tab stays hidden for non-managers.
+- `apps/mobile/app/(app)/(tabs)/_layout.tsx`: register the gym-manager tab, gated on `useManagedGyms`.
+
 **Mobile: shipped to TestFlight build 16 (v0.1.0, 2026-06-05)**
 
 Promoted iOS build 16 to TestFlight (EAS build `ef5d54ec`, IPA `vymincKnhPtzSyt1pK7aLi`, auto-submitted to App Store Connect app `6774629438`, submission `9b36d53b`; remote build number auto-incremented to 16). Carries the match-flow recording fixes below (P0 `jits-ait` end-match-before-record and P1 `jits-zse` finish-time-required), both verified end-to-end in the iOS simulator against an automated realtime NPC opponent. Targets the current/staging backend (`EXPO_PUBLIC_APP_ENV=staging`), same as build 15; the production backend cutover remains the separate `jits-i1n` task. Quality gate green before build: typecheck (all workspaces), 401 tests (mobile 204, web 39, shared 158), iOS `expo export`. Tester "What to Test" note must be set in App Store Connect (EAS submit does not push it).

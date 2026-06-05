@@ -19,6 +19,10 @@ export function EloTabBar({ state, descriptors, navigation }: BottomTabBarProps)
     >
       {state.routes.map((route, index) => {
         const { options } = descriptors[route.key];
+        // A route opts out of the bar by setting `tabBarButton` to a renderer
+        // that returns null (Expo Router's idiom for a hidden-but-mounted tab).
+        // The gym-manager tab uses this to stay hidden for non-managers.
+        if (options.tabBarButton?.({} as never) === null) return null;
         const isActive = state.index === index;
         const label =
           typeof options.tabBarLabel === "string"

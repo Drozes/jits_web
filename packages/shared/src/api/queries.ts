@@ -1369,6 +1369,46 @@ export async function getGymLadder(
   }));
 }
 
+/** A gym the current athlete manages (gym-owner portal entry resolution). */
+export interface ManagedGym {
+  gymId: string;
+  name: string;
+  city: string | null;
+}
+
+/**
+ * Gyms the given athlete manages (rows in `gym_managers`), with the gym name +
+ * city joined for display. Drives the gym-owner portal entry: the hub uses the
+ * first managed gym, and a non-empty list is the gate for showing the Gym
+ * Manager tab. Aggregate read style (returns [] on error), since the absence of
+ * managed gyms is a normal, non-exceptional state for most athletes.
+ */
+export async function getManagedGyms(
+  supabase: Client,
+  athleteId: string,
+): Promise<ManagedGym[]> {
+  const { data, error } = await supabase
+    .from("gym_managers")
+    .select("gym_id, gyms!gym_managers_gym_id_fkey(name, city)")
+    .eq("athlete_id", athleteId)
+    .order("granted_at", { ascending: true });
+  if (error) {
+    console.error("getManagedGyms:", error);
+    return [];
+  }
+  return (data ?? []).map((r) => {
+    // Aliased→T, but the to-one `gyms!fk` join is typed as an array by the
+    // generated types; narrow through unknown and read [0] defensively.
+    const gym = (r.gyms as unknown as { name: string; city: string | null }[] | { name: string; city: string | null } | null);
+    const resolved = Array.isArray(gym) ? gym[0] : gym;
+    return {
+      gymId: r.gym_id,
+      name: resolved?.name ?? "Gym",
+      city: resolved?.city ?? null,
+    };
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Notification history (built from challenges + match history, no new table)
 // ---------------------------------------------------------------------------
