@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+**Mobile gym-owner portal: H6 roster + H7 athlete detail (epic jits-7xv.3, 2026-06-05)**
+
+**Added**
+- Gym Manager roster screen (`apps/mobile/app/(app)/(tabs)/gym-manager/roster.tsx`): H6 active-member list reached from the hub's "Athletes" shortcut. Members are ordered by ELO DESC (BE order preserved), each row showing a circular avatar, name (+ "· You" for the signed-in manager), a mono meta-line (ELO · last-active · `PROVISIONAL` badge for < 20 matches), and a right-aligned stat block (current ELO + most-recent ELO delta). Pull-to-refresh; manager-gated with a "No Managed Gym" fallback. Loads via the new `getGymRoster` wrapper (no direct `.rpc()`).
+- Gym Manager athlete detail screen (`apps/mobile/app/(app)/(tabs)/gym-manager/athlete/[id].tsx`): H7 manager-scoped member detail — hero ELO tile, four stat tiles (Matches, Record `W·L·D`, Win Rate, Peak ELO), an "ELO Trend · Last 10" sparkline, and the "Match History · Last 5" list (opponent + finish type + signed ELO delta). Resolves the managed gym via `useManagedGyms`; the display name is passed through the navigation param (the detail RPC does not echo it). Loads via `getGymAthleteDetail`; handles the `NOT_GYM_MANAGER`/`NOT_GYM_MEMBER` gating codes with distinct fallbacks.
+- `apps/mobile/lib/gym-manager/use-gym-roster.ts` + `use-gym-athlete-detail.ts`: cancelled-ref hooks (W3-4 standard) that map the manager-gating `Result<T>` failure codes onto `isManager`/`notMember` flags so the screens can render the not-authorized path.
+- `apps/mobile/components/gym-manager/roster-row.tsx`, `athlete-detail-parts.tsx` (`DetailHeader`, `StatTile`/`StatGrid`, `RecentMatchRow`, `SectionLabel`), and `elo-sparkline.tsx` — a `react-native-svg`-free column-chart sparkline scaled into a 48pt band (newest column Signal Red). Reuses the `Avatar32`, `DeltaNumber`, and `EloTile` elo-system primitives; all numeric values `font-mono` tabular-nums; no drop shadows.
+- `apps/mobile/lib/gym-manager/roster-format.ts`: pure RN-free formatters (`formatLastActive`, `formatWinRate`, `formatFinish`) shared by the row + detail parts.
+- Tests: `apps/mobile/__tests__/lib/gym-manager/roster-format.test.ts` (10 cases: last-active relative phrasing + no-match fallback, win-rate rounding + em-dash, submission vs time-decision finish labels).
+
 **Mobile gym-owner portal: H2 sessions list + H3 create/edit (epic jits-7xv.2, 2026-06-05)**
 
 **Added**
