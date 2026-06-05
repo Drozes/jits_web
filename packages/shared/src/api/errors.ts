@@ -23,6 +23,8 @@ export type DomainErrorCode =
   | "MATCH_NOT_PAUSED"
   | "ALREADY_CONFIRMED"
   | "ALREADY_DISPUTED"
+  | "NOT_GYM_MANAGER"
+  | "NOT_GYM_MEMBER"
   | "RLS_VIOLATION"
   | "UNKNOWN";
 
@@ -111,6 +113,14 @@ const HINT_TO_CODE: Record<string, { code: DomainErrorCode; message: string }> =
     already_paused: {
       code: "MATCH_NOT_IN_PROGRESS",
       message: "Match is already paused.",
+    },
+    not_gym_manager: {
+      code: "NOT_GYM_MANAGER",
+      message: "You are not a manager of this gym.",
+    },
+    not_member: {
+      code: "NOT_GYM_MEMBER",
+      message: "This athlete is not a member of your gym.",
     },
   };
 

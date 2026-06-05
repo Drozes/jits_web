@@ -135,6 +135,18 @@ describe("mapPostgrestError", () => {
       expect(result.message).toBe("Match is already paused.");
     });
 
+    it("maps 'not_gym_manager' hint to NOT_GYM_MANAGER", () => {
+      const result = mapPostgrestError(pgError("P0001", "err", "not_gym_manager"));
+      expect(result.code).toBe("NOT_GYM_MANAGER");
+      expect(result.message).toBe("You are not a manager of this gym.");
+    });
+
+    it("maps 'not_member' hint to NOT_GYM_MEMBER", () => {
+      const result = mapPostgrestError(pgError("P0001", "err", "not_member"));
+      expect(result.code).toBe("NOT_GYM_MEMBER");
+      expect(result.message).toBe("This athlete is not a member of your gym.");
+    });
+
     it("falls through to UNKNOWN for P0001 with unrecognized hint", () => {
       const result = mapPostgrestError(pgError("P0001", "some DB error", "unknown_hint"));
       expect(result.code).toBe("UNKNOWN");

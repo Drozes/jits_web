@@ -26,7 +26,14 @@ import type {
   WeightClassStats,
   GymManagerStats,
 } from "../types/analytics";
-import { mapPostgrestError, type DomainError } from "./errors";
+import type {
+  GymRosterRow,
+  GymAthleteDetail,
+  GymStats,
+  GymEloBracketStats,
+  GymLadderRow,
+} from "../types/gym-portal";
+import { mapPostgrestError, type DomainError, type Result } from "./errors";
 
 type Client = SupabaseClient<Database>;
 
@@ -1161,6 +1168,205 @@ export async function getGymManagerStats(
     totalMatches: matchesResult.count ?? 0,
     activeMemberCount,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Gym-owner portal RPCs (epic jits-iwd) — manager-gated reads via SECURITY
+// DEFINER functions that bypass match_participants RLS. The four member/stats
+// RPCs raise P0001 (HINT 'not_gym_manager' / 'not_member') when the caller is
+// not a manager, so they return Result<T> to let mobile slices gate UI on the
+// NOT_GYM_MANAGER / NOT_GYM_MEMBER codes. The gym ladder is aggregate-only and
+// not gated, so it returns its rows directly.
+// ---------------------------------------------------------------------------
+
+/** A p_range window token accepted by the gym stats/ladder RPCs. */
+export type GymStatsRange = "30d" | "90d" | "all";
+
+/**
+ * Manager-only: active members of a gym ordered by current_elo DESC, with
+ * recent ELO delta, last-active, provisional flag, and W/L/D. [jits-iwd.1]
+ */
+export async function getGymRoster(
+  supabase: Client,
+  gymId: string,
+): Promise<Result<GymRosterRow[]>> {
+  const { data, error } = await supabase.rpc("get_gym_roster", {
+    p_gym_id: gymId,
+  });
+  if (error) return { ok: false, error: mapPostgrestError(error) };
+
+  const rows = (data ?? []).map((r) => ({
+    athleteId: r.athlete_id,
+    displayName: r.display_name,
+    currentElo: r.current_elo,
+    eloDelta: r.elo_delta,
+    lastActive: r.last_active,
+    isProvisional: r.is_provisional,
+    wins: Number(r.wins),
+    losses: Number(r.losses),
+    draws: Number(r.draws),
+  }));
+  return { ok: true, data: rows };
+}
+
+/**
+ * Manager-only: single member detail (current/peak ELO, W/L/D, win rate,
+ * last-10 ELO trend, last-5 matches). [jits-iwd.2]
+ */
+export async function getGymAthleteDetail(
+  supabase: Client,
+  gymId: string,
+  athleteId: string,
+): Promise<Result<GymAthleteDetail>> {
+  const { data, error } = await supabase.rpc("get_gym_athlete_detail", {
+    p_gym_id: gymId,
+    p_athlete_id: athleteId,
+  });
+  if (error) return { ok: false, error: mapPostgrestError(error) };
+
+  const raw = (data ?? {}) as {
+    current_elo?: number;
+    peak_elo?: number;
+    wins?: number;
+    losses?: number;
+    draws?: number;
+    win_rate?: number;
+    elo_trend?: GymAthleteDetail["eloTrend"];
+    last_matches?: GymAthleteDetail["lastMatches"];
+  };
+  return {
+    ok: true,
+    data: {
+      currentElo: raw.current_elo ?? 0,
+      peakElo: raw.peak_elo ?? 0,
+      wins: raw.wins ?? 0,
+      losses: raw.losses ?? 0,
+      draws: raw.draws ?? 0,
+      winRate: raw.win_rate ?? 0,
+      eloTrend: raw.elo_trend ?? [],
+      lastMatches: raw.last_matches ?? [],
+    },
+  };
+}
+
+/**
+ * Manager-only: gym-wide aggregate dashboard over a 30d/90d/all window (avg
+ * ELO, momentum, submission/draw rates, top submissions, finish times, ELO
+ * trend). [jits-iwd.3]
+ */
+export async function getGymStats(
+  supabase: Client,
+  gymId: string,
+  range: GymStatsRange = "90d",
+): Promise<Result<GymStats>> {
+  const { data, error } = await supabase.rpc("get_gym_stats", {
+    p_gym_id: gymId,
+    p_range: range,
+  });
+  if (error) return { ok: false, error: mapPostgrestError(error) };
+
+  const raw = (data ?? {}) as {
+    avg_elo?: number;
+    momentum?: number;
+    submission_rate?: number;
+    draw_rate?: number;
+    avg_elo_on_draw?: number;
+    winning_submissions?: GymStats["winningSubmissions"];
+    losing_submissions?: GymStats["losingSubmissions"];
+    avg_win_time?: number;
+    avg_loss_time?: number;
+    elo_trend?: GymStats["eloTrend"];
+  };
+  return {
+    ok: true,
+    data: {
+      avgElo: raw.avg_elo ?? 0,
+      momentum: raw.momentum ?? 0,
+      submissionRate: raw.submission_rate ?? 0,
+      drawRate: raw.draw_rate ?? 0,
+      avgEloOnDraw: raw.avg_elo_on_draw ?? 0,
+      winningSubmissions: raw.winning_submissions ?? [],
+      losingSubmissions: raw.losing_submissions ?? [],
+      avgWinTime: raw.avg_win_time ?? 0,
+      avgLossTime: raw.avg_loss_time ?? 0,
+      eloTrend: raw.elo_trend ?? [],
+    },
+  };
+}
+
+/**
+ * Manager-only: per-ELO-bracket breakdown (1900+/1700-1900/1500-1700/
+ * 1300-1500) of counts, rates, momentum, finish times, and top winning/losing
+ * submissions. [jits-iwd.4]
+ */
+export async function getGymStatsByEloRange(
+  supabase: Client,
+  gymId: string,
+  range: GymStatsRange = "90d",
+): Promise<Result<GymEloBracketStats[]>> {
+  const { data, error } = await supabase.rpc("get_gym_stats_by_elo_range", {
+    p_gym_id: gymId,
+    p_range: range,
+  });
+  if (error) return { ok: false, error: mapPostgrestError(error) };
+
+  const raw = (data ?? {}) as {
+    brackets?: {
+      bracket: string;
+      athlete_count: number;
+      match_count: number;
+      avg_elo: number;
+      momentum: number;
+      submission_rate: number;
+      draw_rate: number;
+      avg_win_time: number;
+      avg_loss_time: number;
+      top_winning_sub: string | null;
+      top_losing_sub: string | null;
+    }[];
+  };
+  const brackets = (raw.brackets ?? []).map((b) => ({
+    bracket: b.bracket,
+    athleteCount: Number(b.athlete_count),
+    matchCount: Number(b.match_count),
+    avgElo: b.avg_elo,
+    momentum: b.momentum,
+    submissionRate: b.submission_rate,
+    drawRate: b.draw_rate,
+    avgWinTime: b.avg_win_time,
+    avgLossTime: b.avg_loss_time,
+    topWinningSub: b.top_winning_sub,
+    topLosingSub: b.top_losing_sub,
+  }));
+  return { ok: true, data: brackets };
+}
+
+/**
+ * Aggregate gym ranking by average active-member ELO, optional city filter;
+ * returns athlete/match counts and momentum (no per-athlete data, not gated).
+ * [jits-iwd.5]
+ */
+export async function getGymLadder(
+  supabase: Client,
+  options: { city?: string | null; range?: GymStatsRange } = {},
+): Promise<GymLadderRow[]> {
+  const { data, error } = await supabase.rpc("get_gym_ladder", {
+    ...(options.city ? { p_city: options.city } : {}),
+    p_range: options.range ?? "90d",
+  });
+  if (error) {
+    console.error("getGymLadder:", error);
+    return [];
+  }
+  return (data ?? []).map((r) => ({
+    gymId: r.gym_id,
+    gymName: r.gym_name,
+    city: r.city,
+    athleteCount: Number(r.athlete_count),
+    matchCount: Number(r.match_count),
+    avgElo: r.avg_elo,
+    momentum: r.momentum,
+  }));
 }
 
 // ---------------------------------------------------------------------------
