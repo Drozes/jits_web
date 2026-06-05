@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+**Mobile: shipped to TestFlight build 16 (v0.1.0, 2026-06-05)**
+
+Promoted iOS build 16 to TestFlight (EAS build `ef5d54ec`, IPA `vymincKnhPtzSyt1pK7aLi`, auto-submitted to App Store Connect app `6774629438`, submission `9b36d53b`; remote build number auto-incremented to 16). Carries the match-flow recording fixes below (P0 `jits-ait` end-match-before-record and P1 `jits-zse` finish-time-required), both verified end-to-end in the iOS simulator against an automated realtime NPC opponent. Targets the current/staging backend (`EXPO_PUBLIC_APP_ENV=staging`), same as build 15; the production backend cutover remains the separate `jits-i1n` task. Quality gate green before build: typecheck (all workspaces), 401 tests (mobile 204, web 39, shared 158), iOS `expo export`. Tester "What to Test" note must be set in App Store Connect (EAS submit does not push it).
+
 **Mobile match flow: fix two bugs that blocked recording a match result (jits-ait, jits-zse, 2026-06-05)**
 
 **Fixed**
