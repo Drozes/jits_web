@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+**Mobile gym-owner portal: H2 sessions list + H3 create/edit (epic jits-7xv.2, 2026-06-05)**
+
+**Added**
+- Gym Manager sessions screen (`apps/mobile/app/(app)/(tabs)/gym-manager/sessions.tsx`): H2 sessions list reached from the hub's "Schedule" shortcut. All/Upcoming filter chips (no "Recurring" chip — recurring schedules are templates), one-time session rows, a top-right `+` and a sticky bottom "New Session" CTA. Reuses `getGymDetail` (already returns only `scheduled`/`active` sessions ending in the future, ascending) via the new hook — no new RPC. Manager-gated with a "No Managed Gym" fallback.
+- `apps/mobile/lib/gym-manager/use-gym-sessions.ts`: loads gym name + manager flag + the session list with a cancelled-ref guard (W3-4 standard).
+- `apps/mobile/components/gym-manager/session-edit-sheet.tsx`: H3 one-time create/edit bottom sheet (no recurrence UI). Session name, native date + time pickers (iOS spinner / Android `DateTimePickerAndroid`), 1h/2h/3h duration presets (end derived from start + duration), and max participants. Edits write through `updateSession`; "Delete Session" soft-cancels via `cancelSession` behind a confirm Alert. All mutations go through the `@jits/shared` typed wrappers and honor the `Result<T>` shape.
+- `apps/mobile/components/gym-manager/session-row.tsx`: H2 row — mono day/time block, title + "One-time · May 16" sub-label, chevron (or LIVE pill for an active session); numeric values `font-mono` tabular-nums.
+- `apps/mobile/lib/gym-manager/session-datetime.ts`: pure RN-free date/time helpers (`combineDateAndTime`, `addHours`, `durationHours`, `formatSessionRowParts`, `formatSessionRowDate`) shared by the edit sheet + row.
+- Tests: `apps/mobile/__tests__/lib/gym-manager/session-datetime.test.ts` (11 cases: date/time combine, duration add/derive/round/floor, row label formatting).
+
 **Mobile gym-owner portal: H1 hub + manager-gated tab (epic jits-7xv.1, 2026-06-05)**
 
 **Added**
