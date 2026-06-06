@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+**TestFlight build 17 (2026-06-05): gym-owner portal shipped (mobile + backend)**
+- Promoted the gym-owner portal to TestFlight as iOS build 17 (v0.1.0). Frontend epic jits-7xv (mobile-only): H1 hub, H2/H3 one-time sessions, H6/H7 roster + athlete detail, H8/H10 gym stats + ELO brackets, H9 gym ladder, all manager-gated behind a 5th "Gym" tab. Backend epic jits-iwd: 5 SECURITY DEFINER RPCs (`get_gym_roster`, `get_gym_athlete_detail`, `get_gym_stats`, `get_gym_stats_by_elo_range`, `get_gym_ladder`) deployed to the hosted Supabase (migration `20260605000000`). Deferred: H4/H5 documents (jits-4pk), H11 attendance/leads (jits-rsn). Follow-ups: gym-stats loss-time metric decision (jits-i8h), local pgTAP pollution cleanup (jits-nft).
+
 **Mobile gym-owner portal: H9 gym ladder (epic jits-7xv.5, 2026-06-05)**
 
 **Added**
