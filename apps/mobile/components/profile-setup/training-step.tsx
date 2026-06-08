@@ -6,6 +6,7 @@ import type { GymOption } from "@/lib/profile-setup/use-setup-data";
 import { isTrainingComplete, isValidWeight } from "@/lib/profile-setup/validation";
 import { FREE_AGENT_OPTION, type WizardValues } from "./types";
 import { EloField, EloTextInput } from "./elo-form-field";
+import { CityAutocomplete } from "./city-autocomplete";
 
 interface TrainingStepProps {
   values: WizardValues;
@@ -46,11 +47,6 @@ export function TrainingStep({
       })),
     ],
     [gyms],
-  );
-
-  const cityOptions = React.useMemo(
-    () => cities.map((c) => ({ label: c, value: c })),
-    [cities],
   );
 
   const onGymChange = (next: string) => {
@@ -97,11 +93,10 @@ export function TrainingStep({
         label="City"
         helper="Required to activate your profile. Helps you find local sessions and gyms."
       >
-        <NativeSelect
+        <CityAutocomplete
           value={values.city}
-          onValueChange={(v) => onChange({ city: v })}
-          options={cityOptions}
-          placeholder="Select your city"
+          onChange={(v) => onChange({ city: v })}
+          suggestions={cities}
         />
       </EloField>
 

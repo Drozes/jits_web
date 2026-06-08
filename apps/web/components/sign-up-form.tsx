@@ -9,6 +9,7 @@ import {
   type SignupFormValues,
   validateSignupForm,
 } from "@/lib/profile-setup/signup-form-validation";
+import { CityAutocomplete } from "@/components/profile-setup/city-autocomplete";
 
 interface GymOption {
   id: string;
@@ -236,18 +237,12 @@ export function SignUpForm({ gyms, cities }: SignUpFormProps) {
         </Field>
 
         <Field label="City">
-          <select
-            style={FIELD_INPUT_STYLE}
+          <CityAutocomplete
             value={values.city}
-            onChange={(e) => onChange({ city: e.target.value })}
-          >
-            <option value="">Select a city</option>
-            {cities.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
+            onChange={(city) => onChange({ city })}
+            suggestions={cities}
+            inputStyle={{ ...FIELD_INPUT_STYLE, fontFamily: "var(--font-body)" }}
+          />
         </Field>
 
         <Field label="Home Gym">

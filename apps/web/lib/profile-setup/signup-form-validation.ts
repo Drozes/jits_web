@@ -77,7 +77,7 @@ export function validateSignupForm(values: SignupFormValues): {
     return { valid: false, error: "Enter a valid weight in pounds (50-400)." };
   }
   if (!values.city.trim()) {
-    return { valid: false, error: "Select a city." };
+    return { valid: false, error: "Enter your city." };
   }
   if (!values.gymId) {
     return { valid: false, error: "Select a home gym." };

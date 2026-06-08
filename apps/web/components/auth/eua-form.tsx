@@ -11,6 +11,7 @@ import {
 import { AppHeader } from "@/components/layout/app-header";
 import { Plate } from "@/components/ui/elo-system";
 import { Checkbox } from "@/components/ui/checkbox";
+import { CityAutocomplete } from "@/components/profile-setup/city-autocomplete";
 
 interface ParsedBlock {
   type: "title" | "section" | "paragraph";
@@ -66,7 +67,7 @@ function validateProfile(v: ProfileValues): string | null {
     return "You must be at least 16 years old.";
   }
   if (!v.city.trim()) {
-    return "Select a city.";
+    return "Enter your city.";
   }
   return null;
 }
@@ -261,18 +262,12 @@ export function EuaForm({
             </Field>
 
             <Field label="City">
-              <select
-                style={FIELD_INPUT_STYLE}
+              <CityAutocomplete
                 value={profile.city}
-                onChange={(e) => onChange({ city: e.target.value })}
-              >
-                <option value="">Select a city</option>
-                {cities.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
+                onChange={(city) => onChange({ city })}
+                suggestions={cities}
+                inputStyle={{ ...FIELD_INPUT_STYLE, fontFamily: "var(--font-body)" }}
+              />
             </Field>
 
             <Field label="Home Gym">

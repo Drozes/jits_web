@@ -13,6 +13,7 @@
     "./api/chat-queries": "./src/api/chat-queries.ts",
     "./api/chat-mutations": "./src/api/chat-mutations.ts",
     "./constants": "./src/constants.ts",
+    "./geo": "./src/geo/index.ts",
     "./hooks": "./src/hooks/index.ts",
     "./hooks/*": "./src/hooks/*.ts",
     "./types/*": "./src/types/*.ts",
@@ -20,7 +21,8 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "gen:cities": "node scripts/generate-na-cities.mjs"
   },
   "peerDependencies": {
     "@supabase/supabase-js": "^2.94.1",
@@ -30,6 +32,7 @@
     "@supabase/supabase-js": "^2.94.1",
     "@testing-library/react": "^16.3.2",
     "@types/react": "^19",
+    "country-state-city": "^3.2.1",
     "jsdom": "^26.1.0",
     "react": "^19",
     "react-dom": "^19",

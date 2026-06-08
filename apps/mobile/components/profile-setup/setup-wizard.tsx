@@ -17,6 +17,28 @@ const STEP_LABELS: Record<WizardStep, string> = {
   training: "Where You Train",
 };
 
+/**
+ * Best-effort first/last name from the auth session's metadata, used to prefill
+ * the identity step for SSO signups. Google ID-token sign-in populates
+ * `given_name`/`family_name` (and `name`/`full_name`); email/password signups
+ * have none, so this returns blanks. Birthdate is not provided by Google, so it
+ * always stays a manual field.
+ */
+function deriveSsoName(meta: Record<string, unknown> | undefined): {
+  first: string;
+  last: string;
+} {
+  if (!meta) return { first: "", last: "" };
+  const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
+  const given = str(meta.given_name);
+  const family = str(meta.family_name);
+  if (given || family) return { first: given, last: family };
+  const full = str(meta.full_name) || str(meta.name);
+  if (!full) return { first: "", last: "" };
+  const parts = full.split(/\s+/);
+  return { first: parts[0] ?? "", last: parts.slice(1).join(" ") };
+}
+
 interface SetupWizardProps {
   authUserId: string;
   athlete: SetupAthleteRow | null;
@@ -38,7 +60,10 @@ export function SetupWizard({
   isEditing,
 }: SetupWizardProps) {
   const router = useRouter();
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
+  const ssoName = deriveSsoName(
+    user?.user_metadata as Record<string, unknown> | undefined,
+  );
 
   const steps = React.useMemo<WizardStep[]>(() => {
     const list: WizardStep[] = [];
@@ -49,8 +74,10 @@ export function SetupWizard({
 
   const [currentStep, setCurrentStep] = React.useState<WizardStep>(steps[0]);
   const [values, setValues] = React.useState<WizardValues>({
-    firstName: athlete?.first_name ?? "",
-    lastName: athlete?.last_name ?? "",
+    // New signups have no athlete row yet; fall back to the SSO-provided name so
+    // Google users don't retype what we already know. Existing names win.
+    firstName: athlete?.first_name || ssoName.first,
+    lastName: athlete?.last_name || ssoName.last,
     weight: athlete?.current_weight?.toString() ?? "",
     // No pre-selection for new signups: gymId starts empty so the user must
     // actively pick a real gym or free agent. The edit flow seeds the existing
