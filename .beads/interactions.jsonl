@@ -101,3 +101,4 @@
 {"id":"int-db5c7e7c","kind":"field_change","created_at":"2026-06-08T16:17:37.627387Z","actor":"Drozes","issue_id":"jits-2uk.3","extra":{"field":"status","new_value":"closed","old_value":"in_progress","reason":"Closed"}}
 {"id":"int-a304773a","kind":"field_change","created_at":"2026-06-08T16:17:39.054762Z","actor":"Drozes","issue_id":"jits-2uk.5","extra":{"field":"status","new_value":"closed","old_value":"in_progress","reason":"Closed"}}
 {"id":"int-85f40db9","kind":"field_change","created_at":"2026-06-08T16:17:40.431622Z","actor":"Drozes","issue_id":"jits-2uk.6","extra":{"field":"status","new_value":"closed","old_value":"in_progress","reason":"Closed"}}
+{"id":"int-e09e4b78","kind":"field_change","created_at":"2026-06-08T17:36:18.893228Z","actor":"Drozes","issue_id":"jits-2uk.10","extra":{"field":"status","new_value":"closed","old_value":"open","reason":"Closed"}}
