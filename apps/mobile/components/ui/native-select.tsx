@@ -1,22 +1,18 @@
 import * as React from "react";
-import {
-  Modal,
-  Platform,
-  Pressable,
-  Text,
-  View,
-} from "react-native";
-import { Picker } from "@react-native-picker/picker";
+import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { cn } from "@/lib/cn";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 
 /**
- * Native option picker built on `@react-native-picker/picker`. A pressable
- * field shows the current selection label (or a placeholder); tapping opens a
- * modal bottom container holding the native picker wheel (iOS) / control
- * (Android) with a "Done" button. Replaces the custom bottom-sheet `Select`
- * for the gym and city fields in the profile-setup wizard.
+ * Option picker for the profile-setup wizard (gym field). A pressable field
+ * shows the current selection label (or a placeholder); tapping opens a modal
+ * bottom sheet with a scrollable list of options, tap a row to select.
+ *
+ * Implemented with plain Views/Pressables rather than the native
+ * `@react-native-picker/picker` wheel: that wheel renders blank inside a
+ * `Modal` on the React Native New Architecture (Fabric, enabled here via
+ * `newArchEnabled`), which broke the gym picker. A custom list is New-Arch-safe.
  *
  * `value === ""` is treated as the unselected/placeholder state; never pass an
  * empty string as a real option value.
@@ -47,26 +43,16 @@ export function NativeSelect({
   const tokens = useThemedTokens();
   const insets = useSafeAreaInsets();
   const [visible, setVisible] = React.useState(false);
-  // The picker wheel commits continuously; keep a draft so "Done" applies and
-  // tapping the backdrop without confirming does not mutate the form. Seeded on
-  // open from the current value, so an unselected field (value "") keeps the
-  // placeholder row highlighted and "Done" without scrolling stays unselected.
-  const [draft, setDraft] = React.useState(value);
 
   const selectedLabel = options.find((o) => o.value === value)?.label;
 
   const open = () => {
-    if (disabled) return;
-    setDraft(value);
-    setVisible(true);
+    if (!disabled) setVisible(true);
   };
-  const confirm = () => {
-    // Always propagate the draft (including "" to clear) so validation re-blocks
-    // when the user confirms without making a real selection.
-    onValueChange(draft);
+  const select = (next: string) => {
+    onValueChange(next);
     setVisible(false);
   };
-  const cancel = () => setVisible(false);
 
   return (
     <>
@@ -95,12 +81,12 @@ export function NativeSelect({
         visible={visible}
         transparent
         animationType="slide"
-        onRequestClose={cancel}
+        onRequestClose={() => setVisible(false)}
         statusBarTranslucent
       >
         <Pressable
           style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)" }}
-          onPress={cancel}
+          onPress={() => setVisible(false)}
         >
           <View
             style={{
@@ -115,19 +101,16 @@ export function NativeSelect({
                 backgroundColor: tokens.card,
                 borderTopLeftRadius: 12,
                 borderTopRightRadius: 12,
-                paddingTop: 8,
+                maxHeight: 380,
+                overflow: "hidden",
               }}
             >
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "flex-end",
-                  paddingHorizontal: 16,
-                  paddingVertical: 8,
-                }}
-              >
+              <View className="flex-row items-center justify-between px-4 py-3">
+                <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">
+                  {placeholder}
+                </Text>
                 <Pressable
-                  onPress={confirm}
+                  onPress={() => setVisible(false)}
                   hitSlop={{ top: 14, bottom: 14, left: 12, right: 12 }}
                   accessibilityRole="button"
                   className="active:opacity-70"
@@ -137,29 +120,36 @@ export function NativeSelect({
                   </Text>
                 </Pressable>
               </View>
-              <Picker
-                selectedValue={draft}
-                onValueChange={(v) => setDraft(String(v))}
-                itemStyle={
-                  Platform.OS === "ios"
-                    ? { color: tokens.cardForeground }
-                    : undefined
-                }
+              <View className="h-px bg-hairline-faint" />
+              <ScrollView
+                keyboardShouldPersistTaps="handled"
+                style={{ maxHeight: 320 }}
               >
-                <Picker.Item
-                  label={placeholder}
-                  value=""
-                  color={tokens.cardForeground}
-                />
-                {options.map((o) => (
-                  <Picker.Item
-                    key={o.value}
-                    label={o.label}
-                    value={o.value}
-                    color={tokens.cardForeground}
-                  />
-                ))}
-              </Picker>
+                {options.map((o) => {
+                  const selected = o.value === value;
+                  return (
+                    <Pressable
+                      key={o.value}
+                      onPress={() => select(o.value)}
+                      accessibilityRole="button"
+                      className="px-4 py-3 flex-row items-center justify-between min-h-11 active:bg-surface-4"
+                    >
+                      <Text
+                        className={cn(
+                          "text-[15px] font-body flex-1",
+                          selected ? "text-cta" : "text-ink",
+                        )}
+                        numberOfLines={1}
+                      >
+                        {o.label}
+                      </Text>
+                      {selected ? (
+                        <Text className="text-cta text-[15px] ml-2">{"✓"}</Text>
+                      ) : null}
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
             </Pressable>
           </View>
         </Pressable>
