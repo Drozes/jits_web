@@ -48,11 +48,12 @@ type Client = SupabaseClient<Database>;
  * and mobile's `AuthProvider` in `apps/mobile/lib/auth/auth-context.tsx`
  * consume this projection — keep it in sync with `AthleteGuardRow` below.
  *
- * Excludes `created_at`, `push_token`, `role`, `avatar_url`, `default_still_url`,
- * and `is_scoutable` to keep payloads small on every page load.
+ * Includes `platform_role` and `is_bot` so the apps can gate admin tooling on
+ * every load. Excludes `created_at`, `push_token`, `role`, `avatar_url`,
+ * `default_still_url`, and `is_scoutable` to keep payloads small.
  */
 export const ATHLETE_GUARD_SELECT =
-  "id, auth_user_id, display_name, first_name, last_name, current_elo, highest_elo, current_weight, primary_gym_id, profile_photo_url, looking_for_casual, looking_for_ranked, status, free_agent, gender, date_of_birth, city" as const;
+  "id, auth_user_id, display_name, first_name, last_name, current_elo, highest_elo, current_weight, primary_gym_id, profile_photo_url, looking_for_casual, looking_for_ranked, status, free_agent, gender, date_of_birth, city, platform_role, is_bot" as const;
 
 /**
  * The subset of the `athletes` row returned by `getCurrentAthlete`.
@@ -78,6 +79,8 @@ export type AthleteGuardRow = Pick<
   | "gender"
   | "date_of_birth"
   | "city"
+  | "platform_role"
+  | "is_bot"
 >;
 
 /**
@@ -1592,4 +1595,99 @@ export async function getAdminCards(supabase: Client): Promise<AdminCard[]> {
 
   if (error || !data) return [];
   return data as AdminCard[];
+}
+
+// ---------------------------------------------------------------------------
+// Platform admin tooling (admin-tooling alpha) — admin/founder-gated RPCs and
+// the feature_flags table. The metrics and athlete-search RPCs are admin-gated
+// (raise P0001 HINT 'not_admin' for non-admins) as a server-side backstop;
+// feature_flags is readable by any authenticated athlete (only the SETTER needs
+// the founder/admin RPC).
+// ---------------------------------------------------------------------------
+
+/** Platform-wide counters returned by the `get_admin_metrics` RPC (all integers). */
+export interface AdminMetrics {
+  signups_today: number;
+  signups_7d: number;
+  athletes_total: number;
+  athletes_pending: number;
+  athletes_active: number;
+  matches_today: number;
+  matches_7d: number;
+  sessions_upcoming: number;
+}
+
+/**
+ * Admin-only: platform-wide counters in a single RPC. Returns `Result` so the
+ * mobile screen can surface a retryable error on failure. The screen redirects
+ * non-admins before it ever renders, so the RPC's `not_admin` HINT is a
+ * defense-in-depth backstop rather than a message users normally see.
+ */
+export async function getAdminMetrics(
+  supabase: Client,
+): Promise<Result<AdminMetrics>> {
+  const { data, error } = await supabase.rpc("get_admin_metrics");
+  if (error) return { ok: false, error: mapPostgrestError(error) };
+  // RPC `Returns: Json`; narrow to AdminMetrics (8 integer keys).
+  return { ok: true, data: data as unknown as AdminMetrics };
+}
+
+/** A feature flag row as surfaced to the admin flags screen. */
+export interface FeatureFlagRow {
+  key: string;
+  enabled: boolean;
+  description: string | null;
+}
+
+/**
+ * List all feature flags ordered by key. Any authenticated athlete can SELECT
+ * this table; the route guard restricts who reaches the screen. Aggregate read
+ * style (returns [] on error) since an empty/failed read is non-exceptional.
+ */
+export async function listFeatureFlags(
+  supabase: Client,
+): Promise<FeatureFlagRow[]> {
+  const { data, error } = await supabase
+    .from("feature_flags")
+    .select("key, enabled, description")
+    .order("key");
+
+  if (error) {
+    console.error("listFeatureFlags:", error);
+    return [];
+  }
+  return (data as FeatureFlagRow[]) ?? [];
+}
+
+/** A row returned by the admin role-management athlete search. */
+export interface AthleteSearchResult {
+  id: string;
+  display_name: string;
+  platform_role: Database["public"]["Enums"]["platform_role"];
+}
+
+/**
+ * Search athletes by display name for the admin roles screen. Routed through
+ * the `admin_search_athletes` RPC (SECURITY DEFINER), which enforces the admin
+ * gate, filters out bots, and caps results server-side, so `platform_role` is
+ * never leaked to a non-admin and the raw `athletes` SELECT is avoided. Returns
+ * `{ id, display_name, platform_role }`. Aggregate read style (returns [] on
+ * empty query, or on error — e.g. a non-admin somehow reaching this call).
+ */
+export async function searchAthletes(
+  supabase: Client,
+  query: string,
+): Promise<AthleteSearchResult[]> {
+  const q = query.trim();
+  if (q.length === 0) return [];
+
+  const { data, error } = await supabase.rpc("admin_search_athletes", {
+    p_query: q,
+  });
+
+  if (error) {
+    console.error("searchAthletes:", error);
+    return [];
+  }
+  return (data as AthleteSearchResult[]) ?? [];
 }

@@ -1,11 +1,11 @@
 import * as React from "react";
 import { Alert, Pressable, Text, View } from "react-native";
 import { Link, useRouter, type Href } from "expo-router";
-import { TestTube2 } from "lucide-react-native";
+import { TestTube2, ShieldCheck } from "lucide-react-native";
 import { AppHeader } from "@/components/layout/app-header";
 import { PageContainer } from "@/components/layout/page-container";
 import { Plate } from "@/components/ui/elo-system";
-import { useAuth, useRequireAthlete } from "@/lib/auth/hooks";
+import { useAuth, useIsAdmin, useRequireAthlete } from "@/lib/auth/hooks";
 import { isSentryEnabled, showFeedback } from "@/lib/error-tracking/sentry";
 import { cn } from "@/lib/cn";
 
@@ -22,10 +22,12 @@ type SettingsRoute =
   | "/settings/notifications"
   | "/settings/video"
   | "/settings/feedback"
-  | "/settings/help";
+  | "/settings/help"
+  | "/settings/admin";
 
 export default function SettingsScreen() {
   const { user, signOut } = useAuth();
+  const isAdmin = useIsAdmin();
   useRequireAthlete();
   const router = useRouter();
 
@@ -55,6 +57,7 @@ export default function SettingsScreen() {
         <AccountPlate email={email} onSignOut={handleSignOut} />
         <PreferencesPlate />
         <SupportPlate />
+        {isAdmin ? <AdminPlate /> : null}
         {isSentryEnabled() ? (
           <Text className="font-body text-[11px] text-ink-3 leading-relaxed px-1">
             Tip: shake your phone on any screen to report a bug with a
@@ -111,6 +114,27 @@ function SupportPlate() {
       <SettingsRow href="/settings/help" label="HELP & SUPPORT" />
       <RowDivider />
       <SettingsRow href="/settings/video" label="VIDEO SETTINGS" />
+    </Plate>
+  );
+}
+
+function AdminPlate() {
+  return (
+    <Plate className="p-0 overflow-hidden">
+      <Link href="/settings/admin" asChild>
+        <Pressable
+          accessibilityRole="link"
+          className="flex-row items-center justify-between px-4 py-3 min-h-11 active:bg-surface-4"
+        >
+          <View className="flex-row items-center gap-3">
+            <View pointerEvents="none">
+              <ShieldCheck size={14} className="text-ink-3" />
+            </View>
+            <RowLabel>ADMIN</RowLabel>
+          </View>
+          <Chevron />
+        </Pressable>
+      </Link>
     </Plate>
   );
 }

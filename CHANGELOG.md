@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+**Mobile app icon: E·R lettermark (jits-ais)**
+
+**Changed**
+- Replaced the "Podium Tiers" ladder app icon with the co-founder's **E·R lettermark**: bold `E·R` in DM Sans Bold (the brand heading font), Terminal White `#E8EDF2`, with a Signal Red `#E63946` square interpunct, on Void `#0D0F14`. Regenerated all four mobile brand assets from one vector source so they stay pixel-consistent: `apps/mobile/assets/icon.png` (full-bleed, opaque for App Store), `adaptive-icon.png` (transparent foreground sized into the Android safe zone; `android.adaptiveIcon.backgroundColor` stays `#0D0F14`), `splash-icon.png` (transparent, modest centered mark), and `favicon.png` (48²).
+- Updated the **native splash mark** to the same E·R, so the cold-launch sequence reads as one motion: home-screen icon (E·R) → native splash (E·R on Void, `splash.backgroundColor #0D0F14`) → the existing `SplashStatement` "ELO RATED" wordmark animation → app. Every stage keeps `#0D0F14`, so there is no color seam; no app.json config, splash component, or font-loading changes were needed.
+
+**Added**
+- `design/icon-options/er-lettermark/` — the durable vector source + tooling for the new icon: `icon.svg` / `adaptive-foreground.svg` / `splash.svg` (re-render at any size with `rsvg-convert`, no fonts required), plus `gen.js` (extracts real DM Sans glyph outlines via `opentype.js` and lays out the mark, auto-fitting cap-height/width to the 1024 canvas), `finalize.js`, and `README.md` with the regenerate + render steps. The icon is baked at native build time, so a new EAS build / TestFlight submission is required for it to change on device.
+
+**Mobile admin-tooling alpha: roles / metrics / feature-flags screens (admin-tooling alpha)**
+
+**Added**
+- Admin role-management screen (`apps/mobile/app/(app)/settings/admin/roles.tsx`): founder-only athlete search + role assignment (`admin_set_platform_role`). Debounced name search, select an athlete, pick a target role (member/admin/founder), confirm via `Alert.alert`, with the target's current role shown as a Badge. Admins who are not founders get a read-only "Founders only" notice (admins cannot mint roles). Self-guards with the `useIsAdmin()` route-guard pattern; the setter UI gates on `useIsFounder()`.
+- Admin metrics screen (`apps/mobile/app/(app)/settings/admin/metrics.tsx`): renders the 8 `get_admin_metrics` counters grouped into Signups / Activation Funnel / Matches / Sessions Plates; numbers in `font-mono tabular-nums` (never Signal Red), with loading / error+retry / refresh states.
+- Admin feature-flags screen (`apps/mobile/app/(app)/settings/admin/flags.tsx`): lists every `feature_flags` row (key + description) with a `Switch` that toggles `admin_set_feature_flag` optimistically and rolls back on error (toasting the mapped message). The mobile `Switch` primitive supplies its track/thumb colors from `useThemedTokens()` (RN `Switch` can't take a className).
+- Mobile fetch hooks (`apps/mobile/lib/admin/use-admin-metrics.ts`, `use-feature-flags.ts`, `use-athlete-search.ts`): cancelled-ref `useEffect` pattern; the flags hook exposes an optimistic `toggle` and the search hook is debounced (300ms).
+- Shared typed wrappers (`packages/shared/src/api/`): `getAdminMetrics` (`Result<AdminMetrics>`, new exported 8-key type), `listFeatureFlags` (`FeatureFlagRow[]`), `searchAthletes` (`AthleteSearchResult[]` = id/display_name/platform_role, `ilike` capped at 20) in `queries.ts`; `setPlatformRole` and `setFeatureFlag` (both `Result<void>`) in `mutations.ts`. New domain error codes + HINT mappings in `errors.ts` (`not_founder`, `last_founder`, `athlete_not_found`, `not_admin`).
+
 **TestFlight build 17 (2026-06-05): gym-owner portal shipped (mobile + backend)**
 - Promoted the gym-owner portal to TestFlight as iOS build 17 (v0.1.0). Frontend epic jits-7xv (mobile-only): H1 hub, H2/H3 one-time sessions, H6/H7 roster + athlete detail, H8/H10 gym stats + ELO brackets, H9 gym ladder, all manager-gated behind a 5th "Gym" tab. Backend epic jits-iwd: 5 SECURITY DEFINER RPCs (`get_gym_roster`, `get_gym_athlete_detail`, `get_gym_stats`, `get_gym_stats_by_elo_range`, `get_gym_ladder`) deployed to the hosted Supabase (migration `20260605000000`). Deferred: H4/H5 documents (jits-4pk), H11 attendance/leads (jits-rsn). Follow-ups: gym-stats loss-time metric decision (jits-i8h), local pgTAP pollution cleanup (jits-nft).
 

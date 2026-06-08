@@ -1089,3 +1089,50 @@ export async function deleteAdminCard(
   }
   return { ok: true, data: { id } };
 }
+
+// ---------------------------------------------------------------------------
+// Platform admin tooling (admin-tooling alpha) — founder/admin-gated RPCs.
+// Both raise P0001 with a HINT mapped by mapPostgrestError:
+//   admin_set_platform_role -> not_founder | last_founder | athlete_not_found
+//   admin_set_feature_flag  -> not_admin
+// ---------------------------------------------------------------------------
+
+type PlatformRole = Database["public"]["Enums"]["platform_role"];
+
+/**
+ * Founder-only: set an athlete's platform role (member/admin/founder). Maps the
+ * `not_founder` / `last_founder` / `athlete_not_found` HINTs to clear messages.
+ */
+export async function setPlatformRole(
+  supabase: Client,
+  params: { athleteId: string; role: PlatformRole },
+): Promise<Result<void>> {
+  const { error } = await supabase.rpc("admin_set_platform_role", {
+    p_athlete_id: params.athleteId,
+    p_role: params.role,
+  });
+
+  if (error) {
+    return { ok: false, error: mapPostgrestError(error) };
+  }
+  return { ok: true, data: undefined };
+}
+
+/**
+ * Admin-only: toggle a feature flag. Maps the `not_admin` HINT to a clear
+ * message (a non-admin who deep-linked past the route guard).
+ */
+export async function setFeatureFlag(
+  supabase: Client,
+  params: { key: string; enabled: boolean },
+): Promise<Result<void>> {
+  const { error } = await supabase.rpc("admin_set_feature_flag", {
+    p_key: params.key,
+    p_enabled: params.enabled,
+  });
+
+  if (error) {
+    return { ok: false, error: mapPostgrestError(error) };
+  }
+  return { ok: true, data: undefined };
+}

@@ -34,6 +34,44 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_audit: {
+        Row: {
+          action: string
+          actor_athlete_id: string | null
+          created_at: string
+          id: string
+          payload: Json | null
+          target_id: string | null
+          target_type: string | null
+        }
+        Insert: {
+          action: string
+          actor_athlete_id?: string | null
+          created_at?: string
+          id?: string
+          payload?: Json | null
+          target_id?: string | null
+          target_type?: string | null
+        }
+        Update: {
+          action?: string
+          actor_athlete_id?: string | null
+          created_at?: string
+          id?: string
+          payload?: Json | null
+          target_id?: string | null
+          target_type?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_audit_actor_athlete_id_fkey"
+            columns: ["actor_athlete_id"]
+            isOneToOne: false
+            referencedRelation: "athletes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       admin_cards: {
         Row: {
           created_at: string
@@ -131,10 +169,12 @@ export type Database = {
           gender: string | null
           highest_elo: number
           id: string
+          is_bot: boolean
           is_scoutable: boolean
           last_name: string | null
           looking_for_casual: boolean
           looking_for_ranked: boolean
+          platform_role: Database["public"]["Enums"]["platform_role"]
           primary_gym_id: string | null
           profile_photo_url: string | null
           role: Database["public"]["Enums"]["athlete_role"]
@@ -155,10 +195,12 @@ export type Database = {
           gender?: string | null
           highest_elo?: number
           id?: string
+          is_bot?: boolean
           is_scoutable?: boolean
           last_name?: string | null
           looking_for_casual?: boolean
           looking_for_ranked?: boolean
+          platform_role?: Database["public"]["Enums"]["platform_role"]
           primary_gym_id?: string | null
           profile_photo_url?: string | null
           role?: Database["public"]["Enums"]["athlete_role"]
@@ -179,10 +221,12 @@ export type Database = {
           gender?: string | null
           highest_elo?: number
           id?: string
+          is_bot?: boolean
           is_scoutable?: boolean
           last_name?: string | null
           looking_for_casual?: boolean
           looking_for_ranked?: boolean
+          platform_role?: Database["public"]["Enums"]["platform_role"]
           primary_gym_id?: string | null
           profile_photo_url?: string | null
           role?: Database["public"]["Enums"]["athlete_role"]
@@ -1701,6 +1745,25 @@ export type Database = {
     }
     Functions: {
       _gym_range_cutoff: { Args: { p_range: string }; Returns: string }
+      admin_search_athletes: {
+        Args: { p_query: string }
+        Returns: {
+          display_name: string
+          id: string
+          platform_role: Database["public"]["Enums"]["platform_role"]
+        }[]
+      }
+      admin_set_feature_flag: {
+        Args: { p_enabled: boolean; p_key: string }
+        Returns: undefined
+      }
+      admin_set_platform_role: {
+        Args: {
+          p_athlete_id: string
+          p_role: Database["public"]["Enums"]["platform_role"]
+        }
+        Returns: undefined
+      }
       auth_athlete_id: { Args: never; Returns: string }
       calculate_elo_stakes: {
         Args: {
@@ -1769,6 +1832,7 @@ export type Database = {
       end_match: { Args: { p_match_id: string }; Returns: Json }
       expire_pending_challenges: { Args: never; Returns: number }
       finalize_pending_merges: { Args: never; Returns: number }
+      get_admin_metrics: { Args: never; Returns: Json }
       get_arena_data: { Args: { p_limit?: number }; Returns: Json }
       get_athlete_avatars: { Args: { p_athlete_id: string }; Returns: Json }
       get_athlete_profile_stills: {
@@ -1916,10 +1980,12 @@ export type Database = {
         Args: { p_video_id: string }
         Returns: boolean
       }
+      is_admin: { Args: never; Returns: boolean }
       is_conversation_participant: {
         Args: { p_conversation_id: string }
         Returns: boolean
       }
+      is_founder: { Args: never; Returns: boolean }
       is_gym_manager: { Args: { p_gym_id: string }; Returns: boolean }
       is_match_video_participant: {
         Args: { p_video_id: string }
@@ -1997,6 +2063,7 @@ export type Database = {
       message_type_enum: "user" | "system"
       participant_outcome_enum: "win" | "loss" | "draw"
       participant_role_enum: "competitor" | "referee"
+      platform_role: "member" | "admin" | "founder"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2134,6 +2201,7 @@ export const Constants = {
       message_type_enum: ["user", "system"],
       participant_outcome_enum: ["win", "loss", "draw"],
       participant_role_enum: ["competitor", "referee"],
+      platform_role: ["member", "admin", "founder"],
     },
   },
 } as const

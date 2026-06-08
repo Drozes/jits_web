@@ -25,6 +25,10 @@ export type DomainErrorCode =
   | "ALREADY_DISPUTED"
   | "NOT_GYM_MANAGER"
   | "NOT_GYM_MEMBER"
+  | "NOT_FOUNDER"
+  | "LAST_FOUNDER"
+  | "NOT_ADMIN"
+  | "ATHLETE_NOT_FOUND"
   | "RLS_VIOLATION"
   | "UNKNOWN";
 
@@ -121,6 +125,22 @@ const HINT_TO_CODE: Record<string, { code: DomainErrorCode; message: string }> =
     not_member: {
       code: "NOT_GYM_MEMBER",
       message: "This athlete is not a member of your gym.",
+    },
+    not_founder: {
+      code: "NOT_FOUNDER",
+      message: "Only a founder can change platform roles.",
+    },
+    last_founder: {
+      code: "LAST_FOUNDER",
+      message: "Cannot remove the last founder.",
+    },
+    athlete_not_found: {
+      code: "ATHLETE_NOT_FOUND",
+      message: "That athlete could not be found.",
+    },
+    not_admin: {
+      code: "NOT_ADMIN",
+      message: "You need admin access to do that.",
     },
   };
 

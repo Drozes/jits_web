@@ -55,3 +55,23 @@ export function useRequireAthlete() {
 
   return { user, athlete, isLoading };
 }
+
+/**
+ * True when the current athlete has platform-admin tooling access. `founder`
+ * implies `admin`. Returns false when there is no athlete (signed out, pending,
+ * or still loading). Mirrors `useAuth()`'s context read.
+ */
+export function useIsAdmin(): boolean {
+  const { athlete } = useAuth();
+  return (
+    athlete?.platform_role === "admin" || athlete?.platform_role === "founder"
+  );
+}
+
+/**
+ * True only for the platform founder. Returns false when there is no athlete.
+ */
+export function useIsFounder(): boolean {
+  const { athlete } = useAuth();
+  return athlete?.platform_role === "founder";
+}
