@@ -8,6 +8,7 @@ import {
 } from "@jits/shared/api/queries";
 import { supabase } from "../supabase/client";
 import { setCachedElo } from "../splash/elo-cache";
+import { needsAthleteLoad } from "./athlete-load";
 
 type AuthError = { message: string };
 
@@ -49,6 +50,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [athlete, setAthlete] = React.useState<AthleteGuardRow | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
 
+  // The user id whose athlete-guard row we have actually loaded. Lets the
+  // auth-state callback tell a brand-new sign-in (athlete not loaded yet) apart
+  // from a routine token refresh for the already-loaded user, so it only
+  // re-arms the loading gate for the former.
+  const loadedAthleteForUserId = React.useRef<string | null>(null);
+
   // Subscribe to auth state. Supabase emits INITIAL_SESSION on mount with the
   // restored (or null) session, so this also performs cold-start hydration.
   //
@@ -59,11 +66,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // lock.
   React.useEffect(() => {
     const { data: sub } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      const nextUser = nextSession?.user ?? null;
       setSession(nextSession);
-      setUser(nextSession?.user ?? null);
-      if (!nextSession?.user) {
+      setUser(nextUser);
+      if (!nextUser) {
+        loadedAthleteForUserId.current = null;
         setAthlete(null);
         setIsLoading(false);
+      } else if (needsAthleteLoad(nextUser.id, loadedAthleteForUserId.current)) {
+        // Freshly signed-in user whose athlete row we have NOT loaded yet. Hold
+        // the gate on "Loading..." (synchronously, in the same render that sets
+        // the user) until the user-keyed effect below resolves getCurrentAthlete.
+        // Otherwise app/index.tsx sees `athlete === null` for a signed-in user
+        // and redirects an already-active athlete to /profile-setup before the
+        // row arrives: the redirect is synchronous, the fetch is not, so the
+        // wrong redirect wins every time. setState only here, never await.
+        setIsLoading(true);
       }
     });
     return () => sub.subscription.unsubscribe();
@@ -81,6 +99,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const row = await getCurrentAthlete(supabase, uid);
       if (!cancelled) {
         setAthlete(row);
+        loadedAthleteForUserId.current = uid;
         setIsLoading(false);
       }
     })();

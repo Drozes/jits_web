@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+**Mobile sign-in no longer dumps an already-active athlete back to profile setup**
+
+**Fixed**
+- `apps/mobile/lib/auth/auth-context.tsx`: signing in (Google SSO or email/password) always redirected an already-active athlete to `/profile-setup`. The `onAuthStateChange` callback set `isLoading=false` for the signed-out case but never re-armed it on a fresh sign-in, so after sitting on the login screen (`isLoading` already false, `athlete` still null) the `app/index.tsx` gate ran `if (!athlete) redirect("/profile-setup")` synchronously, before the async `getCurrentAthlete` resolved, and the wrong redirect won every time. Cold-start with a restored session was unaffected. The callback now re-arms `isLoading=true` on a sign-in for a user whose athlete row has not been loaded yet (tracked by a `loadedAthleteForUserId` ref), holding the gate on "Loading..." until the row resolves. Token refreshes and other repeat events for the same user do not re-arm loading, so there is no Loading flash.
+
+**Added**
+- `apps/mobile/lib/auth/athlete-load.ts`: pure `needsAthleteLoad(nextUserId, loadedForUserId)` helper used by the auth-state callback (true only for a fresh sign-in or account switch). Unit + state-machine regression tests in `apps/mobile/__tests__/lib/auth/athlete-load.test.ts`.
+
 **Mobile gym + city pickers: shared full-screen search overlay (jits-vir)**
 
 **Added**
