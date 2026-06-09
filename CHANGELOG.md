@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+**Mobile OTA updates enabled (EAS Update)**
+
+**Added**
+- `apps/mobile/package.json`: `expo-updates@~29.0.17` (resolves to 29.0.18, the SDK 54 pinned version). The native updates runtime was missing, so although `app.json` already had a real `updates.url` (`u.expo.dev/146416ac…`), `runtimeVersion: { policy: "appVersion" }`, and `eas.json` channels (development/preview/production), no build could actually receive over-the-air updates. Installing the package makes the next EAS build OTA-capable. From that build onward, JS-only fixes can ship via `eas update --channel <channel>` without a new TestFlight submission, as long as the build's `runtimeVersion` (the app `version`) matches the published update. No app code imports `expo-updates`; it runs passively from the existing `app.json` config. Validated with `expo install --check` (compatible), `tsc`, and `expo export` (ios bundle + config load clean).
+
 **Mobile sign-in no longer dumps an already-active athlete back to profile setup**
 
 **Fixed**
