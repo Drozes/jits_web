@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+**Gym Finder city dropdown dead to touch (mobile, jits-t0b)**
+
+**Fixed**
+- `apps/mobile/components/ui/select.tsx`: the `SelectTrigger` had `active:opacity-70` on a View nested inside the Pressable; NativeWind v4 css-interop attaches a press responder to that View, swallowing the tap so `onPress` (open) never fired. The city picker on the Gyms tab looked permanently stuck on the defaulted city, and the `Select` in `components/session/template-form-sheet.tsx` was equally dead. Moved the variant onto the Pressable, the same fix jits-vir applied to `SearchSelect`.
+
+**TestFlight build 19 submitted (mobile, v0.1.0)**
+- Submitted iOS build 19 to App Store Connect / TestFlight (EAS build `bb1a7332`). First **OTA-capable** build (embeds `expo-updates`), so subsequent JS-only fixes can ship via `eas update`. Bundles the sign-in fix (`jits-bxb`, no longer routes an active athlete to profile-setup) and the Glow Statement launch splash.
+
 **Admin member management: full roster picker + grant admin / gym owner (mobile, jits-p4d)**
 
 **Added**
