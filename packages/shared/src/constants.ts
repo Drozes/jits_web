@@ -109,16 +109,20 @@ export const SPLASH_REVEAL = {
 } as const;
 
 /** Which launch splash plays. 'climb' = the data-viz rating climb (parked, on
- * TestFlight); 'statement' = the cinematic 'WE ARE / ELO RATED / ARE YOU?' reveal. */
+ * TestFlight); 'statement' = the cinematic 'WE ARE / ELO RATED / ARE YOU?' reveal;
+ * 'glow-statement' = the Statement evolved so the E·R app-icon lettermark hands
+ * off from the native splash, holds while the red dot fades, then expands into
+ * ELO RATED (E→ELO, R→RATED) with ARE YOU? on the lock beat. */
 export const SPLASH_VARIANT = {
   CLIMB: "climb",
   STATEMENT: "statement",
+  GLOW_STATEMENT: "glow-statement",
 } as const;
 
 export type SplashVariant = (typeof SPLASH_VARIANT)[keyof typeof SPLASH_VARIANT];
 
 /** Default splash on a fresh device (no local override). */
-export const DEFAULT_SPLASH_VARIANT: SplashVariant = SPLASH_VARIANT.STATEMENT;
+export const DEFAULT_SPLASH_VARIANT: SplashVariant = SPLASH_VARIANT.GLOW_STATEMENT;
 
 /**
  * "The Statement" launch reveal — timing + sequence (single source of truth).
@@ -168,4 +172,75 @@ export const SPLASH_STATEMENT = {
    *  = AREYOU_DELAY_MS (1080) + AREYOU_MS (700) + HOLD_AFTER_MS (260).
    *  onDone() fires FADEOUT_MS (300) later, once the dissolve finishes. */
   TOTAL_MS: 2040,
+} as const;
+
+/**
+ * "Glow Statement" launch reveal: timing + sequence (single source of truth).
+ * All values in ms; reuses SPLASH_REVEAL.EASING_BEZIER for the base ease and adds
+ * a named settle curve (EASING_EXPAND, no overshoot) for the expand.
+ *
+ * Sequence (design-approved, "Option B" at 0.80× pacing): frame 0 IS the static
+ * native splash (the DM Sans E·R lettermark, centered, matched in size/position).
+ * HOLD it while the red interpunct fades out (so it never overlaps the letters).
+ * WE ARE rises in (left-aligned to ELO RATED). Then EXP: the mark's white E/R
+ * crossfade out while the Bebas wordmark crossfades IN at the MARK'S size (no size
+ * jump) and EXPANDS OUTWARD from the compact E·R seed (E→ELO leftward, R→RATED
+ * rightward), the whole wordmark settling DOWN to its final size as it spreads.
+ * On the LOCK beat a Heavy haptic fires and ARE YOU? rises in red (right-aligned).
+ * Hold, then cross-dissolve out. Every animation is finite and lands on a static
+ * frame. Reduced-motion shows the resting frame (NO mark) and dismisses after a hold.
+ */
+export const SPLASH_GLOW_STATEMENT = {
+  /** Hold the exact static-splash frame (DM Sans E·R mark, full opacity). This beat
+   *  is what makes the native→animated hand-off seamless. */
+  HOLD_MS: 475,
+
+  /** "WE ARE" gray eyebrow rises (translateY 8→0 + opacity) in early, during the
+   *  hold (left-aligned to the wordmark). */
+  WEARE_DELAY_MS: 190,
+  WEARE_MS: 650,
+
+  /** Red interpunct fades OUT within the hold (holds briefly, then fades), so it is
+   *  gone before any letter expands through the center. DELAY + MS == HOLD_MS. */
+  DOT_FADE_DELAY_MS: 150,
+  DOT_FADE_MS: 325,
+
+  /** EXP: the mark's white E/R crossfade OUT while the Bebas wordmark crossfades IN
+   *  (at the mark's size) and expands. == HOLD_MS. */
+  EXP_DELAY_MS: 475,
+
+  /** White E/R glyphs of the mark crossfade out; the wordmark anchors (E,R) crossfade
+   *  in over this same window so the DM Sans→Bebas swap reads as a bloom. */
+  MARK_FADE_MS: 375,
+
+  /** The expand: per non-anchor letter stagger from each word's anchor, and the
+   *  per-letter travel duration. The wordmark settles from the mark's size to final
+   *  over the full span (UNFURL_MS + 4×UNFURL_STEP_MS). */
+  UNFURL_STEP_MS: 60,
+  UNFURL_MS: 625,
+
+  /** LOCK: Heavy haptic + ARE YOU? (Signal Red) rises (translateY 6→0 + opacity,
+   *  right-aligned), ~225ms after the expand+settle lands (EXP + UNFURL span ≈ 1340). */
+  HAPTIC_DELAY_MS: 1565,
+  AREYOU_DELAY_MS: 1565, // == HAPTIC_DELAY_MS
+  AREYOU_MS: 650,
+
+  /** Hold the landed frame, then cross-dissolve the whole overlay out. */
+  HOLD_AFTER_MS: 375,
+  FADEOUT_MS: 350,
+
+  /** Reduced-motion: fade the resting frame IN (opacity only, NO mark, no expand),
+   *  dwell, then cross-fade out. Dismiss begins at
+   *  REDUCED_MOTION_FADEIN_MS + REDUCED_MOTION_HOLD_MS. */
+  REDUCED_MOTION_FADEIN_MS: 300,
+  REDUCED_MOTION_HOLD_MS: 700,
+
+  /** Time from mount until the cross-fade BEGINS in the full-motion path.
+   *  = AREYOU_DELAY_MS (1565) + AREYOU_MS (650) + HOLD_AFTER_MS (375).
+   *  onDone() fires FADEOUT_MS (350) later, once the dissolve finishes. */
+  TOTAL_MS: 2590,
+
+  /** Named settle ease for the expand (no overshoot, a smooth ease-out, per the
+   *  brand minimal-motion rule). */
+  EASING_EXPAND: [0.2, 1, 0.3, 1] as const,
 } as const;
