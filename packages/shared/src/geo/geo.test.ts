@@ -12,6 +12,13 @@ describe("NA_CITIES dataset", () => {
     expect(NA_CITIES).toContain("Toronto, ON, Canada");
     expect(NA_CITIES).toContain("Vancouver, BC, Canada");
   });
+
+  it("excludes counties, parishes, and municipios", () => {
+    expect(NA_CITIES).not.toContain("Austin County, TX, USA");
+    expect(NA_CITIES.some((c) => /\b(County|Parish|Municipio)\b/.test(c))).toBe(
+      false,
+    );
+  });
 });
 
 describe("searchCities", () => {
@@ -20,10 +27,23 @@ describe("searchCities", () => {
     expect(searchCities("   ")).toEqual([]);
   });
 
+  it("returns [] for a single-character query (too ambiguous)", () => {
+    expect(searchCities("a")).toEqual([]);
+    expect(searchCities("a", 25)).toEqual([]);
+  });
+
   it("is case-insensitive and matches by city-name prefix", () => {
     const results = searchCities("austin");
     expect(results).toContain("Austin, TX, USA");
     expect(searchCities("AUSTIN")).toEqual(results);
+  });
+
+  it("floats a major metro to the top of its tier over same-prefix towns", () => {
+    // Without the prominence boost, alphabetical order would surface "Austin,
+    // AR" / "Austin, IN" ahead of the metro people mean.
+    expect(searchCities("austin")[0]).toBe("Austin, TX, USA");
+    expect(searchCities("las")[0]).toBe("Las Vegas, NV, USA");
+    expect(searchCities("los")[0]).toBe("Los Angeles, CA, USA");
   });
 
   it("ranks prefix matches ahead of substring matches", () => {
@@ -37,15 +57,25 @@ describe("searchCities", () => {
     expect(searchCities("vegas")).toContain("Las Vegas, NV, USA");
   });
 
-  it("matches on region/country substrings too", () => {
-    // "TX" never starts a label, so these are substring matches.
+  it("matches on region substrings but not the trailing country", () => {
+    // "TX" never starts a label, so these are region substring matches.
     const results = searchCities("TX");
     expect(results.every((c) => c.toLowerCase().includes("tx"))).toBe(true);
     expect(results.length).toBeGreaterThan(0);
+    // The country suffix is excluded from matching: "Austin, TX, USA" has "usa"
+    // only in its country, so it must NOT match "usa" (a city that literally
+    // contains the substring, like Sausalito, still can). Excluding the country
+    // is what stops "usa"/"sa" from flooding every row and keeps the sort fast.
+    expect(searchCities("usa")).not.toContain("Austin, TX, USA");
+  });
+
+  it("never returns duplicate labels", () => {
+    const results = searchCities("san", 30);
+    expect(new Set(results).size).toBe(results.length);
   });
 
   it("respects the result limit", () => {
-    expect(searchCities("a", 5).length).toBeLessThanOrEqual(5);
-    expect(searchCities("a", 25).length).toBeLessThanOrEqual(25);
+    expect(searchCities("san", 5).length).toBeLessThanOrEqual(5);
+    expect(searchCities("san", 25).length).toBeLessThanOrEqual(25);
   });
 });

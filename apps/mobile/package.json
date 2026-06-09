@@ -23,7 +23,6 @@
     "@react-native-community/datetimepicker": "8.4.4",
     "@react-native-community/netinfo": "11.4.1",
     "@react-native-google-signin/google-signin": "^16.1.2",
-    "@react-native-picker/picker": "2.11.1",
     "@sentry/react-native": "^8.10.0",
     "@supabase/supabase-js": "^2.94.1",
     "class-variance-authority": "^0.7.1",

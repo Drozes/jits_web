@@ -13,11 +13,16 @@ import { dirname, join } from "node:path";
 
 const COUNTRY_LABEL = { US: "USA", CA: "Canada" };
 
+// The raw `country-state-city` data mixes administrative regions (counties,
+// parishes, municipios) in with actual cities, which pollutes the autocomplete
+// ("Austin County" ahead of "Austin"). Drop those so only real places remain.
+const NON_CITY = /\b(county|parish|municipio)\b/i;
+
 const labels = new Set();
 for (const code of Object.keys(COUNTRY_LABEL)) {
   for (const c of City.getCitiesOfCountry(code) ?? []) {
     const name = c.name?.trim();
-    if (!name) continue;
+    if (!name || NON_CITY.test(name)) continue;
     const region = c.stateCode?.trim();
     const country = COUNTRY_LABEL[code];
     labels.add(region ? `${name}, ${region}, ${country}` : `${name}, ${country}`);

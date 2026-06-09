@@ -60,3 +60,7 @@ next-env.d.ts
 .dolt/
 *.db
 .beads-credential-key
+
+# build output / tooling artifacts
+/dist/
+.playwright-mcp/

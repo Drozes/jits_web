@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+**Mobile gym + city pickers: shared full-screen search overlay (jits-vir)**
+
+**Added**
+- `apps/mobile/components/ui/search-select.tsx` — one reusable full-screen search-overlay primitive (`SearchSelect`) for long mobile pickers: a `Pressable` trigger opens a `transparent` `Modal` with the search input pinned to the top and a virtualized `FlatList` of results below. Powers both the gym and city fields; supports option lists and free text (cities). Exported via `components/ui/index.ts`.
+
+**Changed**
+- The mobile gym picker (`native-select.tsx`) and city picker (`city-autocomplete.tsx`) are now thin wrappers over `SearchSelect`, replacing the per-field bespoke dropdowns so both share one searchable overlay (the gym list is expected to grow). `training-step.tsx` field order is Weight, Home Gym, City.
+- `packages/shared/src/geo`: `na-cities.ts` regenerated to exclude counties/parishes/municipios (~20,900 -> ~17,788 entries); `searchCities` floats major metros to the top of each match tier and excludes the trailing country from substring matching (stops "usa"/"sa" flooding results and keeps the per-keystroke sort fast). `generate-na-cities.mjs` adds the county filter; `geo.test.ts` updated.
+
+**Fixed**
+- Search overlay rendered blank on iOS: it used `presentationStyle="fullScreen"`, which presents in a separate native window the app's NativeWind theme variables never reach (this also threw `CoreGraphics NaN` layout errors). Now a `transparent` modal with an inline `useThemedTokens()` background (the DOB-picker pattern), so themed content resolves and is visible.
+- Picker trigger was dead to touch: `active:opacity-70` sat on a child `View`, so NativeWind v4 css-interop attached a press responder to that View and swallowed the tap before the parent `Pressable.onPress` could fire. Moved the variant onto the `Pressable` (matching `ui/select.tsx`). Also added `automaticallyAdjustKeyboardInsets` and a 44pt "Done" hit target.
+
+**Removed**
+- Dead `@react-native-picker/picker` dependency from `apps/mobile/package.json` (zero imports after the SearchSelect consolidation; `package-lock.json` synced).
+
 **Signup blockers from alpha tester feedback: city autocomplete, SSO name prefill (jits-jws)**
 
 **Added**

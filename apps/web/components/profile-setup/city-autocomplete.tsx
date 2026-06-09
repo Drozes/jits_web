@@ -56,6 +56,9 @@ export function CityAutocomplete({
   const query = value.trim();
   const results = useMemo(() => {
     if (!query) return suggestions.slice(0, LIMIT);
+    // searchCities returns [] for queries under 2 chars (a single letter only
+    // yields an alphabetical slice), so the dropdown stays empty until the
+    // second keystroke; that is intentional, shared with mobile.
     if (search) return search(query, LIMIT);
     const q = query.toLowerCase();
     return suggestions.filter((s) => s.toLowerCase().includes(q)).slice(0, LIMIT);

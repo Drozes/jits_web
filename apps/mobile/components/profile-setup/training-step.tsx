@@ -86,6 +86,8 @@ export function TrainingStep({
           onValueChange={onGymChange}
           options={gymOptions}
           placeholder="Select your gym"
+          title="Home Gym"
+          searchPlaceholder="Search gyms"
         />
       </EloField>
 
