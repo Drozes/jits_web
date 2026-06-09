@@ -15,12 +15,12 @@ import { useAuth, useIsAdmin } from "@/lib/auth/hooks";
  */
 
 type AdminRoute =
-  | "/settings/admin/roles"
+  | "/settings/admin/members"
   | "/settings/admin/metrics"
   | "/settings/admin/flags";
 
 const ADMIN_LINKS: { href: AdminRoute; label: string }[] = [
-  { href: "/settings/admin/roles", label: "ROLES" },
+  { href: "/settings/admin/members", label: "MEMBERS" },
   { href: "/settings/admin/metrics", label: "METRICS" },
   { href: "/settings/admin/flags", label: "FEATURE FLAGS" },
 ];

@@ -2,6 +2,25 @@
 
 ## [Unreleased]
 
+**Admin member management: full roster picker + grant admin / gym owner (mobile, jits-p4d)**
+
+**Added**
+- `apps/mobile/app/(app)/settings/admin/members.tsx` — new unified admin **Members** screen. Browse the FULL member roster through the gym/city-style `NativeSelect`/`SearchSelect` autocomplete (loads everyone once, filters locally), select a member, then: founders set the platform role (member/admin/founder); any admin grants/revokes "gym owner" (`gym_managers`) status at any gym. Replaces the search-only `admin/roles.tsx`.
+- `apps/mobile/components/admin/member-role-section.tsx` — founder-only platform-role editor (folds in the former roles screen's logic, incl. the self-demotion warning). Non-founder admins get a read-only notice.
+- `apps/mobile/components/admin/member-gym-owner-section.tsx` — gym-owner manager: lists owned gyms with revoke, plus a gym picker (excludes already-owned) to grant. Reloads after each change.
+- `apps/mobile/lib/admin/use-admin-members.ts` — loads the full roster + all gyms once (cancellation-guarded), with `patchRole` to update a member in place after a role change.
+- `apps/mobile/lib/admin/use-managed-gyms.ts` — loads the gyms a member manages; refetches on member change / `reload()`.
+- `packages/shared/src/api/queries.ts` — `adminListAthletes()` (→ `admin_list_athletes`), `adminListManagedGyms(athleteId)` (→ `admin_list_managed_gyms`), `getAllGyms()` (plain `gyms` SELECT) + `AdminAthlete` / `AdminManagedGym` / `GymOption` types.
+- `packages/shared/src/api/mutations.ts` — `addGymManager({ gymId, athleteId })` (→ `admin_add_gym_manager`), `removeGymManager(...)` (→ `admin_remove_gym_manager`).
+- `packages/shared/src/api/errors.ts` — `GYM_NOT_FOUND` domain code + `gym_not_found` hint mapping.
+- Backend (separate repo `jr_be`): `supabase/migrations/20260609000000_admin_gym_managers.sql` — four `is_admin()`-gated `SECURITY DEFINER` RPCs (`admin_list_athletes`, `admin_add_gym_manager`, `admin_remove_gym_manager`, `admin_list_managed_gyms`). The grant/revoke RPCs bypass the `gym_managers` manager-only INSERT RLS and write `admin_audit` rows. pgTAP `supabase/tests/042_admin_gym_managers_test.sql` (19 assertions, incl. a real RLS-bypass proof under `SET LOCAL ROLE authenticated`). `packages/shared/src/types/database.ts` regenerated.
+
+**Changed**
+- `apps/mobile/app/(app)/settings/admin.tsx` — hub link **ROLES → MEMBERS**.
+
+**Removed**
+- `apps/mobile/app/(app)/settings/admin/roles.tsx` and `apps/mobile/lib/admin/use-athlete-search.ts` — superseded by the Members screen (its role-setting is folded in). The `searchAthletes` shared wrapper is left in place (no current caller).
+
 **Mobile OTA updates enabled (EAS Update)**
 
 **Added**

@@ -1691,3 +1691,85 @@ export async function searchAthletes(
   }
   return (data as AthleteSearchResult[]) ?? [];
 }
+
+// ---------------------------------------------------------------------------
+// Admin member management (admin-tooling alpha) — is_admin()-gated RPCs.
+// ---------------------------------------------------------------------------
+
+/** A row in the admin full-member roster (admin_list_athletes). */
+export interface AdminAthlete {
+  id: string;
+  display_name: string;
+  platform_role: Database["public"]["Enums"]["platform_role"];
+  primary_gym_id: string | null;
+  primary_gym_name: string | null;
+}
+
+/**
+ * Admin-only: the full non-bot member roster for the admin Members picker.
+ * Routed through `admin_list_athletes` (SECURITY DEFINER, is_admin()-gated) so
+ * the client can load every member once and filter locally (mirrors the
+ * gym/city autocomplete). Aggregate read style (returns [] on error — e.g. a
+ * non-admin who deep-linked past the route guard).
+ */
+export async function adminListAthletes(
+  supabase: Client,
+): Promise<AdminAthlete[]> {
+  const { data, error } = await supabase.rpc("admin_list_athletes");
+  if (error) {
+    console.error("adminListAthletes:", error);
+    return [];
+  }
+  return (data as AdminAthlete[]) ?? [];
+}
+
+/** A gym an athlete manages (admin_list_managed_gyms). */
+export interface AdminManagedGym {
+  gym_id: string;
+  gym_name: string;
+  city: string | null;
+  granted_at: string;
+}
+
+/**
+ * Admin-only: the gyms an athlete is a manager (gym owner) of, for the admin
+ * member-detail view. Routed through `admin_list_managed_gyms` (SECURITY
+ * DEFINER, is_admin()-gated). Aggregate read style (returns [] on error).
+ */
+export async function adminListManagedGyms(
+  supabase: Client,
+  athleteId: string,
+): Promise<AdminManagedGym[]> {
+  const { data, error } = await supabase.rpc("admin_list_managed_gyms", {
+    p_athlete_id: athleteId,
+  });
+  if (error) {
+    console.error("adminListManagedGyms:", error);
+    return [];
+  }
+  return (data as AdminManagedGym[]) ?? [];
+}
+
+/** A gym option for the admin gym-owner picker. */
+export interface GymOption {
+  id: string;
+  name: string;
+  city: string | null;
+}
+
+/**
+ * All gyms (id, name, city) ordered by name, for the admin gym-owner picker.
+ * `gyms` is public-readable, so a plain SELECT is fine here. Aggregate read
+ * style (returns [] on error).
+ */
+export async function getAllGyms(supabase: Client): Promise<GymOption[]> {
+  const { data, error } = await supabase
+    .from("gyms")
+    .select("id, name, city")
+    .order("name");
+  if (error) {
+    console.error("getAllGyms:", error);
+    return [];
+  }
+  return (data as GymOption[]) ?? [];
+}

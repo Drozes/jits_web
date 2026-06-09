@@ -1136,3 +1136,50 @@ export async function setFeatureFlag(
   }
   return { ok: true, data: undefined };
 }
+
+// ---------------------------------------------------------------------------
+// Admin gym-owner management (admin-tooling alpha) — is_admin()-gated RPCs.
+// Both run as the function owner, so they bypass the gym_managers manager-only
+// INSERT RLS. They raise P0001 with a HINT mapped by mapPostgrestError:
+//   admin_add_gym_manager    -> not_admin | gym_not_found | athlete_not_found
+//   admin_remove_gym_manager -> not_admin
+// ---------------------------------------------------------------------------
+
+/**
+ * Admin-only: grant gym-manager ("gym owner") status to an athlete at a gym,
+ * bypassing the normal manager-only INSERT RLS. Idempotent. Maps the
+ * `not_admin` / `gym_not_found` / `athlete_not_found` HINTs.
+ */
+export async function addGymManager(
+  supabase: Client,
+  params: { gymId: string; athleteId: string },
+): Promise<Result<void>> {
+  const { error } = await supabase.rpc("admin_add_gym_manager", {
+    p_gym_id: params.gymId,
+    p_athlete_id: params.athleteId,
+  });
+
+  if (error) {
+    return { ok: false, error: mapPostgrestError(error) };
+  }
+  return { ok: true, data: undefined };
+}
+
+/**
+ * Admin-only: revoke gym-manager ("gym owner") status for an athlete at a gym.
+ * Idempotent. Maps the `not_admin` HINT.
+ */
+export async function removeGymManager(
+  supabase: Client,
+  params: { gymId: string; athleteId: string },
+): Promise<Result<void>> {
+  const { error } = await supabase.rpc("admin_remove_gym_manager", {
+    p_gym_id: params.gymId,
+    p_athlete_id: params.athleteId,
+  });
+
+  if (error) {
+    return { ok: false, error: mapPostgrestError(error) };
+  }
+  return { ok: true, data: undefined };
+}

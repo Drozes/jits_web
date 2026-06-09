@@ -1763,6 +1763,33 @@ export type Database = {
     }
     Functions: {
       _gym_range_cutoff: { Args: { p_range: string }; Returns: string }
+      admin_add_gym_manager: {
+        Args: { p_athlete_id: string; p_gym_id: string }
+        Returns: undefined
+      }
+      admin_list_athletes: {
+        Args: never
+        Returns: {
+          display_name: string
+          id: string
+          platform_role: Database["public"]["Enums"]["platform_role"]
+          primary_gym_id: string
+          primary_gym_name: string
+        }[]
+      }
+      admin_list_managed_gyms: {
+        Args: { p_athlete_id: string }
+        Returns: {
+          city: string
+          granted_at: string
+          gym_id: string
+          gym_name: string
+        }[]
+      }
+      admin_remove_gym_manager: {
+        Args: { p_athlete_id: string; p_gym_id: string }
+        Returns: undefined
+      }
       admin_search_athletes: {
         Args: { p_query: string }
         Returns: {

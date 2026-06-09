@@ -29,6 +29,7 @@ export type DomainErrorCode =
   | "LAST_FOUNDER"
   | "NOT_ADMIN"
   | "ATHLETE_NOT_FOUND"
+  | "GYM_NOT_FOUND"
   | "RLS_VIOLATION"
   | "UNKNOWN";
 
@@ -137,6 +138,10 @@ const HINT_TO_CODE: Record<string, { code: DomainErrorCode; message: string }> =
     athlete_not_found: {
       code: "ATHLETE_NOT_FOUND",
       message: "That athlete could not be found.",
+    },
+    gym_not_found: {
+      code: "GYM_NOT_FOUND",
+      message: "That gym could not be found.",
     },
     not_admin: {
       code: "NOT_ADMIN",
