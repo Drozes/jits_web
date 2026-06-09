@@ -1,0 +1,525 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ELO RATED, E.R splash animation options</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --void: #0D0F14;
+    --panel: #13151B;
+    --plate: #1A1D24;
+    --ink: #E8EDF2;
+    --red: #E63946;
+    --gray: #9CA3AF;
+    --data-gray: #6B7280;
+    --gold: #f59e0b;
+    --green: #22C55E;
+    --radius: 4px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: #07080B;
+    color: var(--ink);
+    font-family: "Inter", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    padding-bottom: 80px;
+  }
+  .font-display { font-family: "Bebas Neue", sans-serif; }
+  .font-heading { font-family: "DM Sans", sans-serif; font-weight: 700; }
+  .font-body    { font-family: "Inter", sans-serif; }
+  .font-mono    { font-family: "JetBrains Mono", monospace; font-variant-numeric: tabular-nums; }
+
+  header {
+    position: sticky; top: 0; z-index: 50;
+    background: rgba(13,15,20,0.92);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid #23262F;
+    padding: 14px 22px;
+  }
+  .titlerow { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+  .titlerow h1 {
+    font-family: "Bebas Neue", sans-serif; font-weight: 400;
+    font-size: 26px; letter-spacing: 2px; margin: 0; color: var(--ink);
+  }
+  .titlerow .sub { color: var(--gray); font-size: 12.5px; }
+  .controls { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; margin-top: 12px; }
+  .controls button, .controls label { font-size: 12.5px; }
+  .btn {
+    font-family: "DM Sans", sans-serif; font-weight: 700;
+    background: var(--red); color: #fff; border: none;
+    padding: 8px 16px; border-radius: var(--radius); cursor: pointer;
+    letter-spacing: 0.4px; text-transform: uppercase; font-size: 11.5px;
+  }
+  .btn:active { transform: translateY(1px); }
+  .ctl { display: flex; align-items: center; gap: 8px; color: var(--gray); }
+  .ctl input[type=range] { width: 130px; accent-color: var(--red); }
+  .ctl .val { font-family: "JetBrains Mono", monospace; color: var(--ink); min-width: 38px; }
+  .switch { display: inline-flex; align-items: center; gap: 7px; cursor: pointer; user-select: none; }
+  .switch input { accent-color: var(--red); }
+
+  main {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 26px; padding: 26px 22px;
+    max-width: 1100px; margin: 0 auto;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid #20232B;
+    border-radius: 6px;
+    overflow: hidden;
+    display: flex; flex-direction: column;
+  }
+  .card.featured { border-color: var(--red); }
+  .card .meta { padding: 12px 14px 14px; border-top: 1px solid #20232B; }
+  .card .meta .name {
+    font-family: "DM Sans", sans-serif; font-weight: 700;
+    font-size: 14px; color: var(--ink); letter-spacing: 0.2px;
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  }
+  .card .meta .blurb { color: var(--gray); font-size: 12px; line-height: 1.45; margin-top: 5px; }
+  .card .meta .haptic-at {
+    margin-top: 8px; font-family: "JetBrains Mono", monospace;
+    font-size: 10.5px; color: var(--data-gray);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .card .meta .haptic-at b { color: var(--red); font-weight: 700; }
+  .card .replay {
+    margin-top: 11px; background: var(--plate); color: var(--ink);
+    border: 1px solid #2C3038; border-radius: var(--radius);
+    font-family: "DM Sans", sans-serif; font-weight: 700; font-size: 11px;
+    letter-spacing: 0.5px; text-transform: uppercase;
+    padding: 7px 0; width: 100%; cursor: pointer;
+  }
+  .card .replay:active { transform: translateY(1px); }
+
+  .phone {
+    position: relative;
+    margin: 16px auto 4px;
+    width: 244px; height: 500px;
+    border-radius: 30px;
+    background: #000;
+    padding: 9px;
+    border: 1px solid #2A2E37;
+  }
+  .screen {
+    position: relative;
+    width: 100%; height: 100%;
+    border-radius: 22px;
+    overflow: hidden;
+    background: var(--void);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .notch {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+    width: 92px; height: 19px; background: #000;
+    border-bottom-left-radius: 10px; border-bottom-right-radius: 10px;
+    z-index: 30;
+  }
+  .haptic-ring {
+    position: absolute; inset: 0; border-radius: 22px;
+    border: 2px solid var(--red); opacity: 0; pointer-events: none; z-index: 25;
+  }
+  .haptic-badge {
+    position: absolute; top: 26px; left: 50%; transform: translateX(-50%);
+    z-index: 26; opacity: 0; pointer-events: none;
+    font-family: "JetBrains Mono", monospace; font-size: 10px; font-weight: 700;
+    color: var(--red); letter-spacing: 1px;
+    background: rgba(230,57,70,0.12); border: 1px solid rgba(230,57,70,0.5);
+    padding: 3px 8px; border-radius: 3px; white-space: nowrap;
+  }
+
+  .er-mark { display: block; width: 70%; height: 70%; }
+  .er-mark * { transform-box: fill-box; transform-origin: center; }
+
+  footer {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: rgba(13,15,20,0.92); backdrop-filter: blur(8px);
+    border-top: 1px solid #23262F; padding: 10px 22px;
+    font-size: 11.5px; color: var(--data-gray); z-index: 40;
+    font-family: "JetBrains Mono", monospace;
+  }
+  footer b { color: var(--gray); font-weight: 500; }
+</style>
+</head>
+<body>
+<header>
+  <div class="titlerow">
+    <h1>ELO RATED, E.R SPLASH OPTIONS</h1>
+    <span class="sub font-body">Statement spacing matched to the live splash. Void <span class="font-mono">#0D0F14</span></span>
+  </div>
+  <div class="controls">
+    <button class="btn" id="replayAll">&#9654; Replay all</button>
+    <div class="ctl">
+      <span>Speed</span>
+      <input type="range" id="speed" min="0.35" max="2" step="0.05" value="1" />
+      <span class="val font-mono" id="speedVal">1.00x</span>
+    </div>
+    <label class="switch font-body"><input type="checkbox" id="reduced" /> Reduced motion</label>
+    <label class="switch font-body"><input type="checkbox" id="autoloop" /> Auto-loop</label>
+  </div>
+</header>
+
+<main id="gallery"></main>
+
+<footer>
+  <b>Haptic beats are visualized</b> (red ring pulse + lightning badge). On device they fire <span style="color:var(--ink)">Haptics.impactAsync(Heavy)</span>. Click any phone to replay. Layout matched to <span style="color:var(--ink)">splash-statement.tsx</span>: WE ARE left, ELO RATED center, ARE YOU? right.
+</footer>
+
+<script>
+/* ============================================================
+   SHARED INFRASTRUCTURE
+   ctx.makeMark(), ctx.ms(n), ctx.scale, ctx.EASE, ctx.OVERSHOOT,
+   ctx.haptic(label), ctx.reduced, ctx.colors. Use el.animate(). setTimeout for haptics.
+   ============================================================ */
+const COLORS = { void:'#0D0F14', ink:'#E8EDF2', red:'#E63946', gray:'#9CA3AF', gold:'#f59e0b', green:'#22C55E', panel:'#13151B' };
+const EASE = 'cubic-bezier(.22,1,.36,1)';
+const OVERSHOOT = 'cubic-bezier(.34,1.56,.64,1)';
+
+/* Live-splash proportions (from splash-statement.tsx, scaled k=0.625 from the
+   64px reference wordmark down to this 244px-wide preview). */
+const WORD_FS    = 40;   // ELO RATED wordmark (64 * 0.625)
+const WORD_LS    = 1;    // ~0.02em
+const WEARE_FS   = 11;   // WE ARE  (ref 15)
+const WEARE_LS   = 4.2;  // ref 6.3
+const WEARE_MB   = 9;    // marginBottom (ref 14)
+const AREYOU_FS  = 15;   // ARE YOU? (ref 24)
+const AREYOU_LS  = 2.4;  // ref 3.6
+const AREYOU_MT  = 8;    // marginTop (ref 12)
+const HALO = 'blur(3px) drop-shadow(0 0 16px rgba(232,237,242,0.85))';
+const MARK_HALO = 'drop-shadow(0 0 18px rgba(232,237,242,0.9)) blur(2px)';
+
+const MARK_SVG = `
+<svg class="er-mark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" aria-hidden="true">
+  <g class="er-e" fill="#E8EDF2">
+    <path transform="translate(220.17 641.83)" d="M196.23 0L25.59 0L25.59-259.66L196.23-259.66L196.23-219.22L75.67-219.22L75.67-151.34L185.10-151.34L185.10-112.39L75.67-112.39L75.67-40.43L196.23-40.43"/>
+  </g>
+  <g class="er-r" fill="#E8EDF2">
+    <path transform="translate(560.87 641.83)" d="M75.67 0L25.59 0L25.59-259.66L122.41-259.66Q153.94-259.66 174.34-248.90Q194.74-238.14 204.76-220.15Q214.77-202.16 214.77-180.28Q214.77-159.50 205.13-141.51Q195.48-123.52 174.90-112.58Q154.31-101.64 122.04-101.64L75.67-101.64L75.67 0M217.37 0L160.24 0L106.83-114.25L160.99-114.25L217.37 0M75.67-217.74L75.67-137.99L119.44-137.99Q142.07-137.99 152.83-149.12Q163.58-160.24 163.58-178.42Q163.58-196.60 153.01-207.17Q142.44-217.74 119.44-217.74"/>
+  </g>
+  <rect class="er-dot" x="486.50" y="497.07" width="29.86" height="29.86" fill="#E63946"/>
+</svg>`;
+
+const VARIANTS = [];
+
+function fireHaptic(screen, label) {
+  const ring = screen.querySelector('.haptic-ring');
+  const badge = screen.querySelector('.haptic-badge');
+  if (ring) ring.animate([{ opacity: 0.9, transform: 'scale(1)' }, { opacity: 0, transform: 'scale(1.06)' }], { duration: 420, easing: 'ease-out' });
+  if (badge) {
+    badge.textContent = 'HAPTIC . ' + (label || 'Heavy');
+    badge.animate(
+      [
+        { opacity: 0, transform: 'translateX(-50%) translateY(-4px)' },
+        { opacity: 1, transform: 'translateX(-50%) translateY(0)', offset: 0.2 },
+        { opacity: 1, transform: 'translateX(-50%) translateY(0)', offset: 0.7 },
+        { opacity: 0, transform: 'translateX(-50%) translateY(-4px)' },
+      ],
+      { duration: 900, easing: 'ease-out' }
+    );
+  }
+}
+
+// Build the WE ARE / [hero] / ARE YOU? cluster, sized to the hero's width and centered.
+// Returns the parts so each variant can drive its own hero (wordmark or mark).
+function buildCluster(root, colors, clusterW) {
+  const stack = document.createElement('div');
+  stack.style.cssText = 'position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;pointer-events:none;';
+  if (clusterW) stack.style.width = clusterW + 'px';
+  root.appendChild(stack);
+
+  const eyebrow = document.createElement('div');
+  eyebrow.textContent = 'WE ARE';
+  eyebrow.style.cssText = 'align-self:stretch;text-align:left;color:' + colors.gray + ';font-family:"DM Sans",sans-serif;font-weight:700;font-size:' + WEARE_FS + 'px;letter-spacing:' + WEARE_LS + 'px;text-transform:uppercase;margin-bottom:' + WEARE_MB + 'px;opacity:0;';
+  stack.appendChild(eyebrow);
+
+  const heroRow = document.createElement('div');
+  heroRow.style.cssText = 'position:relative;align-self:stretch;display:flex;align-items:center;justify-content:center;';
+  stack.appendChild(heroRow);
+
+  const accent = document.createElement('div');
+  accent.textContent = 'ARE YOU?';
+  accent.style.cssText = 'align-self:flex-end;text-align:right;color:' + colors.red + ';font-family:"DM Sans",sans-serif;font-weight:700;font-size:' + AREYOU_FS + 'px;letter-spacing:' + AREYOU_LS + 'px;text-transform:uppercase;margin-top:' + AREYOU_MT + 'px;opacity:0;';
+  stack.appendChild(accent);
+
+  return { stack, eyebrow, heroRow, accent };
+}
+
+/* ===========================================================================
+   1. GLOW STATEMENT (FEATURED): the E.R mark ignites, then unfurls into the
+   wordmark. E -> ELO and R -> RATED unfurl from their anchors, the red dot
+   fades, ARE YOU? takes the red. Crisp wordmark (no halo); spacing matched to
+   the live splash-statement layout.
+   =========================================================================== */
+VARIANTS.push({
+  id: 'glow-statement',
+  featured: true,
+  name: 'Glow Statement  (recommended)',
+  blurb: 'The E.R mark ignites, WE ARE rises, then E unfurls into ELO and R into RATED as the red dot fades and ARE YOU? takes the red. Crisp wordmark (no halo), spacing matched to the live splash.',
+  hapticAt: '~1600ms (statement lock)',
+  build(root, ctx) {
+    const { ms, EASE, OVERSHOOT, colors, reduced } = ctx;
+
+    const { stack, eyebrow, heroRow, accent } = buildCluster(root, colors, null);
+
+    // word: crisp wordmark, per-letter. E unfurls into ELO and R into RATED.
+    const word = document.createElement('div');
+    word.className = 'font-display';
+    word.style.cssText = 'position:relative;display:flex;align-items:center;justify-content:center;color:' + colors.ink + ';text-transform:uppercase;font-size:' + WORD_FS + 'px;line-height:1;letter-spacing:' + WORD_LS + 'px;white-space:nowrap;opacity:0;z-index:4;';
+    const chars = ['E', 'L', 'O', ' ', 'R', 'A', 'T', 'E', 'D'];
+    const isAnchor = (i) => i === 0 || i === 4;
+    chars.forEach((ch) => { const s = document.createElement('span'); s.textContent = ch === ' ' ? String.fromCharCode(160) : ch; s.style.display = 'inline-block'; word.appendChild(s); });
+    heroRow.appendChild(word);
+
+    // Measure natural geometry, then lock the cluster + row dimensions so nothing
+    // shifts while the letters expand.
+    const spans = Array.prototype.slice.call(word.children);
+    const widths = spans.map((s) => s.offsetWidth);
+    const wordW = Math.ceil(word.offsetWidth);
+    const wordH = Math.ceil(word.offsetHeight);
+    stack.style.width = wordW + 'px';
+    heroRow.style.width = wordW + 'px';
+    heroRow.style.height = wordH + 'px';
+
+    // E.R mark (prominent monogram) centered on the wordmark line. It starts crisp
+    // at FULL opacity, scale 1, no glow, exactly matching the static native splash,
+    // so the hand-off into the animation has no fade/flicker seam.
+    const SQ = Math.round(wordH * 4);
+    const markWrap = document.createElement('div');
+    markWrap.style.cssText = 'position:absolute;left:50%;top:50%;width:' + SQ + 'px;height:' + SQ + 'px;transform:translate(-50%,-50%);display:flex;align-items:center;justify-content:center;opacity:1;z-index:3;';
+    const mark = ctx.makeMark();
+    markWrap.appendChild(mark);
+    heroRow.appendChild(markWrap);
+    const me = mark.querySelector('.er-e');
+    const mr = mark.querySelector('.er-r');
+    const mdot = mark.querySelector('.er-dot');
+
+    if (reduced) {
+      eyebrow.style.opacity = '1';
+      word.style.opacity = '1';
+      accent.style.opacity = '1';
+      root.animate([{ opacity: 0 }, { opacity: 1 }], { duration: ms(260), easing: EASE, fill: 'both' });
+      return { play() {} };
+    }
+
+    // Compressed initial state: only E and R visible, interior letters at 0 width.
+    word.style.opacity = '0';
+    spans.forEach((s, i) => { if (!isAnchor(i)) { s.style.overflow = 'hidden'; s.style.maxWidth = '0px'; s.style.opacity = '0'; } });
+
+    return {
+      play() {
+        // The E.R mark is already on screen (crisp, full opacity) just like the static
+        // native splash. HOLD that exact frame, then begin the statement. No fade /
+        // scale / glow intro on the mark, so the hand-off is seamless.
+        const HOLD = 420;        // static-matching beat before anything moves
+        const EXP = HOLD + 520;  // expansion begins after WE ARE has risen
+        const LOCK = EXP + 700;  // haptic + ARE YOU? as the wordmark finishes
+
+        eyebrow.animate(
+          [{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'translateY(0)' }],
+          { duration: ms(600), delay: ms(HOLD), easing: EASE, fill: 'both' }
+        );
+
+        word.animate([{ opacity: 0 }, { opacity: 1 }], { duration: ms(260), delay: ms(EXP), easing: 'linear', fill: 'both' });
+        me.animate([{ opacity: 1 }, { opacity: 0 }], { duration: ms(440), delay: ms(EXP), easing: EASE, fill: 'both' });
+        mr.animate([{ opacity: 1 }, { opacity: 0 }], { duration: ms(440), delay: ms(EXP), easing: EASE, fill: 'both' });
+
+        // E -> ELO and R -> RATED unfurl consistently: each non-anchor letter reveals
+        // rightward from its word's anchor (E at index 0, R at index 4); the gap opens first.
+        const STEP = 55;
+        const unfurlDelay = (i) => (i === 3) ? 0 : (i < 4 ? i * STEP : (i - 4) * STEP);
+        spans.forEach((s, i) => {
+          if (!isAnchor(i)) {
+            s.animate(
+              [{ maxWidth: '0px', opacity: 0 }, { maxWidth: widths[i] + 'px', opacity: 1 }],
+              { duration: ms(480), delay: ms(EXP + unfurlDelay(i)), easing: OVERSHOOT, fill: 'both' }
+            );
+          }
+        });
+
+        mdot.animate(
+          [{ opacity: 1 }, { opacity: 1, offset: 0.45 }, { opacity: 0 }],
+          { duration: ms(560), delay: ms(EXP + 140), easing: EASE, fill: 'both' }
+        );
+
+        setTimeout(() => ctx.haptic('Heavy'), ms(LOCK));
+        accent.animate(
+          [{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'translateY(0)' }],
+          { duration: ms(600), delay: ms(LOCK), easing: OVERSHOOT, fill: 'both' }
+        );
+      }
+    };
+  }
+});
+
+/* ===========================================================================
+   2. GLOW IGNITE: the current live "Statement" treatment on the new mark.
+   The E.R mark stays (no expansion): it ignites with a halo that breathes
+   forever, framed by WE ARE / ARE YOU?. Same cluster spacing as above.
+   =========================================================================== */
+VARIANTS.push({
+  id: 'glow-ignite',
+  name: 'Glow Ignite',
+  blurb: 'The E.R mark ignites with a soft white halo that breathes forever, framed by a gray WE ARE eyebrow and a Signal Red ARE YOU? challenge. The mark stays put (no expansion into the wordmark).',
+  hapticAt: '~1080ms (ignite lock / ARE YOU)',
+  build(root, ctx) {
+    const { ms, EASE, OVERSHOOT, colors, reduced } = ctx;
+    const CW = 168;        // cluster width, ~ the wordmark width, so the framing matches
+    const ROW_H = WORD_FS; // hero row height matches the wordmark line, for matched spacing
+    const SQ = Math.round(ROW_H * 4);
+    const REST_GLOW = 0.62;
+
+    const { stack, eyebrow, heroRow, accent } = buildCluster(root, colors, CW);
+    heroRow.style.height = ROW_H + 'px';
+
+    const glowWrap = document.createElement('div');
+    glowWrap.style.cssText = 'position:absolute;left:50%;top:50%;width:' + SQ + 'px;height:' + SQ + 'px;transform:translate(-50%,-50%);display:flex;align-items:center;justify-content:center;opacity:0;filter:' + MARK_HALO + ';z-index:1;';
+    const glowMark = ctx.makeMark();
+    glowMark.querySelectorAll('.er-e, .er-r, .er-dot').forEach((p) => { p.setAttribute('fill', colors.ink); p.style.fill = colors.ink; });
+    glowWrap.appendChild(glowMark);
+    heroRow.appendChild(glowWrap);
+
+    const baseWrap = document.createElement('div');
+    baseWrap.style.cssText = 'position:absolute;left:50%;top:50%;width:' + SQ + 'px;height:' + SQ + 'px;transform:translate(-50%,-50%);display:flex;align-items:center;justify-content:center;opacity:0;z-index:2;';
+    baseWrap.appendChild(ctx.makeMark());
+    heroRow.appendChild(baseWrap);
+
+    if (reduced) {
+      eyebrow.style.opacity = '1';
+      baseWrap.style.opacity = '1';
+      glowWrap.style.opacity = String(REST_GLOW);
+      accent.style.opacity = '1';
+      root.animate([{ opacity: 0 }, { opacity: 1 }], { duration: ms(260), easing: EASE, fill: 'both' });
+      return { play() {} };
+    }
+
+    return {
+      play() {
+        eyebrow.animate(
+          [{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'translateY(0)' }],
+          { duration: ms(520), delay: ms(120), easing: EASE, fill: 'both' }
+        );
+        baseWrap.animate(
+          [{ opacity: 0, transform: 'translate(-50%,-50%) scale(1.04)' }, { opacity: 1, transform: 'translate(-50%,-50%) scale(1)' }],
+          { duration: ms(720), delay: ms(560), easing: EASE, fill: 'both' }
+        );
+        glowWrap.animate(
+          [{ opacity: 0, offset: 0 }, { opacity: 0.85, offset: 0.62 }, { opacity: REST_GLOW, offset: 1 }],
+          { duration: ms(880), delay: ms(560), easing: EASE, fill: 'both' }
+        );
+        glowWrap.animate(
+          [{ opacity: 0.45 }, { opacity: 0.8 }],
+          { duration: ms(3000), delay: ms(1440), easing: 'cubic-bezier(.45,0,.55,1)', iterations: Infinity, direction: 'alternate', fill: 'both' }
+        );
+        accent.animate(
+          [{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'translateY(0)' }],
+          { duration: ms(560), delay: ms(1040), easing: OVERSHOOT, fill: 'both' }
+        );
+        setTimeout(() => ctx.haptic('Heavy'), ms(1080));
+      }
+    };
+  }
+});
+
+
+/* ===========================================================================
+   GALLERY RUNTIME
+   =========================================================================== */
+const gallery = document.getElementById('gallery');
+const speedEl = document.getElementById('speed');
+const speedVal = document.getElementById('speedVal');
+const reducedEl = document.getElementById('reduced');
+const autoloopEl = document.getElementById('autoloop');
+
+const instances = [];
+
+function makeCtx(screen) {
+  const speed = parseFloat(speedEl.value);
+  const scale = 1 / speed;
+  return {
+    scale,
+    ms: (n) => Math.max(0, Math.round(n * scale)),
+    EASE, OVERSHOOT,
+    colors: COLORS,
+    reduced: reducedEl.checked,
+    makeMark() {
+      const tmp = document.createElement('div');
+      tmp.innerHTML = MARK_SVG.trim();
+      return tmp.firstChild;
+    },
+    haptic: (label) => fireHaptic(screen, label),
+  };
+}
+
+function playInstance(inst) {
+  const screen = inst.screen;
+  Array.from(screen.children).forEach((c) => {
+    if (
+      !c.classList.contains('notch') &&
+      !c.classList.contains('haptic-ring') &&
+      !c.classList.contains('haptic-badge')
+    ) c.remove();
+  });
+  const ctx = makeCtx(screen);
+  const controller = inst.variant.build(screen, ctx);
+  if (controller && typeof controller.play === 'function') controller.play();
+}
+
+function buildCards() {
+  VARIANTS.forEach((variant) => {
+    const card = document.createElement('div');
+    card.className = 'card' + (variant.featured ? ' featured' : '');
+
+    const phone = document.createElement('div');
+    phone.className = 'phone';
+    phone.innerHTML =
+      '<div class="screen">' +
+      '<div class="notch"></div>' +
+      '<div class="haptic-ring"></div>' +
+      '<div class="haptic-badge"></div>' +
+      '</div>';
+    const screen = phone.querySelector('.screen');
+
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    meta.innerHTML =
+      '<div class="name">' + variant.name + '</div>' +
+      '<div class="blurb font-body">' + variant.blurb + '</div>' +
+      '<div class="haptic-at"><b>lock</b> . ' + variant.hapticAt + '</div>' +
+      '<button class="replay">Replay</button>';
+
+    card.appendChild(phone);
+    card.appendChild(meta);
+    gallery.appendChild(card);
+
+    const inst = { variant, screen };
+    instances.push(inst);
+
+    phone.addEventListener('click', () => playInstance(inst));
+    meta.querySelector('.replay').addEventListener('click', () => playInstance(inst));
+  });
+}
+
+function replayAll() { instances.forEach(playInstance); }
+
+speedEl.addEventListener('input', () => { speedVal.textContent = parseFloat(speedEl.value).toFixed(2) + 'x'; });
+speedEl.addEventListener('change', replayAll);
+reducedEl.addEventListener('change', replayAll);
+document.getElementById('replayAll').addEventListener('click', replayAll);
+
+let loopTimer = null;
+autoloopEl.addEventListener('change', () => {
+  if (autoloopEl.checked) { loopTimer = setInterval(replayAll, 3600); }
+  else { clearInterval(loopTimer); loopTimer = null; }
+});
+
+buildCards();
+window.addEventListener('load', () => setTimeout(replayAll, 300));
+</script>
+</body>
+</html>

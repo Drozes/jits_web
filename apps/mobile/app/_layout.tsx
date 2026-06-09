@@ -36,6 +36,7 @@ import { OfflineBanner } from "@/components/offline-banner";
 import { DeepLinkBootstrap } from "@/lib/deep-links/handler";
 import { SplashReveal } from "@/components/ui/elo-system/splash-reveal";
 import { SplashStatement } from "@/components/ui/elo-system/splash-statement";
+import { SplashGlowStatement } from "@/components/ui/elo-system/splash-glow-statement";
 import { getCachedElo } from "@/lib/splash/elo-cache";
 import { getSplashVariant } from "@/lib/splash/splash-variant";
 import {
@@ -139,6 +140,9 @@ function RootLayout() {
             <OfflineBanner />
             <Toaster />
           </SafeAreaProvider>
+          {!revealDone && variant === SPLASH_VARIANT.GLOW_STATEMENT && (
+            <SplashGlowStatement onDone={() => setRevealDone(true)} />
+          )}
           {!revealDone && variant === SPLASH_VARIANT.STATEMENT && (
             <SplashStatement onDone={() => setRevealDone(true)} />
           )}

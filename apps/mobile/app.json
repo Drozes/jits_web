@@ -17,11 +17,6 @@
       "url": "https://u.expo.dev/146416ac-fdf5-4fa2-b58f-2ed7c00e0f42",
       "fallbackToCacheTimeout": 0
     },
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#0D0F14"
-    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.elorated.mobile",
@@ -82,6 +77,14 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0D0F14",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 280
+        }
+      ],
       "expo-secure-store",
       [
         "expo-image-picker",

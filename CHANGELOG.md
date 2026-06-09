@@ -15,6 +15,19 @@
 **Added**
 - `apps/mobile/lib/auth/athlete-load.ts`: pure `needsAthleteLoad(nextUserId, loadedForUserId)` helper used by the auth-state callback (true only for a fresh sign-in or account switch). Unit + state-machine regression tests in `apps/mobile/__tests__/lib/auth/athlete-load.test.ts`.
 
+**Mobile "Glow Statement" launch splash: E·R lettermark → ELO RATED expand (jits-cd9)**
+
+**Added**
+- `apps/mobile/components/ui/elo-system/splash-glow-statement.tsx`, new launch-splash variant. Frame 0 is the static DM Sans E·R lettermark (size-matched to the native splash). It HOLDs while the red interpunct fades out, and "WE ARE" rises in (left-aligned). Then the mark's white E/R crossfade out while the Bebas "ELO RATED" crossfades in **at the mark's size** (no size jump) and EXPANDS OUTWARD from the compact E·R seed (E→ELO leftward, R→RATED rightward), the whole wordmark settling DOWN to its final size as it spreads. A Heavy haptic fires and "ARE YOU?" rises in red (right-aligned) on the lock beat. Every animation is finite and lands on a static frame. Reduced-motion shows the resting frame only (no mark, no expand, no haptic).
+- `apps/mobile/components/ui/elo-system/er-mark.tsx`, the animated E·R `react-native-svg` mark (`<G>` of the two white DM Sans Bold glyph paths + a Signal Red `<Rect>` interpunct, each on its own opacity so the dot can fade out during the hold), rendered from the same `design/icon-options/er-lettermark/splash.svg` vector source that generates the native splash icon. Absolutely centered in the full screen (ignores safe-area insets, like the native splash). Pure opacity + transform → New-Architecture/Fabric safe.
+- `SPLASH_GLOW_STATEMENT` timing block + `EASING_EXPAND` settle curve (no overshoot) and the `SPLASH_VARIANT.GLOW_STATEMENT` key in `packages/shared/src/constants.ts` (single source of truth; no inline magic numbers).
+- `research/assets/splash-glow-statement-preview.html`, archived web prototype (look/feel reference only; mirrors `splash-statement-locked.html`).
+
+**Changed**
+- `DEFAULT_SPLASH_VARIANT` is now `glow-statement` (was `statement`). "The Statement" and "The Climb" remain as A/B fallbacks selectable via the AsyncStorage override (`splash-variant.ts`); `apps/mobile/app/_layout.tsx` mounts the new variant. `__tests__/lib/splash/splash-variant.test.ts` updated for the new default.
+- `apps/mobile/app.json` native splash: replaced the legacy top-level `splash` block (`resizeMode: "contain"`, which scaled the mark with screen aspect) with the `expo-splash-screen` config plugin pinned to a fixed `imageWidth` of 280 dp, so the mark is the same physical size on every device and registers with the 280 dp overlay mark (`MARK_DP` in `splash-glow-statement.tsx`, keep the two equal). **Requires a fresh dev/EAS build** (native splash config is baked at build time).
+- `apps/mobile/package.json`: promoted `react-native-svg` from an unpinned peer dependency (declared by `lucide-react-native`) to a pinned direct dependency at `15.15.5` (the version already resolved in the tree and compiled into the build; npm dedupes to a single copy with lucide's peer). This adds no new package, the pin just makes the splash's dependency explicit and safe from `lucide` changing it. (Note: Expo SDK 54 bundles `15.12.1`; aligning is a deferred `expo-doctor` follow-up since 15.15.5 was already building.)
+
 **Mobile gym + city pickers: shared full-screen search overlay (jits-vir)**
 
 **Added**

@@ -37,8 +37,8 @@ beforeEach(() => {
 });
 
 describe("getSplashVariant", () => {
-  it("returns the default ('statement') when storage is empty", async () => {
-    await expect(getSplashVariant()).resolves.toBe("statement");
+  it("returns the default ('glow-statement') when storage is empty", async () => {
+    await expect(getSplashVariant()).resolves.toBe("glow-statement");
   });
 
   it("returns the stored value when it is a valid variant", async () => {
@@ -46,14 +46,21 @@ describe("getSplashVariant", () => {
     await expect(getSplashVariant()).resolves.toBe("climb");
   });
 
+  it("returns the stored value for every registered variant", async () => {
+    for (const v of ["climb", "statement", "glow-statement"]) {
+      mockStore.set(KEY, v);
+      await expect(getSplashVariant()).resolves.toBe(v);
+    }
+  });
+
   it("returns the default when the stored value is invalid", async () => {
     mockStore.set(KEY, "not-a-real-variant");
-    await expect(getSplashVariant()).resolves.toBe("statement");
+    await expect(getSplashVariant()).resolves.toBe("glow-statement");
   });
 
   it("falls back to the default when getItem throws", async () => {
     mockGetItem.mockRejectedValueOnce(new Error("boom"));
-    await expect(getSplashVariant()).resolves.toBe("statement");
+    await expect(getSplashVariant()).resolves.toBe("glow-statement");
   });
 });
 
