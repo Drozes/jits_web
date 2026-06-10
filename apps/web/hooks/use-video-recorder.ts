@@ -59,19 +59,26 @@ export function useVideoRecorder(
   const [error, setError] = useState<string | null>(null);
   const [videoId, setVideoId] = useState<string | null>(null);
   const [nearingLimit, setNearingLimit] = useState(false);
+  const mountedRef = useRef(true);
 
   const upload = useCallback(async (blob: Blob) => {
-    if (!uploaderAthleteId) {
+    // The storage upload + match_videos write below run to completion even
+    // if the step unmounted mid-upload; only React state updates are
+    // skipped after unmount.
+    const fail = (msg: string) => {
+      if (!mountedRef.current) return;
       setUploadStatus("error");
-      setError("Cannot upload: current athlete not loaded yet.");
+      setError(msg);
+    };
+    if (!uploaderAthleteId) {
+      fail("Cannot upload: current athlete not loaded yet.");
       return;
     }
     if (blob.size > MAX_UPLOAD_BYTES) {
-      setUploadStatus("error");
-      setError("Videos must be under 2 GB.");
+      fail("Videos must be under 2 GB.");
       return;
     }
-    setUploadStatus("uploading");
+    if (mountedRef.current) setUploadStatus("uploading");
     try {
       const supabase = createClient();
       const path = buildMatchVideoStoragePath(matchId, uploaderAthleteId, "webm");
@@ -79,7 +86,6 @@ export function useVideoRecorder(
         .from("match-videos")
         .upload(path, blob, { contentType: blob.type || "video/webm" });
       if (uploadError) {
-        setUploadStatus("error");
         // Local Supabase caps `match-videos` at 500 MiB and returns 413.
         // Surface the local-dev caveat per BE §8.5. Prefer the SDK's
         // typed `statusCode` (string) when available; fall back to a
@@ -91,32 +97,50 @@ export function useVideoRecorder(
           (uploadError instanceof StorageApiError && uploadError.statusCode === "413") ||
           /payload too large/i.test(msg);
         if (isLocal && isPayloadTooLarge) {
-          setError("Local development cap is 500 MiB — production cap is 2 GiB. Use a shorter clip while testing.");
+          fail("Local development cap is 500 MiB — production cap is 2 GiB. Use a shorter clip while testing.");
         } else {
-          setError(msg || "Upload failed");
+          fail(msg || "Upload failed");
         }
         return;
       }
-      // Storage upload succeeded — INSERT the parent row.
-      try {
-        const { id } = await upsertMatchVideo(supabase, {
-          matchId,
-          uploaderAthleteId,
-          storagePath: path,
-          fileSizeBytes: blob.size,
-          recordingType: "self",
-          recordedBy: uploaderAthleteId,
-        });
-        setVideoId(id);
+      // Storage upload succeeded; INSERT/UPDATE the parent row.
+      const upserted = await upsertMatchVideo(supabase, {
+        matchId,
+        uploaderAthleteId,
+        storagePath: path,
+        fileSizeBytes: blob.size,
+        recordingType: "self",
+        recordedBy: uploaderAthleteId,
+      });
+      if (!upserted.ok) {
+        // Storage object landed but the DB row didn't: remove the object
+        // so it is never orphaned in the bucket with no `match_videos`
+        // row. Best-effort with observability: under storage RLS a denied
+        // DELETE resolves 200 with `{ data: [] }` and NO error, so success
+        // requires exactly one removed object. A failed cleanup is logged
+        // but never masks the real DB error.
+        try {
+          const { data: removed, error: removeError } = await supabase.storage
+            .from("match-videos")
+            .remove([path]);
+          if (removeError || removed?.length !== 1) {
+            console.warn(
+              `[video] orphan cleanup failed for ${path}:`,
+              removeError?.message ?? `removed ${removed?.length ?? 0} objects (silent RLS denial?)`,
+            );
+          }
+        } catch (removeErr) {
+          console.warn(`[video] orphan cleanup failed for ${path}:`, removeErr);
+        }
+        fail(`Upload stored but saving the video record failed: ${upserted.error.message}`);
+        return;
+      }
+      if (mountedRef.current) {
+        setVideoId(upserted.data.id);
         setUploadStatus("done");
-      } catch (insertErr: unknown) {
-        const m = insertErr instanceof Error ? insertErr.message : String(insertErr);
-        setError(`Upload stored but DB INSERT failed: ${m}`);
-        setUploadStatus("error");
       }
     } catch {
-      setUploadStatus("error");
-      setError("Upload failed");
+      fail("Upload failed");
     }
   }, [matchId, uploaderAthleteId]);
 
@@ -173,8 +197,13 @@ export function useVideoRecorder(
     }
   }, [stopRecording]);
 
+  // Unmount: release the camera. Deliberately does NOT cancel an
+  // upload; the storage + DB write finishes in the background so the
+  // recording is never stranded as an orphan object without a DB row.
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
+      mountedRef.current = false;
       streamRef.current?.getTracks().forEach((t) => t.stop());
     };
   }, []);

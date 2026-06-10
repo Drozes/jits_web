@@ -665,15 +665,15 @@ export interface CreateMatchVideoParams {
  * BE contract: `jr_be/specs/013-chunked-video-pipeline/INTEGRATION.md`
  * §2.1 (column list), §8.1 (RLS / `uploaded_by` resolution).
  *
- * Throws on PostgREST error. On `23505` (uq_match_video_uploader unique
- * violation), callers should fall back to `upsertMatchVideo` which
- * UPDATE-back-to-`'ready'` the existing row — preserves the row id so
- * any open Realtime subscriptions keep working.
+ * Returns `Result<{ id }>`; never throws. On `23505`
+ * (uq_match_video_uploader unique violation), callers should use
+ * `upsertMatchVideo`, which falls back to an UPDATE of the existing row,
+ * preserving the row id so any open Realtime subscriptions keep working.
  */
 export async function createMatchVideo(
   supabase: Client,
   params: CreateMatchVideoParams,
-): Promise<{ id: string }> {
+): Promise<Result<{ id: string }>> {
   const insert: Database["public"]["Tables"]["match_videos"]["Insert"] = {
     match_id: params.matchId,
     uploaded_by: params.uploaderAthleteId,
@@ -694,13 +694,19 @@ export async function createMatchVideo(
     .select("id")
     .single();
 
-  if (error) throw error;
-  return { id: data.id };
+  // `match_video_create` context: a bare 23505 here is the
+  // uq_match_video_uploader conflict, not a duplicate-match conflict.
+  if (error) return { ok: false, error: mapPostgrestError(error, "match_video_create") };
+  return { ok: true, data: { id: data.id } };
 }
 
 /**
- * Retry-safe variant: INSERT first; on `23505` (uniq_match_video_uploader)
+ * Retry-safe variant: INSERT first; on `23505` (uq_match_video_uploader)
  * UPDATE the existing row back to `'ready'` with the new `storage_path`.
+ *
+ * Returns `Result<{ id }>`; never throws. The UPDATE-on-conflict path only
+ * sets the optional columns the caller actually provided, so a retry that
+ * omits e.g. `recordingType` does not clear the value already on the row.
  *
  * Per BE §8.6, the UPDATE re-fires `trg_match_videos_request_slice_update`
  * only if the previous status was NOT `'ready'`. If the existing row is
@@ -710,37 +716,35 @@ export async function createMatchVideo(
 export async function upsertMatchVideo(
   supabase: Client,
   params: CreateMatchVideoParams,
-): Promise<{ id: string }> {
-  try {
-    return await createMatchVideo(supabase, params);
-  } catch (err: unknown) {
-    const code = (err as { code?: string } | null)?.code;
-    if (code !== "23505") throw err;
+): Promise<Result<{ id: string }>> {
+  const created = await createMatchVideo(supabase, params);
+  if (created.ok || created.error.raw?.code !== "23505") return created;
 
-    const update: Database["public"]["Tables"]["match_videos"]["Update"] = {
-      storage_path: params.storagePath,
-      status: "ready",
-      requested_tier: params.requestedTier ?? "standard",
-      // Reset FE-owned columns; never touch chunk_count/slice_*_at etc.
-      duration_seconds: params.durationSeconds ?? null,
-      file_size_bytes: params.fileSizeBytes ?? null,
-      camera_angle: params.cameraAngle ?? null,
-      athlete_left_id: params.athleteLeftId ?? null,
-      recorded_by: params.recordedBy ?? null,
-      recording_type: params.recordingType ?? null,
-    };
+  // Existing row for (match_id, uploaded_by): UPDATE it back to 'ready'.
+  // Only include columns the caller supplied; never touch server-managed
+  // columns (chunk_count / slice_*_at / merge_*_at) per BE §8.6.
+  const update: Database["public"]["Tables"]["match_videos"]["Update"] = {
+    storage_path: params.storagePath,
+    status: "ready",
+  };
+  if (params.requestedTier != null) update.requested_tier = params.requestedTier;
+  if (params.durationSeconds != null) update.duration_seconds = params.durationSeconds;
+  if (params.fileSizeBytes != null) update.file_size_bytes = params.fileSizeBytes;
+  if (params.cameraAngle != null) update.camera_angle = params.cameraAngle;
+  if (params.athleteLeftId != null) update.athlete_left_id = params.athleteLeftId;
+  if (params.recordedBy != null) update.recorded_by = params.recordedBy;
+  if (params.recordingType != null) update.recording_type = params.recordingType;
 
-    const { data, error } = await supabase
-      .from("match_videos")
-      .update(update)
-      .eq("match_id", params.matchId)
-      .eq("uploaded_by", params.uploaderAthleteId)
-      .select("id")
-      .single();
+  const { data, error } = await supabase
+    .from("match_videos")
+    .update(update)
+    .eq("match_id", params.matchId)
+    .eq("uploaded_by", params.uploaderAthleteId)
+    .select("id")
+    .single();
 
-    if (error) throw error;
-    return { id: data.id };
-  }
+  if (error) return { ok: false, error: mapPostgrestError(error, "match_video_create") };
+  return { ok: true, data: { id: data.id } };
 }
 
 // ---------------------------------------------------------------------------

@@ -7,6 +7,7 @@ export type DomainErrorCode =
   | "SELF_CHALLENGE"
   | "CHALLENGE_NOT_ACCEPTED"
   | "MATCH_ALREADY_EXISTS"
+  | "VIDEO_ALREADY_EXISTS"
   | "MATCH_NOT_IN_PROGRESS"
   | "MATCH_NOT_PENDING"
   | "INVALID_RESULT"
@@ -178,6 +179,14 @@ export function mapPostgrestError(
       return {
         code: "ALREADY_JOINED",
         message: "You have already joined this session.",
+        raw: error,
+      };
+    }
+    if (context === "match_video_create") {
+      // uq_match_video_uploader: one video row per (match, uploader).
+      return {
+        code: "VIDEO_ALREADY_EXISTS",
+        message: "A video has already been uploaded for this match.",
         raw: error,
       };
     }

@@ -202,6 +202,18 @@ describe("mapPostgrestError", () => {
       expect(result.message).toBe("A match already exists for this challenge.");
     });
 
+    it("maps to VIDEO_ALREADY_EXISTS with match_video_create context", () => {
+      const result = mapPostgrestError(
+        pgError("23505", "duplicate key"),
+        "match_video_create",
+      );
+      expect(result.code).toBe("VIDEO_ALREADY_EXISTS");
+      expect(result.message).toBe(
+        "A video has already been uploaded for this match.",
+      );
+      expect(result.raw?.code).toBe("23505");
+    });
+
     it("maps to MATCH_ALREADY_EXISTS with unknown context", () => {
       const result = mapPostgrestError(
         pgError("23505", "duplicate"),

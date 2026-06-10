@@ -1,6 +1,7 @@
 import * as FileSystem from "expo-file-system/legacy";
 import { supabase } from "@/lib/supabase/client";
 import { env } from "@/lib/env";
+import { captureException } from "@/lib/error-tracking/sentry";
 import {
   buildMatchVideoStoragePath,
   upsertMatchVideo,
@@ -41,6 +42,22 @@ export interface UploadOptions {
    * RLS `match_videos_insert_participant` policy.
    */
   uploaderAthleteId: string;
+  /**
+   * Pre-built storage key inside the bucket. Pass the SAME path on a
+   * retry so the retry overwrites the half-written object from the
+   * failed attempt instead of orphaning it at a stale path. Defaults to
+   * a fresh `buildVideoPath()` key when omitted.
+   */
+  storagePath?: string;
+  /**
+   * Skip the orphan-compensation delete when the `match_videos` write
+   * fails after a successful storage write. Set this on every attempt
+   * EXCEPT the last one of a retry loop: deleting the object on a
+   * transient DB failure would force the retry to re-upload the whole
+   * file (up to 2 GB). The caller then owns final cleanup (see
+   * `MatchVideoDbError.storageObjectPersisted` + `removeUploadedObject`).
+   */
+  skipCompensation?: boolean;
   /** Storage path file extension (default `mp4`). */
   ext?: string;
 }
@@ -58,6 +75,50 @@ export interface UploadResult {
 const MAX_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024;
 
 /**
+ * The storage write succeeded but the `match_videos` DB write failed.
+ * `storageObjectPersisted` tells the caller whether the uploaded object
+ * is still in the bucket (compensation was skipped via
+ * `skipCompensation`) and therefore needs cleanup after the caller's
+ * final retry attempt.
+ */
+export class MatchVideoDbError extends Error {
+  /** Object key inside `match-videos` that was written before the DB failure. */
+  readonly path: string;
+  /** True when compensation was skipped and the object is still in the bucket. */
+  readonly storageObjectPersisted: boolean;
+
+  constructor(message: string, path: string, storageObjectPersisted: boolean) {
+    super(message);
+    this.name = "MatchVideoDbError";
+    this.path = path;
+    this.storageObjectPersisted = storageObjectPersisted;
+  }
+}
+
+/**
+ * Best-effort removal of an uploaded object that has no `match_videos`
+ * row (orphan compensation). The response is inspected because under
+ * storage RLS a denied DELETE resolves 200 with `{ data: [] }` and NO
+ * error — success therefore requires exactly one removed object. A
+ * failed cleanup is reported (Sentry + console.warn, matching the
+ * codebase's best-effort logging pattern) but never thrown, so it can
+ * never mask the original upload/DB error.
+ */
+export async function removeUploadedObject(path: string): Promise<void> {
+  try {
+    const { data, error } = await supabase.storage.from(VIDEO_BUCKET).remove([path]);
+    if (error || data?.length !== 1) {
+      const detail = error?.message ?? `removed ${data?.length ?? 0} objects (silent RLS denial?)`;
+      console.warn(`[video] orphan cleanup failed for ${path}: ${detail}`);
+      captureException(new Error(`Match-video orphan cleanup failed: ${detail}`), { path });
+    }
+  } catch (err) {
+    console.warn(`[video] orphan cleanup failed for ${path}:`, err);
+    captureException(err, { path });
+  }
+}
+
+/**
  * Streams the recording at `fileUri` straight to Supabase Storage's REST
  * endpoint via `FileSystem.uploadAsync`. Then INSERTs the parent
  * `match_videos` row at `status='ready'` so the slicer trigger fires.
@@ -71,8 +132,8 @@ const MAX_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024;
  * the returned promise as a single "uploading -> done" transition and
  * surface only start/end states to the user.
  */
-export async function uploadRecording({ fileUri, matchId, uploaderAthleteId, ext = "mp4" }: UploadOptions): Promise<UploadResult> {
-  const path = buildVideoPath(matchId, uploaderAthleteId, ext);
+export async function uploadRecording({ fileUri, matchId, uploaderAthleteId, storagePath, skipCompensation = false, ext = "mp4" }: UploadOptions): Promise<UploadResult> {
+  const path = storagePath ?? buildVideoPath(matchId, uploaderAthleteId, ext);
 
   // Resolve the current access token so RLS policies on the bucket apply
   // to the authenticated athlete (mirrors the JS SDK's
@@ -103,8 +164,11 @@ export async function uploadRecording({ fileUri, matchId, uploaderAthleteId, ext
       "Content-Type": ext === "mp4" ? "video/mp4" : "application/octet-stream",
       // Storage REST requires the apikey header even with a JWT.
       apikey: env.supabaseAnonKey,
-      // `x-upsert: false` is the default; spelled out for clarity.
-      "x-upsert": "false",
+      // Upsert so a retry against the SAME path overwrites the
+      // half-written object from a failed earlier attempt instead of
+      // failing 400 "resource already exists". (POST + x-upsert: true is
+      // what the JS SDK's `.upload(path, body, { upsert: true })` sends.)
+      "x-upsert": "true",
     },
   });
 
@@ -126,7 +190,7 @@ export async function uploadRecording({ fileUri, matchId, uploaderAthleteId, ext
     if (info.exists && typeof info.size === "number") fileSize = info.size;
   } catch { /* swallow */ }
 
-  const { id } = await upsertMatchVideo(supabase, {
+  const upserted = await upsertMatchVideo(supabase, {
     matchId,
     uploaderAthleteId,
     storagePath: path,
@@ -135,5 +199,19 @@ export async function uploadRecording({ fileUri, matchId, uploaderAthleteId, ext
     recordedBy: uploaderAthleteId,
   });
 
-  return { path, status: result.status, videoId: id };
+  if (!upserted.ok) {
+    // Storage object landed but the DB row didn't: unless the caller is
+    // managing compensation across retries (`skipCompensation`), remove
+    // the object so it is never orphaned in the bucket with no
+    // `match_videos` row. Best-effort with observability: a failed
+    // cleanup is reported but never masks the real DB error.
+    if (!skipCompensation) await removeUploadedObject(path);
+    throw new MatchVideoDbError(
+      `Video uploaded but saving the record failed: ${upserted.error.message}`,
+      path,
+      skipCompensation,
+    );
+  }
+
+  return { path, status: result.status, videoId: upserted.data.id };
 }
