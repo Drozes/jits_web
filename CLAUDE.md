@@ -145,6 +145,21 @@ After every backend migration, run `npm run db:types` from the repo root (regene
 ### Changelog
 Always update `CHANGELOG.md` under `## [Unreleased]`, organized by area with `**Added** / **Changed** / **Fixed** / **Removed**`. Include file paths for new files; be concise but specific.
 
+### Mobile deploy: OTA vs TestFlight
+Two ways to ship `apps/mobile`. **Default to OTA when the change is JS/asset-only; escalate to a TestFlight build for anything that changes the native binary or the runtime version.** The `ship-mobile` skill classifies a change and runs the right path; this is the rule it encodes.
+
+- **OTA (EAS Update):** `cd apps/mobile && npx eas update --channel <production|preview|development> --environment <env> -m "..."`. Pushes a new JS bundle to already-installed builds; it lands on the next cold start (`fallbackToCacheTimeout: 0`). Seconds-to-minutes, no Apple round trip. **Only reaches builds that already embed `expo-updates` AND share the published `runtimeVersion`** (policy `appVersion` = `expo.version`). It also only routes if the target channel is mapped to a branch (EAS dashboard / `eas channel`), else the update publishes but no build receives it. The first OTA-capable build was the one that added `expo-updates` (build 19, v0.1.0; build numbers are EAS-remote via `appVersionSource: remote` + `autoIncrement`, so `app.json` `buildNumber` is not authoritative). Installs older than that cannot receive any OTA.
+- **TestFlight build:** the `testflight-release` skill (`eas build -p ios --profile production --auto-submit`). A new native binary, required for anything OTA cannot carry.
+
+**Requires a TestFlight build (NOT OTA-eligible):**
+- a native dependency in `apps/mobile/package.json` added / removed / version-changed (`expo-*` / `react-native-*` / anything with native code). A pure-JS dep bump is OTA-ok.
+- `app.json` / `app.config.js` native config: `plugins`, permissions, entitlements, `scheme`, bundle id, icons, native `splash`, the `ios`/`android` blocks, `updates`, `runtimeVersion`.
+- a marketing `expo.version` bump (with `runtimeVersion: appVersion`, bumping the version forks the OTA target, so the new version needs a fresh build before any OTA reaches it).
+- Expo SDK upgrade, `metro.config.js`, `babel.config.js`, `eas.json`, a New-Architecture/Hermes change, or a `react-native-reanimated` worklet/babel-plugin change (reads as JS but is native-bound).
+- env baked at native build time (credentials, anything non-`EXPO_PUBLIC_`). `EXPO_PUBLIC_*` values are inlined into the JS bundle, so a value change *can* ride an OTA, but `eas update` resolves them from the EAS environment (`--environment <env>`) or the publish shell, NOT from `eas.json`'s `build.<profile>.env`. Pass `--environment` matching the target and confirm the resolved value. (Known trap: `build.production.env` sets `EXPO_PUBLIC_APP_ENV=staging`, so do not assume "production = production"; reconcile before relying on this.)
+
+**OTA-eligible (default):** JS/TS/TSX under `apps/mobile`, `packages/shared`, JS-bundled assets, styles, and copy, with none of the above touched. When unsure whether a dep is native, treat it as TestFlight-required. **Eligibility is bound to the native module set of the build already in the field:** a JS change that calls a native API/method newer than what the installed build embeds will crash at runtime even though no native file changed in the diff, so when the JS leans on a new native capability, build. An OTA can NEVER carry a native change (it silently won't); when in doubt, build.
+
 ### Pre-launch blockers (status-tracked, verify before acting)
 Run `eas init` to replace `app.json` placeholders (`extra.eas.projectId`, `updates.url`, Sentry org/project). Universal-link files at `public/.well-known/` need the real Apple Team ID and SHA256 fingerprint, hosted at `https://elorated.com/.well-known/`. Apple Developer + Google Play enrollment required. `STORE_LISTING.md` is the source of truth for the launch checklist.
 
