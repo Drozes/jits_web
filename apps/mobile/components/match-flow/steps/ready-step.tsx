@@ -5,6 +5,7 @@ import { toast } from "@/components/ui/toast";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { supabase } from "@/lib/supabase/client";
 import { cancelSessionMatch, startMatch } from "@jits/shared/api/mutations";
+import { getMatchDetails } from "@jits/shared/api/queries";
 import { useSessionMatchSync } from "@jits/shared/hooks/use-session-match-sync";
 import { ReadyPanel } from "./ready-panel";
 import { cn } from "@/lib/cn";
@@ -68,6 +69,16 @@ export function ReadyStep(props: ReadyStepProps) {
     setLoading(true);
     const result = await startMatch(supabase, matchId);
     if (!result.ok) {
+      // Both devices race to start_match when the ready handshake completes
+      // and the RPC only succeeds once (pending -> in_progress). Losing the
+      // race is NOT an error: check the DB before surfacing one. Without
+      // this, a missed timer-started broadcast strands the losing device on
+      // the ready step with a misleading toast while the match runs.
+      const match = await getMatchDetails(supabase, matchId);
+      if (match?.status === "in_progress" && match.started_at) {
+        onStarted(match.started_at);
+        return;
+      }
       startedRef.current = false;
       setLoading(false);
       toast.error({ text1: "Couldn't start match", description: result.error.message });

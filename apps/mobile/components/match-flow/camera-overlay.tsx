@@ -10,6 +10,9 @@ interface CameraOverlayProps {
   permissionGranted: boolean;
   permissionCanAskAgain: boolean;
   onRequestPermission: () => void;
+  /** Fired by expo-camera once the native capture session is live.
+   * recordAsync before this throws "Camera is not ready yet". */
+  onCameraReady: () => void;
   recording: boolean;
 }
 
@@ -30,6 +33,7 @@ export function CameraOverlay({
   permissionGranted,
   permissionCanAskAgain,
   onRequestPermission,
+  onCameraReady,
   recording,
 }: CameraOverlayProps) {
   const tokens = useThemedTokens();
@@ -76,6 +80,7 @@ export function CameraOverlay({
           facing="back"
           style={{ flex: 1 }}
           videoQuality="720p"
+          onCameraReady={onCameraReady}
         />
         {recording ? (
           <View className="absolute right-2 top-2 flex-row items-center gap-1.5 rounded-xs bg-black/60 px-2 py-1">

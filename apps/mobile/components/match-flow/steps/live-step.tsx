@@ -137,6 +137,7 @@ export function LiveStep(props: LiveStepProps) {
         permissionGranted={recorder.permission?.granted ?? false}
         permissionCanAskAgain={recorder.permission?.canAskAgain ?? true}
         onRequestPermission={() => void recorder.requestPermission()}
+        onCameraReady={recorder.markCameraReady}
         recording={recorder.state === "recording"}
       />
       <TimerDisplay

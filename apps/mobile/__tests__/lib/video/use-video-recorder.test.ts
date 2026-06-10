@@ -97,6 +97,31 @@ function makeStubbornCamera(ignoreFirst: number, uri = "file://clip.mp4"): FakeC
   return { recordAsync, stopRecording };
 }
 
+/**
+ * A camera whose recordAsync REJECTS with the iOS "not ready" error for the
+ * first `failFirst` attempts, then records normally. Mirrors the live iOS 26
+ * behavior where onCameraReady fires before the session can record.
+ */
+function makeNotReadyCamera(failFirst: number, uri = "file://clip.mp4"): FakeCamera {
+  let attempts = 0;
+  let resolveRecord: ((v: { uri: string } | undefined) => void) | null = null;
+  const recordAsync = jest.fn(() => {
+    attempts += 1;
+    if (attempts <= failFirst) {
+      return Promise.reject(
+        new Error("Camera is not ready yet. Wait for 'onCameraReady' callback"),
+      );
+    }
+    return new Promise<{ uri: string } | undefined>((res) => {
+      resolveRecord = res;
+    });
+  });
+  const stopRecording = jest.fn(() => {
+    resolveRecord?.({ uri });
+  });
+  return { recordAsync, stopRecording };
+}
+
 const UPLOAD_OK = { path: "M/A/111.mp4", status: 200, videoId: "VID" };
 
 beforeEach(() => {
@@ -106,6 +131,7 @@ beforeEach(() => {
 
 afterEach(() => {
   (console.warn as jest.Mock).mockRestore?.();
+  jest.useRealTimers();
 });
 
 describe("useVideoRecorder", () => {
@@ -117,6 +143,7 @@ describe("useVideoRecorder", () => {
     const { result } = renderHook(() => useVideoRecorder("M", "A"));
     const cam = makeFakeCamera();
     result.current.cameraRef.current = cam as never;
+    act(() => result.current.markCameraReady());
 
     let startPromise: Promise<void>;
     act(() => {
@@ -156,6 +183,7 @@ describe("useVideoRecorder", () => {
     const { result } = renderHook(() => useVideoRecorder("M", "A"));
     const cam = makeFakeCamera();
     result.current.cameraRef.current = cam as never;
+    act(() => result.current.markCameraReady());
 
     let startPromise: Promise<void>;
     act(() => {
@@ -181,6 +209,7 @@ describe("useVideoRecorder", () => {
     const { result } = renderHook(() => useVideoRecorder("M", "A"));
     const cam = makeFakeCamera();
     result.current.cameraRef.current = cam as never;
+    act(() => result.current.markCameraReady());
 
     let startPromise: Promise<void>;
     act(() => {
@@ -201,6 +230,7 @@ describe("useVideoRecorder", () => {
     const { result } = renderHook(() => useVideoRecorder("M", "A"));
     const cam = makeFakeCamera();
     result.current.cameraRef.current = cam as never;
+    act(() => result.current.markCameraReady());
 
     // End fires while the recorder is still idle (start() not yet run).
     await act(async () => {
@@ -228,6 +258,7 @@ describe("useVideoRecorder", () => {
     // deferred pending-stop loop must re-issue it until recordAsync settles.
     const cam = makeStubbornCamera(1);
     result.current.cameraRef.current = cam as never;
+    act(() => result.current.markCameraReady());
 
     await act(async () => {
       await result.current.stop(); // pending stop while still idle
@@ -245,6 +276,7 @@ describe("useVideoRecorder", () => {
     const { result } = renderHook(() => useVideoRecorder("M", "A"));
     const cam = makeFakeCamera(null);
     result.current.cameraRef.current = cam as never;
+    act(() => result.current.markCameraReady());
 
     await act(async () => {
       await result.current.stop();
@@ -254,6 +286,178 @@ describe("useVideoRecorder", () => {
     });
 
     expect(cam.stopRecording).toHaveBeenCalledTimes(1);
+    expect(mockUploadRecording).not.toHaveBeenCalled();
+    expect(result.current.state).toBe("idle");
+  });
+
+  it("defers start until the camera reports ready, then records", async () => {
+    // Real hardware: recordAsync before onCameraReady throws "Camera is
+    // not ready yet" and the clip silently never records. start() must
+    // defer and markCameraReady must resume it.
+    mockUploadRecording.mockResolvedValueOnce(UPLOAD_OK);
+
+    const { result } = renderHook(() => useVideoRecorder("M", "A"));
+    const cam = makeFakeCamera();
+    result.current.cameraRef.current = cam as never;
+
+    await act(async () => {
+      await result.current.start();
+    });
+    expect(cam.recordAsync).not.toHaveBeenCalled();
+
+    act(() => {
+      result.current.markCameraReady();
+    });
+    await waitFor(() => expect(cam.recordAsync).toHaveBeenCalledTimes(1));
+
+    await act(async () => {
+      await result.current.stop();
+    });
+    await waitFor(() => expect(result.current.state).toBe("uploaded"));
+    expect(result.current.videoId).toBe("VID");
+  });
+
+  it("attempts recordAsync after the backstop timeout when onCameraReady never fires", async () => {
+    // Observed on iOS 26 hardware: onCameraReady sometimes never fires.
+    // After CAMERA_READY_TIMEOUT_MS the deferred start must fall through
+    // and probe the camera directly via the retry loop.
+    jest.useFakeTimers();
+    mockUploadRecording.mockResolvedValueOnce(UPLOAD_OK);
+
+    const { result } = renderHook(() => useVideoRecorder("M", "A"));
+    const cam = makeFakeCamera();
+    result.current.cameraRef.current = cam as never;
+
+    // markCameraReady is never called; start() defers behind the backstop.
+    await act(async () => {
+      await result.current.start();
+    });
+    expect(cam.recordAsync).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(3000);
+    });
+    expect(cam.recordAsync).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await result.current.stop();
+      await jest.runOnlyPendingTimersAsync();
+    });
+    expect(result.current.state).toBe("uploaded");
+    expect(result.current.videoId).toBe("VID");
+  });
+
+  it("honors a stop that arrives while start is deferred on camera readiness", async () => {
+    mockUploadRecording.mockResolvedValueOnce(UPLOAD_OK);
+
+    const { result } = renderHook(() => useVideoRecorder("M", "A"));
+    const cam = makeFakeCamera();
+    result.current.cameraRef.current = cam as never;
+
+    // start() defers (camera not ready); End fires while still idle.
+    await act(async () => {
+      await result.current.start();
+    });
+    await act(async () => {
+      await result.current.stop();
+    });
+    expect(cam.recordAsync).not.toHaveBeenCalled();
+
+    // Camera comes up: deferred start runs and the pending stop is
+    // honored, so the brief clip still records and uploads.
+    act(() => {
+      result.current.markCameraReady();
+    });
+    await waitFor(() => expect(result.current.state).toBe("uploaded"));
+    expect(cam.recordAsync).toHaveBeenCalledTimes(1);
+    expect(result.current.videoId).toBe("VID");
+  });
+
+  it("uploads a clip the OS finalized without an explicit stop (time cap / lost stop)", async () => {
+    mockUploadRecording.mockResolvedValueOnce(UPLOAD_OK);
+
+    let resolveRecord: ((v: { uri: string } | undefined) => void) | null = null;
+    const cam: FakeCamera = {
+      recordAsync: jest.fn(
+        () =>
+          new Promise<{ uri: string } | undefined>((res) => {
+            resolveRecord = res;
+          }),
+      ),
+      stopRecording: jest.fn(),
+    };
+
+    const { result } = renderHook(() => useVideoRecorder("M", "A"));
+    result.current.cameraRef.current = cam as never;
+    act(() => result.current.markCameraReady());
+
+    act(() => {
+      void result.current.start();
+    });
+    await waitFor(() => expect(cam.recordAsync).toHaveBeenCalledTimes(1));
+
+    // The OS ends the recording on its own (maxDuration) — no stop() call.
+    await act(async () => {
+      resolveRecord?.({ uri: "file://capped.mp4" });
+    });
+
+    await waitFor(() => expect(result.current.state).toBe("uploaded"));
+    expect(cam.stopRecording).not.toHaveBeenCalled();
+    expect(mockUploadRecording).toHaveBeenCalledTimes(1);
+    expect(result.current.videoId).toBe("VID");
+  });
+
+  it("retries recordAsync when the camera reports not-ready despite onCameraReady", async () => {
+    mockUploadRecording.mockResolvedValueOnce(UPLOAD_OK);
+
+    const { result } = renderHook(() => useVideoRecorder("M", "A"));
+    const cam = makeNotReadyCamera(2);
+    result.current.cameraRef.current = cam as never;
+    act(() => result.current.markCameraReady());
+
+    let startPromise: Promise<void>;
+    act(() => {
+      startPromise = result.current.start();
+    });
+    // Two not-ready rejections retried at 500ms intervals, then recording.
+    await waitFor(() => expect(cam.recordAsync).toHaveBeenCalledTimes(3), {
+      timeout: 4000,
+    });
+    await act(async () => {
+      await result.current.stop();
+      await startPromise;
+    });
+
+    await waitFor(() => expect(result.current.state).toBe("uploaded"));
+    expect(result.current.videoId).toBe("VID");
+  });
+
+  it("abandons the not-ready retry loop when stop() arrives during the retry sleep", async () => {
+    const { result } = renderHook(() => useVideoRecorder("M", "A"));
+    // A camera that NEVER becomes ready: every attempt rejects not-ready,
+    // so start() is parked in the 500ms retry sleep when stop() lands.
+    const cam = makeNotReadyCamera(Number.POSITIVE_INFINITY);
+    result.current.cameraRef.current = cam as never;
+    act(() => result.current.markCameraReady());
+
+    let startPromise: Promise<void>;
+    act(() => {
+      startPromise = result.current.start();
+    });
+    await waitFor(() => expect(cam.recordAsync).toHaveBeenCalledTimes(1));
+
+    // End fires while the retry sleep is pending. Without the post-sleep
+    // re-check the loop would issue another recordAsync attempt with no
+    // stop ever issued against it: a leaked recording that runs to native
+    // teardown and uploads a post-match garbage clip.
+    await act(async () => {
+      await result.current.stop();
+    });
+    await act(async () => {
+      await startPromise;
+    });
+
+    expect(cam.recordAsync).toHaveBeenCalledTimes(1);
     expect(mockUploadRecording).not.toHaveBeenCalled();
     expect(result.current.state).toBe("idle");
   });
@@ -274,6 +478,7 @@ describe("useVideoRecorder", () => {
     const { result, unmount } = renderHook(() => useVideoRecorder("M", "A"));
     const cam = makeFakeCamera();
     result.current.cameraRef.current = cam as never;
+    act(() => result.current.markCameraReady());
 
     let startPromise: Promise<void>;
     act(() => {

@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+**On-device video debugging: recording now actually works on real iOS hardware (live-tested end to end)**
+
+All four fixes below came out of a live on-device test session (real iPhone + simulator opponent against the local stack) that took a real match recording through upload and the slicer pipeline for the first time. None of these failures reproduced in the simulator or unit tests.
+
+**Fixed**
+- `apps/mobile/lib/video/use-video-recorder.ts`: recording never started on real hardware — `recordAsync` was called as soon as camera *permission* existed, but the native capture session initializes asynchronously and throws "Camera is not ready yet", an error that was previously invisible (state-only). `start()` now defers until `CameraView`'s `onCameraReady` (new `markCameraReady` wiring through `camera-overlay.tsx` / `live-step.tsx`), with a 3s timeout backstop for the observed case where `onCameraReady` never fires, plus a bounded retry (500ms × 16) for the also-observed case where it fires before the session can actually record.
+- `apps/mobile/lib/video/use-video-recorder.ts`: a `stopRecording()` silently ignored by iOS left the recording promise pending forever and the clip lost (observed live). `stop()` now re-issues the stop on a 250ms interval until the promise settles, and a clip the OS finalizes WITHOUT an explicit stop (time cap, lost stop bookkeeping) is now uploaded instead of discarded. A stop (or unmount) arriving during the not-ready retry sleep aborts the retry loop cleanly instead of letting the next attempt record past the match end (review-caught race). The deferred-start backstop timer is held in a ref and cancelled on ready/unmount, and the pending-stop wait short-circuits when the recording settles (no leaked timers; Jest exits cleanly). Error transitions and every start/stop/upload step now emit `[video]` diagnostics tagged with the uploader athlete id (distinguishes devices on a shared Metro).
+- `apps/mobile/components/match-flow/steps/ready-step.tsx`: "Couldn't start match" race — both devices call `startMatch` when the ready handshake completes and the RPC succeeds only once; the loser surfaced a misleading error and was stranded on the ready step whenever the winner's timer-started broadcast was missed. The loser now consults `getMatchDetails` and joins the already-running match.
+- `packages/shared/src/hooks/use-pending-challenges.ts`: realtime channel name used a per-instance counter as its "unique" suffix, so a second hook instance (remount) collided with the first and crashed to the error boundary ("cannot add `postgres_changes` callbacks after `subscribe()`"). The suffix is now globally unique per effect run.
+
+**Added**
+- `apps/mobile/__tests__/lib/video/use-video-recorder.test.ts`: camera-ready deferral + resume, stop while start is deferred, not-ready retry, stop-during-retry-sleep abort, the 3s onCameraReady-timeout backstop (fake timers), OS-finalized clip upload.
+- `apps/mobile/__tests__/components/match-flow/ready-step.test.tsx`: start-race rescue (loser joins the in_progress match with the DB started_at, no toast, no broadcast) and the fallthrough (error toast, retry re-armed).
+- Backend (separate repo `jr_be`): `supabase/migrations/20260610000000_match_videos_bucket.sql` — the `match-videos` bucket moves from config.toml-only into a migration (private, 2 GiB prod cap), plus the bucket's first `storage.objects` RLS policies: participant-gated SELECT (signed-URL playback), own-folder + participant INSERT/UPDATE (x-upsert retry path) with the participant check hardened against future SELECT-policy broadening, own-folder DELETE (frontend orphan compensation), and uuid-shape guards so malformed paths deny cleanly instead of erroring. pgTAP `supabase/tests/043_match_videos_bucket_test.sql` (24 tests); full suite 1329 green.
+
 **Video upload-path bug fixes, Phase 1 (jits-1v6, jits-81l, jits-hu0, jits-voh, jits-0lc, jits-za8, jits-a8y.13)**
 
 **Fixed**

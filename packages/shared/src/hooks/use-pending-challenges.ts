@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 export interface PendingChallenge {
@@ -38,7 +38,6 @@ export function usePendingChallenges(
   athleteId: string,
 ): UsePendingChallengesResult {
   const [challenges, setChallenges] = useState<PendingChallenge[]>([]);
-  const mountIdRef = useRef(0);
 
   const fetchChallenges = useCallback(async () => {
     const now = new Date().toISOString();
@@ -72,7 +71,12 @@ export function usePendingChallenges(
   }, [supabase, athleteId]);
 
   useEffect(() => {
-    const mountId = ++mountIdRef.current;
+    // Channel names must be unique across hook INSTANCES, not just across
+    // re-runs of one instance's effect: a per-instance counter collides
+    // when a remount (Fast Refresh, navigation) creates a second instance
+    // whose counter also starts at 1, crashing with "cannot add
+    // postgres_changes callbacks after subscribe()".
+    const mountId = Math.random().toString(36).slice(2, 10);
     fetchChallenges();
 
     const channel = supabase
