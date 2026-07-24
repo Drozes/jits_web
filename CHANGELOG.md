@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+**Video-native TestFlight build: full video module set embedded, OTA runtime forked to 0.2.0 (jits-kaf.2.6)**
+
+**Added**
+- `apps/mobile/package.json`: `expo-video` (~3.0.16, go-forward player), `expo-media-library` (~18.2.1, save-to-phone), `expo-sharing` (~14.0.8, share sheet), `expo-video-thumbnails` (~10.0.8, future poster generation). `expo-av` stays for now; the shipped `video/[id]` player still uses it, and the expo-video swap follows via OTA against the new runtime.
+- `apps/mobile/app.json`: `expo-video` plugin; `expo-media-library` plugin with photo-library read/save purpose strings.
+
+**Changed**
+- `apps/mobile/app.json`: `expo.version` 0.1.0 -> 0.2.0. With the `appVersion` runtime policy this forks the OTA target: updates published from here on carry runtime 0.2.0 and can never reach the 0.1.0 builds in the field, so future JS may safely use the newly embedded video modules. The final 0.1.0-runtime OTA (Past Match Videos on expo-av) remains the terminal update for older installs.
+
 **Past Match Videos on the mobile Profile tab (first mobile playback surface, jits-kaf.2.1 / jits-kaf.2.2 scope)**
 
 **Added**

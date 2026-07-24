@@ -2,7 +2,7 @@
   "expo": {
     "name": "ELO RATED",
     "slug": "elo-rated",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "scheme": [
       "elorated"
     ],
@@ -112,6 +112,14 @@
           "cameraPermission": "Allow $(PRODUCT_NAME) to use your camera so you can record your matches.",
           "microphonePermission": "Allow $(PRODUCT_NAME) to use your microphone so your match recordings include audio.",
           "recordAudioAndroid": true
+        }
+      ],
+      "expo-video",
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow $(PRODUCT_NAME) to access your photo library so you can view match videos you have saved.",
+          "savePhotosPermission": "Allow $(PRODUCT_NAME) to save match videos to your photo library."
         }
       ],
       [
