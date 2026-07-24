@@ -76,6 +76,19 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "extraPods": [
+              {
+                "name": "AppCheckCore",
+                "version": "11.2.0"
+              }
+            ]
+          }
+        }
+      ],
       "expo-router",
       [
         "expo-splash-screen",

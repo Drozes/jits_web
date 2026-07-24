@@ -11,6 +11,9 @@
 **Changed**
 - `apps/mobile/app.json`: `expo.version` 0.1.0 -> 0.2.0. With the `appVersion` runtime policy this forks the OTA target: updates published from here on carry runtime 0.2.0 and can never reach the 0.1.0 builds in the field, so future JS may safely use the newly embedded video modules. The final 0.1.0-runtime OTA (Past Match Videos on expo-av) remains the terminal update for older installs.
 
+**Fixed**
+- `apps/mobile/app.json` + `expo-build-properties` (~1.0.10): pin CocoaPods `AppCheckCore` to 11.2.0 via `ios.extraPods`. Build 20 failed in the EAS "Install pods" phase because a CNG project resolves pods fresh each build (no committed Podfile.lock) and a post-June AppCheckCore release (transitive dep of GoogleSignIn) added a `RecaptchaInterop` dependency that breaks static-library integration ("Swift pods cannot yet be integrated as static libraries"). The pin restores the June known-good graph (AppCheckCore 11.2.0, no RecaptchaInterop); verified locally with a from-scratch `expo prebuild` + `pod install --repo-update`. Remove the pin when GoogleSignIn/AppCheckCore ship a modular-headers-clean release.
+
 **Past Match Videos on the mobile Profile tab (first mobile playback surface, jits-kaf.2.1 / jits-kaf.2.2 scope)**
 
 **Added**
