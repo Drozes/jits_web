@@ -2,7 +2,7 @@
 
 ## [Unreleased]
 
-**Video-native TestFlight build: full video module set embedded, OTA runtime forked to 0.2.0 (jits-kaf.2.6)**
+**Video-native TestFlight build: full video module set embedded, OTA runtime forked to 0.2.0 (jits-kaf.2.6). Shipped as v0.2.0 build 21, submitted to TestFlight 2026-07-24 (build 20 failed on the AppCheckCore pod drift fixed below).**
 
 **Added**
 - `apps/mobile/package.json`: `expo-video` (~3.0.16, go-forward player), `expo-media-library` (~18.2.1, save-to-phone), `expo-sharing` (~14.0.8, share sheet), `expo-video-thumbnails` (~10.0.8, future poster generation). `expo-av` stays for now; the shipped `video/[id]` player still uses it, and the expo-video swap follows via OTA against the new runtime.
