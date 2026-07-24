@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+**Past Match Videos on the mobile Profile tab (first mobile playback surface, jits-kaf.2.1 / jits-kaf.2.2 scope)**
+
+**Added**
+- `packages/shared/src/api/queries.ts`: `getAthleteVideos()` typed wrapper over the `get_athlete_videos` RPC (own gallery; other athletes gated on `is_scoutable`) and `getMatchVideoSignedUrl()` playback helper (reads `storage_path` off `match_videos` under participant RLS, then signs a 1-hour URL against the private `match-videos` bucket; null on RLS-invisible row, missing path, or sign failure). New `AthleteVideoRow` type. Tests in `packages/shared/src/api/athlete-videos.test.ts`.
+- `apps/mobile/lib/profile/use-athlete-videos.ts`: stale-while-revalidate hook (`useCachedResource`, key `athlete-videos:<id>`) serving the Profile section.
+- `apps/mobile/components/profile/past-match-videos.tsx`: "Past Match Videos" section on the Profile tab; one row per video (opponent, relative date, duration, Analyzed marker) pushing the player. Renders nothing while the athlete has no videos so the empty state never reads as a broken surface.
+- `apps/mobile/app/(app)/video/[id].tsx`: pushed full-screen match-video player with native controls. Deliberately uses `expo-av` (already embedded in the field build) so the screen is OTA-deliverable today; the `expo-video` swap ships with the Phase 2 TestFlight build (jits-kaf.2.6), because an OTA must never reference a native module the installed binary does not carry. Registered on the `(app)` Stack.
+
 **On-device video debugging: recording now actually works on real iOS hardware (live-tested end to end)**
 
 All four fixes below came out of a live on-device test session (real iPhone + simulator opponent against the local stack) that took a real match recording through upload and the slicer pipeline for the first time. None of these failures reproduced in the simulator or unit tests.

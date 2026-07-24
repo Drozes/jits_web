@@ -8,6 +8,7 @@ import { useProfileData } from "@/lib/profile/use-profile-data";
 import { ProfileHeader } from "@/components/profile/profile-header";
 import { ProfileQuickStats } from "@/components/profile/profile-quick-stats";
 import { AccountSection } from "@/components/profile/account-section";
+import { PastMatchVideos } from "@/components/profile/past-match-videos";
 import { ShareProfileSheet } from "@/components/share-profile-sheet";
 import { AppHeader } from "@/components/layout/app-header";
 import { PageContainer } from "@/components/layout/page-container";
@@ -162,6 +163,8 @@ export default function ProfileScreen() {
                 </View>
               )}
             </View>
+
+            <PastMatchVideos athleteId={athlete.id} />
 
             <View className="gap-2">
               <Pressable

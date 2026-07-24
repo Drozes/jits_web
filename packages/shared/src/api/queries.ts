@@ -1773,3 +1773,79 @@ export async function getAllGyms(supabase: Client): Promise<GymOption[]> {
   }
   return (data as GymOption[]) ?? [];
 }
+
+// ---------------------------------------------------------------------------
+// Match videos (athlete gallery + playback)
+// ---------------------------------------------------------------------------
+
+/** Private storage bucket holding match recordings (BE contract §1.2). */
+const MATCH_VIDEO_BUCKET = "match-videos";
+
+/** One entry of the `get_athlete_videos` RPC payload. */
+export interface AthleteVideoRow {
+  video_id: string;
+  match_id: string;
+  opponent_name: string | null;
+  opponent_id: string | null;
+  match_date: string | null;
+  /** The listed athlete's outcome in that match: "win" | "loss" | "draw". */
+  match_result: string | null;
+  duration_seconds: number | null;
+  thumbnail_url: string | null;
+  camera_angle: string | null;
+  has_analysis: boolean;
+  technique_summary: { technique_name: string; count: number }[];
+}
+
+/**
+ * Video history for an athlete via the `get_athlete_videos` RPC
+ * (SECURITY DEFINER: own videos always; other athletes gated on
+ * `is_scoutable`, returning [] when private). Only completed matches with
+ * non-deleted/failed videos come back, newest first. The RPC's `p_limit`
+ * defaults to 10 server-side and is not in the generated types, so it is
+ * intentionally not passed here.
+ */
+export async function getAthleteVideos(
+  supabase: Client,
+  athleteId: string,
+): Promise<AthleteVideoRow[]> {
+  const { data, error } = await supabase.rpc("get_athlete_videos", {
+    p_athlete_id: athleteId,
+  });
+  if (error) {
+    console.error("getAthleteVideos:", error);
+    return [];
+  }
+  return (data as unknown as AthleteVideoRow[]) ?? [];
+}
+
+/**
+ * Resolve a short-lived signed playback URL for one match video. Two steps
+ * because the RPC payload above omits `storage_path`: read it off
+ * `match_videos` (participant-gated RLS), then sign it against the private
+ * bucket (storage RLS re-checks participance on sign). Returns null when
+ * the row is invisible (RLS), the path is missing, or signing fails.
+ */
+export async function getMatchVideoSignedUrl(
+  supabase: Client,
+  videoId: string,
+  expiresInSeconds = 3600,
+): Promise<string | null> {
+  const { data, error } = await supabase
+    .from("match_videos")
+    .select("storage_path")
+    .eq("id", videoId)
+    .maybeSingle();
+  if (error || !data?.storage_path) {
+    if (error) console.error("getMatchVideoSignedUrl:", error);
+    return null;
+  }
+  const { data: signed, error: signError } = await supabase.storage
+    .from(MATCH_VIDEO_BUCKET)
+    .createSignedUrl(data.storage_path, expiresInSeconds);
+  if (signError || !signed?.signedUrl) {
+    if (signError) console.error("getMatchVideoSignedUrl sign:", signError);
+    return null;
+  }
+  return signed.signedUrl;
+}
