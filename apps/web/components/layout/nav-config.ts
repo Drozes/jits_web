@@ -1,4 +1,4 @@
-import { Home, MapPin, Trophy, User, type LucideIcon } from "lucide-react";
+import { Home, Swords, Trophy, User, type LucideIcon } from "lucide-react";
 
 /**
  * Single source of truth for the authed-shell navigation, shared by the
@@ -11,9 +11,13 @@ export interface NavTab {
   icon: LucideIcon;
 }
 
+// NOTE: /gyms is intentionally absent. Gym browsing is hidden from the primary
+// nav (same treatment as chat/messages: nav omission, not a redirect), so the
+// routes stay reachable by direct URL and by the Home + session links that
+// still point at them. Gym SELECTION in signup/settings is untouched.
 export const NAV_TABS: readonly NavTab[] = [
   { href: "/", label: "Home", icon: Home },
-  { href: "/gyms", label: "Gyms", icon: MapPin },
+  { href: "/arena", label: "Arena", icon: Swords },
   { href: "/leaderboard", label: "Rankings", icon: Trophy },
   { href: "/profile", label: "Profile", icon: User },
 ] as const;
@@ -24,6 +28,8 @@ export const NAV_TABS: readonly NavTab[] = [
 // /eua); kept for parity, do not chase it.
 const HIDE_PATTERNS = [
   /^\/session\/[^/]+\/match\//,
+  // Arena matches run the same immersive wizard, so hide the shell there too.
+  /^\/arena\/match\//,
   /^\/session\/[^/]+\/lobby/,
   /^\/session\/[^/]+\/join/,
   /^\/match\/[^/]+\/live/,

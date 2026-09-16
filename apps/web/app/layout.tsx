@@ -4,7 +4,6 @@ import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/sonner";
 import "./design-system/tokens.css";
 import "./globals.css";
-import "./design-system/tokens.css";
 
 const defaultUrl = process.env.VERCEL_URL
   ? `https://${process.env.VERCEL_URL}`
@@ -43,9 +42,18 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.className} ${bebasNeue.variable} ${dmSans.variable} ${inter.variable} ${jetbrainsMono.variable} antialiased`}>
+        {/*
+          TWO token systems must be driven together:
+          - globals.css (shadcn HSL slots) keys off the `.dark` CLASS
+          - design-system/tokens.css (brand tokens) keys off [data-theme]
+          Writing only `class` left every [data-theme="light"] rule dead and
+          pinned the brand layer to dark while shadcn resolved light, which is
+          what made Arena's headings render at 1.01:1. Emit BOTH attributes.
+          The brand is dark-first, so dark is the default.
+        */}
         <ThemeProvider
-          attribute="class"
-          defaultTheme="light"
+          attribute={["class", "data-theme"]}
+          defaultTheme="dark"
           enableSystem
           disableTransitionOnChange
         >

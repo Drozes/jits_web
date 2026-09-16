@@ -2,7 +2,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { TrendingUp, TrendingDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const eloBadgeVariants = cva("inline-flex items-center font-bold tabular-nums", {
+const eloBadgeVariants = cva("inline-flex items-center font-mono font-bold tabular-nums", {
   variants: {
     variant: {
       display: "text-2xl gap-1",
@@ -26,11 +26,25 @@ export function EloBadge({ elo, peak, delta, variant, className }: EloBadgeProps
   if (variant === "stakes" && delta != null) {
     return (
       <div className={cn("flex items-center gap-3", className)}>
-        <div className="flex items-center gap-1.5 rounded-md bg-green-500/10 px-2.5 py-1.5 text-sm font-semibold text-green-700">
+        <div
+          className="flex items-center gap-1.5 px-2.5 py-1.5 text-sm font-semibold"
+          style={{
+            borderRadius: "var(--radius-xs)",
+            border: "1px solid var(--state-positive)",
+            color: "var(--state-positive)",
+          }}
+        >
           <TrendingUp className="h-4 w-4" />
           <span>+{Math.abs(delta)}</span>
         </div>
-        <div className="flex items-center gap-1.5 rounded-md bg-red-500/10 px-2.5 py-1.5 text-sm font-semibold text-red-700">
+        <div
+          className="flex items-center gap-1.5 px-2.5 py-1.5 text-sm font-semibold"
+          style={{
+            borderRadius: "var(--radius-xs)",
+            border: "1px solid var(--state-negative)",
+            color: "var(--state-negative)",
+          }}
+        >
           <TrendingDown className="h-4 w-4" />
           <span>-{Math.abs(delta)}</span>
         </div>
@@ -42,7 +56,10 @@ export function EloBadge({ elo, peak, delta, variant, className }: EloBadgeProps
     <div className={cn(eloBadgeVariants({ variant }), className)}>
       <span>{elo}</span>
       {variant === "display" && peak != null && peak > elo && (
-        <span className="text-sm font-normal text-muted-foreground">
+        <span
+          className="text-sm font-normal"
+          style={{ color: "var(--text-tertiary)" }}
+        >
           Peak: {peak}
         </span>
       )}

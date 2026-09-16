@@ -20,7 +20,7 @@ export type MatchFlowStep =
 interface AthleteInfo { id: string; displayName: string; elo: number; weight: number | null; profilePhotoUrl: string | null }
 
 interface MatchFlowWizardProps {
-  sessionId: string; matchId: string; matchType: "casual" | "ranked";
+  exitHref: string; exitLabel: string; matchId: string; matchType: "casual" | "ranked";
   durationSeconds: number; startedAt: string | null; pausedAt: string | null; totalPausedDuration: number;
   currentAthlete: AthleteInfo; opponent: AthleteInfo;
   isTimekeeper: boolean; hasTimekeeper: boolean; timekeeperEnabled: boolean;
@@ -28,7 +28,7 @@ interface MatchFlowWizardProps {
 }
 
 export function MatchFlowWizard(props: MatchFlowWizardProps) {
-  const { sessionId, matchId, matchType, matchStatus, durationSeconds, currentAthlete, opponent, isTimekeeper, hasTimekeeper, timekeeperEnabled, submissionTypes, initialStep } = props;
+  const { exitHref, exitLabel, matchId, matchType, matchStatus, durationSeconds, currentAthlete, opponent, isTimekeeper, hasTimekeeper, timekeeperEnabled, submissionTypes, initialStep } = props;
   const [step, setStep] = useState<MatchFlowStep>(initialStep);
   const [startedAt, setStartedAt] = useState(props.startedAt);
   // Captured when the timekeeper-live step finishes uploading. Persists
@@ -62,7 +62,7 @@ export function MatchFlowWizard(props: MatchFlowWizardProps) {
     case "weight-verify":
       return <WeightVerifyStep onNext={handleNext} currentAthlete={currentAthlete} opponent={opponent} matchType={matchType} />;
     case "ready-check":
-      return <ReadyCheckStep onNext={handleNext} sessionId={sessionId} matchId={matchId} currentAthleteId={currentAthlete.id} opponentId={opponent.id} timekeeperEnabled={timekeeperEnabled} hasTimekeeper={hasTimekeeper} isTimekeeper={isTimekeeper} />;
+      return <ReadyCheckStep onNext={handleNext} exitHref={exitHref} matchId={matchId} currentAthleteId={currentAthlete.id} opponentId={opponent.id} timekeeperEnabled={timekeeperEnabled} hasTimekeeper={hasTimekeeper} isTimekeeper={isTimekeeper} />;
     case "fighter-live":
       return <FighterLiveStep onNext={handleNext} matchId={matchId} durationSeconds={durationSeconds} startedAt={startedAt ?? ""} pausedAt={props.pausedAt} totalPausedDuration={props.totalPausedDuration} matchType={matchType} timekeeperEnabled={timekeeperEnabled} hasTimekeeper={hasTimekeeper} />;
     case "timekeeper-live":
@@ -72,6 +72,6 @@ export function MatchFlowWizard(props: MatchFlowWizardProps) {
     case "match-summary":
       return <MatchSummaryStep onNext={handleNext} matchId={matchId} matchType={matchType} matchStatus={matchStatus} currentAthleteId={currentAthlete.id} opponent={opponent} resultData={resultRef.current} videoId={videoId} />;
     case "match-recorded":
-      return <MatchRecordedStep sessionId={sessionId} matchId={matchId} currentAthleteId={currentAthlete.id} resultData={resultRef.current} videoId={videoId} />;
+      return <MatchRecordedStep exitHref={exitHref} exitLabel={exitLabel} matchId={matchId} currentAthleteId={currentAthlete.id} resultData={resultRef.current} videoId={videoId} />;
   }
 }

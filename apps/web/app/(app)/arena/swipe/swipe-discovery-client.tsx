@@ -4,13 +4,68 @@ import { useState, useRef, useCallback } from "react";
 import Link from "next/link";
 import { AppHeader } from "@/components/layout/app-header";
 import { PageContainer } from "@/components/layout/page-container";
-import { EloBadge } from "@/components/domain/elo-badge";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Plate, MetaTag } from "@/components/ui/elo-system";
 import { cn, getProfilePhotoUrl } from "@/lib/utils";
 import { getInitials } from "@jits/shared/utils";
-import { X, Eye, Heart, Trophy, RotateCcw } from "lucide-react";
+import { X, Eye, Heart, RotateCcw } from "lucide-react";
+
+/** Circular icon action. Like is the surface's single Signal Red CTA. */
+function IconAction({
+  label,
+  onClick,
+  href,
+  primary = false,
+  size = 56,
+  children,
+}: {
+  label: string;
+  onClick?: () => void;
+  href?: string;
+  primary?: boolean;
+  size?: number;
+  children: React.ReactNode;
+}) {
+  const style: React.CSSProperties = {
+    width: size,
+    height: size,
+    display: "grid",
+    placeItems: "center",
+    background: primary ? "var(--accent-cta)" : "var(--bg-elevated)",
+    color: primary ? "var(--text-on-accent)" : "var(--text-secondary)",
+    border: primary
+      ? "1px solid transparent"
+      : "1px solid var(--border-hairline-strong)",
+    borderRadius: "var(--radius-sm)",
+    cursor: "pointer",
+    transition: "background var(--motion-hover)",
+  };
+
+  if (href) {
+    return (
+      <Link href={href} aria-label={label} style={style}>
+        {children}
+      </Link>
+    );
+  }
+  return (
+    <button type="button" aria-label={label} onClick={onClick} style={style}>
+      {children}
+    </button>
+  );
+}
+
+const STAMP_BASE: React.CSSProperties = {
+  position: "absolute",
+  top: "var(--space-6)",
+  padding: "var(--space-1) var(--space-3)",
+  borderRadius: "var(--radius-xs)",
+  fontFamily: "var(--font-mono)",
+  fontWeight: 700,
+  fontSize: "var(--size-label-l)",
+  textTransform: "uppercase",
+  letterSpacing: "var(--ls-caps-l)",
+  transition: "opacity var(--motion-hover)",
+};
 
 interface Competitor {
   id: string;
@@ -98,119 +153,153 @@ export function SwipeDiscoveryClient({
     <>
       <AppHeader title="Discover" back />
       <PageContainer className="pt-6">
-        <div className="flex flex-col items-center gap-6 animate-page-in">
+        <div
+          className="flex flex-col items-center animate-page-in"
+          style={{ gap: "var(--space-6)" }}
+        >
           {!isFinished && current ? (
             <>
               {/* Card stack */}
               <div className="relative w-full max-w-xs h-96">
-                {/* Next card peek */}
                 {currentIndex + 1 < competitors.length && (
                   <div className="absolute inset-0 scale-95 opacity-50">
-                    <SwipeCard
-                      competitor={competitors[currentIndex + 1]}
-                      className="shadow-md"
-                    />
+                    <SwipeCard competitor={competitors[currentIndex + 1]} />
                   </div>
                 )}
 
-                {/* Current card */}
                 <div
                   ref={cardRef}
                   className="absolute inset-0 touch-none select-none"
                   style={{
                     transform: `translateX(${dragOffset}px) rotate(${rotation}deg)`,
-                    transition: isDragging ? "none" : "transform 0.3s ease",
+                    transition: isDragging
+                      ? "none"
+                      : "transform var(--duration-fast) var(--easing-out)",
                   }}
                   onPointerDown={handlePointerDown}
                   onPointerMove={handlePointerMove}
                   onPointerUp={handlePointerUp}
                 >
-                  <SwipeCard competitor={current} className="shadow-xl" />
+                  <SwipeCard competitor={current} />
 
-                  {/* Swipe indicators */}
                   <div
-                    className={cn(
-                      "absolute top-6 left-6 rounded-lg border-2 border-red-500 px-3 py-1 text-red-500 font-bold text-lg -rotate-12 transition-opacity",
-                      dragOffset < -40 ? "opacity-100" : "opacity-0",
-                    )}
+                    aria-hidden
+                    className={cn(dragOffset < -40 ? "opacity-100" : "opacity-0")}
+                    style={{
+                      ...STAMP_BASE,
+                      left: "var(--space-6)",
+                      border: "1px solid var(--state-negative)",
+                      color: "var(--state-negative)",
+                    }}
                   >
-                    PASS
+                    Pass
                   </div>
                   <div
-                    className={cn(
-                      "absolute top-6 right-6 rounded-lg border-2 border-green-500 px-3 py-1 text-green-500 font-bold text-lg rotate-12 transition-opacity",
-                      dragOffset > 40 ? "opacity-100" : "opacity-0",
-                    )}
+                    aria-hidden
+                    className={cn(dragOffset > 40 ? "opacity-100" : "opacity-0")}
+                    style={{
+                      ...STAMP_BASE,
+                      right: "var(--space-6)",
+                      border: "1px solid var(--state-positive)",
+                      color: "var(--state-positive)",
+                    }}
                   >
-                    LIKE
+                    Like
                   </div>
                 </div>
               </div>
 
               {/* Action buttons */}
-              <div className="flex items-center gap-4">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-14 w-14 rounded-full border-2 border-red-500/50 text-red-500 hover:bg-red-500/10"
-                  onClick={handlePass}
-                >
+              <div
+                className="flex items-center"
+                style={{ gap: "var(--space-4)" }}
+              >
+                <IconAction label="Pass" onClick={handlePass}>
                   <X className="h-6 w-6" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-11 w-11 rounded-full"
-                  asChild
+                </IconAction>
+                <IconAction
+                  label={`View ${current.displayName}'s profile`}
+                  href={`/athlete/${current.id}`}
+                  size={44}
                 >
-                  <Link href={`/athlete/${current.id}`}>
-                    <Eye className="h-5 w-5" />
-                  </Link>
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-14 w-14 rounded-full border-2 border-green-500/50 text-green-500 hover:bg-green-500/10"
-                  onClick={handleLike}
-                >
+                  <Eye className="h-5 w-5" />
+                </IconAction>
+                <IconAction label="Like" onClick={handleLike} primary>
                   <Heart className="h-6 w-6" />
-                </Button>
+                </IconAction>
               </div>
 
               {/* Progress */}
-              <p className="text-xs text-muted-foreground">
-                {currentIndex + 1} of {competitors.length}
+              <p
+                className="font-mono"
+                style={{
+                  fontSize: "var(--size-num-xs)",
+                  color: "var(--text-secondary)",
+                  letterSpacing: "var(--ls-caps-l)",
+                  fontVariantNumeric: "tabular-nums",
+                  margin: 0,
+                }}
+              >
+                {currentIndex + 1} OF {competitors.length}
               </p>
             </>
           ) : (
             /* End state */
-            <Card className="w-full max-w-xs">
-              <CardContent className="p-6 text-center">
-                <Trophy className="h-12 w-12 text-primary mx-auto mb-4" />
-                <h2 className="text-lg font-bold mb-2">All caught up!</h2>
-                <p className="text-sm text-muted-foreground mb-4">
-                  You&apos;ve reviewed {competitors.length} athletes
-                </p>
-                <div className="flex justify-center gap-6 mb-4">
-                  <div className="text-center">
-                    <p className="text-2xl font-bold text-green-500">
-                      {liked.length}
-                    </p>
-                    <p className="text-xs text-muted-foreground">Liked</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-2xl font-bold text-red-500">
-                      {passed.length}
-                    </p>
-                    <p className="text-xs text-muted-foreground">Passed</p>
-                  </div>
-                </div>
-                <Button variant="outline" className="w-full" onClick={handleReset}>
-                  <RotateCcw className="mr-2 h-4 w-4" />
-                  Start Over
-                </Button>
-              </CardContent>
-            </Card>
+            <Plate variant="accent" className="w-full max-w-xs">
+              <div
+                className="font-mono uppercase"
+                style={{
+                  fontSize: "var(--size-num-xs)",
+                  color: "var(--text-secondary)",
+                  letterSpacing: "var(--ls-caps-xl)",
+                }}
+              >
+                All caught up
+              </div>
+              <p
+                style={{
+                  fontFamily: "var(--font-body)",
+                  fontSize: "var(--size-body)",
+                  color: "var(--text-primary)",
+                  margin: "var(--space-2) 0 var(--space-4)",
+                }}
+              >
+                You&apos;ve reviewed {competitors.length} athletes.
+              </p>
+
+              <div
+                className="grid grid-cols-2"
+                style={{ gap: "var(--space-4)", marginBottom: "var(--space-4)" }}
+              >
+                <StatCell label="Liked" value={liked.length} />
+                <StatCell label="Passed" value={passed.length} />
+              </div>
+
+              <button
+                type="button"
+                onClick={handleReset}
+                className="font-heading font-bold uppercase"
+                style={{
+                  width: "100%",
+                  minHeight: 44,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "var(--space-2)",
+                  background: "var(--accent-cta)",
+                  color: "var(--text-on-accent)",
+                  border: "1px solid transparent",
+                  borderRadius: "var(--radius-sm)",
+                  fontSize: "var(--size-label-l)",
+                  letterSpacing: "var(--ls-caps)",
+                  cursor: "pointer",
+                  transition: "background var(--motion-hover)",
+                }}
+              >
+                <RotateCcw className="h-4 w-4" />
+                Start over
+              </button>
+            </Plate>
           )}
         </div>
       </PageContainer>
@@ -218,68 +307,133 @@ export function SwipeDiscoveryClient({
   );
 }
 
-function SwipeCard({
-  competitor,
-  className,
+function StatCell({
+  label,
+  value,
+  suffix = "",
 }: {
-  competitor: Competitor;
-  className?: string;
+  label: string;
+  value: number;
+  suffix?: string;
 }) {
+  return (
+    <div className="text-center">
+      <div
+        className="font-mono"
+        style={{
+          fontSize: "var(--size-num-l)",
+          fontWeight: 700,
+          color: "var(--text-primary)",
+          fontVariantNumeric: "tabular-nums",
+          lineHeight: 1,
+        }}
+      >
+        {value}
+        {suffix}
+      </div>
+      <div
+        className="font-mono uppercase"
+        style={{
+          fontSize: "var(--size-label-xs)",
+          color: "var(--text-secondary)",
+          letterSpacing: "var(--ls-caps-xxl)",
+          marginTop: "var(--space-1)",
+        }}
+      >
+        {label}
+      </div>
+    </div>
+  );
+}
+
+function SwipeCard({ competitor }: { competitor: Competitor }) {
   const total = competitor.wins + competitor.losses;
   const winRate = total > 0 ? Math.round((competitor.wins / total) * 100) : 0;
+  const photo = competitor.profilePhotoUrl
+    ? getProfilePhotoUrl(competitor.profilePhotoUrl)
+    : null;
 
   return (
-    <Card
-      className={cn(
-        "h-full flex flex-col items-center justify-center p-6",
-        className,
-      )}
+    <Plate
+      className="h-full flex flex-col items-center justify-center"
+      style={{ padding: "var(--space-6)" }}
     >
-      <Avatar className="h-24 w-24 bg-gradient-to-br from-primary to-red-600 text-white border-2 border-muted shadow-md mb-4">
-        {competitor.profilePhotoUrl && (
-          <AvatarImage src={getProfilePhotoUrl(competitor.profilePhotoUrl)!} alt={competitor.displayName} className="object-cover" />
+      <span
+        aria-hidden
+        style={{
+          width: 96,
+          height: 96,
+          borderRadius: "var(--radius-md)",
+          border: "1px solid var(--border-hairline-strong)",
+          background: "var(--bg-elevated-hover)",
+          display: "grid",
+          placeItems: "center",
+          overflow: "hidden",
+          marginBottom: "var(--space-4)",
+          fontFamily: "var(--font-mono)",
+          fontSize: "var(--size-heading-l)",
+          fontWeight: 700,
+          color: "var(--text-primary)",
+          letterSpacing: "var(--ls-caps-l)",
+        }}
+      >
+        {photo ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={photo}
+            alt=""
+            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+          />
+        ) : (
+          getInitials(competitor.displayName)
         )}
-        <AvatarFallback className="text-2xl bg-gradient-to-br from-primary to-red-600 text-white">
-          {getInitials(competitor.displayName)}
-        </AvatarFallback>
-      </Avatar>
+      </span>
 
-      <h3 className="text-xl font-bold">{competitor.displayName}</h3>
+      <h3
+        className="font-heading font-bold"
+        style={{
+          fontSize: "var(--size-heading-l)",
+          color: "var(--text-primary)",
+          margin: 0,
+          lineHeight: "var(--lh-snug)",
+          textAlign: "center",
+        }}
+      >
+        {competitor.displayName}
+      </h3>
 
       {competitor.gymName && (
-        <p className="text-sm text-muted-foreground mt-0.5">
+        <p
+          style={{
+            fontFamily: "var(--font-body)",
+            fontSize: "var(--size-body-s)",
+            color: "var(--text-secondary)",
+            margin: "var(--space-1) 0 0",
+            textAlign: "center",
+          }}
+        >
           {competitor.gymName}
         </p>
       )}
-      {competitor.weight != null && (
-        <p className="text-sm text-muted-foreground mt-0.5">
-          {competitor.weight} lbs
-        </p>
-      )}
 
-      <div className="flex items-center gap-2 mt-3">
-        <span className="text-sm text-muted-foreground">ELO</span>
-        <EloBadge elo={competitor.currentElo} variant="compact" />
+      <div
+        className="flex items-center"
+        style={{ gap: "var(--space-2)", marginTop: "var(--space-3)" }}
+      >
+        {competitor.weight != null && (
+          <MetaTag>{competitor.weight} lbs</MetaTag>
+        )}
+        <MetaTag>ELO {competitor.currentElo}</MetaTag>
       </div>
 
-      <div className="grid grid-cols-3 gap-4 mt-6 text-center w-full">
-        <div>
-          <p className="text-lg font-bold text-green-500 tabular-nums">
-            {competitor.wins}
-          </p>
-          <p className="text-xs text-muted-foreground">Wins</p>
-        </div>
-        <div>
-          <p className="text-lg font-bold text-red-500 tabular-nums">
-            {competitor.losses}
-          </p>
-          <p className="text-xs text-muted-foreground">Losses</p>
-        </div>
-        <div>
-          <p className="text-lg font-bold tabular-nums">{winRate}%</p>
-          <p className="text-xs text-muted-foreground">Win Rate</p>
-        </div>
+      <div
+        className="grid grid-cols-3 w-full"
+        style={{ gap: "var(--space-4)", marginTop: "var(--space-6)" }}
+      >
+        <StatCell label="Wins" value={competitor.wins} />
+        <StatCell label="Losses" value={competitor.losses} />
+        <StatCell label="Win Rate" value={winRate} suffix="%" />
       </div>
-    </Card>
+    </Plate>
   );
 }

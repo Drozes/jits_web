@@ -5,7 +5,13 @@
    Drop this file into any project; reference tokens via var(--token-name).
    ========================================================================== */
 
-:root {
+/* The dark palette is the default. It is ALSO bound to [data-theme="dark"] so
+   that (a) an explicit dark choice from the theme picker resolves, and (b) a
+   nested dark island inside a light page still works (e.g. the leaderboard
+   panel). Before [data-theme] was ever written to <html>, those islands only
+   appeared to work because :root applied globally. */
+:root,
+[data-theme="dark"] {
 
   /* ==========================================================================
      COLOR — Raw palette

@@ -7,6 +7,7 @@ import {
   buildMatchVideoStoragePath,
   upsertMatchVideo,
 } from "@jits/shared/api/mutations";
+import { extensionFor, pickMimeType } from "@/lib/video/recorder-codec";
 
 // BE contract: jr_be/specs/013-chunked-video-pipeline/INTEGRATION.md
 // §1.2 path convention + §8.5 size limits.
@@ -35,9 +36,10 @@ interface UseVideoRecorderReturn {
 }
 
 /**
- * Web video recorder. Records via MediaRecorder, uploads the WebM blob
- * to the `match-videos` Storage bucket under the canonical
- * `<match_id>/<uploader_athlete_id>/<unix_ts>.webm` path, then INSERTs
+ * Web video recorder. Records via MediaRecorder, preferring MP4/H.264 and
+ * falling back to WebM, then uploads the blob to the `match-videos` Storage
+ * bucket under the canonical
+ * `<match_id>/<uploader_athlete_id>/<unix_ts>.<ext>` path, then INSERTs
  * the parent `match_videos` row at `status='ready'` so the slicer
  * trigger fires.
  *
@@ -61,7 +63,7 @@ export function useVideoRecorder(
   const [nearingLimit, setNearingLimit] = useState(false);
   const mountedRef = useRef(true);
 
-  const upload = useCallback(async (blob: Blob) => {
+  const upload = useCallback(async (blob: Blob, mimeType: string) => {
     // The storage upload + match_videos write below run to completion even
     // if the step unmounted mid-upload; only React state updates are
     // skipped after unmount.
@@ -81,10 +83,15 @@ export function useVideoRecorder(
     if (mountedRef.current) setUploadStatus("uploading");
     try {
       const supabase = createClient();
-      const path = buildMatchVideoStoragePath(matchId, uploaderAthleteId, "webm");
+      const path = buildMatchVideoStoragePath(
+        matchId,
+        uploaderAthleteId,
+        extensionFor(mimeType),
+      );
       const { error: uploadError } = await supabase.storage
         .from("match-videos")
-        .upload(path, blob, { contentType: blob.type || "video/webm" });
+        // upsert so a retry against the same path replaces rather than 409s.
+        .upload(path, blob, { contentType: mimeType, upsert: true });
       if (uploadError) {
         // Local Supabase caps `match-videos` at 500 MiB and returns 413.
         // Surface the local-dev caveat per BE §8.5. Prefer the SDK's
@@ -139,37 +146,64 @@ export function useVideoRecorder(
         setVideoId(upserted.data.id);
         setUploadStatus("done");
       }
-    } catch {
-      fail("Upload failed");
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      console.error("[video] upload threw:", err);
+      fail(`Upload failed: ${detail}`);
     }
   }, [matchId, uploaderAthleteId]);
 
   const stopRecording = useCallback(() => {
     const recorder = recorderRef.current;
     if (recorder && recorder.state !== "inactive") {
+      // `recorder.mimeType` is authoritative: the browser may hand back a
+      // different type than the one requested.
+      const mimeType = recorder.mimeType || "video/mp4";
       recorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: "video/webm" });
-        if (blob.size > 0) upload(blob);
+        const blob = new Blob(chunksRef.current, { type: mimeType });
+        // Release the camera only AFTER the final dataavailable has flushed.
+        // Stopping tracks synchronously alongside recorder.stop() can truncate
+        // the last chunk.
+        streamRef.current?.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+        if (blob.size > 0) upload(blob, mimeType);
       };
       recorder.stop();
+    } else {
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
     }
-    streamRef.current?.getTracks().forEach((t) => t.stop());
-    streamRef.current = null;
     recorderRef.current = null;
     setIsRecording(false);
   }, [upload]);
 
   const startRecording = useCallback(async () => {
+    // Camera access and codec support are DIFFERENT failures and must not
+    // share an error message (jits-rvc: a codec throw used to be reported as
+    // "Camera access denied", which sends you chasing permissions forever).
+    let stream: MediaStream;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
+      stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "environment", width: 854, height: 480 },
         audio: false,
       });
+    } catch {
+      setError("Camera access denied. You can still manage the match without video.");
+      return;
+    }
+
+    try {
       streamRef.current = stream;
       if (videoRef.current) videoRef.current.srcObject = stream;
 
-      const mimeType = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"]
-        .find((t) => MediaRecorder.isTypeSupported(t)) ?? "video/webm";
+      const mimeType = pickMimeType();
+      if (!mimeType) {
+        // Never hand an unsupported type to the constructor.
+        stream.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+        setError("This browser can't record video. The match still works without it.");
+        return;
+      }
       const recorder = new MediaRecorder(stream, { mimeType });
       chunksRef.current = [];
       recordedBytesRef.current = 0;
@@ -192,8 +226,11 @@ export function useVideoRecorder(
       recorderRef.current = recorder;
       setIsRecording(true);
       setError(null);
-    } catch {
-      setError("Camera access denied. You can still manage the match without video.");
+    } catch (err) {
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+      console.error("[video] recorder start failed:", err);
+      setError("Couldn't start the recorder on this browser. The match still works without it.");
     }
   }, [stopRecording]);
 

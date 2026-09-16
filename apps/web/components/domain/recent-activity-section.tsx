@@ -114,7 +114,7 @@ function ActivityFeedItem({ item }: { item: ActivityItem }) {
           <span className="font-medium">{item.winnerName}</span>{" "}
           {isDraw ? "drew with" : "defeated"}{" "}
           <span className="font-medium">{item.loserName}</span>
-          {!isDraw && <> by <span className="font-medium text-green-600">{item.result}</span></>}
+          {!isDraw && <> by <span className="font-medium text-success">{item.result}</span></>}
         </p>
         <p className="mt-1 text-xs text-muted-foreground">
           {formatRelativeDate(item.date)}

@@ -1,20 +1,15 @@
-import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
+import { MetaTag } from "@/components/ui/elo-system";
 
 interface ChallengeBadgeProps {
   className?: string;
 }
 
+/**
+ * "Challenged" marker for an athlete you already have a pending challenge with.
+ *
+ * Deliberately neutral: amber is reserved for draws / Pressure Score, and a
+ * pending challenge is neither a draw nor a negative state.
+ */
 export function ChallengeBadge({ className }: ChallengeBadgeProps) {
-  return (
-    <Badge
-      className={cn(
-        "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400 dark:bg-amber-500/15 text-[10px] px-1.5 py-0",
-        className,
-      )}
-      variant="outline"
-    >
-      Challenged
-    </Badge>
-  );
+  return <MetaTag className={className}>Challenged</MetaTag>;
 }

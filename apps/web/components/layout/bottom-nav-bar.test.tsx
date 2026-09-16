@@ -7,13 +7,19 @@ vi.mock("next/navigation", () => ({
 }));
 
 describe("BottomNavBar", () => {
-  it("renders all four navigation tabs", () => {
+  it("renders every navigation tab", () => {
     render(<BottomNavBar />);
 
     expect(screen.getByText("Home")).toBeInTheDocument();
-    expect(screen.getByText("Gyms")).toBeInTheDocument();
+    expect(screen.getByText("Arena")).toBeInTheDocument();
     expect(screen.getByText("Rankings")).toBeInTheDocument();
     expect(screen.getByText("Profile")).toBeInTheDocument();
+  });
+
+  it("omits the hidden Gyms tab", () => {
+    render(<BottomNavBar />);
+
+    expect(screen.queryByText("Gyms")).not.toBeInTheDocument();
   });
 
   it("highlights the active tab based on pathname", () => {
@@ -35,9 +41,9 @@ describe("BottomNavBar", () => {
     render(<BottomNavBar />);
 
     expect(screen.getByText("Home").closest("a")).toHaveAttribute("href", "/");
-    expect(screen.getByText("Gyms").closest("a")).toHaveAttribute(
+    expect(screen.getByText("Arena").closest("a")).toHaveAttribute(
       "href",
-      "/gyms",
+      "/arena",
     );
     expect(screen.getByText("Rankings").closest("a")).toHaveAttribute(
       "href",

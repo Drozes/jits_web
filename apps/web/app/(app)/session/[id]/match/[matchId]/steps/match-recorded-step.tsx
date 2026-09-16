@@ -9,7 +9,8 @@ import type { BroadcastResult } from "@jits/shared/hooks/use-session-match-sync"
 import { buildShareUrl, buildShareText } from "@jits/shared/utils";
 
 interface MatchRecordedStepProps {
-  sessionId: string;
+  exitHref: string;
+  exitLabel: string;
   matchId: string;
   currentAthleteId: string;
   resultData: BroadcastResult | null;
@@ -27,7 +28,7 @@ function deriveOutcome(resultData: BroadcastResult | null, currentAthleteId: str
   return resultData.winnerId === currentAthleteId ? "win" : "loss";
 }
 
-export function MatchRecordedStep({ sessionId, currentAthleteId, resultData, videoId }: MatchRecordedStepProps) {
+export function MatchRecordedStep({ exitHref, exitLabel, currentAthleteId, resultData, videoId }: MatchRecordedStepProps) {
   const router = useRouter();
   const [copied, setCopied] = useState(false);
   const outcome = deriveOutcome(resultData, currentAthleteId);
@@ -68,11 +69,8 @@ export function MatchRecordedStep({ sessionId, currentAthleteId, resultData, vid
             {copied ? "Copied!" : "Share Result"}
           </Button>
         )}
-        <Button size="lg" onClick={() => router.push(`/session/${sessionId}/lobby`)}>
-          Back to Lobby
-        </Button>
-        <Button variant="outline" size="lg" onClick={() => router.push("/gyms")}>
-          Exit Session
+        <Button size="lg" onClick={() => router.push(exitHref)}>
+          {exitLabel}
         </Button>
       </div>
     </div>

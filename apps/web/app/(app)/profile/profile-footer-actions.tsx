@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { ShareProfileSheet } from "@/components/domain/share-profile-sheet";
+import { ThemeChips } from "@/components/domain/theme-chips";
 
 interface ProfileFooterActionsProps {
   athlete: {
@@ -74,6 +75,30 @@ export function ProfileFooterActions({ athlete }: ProfileFooterActionsProps) {
       >
         Edit Profile
       </Link>
+
+      <div
+        className="grid grid-cols-[auto_1fr] items-center"
+        style={{
+          gap: "var(--space-3)",
+          marginTop: "var(--space-2)",
+          paddingTop: "var(--space-3)",
+          borderTop: "1px solid var(--border-hairline)",
+        }}
+      >
+        <span
+          className="font-mono uppercase"
+          style={{
+            fontSize: "var(--size-num-xs)",
+            color: "var(--text-secondary)",
+            letterSpacing: "var(--ls-caps-xl)",
+          }}
+        >
+          Theme
+        </span>
+        <div style={{ justifySelf: "end" }}>
+          <ThemeChips />
+        </div>
+      </div>
     </div>
   );
 }

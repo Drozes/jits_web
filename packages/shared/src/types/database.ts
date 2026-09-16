@@ -769,11 +769,13 @@ export type Database = {
           chunks_completed: number
           created_at: string
           duration_seconds: number | null
+          error_message: string | null
           file_size_bytes: number | null
           id: string
           match_id: string
           merge_completed_at: string | null
           merge_started_at: string | null
+          normalized_path: string | null
           platform: string
           platform_asset_id: string | null
           playback_url: string | null
@@ -781,12 +783,14 @@ export type Database = {
           recorded_by: string | null
           recording_type: string | null
           requested_tier: string
+          slice_attempts: number
           slice_completed_at: string | null
           slice_started_at: string | null
           status: string
           storage_path: string | null
           sync_offset_ms: number | null
           thumbnail_url: string | null
+          title: string | null
           updated_at: string
           uploaded_by: string
         }
@@ -798,11 +802,13 @@ export type Database = {
           chunks_completed?: number
           created_at?: string
           duration_seconds?: number | null
+          error_message?: string | null
           file_size_bytes?: number | null
           id?: string
           match_id: string
           merge_completed_at?: string | null
           merge_started_at?: string | null
+          normalized_path?: string | null
           platform?: string
           platform_asset_id?: string | null
           playback_url?: string | null
@@ -810,12 +816,14 @@ export type Database = {
           recorded_by?: string | null
           recording_type?: string | null
           requested_tier?: string
+          slice_attempts?: number
           slice_completed_at?: string | null
           slice_started_at?: string | null
           status?: string
           storage_path?: string | null
           sync_offset_ms?: number | null
           thumbnail_url?: string | null
+          title?: string | null
           updated_at?: string
           uploaded_by: string
         }
@@ -827,11 +835,13 @@ export type Database = {
           chunks_completed?: number
           created_at?: string
           duration_seconds?: number | null
+          error_message?: string | null
           file_size_bytes?: number | null
           id?: string
           match_id?: string
           merge_completed_at?: string | null
           merge_started_at?: string | null
+          normalized_path?: string | null
           platform?: string
           platform_asset_id?: string | null
           playback_url?: string | null
@@ -839,12 +849,14 @@ export type Database = {
           recorded_by?: string | null
           recording_type?: string | null
           requested_tier?: string
+          slice_attempts?: number
           slice_completed_at?: string | null
           slice_started_at?: string | null
           status?: string
           storage_path?: string | null
           sync_offset_ms?: number | null
           thumbnail_url?: string | null
+          title?: string | null
           updated_at?: string
           uploaded_by?: string
         }
@@ -1629,6 +1641,7 @@ export type Database = {
           file_size_bytes: number | null
           id: string
           idx: number
+          retry_count: number
           start_s: number
           status: string
           storage_path: string
@@ -1644,6 +1657,7 @@ export type Database = {
           file_size_bytes?: number | null
           id?: string
           idx: number
+          retry_count?: number
           start_s: number
           status?: string
           storage_path: string
@@ -1659,6 +1673,7 @@ export type Database = {
           file_size_bytes?: number | null
           id?: string
           idx?: number
+          retry_count?: number
           start_s?: number
           status?: string
           storage_path?: string
@@ -2045,6 +2060,7 @@ export type Database = {
         Args: { p_analysis: Json; p_technique_tags: Json; p_video_id: string }
         Returns: string
       }
+      notify_chunk_analyze: { Args: { p_chunk_id: string }; Returns: undefined }
       notify_merge_function: {
         Args: { p_video_id: string }
         Returns: undefined
@@ -2063,6 +2079,7 @@ export type Database = {
       }
       random_match: { Args: { p_session_id: string }; Returns: Json }
       reap_stuck_analyzing_chunks: { Args: never; Returns: number }
+      reap_stuck_slicing_videos: { Args: never; Returns: number }
       record_match_result: {
         Args: {
           p_finish_time_seconds?: number
@@ -2084,6 +2101,7 @@ export type Database = {
         Returns: Json
       }
       resume_match: { Args: { p_match_id: string }; Returns: Json }
+      retry_failed_chunks: { Args: never; Returns: number }
       set_active_avatar: { Args: { p_avatar_id: string }; Returns: Json }
       set_athlete_role: {
         Args: {
@@ -2093,6 +2111,10 @@ export type Database = {
         Returns: undefined
       }
       set_default_still: { Args: { p_still_url: string }; Returns: string }
+      set_match_video_normalized_path: {
+        Args: { p_normalized_path: string; p_video_id: string }
+        Returns: undefined
+      }
       start_match: { Args: { p_match_id: string }; Returns: Json }
       start_match_from_challenge: {
         Args: { p_challenge_id: string }

@@ -130,11 +130,19 @@ function OverviewTab({ eloHistory, currentElo, winStreak, eloThisMonth, submissi
           </h3>
           <div className="grid grid-cols-2 gap-3">
             <div className="text-center rounded-lg bg-orange-50 p-3 dark:bg-orange-950/30">
-              <p className="text-2xl font-bold text-orange-600 tabular-nums">{winStreak}</p>
+              <p
+                className="text-2xl font-bold font-mono tabular-nums"
+                style={{ color: "var(--text-primary)" }}
+              >
+                {winStreak}
+              </p>
               <p className="text-xs text-orange-700 dark:text-orange-400">Win Streak</p>
             </div>
             <div className="text-center rounded-lg bg-blue-50 p-3 dark:bg-blue-950/30">
-              <p className="text-2xl font-bold text-blue-600 tabular-nums">
+              <p
+                className="text-2xl font-bold font-mono tabular-nums"
+                style={{ color: "var(--text-primary)" }}
+              >
                 {eloThisMonth > 0 ? "+" : ""}{eloThisMonth}
               </p>
               <p className="text-xs text-blue-700 dark:text-blue-400">ELO This Month</p>

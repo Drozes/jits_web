@@ -9,8 +9,24 @@ export default function SessionMatchPage({
 }) {
   return (
     <Suspense fallback={<MatchFlowSkeleton />}>
-      <MatchFlowContent paramsPromise={params} />
+      <SessionMatchContent paramsPromise={params} />
     </Suspense>
+  );
+}
+
+async function SessionMatchContent({
+  paramsPromise,
+}: {
+  paramsPromise: Promise<{ id: string; matchId: string }>;
+}) {
+  // params is a Promise under cacheComponents; await it inside the boundary.
+  const { id: sessionId, matchId } = await paramsPromise;
+  return (
+    <MatchFlowContent
+      matchId={matchId}
+      exitHref={`/session/${sessionId}/lobby`}
+      exitLabel="Back to Lobby"
+    />
   );
 }
 

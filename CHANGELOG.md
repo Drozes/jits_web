@@ -2,6 +2,58 @@
 
 ## [Unreleased]
 
+**Arena now runs the real match wizard, with an instant challenge handshake; web video recording fixed on Safari and switched to MP4/H.264.**
+
+**Added**
+- `apps/web/app/(app)/arena/match/[matchId]/page.tsx`: Arena matches render the SAME wizard the Gyms screen uses. The wizard turned out to have no session dependency (its guard is `requireAthlete`, every RPC is keyed on `matchId`, match realtime is `session-match:${matchId}`, and `matches.session_id` is nullable because `chk_match_origin` is satisfied by `challenge_id` alone), so a challenge-originated match renders unchanged. Deliberately NOT done via a shadow `sessions` row: `sessions.gym_id` is `NOT NULL` with no virtual-gym concept, `session_participants_insert_self` forces each athlete to join themselves, and it would pollute the sessions model with fake gym sessions.
+- `apps/web/hooks/use-arena-challenge.ts`: instant handshake. Challenge, live prompt, accept, straight into the wizard, with no inbox round trip. Incoming challenges arrive as a `postgres_changes` INSERT filtered to the recipient; the accepting side then broadcasts `match_started` on a per-challenge channel so both parties navigate together. Double-taps are guarded by a ref set synchronously before the await.
+- `apps/web/app/(app)/arena/arena-content.tsx`: in-row Challenge action on online athletes only (an offline opponent cannot answer a live prompt), plus incoming-challenge and waiting-for-opponent plates.
+- `apps/web/lib/video/recorder-codec.ts` + tests: container negotiation extracted as pure, testable helpers (11 tests).
+
+**Fixed**
+- `apps/web/hooks/use-video-recorder.ts` (**jits-rvc, P0**): web recording was dead on Safari and every iOS browser, and reported "Camera access denied" while doing it. `MediaRecorder.isTypeSupported` rejects every WebM type on Safari, so the preference list fell through to an unsupported `"video/webm"` fallback, which made the `MediaRecorder` constructor throw inside a catch that blamed camera permissions. Now: MP4/H.264 is probed first, an unsupported type is never passed to the constructor, and camera failures and codec failures have separate messages.
+- Container choice (**jits-kaf.1.2, option A**): the recorder no longer hardcodes WebM. The storage extension and `contentType` are derived from `recorder.mimeType`, which is authoritative because the browser may return a different type than requested. This matters beyond Safari: the jr_be slicer muxes chunks with `-c copy`, and VP8-in-WebM fails that outright while VP9-in-WebM yields an MP4 iOS cannot decode. H.264 is the only source that survives the pipeline untouched.
+- `apps/web/hooks/use-video-recorder.ts`: camera tracks are now stopped inside `onstop`, after the final `dataavailable` has flushed. Stopping them synchronously alongside `recorder.stop()` could truncate the last chunk. Upload also gained `upsert: true` so a retry replaces rather than 409s, and the upload catch no longer discards the underlying error.
+- `apps/web/hooks/use-lobby-presence.ts` is now mounted by `ArenaContent` rather than the app layout. As a null-rendering client component nested in a Suspense-deferred async server component, its effect did not run reliably, which is what left Arena's "Online now" section empty even while presence was demonstrably correct on the wire. Mounting it from the component that actually renders the list also keeps the channel off every other screen.
+
+**Changed**
+- `apps/web/app/(app)/session/[id]/match/[matchId]/`: the wizard's four hard-coded `/session/${sessionId}/lobby` exits are now an `exitHref` / `exitLabel` pair, and `MatchFlowContent` takes an explicit `matchId` plus an `allowTimekeeper` flag. Arena passes `allowTimekeeper={false}`, which collapses the timekeeper variants so both remote athletes get `fighter-live`. Session behaviour is unchanged.
+- `apps/web/components/layout/nav-config.ts`: `/arena/match/*` added to the immersive-route patterns so the shell hides during a match.
+
+**Verified end to end on the local stack**: challenge created, opponent accepted, match started, both parties navigated to `/arena/match/<id>`, and the wizard opened on Verify Weights (the fighter path, not timekeeper-wait) showing 175 lbs vs 172 lbs. Typecheck clean across all three workspaces, 257 tests pass, `build:web` green with both Arena routes emitted.
+
+**Still outstanding for video**
+- Option B (normalise WebM to H.264/AAC MP4 in the jr_be slicer before slicing, and store the normalised artifact as the playback source) is not done. Until it lands, a browser with no MP4 encoder still produces an unusable recording.
+- The pipeline is wired and green only on this machine. The five `app.settings.*` GUCs are set by hand with no migration setting them anywhere, the Cloud Run slicer is not deployed, and `RUNBOOK.md` still documents a `--no-allow-unauthenticated` deploy that would 403 every pg_net slice request. Tracked as jits-kaf.1.1, .1.7, .1.8.
+
+**Arena restored on web, re-skinned to the brand token system, and the app-wide theme mismatch that made text unreadable is fixed.**
+
+**Fixed**
+- `apps/web/app/layout.tsx`: the ThemeProvider emitted only `attribute="class"`, but `app/design-system/tokens.css` themes off `[data-theme]`. The brand layer was therefore pinned to its `:root` dark palette and its entire `[data-theme="light"]` branch was dead code, while `defaultTheme="light"` meant `.dark` never applied and every shadcn slot class resolved to light values on the dark shell. Now emits `attribute={["class", "data-theme"]}` with `defaultTheme="dark"` (the brand is dark-first), so both token systems move together. This is the root cause of Arena's section headings rendering at 1.01:1 contrast (near-black on the Void background). Also removes a duplicate `tokens.css` import.
+- `apps/web/app/(app)/arena/*`: Arena was the one primary-nav screen never migrated off shadcn slot classes, so it absorbed the full mismatch. Ported `arena-content.tsx`, `looking-for-match-toggle.tsx`, `swipe/swipe-discovery-client.tsx` and both route skeletons to `var(--…)` brand tokens plus the `components/ui/elo-system` primitives (`Plate`, `Avatar32`, `MetaTag`, `LivePill`). Measured result: every piece of Arena content now clears WCAG AA (4.5:1) in both themes, against 9 distinct sub-4.5 pairings before.
+- `apps/web/app/(app)/arena/arena-content.tsx`: the ELO difference was coloured `text-red-500` when the opponent was *stronger* and `text-green-500` when *weaker*. `eloDiff` is a strength gap, not a rating change, so both directions read backwards against the colour semantics (Signal Red is CTA + state-negative; Gain Green is rating increases only). Now rendered neutrally as `1113 +113 vs you` in mono.
+- `apps/web/app/(app)/arena/looking-for-match-toggle.tsx`: a failed `toggleMatchPreferences` silently reverted the control with no feedback; now raises a toast. Double-taps could fire concurrent, out-of-order mutations; now guarded by a ref set synchronously before the await (a `useTransition` pending flag does NOT cover the await window, so it would have left the race open). The Radix Switch had no accessible name (screen readers announced a bare "switch") and an 18x32px target against the 44px minimum; replaced by the surface's single Signal Red CTA.
+- `apps/web/components/domain/online-indicator.tsx`: the presence dot's `ring-background` resolved light and drew a near-white halo on the dark shell, and an 8px green glow violated the no-drop-shadow rule. Now rings on `var(--bg-primary)` with an `sr-only` label so "online" is not conveyed by colour alone.
+- `apps/web/components/domain/elo-badge.tsx`: ELO rendered in Inter, not `font-mono`, against the rule that all numeric data is mono + tabular-nums. Its `stakes` variant also used raw `green-700`/`red-700`; now on state tokens.
+- `apps/web/components/domain/lobby-active-indicator.tsx`: `animate-ping` looped at Tailwind's default 1000ms, outside the motion budget (only the 480ms rating tick and 1400ms LIVE pulse may auto-animate). Now delegates to `LivePill`.
+- `apps/web/components/domain/challenge-badge.tsx`: used amber, which is reserved for draws / Pressure Score. Now a neutral `MetaTag`.
+
+**Added**
+- `apps/web/components/domain/theme-chips.tsx`: shared Dark / Light / Auto picker. Surfaced on Profile (`profile-footer-actions.tsx`) and reused by Settings, which previously carried its own copy. With the layout fix above this is the first time the light brand palette has ever rendered.
+- `apps/web/app/(app)/arena/arena-content.tsx`: guided empty state. The old one was a bare "No one is looking for a match right now" with no action, the same dead-end pattern `research/012-ftue-discovery-roadmap.md` flags for the Gyms tab. Now branches on whether *you* are live and offers a next step.
+
+**Changed**
+- `apps/web/app/(app)/arena/page.tsx`, `swipe/page.tsx`: removed the `redirect("/")` that hid Arena. All of the real code below it was already intact and unreachable.
+- `apps/web/components/layout/nav-config.ts`: `/gyms` removed from the primary nav. Same treatment as chat/messages (nav omission, not a redirect), so gym routes stay reachable by direct URL and from the Home and session links. Gym *selection* in signup and settings is untouched. `/arena` added in its place.
+- `apps/web/components/layout/bottom-nav-bar.tsx`: the grid was hardcoded `repeat(4, 1fr)`; now derives from `NAV_TABS.length` so adding or hiding a tab cannot drift.
+- `apps/web/app/(app)/layout.tsx`: mounted `LobbyPresenceBootstrap`. It existed but was never mounted anywhere, so the `lobby:online` channel was never created and the Arena online/offline split could not work.
+- Arena is ranked-only: the toggle writes `looking_for_ranked` and clears `looking_for_casual` (casual was removed in `47f166b`); the dead `lookingForCasual`/`lookingForRanked` props were dropped from the Competitor mapper.
+- Arena section headings renamed "Online now" / "Open to challenges". The old "Looking for Match" section header collided with the toggle of the same name.
+
+**Known, not addressed here**
+- `--text-tertiary` (`#6B7280`) measures 3.49:1 on `--bg-elevated` and 4.05:1 on the light plate, below AA for body text. Arena now avoids it for content, but it is still used by the shared `RankRow`, `ParticipantRow` and sidebar chrome. A token-level decision, not an Arena one.
+- The `--text-on-accent` / `--accent-cta` CTA pairing measures 3.54:1. That is the brand's defined primary-button pairing and is used app-wide; changing it is a brand decision.
+
 **Video-native TestFlight build: full video module set embedded, OTA runtime forked to 0.2.0 (jits-kaf.2.6). Shipped as v0.2.0 build 21, submitted to TestFlight 2026-07-24 (build 20 failed on the AppCheckCore pod drift fixed below).**
 
 **Added**

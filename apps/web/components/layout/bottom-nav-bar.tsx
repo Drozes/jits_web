@@ -21,7 +21,7 @@ export function BottomNavBar() {
       <div
         className="mx-auto grid w-full max-w-md"
         style={{
-          gridTemplateColumns: "repeat(4, 1fr)",
+          gridTemplateColumns: `repeat(${NAV_TABS.length}, 1fr)`,
         }}
       >
         {NAV_TABS.map(({ href, label, icon: Icon }) => {

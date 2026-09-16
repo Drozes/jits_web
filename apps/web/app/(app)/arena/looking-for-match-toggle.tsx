@@ -1,105 +1,142 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { toggleMatchPreferences } from "@jits/shared/api/mutations";
 import { joinLobby, leaveLobby } from "@/hooks/use-lobby-presence";
-import { Switch } from "@/components/ui/switch";
-import { CheckCircle2, Swords } from "lucide-react";
+import { Plate, LivePill } from "@/components/ui/elo-system";
 
 interface LookingForMatchToggleProps {
   athleteId: string;
-  initialCasual: boolean;
   initialRanked: boolean;
+  onChange?: (isLooking: boolean) => void;
 }
 
+/**
+ * The one Signal Red CTA on the Arena surface.
+ *
+ * Deliberately a button, not a Switch: the brand system allows exactly one
+ * primary CTA per surface, and going visible is the most important action
+ * here. The previous Radix Switch was an 18x32px target (below the 44px
+ * minimum) sitting on a plate that looked tappable but was not.
+ */
 export function LookingForMatchToggle({
   athleteId,
-  initialCasual,
   initialRanked,
+  onChange,
 }: LookingForMatchToggleProps) {
   const router = useRouter();
-  const [casual, setCasual] = useState(initialCasual);
-  const [ranked, setRanked] = useState(initialRanked);
+  const [isLooking, setIsLooking] = useState(initialRanked);
+  const [isSaving, setIsSaving] = useState(false);
+  const [, startTransition] = useTransition();
+  // useTransition's pending flag is only true while the transition itself is
+  // in flight, i.e. false for the whole await below. A ref set synchronously
+  // before the await is what actually closes the double-tap window.
+  const inFlight = useRef(false);
 
-  const isLooking = casual || ranked;
+  async function handleToggle() {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setIsSaving(true);
 
-  async function persist(nextCasual: boolean, nextRanked: boolean) {
+    // Ranked-only product: casual was removed in 47f166b, so the flag is
+    // always cleared. get_arena_data filters on (casual OR ranked), so ranked
+    // alone is enough to appear in the Arena list.
+    const next = !isLooking;
+    setIsLooking(next);
+    onChange?.(next);
+
     const supabase = createClient();
     const result = await toggleMatchPreferences(supabase, athleteId, {
-      lookingForCasual: nextCasual,
-      lookingForRanked: nextRanked,
+      lookingForCasual: false,
+      lookingForRanked: next,
     });
 
     if (!result.ok) {
-      setCasual(initialCasual);
-      setRanked(initialRanked);
+      setIsLooking(!next);
+      onChange?.(!next);
+      toast.error("Couldn't update your status. Try again.");
+      inFlight.current = false;
+      setIsSaving(false);
       return;
     }
 
-    if (nextCasual || nextRanked) {
+    if (next) {
       joinLobby({
         athlete_id: athleteId,
-        looking_for_casual: nextCasual,
-        looking_for_ranked: nextRanked,
+        looking_for_casual: false,
+        looking_for_ranked: true,
       });
     } else {
       leaveLobby();
     }
 
-    router.refresh();
-  }
-
-  async function handleToggle(checked: boolean) {
-    if (checked) {
-      // Turning on: default to both casual and ranked
-      setCasual(true);
-      setRanked(true);
-      await persist(true, true);
-    } else {
-      // Turning off: clear both
-      setCasual(false);
-      setRanked(false);
-      await persist(false, false);
-    }
+    inFlight.current = false;
+    setIsSaving(false);
+    startTransition(() => router.refresh());
   }
 
   return (
-    <div
-      className={`rounded-xl border-2 p-4 transition-all ${
-        isLooking
-          ? "border-green-500 bg-green-500/10 shadow-sm shadow-green-500/20"
-          : "border-primary/30 bg-primary/5"
-      }`}
-    >
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${
-            isLooking ? "bg-green-500/20" : "bg-primary/10"
-          }`}>
-            <Swords className={`h-5 w-5 ${isLooking ? "text-green-600" : "text-primary"}`} />
-          </div>
-          <div>
-            <h4 className="font-semibold">Looking for Match</h4>
-            <p className="text-sm text-muted-foreground">
-              {isLooking ? "You're visible to opponents" : "Toggle to find opponents"}
-            </p>
-          </div>
+    <Plate variant={isLooking ? "live" : "default"}>
+      <div
+        className="grid grid-cols-[1fr_auto] items-start"
+        style={{ gap: "var(--space-3)" }}
+      >
+        <div style={{ minWidth: 0 }}>
+          <h2
+            className="font-heading font-bold"
+            style={{
+              fontSize: "var(--size-heading-m)",
+              color: "var(--text-primary)",
+              lineHeight: "var(--lh-snug)",
+              margin: 0,
+            }}
+          >
+            Looking for Match
+          </h2>
+          <p
+            style={{
+              fontFamily: "var(--font-body)",
+              fontSize: "var(--size-body-s)",
+              color: "var(--text-secondary)",
+              margin: "var(--space-1) 0 0",
+              lineHeight: "var(--lh-base)",
+            }}
+          >
+            {isLooking
+              ? "You're in the lobby. Opponents can challenge you now."
+              : "Turn on to appear in the lobby so opponents can challenge you."}
+          </p>
         </div>
-        <Switch checked={isLooking} onCheckedChange={handleToggle} />
+        {isLooking && <LivePill label="Live" />}
       </div>
 
-      {isLooking && (
-        <div className="mt-3 border-t border-green-500/20 pt-3">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 text-green-500" />
-            <span className="text-sm font-medium text-green-700 dark:text-green-400">
-              Active and visible
-            </span>
-          </div>
-        </div>
-      )}
-    </div>
+      <button
+        type="button"
+        onClick={handleToggle}
+        disabled={isSaving}
+        className="font-heading font-bold uppercase"
+        style={{
+          marginTop: "var(--space-4)",
+          width: "100%",
+          minHeight: 44,
+          background: isLooking ? "transparent" : "var(--accent-cta)",
+          color: isLooking ? "var(--text-secondary)" : "var(--text-on-accent)",
+          border: isLooking
+            ? "1px solid var(--border-hairline-strong)"
+            : "1px solid transparent",
+          borderRadius: "var(--radius-sm)",
+          fontSize: "var(--size-label-l)",
+          letterSpacing: "var(--ls-caps)",
+          cursor: isSaving ? "default" : "pointer",
+          opacity: isSaving ? 0.6 : 1,
+          transition: "background var(--motion-hover), color var(--motion-hover)",
+        }}
+      >
+        {isLooking ? "Go offline" : "Go live"}
+      </button>
+    </Plate>
   );
 }

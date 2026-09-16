@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useSyncExternalStore } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { RealtimeChannel } from "@supabase/supabase-js";
@@ -78,6 +78,14 @@ export function useLobbyPresence(
   lookingForCasual: boolean,
   lookingForRanked: boolean,
 ): void {
+  // The SUBSCRIBED callback re-fires on every websocket rejoin, but the effect
+  // deliberately depends only on athleteId (so a toggle does not tear the
+  // channel down). Without this ref the rejoin would re-track using the flags
+  // captured at MOUNT, silently dropping a user who went live mid-session out
+  // of the lobby on the next reconnect.
+  const lookingRef = useRef({ lookingForCasual, lookingForRanked });
+  lookingRef.current = { lookingForCasual, lookingForRanked };
+
   useEffect(() => {
     const supabase = createClient();
 
@@ -93,11 +101,13 @@ export function useLobbyPresence(
 
     channel.subscribe(async (status) => {
       if (status === "SUBSCRIBED") {
-        if (lookingForCasual || lookingForRanked) {
+        const { lookingForCasual: casual, lookingForRanked: ranked } =
+          lookingRef.current;
+        if (casual || ranked) {
           await channel.track({
             athlete_id: athleteId,
-            looking_for_casual: lookingForCasual,
-            looking_for_ranked: lookingForRanked,
+            looking_for_casual: casual,
+            looking_for_ranked: ranked,
           } satisfies LobbyPayload);
         }
       }
@@ -109,8 +119,8 @@ export function useLobbyPresence(
       channelRef = null;
       supabase.removeChannel(channel);
     };
-    // Only athleteId in deps — toggle changes go through imperative API,
-    // avoiding channel teardown/reconnect on every toggle.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Only athleteId in deps — toggle changes go through the imperative API,
+    // avoiding channel teardown/reconnect on every toggle. The flags are read
+    // through lookingRef, so no suppression is needed.
   }, [athleteId]);
 }

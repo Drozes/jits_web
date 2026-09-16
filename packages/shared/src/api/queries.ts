@@ -1833,16 +1833,20 @@ export async function getMatchVideoSignedUrl(
 ): Promise<string | null> {
   const { data, error } = await supabase
     .from("match_videos")
-    .select("storage_path")
+    .select("storage_path, normalized_path")
     .eq("id", videoId)
     .maybeSingle();
-  if (error || !data?.storage_path) {
+  // Prefer the normalized H.264/AAC MP4 when the slicer wrote one. It only
+  // exists for webm-family uploads, which iOS Safari and expo-video cannot
+  // play at all; MP4 uploads never have one and keep signing the original.
+  const playbackPath = data?.normalized_path ?? data?.storage_path;
+  if (error || !playbackPath) {
     if (error) console.error("getMatchVideoSignedUrl:", error);
     return null;
   }
   const { data: signed, error: signError } = await supabase.storage
     .from(MATCH_VIDEO_BUCKET)
-    .createSignedUrl(data.storage_path, expiresInSeconds);
+    .createSignedUrl(playbackPath, expiresInSeconds);
   if (signError || !signed?.signedUrl) {
     if (signError) console.error("getMatchVideoSignedUrl sign:", signError);
     return null;

@@ -1,5 +1,4 @@
 import { Suspense } from "react";
-import { redirect } from "next/navigation";
 import { requireAthlete } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
 import { SwipeDiscoveryClient } from "./swipe-discovery-client";
@@ -15,7 +14,6 @@ export default function SwipeDiscoveryPage() {
 }
 
 async function SwipeData() {
-  redirect("/");
   const { athlete: currentAthlete } = await requireAthlete();
   const supabase = await createClient();
 
@@ -52,15 +50,34 @@ async function SwipeData() {
 }
 
 function SwipeSkeleton() {
+  const block = {
+    background: "var(--bg-elevated)",
+    borderRadius: "var(--radius-md)",
+  } as const;
   return (
-    <div className="flex flex-col gap-6 animate-pulse">
-      <div className="h-14 bg-muted" />
-      <div className="px-4 flex flex-col items-center gap-6">
-        <div className="h-96 w-full max-w-xs rounded-2xl bg-muted" />
-        <div className="flex gap-6">
-          <div className="h-14 w-14 rounded-full bg-muted" />
-          <div className="h-14 w-14 rounded-full bg-muted" />
-          <div className="h-14 w-14 rounded-full bg-muted" />
+    <div
+      className="flex flex-col animate-pulse"
+      style={{ gap: "var(--space-6)" }}
+    >
+      <div className="h-14" style={block} />
+      <div
+        className="px-4 flex flex-col items-center"
+        style={{ gap: "var(--space-6)" }}
+      >
+        <div className="h-96 w-full max-w-xs" style={block} />
+        <div className="flex" style={{ gap: "var(--space-6)" }}>
+          <div
+            className="h-14 w-14"
+            style={{ ...block, borderRadius: "var(--radius-sm)" }}
+          />
+          <div
+            className="h-11 w-11"
+            style={{ ...block, borderRadius: "var(--radius-sm)" }}
+          />
+          <div
+            className="h-14 w-14"
+            style={{ ...block, borderRadius: "var(--radius-sm)" }}
+          />
         </div>
       </div>
     </div>

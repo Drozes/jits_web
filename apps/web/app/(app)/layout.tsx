@@ -62,6 +62,9 @@ async function NotificationsBootstrap() {
 async function PresenceBootstrap() {
   const athlete = await getActiveAthlete();
   if (!athlete) return null;
+  // NOTE: lobby:online is mounted by ArenaContent, not here. It is only
+  // meaningful on Arena, and a null-rendering client component nested in this
+  // Suspense-deferred server component did not hydrate reliably.
   return (
     <OnlinePresenceBootstrap
       athleteId={athlete.id}

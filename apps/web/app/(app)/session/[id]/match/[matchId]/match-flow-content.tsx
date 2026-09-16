@@ -23,12 +23,30 @@ function computeInitialStep(
   return "weight-verify";
 }
 
+/**
+ * Renders the match wizard for a match from ANY origin.
+ *
+ * The wizard has no session dependency: the guard is requireAthlete, every RPC
+ * is keyed on matchId, and match realtime is `session-match:${matchId}`.
+ * `matches.session_id` is nullable (chk_match_origin is satisfied by
+ * challenge_id alone), so an Arena challenge match renders here unchanged.
+ * Origin only decides where the exits go and whether a timekeeper may exist.
+ */
 export async function MatchFlowContent({
-  paramsPromise,
+  matchId,
+  exitHref,
+  exitLabel = "Back to Lobby",
+  allowTimekeeper = true,
 }: {
-  paramsPromise: Promise<{ id: string; matchId: string }>;
+  matchId: string;
+  exitHref: string;
+  exitLabel?: string;
+  /**
+   * Arena matches are remote 1v1 with no third party at a gym, so they force
+   * the fighter-live variant by denying the timekeeper branch outright.
+   */
+  allowTimekeeper?: boolean;
 }) {
-  const { id: sessionId, matchId } = await paramsPromise;
   // Use requireAthlete (not requireSessionParticipant) because the match page
   // must also be accessible to timekeepers. Participant validation happens
   // via getMatchDetails RLS + the find check below.
@@ -39,27 +57,28 @@ export async function MatchFlowContent({
     getMatchDetails(supabase, matchId),
     getSubmissionTypes(supabase),
   ]);
-  const timekeeperEnabled = getFlag("timekeeperEnabled");
+  const timekeeperEnabled = allowTimekeeper && getFlag("timekeeperEnabled");
 
-  if (!match) redirect(`/session/${sessionId}/lobby`);
+  if (!match) redirect(exitHref);
 
   const me = match.participants.find((p) => p.athlete_id === athlete.id);
-  if (!me) redirect(`/session/${sessionId}/lobby`);
+  if (!me) redirect(exitHref);
 
   const opponent = match.participants.find((p) => p.athlete_id !== athlete.id);
-  if (!opponent) redirect(`/session/${sessionId}/lobby`);
+  if (!opponent) redirect(exitHref);
 
-  const isTimekeeper = match.timekeeper_id === athlete.id;
+  const isTimekeeper = allowTimekeeper && match.timekeeper_id === athlete.id;
   const initialStep = computeInitialStep(
     match.status,
     timekeeperEnabled,
-    !!match.timekeeper_id,
+    allowTimekeeper && !!match.timekeeper_id,
     isTimekeeper,
   );
 
   return (
     <MatchFlowWizard
-      sessionId={sessionId}
+      exitHref={exitHref}
+      exitLabel={exitLabel}
       matchId={matchId}
       matchType={match.match_type as "casual" | "ranked"}
       durationSeconds={match.duration_seconds}
@@ -69,7 +88,7 @@ export async function MatchFlowContent({
       currentAthlete={{ id: me.athlete_id, displayName: me.display_name, elo: me.current_elo, weight: me.current_weight, profilePhotoUrl: me.profile_photo_url }}
       opponent={{ id: opponent.athlete_id, displayName: opponent.display_name, elo: opponent.current_elo, weight: opponent.current_weight, profilePhotoUrl: opponent.profile_photo_url }}
       isTimekeeper={isTimekeeper}
-      hasTimekeeper={!!match.timekeeper_id}
+      hasTimekeeper={allowTimekeeper && !!match.timekeeper_id}
       timekeeperEnabled={timekeeperEnabled}
       submissionTypes={submissionTypes}
       initialStep={initialStep}

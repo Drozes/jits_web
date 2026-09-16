@@ -11,7 +11,8 @@ import { useSessionMatchSync } from "@jits/shared/hooks/use-session-match-sync";
 
 interface ReadyCheckStepProps {
   onNext: (data: { startedAt: string }) => void;
-  sessionId: string;
+  /** Where cancelling / opponent-cancel returns to (session lobby, or Arena). */
+  exitHref: string;
   matchId: string;
   currentAthleteId: string;
   opponentId: string;
@@ -20,7 +21,7 @@ interface ReadyCheckStepProps {
   isTimekeeper: boolean;
 }
 
-export function ReadyCheckStep({ onNext, sessionId, matchId, currentAthleteId, opponentId, timekeeperEnabled, hasTimekeeper, isTimekeeper }: ReadyCheckStepProps) {
+export function ReadyCheckStep({ onNext, exitHref, matchId, currentAthleteId, opponentId, timekeeperEnabled, hasTimekeeper, isTimekeeper }: ReadyCheckStepProps) {
   const router = useRouter();
   const [myReady, setMyReady] = useState(false);
   const [opponentReady, setOpponentReady] = useState(false);
@@ -47,7 +48,7 @@ export function ReadyCheckStep({ onNext, sessionId, matchId, currentAthleteId, o
       if (cancelledRef.current || startedRef.current) return;
       cancelledRef.current = true;
       toast.info("Match cancelled. Your opponent left the ready check.");
-      router.replace(`/session/${sessionId}/lobby`);
+      router.replace(exitHref);
     },
   });
 
@@ -93,7 +94,7 @@ export function ReadyCheckStep({ onNext, sessionId, matchId, currentAthleteId, o
     }
     // Tell the opponent's ready step to abort too, then return to the lobby.
     sync.broadcastMatchCancelled();
-    router.replace(`/session/${sessionId}/lobby`);
+    router.replace(exitHref);
   }
 
   // Trigger start when both are ready

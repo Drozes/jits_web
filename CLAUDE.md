@@ -117,9 +117,11 @@ Bebas Neue (`font-display`, wordmarks/taglines, all caps) · DM Sans Bold (`font
 
 ## Routes
 
-- **Hidden, preserved routes redirect to `/`, do NOT "fix" or wire them up:** `/arena`, `/arena/swipe`, `/match/pending`, `/match/lobby/[id]`, `/match/[id]/live`, `/match/[id]/results`, `/athlete/[id]/challenges`, `/messages`, `/messages/[id]`. Chat is feature-flagged off (no nav entry); code is preserved.
-- Active route set is the filesystem under `apps/web/app/` and `apps/mobile/app/`. Bottom nav: Home, Gyms, Rankings, Profile.
-- The challenge inbox, head-to-head challenge button, and chat are not yet built on mobile (toast placeholders or hidden).
+- **`/arena` and `/arena/swipe` are LIVE again on web** (deliberate product decision; they previously carried a top-of-component `redirect("/")`). `/arena` is in the primary nav. Do NOT re-hide them.
+- **Still hidden, preserved, do NOT "fix" or wire them up:** `/match/pending`, `/match/lobby/[id]`, `/match/[id]/live`, `/match/[id]/results`, `/athlete/[id]/challenges`, `/messages`, `/messages/[id]`. Note the mechanism differs per route and the old blanket "all redirect to `/`" claim was wrong: `/match/pending`, `/match/lobby/[id]` and `/athlete/[id]/challenges` carry an unconditional `redirect("/")` in their `*-content.tsx`; `/match/[id]/live` and `/match/[id]/results` redirect only for NON-participants; `/messages` and `/messages/[id]` have **no redirect at all** and render fully. There is no `middleware.ts` and no feature flag gating any of this. Chat is hidden purely by the absence of a nav entry, not by a flag.
+- **`/gyms` and `/gyms/[id]` are hidden from the primary nav but remain live routes**, reachable by direct URL and from the Home and session links that still point at them. Gym *selection* in signup / `/eua` / profile edit is a separate surface and is NOT hidden. Do not add `/gyms` back to `NAV_TABS` without a product decision.
+- Active route set is the filesystem under `apps/web/app/` and `apps/mobile/app/`. Web nav: Home, Arena, Rankings, Profile. Mobile nav still has Gyms.
+- The challenge inbox, head-to-head challenge button, and chat are not yet built on mobile (toast placeholders or hidden). On web you can SEND a challenge from an athlete profile, but the inbox and lobby that would answer it are still hidden, so the chain is half-open.
 
 ## Mobile Specifics
 

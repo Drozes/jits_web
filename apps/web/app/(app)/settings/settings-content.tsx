@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useTheme } from "next-themes";
 import { Plate } from "@/components/ui/elo-system";
+import { ThemeChips } from "@/components/domain/theme-chips";
 import { createClient } from "@/lib/supabase/client";
 
 interface SettingsContentProps {
@@ -89,60 +89,14 @@ function SupportSection() {
 }
 
 function ThemeRow() {
-  const { theme, resolvedTheme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => setMounted(true), []);
-
-  const active = mounted ? theme ?? resolvedTheme ?? "system" : "system";
-
   return (
     <div style={{ ...rowBaseStyle, gap: "var(--space-3)" }}>
       <RowLabel>THEME</RowLabel>
-      <div style={{ display: "inline-flex", gap: "var(--space-1)" }}>
-        <ThemeChip active={active === "dark"} onClick={() => setTheme("dark")}>
-          DARK
-        </ThemeChip>
-        <ThemeChip active={active === "light"} onClick={() => setTheme("light")}>
-          LIGHT
-        </ThemeChip>
-      </div>
+      <ThemeChips />
     </div>
   );
 }
 
-function ThemeChip({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={{
-        fontFamily: "var(--font-heading)",
-        fontSize: "var(--size-label-s)",
-        fontWeight: 700,
-        textTransform: "uppercase",
-        letterSpacing: "var(--ls-caps)",
-        padding: "var(--space-2) var(--space-3)",
-        borderRadius: "var(--radius-xs)",
-        border: `1px solid ${active ? "var(--accent-cta)" : "var(--border-hairline-strong)"}`,
-        background: active ? "var(--bg-elevated-hover)" : "transparent",
-        color: active ? "var(--text-primary)" : "var(--text-secondary)",
-        cursor: "pointer",
-        transition: "background var(--motion-hover), color var(--motion-hover), border-color var(--motion-hover)",
-      }}
-    >
-      {children}
-    </button>
-  );
-}
 
 function RowLink({ href, label }: { href: string; label: string }) {
   return (
