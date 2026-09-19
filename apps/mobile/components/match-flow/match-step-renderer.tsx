@@ -25,7 +25,10 @@ interface MatchParticipant {
 
 interface MatchStepRendererProps {
   step: MatchStep;
-  sessionId: string;
+  /** Where the steps that leave the wizard navigate to. */
+  exitHref: string;
+  /** Copy on the summary step's exit cta. */
+  exitLabel: string;
   matchId: string;
   matchType: "ranked" | "casual";
   matchStatus: string;
@@ -47,7 +50,8 @@ interface MatchStepRendererProps {
 
 export function MatchStepRenderer({
   step,
-  sessionId,
+  exitHref,
+  exitLabel,
   matchId,
   matchType,
   matchStatus,
@@ -84,7 +88,7 @@ export function MatchStepRenderer({
   if (step === "ready") {
     return (
       <ReadyStep
-        sessionId={sessionId}
+        exitHref={exitHref}
         matchId={matchId}
         currentAthleteId={me.athlete_id}
         opponentId={opponent.athlete_id}
@@ -160,7 +164,8 @@ export function MatchStepRenderer({
     const weightDivisionGap = isRanked ? me.weight_division_gap ?? null : null;
     return (
       <SummaryStep
-        sessionId={sessionId}
+        exitHref={exitHref}
+        exitLabel={exitLabel}
         matchType={matchType}
         matchStatus={matchStatus}
         outcome={ownOutcome}
