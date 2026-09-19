@@ -131,7 +131,9 @@ jest.mock("@/components/dashboard/session-discovery-section", () => ({
 const READ_FAILED = {
   ok: false as const,
   error: { code: "UNKNOWN" as const, message: "connection failure" },
+  partial: null,
 };
+
 
 // The active athlete. `primary_gym_id` is overwritten per test to exercise both
 // the member and the free-agent discovery paths.
@@ -210,6 +212,26 @@ const mockLiveGym = {
   upcomingSessions: 0,
   hasActiveSession: true,
   nextSessionStart: null,
+};
+/**
+ * What getGymDetailResult hands back when nine of its ten reads succeed and one
+ * capability read (the gym_managers lookup) fails: the session list is intact,
+ * so it is offered. The two capability booleans are absent by type, because an
+ * authorization answer must never be read off a failed read.
+ */
+const PARTIAL_AFTER_CAPABILITY_FAILURE = {
+  ok: false as const,
+  error: { code: "UNKNOWN" as const, message: "connection failure" },
+  partial: {
+    id: mockGymDetail.id,
+    name: mockGymDetail.name,
+    city: mockGymDetail.city,
+    status: mockGymDetail.status,
+    sessions: mockGymDetail.sessions,
+    rsvpSessionIds: mockGymDetail.rsvpSessionIds,
+    participantSessionIds: mockGymDetail.participantSessionIds,
+    memberCount: mockGymDetail.memberCount,
+  },
 };
 
 // Home reads discovery through the Result variants (jits-icei.5). The
@@ -433,6 +455,32 @@ describe("DashboardScreen", () => {
       expect(getByText("5W")).toBeTruthy();
     });
     expect(getByText("discovery:g1:-:0:0:failed:retryable")).toBeTruthy();
+  });
+
+  /**
+   * THE AVAILABILITY REGRESSION THE REVIEW CAUGHT, PINNED.
+   *
+   * Cold start, no warm cache. Nine reads succeed, including a LIVE session at
+   * the athlete's gym, and the single gym_managers read gets a transient 5xx.
+   * Home consumes neither capability boolean, so this must cost the athlete
+   * nothing: the session renders. The failure still travels (the surface is
+   * told), it simply does not suppress data it was handed.
+   */
+  it("renders a live session when only the capability read failed", async () => {
+    const queries = require("@jits/shared/api/queries") as QueryMocks;
+    mockAthlete.primary_gym_id = "g1";
+    queries.getGymDetailResult.mockResolvedValue(
+      PARTIAL_AFTER_CAPABILITY_FAILURE,
+    );
+
+    const { getByText } = render(React.createElement(DashboardScreen));
+    await waitFor(() => {
+      expect(getByText("5W")).toBeTruthy();
+    });
+    // 1 session, gym named, and failed still true: SessionDiscoverySection
+    // shows the error plate only when it has nothing else, so the session wins
+    // and the failure is surfaced rather than swallowed.
+    expect(getByText("discovery:g1:Test Gym:1:0:failed:retryable")).toBeTruthy();
   });
 
   /**

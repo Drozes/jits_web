@@ -429,6 +429,51 @@ describe("getGymDetailResult (jits-icei.5)", () => {
     expect(result.ok).toBe(false);
   });
 
+  /**
+   * A FAILURE MUST NOT COST THE ATHLETE A LIVE SESSION.
+   *
+   * Nine of the ten reads succeed, including the session list, and the single
+   * gym_managers .maybeSingle() fails. That says nothing whatsoever about which
+   * sessions exist, so refusing the whole payload would hide a live session
+   * behind an error plate: correct, but less available than the lenient
+   * function this replaces, on the one surface the issue exists to fix.
+   */
+  it("hands back the session list on a capability failure, so a live session is not hidden", async () => {
+    const queues = healthyDetailQueues();
+    queues.gym_managers = [{ error: { code: "08006", message: "connection failure" } }];
+    const { client } = fifoClient(queues);
+    const result = await getGymDetailResult(client, "g1", "a1");
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.partial).not.toBeNull();
+      expect(result.partial?.sessions).toHaveLength(1);
+      expect(result.partial?.name).toBe("Test Gym");
+    }
+  });
+
+  it("offers NO partial when the session list itself is untrustworthy", async () => {
+    // The empty list here is an artefact of the failed read, not an answer, so
+    // there is nothing safe to hand back and the caller must not render it.
+    const queues = healthyDetailQueues();
+    queues.sessions = [{ error: { code: "08006", message: "connection failure" } }];
+    queues.session_participants = [];
+    queues.session_rsvps = [];
+    queues.athletes = [{ data: { primary_gym_id: "g1" } }, { count: 12 }];
+    const { client } = fifoClient(queues);
+    const result = await getGymDetailResult(client, "g1", "a1");
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.partial).toBeNull();
+  });
+
+  it("offers no partial when the gym row itself could not be read", async () => {
+    const { client } = fifoClient({
+      gyms: [{ error: { code: "08006", message: "connection failure" } }],
+    });
+    const result = await getGymDetailResult(client, "g1", "a1");
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.partial).toBeNull();
+  });
+
   it("still succeeds, and logs, when only a decorative read fails", async () => {
     // Participant counts are a subtitle. Promoting them to fatal would hide a
     // LIVE session behind an error plate, which is the same harm by another

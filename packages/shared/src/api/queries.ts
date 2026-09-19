@@ -602,6 +602,31 @@ export async function getGymsWithSessionsResult(
 }
 
 /**
+ * A gym payload salvaged from a FAILED read, for display only.
+ *
+ * `isMemberGym` and `isGymManager` are typed out on purpose. Both default to
+ * false when their read fails, and false is indistinguishable from a real
+ * answer, so a caller reading an authorization decision off a failed read would
+ * silently demote a manager. That is the same defect class this issue is about,
+ * so the compiler refuses it rather than a comment asking nicely. `memberCount`
+ * stays because it is degraded identically on the success path and is
+ * decorative either way.
+ */
+export type PartialGymDetail = Omit<
+  GymDetail,
+  "isMemberGym" | "isGymManager"
+>;
+
+/**
+ * `Result<GymDetail>`, with the salvaged payload attached to the failure
+ * branch. Assignable to `Result<GymDetail>`, so a caller that only cares about
+ * ok/data/error can ignore `partial` entirely.
+ */
+export type GymDetailResult =
+  | { ok: true; data: GymDetail }
+  | { ok: false; error: DomainError; partial: PartialGymDetail | null };
+
+/**
  * Everything `getGymDetail` and `getGymDetailResult` share: it builds the
  * payload AND reports the first fatal error, so the two public wrappers differ
  * only in policy. The legacy wrapper returns the payload exactly as it always
@@ -635,7 +660,11 @@ async function loadGymDetail(
   supabase: Client,
   gymId: string,
   athleteId: string,
-): Promise<{ detail: GymDetail | null; error: DomainError | null }> {
+): Promise<{
+  detail: GymDetail | null;
+  error: DomainError | null;
+  partial: PartialGymDetail | null;
+}> {
   // Logged rather than swallowed: a degraded read is not worth failing the
   // screen over, but it should never be invisible either.
   const logDegraded = (label: string, error: PostgrestError | null) => {
@@ -656,6 +685,7 @@ async function loadGymDetail(
   if (gymError) {
     return {
       detail: null,
+      partial: null,
       error:
         gymError.code === "PGRST116"
           ? {
@@ -669,6 +699,7 @@ async function loadGymDetail(
   if (!gym) {
     return {
       detail: null,
+      partial: null,
       error: { code: "GYM_NOT_FOUND", message: "That gym could not be found." },
     };
   }
@@ -793,20 +824,30 @@ async function loadGymDetail(
         ? mapPostgrestError(managerRowResult.error, "gym_detail")
         : null;
 
+  const detail: GymDetail = {
+    id: gym.id,
+    name: gym.name,
+    city: gym.city,
+    status: gym.status,
+    sessions: sessionListItems,
+    rsvpSessionIds,
+    participantSessionIds,
+    memberCount: memberCountResult.count ?? 0,
+    isMemberGym,
+    isGymManager,
+  };
+
   return {
-    detail: {
-      id: gym.id,
-      name: gym.name,
-      city: gym.city,
-      status: gym.status,
-      sessions: sessionListItems,
-      rsvpSessionIds,
-      participantSessionIds,
-      memberCount: memberCountResult.count ?? 0,
-      isMemberGym,
-      isGymManager,
-    },
+    detail,
     error: fatal,
+    // The payload is offered back to a Result caller even on a fatal error, but
+    // ONLY while the session list itself is trustworthy. A failed capability
+    // read (the athlete row, the manager row) says nothing about which sessions
+    // exist, so hiding a live session over it would be the very harm this
+    // function is being fixed for. A failed SESSIONS read is different: the
+    // empty list below is an artefact of the failure, not an answer, so there
+    // is nothing safe to offer and the caller gets null.
+    partial: sessionsError ? null : detail,
   };
 }
 
@@ -831,22 +872,39 @@ export async function getGymDetail(
 /**
  * `getGymDetail` with the failure signal it never had (jits-icei.5).
  *
- * `{ ok: false }` means the caller learned nothing and must not speak for the
- * gym; `{ ok: true, data }` means the payload is trustworthy on the things a
- * surface states out loud: which sessions exist, and what the athlete may do
- * here. GYM_NOT_FOUND separates a gym that genuinely does not exist from a read
- * that failed. Strictly additive: the legacy function above is untouched.
+ * `{ ok: true, data }` means the payload is trustworthy on the things a surface
+ * states out loud: which sessions exist, and what the athlete may do here.
+ * `{ ok: false }` means at least one of those is unknown, and GYM_NOT_FOUND
+ * separates a gym that genuinely does not exist from a read that failed.
+ *
+ * ON FAILURE IT STILL HANDS BACK WHAT IT KNOWS, in `partial`. Refusing the
+ * whole payload turned out to be an availability regression on the one surface
+ * this issue exists to fix: nine reads succeeding (including a LIVE session at
+ * the athlete's gym) and a single `gym_managers` read failing would hide that
+ * session behind an error plate, while the old lenient function rendered it.
+ * So the failure branch carries the session list whenever the session list is
+ * trustworthy, and the caller decides. `partial` is null when it is not, and
+ * the capability booleans are typed out of it (see PartialGymDetail) so nobody
+ * can read an authorization answer off a failed read.
+ *
+ * Strictly additive: the legacy function above is untouched, and this type is
+ * assignable to `Result<GymDetail>` for a caller that only wants ok/data/error.
  */
 export async function getGymDetailResult(
   supabase: Client,
   gymId: string,
   athleteId: string,
-): Promise<Result<GymDetail>> {
-  const { detail, error } = await loadGymDetail(supabase, gymId, athleteId);
-  if (error) return { ok: false, error };
+): Promise<GymDetailResult> {
+  const { detail, error, partial } = await loadGymDetail(
+    supabase,
+    gymId,
+    athleteId,
+  );
+  if (error) return { ok: false, error, partial };
   if (!detail) {
     return {
       ok: false,
+      partial: null,
       error: { code: "GYM_NOT_FOUND", message: "That gym could not be found." },
     };
   }

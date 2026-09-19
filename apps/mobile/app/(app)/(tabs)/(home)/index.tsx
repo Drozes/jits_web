@@ -11,7 +11,10 @@ import {
   getGymDetailResult,
   getGymsWithSessionsResult,
 } from "@jits/shared/api/queries";
-import type { Result } from "@jits/shared/api/errors";
+import type {
+  GymDetailResult,
+  PartialGymDetail,
+} from "@jits/shared/api/queries";
 import type { DashboardSummary } from "@jits/shared/types/composites";
 import type {
   ActiveSessionInfo,
@@ -37,8 +40,12 @@ import { useCachedResource } from "@/lib/cache/use-cached-resource";
 interface DashboardData {
   summary: DashboardSummary;
   activeSession: ActiveSessionInfo | null;
-  /** Primary gym with its sessions, powering the discovery surface. */
-  gymDetail: GymDetail | null;
+  /**
+   * Primary gym with its sessions, powering the discovery surface. Typed as
+   * PartialGymDetail because it may be salvaged from a failed read: the
+   * capability booleans are not on it, and nothing here needs them.
+   */
+  gymDetail: PartialGymDetail | null;
   /** Gyms with a live session, loaded only for free agents (no primary gym). */
   liveGyms: GymListItem[];
   /**
@@ -83,18 +90,33 @@ function useDashboardData(
    * Home told the athlete "Nothing scheduled at <gym> right now" on a dropped
    * request. The query reports that case as a failure now, which is the hole
    * this closes.
+   *
+   * A FAILURE DOES NOT THROW THE DATA AWAY. `result.partial` carries whatever
+   * the read did establish, and it is only offered when the session list is
+   * trustworthy, so a failure in a part Home does not even consume (the manager
+   * check, say) must not cost the athlete a live session at their own gym.
+   * `failed` still travels either way: SessionDiscoverySection already decides
+   * correctly from the two together, showing the error plate only when it has
+   * nothing else to show.
+   *
+   * Preference order on failure: the fresh partial first, then the last payload
+   * that fully loaded for this same gym, then nothing. The warm cache is
+   * complete but stale; the partial is incomplete but current, and current wins
+   * for the one thing this surface states, which is what is on right now.
    */
   const settleGymDetail = (
     gymId: string,
-    result: Result<GymDetail>,
-  ): { detail: GymDetail | null; failed: boolean } => {
+    result: GymDetailResult,
+  ): { detail: PartialGymDetail | null; failed: boolean } => {
     if (result.ok) {
       lastGymDetail.current = { gymId, detail: result.data };
       return { detail: result.data, failed: false };
     }
     const cached = lastGymDetail.current;
     return {
-      detail: cached?.gymId === gymId ? cached.detail : null,
+      detail:
+        result.partial ??
+        (cached?.gymId === gymId ? cached.detail : null),
       failed: true,
     };
   };
@@ -123,6 +145,7 @@ function useDashboardData(
                 return settleGymDetail(primaryGymId, {
                   ok: false,
                   error: { code: "UNKNOWN", message: "Gym read threw." },
+                  partial: null,
                 });
               })
           : Promise.resolve({ detail: null, failed: false }),
