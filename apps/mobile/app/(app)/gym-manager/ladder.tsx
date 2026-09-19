@@ -11,7 +11,10 @@ import { AppHeader } from "@/components/layout/app-header";
 import { Chip } from "@/components/ui/elo-system";
 import { useRequireAthlete } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
-import { useManagedGyms } from "@/lib/gym-manager/use-managed-gyms";
+import {
+  managerHref,
+  useGymManagerGymId,
+} from "@/lib/gym-manager/use-gym-manager-gym-id";
 import { useGymLadder } from "@/lib/gym-manager/use-gym-ladder";
 import { LadderRow } from "@/components/gym-manager/ladder-row";
 import { RangeChips } from "@/components/gym-manager/stats-parts";
@@ -30,8 +33,8 @@ const ALL_CITIES = "all";
  * 30d/90d/all window, with a city filter, the manager's own gym highlighted (and
  * called out in the summary line with its rank + momentum), and per-gym momentum
  * arrows. Aggregate-only, so it loads via useGymLadder (not manager-gated);
- * resolves the own gym from useManagedGyms to drive the highlight and the
- * default city. City filtering is client-side off the full row set so the chips
+ * resolves the own gym from the gymId route param (useGymManagerGymId) to
+ * drive the highlight and the default city. City filtering is client-side off the full row set so the chips
  * switch instantly; the range filter (30d/90d/all, RangeChips) re-fetches.
  *
  * The default-city effect only auto-scopes to the manager's own gym city when
@@ -44,8 +47,7 @@ export default function GymManagerLadderScreen() {
   const router = useRouter();
   const tokens = useThemedTokens();
   const { isLoading: authLoading } = useRequireAthlete();
-  const { gyms, isReady: managedReady } = useManagedGyms();
-  const ownGym = gyms[0];
+  const { gymId, gym: ownGym, isReady: managedReady } = useGymManagerGymId();
 
   const [range, setRange] = React.useState<GymStatsRange>("90d");
   const { rows, isLoading, isRefreshing, refresh } = useGymLadder(range);
@@ -83,7 +85,7 @@ export default function GymManagerLadderScreen() {
   if (authLoading || !managedReady || isLoading) {
     return (
       <View className="flex-1 bg-surface">
-        <AppHeader title="Gym Ladder" back backFallback="/gym-manager" />
+        <AppHeader title="Gym Ladder" back backFallback={managerHref("/gym-manager", gymId)} />
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator color={tokens.accentCta} />
         </View>
@@ -93,7 +95,7 @@ export default function GymManagerLadderScreen() {
 
   return (
     <View className="flex-1 bg-surface">
-      <AppHeader title="Gym Ladder" back backFallback="/gym-manager" />
+      <AppHeader title="Gym Ladder" back backFallback={managerHref("/gym-manager", gymId)} />
 
       <View className="px-4 pt-3">
         <RangeChips value={range} onChange={setRange} />

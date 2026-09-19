@@ -1,15 +1,22 @@
 import { Tabs } from "expo-router";
-import { Building2, Dumbbell, Home, Trophy, User } from "lucide-react-native";
+import { Home, Trophy, User } from "lucide-react-native";
 import { EloTabBar } from "@/components/layout/elo-tab-bar";
-import { useManagedGyms } from "@/lib/gym-manager/use-managed-gyms";
 
+/**
+ * Bottom tab navigator. Every route directory inside this `(tabs)` group gets a
+ * slot in EloTabBar, so a screen that must NOT be a tab lives outside the group
+ * instead: `/gyms` and `/gym-manager` are now siblings of `(tabs)` under
+ * `(app)` and push over the bar as cards. Their URLs are unchanged (both
+ * `(app)` and `(tabs)` are route groups, which do not appear in the path). Gym
+ * and session discovery is entered from Home; the gym-manager portal is entered
+ * from the manager affordance on `/gyms/[id]`.
+ *
+ * Target layout is a 4-up bar: Home, Arena, Rankings, Profile. Arena ships in a
+ * later wave and is deliberately NOT registered yet: React Navigation throws on
+ * a Screen whose route file does not exist, so registering it before the screen
+ * lands would crash the app rather than show a placeholder.
+ */
 export default function TabsLayout() {
-  // The gym-owner tab is only shown to athletes who manage at least one gym.
-  // The screen stays mounted either way; `tabBarButton: () => null` is the
-  // Expo Router idiom for a hidden tab, which EloTabBar honors.
-  const { gyms } = useManagedGyms();
-  const isManager = gyms.length > 0;
-
   return (
     <Tabs
       tabBar={(props) => <EloTabBar {...props} />}
@@ -24,26 +31,15 @@ export default function TabsLayout() {
           tabBarIcon: ({ color, size }) => <Home color={color} size={size} />,
         }}
       />
-      <Tabs.Screen
-        name="gyms"
-        options={{
-          title: "Gyms",
-          tabBarIcon: ({ color, size }) => <Dumbbell color={color} size={size} />,
-        }}
-      />
+      {/* ===== ARENA TAB SLOT (second of four) =====
+          Add the `arena` Tabs.Screen right here, at the same time as the
+          `app/(app)/(tabs)/arena/` route directory. Nothing else in this file
+          or in EloTabBar needs to change for it. */}
       <Tabs.Screen
         name="leaderboard"
         options={{
           title: "Rankings",
           tabBarIcon: ({ color, size }) => <Trophy color={color} size={size} />,
-        }}
-      />
-      <Tabs.Screen
-        name="gym-manager"
-        options={{
-          title: "Gym",
-          tabBarIcon: ({ color, size }) => <Building2 color={color} size={size} />,
-          tabBarButton: isManager ? undefined : () => null,
         }}
       />
       <Tabs.Screen

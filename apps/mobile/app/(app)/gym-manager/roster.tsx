@@ -10,29 +10,31 @@ import { useRouter } from "expo-router";
 import { AppHeader } from "@/components/layout/app-header";
 import { useRequireAthlete } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
-import { useManagedGyms } from "@/lib/gym-manager/use-managed-gyms";
+import {
+  managerHref,
+  useGymManagerGymId,
+} from "@/lib/gym-manager/use-gym-manager-gym-id";
 import { useGymRoster } from "@/lib/gym-manager/use-gym-roster";
 import { RosterRow } from "@/components/gym-manager/roster-row";
 
 /**
  * H6 · Gym-owner roster. Active members sorted by ELO DESC (BE order), each row
  * showing name, ELO, most-recent delta, last-active, and a PROVISIONAL badge
- * (< 20 matches). Resolves the managed gym via useManagedGyms, then loads the
- * roster from useGymRoster (manager-gated getGymRoster). Tapping a row opens H7.
+ * (< 20 matches). Resolves the gym from the gymId route param via
+ * useGymManagerGymId, then loads the roster from useGymRoster (manager-gated getGymRoster). Tapping a row opens H7.
  */
 export default function GymManagerRosterScreen() {
   const router = useRouter();
   const tokens = useThemedTokens();
   const { athlete, isLoading: authLoading } = useRequireAthlete();
-  const { gyms, isReady: managedReady } = useManagedGyms();
-  const gymId = gyms[0]?.gymId;
+  const { gymId, isReady: managedReady } = useGymManagerGymId();
   const { roster, isManager, isLoading, isRefreshing, refresh } =
     useGymRoster(gymId);
 
   if (authLoading || !managedReady || (gymId && isLoading)) {
     return (
       <View className="flex-1 bg-surface">
-        <AppHeader title="Athletes" back backFallback="/gym-manager" />
+        <AppHeader title="Athletes" back backFallback={managerHref("/gym-manager", gymId)} />
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator color={tokens.accentCta} />
         </View>
@@ -43,7 +45,7 @@ export default function GymManagerRosterScreen() {
   if (!gymId || !isManager) {
     return (
       <View className="flex-1 bg-surface">
-        <AppHeader title="Athletes" back backFallback="/gym-manager" />
+        <AppHeader title="Athletes" back backFallback={managerHref("/gym-manager", gymId)} />
         <View className="flex-1 items-center justify-center px-8">
           <Text className="font-heading text-[14px] text-ink uppercase tracking-caps-l text-center">
             No Managed Gym
@@ -55,7 +57,7 @@ export default function GymManagerRosterScreen() {
 
   return (
     <View className="flex-1 bg-surface">
-      <AppHeader title="Athletes" back backFallback="/gym-manager" />
+      <AppHeader title="Athletes" back backFallback={managerHref("/gym-manager", gymId)} />
       <FlatList
         data={roster}
         keyExtractor={(r) => r.athleteId}
@@ -81,7 +83,11 @@ export default function GymManagerRosterScreen() {
             isSelf={item.athleteId === athlete?.id}
             onPress={() =>
               router.push(
-                `/gym-manager/athlete/${item.athleteId}?name=${encodeURIComponent(item.displayName)}` as never,
+                // Params are encoded by expo-router's resolveHref, so the
+                // display name needs no manual encodeURIComponent here.
+                managerHref(`/gym-manager/athlete/${item.athleteId}`, gymId, {
+                  name: item.displayName,
+                }),
               )
             }
           />

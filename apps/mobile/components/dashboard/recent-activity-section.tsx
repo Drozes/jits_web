@@ -122,7 +122,7 @@ export function RecentActivitySection({
           <EmptyState
             message="No matches yet, your first match is waiting."
             showLink
-            onPressLink={onPressFindSession ?? (() => router.push("/(app)/gyms"))}
+            onPressLink={onPressFindSession ?? (() => router.push("/gyms"))}
           />
         )
       ) : hasContent ? (

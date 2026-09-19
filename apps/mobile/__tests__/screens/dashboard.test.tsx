@@ -96,14 +96,46 @@ jest.mock("@/components/dashboard/recent-activity-section", () => ({
   },
 }));
 
-// The active athlete
-const mockAthlete = {
+// Discovery renders for real in
+// __tests__/components/dashboard/session-discovery-section.test.tsx. Here it is
+// stubbed to echo the props the dashboard feeds it, which is the contract this
+// screen owns: the primary gym, that gym's sessions, and the free-agent
+// live-gym list.
+jest.mock("@/components/dashboard/session-discovery-section", () => ({
+  SessionDiscoverySection: (props: {
+    gymId: string | null;
+    gymName: string | null;
+    sessions: unknown[];
+    liveGyms: unknown[];
+  }) => {
+    const R = require("react");
+    const RN = require("react-native");
+    return R.createElement(
+      RN.Text,
+      { testID: "session-discovery" },
+      `discovery:${props.gymId ?? "free-agent"}:${props.gymName ?? "-"}:${props.sessions.length}:${props.liveGyms.length}`,
+    );
+  },
+}));
+
+// The active athlete. `primary_gym_id` is overwritten per test to exercise both
+// the member and the free-agent discovery paths.
+const mockAthlete: {
+  id: string;
+  display_name: string;
+  current_elo: number;
+  highest_elo: number;
+  status: string;
+  profile_photo_url: string | null;
+  primary_gym_id: string | null;
+} = {
   id: "a1",
   display_name: "TestUser",
   current_elo: 1200,
   highest_elo: 1250,
   status: "active",
   profile_photo_url: null,
+  primary_gym_id: null,
 };
 
 jest.mock("@/lib/auth/hooks", () => ({
@@ -127,9 +159,49 @@ const mockSummary = {
   recent_activity: [],
 };
 
+const mockGymDetail = {
+  id: "g1",
+  name: "Test Gym",
+  city: "Austin",
+  status: "active",
+  sessions: [
+    {
+      id: "s1",
+      title: "Open Mat",
+      scheduledStart: "2026-09-20T18:00:00.000Z",
+      scheduledEnd: "2026-09-20T20:00:00.000Z",
+      status: "scheduled",
+      participantCount: 2,
+      maxParticipants: null,
+      rsvpCount: 1,
+      createdBy: "a2",
+      createdByName: "Coach",
+    },
+  ],
+  rsvpSessionIds: [],
+  participantSessionIds: [],
+  memberCount: 12,
+  isMemberGym: true,
+  isGymManager: false,
+};
+
+const mockLiveGym = {
+  id: "g9",
+  name: "Live Gym",
+  city: "Austin",
+  status: "active",
+  memberCount: 8,
+  activeSessions: 1,
+  upcomingSessions: 0,
+  hasActiveSession: true,
+  nextSessionStart: null,
+};
+
 jest.mock("@jits/shared/api/queries", () => ({
   getDashboardSummary: jest.fn().mockResolvedValue(mockSummary),
   getActiveSession: jest.fn().mockResolvedValue(null),
+  getGymDetail: jest.fn().mockResolvedValue(null),
+  getGymsWithSessions: jest.fn().mockResolvedValue([]),
 }));
 
 jest.mock("@jits/shared/types/composites", () => ({}), { virtual: true });
@@ -137,15 +209,22 @@ jest.mock("@jits/shared/types/session", () => ({}), { virtual: true });
 
 import DashboardScreen from "@/app/(app)/(tabs)/(home)/index";
 
+interface QueryMocks {
+  getDashboardSummary: jest.Mock;
+  getActiveSession: jest.Mock;
+  getGymDetail: jest.Mock;
+  getGymsWithSessions: jest.Mock;
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
   // Re-wire the resolved value each test since clearAllMocks resets mockResolvedValue
-  const queries = require("@jits/shared/api/queries") as {
-    getDashboardSummary: jest.Mock;
-    getActiveSession: jest.Mock;
-  };
+  const queries = require("@jits/shared/api/queries") as QueryMocks;
   queries.getDashboardSummary.mockResolvedValue(mockSummary);
   queries.getActiveSession.mockResolvedValue(null);
+  queries.getGymDetail.mockResolvedValue(null);
+  queries.getGymsWithSessions.mockResolvedValue([]);
+  mockAthlete.primary_gym_id = null;
 });
 
 describe("DashboardScreen", () => {
@@ -172,6 +251,57 @@ describe("DashboardScreen", () => {
       expect(getByText("2L")).toBeTruthy();
       expect(getByText("1D")).toBeTruthy();
     });
+  });
+
+  // Discovery is the ONLY path to a new session since the Gyms tab was removed,
+  // so Home must always mount it and must feed it the right gym.
+  it("always renders the session discovery surface", async () => {
+    const { getByTestId } = render(React.createElement(DashboardScreen));
+    await waitFor(() => {
+      expect(getByTestId("session-discovery")).toBeTruthy();
+    });
+  });
+
+  it("feeds discovery the primary gym and its sessions for a member", async () => {
+    const queries = require("@jits/shared/api/queries") as QueryMocks;
+    mockAthlete.primary_gym_id = "g1";
+    queries.getGymDetail.mockResolvedValue(mockGymDetail);
+
+    const { getByText } = render(React.createElement(DashboardScreen));
+    await waitFor(() => {
+      expect(getByText("discovery:g1:Test Gym:1:0")).toBeTruthy();
+    });
+    expect(queries.getGymDetail).toHaveBeenCalledWith({}, "g1", "a1");
+    // A member never pays for the gym-wide list; their own gym answers the question.
+    expect(queries.getGymsWithSessions).not.toHaveBeenCalled();
+  });
+
+  it("feeds discovery the live-gym list for a free agent", async () => {
+    const queries = require("@jits/shared/api/queries") as QueryMocks;
+    queries.getGymsWithSessions.mockResolvedValue([mockLiveGym]);
+
+    const { getByText } = render(React.createElement(DashboardScreen));
+    await waitFor(() => {
+      expect(getByText("discovery:free-agent:-:0:1")).toBeTruthy();
+    });
+    expect(queries.getGymDetail).not.toHaveBeenCalled();
+  });
+
+  it("still renders the dashboard when the discovery reads fail", async () => {
+    const queries = require("@jits/shared/api/queries") as QueryMocks;
+    // The screen logs the swallowed rejection on purpose; keep it out of the
+    // test output rather than leaving a red herring in the run.
+    const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+    mockAthlete.primary_gym_id = "g-broken";
+    queries.getGymDetail.mockRejectedValue(new Error("boom"));
+
+    const { getByText, getByTestId } = render(React.createElement(DashboardScreen));
+    await waitFor(() => {
+      expect(getByText("5W")).toBeTruthy();
+    });
+    expect(getByTestId("session-discovery")).toBeTruthy();
+    expect(errorSpy).toHaveBeenCalled();
+    errorSpy.mockRestore();
   });
 
   it("renders the recent activity section", async () => {

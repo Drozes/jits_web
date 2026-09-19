@@ -5,11 +5,21 @@ import { useRouter } from "expo-router";
 import { useRequireAthlete } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { supabase } from "@/lib/supabase/client";
-import { getActiveSession, getDashboardSummary } from "@jits/shared/api/queries";
+import {
+  getActiveSession,
+  getDashboardSummary,
+  getGymDetail,
+  getGymsWithSessions,
+} from "@jits/shared/api/queries";
 import type { DashboardSummary } from "@jits/shared/types/composites";
-import type { ActiveSessionInfo } from "@jits/shared/types/session";
-import { Avatar32, EloTile, MetaTag, Plate, Wordmark } from "@/components/ui/elo-system";
+import type {
+  ActiveSessionInfo,
+  GymDetail,
+  GymListItem,
+} from "@jits/shared/types/session";
+import { Avatar32, EloTile, MetaTag, Wordmark } from "@/components/ui/elo-system";
 import { ActiveSessionCard } from "@/components/dashboard/active-session-card";
+import { SessionDiscoverySection } from "@/components/dashboard/session-discovery-section";
 import { RecentActivitySection } from "@/components/dashboard/recent-activity-section";
 import { StatOverview } from "@/components/dashboard/stat-overview";
 import { NotificationBell } from "@/components/notifications/notification-bell";
@@ -26,20 +36,46 @@ import { useCachedResource } from "@/lib/cache/use-cached-resource";
 interface DashboardData {
   summary: DashboardSummary;
   activeSession: ActiveSessionInfo | null;
+  /** Primary gym with its sessions, powering the discovery surface. */
+  gymDetail: GymDetail | null;
+  /** Gyms with a live session, loaded only for free agents (no primary gym). */
+  liveGyms: GymListItem[];
 }
 
-function useDashboardData(athleteId: string | undefined) {
+function useDashboardData(
+  athleteId: string | undefined,
+  primaryGymId: string | null | undefined,
+) {
   const { data, isLoading, isStale, error, refresh } = useCachedResource<DashboardData>(
-    `dashboard:${athleteId}`,
+    `dashboard:${athleteId}:${primaryGymId ?? "free-agent"}`,
     async (_signal) => {
-      // Both reads are independent and already parallel; keep the Promise.all.
-      const [summary, activeSession] = await Promise.all([
+      // All four reads are independent; keep them in one Promise.all so the
+      // discovery surface costs latency only where it overlaps the others.
+      // Exactly one of the last two runs for real: an athlete with a primary
+      // gym gets that gym's sessions, a free agent gets the live-gym list.
+      const [summary, activeSession, gymDetail, liveGyms] = await Promise.all([
         getDashboardSummary(supabase),
         getActiveSession(supabase, athleteId!),
+        // Discovery data is additive. A failure here must degrade the surface,
+        // never blank the dashboard, so both reads swallow their rejection.
+        primaryGymId
+          ? getGymDetail(supabase, primaryGymId, athleteId!).catch((err) => {
+              console.error("[dashboard] gym detail fetch failed", err);
+              return null;
+            })
+          : Promise.resolve(null),
+        primaryGymId
+          ? Promise.resolve([] as GymListItem[])
+          : getGymsWithSessions(supabase)
+              .then((gyms) => gyms.filter((g) => g.hasActiveSession))
+              .catch((err) => {
+                console.error("[dashboard] gym list fetch failed", err);
+                return [] as GymListItem[];
+              }),
       ]);
-      return { summary, activeSession };
+      return { summary, activeSession, gymDetail, liveGyms };
     },
-    [athleteId],
+    [athleteId, primaryGymId],
   );
 
   React.useEffect(() => {
@@ -71,7 +107,10 @@ export default function DashboardScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const tokens = useThemedTokens();
-  const { data, isLoading, isStale, refresh } = useDashboardData(athlete?.id);
+  const { data, isLoading, isStale, refresh } = useDashboardData(
+    athlete?.id,
+    athlete?.primary_gym_id,
+  );
 
   const onRefresh = React.useCallback(() => {
     // SWR keeps stale data on screen while revalidating; no artificial delay.
@@ -87,7 +126,6 @@ export default function DashboardScreen() {
   }
 
   const stats = data?.summary.stats;
-  const isSessionLive = data?.activeSession?.status === "active";
 
   const recentMatches = (data?.summary.recent_matches ?? []).map((m) => ({
     id: m.match_id,
@@ -157,11 +195,26 @@ export default function DashboardScreen() {
 
             <ActiveSessionCard session={data?.activeSession ?? null} />
 
+            {/*
+              Gym and session discovery. Sits directly under the active-session
+              card so an athlete already training sees that first and everyone
+              else sees the way into a session immediately below it. This is the
+              only discovery path in the app now that the Gyms tab is gone.
+            */}
+            <SessionDiscoverySection
+              gymId={athlete.primary_gym_id ?? null}
+              gymName={data?.gymDetail?.name ?? null}
+              sessions={data?.gymDetail?.sessions ?? []}
+              rsvpSessionIds={data?.gymDetail?.rsvpSessionIds ?? []}
+              participantSessionIds={data?.gymDetail?.participantSessionIds ?? []}
+              liveGyms={data?.liveGyms ?? []}
+            />
+
             <RecentActivitySection
               myMatches={recentMatches}
               allActivity={recentActivity}
               onPressMatch={() => toast.info("Match details coming soon")}
-              onPressFindSession={() => router.push("/(app)/gyms")}
+              onPressFindSession={() => router.push("/gyms")}
             />
 
             <StatOverview
@@ -171,15 +224,6 @@ export default function DashboardScreen() {
                 draws: stats?.draws ?? 0,
               }}
             />
-
-            {!isSessionLive && (
-              <Plate variant="accent">
-                <Text className="font-body text-[14px] text-ink leading-[22px]">
-                  Your gym hasn{"’"}t designated a live session yet. Check the
-                  schedule or browse other gyms in your city.
-                </Text>
-              </Plate>
-            )}
           </>
         )}
       </ScrollView>
