@@ -9,7 +9,10 @@ import { buildShareUrl, buildShareText } from "@jits/shared/utils";
 import { EloTile, Plate } from "@/components/ui/elo-system";
 
 interface SummaryStepProps {
-  sessionId: string;
+  /** Where the primary exit cta returns to (session lobby, or elsewhere). */
+  exitHref: string;
+  /** Copy on the primary exit cta. */
+  exitLabel: string;
   matchType: "ranked" | "casual";
   matchStatus: string;
   /** "win" | "loss" | "draw"; null when no result was recorded yet. */
@@ -27,8 +30,8 @@ interface SummaryStepProps {
 /**
  * Step 8: terminal summary screen. Mirrors D9 / D10 wireframes (lines
  * 1275-1337). Hero EloTile with before -> after for the rating tick,
- * a delta plate (positive / negative / draw), and back-to-lobby /
- * done ctas.
+ * a delta plate (positive / negative / draw), and the caller-supplied
+ * exit cta plus a Done cta back to Home.
  *
  * The animated tick (480ms) is handled by EloTile when both `before`
  * and `after` are supplied. ELO RATED brand rule: the rating tick is
@@ -39,7 +42,8 @@ export function SummaryStep(props: SummaryStepProps) {
   const router = useRouter();
   const { athlete } = useAuth();
   const {
-    sessionId,
+    exitHref,
+    exitLabel,
     matchType,
     matchStatus,
     outcome,
@@ -165,11 +169,11 @@ export function SummaryStep(props: SummaryStepProps) {
         ) : null}
         <Pressable
           accessibilityRole="button"
-          onPress={() => router.replace(`/(app)/session/${sessionId}/lobby`)}
+          onPress={() => router.replace(exitHref)}
           className="bg-cta items-center justify-center py-3 rounded-sm active:bg-cta-hover"
         >
           <Text className="font-heading text-[13px] text-ink-on-cta uppercase tracking-caps">
-            Back to Lobby
+            {exitLabel}
           </Text>
         </Pressable>
         <Pressable

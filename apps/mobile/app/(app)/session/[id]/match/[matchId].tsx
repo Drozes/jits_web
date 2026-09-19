@@ -66,7 +66,8 @@ export default function SessionMatchScreen() {
       <View className="flex-1 bg-surface">
         <AppHeader title="Match" />
         <MatchFlowWizard
-          sessionId={id}
+          exitHref={`/(app)/session/${id}/lobby`}
+          exitLabel="Back to Lobby"
           matchId={matchId}
           currentAthleteId={athlete.id}
           onStepChange={setStep}

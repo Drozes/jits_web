@@ -11,7 +11,8 @@ import { ReadyPanel } from "./ready-panel";
 import { cn } from "@/lib/cn";
 
 interface ReadyStepProps {
-  sessionId: string;
+  /** Where a cancelled ready check returns to (session lobby, or elsewhere). */
+  exitHref: string;
   matchId: string;
   currentAthleteId: string;
   opponentId: string;
@@ -31,7 +32,7 @@ interface ReadyStepProps {
 export function ReadyStep(props: ReadyStepProps) {
   const tokens = useThemedTokens();
   const router = useRouter();
-  const { sessionId, matchId, currentAthleteId, opponentId, onStarted } = props;
+  const { exitHref, matchId, currentAthleteId, opponentId, onStarted } = props;
   const [myReady, setMyReady] = React.useState(false);
   const [opponentReady, setOpponentReady] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
@@ -51,15 +52,15 @@ export function ReadyStep(props: ReadyStepProps) {
       onStarted(startedAt);
     },
     onMatchCancelled: () => {
-      // The opponent cancelled. Abort our own ready step and return to the
-      // lobby. Guard so we only act once and not after we ourselves cancelled.
+      // The opponent cancelled. Abort our own ready step and head back out.
+      // Guard so we only act once and not after we ourselves cancelled.
       if (cancelledRef.current || startedRef.current) return;
       cancelledRef.current = true;
       toast.info({
         text1: "Match cancelled",
         description: "Your opponent left the ready check.",
       });
-      router.replace(`/(app)/session/${sessionId}/lobby`);
+      router.replace(exitHref);
     },
   });
 
@@ -112,10 +113,10 @@ export function ReadyStep(props: ReadyStepProps) {
       toast.error({ text1: "Could not cancel", description: result.error.message });
       return;
     }
-    // Tell the opponent's ready step to abort too, then head back to the lobby.
+    // Tell the opponent's ready step to abort too, then head back out.
     sync.broadcastMatchCancelled();
-    router.replace(`/(app)/session/${sessionId}/lobby`);
-  }, [matchId, sessionId, sync, router]);
+    router.replace(exitHref);
+  }, [matchId, exitHref, sync, router]);
 
   function handleCancelPress() {
     if (cancelling || loading || startedRef.current) return;

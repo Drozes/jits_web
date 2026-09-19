@@ -52,6 +52,7 @@ function buildVars(t: typeof lightTokens) {
     "--text-tertiary": t.textTertiary,
     "--text-on-accent": t.textOnAccent,
     "--accent-cta": t.accentCta,
+    "--accent-cta-text": t.accentCtaText,
     "--accent-cta-hover": t.accentCtaHover,
     "--state-positive": t.statePositive,
     "--state-negative": t.stateNegative,
