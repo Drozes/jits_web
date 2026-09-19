@@ -393,6 +393,30 @@ describe("no session-lobby URL can be rebuilt in the match-flow tree", () => {
   }
 
   /**
+   * Source with comments stripped, for both scans below.
+   *
+   * Neither a route literal nor a live `sessionId` reference can occur in a
+   * comment, so stripping costs no true-positive coverage, and it removes the
+   * whole class of false positives from prose that merely QUOTES a path. This
+   * repo's house docblock style names the web file a component was ported
+   * from, and those paths contain the `(app)` group: see
+   * components/session/wizard/confirm-step.tsx:42, geo-step.tsx:22,
+   * waiver-step.tsx:26 and weight-step.tsx:18. The match-flow components
+   * genuinely are native ports of web match-flow files, so someone will write
+   * exactly that docblock in a scanned file. Without stripping it would fail
+   * the route-literal scan (its `/session/` is preceded by ")", which the
+   * lookbehind does not exclude) and a comment naming `sessionId` would fail
+   * the identifier scan, in both cases a confusing red unrelated to the
+   * regression these guards exist to catch.
+   */
+  function strippedSource(file: string): string {
+    return fs
+      .readFileSync(file, "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+  }
+
+  /**
    * A session-lobby route literal, in EITHER spelling. Expo Router treats the
    * `(app)` group segment as optional, so `/session/<id>/lobby` and
    * `/(app)/session/<id>/lobby` are the same route, and the group-less form is
@@ -403,7 +427,18 @@ describe("no session-lobby URL can be rebuilt in the match-flow tree", () => {
    * Anchored at a string boundary so a docblock that merely MENTIONS a file
    * path (`components/session/wizard-progress.tsx`) is not a false positive:
    * a route literal has a quote, backtick or `)` before the slash, while a
-   * file path has a word character.
+   * file path has a word character. Comments are stripped before testing
+   * (see strippedSource), which is what actually handles prose.
+   *
+   * KNOWN RESIDUAL FALSE NEGATIVE, deliberately not chased: a URL assembled
+   * from a prefix constant that stops before the trailing slash AND uses an
+   * identifier not named `sessionId` slips past both scans, e.g.
+   *   const LOBBY_PREFIX = "/session";
+   *   return `${LOBBY_PREFIX}/${originId}/lobby`;
+   * That is evasion-shaped rather than accident-shaped. A natural
+   * re-coupling either keeps `/session/` intact or reuses the name
+   * `sessionId`, and both of those are caught. Writing the limit down is the
+   * point; widening the pattern to chase it would cost false positives.
    */
   const SESSION_ROUTE_LITERAL = /(?<![\w.])\/(?:\(app\)\/)?session\//;
 
@@ -413,7 +448,7 @@ describe("no session-lobby URL can be rebuilt in the match-flow tree", () => {
     expect(files.length).toBeGreaterThan(5);
 
     const offenders = files.filter((file) =>
-      SESSION_ROUTE_LITERAL.test(fs.readFileSync(file, "utf8")),
+      SESSION_ROUTE_LITERAL.test(strippedSource(file)),
     );
     expect(offenders).toEqual([]);
   });
@@ -424,9 +459,7 @@ describe("no session-lobby URL can be rebuilt in the match-flow tree", () => {
     const files = MATCH_FLOW_DIRS.flatMap(sourceFiles);
     expect(files.length).toBeGreaterThan(5);
 
-    const offenders = files.filter((file) =>
-      /\bsessionId\b/.test(fs.readFileSync(file, "utf8")),
-    );
+    const offenders = files.filter((file) => /\bsessionId\b/.test(strippedSource(file)));
     expect(offenders).toEqual([]);
   });
 
