@@ -103,7 +103,7 @@ export const lightTokens: ColorTokens = {
   textOnAccent: "#0D0F14",       // void on signal-red: 4.60:1 (was #E8EDF2, 3.54:1)
   accentCta: "#E63946",          // signal-red, BRAND, unchanged
   accentCtaText: "#AC2B34",      // signal-red-text: 4.62:1 on the darkest surface
-  accentCtaHover: "#C42939",     // signal-red-dark
+  accentCtaHover: "#F0556B",     // signal-red lifted: 5.67:1 under the void label (was #C42939, 3.40:1)
   statePositive: "#116A33",      // gain-green-dark: 4.64:1 on the darkest surface (was #15803D, 3.47:1)
   stateNegative: "#AC2B34",      // matches accentCtaText, text-only usage
   stateNeutral: "#575C68",       // tracks textTertiary
@@ -150,7 +150,7 @@ export const darkTokens: ColorTokens = {
   textOnAccent: "#0D0F14",       // void on signal-red: 4.60:1 (was #E8EDF2, 3.54:1)
   accentCta: "#E63946",          // signal-red, BRAND, unchanged
   accentCtaText: "#EC6A74",      // signal-red-text: 4.70:1 on the lightest surface
-  accentCtaHover: "#F0556B",     // signal-red lifted
+  accentCtaHover: "#F0556B",     // signal-red lifted: 5.67:1 under the void label (was 2.87:1 under the white one)
   statePositive: "#22C55E",      // gain-green: 6.30:1 on the lightest surface
   stateNegative: "#EC6A74",      // matches accentCtaText, text-only usage
   stateNeutral: "#8D929D",       // tracks textTertiary

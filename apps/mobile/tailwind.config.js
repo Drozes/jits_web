@@ -152,7 +152,7 @@ const lightVars = {
   "--text-on-accent": "#0D0F14",
   "--accent-cta": "#E63946",
   "--accent-cta-text": "#AC2B34",
-  "--accent-cta-hover": "#C42939",
+  "--accent-cta-hover": "#F0556B",
   "--state-positive": "#116A33",
   "--state-negative": "#AC2B34",
   "--state-neutral": "#575C68",

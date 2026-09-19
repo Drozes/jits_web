@@ -19,6 +19,7 @@
 import { darkTokens, lightTokens, type ColorTokens } from "@/lib/tokens";
 
 declare const require: (id: string) => any;
+declare const __dirname: string;
 
 // ---------------------------------------------------------------------------
 // WCAG 2.1 math
@@ -130,8 +131,30 @@ const TEXT_KEYS = [
   "stateNeutral",
 ] as const;
 
-/** Tokens drawn as non-text marks (Plate accent rails, selected borders). */
+/**
+ * Accent FILLS that carry a `textOnAccent` label. `accentCtaHover` belongs here:
+ * 30 call sites put `active:bg-cta-hover` on a `bg-cta` button whose label is
+ * `text-ink-on-cta`, so the pressed state is a real text-on-surface pair. These
+ * are deliberately NOT in SURFACE_KEYS, because the neutral ink tokens never sit
+ * on a red fill.
+ */
+const ACCENT_FILL_KEYS = ["accentCta", "accentCtaHover"] as const;
+
+/** Tokens drawn as non-text marks (Plate accent rails, selected borders, bars). */
 const NON_TEXT_KEYS = ["accentCta", "statePositive", "stateNegative"] as const;
+
+/**
+ * Non-text pairs that cannot reach 3:1 without moving a locked brand color.
+ * Recorded at their measured value so the number cannot drift further unnoticed.
+ * Keyed `theme:mark:surface`.
+ */
+const NON_TEXT_EXCEPTIONS: Record<string, number> = {
+  // Brand red on the darkest light surface. Passing would require moving
+  // #E63946, which is locked. Live at components/gym-manager/elo-sparkline.tsx:42
+  // and gym-stats-trend.tsx:44, where the highlighted `bg-cta` bar sits directly
+  // against `bg-surface-4` bars. Pre-existing and accepted, not introduced here.
+  "light:accentCta:bgElevatedHover": 2.89,
+};
 
 const THEMES: Array<[string, ColorTokens]> = [
   ["light", lightTokens],
@@ -168,10 +191,20 @@ describe.each(THEMES)("%s theme contrast", (themeName, tokens) => {
     });
   });
 
-  it("the button label on the brand-red fill meets AA", () => {
-    expect(contrast(tokens.textOnAccent, tokens.accentCta)).toBeGreaterThanOrEqual(
-      AA_NORMAL_TEXT,
-    );
+  describe("the CTA label meets AA on every accent fill", () => {
+    // Covers the resting fill AND the pressed fill. The pressed pair is the one
+    // that regressed once already: darkening the label to #0D0F14 fixed the dark
+    // press (2.87 -> 5.67) but broke the light press (4.79 -> 3.40) until
+    // accentCtaHover was lifted instead of darkened.
+    it.each([...ACCENT_FILL_KEYS])("textOnAccent on %s", (fillKey) => {
+      const ratio = contrast(tokens.textOnAccent, tokens[fillKey]);
+      const label = `textOnAccent ${tokens.textOnAccent} on ${fillKey} ${tokens[fillKey]}`;
+      expect({ label, ratio: round(ratio), meetsAA: ratio >= AA_NORMAL_TEXT }).toEqual({
+        label,
+        ratio: round(ratio),
+        meetsAA: true,
+      });
+    });
   });
 
   it("keeps the brand red exactly #E63946", () => {
@@ -186,11 +219,51 @@ describe.each(THEMES)("%s theme contrast", (themeName, tokens) => {
     }
   });
 
-  describe("non-text marks meet WCAG 1.4.11 (3:1) on the card surface", () => {
-    it.each([...NON_TEXT_KEYS])("%s on bgElevated", (key) => {
-      expect(contrast(tokens[key], tokens.bgElevated)).toBeGreaterThanOrEqual(
-        NON_TEXT,
-      );
+  it("keeps stateNeutral pinned to textTertiary", () => {
+    // They are documented as the same hex. Without this they can silently
+    // diverge: fixing textTertiary alone leaves every stateNeutral pair
+    // measuring the old, failing value while the suite stays green.
+    expect(tokens.stateNeutral).toBe(tokens.textTertiary);
+  });
+
+
+  describe("non-text marks meet WCAG 1.4.11 (3:1) on every surface", () => {
+    const markPairs: Array<
+      [(typeof NON_TEXT_KEYS)[number], (typeof SURFACE_KEYS)[number]]
+    > = NON_TEXT_KEYS.flatMap((markKey) =>
+      SURFACE_KEYS.map(
+        (surfaceKey) =>
+          [markKey, surfaceKey] as [
+            (typeof NON_TEXT_KEYS)[number],
+            (typeof SURFACE_KEYS)[number],
+          ],
+      ),
+    );
+
+    it.each(markPairs)("%s on %s", (markKey, surfaceKey) => {
+      const ratio = contrast(tokens[markKey], tokens[surfaceKey]);
+      const exceptionKey = `${themeName}:${markKey}:${surfaceKey}`;
+      const accepted = NON_TEXT_EXCEPTIONS[exceptionKey];
+
+      if (accepted === undefined) {
+        const label = `${markKey} ${tokens[markKey]} on ${surfaceKey} ${tokens[surfaceKey]}`;
+        expect({ label, ratio: round(ratio), meets: ratio >= NON_TEXT }).toEqual({
+          label,
+          ratio: round(ratio),
+          meets: true,
+        });
+        return;
+      }
+
+      // Known exception: must not get worse...
+      expect(round(ratio)).toBeGreaterThanOrEqual(accepted);
+      // ...and once it clears 3:1 the exception is stale, so say so loudly
+      // rather than letting a dead entry mask a future regression.
+      expect({
+        exceptionKey,
+        ratio: round(ratio),
+        stillNeeded: ratio < NON_TEXT,
+      }).toEqual({ exceptionKey, ratio: round(ratio), stillNeeded: true });
     });
   });
 
@@ -263,7 +336,71 @@ describe("token mirrors stay in lockstep", () => {
     expect(Object.keys(vars).sort()).toEqual(fromTokens);
   });
 
+  it("keeps the text/fill split on the brand red wired up", () => {
+    // Highest-risk mechanism in this change and the easiest to lose silently:
+    // `text-cta` resolves through theme.extend.textColor, while `bg-cta` and
+    // `border-cta` resolve through theme.extend.colors. A refactor that flattens
+    // theme.extend would revert all 18 `text-cta` call sites to the brand red
+    // (3.21:1 on a light plate) with every contrast assertion above still green,
+    // because those compare token VALUES, not the utility mapping.
+    const config = require("../../tailwind.config.js");
+    expect(config.theme.extend.textColor.cta).toBe("var(--accent-cta-text)");
+    expect(config.theme.extend.colors.cta).toBe("var(--accent-cta)");
+  });
+
   it("lightTokens and darkTokens declare the same keys", () => {
     expect(Object.keys(darkTokens).sort()).toEqual(Object.keys(lightTokens).sort());
+  });
+});
+
+describe("text-ink-on-cta is only ever used on an accent fill", () => {
+  // `textOnAccent` is now near-black in both themes, so it is valid ONLY on the
+  // red fill. In dark it measures 1.00:1 against bgPrimary, meaning a component
+  // that reuses `text-ink-on-cta` off a CTA renders literally invisible text
+  // rather than merely low-contrast text. Before the label was darkened that
+  // mistake was survivable; now it is not, so it gets a guard.
+  //
+  // This is a co-location check at file granularity: any file that uses the
+  // label class must also paint a `bg-cta` fill. It cannot prove the two are on
+  // the same element, but it does catch the class escaping into a component
+  // that has no CTA at all, which is the failure mode that matters.
+  const fs = require("fs");
+  const path = require("path");
+  const MOBILE_ROOT = path.resolve(__dirname, "..", "..");
+  const SCAN_DIRS = ["app", "components"];
+  const LABEL_CLASS = "text-ink-on-cta";
+  const FILL_CLASS = "bg-cta";
+
+  function walk(dir: string, out: string[] = []): string[] {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name === "node_modules") continue;
+        walk(full, out);
+      } else if (/\.tsx?$/.test(entry.name)) {
+        out.push(full);
+      }
+    }
+    return out;
+  }
+
+  it("every file using the label class also paints a CTA fill", () => {
+    const files = SCAN_DIRS.flatMap((dir) => walk(path.join(MOBILE_ROOT, dir)));
+    const offenders = files
+      .filter((file: string) => {
+        const source: string = fs.readFileSync(file, "utf8");
+        return source.includes(LABEL_CLASS) && !source.includes(FILL_CLASS);
+      })
+      .map((file: string) => path.relative(MOBILE_ROOT, file));
+
+    expect(offenders).toEqual([]);
+  });
+
+  it("actually finds the label class, so the scan cannot pass vacuously", () => {
+    const files = SCAN_DIRS.flatMap((dir) => walk(path.join(MOBILE_ROOT, dir)));
+    const users = files.filter((file: string) =>
+      fs.readFileSync(file, "utf8").includes(LABEL_CLASS),
+    );
+    expect(users.length).toBeGreaterThan(0);
   });
 });
