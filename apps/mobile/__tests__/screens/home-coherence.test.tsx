@@ -59,7 +59,15 @@ const tomorrowsOpenMat: SessionListItem = {
 };
 
 /** The two components in the order and adjacency Home renders them. */
-function HomeBlock({ sessions }: { sessions: SessionListItem[] }) {
+function HomeBlock({
+  sessions,
+  rsvpSessionIds = [],
+  participantSessionIds = [],
+}: {
+  sessions: SessionListItem[];
+  rsvpSessionIds?: string[];
+  participantSessionIds?: string[];
+}) {
   return (
     <View>
       <ActiveSessionCard session={null} />
@@ -67,8 +75,8 @@ function HomeBlock({ sessions }: { sessions: SessionListItem[] }) {
         gymId="g1"
         gymName="Test Gym"
         sessions={sessions}
-        rsvpSessionIds={[]}
-        participantSessionIds={[]}
+        rsvpSessionIds={rsvpSessionIds}
+        participantSessionIds={participantSessionIds}
         liveGyms={[]}
       />
     </View>
@@ -97,8 +105,38 @@ describe("Home active-session card and discovery together", () => {
   it("states only what is true of the athlete, not of the gym", () => {
     const { getByText } = render(<HomeBlock sessions={[tomorrowsOpenMat]} />);
 
-    expect(getByText("Not checked in")).toBeTruthy();
-    expect(getByText(/not checked in to a session yet/)).toBeTruthy();
+    expect(getByText("No live session")).toBeTruthy();
+    expect(getByText(/not in a live session right now/)).toBeTruthy();
+  });
+
+  /**
+   * The state THIS FEATURE creates, in one tap from the surface it adds.
+   *
+   * Attend on the discovery section opens /session/[id]/join for a SCHEDULED
+   * session (gym-detail-parts.tsx), confirm-step calls joinSessionLobby with no
+   * branch on status, and joinSessionLobby upserts a participant row with
+   * status 'checked_in' and writes NO rsvp row (mutations.ts:234-261). The
+   * session is still 'scheduled', so getActiveSession's priority 1 (active +
+   * participant) misses and priority 2 (RSVP + future start) misses, and it
+   * returns null. The card must not tell someone who checked in a moment ago,
+   * from this very screen, that they are not checked in.
+   */
+  it("does not deny a check-in to a session that is still scheduled", () => {
+    const { getByText, queryByText } = render(
+      <HomeBlock
+        sessions={[tomorrowsOpenMat]}
+        participantSessionIds={[tomorrowsOpenMat.id]}
+      />,
+    );
+
+    // The section below already knows they are going.
+    expect(getByText("✓ Going")).toBeTruthy();
+
+    // So the card above may not contradict it. It may say only that no session
+    // is LIVE, which is still true here.
+    expect(queryByText(/checked in/i)).toBeNull();
+    expect(getByText("No live session")).toBeTruthy();
+    expect(getByText(/not in a live session right now/)).toBeTruthy();
   });
 
   it("does not deny an RSVP once the session has gone active", () => {
@@ -112,9 +150,12 @@ describe("Home active-session card and discovery together", () => {
       />,
     );
 
-    expect(getByText("Not checked in")).toBeTruthy();
     expect(queryByText(/RSVP/)).toBeNull();
-    // And the live session they RSVP'd to is right there to join.
+    // The card speaks about the athlete, not about the gym: they are not IN a
+    // live session. The live session they RSVP'd to is right there to join, and
+    // the body sentence points at it rather than away.
+    expect(getByText("No live session")).toBeTruthy();
+    expect(getByText(/Pick one from Find a\s+Session below/)).toBeTruthy();
     expect(getByText("Session Live")).toBeTruthy();
   });
 
@@ -132,7 +173,7 @@ describe("Home active-session card and discovery together", () => {
       <HomeBlock sessions={[]} />,
     );
 
-    expect(getByText("Not checked in")).toBeTruthy();
+    expect(getByText("No live session")).toBeTruthy();
     expect(getByText("No Sessions Scheduled")).toBeTruthy();
     expect(queryByText("No upcoming session")).toBeNull();
     expect(getAllByText(/^Browse/i)).toHaveLength(1);

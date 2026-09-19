@@ -25,26 +25,40 @@ export function ActiveSessionCard({ session }: ActiveSessionCardProps) {
   const router = useRouter();
 
   if (!session) {
-    // Says only that the athlete is not checked in, the one thing a null here
-    // reliably means. It must NOT also claim they have not RSVP'd:
-    // getActiveSession's RSVP branch matches only sessions still `scheduled`
-    // with a start in the future, so an athlete who RSVP'd to tonight's open
-    // mat and opens the app after it goes active (or after its start time
-    // passes) lands in this branch having very much RSVP'd. Nor may it say
-    // there is nothing on: the gym's sessions are listed by the discovery
-    // section directly below, which also owns the browse action. A second one
-    // here read as a contradiction when that list showed the very session this
-    // card called missing.
+    // A null here reliably means ONE thing: the athlete is not in a live
+    // session. Every string in this branch says that and nothing more, because
+    // the two richer-sounding claims are both reachable-false:
+    //
+    //   "you haven't RSVP'd" -- getActiveSession's RSVP branch matches only
+    //   sessions still `scheduled` with a future start, so an athlete who
+    //   RSVP'd to tonight's open mat and opens the app after it goes active
+    //   lands here having very much RSVP'd.
+    //
+    //   "you're not checked in" -- joinSessionLobby checks a participant in
+    //   unconditionally and writes no RSVP row (mutations.ts:234-261), and the
+    //   discovery section's Attend row opens that wizard for SCHEDULED sessions
+    //   too, so one tap on Home checks an athlete into a session that is still
+    //   scheduled. Priority 1 finds no active session, priority 2 finds no
+    //   RSVP, this branch renders, and they checked in a moment ago from this
+    //   very screen. (The fix belongs in packages/shared; see jits-icei.5.)
+    //
+    // Nor may it say there is nothing on: the gym's sessions are listed
+    // directly below, which also owns the browse action. A second one here read
+    // as a contradiction when that list showed the session this card missed.
     return (
       <Plate>
         <View className="flex-row items-center justify-between mb-2">
           <Text className="font-heading text-[18px] text-ink flex-1" numberOfLines={1}>
-            Not checked in
+            No live session
           </Text>
-          <MetaTag>Not in a session</MetaTag>
+          {/* Kept short on purpose: this sits in a justify-between row against
+              a flex-1 numberOfLines={1} heading, and at 320pt a 16-character
+              tag leaves the heading about 113pt for about 106pt of text, i.e.
+              truncation on the next copy change or at a larger text size. */}
+          <MetaTag>Not live</MetaTag>
         </View>
         <Text className="font-body text-[13px] text-ink-2">
-          You{"’"}re not checked in to a session yet. Pick one from Find a
+          You{"’"}re not in a live session right now. Pick one from Find a
           Session below.
         </Text>
       </Plate>
