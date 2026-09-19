@@ -473,3 +473,102 @@ describe("an upload that finishes LATE still reaches the summary", () => {
     screen.getByTestId("upload-status-banner");
   });
 });
+
+/**
+ * RECORDER-ONLY failures have to survive the same refresh, and ONLY the
+ * wizard's `revalidating` predicate keeps them alive.
+ *
+ * The suites above pass with that predicate deleted, because the upload
+ * outcome lives in the match-keyed store and nothing in the component tree
+ * can reach it. That is a trap: it means the whole suite stays green while
+ * a real class of failure goes silent, so a future reader can remove the
+ * predicate as dead weight and reopen it without a single red test.
+ *
+ * The class is every failure that never reaches the store, because no
+ * upload was ever attempted:
+ *
+ *   "Camera not ready"            start() with no camera
+ *   "Camera permission required"  denied on the live step
+ *   "Recording failed: ..."       recordAsync rejected
+ *   "Stop failed: ..."            stopRecording threw
+ *   "The recording did not finish" the stop watchdog (jits-2zpe F3)
+ *   "Recording ... no clip was saved" a cap fire that produced no file
+ *
+ * Each of those sets recorder state only. A remount replaces the recorder
+ * with a fresh idle one, `deriveUploadBannerState` finds no store entry and
+ * an idle recorder, and renders nothing at all, on the summary step, which
+ * is the one place jits-od3 requires it to be visible.
+ *
+ * DELETING `revalidating` FROM match-flow-wizard.tsx MUST TURN THIS SUITE
+ * RED. Verified by doing exactly that.
+ */
+describe("a recorder-only failure survives the confirm-to-summary refresh", () => {
+  it("keeps a recording failure on screen, with no upload ever attempted", async () => {
+    // recordAsync rejects with something that is NOT the retryable
+    // "not ready", so the recorder goes straight to its error state.
+    mockCamera.recordAsync.mockImplementation(() =>
+      Promise.reject(new Error("Session configuration failed")),
+    );
+
+    const screen = renderWizard();
+    await waitFor(() => expect(screen.getByText(/recording failed/i)).toBeTruthy());
+
+    await advanceToConfirm(screen);
+    await completeMatch();
+    await waitFor(() => expect(screen.getByText("Back to Arena")).toBeTruthy());
+
+    // On the summary, after the refresh. Nothing in the store could carry
+    // this: the upload never ran.
+    screen.getByTestId("upload-status-banner");
+    screen.getByText(/recording failed/i);
+    screen.getByText(/session configuration failed/i);
+    expect(mockUpsertMatchVideo).not.toHaveBeenCalled();
+  });
+
+  it("keeps a cap fire that produced no clip on screen", async () => {
+    // The OS ends the recording on its own and hands back no file. The
+    // truncation IS written to the store, but only as a "pending" entry
+    // with no status to render, so the message itself is recorder-only.
+    mockCamera.recordAsync.mockImplementation(
+      () =>
+        new Promise<{ uri: string } | undefined>((res) => {
+          resolveRecord = res;
+        }),
+    );
+
+    const screen = renderWizard();
+    await waitFor(() => expect(mockCamera.recordAsync).toHaveBeenCalledTimes(1));
+
+    await act(async () => {
+      resolveRecord?.(undefined);
+    });
+    await waitFor(() => expect(screen.getByText(/no clip was saved/i)).toBeTruthy());
+
+    await advanceToConfirm(screen);
+    await completeMatch();
+    await waitFor(() => expect(screen.getByText("Back to Arena")).toBeTruthy());
+
+    screen.getByTestId("upload-status-banner");
+    screen.getByText(/no clip was saved/i);
+    expect(mockUpsertMatchVideo).not.toHaveBeenCalled();
+  });
+
+  it("keeps a failed stop on screen", async () => {
+    // stopRecording throws, so the recorder reports "Stop failed" and
+    // recordAsync never settles: no clip, no upload, nothing in the store.
+    mockCamera.stopRecording.mockImplementation(() => {
+      throw new Error("capture session already torn down");
+    });
+
+    const screen = renderWizard();
+    await advanceToConfirm(screen);
+    await waitFor(() => expect(screen.getByText(/stop failed/i)).toBeTruthy());
+
+    await completeMatch();
+    await waitFor(() => expect(screen.getByText("Back to Arena")).toBeTruthy());
+
+    screen.getByTestId("upload-status-banner");
+    screen.getByText(/stop failed/i);
+    expect(mockUpsertMatchVideo).not.toHaveBeenCalled();
+  });
+});

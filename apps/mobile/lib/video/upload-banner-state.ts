@@ -33,6 +33,16 @@ export function deriveUploadBannerState(
 ): UploadBannerState {
   // 1. Transient, and only the live recorder can know it. A remounted
   //    recorder is idle, so a stale "stopping" cannot outlive its owner.
+  //
+  //    ASSUMPTION, currently true but undefended: putting this first means
+  //    a recorder in "stopping" HIDES a store entry, including an error.
+  //    That is safe only because the two cannot coexist. `stoppingRef` is
+  //    cleared before handleUpload runs, so by the time any upload outcome
+  //    exists the recorder has already left "stopping". If a future change
+  //    lets an upload start while the recorder is still stopping (a second
+  //    clip, say, or a retry issued mid-stop), this ordering would swallow
+  //    that upload's failure behind a spinner. Reorder to check
+  //    `upload?.status === "error"` first if that ever becomes possible.
   if (recorderState === "stopping") {
     return { kind: "stopping", message: null, truncation: null };
   }
