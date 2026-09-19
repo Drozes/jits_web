@@ -25,23 +25,27 @@ export function ActiveSessionCard({ session }: ActiveSessionCardProps) {
   const router = useRouter();
 
   if (!session) {
-    // getActiveSession returns null unless the athlete is checked in to a live
-    // session or holds an RSVP to a future one, so this branch says only that,
-    // and never that there is nothing on. The gym's own sessions are listed by
-    // the discovery section directly below, which is also where the browse
-    // action lives: a second one here read as a contradiction when that list
-    // showed the very session this card called missing.
+    // Says only that the athlete is not checked in, the one thing a null here
+    // reliably means. It must NOT also claim they have not RSVP'd:
+    // getActiveSession's RSVP branch matches only sessions still `scheduled`
+    // with a start in the future, so an athlete who RSVP'd to tonight's open
+    // mat and opens the app after it goes active (or after its start time
+    // passes) lands in this branch having very much RSVP'd. Nor may it say
+    // there is nothing on: the gym's sessions are listed by the discovery
+    // section directly below, which also owns the browse action. A second one
+    // here read as a contradiction when that list showed the very session this
+    // card called missing.
     return (
       <Plate>
         <View className="flex-row items-center justify-between mb-2">
           <Text className="font-heading text-[18px] text-ink flex-1" numberOfLines={1}>
             Not checked in
           </Text>
-          <MetaTag>No RSVP</MetaTag>
+          <MetaTag>Not in a session</MetaTag>
         </View>
         <Text className="font-body text-[13px] text-ink-2">
-          You haven{"’"}t RSVP{"’"}d to or checked in to a session yet. Pick one
-          from Find a Session below.
+          You{"’"}re not checked in to a session yet. Pick one from Find a
+          Session below.
         </Text>
       </Plate>
     );

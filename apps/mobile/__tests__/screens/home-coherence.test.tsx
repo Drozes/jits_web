@@ -98,7 +98,24 @@ describe("Home active-session card and discovery together", () => {
     const { getByText } = render(<HomeBlock sessions={[tomorrowsOpenMat]} />);
 
     expect(getByText("Not checked in")).toBeTruthy();
-    expect(getByText(/haven.t RSVP.d to or checked in/)).toBeTruthy();
+    expect(getByText(/not checked in to a session yet/)).toBeTruthy();
+  });
+
+  it("does not deny an RSVP once the session has gone active", () => {
+    // getActiveSession's RSVP branch matches only sessions still `scheduled`
+    // with a start in the future, so an athlete who RSVP'd to tonight's open
+    // mat and opens the app after it goes live gets a null card while very much
+    // holding an RSVP. Common state, and the card used to call them a no-show.
+    const { getByText, queryByText } = render(
+      <HomeBlock
+        sessions={[{ ...tomorrowsOpenMat, id: "live1", status: "active" }]}
+      />,
+    );
+
+    expect(getByText("Not checked in")).toBeTruthy();
+    expect(queryByText(/RSVP/)).toBeNull();
+    // And the live session they RSVP'd to is right there to join.
+    expect(getByText("Session Live")).toBeTruthy();
   });
 
   it("offers exactly one browse action across the pair", () => {

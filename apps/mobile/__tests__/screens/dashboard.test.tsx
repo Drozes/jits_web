@@ -298,32 +298,35 @@ describe("DashboardScreen", () => {
     expect(queries.getGymDetail).not.toHaveBeenCalled();
   });
 
-  // A swallowed rejection resolves, so the cache writes it through as a SUCCESS.
-  // The failure therefore has to travel in the data itself, or the surface reads
-  // it as "your gym has nothing on" and says so, for as long as that entry lives.
-  it("tells discovery the read failed instead of passing off empty as real", async () => {
+  /**
+   * THE PRODUCTION FAILURE SHAPE IS A RESOLVED NULL, NOT A REJECTION.
+   *
+   * getGymDetail never rejects on a failed request: postgrest-js defaults
+   * shouldThrowOnError to false and converts even a hard fetch error into a
+   * resolved { data: null, error } (PostgrestBuilder.ts:82, :372), and
+   * getGymDetail discards that error and returns null (queries.ts:547-553). A
+   * dropped connection, an RLS denial, an expired JWT and a PostgREST 5xx all
+   * arrive as a plain null. Mocking a rejection here would certify a path that
+   * cannot occur in production, so these drive the real one: mockResolvedValue.
+   */
+  it("treats an unreadable primary gym as failed, not as an empty gym", async () => {
     const queries = require("@jits/shared/api/queries") as QueryMocks;
-    // The screen logs the swallowed rejection on purpose; keep it out of the
-    // test output rather than leaving a red herring in the run.
-    const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
-    mockAthlete.primary_gym_id = "g-broken";
-    queries.getGymDetail.mockRejectedValue(new Error("boom"));
+    mockAthlete.primary_gym_id = "g-unreadable";
+    queries.getGymDetail.mockResolvedValue(null);
 
     const { getByText } = render(React.createElement(DashboardScreen));
     await waitFor(() => {
-      // The dashboard still paints in full, and discovery is told it is blind.
+      // The dashboard still paints in full, and discovery is told it is blind
+      // rather than being handed an empty list it would report as fact.
       expect(getByText("5W")).toBeTruthy();
     });
     expect(
-      getByText("discovery:g-broken:-:0:0:failed:retryable"),
+      getByText("discovery:g-unreadable:-:0:0:failed:retryable"),
     ).toBeTruthy();
-    expect(errorSpy).toHaveBeenCalled();
-    errorSpy.mockRestore();
   });
 
-  it("falls back to the last good gym payload when a refresh fails", async () => {
+  it("falls back to the last good gym payload when a refresh comes back empty", async () => {
     const queries = require("@jits/shared/api/queries") as QueryMocks;
-    const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
     mockAthlete.primary_gym_id = "g1";
     queries.getGymDetail.mockResolvedValue(mockGymDetail);
 
@@ -334,10 +337,10 @@ describe("DashboardScreen", () => {
       expect(getByText("discovery:g1:Test Gym:1:0:ok:retryable")).toBeTruthy();
     });
 
-    // Same athlete, same gym, and the next read drops. The session that loaded
-    // a moment ago is still the best answer available, so it must survive the
-    // failure rather than be replaced by a null that reads as "gym is empty".
-    queries.getGymDetail.mockRejectedValue(new Error("offline"));
+    // Same athlete, same gym, and the next read comes back unreadable. The
+    // session that loaded a moment ago is still the best answer available, so
+    // it must survive rather than be replaced by a null that reads as empty.
+    queries.getGymDetail.mockResolvedValue(null);
     await act(async () => {
       UNSAFE_getByType(RefreshControl).props.onRefresh();
     });
@@ -347,6 +350,28 @@ describe("DashboardScreen", () => {
         getByText("discovery:g1:Test Gym:1:0:failed:retryable"),
       ).toBeTruthy();
     });
+  });
+
+  // The belt-and-braces path: a genuine throw from inside the query function
+  // (a JS error, not a failed request) is still possible and gets the same
+  // treatment. This is a supplement to the resolved-null tests above, never a
+  // substitute for them.
+  it("also handles a thrown error from the gym read", async () => {
+    const queries = require("@jits/shared/api/queries") as QueryMocks;
+    // The screen logs the swallowed throw on purpose; keep it out of the test
+    // output rather than leaving a red herring in the run.
+    const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+    mockAthlete.primary_gym_id = "g-broken";
+    queries.getGymDetail.mockRejectedValue(new Error("boom"));
+
+    const { getByText } = render(React.createElement(DashboardScreen));
+    await waitFor(() => {
+      expect(getByText("5W")).toBeTruthy();
+    });
+    expect(
+      getByText("discovery:g-broken:-:0:0:failed:retryable"),
+    ).toBeTruthy();
+    expect(errorSpy).toHaveBeenCalled();
     errorSpy.mockRestore();
   });
 
