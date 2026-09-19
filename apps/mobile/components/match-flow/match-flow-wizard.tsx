@@ -23,7 +23,13 @@ interface MatchFlowWizardProps {
    * match passes whatever surface it was started from.
    */
   exitHref: string;
-  /** Copy on the exit cta. Defaults to the session lobby wording. */
+  /**
+   * Copy on the exit cta. Omitted, blank or whitespace-only falls back to
+   * the session lobby wording: a default parameter only covers `undefined`,
+   * and an empty label would render a tappable but visually blank cta that
+   * is also unlabeled to VoiceOver / TalkBack. Callers that derive the label
+   * from data (an opponent name, a gym name) can pass whatever they have.
+   */
   exitLabel?: string;
   matchId: string;
   currentAthleteId: string;
@@ -70,11 +76,15 @@ function computeOwnOutcome(
  */
 export function MatchFlowWizard({
   exitHref,
-  exitLabel = "Back to Lobby",
+  exitLabel: rawExitLabel,
   matchId,
   currentAthleteId,
   onStepChange,
 }: MatchFlowWizardProps) {
+  // Single resolution point for the label: every downstream consumer takes a
+  // required non-empty string, so blank and whitespace-only are normalised
+  // here rather than defended against three times further down.
+  const exitLabel = rawExitLabel?.trim() || "Back to Lobby";
   const insets = useSafeAreaInsets();
   const { match, submissionTypes, isLoading, error, refresh } = useMatchDetails(matchId);
   const [step, setStep] = React.useState<MatchStep | null>(null);

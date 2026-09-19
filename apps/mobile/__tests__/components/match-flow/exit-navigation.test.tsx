@@ -261,6 +261,63 @@ describe("MatchFlowWizard exit navigation", () => {
     fireEvent.press(getByText(SESSION_LABEL));
     expect(mockRouterReplace).toHaveBeenCalledWith(SESSION_EXIT);
   });
+
+  // A default parameter only fires on `undefined`, so a blank label used to
+  // reach the cta and render a full-width tappable Pressable with empty Text:
+  // invisible on screen and unlabeled to VoiceOver / TalkBack. Callers that
+  // compute the label from data can produce exactly that.
+  it.each([
+    ["empty string", ""],
+    ["whitespace only", "   "],
+    ["tab and newline", "\t\n"],
+  ])("falls back to the default label when exitLabel is %s", (_name, label) => {
+    mockUseMatchDetails.mockReturnValue(notAParticipantResult());
+
+    const { getByText } = render(
+      <MatchFlowWizard
+        exitHref={ARENA_EXIT}
+        exitLabel={label}
+        matchId="M1"
+        currentAthleteId="me-1"
+      />,
+    );
+
+    // The cta is visible and reachable by its text, and still exits correctly.
+    fireEvent.press(getByText(SESSION_LABEL));
+    expect(mockRouterReplace).toHaveBeenCalledWith(ARENA_EXIT);
+  });
+
+  it("falls back to the default label on the summary step too", () => {
+    mockUseMatchDetails.mockReturnValue(completedMatchResult());
+
+    const { getByText } = render(
+      <MatchFlowWizard
+        exitHref={ARENA_EXIT}
+        exitLabel="   "
+        matchId="M1"
+        currentAthleteId="me-1"
+      />,
+    );
+
+    fireEvent.press(getByText(SESSION_LABEL));
+    expect(mockRouterReplace).toHaveBeenCalledWith(ARENA_EXIT);
+  });
+
+  it("keeps a caller label that merely has surrounding whitespace", () => {
+    mockUseMatchDetails.mockReturnValue(completedMatchResult());
+
+    const { getByText } = render(
+      <MatchFlowWizard
+        exitHref={ARENA_EXIT}
+        exitLabel="  Back to Arena  "
+        matchId="M1"
+        currentAthleteId="me-1"
+      />,
+    );
+
+    fireEvent.press(getByText(ARENA_LABEL));
+    expect(mockRouterReplace).toHaveBeenCalledWith(ARENA_EXIT);
+  });
 });
 
 describe("ReadyStep exit navigation", () => {
@@ -335,13 +392,40 @@ describe("no session-lobby URL can be rebuilt in the match-flow tree", () => {
     });
   }
 
-  it("has no hardcoded /(app)/session/... route left anywhere in it", () => {
+  /**
+   * A session-lobby route literal, in EITHER spelling. Expo Router treats the
+   * `(app)` group segment as optional, so `/session/<id>/lobby` and
+   * `/(app)/session/<id>/lobby` are the same route, and the group-less form is
+   * the dominant house style elsewhere in this app (session lobby, join,
+   * gym detail, deep-link handler). Matching only the group-prefixed spelling
+   * would let the regression back in wearing the other hat.
+   *
+   * Anchored at a string boundary so a docblock that merely MENTIONS a file
+   * path (`components/session/wizard-progress.tsx`) is not a false positive:
+   * a route literal has a quote, backtick or `)` before the slash, while a
+   * file path has a word character.
+   */
+  const SESSION_ROUTE_LITERAL = /(?<![\w.])\/(?:\(app\)\/)?session\//;
+
+  it("has no session-lobby route literal left in it, in either spelling", () => {
     const files = MATCH_FLOW_DIRS.flatMap(sourceFiles);
     // Guard the guard: if the tree moves, this must fail loudly, not pass empty.
     expect(files.length).toBeGreaterThan(5);
 
     const offenders = files.filter((file) =>
-      fs.readFileSync(file, "utf8").includes("/(app)/session/"),
+      SESSION_ROUTE_LITERAL.test(fs.readFileSync(file, "utf8")),
+    );
+    expect(offenders).toEqual([]);
+  });
+
+  it("has no `sessionId` identifier left in it", () => {
+    // Catches a re-coupling that builds the URL some other way (concatenation,
+    // a helper, a constant) and so slips past the route-literal scan.
+    const files = MATCH_FLOW_DIRS.flatMap(sourceFiles);
+    expect(files.length).toBeGreaterThan(5);
+
+    const offenders = files.filter((file) =>
+      /\bsessionId\b/.test(fs.readFileSync(file, "utf8")),
     );
     expect(offenders).toEqual([]);
   });
@@ -363,7 +447,7 @@ describe("no session-lobby URL can be rebuilt in the match-flow tree", () => {
     expect(mockRouterReplace.mock.calls.length).toBeGreaterThan(0);
     for (const [href] of mockRouterReplace.mock.calls) {
       expect(String(href)).not.toContain("undefined");
-      expect(String(href)).not.toContain("/(app)/session/");
+      expect(String(href)).not.toMatch(SESSION_ROUTE_LITERAL);
     }
   });
 });
