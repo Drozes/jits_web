@@ -8,9 +8,10 @@ import { supabase } from "@/lib/supabase/client";
 import {
   getActiveSession,
   getDashboardSummary,
-  getGymDetail,
-  getGymsWithSessions,
+  getGymDetailResult,
+  getGymsWithSessionsResult,
 } from "@jits/shared/api/queries";
+import type { Result } from "@jits/shared/api/errors";
 import type { DashboardSummary } from "@jits/shared/types/composites";
 import type {
   ActiveSessionInfo,
@@ -64,26 +65,32 @@ function useDashboardData(
   /**
    * Turns a gym read into data plus an honest verdict on whether it worked.
    *
-   * The failure signal has to be derived from the DATA, because getGymDetail
-   * does not reject on a failed request and a `.catch` here would never run:
-   * postgrest-js sets `shouldThrowOnError = false` and its outer handler
-   * converts even a hard fetch error into a RESOLVED `{ data: null, error }`
-   * (PostgrestBuilder.ts:82 and :372), and getGymDetail then discards that
-   * error and returns null (queries.ts:547-553). A dropped connection, an RLS
-   * denial, an expired JWT and a PostgREST 5xx all arrive here as a plain null.
+   * The verdict now comes from the query itself: getGymDetailResult returns
+   * Result<GymDetail>, so `ok: false` means the read failed and `ok: true`
+   * means the payload can be spoken for (jits-icei.5).
    *
-   * A null for the athlete's OWN primary gym is never a normal state: it means
-   * their gym row could not be read, not that the gym has no sessions. Treating
-   * it as "nothing scheduled" is exactly the bug this guards, so it counts as a
-   * failure and the surface says so instead of speaking for the gym.
+   * It is still derived from the RESOLVED value and never from a rejection,
+   * because supabase-js does not reject: postgrest-js sets
+   * `shouldThrowOnError = false` and its outer handler converts even a hard
+   * fetch error into a resolved `{ data: null, error }` (PostgrestBuilder.ts:82
+   * and :372). A `.catch` can only ever catch a JS throw, never a failed
+   * request.
+   *
+   * WHAT THIS REPLACES: the previous version inferred failure from a null
+   * detail, which covered only a failure of getGymDetail's FIRST read, the gym
+   * row. When the gym row loaded and the sessions read then failed, that error
+   * was discarded too, the detail came back truthy with `sessions: []`, and
+   * Home told the athlete "Nothing scheduled at <gym> right now" on a dropped
+   * request. The query reports that case as a failure now, which is the hole
+   * this closes.
    */
   const settleGymDetail = (
     gymId: string,
-    detail: GymDetail | null,
+    result: Result<GymDetail>,
   ): { detail: GymDetail | null; failed: boolean } => {
-    if (detail) {
-      lastGymDetail.current = { gymId, detail };
-      return { detail, failed: false };
+    if (result.ok) {
+      lastGymDetail.current = { gymId, detail: result.data };
+      return { detail: result.data, failed: false };
     }
     const cached = lastGymDetail.current;
     return {
@@ -105,29 +112,38 @@ function useDashboardData(
         // blank the dashboard. Both reads report their outcome instead of
         // letting an empty result pass for a real one.
         primaryGymId
-          ? getGymDetail(supabase, primaryGymId, athleteId!)
-              .then((detail) => settleGymDetail(primaryGymId, detail))
+          ? getGymDetailResult(supabase, primaryGymId, athleteId!)
+              .then((result) => settleGymDetail(primaryGymId, result))
               // Belt and braces. This path means a JS error thrown inside the
-              // query function, NOT a failed request: those resolve (see
-              // settleGymDetail), which is why the verdict is derived there and
-              // not here. Same treatment either way.
+              // query function, NOT a failed request: those resolve as
+              // `{ ok: false }` (see settleGymDetail), which is why the verdict
+              // is derived there and not here. Same treatment either way.
               .catch((err) => {
                 console.error("[dashboard] gym detail fetch threw", err);
-                return settleGymDetail(primaryGymId, null);
+                return settleGymDetail(primaryGymId, {
+                  ok: false,
+                  error: { code: "UNKNOWN", message: "Gym read threw." },
+                });
               })
           : Promise.resolve({ detail: null, failed: false }),
         primaryGymId
           ? Promise.resolve({ list: [] as GymListItem[], failed: false })
-          : getGymsWithSessions(supabase)
-              .then((all) => ({
-                // An empty list is NOT treated as a failure here, unlike the
-                // gym read above: "no gym is live right now" is a legitimate
-                // answer, and the free-agent branch makes no claim about any
-                // particular gym (it shows the no-home-gym plate and the browse
-                // action either way), so there is no false statement to make.
-                list: all.filter((g) => g.hasActiveSession),
-                failed: false,
-              }))
+          : getGymsWithSessionsResult(supabase)
+              .then((result) =>
+                result.ok
+                  ? {
+                      // An empty list is NOT a failure, unlike the gym read
+                      // above: "no gym is live right now" is a legitimate
+                      // answer, and the free-agent branch makes no claim about
+                      // any particular gym (it shows the no-home-gym plate and
+                      // the browse action either way), so there is no false
+                      // statement to make. A failed read is a different thing
+                      // and now says so.
+                      list: result.data.filter((g) => g.hasActiveSession),
+                      failed: false,
+                    }
+                  : { list: [] as GymListItem[], failed: true },
+              )
               .catch((err) => {
                 console.error("[dashboard] gym list fetch threw", err);
                 return { list: [] as GymListItem[], failed: true };

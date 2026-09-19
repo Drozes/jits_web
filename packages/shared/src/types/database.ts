@@ -1969,6 +1969,13 @@ export type Database = {
           momentum: number
         }[]
       }
+      get_gym_member_counts: {
+        Args: never
+        Returns: {
+          gym_id: string
+          member_count: number
+        }[]
+      }
       get_gym_roster: {
         Args: { p_gym_id: string }
         Returns: {
