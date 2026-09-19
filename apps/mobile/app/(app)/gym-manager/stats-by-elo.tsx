@@ -4,7 +4,10 @@ import { useLocalSearchParams } from "expo-router";
 import { AppHeader } from "@/components/layout/app-header";
 import { useRequireAthlete } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
-import { useManagedGyms } from "@/lib/gym-manager/use-managed-gyms";
+import {
+  managerHref,
+  useGymManagerGymId,
+} from "@/lib/gym-manager/use-gym-manager-gym-id";
 import { useGymBracketStats } from "@/lib/gym-manager/use-gym-bracket-stats";
 import { BracketCard } from "@/components/gym-manager/bracket-card";
 import { RangeChips } from "@/components/gym-manager/stats-parts";
@@ -20,14 +23,14 @@ function parseRange(value: string | undefined): GymStatsRange {
  * (1900+ / 1700-1900 / 1500-1700 / 1300-1500) of counts, rates, momentum,
  * finish times, and top winning/losing submissions over a 30d/90d/all window.
  * Seeds the range from the H8 nav param, then owns its own chip toggle.
- * Resolves the managed gym via useManagedGyms; loads via useGymBracketStats.
+ * Resolves the gym from the gymId route param via useGymManagerGymId; loads
+ * via useGymBracketStats.
  */
 export default function GymManagerStatsByEloScreen() {
   const { range: rangeParam } = useLocalSearchParams<{ range?: string }>();
   const tokens = useThemedTokens();
   const { isLoading: authLoading } = useRequireAthlete();
-  const { gyms, isReady: managedReady } = useManagedGyms();
-  const gymId = gyms[0]?.gymId;
+  const { gymId, isReady: managedReady } = useGymManagerGymId();
   const [range, setRange] = React.useState<GymStatsRange>(
     parseRange(rangeParam),
   );
@@ -52,7 +55,7 @@ export default function GymManagerStatsByEloScreen() {
   if (authLoading || !managedReady || (gymId && isLoading && brackets.length === 0)) {
     return (
       <View className="flex-1 bg-surface">
-        <AppHeader title="Stats · By ELO Range" back backFallback="/gym-manager/stats" />
+        <AppHeader title="Stats · By ELO Range" back backFallback={managerHref("/gym-manager/stats", gymId)} />
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator color={tokens.accentCta} />
         </View>
@@ -63,7 +66,7 @@ export default function GymManagerStatsByEloScreen() {
   if (!gymId || !isManager) {
     return (
       <View className="flex-1 bg-surface">
-        <AppHeader title="Stats · By ELO Range" back backFallback="/gym-manager/stats" />
+        <AppHeader title="Stats · By ELO Range" back backFallback={managerHref("/gym-manager/stats", gymId)} />
         <View className="flex-1 items-center justify-center px-8">
           <Text className="font-heading text-[14px] text-ink uppercase tracking-caps-l text-center">
             No Managed Gym
@@ -75,7 +78,7 @@ export default function GymManagerStatsByEloScreen() {
 
   return (
     <View className="flex-1 bg-surface">
-      <AppHeader title="Stats · By ELO Range" back backFallback="/gym-manager/stats" />
+      <AppHeader title="Stats · By ELO Range" back backFallback={managerHref("/gym-manager/stats", gymId)} />
       <ScrollView
         contentContainerStyle={{
           paddingHorizontal: 16,

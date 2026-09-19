@@ -3,8 +3,8 @@ import * as React from "react";
 /**
  * Lightweight stale-while-revalidate cache for ELO RATED mobile.
  *
- * No external data-fetching library. The four tab payloads are cheap RPCs that
- * revalidate in well under a second, so the cache is **in-memory only**: a
+ * No external data-fetching library. The cached screen payloads are cheap RPCs
+ * that revalidate in well under a second, so the cache is **in-memory only**: a
  * module-level `Map` keyed by string. It already survives every in-session
  * navigation (tabs stay mounted), so cross-launch persistence would buy only a
  * sub-second head start on the very first cold paint after a kill — not worth

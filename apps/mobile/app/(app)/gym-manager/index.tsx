@@ -19,7 +19,10 @@ import { AppHeader } from "@/components/layout/app-header";
 import { toast } from "@/components/ui";
 import { useRequireAthlete } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
-import { useManagedGyms } from "@/lib/gym-manager/use-managed-gyms";
+import {
+  managerHref,
+  useGymManagerGymId,
+} from "@/lib/gym-manager/use-gym-manager-gym-id";
 import { useGymHub } from "@/lib/gym-manager/use-gym-hub";
 import {
   MetricGrid,
@@ -31,31 +34,41 @@ import {
 } from "@/components/gym-manager/hub-parts";
 
 /**
- * H1 · Gym-owner hub. Manager-gated landing for the gym-manager tab:
+ * H1 · Gym-owner hub. Manager-gated landing for the gym-owner portal:
  *   - next-session plate (live or soonest upcoming) with a countdown
  *   - this-month metric tiles (active athletes, matches)
  *   - shortcut tiles to Sessions, Athletes, Gym Stats, Gym Ladder
  *
- * Resolves the managed gym via useManagedGyms, then loads the hub via useGymHub
- * (reuses getGymDetail + getGymManagerStats). The tab itself is only rendered
- * for managers (see (tabs)/_layout.tsx), so this is a defensive guard.
+ * Resolves the gym via useGymManagerGymId (the `gymId` route param handed over
+ * by the Manage Gym affordance on /gyms/[id], validated against the athlete's
+ * managed gyms), then loads the hub via useGymHub (reuses getGymDetail +
+ * getGymManagerStats). The portal is entered only through that affordance,
+ * which is itself manager-gated, so the non-manager branch is a defensive guard.
  */
 export default function GymManagerHubScreen() {
   const router = useRouter();
   const tokens = useThemedTokens();
   const { athlete, isLoading: authLoading } = useRequireAthlete();
-  const { gyms, isReady: managedReady } = useManagedGyms();
-  const gymId = gyms[0]?.gymId;
+  const { gymId, isReady: managedReady } = useGymManagerGymId();
   const { data, isLoading, isRefreshing, refresh } = useGymHub(gymId, athlete?.id);
 
-  const go = (path: string) => () => router.push(path as never);
+  // The hub is no longer a tab root: it is pushed from /gyms/[id]. On a cold
+  // entry (deep link or reload) there is nothing to pop to, so the chevron
+  // falls back to the gym screen that owns the entry point.
+  const gymBackFallback = gymId ? `/gyms/${gymId}` : "/gyms";
+
+  // Portal-internal links carry the active gym forward; a session link leaves
+  // the portal, so it does not.
+  const go = (pathname: string) => () =>
+    router.push(managerHref(pathname, gymId));
+  const goSession = (pathname: string) => () => router.push(pathname);
   const placeholder = (label: string) => () =>
     toast.info(`${label} coming soon`);
 
   if (authLoading || !managedReady || (gymId && isLoading)) {
     return (
       <View className="flex-1 bg-surface">
-        <AppHeader title="Gym" />
+        <AppHeader title="Gym" back backFallback={gymBackFallback} />
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator color={tokens.accentCta} />
         </View>
@@ -63,12 +76,12 @@ export default function GymManagerHubScreen() {
     );
   }
 
-  // Not a manager of any gym (or the lookup found none): the tab is normally
-  // hidden, so this only shows if state changed mid-session.
+  // Not a manager of the resolved gym (or the lookup found none). The entry
+  // point is manager-gated, so this only shows if state changed mid-session.
   if (!gymId || !data?.isManager) {
     return (
       <View className="flex-1 bg-surface">
-        <AppHeader title="Gym" />
+        <AppHeader title="Gym" back backFallback={gymBackFallback} />
         <View className="flex-1 items-center justify-center px-8">
           <Text className="font-heading text-[14px] text-ink uppercase tracking-caps-l text-center">
             No Managed Gym
@@ -83,7 +96,7 @@ export default function GymManagerHubScreen() {
 
   return (
     <View className="flex-1 bg-surface">
-      <AppHeader title={data.gymName} />
+      <AppHeader title={data.gymName} back backFallback={gymBackFallback} />
       <ScrollView
         contentContainerStyle={{
           paddingHorizontal: 16,
@@ -105,12 +118,8 @@ export default function GymManagerHubScreen() {
             session={data.nextSession}
             isLive={data.nextIsLive}
             onPress={
-              data.nextSession
-                ? go(
-                    data.nextIsLive
-                      ? `/session/${data.nextSession.id}/join`
-                      : "/gym-manager/sessions",
-                  )
+              data.nextSession && data.nextIsLive
+                ? goSession(`/session/${data.nextSession.id}/join`)
                 : go("/gym-manager/sessions")
             }
           />

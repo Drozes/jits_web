@@ -1,9 +1,10 @@
 import { Stack } from "expo-router";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 
-// Anchor the tab navigator beneath the pushed detail screens (athlete/[id],
-// session/[id], video/[id], settings). Deep links / reloads into those routes
-// otherwise land with an empty stack and a dead back chevron.
+// Anchor the tab navigator beneath the pushed detail screens (gyms,
+// gym-manager, athlete/[id], session/[id], video/[id], settings). Deep links /
+// reloads into those routes otherwise land with an empty stack and a dead back
+// chevron.
 export const unstable_settings = {
   initialRouteName: "(tabs)",
 };
@@ -23,6 +24,12 @@ export default function AppLayout() {
       }}
     >
       <Stack.Screen name="(tabs)" />
+      {/* Gym discovery and the gym-owner portal push over the tab bar instead
+          of being tabs. Both keep their original URLs (/gyms, /gyms/[id],
+          /gym-manager/*) because `(app)` and `(tabs)` are route groups and do
+          not appear in the path. */}
+      <Stack.Screen name="gyms" />
+      <Stack.Screen name="gym-manager" />
       <Stack.Screen name="athlete/[id]" />
       <Stack.Screen name="session/[id]" />
       <Stack.Screen name="video/[id]" />

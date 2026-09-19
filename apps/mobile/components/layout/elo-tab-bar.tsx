@@ -6,7 +6,12 @@ import { cn } from "@/lib/cn";
 
 /**
  * Custom bottom tab bar mirroring apps/web/components/layout/bottom-nav-bar.tsx.
- * 4-up grid, 2px CTA top border on active, mono-caps labels, hairline top border.
+ *
+ * Equal-width columns, one per tab registered in `(tabs)/_layout.tsx`: Home,
+ * Arena, Rankings, Profile once Arena lands, three until then. Each column is
+ * `flex-1`, so the row divides evenly at whatever count is registered and no
+ * item is squeezed. 2px CTA top border on active, mono-caps labels, hairline
+ * top border, bottom safe-area inset applied to the container.
  */
 export function EloTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
@@ -19,9 +24,13 @@ export function EloTabBar({ state, descriptors, navigation }: BottomTabBarProps)
     >
       {state.routes.map((route, index) => {
         const { options } = descriptors[route.key];
-        // A route opts out of the bar by setting `tabBarButton` to a renderer
-        // that returns null (Expo Router's idiom for a hidden-but-mounted tab).
-        // The gym-manager tab uses this to stay hidden for non-managers.
+        // Opt-out contract: Expo Router compiles `options={{ href: null }}` on a
+        // Tabs.Screen down to `tabBarButton: () => null`, so honoring that here
+        // is what makes the documented "mounted but not in the bar" escape hatch
+        // work with this custom bar. No tab uses it today (routes that must not
+        // be tabs live outside the `(tabs)` group instead), but the branch is
+        // the contract with Expo Router, not a leftover, and is covered by
+        // __tests__/components/layout/elo-tab-bar.test.tsx.
         if (options.tabBarButton?.({} as never) === null) return null;
         const isActive = state.index === index;
         const label =

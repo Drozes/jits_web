@@ -7,8 +7,8 @@ import {
   Text,
   View,
 } from "react-native";
-import { useLocalSearchParams } from "expo-router";
-import { Pencil, Plus } from "lucide-react-native";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { Pencil, Plus, SlidersHorizontal } from "lucide-react-native";
 import { AppHeader } from "@/components/layout/app-header";
 import { SessionCard } from "@/components/session-card";
 import { CreateSessionSheet } from "@/components/session/create-session-sheet";
@@ -112,6 +112,7 @@ function useGymDetailData(gymId: string | undefined, athleteId: string | undefin
 
 export default function GymDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const router = useRouter();
   const tokens = useThemedTokens();
   const { athlete, isLoading: authLoading } = useRequireAthlete();
   const { data, coords, avgPerSession, isLoading, isRefreshing, refresh } = useGymDetailData(
@@ -263,6 +264,34 @@ export default function GymDetailScreen() {
                     </Text>
                   </Pressable>
                 </CreateSessionSheet>
+
+                {/*
+                  Entry point to the gym-owner portal (roster, sessions, stats,
+                  ELO brackets, cross-gym ladder, SessionEditSheet). The portal
+                  is not a tab; this manager-gated affordance is how it is
+                  reached, mirroring web's /gyms/[id]/manage link. The gym id
+                  goes along so the portal shows THIS gym rather than falling
+                  back to the manager's first one.
+                */}
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Manage gym"
+                  onPress={() =>
+                    router.push({
+                      pathname: "/gym-manager",
+                      params: { gymId: data.id },
+                    })
+                  }
+                  className="mt-2 rounded-sm border border-hairline-strong bg-surface-3 py-3 px-5 items-center justify-center active:bg-surface-4 flex-row gap-2"
+                >
+                  <View pointerEvents="none">
+                    <SlidersHorizontal size={16} color={tokens.textSecondary} />
+                  </View>
+                  <Text className="font-heading text-[13px] text-ink uppercase tracking-caps">
+                    Manage Gym
+                  </Text>
+                </Pressable>
+
                 <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-xl mt-2">
                   Upcoming Sessions
                   {upcomingSessions.length > 0 ? ` · ${upcomingSessions.length}` : ""}

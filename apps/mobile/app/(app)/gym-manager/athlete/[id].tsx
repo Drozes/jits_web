@@ -5,7 +5,10 @@ import { AppHeader } from "@/components/layout/app-header";
 import { EloTile } from "@/components/ui/elo-system";
 import { useRequireAthlete } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
-import { useManagedGyms } from "@/lib/gym-manager/use-managed-gyms";
+import {
+  managerHref,
+  useGymManagerGymId,
+} from "@/lib/gym-manager/use-gym-manager-gym-id";
 import { useGymAthleteDetail } from "@/lib/gym-manager/use-gym-athlete-detail";
 import { formatWinRate } from "@/lib/gym-manager/roster-format";
 import { EloSparkline } from "@/components/gym-manager/elo-sparkline";
@@ -20,17 +23,16 @@ import {
 /**
  * H7 · Gym-owner athlete detail. Manager-scoped member stats: ELO, record,
  * win rate, peak ELO, a last-10 ELO-trend sparkline, and the last-5 matches.
- * Resolves the managed gym via useManagedGyms and the member id from the route;
- * the display name is passed through the navigation param (the detail RPC does
- * not echo it back). Loads via useGymAthleteDetail (manager-gated, member-scoped).
+ * Resolves the gym from the gymId route param via useGymManagerGymId and the
+ * member id from the route; the display name is passed through the navigation
+ * param (the detail RPC does not echo it back). Loads via useGymAthleteDetail
+ * (manager-gated, member-scoped).
  */
 export default function GymManagerAthleteDetailScreen() {
   const { id, name } = useLocalSearchParams<{ id: string; name?: string }>();
   const tokens = useThemedTokens();
   const { isLoading: authLoading } = useRequireAthlete();
-  const { gyms, isReady: managedReady } = useManagedGyms();
-  const gym = gyms[0];
-  const gymId = gym?.gymId;
+  const { gymId, gym, isReady: managedReady } = useGymManagerGymId();
   const { data, isManager, notMember, isLoading } = useGymAthleteDetail(
     gymId,
     id,
@@ -42,7 +44,7 @@ export default function GymManagerAthleteDetailScreen() {
   if (authLoading || !managedReady || (gymId && id && isLoading)) {
     return (
       <View className="flex-1 bg-surface">
-        <AppHeader title={displayName} back backFallback="/gym-manager/roster" />
+        <AppHeader title={displayName} back backFallback={managerHref("/gym-manager/roster", gymId)} />
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator color={tokens.accentCta} />
         </View>
@@ -53,7 +55,7 @@ export default function GymManagerAthleteDetailScreen() {
   if (!gymId || !isManager || notMember || !data) {
     return (
       <View className="flex-1 bg-surface">
-        <AppHeader title={displayName} back backFallback="/gym-manager/roster" />
+        <AppHeader title={displayName} back backFallback={managerHref("/gym-manager/roster", gymId)} />
         <View className="flex-1 items-center justify-center px-8">
           <Text className="font-heading text-[14px] text-ink uppercase tracking-caps-l text-center">
             {notMember ? "Not A Gym Member" : "Athlete Unavailable"}
@@ -65,7 +67,7 @@ export default function GymManagerAthleteDetailScreen() {
 
   return (
     <View className="flex-1 bg-surface">
-      <AppHeader title={displayName} back backFallback="/gym-manager/roster" />
+      <AppHeader title={displayName} back backFallback={managerHref("/gym-manager/roster", gymId)} />
       <ScrollView
         contentContainerStyle={{
           paddingHorizontal: 16,
