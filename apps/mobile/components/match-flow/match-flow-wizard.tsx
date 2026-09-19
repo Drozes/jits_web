@@ -11,6 +11,8 @@ import type { BroadcastResult } from "@jits/shared/hooks/use-session-match-sync"
 import { WizardError, WizardLoading } from "./wizard-status";
 import { QueueStatusBanner } from "./queue-status-banner";
 import { MatchStepRenderer } from "./match-step-renderer";
+import { MatchRecorderProvider } from "./match-recorder-context";
+import { MatchRecorderCamera, MatchRecorderStatus } from "./match-recorder-surface";
 import { cn } from "@/lib/cn";
 
 interface MatchFlowWizardProps {
@@ -137,30 +139,41 @@ export function MatchFlowWizard({
       }}
       keyboardShouldPersistTaps="handled"
     >
-      <WizardStepHeader currentIdx={stepIdx} label={STEP_LABELS[step]} />
-      <QueueStatusBanner />
-      <MatchStepRenderer
-        step={step}
-        exitHref={exitHref}
-        exitLabel={exitLabel}
+      <MatchRecorderProvider
         matchId={matchId}
-        matchType={matchType}
-        matchStatus={match.status}
-        durationSeconds={match.duration_seconds}
-        startedAt={startedAt ?? match.started_at ?? new Date().toISOString()}
-        pausedAt={match.paused_at}
-        totalPausedDuration={match.total_paused_duration}
-        me={me}
-        opponent={opponent}
-        submissionTypes={submissionTypes}
-        resultData={resultData}
-        ownOutcome={ownOutcome}
-        setStep={setStep}
-        setStartedAt={setStartedAt}
-        setResultData={setResultData}
-        advanceToResult={advanceToResult}
-        refresh={refresh}
-      />
+        uploaderAthleteId={me.athlete_id}
+        matchDurationSeconds={match.duration_seconds}
+      >
+        <WizardStepHeader currentIdx={stepIdx} label={STEP_LABELS[step]} />
+        <QueueStatusBanner />
+        {/* Above the step, never inside one: the upload begins after the
+            live step has already unmounted, so this is the only place its
+            outcome (success, stall or failure) can be seen. jits-od3. */}
+        <MatchRecorderStatus />
+        <MatchRecorderCamera step={step} />
+        <MatchStepRenderer
+          step={step}
+          exitHref={exitHref}
+          exitLabel={exitLabel}
+          matchId={matchId}
+          matchType={matchType}
+          matchStatus={match.status}
+          durationSeconds={match.duration_seconds}
+          startedAt={startedAt ?? match.started_at ?? new Date().toISOString()}
+          pausedAt={match.paused_at}
+          totalPausedDuration={match.total_paused_duration}
+          me={me}
+          opponent={opponent}
+          submissionTypes={submissionTypes}
+          resultData={resultData}
+          ownOutcome={ownOutcome}
+          setStep={setStep}
+          setStartedAt={setStartedAt}
+          setResultData={setResultData}
+          advanceToResult={advanceToResult}
+          refresh={refresh}
+        />
+      </MatchRecorderProvider>
     </ScrollView>
   );
 }

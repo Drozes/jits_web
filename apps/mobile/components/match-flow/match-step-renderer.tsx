@@ -9,6 +9,7 @@ import { ResultStep } from "./steps/result-step";
 import { ConfirmStep } from "./steps/confirm-step";
 import { SummaryStep } from "./steps/summary-step";
 import { WaitStep } from "./steps/wait-step";
+import { useMatchRecorder } from "./match-recorder-context";
 
 interface MatchParticipant {
   athlete_id: string;
@@ -70,6 +71,11 @@ export function MatchStepRenderer({
   advanceToResult,
   refresh,
 }: MatchStepRendererProps) {
+  // One recorder for the whole wizard, owned by MatchRecorderProvider above
+  // this component. The steps stay presentational: the live step drives it,
+  // the summary step reads the uploaded video's id off it.
+  const recorder = useMatchRecorder();
+
   if (step === "wait") {
     return <WaitStep message="Waiting for opponent..." allowSkip onSkip={() => setStep("weight")} />;
   }
@@ -108,7 +114,7 @@ export function MatchStepRenderer({
         startedAt={startedAt}
         pausedAt={pausedAt}
         totalPausedDuration={totalPausedDuration}
-        uploaderAthleteId={me.athlete_id}
+        recorder={recorder}
         onEnded={() => setStep("end")}
       />
     );
@@ -173,6 +179,8 @@ export function MatchStepRenderer({
         eloBefore={eloBefore}
         eloAfter={eloAfter ?? me.current_elo}
         weightDivisionGap={weightDivisionGap}
+        videoId={recorder.videoId}
+        videoState={recorder.state}
       />
     );
   }

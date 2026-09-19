@@ -6,6 +6,15 @@ import {
   removeUploadedObject,
   uploadRecording,
 } from "./upload-recording";
+import {
+  CAMERA_READY_TIMEOUT_MS,
+  CAP_DETECTION_TOLERANCE_MS,
+  PENDING_STOP_MAX_ATTEMPTS,
+  PENDING_STOP_RETRY_MS,
+  RECORD_START_MAX_ATTEMPTS,
+  RECORD_START_RETRY_MS,
+  computeMaxRecordingSeconds,
+} from "./recording-limits";
 
 /**
  * State machine for the recorder. Mirrors the web hook's `uploadStatus`
@@ -39,18 +48,28 @@ export type RecordingState =
 // CAVEAT: the exact native timing window is verified only against the JS
 // contract in unit tests — it still needs verification on physical
 // iOS/Android hardware (tracked in jits-a8y.13).
-const PENDING_STOP_RETRY_MS = 250;
-const PENDING_STOP_MAX_ATTEMPTS = 8;
-
+//
 // Start hardening (observed live on iOS 26 hardware): expo-camera's
 // onCameraReady can fire BEFORE the native session can actually record, and
 // sometimes never fires at all. So no single readiness signal is trusted:
 // a not-ready recordAsync rejection is retried on an interval (~8s budget),
 // and a deferred start falls through after a timeout if onCameraReady never
 // arrives, letting the retry loop probe the camera directly.
-const RECORD_START_RETRY_MS = 500;
-const RECORD_START_MAX_ATTEMPTS = 16;
-const CAMERA_READY_TIMEOUT_MS = 3000;
+//
+// Both retry budgets live in ./recording-limits because the recording cap
+// is derived from them: the cap has to outlast the worst-case start and
+// stop delays or it races the match clock (jits-2zpe).
+
+/**
+ * Why a recording ended before the match did. `null` is the normal case:
+ * the clip covers the match. Anything else means the clip is short and the
+ * user has to be told rather than shown a plain success.
+ *
+ *   limit       : the OS `maxDuration` backstop fired
+ *   interrupted : recordAsync settled on its own for some other reason
+ *                 (a call, backgrounding, a stop whose bookkeeping was lost)
+ */
+export type RecordingTruncation = "limit" | "interrupted";
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -102,6 +121,15 @@ export interface UseVideoRecorderReturn {
   markCameraReady: () => void;
   /** Populated after a successful upload + match_videos INSERT. */
   videoId: string | null;
+  /**
+   * Set when the recording ended before the match did. The clip is still
+   * uploaded (a short clip beats no clip), but callers MUST surface this:
+   * a truncated recording reported as a plain success is exactly the
+   * silent data loss jits-2zpe was filed for.
+   */
+  truncation: RecordingTruncation | null;
+  /** The OS cap actually in force, in seconds. Exposed for diagnostics. */
+  maxDurationSeconds: number;
 }
 
 /**
@@ -121,10 +149,18 @@ export interface UseVideoRecorderReturn {
  *                            present before `start()` is called; pass
  *                            `useAuth().athlete?.id`. Recorder no-ops
  *                            with an error state when null.
+ * @param matchDurationSeconds
+ *                           The match's configured `duration_seconds`. The
+ *                            OS recording cap is derived from it (see
+ *                            ./recording-limits) so it can never sit exactly
+ *                            on the match clock again. Omitted or unknown
+ *                            falls back to the ceiling: over-recording is
+ *                            recoverable, truncation is not.
  */
 export function useVideoRecorder(
   matchId: string,
   uploaderAthleteId: string | null,
+  matchDurationSeconds?: number | null,
 ): UseVideoRecorderReturn {
   const cameraRef = React.useRef<CameraView | null>(null);
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
@@ -133,6 +169,15 @@ export function useVideoRecorder(
   const [error, setError] = React.useState<string | null>(null);
   const [uploadProgress] = React.useState<number | null>(null);
   const [videoId, setVideoId] = React.useState<string | null>(null);
+  const [truncation, setTruncation] = React.useState<RecordingTruncation | null>(null);
+  const truncationRef = React.useRef<RecordingTruncation | null>(null);
+  // Wall-clock at which the live recordAsync attempt was issued. Lets an
+  // unexpected settle be classified as "hit the OS cap" vs "interrupted"
+  // instead of passing silently as a normal completion.
+  const recordStartedAtRef = React.useRef<number | null>(null);
+  // The OS cap for THIS match, derived from its configured duration rather
+  // than hardcoded, so it cannot drift back into a tie with the match clock.
+  const maxDurationSeconds = computeMaxRecordingSeconds(matchDurationSeconds);
   const stoppingRef = React.useRef(false);
   // Stop requested before the recorder reached 'recording' (End fired on a
   // very short match while start() was mid-flight). Honored by start().
@@ -168,6 +213,20 @@ export function useVideoRecorder(
     if (!mountedRef.current) return;
     setState(s);
     setError(err);
+  }, [logTag]);
+
+  /**
+   * Record that this clip does not cover the whole match. Kept in a ref as
+   * well as state so `stop()` can read it from a stale closure and so it
+   * survives the screen that started the recording unmounting mid-upload.
+   */
+  const markTruncated = React.useCallback((reason: RecordingTruncation) => {
+    truncationRef.current = reason;
+    console.warn(
+      `[video] ${logTag} recording ended before the match did (${reason}); clip is short`,
+    );
+    if (!mountedRef.current) return;
+    setTruncation(reason);
   }, [logTag]);
 
   const requestPermission = React.useCallback(async () => {
@@ -274,7 +333,13 @@ export function useVideoRecorder(
         console.log(
           `[video] ${logTag} recordAsync attempt ${attempt} (cam perm=${cameraPermission?.granted}, mic perm=${micPermission?.granted})`,
         );
-        const promise = cam.recordAsync({ maxDuration: 600 });
+        // maxDuration is a LAST-RESORT backstop against a stopRecording the
+        // hardware silently dropped, never the thing that ends a normal
+        // match recording. It used to be a hardcoded 600, exactly the
+        // backend's default duration_seconds, so it fired before the match
+        // ended on every full-length match (jits-2zpe).
+        recordStartedAtRef.current = Date.now();
+        const promise = cam.recordAsync({ maxDuration: maxDurationSeconds });
         recordPromiseRef.current = promise;
         // A stop requested while start() was still spinning up must not be
         // dropped; honor it as soon as the native recorder is live so very
@@ -303,9 +368,16 @@ export function useVideoRecorder(
           } else if (result?.uri) {
             // The OS ended the recording without an explicit stop() (time
             // cap, interruption, or a stop whose bookkeeping was lost).
-            // The clip is real: save it rather than discard it.
+            // The clip is real: save it rather than discard it. But this is
+            // NOT a normal completion. The match is still running, so the
+            // clip is short and the user has to be told (jits-2zpe).
+            const elapsedMs = recordStartedAtRef.current
+              ? Date.now() - recordStartedAtRef.current
+              : 0;
+            const hitCap = elapsedMs >= maxDurationSeconds * 1000 - CAP_DETECTION_TOLERANCE_MS;
+            markTruncated(hitCap ? "limit" : "interrupted");
             console.warn(
-              `[video] ${logTag} recordAsync settled without an explicit stop; uploading clip anyway`,
+              `[video] ${logTag} recordAsync settled without an explicit stop after ${Math.round(elapsedMs / 1000)}s (cap ${maxDurationSeconds}s); uploading the short clip anyway`,
             );
             await handleUpload(result.uri);
           } else {
@@ -356,8 +428,17 @@ export function useVideoRecorder(
       }
     } finally {
       recordPromiseRef.current = null;
+      recordStartedAtRef.current = null;
     }
-  }, [cameraPermission?.granted, micPermission?.granted, handleUpload, transition, logTag]);
+  }, [
+    cameraPermission?.granted,
+    micPermission?.granted,
+    handleUpload,
+    transition,
+    logTag,
+    maxDurationSeconds,
+    markTruncated,
+  ]);
 
   startRef.current = start;
 
@@ -377,8 +458,21 @@ export function useVideoRecorder(
     if (stateRef.current !== "recording") {
       // Not recording *yet*: if the recorder is still idle (start() queued
       // or mid-flight), register the intent so start() stops + uploads as
-      // soon as recording begins. States past 'recording' need no stop.
-      if (stateRef.current === "idle") pendingStopRef.current = true;
+      // soon as recording begins.
+      if (stateRef.current === "idle") {
+        pendingStopRef.current = true;
+        return;
+      }
+      // Past 'recording' there is nothing left to stop, but this must not
+      // pass silently when the recording already ended on its own: the
+      // match ran on past the end of the clip, which is precisely the
+      // truncation the user is being shown (jits-2zpe). `truncation`
+      // carries that to the UI; this log carries it to a device console.
+      if (truncationRef.current) {
+        console.warn(
+          `[video] ${logTag} stop requested after the recording had already ended (${truncationRef.current}) in state ${stateRef.current}; the clip does not cover the end of the match`,
+        );
+      }
       return;
     }
     const cam = cameraRef.current;
@@ -437,5 +531,7 @@ export function useVideoRecorder(
     stop,
     markCameraReady,
     videoId,
+    truncation,
+    maxDurationSeconds,
   };
 }
