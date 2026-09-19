@@ -14,7 +14,17 @@ import { MatchStepRenderer } from "./match-step-renderer";
 import { cn } from "@/lib/cn";
 
 interface MatchFlowWizardProps {
-  sessionId: string;
+  /**
+   * Where every exit in this wizard goes: the error / not-a-participant
+   * splash, a cancelled ready check, and the summary step's primary cta.
+   * The wizard has no session dependency (every RPC is keyed on `matchId`
+   * and `matches.session_id` is nullable), so a match's origin only decides
+   * where its exits point. A session match passes its lobby; a sessionless
+   * match passes whatever surface it was started from.
+   */
+  exitHref: string;
+  /** Copy on the exit cta. Defaults to the session lobby wording. */
+  exitLabel?: string;
   matchId: string;
   currentAthleteId: string;
   /** Reports the active wizard step so the screen can guard back-nav. */
@@ -46,9 +56,12 @@ function computeOwnOutcome(
 }
 
 /**
- * Top-level orchestrator for the 8-step session match wizard. Loads the
- * match + submission types, derives the initial step from match.status,
- * and renders one step at a time.
+ * Top-level orchestrator for the 8-step match wizard. Loads the match +
+ * submission types, derives the initial step from match.status, and
+ * renders one step at a time.
+ *
+ * Origin-agnostic: it takes `exitHref` / `exitLabel` rather than a session
+ * id, so it mounts unchanged for a match with no session at all.
  *
  * ELO design system: page-tinted surface with a meta-strip progress
  * indicator (mirrors `apps/mobile/components/session/wizard-progress.tsx`
@@ -56,7 +69,8 @@ function computeOwnOutcome(
  * but its internal layout is full-bleed within the padding.
  */
 export function MatchFlowWizard({
-  sessionId,
+  exitHref,
+  exitLabel = "Back to Lobby",
   matchId,
   currentAthleteId,
   onStepChange,
@@ -81,13 +95,22 @@ export function MatchFlowWizard({
 
   if (isLoading || !match || !step) return <WizardLoading />;
   if (error) {
-    return <WizardError sessionId={sessionId} title="Match unavailable" message={error} />;
+    return (
+      <WizardError
+        exitHref={exitHref}
+        exitLabel={exitLabel}
+        title="Match unavailable"
+        message={error}
+      />
+    );
   }
 
   const me = match.participants.find((p) => p.athlete_id === currentAthleteId);
   const opponent = match.participants.find((p) => p.athlete_id !== currentAthleteId);
   if (!me || !opponent) {
-    return <WizardError sessionId={sessionId} title="Not a participant" />;
+    return (
+      <WizardError exitHref={exitHref} exitLabel={exitLabel} title="Not a participant" />
+    );
   }
 
   const matchType = (match.match_type as "ranked" | "casual") ?? "casual";
@@ -108,7 +131,8 @@ export function MatchFlowWizard({
       <QueueStatusBanner />
       <MatchStepRenderer
         step={step}
-        sessionId={sessionId}
+        exitHref={exitHref}
+        exitLabel={exitLabel}
         matchId={matchId}
         matchType={matchType}
         matchStatus={match.status}

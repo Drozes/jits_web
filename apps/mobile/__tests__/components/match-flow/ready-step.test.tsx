@@ -90,7 +90,7 @@ const mockGetMatchDetails = getMatchDetails as jest.Mock;
 function renderReadyStep(onStarted: jest.Mock) {
   return render(
     <ReadyStep
-      sessionId="S1"
+      exitHref="/(app)/session/S1/lobby"
       matchId="M1"
       currentAthleteId="me-1"
       opponentId="opp-1"

@@ -20,17 +20,21 @@ export function WizardLoading() {
 }
 
 /**
- * Error / "not a participant" splash with a Back-to-Lobby escape hatch.
+ * Error / "not a participant" splash with a caller-supplied escape hatch.
  *
  * ELO design system: hero title in heading caps, muted body, and a
- * Signal Red CTA returning the user to the lobby.
+ * Signal Red CTA returning the user to wherever the match came from.
  */
 export function WizardError({
-  sessionId,
+  exitHref,
+  exitLabel,
   title,
   message,
 }: {
-  sessionId: string;
+  /** Where the escape-hatch cta goes (session lobby, or elsewhere). */
+  exitHref: string;
+  /** Copy on the escape-hatch cta. */
+  exitLabel: string;
   title: string;
   message?: string;
 }) {
@@ -45,11 +49,11 @@ export function WizardError({
       ) : null}
       <Pressable
         accessibilityRole="button"
-        onPress={() => router.replace(`/(app)/session/${sessionId}/lobby`)}
+        onPress={() => router.replace(exitHref)}
         className="mt-2 bg-cta items-center justify-center py-3 px-5 rounded-sm active:bg-cta-hover"
       >
         <Text className="font-heading text-[13px] text-ink-on-cta uppercase tracking-caps">
-          Back to Lobby
+          {exitLabel}
         </Text>
       </Pressable>
     </View>
