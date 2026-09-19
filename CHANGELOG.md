@@ -2,6 +2,26 @@
 
 ## [Unreleased]
 
+**Shared discovery queries can now report a failed read, and the gym list stopped shipping every active athlete to the device.**
+
+**Added**
+- `packages/shared/src/api/queries.ts`: `getGymDetailResult`, `getGymsWithSessionsResult` and `getMatchVideoSignedUrlResult`, three sibling queries returning the existing `Result<T>` union from `api/errors.ts` (the convention the mutations already use). The originals kept their exact behaviour, so every existing call site on web and mobile is untouched. Each pair shares one internal loader that builds the payload AND reports the first fatal error; the lenient wrapper takes the payload, the Result wrapper refuses it (**jits-icei.5**).
+- `apps/mobile/__tests__/screens/video-playback.test.tsx`: first test coverage for the match-video screen (5 tests), including the failure-is-not-absence distinction and the retry.
+
+**Fixed**
+- **jits-icei.5, P1**: shared queries discarded the PostgREST `error` and returned `null` or `[]`, so a caller could not tell a failed read from an empty result. supabase-js never rejects (postgrest-js sets `shouldThrowOnError = false` and converts even a hard network failure into a resolved `{ data: null, error }`), so no amount of `try`/`catch` at a call site could have recovered it. The shipped consequence: mobile Home told an athlete their gym had nothing scheduled whenever the read failed.
+- `apps/mobile/app/(app)/(tabs)/(home)/index.tsx`: discovery now reads the real signal instead of inferring failure from a null gym. The previous workaround covered only a failure of `getGymDetail`'s FIRST read; if the gym row loaded and the sessions read then failed, the error was discarded, a truthy detail came back with `sessions: []`, and Home said "Nothing scheduled at <gym> right now" on a dropped request. That hole is closed. The free-agent branch's error plate was likewise unreachable in production (its `failed` flag could never be true) and is now live.
+- `apps/mobile/app/(app)/video/[id].tsx`: "the recording is not there" and "we could not find out" are now different states. A transient failure rendered the "Video Unavailable" empty state, telling an athlete their match video does not exist; it now gets its own message and a Try Again action.
+- `getGymDetail`'s ten reads are sorted into fatal and degraded. Fatal (the Result reports failure): the gym row, the session list, and the two capability booleans `isMemberGym` / `isGymManager`, since a false `isGymManager` silently removes the Manage entry from a real manager. Degraded (logged, defaulted): participant and RSVP counts, creator names, the athlete's own rsvp/checked-in lists, and the member count. Promoting those to fatal would hide a LIVE session behind an error plate, which is the same harm by another route.
+- A FAILED read still hands back what it established, as `partial` on the failure branch (`GymDetailResult`, `PartialGymDetail`). Refusing the whole payload was an availability regression on the surface this issue exists to fix: nine reads succeeding including a live session, plus one failed `gym_managers` read, would have hidden that session behind an error plate, where the old lenient function rendered it. `partial` is offered only while the session list is trustworthy (a failed sessions read yields null, because the empty list is an artefact of the failure), and the two capability booleans are typed OUT of it so no caller can read an authorization answer off a failed read. `getGymDetailResult`'s type stays assignable to `Result<GymDetail>`.
+
+**Changed**
+- **jits-icei.2, P1**: `getGymsWithSessions` no longer issues `SELECT primary_gym_id FROM athletes WHERE status = 'active'` with no limit. That read shipped every active athlete row to the device purely to build a member-count map client side, and it moved onto the Home landing screen for every athlete without a primary gym, plus every server render of web `/gyms`. It now calls the new `get_gym_member_counts()` RPC: one row per gym that has members. On the local dataset that is 19 athlete rows down to 2 gym rows; in production it goes from O(active athletes) to O(gyms with members). **Requires the jr_be migration `20260918030000_gym_member_counts.sql` (jr_be-p33) to be applied first.** If the RPC is missing the counts degrade to 0 with a logged error rather than failing the gym list, so an out-of-order deploy is survivable.
+- `packages/shared/src/types/database.ts`: `get_gym_member_counts` added to `Functions`. Hand-written to match what `npm run db:types` will generate, because regenerating against the local database would have rewritten the file from a drifted local schema.
+
+**Not changed, deliberately**
+- `getGymDetail`, `getGymsWithSessions` and `getMatchVideoSignedUrl` keep their exact previous behaviour, including returning a partial payload when a later read fails. Web's three `getGymDetail` call sites turn `null` into `notFound()`, so tightening the original would have converted a dropped sessions read into a 404 on a page that used to render. Tests pin both the new strictness and the old leniency.
+
 **Arena ships on mobile at parity with web: a fourth tab, the live challenge handshake, and a sessionless match route that inherits the whole video pipeline. The lobby flag now clears when you leave, which web never did.**
 
 **Added**

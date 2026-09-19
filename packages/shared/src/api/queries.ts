@@ -1,4 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { PostgrestError, SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "../types/database";
 import type { Athlete } from "../types/athlete";
 import type {
@@ -459,37 +459,71 @@ export async function getPendingChallengeOpponentIds(
 // Sessions & Gyms
 // ---------------------------------------------------------------------------
 
-/** Fetch all active gyms with session counts and member counts */
-export async function getGymsWithSessions(
-  supabase: Client,
-): Promise<GymListItem[]> {
-  // Fetch gyms, member-count source, and sessions in parallel: the three
-  // reads are independent, so serializing them tripled the tab's load latency.
-  const [{ data: gyms }, { data: athletes }, { data: sessions }] =
-    await Promise.all([
-      supabase
-        .from("gyms")
-        .select("id, name, city, status")
-        .eq("status", "active")
-        .order("name"),
-      supabase
-        .from("athletes")
-        .select("primary_gym_id")
-        .eq("status", "active")
-        .not("primary_gym_id", "is", null),
-      supabase
-        .from("sessions")
-        .select("id, gym_id, status, scheduled_start, scheduled_end")
-        .in("status", ["active", "scheduled"]),
-    ]);
+/**
+ * Everything `getGymsWithSessions` and `getGymsWithSessionsResult` share.
+ *
+ * It returns the rows it managed to build AND the first fatal error, so the two
+ * public wrappers can differ in policy without differing in behaviour: the
+ * legacy wrapper keeps handing back whatever it built (which is what web
+ * `/gyms` has always rendered), while the Result wrapper refuses to pass a
+ * failed read off as data.
+ *
+ * NOTHING HERE CAN REJECT, so failure is derived from `error` and never from a
+ * rejection: postgrest-js sets `shouldThrowOnError = false` by default
+ * (PostgrestBuilder.ts:82) and its outer handler turns even a hard network
+ * failure into a RESOLVED `{ data: null, error }`. A `.catch` around any of
+ * these reads would be dead code, and a test that mocked a rejection would be
+ * certifying a path production cannot produce.
+ */
+async function loadGymsWithSessions(supabase: Client): Promise<{
+  items: GymListItem[];
+  error: DomainError | null;
+}> {
+  // Fetch gyms, member counts, and sessions in parallel: the three reads are
+  // independent, so serializing them tripled the tab's load latency.
+  const [gymsResult, memberCountsResult, sessionsResult] = await Promise.all([
+    supabase
+      .from("gyms")
+      .select("id, name, city, status")
+      .eq("status", "active")
+      .order("name"),
+    // Pre-aggregated server side: one row per gym that has members, rather than
+    // one row per active athlete. The client-side version of this map shipped
+    // the entire active-athlete table to the device, on the Home landing screen
+    // for every athlete without a primary gym (jits-icei.2; RPC is jr_be-p33).
+    supabase.rpc("get_gym_member_counts"),
+    supabase
+      .from("sessions")
+      .select("id, gym_id, status, scheduled_start, scheduled_end")
+      .in("status", ["active", "scheduled"]),
+  ]);
 
-  if (!gyms || gyms.length === 0) return [];
+  // FATAL: without gyms there is no list at all, and without sessions the list
+  // would quietly report every gym as dark. Both are claims the surface acts on.
+  const fatal: DomainError | null = gymsResult.error
+    ? mapPostgrestError(gymsResult.error, "gyms_list")
+    : sessionsResult.error
+      ? mapPostgrestError(sessionsResult.error, "gyms_list")
+      : null;
+
+  // NOT FATAL: the member count is a subtitle on a gym card, and it is the one
+  // read here that can fail for a deployment reason (the RPC ships in a jr_be
+  // migration, so a frontend that reaches production first sees PGRST202 until
+  // the backend catches up). Degrade the counts to 0 and log it, rather than
+  // blanking a list of live gyms over a decorative number.
+  if (memberCountsResult.error) {
+    console.error(
+      "getGymsWithSessions (member counts):",
+      memberCountsResult.error,
+    );
+  }
+
+  const gyms = gymsResult.data;
+  if (!gyms || gyms.length === 0) return { items: [], error: fatal };
 
   const memberCountMap = new Map<string, number>();
-  for (const a of athletes ?? []) {
-    if (a.primary_gym_id) {
-      memberCountMap.set(a.primary_gym_id, (memberCountMap.get(a.primary_gym_id) ?? 0) + 1);
-    }
+  for (const row of memberCountsResult.data ?? []) {
+    memberCountMap.set(row.gym_id, Number(row.member_count));
   }
 
   const activeMap = new Map<string, number>();
@@ -497,7 +531,7 @@ export async function getGymsWithSessions(
   const nextStartMap = new Map<string, string>();
   const now = new Date().toISOString();
 
-  for (const s of sessions ?? []) {
+  for (const s of sessionsResult.data ?? []) {
     // A session is "live/joinable" iff status='active' AND scheduled_end is in
     // the future. This matches getGymDetail's filter (.gt("scheduled_end", now))
     // so a gym never shows LIVE on the list while detail shows no sessions. We
@@ -514,7 +548,7 @@ export async function getGymsWithSessions(
     }
   }
 
-  // 4. Build GymListItem array, sort by active sessions first then name
+  // Build GymListItem array, sort by active sessions first then name
   const items: GymListItem[] = gyms.map((g) => {
     const activeSessions = activeMap.get(g.id) ?? 0;
     return {
@@ -535,27 +569,144 @@ export async function getGymsWithSessions(
     return a.name.localeCompare(b.name);
   });
 
-  return items;
+  return { items, error: fatal };
 }
 
-/** Fetch gym detail with sessions, RSVP info, and membership check */
-export async function getGymDetail(
+/**
+ * Fetch all active gyms with session counts and member counts.
+ *
+ * LENIENT, AND UNCHANGED ON PURPOSE: it returns whatever it could build and
+ * never reports failure, which is exactly what web `/gyms` has rendered since
+ * it shipped. Callers that have to tell an empty list from a failed read want
+ * `getGymsWithSessionsResult` instead (jits-icei.5).
+ */
+export async function getGymsWithSessions(
+  supabase: Client,
+): Promise<GymListItem[]> {
+  return (await loadGymsWithSessions(supabase)).items;
+}
+
+/**
+ * `getGymsWithSessions` with the failure signal it never had (jits-icei.5).
+ *
+ * `{ ok: false }` means the read failed and the caller knows nothing about what
+ * is on anywhere; `{ ok: true, data: [] }` means no gym currently has a live
+ * session, which is a fact the surface may state. Strictly additive: the legacy
+ * function above keeps its exact behaviour for existing callers.
+ */
+export async function getGymsWithSessionsResult(
+  supabase: Client,
+): Promise<Result<GymListItem[]>> {
+  const { items, error } = await loadGymsWithSessions(supabase);
+  return error ? { ok: false, error } : { ok: true, data: items };
+}
+
+/**
+ * A gym payload salvaged from a FAILED read, for display only.
+ *
+ * `isMemberGym` and `isGymManager` are typed out on purpose. Both default to
+ * false when their read fails, and false is indistinguishable from a real
+ * answer, so a caller reading an authorization decision off a failed read would
+ * silently demote a manager. That is the same defect class this issue is about,
+ * so the compiler refuses it rather than a comment asking nicely. `memberCount`
+ * stays because it is degraded identically on the success path and is
+ * decorative either way.
+ */
+export type PartialGymDetail = Omit<
+  GymDetail,
+  "isMemberGym" | "isGymManager"
+>;
+
+/**
+ * `Result<GymDetail>`, with the salvaged payload attached to the failure
+ * branch. Assignable to `Result<GymDetail>`, so a caller that only cares about
+ * ok/data/error can ignore `partial` entirely.
+ */
+export type GymDetailResult =
+  | { ok: true; data: GymDetail }
+  | { ok: false; error: DomainError; partial: PartialGymDetail | null };
+
+/**
+ * Everything `getGymDetail` and `getGymDetailResult` share: it builds the
+ * payload AND reports the first fatal error, so the two public wrappers differ
+ * only in policy. The legacy wrapper returns the payload exactly as it always
+ * did; the Result wrapper refuses to hand over a payload a failed read has
+ * quietly hollowed out.
+ *
+ * NOTHING HERE CAN REJECT, so every verdict is derived from `error` and never
+ * from a rejection: postgrest-js sets `shouldThrowOnError = false` by default
+ * (PostgrestBuilder.ts:82) and its outer handler turns even a hard network
+ * failure into a RESOLVED `{ data: null, error }`. That is exactly why this
+ * function used to be dangerous: it destructured `data` and dropped `error`, so
+ * a dropped connection, an RLS denial, an expired JWT and a PostgREST 5xx all
+ * arrived at the caller as a gym with no sessions (jits-icei.5).
+ *
+ * FATAL vs DEGRADED. Ten reads across three waves back one payload and they do
+ * not carry equal weight, so they are sorted:
+ *
+ *   FATAL (the Result refuses the payload): the gym row, the session list, and
+ *   the two capability booleans, isMemberGym and isGymManager. A failure in any
+ *   of these lets the surface state something false that the athlete then acts
+ *   on: "nothing is scheduled at your gym", or "you do not manage this gym".
+ *
+ *   DEGRADED (logged, defaulted, payload still returned): per-session
+ *   participant and RSVP counts, creator display names, the athlete's own
+ *   rsvp/checked-in id lists, and the member count. These are decorative or
+ *   self-correcting on the next read, and promoting them to fatal would hide a
+ *   LIVE session behind an error plate, which is the same harm this issue
+ *   exists to prevent, reached by a different route.
+ */
+async function loadGymDetail(
   supabase: Client,
   gymId: string,
   athleteId: string,
-): Promise<GymDetail | null> {
+): Promise<{
+  detail: GymDetail | null;
+  error: DomainError | null;
+  partial: PartialGymDetail | null;
+}> {
+  // Logged rather than swallowed: a degraded read is not worth failing the
+  // screen over, but it should never be invisible either.
+  const logDegraded = (label: string, error: PostgrestError | null) => {
+    if (error) console.error(`getGymDetail (${label}):`, error);
+  };
+
   // 1. Fetch gym
-  const { data: gym } = await supabase
+  const { data: gym, error: gymError } = await supabase
     .from("gyms")
     .select("id, name, city, status")
     .eq("id", gymId)
     .single();
 
-  if (!gym) return null;
+  // `.single()` reports "no rows" as PGRST116 rather than as a null row, so the
+  // two cases separate cleanly: a gym that does not exist is a fact the caller
+  // may state, a read that failed is not. Both still yield no detail, which is
+  // what this function has always returned and what its callers handle.
+  if (gymError) {
+    return {
+      detail: null,
+      partial: null,
+      error:
+        gymError.code === "PGRST116"
+          ? {
+              code: "GYM_NOT_FOUND",
+              message: "That gym could not be found.",
+              raw: gymError,
+            }
+          : mapPostgrestError(gymError, "gym_detail"),
+    };
+  }
+  if (!gym) {
+    return {
+      detail: null,
+      partial: null,
+      error: { code: "GYM_NOT_FOUND", message: "That gym could not be found." },
+    };
+  }
 
   // 2. Fetch current/upcoming sessions for this gym
   const now = new Date().toISOString();
-  const { data: sessions } = await supabase
+  const { data: sessions, error: sessionsError } = await supabase
     .from("sessions")
     .select("id, title, scheduled_start, scheduled_end, status, max_participants, created_by")
     .eq("gym_id", gymId)
@@ -571,23 +722,29 @@ export async function getGymDetail(
     await Promise.all([
       sessionIds.length > 0
         ? supabase.from("session_participants").select("session_id").in("session_id", sessionIds)
-        : Promise.resolve({ data: [] as { session_id: string }[] }),
+        : Promise.resolve({ data: [] as { session_id: string }[], error: null }),
       sessionIds.length > 0
         ? supabase.from("session_rsvps").select("session_id").in("session_id", sessionIds)
-        : Promise.resolve({ data: [] as { session_id: string }[] }),
+        : Promise.resolve({ data: [] as { session_id: string }[], error: null }),
       sessionIds.length > 0
         ? supabase
             .from("athletes")
             .select("id, display_name")
             .in("id", (sessions ?? []).map((s) => s.created_by))
-        : Promise.resolve({ data: [] as { id: string; display_name: string }[] }),
+        : Promise.resolve({ data: [] as { id: string; display_name: string }[], error: null }),
       sessionIds.length > 0
         ? supabase.from("session_rsvps").select("session_id").eq("athlete_id", athleteId).in("session_id", sessionIds)
-        : Promise.resolve({ data: [] as { session_id: string }[] }),
+        : Promise.resolve({ data: [] as { session_id: string }[], error: null }),
       sessionIds.length > 0
         ? supabase.from("session_participants").select("session_id").eq("athlete_id", athleteId).in("session_id", sessionIds)
-        : Promise.resolve({ data: [] as { session_id: string }[] }),
+        : Promise.resolve({ data: [] as { session_id: string }[], error: null }),
     ]);
+
+  logDegraded("participants", participantsResult.error);
+  logDegraded("rsvps", rsvpsResult.error);
+  logDegraded("creators", creatorsResult.error);
+  logDegraded("own rsvps", athleteRsvpsResult.error);
+  logDegraded("own participation", athleteParticipantsResult.error);
 
   // Count participants per session
   const participantCountMap = new Map<string, number>();
@@ -632,7 +789,7 @@ export async function getGymDetail(
   }));
 
   // 5. Check membership, manager status, and count members
-  const [{ data: athleteRow }, { count: memberCount }, { data: managerRow }] = await Promise.all([
+  const [athleteRowResult, memberCountResult, managerRowResult] = await Promise.all([
     supabase
       .from("athletes")
       .select("primary_gym_id")
@@ -651,10 +808,23 @@ export async function getGymDetail(
       .maybeSingle(),
   ]);
 
-  const isMemberGym = athleteRow?.primary_gym_id === gymId;
-  const isGymManager = !!managerRow;
+  logDegraded("member count", memberCountResult.error);
 
-  return {
+  const isMemberGym = athleteRowResult.data?.primary_gym_id === gymId;
+  // `.maybeSingle()` means a non-manager is data null with NO error, so only a
+  // genuine failure lands in managerRowResult.error. Without that distinction a
+  // dropped request silently demotes a manager.
+  const isGymManager = !!managerRowResult.data;
+
+  const fatal: DomainError | null = sessionsError
+    ? mapPostgrestError(sessionsError, "gym_detail")
+    : athleteRowResult.error
+      ? mapPostgrestError(athleteRowResult.error, "gym_detail")
+      : managerRowResult.error
+        ? mapPostgrestError(managerRowResult.error, "gym_detail")
+        : null;
+
+  const detail: GymDetail = {
     id: gym.id,
     name: gym.name,
     city: gym.city,
@@ -662,10 +832,83 @@ export async function getGymDetail(
     sessions: sessionListItems,
     rsvpSessionIds,
     participantSessionIds,
-    memberCount: memberCount ?? 0,
+    memberCount: memberCountResult.count ?? 0,
     isMemberGym,
     isGymManager,
   };
+
+  return {
+    detail,
+    error: fatal,
+    // The payload is offered back to a Result caller even on a fatal error, but
+    // ONLY while the session list itself is trustworthy. A failed capability
+    // read (the athlete row, the manager row) says nothing about which sessions
+    // exist, so hiding a live session over it would be the very harm this
+    // function is being fixed for. A failed SESSIONS read is different: the
+    // empty list below is an artefact of the failure, not an answer, so there
+    // is nothing safe to offer and the caller gets null.
+    partial: sessionsError ? null : detail,
+  };
+}
+
+/**
+ * Fetch gym detail with sessions, RSVP info, and membership check.
+ *
+ * LENIENT, AND UNCHANGED ON PURPOSE: null still means only "the gym row could
+ * not be read", and a failure in any later read still yields a payload with the
+ * affected parts defaulted, exactly as before. Web's three call sites turn null
+ * into `notFound()`, so tightening this would convert a dropped request into a
+ * 404. Callers that must tell "no sessions" from "could not read sessions" want
+ * `getGymDetailResult` instead (jits-icei.5).
+ */
+export async function getGymDetail(
+  supabase: Client,
+  gymId: string,
+  athleteId: string,
+): Promise<GymDetail | null> {
+  return (await loadGymDetail(supabase, gymId, athleteId)).detail;
+}
+
+/**
+ * `getGymDetail` with the failure signal it never had (jits-icei.5).
+ *
+ * `{ ok: true, data }` means the payload is trustworthy on the things a surface
+ * states out loud: which sessions exist, and what the athlete may do here.
+ * `{ ok: false }` means at least one of those is unknown, and GYM_NOT_FOUND
+ * separates a gym that genuinely does not exist from a read that failed.
+ *
+ * ON FAILURE IT STILL HANDS BACK WHAT IT KNOWS, in `partial`. Refusing the
+ * whole payload turned out to be an availability regression on the one surface
+ * this issue exists to fix: nine reads succeeding (including a LIVE session at
+ * the athlete's gym) and a single `gym_managers` read failing would hide that
+ * session behind an error plate, while the old lenient function rendered it.
+ * So the failure branch carries the session list whenever the session list is
+ * trustworthy, and the caller decides. `partial` is null when it is not, and
+ * the capability booleans are typed out of it (see PartialGymDetail) so nobody
+ * can read an authorization answer off a failed read.
+ *
+ * Strictly additive: the legacy function above is untouched, and this type is
+ * assignable to `Result<GymDetail>` for a caller that only wants ok/data/error.
+ */
+export async function getGymDetailResult(
+  supabase: Client,
+  gymId: string,
+  athleteId: string,
+): Promise<GymDetailResult> {
+  const { detail, error, partial } = await loadGymDetail(
+    supabase,
+    gymId,
+    athleteId,
+  );
+  if (error) return { ok: false, error, partial };
+  if (!detail) {
+    return {
+      ok: false,
+      partial: null,
+      error: { code: "GYM_NOT_FOUND", message: "That gym could not be found." },
+    };
+  }
+  return { ok: true, data: detail };
 }
 
 /** Fetch active or upcoming session for dashboard card */
@@ -1820,36 +2063,99 @@ export async function getAthleteVideos(
 }
 
 /**
- * Resolve a short-lived signed playback URL for one match video. Two steps
- * because the RPC payload above omits `storage_path`: read it off
+ * Everything `getMatchVideoSignedUrl` and `getMatchVideoSignedUrlResult` share.
+ *
+ * Two steps because the RPC payload above omits `storage_path`: read it off
  * `match_videos` (participant-gated RLS), then sign it against the private
- * bucket (storage RLS re-checks participance on sign). Returns null when
- * the row is invisible (RLS), the path is missing, or signing fails.
+ * bucket (storage RLS re-checks participance on sign).
+ *
+ * ABSENCE AND FAILURE ARE DIFFERENT THINGS HERE, which is the whole point of
+ * splitting this out. A missing row or a missing path means there is no
+ * recording to play and nothing went wrong; a failed read or a failed signing
+ * means we do not know whether there is one. Collapsing both to null is what
+ * made a transient PostgREST failure render as "Video Unavailable", telling an
+ * athlete their match video does not exist (jits-icei.5).
+ */
+async function loadMatchVideoSignedUrl(
+  supabase: Client,
+  videoId: string,
+  expiresInSeconds: number,
+): Promise<{ url: string | null; error: DomainError | null }> {
+  const { data, error } = await supabase
+    .from("match_videos")
+    .select("storage_path, normalized_path")
+    .eq("id", videoId)
+    .maybeSingle();
+  if (error) {
+    console.error("getMatchVideoSignedUrl:", error);
+    return { url: null, error: mapPostgrestError(error, "match_video_playback") };
+  }
+  // Prefer the normalized H.264/AAC MP4 when the slicer wrote one. It only
+  // exists for webm-family uploads, which iOS Safari and expo-video cannot
+  // play at all; MP4 uploads never have one and keep signing the original.
+  const playbackPath = data?.normalized_path ?? data?.storage_path;
+  // No row (deleted, or hidden from a non-participant by RLS) and no path are
+  // both genuine absence: there is nothing to sign, and the read succeeded.
+  if (!playbackPath) return { url: null, error: null };
+
+  const { data: signed, error: signError } = await supabase.storage
+    .from(MATCH_VIDEO_BUCKET)
+    .createSignedUrl(playbackPath, expiresInSeconds);
+  if (signError) {
+    console.error("getMatchVideoSignedUrl sign:", signError);
+    return {
+      url: null,
+      error: { code: "UNKNOWN", message: signError.message },
+    };
+  }
+  if (!signed?.signedUrl) {
+    // A path that exists but cannot be signed is a failure, not an absence:
+    // storage answered without an error and without a URL.
+    return {
+      url: null,
+      error: { code: "UNKNOWN", message: "Storage returned no signed URL." },
+    };
+  }
+  return { url: signed.signedUrl, error: null };
+}
+
+/**
+ * Resolve a short-lived signed playback URL for one match video. Returns null
+ * when the row is invisible (RLS), the path is missing, or signing fails.
+ *
+ * LENIENT, AND UNCHANGED ON PURPOSE. New callers should prefer
+ * `getMatchVideoSignedUrlResult`, which can tell "there is no recording" from
+ * "we could not find out".
  */
 export async function getMatchVideoSignedUrl(
   supabase: Client,
   videoId: string,
   expiresInSeconds = 3600,
 ): Promise<string | null> {
-  const { data, error } = await supabase
-    .from("match_videos")
-    .select("storage_path, normalized_path")
-    .eq("id", videoId)
-    .maybeSingle();
-  // Prefer the normalized H.264/AAC MP4 when the slicer wrote one. It only
-  // exists for webm-family uploads, which iOS Safari and expo-video cannot
-  // play at all; MP4 uploads never have one and keep signing the original.
-  const playbackPath = data?.normalized_path ?? data?.storage_path;
-  if (error || !playbackPath) {
-    if (error) console.error("getMatchVideoSignedUrl:", error);
-    return null;
-  }
-  const { data: signed, error: signError } = await supabase.storage
-    .from(MATCH_VIDEO_BUCKET)
-    .createSignedUrl(playbackPath, expiresInSeconds);
-  if (signError || !signed?.signedUrl) {
-    if (signError) console.error("getMatchVideoSignedUrl sign:", signError);
-    return null;
-  }
-  return signed.signedUrl;
+  return (await loadMatchVideoSignedUrl(supabase, videoId, expiresInSeconds))
+    .url;
+}
+
+/**
+ * `getMatchVideoSignedUrl` with the failure signal it never had (jits-icei.5).
+ *
+ *   { ok: true, data: string } playable, here is the URL
+ *   { ok: true, data: null }   the read worked and there is no recording
+ *   { ok: false, error }       the read or the signing failed, we know nothing
+ *
+ * The middle case is what the "Video Unavailable" empty state is for; the last
+ * one is a retry, not an empty state. Strictly additive: the legacy function
+ * above is untouched.
+ */
+export async function getMatchVideoSignedUrlResult(
+  supabase: Client,
+  videoId: string,
+  expiresInSeconds = 3600,
+): Promise<Result<string | null>> {
+  const { url, error } = await loadMatchVideoSignedUrl(
+    supabase,
+    videoId,
+    expiresInSeconds,
+  );
+  return error ? { ok: false, error } : { ok: true, data: url };
 }
