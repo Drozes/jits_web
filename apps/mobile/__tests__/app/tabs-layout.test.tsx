@@ -77,11 +77,11 @@ beforeEach(() => {
   mockUseManagedGyms.mockClear();
 });
 
-// Both lists take "arena" in position 2 when the Arena screen lands. Three tabs
-// is a product decision for that window, not a technical limit: expo-router
-// would silently drop a Screen whose route file is missing, so an early
-// registration would render no column rather than crash.
-const EXPECTED_TABS = ["(home)", "leaderboard", "profile"];
+// The shipped 4-up, in bar order. Registration and route file stay in lockstep:
+// expo-router silently drops a Screen whose route file is missing, so a name
+// here with no directory under (tabs) renders no column rather than crashing.
+// The on-disk assertion below is what catches that direction.
+const EXPECTED_TABS = ["(home)", "arena", "leaderboard", "profile"];
 
 describe("(tabs)/_layout", () => {
   it("registers exactly the shipped tabs, in bar order", () => {
@@ -91,9 +91,9 @@ describe("(tabs)/_layout", () => {
 
   it("holds exactly the shipped tabs on disk, so nothing auto-registers", () => {
     // The assertion the mocked-router tests above structurally cannot make:
-    // expo-router turns any directory here into a tab on its own. Adding
-    // app/(app)/(tabs)/arena/ without touching _layout.tsx would still put a
-    // fourth column in the bar, and only this check would notice.
+    // expo-router turns any directory here into a tab on its own, so a
+    // directory dropped in without touching _layout.tsx would still put a
+    // column in the bar, and only this check would notice.
     const onDisk = fs
       .readdirSync(TABS_DIR)
       .filter((name) => name !== "_layout.tsx" && !name.startsWith("."))
