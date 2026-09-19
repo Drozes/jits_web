@@ -365,6 +365,9 @@ describe("recorder ownership is structural, not by convention", () => {
 
   // The WHOLE match-flow tree, not just steps/.
   const MATCH_FLOW_DIR = path.join(__dirname, "../../../components/match-flow");
+  // ... and the whole components tree for the launder scan, because a
+  // launderer does not have to live next to what it launders (defeat 4).
+  const COMPONENTS_DIR = path.join(__dirname, "../../../components");
   const VIDEO_LIB_DIR = path.join(__dirname, "../../../lib/video");
 
   /**
@@ -404,14 +407,24 @@ describe("recorder ownership is structural, not by convention", () => {
 
   /**
    * Does this source launder one of them out under another name? This is
-   * what catches the re-export defeat: the importing step looks innocent,
+   * what catches the re-export defeats: the importing step looks innocent,
    * so the guard has to fail the file doing the laundering.
+   *
+   * Three spellings, because each of the last two was a live hole:
+   *   export { UploadProgressBanner as StatusChip }   named re-export
+   *   export * from "./use-video-recorder"           barrel re-export
+   *   export default UploadProgressBanner            default re-export
+   *
+   * The default form mattered most: it works from inside an ALLOWLISTED
+   * owner file, which by definition is allowed to name the identifier, and
+   * a step importing a default binds it to whatever name it likes.
    */
   function laundersExport(src: string): boolean {
     const s = strippedSource(src);
     return (
       /export\s*\{[^}]*\b(?:UploadProgressBanner|useVideoRecorder)\b[^}]*\}/.test(s) ||
-      /export\s*\*\s*from\s*["'][^"']*(?:use-video-recorder|upload-progress-banner)["']/.test(s)
+      /export\s*\*\s*from\s*["'][^"']*(?:use-video-recorder|upload-progress-banner)["']/.test(s) ||
+      /export\s+default\s+(?:function\s+|class\s+)?(?:UploadProgressBanner|useVideoRecorder)\b/.test(s)
     );
   }
 
@@ -440,9 +453,15 @@ describe("recorder ownership is structural, not by convention", () => {
     for (const owner of OWNERS) expect(present).toContain(owner);
   });
 
-  it("nothing re-exports the recorder or the banner under another name", () => {
-    const files = [...sourceFiles(MATCH_FLOW_DIR), ...sourceFiles(VIDEO_LIB_DIR)];
-    const offenders = files.filter((file) => laundersExport(fs.readFileSync(file, "utf8")));
+  it("nothing ANYWHERE under components/ re-exports them under another name", () => {
+    // Deliberately not limited to match-flow/ and not exempting the owner
+    // allowlist: a launderer can sit anywhere the consuming step can
+    // import from, and an owner is exactly the file best placed to launder.
+    const files = [...sourceFiles(COMPONENTS_DIR), ...sourceFiles(VIDEO_LIB_DIR)];
+    expect(files.length).toBeGreaterThan(20);
+    const offenders = files
+      .filter((file) => laundersExport(fs.readFileSync(file, "utf8")))
+      .map((file) => path.relative(COMPONENTS_DIR, file));
     expect(offenders).toEqual([]);
   });
 
@@ -471,6 +490,60 @@ describe("recorder ownership is structural, not by convention", () => {
     expect(claimsRecorderOwnership(`import { StatusChip } from "../chip";`)).toBe(false);
   });
 
+  it("catches DEFEAT 4, a launderer outside the match-flow tree", () => {
+    // components/video/chip.tsx re-exporting both under new names, consumed
+    // by a step whose own source names neither. The step is invisible to
+    // the ownership scan by construction, so the launder scan has to reach
+    // outside match-flow/ to see the file doing it. That is why it runs
+    // over the whole components tree.
+    const outsider = `
+      export { UploadProgressBanner as StatusChip } from "../match-flow/upload-progress-banner";
+      export { useVideoRecorder as useRec } from "@/lib/video/use-video-recorder";
+    `;
+    expect(laundersExport(outsider)).toBe(true);
+
+    const consumer = `
+      import { StatusChip, useRec } from "@/components/video/chip";
+      export function LiveStep() { const r = useRec("M", "A"); return <StatusChip />; }
+    `;
+    // Confirming WHY the scan has to be wide: the consumer itself is clean.
+    expect(claimsRecorderOwnership(consumer)).toBe(false);
+
+    // And the scan really does reach outside match-flow/.
+    const scanned = sourceFiles(COMPONENTS_DIR).map((f) => path.relative(COMPONENTS_DIR, f));
+    expect(scanned.some((f: string) => !f.startsWith("match-flow/"))).toBe(true);
+  });
+
+  it("catches DEFEAT 5, a default export added to an ALLOWLISTED owner", () => {
+    // The owner is allowed to name the identifier, so the ownership scan
+    // cannot help, and a default import in a step binds any name it likes.
+    expect(laundersExport(`export default UploadProgressBanner;`)).toBe(true);
+    expect(laundersExport(`export default function UploadProgressBanner() {}`)).toBe(true);
+    expect(laundersExport(`export default useVideoRecorder;`)).toBe(true);
+    // `as default` inside braces was already covered by the named form.
+    expect(laundersExport(`export { UploadProgressBanner as default };`)).toBe(true);
+    // The legitimate definition is NOT a default re-export.
+    expect(laundersExport(`export function UploadProgressBanner() {}`)).toBe(false);
+    expect(laundersExport(`export default function MatchRecorderStatus() {}`)).toBe(false);
+  });
+
+  /**
+   * KNOWN RESIDUAL, written down rather than chased.
+   *
+   * A source scan cannot see through a WRAPPER. A file that renders the
+   * banner inside a component of its own, and exports that component under
+   * a new name, is caught only because the wrapper's source still names
+   * `UploadProgressBanner`, and only where the ownership scan reaches
+   * (components/match-flow). A wrapper placed elsewhere under components/
+   * is caught by neither scan today: it is not a re-export, so
+   * `laundersExport` does not match, and it is outside the ownership scan.
+   *
+   * Closing that would mean widening the ownership allowlist over the whole
+   * components tree, which buys little: a wrapper is a deliberate act with
+   * a component boundary in it, not the accidental shape these guards
+   * exist to catch, and the render-level tests above already fail if the
+   * chip stops appearing on the summary. Noted so the limit is a choice.
+   */
   it("does not fire on prose that merely mentions them", () => {
     // Comments are stripped, so the house docblock style that names the
     // component a file was ported from is not a false positive.
