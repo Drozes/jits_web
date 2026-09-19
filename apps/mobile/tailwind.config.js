@@ -31,7 +31,8 @@
 // Web `var(--text-secondary)`     → mobile `text-ink-2`
 // Web `var(--text-tertiary)`      → mobile `text-ink-3`
 // Web `var(--text-on-accent)`     → mobile `text-ink-on-cta`
-// Web `var(--accent-cta)`         → mobile `bg-cta` / `text-cta` / `border-cta`
+// Web `var(--accent-cta)`         → mobile `bg-cta` / `border-cta` (brand red)
+// Web `var(--accent-cta-text)`    → mobile `text-cta` (AA-tuned red, see textColor below)
 // Web `var(--accent-cta-hover)`   → mobile `bg-cta-hover`
 // Web `var(--state-positive)`     → mobile `bg-positive` / `text-positive` / `border-positive`
 // Web `var(--state-negative)`     → mobile `bg-negative` / `text-negative` / `border-negative`
@@ -98,7 +99,9 @@ const cssVarColors = {
   "ink-2": "var(--text-secondary)",
   "ink-3": "var(--text-tertiary)",
   "ink-on-cta": "var(--text-on-accent)",
-  // Accent + state
+  // Accent + state. `cta` is the BRAND red and is used for fills and rules.
+  // `text-cta` is deliberately remapped below to `--accent-cta-text`, because
+  // the brand red cannot reach 4.5:1 as text on any surface in either theme.
   cta: "var(--accent-cta)",
   "cta-hover": "var(--accent-cta-hover)",
   positive: "var(--state-positive)",
@@ -137,23 +140,25 @@ const lightVars = {
   "--gold": "hsl(38, 92%, 50%)",
   "--brand-orange": "hsl(25, 95%, 53%)",
   "--deep-red": "hsl(355, 67%, 47%)",
-  // ELO (Paddock family)
-  "--bg-primary": "#F2F4F7",
+  // ELO (Paddock family). Must stay byte-identical to `lightTokens` in lib/tokens.ts;
+  // __tests__/lib/tokens-contrast.test.ts fails the build if the two drift.
+  "--bg-primary": "#F8FAFC",
   "--bg-secondary": "#E8EBF0",
   "--bg-elevated": "#DEE2E9",
   "--bg-elevated-hover": "#D2D7E0",
   "--text-primary": "#0D0F14",
   "--text-secondary": "#4B5563",
-  "--text-tertiary": "#6B7280",
-  "--text-on-accent": "#E8EDF2",
+  "--text-tertiary": "#575C68",
+  "--text-on-accent": "#0D0F14",
   "--accent-cta": "#E63946",
-  "--accent-cta-hover": "#C42939",
-  "--state-positive": "#15803D",
-  "--state-negative": "#E63946",
-  "--state-neutral": "#6B7280",
-  "--border-hairline": "rgba(13, 15, 20, 0.14)",
-  "--border-hairline-faint": "rgba(13, 15, 20, 0.07)",
-  "--border-hairline-strong": "rgba(13, 15, 20, 0.25)",
+  "--accent-cta-text": "#AC2B34",
+  "--accent-cta-hover": "#F0556B",
+  "--state-positive": "#116A33",
+  "--state-negative": "#AC2B34",
+  "--state-neutral": "#575C68",
+  "--border-hairline": "rgba(13, 15, 20, 0.22)",
+  "--border-hairline-faint": "rgba(13, 15, 20, 0.11)",
+  "--border-hairline-strong": "rgba(13, 15, 20, 0.34)",
 };
 
 module.exports = {
@@ -168,6 +173,13 @@ module.exports = {
   theme: {
     extend: {
       colors: cssVarColors,
+      // Text-only override. `bg-cta` and `border-cta` keep the brand red
+      // (var(--accent-cta), #E63946), while `text-cta` resolves to the
+      // AA-tuned red. This keeps the ~18 existing `text-cta` call sites
+      // working unchanged and leaves app.json's push accent untouched.
+      textColor: {
+        cta: "var(--accent-cta-text)",
+      },
       borderRadius: {
         // ELO radius scale: sharp corners. lg (8px) is reserved for modals only.
         none: "0",
