@@ -140,8 +140,18 @@ const TEXT_KEYS = [
  */
 const ACCENT_FILL_KEYS = ["accentCta", "accentCtaHover"] as const;
 
-/** Tokens drawn as non-text marks (Plate accent rails, selected borders, bars). */
-const NON_TEXT_KEYS = ["accentCta", "statePositive", "stateNegative"] as const;
+/**
+ * Tokens drawn as non-text marks (Plate accent rails, selected borders, bars).
+ * `accentCtaHover` is here as well as in ACCENT_FILL_KEYS: the pressed button is
+ * a fill with its own boundary against the page, so it owes 1.4.11 on top of the
+ * 4.5:1 it owes its label.
+ */
+const NON_TEXT_KEYS = [
+  "accentCta",
+  "accentCtaHover",
+  "statePositive",
+  "stateNegative",
+] as const;
 
 /**
  * Non-text pairs that cannot reach 3:1 without moving a locked brand color.
@@ -154,6 +164,22 @@ const NON_TEXT_EXCEPTIONS: Record<string, number> = {
   // and gym-stats-trend.tsx:44, where the highlighted `bg-cta` bar sits directly
   // against `bg-surface-4` bars. Pre-existing and accepted, not introduced here.
   "light:accentCta:bgElevatedHover": 2.89,
+
+  // The light pressed CTA fill. These are PERMANENT, not a todo: no pressed-fill
+  // color exists that satisfies both constraints at once, so do not burn an
+  // afternoon re-tuning the red.
+  //
+  //   Holding the #0D0F14 label at 4.5:1 requires fill luminance >= 0.1965.
+  //   Holding 3:1 against bgElevatedHover #D2D7E0 requires fill luminance
+  //   <= 0.1923. That window is EMPTY.
+  //
+  // Against bgElevated a window does exist but is only 0.023 wide in luminance,
+  // which is not a tolerance worth balancing a brand color on. The label is the
+  // accessibility-critical half of the pair (it carries the words), so it wins
+  // and the fill boundary is recorded here. Actual fill #F0556B is L=0.2608.
+  "light:accentCtaHover:bgSecondary": 2.83,
+  "light:accentCtaHover:bgElevated": 2.6,
+  "light:accentCtaHover:bgElevatedHover": 2.34,
 };
 
 const THEMES: Array<[string, ColorTokens]> = [
@@ -360,16 +386,25 @@ describe("text-ink-on-cta is only ever used on an accent fill", () => {
   // rather than merely low-contrast text. Before the label was darkened that
   // mistake was survivable; now it is not, so it gets a guard.
   //
-  // This is a co-location check at file granularity: any file that uses the
-  // label class must also paint a `bg-cta` fill. It cannot prove the two are on
-  // the same element, but it does catch the class escaping into a component
-  // that has no CTA at all, which is the failure mode that matters.
+  // This is a WEAK guard, not an invariant: a co-location check at file
+  // granularity. Any file that applies the label must also paint a CTA fill. It
+  // cannot prove the two are on the same element, but it does catch the label
+  // escaping into a file that has no CTA at all, which is the failure mode that
+  // matters.
+  //
+  // Both spellings count, because the label reaches components two ways: the
+  // NativeWind class `text-ink-on-cta`, and the runtime accessor
+  // `tokens.textOnAccent` for RN props that take no className. lib/ is scanned
+  // for the same reason: lib/error-tracking/sentry.ts pairs
+  // `backgroundColor: t.accentCta` with `color: t.textOnAccent`, and an earlier
+  // version of this scan could not see it.
   const fs = require("fs");
   const path = require("path");
   const MOBILE_ROOT = path.resolve(__dirname, "..", "..");
-  const SCAN_DIRS = ["app", "components"];
-  const LABEL_CLASS = "text-ink-on-cta";
-  const FILL_CLASS = "bg-cta";
+  const SCAN_DIRS = ["app", "components", "lib"];
+  // \b stops `accentCta` from matching `accentCtaText`, which implies no fill.
+  const LABEL_PATTERN = /text-ink-on-cta|\btextOnAccent\b/;
+  const FILL_PATTERN = /bg-cta|\baccentCta\b|\baccentCtaHover\b/;
 
   function walk(dir: string, out: string[] = []): string[] {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -384,23 +419,28 @@ describe("text-ink-on-cta is only ever used on an accent fill", () => {
     return out;
   }
 
-  it("every file using the label class also paints a CTA fill", () => {
-    const files = SCAN_DIRS.flatMap((dir) => walk(path.join(MOBILE_ROOT, dir)));
-    const offenders = files
-      .filter((file: string) => {
-        const source: string = fs.readFileSync(file, "utf8");
-        return source.includes(LABEL_CLASS) && !source.includes(FILL_CLASS);
-      })
+  const labelUsers = () =>
+    SCAN_DIRS.flatMap((dir) => walk(path.join(MOBILE_ROOT, dir))).filter(
+      (file: string) => LABEL_PATTERN.test(fs.readFileSync(file, "utf8")),
+    );
+
+  it("every file applying the CTA label also paints a CTA fill", () => {
+    const offenders = labelUsers()
+      .filter((file: string) => !FILL_PATTERN.test(fs.readFileSync(file, "utf8")))
       .map((file: string) => path.relative(MOBILE_ROOT, file));
 
     expect(offenders).toEqual([]);
   });
 
-  it("actually finds the label class, so the scan cannot pass vacuously", () => {
-    const files = SCAN_DIRS.flatMap((dir) => walk(path.join(MOBILE_ROOT, dir)));
-    const users = files.filter((file: string) =>
-      fs.readFileSync(file, "utf8").includes(LABEL_CLASS),
+  it("actually finds the label, so the scan cannot pass vacuously", () => {
+    // Guards against a rename or a bad SCAN_DIRS silently emptying the scan.
+    expect(labelUsers().length).toBeGreaterThan(0);
+  });
+
+  it("reaches the runtime accessor form in lib/, not just the class form", () => {
+    const seen = labelUsers().map((file: string) =>
+      path.relative(MOBILE_ROOT, file),
     );
-    expect(users.length).toBeGreaterThan(0);
+    expect(seen).toContain("lib/error-tracking/sentry.ts");
   });
 });
