@@ -6,6 +6,17 @@ import {
   removeUploadedObject,
   uploadRecording,
 } from "./upload-recording";
+import {
+  CAMERA_READY_TIMEOUT_MS,
+  CAP_DETECTION_TOLERANCE_MS,
+  PENDING_STOP_MAX_ATTEMPTS,
+  PENDING_STOP_RETRY_MS,
+  RECORD_START_MAX_ATTEMPTS,
+  RECORD_START_RETRY_MS,
+  STOP_WATCHDOG_MS,
+  computeMaxRecordingSeconds,
+} from "./recording-limits";
+import { setMatchUpload, useMatchUpload } from "./match-upload-store";
 
 /**
  * State machine for the recorder. Mirrors the web hook's `uploadStatus`
@@ -39,18 +50,28 @@ export type RecordingState =
 // CAVEAT: the exact native timing window is verified only against the JS
 // contract in unit tests — it still needs verification on physical
 // iOS/Android hardware (tracked in jits-a8y.13).
-const PENDING_STOP_RETRY_MS = 250;
-const PENDING_STOP_MAX_ATTEMPTS = 8;
-
+//
 // Start hardening (observed live on iOS 26 hardware): expo-camera's
 // onCameraReady can fire BEFORE the native session can actually record, and
 // sometimes never fires at all. So no single readiness signal is trusted:
 // a not-ready recordAsync rejection is retried on an interval (~8s budget),
 // and a deferred start falls through after a timeout if onCameraReady never
 // arrives, letting the retry loop probe the camera directly.
-const RECORD_START_RETRY_MS = 500;
-const RECORD_START_MAX_ATTEMPTS = 16;
-const CAMERA_READY_TIMEOUT_MS = 3000;
+//
+// Both retry budgets live in ./recording-limits because the recording cap
+// is derived from them: the cap has to outlast the worst-case start and
+// stop delays or it races the match clock (jits-2zpe).
+
+/**
+ * Why a recording ended before the match did. `null` is the normal case:
+ * the clip covers the match. Anything else means the clip is short and the
+ * user has to be told rather than shown a plain success.
+ *
+ *   limit       : the OS `maxDuration` backstop fired
+ *   interrupted : recordAsync settled on its own for some other reason
+ *                 (a call, backgrounding, a stop whose bookkeeping was lost)
+ */
+export type RecordingTruncation = "limit" | "interrupted";
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -100,8 +121,23 @@ export interface UseVideoRecorderReturn {
    * until readiness and this callback resumes it.
    */
   markCameraReady: () => void;
+  /**
+   * Wire to the viewfinder's unmount. The recorder outlives the view now,
+   * so readiness state and the deferred-start backstop have to be torn
+   * down when the camera goes away, or they fire against a null ref.
+   */
+  releaseCamera: () => void;
   /** Populated after a successful upload + match_videos INSERT. */
   videoId: string | null;
+  /**
+   * Set when the recording ended before the match did. The clip is still
+   * uploaded (a short clip beats no clip), but callers MUST surface this:
+   * a truncated recording reported as a plain success is exactly the
+   * silent data loss jits-2zpe was filed for.
+   */
+  truncation: RecordingTruncation | null;
+  /** The OS cap actually in force, in seconds. Exposed for diagnostics. */
+  maxDurationSeconds: number;
 }
 
 /**
@@ -121,10 +157,18 @@ export interface UseVideoRecorderReturn {
  *                            present before `start()` is called; pass
  *                            `useAuth().athlete?.id`. Recorder no-ops
  *                            with an error state when null.
+ * @param matchDurationSeconds
+ *                           The match's configured `duration_seconds`. The
+ *                            OS recording cap is derived from it (see
+ *                            ./recording-limits) so it can never sit exactly
+ *                            on the match clock again. Omitted or unknown
+ *                            falls back to the ceiling: over-recording is
+ *                            recoverable, truncation is not.
  */
 export function useVideoRecorder(
   matchId: string,
   uploaderAthleteId: string | null,
+  matchDurationSeconds?: number | null,
 ): UseVideoRecorderReturn {
   const cameraRef = React.useRef<CameraView | null>(null);
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
@@ -132,7 +176,23 @@ export function useVideoRecorder(
   const [state, setState] = React.useState<RecordingState>("idle");
   const [error, setError] = React.useState<string | null>(null);
   const [uploadProgress] = React.useState<number | null>(null);
-  const [videoId, setVideoId] = React.useState<string | null>(null);
+  // The upload's OUTCOME is not component state. It is keyed on the match
+  // (see ./match-upload-store) so it survives this hook being unmounted and
+  // replaced, which the wizard does on every match, and so an upload that
+  // finishes after this hook is gone still records its result somewhere the
+  // UI can find it. `videoId` and `truncation` below are reads of that
+  // store, not a second copy of it.
+  const upload = useMatchUpload(matchId);
+  const videoId = upload?.videoId ?? null;
+  const truncation = upload?.truncation ?? null;
+  const truncationRef = React.useRef<RecordingTruncation | null>(null);
+  // Wall-clock at which the live recordAsync attempt was issued. Lets an
+  // unexpected settle be classified as "hit the OS cap" vs "interrupted"
+  // instead of passing silently as a normal completion.
+  const recordStartedAtRef = React.useRef<number | null>(null);
+  // The OS cap for THIS match, derived from its configured duration rather
+  // than hardcoded, so it cannot drift back into a tie with the match clock.
+  const maxDurationSeconds = computeMaxRecordingSeconds(matchDurationSeconds);
   const stoppingRef = React.useRef(false);
   // Stop requested before the recorder reached 'recording' (End fired on a
   // very short match while start() was mid-flight). Honored by start().
@@ -150,6 +210,9 @@ export function useVideoRecorder(
   // markCameraReady and unmount can cancel it; an uncancelled timer leaks
   // past the test run (Jest force-exit) and can fire after teardown.
   const cameraReadyTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Watchdog out of 'stopping' (see stop()). Held so the recordAsync await
+  // and unmount can cancel it.
+  const stopWatchdogRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   // Distinguishes devices in the shared Metro log stream.
   const logTag = `[${(uploaderAthleteId ?? "anon").slice(0, 8)}]`;
   // Read-at-call-time state so stop() works from stale closures (broadcast
@@ -170,6 +233,22 @@ export function useVideoRecorder(
     setError(err);
   }, [logTag]);
 
+  /**
+   * Record that this clip does not cover the whole match. Kept in a ref as
+   * well as state so `stop()` can read it from a stale closure and so it
+   * survives the screen that started the recording unmounting mid-upload.
+   */
+  const markTruncated = React.useCallback((reason: RecordingTruncation) => {
+    truncationRef.current = reason;
+    console.warn(
+      `[video] ${logTag} recording ended before the match did (${reason}); clip is short`,
+    );
+    // Written to the store, not to local state, and deliberately NOT gated
+    // on mountedRef: this can land after the screen is gone and it still
+    // has to reach whatever surface is showing next.
+    setMatchUpload(matchId, { truncation: reason });
+  }, [logTag, matchId]);
+
   const requestPermission = React.useCallback(async () => {
     await requestCameraPermission();
     await requestMicPermission();
@@ -185,6 +264,10 @@ export function useVideoRecorder(
     // A fresh Date.now() per attempt would strand the first attempt's
     // half-written object at a stale path (double-orphan).
     const storagePath = buildVideoPath(matchId, uploaderAthleteId);
+    // Every store write from here down is unguarded on purpose. This chain
+    // runs to completion past unmount, and its result has to land whether
+    // or not anything is still mounted to hear it.
+    setMatchUpload(matchId, { status: "uploading", storagePath, error: null });
     try {
       // First attempt skips orphan compensation: a transient DB failure
       // must not delete the just-uploaded object only for the retry to
@@ -197,7 +280,7 @@ export function useVideoRecorder(
         storagePath,
         skipCompensation: true,
       });
-      if (mountedRef.current) setVideoId(r.videoId);
+      setMatchUpload(matchId, { status: "uploaded", videoId: r.videoId, error: null });
       transition("uploaded");
     } catch (firstErr) {
       // Retry once before giving up; same storage path, so the upsert
@@ -206,7 +289,7 @@ export function useVideoRecorder(
       // here removes the object (no orphan after the last attempt).
       try {
         const r = await uploadRecording({ fileUri, matchId, uploaderAthleteId, storagePath });
-        if (mountedRef.current) setVideoId(r.videoId);
+        setMatchUpload(matchId, { status: "uploaded", videoId: r.videoId, error: null });
         transition("uploaded");
       } catch (secondErr) {
         // If attempt 1 left its object in the bucket (DB write failed
@@ -222,6 +305,7 @@ export function useVideoRecorder(
           await removeUploadedObject(storagePath);
         }
         const msg = secondErr instanceof Error ? secondErr.message : String(secondErr);
+        setMatchUpload(matchId, { status: "error", error: `Upload failed: ${msg}` });
         transition("error", `Upload failed: ${msg}`);
         // Re-surface for logging by callers (toast).
         // Web treats this as recoverable; we do too.
@@ -252,6 +336,19 @@ export function useVideoRecorder(
       cameraReadyTimeoutRef.current = setTimeout(() => {
         cameraReadyTimeoutRef.current = null;
         if (!mountedRef.current) return;
+        // The viewfinder can go away while this backstop is pending: the
+        // recorder now outlives the step, so a match that ends within the
+        // timeout leaves the ref null. Re-entering start() would then hit
+        // the "Camera not ready" branch and, because the status chip is
+        // persistent, accuse the user of a camera failure for the rest of
+        // the wizard over a match that was simply short.
+        if (!cameraRef.current) {
+          startWhenReadyRef.current = false;
+          console.log(
+            `[video] ${logTag} camera went away while start was deferred; nothing to record`,
+          );
+          return;
+        }
         if (startWhenReadyRef.current && stateRef.current === "idle") {
           startWhenReadyRef.current = false;
           cameraReadyRef.current = true;
@@ -274,7 +371,13 @@ export function useVideoRecorder(
         console.log(
           `[video] ${logTag} recordAsync attempt ${attempt} (cam perm=${cameraPermission?.granted}, mic perm=${micPermission?.granted})`,
         );
-        const promise = cam.recordAsync({ maxDuration: 600 });
+        // maxDuration is a LAST-RESORT backstop against a stopRecording the
+        // hardware silently dropped, never the thing that ends a normal
+        // match recording. It used to be a hardcoded 600, exactly the
+        // backend's default duration_seconds, so it fired before the match
+        // ended on every full-length match (jits-2zpe).
+        recordStartedAtRef.current = Date.now();
+        const promise = cam.recordAsync({ maxDuration: maxDurationSeconds });
         recordPromiseRef.current = promise;
         // A stop requested while start() was still spinning up must not be
         // dropped; honor it as soon as the native recorder is live so very
@@ -300,18 +403,38 @@ export function useVideoRecorder(
               console.warn(`[video] ${logTag} recordAsync resolved without a URI; clip skipped`);
               transition("idle");
             }
-          } else if (result?.uri) {
+          } else {
             // The OS ended the recording without an explicit stop() (time
             // cap, interruption, or a stop whose bookkeeping was lost).
-            // The clip is real: save it rather than discard it.
-            console.warn(
-              `[video] ${logTag} recordAsync settled without an explicit stop; uploading clip anyway`,
-            );
-            await handleUpload(result.uri);
-          } else {
-            console.warn(
-              `[video] ${logTag} recordAsync settled while not stopping, no URI; nothing to upload`,
-            );
+            // Either way this is NOT a normal completion: the match is
+            // still running, so whatever we have stops short of the end and
+            // the user has to be told (jits-2zpe).
+            const elapsedMs = recordStartedAtRef.current
+              ? Date.now() - recordStartedAtRef.current
+              : 0;
+            const hitCap = elapsedMs >= maxDurationSeconds * 1000 - CAP_DETECTION_TOLERANCE_MS;
+            markTruncated(hitCap ? "limit" : "interrupted");
+            if (result?.uri) {
+              // The clip is real: save it rather than discard it.
+              console.warn(
+                `[video] ${logTag} recordAsync settled without an explicit stop after ${Math.round(elapsedMs / 1000)}s (cap ${maxDurationSeconds}s); uploading the short clip anyway`,
+              );
+              await handleUpload(result.uri);
+            } else {
+              // No file at all. This branch used to return with no
+              // transition(), stranding the machine in 'recording' with
+              // nothing on screen: the one path where the cap could fire
+              // and the user was told nothing.
+              console.warn(
+                `[video] ${logTag} recordAsync settled while not stopping after ${Math.round(elapsedMs / 1000)}s with no URI; the recording was lost`,
+              );
+              transition(
+                "error",
+                hitCap
+                  ? "Recording hit its time limit and no clip was saved."
+                  : "Recording stopped early and no clip was saved.",
+              );
+            }
           }
           return;
         } catch (err) {
@@ -356,8 +479,22 @@ export function useVideoRecorder(
       }
     } finally {
       recordPromiseRef.current = null;
+      recordStartedAtRef.current = null;
+      // The promise settled, so the stop watchdog has nothing left to guard.
+      if (stopWatchdogRef.current) {
+        clearTimeout(stopWatchdogRef.current);
+        stopWatchdogRef.current = null;
+      }
     }
-  }, [cameraPermission?.granted, micPermission?.granted, handleUpload, transition, logTag]);
+  }, [
+    cameraPermission?.granted,
+    micPermission?.granted,
+    handleUpload,
+    transition,
+    logTag,
+    maxDurationSeconds,
+    markTruncated,
+  ]);
 
   startRef.current = start;
 
@@ -373,12 +510,36 @@ export function useVideoRecorder(
     }
   }, [start]);
 
+  const releaseCamera = React.useCallback(() => {
+    if (cameraReadyTimeoutRef.current) {
+      clearTimeout(cameraReadyTimeoutRef.current);
+      cameraReadyTimeoutRef.current = null;
+    }
+    // Readiness belongs to the capture session that just went away. Leaving
+    // it true would let a later start() run recordAsync against a null ref.
+    cameraReadyRef.current = false;
+    startWhenReadyRef.current = false;
+  }, []);
+
   const stop = React.useCallback(async () => {
     if (stateRef.current !== "recording") {
       // Not recording *yet*: if the recorder is still idle (start() queued
       // or mid-flight), register the intent so start() stops + uploads as
-      // soon as recording begins. States past 'recording' need no stop.
-      if (stateRef.current === "idle") pendingStopRef.current = true;
+      // soon as recording begins.
+      if (stateRef.current === "idle") {
+        pendingStopRef.current = true;
+        return;
+      }
+      // Past 'recording' there is nothing left to stop, but this must not
+      // pass silently when the recording already ended on its own: the
+      // match ran on past the end of the clip, which is precisely the
+      // truncation the user is being shown (jits-2zpe). `truncation`
+      // carries that to the UI; this log carries it to a device console.
+      if (truncationRef.current) {
+        console.warn(
+          `[video] ${logTag} stop requested after the recording had already ended (${truncationRef.current}) in state ${stateRef.current}; the clip does not cover the end of the match`,
+        );
+      }
       return;
     }
     const cam = cameraRef.current;
@@ -401,6 +562,27 @@ export function useVideoRecorder(
     if (recordPromiseRef.current) {
       void issuePendingStop(cam, recordPromiseRef.current);
     }
+    // ... and if even THAT is ignored, 'stopping' had no exit at all: the
+    // re-issue loop gives up after its budget and the state machine sat in
+    // 'stopping' forever. That used to be invisible because the live step
+    // unmounted and took the camera with it. Now the viewfinder is held
+    // open through 'stopping' (so the native session is not torn down
+    // mid-finalize), which would mean a full-width live preview, a
+    // permanent "Finishing recording..." spinner and a lit mic indicator
+    // sitting over the result, confirm and summary steps.
+    if (stopWatchdogRef.current) clearTimeout(stopWatchdogRef.current);
+    stopWatchdogRef.current = setTimeout(() => {
+      stopWatchdogRef.current = null;
+      if (!mountedRef.current) return;
+      if (stateRef.current !== "stopping") return;
+      // stoppingRef stays TRUE on purpose: if the promise settles late the
+      // clip still takes the normal stopped path and uploads, rather than
+      // being mislabelled as an interruption.
+      transition(
+        "error",
+        "The recording did not finish. The camera stopped responding, so this clip may not have been saved.",
+      );
+    }, STOP_WATCHDOG_MS);
   }, [transition, logTag]);
 
   // Cleanup: if the hook unmounts mid-recording, stop the camera so the
@@ -411,6 +593,10 @@ export function useVideoRecorder(
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
+      if (stopWatchdogRef.current) {
+        clearTimeout(stopWatchdogRef.current);
+        stopWatchdogRef.current = null;
+      }
       if (cameraReadyTimeoutRef.current) {
         clearTimeout(cameraReadyTimeoutRef.current);
         cameraReadyTimeoutRef.current = null;
@@ -436,6 +622,9 @@ export function useVideoRecorder(
     start,
     stop,
     markCameraReady,
+    releaseCamera,
     videoId,
+    truncation,
+    maxDurationSeconds,
   };
 }

@@ -6,11 +6,10 @@ import { useSessionMatchTimer } from "@jits/shared/hooks/use-session-match-timer
 import { useLiveControls } from "@/lib/match-flow/use-live-controls";
 import { useMatchKeepAwake } from "@/lib/match-flow/use-keep-awake";
 import { matchHaptics } from "@/lib/match-flow/use-haptics";
-import { useVideoRecorder } from "@/lib/video/use-video-recorder";
+import type { UseVideoRecorderReturn } from "@/lib/video/use-video-recorder";
+import { AUTO_END_DELAY_MS } from "@/lib/video/recording-limits";
 import { TimerDisplay } from "./timer-display";
 import { LiveControls } from "./live-controls";
-import { CameraOverlay } from "../camera-overlay";
-import { UploadProgressBanner } from "../upload-progress-banner";
 
 interface LiveStepProps {
   matchId: string;
@@ -20,11 +19,13 @@ interface LiveStepProps {
   pausedAt: string | null;
   totalPausedDuration: number;
   /**
-   * Current athlete's `athletes.id` for setting `match_videos.uploaded_by`
-   * per BE contract §2.1 + §8.1. May be null briefly during AuthProvider
-   * hydration; recorder will surface an error state until populated.
+   * The wizard's recorder, owned by `MatchRecorderProvider` ABOVE the step
+   * boundary. It is deliberately not created here: ending a match unmounts
+   * this step in the same tick and the upload only starts after that, so a
+   * recorder scoped to this step could never report its own outcome
+   * (jits-od3). The viewfinder and the status chip live up there too.
    */
-  uploaderAthleteId: string | null;
+  recorder: UseVideoRecorderReturn;
   /** Advance to the result step. Called after end_match completes or
    * after we receive a `match_ended` broadcast from the opponent. */
   onEnded: () => void;
@@ -33,17 +34,22 @@ interface LiveStepProps {
 const TIME_WARNING_SECONDS = 10;
 
 /**
- * Step 4: live timer with pause / resume / end controls. Mounts a
- * camera preview, auto-starts recording on entry, auto-stops on end.
- * Activates the screen wake-lock for the duration of the step and fires
- * haptics on key events (match start, time-warning, match end).
+ * Step 4: live timer with pause / resume / end controls. Auto-starts the
+ * wizard's recorder on entry and stops it on end. Activates the screen
+ * wake-lock for the duration of the step and fires haptics on key events
+ * (match start, time-warning, match end).
+ *
+ * The viewfinder and the upload status chip are rendered by the wizard,
+ * not here: the camera has to be warm BEFORE this step mounts, and the
+ * upload outcome arrives AFTER it unmounts, so neither can be scoped to
+ * this step (jits-2zpe, jits-od3).
  *
  * Recording is best-effort: if the user denies camera access, the match
- * runs as before and a small banner explains the fallback.
+ * runs as before and the wizard's camera slot explains the fallback.
  *
  * ELO design system: timekeeper-view (D7 wireframe lines 1213-1238).
- * The camera viewfinder sits up top, then the hero mono timer, then
- * pause / end controls, then the upload status banner.
+ * The camera viewfinder sits up top (wizard-level), then the hero mono
+ * timer, then pause / end controls.
  */
 export function LiveStep(props: LiveStepProps) {
   const {
@@ -53,7 +59,7 @@ export function LiveStep(props: LiveStepProps) {
     startedAt,
     pausedAt,
     totalPausedDuration,
-    uploaderAthleteId,
+    recorder,
     onEnded,
   } = props;
   const endedRef = React.useRef(false);
@@ -64,7 +70,6 @@ export function LiveStep(props: LiveStepProps) {
 
   useMatchKeepAwake(true);
 
-  const recorder = useVideoRecorder(matchId, uploaderAthleteId);
   const timer = useSessionMatchTimer({ durationSeconds, startedAt, pausedAt, totalPausedDuration });
   const sync = useSessionMatchSync({
     supabase,
@@ -125,21 +130,13 @@ export function LiveStep(props: LiveStepProps) {
       expiryFiredRef.current = true;
       const t = setTimeout(() => {
         if (!endedRef.current) void handleEnd();
-      }, 1000);
+      }, AUTO_END_DELAY_MS);
       return () => clearTimeout(t);
     }
   }, [timer.remaining, timer.running, handleEnd]);
 
   return (
     <View className="items-center gap-5 px-1 py-2">
-      <CameraOverlay
-        cameraRef={recorder.cameraRef}
-        permissionGranted={recorder.permission?.granted ?? false}
-        permissionCanAskAgain={recorder.permission?.canAskAgain ?? true}
-        onRequestPermission={() => void recorder.requestPermission()}
-        onCameraReady={recorder.markCameraReady}
-        recording={recorder.state === "recording"}
-      />
       <TimerDisplay
         formatted={timer.formatted}
         remaining={timer.remaining}
@@ -152,7 +149,6 @@ export function LiveStep(props: LiveStepProps) {
         onPauseResume={handlePauseResume}
         onEnd={handleEnd}
       />
-      <UploadProgressBanner state={recorder.state} error={recorder.error} />
     </View>
   );
 }
