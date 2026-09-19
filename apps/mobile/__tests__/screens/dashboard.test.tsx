@@ -1,5 +1,6 @@
 import * as React from "react";
-import { render, waitFor } from "@testing-library/react-native";
+import { RefreshControl } from "react-native";
+import { act, render, waitFor } from "@testing-library/react-native";
 
 // ---- mocks ----
 
@@ -96,14 +97,48 @@ jest.mock("@/components/dashboard/recent-activity-section", () => ({
   },
 }));
 
-// The active athlete
-const mockAthlete = {
+// Discovery renders for real in
+// __tests__/components/dashboard/session-discovery-section.test.tsx. Here it is
+// stubbed to echo the props the dashboard feeds it, which is the contract this
+// screen owns: the primary gym, that gym's sessions, and the free-agent
+// live-gym list.
+jest.mock("@/components/dashboard/session-discovery-section", () => ({
+  SessionDiscoverySection: (props: {
+    gymId: string | null;
+    gymName: string | null;
+    sessions: unknown[];
+    liveGyms: unknown[];
+    loadFailed?: boolean;
+    onRetry?: () => void;
+  }) => {
+    const R = require("react");
+    const RN = require("react-native");
+    return R.createElement(
+      RN.Text,
+      { testID: "session-discovery" },
+      `discovery:${props.gymId ?? "free-agent"}:${props.gymName ?? "-"}:${props.sessions.length}:${props.liveGyms.length}:${props.loadFailed ? "failed" : "ok"}:${typeof props.onRetry === "function" ? "retryable" : "no-retry"}`,
+    );
+  },
+}));
+
+// The active athlete. `primary_gym_id` is overwritten per test to exercise both
+// the member and the free-agent discovery paths.
+const mockAthlete: {
+  id: string;
+  display_name: string;
+  current_elo: number;
+  highest_elo: number;
+  status: string;
+  profile_photo_url: string | null;
+  primary_gym_id: string | null;
+} = {
   id: "a1",
   display_name: "TestUser",
   current_elo: 1200,
   highest_elo: 1250,
   status: "active",
   profile_photo_url: null,
+  primary_gym_id: null,
 };
 
 jest.mock("@/lib/auth/hooks", () => ({
@@ -127,9 +162,49 @@ const mockSummary = {
   recent_activity: [],
 };
 
+const mockGymDetail = {
+  id: "g1",
+  name: "Test Gym",
+  city: "Austin",
+  status: "active",
+  sessions: [
+    {
+      id: "s1",
+      title: "Open Mat",
+      scheduledStart: "2026-09-20T18:00:00.000Z",
+      scheduledEnd: "2026-09-20T20:00:00.000Z",
+      status: "scheduled",
+      participantCount: 2,
+      maxParticipants: null,
+      rsvpCount: 1,
+      createdBy: "a2",
+      createdByName: "Coach",
+    },
+  ],
+  rsvpSessionIds: [],
+  participantSessionIds: [],
+  memberCount: 12,
+  isMemberGym: true,
+  isGymManager: false,
+};
+
+const mockLiveGym = {
+  id: "g9",
+  name: "Live Gym",
+  city: "Austin",
+  status: "active",
+  memberCount: 8,
+  activeSessions: 1,
+  upcomingSessions: 0,
+  hasActiveSession: true,
+  nextSessionStart: null,
+};
+
 jest.mock("@jits/shared/api/queries", () => ({
   getDashboardSummary: jest.fn().mockResolvedValue(mockSummary),
   getActiveSession: jest.fn().mockResolvedValue(null),
+  getGymDetail: jest.fn().mockResolvedValue(null),
+  getGymsWithSessions: jest.fn().mockResolvedValue([]),
 }));
 
 jest.mock("@jits/shared/types/composites", () => ({}), { virtual: true });
@@ -137,15 +212,30 @@ jest.mock("@jits/shared/types/session", () => ({}), { virtual: true });
 
 import DashboardScreen from "@/app/(app)/(tabs)/(home)/index";
 
+interface QueryMocks {
+  getDashboardSummary: jest.Mock;
+  getActiveSession: jest.Mock;
+  getGymDetail: jest.Mock;
+  getGymsWithSessions: jest.Mock;
+}
+
+// useCachedResource's store is a module-level Map that jest never clears
+// between tests, and its key is derived from the athlete. A fixed id would hand
+// each test the previous one's payload as a warm first paint, so tests would
+// start green before their own mocks resolved. A fresh id per test gives each
+// one a cold cache.
+let athleteSeq = 0;
+
 beforeEach(() => {
   jest.clearAllMocks();
   // Re-wire the resolved value each test since clearAllMocks resets mockResolvedValue
-  const queries = require("@jits/shared/api/queries") as {
-    getDashboardSummary: jest.Mock;
-    getActiveSession: jest.Mock;
-  };
+  const queries = require("@jits/shared/api/queries") as QueryMocks;
   queries.getDashboardSummary.mockResolvedValue(mockSummary);
   queries.getActiveSession.mockResolvedValue(null);
+  queries.getGymDetail.mockResolvedValue(null);
+  queries.getGymsWithSessions.mockResolvedValue([]);
+  mockAthlete.primary_gym_id = null;
+  mockAthlete.id = `a${++athleteSeq}`;
 });
 
 describe("DashboardScreen", () => {
@@ -172,6 +262,117 @@ describe("DashboardScreen", () => {
       expect(getByText("2L")).toBeTruthy();
       expect(getByText("1D")).toBeTruthy();
     });
+  });
+
+  // Discovery is the ONLY path to a new session since the Gyms tab was removed,
+  // so Home must always mount it and must feed it the right gym.
+  it("always renders the session discovery surface", async () => {
+    const { getByTestId } = render(React.createElement(DashboardScreen));
+    await waitFor(() => {
+      expect(getByTestId("session-discovery")).toBeTruthy();
+    });
+  });
+
+  it("feeds discovery the primary gym and its sessions for a member", async () => {
+    const queries = require("@jits/shared/api/queries") as QueryMocks;
+    mockAthlete.primary_gym_id = "g1";
+    queries.getGymDetail.mockResolvedValue(mockGymDetail);
+
+    const { getByText } = render(React.createElement(DashboardScreen));
+    await waitFor(() => {
+      expect(getByText("discovery:g1:Test Gym:1:0:ok:retryable")).toBeTruthy();
+    });
+    expect(queries.getGymDetail).toHaveBeenCalledWith({}, "g1", mockAthlete.id);
+    // A member never pays for the gym-wide list; their own gym answers the question.
+    expect(queries.getGymsWithSessions).not.toHaveBeenCalled();
+  });
+
+  it("feeds discovery the live-gym list for a free agent", async () => {
+    const queries = require("@jits/shared/api/queries") as QueryMocks;
+    queries.getGymsWithSessions.mockResolvedValue([mockLiveGym]);
+
+    const { getByText } = render(React.createElement(DashboardScreen));
+    await waitFor(() => {
+      expect(getByText("discovery:free-agent:-:0:1:ok:retryable")).toBeTruthy();
+    });
+    expect(queries.getGymDetail).not.toHaveBeenCalled();
+  });
+
+  /**
+   * THE PRODUCTION FAILURE SHAPE IS A RESOLVED NULL, NOT A REJECTION.
+   *
+   * getGymDetail never rejects on a failed request: postgrest-js defaults
+   * shouldThrowOnError to false and converts even a hard fetch error into a
+   * resolved { data: null, error } (PostgrestBuilder.ts:82, :372), and
+   * getGymDetail discards that error and returns null (queries.ts:547-553). A
+   * dropped connection, an RLS denial, an expired JWT and a PostgREST 5xx all
+   * arrive as a plain null. Mocking a rejection here would certify a path that
+   * cannot occur in production, so these drive the real one: mockResolvedValue.
+   */
+  it("treats an unreadable primary gym as failed, not as an empty gym", async () => {
+    const queries = require("@jits/shared/api/queries") as QueryMocks;
+    mockAthlete.primary_gym_id = "g-unreadable";
+    queries.getGymDetail.mockResolvedValue(null);
+
+    const { getByText } = render(React.createElement(DashboardScreen));
+    await waitFor(() => {
+      // The dashboard still paints in full, and discovery is told it is blind
+      // rather than being handed an empty list it would report as fact.
+      expect(getByText("5W")).toBeTruthy();
+    });
+    expect(
+      getByText("discovery:g-unreadable:-:0:0:failed:retryable"),
+    ).toBeTruthy();
+  });
+
+  it("falls back to the last good gym payload when a refresh comes back empty", async () => {
+    const queries = require("@jits/shared/api/queries") as QueryMocks;
+    mockAthlete.primary_gym_id = "g1";
+    queries.getGymDetail.mockResolvedValue(mockGymDetail);
+
+    const { getByText, UNSAFE_getByType } = render(
+      React.createElement(DashboardScreen),
+    );
+    await waitFor(() => {
+      expect(getByText("discovery:g1:Test Gym:1:0:ok:retryable")).toBeTruthy();
+    });
+
+    // Same athlete, same gym, and the next read comes back unreadable. The
+    // session that loaded a moment ago is still the best answer available, so
+    // it must survive rather than be replaced by a null that reads as empty.
+    queries.getGymDetail.mockResolvedValue(null);
+    await act(async () => {
+      UNSAFE_getByType(RefreshControl).props.onRefresh();
+    });
+
+    await waitFor(() => {
+      expect(
+        getByText("discovery:g1:Test Gym:1:0:failed:retryable"),
+      ).toBeTruthy();
+    });
+  });
+
+  // The belt-and-braces path: a genuine throw from inside the query function
+  // (a JS error, not a failed request) is still possible and gets the same
+  // treatment. This is a supplement to the resolved-null tests above, never a
+  // substitute for them.
+  it("also handles a thrown error from the gym read", async () => {
+    const queries = require("@jits/shared/api/queries") as QueryMocks;
+    // The screen logs the swallowed throw on purpose; keep it out of the test
+    // output rather than leaving a red herring in the run.
+    const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+    mockAthlete.primary_gym_id = "g-broken";
+    queries.getGymDetail.mockRejectedValue(new Error("boom"));
+
+    const { getByText } = render(React.createElement(DashboardScreen));
+    await waitFor(() => {
+      expect(getByText("5W")).toBeTruthy();
+    });
+    expect(
+      getByText("discovery:g-broken:-:0:0:failed:retryable"),
+    ).toBeTruthy();
+    expect(errorSpy).toHaveBeenCalled();
+    errorSpy.mockRestore();
   });
 
   it("renders the recent activity section", async () => {

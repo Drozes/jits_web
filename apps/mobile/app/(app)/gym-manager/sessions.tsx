@@ -12,7 +12,10 @@ import { AppHeader } from "@/components/layout/app-header";
 import { Chip } from "@/components/ui/elo-system";
 import { useRequireAthlete } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
-import { useManagedGyms } from "@/lib/gym-manager/use-managed-gyms";
+import {
+  managerHref,
+  useGymManagerGymId,
+} from "@/lib/gym-manager/use-gym-manager-gym-id";
 import { useGymSessions } from "@/lib/gym-manager/use-gym-sessions";
 import { SessionRow } from "@/components/gym-manager/session-row";
 import { SessionEditSheet } from "@/components/gym-manager/session-edit-sheet";
@@ -28,14 +31,13 @@ const FILTERS: { value: Filter; label: string }[] = [
 /**
  * H2 · Gym-owner sessions list. All/Upcoming filter chips, one-time session
  * rows (recurring schedules live in templates), and create/edit via the shared
- * SessionEditSheet. Resolves the managed gym via useManagedGyms, then loads the
- * session list from useGymSessions (reuses getGymDetail — no new RPC).
+ * SessionEditSheet. Resolves the gym from the gymId route param via
+ * useGymManagerGymId, then loads the session list from useGymSessions (reuses getGymDetail — no new RPC).
  */
 export default function GymManagerSessionsScreen() {
   const tokens = useThemedTokens();
   const { athlete, isLoading: authLoading } = useRequireAthlete();
-  const { gyms, isReady: managedReady } = useManagedGyms();
-  const gymId = gyms[0]?.gymId;
+  const { gymId, isReady: managedReady } = useGymManagerGymId();
   const { data, isLoading, isRefreshing, refresh } = useGymSessions(gymId, athlete?.id);
   const [filter, setFilter] = React.useState<Filter>("all");
 
@@ -50,7 +52,7 @@ export default function GymManagerSessionsScreen() {
   if (authLoading || !managedReady || (gymId && isLoading)) {
     return (
       <View className="flex-1 bg-surface">
-        <AppHeader title="Sessions" back backFallback="/gym-manager" />
+        <AppHeader title="Sessions" back backFallback={managerHref("/gym-manager", gymId)} />
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator color={tokens.accentCta} />
         </View>
@@ -61,7 +63,7 @@ export default function GymManagerSessionsScreen() {
   if (!gymId || !data?.isManager) {
     return (
       <View className="flex-1 bg-surface">
-        <AppHeader title="Sessions" back backFallback="/gym-manager" />
+        <AppHeader title="Sessions" back backFallback={managerHref("/gym-manager", gymId)} />
         <View className="flex-1 items-center justify-center px-8">
           <Text className="font-heading text-[14px] text-ink uppercase tracking-caps-l text-center">
             No Managed Gym
@@ -76,7 +78,7 @@ export default function GymManagerSessionsScreen() {
       <AppHeader
         title="Sessions"
         back
-        backFallback="/gym-manager"
+        backFallback={managerHref("/gym-manager", gymId)}
         rightAction={
           <SessionEditSheet gymId={gymId} onSaved={refresh}>
             <Pressable

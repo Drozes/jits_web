@@ -155,6 +155,15 @@ export default function GymsScreen() {
     <View className="flex-1 bg-surface">
       <AppHeader
         title="Gym Finder"
+        back
+        // The gym list used to be a tab root, where the tab bar was the way out.
+        // It is now pushed from Home (and is the backFallback target of the gym
+        // detail and session screens), so it needs its own chevron, falling back
+        // to Home when it was itself the entry route. Spelled with its groups
+        // rather than "/": that path is also served by app/index.tsx, the auth
+        // gate, so replacing to it risks tearing down and remounting the whole
+        // (app) tree and flashing its loading state.
+        backFallback="/(app)/(tabs)/(home)"
         rightAction={
           <CreateGymSheet onCreated={refresh}>
             <Pressable

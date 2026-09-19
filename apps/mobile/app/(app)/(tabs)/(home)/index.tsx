@@ -5,11 +5,21 @@ import { useRouter } from "expo-router";
 import { useRequireAthlete } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { supabase } from "@/lib/supabase/client";
-import { getActiveSession, getDashboardSummary } from "@jits/shared/api/queries";
+import {
+  getActiveSession,
+  getDashboardSummary,
+  getGymDetail,
+  getGymsWithSessions,
+} from "@jits/shared/api/queries";
 import type { DashboardSummary } from "@jits/shared/types/composites";
-import type { ActiveSessionInfo } from "@jits/shared/types/session";
-import { Avatar32, EloTile, MetaTag, Plate, Wordmark } from "@/components/ui/elo-system";
+import type {
+  ActiveSessionInfo,
+  GymDetail,
+  GymListItem,
+} from "@jits/shared/types/session";
+import { Avatar32, EloTile, MetaTag, Wordmark } from "@/components/ui/elo-system";
 import { ActiveSessionCard } from "@/components/dashboard/active-session-card";
+import { SessionDiscoverySection } from "@/components/dashboard/session-discovery-section";
 import { RecentActivitySection } from "@/components/dashboard/recent-activity-section";
 import { StatOverview } from "@/components/dashboard/stat-overview";
 import { NotificationBell } from "@/components/notifications/notification-bell";
@@ -26,20 +36,112 @@ import { useCachedResource } from "@/lib/cache/use-cached-resource";
 interface DashboardData {
   summary: DashboardSummary;
   activeSession: ActiveSessionInfo | null;
+  /** Primary gym with its sessions, powering the discovery surface. */
+  gymDetail: GymDetail | null;
+  /** Gyms with a live session, loaded only for free agents (no primary gym). */
+  liveGyms: GymListItem[];
+  /**
+   * True when a discovery read rejected. It must travel with the data: an empty
+   * result and a failed result look identical downstream, and discovery is the
+   * only path to a session, so claiming "nothing scheduled" on a dropped
+   * request would tell an athlete their gym is dark while an open mat runs.
+   */
+  discoveryFailed: boolean;
 }
 
-function useDashboardData(athleteId: string | undefined) {
+function useDashboardData(
+  athleteId: string | undefined,
+  primaryGymId: string | null | undefined,
+) {
+  // Last gym payload that actually loaded, so a failed refresh falls back to it
+  // instead of overwriting good data with null. The outer cache keeps stale data
+  // on failure, but only for a rejected fetch: a swallowed inner failure
+  // resolves and is written through as a success, which would defeat it.
+  const lastGymDetail = React.useRef<{ gymId: string; detail: GymDetail } | null>(
+    null,
+  );
+
+  /**
+   * Turns a gym read into data plus an honest verdict on whether it worked.
+   *
+   * The failure signal has to be derived from the DATA, because getGymDetail
+   * does not reject on a failed request and a `.catch` here would never run:
+   * postgrest-js sets `shouldThrowOnError = false` and its outer handler
+   * converts even a hard fetch error into a RESOLVED `{ data: null, error }`
+   * (PostgrestBuilder.ts:82 and :372), and getGymDetail then discards that
+   * error and returns null (queries.ts:547-553). A dropped connection, an RLS
+   * denial, an expired JWT and a PostgREST 5xx all arrive here as a plain null.
+   *
+   * A null for the athlete's OWN primary gym is never a normal state: it means
+   * their gym row could not be read, not that the gym has no sessions. Treating
+   * it as "nothing scheduled" is exactly the bug this guards, so it counts as a
+   * failure and the surface says so instead of speaking for the gym.
+   */
+  const settleGymDetail = (
+    gymId: string,
+    detail: GymDetail | null,
+  ): { detail: GymDetail | null; failed: boolean } => {
+    if (detail) {
+      lastGymDetail.current = { gymId, detail };
+      return { detail, failed: false };
+    }
+    const cached = lastGymDetail.current;
+    return {
+      detail: cached?.gymId === gymId ? cached.detail : null,
+      failed: true,
+    };
+  };
+
   const { data, isLoading, isStale, error, refresh } = useCachedResource<DashboardData>(
-    `dashboard:${athleteId}`,
+    `dashboard:${athleteId}:${primaryGymId ?? "free-agent"}`,
     async (_signal) => {
-      // Both reads are independent and already parallel; keep the Promise.all.
-      const [summary, activeSession] = await Promise.all([
+      // All four reads are independent; keep them in one Promise.all. Exactly
+      // one of the last two runs for real: an athlete with a primary gym gets
+      // that gym's sessions, a free agent gets the live-gym list.
+      const [summary, activeSession, gym, gyms] = await Promise.all([
         getDashboardSummary(supabase),
         getActiveSession(supabase, athleteId!),
+        // Discovery data is additive: a failure must degrade the surface, never
+        // blank the dashboard. Both reads report their outcome instead of
+        // letting an empty result pass for a real one.
+        primaryGymId
+          ? getGymDetail(supabase, primaryGymId, athleteId!)
+              .then((detail) => settleGymDetail(primaryGymId, detail))
+              // Belt and braces. This path means a JS error thrown inside the
+              // query function, NOT a failed request: those resolve (see
+              // settleGymDetail), which is why the verdict is derived there and
+              // not here. Same treatment either way.
+              .catch((err) => {
+                console.error("[dashboard] gym detail fetch threw", err);
+                return settleGymDetail(primaryGymId, null);
+              })
+          : Promise.resolve({ detail: null, failed: false }),
+        primaryGymId
+          ? Promise.resolve({ list: [] as GymListItem[], failed: false })
+          : getGymsWithSessions(supabase)
+              .then((all) => ({
+                // An empty list is NOT treated as a failure here, unlike the
+                // gym read above: "no gym is live right now" is a legitimate
+                // answer, and the free-agent branch makes no claim about any
+                // particular gym (it shows the no-home-gym plate and the browse
+                // action either way), so there is no false statement to make.
+                list: all.filter((g) => g.hasActiveSession),
+                failed: false,
+              }))
+              .catch((err) => {
+                console.error("[dashboard] gym list fetch threw", err);
+                return { list: [] as GymListItem[], failed: true };
+              }),
       ]);
-      return { summary, activeSession };
+      return {
+        summary,
+        activeSession,
+        gymDetail: gym.detail,
+        liveGyms: gyms.list,
+        discoveryFailed: gym.failed || gyms.failed,
+      };
     },
-    [athleteId],
+    [athleteId, primaryGymId],
   );
 
   React.useEffect(() => {
@@ -71,7 +173,10 @@ export default function DashboardScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const tokens = useThemedTokens();
-  const { data, isLoading, isStale, refresh } = useDashboardData(athlete?.id);
+  const { data, isLoading, isStale, refresh } = useDashboardData(
+    athlete?.id,
+    athlete?.primary_gym_id,
+  );
 
   const onRefresh = React.useCallback(() => {
     // SWR keeps stale data on screen while revalidating; no artificial delay.
@@ -87,7 +192,6 @@ export default function DashboardScreen() {
   }
 
   const stats = data?.summary.stats;
-  const isSessionLive = data?.activeSession?.status === "active";
 
   const recentMatches = (data?.summary.recent_matches ?? []).map((m) => ({
     id: m.match_id,
@@ -157,11 +261,28 @@ export default function DashboardScreen() {
 
             <ActiveSessionCard session={data?.activeSession ?? null} />
 
+            {/*
+              Gym and session discovery. Sits directly under the active-session
+              card so an athlete already training sees that first and everyone
+              else sees the way into a session immediately below it. This is the
+              only discovery path in the app now that the Gyms tab is gone.
+            */}
+            <SessionDiscoverySection
+              gymId={athlete.primary_gym_id ?? null}
+              gymName={data?.gymDetail?.name ?? null}
+              sessions={data?.gymDetail?.sessions ?? []}
+              rsvpSessionIds={data?.gymDetail?.rsvpSessionIds ?? []}
+              participantSessionIds={data?.gymDetail?.participantSessionIds ?? []}
+              liveGyms={data?.liveGyms ?? []}
+              loadFailed={data?.discoveryFailed ?? false}
+              onRetry={refresh}
+            />
+
             <RecentActivitySection
               myMatches={recentMatches}
               allActivity={recentActivity}
               onPressMatch={() => toast.info("Match details coming soon")}
-              onPressFindSession={() => router.push("/(app)/gyms")}
+              onPressFindSession={() => router.push("/gyms")}
             />
 
             <StatOverview
@@ -171,15 +292,6 @@ export default function DashboardScreen() {
                 draws: stats?.draws ?? 0,
               }}
             />
-
-            {!isSessionLive && (
-              <Plate variant="accent">
-                <Text className="font-body text-[14px] text-ink leading-[22px]">
-                  Your gym hasn{"’"}t designated a live session yet. Check the
-                  schedule or browse other gyms in your city.
-                </Text>
-              </Plate>
-            )}
           </>
         )}
       </ScrollView>

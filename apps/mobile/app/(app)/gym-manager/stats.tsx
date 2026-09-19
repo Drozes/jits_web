@@ -4,7 +4,10 @@ import { useRouter } from "expo-router";
 import { AppHeader } from "@/components/layout/app-header";
 import { useRequireAthlete } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
-import { useManagedGyms } from "@/lib/gym-manager/use-managed-gyms";
+import {
+  managerHref,
+  useGymManagerGymId,
+} from "@/lib/gym-manager/use-gym-manager-gym-id";
 import { useGymStats } from "@/lib/gym-manager/use-gym-stats";
 import { GymStatsTrend } from "@/components/gym-manager/gym-stats-trend";
 import {
@@ -29,15 +32,14 @@ import type { GymStatsRange } from "@jits/shared/api/queries";
  * window: avg gym ELO + momentum, submission rate (split meter), draw rate +
  * Pressure-Score ELO cost, winning/losing submission breakdown, avg win/loss
  * finish times, and an ELO trend sparkline. A drill-down tile opens the H10
- * per-ELO-bracket breakdown. Resolves the managed gym via useManagedGyms and
- * loads via useGymStats (manager-gated getGymStats).
+ * per-ELO-bracket breakdown. Resolves the gym from the gymId route param via
+ * useGymManagerGymId and loads via useGymStats (manager-gated getGymStats).
  */
 export default function GymManagerStatsScreen() {
   const router = useRouter();
   const tokens = useThemedTokens();
   const { isLoading: authLoading } = useRequireAthlete();
-  const { gyms, isReady: managedReady } = useManagedGyms();
-  const gymId = gyms[0]?.gymId;
+  const { gymId, isReady: managedReady } = useGymManagerGymId();
   const [range, setRange] = React.useState<GymStatsRange>("90d");
   const { data, isManager, isLoading } = useGymStats(gymId, range);
 
@@ -46,7 +48,7 @@ export default function GymManagerStatsScreen() {
   if (authLoading || !managedReady || (gymId && isLoading && !data)) {
     return (
       <View className="flex-1 bg-surface">
-        <AppHeader title="Gym Stats" back backFallback="/gym-manager" />
+        <AppHeader title="Gym Stats" back backFallback={managerHref("/gym-manager", gymId)} />
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator color={tokens.accentCta} />
         </View>
@@ -57,7 +59,7 @@ export default function GymManagerStatsScreen() {
   if (!gymId || !isManager) {
     return (
       <View className="flex-1 bg-surface">
-        <AppHeader title="Gym Stats" back backFallback="/gym-manager" />
+        <AppHeader title="Gym Stats" back backFallback={managerHref("/gym-manager", gymId)} />
         <View className="flex-1 items-center justify-center px-8">
           <Text className="font-heading text-[14px] text-ink uppercase tracking-caps-l text-center">
             No Managed Gym
@@ -75,7 +77,7 @@ export default function GymManagerStatsScreen() {
 
   return (
     <View className="flex-1 bg-surface">
-      <AppHeader title="Gym Stats" back backFallback="/gym-manager" />
+      <AppHeader title="Gym Stats" back backFallback={managerHref("/gym-manager", gymId)} />
       <ScrollView
         contentContainerStyle={{
           paddingHorizontal: 16,
@@ -88,7 +90,9 @@ export default function GymManagerStatsScreen() {
         <DrillDownTile
           label="Drill Down By ELO Range"
           onPress={() =>
-            router.push(`/gym-manager/stats-by-elo?range=${range}` as never)
+            router.push(
+              managerHref("/gym-manager/stats-by-elo", gymId, { range }),
+            )
           }
         />
 
