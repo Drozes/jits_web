@@ -50,9 +50,12 @@ jest.mock("expo-camera", () => ({
 }));
 
 import { renderHook, act, waitFor } from "@testing-library/react-native";
+import { resetMatchUploadStore } from "@/lib/video/match-upload-store";
 import { useVideoRecorder } from "@/lib/video/use-video-recorder";
 import { MatchVideoDbError } from "@/lib/video/upload-recording";
 import {
+  CAMERA_READY_TIMEOUT_MS,
+  STOP_WATCHDOG_MS,
   WORST_CASE_START_DELAY_SECONDS,
   computeMaxRecordingSeconds,
 } from "@/lib/video/recording-limits";
@@ -130,6 +133,9 @@ const UPLOAD_OK = { path: "M/A/111.mp4", status: 200, videoId: "VID" };
 
 beforeEach(() => {
   jest.clearAllMocks();
+  // Module-level by design: reset it or one test's upload outcome leaks
+  // into the next through the shared matchId.
+  resetMatchUploadStore();
   jest.spyOn(console, "warn").mockImplementation(() => undefined);
 });
 
@@ -338,8 +344,17 @@ describe("useVideoRecorder", () => {
     });
     expect(cam.recordAsync).not.toHaveBeenCalled();
 
+    // The RUNTIME half of pinning the budget: the deferral lasts exactly
+    // CAMERA_READY_TIMEOUT_MS, so raising that constant really does spend
+    // that much of the match clock, which is what the cap has to cover.
+    // The value itself is pinned in recording-limits.test.ts.
     await act(async () => {
-      await jest.advanceTimersByTimeAsync(3000);
+      await jest.advanceTimersByTimeAsync(CAMERA_READY_TIMEOUT_MS - 1);
+    });
+    expect(cam.recordAsync).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(1);
     });
     expect(cam.recordAsync).toHaveBeenCalledTimes(1);
 
@@ -702,5 +717,169 @@ describe("useVideoRecorder recording cap", () => {
     expect(result.current.truncation).toBe("limit");
 
     nowSpy.mockRestore();
+  });
+
+  it("reports a cap that produced NO file, instead of stranding the machine", async () => {
+    // Pre-existing dead end: recordAsync settling with no URI while not
+    // stopping returned without any transition(), leaving the recorder in
+    // 'recording' forever with nothing on screen. It is the one path where
+    // the cap could fire and the user was told nothing (jits-2zpe).
+    const nowSpy = jest.spyOn(Date, "now");
+    const t0 = 1_700_000_000_000;
+    nowSpy.mockReturnValue(t0);
+
+    const { result } = renderHook(() => useVideoRecorder("M", "A", 600));
+    const cam = makeManualCamera();
+    await startRecording(result, cam);
+
+    nowSpy.mockReturnValue(t0 + result.current.maxDurationSeconds * 1000);
+    await act(async () => {
+      cam.settle(undefined);
+    });
+
+    await waitFor(() => expect(result.current.state).toBe("error"));
+    expect(result.current.error).toMatch(/time limit/i);
+    expect(result.current.truncation).toBe("limit");
+    expect(mockUploadRecording).not.toHaveBeenCalled();
+
+    nowSpy.mockRestore();
+  });
+});
+
+/**
+ * The recorder now OUTLIVES the viewfinder: the wizard owns it, and the
+ * camera is mounted only on the steps that need it. Two states that used
+ * to be cleaned up by the live step unmounting the whole hook have to be
+ * handled explicitly, or they surface as a permanent false accusation on
+ * the persistent status chip.
+ */
+describe("useVideoRecorder camera and stop lifecycle", () => {
+  it("does not claim a camera failure when the camera goes away mid-deferral", async () => {
+    // A match that ends inside the camera-ready backstop: start() is
+    // deferred, the step leaves live, MatchRecorderCamera unmounts and
+    // React nulls cameraRef. Re-entering start() would hit "Camera not
+    // ready" and, because the chip is persistent now, accuse the user of a
+    // camera failure through result, confirm and summary.
+    jest.useFakeTimers();
+
+    const { result } = renderHook(() => useVideoRecorder("M", "A", 600));
+    const cam = makeFakeCamera();
+    result.current.cameraRef.current = cam as never;
+
+    // markCameraReady is never called, so start() defers behind the backstop.
+    await act(async () => {
+      await result.current.start();
+    });
+    expect(cam.recordAsync).not.toHaveBeenCalled();
+
+    // The viewfinder unmounts: the surface releases the camera and React
+    // nulls the ref.
+    act(() => {
+      result.current.releaseCamera();
+      result.current.cameraRef.current = null;
+    });
+
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(CAMERA_READY_TIMEOUT_MS + 100);
+    });
+
+    expect(cam.recordAsync).not.toHaveBeenCalled();
+    expect(result.current.state).toBe("idle");
+    expect(result.current.error).toBeNull();
+  });
+
+  it("releaseCamera clears readiness, so a later start cannot record on a dead ref", async () => {
+    const { result } = renderHook(() => useVideoRecorder("M", "A", 600));
+    const cam = makeFakeCamera();
+    result.current.cameraRef.current = cam as never;
+    act(() => result.current.markCameraReady());
+
+    act(() => {
+      result.current.releaseCamera();
+      result.current.cameraRef.current = null;
+    });
+
+    await act(async () => {
+      await result.current.start();
+    });
+
+    // It reports a real failure (a caller genuinely asked to record with no
+    // camera) but it never calls recordAsync on a null ref.
+    expect(cam.recordAsync).not.toHaveBeenCalled();
+    expect(result.current.state).toBe("error");
+  });
+
+  it("gives up on a stop the hardware never honours, instead of hanging in stopping", async () => {
+    // issuePendingStop gives up after its budget. Before the watchdog there
+    // was NO exit from 'stopping': the machine sat there, the chip spun
+    // "Finishing recording..." forever, and the viewfinder (held open
+    // through 'stopping' so the session is not torn down mid-finalize)
+    // pinned the camera and the mic indicator over result and summary.
+    jest.useFakeTimers();
+
+    const { result } = renderHook(() => useVideoRecorder("M", "A", 600));
+    // A camera whose stopRecording is simply ignored, forever.
+    const cam: FakeCamera = {
+      recordAsync: jest.fn(() => new Promise<{ uri: string } | undefined>(() => {})),
+      stopRecording: jest.fn(),
+    };
+    result.current.cameraRef.current = cam as never;
+    act(() => result.current.markCameraReady());
+
+    act(() => {
+      void result.current.start();
+    });
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(0);
+    });
+    expect(cam.recordAsync).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await result.current.stop();
+    });
+    expect(result.current.state).toBe("stopping");
+
+    // Still stopping just before the watchdog...
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(STOP_WATCHDOG_MS - 100);
+    });
+    expect(result.current.state).toBe("stopping");
+
+    // ... and out of it after, with something the user can read.
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(200);
+    });
+    expect(result.current.state).toBe("error");
+    expect(result.current.error).toMatch(/did not finish/i);
+  });
+
+  it("does not fire the watchdog when the stop lands normally", async () => {
+    jest.useFakeTimers();
+    mockUploadRecording.mockResolvedValueOnce(UPLOAD_OK);
+
+    const { result } = renderHook(() => useVideoRecorder("M", "A", 600));
+    const cam = makeFakeCamera();
+    result.current.cameraRef.current = cam as never;
+    act(() => result.current.markCameraReady());
+
+    act(() => {
+      void result.current.start();
+    });
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(0);
+    });
+    await act(async () => {
+      await result.current.stop();
+      await jest.advanceTimersByTimeAsync(0);
+    });
+    expect(result.current.state).toBe("uploaded");
+
+    // Long past the watchdog: a settled recording must not be clobbered
+    // into an error by a timer nobody cancelled.
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(STOP_WATCHDOG_MS * 2);
+    });
+    expect(result.current.state).toBe("uploaded");
+    expect(result.current.error).toBeNull();
   });
 });

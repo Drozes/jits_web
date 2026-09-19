@@ -207,6 +207,7 @@ jest.mock("@/lib/match-flow/use-match-details", () => ({
 
 import { MatchFlowWizard } from "@/components/match-flow/match-flow-wizard";
 import { computeMaxRecordingSeconds } from "@/lib/video/recording-limits";
+import { resetMatchUploadStore } from "@/lib/video/match-upload-store";
 
 // ---- fixtures ----
 
@@ -275,6 +276,8 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockCameraMounts.count = 0;
   mockSyncParams.current = null;
+  // The upload store is module state and outlives a render by design.
+  resetMatchUploadStore();
   warnSpy = jest.spyOn(console, "warn").mockImplementation(() => undefined);
   logSpy = jest.spyOn(console, "log").mockImplementation(() => undefined);
 

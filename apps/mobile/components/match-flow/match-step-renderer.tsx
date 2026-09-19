@@ -9,6 +9,7 @@ import { ResultStep } from "./steps/result-step";
 import { ConfirmStep } from "./steps/confirm-step";
 import { SummaryStep } from "./steps/summary-step";
 import { WaitStep } from "./steps/wait-step";
+import { useMatchUpload } from "@/lib/video/match-upload-store";
 import { useMatchRecorder } from "./match-recorder-context";
 
 interface MatchParticipant {
@@ -72,9 +73,12 @@ export function MatchStepRenderer({
   refresh,
 }: MatchStepRendererProps) {
   // One recorder for the whole wizard, owned by MatchRecorderProvider above
-  // this component. The steps stay presentational: the live step drives it,
-  // the summary step reads the uploaded video's id off it.
+  // this component; the live step drives it. The summary step's playback
+  // affordance reads the match-keyed upload store instead, because the id
+  // has to survive this subtree remounting (which the wizard does on every
+  // match) and an upload that lands after the recorder that started it.
   const recorder = useMatchRecorder();
+  const upload = useMatchUpload(matchId);
 
   if (step === "wait") {
     return <WaitStep message="Waiting for opponent..." allowSkip onSkip={() => setStep("weight")} />;
@@ -179,8 +183,8 @@ export function MatchStepRenderer({
         eloBefore={eloBefore}
         eloAfter={eloAfter ?? me.current_elo}
         weightDivisionGap={weightDivisionGap}
-        videoId={recorder.videoId}
-        videoState={recorder.state}
+        videoId={upload?.videoId ?? null}
+        videoPending={upload?.status === "uploading" || recorder.state === "stopping"}
       />
     );
   }

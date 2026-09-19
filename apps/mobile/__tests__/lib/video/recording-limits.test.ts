@@ -26,6 +26,7 @@ import {
   RECORDING_PAUSE_SLACK_SECONDS,
   RECORD_START_MAX_ATTEMPTS,
   RECORD_START_RETRY_MS,
+  STOP_WATCHDOG_MS,
   WORST_CASE_START_DELAY_SECONDS,
   WORST_CASE_STOP_DELAY_SECONDS,
   computeMaxRecordingSeconds,
@@ -118,26 +119,54 @@ describe("computeMaxRecordingSeconds", () => {
   });
 });
 
-describe("delay budgets track the recorder's own retry constants", () => {
-  // These exist so the cap cannot drift away from the delays it has to
-  // cover. If someone widens a retry budget, the cap widens with it.
-  it("derives the start delay from the camera-ready backstop and the retry loop", () => {
-    expect(WORST_CASE_START_DELAY_SECONDS).toBe(
-      Math.ceil((CAMERA_READY_TIMEOUT_MS + RECORD_START_MAX_ATTEMPTS * RECORD_START_RETRY_MS) / 1000),
-    );
-    expect(WORST_CASE_START_DELAY_SECONDS).toBeGreaterThan(0);
+/**
+ * VALUES, not expressions.
+ *
+ * An earlier version of this block asserted things like
+ *
+ *   WORST_CASE_START_DELAY_SECONDS ===
+ *     Math.ceil((CAMERA_READY_TIMEOUT_MS + MAX_ATTEMPTS * RETRY_MS) / 1000)
+ *
+ * evaluated from the same exported constants: the definition restated, so
+ * it could not fail. Changing CAMERA_READY_TIMEOUT_MS from 3000 to 30000
+ * left all three assertions green while the real start budget silently
+ * grew tenfold past what the cap covers. Pin the NUMBERS instead, so any
+ * change to them is a deliberate, visible edit here, and assert the
+ * RUNTIME actually uses them over in use-video-recorder.test.ts.
+ */
+describe("the timing budget the cap is built from", () => {
+  it.each([
+    ["CAMERA_READY_TIMEOUT_MS", CAMERA_READY_TIMEOUT_MS, 3000],
+    ["RECORD_START_RETRY_MS", RECORD_START_RETRY_MS, 500],
+    ["RECORD_START_MAX_ATTEMPTS", RECORD_START_MAX_ATTEMPTS, 16],
+    ["PENDING_STOP_RETRY_MS", PENDING_STOP_RETRY_MS, 250],
+    ["PENDING_STOP_MAX_ATTEMPTS", PENDING_STOP_MAX_ATTEMPTS, 8],
+    ["AUTO_END_DELAY_MS", AUTO_END_DELAY_MS, 1000],
+  ])("pins %s", (_name, actual, expected) => {
+    expect(actual).toBe(expected);
   });
 
-  it("derives the stop delay from the auto-end wait and the stop re-issue loop", () => {
-    expect(WORST_CASE_STOP_DELAY_SECONDS).toBe(
-      Math.ceil((AUTO_END_DELAY_MS + PENDING_STOP_MAX_ATTEMPTS * PENDING_STOP_RETRY_MS) / 1000),
-    );
-    expect(WORST_CASE_STOP_DELAY_SECONDS).toBeGreaterThan(0);
+  it.each([
+    ["WORST_CASE_START_DELAY_SECONDS", WORST_CASE_START_DELAY_SECONDS, 11],
+    ["WORST_CASE_STOP_DELAY_SECONDS", WORST_CASE_STOP_DELAY_SECONDS, 3],
+    ["RECORDING_CLOCK_SLACK_SECONDS", RECORDING_CLOCK_SLACK_SECONDS, 14],
+    ["RECORDING_PAUSE_SLACK_SECONDS", RECORDING_PAUSE_SLACK_SECONDS, 600],
+    ["STOP_WATCHDOG_MS", STOP_WATCHDOG_MS, 10000],
+  ])("pins the derived %s", (_name, actual, expected) => {
+    expect(actual).toBe(expected);
   });
 
-  it("sums both into the clock slack the cap is built from", () => {
-    expect(RECORDING_CLOCK_SLACK_SECONDS).toBe(
-      WORST_CASE_START_DELAY_SECONDS + WORST_CASE_STOP_DELAY_SECONDS,
+  it("pins the cap for the backend's default match duration", () => {
+    // 600 (the match) + 600 (pause allowance) + 14 (start and stop slack).
+    // The whole fix in one number, and that number is not 600.
+    expect(computeMaxRecordingSeconds(BACKEND_DEFAULT_MATCH_SECONDS)).toBe(1214);
+  });
+
+  it("keeps the stop watchdog clear of the re-issue loop it backstops", () => {
+    // It must not fire while issuePendingStop is still legitimately
+    // re-issuing, or a stop that was about to land is reported as failed.
+    expect(STOP_WATCHDOG_MS).toBeGreaterThan(
+      PENDING_STOP_MAX_ATTEMPTS * PENDING_STOP_RETRY_MS,
     );
   });
 });

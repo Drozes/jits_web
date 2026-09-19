@@ -25,19 +25,18 @@ import type { RecordingState, RecordingTruncation } from "@/lib/video/use-video-
 
 // ---- the recorder under the wizard ----
 
+/**
+ * Only the TRANSIENT half of the recorder is stubbed here. The durable
+ * half, the upload's outcome, is seeded into the REAL match-keyed store,
+ * because that is what the wizard actually reads. Stubbing the outcome on
+ * the recorder would exercise a path production no longer takes.
+ */
 interface FakeRecorder {
   state: RecordingState;
   error: string | null;
-  videoId: string | null;
-  truncation: RecordingTruncation | null;
 }
 
-let mockRecorderValue: FakeRecorder = {
-  state: "idle",
-  error: null,
-  videoId: null,
-  truncation: null,
-};
+let mockRecorderValue: FakeRecorder = { state: "idle", error: null };
 
 const mockStart = jest.fn();
 const mockStop = jest.fn();
@@ -53,8 +52,9 @@ jest.mock("@/lib/video/use-video-recorder", () => ({
     start: mockStart,
     stop: mockStop,
     markCameraReady: jest.fn(),
-    videoId: mockRecorderValue.videoId,
-    truncation: mockRecorderValue.truncation,
+    releaseCamera: jest.fn(),
+    videoId: null,
+    truncation: null,
     maxDurationSeconds: 1214,
   }),
 }));
@@ -147,6 +147,11 @@ jest.mock("@/lib/match-flow/use-match-details", () => ({
 }));
 
 import { MatchFlowWizard } from "@/components/match-flow/match-flow-wizard";
+import {
+  resetMatchUploadStore,
+  setMatchUpload,
+  type MatchUploadEntry,
+} from "@/lib/video/match-upload-store";
 
 // ---- fixtures ----
 
@@ -193,15 +198,15 @@ function summaryMatch(status = "completed") {
   };
 }
 
-function renderSummary(recorder: Partial<FakeRecorder>, status = "completed") {
-  mockRecorderValue = {
-    state: "idle",
-    error: null,
-    videoId: null,
-    truncation: null,
-    ...recorder,
-  };
-  mockUseMatchDetails.mockReturnValue(summaryMatch(status));
+type UploadSeed = Partial<Omit<MatchUploadEntry, "matchId" | "updatedAt">>;
+
+function renderSummary(
+  upload: UploadSeed | null,
+  opts: { recorder?: Partial<FakeRecorder>; status?: string } = {},
+) {
+  mockRecorderValue = { state: "idle", error: null, ...opts.recorder };
+  if (upload) setMatchUpload("M1", upload);
+  mockUseMatchDetails.mockReturnValue(summaryMatch(opts.status ?? "completed"));
   return render(
     <MatchFlowWizard
       exitHref={EXIT}
@@ -214,18 +219,23 @@ function renderSummary(recorder: Partial<FakeRecorder>, status = "completed") {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  // The store is module state by design, so it outlives a render. Reset it
+  // between tests or one case's failure leaks into the next.
+  resetMatchUploadStore();
 });
 
 describe("upload status survives the step that started it", () => {
   it("shows an in-flight upload on the summary step", () => {
-    const { getByTestId, getByText } = renderSummary({ state: "uploading" });
+    const { getByTestId, getByText } = renderSummary({ status: "uploading" });
 
     getByTestId("upload-status-banner");
     getByText(/uploading match video/i);
   });
 
   it("shows the finishing-recording state on the summary step", () => {
-    const { getByTestId, getByText } = renderSummary({ state: "stopping" });
+    const { getByTestId, getByText } = renderSummary(null, {
+      recorder: { state: "stopping" },
+    });
 
     getByTestId("upload-status-banner");
     getByText(/finishing recording/i);
@@ -233,7 +243,7 @@ describe("upload status survives the step that started it", () => {
 
   it("shows success on the summary step", () => {
     const { getByTestId, getByText } = renderSummary({
-      state: "uploaded",
+      status: "uploaded",
       videoId: "VID-1",
     });
 
@@ -245,7 +255,7 @@ describe("upload status survives the step that started it", () => {
     // The worst case of the defect: the user was never told the upload
     // failed, because the only surface that could say so had unmounted.
     const { getByTestId, getByText } = renderSummary({
-      state: "error",
+      status: "error",
       error: "Upload failed: Video uploaded but saving the record failed: permission denied",
     });
 
@@ -258,7 +268,7 @@ describe("upload status survives the step that started it", () => {
     // A clip cut short by the OS cap uploads successfully, so state alone
     // reads as a plain success. It is not one (jits-2zpe).
     const { getByText, queryByText } = renderSummary({
-      state: "uploaded",
+      status: "uploaded",
       videoId: "VID-1",
       truncation: "limit",
     });
@@ -268,14 +278,14 @@ describe("upload status survives the step that started it", () => {
   });
 
   it("says nothing at all when no recording was made", () => {
-    const { queryByTestId } = renderSummary({ state: "idle" });
+    const { queryByTestId } = renderSummary(null);
     expect(queryByTestId("upload-status-banner")).toBeNull();
   });
 
   it("keeps reporting the upload on a DISPUTED match's summary", () => {
     const { getByText } = renderSummary(
-      { state: "error", error: "Upload failed: network died" },
-      "disputed",
+      { status: "error", error: "Upload failed: network died" },
+      { status: "disputed" },
     );
     getByText(/upload failed/i);
   });
@@ -283,7 +293,7 @@ describe("upload status survives the step that started it", () => {
 
 describe("watching the match back from the summary (jits-p75q)", () => {
   it("offers playback once the video has an id, and routes to the player", () => {
-    const { getByText } = renderSummary({ state: "uploaded", videoId: "VID-1" });
+    const { getByText } = renderSummary({ status: "uploaded", videoId: "VID-1" });
 
     fireEvent.press(getByText("Watch Match Video"));
     expect(mockRouterPush).toHaveBeenCalledWith("/(app)/video/VID-1");
@@ -291,7 +301,7 @@ describe("watching the match back from the summary (jits-p75q)", () => {
 
   it("shows a pending affordance while the upload is still running", () => {
     // Never a link to an id that does not exist yet: that route would 404.
-    const { getByText, queryByText } = renderSummary({ state: "uploading" });
+    const { getByText, queryByText } = renderSummary({ status: "uploading" });
 
     getByText(/video uploading/i);
     expect(queryByText("Watch Match Video")).toBeNull();
@@ -302,8 +312,8 @@ describe("watching the match back from the summary (jits-p75q)", () => {
     // The profile list filters on matches.status = 'completed', so this
     // summary is the only way to a disputed match's video.
     const { getByText } = renderSummary(
-      { state: "uploaded", videoId: "VID-9" },
-      "disputed",
+      { status: "uploaded", videoId: "VID-9" },
+      { status: "disputed" },
     );
 
     fireEvent.press(getByText("Watch Match Video"));
@@ -311,7 +321,7 @@ describe("watching the match back from the summary (jits-p75q)", () => {
   });
 
   it("offers nothing when there is no video and none is coming", () => {
-    const { queryByText } = renderSummary({ state: "idle" });
+    const { queryByText } = renderSummary(null);
     expect(queryByText("Watch Match Video")).toBeNull();
     expect(queryByText(/video uploading/i)).toBeNull();
   });
@@ -322,15 +332,53 @@ describe("watching the match back from the summary (jits-p75q)", () => {
 // widening the app's type surface.
 declare const __dirname: string;
 
-describe("no step owns the upload surface any more", () => {
+/**
+ * Guard the fix STRUCTURALLY, not only through rendered output. A banner
+ * or a recorder put back inside a component that unmounts is invisible
+ * again, and the render tests above would not necessarily catch it,
+ * because a second banner still renders somewhere.
+ *
+ * The first version of this guard was defeated three ways, all of them
+ * ordinary things to do rather than deliberate evasion:
+ *
+ *   1. aliasing the hook, `const useRec = useVideoRecorder`, slipped past
+ *      a pattern that required a call, `useVideoRecorder\s*\(`;
+ *   2. re-exporting the banner under another name hid the import;
+ *   3. only `steps/` was scanned, so a new panel dropped next to
+ *      camera-overlay.tsx, queue-status-banner.tsx and wizard-status.tsx,
+ *      which already live directly in `components/match-flow/`, was
+ *      invisible to it.
+ *
+ * The predicates below are pure so each defeat can be mutation-tested
+ * against synthetic sources, rather than trusted to be caught.
+ */
+describe("recorder ownership is structural, not by convention", () => {
   const fs = require("fs") as {
     readdirSync: (dir: string) => string[];
     statSync: (p: string) => { isDirectory: () => boolean };
     readFileSync: (p: string, enc: string) => string;
   };
-  const path = require("path") as { join: (...parts: string[]) => string };
+  const path = require("path") as {
+    join: (...parts: string[]) => string;
+    relative: (from: string, to: string) => string;
+  };
 
-  const STEPS_DIR = path.join(__dirname, "../../../components/match-flow/steps");
+  // The WHOLE match-flow tree, not just steps/.
+  const MATCH_FLOW_DIR = path.join(__dirname, "../../../components/match-flow");
+  const VIDEO_LIB_DIR = path.join(__dirname, "../../../lib/video");
+
+  /**
+   * The only files allowed to name the recorder or the banner. Anything
+   * else in the tree referencing them is a component taking ownership of
+   * state that must outlive it. Adding to this list is a visible,
+   * reviewable act, which is the point.
+   */
+  const OWNERS = [
+    "match-recorder-context.tsx",
+    "match-recorder-surface.tsx",
+    "match-flow-wizard.tsx",
+    "upload-progress-banner.tsx",
+  ];
 
   function sourceFiles(dir: string): string[] {
     return fs.readdirSync(dir).flatMap((name: string) => {
@@ -340,28 +388,100 @@ describe("no step owns the upload surface any more", () => {
     });
   }
 
-  function strippedSource(file: string): string {
-    return fs
-      .readFileSync(file, "utf8")
-      .replace(/\/\*[\s\S]*?\*\//g, "")
-      .replace(/\/\/.*$/gm, "");
+  function strippedSource(src: string): string {
+    return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
   }
 
   /**
-   * Guard the fix at the structural level, not just the rendered output.
-   * A banner (or a recorder) put back inside a step is invisible again the
-   * moment that step unmounts, and the render tests above would not
-   * necessarily catch it, because a second banner still renders.
+   * Does this source take ownership of the recorder or the status banner?
+   * Matches the BARE IDENTIFIER, not a call, so an alias is still caught:
+   * an alias has to name the thing it aliases.
    */
-  it("no step component mounts the upload banner or creates a recorder", () => {
-    const files = sourceFiles(STEPS_DIR);
-    // Guard the guard: if the tree moves, fail loudly rather than pass empty.
-    expect(files.length).toBeGreaterThan(5);
+  function claimsRecorderOwnership(src: string): boolean {
+    const s = strippedSource(src);
+    return /\buseVideoRecorder\b/.test(s) || /\bUploadProgressBanner\b/.test(s);
+  }
 
-    const offenders = files.filter((file) => {
-      const src = strippedSource(file);
-      return /UploadProgressBanner|useVideoRecorder\s*\(/.test(src);
-    });
+  /**
+   * Does this source launder one of them out under another name? This is
+   * what catches the re-export defeat: the importing step looks innocent,
+   * so the guard has to fail the file doing the laundering.
+   */
+  function laundersExport(src: string): boolean {
+    const s = strippedSource(src);
+    return (
+      /export\s*\{[^}]*\b(?:UploadProgressBanner|useVideoRecorder)\b[^}]*\}/.test(s) ||
+      /export\s*\*\s*from\s*["'][^"']*(?:use-video-recorder|upload-progress-banner)["']/.test(s)
+    );
+  }
+
+  it("scans the whole match-flow tree, not just steps/", () => {
+    const files = sourceFiles(MATCH_FLOW_DIR).map((f) => path.relative(MATCH_FLOW_DIR, f));
+    // Guard the guard: fail loudly if the tree moves, never pass empty.
+    expect(files.length).toBeGreaterThan(10);
+    expect(files).toContain("steps/live-step.tsx");
+    // Defeat 3: components that live directly in match-flow/, which the
+    // steps-only scan could never see.
+    expect(files).toContain("camera-overlay.tsx");
+    expect(files).toContain("queue-status-banner.tsx");
+  });
+
+  it("only the four owning files name the recorder or the banner", () => {
+    const offenders = sourceFiles(MATCH_FLOW_DIR)
+      .filter((file) => claimsRecorderOwnership(fs.readFileSync(file, "utf8")))
+      .map((file) => path.relative(MATCH_FLOW_DIR, file))
+      .filter((rel) => !OWNERS.includes(rel));
     expect(offenders).toEqual([]);
+  });
+
+  it("every owner on the allowlist actually exists", () => {
+    // A rename that orphans an allowlist entry silently widens the guard.
+    const present = sourceFiles(MATCH_FLOW_DIR).map((f) => path.relative(MATCH_FLOW_DIR, f));
+    for (const owner of OWNERS) expect(present).toContain(owner);
+  });
+
+  it("nothing re-exports the recorder or the banner under another name", () => {
+    const files = [...sourceFiles(MATCH_FLOW_DIR), ...sourceFiles(VIDEO_LIB_DIR)];
+    const offenders = files.filter((file) => laundersExport(fs.readFileSync(file, "utf8")));
+    expect(offenders).toEqual([]);
+  });
+
+  // ---- mutation tests: each defeat, fed to the predicate as source ----
+
+  it("catches DEFEAT 1, aliasing the hook instead of calling it", () => {
+    const aliased = `
+      import { useVideoRecorder } from "@/lib/video/use-video-recorder";
+      const useRec = useVideoRecorder;
+      export function LiveStep() { const r = useRec("M", "A"); return null; }
+    `;
+    expect(claimsRecorderOwnership(aliased)).toBe(true);
+    // And the old pattern, for the record, did not.
+    expect(/useVideoRecorder\s*\(/.test(strippedSource(aliased))).toBe(false);
+  });
+
+  it("catches DEFEAT 2, re-exporting the banner under another name", () => {
+    const launderer = `
+      import { UploadProgressBanner } from "./upload-progress-banner";
+      export { UploadProgressBanner as StatusChip };
+    `;
+    expect(laundersExport(launderer)).toBe(true);
+    expect(laundersExport(`export * from "./use-video-recorder";`)).toBe(true);
+    // A step importing the laundered alias looks innocent on its own,
+    // which is exactly why the laundering file is what gets failed.
+    expect(claimsRecorderOwnership(`import { StatusChip } from "../chip";`)).toBe(false);
+  });
+
+  it("does not fire on prose that merely mentions them", () => {
+    // Comments are stripped, so the house docblock style that names the
+    // component a file was ported from is not a false positive.
+    expect(
+      claimsRecorderOwnership(`
+        /** Mirrors UploadProgressBanner; see useVideoRecorder for the states. */
+        export function TimerDisplay() { return null; }
+      `),
+    ).toBe(false);
+    expect(
+      claimsRecorderOwnership(`// uses useVideoRecorder indirectly\nexport const x = 1;`),
+    ).toBe(false);
   });
 });

@@ -66,6 +66,18 @@ export const RECORDING_CLOCK_SLACK_SECONDS =
   WORST_CASE_START_DELAY_SECONDS + WORST_CASE_STOP_DELAY_SECONDS;
 
 /**
+ * How long a stop may sit in flight before the recorder gives up on it.
+ *
+ * The re-issue loop runs for `PENDING_STOP_MAX_ATTEMPTS *
+ * PENDING_STOP_RETRY_MS`; past that, a `recordAsync` that still has not
+ * settled is the dropped-stop hardware bug the hardening exists for, and
+ * the state machine had NO exit from `stopping` at all. The extra 8s on
+ * top covers a large clip genuinely still being finalized on a slow device:
+ * the file write is native and can outlast the stop call by seconds.
+ */
+export const STOP_WATCHDOG_MS = PENDING_STOP_MAX_ATTEMPTS * PENDING_STOP_RETRY_MS + 8000;
+
+/**
  * Pause allowance. `pause_match` / `resume_match` stop the match clock but
  * NOT the camera, so every paused second is recorded wall-clock the match
  * duration does not account for. Ten minutes covers an injury check or a

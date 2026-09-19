@@ -105,7 +105,18 @@ export function MatchFlowWizard({
 
   const advanceToResult = React.useCallback(() => setStep("result"), []);
 
-  if (isLoading || !match || !step) return <WizardLoading />;
+  // The confirm step calls refresh() the instant the row completes, which
+  // re-enters useMatchDetails' loading state while the already-loaded match
+  // is still in hand. Treating that as a first load blanks the whole wizard
+  // to the loading splash on EVERY match, and remounts the recorder with it.
+  // The upload outcome survives that regardless now (it lives in the
+  // match-keyed store, not here), but there is no reason to throw the
+  // camera, the permissions hooks and the rendered step away for a refetch
+  // whose result we already have. Distinguish a revalidation of THIS match
+  // from a genuine first load, or a load for a DIFFERENT matchId.
+  const revalidating = isLoading && match != null && match.id === matchId;
+
+  if ((isLoading && !revalidating) || !match || !step) return <WizardLoading />;
   if (error) {
     return (
       <WizardError
@@ -149,7 +160,7 @@ export function MatchFlowWizard({
         {/* Above the step, never inside one: the upload begins after the
             live step has already unmounted, so this is the only place its
             outcome (success, stall or failure) can be seen. jits-od3. */}
-        <MatchRecorderStatus />
+        <MatchRecorderStatus matchId={matchId} />
         <MatchRecorderCamera step={step} />
         <MatchStepRenderer
           step={step}

@@ -5,7 +5,6 @@ import { toast } from "@/components/ui/toast";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { useAuth } from "@/lib/auth/hooks";
 import { cn } from "@/lib/cn";
-import type { RecordingState } from "@/lib/video/use-video-recorder";
 import { buildShareUrl, buildShareText } from "@jits/shared/utils";
 import { EloTile, Plate } from "@/components/ui/elo-system";
 
@@ -32,9 +31,11 @@ interface SummaryStepProps {
    * started or the upload failed.
    */
   videoId?: string | null;
-  /** Recorder state, so a still-running upload shows as pending rather
-   * than as a missing affordance or a link that would 404 (jits-p75q). */
-  videoState?: RecordingState;
+  /** True while the upload is still in flight, so it shows as pending
+   * rather than as a missing affordance or a link that would 404
+   * (jits-p75q). Derived from the match-keyed upload store, so it stays
+   * right across a remount and across a late-finishing upload. */
+  videoPending?: boolean;
 }
 
 /**
@@ -62,13 +63,9 @@ export function SummaryStep(props: SummaryStepProps) {
     eloAfter,
     weightDivisionGap,
     videoId,
-    videoState = "idle",
+    videoPending = false,
   } = props;
   const disputed = matchStatus === "disputed";
-  // Playback is offered on outcome-independent grounds: a disputed match's
-  // video is exactly the one worth watching, and the profile list that was
-  // the only other entry point filters on status='completed' (jits-p75q).
-  const videoPending = videoState === "stopping" || videoState === "uploading";
   const gap = weightDivisionGap ?? 0;
 
   // Authoritative ratings from the BE; no arithmetic re-derivation.
@@ -169,6 +166,10 @@ export function SummaryStep(props: SummaryStepProps) {
       ) : null}
 
       <View className="gap-3 pt-2">
+        {/* Playback is offered on outcome-independent grounds: a disputed
+            match's video is exactly the one worth watching, and the profile
+            list that was the only other entry point filters on
+            status='completed' (jits-p75q). */}
         {videoId ? (
           <Pressable
             accessibilityRole="button"

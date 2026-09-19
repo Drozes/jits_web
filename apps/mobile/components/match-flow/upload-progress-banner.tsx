@@ -1,18 +1,17 @@
 import { ActivityIndicator, Text, View } from "react-native";
 import { CheckCircle2, AlertTriangle } from "lucide-react-native";
 import { useThemedTokens } from "@/lib/theme/use-theme";
-import type { RecordingState, RecordingTruncation } from "@/lib/video/use-video-recorder";
+import type { RecordingTruncation } from "@/lib/video/use-video-recorder";
+import type { UploadBannerState } from "@/lib/video/upload-banner-state";
 
-interface UploadProgressBannerProps {
-  state: RecordingState;
-  error: string | null;
-  /**
-   * Set when the clip does not cover the whole match. A truncated
-   * recording that finished uploading is NOT a plain success and must not
-   * render as one (jits-2zpe).
-   */
-  truncation?: RecordingTruncation | null;
-}
+/**
+ * Exactly the state `deriveUploadBannerState` produces. The component
+ * decides no precedence of its own: that lives in one testable table in
+ * `lib/video/upload-banner-state.ts`, because the inputs come from two
+ * places with different lifetimes (a view-bound recorder and a
+ * match-keyed upload store that outlives it).
+ */
+type UploadProgressBannerProps = UploadBannerState;
 
 /** Copy for a clip that ended before the match did. */
 function truncationCopy(truncation: RecordingTruncation): string {
@@ -38,12 +37,12 @@ function truncationCopy(truncation: RecordingTruncation): string {
  * ELO design system: hairline plate with caps mono copy. Status color
  * follows positive / negative ink tokens.
  */
-export function UploadProgressBanner({ state, error, truncation }: UploadProgressBannerProps) {
+export function UploadProgressBanner({ kind, message, truncation }: UploadProgressBannerProps) {
   const tokens = useThemedTokens();
 
-  if (state === "idle" || state === "recording") return null;
+  if (kind === "hidden") return null;
 
-  if (state === "stopping" || state === "uploading") {
+  if (kind === "stopping" || kind === "uploading") {
     return (
       <View
         testID="upload-status-banner"
@@ -52,13 +51,13 @@ export function UploadProgressBanner({ state, error, truncation }: UploadProgres
       >
         <ActivityIndicator size="small" color={tokens.textSecondary} />
         <Text className="font-mono text-[10px] text-ink-2 uppercase tracking-caps-l">
-          {state === "stopping" ? "Finishing recording..." : "Uploading match video..."}
+          {kind === "stopping" ? "Finishing recording..." : "Uploading match video..."}
         </Text>
       </View>
     );
   }
 
-  if (state === "uploaded") {
+  if (kind === "uploaded") {
     // Uploaded, but the clip is short: warn rather than congratulate.
     if (truncation) {
       return (
@@ -91,23 +90,19 @@ export function UploadProgressBanner({ state, error, truncation }: UploadProgres
     );
   }
 
-  if (state === "error") {
-    return (
-      <View
-        testID="upload-status-banner"
-        accessibilityLiveRegion="polite"
-        className="w-full flex-row items-center gap-2 rounded-xs bg-surface-3 border border-negative px-3 py-2"
+  return (
+    <View
+      testID="upload-status-banner"
+      accessibilityLiveRegion="polite"
+      className="w-full flex-row items-center gap-2 rounded-xs bg-surface-3 border border-negative px-3 py-2"
+    >
+      <AlertTriangle size={14} color={tokens.stateNegative} />
+      <Text
+        className="flex-1 font-mono text-[10px] text-negative uppercase tracking-caps-l"
+        numberOfLines={3}
       >
-        <AlertTriangle size={14} color={tokens.stateNegative} />
-        <Text
-          className="flex-1 font-mono text-[10px] text-negative uppercase tracking-caps-l"
-          numberOfLines={3}
-        >
-          {error ?? "Recording unavailable"}
-        </Text>
-      </View>
-    );
-  }
-
-  return null;
+        {message ?? "Recording unavailable"}
+      </Text>
+    </View>
+  );
 }
