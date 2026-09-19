@@ -11,6 +11,8 @@ import type { BroadcastResult } from "@jits/shared/hooks/use-session-match-sync"
 import { WizardError, WizardLoading } from "./wizard-status";
 import { QueueStatusBanner } from "./queue-status-banner";
 import { MatchStepRenderer } from "./match-step-renderer";
+import { MatchRecorderProvider } from "./match-recorder-context";
+import { MatchRecorderCamera, MatchRecorderStatus } from "./match-recorder-surface";
 import { cn } from "@/lib/cn";
 
 interface MatchFlowWizardProps {
@@ -103,7 +105,30 @@ export function MatchFlowWizard({
 
   const advanceToResult = React.useCallback(() => setStep("result"), []);
 
-  if (isLoading || !match || !step) return <WizardLoading />;
+  // LOAD-BEARING. Do not delete this as a mere optimisation.
+  //
+  // The confirm step calls refresh() the instant the row completes, which
+  // re-enters useMatchDetails' loading state while the already-loaded match
+  // is still in hand. Treating that as a first load blanks the whole wizard
+  // to the loading splash on EVERY match and remounts the recorder with it.
+  //
+  // The UPLOAD outcome survives such a remount by itself, because it lives
+  // in the match-keyed store rather than here. RECORDER-ONLY failures do
+  // NOT: "Camera not ready", "Camera permission required", "Recording
+  // failed", "Stop failed", the stop watchdog's "The recording did not
+  // finish", and a cap fire that produced no file, all live on the recorder
+  // and never reach the store, because no upload was ever attempted. A
+  // remount replaces the recorder with a fresh idle one and every one of
+  // those messages disappears, on the summary step, which is the one place
+  // jits-od3 requires them to be visible.
+  //
+  // So this predicate is what keeps that class alive, and
+  // upload-survives-remount.test.tsx has a suite that fails if it is
+  // removed. Distinguish a revalidation of THIS match from a genuine first
+  // load, or a load for a DIFFERENT matchId.
+  const revalidating = isLoading && match != null && match.id === matchId;
+
+  if ((isLoading && !revalidating) || !match || !step) return <WizardLoading />;
   if (error) {
     return (
       <WizardError
@@ -137,30 +162,41 @@ export function MatchFlowWizard({
       }}
       keyboardShouldPersistTaps="handled"
     >
-      <WizardStepHeader currentIdx={stepIdx} label={STEP_LABELS[step]} />
-      <QueueStatusBanner />
-      <MatchStepRenderer
-        step={step}
-        exitHref={exitHref}
-        exitLabel={exitLabel}
+      <MatchRecorderProvider
         matchId={matchId}
-        matchType={matchType}
-        matchStatus={match.status}
-        durationSeconds={match.duration_seconds}
-        startedAt={startedAt ?? match.started_at ?? new Date().toISOString()}
-        pausedAt={match.paused_at}
-        totalPausedDuration={match.total_paused_duration}
-        me={me}
-        opponent={opponent}
-        submissionTypes={submissionTypes}
-        resultData={resultData}
-        ownOutcome={ownOutcome}
-        setStep={setStep}
-        setStartedAt={setStartedAt}
-        setResultData={setResultData}
-        advanceToResult={advanceToResult}
-        refresh={refresh}
-      />
+        uploaderAthleteId={me.athlete_id}
+        matchDurationSeconds={match.duration_seconds}
+      >
+        <WizardStepHeader currentIdx={stepIdx} label={STEP_LABELS[step]} />
+        <QueueStatusBanner />
+        {/* Above the step, never inside one: the upload begins after the
+            live step has already unmounted, so this is the only place its
+            outcome (success, stall or failure) can be seen. jits-od3. */}
+        <MatchRecorderStatus matchId={matchId} />
+        <MatchRecorderCamera step={step} />
+        <MatchStepRenderer
+          step={step}
+          exitHref={exitHref}
+          exitLabel={exitLabel}
+          matchId={matchId}
+          matchType={matchType}
+          matchStatus={match.status}
+          durationSeconds={match.duration_seconds}
+          startedAt={startedAt ?? match.started_at ?? new Date().toISOString()}
+          pausedAt={match.paused_at}
+          totalPausedDuration={match.total_paused_duration}
+          me={me}
+          opponent={opponent}
+          submissionTypes={submissionTypes}
+          resultData={resultData}
+          ownOutcome={ownOutcome}
+          setStep={setStep}
+          setStartedAt={setStartedAt}
+          setResultData={setResultData}
+          advanceToResult={advanceToResult}
+          refresh={refresh}
+        />
+      </MatchRecorderProvider>
     </ScrollView>
   );
 }

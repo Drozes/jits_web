@@ -1,5 +1,5 @@
 import { Tabs } from "expo-router";
-import { Home, Trophy, User } from "lucide-react-native";
+import { Home, Swords, Trophy, User } from "lucide-react-native";
 import { EloTabBar } from "@/components/layout/elo-tab-bar";
 
 /**
@@ -11,13 +11,12 @@ import { EloTabBar } from "@/components/layout/elo-tab-bar";
  * and session discovery is entered from Home; the gym-manager portal is entered
  * from the manager affordance on `/gyms/[id]`.
  *
- * Target layout is a 4-up bar: Home, Arena, Rankings, Profile. Arena ships in a
- * later wave, so the bar deliberately carries three tabs until then rather than
- * a placeholder route that would be deleted days later. Registering `arena`
- * ahead of its screen would not help either: expo-router drops a Screen with no
+ * The bar is the target 4-up: Home, Arena, Rankings, Profile. A Screen and its
+ * route file have to land together, because expo-router drops a Screen with no
  * matching route file (console.warn "[Layout children]: No route named ...",
- * then it is filtered out, in 6.0.23 build/useScreens.js:65-68), so the fourth
- * column would simply not render. The tab and the screen land together.
+ * then it is filtered out, in 6.0.23 build/useScreens.js:65-68) and the column
+ * simply would not render. EloTabBar needs no change for a fourth tab: its
+ * columns are flex-1 and it reads the list off the navigator.
  */
 export default function TabsLayout() {
   return (
@@ -34,11 +33,13 @@ export default function TabsLayout() {
           tabBarIcon: ({ color, size }) => <Home color={color} size={size} />,
         }}
       />
-      {/* ===== ARENA TAB SLOT (second of four) =====
-          Add the `arena` Tabs.Screen right here, at the same time as the
-          `app/(app)/(tabs)/arena/` route directory. Nothing else in this file
-          or in EloTabBar needs to change for it. Both expectations in
-          __tests__/app/tabs-layout.test.tsx take "arena" in this position. */}
+      <Tabs.Screen
+        name="arena"
+        options={{
+          title: "Arena",
+          tabBarIcon: ({ color, size }) => <Swords color={color} size={size} />,
+        }}
+      />
       <Tabs.Screen
         name="leaderboard"
         options={{

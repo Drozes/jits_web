@@ -1,6 +1,6 @@
 import { Pressable, Share, Text, View } from "react-native";
 import { useRouter } from "expo-router";
-import { Share2, Scale } from "lucide-react-native";
+import { Share2, Scale, PlayCircle } from "lucide-react-native";
 import { toast } from "@/components/ui/toast";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { useAuth } from "@/lib/auth/hooks";
@@ -25,6 +25,17 @@ interface SummaryStepProps {
   eloAfter?: number | null;
   /** BE-stamped IBJJF division gap. Shown (informational) when > 0. */
   weightDivisionGap?: number | null;
+  /**
+   * `match_videos.id` for the clip just recorded, once the upload has
+   * landed. Null until then, and null forever if recording was never
+   * started or the upload failed.
+   */
+  videoId?: string | null;
+  /** True while the upload is still in flight, so it shows as pending
+   * rather than as a missing affordance or a link that would 404
+   * (jits-p75q). Derived from the match-keyed upload store, so it stays
+   * right across a remount and across a late-finishing upload. */
+  videoPending?: boolean;
 }
 
 /**
@@ -51,6 +62,8 @@ export function SummaryStep(props: SummaryStepProps) {
     eloBefore,
     eloAfter,
     weightDivisionGap,
+    videoId,
+    videoPending = false,
   } = props;
   const disputed = matchStatus === "disputed";
   const gap = weightDivisionGap ?? 0;
@@ -153,6 +166,33 @@ export function SummaryStep(props: SummaryStepProps) {
       ) : null}
 
       <View className="gap-3 pt-2">
+        {/* Playback is offered on outcome-independent grounds: a disputed
+            match's video is exactly the one worth watching, and the profile
+            list that was the only other entry point filters on
+            status='completed' (jits-p75q). */}
+        {videoId ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push(`/(app)/video/${videoId}`)}
+            className="flex-row items-center justify-center gap-2 border border-hairline-strong rounded-sm bg-surface-3 py-3 active:bg-surface-4"
+          >
+            <View pointerEvents="none">
+              <PlayCircle size={14} color={tokens.textPrimary} />
+            </View>
+            <Text className="font-heading text-[13px] text-ink uppercase tracking-caps">
+              Watch Match Video
+            </Text>
+          </Pressable>
+        ) : videoPending ? (
+          <View className="flex-row items-center justify-center gap-2 border border-hairline-strong rounded-sm py-3 opacity-60">
+            <View pointerEvents="none">
+              <PlayCircle size={14} color={tokens.textSecondary} />
+            </View>
+            <Text className="font-heading text-[13px] text-ink-2 uppercase tracking-caps">
+              Video Uploading...
+            </Text>
+          </View>
+        ) : null}
         {outcome && !disputed ? (
           <Pressable
             accessibilityRole="button"
