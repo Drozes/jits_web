@@ -52,13 +52,14 @@ export type ColorTokens = {
   bgElevatedHover: string;  // Plate Bright — hover / focused state
   textPrimary: string;      // Terminal White / Void
   textSecondary: string;    // Data Gray Bright / #4B5563
-  textTertiary: string;     // Data Gray
-  textOnAccent: string;     // Always terminal white
-  accentCta: string;        // Signal Red
+  textTertiary: string;     // Data Gray, AA (4.5:1) on every surface
+  textOnAccent: string;     // Label sitting ON the Signal Red fill
+  accentCta: string;        // Signal Red (BRAND). Fills and rules only, never text.
+  accentCtaText: string;    // Signal Red tuned for TEXT, AA on every surface
   accentCtaHover: string;   // Lifted / dark variant for hover
   statePositive: string;    // Gain Green (dark for light mode)
-  stateNegative: string;    // Signal Red
-  stateNeutral: string;     // Data Gray
+  stateNegative: string;    // Signal Red tuned for text
+  stateNeutral: string;     // Data Gray (tracks textTertiary)
   borderHairline: string;       // Subtle divider
   borderHairlineFaint: string;  // Faintest divider
   borderHairlineStrong: string; // Strongest divider (still hairline)
@@ -92,22 +93,23 @@ export const lightTokens: ColorTokens = {
   deepRed: "hsl(355, 67%, 47%)",
 
   // ELO — Paddock family (light surfaces shift DARKER as they elevate)
-  bgPrimary: "#F2F4F7",          // paddock
+  bgPrimary: "#F8FAFC",          // paddock (lifted: plate separation 1.18 -> 1.24)
   bgSecondary: "#E8EBF0",        // paddock-panel
   bgElevated: "#DEE2E9",         // paddock-plate
-  bgElevatedHover: "#D2D7E0",    // paddock-plate-bright
-  textPrimary: "#0D0F14",        // void
-  textSecondary: "#4B5563",      // AA-passing on light
-  textTertiary: "#6B7280",       // data-gray
-  textOnAccent: "#E8EDF2",       // terminal-white
-  accentCta: "#E63946",          // signal-red
+  bgElevatedHover: "#D2D7E0",    // paddock-plate-bright (darkest surface, sets the ink floor)
+  textPrimary: "#0D0F14",        // void: 13.27:1 on the darkest surface
+  textSecondary: "#4B5563",      // 5.23:1 on the darkest surface
+  textTertiary: "#575C68",       // data-gray-dark: 4.64:1 on the darkest surface (was #6B7280, 3.35:1)
+  textOnAccent: "#0D0F14",       // void on signal-red: 4.60:1 (was #E8EDF2, 3.54:1)
+  accentCta: "#E63946",          // signal-red, BRAND, unchanged
+  accentCtaText: "#AC2B34",      // signal-red-text: 4.62:1 on the darkest surface
   accentCtaHover: "#C42939",     // signal-red-dark
-  statePositive: "#15803D",      // gain-green-dark (AA on light)
-  stateNegative: "#E63946",      // signal-red
-  stateNeutral: "#6B7280",       // data-gray
-  borderHairline: "rgba(13, 15, 20, 0.14)",
-  borderHairlineFaint: "rgba(13, 15, 20, 0.07)",
-  borderHairlineStrong: "rgba(13, 15, 20, 0.25)",
+  statePositive: "#116A33",      // gain-green-dark: 4.64:1 on the darkest surface (was #15803D, 3.47:1)
+  stateNegative: "#AC2B34",      // matches accentCtaText, text-only usage
+  stateNeutral: "#575C68",       // tracks textTertiary
+  borderHairline: "rgba(13, 15, 20, 0.22)",
+  borderHairlineFaint: "rgba(13, 15, 20, 0.11)",
+  borderHairlineStrong: "rgba(13, 15, 20, 0.34)",
 };
 
 export const darkTokens: ColorTokens = {
@@ -138,20 +140,21 @@ export const darkTokens: ColorTokens = {
   deepRed: "hsl(355, 67%, 47%)",
 
   // ELO — Void family (dark surfaces shift LIGHTER as they elevate)
-  bgPrimary: "#0D0F14",          // void
+  bgPrimary: "#0D0F14",          // void (unchanged: matches app.json splash, no native drift)
   bgSecondary: "#13151B",        // panel
-  bgElevated: "#1A1D24",         // plate
-  bgElevatedHover: "#242832",    // plate-bright
-  textPrimary: "#E8EDF2",        // terminal-white
-  textSecondary: "#9CA3AF",      // data-gray-bright
-  textTertiary: "#6B7280",       // data-gray
-  textOnAccent: "#E8EDF2",       // terminal-white
-  accentCta: "#E63946",          // signal-red
+  bgElevated: "#1E222B",         // plate (lifted: page separation 1.14 -> 1.20)
+  bgElevatedHover: "#262A34",    // plate-bright (lightest surface, sets the ink floor)
+  textPrimary: "#E8EDF2",        // terminal-white: 12.18:1 on the lightest surface
+  textSecondary: "#9CA3AF",      // data-gray-bright: 5.65:1 on the lightest surface
+  textTertiary: "#8D929D",       // data-gray-lift: 4.60:1 on the lightest surface (was #6B7280, 3.05:1)
+  textOnAccent: "#0D0F14",       // void on signal-red: 4.60:1 (was #E8EDF2, 3.54:1)
+  accentCta: "#E63946",          // signal-red, BRAND, unchanged
+  accentCtaText: "#EC6A74",      // signal-red-text: 4.70:1 on the lightest surface
   accentCtaHover: "#F0556B",     // signal-red lifted
-  statePositive: "#22C55E",      // gain-green
-  stateNegative: "#E63946",      // signal-red
-  stateNeutral: "#6B7280",       // data-gray
-  borderHairline: "rgba(107, 114, 128, 0.25)",
-  borderHairlineFaint: "rgba(107, 114, 128, 0.12)",
-  borderHairlineStrong: "rgba(107, 114, 128, 0.40)",
+  statePositive: "#22C55E",      // gain-green: 6.30:1 on the lightest surface
+  stateNegative: "#EC6A74",      // matches accentCtaText, text-only usage
+  stateNeutral: "#8D929D",       // tracks textTertiary
+  borderHairline: "rgba(107, 114, 128, 0.45)",
+  borderHairlineFaint: "rgba(107, 114, 128, 0.20)",
+  borderHairlineStrong: "rgba(107, 114, 128, 0.62)",
 };

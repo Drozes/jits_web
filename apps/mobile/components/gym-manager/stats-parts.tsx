@@ -10,6 +10,7 @@ import { Pressable, Text, View } from "react-native";
 import { ChevronRight } from "lucide-react-native";
 import { DeltaNumber } from "@/components/ui/elo-system";
 import { Chip } from "@/components/ui/elo-system";
+import { useThemedTokens } from "@/lib/theme/use-theme";
 import {
   formatElo,
   formatFinishTime,
@@ -56,6 +57,7 @@ interface DrillDownTileProps {
 
 /** Full-width row tile that navigates into the H10 bracket drill-down. */
 export function DrillDownTile({ label, onPress }: DrillDownTileProps) {
+  const tokens = useThemedTokens();
   return (
     <Pressable
       accessibilityRole="button"
@@ -65,7 +67,7 @@ export function DrillDownTile({ label, onPress }: DrillDownTileProps) {
       <Text className="font-heading text-[12px] text-ink uppercase tracking-caps">
         {label}
       </Text>
-      <ChevronRight size={18} color="#6B7280" />
+      <ChevronRight size={18} color={tokens.textTertiary} />
     </Pressable>
   );
 }
