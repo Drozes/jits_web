@@ -59,8 +59,10 @@ jest.mock("@/lib/supabase/client", () => ({
     },
     removeChannel: (...a: unknown[]) => mockRemoveChannel(...a),
     from: () => ({
-      select: () => ({
-        eq: () => ({ maybeSingle: () => mockMaybeSingle() }),
+      // Columns are passed through so a test can tell the challenger-name
+      // lookup apart from the opponent-eligibility re-read.
+      select: (columns: string) => ({
+        eq: () => ({ maybeSingle: () => mockMaybeSingle(columns) }),
       }),
     }),
   },
@@ -165,10 +167,19 @@ beforeEach(() => {
   mockChannelTopics.length = 0;
   jest.clearAllMocks();
   mockSend.mockResolvedValue("ok");
-  mockMaybeSingle.mockResolvedValue({
-    data: { display_name: "Rival", current_elo: 1350, current_weight: 190 },
-    error: null,
-  });
+  mockMaybeSingle.mockImplementation((columns: string) =>
+    columns.includes("looking_for_ranked")
+      ? // Eligibility re-read: by default the opponent is still there, so a
+        // refused insert really is the cap.
+        Promise.resolve({
+          data: { looking_for_ranked: true, status: "active" },
+          error: null,
+        })
+      : Promise.resolve({
+          data: { display_name: "Rival", current_elo: 1350, current_weight: 190 },
+          error: null,
+        }),
+  );
   mockCreateChallenge.mockResolvedValue({ ok: true, data: { id: CHALLENGE } });
   mockAcceptChallenge.mockResolvedValue({ ok: true, data: undefined });
   mockDeclineChallenge.mockResolvedValue({ ok: true, data: undefined });
@@ -230,6 +241,65 @@ describe("sending a challenge", () => {
     expect(result.current.capReached).toBe(true);
     expect(result.current.outgoing).toBeNull();
     expect(mockToastError).not.toHaveBeenCalled();
+  });
+
+  it("does NOT claim the cap when the opponent simply left the Arena", async () => {
+    // mapPostgrestError collapses every 42501 on this insert into
+    // MAX_PENDING_CHALLENGES, but opponent_accepts_match_type is a reachable
+    // cause: the roster is a snapshot and this design has people going
+    // offline constantly, so the opponent can clear their looking_for_ranked
+    // between the load and the tap. A standing "cancel one of your three"
+    // plate would then be a flat lie that also disables every row.
+    mockCreateChallenge.mockResolvedValue({
+      ok: false,
+      error: { code: "MAX_PENDING_CHALLENGES", message: "3 pending" },
+    });
+    mockMaybeSingle.mockImplementation((columns: string) =>
+      columns.includes("looking_for_ranked")
+        ? Promise.resolve({
+            data: { looking_for_ranked: false, status: "active" },
+            error: null,
+          })
+        : Promise.resolve({ data: null, error: null }),
+    );
+    const onUnavailable = jest.fn();
+    const { result } = renderHook(() =>
+      useArenaChallenge({
+        athleteId: ME,
+        athleteWeight: 180,
+        onOpponentUnavailable: onUnavailable,
+      }),
+    );
+
+    await act(async () => {
+      await result.current.sendChallenge(OPPONENT, "Rival");
+    });
+
+    expect(result.current.capReached).toBe(false);
+    expect(mockToastInfo).toHaveBeenCalledWith("Rival just left the Arena.");
+    expect(onUnavailable).toHaveBeenCalledWith(OPPONENT);
+  });
+
+  it("does not assert the cap on an eligibility read it could not make", async () => {
+    // An unverified standing banner that disables the whole surface is a
+    // worse answer than an unhelpful toast.
+    mockCreateChallenge.mockResolvedValue({
+      ok: false,
+      error: { code: "MAX_PENDING_CHALLENGES", message: "3 pending" },
+    });
+    mockMaybeSingle.mockImplementation((columns: string) =>
+      columns.includes("looking_for_ranked")
+        ? Promise.resolve({ data: null, error: { message: "network" } })
+        : Promise.resolve({ data: null, error: null }),
+    );
+    const { result } = mount();
+
+    await act(async () => {
+      await result.current.sendChallenge(OPPONENT, "Rival");
+    });
+
+    expect(result.current.capReached).toBe(false);
+    expect(mockToastError).toHaveBeenCalled();
   });
 
   it("toasts other failures and leaves the row challengeable", async () => {
@@ -407,16 +477,13 @@ describe("accepting", () => {
     expect(mockPush).toHaveBeenCalledWith(`/match/${MATCH}`);
   });
 
-  it("retries the match start exactly once when the other side won the race", async () => {
-    mockStartMatch
-      .mockResolvedValueOnce({
-        ok: false,
-        error: { code: "MATCH_ALREADY_EXISTS", message: "dupe" },
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        data: { success: true, match_id: MATCH, challenge_id: CHALLENGE },
-      });
+  it("asks the server for the match exactly once", async () => {
+    // Both parties may call start_match_from_challenge for the same
+    // challenge. They converge without any client retry: matches.challenge_id
+    // is UNIQUE and the function's own EXCEPTION block catches
+    // unique_violation, re-selects the winner's id and returns success, so no
+    // 23505 ever reaches PostgREST. A retry on MATCH_ALREADY_EXISTS would be
+    // dead code guarding a response the server cannot produce.
     const { result } = mount();
     await raiseIncoming(result);
 
@@ -424,8 +491,49 @@ describe("accepting", () => {
       await result.current.accept();
     });
 
-    expect(mockStartMatch).toHaveBeenCalledTimes(2);
+    expect(mockStartMatch).toHaveBeenCalledTimes(1);
     expect(mockPush).toHaveBeenCalledWith(`/match/${MATCH}`);
+  });
+
+  it("still enters the match on a SECOND accept in the same session", async () => {
+    // The Arena is a tab screen with no unmountOnBlur under an (app) Stack,
+    // so this hook instance survives the round trip into a match and back. A
+    // one-shot "already navigated" latch would make every later accept a
+    // silent no-op: the server creates the match, the opponent navigates in,
+    // and this athlete sits on a stale prompt, alone in a match they never
+    // joined.
+    const { result } = mount();
+
+    await raiseIncoming(result);
+    await act(async () => {
+      await result.current.accept();
+    });
+    expect(mockPush).toHaveBeenCalledTimes(1);
+
+    // Back in the Arena, a different challenge from someone else.
+    mockStartMatch.mockResolvedValue({
+      ok: true,
+      data: { success: true, match_id: "match-2", challenge_id: "ch-2" },
+    });
+    await act(async () => {
+      await incomingBinding().handler({
+        new: {
+          id: "ch-2",
+          challenger_id: "opp-2",
+          opponent_id: ME,
+          status: "pending",
+        },
+      });
+    });
+    await waitFor(() => expect(result.current.incoming).not.toBeNull());
+
+    await act(async () => {
+      await result.current.accept();
+    });
+
+    expect(mockPush).toHaveBeenCalledTimes(2);
+    expect(mockPush).toHaveBeenLastCalledWith("/match/match-2");
+    expect(result.current.incoming).toBeNull();
   });
 
   it("says a dead challenge is dead instead of blaming the match start", async () => {

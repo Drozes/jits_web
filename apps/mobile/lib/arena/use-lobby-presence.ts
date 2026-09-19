@@ -11,6 +11,25 @@
  *
  * Mirrors `apps/web/hooks/use-lobby-presence.ts`. Same external-store shape,
  * so any component can read the lobby without a Provider wrap.
+ *
+ * THE CHANNEL IS CREATED ONCE AND REUSED, NEVER REBUILT. This topic is a
+ * shared constant, so the per-instance suffix that protects the Arena's
+ * postgres_changes channel is not available here, and realtime-js 2.105.4
+ * makes a rebuild actively dangerous:
+ *   - `RealtimeClient.channel(topic)` returns the EXISTING instance when one
+ *     with that topic is still registered (RealtimeClient.js:343-355).
+ *   - `removeChannel()` is async and only tears the channel down when
+ *     `unsubscribe()` resolves 'ok' (RealtimeClient.js:270-276), so a
+ *     fire-and-forget removal can leave the instance registered.
+ *   - `subscribe()` is a silent no-op unless the adapter `isClosed()`
+ *     (RealtimeChannel.js:121), so re-subscribing that instance never fires
+ *     SUBSCRIBED, never tracks, and the athlete never appears to anyone.
+ *   - `on()` THROWS for presence and postgres_changes alike once the channel
+ *     is joined or joining (RealtimeChannel.js:389-396), so re-binding it is
+ *     not an option either.
+ * A remount racing its own teardown would therefore leave a channel that is
+ * silently dead for the rest of the app session, with "Online now" stuck at
+ * zero. Adopting the live instance sidesteps all four.
  */
 import * as React from "react";
 import { useSyncExternalStore } from "react";
@@ -32,6 +51,9 @@ export interface LobbyPayload {
   looking_for_casual: boolean;
   looking_for_ranked: boolean;
 }
+
+/** What `RealtimeClient` keys its channel registry by. */
+const REGISTERED_TOPIC = `realtime:${LOBBY_TOPIC}`;
 
 // ---------------------------------------------------------------------------
 // External store
@@ -70,6 +92,8 @@ export function useLobbyStatus(athleteId: string): boolean {
 // ---------------------------------------------------------------------------
 
 let channelRef: RealtimeChannel | null = null;
+/** The athlete the live channel's presence key was built for. */
+let channelAthleteId: string | null = null;
 /**
  * What we WANT tracked, independent of whether the channel is joined yet.
  *
@@ -97,9 +121,29 @@ export async function leaveLobby(): Promise<void> {
   await channelRef?.untrack();
 }
 
-/** Test seam: true when a join is currently desired. */
-export function isLobbyJoinDesired(): boolean {
-  return desiredPayload !== null;
+/** True while the client still holds this exact channel instance. */
+function isRegistered(channel: RealtimeChannel | null): boolean {
+  if (!channel) return false;
+  return supabase.getChannels().some((c) => c === channel);
+}
+
+/**
+ * Drop the channel properly: awaited, and with the status checked, because a
+ * removal that did not confirm leaves the instance registered and poisons
+ * every later `channel()` call for this topic.
+ */
+async function releaseChannel(): Promise<void> {
+  const channel = channelRef;
+  channelRef = null;
+  channelAthleteId = null;
+  desiredPayload = null;
+  lobbyIds = new Set();
+  emitChange();
+  if (!channel) return;
+  const status = await supabase.removeChannel(channel);
+  if (status !== "ok") {
+    console.warn("[arena] lobby channel did not confirm teardown:", status);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -109,49 +153,75 @@ export function isLobbyJoinDesired(): boolean {
 /**
  * Owns the single `lobby:online` channel. Mount once, on the Arena screen.
  *
- * The effect depends on `athleteId` alone. Going live and going offline run
- * through the imperative API above rather than through props, so a toggle
- * never tears the channel down and re-joins it.
+ * Going live and going offline run through the imperative API above rather
+ * than through props, so a toggle never tears the channel down and re-joins
+ * it.
  */
 export function useLobbyPresence(athleteId: string): void {
-  const mountIdRef = React.useRef(0);
-
   React.useEffect(() => {
-    if (!athleteId) return;
+    let cancelled = false;
 
-    const mountId = ++mountIdRef.current;
+    async function ensure() {
+      if (!athleteId) {
+        await releaseChannel();
+        return;
+      }
 
-    // The topic is a shared constant, never per-mount: Presence only syncs
-    // members of the same topic, so `lobby:online:${mountId}` would isolate
-    // this client into an empty lobby of one. `mountId` is only a stale-write
-    // guard for the sync handler below.
-    const channel = supabase.channel(LOBBY_TOPIC, {
-      config: { presence: { key: athleteId } },
-    });
+      // Adopt a channel we already hold for this athlete. Its existing
+      // presence binding is still wired to the module store, so nothing needs
+      // re-binding, which is fortunate, because `on()` would throw.
+      if (isRegistered(channelRef) && channelAthleteId === athleteId) {
+        await trackDesired();
+        return;
+      }
 
-    channel.on("presence", { event: "sync" }, () => {
-      // Drop a late sync from a superseded mount so it cannot clobber the
-      // store after cleanup.
-      if (mountId !== mountIdRef.current) return;
-      const state = channel.presenceState<LobbyPayload>();
-      lobbyIds = new Set(Object.keys(state));
-      emitChange();
-    });
+      // Either we hold a channel for a different athlete, or one was left
+      // behind. Both have to go before `channel()` will hand back anything
+      // new rather than the old instance.
+      if (channelRef || channelAthleteId !== null) await releaseChannel();
+      if (cancelled) return;
 
-    channel.subscribe((status) => {
-      if (status !== "SUBSCRIBED") return;
-      void trackDesired();
-    });
+      const stray = supabase
+        .getChannels()
+        .find((c) => c.topic === REGISTERED_TOPIC);
+      if (stray) {
+        const status = await supabase.removeChannel(stray);
+        if (status !== "ok") {
+          console.warn("[arena] stale lobby channel did not clear:", status);
+        }
+      }
+      if (cancelled) return;
 
-    channelRef = channel;
+      const channel = supabase.channel(LOBBY_TOPIC, {
+        config: { presence: { key: athleteId } },
+      });
+
+      channel.on("presence", { event: "sync" }, () => {
+        // Identity guard rather than a mount counter: the only question that
+        // matters is whether this is still the channel the module owns.
+        if (channelRef !== channel) return;
+        const state = channel.presenceState<LobbyPayload>();
+        lobbyIds = new Set(Object.keys(state));
+        emitChange();
+      });
+
+      channel.subscribe((status) => {
+        if (status !== "SUBSCRIBED") return;
+        void trackDesired();
+      });
+
+      channelRef = channel;
+      channelAthleteId = athleteId;
+    }
+
+    void ensure();
 
     return () => {
-      channelRef = null;
-      desiredPayload = null;
-      void supabase.removeChannel(channel);
-      // Clear the snapshot so a re-mount never renders a stale lobby.
-      lobbyIds = new Set();
-      emitChange();
+      cancelled = true;
+      // Leave the lobby, KEEP the channel. Removing it here is what creates
+      // the zombie described at the top of this file, and an observer with
+      // nothing tracked costs one idle topic.
+      void leaveLobby();
     };
   }, [athleteId]);
 }

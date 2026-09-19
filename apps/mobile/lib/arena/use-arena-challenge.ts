@@ -26,8 +26,6 @@ import {
   declineChallenge,
   startMatchFromChallenge,
 } from "@jits/shared/api/mutations";
-import type { Result } from "@jits/shared/api/errors";
-import type { StartMatchResponse } from "@jits/shared/types/composites";
 import { toast } from "@/components/ui/toast";
 import { supabase } from "../supabase/client";
 import { arenaMatchHref, challengeTopic, incomingTopic } from "./constants";
@@ -57,6 +55,12 @@ interface ChallengeRow {
 export interface UseArenaChallengeArgs {
   athleteId: string;
   athleteWeight: number | null;
+  /**
+   * Called when an opponent turns out to have left the Arena between the
+   * roster load and the tap. The roster has no realtime feed on `athletes`,
+   * so this is how the stale row gets corrected.
+   */
+  onOpponentUnavailable?: (opponentId: string) => void;
 }
 
 export interface UseArenaChallengeResult {
@@ -77,19 +81,15 @@ export interface UseArenaChallengeResult {
 }
 
 /**
- * `start_match_from_challenge` returns the existing match when one is already
- * there, so the only way it can fail on a race is the `matches.challenge_id`
- * UNIQUE constraint firing between its existence check and its insert. The
- * loser of that race retries once and takes the winner's row. Both parties
- * therefore converge on one match even when both call it.
+ * Both parties may call `start_match_from_challenge` for the same challenge,
+ * and they converge on one match without any client-side retry:
+ * `matches.challenge_id` is UNIQUE, and the function's own EXCEPTION block
+ * catches `unique_violation`, re-selects the winner's match id and returns
+ * `{ success: true, already_exists: true }`
+ * (jr_be 20260219000000_start_match_enhancements.sql). No 23505 ever reaches
+ * PostgREST, so a client retry on MATCH_ALREADY_EXISTS would be dead code
+ * guarding a response the server cannot produce.
  */
-async function startMatchWithRetry(
-  challengeId: string,
-): Promise<Result<StartMatchResponse>> {
-  const first = await startMatchFromChallenge(supabase, challengeId);
-  if (first.ok || first.error.code !== "MATCH_ALREADY_EXISTS") return first;
-  return startMatchFromChallenge(supabase, challengeId);
-}
 
 /**
  * Tell the other side the match exists.
@@ -116,6 +116,7 @@ async function broadcast(
 export function useArenaChallenge({
   athleteId,
   athleteWeight,
+  onOpponentUnavailable,
 }: UseArenaChallengeArgs): UseArenaChallengeResult {
   const router = useRouter();
   const [incoming, setIncoming] = React.useState<IncomingChallenge | null>(null);
@@ -130,9 +131,20 @@ export function useArenaChallenge({
   const outgoingRef = React.useRef<OutgoingChallenge | null>(null);
   const weightRef = React.useRef(athleteWeight);
   weightRef.current = athleteWeight;
-  // A match_started broadcast and the accepted-status fallback can both land.
-  // Whichever is first wins; the other must not push a second screen.
-  const enteredRef = React.useRef(false);
+  const unavailableRef = React.useRef(onOpponentUnavailable);
+  unavailableRef.current = onOpponentUnavailable;
+  /**
+   * The challenge we have already navigated for.
+   *
+   * A match_started broadcast and the accepted-status fallback can both land
+   * for the SAME challenge, and only one of them may push a screen. It is
+   * keyed by challenge id rather than being a boolean, because this hook
+   * outlives a match: the Arena is a tab screen with no unmountOnBlur, so the
+   * instance survives the round trip into a match and back, and a boolean
+   * latch would make every later accept a silent no-op, leaving the opponent
+   * alone in a match nobody joined.
+   */
+  const enteredForRef = React.useRef<string | null>(null);
 
   const setIncomingBoth = React.useCallback(
     (next: IncomingChallenge | null) => {
@@ -150,9 +162,9 @@ export function useArenaChallenge({
   );
 
   const enterMatch = React.useCallback(
-    (matchId: string) => {
-      if (enteredRef.current) return;
-      enteredRef.current = true;
+    (challengeId: string, matchId: string) => {
+      if (enteredForRef.current === challengeId) return;
+      enteredForRef.current = challengeId;
       setIncomingBoth(null);
       setOutgoingBoth(null);
       router.push(arenaMatchHref(matchId));
@@ -249,8 +261,8 @@ export function useArenaChallenge({
           // challenger the match is happening. `start_match_from_challenge` is
           // idempotent, so asking for it again is safe.
           if (row.status === "accepted" || row.status === "started") {
-            const started = await startMatchWithRetry(row.id);
-            if (started.ok) enterMatch(started.data.match_id);
+            const started = await startMatchFromChallenge(supabase, row.id);
+            if (started.ok) enterMatch(row.id, started.data.match_id);
           }
         },
       )
@@ -270,7 +282,7 @@ export function useArenaChallenge({
       .channel(challengeTopic(outgoingId))
       .on("broadcast", { event: "match_started" }, ({ payload }) => {
         const matchId = (payload as { matchId?: string })?.matchId;
-        if (matchId) enterMatch(matchId);
+        if (matchId) enterMatch(outgoingId, matchId);
       })
       .on("broadcast", { event: "declined" }, () => {
         setOutgoingBoth(null);
@@ -300,6 +312,50 @@ export function useArenaChallenge({
     }
   }, []);
 
+  /**
+   * Work out what a refused insert actually means before saying anything.
+   *
+   * `mapPostgrestError` collapses EVERY 42501 on this insert into
+   * MAX_PENDING_CHALLENGES, but `challenges_insert` has four WITH CHECK
+   * clauses. Three are unreachable from this screen (an inactive challenger is
+   * stopped by the athlete guard; an inactive opponent and a self-challenge
+   * are filtered out of `get_arena_data`). The fourth,
+   * `opponent_accepts_match_type`, IS reachable and the window is wide,
+   * because the roster is a snapshot taken at mount and this very design has
+   * people dropping out of the Arena constantly: the opponent can leave
+   * between the roster load and the tap, which clears their
+   * `looking_for_ranked` and makes the insert fail for a reason that has
+   * nothing to do with the cap. Asserting a standing "you have 3 challenges
+   * out" plate then would be a flat lie that also disables every row.
+   *
+   * So the opponent's row decides. When it cannot be read at all, the cap is
+   * NOT asserted: a toast that is merely unhelpful beats a standing banner
+   * that is confidently wrong about a limit the athlete may be nowhere near.
+   */
+  const explainRefusedInsert = React.useCallback(
+    async (opponentId: string, opponentName: string) => {
+      const { data, error } = await supabase
+        .from("athletes")
+        .select("looking_for_ranked, status")
+        .eq("id", opponentId)
+        .maybeSingle();
+
+      if (error || !data) {
+        toast.error("Couldn't send that challenge. Try again.");
+        return;
+      }
+
+      if (data.looking_for_ranked !== true || data.status !== "active") {
+        toast.info(`${opponentName} just left the Arena.`);
+        unavailableRef.current?.(opponentId);
+        return;
+      }
+
+      setCapReached(true);
+    },
+    [],
+  );
+
   const sendChallenge = React.useCallback(
     (opponentId: string, opponentName: string) =>
       runExclusive(async () => {
@@ -310,23 +366,14 @@ export function useArenaChallenge({
         });
 
         if (!result.ok) {
-          // `mapPostgrestError` turns any 42501 on this insert into
-          // MAX_PENDING_CHALLENGES. Inside the Arena that mapping is exact:
-          // the other WITH CHECK clauses are an inactive challenger (blocked
-          // by the athlete guard before this screen renders), an inactive
-          // opponent and a self-challenge (both filtered out of
-          // `get_arena_data`), and an opponent who does not accept ranked
-          // (whose Challenge affordance is already suppressed). The cap is
-          // what is left.
           if (result.error.code === "MAX_PENDING_CHALLENGES") {
-            setCapReached(true);
+            await explainRefusedInsert(opponentId, opponentName);
             return;
           }
           toast.error(result.error.message || "Couldn't send that challenge.");
           return;
         }
 
-        enteredRef.current = false;
         setCapReached(false);
         setOutgoingBoth({
           challengeId: result.data.id,
@@ -334,7 +381,7 @@ export function useArenaChallenge({
           opponentName,
         });
       }),
-    [runExclusive, setOutgoingBoth],
+    [runExclusive, setOutgoingBoth, explainRefusedInsert],
   );
 
   const accept = React.useCallback(
@@ -359,7 +406,10 @@ export function useArenaChallenge({
         // update that matches no rows is not an error, so a challenge that was
         // cancelled or expired a moment ago still returns ok above. The real
         // answer arrives here, as `not_accepted`.
-        const started = await startMatchWithRetry(current.challengeId);
+        const started = await startMatchFromChallenge(
+          supabase,
+          current.challengeId,
+        );
         if (!started.ok) {
           setIncomingBoth(null);
           toast.error(
@@ -377,7 +427,7 @@ export function useArenaChallenge({
           matchId: started.data.match_id,
         });
 
-        enterMatch(started.data.match_id);
+        enterMatch(current.challengeId, started.data.match_id);
       }),
     [runExclusive, setIncomingBoth, enterMatch],
   );

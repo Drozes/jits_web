@@ -23,6 +23,7 @@ import { AppHeader } from "@/components/layout/app-header";
 import { PageContainer } from "@/components/layout/page-container";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { useLobbyIds, useLobbyPresence } from "@/lib/arena/use-lobby-presence";
+import { useIsTabSelected } from "@/lib/arena/use-arena-tab-focus";
 import { useArenaLive } from "@/lib/arena/use-arena-live";
 import { useArenaRoster } from "@/lib/arena/use-arena-roster";
 import { useArenaChallenge } from "@/lib/arena/use-arena-challenge";
@@ -48,11 +49,17 @@ export default function ArenaScreen() {
   useLobbyPresence(athleteId);
   const lobbyIds = useLobbyIds();
 
+  // The TAB, not this screen: pushing an athlete profile or dropping into a
+  // match blurs the screen while the Arena tab stays selected, and neither is
+  // leaving the Arena.
+  const isArenaTabSelected = useIsTabSelected("arena");
+
   const { isLive, isSaving, toggle } = useArenaLive({
     athleteId,
     displayName: athlete?.display_name ?? "",
     currentElo: athlete?.current_elo ?? 0,
     initialRanked: athlete?.looking_for_ranked ?? false,
+    isArenaTabSelected,
   });
 
   const {
@@ -77,6 +84,9 @@ export default function ArenaScreen() {
   } = useArenaChallenge({
     athleteId,
     athleteWeight: athlete?.current_weight ?? null,
+    // An opponent who left between the roster load and the tap leaves a stale
+    // row behind; re-reading the roster is what corrects it.
+    onOpponentUnavailable: refresh,
   });
 
   const online = competitors.filter((c) => lobbyIds.has(c.id));

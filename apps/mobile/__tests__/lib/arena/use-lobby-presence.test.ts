@@ -1,12 +1,19 @@
 /**
  * `lobby:online` presence.
  *
- * The two things that have actually broken here before, both guarded below:
- * a per-mount channel topic (which isolates the client into a lobby of one and
- * never syncs, jits-a8y.1), and a track that is issued before the channel has
- * joined and is therefore silently dropped.
+ * Three things have to hold, and each of them has a way of failing silently:
+ *
+ *  - the topic is the shared constant, because a per-mount name isolates the
+ *    client into a lobby of one that never syncs (jits-a8y.1);
+ *  - a track requested before the channel joined still lands;
+ *  - a remount ADOPTS the live channel instead of rebuilding it. realtime-js
+ *    2.105.4 hands back the existing instance for a live topic, `subscribe()`
+ *    is a no-op unless the adapter is closed, and `on()` THROWS for presence
+ *    once the channel is joined, so a rebuild produces a channel that never
+ *    fires SUBSCRIBED, never tracks, and leaves "Online now" at zero for the
+ *    rest of the app session.
  */
-import { act, renderHook } from "@testing-library/react-native";
+import { act, renderHook, waitFor } from "@testing-library/react-native";
 import { LOBBY_TOPIC } from "@/lib/arena/constants";
 
 // ---- mocks ----
@@ -14,6 +21,7 @@ import { LOBBY_TOPIC } from "@/lib/arena/constants";
 interface MockChannel {
   topic: string;
   config: unknown;
+  joined: boolean;
   syncHandler: (() => void) | null;
   subscribeHandler: ((status: string) => void) | null;
   on: jest.Mock;
@@ -23,21 +31,29 @@ interface MockChannel {
   presenceState: jest.Mock;
 }
 
+/** Every channel ever created, including released ones. */
 const mockChannels: MockChannel[] = [];
+/** What the client still holds, which is what `getChannels()` reports. */
+const mockRegistry: MockChannel[] = [];
 const mockRemoveChannel = jest.fn();
 
 function mockMakeChannel(topic: string, config: unknown): MockChannel {
   const channel: MockChannel = {
-    topic,
+    // RealtimeClient keys its registry by the prefixed topic.
+    topic: `realtime:${topic}`,
     config,
+    joined: false,
     syncHandler: null,
     subscribeHandler: null,
     on: jest.fn((_type: string, _filter: unknown, handler: () => void) => {
+      // Production would throw here on a joined channel; the test asserts we
+      // never reach that, rather than reproducing the throw.
       channel.syncHandler = handler;
       return channel;
     }),
     subscribe: jest.fn((handler: (status: string) => void) => {
       channel.subscribeHandler = handler;
+      channel.joined = true;
       return channel;
     }),
     track: jest.fn().mockResolvedValue(undefined),
@@ -50,11 +66,22 @@ function mockMakeChannel(topic: string, config: unknown): MockChannel {
 jest.mock("@/lib/supabase/client", () => ({
   supabase: {
     channel: (topic: string, config: unknown) => {
+      const existing = mockRegistry.find((c) => c.topic === `realtime:${topic}`);
+      if (existing) return existing;
       const c = mockMakeChannel(topic, config);
       mockChannels.push(c);
+      mockRegistry.push(c);
       return c;
     },
-    removeChannel: (...args: unknown[]) => mockRemoveChannel(...args),
+    getChannels: () => [...mockRegistry],
+    removeChannel: (channel: MockChannel) => {
+      const status = mockRemoveChannel(channel) ?? "ok";
+      if (status === "ok") {
+        const i = mockRegistry.indexOf(channel);
+        if (i >= 0) mockRegistry.splice(i, 1);
+      }
+      return Promise.resolve(status);
+    },
   },
 }));
 
@@ -83,33 +110,54 @@ function mount(athleteId = ME) {
   });
 }
 
+/** The hook's setup is async, so let it settle before asserting. */
+async function settle() {
+  await act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+}
+
 beforeEach(() => {
   mockChannels.length = 0;
-  mockRemoveChannel.mockClear();
+  mockRegistry.length = 0;
+  mockRemoveChannel.mockReset();
+  mockRemoveChannel.mockReturnValue("ok");
+});
+
+afterEach(async () => {
+  // Leave module state clean for the next test: the channel deliberately
+  // survives unmount, so it has to be released explicitly here.
+  const { unmount } = mount("");
+  await settle();
+  unmount();
 });
 
 describe("useLobbyPresence", () => {
-  it("joins the shared lobby topic, keyed by athlete, exactly once", () => {
+  it("joins the shared lobby topic, keyed by athlete, exactly once", async () => {
     const { rerender, unmount } = mount();
+    await settle();
 
     expect(mockChannels).toHaveLength(1);
     // Byte-identical to web's topic. A per-mount name would give this client
     // its own empty lobby and the roster split would never populate.
-    expect(mockChannels[0].topic).toBe(LOBBY_TOPIC);
-    expect(mockChannels[0].topic).toBe("lobby:online");
+    expect(mockChannels[0].topic).toBe(`realtime:${LOBBY_TOPIC}`);
+    expect(mockChannels[0].topic).toBe("realtime:lobby:online");
     expect(mockChannels[0].config).toEqual({
       config: { presence: { key: ME } },
     });
 
     rerender(undefined);
     rerender(undefined);
+    await settle();
     expect(mockChannels).toHaveLength(1);
 
     unmount();
   });
 
-  it("publishes the presence roster to every subscriber on sync", () => {
+  it("publishes the presence roster to every subscriber on sync", async () => {
     const { result, unmount } = mount();
+    await settle();
     const channel = mockChannels[0];
     channel.presenceState.mockReturnValue({
       "athlete-a": [{}],
@@ -126,12 +174,9 @@ describe("useLobbyPresence", () => {
 
   it("tracks a join that was requested before the channel had joined", async () => {
     const { unmount } = mount();
+    await settle();
     const channel = mockChannels[0];
 
-    // A tap on Go live can land in the window between channel() and
-    // SUBSCRIBED. The request has to survive that window: whatever a pre-join
-    // track does with its buffer, the athlete must end up tracked once the
-    // channel is actually up, or they never appear to anyone.
     await act(async () => {
       await joinLobby(PAYLOAD);
     });
@@ -150,6 +195,7 @@ describe("useLobbyPresence", () => {
 
   it("re-tracks the CURRENT payload on a websocket rejoin, not a stale one", async () => {
     const { unmount } = mount();
+    await settle();
     const channel = mockChannels[0];
 
     await act(async () => {
@@ -157,8 +203,6 @@ describe("useLobbyPresence", () => {
     });
     expect(channel.track).not.toHaveBeenCalled();
 
-    // Went live after the channel was already up. SUBSCRIBED fires again on
-    // every rejoin, and it has to re-assert what is true now.
     await act(async () => {
       await joinLobby(PAYLOAD);
     });
@@ -177,6 +221,7 @@ describe("useLobbyPresence", () => {
 
   it("stops re-tracking once the athlete has left the lobby", async () => {
     const { unmount } = mount();
+    await settle();
     const channel = mockChannels[0];
 
     await act(async () => {
@@ -195,28 +240,149 @@ describe("useLobbyPresence", () => {
     unmount();
   });
 
-  it("removes the channel and clears the roster on unmount", () => {
-    const { result, unmount } = mount();
+  it("leaves the lobby but KEEPS the channel on unmount", async () => {
+    const { unmount } = mount();
+    await settle();
+    const channel = mockChannels[0];
+    await act(async () => {
+      channel.subscribeHandler?.("SUBSCRIBED");
+      await joinLobby(PAYLOAD);
+    });
+
+    await act(async () => {
+      unmount();
+      await Promise.resolve();
+    });
+
+    expect(channel.untrack).toHaveBeenCalled();
+    // Removing it is what creates the zombie: removeChannel only tears down
+    // when unsubscribe confirms, and the next channel() call would hand back
+    // this same instance with subscribe() already a no-op.
+    expect(mockRemoveChannel).not.toHaveBeenCalled();
+  });
+
+  it("ADOPTS the live channel on a remount instead of rebuilding it", async () => {
+    const first = mount();
+    await settle();
+    const channel = mockChannels[0];
+    await act(async () => {
+      channel.subscribeHandler?.("SUBSCRIBED");
+    });
+    channel.on.mockClear();
+    channel.subscribe.mockClear();
+
+    await act(async () => {
+      first.unmount();
+      await Promise.resolve();
+    });
+
+    const second = mount();
+    await settle();
+
+    expect(mockChannels).toHaveLength(1);
+    // `on()` throws for presence on a joined channel, and `subscribe()` is a
+    // silent no-op on one that is not closed. Doing neither is the point.
+    expect(channel.on).not.toHaveBeenCalled();
+    expect(channel.subscribe).not.toHaveBeenCalled();
+
+    second.unmount();
+  });
+
+  it("keeps the adopted channel's sync wired to the store", async () => {
+    // The adopted channel keeps the binding the first mount made, so the
+    // roster must still flow after a remount. If it did not, "Online now"
+    // would sit at zero with no error anywhere.
+    const first = mount();
+    await settle();
+    const channel = mockChannels[0];
+    await act(async () => {
+      first.unmount();
+      await Promise.resolve();
+    });
+
+    const second = mount();
+    await settle();
+    channel.presenceState.mockReturnValue({ "athlete-a": [{}] });
+    act(() => {
+      channel.syncHandler?.();
+    });
+
+    expect([...second.result.current]).toEqual(["athlete-a"]);
+    second.unmount();
+  });
+
+  it("releases and rebuilds when the athlete changes", async () => {
+    const first = mount();
+    await settle();
+    const original = mockChannels[0];
+    await act(async () => {
+      first.unmount();
+      await Promise.resolve();
+    });
+
+    const second = mount("someone-else");
+    await settle();
+
+    expect(mockRemoveChannel).toHaveBeenCalledWith(original);
+    expect(mockChannels).toHaveLength(2);
+    expect(mockChannels[1].config).toEqual({
+      config: { presence: { key: "someone-else" } },
+    });
+
+    second.unmount();
+  });
+
+  it("does not build a second channel when a release did not confirm", async () => {
+    // removeChannel resolves the unsubscribe status and only tears down on
+    // 'ok'. A rebuild after a failed release would be handed the same
+    // instance back, with on() throwing and subscribe() doing nothing.
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    mockRemoveChannel.mockReturnValue("timed out");
+    const first = mount();
+    await settle();
+    await act(async () => {
+      first.unmount();
+      await Promise.resolve();
+    });
+
+    const second = mount("someone-else");
+    await settle();
+
+    expect(mockChannels).toHaveLength(1);
+    expect(mockRegistry).toHaveLength(1);
+    // Silent failure is the enemy here, so the unconfirmed teardown is said
+    // out loud rather than swallowed.
+    expect(warn).toHaveBeenCalled();
+
+    second.unmount();
+    mockRemoveChannel.mockReturnValue("ok");
+    warn.mockRestore();
+  });
+
+  it("does nothing without an athlete id", async () => {
+    const { unmount } = mount("");
+    await settle();
+    expect(mockChannels).toHaveLength(0);
+    unmount();
+  });
+
+  it("clears the roster when the channel is released", async () => {
+    const first = mount();
+    await settle();
     const channel = mockChannels[0];
     channel.presenceState.mockReturnValue({ "athlete-a": [{}] });
     act(() => {
       channel.syncHandler?.();
     });
-    expect(result.current.size).toBe(1);
+    expect(first.result.current.size).toBe(1);
 
-    unmount();
+    await act(async () => {
+      first.unmount();
+      await Promise.resolve();
+    });
 
-    expect(mockRemoveChannel).toHaveBeenCalledWith(channel);
-
-    // A fresh mount must not inherit the previous lobby.
-    const second = mount();
-    expect(second.result.current.size).toBe(0);
+    const second = mount("someone-else");
+    await waitFor(() => expect(second.result.current.size).toBe(0));
     second.unmount();
-  });
-
-  it("does nothing without an athlete id", () => {
-    const { unmount } = mount("");
-    expect(mockChannels).toHaveLength(0);
-    unmount();
   });
 });

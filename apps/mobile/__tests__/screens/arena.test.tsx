@@ -93,14 +93,23 @@ jest.mock("@/lib/arena/use-lobby-presence", () => ({
   useLobbyIds: () => mockLobbyIds,
 }));
 
+const mockUseIsTabSelected = jest.fn((_name: string) => true);
+jest.mock("@/lib/arena/use-arena-tab-focus", () => ({
+  useIsTabSelected: (name: string) => mockUseIsTabSelected(name),
+}));
+
 const mockToggle = jest.fn();
 let mockIsLive = false;
+const mockLiveArgs = jest.fn();
 jest.mock("@/lib/arena/use-arena-live", () => ({
-  useArenaLive: () => ({
-    isLive: mockIsLive,
-    isSaving: false,
-    toggle: mockToggle,
-  }),
+  useArenaLive: (args: Record<string, unknown>) => {
+    mockLiveArgs(args);
+    return {
+      isLive: mockIsLive,
+      isSaving: false,
+      toggle: mockToggle,
+    };
+  },
 }));
 
 const mockRefresh = jest.fn();
@@ -132,8 +141,12 @@ let mockChallenge = {
   cancelOutgoing: mockCancelOutgoing,
   clearCap: mockClearCap,
 };
+const mockChallengeArgs = jest.fn();
 jest.mock("@/lib/arena/use-arena-challenge", () => ({
-  useArenaChallenge: () => mockChallenge,
+  useArenaChallenge: (args: Record<string, unknown>) => {
+    mockChallengeArgs(args);
+    return mockChallenge;
+  },
 }));
 
 import ArenaScreen from "@/app/(app)/(tabs)/arena/index";
@@ -339,5 +352,25 @@ describe("Arena screen", () => {
 
     fireEvent.press(getByLabelText("Alpha, ELO 1300"));
     expect(mockPush).toHaveBeenCalledWith("/athlete/a-1");
+  });
+
+  it("scopes staying-live to the TAB, not this screen", () => {
+    // A pushed profile or match blurs the screen while the tab stays
+    // selected, so the live state has to be keyed on the tab.
+    render(<ArenaScreen />);
+
+    expect(mockUseIsTabSelected).toHaveBeenCalledWith("arena");
+    expect(mockLiveArgs).toHaveBeenCalledWith(
+      expect.objectContaining({ isArenaTabSelected: true }),
+    );
+  });
+
+  it("re-reads the roster when an opponent turns out to have left", () => {
+    // The roster is a snapshot with no realtime feed on `athletes`, so the
+    // stale row has to be corrected by something.
+    render(<ArenaScreen />);
+
+    const args = mockChallengeArgs.mock.calls[0][0];
+    expect(args.onOpponentUnavailable).toBe(mockRefresh);
   });
 });
