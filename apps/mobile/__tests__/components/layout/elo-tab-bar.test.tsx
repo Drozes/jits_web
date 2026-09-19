@@ -50,10 +50,12 @@ function buildProps(screens: Screen[], activeIndex = 0): BottomTabBarProps {
   } as unknown as BottomTabBarProps;
 }
 
-// The shipped bar. Arena is added to this list in the Arena wave, taking the
-// bar to its target 4-up; nothing else about the bar changes for it.
+// The shipped bar, at its target 4-up. The bar itself is count-agnostic: its
+// columns are flex-1 and the list comes off the navigator, so adding Arena
+// changed nothing in the component.
 const CURRENT_TABS: Screen[] = [
   { name: "(home)", title: "Home" },
+  { name: "arena", title: "Arena" },
   { name: "leaderboard", title: "Rankings" },
   { name: "profile", title: "Profile" },
 ];
@@ -71,6 +73,7 @@ describe("EloTabBar", () => {
     expect(buttons).toHaveLength(CURRENT_TABS.length);
     expect(buttons.map((b) => b.props.accessibilityLabel)).toEqual([
       "Home",
+      "Arena",
       "Rankings",
       "Profile",
     ]);
@@ -87,13 +90,16 @@ describe("EloTabBar", () => {
   });
 
   it("marks only the active tab as selected", () => {
+    const ACTIVE = 1; // Arena
     const { getAllByRole } = render(
-      React.createElement(EloTabBar, buildProps(CURRENT_TABS, 1)),
+      React.createElement(EloTabBar, buildProps(CURRENT_TABS, ACTIVE)),
     );
     const selected = getAllByRole("button").map(
       (b) => b.props.accessibilityState?.selected === true,
     );
-    expect(selected).toEqual([false, true, false]);
+    // Derived from the tab list rather than hardcoded, so adding a tab cannot
+    // leave this asserting a shorter bar than the one being rendered.
+    expect(selected).toEqual(CURRENT_TABS.map((_, i) => i === ACTIVE));
   });
 
   it("navigates to the pressed tab and not to the active one", () => {
