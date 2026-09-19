@@ -40,40 +40,72 @@ interface DashboardData {
   gymDetail: GymDetail | null;
   /** Gyms with a live session, loaded only for free agents (no primary gym). */
   liveGyms: GymListItem[];
+  /**
+   * True when a discovery read rejected. It must travel with the data: an empty
+   * result and a failed result look identical downstream, and discovery is the
+   * only path to a session, so claiming "nothing scheduled" on a dropped
+   * request would tell an athlete their gym is dark while an open mat runs.
+   */
+  discoveryFailed: boolean;
 }
 
 function useDashboardData(
   athleteId: string | undefined,
   primaryGymId: string | null | undefined,
 ) {
+  // Last gym payload that actually loaded, so a failed refresh falls back to it
+  // instead of overwriting good data with null. The outer cache keeps stale data
+  // on failure, but only for a rejected fetch: a swallowed inner rejection
+  // resolves and is written through as a success, which would defeat it.
+  const lastGymDetail = React.useRef<{ gymId: string; detail: GymDetail } | null>(
+    null,
+  );
+
   const { data, isLoading, isStale, error, refresh } = useCachedResource<DashboardData>(
     `dashboard:${athleteId}:${primaryGymId ?? "free-agent"}`,
     async (_signal) => {
-      // All four reads are independent; keep them in one Promise.all so the
-      // discovery surface costs latency only where it overlaps the others.
-      // Exactly one of the last two runs for real: an athlete with a primary
-      // gym gets that gym's sessions, a free agent gets the live-gym list.
-      const [summary, activeSession, gymDetail, liveGyms] = await Promise.all([
+      // All four reads are independent; keep them in one Promise.all. Exactly
+      // one of the last two runs for real: an athlete with a primary gym gets
+      // that gym's sessions, a free agent gets the live-gym list.
+      const [summary, activeSession, gym, gyms] = await Promise.all([
         getDashboardSummary(supabase),
         getActiveSession(supabase, athleteId!),
-        // Discovery data is additive. A failure here must degrade the surface,
-        // never blank the dashboard, so both reads swallow their rejection.
+        // Discovery data is additive: a failure must degrade the surface, never
+        // blank the dashboard. Both reads swallow the rejection but report it.
         primaryGymId
-          ? getGymDetail(supabase, primaryGymId, athleteId!).catch((err) => {
-              console.error("[dashboard] gym detail fetch failed", err);
-              return null;
-            })
-          : Promise.resolve(null),
+          ? getGymDetail(supabase, primaryGymId, athleteId!)
+              .then((detail) => {
+                if (detail) lastGymDetail.current = { gymId: primaryGymId, detail };
+                return { detail, failed: false };
+              })
+              .catch((err) => {
+                console.error("[dashboard] gym detail fetch failed", err);
+                const cached = lastGymDetail.current;
+                return {
+                  detail: cached?.gymId === primaryGymId ? cached.detail : null,
+                  failed: true,
+                };
+              })
+          : Promise.resolve({ detail: null, failed: false }),
         primaryGymId
-          ? Promise.resolve([] as GymListItem[])
+          ? Promise.resolve({ list: [] as GymListItem[], failed: false })
           : getGymsWithSessions(supabase)
-              .then((gyms) => gyms.filter((g) => g.hasActiveSession))
+              .then((all) => ({
+                list: all.filter((g) => g.hasActiveSession),
+                failed: false,
+              }))
               .catch((err) => {
                 console.error("[dashboard] gym list fetch failed", err);
-                return [] as GymListItem[];
+                return { list: [] as GymListItem[], failed: true };
               }),
       ]);
-      return { summary, activeSession, gymDetail, liveGyms };
+      return {
+        summary,
+        activeSession,
+        gymDetail: gym.detail,
+        liveGyms: gyms.list,
+        discoveryFailed: gym.failed || gyms.failed,
+      };
     },
     [athleteId, primaryGymId],
   );
@@ -208,6 +240,8 @@ export default function DashboardScreen() {
               rsvpSessionIds={data?.gymDetail?.rsvpSessionIds ?? []}
               participantSessionIds={data?.gymDetail?.participantSessionIds ?? []}
               liveGyms={data?.liveGyms ?? []}
+              loadFailed={data?.discoveryFailed ?? false}
+              onRetry={refresh}
             />
 
             <RecentActivitySection

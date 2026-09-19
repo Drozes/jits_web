@@ -1,5 +1,6 @@
 import * as React from "react";
-import { render, waitFor } from "@testing-library/react-native";
+import { RefreshControl } from "react-native";
+import { act, render, waitFor } from "@testing-library/react-native";
 
 // ---- mocks ----
 
@@ -107,13 +108,15 @@ jest.mock("@/components/dashboard/session-discovery-section", () => ({
     gymName: string | null;
     sessions: unknown[];
     liveGyms: unknown[];
+    loadFailed?: boolean;
+    onRetry?: () => void;
   }) => {
     const R = require("react");
     const RN = require("react-native");
     return R.createElement(
       RN.Text,
       { testID: "session-discovery" },
-      `discovery:${props.gymId ?? "free-agent"}:${props.gymName ?? "-"}:${props.sessions.length}:${props.liveGyms.length}`,
+      `discovery:${props.gymId ?? "free-agent"}:${props.gymName ?? "-"}:${props.sessions.length}:${props.liveGyms.length}:${props.loadFailed ? "failed" : "ok"}:${typeof props.onRetry === "function" ? "retryable" : "no-retry"}`,
     );
   },
 }));
@@ -216,6 +219,13 @@ interface QueryMocks {
   getGymsWithSessions: jest.Mock;
 }
 
+// useCachedResource's store is a module-level Map that jest never clears
+// between tests, and its key is derived from the athlete. A fixed id would hand
+// each test the previous one's payload as a warm first paint, so tests would
+// start green before their own mocks resolved. A fresh id per test gives each
+// one a cold cache.
+let athleteSeq = 0;
+
 beforeEach(() => {
   jest.clearAllMocks();
   // Re-wire the resolved value each test since clearAllMocks resets mockResolvedValue
@@ -225,6 +235,7 @@ beforeEach(() => {
   queries.getGymDetail.mockResolvedValue(null);
   queries.getGymsWithSessions.mockResolvedValue([]);
   mockAthlete.primary_gym_id = null;
+  mockAthlete.id = `a${++athleteSeq}`;
 });
 
 describe("DashboardScreen", () => {
@@ -269,9 +280,9 @@ describe("DashboardScreen", () => {
 
     const { getByText } = render(React.createElement(DashboardScreen));
     await waitFor(() => {
-      expect(getByText("discovery:g1:Test Gym:1:0")).toBeTruthy();
+      expect(getByText("discovery:g1:Test Gym:1:0:ok:retryable")).toBeTruthy();
     });
-    expect(queries.getGymDetail).toHaveBeenCalledWith({}, "g1", "a1");
+    expect(queries.getGymDetail).toHaveBeenCalledWith({}, "g1", mockAthlete.id);
     // A member never pays for the gym-wide list; their own gym answers the question.
     expect(queries.getGymsWithSessions).not.toHaveBeenCalled();
   });
@@ -282,12 +293,15 @@ describe("DashboardScreen", () => {
 
     const { getByText } = render(React.createElement(DashboardScreen));
     await waitFor(() => {
-      expect(getByText("discovery:free-agent:-:0:1")).toBeTruthy();
+      expect(getByText("discovery:free-agent:-:0:1:ok:retryable")).toBeTruthy();
     });
     expect(queries.getGymDetail).not.toHaveBeenCalled();
   });
 
-  it("still renders the dashboard when the discovery reads fail", async () => {
+  // A swallowed rejection resolves, so the cache writes it through as a SUCCESS.
+  // The failure therefore has to travel in the data itself, or the surface reads
+  // it as "your gym has nothing on" and says so, for as long as that entry lives.
+  it("tells discovery the read failed instead of passing off empty as real", async () => {
     const queries = require("@jits/shared/api/queries") as QueryMocks;
     // The screen logs the swallowed rejection on purpose; keep it out of the
     // test output rather than leaving a red herring in the run.
@@ -295,12 +309,44 @@ describe("DashboardScreen", () => {
     mockAthlete.primary_gym_id = "g-broken";
     queries.getGymDetail.mockRejectedValue(new Error("boom"));
 
-    const { getByText, getByTestId } = render(React.createElement(DashboardScreen));
+    const { getByText } = render(React.createElement(DashboardScreen));
     await waitFor(() => {
+      // The dashboard still paints in full, and discovery is told it is blind.
       expect(getByText("5W")).toBeTruthy();
     });
-    expect(getByTestId("session-discovery")).toBeTruthy();
+    expect(
+      getByText("discovery:g-broken:-:0:0:failed:retryable"),
+    ).toBeTruthy();
     expect(errorSpy).toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+
+  it("falls back to the last good gym payload when a refresh fails", async () => {
+    const queries = require("@jits/shared/api/queries") as QueryMocks;
+    const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+    mockAthlete.primary_gym_id = "g1";
+    queries.getGymDetail.mockResolvedValue(mockGymDetail);
+
+    const { getByText, UNSAFE_getByType } = render(
+      React.createElement(DashboardScreen),
+    );
+    await waitFor(() => {
+      expect(getByText("discovery:g1:Test Gym:1:0:ok:retryable")).toBeTruthy();
+    });
+
+    // Same athlete, same gym, and the next read drops. The session that loaded
+    // a moment ago is still the best answer available, so it must survive the
+    // failure rather than be replaced by a null that reads as "gym is empty".
+    queries.getGymDetail.mockRejectedValue(new Error("offline"));
+    await act(async () => {
+      UNSAFE_getByType(RefreshControl).props.onRefresh();
+    });
+
+    await waitFor(() => {
+      expect(
+        getByText("discovery:g1:Test Gym:1:0:failed:retryable"),
+      ).toBeTruthy();
+    });
     errorSpy.mockRestore();
   });
 

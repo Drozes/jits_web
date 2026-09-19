@@ -25,27 +25,24 @@ export function ActiveSessionCard({ session }: ActiveSessionCardProps) {
   const router = useRouter();
 
   if (!session) {
+    // getActiveSession returns null unless the athlete is checked in to a live
+    // session or holds an RSVP to a future one, so this branch says only that,
+    // and never that there is nothing on. The gym's own sessions are listed by
+    // the discovery section directly below, which is also where the browse
+    // action lives: a second one here read as a contradiction when that list
+    // showed the very session this card called missing.
     return (
       <Plate>
         <View className="flex-row items-center justify-between mb-2">
           <Text className="font-heading text-[18px] text-ink flex-1" numberOfLines={1}>
-            No upcoming session
+            Not checked in
           </Text>
-          <MetaTag>Find a gym</MetaTag>
+          <MetaTag>No RSVP</MetaTag>
         </View>
-        <Text className="font-body text-[13px] text-ink-2 mb-2">
-          Browse gyms in your city to see scheduled open mats.
+        <Text className="font-body text-[13px] text-ink-2">
+          You haven{"’"}t RSVP{"’"}d to or checked in to a session yet. Pick one
+          from Find a Session below.
         </Text>
-        <Pressable
-          onPress={() => router.push("/(app)/gyms")}
-          accessibilityRole="button"
-          hitSlop={{ top: 14, bottom: 14, left: 8, right: 8 }}
-          className="active:opacity-70"
-        >
-          <Text className="font-mono-bold text-[10px] text-cta uppercase tracking-caps-l">
-            Browse gyms →
-          </Text>
-        </Pressable>
       </Plate>
     );
   }

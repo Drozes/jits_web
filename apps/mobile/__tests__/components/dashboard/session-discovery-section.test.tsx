@@ -85,7 +85,7 @@ beforeEach(() => {
 
 describe("SessionDiscoverySection (member with sessions)", () => {
   it("lists the gym's upcoming sessions and opens the join flow", () => {
-    const { getByText, getAllByRole } = render(
+    const { getByText } = render(
       React.createElement(SessionDiscoverySection, {
         ...baseProps,
         sessions: [session()],
@@ -93,8 +93,10 @@ describe("SessionDiscoverySection (member with sessions)", () => {
     );
 
     expect(getByText("Upcoming ELO Sessions")).toBeTruthy();
-    // The attend row is the join entry point; tapping it opens the join wizard.
-    fireEvent.press(getAllByRole("button")[0]);
+    // The attend row is the join entry point. Press its own label: a positional
+    // getAllByRole("button")[0] would silently retarget the moment the surface
+    // gains a button above the list.
+    fireEvent.press(getByText("Attend"));
     expect(mockPush).toHaveBeenCalledWith("/session/s1/join");
   });
 
@@ -170,6 +172,73 @@ describe("SessionDiscoverySection (free agent)", () => {
     );
 
     expect(queryByText("Live Right Now")).toBeNull();
+    fireEvent.press(getByLabelText("Browse gyms"));
+    expect(mockPush).toHaveBeenCalledWith("/gyms");
+  });
+});
+
+/**
+ * A dropped request and an empty gym produce identical data. Telling a member
+ * their gym is dark when the read simply failed is the worst outcome on this
+ * surface: it is the only path to a session, so they close the app instead of
+ * joining the open mat that is actually running.
+ */
+describe("SessionDiscoverySection (failed load)", () => {
+  it("never claims the gym is empty when the read failed", () => {
+    const onRetry = jest.fn();
+    const { getByText, queryByText, getByLabelText } = render(
+      React.createElement(SessionDiscoverySection, {
+        ...baseProps,
+        loadFailed: true,
+        onRetry,
+      }),
+    );
+
+    expect(getByText("Sessions Unavailable")).toBeTruthy();
+    expect(queryByText("No Sessions Scheduled")).toBeNull();
+    expect(queryByText(/Nothing scheduled at Test Gym right now/)).toBeNull();
+
+    fireEvent.press(getByLabelText("Retry loading sessions"));
+    expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps showing sessions it already has and stays quiet about the failure", () => {
+    const { getByText, queryByText } = render(
+      React.createElement(SessionDiscoverySection, {
+        ...baseProps,
+        sessions: [session()],
+        loadFailed: true,
+      }),
+    );
+
+    // Stale sessions beat an error plate: the data is still the best answer.
+    expect(getByText("Upcoming ELO Sessions")).toBeTruthy();
+    expect(queryByText("Sessions Unavailable")).toBeNull();
+  });
+
+  it("reports the failure on the free-agent path too", () => {
+    const { getByText, queryByText } = render(
+      React.createElement(SessionDiscoverySection, {
+        ...baseProps,
+        gymId: null,
+        gymName: null,
+        loadFailed: true,
+      }),
+    );
+
+    expect(getByText("Sessions Unavailable")).toBeTruthy();
+    // The home-gym explainer is still true, so it stays.
+    expect(queryByText(/haven.t set a home gym yet/)).toBeTruthy();
+  });
+
+  it("still offers the gym list when the read failed", () => {
+    const { getByLabelText } = render(
+      React.createElement(SessionDiscoverySection, {
+        ...baseProps,
+        loadFailed: true,
+      }),
+    );
+
     fireEvent.press(getByLabelText("Browse gyms"));
     expect(mockPush).toHaveBeenCalledWith("/gyms");
   });

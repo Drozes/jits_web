@@ -24,6 +24,14 @@ export interface SessionDiscoverySectionProps {
    * (an athlete with a primary gym is pointed at their own gym instead).
    */
   liveGyms: GymListItem[];
+  /**
+   * True when the discovery read failed. An empty result and a failed result
+   * look identical in the data, so without this the surface would state, both
+   * falsely and confidently, that there is nothing on. Never tell an athlete
+   * their gym is dark because a request was dropped.
+   */
+  loadFailed?: boolean;
+  onRetry?: () => void;
 }
 
 /**
@@ -52,6 +60,8 @@ export function SessionDiscoverySection({
   rsvpSessionIds,
   participantSessionIds,
   liveGyms,
+  loadFailed = false,
+  onRetry,
 }: SessionDiscoverySectionProps) {
   const router = useRouter();
   const tokens = useThemedTokens();
@@ -72,7 +82,13 @@ export function SessionDiscoverySection({
   );
 
   const isFreeAgent = !gymId;
-  const hasNothingAtMyGym = !isFreeAgent && sessions.length === 0;
+  // A failed read that left nothing on screen is the one case where the surface
+  // must NOT speak: it says it could not load and offers a retry. A failure that
+  // still has data (a stale gym payload) renders that data and stays quiet.
+  const showLoadError =
+    loadFailed && (isFreeAgent ? liveGyms.length === 0 : sessions.length === 0);
+  const hasNothingAtMyGym =
+    !isFreeAgent && sessions.length === 0 && !showLoadError;
 
   return (
     <View className="gap-3">
@@ -90,7 +106,9 @@ export function SessionDiscoverySection({
             </Text>
           </Plate>
 
-          {liveGyms.length > 0 ? (
+          {showLoadError ? (
+            <LoadErrorPlate onRetry={onRetry} />
+          ) : liveGyms.length > 0 ? (
             <View className="gap-2">
               <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-xl">
                 Live Right Now
@@ -105,11 +123,15 @@ export function SessionDiscoverySection({
         <>
           {activeSession ? <ActiveSessionPlate session={activeSession} /> : null}
 
-          <UpcomingSessionsSection
-            sessions={upcomingSessions}
-            rsvpSet={rsvpSet}
-            participantSet={participantSet}
-          />
+          {showLoadError ? (
+            <LoadErrorPlate onRetry={onRetry} />
+          ) : (
+            <UpcomingSessionsSection
+              sessions={upcomingSessions}
+              rsvpSet={rsvpSet}
+              participantSet={participantSet}
+            />
+          )}
 
           {hasNothingAtMyGym ? (
             <Text className="font-body text-[12px] text-ink-3 leading-[18px]">
@@ -162,6 +184,39 @@ export function SessionDiscoverySection({
           Browse Gyms
         </Text>
       </Pressable>
+    </View>
+  );
+}
+
+/**
+ * Shown in place of the session list when the read failed and left nothing to
+ * show. The distinction matters: "no sessions" is a fact about the gym, this is
+ * a fact about the request, and on a flaky connection the wrong one sends an
+ * athlete away from a live open mat.
+ */
+function LoadErrorPlate({ onRetry }: { onRetry?: () => void }) {
+  return (
+    <View className="rounded-xs border border-dashed border-hairline bg-surface-3 p-4 gap-2 items-center">
+      <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-l">
+        Sessions Unavailable
+      </Text>
+      <Text className="font-body text-[12px] text-ink-2 text-center leading-[18px]">
+        We couldn{"’"}t load sessions just now. Your gym may still have one
+        running.
+      </Text>
+      {onRetry ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Retry loading sessions"
+          onPress={onRetry}
+          hitSlop={{ top: 14, bottom: 14, left: 8, right: 8 }}
+          className="active:opacity-70"
+        >
+          <Text className="font-mono-bold text-[10px] text-cta uppercase tracking-caps-l">
+            Try Again
+          </Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
