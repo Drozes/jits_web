@@ -31,6 +31,7 @@ import { Toaster } from "@/components/ui/toast";
 import { PushRegistrationBootstrap } from "@/lib/notifications/push-registration-bootstrap";
 import { SentryUserBootstrap } from "@/lib/error-tracking/sentry-user-bootstrap";
 import { OnlinePresenceBootstrap } from "@/lib/presence/online-presence-bootstrap";
+import { VideoUploadBootstrap } from "@/lib/video/video-upload-bootstrap";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { OfflineBanner } from "@/components/offline-banner";
 import { DeepLinkBootstrap } from "@/lib/deep-links/handler";
@@ -129,6 +130,7 @@ function RootLayout() {
                 <PushRegistrationBootstrap />
                 <SentryUserBootstrap />
                 <OnlinePresenceBootstrap />
+                <VideoUploadBootstrap />
                 <DeepLinkBootstrap />
                 <Stack screenOptions={{ headerShown: false }}>
                   <Stack.Screen name="(auth)" />

@@ -27,6 +27,13 @@ export interface UploadBannerState {
   message: string | null;
   /** Only set for "uploaded"; turns a success into a warning. */
   truncation: RecordingTruncation | null;
+  /**
+   * Only meaningful for "uploading": 0..1 of the clip the server has
+   * confirmed, or null when the upload has started but no byte offset is
+   * known yet. Null renders the old indeterminate spinner, which is now
+   * the exception rather than the only thing we can show.
+   */
+  progress: number | null;
 }
 
 export function deriveUploadBannerState(
@@ -47,7 +54,7 @@ export function deriveUploadBannerState(
   //    that upload's failure behind a spinner. Reorder to check
   //    `upload?.status === "error"` first if that ever becomes possible.
   if (recorderState === "stopping") {
-    return { kind: "stopping", message: null, truncation: null };
+    return { kind: "stopping", message: null, truncation: null, progress: null };
   }
 
   // 2. A LIVE recorder failure outranks the store, for the mirror image of
@@ -66,13 +73,20 @@ export function deriveUploadBannerState(
   //    `deriveUploadBannerState("error", "Camera permission required",
   //    { status: "uploaded", videoId: "VID-OLD" })`.
   //
-  //    SAME ASSUMPTION AS (1), same escape hatch: this hides an upload that
-  //    is genuinely in flight behind a recorder error. Safe only because
-  //    the two cannot coexist today, since `handleUpload` is the only thing
-  //    that writes "uploading" and it owns the recorder state for the whole
-  //    of that window ("uploading" -> "uploaded" / "error"). If a retry
-  //    ever re-drives an upload WITHOUT the recorder (jits-341p), let
-  //    `upload?.status === "uploading"` win over this branch.
+  //    THE ESCAPE HATCH THIS BRANCH DOCUMENTED IS NOW TAKEN. It used to be
+  //    safe to put a recorder error ahead of an in-flight upload because
+  //    the two could not coexist: `handleUpload` was the only writer of
+  //    "uploading" and it owned the recorder state for that whole window.
+  //    `video-upload-manager.ts` breaks that (jits-341p): a persisted job
+  //    resumes on foreground or reconnect with no recorder involved, so a
+  //    user who re-enters the same match and denies the camera would have
+  //    seen "Camera permission required" sitting over an upload that was
+  //    genuinely running. An upload in flight is therefore checked FIRST
+  //    below, exactly as the previous author prescribed.
+  if (upload?.status === "uploading") {
+    return { kind: "uploading", message: null, truncation: null, progress: upload.progress };
+  }
+
   if (recorderState === "error") {
     return {
       kind: "error",
@@ -80,6 +94,7 @@ export function deriveUploadBannerState(
       // still better than the generic fallback.
       message: recorderError ?? upload?.error ?? "Recording unavailable",
       truncation: upload?.truncation ?? null,
+      progress: null,
     };
   }
 
@@ -88,18 +103,17 @@ export function deriveUploadBannerState(
   //    while the upload is genuinely still in flight, or has genuinely
   //    failed; trusting the recorder there is exactly how the failure went
   //    silent.
+  // "uploading" is handled above, ahead of the recorder-error branch.
   if (upload) {
-    if (upload.status === "uploading") {
-      return { kind: "uploading", message: null, truncation: null };
-    }
     if (upload.status === "uploaded") {
-      return { kind: "uploaded", message: null, truncation: upload.truncation };
+      return { kind: "uploaded", message: null, truncation: upload.truncation, progress: 1 };
     }
     if (upload.status === "error") {
       return {
         kind: "error",
         message: upload.error ?? "Upload failed",
         truncation: upload.truncation,
+        progress: null,
       };
     }
     // "pending": something is known about the recording (a truncation, or
@@ -107,5 +121,5 @@ export function deriveUploadBannerState(
     // recorder is neither stopping nor failed. Nothing worth saying yet.
   }
 
-  return { kind: "hidden", message: null, truncation: null };
+  return { kind: "hidden", message: null, truncation: null, progress: null };
 }

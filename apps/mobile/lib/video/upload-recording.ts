@@ -1,4 +1,5 @@
 import * as FileSystem from "expo-file-system/legacy";
+import { Upload } from "tus-js-client/lib.es5/browser/index.js";
 import { supabase } from "@/lib/supabase/client";
 import { env } from "@/lib/env";
 import { captureException } from "@/lib/error-tracking/sentry";
@@ -6,6 +7,11 @@ import {
   buildMatchVideoStoragePath,
   upsertMatchVideo,
 } from "@jits/shared/api/mutations";
+import {
+  AsyncStorageUrlStorage,
+  ExpoFileReader,
+  type TusFileInput,
+} from "./tus-rn-shims";
 
 /**
  * Bucket + path convention per BE contract
@@ -20,6 +26,16 @@ import {
 export const VIDEO_BUCKET = "match-videos";
 
 /**
+ * Supabase Storage's resumable (tus) endpoint requires EXACTLY 6 MiB chunks
+ * for every PATCH but the last. This is not a tuning knob: a different size
+ * is rejected by the server. See Supabase Storage docs, "Resumable Upload".
+ */
+export const SUPABASE_TUS_CHUNK_SIZE = 6 * 1024 * 1024;
+
+/** 2 GiB client-side cap per BE contract §8.5. */
+export const MAX_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024;
+
+/**
  * Build the canonical storage key inside the `match-videos` bucket.
  * Thin wrapper around the shared helper that defaults to `mp4` for the
  * mobile expo-camera recording.
@@ -32,59 +48,20 @@ export function buildVideoPath(
   return buildMatchVideoStoragePath(matchId, uploaderAthleteId, ext);
 }
 
-export interface UploadOptions {
-  /** Local file:// URI returned by `cameraRef.current.recordAsync()`. */
-  fileUri: string;
-  /** Match ID -- used in the storage path. */
-  matchId: string;
-  /**
-   * Uploading athlete's `athletes.id` (NOT auth_user_id). Required by
-   * RLS `match_videos_insert_participant` policy.
-   */
-  uploaderAthleteId: string;
-  /**
-   * Pre-built storage key inside the bucket. Pass the SAME path on a
-   * retry so the retry overwrites the half-written object from the
-   * failed attempt instead of orphaning it at a stale path. Defaults to
-   * a fresh `buildVideoPath()` key when omitted.
-   */
-  storagePath?: string;
-  /**
-   * Skip the orphan-compensation delete when the `match_videos` write
-   * fails after a successful storage write. Set this on every attempt
-   * EXCEPT the last one of a retry loop: deleting the object on a
-   * transient DB failure would force the retry to re-upload the whole
-   * file (up to 2 GB). The caller then owns final cleanup (see
-   * `MatchVideoDbError.storageObjectPersisted` + `removeUploadedObject`).
-   */
-  skipCompensation?: boolean;
-  /** Storage path file extension (default `mp4`). */
-  ext?: string;
+export function contentTypeFor(ext: string): string {
+  return ext === "mp4" ? "video/mp4" : "application/octet-stream";
 }
-
-export interface UploadResult {
-  /** Final storage path within the bucket. */
-  path: string;
-  /** HTTP status returned by Supabase Storage's REST endpoint. */
-  status: number;
-  /** `match_videos.id` from the INSERT/UPSERT that follows the storage PUT. */
-  videoId: string;
-}
-
-/** 2 GiB client-side cap per BE contract §8.5. */
-const MAX_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024;
 
 /**
  * The storage write succeeded but the `match_videos` DB write failed.
  * `storageObjectPersisted` tells the caller whether the uploaded object
- * is still in the bucket (compensation was skipped via
- * `skipCompensation`) and therefore needs cleanup after the caller's
- * final retry attempt.
+ * is still in the bucket and therefore needs cleanup if the row can never
+ * be written.
  */
 export class MatchVideoDbError extends Error {
   /** Object key inside `match-videos` that was written before the DB failure. */
   readonly path: string;
-  /** True when compensation was skipped and the object is still in the bucket. */
+  /** True when the object is still in the bucket. */
   readonly storageObjectPersisted: boolean;
 
   constructor(message: string, path: string, storageObjectPersisted: boolean) {
@@ -99,10 +76,17 @@ export class MatchVideoDbError extends Error {
  * Best-effort removal of an uploaded object that has no `match_videos`
  * row (orphan compensation). The response is inspected because under
  * storage RLS a denied DELETE resolves 200 with `{ data: [] }` and NO
- * error — success therefore requires exactly one removed object. A
- * failed cleanup is reported (Sentry + console.warn, matching the
- * codebase's best-effort logging pattern) but never thrown, so it can
- * never mask the original upload/DB error.
+ * error, so success requires exactly one removed object. A failed cleanup
+ * is reported (Sentry + console.warn, matching the codebase's best-effort
+ * logging pattern) but never thrown, so it can never mask the original
+ * upload/DB error.
+ *
+ * DELIBERATELY RARE NOW. This used to run on the first transient DB
+ * failure, which deleted a 600 MB object that had just uploaded
+ * successfully and forced the retry to send it all again. The bytes are
+ * the expensive, irreplaceable half of this operation; the row is one
+ * INSERT. Compensation is now only reached when a job is ABANDONED
+ * (`video-upload-manager.ts`), never between retries.
  */
 export async function removeUploadedObject(path: string): Promise<void> {
   try {
@@ -118,100 +102,179 @@ export async function removeUploadedObject(path: string): Promise<void> {
   }
 }
 
-/**
- * Streams the recording at `fileUri` straight to Supabase Storage's REST
- * endpoint via `FileSystem.uploadAsync`. Then INSERTs the parent
- * `match_videos` row at `status='ready'` so the slicer trigger fires.
- *
- * We stream rather than base64-load because match recordings can be
- * 50+ MB; reading the whole file into memory as a base64 string would
- * push past JS heap limits on lower-end Android devices.
- *
- * Streaming caveat: `FileSystem.uploadAsync` does not expose a
- * progress callback for `BINARY_CONTENT` uploads. Callers should treat
- * the returned promise as a single "uploading -> done" transition and
- * surface only start/end states to the user.
- */
-export async function uploadRecording({ fileUri, matchId, uploaderAthleteId, storagePath, skipCompensation = false, ext = "mp4" }: UploadOptions): Promise<UploadResult> {
-  const path = storagePath ?? buildVideoPath(matchId, uploaderAthleteId, ext);
+/** Byte size of a local recording, or null when it cannot be read. */
+export async function getRecordingSize(fileUri: string): Promise<number | null> {
+  try {
+    const info = await FileSystem.getInfoAsync(fileUri);
+    if (info.exists && typeof info.size === "number") return info.size;
+  } catch {
+    // Treated as "unknown", not as "missing": the caller decides.
+  }
+  return null;
+}
 
-  // Resolve the current access token so RLS policies on the bucket apply
-  // to the authenticated athlete (mirrors the JS SDK's
-  // `supabase.storage.from(...).upload(...)` flow but without buffering).
+// ---------------------------------------------------------------------------
+// Resumable (tus) storage upload
+// ---------------------------------------------------------------------------
+
+// Retry classification is shared with apps/web (both upload over tus and
+// must treat the same status the same way). Re-exported here because this
+// module is the mobile upload path's public face.
+export {
+  classifyUploadError,
+  statusOfUploadError,
+  type UploadFailureClass,
+} from "@jits/shared/utils";
+
+export interface ResumableUploadOptions {
+  /** Local `file://` URI of the clip. */
+  fileUri: string;
+  /** Exact byte size. tus needs it up front for `Upload-Length`. */
+  fileSizeBytes: number;
+  /** Canonical object key inside `match-videos`. Stable across attempts. */
+  storagePath: string;
+  /** Extension, driving the stored content type. */
+  ext: string;
+  /** A tus upload URL from an earlier attempt, to resume rather than restart. */
+  uploadUrl?: string | null;
+  /** Server-confirmed bytes. Called on creation and after every PATCH. */
+  onProgress?: (bytesUploaded: number, bytesTotal: number) => void;
+  /** Called once the creation POST yields a URL, so it can be persisted. */
+  onUploadUrl?: (uploadUrl: string) => void;
+  /**
+   * Receives an abort function for the in-flight upload, so a superseding
+   * recording on the same match can cut this one short.
+   */
+  onAbortHandle?: (abort: () => void) => void;
+}
+
+/**
+ * Upload a local recording to Supabase Storage over tus, resuming from
+ * `uploadUrl` when one is supplied.
+ *
+ * Replaces a single `FileSystem.uploadAsync(BINARY_CONTENT)` POST of the
+ * whole file, which was non-resumable (a drop at 99% discarded every byte)
+ * and emitted no progress events at all.
+ *
+ * tus's OWN retry machinery is disabled (`retryDelays: null`). There is
+ * exactly one retry authority, `video-upload-manager.ts`, because only it
+ * can persist the attempt across a process kill and apply jittered backoff;
+ * two independent retry loops would multiply their attempt counts together
+ * and make the observed behaviour impossible to reason about.
+ *
+ * The access token is resolved per call, not per recording: a clip resumed
+ * hours later must not present the JWT that was current when it was shot.
+ */
+export async function uploadFileResumable({
+  fileUri,
+  fileSizeBytes,
+  storagePath,
+  ext,
+  uploadUrl,
+  onProgress,
+  onUploadUrl,
+  onAbortHandle,
+}: ResumableUploadOptions): Promise<void> {
+  if (fileSizeBytes > MAX_UPLOAD_BYTES) throw new Error("Videos must be under 2 GB.");
+
   const { data: sessionData } = await supabase.auth.getSession();
   const accessToken = sessionData.session?.access_token;
   if (!accessToken) throw new Error("Not signed in");
 
-  // Pre-flight size check. expo-file-system exposes file metadata; we
-  // skip the request if the cap would obviously be exceeded.
-  try {
-    const info = await FileSystem.getInfoAsync(fileUri);
-    if (info.exists && typeof info.size === "number" && info.size > MAX_UPLOAD_BYTES) {
-      throw new Error("Videos must be under 2 GB.");
-    }
-  } catch (err) {
-    // Re-throw the size error; ignore any benign info-fetch failure.
-    if (err instanceof Error && /under 2 GB/.test(err.message)) throw err;
-  }
+  const endpoint = `${env.supabaseUrl}/storage/v1/upload/resumable`;
+  const file: TusFileInput = { uri: fileUri, size: fileSizeBytes };
 
-  const url = `${env.supabaseUrl}/storage/v1/object/${VIDEO_BUCKET}/${path}`;
+  await new Promise<void>((resolve, reject) => {
+    const upload = new Upload(file as unknown as File, {
+      endpoint,
+      uploadUrl: uploadUrl ?? undefined,
+      // Supabase mandates 6 MiB. See SUPABASE_TUS_CHUNK_SIZE.
+      chunkSize: SUPABASE_TUS_CHUNK_SIZE,
+      uploadSize: fileSizeBytes,
+      retryDelays: null,
+      onShouldRetry: () => false,
+      headers: {
+        authorization: `Bearer ${accessToken}`,
+        apikey: env.supabaseAnonKey,
+        // Preserved from the old single-shot path: a retry re-PUTs the same
+        // key, and the backend keeps a storage UPDATE policy specifically
+        // for that.
+        "x-upsert": "true",
+      },
+      metadata: {
+        bucketName: VIDEO_BUCKET,
+        objectName: storagePath,
+        contentType: contentTypeFor(ext),
+        cacheControl: "3600",
+      },
+      // The creation POST carries no bytes, so the upload URL is known (and
+      // can be persisted) before the first 6 MiB leaves the device.
+      uploadDataDuringCreation: false,
+      storeFingerprintForResuming: true,
+      removeFingerprintOnSuccess: true,
+      // Deterministic and derived from the object key, so the same clip
+      // fingerprints identically across process restarts. tus's default
+      // fingerprint reads `File` fields our input does not have.
+      fingerprint: async () => `elo-match-video::${storagePath}`,
+      urlStorage: new AsyncStorageUrlStorage(),
+      fileReader: new ExpoFileReader(),
+      onUploadUrlAvailable: () => {
+        if (upload.url) onUploadUrl?.(upload.url);
+      },
+      onProgress: (sent, total) => onProgress?.(sent, total),
+      onSuccess: () => resolve(),
+      onError: (err) => reject(err),
+    });
 
-  const result = await FileSystem.uploadAsync(url, fileUri, {
-    httpMethod: "POST",
-    uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": ext === "mp4" ? "video/mp4" : "application/octet-stream",
-      // Storage REST requires the apikey header even with a JWT.
-      apikey: env.supabaseAnonKey,
-      // Upsert so a retry against the SAME path overwrites the
-      // half-written object from a failed earlier attempt instead of
-      // failing 400 "resource already exists". (POST + x-upsert: true is
-      // what the JS SDK's `.upload(path, body, { upsert: true })` sends.)
-      "x-upsert": "true",
-    },
+    onAbortHandle?.(() => {
+      // `false` keeps the partial upload on the server so a later attempt
+      // can still resume it; terminating would throw away real bytes.
+      void upload.abort(false).catch(() => undefined);
+    });
+
+    upload.start();
   });
+}
 
-  if (result.status < 200 || result.status >= 300) {
-    // Local Supabase caps `match-videos` at 500 MiB and returns 413.
-    // Surface the local-dev caveat per BE §8.5.
-    const isLocal = /127\.0\.0\.1|localhost/.test(env.supabaseUrl);
-    if (isLocal && result.status === 413) {
-      throw new Error("Local development cap is 500 MiB — production cap is 2 GiB. Use a shorter clip while testing.");
-    }
-    throw new Error(`Upload failed (${result.status}): ${result.body}`);
-  }
+// ---------------------------------------------------------------------------
+// match_videos row
+// ---------------------------------------------------------------------------
 
-  // Storage PUT succeeded — INSERT the parent row. Use upsert so retries
-  // from a previous failure on the same match are race-safe.
-  let fileSize: number | undefined;
-  try {
-    const info = await FileSystem.getInfoAsync(fileUri);
-    if (info.exists && typeof info.size === "number") fileSize = info.size;
-  } catch { /* swallow */ }
+export interface MatchVideoRowParams {
+  matchId: string;
+  uploaderAthleteId: string;
+  storagePath: string;
+  fileSizeBytes?: number;
+}
 
+/**
+ * INSERT/UPSERT the parent `match_videos` row at `status='ready'` so the
+ * slicer trigger fires. Returns the row id.
+ *
+ * Throws `MatchVideoDbError` with `storageObjectPersisted: true` on failure:
+ * the caller decides whether to retry (it should) or compensate (only when
+ * abandoning the job outright).
+ */
+export async function writeMatchVideoRow({
+  matchId,
+  uploaderAthleteId,
+  storagePath,
+  fileSizeBytes,
+}: MatchVideoRowParams): Promise<string> {
   const upserted = await upsertMatchVideo(supabase, {
     matchId,
     uploaderAthleteId,
-    storagePath: path,
-    fileSizeBytes: fileSize,
+    storagePath,
+    fileSizeBytes,
     recordingType: "self",
     recordedBy: uploaderAthleteId,
   });
-
   if (!upserted.ok) {
-    // Storage object landed but the DB row didn't: unless the caller is
-    // managing compensation across retries (`skipCompensation`), remove
-    // the object so it is never orphaned in the bucket with no
-    // `match_videos` row. Best-effort with observability: a failed
-    // cleanup is reported but never masks the real DB error.
-    if (!skipCompensation) await removeUploadedObject(path);
     throw new MatchVideoDbError(
       `Video uploaded but saving the record failed: ${upserted.error.message}`,
-      path,
-      skipCompensation,
+      storagePath,
+      true,
     );
   }
-
-  return { path, status: result.status, videoId: upserted.data.id };
+  return upserted.data.id;
 }

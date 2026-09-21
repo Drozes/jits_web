@@ -73,12 +73,74 @@ jest.mock("expo-camera", () => {
   };
 });
 
-const mockUploadAsync = jest.fn();
 const mockGetInfoAsync = jest.fn();
 jest.mock("expo-file-system/legacy", () => ({
-  uploadAsync: (...args: unknown[]) => mockUploadAsync(...args),
   getInfoAsync: (...args: unknown[]) => mockGetInfoAsync(...args),
-  FileSystemUploadType: { BINARY_CONTENT: "binary" },
+}));
+
+// Custody of the local clip is covered in
+// __tests__/lib/video/recording-file.test.ts; here it would only add a
+// filesystem to stub.
+jest.mock("@/lib/video/recording-file", () => ({
+  retainRecording: (uri: string) => uri,
+  releaseRecording: jest.fn(),
+}));
+
+// The real NetInfo module reaches for a native reachability probe that does
+// not exist under Jest. The manager only uses it to notice a RECONNECT.
+jest.mock("@react-native-community/netinfo", () => ({
+  __esModule: true,
+  default: {
+    fetch: async () => ({ isConnected: true }),
+    addEventListener: () => () => undefined,
+  },
+}));
+
+// Backoff is real everywhere else; here it would just make the test sleep.
+jest.mock("@jits/shared/utils", () => ({
+  ...jest.requireActual("@jits/shared/utils"),
+  backoffDelayMs: () => 0,
+}));
+
+// ---- tus-js-client double ----
+//
+// The storage write is now a resumable tus transfer. These suites are about
+// where the OUTCOME lands, so the transfer always succeeds unless a test
+// says otherwise; the DB half is what they drive.
+
+interface CapturedTus {
+  options: Record<string, unknown>;
+}
+const mockTusCalls: CapturedTus[] = [];
+
+/**
+ * Calls one of the tus option callbacks. A helper rather than an inline
+ * cast because a `jest.mock` factory may not reference any out-of-scope
+ * identifier, including the parameter name in a function type annotation.
+ */
+function mockInvoke(options: Record<string, unknown>, key: string, ...args: unknown[]): void {
+  const fn = options[key];
+  if (typeof fn === "function") (fn as (...rest: unknown[]) => void)(...args);
+}
+
+jest.mock("tus-js-client/lib.es5/browser/index.js", () => ({
+  Upload: class {
+    url: string | null = null;
+    options: Record<string, unknown>;
+    constructor(_file: unknown, options: Record<string, unknown>) {
+      this.options = options;
+      mockTusCalls.push({ options });
+    }
+    start() {
+      this.url = "https://example.supabase.co/storage/v1/upload/resumable/abc";
+      mockInvoke(this.options, "onUploadUrlAvailable");
+      mockInvoke(this.options, "onProgress", 1, 1);
+      mockInvoke(this.options, "onSuccess");
+    }
+    abort() {
+      return Promise.resolve();
+    }
+  },
 }));
 
 // ---- Supabase client: resolved responses, plus a drivable realtime channel ----
@@ -316,7 +378,7 @@ beforeEach(() => {
   });
 
   mockGetInfoAsync.mockResolvedValue({ exists: true, size: 12345 });
-  mockUploadAsync.mockResolvedValue({ status: 200, body: "" });
+  mockTusCalls.length = 0;
   mockUpsertMatchVideo.mockResolvedValue({ ok: true, data: { id: "VID-1" } });
   mockGetSubmissionTypes.mockResolvedValue([]);
   mockGetMatchDetails.mockResolvedValue(matchRow("in_progress"));
@@ -393,7 +455,7 @@ describe("the confirm-to-summary refresh cannot erase the upload", () => {
 
     const screen = renderWizard();
     await advanceToConfirm(screen);
-    await waitFor(() => expect(screen.getByText(/upload failed/i)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/saving the record failed/i)).toBeTruthy());
 
     await completeMatch();
 
@@ -401,7 +463,7 @@ describe("the confirm-to-summary refresh cannot erase the upload", () => {
     // refresh() rebuilt the recorder idle here and the chip vanished.
     await waitFor(() => expect(screen.getByText("Back to Arena")).toBeTruthy());
     screen.getByTestId("upload-status-banner");
-    screen.getByText(/upload failed/i);
+    screen.getByText(/saving the record failed/i);
     screen.getByText(/row-level security/i);
   });
 
@@ -435,9 +497,10 @@ describe("the confirm-to-summary refresh cannot erase the upload", () => {
  * Hold every `upsertMatchVideo` call open until `release()` is called, then
  * settle them all with `value` (and settle later calls immediately).
  *
- * Every call, not just the first: the recorder retries a failed upload
- * once, so releasing only one attempt would leave the other pending
- * forever and the test would hang rather than assert anything.
+ * Every call, not just the first: the upload runner retries the
+ * `match_videos` write on its own budget, so releasing only one attempt
+ * would leave the others pending forever and the test would hang rather
+ * than assert anything.
  */
 function holdUpsert(value: unknown): { release: () => void } {
   let released = false;
@@ -502,7 +565,7 @@ describe("an upload that finishes LATE still reaches the summary", () => {
       held.release();
     });
 
-    await waitFor(() => expect(screen.getByText(/upload failed/i)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/saving the record failed/i)).toBeTruthy());
     screen.getByTestId("upload-status-banner");
   });
 });

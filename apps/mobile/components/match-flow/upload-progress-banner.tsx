@@ -1,4 +1,4 @@
-import { ActivityIndicator, Text, View } from "react-native";
+import { ActivityIndicator, Text, View, type DimensionValue } from "react-native";
 import { CheckCircle2, AlertTriangle } from "lucide-react-native";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import type { RecordingTruncation } from "@/lib/video/use-video-recorder";
@@ -29,30 +29,65 @@ function truncationCopy(truncation: RecordingTruncation): string {
  * result, confirm and summary, so a stuck or failed upload is visible
  * instead of silent.
  *
- * Note: no percentage. The upload streams via `FileSystem.uploadAsync`,
- * which emits no progress events for `BINARY_CONTENT`; real progress needs
- * `createUploadTask` and is tracked separately (jits-l5eq). Indeterminate
- * but visible beats invisible.
+ * Shows a real percentage. The upload is a resumable tus transfer whose
+ * PATCH responses carry a server-confirmed byte offset, so `progress` is
+ * the fraction the server has actually accepted, not a guess. It falls
+ * back to the old indeterminate spinner only before the first offset is
+ * known, which is the one moment there is genuinely nothing to report.
+ * (The previous `FileSystem.uploadAsync(BINARY_CONTENT)` path emitted no
+ * progress events at all, so a ten-minute upload was a bare spinner.)
  *
  * ELO design system: hairline plate with caps mono copy. Status color
  * follows positive / negative ink tokens.
  */
-export function UploadProgressBanner({ kind, message, truncation }: UploadProgressBannerProps) {
+/** `0.42` -> `"42%"`. Clamped, because a server offset can overshoot. */
+function percentLabel(progress: number): string {
+  return `${Math.round(Math.max(0, Math.min(1, progress)) * 100)}%`;
+}
+
+export function UploadProgressBanner({
+  kind,
+  message,
+  truncation,
+  progress,
+}: UploadProgressBannerProps) {
   const tokens = useThemedTokens();
 
   if (kind === "hidden") return null;
 
   if (kind === "stopping" || kind === "uploading") {
+    const pct = kind === "uploading" && progress != null ? percentLabel(progress) : null;
     return (
       <View
         testID="upload-status-banner"
         accessibilityLiveRegion="polite"
-        className="w-full flex-row items-center gap-2 rounded-xs bg-surface-3 border border-hairline-strong px-3 py-2"
+        className="w-full gap-1.5 rounded-xs bg-surface-3 border border-hairline-strong px-3 py-2"
       >
-        <ActivityIndicator size="small" color={tokens.textSecondary} />
-        <Text className="font-mono text-[10px] text-ink-2 uppercase tracking-caps-l">
-          {kind === "stopping" ? "Finishing recording..." : "Uploading match video..."}
-        </Text>
+        <View className="w-full flex-row items-center gap-2">
+          <ActivityIndicator size="small" color={tokens.textSecondary} />
+          <Text className="flex-1 font-mono text-[10px] text-ink-2 uppercase tracking-caps-l">
+            {kind === "stopping" ? "Finishing recording..." : "Uploading match video..."}
+          </Text>
+          {pct ? (
+            <Text
+              testID="upload-progress-percent"
+              className="font-mono text-[10px] text-ink-2 tabular-nums"
+            >
+              {pct}
+            </Text>
+          ) : null}
+        </View>
+        {/* Hairline fill rather than a component: brand rules forbid
+            elevation, and a 2px track reads as data, not decoration. */}
+        {pct ? (
+          <View className="h-0.5 w-full bg-hairline-strong">
+            <View
+              testID="upload-progress-fill"
+              className="h-full bg-ink-2"
+              style={{ width: pct as DimensionValue }}
+            />
+          </View>
+        ) : null}
       </View>
     );
   }

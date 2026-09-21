@@ -139,8 +139,14 @@ describe("beginMatchUploadAttempt", () => {
       error: null,
       truncation: null,
       storagePath: null,
+      progress: null,
     });
     expect(getMatchUpload("M1")).toMatchObject({ status: "pending", videoId: null });
+  });
+
+  it("clears the previous attempt's progress, so the bar does not start full", () => {
+    setMatchUpload("M1", { status: "uploaded", progress: 1 });
+    expect(beginMatchUploadAttempt("M1").progress).toBeNull();
   });
 
   it("notifies subscribers once, so the chip does not blink through hidden", () => {
@@ -156,6 +162,21 @@ describe("beginMatchUploadAttempt", () => {
     setMatchUpload("M2", { status: "uploaded", videoId: "VID-2" });
     beginMatchUploadAttempt("M1");
     expect(getMatchUpload("M2")?.videoId).toBe("VID-2");
+  });
+});
+
+describe("upload progress", () => {
+  it("is null until the first byte offset is known", () => {
+    setMatchUpload("M1", { status: "uploading" });
+    expect(getMatchUpload("M1")?.progress).toBeNull();
+  });
+
+  it("survives a merge that does not mention it", () => {
+    // The banner reads progress and status from the same entry, and they
+    // are written by different callbacks a chunk apart.
+    setMatchUpload("M1", { status: "uploading", progress: 0.42 });
+    setMatchUpload("M1", { storagePath: "M1/A1/1.mp4" });
+    expect(getMatchUpload("M1")?.progress).toBe(0.42);
   });
 });
 
@@ -212,6 +233,7 @@ describe("deriveUploadBannerState", () => {
     error: null,
     truncation: null,
     storagePath: null,
+    progress: null,
     updatedAt: 0,
     ...patch,
   }) as never;
@@ -303,6 +325,31 @@ describe("deriveUploadBannerState", () => {
     expect(deriveUploadBannerState("idle", null, entry({ status: "pending" })).kind).toBe(
       "hidden",
     );
+  });
+
+  it("shows an upload IN FLIGHT over a live recorder error", () => {
+    // Before the upload runner, a recorder error could not coexist with an
+    // in-flight upload, so the recorder won. It can now: a persisted job
+    // resumes on foreground or reconnect with no recorder involved, so a
+    // user who re-enters the same match and denies the camera would have
+    // seen "Camera permission required" sitting over a running upload.
+    expect(
+      deriveUploadBannerState(
+        "error",
+        "Camera permission required",
+        entry({ status: "uploading", progress: 0.6 }),
+      ),
+    ).toMatchObject({ kind: "uploading", progress: 0.6 });
+  });
+
+  it("passes the byte progress through for the uploading chip", () => {
+    expect(
+      deriveUploadBannerState("idle", null, entry({ status: "uploading", progress: 0.25 })),
+    ).toMatchObject({ kind: "uploading", progress: 0.25 });
+    // Still allowed to be unknown, which renders the indeterminate spinner.
+    expect(
+      deriveUploadBannerState("idle", null, entry({ status: "uploading" })).progress,
+    ).toBeNull();
   });
 
   it("never renders an error with no message at all", () => {

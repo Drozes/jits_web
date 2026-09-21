@@ -25,12 +25,25 @@ import type { RecordingTruncation } from "./use-video-recorder";
  * the component tree can reach it. A write always lands; whoever is
  * mounted finds out via `useSyncExternalStore`.
  *
- * SCOPE. In memory only, for the life of the JS context. It is NOT
- * persistence: surviving an app restart, and re-driving a failed upload,
- * are jits-341p. This module is the substrate that issue builds on, not
- * that issue. The file URI is deliberately not held here (holding a temp
- * capture file has its own lifecycle, and that is jits-341p's problem);
- * `storagePath` is recorded because a retry MUST reuse the same key.
+ * SCOPE. Still in memory only, for the life of the JS context, and still
+ * NOT the durable record. That is now `lib/video/upload-persistence.ts`,
+ * which holds the file URI, the tus upload URL, the byte offset and the
+ * attempt count on DISK so an app kill resumes instead of restarting
+ * (jits-341p). This store is the VIEW of that work: what the currently
+ * mounted surface should say about this match right now.
+ *
+ * The earlier version of this docblock said the local `file://` URI was
+ * deliberately NOT recorded, because "holding a temp capture file has its
+ * own lifecycle". That decision is reversed, and deliberately: at up to 10
+ * minutes and 300-600 MB per match, an upload that cannot be resumed after
+ * the app is backgrounded and killed loses the recording outright, and
+ * every match is about to be recorded. The lifecycle objection was real
+ * and is now solved rather than avoided, in `lib/video/recording-file.ts`:
+ * the clip is moved out of the purgeable camera cache into the document
+ * directory before the first byte is sent, and deleted when the job
+ * settles or is abandoned. The URI lives in the persisted JOB, not here,
+ * because nothing rendering this store needs it. `storagePath` is still
+ * recorded because a retry MUST reuse the same key.
  *
  * ONE ENTRY DESCRIBES ONE RECORDING ATTEMPT. Every field except `matchId`
  * is PER-ATTEMPT: `status`, `videoId`, `error`, `truncation` and
@@ -80,6 +93,14 @@ export interface MatchUploadEntry {
    * the failed attempt's half-written object at a dead path (jits-voh).
    */
   storagePath: string | null;
+  /**
+   * Fraction of the clip the server has confirmed, 0..1, or null when
+   * nothing is known yet. Real byte-level progress from the tus PATCH
+   * responses; the old `FileSystem.uploadAsync(BINARY_CONTENT)` path could
+   * not produce this at all, which is why the banner was an indeterminate
+   * spinner for a ten-minute upload.
+   */
+  progress: number | null;
   /** Wall-clock of the last write, used only for eviction ordering. */
   updatedAt: number;
 }
@@ -148,6 +169,7 @@ export function setMatchUpload(
     error: prev?.error ?? null,
     truncation: prev?.truncation ?? null,
     storagePath: prev?.storagePath ?? null,
+    progress: prev?.progress ?? null,
     ...patch,
     updatedAt: Date.now(),
   };
@@ -180,6 +202,7 @@ export function beginMatchUploadAttempt(matchId: string): MatchUploadEntry {
     error: null,
     truncation: null,
     storagePath: null,
+    progress: null,
     updatedAt: Date.now(),
   };
   entries.set(matchId, next);

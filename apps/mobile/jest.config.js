@@ -9,7 +9,7 @@ module.exports = {
   // __tests__/support/ holds shared helpers (the WCAG math and AA threshold
   // table imported by both token suites), not tests.
   testPathIgnorePatterns: ["/node_modules/", "<rootDir>/__tests__/support/"],
-  setupFilesAfterEnv: ["@testing-library/jest-native/extend-expect"],
+  setupFilesAfterEnv: ["@testing-library/jest-native/extend-expect", "<rootDir>/jest.setup.js"],
   transformIgnorePatterns: [
     "node_modules/(?!(.pnpm|react-native|@react-native|@react-native-community|expo|@expo|@expo-google-fonts|react-navigation|@react-navigation|native-base|nativewind|react-native-css-interop|react-native-reanimated|lucide-react-native|class-variance-authority|clsx|tailwind-merge|@gorhom|react-native-gesture-handler|react-native-screens|react-native-safe-area-context|react-native-toast-message|@supabase|@jits))",
     "/node_modules/react-native-reanimated/plugin/",

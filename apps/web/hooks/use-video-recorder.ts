@@ -1,13 +1,14 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { StorageApiError } from "@supabase/supabase-js";
 import {
   buildMatchVideoStoragePath,
   upsertMatchVideo,
 } from "@jits/shared/api/mutations";
+import { backoffDelayMs, classifyUploadError } from "@jits/shared/utils";
 import { extensionFor, pickMimeType } from "@/lib/video/recorder-codec";
+import { uploadBlobResumable } from "@/lib/video/resumable-upload";
 
 // BE contract: jr_be/specs/013-chunked-video-pipeline/INTEGRATION.md
 // §1.2 path convention + §8.5 size limits.
@@ -15,6 +16,31 @@ const MAX_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024; // 2 GiB client-side cap
 // Warn the user once live usage crosses this fraction of the cap so the
 // auto-stop at 100% isn't a surprise (parity with mobile's pre-flight check).
 const NEARING_LIMIT_BYTES = MAX_UPLOAD_BYTES * 0.9;
+const VIDEO_BUCKET = "match-videos";
+
+/** Automatic attempts at the byte upload before the user is asked. */
+export const WEB_UPLOAD_MAX_ATTEMPTS = 4;
+const UPLOAD_BACKOFF = { baseMs: 2_000, maxMs: 30_000 };
+/** Automatic attempts at the `match_videos` row within one run. */
+export const WEB_ROW_MAX_ATTEMPTS = 4;
+const ROW_BACKOFF = { baseMs: 750, maxMs: 10_000 };
+
+/**
+ * How far the upload got. The two halves have completely different costs:
+ * re-uploading bytes is minutes and hundreds of megabytes, re-writing the
+ * row is one INSERT. A retry must never redo the half that already worked.
+ */
+type UploadPhase = "bytes" | "row";
+
+interface PendingUpload {
+  blob: Blob;
+  mimeType: string;
+  /** Built ONCE per recording. Every attempt re-PUTs this same key. */
+  path: string;
+  phase: UploadPhase;
+  /** tus upload URL, so a retry resumes instead of restarting. */
+  uploadUrl: string | null;
+}
 
 interface UseVideoRecorderReturn {
   videoRef: React.RefObject<HTMLVideoElement | null>;
@@ -29,10 +55,38 @@ interface UseVideoRecorderReturn {
    */
   videoId: string | null;
   /**
+   * Fraction of the recording the server has confirmed, 0..1, or null
+   * before the first offset is known. Real byte progress from the tus
+   * PATCH responses.
+   */
+  uploadProgress: number | null;
+  /**
    * True once live recorded size crosses 90% of `MAX_UPLOAD_BYTES`.
    * Lets consumers warn before the recorder auto-stops at the 2 GB cap.
    */
   nearingLimit: boolean;
+  /**
+   * True while a failed upload can still be re-driven, i.e. the recording
+   * is still in this page's memory. The wizard uses it to decide whether
+   * "Retry upload" is worth offering.
+   */
+  canRetryUpload: boolean;
+  /** Re-drive a failed upload from whichever half still needs doing. */
+  retryUpload: () => void;
+  /**
+   * Give up on this recording deliberately. Compensates an orphaned
+   * storage object (bytes up, no row) and clears the pending state, so the
+   * wizard can move on without leaving a file nobody can reach.
+   */
+  discardUpload: () => Promise<void>;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function messageOf(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
 }
 
 /**
@@ -42,6 +96,11 @@ interface UseVideoRecorderReturn {
  * `<match_id>/<uploader_athlete_id>/<unix_ts>.<ext>` path, then INSERTs
  * the parent `match_videos` row at `status='ready'` so the slicer
  * trigger fires.
+ *
+ * The upload is RESUMABLE (tus) and RETRIED with jittered exponential
+ * backoff. It used to be a single `storage.upload()` with no retry at all:
+ * one dropped connection at 80% of a 600 MB clip lost the recording, and
+ * the wizard advanced past the failure anyway.
  *
  * `uploaderAthleteId` MUST be the caller's `athletes.id` (NOT the
  * Supabase auth user id). The RLS `match_videos_insert_participant`
@@ -60,98 +119,215 @@ export function useVideoRecorder(
   const [uploadStatus, setUploadStatus] = useState<"idle" | "uploading" | "done" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
   const [videoId, setVideoId] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [nearingLimit, setNearingLimit] = useState(false);
+  const [canRetryUpload, setCanRetryUpload] = useState(false);
   const mountedRef = useRef(true);
+  /**
+   * The recording and how far it got. Held in a ref, not state, because the
+   * upload deliberately runs to completion past unmount and a manual retry
+   * has to find the same blob and the same object key.
+   */
+  const pendingRef = useRef<PendingUpload | null>(null);
+  /** Guards against two upload runs for the same recording overlapping. */
+  const runningRef = useRef(false);
 
-  const upload = useCallback(async (blob: Blob, mimeType: string) => {
-    // The storage upload + match_videos write below run to completion even
-    // if the step unmounted mid-upload; only React state updates are
-    // skipped after unmount.
+  const supabase = useMemo(() => createClient(), []);
+
+  /**
+   * Best-effort removal of an object that has no `match_videos` row. Under
+   * storage RLS a denied DELETE resolves 200 with `{ data: [] }` and NO
+   * error, so success requires exactly one removed object. Reported, never
+   * thrown, so it cannot mask the real failure.
+   */
+  const removeOrphan = useCallback(
+    async (path: string) => {
+      try {
+        const { data: removed, error: removeError } = await supabase.storage
+          .from(VIDEO_BUCKET)
+          .remove([path]);
+        if (removeError || removed?.length !== 1) {
+          console.warn(
+            `[video] orphan cleanup failed for ${path}:`,
+            removeError?.message ??
+              `removed ${removed?.length ?? 0} objects (silent RLS denial?)`,
+          );
+        }
+      } catch (removeErr) {
+        console.warn(`[video] orphan cleanup failed for ${path}:`, removeErr);
+      }
+    },
+    [supabase],
+  );
+
+  /**
+   * Run the pending upload to completion, or leave it retryable.
+   *
+   * The storage object is NEVER deleted because the DB write failed. The
+   * bytes are the expensive, irreplaceable half; the row is one INSERT, so
+   * it is retried on its own budget and then handed to the user as a
+   * retryable failure. Compensation happens only in `discardUpload`, when
+   * the recording is abandoned on purpose.
+   */
+  const runUpload = useCallback(async () => {
+    const pending = pendingRef.current;
+    if (!pending || runningRef.current) return;
+    if (!uploaderAthleteId) {
+      if (mountedRef.current) {
+        setUploadStatus("error");
+        setError("Cannot upload: current athlete not loaded yet.");
+        setCanRetryUpload(true);
+      }
+      return;
+    }
+    runningRef.current = true;
+
     const fail = (msg: string) => {
       if (!mountedRef.current) return;
       setUploadStatus("error");
       setError(msg);
+      setCanRetryUpload(true);
     };
-    if (!uploaderAthleteId) {
-      fail("Cannot upload: current athlete not loaded yet.");
-      return;
-    }
-    if (blob.size > MAX_UPLOAD_BYTES) {
-      fail("Videos must be under 2 GB.");
-      return;
-    }
-    if (mountedRef.current) setUploadStatus("uploading");
+
     try {
-      const supabase = createClient();
-      const path = buildMatchVideoStoragePath(
-        matchId,
-        uploaderAthleteId,
-        extensionFor(mimeType),
-      );
-      const { error: uploadError } = await supabase.storage
-        .from("match-videos")
-        // upsert so a retry against the same path replaces rather than 409s.
-        .upload(path, blob, { contentType: mimeType, upsert: true });
-      if (uploadError) {
-        // Local Supabase caps `match-videos` at 500 MiB and returns 413.
-        // Surface the local-dev caveat per BE §8.5. Prefer the SDK's
-        // typed `statusCode` (string) when available; fall back to a
-        // message regex for non-`StorageApiError` errors.
-        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-        const isLocal = /127\.0\.0\.1|localhost/.test(supabaseUrl);
-        const msg = uploadError.message ?? "";
-        const isPayloadTooLarge =
-          (uploadError instanceof StorageApiError && uploadError.statusCode === "413") ||
-          /payload too large/i.test(msg);
-        if (isLocal && isPayloadTooLarge) {
-          fail("Local development cap is 500 MiB — production cap is 2 GiB. Use a shorter clip while testing.");
-        } else {
-          fail(msg || "Upload failed");
-        }
-        return;
-      }
-      // Storage upload succeeded; INSERT/UPDATE the parent row.
-      const upserted = await upsertMatchVideo(supabase, {
-        matchId,
-        uploaderAthleteId,
-        storagePath: path,
-        fileSizeBytes: blob.size,
-        recordingType: "self",
-        recordedBy: uploaderAthleteId,
-      });
-      if (!upserted.ok) {
-        // Storage object landed but the DB row didn't: remove the object
-        // so it is never orphaned in the bucket with no `match_videos`
-        // row. Best-effort with observability: under storage RLS a denied
-        // DELETE resolves 200 with `{ data: [] }` and NO error, so success
-        // requires exactly one removed object. A failed cleanup is logged
-        // but never masks the real DB error.
-        try {
-          const { data: removed, error: removeError } = await supabase.storage
-            .from("match-videos")
-            .remove([path]);
-          if (removeError || removed?.length !== 1) {
-            console.warn(
-              `[video] orphan cleanup failed for ${path}:`,
-              removeError?.message ?? `removed ${removed?.length ?? 0} objects (silent RLS denial?)`,
-            );
-          }
-        } catch (removeErr) {
-          console.warn(`[video] orphan cleanup failed for ${path}:`, removeErr);
-        }
-        fail(`Upload stored but saving the video record failed: ${upserted.error.message}`);
-        return;
-      }
       if (mountedRef.current) {
-        setVideoId(upserted.data.id);
-        setUploadStatus("done");
+        setUploadStatus("uploading");
+        setError(null);
+        setCanRetryUpload(false);
+        if (pending.phase === "bytes") setUploadProgress(0);
       }
+
+      if (pending.phase === "bytes") {
+        let uploaded = false;
+        let lastError = "Upload failed";
+        for (let attempt = 1; attempt <= WEB_UPLOAD_MAX_ATTEMPTS; attempt++) {
+          try {
+            await uploadBlobResumable({
+              supabase,
+              bucket: VIDEO_BUCKET,
+              path: pending.path,
+              blob: pending.blob,
+              contentType: pending.mimeType,
+              uploadUrl: pending.uploadUrl,
+              onUploadUrl: (url) => {
+                pending.uploadUrl = url;
+              },
+              onProgress: (sent, total) => {
+                if (mountedRef.current && total > 0) {
+                  setUploadProgress(Math.max(0, Math.min(1, sent / total)));
+                }
+              },
+            });
+            uploaded = true;
+            break;
+          } catch (err) {
+            const klass = classifyUploadError(err);
+            lastError = messageOf(err);
+            console.warn(
+              `[video] upload attempt ${attempt}/${WEB_UPLOAD_MAX_ATTEMPTS} failed` +
+                `${klass.status ? ` (HTTP ${klass.status})` : ""}: ${lastError}`,
+            );
+            // A dropped or conflicting upload URL cannot be resumed; the
+            // next attempt creates a new one against the same object key.
+            if (klass.resetUploadUrl) pending.uploadUrl = null;
+            if (!klass.retryable || attempt >= WEB_UPLOAD_MAX_ATTEMPTS) break;
+            await sleep(backoffDelayMs(attempt, UPLOAD_BACKOFF));
+          }
+        }
+        if (!uploaded) {
+          fail(`Upload failed: ${lastError}`);
+          return;
+        }
+        // Never re-upload a complete object on a later retry.
+        pending.phase = "row";
+        if (mountedRef.current) setUploadProgress(1);
+      }
+
+      let lastRowError = "Saving the video record failed";
+      for (let attempt = 1; attempt <= WEB_ROW_MAX_ATTEMPTS; attempt++) {
+        const upserted = await upsertMatchVideo(supabase, {
+          matchId,
+          uploaderAthleteId,
+          storagePath: pending.path,
+          fileSizeBytes: pending.blob.size,
+          recordingType: "self",
+          recordedBy: uploaderAthleteId,
+        });
+        if (upserted.ok) {
+          pendingRef.current = null;
+          if (mountedRef.current) {
+            setVideoId(upserted.data.id);
+            setUploadStatus("done");
+            setError(null);
+            setCanRetryUpload(false);
+          }
+          return;
+        }
+        lastRowError = upserted.error.message;
+        console.warn(
+          `[video] match_videos write ${attempt}/${WEB_ROW_MAX_ATTEMPTS} failed: ${lastRowError}`,
+        );
+        if (attempt < WEB_ROW_MAX_ATTEMPTS) {
+          await sleep(backoffDelayMs(attempt, ROW_BACKOFF));
+        }
+      }
+      // Bytes are safely in the bucket; only the row is missing, and the
+      // object stays there so a retry costs one INSERT rather than a
+      // second 600 MB transfer.
+      fail(`Upload stored but saving the video record failed: ${lastRowError}`);
     } catch (err) {
-      const detail = err instanceof Error ? err.message : String(err);
       console.error("[video] upload threw:", err);
-      fail(`Upload failed: ${detail}`);
+      fail(`Upload failed: ${messageOf(err)}`);
+    } finally {
+      runningRef.current = false;
     }
-  }, [matchId, uploaderAthleteId]);
+  }, [matchId, supabase, uploaderAthleteId]);
+
+  const beginUpload = useCallback(
+    (blob: Blob, mimeType: string) => {
+      if (!uploaderAthleteId) {
+        setUploadStatus("error");
+        setError("Cannot upload: current athlete not loaded yet.");
+        return;
+      }
+      if (blob.size > MAX_UPLOAD_BYTES) {
+        setUploadStatus("error");
+        setError("Videos must be under 2 GB.");
+        return;
+      }
+      pendingRef.current = {
+        blob,
+        mimeType,
+        // Built ONCE per recording: every retry re-PUTs the same key, which
+        // is what lets a resumed upload keep the bytes the server holds and
+        // what the storage UPDATE policy is there for.
+        path: buildMatchVideoStoragePath(matchId, uploaderAthleteId, extensionFor(mimeType)),
+        phase: "bytes",
+        uploadUrl: null,
+      };
+      void runUpload();
+    },
+    [matchId, runUpload, uploaderAthleteId],
+  );
+
+  const retryUpload = useCallback(() => {
+    if (!pendingRef.current) return;
+    void runUpload();
+  }, [runUpload]);
+
+  const discardUpload = useCallback(async () => {
+    const pending = pendingRef.current;
+    pendingRef.current = null;
+    if (mountedRef.current) {
+      setCanRetryUpload(false);
+      setUploadStatus("idle");
+      setUploadProgress(null);
+    }
+    // Only a "row"-phase job has bytes in the bucket with no row pointing
+    // at them. Abandoning it deliberately is the one moment deleting them
+    // is right.
+    if (pending?.phase === "row") await removeOrphan(pending.path);
+  }, [removeOrphan]);
 
   const stopRecording = useCallback(() => {
     const recorder = recorderRef.current;
@@ -166,7 +342,7 @@ export function useVideoRecorder(
         // the last chunk.
         streamRef.current?.getTracks().forEach((t) => t.stop());
         streamRef.current = null;
-        if (blob.size > 0) upload(blob, mimeType);
+        if (blob.size > 0) beginUpload(blob, mimeType);
       };
       recorder.stop();
     } else {
@@ -175,7 +351,7 @@ export function useVideoRecorder(
     }
     recorderRef.current = null;
     setIsRecording(false);
-  }, [upload]);
+  }, [beginUpload]);
 
   const startRecording = useCallback(async () => {
     // Camera access and codec support are DIFFERENT failures and must not
@@ -214,8 +390,8 @@ export function useVideoRecorder(
         recordedBytesRef.current += e.data.size;
         // Live size guard (parity with mobile's pre-flight check): warn at
         // 90%, then auto-stop at the 2 GB cap so the user isn't surprised
-        // by a rejected upload after a long recording. `upload()` keeps its
-        // own post-record check as a backstop.
+        // by a rejected upload after a long recording. `beginUpload` keeps
+        // its own post-record check as a backstop.
         if (recordedBytesRef.current >= NEARING_LIMIT_BYTES) setNearingLimit(true);
         if (recordedBytesRef.current >= MAX_UPLOAD_BYTES) {
           setError("Recording stopped: 2 GB limit reached.");
@@ -245,5 +421,18 @@ export function useVideoRecorder(
     };
   }, []);
 
-  return { videoRef, isRecording, startRecording, stopRecording, uploadStatus, error, videoId, nearingLimit };
+  return {
+    videoRef,
+    isRecording,
+    startRecording,
+    stopRecording,
+    uploadStatus,
+    error,
+    videoId,
+    uploadProgress,
+    nearingLimit,
+    canRetryUpload,
+    retryUpload,
+    discardUpload,
+  };
 }

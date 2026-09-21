@@ -79,12 +79,80 @@ jest.mock("expo-camera", () => {
   };
 });
 
-const mockUploadAsync = jest.fn();
 const mockGetInfoAsync = jest.fn();
 jest.mock("expo-file-system/legacy", () => ({
-  uploadAsync: (...args: unknown[]) => mockUploadAsync(...args),
   getInfoAsync: (...args: unknown[]) => mockGetInfoAsync(...args),
-  FileSystemUploadType: { BINARY_CONTENT: "binary" },
+}));
+
+// Custody of the local clip (move out of the camera cache, delete when the
+// job settles) is covered in __tests__/lib/video/recording-file.test.ts.
+// Here it would only add a filesystem to stub.
+jest.mock("@/lib/video/recording-file", () => ({
+  retainRecording: (uri: string) => uri,
+  releaseRecording: jest.fn(),
+}));
+
+// The real NetInfo module reaches for a native reachability probe that does
+// not exist under Jest. The manager only uses it to notice a RECONNECT.
+jest.mock("@react-native-community/netinfo", () => ({
+  __esModule: true,
+  default: {
+    fetch: async () => ({ isConnected: true }),
+    addEventListener: () => () => undefined,
+  },
+}));
+
+// Backoff is real everywhere else; here it would just make the test sleep.
+jest.mock("@jits/shared/utils", () => ({
+  ...jest.requireActual("@jits/shared/utils"),
+  backoffDelayMs: () => 0,
+}));
+
+// ---- tus-js-client double ----
+//
+// The upload is now a resumable tus transfer. The protocol is tus's problem;
+// what this sequence cares about is that ONE transfer happens, against the
+// object key prod RLS requires, and that its outcome reaches a surface that
+// outlives the live step.
+
+interface CapturedTus {
+  options: Record<string, unknown>;
+}
+const mockTusCalls: CapturedTus[] = [];
+const mockTusFailure = { current: null as Error | null };
+
+/**
+ * Calls one of the tus option callbacks. A helper rather than an inline
+ * cast because a `jest.mock` factory may not reference any out-of-scope
+ * identifier, including the parameter name in a function type annotation.
+ */
+function mockInvoke(options: Record<string, unknown>, key: string, ...args: unknown[]): void {
+  const fn = options[key];
+  if (typeof fn === "function") (fn as (...rest: unknown[]) => void)(...args);
+}
+
+jest.mock("tus-js-client/lib.es5/browser/index.js", () => ({
+  Upload: class {
+    url: string | null = null;
+    options: Record<string, unknown>;
+    constructor(_file: unknown, options: Record<string, unknown>) {
+      this.options = options;
+      mockTusCalls.push({ options });
+    }
+    start() {
+      if (mockTusFailure.current) {
+        mockInvoke(this.options, "onError", mockTusFailure.current);
+        return;
+      }
+      this.url = "https://example.supabase.co/storage/v1/upload/resumable/abc";
+      mockInvoke(this.options, "onUploadUrlAvailable");
+      mockInvoke(this.options, "onProgress", 1, 1);
+      mockInvoke(this.options, "onSuccess");
+    }
+    abort() {
+      return Promise.resolve();
+    }
+  },
 }));
 
 // ---- Supabase client: resolved responses, never rejections ----
@@ -310,7 +378,8 @@ beforeEach(() => {
   });
 
   mockGetInfoAsync.mockResolvedValue({ exists: true, size: 12345 });
-  mockUploadAsync.mockResolvedValue({ status: 200, body: "" });
+  mockTusCalls.length = 0;
+  mockTusFailure.current = null;
   mockStorageRemove.mockResolvedValue({ data: [{ name: "x" }], error: null });
   mockInsertSingle.mockResolvedValue({ data: { id: "VID-1" }, error: null });
 });
@@ -391,14 +460,21 @@ describe("record, end, upload, across the step boundary", () => {
     // ... and the failure still reaches the user. This is the assertion the
     // old code could not satisfy at all: the only banner had unmounted.
     await waitFor(() => {
-      expect(getByText(/upload failed/i)).toBeTruthy();
+      expect(getByText(/saving the record failed/i)).toBeTruthy();
     });
     getByTestId("upload-status-banner");
     getByText(/row-level security/i);
+    // The copy tells the user it is not over, because it is not: the job
+    // is parked in phase "row" and the next foreground retries the write.
+    getByText(/retry automatically/i);
 
-    // The storage object landed but no row did, so the upload genuinely
-    // failed: two attempts were made and both were refused by the DB.
-    expect(mockUploadAsync).toHaveBeenCalledTimes(2);
+    // THE BYTES WENT UP ONCE. The old path deleted the object on the first
+    // DB failure and re-uploaded the whole file on the retry; now the row
+    // is retried on its own budget and the object is left alone, because a
+    // 600 MB re-upload is not a reasonable response to a transient write.
+    expect(mockTusCalls).toHaveLength(1);
+    expect(mockInsertSingle.mock.calls.length).toBeGreaterThan(1);
+    expect(mockStorageRemove).not.toHaveBeenCalled();
   });
 
   it("shows success after the live step is gone", async () => {
@@ -412,7 +488,7 @@ describe("record, end, upload, across the step boundary", () => {
 
     await waitFor(() => expect(getByText(/match video uploaded/i)).toBeTruthy());
     getByTestId("upload-status-banner");
-    expect(mockUploadAsync).toHaveBeenCalledTimes(1);
+    expect(mockTusCalls).toHaveLength(1);
   });
 
   it("does not pretend to release the camera on unmount", async () => {
@@ -444,14 +520,18 @@ describe("record, end, upload, across the step boundary", () => {
     await act(async () => {
       fireEvent.press(getByText("End Match"));
     });
-    await waitFor(() => expect(mockUploadAsync).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(mockTusCalls).toHaveLength(1));
 
     // `<match_id>/<uploader_athlete_id>/<unix_ts>.mp4`: segment 1 must be
     // the match uuid and segment 2 the uploader's own athlete id, per
-    // jr_be `20260610000000_match_videos_bucket.sql`.
-    const url = mockUploadAsync.mock.calls[0][0] as string;
-    expect(url).toMatch(
-      /\/storage\/v1\/object\/match-videos\/M1\/me-1\/\d+\.mp4$/,
-    );
+    // jr_be `20260610000000_match_videos_bucket.sql`. Under tus the key
+    // travels as Upload-Metadata rather than in the URL, but the
+    // convention is unchanged and the storage INSERT policy still keys on
+    // `foldername[2] = auth_athlete_id()`.
+    const metadata = mockTusCalls[0].options.metadata as Record<string, string>;
+    expect(metadata.bucketName).toBe("match-videos");
+    expect(metadata.objectName).toMatch(/^M1\/me-1\/\d+\.mp4$/);
+    // And Supabase's mandated chunk size is what actually goes out.
+    expect(mockTusCalls[0].options.chunkSize).toBe(6 * 1024 * 1024);
   });
 });

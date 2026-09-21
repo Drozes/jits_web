@@ -70,6 +70,39 @@ export interface PendingUploadJob {
  */
 export const UPLOAD_JOB_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
+/**
+ * Per-match write serialisation.
+ *
+ * Several writers touch one job concurrently: the progress callback (fire
+ * and forget, every few seconds), the upload-URL callback (fire and forget,
+ * once), and the attempt/phase writes in the retry loop. `patchUploadJob`
+ * is a read-modify-write, so two of them interleaving means the later read
+ * sees the earlier writer's PRE-state and its write silently reverts it.
+ *
+ * That is not theoretical: it dropped the tus upload URL. The URL callback
+ * and the failure handler fired in the same tick, the failure handler read
+ * first, and the retry resumed with `uploadUrl: null`, re-uploading the
+ * whole clip from zero. Chaining every write for a match behind the
+ * previous one makes each read-modify-write atomic with respect to the
+ * others.
+ */
+const writeChains = new Map<string, Promise<unknown>>();
+
+function serialize<T>(matchId: string, fn: () => Promise<T>): Promise<T> {
+  const previous = writeChains.get(matchId) ?? Promise.resolve();
+  const next = previous.then(fn, fn);
+  // The stored link must never reject, or every later write on this match
+  // would inherit the rejection.
+  writeChains.set(
+    matchId,
+    next.then(
+      () => undefined,
+      () => undefined,
+    ),
+  );
+  return next;
+}
+
 function keyFor(matchId: string): string {
   return `${UPLOAD_JOB_PREFIX}${matchId}`;
 }
@@ -97,29 +130,47 @@ function isValidJob(value: unknown): value is PendingUploadJob {
   );
 }
 
-export async function saveUploadJob(job: PendingUploadJob): Promise<void> {
-  try {
-    await AsyncStorage.setItem(keyFor(job.matchId), JSON.stringify({ ...job, updatedAt: Date.now() }));
-  } catch (err) {
-    // Persistence is a resilience feature, not a precondition: an upload that
-    // cannot be recorded still runs, it just cannot survive a process kill.
-    console.warn(`[video] could not persist upload job for ${job.matchId}:`, err);
-  }
-}
-
-export async function loadUploadJob(matchId: string): Promise<PendingUploadJob | null> {
+/** Read a record with no serialisation. Callers hold the chain already. */
+async function readRaw(matchId: string): Promise<PendingUploadJob | null> {
   try {
     const raw = await AsyncStorage.getItem(keyFor(matchId));
     if (!raw) return null;
     const parsed: unknown = JSON.parse(raw);
-    if (!isValidJob(parsed)) {
-      await removeUploadJob(matchId);
-      return null;
-    }
-    return parsed;
+    if (isValidJob(parsed)) return parsed;
+    await AsyncStorage.removeItem(keyFor(matchId));
+    return null;
   } catch {
+    // Unparseable: drop it rather than re-scanning it on every resume for
+    // the rest of the retention window.
+    try {
+      await AsyncStorage.removeItem(keyFor(matchId));
+    } catch {
+      /* nothing else to try */
+    }
     return null;
   }
+}
+
+/** Write a record with no serialisation. Callers hold the chain already. */
+async function writeRaw(job: PendingUploadJob): Promise<void> {
+  try {
+    await AsyncStorage.setItem(
+      keyFor(job.matchId),
+      JSON.stringify({ ...job, updatedAt: Date.now() }),
+    );
+  } catch (err) {
+    // Persistence is a resilience feature, not a precondition: an upload
+    // that cannot be recorded still runs, it just cannot survive a kill.
+    console.warn(`[video] could not persist upload job for ${job.matchId}:`, err);
+  }
+}
+
+export async function saveUploadJob(job: PendingUploadJob): Promise<void> {
+  await serialize(job.matchId, () => writeRaw(job));
+}
+
+export async function loadUploadJob(matchId: string): Promise<PendingUploadJob | null> {
+  return serialize(matchId, () => readRaw(matchId));
 }
 
 /** Every persisted job, oldest first, with malformed records dropped. */
@@ -130,51 +181,49 @@ export async function loadUploadJobs(): Promise<PendingUploadJob[]> {
   } catch {
     return [];
   }
-  const jobKeys = keys.filter((k) => k.startsWith(UPLOAD_JOB_PREFIX));
-  if (jobKeys.length === 0) return [];
+  const matchIds = keys
+    .filter((k) => k.startsWith(UPLOAD_JOB_PREFIX))
+    .map((k) => k.slice(UPLOAD_JOB_PREFIX.length));
   const jobs: PendingUploadJob[] = [];
-  for (const key of jobKeys) {
-    try {
-      const raw = await AsyncStorage.getItem(key);
-      if (!raw) continue;
-      const parsed: unknown = JSON.parse(raw);
-      if (isValidJob(parsed)) jobs.push(parsed);
-      else await AsyncStorage.removeItem(key);
-    } catch {
-      try {
-        await AsyncStorage.removeItem(key);
-      } catch {
-        /* nothing else to try */
-      }
-    }
+  for (const matchId of matchIds) {
+    const job = await loadUploadJob(matchId);
+    if (job) jobs.push(job);
   }
   return jobs.sort((a, b) => a.createdAt - b.createdAt);
 }
 
 export async function removeUploadJob(matchId: string): Promise<void> {
-  try {
-    await AsyncStorage.removeItem(keyFor(matchId));
-  } catch {
-    // A stale record is swept by age; failing to remove one is not worth
-    // surfacing over the upload's own outcome.
-  }
+  await serialize(matchId, async () => {
+    try {
+      await AsyncStorage.removeItem(keyFor(matchId));
+    } catch {
+      // A stale record is swept by age; failing to remove one is not worth
+      // surfacing over the upload's own outcome.
+    }
+  });
 }
 
 /**
- * Merge a patch into a stored job. Reads the CURRENT record rather than
- * patching the caller's copy, so a progress write issued from a long-running
- * attempt cannot resurrect fields (a stale `uploadUrl`, a lower `attempt`)
- * that the resume sweep has since changed.
+ * Merge `patch` into the stored job, as one atomic read-modify-write.
+ *
+ * Reads the CURRENT record rather than patching the caller's copy, so a
+ * progress write issued from a long-running attempt cannot resurrect fields
+ * (a stale `uploadUrl`, a lower `attempt`) that a later writer has changed.
+ * The read AND the write are inside the serialisation chain, so two patches
+ * landing in the same tick apply in order instead of one reverting the
+ * other; see `serialize` for the bug that caused.
  */
 export async function patchUploadJob(
   matchId: string,
   patch: Partial<Omit<PendingUploadJob, "matchId">>,
 ): Promise<PendingUploadJob | null> {
-  const current = await loadUploadJob(matchId);
-  if (!current) return null;
-  const next: PendingUploadJob = { ...current, ...patch, matchId, updatedAt: Date.now() };
-  await saveUploadJob(next);
-  return next;
+  return serialize(matchId, async () => {
+    const current = await readRaw(matchId);
+    if (!current) return null;
+    const next: PendingUploadJob = { ...current, ...patch, matchId, updatedAt: Date.now() };
+    await writeRaw(next);
+    return next;
+  });
 }
 
 /** True when the job is old enough that nothing is going to rescue it. */

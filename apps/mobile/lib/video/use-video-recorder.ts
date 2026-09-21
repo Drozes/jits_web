@@ -1,11 +1,7 @@
 import * as React from "react";
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from "expo-camera";
-import {
-  MatchVideoDbError,
-  buildVideoPath,
-  removeUploadedObject,
-  uploadRecording,
-} from "./upload-recording";
+import { buildVideoPath } from "./upload-recording";
+import { startMatchVideoUpload } from "./video-upload-manager";
 import {
   CAMERA_READY_TIMEOUT_MS,
   CAP_DETECTION_TOLERANCE_MS,
@@ -152,8 +148,15 @@ export interface UseVideoRecorderReturn {
  *
  * Recording is best-effort: callers are expected to surface permission
  * issues or upload failures through `state` + `error` but should keep
- * the match flow running regardless. A failed upload retries once
- * automatically; the second failure is final.
+ * the match flow running regardless.
+ *
+ * The upload itself is NOT owned by this hook. It is handed to
+ * `lib/video/video-upload-manager.ts`, which uploads resumably over tus,
+ * persists the job to disk, retries with jittered exponential backoff and
+ * resumes on foreground or reconnect. This hook only reports the terminal
+ * outcome through `state`; everything in between reaches the UI through
+ * the match-keyed store, because an upload now routinely outlives not just
+ * this hook but the whole process.
  */
 /**
  * @param matchId            UUID of the parent match.
@@ -179,7 +182,6 @@ export function useVideoRecorder(
   const [micPermission, requestMicPermission] = useMicrophonePermissions();
   const [state, setState] = React.useState<RecordingState>("idle");
   const [error, setError] = React.useState<string | null>(null);
-  const [uploadProgress] = React.useState<number | null>(null);
   // The upload's OUTCOME is not component state. It is keyed on the match
   // (see ./match-upload-store) so it survives this hook being unmounted and
   // replaced, which the wizard does on every match, and so an upload that
@@ -189,6 +191,12 @@ export function useVideoRecorder(
   const upload = useMatchUpload(matchId);
   const videoId = upload?.videoId ?? null;
   const truncation = upload?.truncation ?? null;
+  // Real byte-level progress, written by the upload manager from the tus
+  // PATCH responses. It is read from the store rather than held here so it
+  // keeps flowing after this hook is replaced (the wizard remounts on every
+  // match) and so a resumed upload from a previous app launch reports
+  // against whatever surface happens to be mounted.
+  const uploadProgress = upload?.progress ?? null;
   const truncationRef = React.useRef<RecordingTruncation | null>(null);
   // Wall-clock at which the live recordAsync attempt was issued. Lets an
   // unexpected settle be classified as "hit the OS cap" vs "interrupted"
@@ -229,6 +237,15 @@ export function useVideoRecorder(
   // screen unmounted mid-flight; only the React state updates are skipped.
   const transition = React.useCallback((s: RecordingState, err: string | null = null) => {
     stateRef.current = s;
+    // The stop watchdog guards ONE state. Leaving 'stopping' retires it
+    // here rather than in start()'s finally, because the upload that
+    // follows can now run for many minutes across backoff and resume, and
+    // a timer that outlives the state it guards is a leak the test runner
+    // notices before a user does.
+    if (s !== "stopping" && stopWatchdogRef.current) {
+      clearTimeout(stopWatchdogRef.current);
+      stopWatchdogRef.current = null;
+    }
     // Error transitions are otherwise invisible in logs (state-only); always
     // surface them so device-side recording failures are diagnosable.
     if (err) console.warn(`[video] ${logTag} recorder ${s}: ${err}`);
@@ -264,9 +281,11 @@ export function useVideoRecorder(
       return;
     }
     transition("uploading");
-    // Build the storage key ONCE so the retry below reuses the same path.
-    // A fresh Date.now() per attempt would strand the first attempt's
-    // half-written object at a stale path (double-orphan).
+    // Build the storage key ONCE so every retry reuses the same path. A
+    // fresh Date.now() per attempt would strand the previous attempt's
+    // half-written object at a stale path (double-orphan), and with a
+    // RESUMABLE upload it would also throw away every byte already
+    // accepted by the server.
     const storagePath = buildVideoPath(matchId, uploaderAthleteId);
     // Every store write from here down is unguarded on purpose. This chain
     // runs to completion past unmount, and its result has to land whether
@@ -283,51 +302,23 @@ export function useVideoRecorder(
       storagePath,
       error: null,
       videoId: null,
+      progress: 0,
     });
-    try {
-      // First attempt skips orphan compensation: a transient DB failure
-      // must not delete the just-uploaded object only for the retry to
-      // re-upload the whole file (up to 2 GB). The retry reuses the same
-      // path, so the x-upsert write simply lands on top of it.
-      const r = await uploadRecording({
-        fileUri,
-        matchId,
-        uploaderAthleteId,
-        storagePath,
-        skipCompensation: true,
-      });
-      setMatchUpload(matchId, { status: "uploaded", videoId: r.videoId, error: null });
-      transition("uploaded");
-    } catch (firstErr) {
-      // Retry once before giving up; same storage path, so the upsert
-      // header overwrites whatever the first attempt left behind. This
-      // is the FINAL attempt, so compensation is back on: a DB failure
-      // here removes the object (no orphan after the last attempt).
-      try {
-        const r = await uploadRecording({ fileUri, matchId, uploaderAthleteId, storagePath });
-        setMatchUpload(matchId, { status: "uploaded", videoId: r.videoId, error: null });
-        transition("uploaded");
-      } catch (secondErr) {
-        // If attempt 1 left its object in the bucket (DB write failed
-        // after a successful storage write, compensation skipped) and
-        // attempt 2 failed BEFORE its own compensation could run (a
-        // storage-level failure never reaches the DB step), the first
-        // attempt's object is still there — clean it up now.
-        if (
-          firstErr instanceof MatchVideoDbError &&
-          firstErr.storageObjectPersisted &&
-          !(secondErr instanceof MatchVideoDbError)
-        ) {
-          await removeUploadedObject(storagePath);
-        }
-        const msg = secondErr instanceof Error ? secondErr.message : String(secondErr);
-        setMatchUpload(matchId, { status: "error", error: `Upload failed: ${msg}` });
-        transition("error", `Upload failed: ${msg}`);
-        // Re-surface for logging by callers (toast).
-        // Web treats this as recoverable; we do too.
-        if (firstErr instanceof Error) console.warn("[video] first upload failed:", firstErr.message);
-      }
-    }
+    // Retrying, backoff, resuming, persistence and orphan compensation all
+    // live in the upload manager, not here. The hook's only remaining job
+    // is to mirror the terminal outcome into its own state for the callers
+    // that read `recorder.state`; every intermediate signal (progress, a
+    // paused-and-will-resume upload, an upload finishing after this hook
+    // is gone) reaches the UI through the match-keyed store instead.
+    const outcome = await startMatchVideoUpload({
+      matchId,
+      uploaderAthleteId,
+      fileUri,
+      storagePath,
+      truncation: truncationRef.current,
+    });
+    if (outcome.ok) transition("uploaded");
+    else transition("error", outcome.error);
   }, [matchId, uploaderAthleteId, transition]);
 
   const start = React.useCallback(async () => {

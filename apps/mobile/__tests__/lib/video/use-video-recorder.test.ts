@@ -1,9 +1,12 @@
 /**
  * Tests for the mobile video recorder hook (lib/video/use-video-recorder.ts).
  *
- * Covers the Phase 1 recorder lifecycle fixes:
- * - jits-voh: the once-failed upload retries against the SAME storage path
- *   (the key is built once per recording, not per attempt).
+ * Covers the recorder lifecycle. Note the division of labour after
+ * jits-341p: retrying, backoff, resuming and persistence moved OUT of this
+ * hook and into `lib/video/video-upload-manager.ts`, which is doubled here.
+ * What is still this hook's job, and is what these tests pin down:
+ * - jits-voh: the storage key is built ONCE per recording and handed to the
+ *   manager, so every attempt and every resume reuses it.
  * - jits-a8y.13: a stop requested before the recorder reaches 'recording'
  *   (End fired on a very short match) is honored once recording starts;
  *   the clip is stopped and uploaded, not silently dropped.
@@ -11,31 +14,20 @@
  *   write; only React state updates are skipped.
  */
 
-const mockUploadRecording = jest.fn();
+const mockStartUpload = jest.fn();
 const mockBuildVideoPath = jest.fn((..._args: unknown[]) => "M/A/111.mp4");
-const mockRemoveUploadedObject = jest.fn();
 
-jest.mock("@/lib/video/upload-recording", () => {
-  // Defined inside the factory (jest.mock is hoisted above imports, so an
-  // out-of-scope class would hit the TDZ). The hook and the tests both see
-  // this same class via the mocked module, so instanceof checks work.
-  class MatchVideoDbError extends Error {
-    readonly path: string;
-    readonly storageObjectPersisted: boolean;
-    constructor(message: string, path: string, storageObjectPersisted: boolean) {
-      super(message);
-      this.name = "MatchVideoDbError";
-      this.path = path;
-      this.storageObjectPersisted = storageObjectPersisted;
-    }
-  }
-  return {
-    uploadRecording: (...args: unknown[]) => mockUploadRecording(...args),
-    buildVideoPath: (...args: unknown[]) => mockBuildVideoPath(...args),
-    removeUploadedObject: (...args: unknown[]) => mockRemoveUploadedObject(...args),
-    MatchVideoDbError,
-  };
-});
+jest.mock("@/lib/video/upload-recording", () => ({
+  buildVideoPath: (...args: unknown[]) => mockBuildVideoPath(...args),
+}));
+
+// The upload runner is a seam, not an implementation detail of this hook:
+// it owns the retry loop, the backoff, the on-disk job and the store writes
+// that outlive this component. Its own behaviour is covered in
+// __tests__/lib/video/video-upload-manager.test.ts.
+jest.mock("@/lib/video/video-upload-manager", () => ({
+  startMatchVideoUpload: (...args: unknown[]) => mockStartUpload(...args),
+}));
 
 jest.mock("expo-camera", () => ({
   CameraView: () => null,
@@ -57,7 +49,6 @@ import {
   setMatchUpload,
 } from "@/lib/video/match-upload-store";
 import { useVideoRecorder } from "@/lib/video/use-video-recorder";
-import { MatchVideoDbError } from "@/lib/video/upload-recording";
 import {
   CAMERA_READY_TIMEOUT_MS,
   STOP_WATCHDOG_MS,
@@ -134,7 +125,39 @@ function makeNotReadyCamera(failFirst: number, uri = "file://clip.mp4"): FakeCam
   return { recordAsync, stopRecording };
 }
 
-const UPLOAD_OK = { path: "M/A/111.mp4", status: 200, videoId: "VID" };
+type ManagerOutcome =
+  | { ok: true; videoId: string }
+  | { ok: false; error: string; willRetryLater: boolean };
+
+const UPLOAD_OK: ManagerOutcome = { ok: true, videoId: "VID" };
+
+/**
+ * What the real manager does on success: write the outcome to the
+ * match-keyed store (the hook reads `videoId` from there, not from the
+ * return value) and resolve.
+ */
+async function uploadSucceeds({
+  matchId,
+  storagePath,
+}: {
+  matchId: string;
+  storagePath: string;
+}): Promise<ManagerOutcome> {
+  setMatchUpload(matchId, {
+    status: "uploaded",
+    videoId: "VID",
+    storagePath,
+    error: null,
+    progress: 1,
+  });
+  return UPLOAD_OK;
+}
+
+/** What the real manager does when it has given up. It never throws. */
+async function uploadFails({ matchId }: { matchId: string }): Promise<ManagerOutcome> {
+  setMatchUpload(matchId, { status: "error", error: "Upload failed: network died" });
+  return { ok: false, error: "Upload failed: network died", willRetryLater: false };
+}
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -150,10 +173,8 @@ afterEach(() => {
 });
 
 describe("useVideoRecorder", () => {
-  it("retries a failed upload with the SAME storage path (jits-voh)", async () => {
-    mockUploadRecording
-      .mockRejectedValueOnce(new Error("network blip"))
-      .mockResolvedValueOnce(UPLOAD_OK);
+  it("builds the storage key ONCE and hands it to the upload runner (jits-voh)", async () => {
+    mockStartUpload.mockImplementationOnce(uploadSucceeds);
 
     const { result } = renderHook(() => useVideoRecorder("M", "A"));
     const cam = makeFakeCamera();
@@ -171,29 +192,27 @@ describe("useVideoRecorder", () => {
 
     await waitFor(() => expect(result.current.state).toBe("uploaded"));
     expect(result.current.videoId).toBe("VID");
-    // The storage key is computed once and shared by both attempts.
+    // One key per RECORDING, not per attempt. Every retry and every resume
+    // inside the manager reuses it, so a half-written object is overwritten
+    // rather than stranded at a dead path, and a resumable upload does not
+    // lose the bytes the server already holds.
     expect(mockBuildVideoPath).toHaveBeenCalledTimes(1);
-    expect(mockUploadRecording).toHaveBeenCalledTimes(2);
-    const [firstCall, secondCall] = mockUploadRecording.mock.calls as Array<
-      [{ storagePath?: string; skipCompensation?: boolean }]
-    >;
-    expect(firstCall[0].storagePath).toBe("M/A/111.mp4");
-    expect(secondCall[0].storagePath).toBe("M/A/111.mp4");
-    // Compensation is deferred to the FINAL attempt: attempt 1 must not
-    // delete the uploaded object (the retry would re-upload up to 2 GB).
-    expect(firstCall[0].skipCompensation).toBe(true);
-    expect(secondCall[0].skipCompensation).toBeFalsy();
+    expect(mockStartUpload).toHaveBeenCalledTimes(1);
+    expect(mockStartUpload).toHaveBeenCalledWith({
+      matchId: "M",
+      uploaderAthleteId: "A",
+      fileUri: "file://clip.mp4",
+      storagePath: "M/A/111.mp4",
+      truncation: null,
+    });
   });
 
-  it("cleans up attempt 1's persisted object when the final attempt fails at the storage layer", async () => {
-    // Attempt 1: storage write landed, DB write failed, compensation
-    // skipped (object persisted). Attempt 2: storage-level failure, so
-    // uploadRecording's internal compensation never ran. The hook's
-    // final catch must remove the leftover object.
-    mockUploadRecording
-      .mockRejectedValueOnce(new MatchVideoDbError("db write failed", "M/A/111.mp4", true))
-      .mockRejectedValueOnce(new Error("network died"));
-    mockRemoveUploadedObject.mockResolvedValue(undefined);
+  it("does not retry the upload itself, because the runner owns that", async () => {
+    // The old hook fired two attempts back to back with no delay, so a
+    // flaky link burned both within seconds. Retrying is now the manager's
+    // job, with jittered backoff and a persisted job; the hook must call it
+    // exactly once and report what it says.
+    mockStartUpload.mockImplementationOnce(uploadFails);
 
     const { result } = renderHook(() => useVideoRecorder("M", "A"));
     const cam = makeFakeCamera();
@@ -210,18 +229,17 @@ describe("useVideoRecorder", () => {
     });
 
     await waitFor(() => expect(result.current.state).toBe("error"));
-    expect(mockRemoveUploadedObject).toHaveBeenCalledWith("M/A/111.mp4");
+    expect(mockStartUpload).toHaveBeenCalledTimes(1);
     expect(result.current.error).toMatch(/network died/);
   });
 
-  it("does not double-compensate when the final attempt failed at the DB layer", async () => {
-    // Attempt 2 reaching the DB step means uploadRecording already ran
-    // its own compensation; the hook must not remove the path again.
-    mockUploadRecording
-      .mockRejectedValueOnce(new MatchVideoDbError("db write failed", "M/A/111.mp4", true))
-      .mockRejectedValueOnce(new MatchVideoDbError("db write failed again", "M/A/111.mp4", false));
+  it("passes a truncation through so a resumed upload can still warn", async () => {
+    // The clip is short (the OS cap fired). That fact lives on the job the
+    // manager persists, so it survives the process and can still be shown
+    // when the upload finally lands.
+    mockStartUpload.mockImplementationOnce(uploadSucceeds);
 
-    const { result } = renderHook(() => useVideoRecorder("M", "A"));
+    const { result } = renderHook(() => useVideoRecorder("M", "A", 1));
     const cam = makeFakeCamera();
     result.current.cameraRef.current = cam as never;
     act(() => result.current.markCameraReady());
@@ -230,17 +248,18 @@ describe("useVideoRecorder", () => {
     act(() => {
       startPromise = result.current.start();
     });
+    // recordAsync settles on its own, with no stop() ever issued.
     await act(async () => {
-      await result.current.stop();
+      cam.stopRecording();
       await startPromise;
     });
 
-    await waitFor(() => expect(result.current.state).toBe("error"));
-    expect(mockRemoveUploadedObject).not.toHaveBeenCalled();
+    await waitFor(() => expect(mockStartUpload).toHaveBeenCalledTimes(1));
+    expect(mockStartUpload.mock.calls[0][0].truncation).toBeTruthy();
   });
 
   it("honors a stop requested before recording starts (jits-a8y.13)", async () => {
-    mockUploadRecording.mockResolvedValueOnce(UPLOAD_OK);
+    mockStartUpload.mockImplementationOnce(uploadSucceeds);
 
     const { result } = renderHook(() => useVideoRecorder("M", "A"));
     const cam = makeFakeCamera();
@@ -260,13 +279,13 @@ describe("useVideoRecorder", () => {
     });
 
     expect(cam.stopRecording).toHaveBeenCalledTimes(1);
-    expect(mockUploadRecording).toHaveBeenCalledTimes(1);
+    expect(mockStartUpload).toHaveBeenCalledTimes(1);
     expect(result.current.state).toBe("uploaded");
     expect(result.current.videoId).toBe("VID");
   });
 
   it("re-issues a pending stop the camera ignored before capture began (jits-a8y.13)", async () => {
-    mockUploadRecording.mockResolvedValueOnce(UPLOAD_OK);
+    mockStartUpload.mockImplementationOnce(uploadSucceeds);
 
     const { result } = renderHook(() => useVideoRecorder("M", "A"));
     // Hardware can drop a stop issued before native capture is live; the
@@ -301,7 +320,7 @@ describe("useVideoRecorder", () => {
     });
 
     expect(cam.stopRecording).toHaveBeenCalledTimes(1);
-    expect(mockUploadRecording).not.toHaveBeenCalled();
+    expect(mockStartUpload).not.toHaveBeenCalled();
     expect(result.current.state).toBe("idle");
   });
 
@@ -309,7 +328,7 @@ describe("useVideoRecorder", () => {
     // Real hardware: recordAsync before onCameraReady throws "Camera is
     // not ready yet" and the clip silently never records. start() must
     // defer and markCameraReady must resume it.
-    mockUploadRecording.mockResolvedValueOnce(UPLOAD_OK);
+    mockStartUpload.mockImplementationOnce(uploadSucceeds);
 
     const { result } = renderHook(() => useVideoRecorder("M", "A"));
     const cam = makeFakeCamera();
@@ -337,7 +356,7 @@ describe("useVideoRecorder", () => {
     // After CAMERA_READY_TIMEOUT_MS the deferred start must fall through
     // and probe the camera directly via the retry loop.
     jest.useFakeTimers();
-    mockUploadRecording.mockResolvedValueOnce(UPLOAD_OK);
+    mockStartUpload.mockImplementationOnce(uploadSucceeds);
 
     const { result } = renderHook(() => useVideoRecorder("M", "A"));
     const cam = makeFakeCamera();
@@ -372,7 +391,7 @@ describe("useVideoRecorder", () => {
   });
 
   it("honors a stop that arrives while start is deferred on camera readiness", async () => {
-    mockUploadRecording.mockResolvedValueOnce(UPLOAD_OK);
+    mockStartUpload.mockImplementationOnce(uploadSucceeds);
 
     const { result } = renderHook(() => useVideoRecorder("M", "A"));
     const cam = makeFakeCamera();
@@ -398,7 +417,7 @@ describe("useVideoRecorder", () => {
   });
 
   it("uploads a clip the OS finalized without an explicit stop (time cap / lost stop)", async () => {
-    mockUploadRecording.mockResolvedValueOnce(UPLOAD_OK);
+    mockStartUpload.mockImplementationOnce(uploadSucceeds);
 
     let resolveRecord: ((v: { uri: string } | undefined) => void) | null = null;
     const cam: FakeCamera = {
@@ -427,7 +446,7 @@ describe("useVideoRecorder", () => {
 
     await waitFor(() => expect(result.current.state).toBe("uploaded"));
     expect(cam.stopRecording).not.toHaveBeenCalled();
-    expect(mockUploadRecording).toHaveBeenCalledTimes(1);
+    expect(mockStartUpload).toHaveBeenCalledTimes(1);
     expect(result.current.videoId).toBe("VID");
     // The clip is saved, but this is NOT a normal completion: the match was
     // still running. It settled immediately, well inside the cap, so it is
@@ -436,7 +455,7 @@ describe("useVideoRecorder", () => {
   });
 
   it("retries recordAsync when the camera reports not-ready despite onCameraReady", async () => {
-    mockUploadRecording.mockResolvedValueOnce(UPLOAD_OK);
+    mockStartUpload.mockImplementationOnce(uploadSucceeds);
 
     const { result } = renderHook(() => useVideoRecorder("M", "A"));
     const cam = makeNotReadyCamera(2);
@@ -486,16 +505,16 @@ describe("useVideoRecorder", () => {
     });
 
     expect(cam.recordAsync).toHaveBeenCalledTimes(1);
-    expect(mockUploadRecording).not.toHaveBeenCalled();
+    expect(mockStartUpload).not.toHaveBeenCalled();
     expect(result.current.state).toBe("idle");
   });
 
   it("completes the upload even when unmounted mid-flight (jits-hu0)", async () => {
-    let resolveUpload!: (v: typeof UPLOAD_OK) => void;
+    let resolveUpload!: (v: ManagerOutcome) => void;
     let uploadSettled = false;
-    mockUploadRecording.mockImplementationOnce(
+    mockStartUpload.mockImplementationOnce(
       () =>
-        new Promise<typeof UPLOAD_OK>((res) => {
+        new Promise<ManagerOutcome>((res) => {
           resolveUpload = (v) => {
             uploadSettled = true;
             res(v);
@@ -530,7 +549,7 @@ describe("useVideoRecorder", () => {
     resolveUpload(UPLOAD_OK);
     await startPromise!;
     expect(uploadSettled).toBe(true);
-    expect(mockUploadRecording).toHaveBeenCalledTimes(1);
+    expect(mockStartUpload).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -623,7 +642,7 @@ describe("useVideoRecorder recording cap", () => {
   });
 
   it("reports the OS cap firing as a truncation, and still saves the clip", async () => {
-    mockUploadRecording.mockResolvedValueOnce(UPLOAD_OK);
+    mockStartUpload.mockImplementationOnce(uploadSucceeds);
     // Control wall-clock directly rather than through fake timers: the
     // classification is a Date.now() delta, and faking timers would also
     // disturb the hook's own retry timers.
@@ -645,14 +664,14 @@ describe("useVideoRecorder recording cap", () => {
     await waitFor(() => expect(result.current.state).toBe("uploaded"));
     expect(result.current.truncation).toBe("limit");
     // The clip is real, so it is still uploaded rather than discarded.
-    expect(mockUploadRecording).toHaveBeenCalledTimes(1);
+    expect(mockStartUpload).toHaveBeenCalledTimes(1);
     expect(result.current.videoId).toBe("VID");
 
     nowSpy.mockRestore();
   });
 
   it("distinguishes an interruption from the cap", async () => {
-    mockUploadRecording.mockResolvedValueOnce(UPLOAD_OK);
+    mockStartUpload.mockImplementationOnce(uploadSucceeds);
     const nowSpy = jest.spyOn(Date, "now");
     const t0 = 1_700_000_000_000;
     nowSpy.mockReturnValue(t0);
@@ -676,7 +695,7 @@ describe("useVideoRecorder recording cap", () => {
   it("leaves truncation null when the match ends the recording normally", async () => {
     // The guard against a false positive: a clip that covers the whole
     // match must not warn the user that it was cut short.
-    mockUploadRecording.mockResolvedValueOnce(UPLOAD_OK);
+    mockStartUpload.mockImplementationOnce(uploadSucceeds);
 
     const { result } = renderHook(() => useVideoRecorder("M", "A", 600));
     const cam = makeFakeCamera();
@@ -699,7 +718,7 @@ describe("useVideoRecorder recording cap", () => {
   it("does not let the real stop() pass silently after the cap already fired", async () => {
     // The old code's second half: once the cap had fired, state was past
     // 'recording' and stop() returned with nothing said anywhere.
-    mockUploadRecording.mockResolvedValueOnce(UPLOAD_OK);
+    mockStartUpload.mockImplementationOnce(uploadSucceeds);
     const nowSpy = jest.spyOn(Date, "now");
     const t0 = 1_700_000_000_000;
     nowSpy.mockReturnValue(t0);
@@ -750,7 +769,7 @@ describe("useVideoRecorder recording cap", () => {
     await waitFor(() => expect(result.current.state).toBe("error"));
     expect(result.current.error).toMatch(/time limit/i);
     expect(result.current.truncation).toBe("limit");
-    expect(mockUploadRecording).not.toHaveBeenCalled();
+    expect(mockStartUpload).not.toHaveBeenCalled();
 
     nowSpy.mockRestore();
   });
@@ -870,7 +889,7 @@ describe("useVideoRecorder camera and stop lifecycle", () => {
     // the state machine sat in 'recording' with a HIDDEN banner while the OS
     // ran the clip out to its cap. start()'s own `if (!cam)` transitions;
     // this is the same failure and now reads the same way.
-    mockUploadRecording.mockResolvedValueOnce(UPLOAD_OK);
+    mockStartUpload.mockImplementationOnce(uploadSucceeds);
 
     const { result } = renderHook(() => useVideoRecorder("M", "A", 600));
     const cam = makeFakeCamera();
@@ -942,7 +961,7 @@ describe("useVideoRecorder camera and stop lifecycle", () => {
 
   it("does not fire the watchdog when the stop lands normally", async () => {
     jest.useFakeTimers();
-    mockUploadRecording.mockResolvedValueOnce(UPLOAD_OK);
+    mockStartUpload.mockImplementationOnce(uploadSucceeds);
 
     const { result } = renderHook(() => useVideoRecorder("M", "A", 600));
     const cam = makeFakeCamera();
@@ -981,7 +1000,7 @@ describe("useVideoRecorder camera and stop lifecycle", () => {
  */
 describe("a new recording attempt supersedes the previous one on the same match", () => {
   it("does not report a COMPLETE clip as interrupted because an earlier attempt was", async () => {
-    mockUploadRecording.mockResolvedValueOnce(UPLOAD_OK).mockResolvedValueOnce(UPLOAD_OK);
+    mockStartUpload.mockImplementationOnce(uploadSucceeds).mockImplementationOnce(uploadSucceeds);
 
     // Recorder #1: recordAsync settles on its own, with no explicit stop.
     // That is an interruption and it is written to the store.
@@ -1026,10 +1045,8 @@ describe("a new recording attempt supersedes the previous one on the same match"
   it("does not offer a previous attempt's videoId beside a fresh failure", async () => {
     // This match already uploaded a clip once in this process.
     setMatchUpload("SAME", { status: "uploaded", videoId: "OLD-VID" });
-    // Both the attempt and its automatic retry fail.
-    mockUploadRecording
-      .mockRejectedValueOnce(new Error("network died"))
-      .mockRejectedValueOnce(new Error("network died"));
+    // The upload runner has exhausted its budget and given up.
+    mockStartUpload.mockImplementationOnce(uploadFails);
 
     const { result } = renderHook(() => useVideoRecorder("SAME", "A", 600));
     const cam = makeFakeCamera();

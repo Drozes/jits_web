@@ -189,7 +189,12 @@ export class AsyncStorageUrlStorage {
   }
 
   async addUpload(fingerprint: string, upload: TusPreviousUpload): Promise<string> {
-    const key = `${TUS_URL_STORAGE_PREFIX}${fingerprint}::${Date.now()}`;
+    // Timestamp plus randomness: two creation POSTs for the same clip in
+    // the same millisecond (a retry that races a resume) would otherwise
+    // overwrite each other's entry.
+    const key = `${TUS_URL_STORAGE_PREFIX}${fingerprint}::${Date.now()}-${Math.round(
+      Math.random() * 1e9,
+    )}`;
     try {
       await AsyncStorage.setItem(key, JSON.stringify(upload));
     } catch {
