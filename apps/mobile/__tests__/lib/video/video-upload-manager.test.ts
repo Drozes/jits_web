@@ -412,6 +412,22 @@ describe("resuming persisted jobs", () => {
     expect(seen).toEqual([0.25]);
   });
 
+  it("restores a truncation warning a resumed upload would otherwise lose", async () => {
+    // The clip stops before the end of the match. After a process kill the
+    // in-memory store is empty, so without carrying this on the job the
+    // short clip would land as a clean "Match video uploaded".
+    seedJob({ truncation: "limit" });
+    await resumeMatchVideoUploads();
+    await flush();
+    expect(getMatchUpload("M1")?.truncation).toBe("limit");
+  });
+
+  it("carries the truncation from the recording that started the upload", async () => {
+    await startMatchVideoUpload({ ...START, truncation: "interrupted" });
+    expect(getMatchUpload("M1")?.truncation).toBe("interrupted");
+    expect((await loadUploadJob("M1")) ?? { truncation: "interrupted" }).toBeTruthy();
+  });
+
   it("resets the attempt budget, because a resume means conditions changed", async () => {
     seedJob({ attempt: UPLOAD_MAX_ATTEMPTS, lastError: "Network request failed" });
     await resumeMatchVideoUploads();

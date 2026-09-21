@@ -308,6 +308,11 @@ async function runJob(job: PendingUploadJob, handle: RunnerHandle): Promise<Uplo
     error: null,
     videoId: null,
     progress: job.phase === "row" ? 1 : ratio(job.bytesUploaded, job.fileSizeBytes),
+    // Restored from the JOB, not assumed from the store. On a resume after
+    // a process kill the store is empty, and a clip that stops before the
+    // end of the match would otherwise land as a clean success: exactly
+    // the silent data loss jits-2zpe was filed for.
+    truncation: job.truncation,
   });
 
   let current = job;
