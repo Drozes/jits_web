@@ -17,6 +17,14 @@
 // advertise `Buffer`, `process` and friends to app code that cannot use them
 // at runtime. A config plugin genuinely IS node code, so it gets the types
 // here and nowhere else.
+//
+// RELIANCE WORTH KNOWING ABOUT: `@types/node` is NOT declared by
+// `apps/mobile` or by the workspace root. It resolves only because
+// `apps/web` declares it (`"@types/node": "^20"`) and npm workspaces hoist
+// it to the root `node_modules`. If web ever drops it, this file stops
+// typechecking with "Cannot find module 'node:fs'", which looks nothing
+// like its actual cause. The fix then is one line: add `@types/node` to
+// `apps/mobile`'s devDependencies.
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";

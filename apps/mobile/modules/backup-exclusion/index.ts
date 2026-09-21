@@ -28,6 +28,32 @@ const native = requireOptionalNativeModule<BackupExclusionNativeModule>("BackupE
 export const isBackupExclusionSupported: boolean = native != null && Platform.OS === "ios";
 
 /**
+ * Which of the three populations this install is in.
+ *
+ * `isBackupExclusionSupported` alone cannot answer the question this feature
+ * needs answered, because it is false for two completely different reasons.
+ * On Android false is CORRECT: exclusion there is declarative, via
+ * `plugins/with-android-backup-rules.js`, and nothing is wrong. On iOS false
+ * means the native module is not in this binary and clips ARE being backed
+ * up. Reporting both as one value would bury the second in the first.
+ *
+ *   active         iOS with the module. The flag is really being set.
+ *   missing        iOS without it. The exclusion is silently inert HERE.
+ *   not-applicable Android, handled by the manifest backup rules instead.
+ *
+ * "missing" is not hypothetical. `expo.version` is 0.2.0 with a
+ * `runtimeVersion` policy of `appVersion`, so the TestFlight build that adds
+ * this module and every already-installed 0.2.0 binary share a runtime
+ * version and accept the same OTA. A JS bundle can never carry a native
+ * module, so after that build there will be two populations running
+ * identical JS, and this is what tells them apart.
+ */
+export type BackupExclusionStatus = "active" | "missing" | "not-applicable";
+
+export const backupExclusionStatus: BackupExclusionStatus =
+  Platform.OS !== "ios" ? "not-applicable" : isBackupExclusionSupported ? "active" : "missing";
+
+/**
  * Ask iOS to keep `uri` out of iCloud and iTunes backups.
  *
  * Returns `true` only when the flag was genuinely written. `false` covers
@@ -37,8 +63,8 @@ export const isBackupExclusionSupported: boolean = native != null && Platform.OS
  * throws, because the caller is a best-effort step in front of an upload
  * that matters more than the flag.
  *
- * Synchronous, matching the native `Function`: one local metadata write, on
- * a path that is called once per recording.
+ * Synchronous, matching the native `Function`: a local metadata write on a
+ * path that runs twice per recording (the directory and the clip).
  */
 export function excludeFromBackup(uri: string): boolean {
   if (!native) return false;

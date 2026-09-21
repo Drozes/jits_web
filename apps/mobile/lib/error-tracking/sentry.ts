@@ -154,6 +154,19 @@ export function clearSentryUser(): void {
 }
 
 /**
+ * Set a searchable tag on the global Sentry scope, so every event from this
+ * launch carries it. Safe to call before init; the call is dropped.
+ *
+ * For facts about the BUILD rather than about one error: the things you
+ * want to filter and group by in the Sentry UI, not read off a single
+ * stack trace.
+ */
+export function setSentryTag(key: string, value: string): void {
+  if (!initialized) return;
+  Sentry.setTag(key, value);
+}
+
+/**
  * Report an error to Sentry. Safe to call even when Sentry is not
  * initialized; the call is silently dropped.
  */

@@ -15,6 +15,19 @@
  */
 
 const mockRequireOptional = jest.fn();
+const mockPlatformOS = { current: "ios" };
+
+// Minimal on purpose: the module under test reads `Platform.OS` and nothing
+// else from react-native. A real `Platform` cannot be used here, because
+// `jest.isolateModules` hands the re-required module a FRESH react-native,
+// so mutating the outer instance would not reach it.
+jest.mock("react-native", () => ({
+  Platform: {
+    get OS() {
+      return mockPlatformOS.current;
+    },
+  },
+}));
 
 jest.mock("expo-modules-core", () => ({
   requireOptionalNativeModule: (...args: unknown[]) => mockRequireOptional(...(args as [])),
@@ -24,6 +37,10 @@ jest.mock("expo-modules-core", () => ({
  * Fresh import each time, because the module resolves the native half ONCE
  * at import and that resolution is the thing under test.
  */
+function setPlatform(os: string): void {
+  mockPlatformOS.current = os;
+}
+
 function load(native: unknown): typeof import("@/modules/backup-exclusion") {
   mockRequireOptional.mockReturnValue(native);
   let mod!: typeof import("@/modules/backup-exclusion");
@@ -36,6 +53,7 @@ function load(native: unknown): typeof import("@/modules/backup-exclusion") {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  setPlatform("ios");
 });
 
 describe("when the native module is absent", () => {
@@ -95,5 +113,41 @@ describe("when the native module is present", () => {
     const mod = load({ setExcludedFromBackup: jest.fn(() => true), isExcludedFromBackup });
     expect(mod.isExcludedFromBackup("file:///docs/match-uploads")).toBe(true);
     expect(isExcludedFromBackup).toHaveBeenCalledWith("file:///docs/match-uploads");
+  });
+});
+
+describe("backupExclusionStatus", () => {
+  it('is "active" on iOS with the module', () => {
+    setPlatform("ios");
+    const mod = load({ setExcludedFromBackup: jest.fn(), isExcludedFromBackup: jest.fn() });
+    expect(mod.backupExclusionStatus).toBe("active");
+  });
+
+  it('is "missing" on iOS WITHOUT it, which is the case worth alerting on', () => {
+    // An OTA that landed on a binary predating the native module: clips are
+    // going to iCloud and nothing else in the app would ever say so.
+    setPlatform("ios");
+    const mod = load(null);
+    expect(mod.backupExclusionStatus).toBe("missing");
+  });
+
+  it('is "not-applicable" on Android, not "missing"', () => {
+    // Android exclusion is declarative, so the absent native module is
+    // CORRECT there. Collapsing this into the same value as a genuinely
+    // broken iOS install would bury every real case under the whole Android
+    // install base, which is the reason this is three-valued and not a
+    // boolean.
+    setPlatform("android");
+    const mod = load(null);
+    expect(mod.backupExclusionStatus).toBe("not-applicable");
+    expect(mod.isBackupExclusionSupported).toBe(false);
+  });
+
+  it('is "not-applicable" on Android even if a native module IS present', () => {
+    // The Android half exists and returns false honestly; its presence is
+    // not evidence that anything was excluded.
+    setPlatform("android");
+    const mod = load({ setExcludedFromBackup: jest.fn(), isExcludedFromBackup: jest.fn() });
+    expect(mod.backupExclusionStatus).toBe("not-applicable");
   });
 });
