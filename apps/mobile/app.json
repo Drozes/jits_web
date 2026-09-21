@@ -31,7 +31,8 @@
       },
       "associatedDomains": [
         "applinks:elorated.com"
-      ]
+      ],
+      "appleTeamId": "JK9Q5E3HT8"
     },
     "android": {
       "package": "com.elorated.mobile",
