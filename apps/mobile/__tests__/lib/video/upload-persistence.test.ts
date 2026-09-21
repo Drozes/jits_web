@@ -32,6 +32,7 @@ jest.mock("@react-native-async-storage/async-storage", () => ({
 import {
   UPLOAD_JOB_MAX_AGE_MS,
   UPLOAD_JOB_PREFIX,
+  __writeChainCount,
   type PendingUploadJob,
   isJobExpired,
   loadUploadJob,
@@ -201,6 +202,76 @@ describe("removeUploadJob", () => {
     await removeUploadJob("M1");
     expect(await loadUploadJob("M1")).toBeNull();
     expect(await loadUploadJob("M2")).not.toBeNull();
+  });
+});
+
+describe("normalising a record on read", () => {
+  it("repairs a missing bytesUploaded instead of throwing the job away", async () => {
+    // The job is the only handle on a 600 MB recording that has already
+    // survived a process kill, and this field only feeds a progress bar,
+    // where a non-number renders `width: "NaN%"`.
+    const { bytesUploaded: _drop, ...withoutBytes } = job();
+    mockStore.set(`${UPLOAD_JOB_PREFIX}M1`, JSON.stringify(withoutBytes));
+    expect(await loadUploadJob("M1")).toMatchObject({
+      bytesUploaded: 0,
+      storagePath: "M1/A1/1700000000000.mp4",
+    });
+  });
+
+  it("repairs a NaN or negative offset", async () => {
+    mockStore.set(`${UPLOAD_JOB_PREFIX}M1`, JSON.stringify({ ...job(), bytesUploaded: -5 }));
+    expect((await loadUploadJob("M1"))?.bytesUploaded).toBe(0);
+    // JSON has no NaN, so a corrupt value arrives as null or a string.
+    mockStore.set(`${UPLOAD_JOB_PREFIX}M2`, JSON.stringify({ ...job({ matchId: "M2" }), bytesUploaded: "12" }));
+    expect((await loadUploadJob("M2"))?.bytesUploaded).toBe(0);
+  });
+
+  it("repairs a non-string uploadUrl and an unknown truncation", async () => {
+    mockStore.set(
+      `${UPLOAD_JOB_PREFIX}M1`,
+      JSON.stringify({ ...job(), uploadUrl: 42, truncation: "sideways", lastError: 7 }),
+    );
+    expect(await loadUploadJob("M1")).toMatchObject({
+      uploadUrl: null,
+      truncation: null,
+      lastError: null,
+    });
+  });
+
+  it("keeps good values untouched", async () => {
+    await saveUploadJob(job({ bytesUploaded: 123, uploadUrl: "https://up/1", truncation: "limit" }));
+    expect(await loadUploadJob("M1")).toMatchObject({
+      bytesUploaded: 123,
+      uploadUrl: "https://up/1",
+      truncation: "limit",
+    });
+  });
+});
+
+describe("write-chain bookkeeping", () => {
+  it("drops a match's chain once it is idle, so the map cannot grow forever", async () => {
+    // One entry per match for the life of the process is one entry per
+    // match played on a gym ladder night.
+    await saveUploadJob(job({ matchId: "M1" }));
+    await saveUploadJob(job({ matchId: "M2" }));
+    await patchUploadJob("M1", { attempt: 1 });
+    await removeUploadJob("M1");
+    await removeUploadJob("M2");
+    // Let the pruning continuations run.
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(__writeChainCount()).toBe(0);
+  });
+
+  it("keeps the chain while writes are still queued behind it", async () => {
+    await saveUploadJob(job());
+    const a = patchUploadJob("M1", { attempt: 1 });
+    const b = patchUploadJob("M1", { attempt: 2 });
+    expect(__writeChainCount()).toBe(1);
+    await a;
+    await b;
+    // Ordered, not interleaved: the second patch read the first's result.
+    expect((await loadUploadJob("M1"))?.attempt).toBe(2);
   });
 });
 

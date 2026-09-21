@@ -87,20 +87,43 @@ export const UPLOAD_JOB_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
  * others.
  */
 const writeChains = new Map<string, Promise<unknown>>();
+/**
+ * Outstanding links per match, so the chain can be dropped once it is idle.
+ * Without this the map grows one entry per match for the life of the
+ * process, which on a gym ladder night is one entry per match played.
+ */
+const chainDepth = new Map<string, number>();
 
 function serialize<T>(matchId: string, fn: () => Promise<T>): Promise<T> {
   const previous = writeChains.get(matchId) ?? Promise.resolve();
+  chainDepth.set(matchId, (chainDepth.get(matchId) ?? 0) + 1);
   const next = previous.then(fn, fn);
   // The stored link must never reject, or every later write on this match
   // would inherit the rejection.
+  const settled = next.then(
+    () => undefined,
+    () => undefined,
+  );
   writeChains.set(
     matchId,
-    next.then(
-      () => undefined,
-      () => undefined,
-    ),
+    settled.then(() => {
+      const remaining = (chainDepth.get(matchId) ?? 1) - 1;
+      if (remaining > 0) {
+        chainDepth.set(matchId, remaining);
+        return;
+      }
+      // Nothing queued behind us, so the chain is idle and safe to drop.
+      // A write that arrives later simply starts a fresh chain.
+      chainDepth.delete(matchId);
+      writeChains.delete(matchId);
+    }),
   );
   return next;
+}
+
+/** Test-only: how many match chains are still held. */
+export function __writeChainCount(): number {
+  return writeChains.size;
 }
 
 function keyFor(matchId: string): string {
@@ -130,13 +153,45 @@ function isValidJob(value: unknown): value is PendingUploadJob {
   );
 }
 
+/**
+ * Repair the fields a job can survive without.
+ *
+ * Deliberately NORMALISE rather than reject: a record that has already
+ * survived a process kill is the only handle on a 600 MB recording, so a
+ * missing `bytesUploaded` must not throw the whole job away. It only ever
+ * fed a progress bar, where a non-number renders `width: "NaN%"`. The
+ * load-bearing fields (`storagePath`, `fileSizeBytes`, `phase`) are still
+ * validated by `isValidJob`, because guessing those would be worse than
+ * dropping the record.
+ */
+function normaliseJob(job: PendingUploadJob): PendingUploadJob {
+  const bytesUploaded =
+    typeof job.bytesUploaded === "number" &&
+    Number.isFinite(job.bytesUploaded) &&
+    job.bytesUploaded >= 0
+      ? job.bytesUploaded
+      : 0;
+  return {
+    ...job,
+    bytesUploaded,
+    uploadUrl: typeof job.uploadUrl === "string" ? job.uploadUrl : null,
+    truncation:
+      job.truncation === "limit" || job.truncation === "interrupted" ? job.truncation : null,
+    lastError: typeof job.lastError === "string" ? job.lastError : null,
+    updatedAt:
+      typeof job.updatedAt === "number" && Number.isFinite(job.updatedAt)
+        ? job.updatedAt
+        : job.createdAt,
+  };
+}
+
 /** Read a record with no serialisation. Callers hold the chain already. */
 async function readRaw(matchId: string): Promise<PendingUploadJob | null> {
   try {
     const raw = await AsyncStorage.getItem(keyFor(matchId));
     if (!raw) return null;
     const parsed: unknown = JSON.parse(raw);
-    if (isValidJob(parsed)) return parsed;
+    if (isValidJob(parsed)) return normaliseJob(parsed);
     await AsyncStorage.removeItem(keyFor(matchId));
     return null;
   } catch {

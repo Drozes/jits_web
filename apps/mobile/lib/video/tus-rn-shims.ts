@@ -71,8 +71,14 @@ function withSize(bytes: Uint8Array): TusChunkValue {
  *
  * The handle is opened lazily on the first `slice()` and held open for the
  * life of the upload attempt, because tus reads strictly forward and
- * re-opening per chunk would be ~100 native calls on a 600 MB file. A failed
- * attempt closes it; the next attempt opens a fresh one.
+ * re-opening per chunk would be ~100 native calls on a 600 MB file.
+ *
+ * WHO CLOSES IT. tus calls `close()` only on its two SUCCESS paths, and
+ * `Upload.abort()` deliberately does not, so a failed or aborted attempt
+ * would leak the native handle. `uploadFileResumable` therefore owns the
+ * lifetime: it receives the source through `ExpoFileReader`'s `onOpen` hook
+ * and closes it in a `finally`. `close()` is idempotent so tus closing it
+ * first is harmless.
  */
 export class ExpoFileSource implements TusFileSource {
   readonly size: number;
@@ -108,9 +114,20 @@ export class ExpoFileSource implements TusFileSource {
     const handle = this.open();
     handle.offset = from;
     const bytes = handle.readBytes(length);
-    // `done` is computed from what we actually read, not from the requested
-    // window: a short read at EOF must still terminate the upload.
-    return { value: withSize(bytes), done: from + bytes.byteLength >= this.size };
+
+    // A SHORT READ IS ALWAYS TERMINAL. The file is smaller than the `size`
+    // this source was constructed with, which means it changed underneath a
+    // resumed upload. Reporting `done: false` here is what makes tus loop
+    // forever: it sends an empty (or short) PATCH, the server echoes the
+    // same offset, `_performUpload()` recurses, and tus's own
+    // "source is done after N bytes" guard never fires because it only runs
+    // on a chunk marked done. Marking it done instead makes that guard fire
+    // and the upload reject cleanly, which the retry loop can act on.
+    const shortRead = bytes.byteLength < length;
+    return {
+      value: withSize(bytes),
+      done: shortRead || from + bytes.byteLength >= this.size,
+    };
   }
 
   close(): void {
@@ -127,8 +144,16 @@ export class ExpoFileSource implements TusFileSource {
   }
 }
 
-/** tus `FileReader` that understands our `{ uri, size }` input. */
+/**
+ * tus `FileReader` that understands our `{ uri, size }` input.
+ *
+ * `onOpen` exists so the caller can close the source itself: tus closes it
+ * only when the upload SUCCEEDS, so a failed or aborted attempt would
+ * otherwise leave a native file handle open for the life of the process.
+ */
 export class ExpoFileReader {
+  constructor(private readonly onOpen?: (source: TusFileSource) => void) {}
+
   async openFile(input: TusFileInput, _chunkSize: number): Promise<TusFileSource> {
     if (!input || typeof input.uri !== "string") {
       throw new Error("tus: expected a { uri, size } input for the React Native file reader");
@@ -136,7 +161,9 @@ export class ExpoFileReader {
     if (!Number.isFinite(input.size) || input.size <= 0) {
       throw new Error(`tus: refusing to upload ${input.uri} with size ${String(input.size)}`);
     }
-    return new ExpoFileSource(input);
+    const source = new ExpoFileSource(input);
+    this.onOpen?.(source);
+    return source;
   }
 }
 

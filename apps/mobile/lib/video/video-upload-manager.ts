@@ -17,7 +17,7 @@ import {
   removeUploadJob,
   saveUploadJob,
 } from "./upload-persistence";
-import { setMatchUpload } from "./match-upload-store";
+import { getMatchUpload, setMatchUpload } from "./match-upload-store";
 import type { RecordingTruncation } from "./use-video-recorder";
 
 /**
@@ -61,6 +61,26 @@ export const ROW_MAX_ATTEMPTS = 5;
 export const ROW_BACKOFF = { baseMs: 750, maxMs: 20_000 } as const;
 /** Lower bound between persisted progress writes, to spare AsyncStorage. */
 export const PROGRESS_PERSIST_INTERVAL_MS = 5_000;
+/**
+ * How long an attempt may go with NO server-confirmed activity before it is
+ * aborted and retried.
+ *
+ * It exists because nothing else can end a stalled transfer: tus's browser
+ * HTTP stack sets no `xhr.timeout`, React Native's `XMLHttpRequest` defaults
+ * to 0, and tus's own retry loop is disabled here. So when iOS suspends the
+ * app mid-PATCH and the socket goes half-open, `uploadFileResumable` never
+ * settles: the runner is not in `backoffSleep` so a wake is a no-op, and
+ * `resumeMatchVideoUploads` skips it because a runner is registered. The
+ * job would read "uploading" forever and block every future resume for that
+ * match until the process died.
+ *
+ * This is a STALL detector, not a throughput requirement. A false positive
+ * costs one resumed attempt and zero bytes, because the server keeps the
+ * offset and the next attempt picks up from it.
+ */
+export const UPLOAD_STALL_TIMEOUT_MS = 120_000;
+/** How often the stall detector re-checks. */
+export const STALL_CHECK_INTERVAL_MS = 15_000;
 
 export type UploadOutcome =
   | { ok: true; videoId: string }
@@ -82,6 +102,13 @@ type JobPatch = Partial<Omit<PendingUploadJob, "matchId">>;
 interface RunnerHandle {
   /** Identifies this run; a newer recording on the same match bumps it. */
   generation: number;
+  /**
+   * The object key this runner owns, once it knows it. Lets a SUPERSEDED
+   * runner tell its own orphan from the object the current runner is
+   * actively writing, which is the difference between cleaning up and
+   * destroying a good recording.
+   */
+  storagePath: string | null;
   /** Aborts the in-flight tus request, keeping the server-side partial. */
   abort: (() => void) | null;
   /** Resolver for the backoff sleep currently in progress, if any. */
@@ -106,13 +133,79 @@ function messageOf(err: unknown): string {
 }
 
 function ratio(bytes: number, total: number): number {
+  // Both guarded: a non-number from a record written by an older build
+  // would otherwise reach the banner as `width: "NaN%"`.
   if (!Number.isFinite(total) || total <= 0) return 0;
+  if (!Number.isFinite(bytes) || bytes <= 0) return 0;
   return Math.max(0, Math.min(1, bytes / total));
 }
 
 function requestWake(handle: RunnerHandle): void {
   handle.wakeRequested = true;
   handle.wakeFn?.();
+}
+
+/**
+ * Watches for an attempt that has stopped making progress and aborts it.
+ * Ticks off wall-clock rather than a single `setTimeout` so a process that
+ * was SUSPENDED mid-upload notices the stall on its very first tick after
+ * the app comes back, instead of waiting out a timer that never ran.
+ */
+function startStallWatchdog(onStall: () => void): {
+  ping: () => void;
+  stop: () => void;
+} {
+  let lastActivityAt = Date.now();
+  const timer = setInterval(() => {
+    if (Date.now() - lastActivityAt < UPLOAD_STALL_TIMEOUT_MS) return;
+    clearInterval(timer);
+    onStall();
+  }, STALL_CHECK_INTERVAL_MS);
+  return {
+    ping: () => {
+      lastActivityAt = Date.now();
+    },
+    stop: () => clearInterval(timer),
+  };
+}
+
+/**
+ * Claim the runner slot for a match SYNCHRONOUSLY, superseding whoever held
+ * it.
+ *
+ * Synchronous is the whole point. Every caller used to check the map, then
+ * await something (a file stat, a persisted write), then register, and two
+ * callers could both pass the check before either registered. That is not
+ * theoretical: `ensureUploadListeners` binds AppState "active" and NetInfo
+ * reconnect as independent triggers that fire together on the canonical
+ * "walk back into wifi and open the app", with the bootstrap's mount effect
+ * as a third caller. Two runners on one job both resume from the same
+ * persisted tus URL, the server answers 409, and the loser nulls the URL
+ * and starts a SECOND full transfer of the same 600 MB against the same
+ * key.
+ *
+ * The handle is registered before this function returns, so a concurrent
+ * caller sees it and stands down.
+ */
+function claimRunner(matchId: string, storagePath: string | null): RunnerHandle {
+  const previous = runners.get(matchId);
+  generationCounter += 1;
+  const handle: RunnerHandle = {
+    generation: generationCounter,
+    storagePath,
+    abort: null,
+    wakeFn: null,
+    wakeRequested: false,
+    promise: Promise.resolve({ ok: false, error: "not started", willRetryLater: false }),
+  };
+  runners.set(matchId, handle);
+  if (previous) {
+    // Only after the replacement is registered, so the loser's own
+    // `isCurrent()` reads false the moment it wakes.
+    previous.abort?.();
+    requestWake(previous);
+  }
+  return handle;
 }
 
 /** Backoff sleep that a foreground or reconnect event can cut short. */
@@ -140,26 +233,79 @@ async function backoffSleep(handle: RunnerHandle, ms: number): Promise<void> {
 // Byte upload
 // ---------------------------------------------------------------------------
 
+type ByteFailure = {
+  ok: false;
+  error: string;
+  retryable: boolean;
+  /**
+   * The clip is gone from the device. Distinct from every other failure
+   * because it is the ONLY one where there is nothing left to keep: the job
+   * and the (absent) file can be abandoned. Every other failure parks.
+   */
+  fileMissing?: boolean;
+  /** The run lost its slot to a newer recording. Its writes must not land. */
+  superseded?: boolean;
+};
+
+/**
+ * Drop an object a SUPERSEDED runner uploaded.
+ *
+ * Only ever deletes a key that the runner now holding the slot is provably
+ * not using. When that cannot be established (no current runner, or it has
+ * not settled on a key yet) the object is left in place and reported: a
+ * leaked 600 MB object is recoverable, deleting the live recording is not.
+ */
+async function discardSupersededObject(
+  matchId: string,
+  storagePath: string,
+): Promise<void> {
+  // The live runner's key when one is still running, else the key the
+  // match store believes in, which outlives the runner that set it. Either
+  // way this is "the object this match currently owns"; anything else at a
+  // different key is ours and is unreachable.
+  const ownerPath = runners.get(matchId)?.storagePath ?? getMatchUpload(matchId)?.storagePath;
+  if (!ownerPath || ownerPath === storagePath) {
+    console.warn(
+      `[video] superseded upload left ${storagePath} in the bucket; not deleting (owner path unknown or identical)`,
+    );
+    captureException(new Error("Superseded match-video object left in the bucket"), {
+      matchId,
+      storagePath,
+    });
+    return;
+  }
+  console.warn(`[video] removing superseded upload ${storagePath} for ${matchId}`);
+  await removeUploadedObject(storagePath);
+}
+
 async function uploadBytes(
   job: PendingUploadJob,
   handle: RunnerHandle,
   isCurrent: () => boolean,
-): Promise<{ ok: true; job: PendingUploadJob } | { ok: false; error: string; retryable: boolean }> {
+): Promise<{ ok: true; job: PendingUploadJob } | ByteFailure> {
   let current = job;
   let lastError = "Upload failed";
   let lastRetryable = true;
 
+  const superseded = (): ByteFailure => ({
+    ok: false,
+    error: "Superseded by a newer recording",
+    retryable: false,
+    superseded: true,
+  });
+
   for (let attempt = current.attempt + 1; attempt <= UPLOAD_MAX_ATTEMPTS; attempt++) {
-    if (!isCurrent()) return { ok: false, error: "Superseded by a newer recording", retryable: false };
+    if (!isCurrent()) return superseded();
 
     // The clip can vanish between attempts (cache purge, user clearing
-    // storage). There is nothing to upload and nothing to wait for, so this
-    // is terminal rather than parked.
+    // storage). There is nothing to upload and nothing to wait for.
     const size = await getRecordingSize(current.fileUri);
+    if (!isCurrent()) return superseded();
     if (size == null || size === 0) {
       return {
         ok: false,
         retryable: false,
+        fileMissing: true,
         error: "The recording is no longer on this device, so it can't be uploaded.",
       };
     }
@@ -168,9 +314,16 @@ async function uploadBytes(
       // the server is holding: its Upload-Length no longer matches.
       const patch: JobPatch = { fileSizeBytes: size, uploadUrl: null, bytesUploaded: 0 };
       current = (await patchUploadJob(current.matchId, patch)) ?? { ...current, ...patch };
+      if (!isCurrent()) return superseded();
     }
 
     let lastPersistedAt = 0;
+    const stall = startStallWatchdog(() => {
+      console.warn(
+        `[video] upload for ${current.matchId} made no progress for ${UPLOAD_STALL_TIMEOUT_MS}ms; aborting the attempt`,
+      );
+      handle.abort?.();
+    });
     try {
       await uploadFileResumable({
         fileUri: current.fileUri,
@@ -182,10 +335,18 @@ async function uploadBytes(
           handle.abort = abort;
         },
         onUploadUrl: (url) => {
+          stall.ping();
+          // GUARDED, like every other write. A superseded runner's creation
+          // POST landing late would otherwise stamp its own tus URL onto the
+          // NEW clip's job, and the next resume would PATCH the new clip's
+          // bytes into the old clip's object: one file corrupted, the other
+          // never written.
+          if (!isCurrent()) return;
           current = { ...current, uploadUrl: url };
           void patchUploadJob(current.matchId, { uploadUrl: url });
         },
         onProgress: (sent, total) => {
+          stall.ping();
           if (!isCurrent()) return;
           setMatchUpload(current.matchId, { progress: ratio(sent, total) });
           const now = Date.now();
@@ -197,6 +358,18 @@ async function uploadBytes(
       });
 
       handle.abort = null;
+      // THE SUCCESS PATH NEEDS THE GUARD MOST. It is the only one that
+      // mutates the persisted `phase`, and a superseded runner writing
+      // `phase: "row"` onto the NEW job makes the next launch skip the
+      // upload entirely and write a `match_videos` row at `status='ready'`
+      // for an object that was never uploaded. That dispatches the backend
+      // slicer at a nonexistent file while the user is told the video
+      // uploaded.
+      if (!isCurrent()) {
+        await discardSupersededObject(current.matchId, current.storagePath);
+        return superseded();
+      }
+
       // Bytes are in the bucket. `attempt` resets because the row write has
       // its own budget, and the phase flip is what stops any later resume
       // from re-uploading a complete object.
@@ -211,7 +384,7 @@ async function uploadBytes(
       return { ok: true, job: next };
     } catch (err) {
       handle.abort = null;
-      if (!isCurrent()) return { ok: false, error: "Superseded by a newer recording", retryable: false };
+      if (!isCurrent()) return superseded();
 
       const klass = classifyUploadError(err);
       lastError = messageOf(err);
@@ -230,6 +403,8 @@ async function uploadBytes(
 
       if (!klass.retryable || attempt >= UPLOAD_MAX_ATTEMPTS) break;
       await backoffSleep(handle, backoffDelayMs(attempt, UPLOAD_BACKOFF));
+    } finally {
+      stall.stop();
     }
   }
 
@@ -262,6 +437,9 @@ async function writeRow(
       console.warn(
         `[video] match_videos write ${attempt}/${ROW_MAX_ATTEMPTS} for ${job.matchId} failed: ${lastError}`,
       );
+      // `writeMatchVideoRow` awaits, so the slot can change under it. A
+      // superseded runner must not stamp its attempt count on the new job.
+      if (!isCurrent()) return { ok: false, error: "Superseded by a newer recording" };
       await patchUploadJob(job.matchId, { attempt, lastError });
       if (attempt >= ROW_MAX_ATTEMPTS) break;
       await backoffSleep(handle, backoffDelayMs(attempt, ROW_BACKOFF));
@@ -301,6 +479,7 @@ async function abandonJob(job: PendingUploadJob, reason: string): Promise<void> 
 
 async function runJob(job: PendingUploadJob, handle: RunnerHandle): Promise<UploadOutcome> {
   const isCurrent = () => runners.get(job.matchId)?.generation === handle.generation;
+  handle.storagePath = job.storagePath;
 
   setMatchUpload(job.matchId, {
     status: "uploading",
@@ -319,14 +498,27 @@ async function runJob(job: PendingUploadJob, handle: RunnerHandle): Promise<Uplo
   if (current.phase === "bytes") {
     const bytes = await uploadBytes(current, handle, isCurrent);
     if (!bytes.ok) {
-      if (!isCurrent()) return { ok: false, error: bytes.error, willRetryLater: false };
-      if (!bytes.retryable) {
-        await abandonJob(current, `unrecoverable upload failure: ${bytes.error}`);
+      if (bytes.superseded || !isCurrent()) {
+        return { ok: false, error: bytes.error, willRetryLater: false };
+      }
+      if (bytes.fileMissing) {
+        // The ONLY terminal case. There is no clip left to keep and no
+        // object in the bucket, so there is nothing to park either.
+        await abandonJob(current, `the recording file is gone: ${bytes.error}`);
         const message = `Upload failed: ${bytes.error}`;
         setMatchUpload(current.matchId, { status: "error", error: message });
         return { ok: false, error: message, willRetryLater: false };
       }
-      const message = `Upload paused: ${bytes.error}. It will resume automatically.`;
+      // EVERYTHING ELSE PARKS, INCLUDING A NON-RETRYABLE FAILURE. This used
+      // to call `abandonJob`, which deletes the local clip, so a single 403
+      // destroyed an irreplaceable 600 MB recording with no user choice on
+      // the strength of one request. A 403 can be transient (a token edge, a
+      // `match_participants` row not yet visible), and the web half already
+      // keeps the recording and offers the user a retry. The job stays on
+      // disk; the retention window, not one response, decides to give up.
+      const message = bytes.retryable
+        ? `Upload paused: ${bytes.error}. It will resume automatically.`
+        : `Upload failed: ${bytes.error}. The recording is saved on this device and will be retried.`;
       setMatchUpload(current.matchId, { status: "error", error: message });
       return { ok: false, error: message, willRetryLater: true };
     }
@@ -334,8 +526,13 @@ async function runJob(job: PendingUploadJob, handle: RunnerHandle): Promise<Uplo
   }
 
   const row = await writeRow(current, handle, isCurrent);
+  // The row write awaits, so the slot can change under it. Settling a
+  // superseded run here would delete the NEW job record and the NEW clip.
+  if (!isCurrent()) {
+    if (row.ok) await discardSupersededObject(current.matchId, current.storagePath);
+    return { ok: false, error: "Superseded by a newer recording", willRetryLater: false };
+  }
   if (!row.ok) {
-    if (!isCurrent()) return { ok: false, error: row.error, willRetryLater: false };
     const message = `Video uploaded, but saving the record failed: ${row.error}. It will retry automatically.`;
     setMatchUpload(current.matchId, { status: "error", error: message });
     return { ok: false, error: message, willRetryLater: true };
@@ -352,35 +549,40 @@ async function runJob(job: PendingUploadJob, handle: RunnerHandle): Promise<Uplo
   return { ok: true, videoId: row.videoId };
 }
 
-function launch(job: PendingUploadJob): Promise<UploadOutcome> {
-  generationCounter += 1;
-  const handle: RunnerHandle = {
-    generation: generationCounter,
-    abort: null,
-    wakeFn: null,
-    wakeRequested: false,
-    promise: Promise.resolve({ ok: false, error: "not started", willRetryLater: false }),
-  };
-  // Registered BEFORE the run starts. `runJob` executes synchronously up to
-  // its first await, and its very first act is an `isCurrent()` check that
-  // reads this map; registering afterwards made every run believe it had
-  // already been superseded.
-  runners.set(job.matchId, handle);
-  handle.promise = runJob(job, handle)
+/**
+ * Attach a run to a slot that has ALREADY been claimed, and wire its
+ * cleanup. `claimRunner` does the registration; this only fills in the
+ * promise, so there is never a window where the slot is held by a handle
+ * nothing will ever settle.
+ */
+function attachRun(
+  matchId: string,
+  handle: RunnerHandle,
+  run: () => Promise<UploadOutcome>,
+): Promise<UploadOutcome> {
+  handle.promise = run()
     .catch((err): UploadOutcome => {
       // Nothing inside runJob is expected to throw, but an unhandled
       // rejection out of a fire-and-forget resume would take the app down
       // in dev and be invisible in production.
       const message = messageOf(err);
-      console.warn(`[video] upload runner crashed for ${job.matchId}: ${message}`);
-      captureException(err, { matchId: job.matchId });
-      setMatchUpload(job.matchId, { status: "error", error: `Upload failed: ${message}` });
+      console.warn(`[video] upload runner crashed for ${matchId}: ${message}`);
+      captureException(err, { matchId });
+      if (runners.get(matchId)?.generation === handle.generation) {
+        setMatchUpload(matchId, { status: "error", error: `Upload failed: ${message}` });
+      }
       return { ok: false, error: message, willRetryLater: true };
     })
     .finally(() => {
-      if (runners.get(job.matchId)?.generation === handle.generation) runners.delete(job.matchId);
+      if (runners.get(matchId)?.generation === handle.generation) runners.delete(matchId);
     });
   return handle.promise;
+}
+
+/** Claim the slot and run a persisted job on it. */
+function launch(job: PendingUploadJob): Promise<UploadOutcome> {
+  const handle = claimRunner(job.matchId, job.storagePath);
+  return attachRun(job.matchId, handle, () => runJob(job, handle));
 }
 
 // ---------------------------------------------------------------------------
@@ -388,38 +590,36 @@ function launch(job: PendingUploadJob): Promise<UploadOutcome> {
 // ---------------------------------------------------------------------------
 
 /**
- * Start (or restart) the upload for a freshly recorded clip and resolve
- * with its outcome.
+ * Everything `startMatchVideoUpload` does after it has claimed the slot.
  *
- * The clip is moved out of the camera cache and a job record is written
- * BEFORE the first byte is sent, so a kill at any point after this leaves
- * something resumable behind.
- *
- * A second call for the same match supersedes the first: the running loop
- * is aborted (keeping the server-side partial, which costs nothing) and its
- * job record is replaced, because the new clip is a different file with a
- * different length.
+ * It runs INSIDE the runner's promise so the slot is held for the whole
+ * sequence. Previously the slot was released at the top and only re-taken
+ * after two awaits (a file stat and a persisted write), and an AppState
+ * "active" landing in that window started a second, and then a third,
+ * transport for the same match.
  */
-export async function startMatchVideoUpload(params: StartUploadParams): Promise<UploadOutcome> {
+async function prepareAndRun(
+  params: StartUploadParams,
+  handle: RunnerHandle,
+): Promise<UploadOutcome> {
+  const matchId = params.matchId;
+  const isCurrent = () => runners.get(matchId)?.generation === handle.generation;
   const ext = params.ext ?? "mp4";
-  const previous = runners.get(params.matchId);
-  if (previous) {
-    runners.delete(params.matchId);
-    previous.abort?.();
-    requestWake(previous);
-  }
 
-  const fileUri = retainRecording(params.fileUri, params.matchId, ext);
+  const fileUri = retainRecording(params.fileUri, matchId, ext);
   const size = await getRecordingSize(fileUri);
+  if (!isCurrent()) {
+    return { ok: false, error: "Superseded by a newer recording", willRetryLater: false };
+  }
   if (size == null || size === 0) {
     const error = "The recording file is empty or missing, so there is nothing to upload.";
-    setMatchUpload(params.matchId, { status: "error", error, storagePath: params.storagePath });
+    setMatchUpload(matchId, { status: "error", error, storagePath: params.storagePath });
     return { ok: false, error, willRetryLater: false };
   }
 
   const now = Date.now();
   const job: PendingUploadJob = {
-    matchId: params.matchId,
+    matchId,
     uploaderAthleteId: params.uploaderAthleteId,
     fileUri,
     storagePath: params.storagePath,
@@ -435,30 +635,63 @@ export async function startMatchVideoUpload(params: StartUploadParams): Promise<
     lastError: null,
   };
   await saveUploadJob(job);
+  if (!isCurrent()) {
+    return { ok: false, error: "Superseded by a newer recording", willRetryLater: false };
+  }
+  return runJob(job, handle);
+}
+
+/**
+ * Start (or restart) the upload for a freshly recorded clip and resolve
+ * with its outcome.
+ *
+ * The clip is moved out of the camera cache and a job record is written
+ * BEFORE the first byte is sent, so a kill at any point after this leaves
+ * something resumable behind.
+ *
+ * A second call for the same match supersedes the first: the running loop
+ * is aborted (keeping the server-side partial, which costs nothing) and its
+ * job record is replaced, because the new clip is a different file with a
+ * different length. The slot is claimed synchronously, so nothing can slip
+ * in between the supersede and the replacement.
+ */
+export function startMatchVideoUpload(params: StartUploadParams): Promise<UploadOutcome> {
+  const handle = claimRunner(params.matchId, params.storagePath);
   ensureUploadListeners();
-  return launch(job);
+  return attachRun(params.matchId, handle, () => prepareAndRun(params, handle));
 }
 
 /**
  * Resume every persisted job that is not already running. Safe to call
- * repeatedly: a match with a live runner is skipped rather than duplicated.
+ * repeatedly, and safe to call CONCURRENTLY: the `runners.has` check and
+ * the `launch` that follows it are one synchronous unit, so two sweeps
+ * racing on the same foreground cannot both start the same job.
  */
 export async function resumeMatchVideoUploads(): Promise<void> {
   ensureUploadListeners();
   const jobs = await loadUploadJobs();
   for (const job of jobs) {
+    // The runner check comes FIRST, including before expiry. A job created
+    // just under the window can be launched and still be transferring when
+    // a sweep crosses it, and `abandonJob` deletes the local clip: expiring
+    // it there would pull the file out from under a live upload.
+    if (runners.has(job.matchId)) continue;
     if (isJobExpired(job)) {
       await abandonJob(job, "job older than the retention window");
       continue;
     }
-    if (runners.has(job.matchId)) continue;
     // `attempt` is reset here on purpose: a resume is triggered by a real
     // change in conditions (the app came back, the network came back), so a
     // previous run's exhausted budget should not immediately exhaust this
     // one. The retention window, not the attempt count, is what eventually
     // gives up.
-    const fresh = (await patchUploadJob(job.matchId, { attempt: 0 })) ?? job;
-    void launch(fresh);
+    //
+    // Reset IN MEMORY, not through `patchUploadJob`: persisting it first
+    // would put an await between the check above and the claim below, which
+    // is exactly the window two concurrent sweeps used to both pass. The
+    // on-disk value only matters to a future process, and that process
+    // resets it the same way.
+    void launch({ ...job, attempt: 0 });
   }
 }
 

@@ -40,8 +40,13 @@ function truncationCopy(truncation: RecordingTruncation): string {
  * ELO design system: hairline plate with caps mono copy. Status color
  * follows positive / negative ink tokens.
  */
-/** `0.42` -> `"42%"`. Clamped, because a server offset can overshoot. */
-function percentLabel(progress: number): string {
+/**
+ * `0.42` -> `"42%"`. Clamped because a server offset can overshoot, and
+ * finite-checked because this string is also used as a layout `width`:
+ * `"NaN%"` is a silent rendering failure rather than a visible one.
+ */
+function percentLabel(progress: number): string | null {
+  if (!Number.isFinite(progress)) return null;
   return `${Math.round(Math.max(0, Math.min(1, progress)) * 100)}%`;
 }
 

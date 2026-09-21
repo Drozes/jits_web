@@ -123,16 +123,35 @@ describe("ExpoFileSource", () => {
     expect((await source.slice(20, 25)).done).toBe(true);
   });
 
-  it("reports done from bytes actually read, not from the requested window", async () => {
-    // A short read at EOF (the file shrank, or the platform returned less)
-    // must still terminate the upload instead of looping on empty PATCHes.
+  it("marks a SHORT read done, which is what stops tus looping forever", async () => {
+    // The file is smaller than the size this source was built with: it
+    // changed underneath a resumed upload. The previous version of this
+    // reported `done: false`, which is precisely the infinite loop it
+    // claimed to prevent. tus sends the short chunk, the server echoes the
+    // offset, `_performUpload()` recurses, and tus's own "source is done
+    // after N bytes" guard never fires because it only runs on a chunk
+    // marked done.
+    //
+    // Marked done, tus compares `offset + valueSize` against the configured
+    // size, sees 3 != 10, and rejects: a clean failure the retry loop owns.
     seedFile(3);
     const source = new ExpoFileSource({ uri: "file://clip.mp4", size: 10 });
     const { value, done } = await source.slice(0, 10);
     expect(value.byteLength).toBe(3);
+    expect(value.size).toBe(3);
+    expect(done).toBe(true);
+  });
+
+  it("marks a zero-length read at the reported size done", async () => {
+    const source = new ExpoFileSource({ uri: "file://clip.mp4", size: SIZE });
+    expect((await source.slice(SIZE, SIZE + 10)).done).toBe(true);
+  });
+
+  it("does not mark a FULL read short, so a normal chunk keeps going", async () => {
+    const source = new ExpoFileSource({ uri: "file://clip.mp4", size: SIZE });
+    const { value, done } = await source.slice(0, 10);
+    expect(value.byteLength).toBe(10);
     expect(done).toBe(false);
-    // ... and a zero-length read at the reported size is done.
-    expect((await source.slice(10, 20)).done).toBe(true);
   });
 
   it("opens the handle once and holds it for the whole attempt", async () => {
@@ -170,6 +189,22 @@ describe("ExpoFileSource", () => {
 });
 
 describe("ExpoFileReader", () => {
+  it("hands the source to onOpen so the caller can close it", async () => {
+    // tus closes the source only when the upload SUCCEEDS, and `abort()`
+    // deliberately does not, so without this a failed attempt leaks a
+    // native file handle for the life of the process.
+    const opened: Array<{ close: () => void }> = [];
+    const reader = new ExpoFileReader((source) => opened.push(source));
+    const source = await reader.openFile({ uri: "file://clip.mp4", size: SIZE }, 1);
+    expect(opened).toEqual([source]);
+  });
+
+  it("is usable with no onOpen hook at all", async () => {
+    await expect(
+      new ExpoFileReader().openFile({ uri: "file://clip.mp4", size: SIZE }, 1),
+    ).resolves.toBeTruthy();
+  });
+
   it("accepts our { uri, size } input", async () => {
     const source = await new ExpoFileReader().openFile(
       { uri: "file://clip.mp4", size: SIZE },

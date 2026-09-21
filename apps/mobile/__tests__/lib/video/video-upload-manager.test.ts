@@ -94,10 +94,13 @@ jest.mock("@/lib/error-tracking/sentry", () => ({ captureException: jest.fn() })
 import { AppState } from "react-native";
 import {
   ROW_MAX_ATTEMPTS,
+  STALL_CHECK_INTERVAL_MS,
   UPLOAD_BACKOFF,
   UPLOAD_MAX_ATTEMPTS,
+  UPLOAD_STALL_TIMEOUT_MS,
   __resetVideoUploadManager,
   ensureUploadListeners,
+  hasActiveVideoUploads,
   resumeMatchVideoUploads,
   startMatchVideoUpload,
 } from "@/lib/video/video-upload-manager";
@@ -310,16 +313,35 @@ describe("retrying the byte upload", () => {
     expect(getMatchUpload("M1")?.error).toMatch(/resume automatically/);
   });
 
-  it("gives up immediately on a failure waiting cannot fix", async () => {
-    // 403 is RLS. Retrying it six times just wastes the user's battery.
+  it("stops retrying a failure waiting cannot fix, but KEEPS the recording", async () => {
+    // 403 is RLS, so retrying it six times just wastes the user's battery.
+    // It is NOT a reason to destroy the clip: a 403 can be transient (a
+    // token edge, a match_participants row not yet visible), and this used
+    // to delete an irreplaceable 600 MB recording off the device on the
+    // strength of a single response.
     mockUploadFileResumable.mockRejectedValue(httpError(403, "row-level security"));
 
     const outcome = await startMatchVideoUpload(START);
 
     expect(mockUploadFileResumable).toHaveBeenCalledTimes(1);
-    expect(outcome).toMatchObject({ ok: false, willRetryLater: false });
-    expect(await loadUploadJob("M1")).toBeNull();
+    expect(outcome).toMatchObject({ ok: false, willRetryLater: true });
+    // Parked, not abandoned: both the job and the clip survive.
+    expect(await loadUploadJob("M1")).toMatchObject({ phase: "bytes" });
+    expect(mockReleaseRecording).not.toHaveBeenCalled();
     // Nothing was uploaded, so there is nothing in the bucket to clean up.
+    expect(mockRemoveUploadedObject).not.toHaveBeenCalled();
+  });
+
+  it("abandons ONLY when the clip itself is gone", async () => {
+    seedJob();
+    mockGetRecordingSize.mockResolvedValue(null);
+
+    await resumeMatchVideoUploads();
+    await flush();
+
+    // Nothing to keep and nothing to upload, so the record goes too.
+    expect(await loadUploadJob("M1")).toBeNull();
+    expect(mockUploadFileResumable).not.toHaveBeenCalled();
     expect(mockRemoveUploadedObject).not.toHaveBeenCalled();
   });
 
@@ -471,6 +493,35 @@ describe("resuming persisted jobs", () => {
     expect(mockUploadFileResumable).not.toHaveBeenCalled();
   });
 
+  it("never expires a job that is currently uploading", async () => {
+    // A job created just inside the window can be launched and still be
+    // transferring when a later sweep crosses it. `abandonJob` deletes the
+    // local clip, so expiring it there pulls the file out from under a live
+    // upload.
+    seedJob({ createdAt: Date.now() - UPLOAD_JOB_MAX_AGE_MS + 1 });
+    const held = heldGate();
+    mockUploadFileResumable.mockImplementation(held.impl);
+
+    await resumeMatchVideoUploads();
+    await flush();
+    expect(mockUploadFileResumable).toHaveBeenCalledTimes(1);
+
+    // The clock crosses the window while the transfer is in flight.
+    const realNow = Date.now;
+    jest.spyOn(Date, "now").mockImplementation(() => realNow() + UPLOAD_JOB_MAX_AGE_MS);
+    try {
+      await resumeMatchVideoUploads();
+      await flush();
+      expect(mockReleaseRecording).not.toHaveBeenCalled();
+      expect(await loadUploadJob("M1")).not.toBeNull();
+    } finally {
+      (Date.now as jest.Mock).mockRestore();
+    }
+
+    held.finish();
+    await flush();
+  });
+
   it("abandons an expired byte-phase job WITHOUT a pointless delete", async () => {
     seedJob({ phase: "bytes", createdAt: Date.now() - UPLOAD_JOB_MAX_AGE_MS - 1 });
     await resumeMatchVideoUploads();
@@ -542,37 +593,337 @@ describe("resume triggers", () => {
 });
 
 describe("a second recording on the same match", () => {
-  it("supersedes the first run rather than racing it", async () => {
-    let abortFirst: (() => void) | null = null;
-    let failFirst: ((e: Error) => void) | null = null;
-    mockUploadFileResumable.mockImplementationOnce(
-      (opts: { onAbortHandle?: (a: () => void) => void }) =>
-        new Promise<void>((_res, rej) => {
-          opts.onAbortHandle?.(() => {
-            abortFirst = () => undefined;
-            rej(new Error("aborted"));
-          });
-          failFirst = rej;
-        }),
-    );
+  /**
+   * A transfer that hangs until the test releases it.
+   *
+   * `registerAbort: false` models the real window in which a superseded
+   * transfer can still SUCCEED: `uploadFileResumable` awaits
+   * `supabase.auth.getSession()` before it wires `onAbortHandle`, so a
+   * supersede landing in there finds `handle.abort` still null, issues no
+   * abort, and the transfer runs to completion having already lost its slot.
+   */
+  function heldTransfer(registerAbort = true) {
+    const gate: { finish: (() => void) | null; fail: ((e: Error) => void) | null } = {
+      finish: null,
+      fail: null,
+    };
+    const impl = (opts: {
+      onAbortHandle?: (abort: () => void) => void;
+      onUploadUrl?: (u: string) => void;
+    }) =>
+      new Promise<void>((res, rej) => {
+        gate.finish = () => res();
+        gate.fail = (e) => rej(e);
+        if (registerAbort) opts.onAbortHandle?.(() => rej(new Error("Upload aborted")));
+      });
+    return { gate, impl };
+  }
 
-    const first = startMatchVideoUpload(START);
+  const SECOND = {
+    ...START,
+    fileUri: "file://cache/clip2.mp4",
+    storagePath: "M1/A1/1700000009999.mp4",
+  };
+
+  it("supersedes the first run rather than racing it", async () => {
+    const first = heldTransfer();
+    mockUploadFileResumable.mockImplementationOnce(first.impl);
+
+    const running = startMatchVideoUpload(START);
     await flush();
 
-    const second = startMatchVideoUpload({
-      ...START,
-      fileUri: "file://cache/clip2.mp4",
-      storagePath: "M1/A1/1700000009999.mp4",
-    });
-
+    const second = startMatchVideoUpload(SECOND);
     await expect(second).resolves.toEqual({ ok: true, videoId: "VID-1" });
-    // The superseded run must not write its own failure over the winner's
-    // result.
-    await first;
+    await running;
+
     expect(getMatchUpload("M1")).toMatchObject({ status: "uploaded", videoId: "VID-1" });
-    expect(abortFirst ?? failFirst).toBeTruthy();
+  });
+
+  it("a superseded transfer that SUCCEEDS late never touches the new job", async () => {
+    // THE WORST BUG IN THE FIRST CUT. The success path was the one exit
+    // with no supersede check, and it is the only one that mutates the
+    // persisted `phase`. A late-resolving first transfer wrote
+    // `phase: "row"` onto the SECOND clip's job, whose bytes had never been
+    // uploaded. The next launch then skipped the upload entirely and wrote
+    // a match_videos row at status='ready' for an object that does not
+    // exist, dispatching the backend slicer at a nonexistent file while the
+    // user was told the video uploaded.
+    const first = heldTransfer(false);
+    const second = heldTransfer();
+    mockUploadFileResumable
+      .mockImplementationOnce(first.impl)
+      .mockImplementationOnce(second.impl);
+
+    const firstRun = startMatchVideoUpload(START);
+    await flush();
+    const secondRun = startMatchVideoUpload(SECOND);
+    await flush();
+
+    // The first transfer's final PATCH lands AFTER it lost the slot.
+    first.gate.finish?.();
+    await firstRun;
+    await flush();
+
+    const job = await loadUploadJob("M1");
+    expect(job).toMatchObject({ storagePath: SECOND.storagePath, phase: "bytes" });
+    // Its object is a real orphan, and it is safe to remove because the
+    // runner holding the slot provably owns a different key.
+    expect(mockRemoveUploadedObject).toHaveBeenCalledWith(START.storagePath);
+    expect(mockRemoveUploadedObject).not.toHaveBeenCalledWith(SECOND.storagePath);
+    // And no row was written for the clip that never uploaded.
+    expect(mockWriteMatchVideoRow).not.toHaveBeenCalled();
+
+    second.gate.finish?.();
+    await secondRun;
+    expect(mockWriteMatchVideoRow).toHaveBeenCalledWith(
+      expect.objectContaining({ storagePath: SECOND.storagePath }),
+    );
+  });
+
+  it("a superseded creation POST never stamps its tus URL on the new job", async () => {
+    // Otherwise the next resume HEADs the OLD clip's upload and PATCHes the
+    // NEW clip's bytes into it: one object corrupted, the other never
+    // written.
+    const first = heldTransfer(false);
+    const second = heldTransfer();
+    mockUploadFileResumable
+      .mockImplementationOnce(
+        (opts: {
+          onAbortHandle?: (a: () => void) => void;
+          onUploadUrl?: (u: string) => void;
+        }) => {
+          const promise = first.impl(opts);
+          // Late creation POST, after the supersede below.
+          setTimeout(() => opts.onUploadUrl?.("https://up/first-clip"), 0);
+          return promise;
+        },
+      )
+      .mockImplementationOnce(second.impl);
+
+    const firstRun = startMatchVideoUpload(START);
+    await flush();
+    const secondRun = startMatchVideoUpload(SECOND);
+    await flush();
+    await flush();
+
+    const job = await loadUploadJob("M1");
+    expect(job?.storagePath).toBe(SECOND.storagePath);
+    expect(job?.uploadUrl).toBeNull();
+
+    first.gate.fail?.(new Error("Network request failed"));
+    await firstRun;
+    second.gate.finish?.();
+    await secondRun;
+  });
+
+  it("a superseded ROW write never deletes the new job or the new clip", async () => {
+    const second = heldTransfer();
+    const rowGate: { release: (() => void) | null } = { release: null };
+    mockWriteMatchVideoRow.mockImplementationOnce(
+      () =>
+        new Promise<string>((res) => {
+          rowGate.release = () => res("VID-OLD");
+        }),
+    );
+    // The first transfer uses the default (immediate) success, so the first
+    // run is sitting inside its ROW write when the re-recording lands.
+    mockUploadFileResumable
+      .mockResolvedValueOnce(undefined)
+      .mockImplementationOnce(second.impl);
+
+    const firstRun = startMatchVideoUpload(START);
+    await flush();
+    const secondRun = startMatchVideoUpload(SECOND);
+    await flush();
+
+    rowGate.release?.();
+    await firstRun;
+    await flush();
+
+    // The winner's job and clip both survive.
+    expect(mockReleaseRecording).not.toHaveBeenCalledWith(SECOND.fileUri);
+    expect(await loadUploadJob("M1")).toMatchObject({ storagePath: SECOND.storagePath });
+    // The loser's object has no row pointing at it, so it is cleaned up.
+    expect(mockRemoveUploadedObject).toHaveBeenCalledWith(START.storagePath);
+
+    second.gate.finish?.();
+    await secondRun;
+  });
+
+  it("leaves a superseded object alone when it cannot prove which key is live", async () => {
+    // Same key on both runs (a same-millisecond re-record). Deleting would
+    // destroy the recording the current runner is writing, so it is left
+    // and reported instead.
+    const first = heldTransfer(false);
+    const second = heldTransfer();
+    mockUploadFileResumable
+      .mockImplementationOnce(first.impl)
+      .mockImplementationOnce(second.impl);
+
+    const firstRun = startMatchVideoUpload(START);
+    await flush();
+    const secondRun = startMatchVideoUpload({ ...START, fileUri: "file://cache/clip2.mp4" });
+    await flush();
+
+    first.gate.finish?.();
+    await firstRun;
+    expect(mockRemoveUploadedObject).not.toHaveBeenCalled();
+
+    second.gate.finish?.();
+    await secondRun;
   });
 });
+
+describe("concurrent starts and sweeps cannot double-run a match", () => {
+  it("two resume sweeps racing on one foreground start ONE transfer", async () => {
+    // AppState "active" and a NetInfo reconnect fire together on the
+    // canonical "walk back into wifi and open the app", with the bootstrap
+    // mount effect as a third caller. The check and the claim used to
+    // straddle an await, so both sweeps passed before either registered:
+    // two transfers resuming from the SAME tus URL, the server answering
+    // 409, and the loser nulling the URL and starting a second full 600 MB
+    // transfer against the same key.
+    seedJob();
+    const held = heldGate();
+    mockUploadFileResumable.mockImplementation(held.impl);
+
+    const a = resumeMatchVideoUploads();
+    const b = resumeMatchVideoUploads();
+    await a;
+    await b;
+    await flush();
+
+    expect(mockUploadFileResumable).toHaveBeenCalledTimes(1);
+    held.finish();
+    await flush();
+  });
+
+  it("a resume landing mid-start does not add a second transport", async () => {
+    // `startMatchVideoUpload` used to release the slot at the top and only
+    // re-take it after two awaits; an AppState "active" in that window
+    // produced a third transport for one match.
+    seedJob();
+    const sizeGate: { release: ((v: number) => void) | null } = { release: null };
+    mockGetRecordingSize.mockImplementationOnce(
+      () =>
+        new Promise<number>((res) => {
+          sizeGate.release = res;
+        }),
+    );
+    const held = heldGate();
+    mockUploadFileResumable.mockImplementation(held.impl);
+
+    const running = startMatchVideoUpload(START);
+    // The start is parked on its file stat. A sweep arrives.
+    await resumeMatchVideoUploads();
+    await flush();
+    expect(mockUploadFileResumable).not.toHaveBeenCalled();
+
+    sizeGate.release?.(SIZE);
+    await flush();
+    expect(mockUploadFileResumable).toHaveBeenCalledTimes(1);
+
+    held.finish();
+    await running;
+    expect(hasActiveVideoUploads()).toBe(false);
+  });
+
+  it("releases the slot when a start bails on a missing file", async () => {
+    mockGetRecordingSize.mockResolvedValue(null);
+    await startMatchVideoUpload(START);
+    // A held slot with nothing to settle it would block every later resume
+    // for this match until the process died.
+    expect(hasActiveVideoUploads()).toBe(false);
+  });
+});
+
+describe("a stalled transfer", () => {
+  it("is aborted and retried instead of hanging forever", async () => {
+    // Nothing else can end it: tus's HTTP stack sets no xhr.timeout, RN
+    // defaults to 0, and tus's own retry loop is disabled here. A half-open
+    // socket after an iOS suspend left the job reading "uploading" forever
+    // AND blocked every future resume, because a runner was registered.
+    jest.useFakeTimers();
+    try {
+      mockUploadFileResumable
+        .mockImplementationOnce(
+          (opts: { onAbortHandle?: (a: () => void) => void }) =>
+            new Promise<void>((_res, rej) => {
+              opts.onAbortHandle?.(() => rej(new Error("Upload aborted")));
+            }),
+        )
+        .mockResolvedValueOnce(undefined);
+
+      const running = startMatchVideoUpload(START);
+      await microtasks();
+      expect(mockUploadFileResumable).toHaveBeenCalledTimes(1);
+
+      // No progress at all for the stall window.
+      jest.advanceTimersByTime(UPLOAD_STALL_TIMEOUT_MS + STALL_CHECK_INTERVAL_MS);
+      await microtasks();
+      // Backoff before the retry (mocked to 0, but still a timer).
+      jest.advanceTimersByTime(1);
+      await microtasks();
+
+      expect(mockUploadFileResumable).toHaveBeenCalledTimes(2);
+      jest.advanceTimersByTime(1);
+      await microtasks();
+      await expect(running).resolves.toEqual({ ok: true, videoId: "VID-1" });
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("is NOT aborted while it is still making progress", async () => {
+    jest.useFakeTimers();
+    try {
+      mockUploadFileResumable.mockImplementationOnce(
+        (opts: {
+          onAbortHandle?: (a: () => void) => void;
+          onProgress?: (a: number, b: number) => void;
+        }) =>
+          new Promise<void>((res, rej) => {
+            opts.onAbortHandle?.(() => rej(new Error("Upload aborted")));
+            // A slow but live transfer: one chunk confirmed per check.
+            const tick = setInterval(() => opts.onProgress?.(1, SIZE), STALL_CHECK_INTERVAL_MS);
+            setTimeout(() => {
+              clearInterval(tick);
+              res();
+            }, UPLOAD_STALL_TIMEOUT_MS * 3);
+          }),
+      );
+
+      const running = startMatchVideoUpload(START);
+      await microtasks();
+      for (let i = 0; i < 40; i++) {
+        jest.advanceTimersByTime(STALL_CHECK_INTERVAL_MS);
+        await microtasks();
+      }
+      await expect(running).resolves.toEqual({ ok: true, videoId: "VID-1" });
+      expect(mockUploadFileResumable).toHaveBeenCalledTimes(1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+});
+
+/** A transfer the test finishes on demand. */
+function heldGate() {
+  let resolve: (() => void) | null = null;
+  return {
+    impl: (opts: { onAbortHandle?: (a: () => void) => void }) =>
+      new Promise<void>((res, rej) => {
+        resolve = () => res();
+        opts.onAbortHandle?.(() => rej(new Error("Upload aborted")));
+      }),
+    finish: () => resolve?.(),
+  };
+}
+
+/** Drain microtasks only. Safe under fake timers. */
+async function microtasks(): Promise<void> {
+  for (let i = 0; i < 40; i++) await Promise.resolve();
+}
 
 /** Let queued microtasks and zero-delay timers run. */
 async function flush(): Promise<void> {

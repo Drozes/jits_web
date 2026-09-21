@@ -239,16 +239,44 @@ describe("uploadFileResumable", () => {
     await expect(uploadFileResumable(BASE)).rejects.toThrow("boom");
   });
 
-  it("hands back an abort that KEEPS the server-side partial", async () => {
-    let abortUpload: (() => void) | null = null;
-    mockOnStart.current = (u) => {
-      abortUpload?.();
-      (u.options.onSuccess as () => void)();
+  it("hands back an abort that KEEPS the server-side partial and SETTLES", async () => {
+    const handle: { abort: (() => void) | null } = { abort: null };
+    mockOnStart.current = () => {
+      // A transfer that never resolves on its own, which is what an aborted
+      // one does: tus leaves the promise pending forever.
+      handle.abort?.();
     };
-    await uploadFileResumable({ ...BASE, onAbortHandle: (a) => (abortUpload = a) });
+    await expect(
+      uploadFileResumable({
+        ...BASE,
+        onAbortHandle: (a) => {
+          handle.abort = a;
+        },
+      }),
+    ).rejects.toThrow(/aborted/i);
     // `abort(false)` rather than `abort(true)`: terminating would delete
     // real bytes the next attempt could have resumed from.
     expect(mockUploads[0].abort).toHaveBeenCalledWith(false);
+  });
+
+  it("closes the file source even when the upload fails", async () => {
+    // tus closes the source only on its SUCCESS paths and `abort()` never
+    // does, so without this a failed attempt leaks a native file handle for
+    // the life of the process.
+    const closes = jest.fn();
+    mockOnStart.current = (u) => {
+      const reader = u.options.fileReader as {
+        openFile: (input: unknown, chunk: number) => Promise<{ close: () => void }>;
+      };
+      // Opening is what registers the source with `uploadFileResumable`,
+      // exactly as tus does during `start()`.
+      void reader.openFile({ uri: "file://clip.mp4", size: 10 }, 1).then((source) => {
+        jest.spyOn(source, "close").mockImplementation(closes);
+        (u.options.onError as (e: Error) => void)(new Error("Network request failed"));
+      });
+    };
+    await expect(uploadFileResumable(BASE)).rejects.toThrow("Network request failed");
+    expect(closes).toHaveBeenCalledTimes(1);
   });
 
   it("refuses a file over the 2 GiB contract cap without touching the network", async () => {

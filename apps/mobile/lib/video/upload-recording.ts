@@ -184,56 +184,77 @@ export async function uploadFileResumable({
   const endpoint = `${env.supabaseUrl}/storage/v1/upload/resumable`;
   const file: TusFileInput = { uri: fileUri, size: fileSizeBytes };
 
-  await new Promise<void>((resolve, reject) => {
-    const upload = new Upload(file as unknown as File, {
-      endpoint,
-      uploadUrl: uploadUrl ?? undefined,
-      // Supabase mandates 6 MiB. See SUPABASE_TUS_CHUNK_SIZE.
-      chunkSize: SUPABASE_TUS_CHUNK_SIZE,
-      uploadSize: fileSizeBytes,
-      retryDelays: null,
-      onShouldRetry: () => false,
-      headers: {
-        authorization: `Bearer ${accessToken}`,
-        apikey: env.supabaseAnonKey,
-        // Preserved from the old single-shot path: a retry re-PUTs the same
-        // key, and the backend keeps a storage UPDATE policy specifically
-        // for that.
-        "x-upsert": "true",
-      },
-      metadata: {
-        bucketName: VIDEO_BUCKET,
-        objectName: storagePath,
-        contentType: contentTypeFor(ext),
-        cacheControl: "3600",
-      },
-      // The creation POST carries no bytes, so the upload URL is known (and
-      // can be persisted) before the first 6 MiB leaves the device.
-      uploadDataDuringCreation: false,
-      storeFingerprintForResuming: true,
-      removeFingerprintOnSuccess: true,
-      // Deterministic and derived from the object key, so the same clip
-      // fingerprints identically across process restarts. tus's default
-      // fingerprint reads `File` fields our input does not have.
-      fingerprint: async () => `elo-match-video::${storagePath}`,
-      urlStorage: new AsyncStorageUrlStorage(),
-      fileReader: new ExpoFileReader(),
-      onUploadUrlAvailable: () => {
-        if (upload.url) onUploadUrl?.(upload.url);
-      },
-      onProgress: (sent, total) => onProgress?.(sent, total),
-      onSuccess: () => resolve(),
-      onError: (err) => reject(err),
-    });
+  // tus closes the file source only on its SUCCESS paths, and `abort()`
+  // deliberately does not, so a failed or aborted attempt would leak the
+  // native handle. We hold a reference and close it ourselves below.
+  // A holder rather than a bare `let`: the only writer is a callback, and
+  // TypeScript's control-flow analysis narrows an unassigned `let` to
+  // `never` at the `finally`.
+  const opened: { source: { close: () => void } | null } = { source: null };
+  try {
+    await runTusUpload();
+  } finally {
+    opened.source?.close();
+  }
 
-    onAbortHandle?.(() => {
-      // `false` keeps the partial upload on the server so a later attempt
-      // can still resume it; terminating would throw away real bytes.
-      void upload.abort(false).catch(() => undefined);
-    });
+  function runTusUpload(): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      const upload = new Upload(file as unknown as File, {
+        endpoint,
+        uploadUrl: uploadUrl ?? undefined,
+        // Supabase mandates 6 MiB. See SUPABASE_TUS_CHUNK_SIZE.
+        chunkSize: SUPABASE_TUS_CHUNK_SIZE,
+        uploadSize: fileSizeBytes,
+        retryDelays: null,
+        onShouldRetry: () => false,
+        headers: {
+          authorization: `Bearer ${accessToken}`,
+          apikey: env.supabaseAnonKey,
+          // Preserved from the old single-shot path: a retry re-PUTs the same
+          // key, and the backend keeps a storage UPDATE policy specifically
+          // for that.
+          "x-upsert": "true",
+        },
+        metadata: {
+          bucketName: VIDEO_BUCKET,
+          objectName: storagePath,
+          contentType: contentTypeFor(ext),
+          cacheControl: "3600",
+        },
+        // The creation POST carries no bytes, so the upload URL is known (and
+        // can be persisted) before the first 6 MiB leaves the device.
+        uploadDataDuringCreation: false,
+        storeFingerprintForResuming: true,
+        removeFingerprintOnSuccess: true,
+        // Deterministic and derived from the object key, so the same clip
+        // fingerprints identically across process restarts. tus's default
+        // fingerprint reads `File` fields our input does not have.
+        fingerprint: async () => `elo-match-video::${storagePath}`,
+        urlStorage: new AsyncStorageUrlStorage(),
+        fileReader: new ExpoFileReader((source) => {
+          opened.source = source;
+        }),
+        onUploadUrlAvailable: () => {
+          if (upload.url) onUploadUrl?.(upload.url);
+        },
+        onProgress: (sent, total) => onProgress?.(sent, total),
+        onSuccess: () => resolve(),
+        onError: (err) => reject(err),
+      });
 
-    upload.start();
-  });
+      onAbortHandle?.(() => {
+        // `false` keeps the partial upload on the server so a later attempt
+        // can still resume it; terminating would throw away real bytes.
+        void upload.abort(false).catch(() => undefined);
+        // `abort()` leaves the promise pending forever, so the caller would
+        // wait on a transfer nobody is driving. Settle it as a retryable
+        // failure: the server keeps the offset, so the next attempt resumes.
+        reject(new Error("Upload aborted"));
+      });
+
+      upload.start();
+    });
+  }
 }
 
 // ---------------------------------------------------------------------------
