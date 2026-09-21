@@ -49,8 +49,13 @@ jest.mock("expo-camera", () => ({
   ],
 }));
 
-import { renderHook, act, waitFor } from "@testing-library/react-native";
-import { resetMatchUploadStore } from "@/lib/video/match-upload-store";
+import * as React from "react";
+import { render, renderHook, act, waitFor } from "@testing-library/react-native";
+import {
+  getMatchUpload,
+  resetMatchUploadStore,
+  setMatchUpload,
+} from "@/lib/video/match-upload-store";
 import { useVideoRecorder } from "@/lib/video/use-video-recorder";
 import { MatchVideoDbError } from "@/lib/video/upload-recording";
 import {
@@ -512,7 +517,12 @@ describe("useVideoRecorder", () => {
     });
     expect(result.current.state).toBe("uploading");
 
-    // Screen goes away while the upload is still in flight.
+    // Screen goes away while the upload is still in flight. React detaches
+    // refs in the MUTATION phase, so a real CameraView's handle is already
+    // null before any of the hook's cleanup runs; these tests assign
+    // `cameraRef` by hand, so they have to null it by hand too or they
+    // model an unmount that cannot happen.
+    result.current.cameraRef.current = null;
     unmount();
 
     // The upload chain still runs to completion (storage + DB write);
@@ -853,6 +863,83 @@ describe("useVideoRecorder camera and stop lifecycle", () => {
     expect(result.current.error).toMatch(/did not finish/i);
   });
 
+  it("does not strand the machine in 'recording' when the camera is gone at stop time", async () => {
+    // The viewfinder can go away while the match is still live (a backgrounded
+    // app, a step that advanced early), and React detaches the ref with it.
+    // stop() used to `return` here with no transition and no pending stop, so
+    // the state machine sat in 'recording' with a HIDDEN banner while the OS
+    // ran the clip out to its cap. start()'s own `if (!cam)` transitions;
+    // this is the same failure and now reads the same way.
+    mockUploadRecording.mockResolvedValueOnce(UPLOAD_OK);
+
+    const { result } = renderHook(() => useVideoRecorder("M", "A", 600));
+    const cam = makeFakeCamera();
+    result.current.cameraRef.current = cam as never;
+    act(() => result.current.markCameraReady());
+    act(() => {
+      void result.current.start();
+    });
+    await waitFor(() => expect(cam.recordAsync).toHaveBeenCalledTimes(1));
+    expect(result.current.state).toBe("recording");
+
+    act(() => {
+      result.current.cameraRef.current = null;
+    });
+
+    await act(async () => {
+      await result.current.stop();
+    });
+
+    expect(result.current.state).toBe("error");
+    expect(result.current.error).toMatch(/camera closed/i);
+    expect(cam.stopRecording).not.toHaveBeenCalled();
+
+    // stoppingRef stayed false, so when the OS finally finalizes the clip it
+    // is classified as a truncation (which it is: nobody stopped it at the
+    // end of the match) and the clip is still uploaded rather than dropped.
+    await act(async () => {
+      cam.stopRecording();
+    });
+    await waitFor(() => expect(getMatchUpload("M")?.truncation).toBe("interrupted"));
+    await waitFor(() => expect(getMatchUpload("M")?.status).toBe("uploaded"));
+  });
+
+  it("cannot release the camera from its unmount cleanup, because React detaches refs first", () => {
+    // Documents why this hook has no unmount-time `stopRecording()` guard.
+    // `useImperativeHandle` is real React, not a stub, so the ordering here
+    // is the ordering production gets: the handle is attached and detached
+    // in the MUTATION phase, before any passive effect cleanup runs. A guard
+    // reading `cameraRef.current` from a passive cleanup therefore always
+    // saw null and never ran. expo-camera's native teardown owns release.
+    const camHandle = { recordAsync: jest.fn(), stopRecording: jest.fn() };
+    const seenAtCleanup: unknown[] = [];
+
+    const Viewfinder = React.forwardRef((_props: unknown, ref: React.Ref<unknown>) => {
+      React.useImperativeHandle(ref, () => camHandle, []);
+      return null;
+    });
+    Viewfinder.displayName = "Viewfinder";
+
+    function Harness() {
+      const recorder = useVideoRecorder("M", "A", 600);
+      const { cameraRef } = recorder;
+      // Declared after the hook's own effect, so its cleanup runs after the
+      // hook's. If the ref is already null here, it was null there too.
+      React.useEffect(() => {
+        return () => {
+          seenAtCleanup.push(cameraRef.current);
+        };
+      }, [cameraRef]);
+      return React.createElement(Viewfinder, { ref: cameraRef });
+    }
+
+    const { unmount } = render(React.createElement(Harness));
+    unmount();
+
+    expect(seenAtCleanup).toEqual([null]);
+    expect(camHandle.stopRecording).not.toHaveBeenCalled();
+  });
+
   it("does not fire the watchdog when the stop lands normally", async () => {
     jest.useFakeTimers();
     mockUploadRecording.mockResolvedValueOnce(UPLOAD_OK);
@@ -881,5 +968,166 @@ describe("useVideoRecorder camera and stop lifecycle", () => {
     });
     expect(result.current.state).toBe("uploaded");
     expect(result.current.error).toBeNull();
+  });
+});
+
+/**
+ * The match-keyed store entry describes ONE recording attempt (see
+ * match-upload-store's docblock). Nothing in the process ever wrote
+ * `truncation` or `videoId` back to null, so a second recording on the same
+ * matchId, which is just re-entering an `in_progress` match from Arena or a
+ * lobby, inherited the previous attempt's verdict about a clip it has
+ * nothing to do with.
+ */
+describe("a new recording attempt supersedes the previous one on the same match", () => {
+  it("does not report a COMPLETE clip as interrupted because an earlier attempt was", async () => {
+    mockUploadRecording.mockResolvedValueOnce(UPLOAD_OK).mockResolvedValueOnce(UPLOAD_OK);
+
+    // Recorder #1: recordAsync settles on its own, with no explicit stop.
+    // That is an interruption and it is written to the store.
+    const first = renderHook(() => useVideoRecorder("SAME", "A", 600));
+    const cam1 = makeFakeCamera();
+    first.result.current.cameraRef.current = cam1 as never;
+    act(() => first.result.current.markCameraReady());
+    act(() => {
+      void first.result.current.start();
+    });
+    await waitFor(() => expect(cam1.recordAsync).toHaveBeenCalledTimes(1));
+    await act(async () => {
+      cam1.stopRecording();
+    });
+    await waitFor(() => expect(getMatchUpload("SAME")?.truncation).toBe("interrupted"));
+    first.result.current.cameraRef.current = null;
+    first.unmount();
+
+    // Recorder #2 on the SAME match, recording a clip that covers all of it
+    // and stopping cleanly at the end.
+    const second = renderHook(() => useVideoRecorder("SAME", "A", 600));
+    const cam2 = makeFakeCamera();
+    second.result.current.cameraRef.current = cam2 as never;
+    act(() => second.result.current.markCameraReady());
+    let startPromise: Promise<void>;
+    act(() => {
+      startPromise = second.result.current.start();
+    });
+    await act(async () => {
+      await second.result.current.stop();
+      await startPromise;
+    });
+    await waitFor(() => expect(second.result.current.state).toBe("uploaded"));
+
+    // The red "Recording was interrupted. The clip stops before the end of
+    // the match." banner over a clip that covers the whole match is the
+    // defect: attempt 1's truncation had no way to clear.
+    expect(getMatchUpload("SAME")?.truncation).toBeNull();
+    expect(second.result.current.truncation).toBeNull();
+  });
+
+  it("does not offer a previous attempt's videoId beside a fresh failure", async () => {
+    // This match already uploaded a clip once in this process.
+    setMatchUpload("SAME", { status: "uploaded", videoId: "OLD-VID" });
+    // Both the attempt and its automatic retry fail.
+    mockUploadRecording
+      .mockRejectedValueOnce(new Error("network died"))
+      .mockRejectedValueOnce(new Error("network died"));
+
+    const { result } = renderHook(() => useVideoRecorder("SAME", "A", 600));
+    const cam = makeFakeCamera();
+    result.current.cameraRef.current = cam as never;
+    act(() => result.current.markCameraReady());
+    let startPromise: Promise<void>;
+    act(() => {
+      startPromise = result.current.start();
+    });
+    await act(async () => {
+      await result.current.stop();
+      await startPromise;
+    });
+
+    await waitFor(() => expect(result.current.state).toBe("error"));
+    // An "error" entry carrying a working videoId renders a failure banner
+    // and a "Watch Match Video" button on the summary at the same time.
+    expect(getMatchUpload("SAME")).toMatchObject({ status: "error", videoId: null });
+    expect(result.current.videoId).toBeNull();
+  });
+
+  it("does NOT reset when a start never reaches the camera", async () => {
+    // Nothing was recorded, so the last real outcome is still the truth
+    // about this match and must stay on screen.
+    setMatchUpload("SAME", { status: "uploaded", videoId: "OLD-VID", truncation: "limit" });
+
+    const { result } = renderHook(() => useVideoRecorder("SAME", "A", 600));
+    // No camera ref at all: start() bails before it commits to recording.
+    await act(async () => {
+      await result.current.start();
+    });
+
+    expect(result.current.state).toBe("error");
+    expect(getMatchUpload("SAME")).toMatchObject({
+      status: "uploaded",
+      videoId: "OLD-VID",
+      truncation: "limit",
+    });
+  });
+});
+
+/**
+ * Ref writes belong to the commit phase, not the render phase.
+ *
+ * React is free to discard or interrupt a render; a ref written during one
+ * survives that, so `startRef` could be left pointing at a `start` closure
+ * built from props and state that were never committed (a stale
+ * `cameraPermission`, a stale `maxDurationSeconds`). The deferred-start
+ * backstop calls exactly that closure, minutes later.
+ *
+ * The invariant is structural, so it is asserted structurally: wrap every
+ * ref the hook creates and record any write that happens while its render
+ * is in progress.
+ */
+describe("useVideoRecorder render purity", () => {
+  it("writes no ref during render", () => {
+    const realUseRef = React.useRef;
+    const proxies = new WeakMap<object, object>();
+    let rendering = false;
+    let writesDuringRender = 0;
+
+    const spy = jest
+      .spyOn(React, "useRef")
+      .mockImplementation(((initial: unknown) => {
+        const box = realUseRef(initial) as unknown as { current: unknown };
+        let proxy = proxies.get(box);
+        if (!proxy) {
+          proxy = new Proxy(box, {
+            set(target, prop, value) {
+              if (prop === "current" && rendering) writesDuringRender += 1;
+              (target as Record<string | symbol, unknown>)[prop] = value;
+              return true;
+            },
+          });
+          proxies.set(box, proxy);
+        }
+        return proxy;
+      }) as never);
+
+    try {
+      const { rerender } = renderHook(
+        ({ duration }: { duration: number }) => {
+          rendering = true;
+          try {
+            return useVideoRecorder("M", "A", duration);
+          } finally {
+            rendering = false;
+          }
+        },
+        { initialProps: { duration: 600 } },
+      );
+      // A second render with different inputs rebuilds `start`, which is the
+      // render the old code wrote to `startRef` from.
+      rerender({ duration: 1800 });
+    } finally {
+      spy.mockRestore();
+    }
+
+    expect(writesDuringRender).toBe(0);
   });
 });

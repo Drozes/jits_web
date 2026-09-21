@@ -5,7 +5,10 @@ import { ArenaContent } from "./arena-content";
 import { AppHeader } from "@/components/layout/app-header";
 import { PageContainer } from "@/components/layout/page-container";
 import { PageHeaderActions } from "@/components/layout/page-header-actions";
-import { getArenaData } from "@jits/shared/api/queries";
+import { getArenaDataResult } from "@jits/shared/api/queries";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import { WifiOff } from "lucide-react";
 
 function ArenaSkeleton() {
   const bar = {
@@ -48,7 +51,17 @@ async function ArenaData() {
   // get_arena_data orders looking_athletes by current_elo DESC and applies
   // p_limit (default 20). Presence is uncapped, so a low default silently hid
   // live athletes below the cut and under-reported the "Online now" count.
-  const arena = await getArenaData(supabase, 100);
+  //
+  // RESULT VARIANT, NOT THE LENIENT ONE. `getArenaData` resolves to `null` when
+  // the RPC fails (and get_arena_data RAISEs whenever auth_athlete_id() is
+  // null, so that is reachable, not theoretical), and the very next statement
+  // here used to call `.map()` on `arena.looking_athletes`, a TypeError on a
+  // primary nav tab. The other failure mode is just as bad and quieter:
+  // coalescing the null would render "nobody is looking for a match" as a fact
+  // about the world when it is really a fact about the request.
+  const arena = await getArenaDataResult(supabase, 100);
+
+  if (!arena.ok) return <ArenaUnavailable />;
 
   type ArenaAthlete = { id: string; display_name: string; current_elo: number; gym_name: string | null; current_weight: number | null; profile_photo_url?: string | null };
   const toCompetitor = (a: ArenaAthlete) => ({
@@ -63,11 +76,35 @@ async function ArenaData() {
 
   return (
     <ArenaContent
-      lookingCompetitors={arena.looking_athletes.map((a) => toCompetitor(a))}
+      lookingCompetitors={arena.data.looking_athletes.map((a) => toCompetitor(a))}
       currentAthleteId={currentAthlete.id}
       currentAthleteWeight={currentAthlete.current_weight}
       currentAthleteRanked={currentAthlete.looking_for_ranked}
-      challengedIds={arena.challenged_opponent_ids}
+      challengedIds={arena.data.challenged_opponent_ids}
     />
+  );
+}
+
+/**
+ * Shown when the arena read FAILED, which is a different statement from "no
+ * one is looking for a match". Same shape as `SessionUnavailable`: a plate, a
+ * cause, and one way out. A server component cannot offer a `reset()`, so the
+ * exit is a link rather than a retry button.
+ */
+function ArenaUnavailable() {
+  return (
+    <div className="flex flex-col items-center gap-4 py-12 text-center">
+      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+        <WifiOff className="h-6 w-6 text-muted-foreground" />
+      </div>
+      <p className="text-lg font-semibold">Arena unavailable</p>
+      <p className="text-sm text-muted-foreground">
+        We couldn&apos;t load who&apos;s looking for a match. This is a
+        connection problem, not an empty arena.
+      </p>
+      <Button asChild>
+        <Link href="/">Back to home</Link>
+      </Button>
+    </div>
   );
 }

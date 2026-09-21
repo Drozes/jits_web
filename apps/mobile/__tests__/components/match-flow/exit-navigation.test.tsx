@@ -168,6 +168,24 @@ function completedMatchResult() {
   };
 }
 
+/**
+ * A FIRST LOAD that failed, exactly as `useMatchDetails` reports one.
+ *
+ * `getMatchDetails` resolves null on ANY failure, and the hook turns that
+ * into `error` set with `match` still null (lib/match-flow/use-match-details.ts
+ * :44-48; its catch branch does the same with the thrown message). So this
+ * combination is not contrived, it is the only shape a failed first load has.
+ */
+function firstLoadFailureResult() {
+  return {
+    match: null,
+    submissionTypes: [],
+    isLoading: false,
+    error: "Match not found",
+    refresh: jest.fn(),
+  };
+}
+
 /** A match the current athlete is not part of: the wizard's error splash. */
 function notAParticipantResult() {
   return {
@@ -248,6 +266,29 @@ describe("MatchFlowWizard exit navigation", () => {
     );
     arena.getByText("Not a participant");
     fireEvent.press(arena.getByText(ARENA_LABEL));
+    expect(mockRouterReplace).toHaveBeenLastCalledWith(ARENA_EXIT);
+  });
+
+  it("routes a FIRST-LOAD failure to the error splash, not a permanent spinner", () => {
+    // The loading guard used to run first and include `|| !match`, so on a
+    // failed first load the `!match` term won and `WizardError` was
+    // unreachable: a permanent "Loading match..." with no exit cta, for a
+    // match that had already finished failing to load.
+    mockUseMatchDetails.mockReturnValue(firstLoadFailureResult());
+
+    const { getByText, queryByText } = render(
+      <MatchFlowWizard
+        exitHref={ARENA_EXIT}
+        exitLabel={ARENA_LABEL}
+        matchId="M1"
+        currentAthleteId="me-1"
+      />,
+    );
+
+    expect(queryByText("Loading match...")).toBeNull();
+    getByText("Match unavailable");
+    getByText("Match not found");
+    fireEvent.press(getByText(ARENA_LABEL));
     expect(mockRouterReplace).toHaveBeenLastCalledWith(ARENA_EXIT);
   });
 

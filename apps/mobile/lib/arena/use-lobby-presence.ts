@@ -30,6 +30,14 @@
  * A remount racing its own teardown would therefore leave a channel that is
  * silently dead for the rest of the app session, with "Online now" stuck at
  * zero. Adopting the live instance sidesteps all four.
+ *
+ * When a removal does NOT confirm, there is no instance worth adopting and no
+ * safe way to build one, so setup BAILS OUT and comes back later rather than
+ * re-binding the registered instance. Continuing past an unconfirmed removal
+ * is the same dead lobby by a different door: `channel()` hands back the
+ * joined instance, `on()` throws, `channelRef` is never assigned, and from
+ * then on the identity guard in the sync handler rejects every update while
+ * `track()` has nothing to push to.
  */
 import * as React from "react";
 import { useSyncExternalStore } from "react";
@@ -54,6 +62,17 @@ export interface LobbyPayload {
 
 /** What `RealtimeClient` keys its channel registry by. */
 const REGISTERED_TOPIC = `realtime:${LOBBY_TOPIC}`;
+
+/**
+ * Backoff for a stale channel we could not clear.
+ *
+ * An unconfirmed removal means the socket is not answering, which is a
+ * condition that passes: the retry is what turns "dead for the rest of the
+ * session" into "dead until the connection comes back". Bounded because these
+ * delays only cover a socket on its way back, and a remount or an athlete
+ * change re-runs setup anyway.
+ */
+const STALE_RETRY_DELAYS_MS = [1_000, 2_000, 4_000];
 
 // ---------------------------------------------------------------------------
 // External store
@@ -160,8 +179,28 @@ async function releaseChannel(): Promise<void> {
 export function useLobbyPresence(athleteId: string): void {
   React.useEffect(() => {
     let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
-    async function ensure() {
+    /**
+     * Come back to a setup that could not complete. `attempt` is the try that
+     * just failed, so the delays step up and the sequence terminates.
+     */
+    function retryLater(attempt: number) {
+      if (cancelled) return;
+      const delay = STALE_RETRY_DELAYS_MS[attempt];
+      if (delay === undefined) {
+        console.warn(
+          "[arena] gave up clearing the stale lobby channel; the lobby stays empty until the Arena is re-entered",
+        );
+        return;
+      }
+      retryTimer = setTimeout(() => {
+        retryTimer = null;
+        run(attempt + 1);
+      }, delay);
+    }
+
+    async function ensure(attempt: number) {
       if (!athleteId) {
         await releaseChannel();
         return;
@@ -187,7 +226,15 @@ export function useLobbyPresence(athleteId: string): void {
       if (stray) {
         const status = await supabase.removeChannel(stray);
         if (status !== "ok") {
+          // BAIL OUT. The instance is still registered and still joined, so
+          // `channel()` below would hand back this exact one and `on()` would
+          // THROW on it, killing the lobby for the rest of the app session.
+          // An unconfirmed removal is a socket that is not answering, which
+          // is temporary, so the honest move is to leave the lobby empty and
+          // try the removal again rather than adopt a channel we cannot wire.
           console.warn("[arena] stale lobby channel did not clear:", status);
+          retryLater(attempt);
+          return;
         }
       }
       if (cancelled) return;
@@ -214,10 +261,23 @@ export function useLobbyPresence(athleteId: string): void {
       channelAthleteId = athleteId;
     }
 
-    void ensure();
+    /**
+     * Never let a setup failure escape as an unhandled rejection, and never
+     * let it pass quietly either: a lobby that is empty because setup threw
+     * looks exactly like a lobby that is empty because nobody is in it.
+     */
+    function run(attempt: number) {
+      void ensure(attempt).catch((error: unknown) => {
+        console.warn("[arena] lobby channel setup failed:", error);
+        retryLater(attempt);
+      });
+    }
+
+    run(0);
 
     return () => {
       cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
       // Leave the lobby, KEEP the channel. Removing it here is what creates
       // the zombie described at the top of this file, and an observer with
       // nothing tracked costs one idle topic.

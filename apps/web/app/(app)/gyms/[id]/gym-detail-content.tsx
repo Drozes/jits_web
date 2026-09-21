@@ -1,10 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { WifiOff } from "lucide-react";
 import { Plate, LivePill, EloTile, ParticipantRow, DataRow } from "@/components/ui/elo-system";
 import { requireAthlete } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
-import { getGymDetail, getGymManagerStats } from "@jits/shared/api/queries";
-import type { SessionListItem } from "@jits/shared/types/session";
+import { Button } from "@/components/ui/button";
+import { getGymDetailResult, getGymManagerStats } from "@jits/shared/api/queries";
+import type { PartialGymDetail } from "@jits/shared/api/queries";
+import type { GymDetail, SessionListItem } from "@jits/shared/types/session";
 import type { GymManagerStats } from "@jits/shared/types/analytics";
 import { GymRsvpAction } from "./gym-rsvp-action";
 
@@ -16,19 +19,46 @@ export async function GymDetailContent({ paramsPromise }: GymDetailContentProps)
   const { id } = await paramsPromise;
   const { athlete } = await requireAthlete();
   const supabase = await createClient();
-  const [gym, managerStats] = await Promise.all([
-    getGymDetail(supabase, id, athlete.id),
+  // RESULT VARIANT, NOT THE LENIENT ONE. `getGymDetail` coalesced a failed
+  // sessions read to `[]`, so a dropped request rendered "No sessions
+  // scheduled" as a statement about the gym rather than about the request, and
+  // an athlete standing in the room was told there was nothing on.
+  const [result, managerStats] = await Promise.all([
+    getGymDetailResult(supabase, id, athlete.id),
     getGymManagerStats(supabase, id),
   ]);
 
-  if (!gym) notFound();
+  // A gym that genuinely does not exist is still a 404. Every other failure is
+  // NOT: turning a dropped request into "no such gym" is the same lie in a
+  // different costume.
+  if (!result.ok && result.error.code === "GYM_NOT_FOUND") notFound();
 
+  // PARTIAL: the session list is trustworthy and only a capability read failed
+  // (the athlete row, or the gym_managers row). Those decide the "My Gym" tag
+  // and the header's Manage link, neither of which is worth hiding a LIVE
+  // session over, so render the gym and say plainly what is unconfirmed.
+  // `PartialGymDetail` types `isMemberGym` / `isGymManager` out entirely, so
+  // there is no way to accidentally read an authorization answer off it.
+  const gym: GymDetail | PartialGymDetail | null = result.ok
+    ? result.data
+    : result.partial;
+
+  if (!gym) return <GymDetailUnavailable />;
+
+  const degraded = !result.ok;
   const activeSession = gym.sessions.find((s) => s.status === "active") ?? null;
   const upcomingSessions = gym.sessions.filter((s) => s.status !== "active");
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-5)" }}>
-      <GymTitle name={gym.name} city={gym.city} isMyGym={gym.isMemberGym} />
+      <GymTitle
+        name={gym.name}
+        city={gym.city}
+        // Unknown on the degraded path, and unknown must not render as "no".
+        isMyGym={result.ok ? result.data.isMemberGym : undefined}
+      />
+
+      {degraded && <MembershipUnconfirmedNote />}
 
       {activeSession && (
         <ActiveSessionPlate session={activeSession} />
@@ -46,6 +76,44 @@ export async function GymDetailContent({ paramsPromise }: GymDetailContentProps)
   );
 }
 
+/**
+ * Shown when nothing about this gym could be trusted: the gym row failed to
+ * read, or the SESSION LIST did, in which case the empty list is an artefact of
+ * the failure and not an answer. Mirrors `SessionUnavailable`. A server
+ * component has no `reset()`, so the exit is a link rather than a retry.
+ */
+function GymDetailUnavailable() {
+  return (
+    <div className="flex flex-col items-center gap-4 py-12 text-center">
+      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+        <WifiOff className="h-6 w-6 text-muted-foreground" />
+      </div>
+      <p className="text-lg font-semibold">Gym unavailable</p>
+      <p className="text-sm text-muted-foreground">
+        We couldn&apos;t load this gym&apos;s schedule. This is a connection
+        problem, so there may well be a session on.
+      </p>
+      <Button asChild>
+        <Link href="/gyms">Back to gyms</Link>
+      </Button>
+    </div>
+  );
+}
+
+/**
+ * The narrow degraded case: sessions are real, the membership/manager reads
+ * are not. Said out loud rather than papered over, because the absent "My Gym"
+ * tag and the absent Manage link would otherwise read as answers.
+ */
+function MembershipUnconfirmedNote() {
+  return (
+    <p className="text-sm text-muted-foreground">
+      We couldn&apos;t confirm your membership or manager access for this gym.
+      The sessions below are current.
+    </p>
+  );
+}
+
 function GymTitle({
   name,
   city,
@@ -53,7 +121,8 @@ function GymTitle({
 }: {
   name: string;
   city: string | null;
-  isMyGym: boolean;
+  /** `undefined` means the membership read failed: say nothing, not "no". */
+  isMyGym?: boolean;
 }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-1)" }}>

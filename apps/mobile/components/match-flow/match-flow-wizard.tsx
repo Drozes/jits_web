@@ -128,7 +128,21 @@ export function MatchFlowWizard({
   // load, or a load for a DIFFERENT matchId.
   const revalidating = isLoading && match != null && match.id === matchId;
 
-  if ((isLoading && !revalidating) || !match || !step) return <WizardLoading />;
+  // The error guard runs FIRST, above the loading guard, and has to.
+  //
+  // `getMatchDetails` returns null on any failure, and `useMatchDetails`
+  // turns that into `{ match: null, error: "Match not found" }` (see
+  // lib/match-flow/use-match-details.ts:44-48; its catch branch does the
+  // same with the thrown message). So on a FIRST-load failure `error` is
+  // set and `match` is still null, and with the loading guard first the
+  // `!match` term won and `WizardError` was unreachable: the user sat on a
+  // permanent "Loading match..." spinner for a match that had already
+  // failed to load, with no exit cta.
+  //
+  // Nothing else changes order. When `match` IS in hand, `error` already
+  // outranked the render below, because the loading guard fell through.
+  // And `error` cannot be set while revalidating: the hook clears it
+  // (`setError(null)`) synchronously as each fetch begins.
   if (error) {
     return (
       <WizardError
@@ -139,6 +153,7 @@ export function MatchFlowWizard({
       />
     );
   }
+  if ((isLoading && !revalidating) || !match || !step) return <WizardLoading />;
 
   const me = match.participants.find((p) => p.athlete_id === currentAthleteId);
   const opponent = match.participants.find((p) => p.athlete_id !== currentAthleteId);

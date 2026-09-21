@@ -23,6 +23,11 @@
  *     true. Every transition runs on one promise queue, so the clear is issued
  *     only after the set has landed.
  *
+ * The two signals are NOT symmetric, and going offline is written around that:
+ * presence lapses by itself when the socket dies, the column does not, so on
+ * the way out the flag write is the one that must go out and the untrack is
+ * the one that can be left to finish or not. See `step()`.
+ *
  * Ranked only. `toggleMatchPreferences` always writes
  * `looking_for_casual: false`; casual was removed from the product and
  * `get_arena_data` filters on (casual OR ranked), so ranked alone is enough to
@@ -135,12 +140,26 @@ export function useArenaLive({
       return true;
     }
 
-    // Presence first here: it is local and instant, so the window where the
-    // athlete is still challengeable closes immediately, and the flag write
-    // that follows only has to catch the slower list up.
+    // CONCURRENT, not sequential, and deliberately so. `leaveLobby()` awaits
+    // `channel.untrack()`, which is a presence SEND: it takes the websocket
+    // push branch, and on a socket that is not connected the push is buffered
+    // with its timeout already running and resolves 'timed out' only after
+    // ten seconds. Awaiting it here spends the little time a backgrounded app
+    // has on the half that heals itself (presence lapses when the socket
+    // dies) and defers the half that does not (the column survives), so iOS
+    // suspends the process with `looking_for_ranked` still true and the
+    // athlete parked in "Open to challenges" with the app closed.
+    //
+    // Issuing the untrack first still closes the challengeable window as
+    // early as possible; not awaiting it is what keeps the durable write from
+    // queueing behind ten seconds of dead socket.
     actualRef.current = false;
     setIsLive(false);
-    await leaveLobby();
+    void leaveLobby().catch((error: unknown) => {
+      // Presence failing is survivable, the flag write is not, so this must
+      // never reject the transition. Said out loud rather than swallowed.
+      console.warn("[arena] leaving the lobby failed:", error);
+    });
     return writeLookingFlag(id, false);
   }, []);
 
@@ -207,6 +226,19 @@ export function useArenaLive({
 
   const requestOfflineRef = React.useRef(requestOffline);
   requestOfflineRef.current = requestOffline;
+  const requestLiveRef = React.useRef(requestLive);
+  requestLiveRef.current = requestLive;
+  const isArenaTabSelectedRef = React.useRef(isArenaTabSelected);
+  isArenaTabSelectedRef.current = isArenaTabSelected;
+  /**
+   * Whether the background that just happened took a live athlete down.
+   *
+   * Read off the INTENT at the moment of backgrounding, which is the whole
+   * guard: an athlete who toggled off and then closed the app leaves this
+   * false and is never resurrected. It is the defensive clear that gets
+   * undone, not a decision the athlete made.
+   */
+  const resumeLiveRef = React.useRef(false);
 
   // Leaving the Arena TAB takes the athlete offline. Pushing an athlete
   // profile or dropping into a match does not: the tab is still selected and
@@ -221,11 +253,26 @@ export function useArenaLive({
   // who has closed the app.
   React.useEffect(() => {
     const onChange = (next: AppStateStatus) => {
-      // "background" only. iOS also reports "inactive" for the notification
-      // shade, Control Center, an incoming-call banner, a system alert and a
-      // half-swiped app switcher, none of which mean the athlete left.
-      if (next !== "background") return;
-      void requestOfflineRef.current();
+      // Clear on "background" only. iOS also reports "inactive" for the
+      // notification shade, Control Center, an incoming-call banner, a system
+      // alert and a half-swiped app switcher, none of which mean the athlete
+      // left.
+      if (next === "background") {
+        resumeLiveRef.current = desiredRef.current;
+        void requestOfflineRef.current();
+        return;
+      }
+      // Put back exactly what the background took away. Without this the
+      // athlete comes back silently offline with a toggle that still looks
+      // live-capable, and nothing else can fix it: this handler ignores
+      // "active" otherwise, the arrival effect is one-shot, and the tab
+      // effect only ever takes people offline.
+      if (next !== "active" || !resumeLiveRef.current) return;
+      resumeLiveRef.current = false;
+      // Not if they came back somewhere else. The tab effect owns that case
+      // and it has already cleared them.
+      if (!isArenaTabSelectedRef.current) return;
+      void requestLiveRef.current();
     };
     const sub = AppState.addEventListener("change", onChange);
     return () => sub.remove();

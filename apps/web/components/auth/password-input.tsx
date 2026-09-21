@@ -13,6 +13,15 @@ interface PasswordInputProps {
   onChange: (value: string) => void;
   showToggle?: boolean;
   forgotPasswordLink?: boolean;
+  disabled?: boolean;
+  /**
+   * Design-system overrides for surfaces that style fields with brand tokens
+   * (the login screen) rather than the default shadcn card chrome. Same escape
+   * hatch `CityAutocomplete` uses.
+   */
+  inputStyle?: React.CSSProperties;
+  inputClassName?: string;
+  labelStyle?: React.CSSProperties;
 }
 
 export function PasswordInput({
@@ -23,13 +32,19 @@ export function PasswordInput({
   onChange,
   showToggle,
   forgotPasswordLink,
+  disabled,
+  inputStyle,
+  inputClassName,
+  labelStyle,
 }: PasswordInputProps) {
   const [showPassword, setShowPassword] = useState(false);
 
   return (
     <div className="grid gap-2">
       <div className="flex items-center">
-        <Label htmlFor={id}>{label}</Label>
+        <Label htmlFor={id} style={labelStyle}>
+          {label}
+        </Label>
         {forgotPasswordLink && (
           <Link
             href="/forgot-password"
@@ -46,13 +61,16 @@ export function PasswordInput({
             type={showPassword ? "text" : "password"}
             autoComplete={autoComplete}
             required
+            disabled={disabled}
             value={value}
             onChange={(e) => onChange(e.target.value)}
-            className="pr-10"
+            style={inputStyle}
+            className={inputClassName ? `${inputClassName} pr-10` : "pr-10"}
           />
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
+            aria-label={showPassword ? "Hide password" : "Show password"}
             className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
             tabIndex={-1}
           >
@@ -77,8 +95,11 @@ export function PasswordInput({
           type="password"
           autoComplete={autoComplete}
           required
+          disabled={disabled}
           value={value}
           onChange={(e) => onChange(e.target.value)}
+          style={inputStyle}
+          className={inputClassName}
         />
       )}
     </div>

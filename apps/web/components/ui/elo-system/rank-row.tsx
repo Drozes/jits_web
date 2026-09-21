@@ -35,7 +35,7 @@ export function RankRow({ rank, name, subtitle, value, delta, leader = false, yo
           style={{
             fontFamily: "var(--font-mono)",
             fontSize: "var(--size-num-xs)",
-            color: "var(--accent-cta)",
+            color: "var(--accent-cta-text)",
             fontWeight: 700,
             textTransform: "uppercase",
             letterSpacing: "var(--ls-caps-xl)",
@@ -51,7 +51,7 @@ export function RankRow({ rank, name, subtitle, value, delta, leader = false, yo
           fontFamily: "var(--font-mono)",
           fontWeight: 700,
           fontSize: "var(--size-num-m)",
-          color: leader ? "var(--accent-cta)" : "var(--text-secondary)",
+          color: leader ? "var(--accent-cta-text)" : "var(--text-secondary)",
           textAlign: "right",
           fontVariantNumeric: "tabular-nums",
         }}

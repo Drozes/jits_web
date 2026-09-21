@@ -42,17 +42,33 @@ jest.mock("expo-camera", () => {
   const R = require("react");
   const RN = require("react-native");
   return {
-    // A CameraView that behaves like the real one for the two things this
-    // sequence depends on: it publishes an imperative handle on the ref and
-    // it reports readiness once the native session is live.
+    // A CameraView that behaves like the real one for the three things this
+    // sequence depends on: it publishes an imperative handle on the ref, it
+    // DETACHES that handle on unmount, and it reports readiness once the
+    // native session is live.
+    //
+    // The detach is not cosmetic. React attaches and detaches refs in the
+    // MUTATION phase, so a real CameraView's handle is already null by the
+    // time any passive effect cleanup runs. This stub used to set the ref
+    // on mount and never null it, which diverges from React in exactly the
+    // direction that hides unmount-time bugs: it kept
+    // `useVideoRecorder`'s unmount "stop the camera" guard looking alive
+    // when it was dead code. A layout effect is used rather than a passive
+    // one so the attach/detach lands in the same commit phase React uses.
     CameraView: R.forwardRef(
       (props: { onCameraReady?: () => void }, ref: React.Ref<unknown>) => {
+        R.useLayoutEffect(() => {
+          const set = (v: unknown) => {
+            if (typeof ref === "function") ref(v);
+            else if (ref && typeof ref === "object") {
+              (ref as { current: unknown }).current = v;
+            }
+          };
+          set(mockCamera);
+          return () => set(null);
+        }, []);
         R.useEffect(() => {
           mockCameraMounts.count += 1;
-          if (typeof ref === "function") ref(mockCamera);
-          else if (ref && typeof ref === "object") {
-            (ref as { current: unknown }).current = mockCamera;
-          }
           props.onCameraReady?.();
         }, []);
         return R.createElement(RN.View, { testID: "camera-view" });
@@ -397,6 +413,28 @@ describe("record, end, upload, across the step boundary", () => {
     await waitFor(() => expect(getByText(/match video uploaded/i)).toBeTruthy());
     getByTestId("upload-status-banner");
     expect(mockUploadAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not pretend to release the camera on unmount", async () => {
+    // Navigating away mid-recording. `useVideoRecorder` used to read
+    // `cameraRef.current` in its unmount cleanup and call `stopRecording()`
+    // on it, logging "unmount cleanup stopping an active recording".
+    //
+    // That guard could never run: React detaches refs in the MUTATION
+    // phase, so the ref is null before any passive cleanup. It only LOOKED
+    // alive because this stub set the ref on mount and never nulled it.
+    // With the stub honest, the guard is provably dead, so it is gone; what
+    // releases the capture session is expo-camera's own native teardown
+    // when CameraView unmounts.
+    const { unmount } = renderWizard("in_progress");
+    await waitFor(() => expect(mockCamera.recordAsync).toHaveBeenCalledTimes(1));
+
+    unmount();
+
+    expect(mockCamera.stopRecording).not.toHaveBeenCalled();
+    expect(
+      warnSpy.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n"),
+    ).not.toMatch(/unmount cleanup/i);
   });
 
   it("uploads to the path prod storage RLS requires", async () => {

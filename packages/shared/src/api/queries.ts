@@ -7,6 +7,8 @@ import type {
   EloHistoryRow,
   DashboardSummary,
   ArenaData,
+  PendingChallenge,
+  PendingChallengesForAthlete,
 } from "../types/composites";
 import type { SubmissionType } from "../types/submission-type";
 import type {
@@ -122,14 +124,84 @@ export async function getDashboardSummary(
   return data as unknown as DashboardSummary;
 }
 
-/** Fetch all arena page data in a single RPC (athletes, challenges, activity) */
+/**
+ * Everything `getArenaData` and `getArenaDataResult` share.
+ *
+ * `raw` is the RPC payload EXACTLY as PostgREST handed it over, including the
+ * `null` it becomes on failure; `error` is the separate verdict. Keeping the
+ * two apart is the whole point: the lenient wrapper has to keep returning that
+ * raw value (mobile reads the null as "failed read"), while the Result wrapper
+ * has to refuse it.
+ *
+ * NOTHING HERE CAN REJECT, so failure is derived from `error` and never from a
+ * rejection: postgrest-js sets `shouldThrowOnError = false` by default
+ * (PostgrestBuilder.ts:82) and its outer handler turns even a hard network
+ * failure into a RESOLVED `{ data: null, error }`.
+ *
+ * `get_arena_data` also RAISEs when `auth_athlete_id()` resolves to nothing, so
+ * an authenticated-but-not-yet-an-athlete session reaches this as a P0001, not
+ * as an empty lobby.
+ */
+async function loadArenaData(
+  supabase: Client,
+  limit: number,
+): Promise<{ raw: ArenaData | null; error: DomainError | null }> {
+  const { data, error } = await supabase.rpc("get_arena_data", { p_limit: limit });
+  // Logged on both paths, unchanged: the lenient caller has nothing else to go
+  // on, and the Result caller still wants the PostgREST detail in the server log.
+  if (error) console.error("getArenaData:", error);
+  return {
+    raw: (data as unknown as ArenaData | null) ?? null,
+    error: error ? mapPostgrestError(error, "arena_data") : null,
+  };
+}
+
+/**
+ * Fetch all arena page data in a single RPC (athletes, challenges, activity).
+ *
+ * LENIENT, AND UNCHANGED ON PURPOSE, INCLUDING THE LIE IN ITS RETURN TYPE: it
+ * is annotated `Promise<ArenaData>` but resolves to `null` whenever the RPC
+ * failed. `apps/mobile/lib/arena/use-arena-roster.ts` depends on exactly that
+ * (it re-widens to `ArenaData | null` and treats null as "failed read, do not
+ * claim the lobby is empty"), so tightening this would delete mobile's only
+ * failure signal. New callers want `getArenaDataResult` instead.
+ */
 export async function getArenaData(
   supabase: Client,
   limit = 20,
 ): Promise<ArenaData> {
-  const { data, error } = await supabase.rpc("get_arena_data", { p_limit: limit });
-  if (error) console.error("getArenaData:", error);
-  return data as unknown as ArenaData;
+  const { raw } = await loadArenaData(supabase, limit);
+  return raw as ArenaData;
+}
+
+/**
+ * `getArenaData` with the failure signal it never had.
+ *
+ * `{ ok: true, data }` means the lobby really is what the payload says, empty
+ * included; `{ ok: false }` means the read failed and the caller knows nothing
+ * about who is looking for a match.
+ *
+ * It also rejects a payload whose `looking_athletes` is not an array. Web's
+ * `/arena` calls `.map()` on that field straight away, so a malformed or null
+ * payload is a TypeError on a primary nav tab rather than a bad render, and
+ * "shaped wrong" is not meaningfully different from "did not load" to the
+ * surface that has to draw something.
+ *
+ * Strictly additive: the legacy function above is untouched.
+ */
+export async function getArenaDataResult(
+  supabase: Client,
+  limit = 20,
+): Promise<Result<ArenaData>> {
+  const { raw, error } = await loadArenaData(supabase, limit);
+  if (error) return { ok: false, error };
+  if (!raw || !Array.isArray(raw.looking_athletes)) {
+    return {
+      ok: false,
+      error: { code: "UNKNOWN", message: "The arena returned no data." },
+    };
+  }
+  return { ok: true, data: raw };
 }
 
 // ---------------------------------------------------------------------------
@@ -453,6 +525,106 @@ export async function getPendingChallengeOpponentIds(
   for (const c of sent ?? []) ids.add(c.opponent_id);
   for (const c of received ?? []) ids.add(c.challenger_id);
   return ids;
+}
+
+/**
+ * Columns + aliased FK joins behind `getPendingChallengesForAthlete`.
+ *
+ * BOTH joins are ALIASED (`challenger:` / `opponent:`), which is what makes
+ * PostgREST embed them as a single object rather than an array (see the FK
+ * join-shape rules in CLAUDE.md). `challenges` has two FKs onto `athletes`, so
+ * the constraint names are mandatory to disambiguate them.
+ */
+const PENDING_CHALLENGE_SELECT = `id, challenger_id, opponent_id, match_type, created_at, expires_at, challenger_weight, opponent_weight,
+  challenger:athletes!fk_challenges_challenger(display_name),
+  opponent:athletes!fk_challenges_opponent(display_name)` as const;
+
+/**
+ * Read a display name off an aliased FK embed.
+ *
+ * The embed is a single object at runtime, but the generated types have been
+ * known to widen a to-one embed to an array, and PostgREST hands back `null`
+ * when RLS hides the referenced row. Both shapes and the null collapse here so
+ * neither consumer has to repeat the narrowing.
+ */
+function embeddedDisplayName(embed: unknown): string {
+  const value = Array.isArray(embed) ? embed[0] : embed;
+  const name = (value as { display_name?: string } | null | undefined)?.display_name;
+  return name ?? "Unknown";
+}
+
+/**
+ * Every live challenge involving the athlete, split into `incoming` (they are
+ * the opponent) and `outgoing` (they are the challenger), newest first.
+ *
+ * "Live" means `status = 'pending'` AND `expires_at` is still in the future.
+ * The expiry filter is applied in the query rather than after the fact because
+ * the BE leaves a lapsed challenge sitting at `pending` until a sweep updates
+ * it, so status alone would show an athlete an inbox row they can no longer
+ * accept.
+ *
+ * ONE READ, NOT TWO. A single `.or(challenger_id.eq.X, opponent_id.eq.X)`
+ * fetches both directions in one round trip and, more importantly, gives one
+ * failure verdict: two reads could half-fail and leave the caller rendering an
+ * empty outbox next to a populated inbox, with no way to tell which half was
+ * real.
+ *
+ * RLS: `challenges_select_own` (jr_be
+ * `20260204034400_create_challenges_table.sql`) is
+ * `USING (challenger_id = auth_athlete_id() OR opponent_id = auth_athlete_id())`
+ * for role `authenticated`, and no later migration replaces it. So this query
+ * returns rows for the CALLER and nobody else: passing another athlete's id
+ * yields an empty list, not a leak, and not an error either, which is why the
+ * caller must pass the current athlete's own id for the result to mean
+ * anything.
+ *
+ * Returns `Result` (never throws): `{ ok: true, data: { incoming: [], outgoing: [] } }`
+ * is the fact "no live challenges", while `{ ok: false }` is "we could not find
+ * out": the distinction the inbox has to render differently.
+ */
+export async function getPendingChallengesForAthlete(
+  supabase: Client,
+  athleteId: string,
+): Promise<Result<PendingChallengesForAthlete>> {
+  const now = new Date().toISOString();
+
+  const { data, error } = await supabase
+    .from("challenges")
+    .select(PENDING_CHALLENGE_SELECT)
+    .eq("status", "pending")
+    .gt("expires_at", now)
+    .or(`challenger_id.eq.${athleteId},opponent_id.eq.${athleteId}`)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("getPendingChallengesForAthlete:", error);
+    return { ok: false, error: mapPostgrestError(error, "challenges_pending") };
+  }
+
+  const incoming: PendingChallenge[] = [];
+  const outgoing: PendingChallenge[] = [];
+
+  for (const row of data ?? []) {
+    const challenge: PendingChallenge = {
+      challengeId: row.id,
+      challengerId: row.challenger_id,
+      opponentId: row.opponent_id,
+      challengerName: embeddedDisplayName(row.challenger),
+      opponentName: embeddedDisplayName(row.opponent),
+      matchType: row.match_type,
+      createdAt: row.created_at,
+      expiresAt: row.expires_at,
+      challengerWeight: row.challenger_weight,
+      opponentWeight: row.opponent_weight,
+    };
+    // Direction is decided by the athlete's ROLE on the row, and the two are
+    // mutually exclusive: `challenges_insert` enforces
+    // `challenger_id != opponent_id`, so no row can land in both buckets.
+    if (row.opponent_id === athleteId) incoming.push(challenge);
+    else if (row.challenger_id === athleteId) outgoing.push(challenge);
+  }
+
+  return { ok: true, data: { incoming, outgoing } };
 }
 
 // ---------------------------------------------------------------------------

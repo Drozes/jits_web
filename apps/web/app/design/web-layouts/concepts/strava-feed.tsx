@@ -417,7 +417,7 @@ function KudosAffordance({ kudos, youKudosed }: { kudos: number; youKudosed: boo
         aria-hidden
         style={{
           fontSize: "var(--size-num-s)",
-          color: youKudosed ? "var(--accent-cta)" : "var(--text-tertiary)",
+          color: youKudosed ? "var(--accent-cta-text)" : "var(--text-tertiary)",
           lineHeight: 1,
         }}
       >

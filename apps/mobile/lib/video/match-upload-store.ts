@@ -32,6 +32,25 @@ import type { RecordingTruncation } from "./use-video-recorder";
  * capture file has its own lifecycle, and that is jits-341p's problem);
  * `storagePath` is recorded because a retry MUST reuse the same key.
  *
+ * ONE ENTRY DESCRIBES ONE RECORDING ATTEMPT. Every field except `matchId`
+ * is PER-ATTEMPT: `status`, `videoId`, `error`, `truncation` and
+ * `storagePath` all describe the clip the latest attempt produced. What
+ * this store makes durable is the ENTRY against the component tree (the
+ * step unmounting, the wizard remounting on every match, an upload landing
+ * late), NOT one attempt's fields across a LATER attempt on the same
+ * match. So a second recording on the same matchId (re-entering an
+ * `in_progress` match from Arena or a lobby, or a permission flip that
+ * re-runs start()) calls `beginMatchUploadAttempt` to clear all of them
+ * before it records, and only `setMatchUpload` merges, within an attempt.
+ *
+ * Merging across attempts is how a COMPLETE clip got reported as
+ * "Recording was interrupted. The clip stops before the end of the match."
+ * (attempt 1's `truncation` outlived attempt 1), and how an `error` entry
+ * kept attempt 1's `videoId` and rendered a working "Watch Match Video"
+ * button beside its own failure banner. Both reproduced; neither had any
+ * way to clear, because nothing in the process ever wrote those fields
+ * back to null.
+ *
  * Mirrored by apps/web separately; the shape is deliberately platform
  * agnostic so the two can converge, but nothing here belongs in
  * packages/shared until both sides actually share it.
@@ -66,10 +85,21 @@ export interface MatchUploadEntry {
 }
 
 /**
- * Cap on tracked matches. A long session (a gym running a ladder) would
- * otherwise accumulate an entry per match for the life of the process.
- * Eight is far more matches than anyone has open context for, and the
- * oldest entry is the least likely to still have a surface showing it.
+ * Cap on tracked SETTLED matches. A long session (a gym running a ladder)
+ * would otherwise accumulate an entry per match for the life of the
+ * process. Eight is far more matches than anyone has open context for, and
+ * the oldest settled entry is the least likely to still have a surface
+ * showing it.
+ *
+ * An entry whose upload is still IN FLIGHT (`status === "uploading"`) is
+ * never evicted, however old it is. Evicting one loses the `storagePath`
+ * the automatic retry has to reuse and the `truncation` the user still has
+ * to be told about, and the upload then RESURRECTS the entry from scratch
+ * when it lands, as a clean "uploaded" with no truncation warning and no
+ * storage key. The >8-matches-in-one-session case this cap exists for (a
+ * ladder night) is exactly the case that can leave an old upload still
+ * running, so that ordering is not theoretical. Concurrent uploads bound
+ * themselves, so the map stays small without the cap's help.
  */
 export const MAX_TRACKED_MATCHES = 8;
 
@@ -82,8 +112,13 @@ function emit(): void {
 
 function evictIfNeeded(): void {
   if (entries.size <= MAX_TRACKED_MATCHES) return;
-  const oldest = [...entries.values()].sort((a, b) => a.updatedAt - b.updatedAt);
-  for (const entry of oldest.slice(0, entries.size - MAX_TRACKED_MATCHES)) {
+  // Only settled entries are candidates. An in-flight upload still needs
+  // its storagePath (retry key) and its truncation, and would otherwise be
+  // re-created wrong when it lands. See MAX_TRACKED_MATCHES.
+  const evictable = [...entries.values()]
+    .filter((entry) => entry.status !== "uploading")
+    .sort((a, b) => a.updatedAt - b.updatedAt);
+  for (const entry of evictable.slice(0, entries.size - MAX_TRACKED_MATCHES)) {
     entries.delete(entry.matchId);
   }
 }
@@ -114,6 +149,37 @@ export function setMatchUpload(
     truncation: prev?.truncation ?? null,
     storagePath: prev?.storagePath ?? null,
     ...patch,
+    updatedAt: Date.now(),
+  };
+  entries.set(matchId, next);
+  evictIfNeeded();
+  emit();
+  return next;
+}
+
+/**
+ * Start a NEW recording attempt for a match: replace the entry outright so
+ * none of the previous attempt's per-attempt fields can survive into it.
+ *
+ * Deliberately a REPLACE, not a merge, and deliberately not `clearMatchUpload`
+ * followed by a write: every field here describes one clip (see the module
+ * docblock), so carrying any of them forward mislabels the new clip, and a
+ * clear-then-write would emit twice and blink the chip through "hidden".
+ *
+ * Called by `useVideoRecorder` the moment it commits to recording, which is
+ * the only point at which the previous outcome is genuinely superseded. A
+ * start that never reaches the camera (no permission, no ref, a deferral
+ * that times out) does NOT reset: nothing was recorded, so the last real
+ * outcome is still the truth about this match.
+ */
+export function beginMatchUploadAttempt(matchId: string): MatchUploadEntry {
+  const next: MatchUploadEntry = {
+    matchId,
+    status: "pending",
+    videoId: null,
+    error: null,
+    truncation: null,
+    storagePath: null,
     updatedAt: Date.now(),
   };
   entries.set(matchId, next);

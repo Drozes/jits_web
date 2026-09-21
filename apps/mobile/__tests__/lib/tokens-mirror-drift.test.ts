@@ -39,12 +39,15 @@
  * Together: the contract is verified everywhere, the file's conformance to the
  * contract is verified wherever the file exists.
  *
- * MIRRORS 3 AND 4 (web) are known-stale until jits-ozvd lands, which another
- * workstream owns, so their divergence is recorded token by token in
- * `__tests__/fixtures/pending-web-drift.json`. The ledger is an EXACT match,
- * not a licence: drift that is not in the ledger fails, and a ledger entry that
- * has stopped diverging ALSO fails, with the lines to delete. It lives in a
- * data file so the jits-ozvd author edits data, not a mobile test.
+ * MIRRORS 3 AND 4 (web) were known-stale until jits-ozvd landed the same AA
+ * repair in both web tokens.css copies. Their ledger,
+ * `__tests__/fixtures/pending-web-drift.json`, is now EMPTY, so both web
+ * mirrors are gated exactly as strictly as the brand file: any divergence from
+ * `lib/tokens.ts` fails. The ledger mechanism is kept for the next time a web
+ * mirror has to diverge deliberately and temporarily. It is an EXACT match, not
+ * a licence: drift that is not in the ledger fails, and a ledger entry that has
+ * stopped diverging ALSO fails, with the lines to delete. It lives in a data
+ * file so whoever owns the web half edits data, not a mobile test.
  *
  * COMPARISON MECHANICS
  *
@@ -375,10 +378,32 @@ function parseStylesheet(css: string): CssBlock[] {
   return parseBody(stripComments(css), []).children;
 }
 
+/**
+ * Selectors are recognised after NORMALISATION, never by literal string
+ * equality. `[data-theme='light']`, `[data-theme = "light"]` and
+ * `[data-theme="light"]` are the same selector to a browser, so a guard that
+ * only accepted the third spelling reported a correct file as catastrophically
+ * drifted: the light block would not be recognised at all and all 17 light
+ * tokens would read "(not declared)". A reformat, a Prettier run or a
+ * SharePoint round-trip must not be able to do that.
+ *
+ * Whitespace around `[`, `]`, `=`, `(`, `)` and `,` is dropped as well. That
+ * also collapses a descendant combinator (`html [data-theme="light"]` becomes
+ * `html[data-theme="light"]`), which is harmless here: both spellings classify
+ * light, and neither is a form the palette files use.
+ */
+function normalizeSelector(selector: string): string {
+  return selector
+    .replace(/'/g, '"')
+    .replace(/\s+/g, " ")
+    .replace(/\s*([[\]=(),])\s*/g, "$1")
+    .trim();
+}
+
 function selectorParts(selector: string): string[] {
   return selector
     .split(",")
-    .map((part) => part.trim())
+    .map((part) => normalizeSelector(part))
     .filter((part) => part.length > 0);
 }
 
@@ -387,30 +412,103 @@ function isAtRule(selector: string): boolean {
 }
 
 /**
- * The theme a block defines, or null if it is not a recognised theme block.
+ * A palette root is built ONLY from these components. Anything else in the
+ * part (a class, an id, an arbitrary pseudo-class, a combinator) makes the
+ * block conditional, which is off-palette territory and must be reported by
+ * `paletteDeclarationsOutsideThemeBlocks` rather than merged: `:root.compact`
+ * is not the palette.
+ */
+const PALETTE_ROOT_SHAPE = /^(?::root|html|\[data-theme="(?:dark|light)"\])+$/;
+const LIGHT_ATTRIBUTE = /\[data-theme="light"\]/;
+
+/**
+ * Drop `:not(...)` groups before classifying. `:root:not([data-theme="light"])`
+ * is the standard "dark unless explicitly light" idiom and is a DARK block; a
+ * classifier that merely looked for the substring `[data-theme="light"]` would
+ * call it light and then report every dark token as missing.
+ */
+function withoutNegations(part: string): string {
+  let out = part;
+  for (;;) {
+    const next = out.replace(/:not\([^()]*\)/g, "");
+    if (next === out) return out;
+    out = next;
+  }
+}
+
+/** The theme ONE selector part selects, or null if it is not a palette root. */
+function themeOfSelectorPart(part: string): Theme | null {
+  const positive = withoutNegations(part);
+  if (!PALETTE_ROOT_SHAPE.test(positive)) return null;
+  return LIGHT_ATTRIBUTE.test(positive) ? "light" : "dark";
+}
+
+/**
+ * EVERY theme a block selects. Not "the first one that matched".
+ *
  * Recognition requires TOP LEVEL (`path.length === 1`): a `:root` nested inside
  * an `@media` is a conditional override, not the palette, and must be reported
  * rather than merged.
+ *
+ * A selector LIST is why this returns a set. The predecessor tested
+ * `[data-theme="light"]` first and RETURNED on the first match, so
+ *
+ *     [data-theme="light"], :root { --bg-primary: #F2F4F7 }
+ *
+ * was classified light-only and its declarations were merged nowhere near the
+ * dark palette. In a browser that same block also matches `:root` at equal
+ * specificity and, appearing later in the file, WINS: the rendered dark page
+ * background silently became the light one while this guard reported agreement
+ * in green. Verified empirically. Classifying by every part closes it.
  */
-function themeOf(block: CssBlock): Theme | null {
-  if (block.path.length !== 1) return null;
-  if (isAtRule(block.selector)) return null;
-  const parts = selectorParts(block.selector);
-  if (parts.includes('[data-theme="light"]')) return "light";
-  if (parts.includes(":root") || parts.includes('[data-theme="dark"]')) return "dark";
-  return null;
+function themesOf(block: CssBlock): Theme[] {
+  if (block.path.length !== 1) return [];
+  if (isAtRule(block.selector)) return [];
+  const found: Theme[] = [];
+  for (const part of selectorParts(block.selector)) {
+    const theme = themeOfSelectorPart(part);
+    if (theme !== null && found.indexOf(theme) === -1) found.push(theme);
+  }
+  return found;
 }
 
-/** Collapse every recognised block for `theme`, later blocks winning. */
+/** Collapse every block that selects `theme`, later blocks winning. */
 function declarationsForTheme(blocks: readonly CssBlock[], theme: Theme): Declarations {
   const merged: Declarations = {};
   for (const block of blocks) {
-    if (themeOf(block) !== theme) continue;
+    if (themesOf(block).indexOf(theme) === -1) continue;
     for (const [name, value] of Object.entries(block.declarations)) {
       merged[name] = value;
     }
   }
   return merged;
+}
+
+/**
+ * Top-level blocks whose selector list claims BOTH palettes while declaring
+ * palette properties. Merging into both themes (above) already stops such a
+ * block from hiding, but it must ALSO fail by name: one block cannot express
+ * two palettes, so whatever it declares lands in both and one of the two themes
+ * is silently wearing the other's colour. Reported as a conflict, the author
+ * sees the cause; left to surface as a token diff, they see an inscrutable
+ * "dark --bg-primary resolves to #f2f4f7" and go looking in the wrong block.
+ */
+function blocksClaimingBothThemes(
+  blocks: readonly CssBlock[],
+  watched: ReadonlySet<string>,
+): string[] {
+  const conflicts: string[] = [];
+  for (const block of blocks) {
+    if (themesOf(block).length < 2) continue;
+    const declared = Object.keys(block.declarations)
+      .filter((name) => watched.has(name))
+      .sort();
+    if (declared.length === 0) continue;
+    conflicts.push(
+      `${normalizeSelector(block.selector)} selects the dark AND the light palette, and declares ${declared.join(", ")}`,
+    );
+  }
+  return conflicts.sort();
 }
 
 // ---------------------------------------------------------------------------
@@ -527,7 +625,7 @@ function paletteDeclarationsOutsideThemeBlocks(
   const leaks: string[] = [];
 
   const visit = (block: CssBlock): void => {
-    if (themeOf(block) === null) {
+    if (themesOf(block).length === 0) {
       for (const name of Object.keys(block.declarations)) {
         if (watched.has(name)) {
           leaks.push(`${name} declared at ${block.path.join(" > ").replace(/\s+/g, " ")}`);
@@ -644,6 +742,182 @@ describe("token mapping table", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Theme-block classification
+//
+// The guard's whole value rests on classifying a block into the theme(s) a
+// browser would actually apply it to. Two ways that went wrong, both fixed
+// here and both pinned by the tests below:
+//
+//   DEFEAT (the guard reports green while the rendered palette has changed):
+//     a selector LIST naming both a theme attribute and `:root`. The old
+//     classifier returned on its first match, so the block was filed light-only
+//     and never reached the dark palette, even though `:root` matches at equal
+//     specificity and wins by document order.
+//
+//   FALSE POSITIVE (the guard reports red on a correct file): selector
+//     recognition by literal string equality, so a single-quoted, qualified or
+//     negated spelling of the very same selector was not recognised at all and
+//     every token in that block read "(not declared)".
+// ---------------------------------------------------------------------------
+
+/**
+ * A minimal but COMPLETE two-block stylesheet holding the agreed palette, so a
+ * classification test measures classification and nothing else. `extra` is
+ * appended verbatim after the two blocks, which is where a defeating block goes
+ * (document order matters: it has to come last to win).
+ */
+function stylesheetFixture(darkSelector: string, lightSelector: string, extra = ""): string {
+  const body = (theme: Theme) =>
+    MAPPED_CSS_NAMES.map((cssName) => `  ${cssName}: ${BRAND_PALETTE_SNAPSHOT[theme][cssName]};`).join(
+      "\n",
+    );
+  return (
+    `${darkSelector} {\n${body("dark")}\n}\n\n` +
+    `${lightSelector} {\n${body("light")}\n}\n\n${extra}\n`
+  );
+}
+
+function divergencesIn(css: string): Divergence[] {
+  return divergencesBetween(resolvedPalette(parseStylesheet(css)), BRAND_PALETTE_SNAPSHOT);
+}
+
+describe("theme-block classification", () => {
+  it("classifies a single selector part by the theme a browser would apply it to", () => {
+    const themeOfPart = (selector: string) =>
+      themeOfSelectorPart(selectorParts(selector)[0] ?? "");
+
+    expect(themeOfPart(":root")).toBe("dark");
+    expect(themeOfPart("html")).toBe("dark");
+    expect(themeOfPart('[data-theme="dark"]')).toBe("dark");
+    expect(themeOfPart('html[data-theme="dark"]')).toBe("dark");
+    expect(themeOfPart('[data-theme="light"]')).toBe("light");
+    expect(themeOfPart('html[data-theme="light"]')).toBe("light");
+    expect(themeOfPart(":root[data-theme=\"light\"]")).toBe("light");
+
+    // ":not(light)" is the "dark unless explicitly light" idiom, NOT a light
+    // block. A substring test for [data-theme="light"] gets this backwards.
+    expect(themeOfPart(':root:not([data-theme="light"])')).toBe("dark");
+    expect(themeOfPart(':root:not([data-theme="dark"])')).toBe("dark");
+
+    // Conditional roots are not the palette: they stay off-palette so that
+    // paletteDeclarationsOutsideThemeBlocks reports them.
+    expect(themeOfPart(":root.compact")).toBeNull();
+    expect(themeOfPart("body")).toBeNull();
+    expect(themeOfPart(".theme-dark")).toBeNull();
+  });
+
+  it("recognises reformatted spellings of the same selector (no false positive)", () => {
+    // Every one of these is the identical stylesheet to a browser. Before
+    // normalisation each turned the guard red with 17 "(not declared)" tokens.
+    const spellings: Array<[string, string]> = [
+      [':root, [data-theme="dark"]', '[data-theme="light"]'],
+      [":root, [data-theme='dark']", "[data-theme='light']"],
+      [':root , [data-theme = "dark"]', '[data-theme = "light"]'],
+      [':root, html[data-theme="dark"]', 'html[data-theme="light"]'],
+      [':root:not([data-theme="light"])', '[data-theme="light"]'],
+      [':root,\n[data-theme="dark"]', '[data-theme="light"]'],
+    ];
+
+    for (const [darkSelector, lightSelector] of spellings) {
+      const divergences = divergencesIn(stylesheetFixture(darkSelector, lightSelector));
+      expect({ darkSelector, lightSelector, divergences }).toEqual({
+        darkSelector,
+        lightSelector,
+        divergences: [],
+      });
+    }
+  });
+
+  it("catches a selector LIST that claims both palettes and rewrites the dark one", () => {
+    // THE DEFEAT. This block matches :root at equal specificity and comes last,
+    // so a browser paints the dark page background #F2F4F7. The predecessor
+    // classifier filed it light-only and reported the mirror as agreeing.
+    const css = stylesheetFixture(
+      ':root, [data-theme="dark"]',
+      '[data-theme="light"]',
+      '[data-theme="light"], :root { --bg-primary: #F2F4F7; }',
+    );
+
+    const blocks = parseStylesheet(css);
+
+    // 1. The block is filed under BOTH themes, so the dark palette shows it.
+    expect(themesOf(blocks[blocks.length - 1])).toEqual(["light", "dark"]);
+    expect(resolvedPalette(blocks).dark["--bg-primary"]).toBe("#f2f4f7");
+
+    // BOTH themes diverge, which is the honest reading: one block cannot hold
+    // two palettes, so #F2F4F7 lands in light as well (where the AA repair
+    // lifted the page to #F8FAFC). The entry that matters is the DARK one: it
+    // is the one the predecessor classifier could not see at all.
+    const divergences = divergencesIn(css);
+    expect(divergences.map((d) => d.key).sort()).toEqual([
+      "dark --bg-primary",
+      "light --bg-primary",
+    ]);
+    const darkDivergence = divergences.filter((d) => d.theme === "dark")[0];
+    expect(darkDivergence.actual).toBe("#f2f4f7");
+    expect(darkDivergence.expected).toBe(BRAND_PALETTE_SNAPSHOT.dark["--bg-primary"]);
+
+    // 2. And it fails BY NAME, so the author is pointed at the block rather
+    //    than at an inscrutable token diff.
+    const watched = watchedNames(
+      declarationsForTheme(blocks, "dark"),
+      declarationsForTheme(blocks, "light"),
+    );
+    const conflicts = blocksClaimingBothThemes(blocks, watched);
+    expect(conflicts).toHaveLength(1);
+    expect(conflicts[0]).toContain("selects the dark AND the light palette");
+    expect(conflicts[0]).toContain("--bg-primary");
+  });
+
+  it("does not cry conflict over a dark-only list or a non-palette declaration", () => {
+    const darkOnly = parseStylesheet(
+      stylesheetFixture(':root, [data-theme="dark"]', '[data-theme="light"]'),
+    );
+    const watchedDarkOnly = watchedNames(
+      declarationsForTheme(darkOnly, "dark"),
+      declarationsForTheme(darkOnly, "light"),
+    );
+    expect(blocksClaimingBothThemes(darkOnly, watchedDarkOnly)).toEqual([]);
+
+    // Claims both themes, but declares nothing the palette cares about.
+    const harmless = parseStylesheet(
+      stylesheetFixture(
+        ':root, [data-theme="dark"]',
+        '[data-theme="light"]',
+        '[data-theme="light"], :root { --duration-fast: 0ms; }',
+      ),
+    );
+    const watchedHarmless = watchedNames(
+      declarationsForTheme(harmless, "dark"),
+      declarationsForTheme(harmless, "light"),
+    );
+    expect(blocksClaimingBothThemes(harmless, watchedHarmless)).toEqual([]);
+  });
+
+  it("still refuses to merge a nested or conditional root", () => {
+    const css = stylesheetFixture(
+      ':root, [data-theme="dark"]',
+      '[data-theme="light"]',
+      "@media (prefers-color-scheme: light) { :root { --text-tertiary: #6B7280; } }\n" +
+        ":root.compact { --text-tertiary: #6B7280; }",
+    );
+    const blocks = parseStylesheet(css);
+    const watched = watchedNames(
+      declarationsForTheme(blocks, "dark"),
+      declarationsForTheme(blocks, "light"),
+    );
+
+    // Neither rewrites the compared palette...
+    expect(divergencesIn(css)).toEqual([]);
+    // ...and both are reported as off-palette rather than silently accepted.
+    expect(paletteDeclarationsOutsideThemeBlocks(blocks, watched)).toEqual([
+      "--text-tertiary declared at :root.compact",
+      "--text-tertiary declared at @media (prefers-color-scheme: light) > :root",
+    ]);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // The committed contract, verified EVERYWHERE including CI and worktrees
 // ---------------------------------------------------------------------------
 
@@ -738,7 +1012,27 @@ describe(BRAND_MIRROR.label, () => {
       const dark = declarationsForTheme(blocks, "dark");
       const light = declarationsForTheme(blocks, "light");
 
-      const leaks = paletteDeclarationsOutsideThemeBlocks(blocks, watchedNames(dark, light));
+      const watched = watchedNames(dark, light);
+
+      const conflicts = blocksClaimingBothThemes(blocks, watched);
+      if (conflicts.length > 0) {
+        throw new Error(
+          [
+            `The brand canonical tokens.css has ${conflicts.length} block(s) whose selector`,
+            "list selects BOTH palettes at once. Such a block lands in both themes, so one",
+            "of the two is wearing the other's colour, and a classifier that stopped at the",
+            "first matching selector part would not even see it.",
+            "",
+            "Split it: one block per palette.",
+            "",
+            ...conflicts.map((conflict) => `      ${conflict}`),
+            "",
+            `File: ${BRAND_MIRROR.relativePath}`,
+          ].join("\n"),
+        );
+      }
+
+      const leaks = paletteDeclarationsOutsideThemeBlocks(blocks, watched);
       if (leaks.length > 0) {
         throw new Error(
           [
@@ -797,6 +1091,15 @@ describe.each(WEB_MIRRORS.map((mirror) => [mirror.label, mirror] as const))(
         declarationsForTheme(blocks, "light"),
       );
       expect(paletteDeclarationsOutsideThemeBlocks(blocks, watched)).toEqual([]);
+    });
+
+    it("declares no block whose selector list claims both palettes", () => {
+      const blocks = readMirror(mirror);
+      const watched = watchedNames(
+        declarationsForTheme(blocks, "dark"),
+        declarationsForTheme(blocks, "light"),
+      );
+      expect(blocksClaimingBothThemes(blocks, watched)).toEqual([]);
     });
 
     it("diverges from lib/tokens.ts exactly as the jits-ozvd pending ledger records", () => {

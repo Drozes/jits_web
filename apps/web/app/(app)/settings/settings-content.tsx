@@ -53,7 +53,7 @@ function AccountSection({ email }: { email: string }) {
           style={{
             fontFamily: "var(--font-mono)",
             fontSize: "var(--size-num-xs)",
-            color: "var(--accent-cta)",
+            color: "var(--accent-cta-text)",
             textTransform: "uppercase",
             letterSpacing: "var(--ls-caps-l)",
             lineHeight: 1.2,

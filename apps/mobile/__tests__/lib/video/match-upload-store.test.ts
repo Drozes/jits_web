@@ -11,6 +11,7 @@
 import { renderHook, act } from "@testing-library/react-native";
 import {
   MAX_TRACKED_MATCHES,
+  beginMatchUploadAttempt,
   clearMatchUpload,
   getMatchUpload,
   resetMatchUploadStore,
@@ -93,6 +94,68 @@ describe("match upload store", () => {
     expect(getMatchUpload(`M${MAX_TRACKED_MATCHES + 2}`)?.videoId).toBe(
       `VID-${MAX_TRACKED_MATCHES + 2}`,
     );
+  });
+
+  it("never evicts a match whose upload is still IN FLIGHT", () => {
+    // A gym ladder night is >8 matches in one session, which is exactly the
+    // case the cap exists for and exactly the case that can leave an old
+    // upload still running. Evicting it loses the storagePath the retry has
+    // to reuse and the truncation the user still has to be told about, and
+    // the in-flight upload then re-creates the entry from nothing when it
+    // lands: a clean "uploaded" with neither.
+    setMatchUpload("OLD", {
+      status: "uploading",
+      storagePath: "OLD/A/1.mp4",
+      truncation: "limit",
+    });
+    for (let i = 0; i < MAX_TRACKED_MATCHES + 2; i++) {
+      setMatchUpload(`M${i}`, { status: "uploaded", videoId: `VID-${i}` });
+    }
+
+    expect(getMatchUpload("OLD")).toMatchObject({
+      status: "uploading",
+      storagePath: "OLD/A/1.mp4",
+      truncation: "limit",
+    });
+    // Settled entries are still capped: the oldest of THOSE went instead.
+    expect(getMatchUpload("M0")).toBeNull();
+  });
+});
+
+describe("beginMatchUploadAttempt", () => {
+  it("clears every per-attempt field, so nothing describes the previous clip", () => {
+    setMatchUpload("M1", {
+      status: "uploaded",
+      videoId: "VID-OLD",
+      truncation: "interrupted",
+      storagePath: "M1/A1/1.mp4",
+      error: "stale",
+    });
+
+    expect(beginMatchUploadAttempt("M1")).toMatchObject({
+      matchId: "M1",
+      status: "pending",
+      videoId: null,
+      error: null,
+      truncation: null,
+      storagePath: null,
+    });
+    expect(getMatchUpload("M1")).toMatchObject({ status: "pending", videoId: null });
+  });
+
+  it("notifies subscribers once, so the chip does not blink through hidden", () => {
+    const listener = jest.fn();
+    setMatchUpload("M1", { status: "uploaded", videoId: "VID-OLD" });
+    subscribeMatchUpload(listener);
+
+    beginMatchUploadAttempt("M1");
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves other matches alone", () => {
+    setMatchUpload("M2", { status: "uploaded", videoId: "VID-2" });
+    beginMatchUploadAttempt("M1");
+    expect(getMatchUpload("M2")?.videoId).toBe("VID-2");
   });
 });
 
@@ -182,6 +245,52 @@ describe("deriveUploadBannerState", () => {
     ).toMatchObject({ kind: "uploaded", truncation: "limit" });
   });
 
+  it("shows a LIVE recorder failure over a STALE store success", () => {
+    // Only a recorder that exists can be in "error"; a remounted one is
+    // "idle". So this is a failure happening now, over a store entry that
+    // can be a previous attempt's outcome on the same match. Checking the
+    // store first rendered a green "Match video uploaded" chip while the
+    // recorder was reporting a camera the user had just denied.
+    expect(
+      deriveUploadBannerState(
+        "error",
+        "Camera permission required",
+        entry({ status: "uploaded", videoId: "VID-OLD" }),
+      ),
+    ).toMatchObject({ kind: "error", message: "Camera permission required" });
+  });
+
+  it("keeps a live recorder failure ahead of a stale PENDING or ERROR entry too", () => {
+    expect(
+      deriveUploadBannerState(
+        "error",
+        "Camera not ready",
+        entry({ status: "pending", truncation: "limit" }),
+      ),
+    ).toMatchObject({ kind: "error", message: "Camera not ready", truncation: "limit" });
+    // Same kind either way, but the live message is the current one.
+    expect(
+      deriveUploadBannerState(
+        "error",
+        "Recording failed: session configuration failed",
+        entry({ status: "error", error: "Upload failed: old" }),
+      ),
+    ).toMatchObject({
+      kind: "error",
+      message: "Recording failed: session configuration failed",
+    });
+  });
+
+  it("still trusts the store when the recorder is idle, which is the remount case", () => {
+    // The reorder above must not cost the property the store exists for.
+    expect(
+      deriveUploadBannerState("idle", "ignored", entry({ status: "uploading" })).kind,
+    ).toBe("uploading");
+    expect(
+      deriveUploadBannerState("idle", "ignored", entry({ status: "uploaded" })).kind,
+    ).toBe("uploaded");
+  });
+
   it("falls back to recorder failures that never reached an upload", () => {
     // No camera, no permission, a stop the hardware never honoured.
     expect(deriveUploadBannerState("error", "Camera not ready", null)).toMatchObject({
@@ -201,5 +310,10 @@ describe("deriveUploadBannerState", () => {
     expect(
       deriveUploadBannerState("idle", null, entry({ status: "error", error: null })).message,
     ).toBeTruthy();
+    // A recorder error with no message of its own borrows the store's
+    // rather than falling all the way to the generic string.
+    expect(
+      deriveUploadBannerState("error", null, entry({ status: "error", error: "boom" })).message,
+    ).toBe("boom");
   });
 });

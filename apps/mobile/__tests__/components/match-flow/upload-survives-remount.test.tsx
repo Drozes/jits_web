@@ -46,13 +46,23 @@ jest.mock("expo-camera", () => {
   const R = require("react");
   const RN = require("react-native");
   return {
+    // Attaches the imperative handle on mount and DETACHES it on unmount,
+    // the way React really manages a ref (mutation phase, before any
+    // passive cleanup). A stub that only ever attaches hides every
+    // unmount-time bug; see the same note in record-upload-sequence.test.tsx.
     CameraView: R.forwardRef(
       (props: { onCameraReady?: () => void }, ref: React.Ref<unknown>) => {
+        R.useLayoutEffect(() => {
+          const set = (v: unknown) => {
+            if (typeof ref === "function") ref(v);
+            else if (ref && typeof ref === "object") {
+              (ref as { current: unknown }).current = v;
+            }
+          };
+          set(mockCamera);
+          return () => set(null);
+        }, []);
         R.useEffect(() => {
-          if (typeof ref === "function") ref(mockCamera);
-          else if (ref && typeof ref === "object") {
-            (ref as { current: unknown }).current = mockCamera;
-          }
           props.onCameraReady?.();
         }, []);
         return R.createElement(RN.View, { testID: "camera-view" });
@@ -346,6 +356,29 @@ async function completeMatch(status: "completed" | "disputed" = "completed") {
     mockRowChange.handler?.({ new: { status } });
   });
 }
+
+/**
+ * `useMatchDetails` is real in this file, so it is the right place to pin
+ * that a failed FIRST load is reachable and renders the error splash rather
+ * than a spinner that never resolves.
+ */
+describe("a first load that fails", () => {
+  it("reaches the error splash instead of a permanent loading spinner", async () => {
+    // getMatchDetails resolves null on ANY failure, so the real hook ends
+    // the first load with `error` set and `match` still null. The wizard's
+    // loading guard used to include `|| !match` AND run first, so `!match`
+    // won and WizardError was unreachable.
+    mockGetMatchDetails.mockResolvedValue(null);
+
+    const screen = renderWizard();
+
+    await waitFor(() => expect(screen.getByText("Match unavailable")).toBeTruthy());
+    screen.getByText("Match not found");
+    // With an exit, which the spinner never offered.
+    screen.getByText("Back to Arena");
+    expect(screen.queryByText("Loading match...")).toBeNull();
+  });
+});
 
 describe("the confirm-to-summary refresh cannot erase the upload", () => {
   it("still shows the failure on the summary after the row completes", async () => {

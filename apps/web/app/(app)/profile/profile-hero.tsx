@@ -148,7 +148,7 @@ export function ProfileHero({
             letterSpacing: "var(--ls-caps-l)",
           }}
         >
-          <strong style={{ color: "var(--accent-cta)", fontWeight: 700 }}>
+          <strong style={{ color: "var(--accent-cta-text)", fontWeight: 700 }}>
             #{rank}
           </strong>{" "}
           · Global

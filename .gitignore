@@ -16,6 +16,10 @@ node_modules/
 /test-results/
 # Playwright output also lands under apps/web/; match at any depth.
 test-results/
+playwright-report/
+
+# Agent worktrees (see the agent-worktree-stale-main memory).
+.worktrees/
 
 # next.js
 .next/

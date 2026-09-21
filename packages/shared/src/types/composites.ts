@@ -195,3 +195,51 @@ export interface RecentActivityItem {
   match_type: string;
   completed_at: string;
 }
+
+// ---------------------------------------------------------------------------
+// Pending challenges (challenge inbox / outbox)
+// ---------------------------------------------------------------------------
+
+/**
+ * One live challenge as the inbox/outbox surfaces render it: still `pending`
+ * and not yet past `expires_at`, with BOTH display names resolved so a caller
+ * can render either direction without a second lookup.
+ *
+ * DELIBERATELY DECLARED HERE, NOT IN `api/queries.ts`. The root barrel
+ * (`src/index.ts`) star-exports both `./api` and `./hooks`, and
+ * `hooks/use-pending-challenges.ts` already exports a different, narrower
+ * `PendingChallenge` (received-only, no ids). Exporting a second one through
+ * `./api` would make the name ambiguous in the barrel and fail the build with
+ * TS2308. Living in `types/composites.ts` keeps the intended name AND keeps the
+ * two out of the same barrel:
+ *
+ *     import { getPendingChallengesForAthlete } from "@jits/shared/api/queries";
+ *     import type { PendingChallenge } from "@jits/shared/types/composites";
+ */
+export interface PendingChallenge {
+  challengeId: string;
+  challengerId: string;
+  opponentId: string;
+  /** `athletes.display_name` of the challenger; "Unknown" if the join is empty. */
+  challengerName: string;
+  /** `athletes.display_name` of the opponent; "Unknown" if the join is empty. */
+  opponentName: string;
+  matchType: Database["public"]["Enums"]["match_type_enum"];
+  createdAt: string;
+  expiresAt: string;
+  /** Weights (lbs) proposed on the challenge; null when not supplied. */
+  challengerWeight: number | null;
+  opponentWeight: number | null;
+}
+
+/**
+ * The athlete's live challenges, split by direction.
+ *
+ * `incoming` = they are the OPPONENT (someone challenged them: the inbox, the
+ * side with accept/decline). `outgoing` = they are the CHALLENGER (what they
+ * sent and are waiting on). Both are newest-first.
+ */
+export interface PendingChallengesForAthlete {
+  incoming: PendingChallenge[];
+  outgoing: PendingChallenge[];
+}

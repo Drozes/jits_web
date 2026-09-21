@@ -1,9 +1,12 @@
 import { describe, it, expect, vi } from "vitest";
 import {
+  getArenaData,
+  getArenaDataResult,
   getGymDetail,
   getGymDetailResult,
   getGymsWithSessions,
   getGymsWithSessionsResult,
+  getPendingChallengesForAthlete,
 } from "./queries";
 
 // ---------------------------------------------------------------------------
@@ -509,5 +512,335 @@ describe("getGymDetailResult (jits-icei.5)", () => {
     expect(detail).not.toBeNull();
     expect(detail?.sessions).toEqual([]);
     expect(detail?.name).toBe("Test Gym");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getArenaDataResult (Task 1): the arena read gets a failure signal, and the
+// lenient getArenaData keeps its exact old behaviour because mobile's
+// use-arena-roster.ts derives "failed read" from the null it returns.
+//
+// Every failure here is a RESOLVED { data: null, error }, never a rejection,
+// for the reason documented at the top of this file.
+// ---------------------------------------------------------------------------
+
+const ARENA_PAYLOAD = {
+  looking_athletes: [
+    {
+      id: "a1",
+      display_name: "Rival",
+      current_elo: 1200,
+      gym_name: "Test Gym",
+      looking_for_casual: true,
+      looking_for_ranked: true,
+      profile_photo_url: null,
+      current_weight: 170,
+    },
+  ],
+  other_athletes: [],
+  challenged_opponent_ids: ["a9"],
+  recent_activity: [],
+};
+
+/** Silences the console.error both arena wrappers emit on a failed read. */
+function silenceErrors() {
+  return vi.spyOn(console, "error").mockImplementation(() => {});
+}
+
+describe("getArenaDataResult", () => {
+  it("reports success and hands back the payload on a healthy read", async () => {
+    const { client, reads } = fifoClient({}, { get_arena_data: { data: ARENA_PAYLOAD } });
+    const result = await getArenaDataResult(client, 100);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.looking_athletes).toHaveLength(1);
+      expect(result.data.challenged_opponent_ids).toEqual(["a9"]);
+    }
+    expect(reads).toContain("rpc:get_arena_data");
+  });
+
+  it("reports success with an empty roster, which is a fact the page may state", async () => {
+    const { client } = fifoClient(
+      {},
+      { get_arena_data: { data: { ...ARENA_PAYLOAD, looking_athletes: [] } } },
+    );
+    const result = await getArenaDataResult(client, 100);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.data.looking_athletes).toEqual([]);
+  });
+
+  /**
+   * THE CRASH THIS TASK EXISTS TO CLOSE. The old getArenaData logged the error
+   * and returned `data`, which is null on failure, and web /arena then called
+   * `.map()` on `arena.looking_athletes` — a TypeError on a primary nav tab.
+   */
+  it("reports failure, rather than a null payload, when the RPC fails", async () => {
+    const spy = silenceErrors();
+    const { client } = fifoClient(
+      {},
+      { get_arena_data: { error: { code: "08006", message: "connection failure" } } },
+    );
+    const result = await getArenaDataResult(client, 100);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("UNKNOWN");
+    expect(spy).toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  /**
+   * get_arena_data RAISEs when auth_athlete_id() resolves to nothing, so the
+   * reachable failure on this surface is a P0001, not a network drop. With the
+   * athlete_not_found hint it maps to a specific code the caller could act on.
+   */
+  it("maps the RPC's athlete_not_found RAISE to ATHLETE_NOT_FOUND", async () => {
+    const spy = silenceErrors();
+    const { client } = fifoClient(
+      {},
+      {
+        get_arena_data: {
+          error: {
+            code: "P0001",
+            message: "Athlete not found",
+            hint: "athlete_not_found",
+          },
+        },
+      },
+    );
+    const result = await getArenaDataResult(client, 100);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("ATHLETE_NOT_FOUND");
+    spy.mockRestore();
+  });
+
+  it("reports failure when the RPC answers with no error and no data", async () => {
+    const { client } = fifoClient({}, { get_arena_data: { data: null } });
+    const result = await getArenaDataResult(client, 100);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("UNKNOWN");
+  });
+
+  it("reports failure when the payload is shaped wrong, rather than passing a crash on", async () => {
+    // No looking_athletes key at all. The caller's very next statement is
+    // .map() on it, so "shaped wrong" and "did not load" are the same event as
+    // far as the surface is concerned.
+    const { client } = fifoClient(
+      {},
+      { get_arena_data: { data: { challenged_opponent_ids: [] } } },
+    );
+    const result = await getArenaDataResult(client, 100);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("UNKNOWN");
+  });
+
+  /**
+   * BACKWARD COMPATIBILITY GUARD, AND IT IS LOAD-BEARING.
+   * apps/mobile/lib/arena/use-arena-roster.ts re-widens this to
+   * `ArenaData | null` and treats null as "failed read, do not claim the lobby
+   * is empty". Returning [] or throwing here would delete mobile's only
+   * failure signal.
+   */
+  it("leaves the legacy getArenaData resolving to null on the same failure", async () => {
+    const spy = silenceErrors();
+    const { client } = fifoClient(
+      {},
+      { get_arena_data: { error: { code: "08006", message: "connection failure" } } },
+    );
+    const arena = await getArenaData(client, 100);
+    expect(arena).toBeNull();
+    spy.mockRestore();
+  });
+
+  it("leaves the legacy getArenaData returning the payload on a healthy read", async () => {
+    const { client } = fifoClient({}, { get_arena_data: { data: ARENA_PAYLOAD } });
+    const arena = await getArenaData(client, 100);
+    expect(arena.looking_athletes).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getPendingChallengesForAthlete (Task 4): the challenge inbox/outbox read
+// that web and mobile will both consume.
+// ---------------------------------------------------------------------------
+
+/**
+ * A challenges-table mock that RECORDS the builder calls, so the tests can
+ * assert the server-side filters and not just the mapping. The status and
+ * expiry filters are the difference between an inbox and a list of rows the
+ * athlete can no longer act on, and they are invisible to a mock that only
+ * returns canned data.
+ */
+function challengeClient(resp: Resp) {
+  const calls: { method: string; args: unknown[] }[] = [];
+  const chain: Record<string, unknown> = {};
+  for (const m of ["select", "eq", "gt", "or", "order"]) {
+    chain[m] = (...args: unknown[]) => {
+      calls.push({ method: m, args });
+      return chain;
+    };
+  }
+  chain.then = (resolve: (value: Resp) => unknown) =>
+    resolve({ data: resp.data ?? null, error: resp.error ?? null });
+
+  const client = {
+    from(table: string) {
+      if (table !== "challenges") throw new Error(`unexpected table ${table}`);
+      calls.push({ method: "from", args: [table] });
+      return chain;
+    },
+  } as never;
+  return { client, calls };
+}
+
+const ME = "athlete-me";
+
+const INCOMING_ROW = {
+  id: "c-in",
+  challenger_id: "athlete-rival",
+  opponent_id: ME,
+  match_type: "ranked",
+  created_at: "2026-09-20T10:00:00.000Z",
+  expires_at: "2026-09-22T10:00:00.000Z",
+  challenger_weight: 170,
+  opponent_weight: null,
+  challenger: { display_name: "Rival" },
+  opponent: { display_name: "Me" },
+};
+
+const OUTGOING_ROW = {
+  id: "c-out",
+  challenger_id: ME,
+  opponent_id: "athlete-target",
+  match_type: "casual",
+  created_at: "2026-09-19T10:00:00.000Z",
+  expires_at: "2026-09-21T10:00:00.000Z",
+  challenger_weight: null,
+  opponent_weight: 185,
+  challenger: { display_name: "Me" },
+  opponent: { display_name: "Target" },
+};
+
+describe("getPendingChallengesForAthlete", () => {
+  it("splits rows by the athlete's role on the row", async () => {
+    const { client } = challengeClient({ data: [INCOMING_ROW, OUTGOING_ROW] });
+    const result = await getPendingChallengesForAthlete(client, ME);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.incoming.map((c) => c.challengeId)).toEqual(["c-in"]);
+    expect(result.data.outgoing.map((c) => c.challengeId)).toEqual(["c-out"]);
+
+    const incoming = result.data.incoming[0];
+    expect(incoming).toEqual({
+      challengeId: "c-in",
+      challengerId: "athlete-rival",
+      opponentId: ME,
+      challengerName: "Rival",
+      opponentName: "Me",
+      matchType: "ranked",
+      createdAt: "2026-09-20T10:00:00.000Z",
+      expiresAt: "2026-09-22T10:00:00.000Z",
+      challengerWeight: 170,
+      opponentWeight: null,
+    });
+  });
+
+  it("applies the pending + not-expired + either-direction filters server side", async () => {
+    const { client, calls } = challengeClient({ data: [] });
+    await getPendingChallengesForAthlete(client, ME);
+
+    const eq = calls.find((c) => c.method === "eq");
+    expect(eq?.args).toEqual(["status", "pending"]);
+
+    // A lapsed challenge sits at 'pending' until a BE sweep updates it, so
+    // status alone would show an inbox row the athlete can no longer accept.
+    const gt = calls.find((c) => c.method === "gt");
+    expect(gt?.args[0]).toBe("expires_at");
+    expect(typeof gt?.args[1]).toBe("string");
+    expect(Number.isNaN(Date.parse(gt?.args[1] as string))).toBe(false);
+
+    const or = calls.find((c) => c.method === "or");
+    expect(or?.args[0]).toBe(
+      `challenger_id.eq.${ME},opponent_id.eq.${ME}`,
+    );
+  });
+
+  it("resolves display names when the aliased embed arrives widened to an array", async () => {
+    // Aliased FK joins return a single object, but the generated types have
+    // been known to widen a to-one embed to an array; the name must survive
+    // either shape rather than silently becoming "Unknown".
+    const { client } = challengeClient({
+      data: [
+        {
+          ...INCOMING_ROW,
+          challenger: [{ display_name: "Rival" }],
+          opponent: [{ display_name: "Me" }],
+        },
+      ],
+    });
+    const result = await getPendingChallengesForAthlete(client, ME);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.incoming[0].challengerName).toBe("Rival");
+      expect(result.data.incoming[0].opponentName).toBe("Me");
+    }
+  });
+
+  it("falls back to Unknown when RLS hides the embedded athlete row", async () => {
+    const { client } = challengeClient({
+      data: [{ ...INCOMING_ROW, challenger: null, opponent: null }],
+    });
+    const result = await getPendingChallengesForAthlete(client, ME);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.incoming[0].challengerName).toBe("Unknown");
+      expect(result.data.incoming[0].opponentName).toBe("Unknown");
+    }
+  });
+
+  it("reports success with empty buckets when there are no live challenges", async () => {
+    // A real answer, and the caller is allowed to state it.
+    const { client } = challengeClient({ data: [] });
+    const result = await getPendingChallengesForAthlete(client, ME);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.data).toEqual({ incoming: [], outgoing: [] });
+  });
+
+  it("reports failure, not an empty inbox, when the read fails", async () => {
+    const spy = silenceErrors();
+    const { client } = challengeClient({
+      error: { code: "08006", message: "connection failure" },
+    });
+    const result = await getPendingChallengesForAthlete(client, ME);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("UNKNOWN");
+    expect(spy).toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  it("maps an RLS denial to RLS_VIOLATION rather than to a challenge-quota error", async () => {
+    // 42501 means MAX_PENDING_CHALLENGES only in the challenge_create context;
+    // on a read it is a plain policy denial and must not be relabelled.
+    const spy = silenceErrors();
+    const { client } = challengeClient({
+      error: { code: "42501", message: "permission denied" },
+    });
+    const result = await getPendingChallengesForAthlete(client, ME);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("RLS_VIOLATION");
+    spy.mockRestore();
+  });
+
+  it("ignores a row the athlete is not a party to instead of guessing a direction", async () => {
+    // RLS (challenges_select_own) makes this unreachable in production, but a
+    // row that belongs to neither bucket must be dropped, never defaulted into
+    // one: an outbox entry the athlete never sent would be worse than a gap.
+    const { client } = challengeClient({
+      data: [
+        { ...INCOMING_ROW, id: "c-other", challenger_id: "x", opponent_id: "y" },
+      ],
+    });
+    const result = await getPendingChallengesForAthlete(client, ME);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.data).toEqual({ incoming: [], outgoing: [] });
   });
 });

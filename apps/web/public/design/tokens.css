@@ -15,8 +15,8 @@
 
   --color-void:           #0D0F14;  /* Primary background — 95% of surfaces */
   --color-panel:          #13151B;  /* Slightly lifted surface (Instrument-style) */
-  --color-plate:          #1A1D24;  /* Card / data plate background */
-  --color-plate-bright:   #242832;  /* Hover / focused state for plates */
+  --color-plate:          #1E222B;  /* Card / data plate background (lifted: page separation 1.14 -> 1.20) */
+  --color-plate-bright:   #262A34;  /* Hover / focused state for plates — lightest dark surface, sets the ink floor */
   --color-terminal-white: #E8EDF2;  /* Primary text + wordmark */
   --color-data-gray:      #6B7280;  /* Tertiary text, dividers, metadata */
   --color-data-gray-bright: #9CA3AF; /* Secondary text, labels */
@@ -27,12 +27,16 @@
      Surfaces shift DARKER as they elevate (inverse of Void's ladder).
      These tokens are referenced only by the [data-theme="light"] block below;
      never use them directly in component CSS. */
-  --color-paddock:              #F2F4F7;  /* Light base — page background */
+  --color-paddock:              #F8FAFC;  /* Light base — page background (lifted: plate separation 1.18 -> 1.24) */
   --color-paddock-panel:        #E8EBF0;  /* Light lifted surface (nav, footer) */
   --color-paddock-plate:        #DEE2E9;  /* Light card / data plate */
   --color-paddock-plate-bright: #D2D7E0;  /* Light hover / focused state */
-  --color-gain-green-dark:      #15803D;  /* Gain Green darkened for AA on light surfaces */
-  --color-signal-red-dark:      #C42939;  /* Signal Red darkened for hover on light surfaces */
+  --color-gain-green-dark:      #116A33;  /* Gain Green darkened for AA on light surfaces (4.64:1 on the darkest light surface; #15803D was 3.47:1) */
+  --color-signal-red-dark:      #C42939;  /* INTENTIONALLY UNREFERENCED by this file since light
+                                             --accent-cta-hover moved to #F0556B (jits-ozvd). Kept because
+                                             public/design/elo-rated-style-guide.html still maps it to
+                                             --signal-red-dark. Do not use it for text: 4.79:1 under the old
+                                             white label but only 3.40:1 under the current Void label. */
 
   /* ==========================================================================
      COLOR — Semantic tokens
@@ -47,19 +51,20 @@
 
   --text-primary:        var(--color-terminal-white);
   --text-secondary:      var(--color-data-gray-bright);
-  --text-tertiary:       var(--color-data-gray);
-  --text-on-accent:      var(--color-terminal-white);
+  --text-tertiary:       #8D929D; /* data-gray lifted: 4.60:1 on --color-plate-bright (--color-data-gray was 3.05:1) */
+  --text-on-accent:      var(--color-void); /* Void on Signal Red: 4.60:1 (Terminal White was 3.54:1) */
 
-  --accent-cta:          var(--color-signal-red);
-  --accent-cta-hover:    #F0556B; /* Signal Red lifted for hover */
+  --accent-cta:          var(--color-signal-red);   /* BRAND. Fills and rules only, never text. */
+  --accent-cta-text:     #EC6A74; /* Signal Red tuned for TEXT: 4.70:1 on --color-plate-bright */
+  --accent-cta-hover:    #F0556B; /* Signal Red lifted for hover: 5.67:1 under the Void label */
 
   --state-positive:      var(--color-gain-green);
-  --state-negative:      var(--color-signal-red);
-  --state-neutral:       var(--color-data-gray);
+  --state-negative:      #EC6A74; /* matches --accent-cta-text; text-only usage */
+  --state-neutral:       #8D929D; /* tracks --text-tertiary */
 
-  --border-hairline:        rgba(107, 114, 128, 0.25);
-  --border-hairline-faint:  rgba(107, 114, 128, 0.12);
-  --border-hairline-strong: rgba(107, 114, 128, 0.40);
+  --border-hairline:        rgba(107, 114, 128, 0.45);
+  --border-hairline-faint:  rgba(107, 114, 128, 0.20);
+  --border-hairline-strong: rgba(107, 114, 128, 0.62);
 
   /* ==========================================================================
      TYPOGRAPHY — Font stacks
@@ -265,19 +270,26 @@
 
   --text-primary:      var(--color-void);
   --text-secondary:    #4B5563;                      /* Darker than dark-mode #9CA3AF for AA */
-  --text-tertiary:     var(--color-data-gray);
-  --text-on-accent:    var(--color-terminal-white);  /* CTA text stays white in both modes */
+  --text-tertiary:     #575C68;                      /* data-gray darkened: 4.64:1 on the darkest light surface (--color-data-gray was 3.35:1) */
+  --text-on-accent:    var(--color-void);             /* Void on Signal Red: 4.60:1 (Terminal White was 3.54:1) */
 
-  --accent-cta:        var(--color-signal-red);
-  --accent-cta-hover:  var(--color-signal-red-dark);
+  --accent-cta:        var(--color-signal-red);      /* BRAND. Fills and rules only, never text. */
+  --accent-cta-text:   #AC2B34;                      /* Signal Red tuned for TEXT: 4.62:1 on the darkest light surface */
+  --accent-cta-hover:  #F0556B;                      /* Same lifted red as dark mode: 5.67:1 under the Void label.
+                                                        DOCUMENTED EXCEPTION: as a FILL this pressed state cannot also
+                                                        clear WCAG 1.4.11's 3:1 against the light surfaces. Holding the
+                                                        #0D0F14 label at 4.5:1 needs fill luminance >= 0.1965; holding
+                                                        3:1 against --color-paddock-plate-bright needs <= 0.1923. That
+                                                        window is empty, so the label wins and the fill boundary is
+                                                        accepted at 2.83 / 2.60 / 2.34:1 (panel / plate / plate-bright). */
 
   --state-positive:    var(--color-gain-green-dark); /* AA-passing on light surfaces */
-  --state-negative:    var(--color-signal-red);
-  --state-neutral:     var(--color-data-gray);
+  --state-negative:    #AC2B34;                      /* matches --accent-cta-text; text-only usage */
+  --state-neutral:     #575C68;                      /* tracks --text-tertiary */
 
-  --border-hairline:        rgba(13, 15, 20, 0.14);
-  --border-hairline-faint:  rgba(13, 15, 20, 0.07);
-  --border-hairline-strong: rgba(13, 15, 20, 0.25);
+  --border-hairline:        rgba(13, 15, 20, 0.22);
+  --border-hairline-faint:  rgba(13, 15, 20, 0.11);
+  --border-hairline-strong: rgba(13, 15, 20, 0.34);
 }
 
 /* ============================================================================

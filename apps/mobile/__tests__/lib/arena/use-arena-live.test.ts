@@ -41,11 +41,45 @@ jest.mock("@/components/ui/toast", () => ({
   toast: { error: (...a: unknown[]) => mockToastError(...a), info: jest.fn() },
 }));
 
+// The client is an opaque handle here: the hook only ever passes it through
+// to `toggleMatchPreferences`. What matters for timing is the `leaveLobby`
+// mock above, because that is the call that wraps `channel.untrack()`.
 jest.mock("@/lib/supabase/client", () => ({ supabase: {} }));
 
 import { useArenaLive, type UseArenaLiveArgs } from "@/lib/arena/use-arena-live";
 
 // ---- fixtures ----
+
+/**
+ * A promise the test releases by hand.
+ *
+ * `leaveLobby()` awaits `channel.untrack()`, which is a presence SEND, so it
+ * takes the websocket push branch: when the socket is not connected the push
+ * is buffered with its timeout already running and resolves 'timed out' only
+ * after ten seconds. A mock that resolves immediately cannot represent that,
+ * which is how a flag write sequenced behind it looked fine in tests while
+ * never leaving a suspended device.
+ */
+/**
+ * Drain the microtask queue. Enough passes for a settled transition to walk
+ * its promise chain, and no passes at all for one that is genuinely blocked.
+ */
+async function flush() {
+  for (let i = 0; i < 8; i++) await Promise.resolve();
+}
+
+function deferred<T = void>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  // Nothing in these tests consumes the rejection directly; the hook is the
+  // only consumer and the point is that it handles it.
+  promise.catch(() => {});
+  return { promise, resolve, reject };
+}
 
 const ARGS: UseArenaLiveArgs = {
   athleteId: "me-1",
@@ -188,7 +222,11 @@ describe("going live", () => {
 });
 
 describe("going offline", () => {
-  it("leaves presence before clearing the flag", async () => {
+  it("issues the untrack first but does not sequence the flag write behind it", async () => {
+    // Order of ISSUE, not of completion: both go out in the same tick. The
+    // untrack goes first because it shortens the window where the athlete is
+    // still challengeable, and the flag write does not wait for it because
+    // the flag is the half that never heals itself.
     const { result } = mount();
     await act(async () => {
       await result.current.toggle();
@@ -200,6 +238,97 @@ describe("going offline", () => {
     });
 
     expect(mockCalls).toEqual(["leaveLobby", "flag:false"]);
+    expect(result.current.isLive).toBe(false);
+  });
+
+  it("writes the clearing flag without waiting for a slow untrack", async () => {
+    // The whole reason this hook exists. `leaveLobby()` can hang for ten
+    // seconds on a socket that is already gone, and iOS suspends a
+    // backgrounded process long before that, so a flag write queued behind
+    // the untrack is a write that never leaves the device: the athlete sits
+    // in "Open to challenges" with the app closed, and the next visit
+    // re-asserts the flag rather than correcting it.
+    const untrack = deferred();
+    mockLeaveLobby.mockReturnValue(untrack.promise);
+    const { result } = mount();
+    await act(async () => {
+      await result.current.toggle();
+    });
+    mockToggleMatchPreferences.mockClear();
+
+    await act(async () => {
+      appStateHandler?.("background");
+      await Promise.resolve();
+    });
+
+    // Still in flight, exactly as it would be for the whole ten seconds.
+    expect(mockLeaveLobby).toHaveBeenCalled();
+    expect(lastFlagWrite()).toEqual({
+      lookingForCasual: false,
+      lookingForRanked: false,
+    });
+
+    await act(async () => {
+      untrack.resolve();
+      await Promise.resolve();
+    });
+  });
+
+  it("settles the toggle without waiting for a slow untrack", async () => {
+    // Same reasoning one layer up: awaiting the untrack would leave the
+    // switch spinning for ten seconds on a bad connection. Asserted on a
+    // flushed microtask queue rather than by awaiting the toggle, so a
+    // regression fails this test instead of hanging the suite.
+    const untrack = deferred();
+    const { result } = mount();
+    await act(async () => {
+      await result.current.toggle();
+    });
+    mockLeaveLobby.mockReturnValue(untrack.promise);
+
+    let settled = false;
+    await act(async () => {
+      void result.current.toggle().then(() => {
+        settled = true;
+      });
+      await flush();
+    });
+
+    expect(settled).toBe(true);
+    expect(result.current.isLive).toBe(false);
+    expect(result.current.isSaving).toBe(false);
+    expect(lastFlagWrite()).toEqual({
+      lookingForCasual: false,
+      lookingForRanked: false,
+    });
+    expect(mockToastError).not.toHaveBeenCalled();
+
+    await act(async () => {
+      untrack.resolve();
+      await flush();
+    });
+  });
+
+  it("clears the flag even when the untrack rejects", async () => {
+    // An untrack that throws must not take the flag write down with it.
+    // Presence lapses when the socket dies; the column does not.
+    jest.spyOn(console, "warn").mockImplementation(() => {});
+    mockLeaveLobby.mockRejectedValue(new Error("untrack failed"));
+    const { result } = mount();
+    await act(async () => {
+      await result.current.toggle();
+    });
+    mockToggleMatchPreferences.mockClear();
+
+    await act(async () => {
+      appStateHandler?.("background");
+      await Promise.resolve();
+    });
+
+    expect(lastFlagWrite()).toEqual({
+      lookingForCasual: false,
+      lookingForRanked: false,
+    });
     expect(result.current.isLive).toBe(false);
   });
 
@@ -290,6 +419,113 @@ describe("going offline", () => {
       lookingForCasual: false,
       lookingForRanked: false,
     });
+  });
+});
+
+describe("coming back from the background", () => {
+  it("puts a backgrounded athlete back in the lobby on return", async () => {
+    // Backgrounding clears both signals defensively, not because the athlete
+    // asked to stop. Without a re-assert on the way back they are silently
+    // offline, with a toggle that still reads live-capable, until they think
+    // to tap it twice.
+    const { result } = mount();
+    await act(async () => {
+      await result.current.toggle();
+    });
+    await act(async () => {
+      appStateHandler?.("background");
+      await Promise.resolve();
+    });
+    expect(result.current.isLive).toBe(false);
+    mockCalls.length = 0;
+    mockJoinLobby.mockClear();
+
+    await act(async () => {
+      appStateHandler?.("active");
+      await Promise.resolve();
+    });
+
+    expect(mockCalls).toEqual(["flag:true", "joinLobby"]);
+    expect(result.current.isLive).toBe(true);
+  });
+
+  it("does NOT resurrect a state the athlete themselves turned off", async () => {
+    // The intent read at background time is the whole guard: an athlete who
+    // toggled off and then closed the app must not come back advertised.
+    const { result } = mount();
+    await act(async () => {
+      await result.current.toggle();
+    });
+    await act(async () => {
+      await result.current.toggle();
+    });
+    await act(async () => {
+      appStateHandler?.("background");
+      await Promise.resolve();
+    });
+    mockCalls.length = 0;
+
+    await act(async () => {
+      appStateHandler?.("active");
+      await Promise.resolve();
+    });
+
+    expect(mockCalls).toEqual([]);
+    expect(result.current.isLive).toBe(false);
+  });
+
+  it("does not resume when the athlete has left the Arena tab", async () => {
+    const { result, rerender } = mount();
+    await act(async () => {
+      await result.current.toggle();
+    });
+    await act(async () => {
+      appStateHandler?.("background");
+      await Promise.resolve();
+    });
+    await act(async () => {
+      rerender({ ...ARGS, isArenaTabSelected: false });
+      await Promise.resolve();
+    });
+    mockCalls.length = 0;
+
+    await act(async () => {
+      appStateHandler?.("active");
+      await Promise.resolve();
+    });
+
+    expect(mockCalls).toEqual([]);
+    expect(result.current.isLive).toBe(false);
+  });
+
+  it("resumes only once per background, not on every later 'active'", async () => {
+    const { result } = mount();
+    await act(async () => {
+      await result.current.toggle();
+    });
+    await act(async () => {
+      appStateHandler?.("background");
+      await Promise.resolve();
+    });
+    await act(async () => {
+      appStateHandler?.("active");
+      await Promise.resolve();
+    });
+    // An athlete who toggles off after returning stays off, even though the
+    // OS keeps reporting "active" through every Control Center swipe.
+    await act(async () => {
+      await result.current.toggle();
+    });
+    mockCalls.length = 0;
+
+    await act(async () => {
+      appStateHandler?.("inactive");
+      appStateHandler?.("active");
+      await Promise.resolve();
+    });
+
+    expect(mockCalls).toEqual([]);
+    expect(result.current.isLive).toBe(false);
   });
 });
 

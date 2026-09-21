@@ -16,7 +16,11 @@ import {
   STOP_WATCHDOG_MS,
   computeMaxRecordingSeconds,
 } from "./recording-limits";
-import { setMatchUpload, useMatchUpload } from "./match-upload-store";
+import {
+  beginMatchUploadAttempt,
+  setMatchUpload,
+  useMatchUpload,
+} from "./match-upload-store";
 
 /**
  * State machine for the recorder. Mirrors the web hook's `uploadStatus`
@@ -267,7 +271,19 @@ export function useVideoRecorder(
     // Every store write from here down is unguarded on purpose. This chain
     // runs to completion past unmount, and its result has to land whether
     // or not anything is still mounted to hear it.
-    setMatchUpload(matchId, { status: "uploading", storagePath, error: null });
+    // videoId explicitly nulled, not merely left alone: an entry that
+    // carried a PREVIOUS attempt's id into a failure rendered an error
+    // banner and a working "Watch Match Video" button side by side. This
+    // attempt has no id until its row lands. `truncation` is NOT cleared
+    // here: markTruncated writes it just before this on the
+    // settled-without-a-stop path, and it is true of the clip being
+    // uploaded right now.
+    setMatchUpload(matchId, {
+      status: "uploading",
+      storagePath,
+      error: null,
+      videoId: null,
+    });
     try {
       // First attempt skips orphan compensation: a transient DB failure
       // must not delete the just-uploaded object only for the retry to
@@ -360,6 +376,20 @@ export function useVideoRecorder(
       }, CAMERA_READY_TIMEOUT_MS);
       return;
     }
+    // A recording that is actually about to happen SUPERSEDES whatever the
+    // last one left behind for this match. Nothing else ever clears these,
+    // so without this a second recorder on the same matchId (re-entering an
+    // `in_progress` match from Arena or a lobby, or a permission flip that
+    // re-runs start()) inherited attempt 1's `truncation` and reported a
+    // clip covering the whole match as "Recording was interrupted", and
+    // inherited its `videoId` so a failed upload still offered playback.
+    // See match-upload-store's docblock for which fields are per-attempt.
+    //
+    // Placed HERE, past every guard, on purpose: a start that never reaches
+    // the camera (no ref, no permission, a deferral still pending) records
+    // nothing, so the previous outcome is still the truth about this match.
+    truncationRef.current = null;
+    beginMatchUploadAttempt(matchId);
     transition("recording");
     try {
       // recordAsync resolves only when stopRecording is called (or
@@ -492,11 +522,20 @@ export function useVideoRecorder(
     handleUpload,
     transition,
     logTag,
+    matchId,
     maxDurationSeconds,
     markTruncated,
   ]);
 
-  startRef.current = start;
+  // Mutating a ref during render is not safe: React can discard or
+  // interrupt a render, which would leave `startRef` pointing at a closure
+  // from an abandoned render (stale `cameraPermission`, stale
+  // `maxDurationSeconds`). The only reader is the deferred-start backstop
+  // timer, which fires long after commit, so a commit-time write is both
+  // correct and sufficient.
+  React.useEffect(() => {
+    startRef.current = start;
+  }, [start]);
 
   const markCameraReady = React.useCallback(() => {
     if (cameraReadyTimeoutRef.current) {
@@ -543,7 +582,22 @@ export function useVideoRecorder(
       return;
     }
     const cam = cameraRef.current;
-    if (!cam) return;
+    if (!cam) {
+      // Symmetric with start()'s own `if (!cam)`, which DOES transition.
+      // Returning silently here left the machine in 'recording' with no
+      // pending stop and nothing on screen: the recording then ran to the
+      // OS cap (up to two hours) behind a hidden banner.
+      //
+      // stoppingRef stays FALSE on purpose. We did not stop this recording
+      // and cannot, so when recordAsync eventually settles it takes the
+      // settled-without-a-stop path, is classified as a truncation, and
+      // still uploads whatever clip exists.
+      transition(
+        "error",
+        "The camera closed before the recording could be stopped. This clip may be cut short.",
+      );
+      return;
+    }
     stoppingRef.current = true;
     transition("stopping");
     console.log(`[video] ${logTag} stop requested (state was recording)`);
@@ -585,10 +639,34 @@ export function useVideoRecorder(
     }, STOP_WATCHDOG_MS);
   }, [transition, logTag]);
 
-  // Cleanup: if the hook unmounts mid-recording, stop the camera so the
-  // OS releases the capture session. An in-flight upload keeps running
-  // (it must finish the storage + DB write); only state setters are
-  // skipped after unmount via mountedRef.
+  // Cleanup: cancel the two timers this hook owns, and stop writing state.
+  // An in-flight upload keeps running (it must finish the storage + DB
+  // write); only state setters are skipped after unmount via mountedRef.
+  //
+  // It does NOT try to stop the camera, and deliberately so. There used to
+  // be a `cameraRef.current && !stoppingRef.current` guard here that called
+  // `stopRecording()` to "release the capture session". It was dead code
+  // and it could not have been anything else:
+  //
+  //   1. React detaches refs during the MUTATION phase, so by the time a
+  //      passive cleanup runs `cameraRef.current` is already null. The
+  //      guard never once ran. Every CameraView test stub set the ref on
+  //      mount and never nulled it on unmount, which is exactly why no
+  //      test noticed; the stubs are honest now.
+  //   2. Capturing the handle during render or commit would not help
+  //      either. This hook OUTLIVES the viewfinder by design
+  //      (`MatchRecorderCamera` mounts the camera only for ready / live /
+  //      stopping), so the only way to reach this cleanup mid-recording is
+  //      the whole wizard unmounting, which takes `CameraView` down with
+  //      it. `stopRecording()` is an imperative handle on a native view
+  //      that no longer exists by then.
+  //
+  // expo-camera's own native teardown ends the capture session when the
+  // view is destroyed; that is what actually releases the camera. The
+  // hook-side counterpart to the viewfinder going away is `releaseCamera`,
+  // which tears down readiness and the deferred-start backstop. A warn that
+  // never fires, over a call that cannot land, is worse than nothing: it
+  // reads as a safety net and is not one.
   React.useEffect(() => {
     mountedRef.current = true;
     return () => {
@@ -601,13 +679,7 @@ export function useVideoRecorder(
         clearTimeout(cameraReadyTimeoutRef.current);
         cameraReadyTimeoutRef.current = null;
       }
-      const cam = cameraRef.current;
-      if (cam && stoppingRef.current === false) {
-        console.warn(`[video] ${logTag} unmount cleanup stopping an active recording`);
-        try { cam.stopRecording(); } catch { /* noop */ }
-      }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return {

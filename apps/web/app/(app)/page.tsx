@@ -338,7 +338,7 @@ function UpcomingSessionPlate({
           style={{
             fontSize: "var(--size-num-xs)",
             letterSpacing: "var(--ls-caps-l)",
-            color: "var(--accent-cta)",
+            color: "var(--accent-cta-text)",
             textDecoration: "none",
           }}
         >
