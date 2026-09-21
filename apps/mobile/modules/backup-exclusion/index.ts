@@ -37,9 +37,15 @@ export const isBackupExclusionSupported: boolean = native != null && Platform.OS
  * means the native module is not in this binary and clips ARE being backed
  * up. Reporting both as one value would bury the second in the first.
  *
- *   active         iOS with the module. The flag is really being set.
+ *   active         iOS with the module, so the flag CAN be set here.
  *   missing        iOS without it. The exclusion is silently inert HERE.
  *   not-applicable Android, handled by the manifest backup rules instead.
+ *
+ * Note the limit of "active": it reports which binary population this install
+ * is in, not whether any individual write landed. `excludeFromBackup` can
+ * still return false per call (a path that has gone away, an OS refusal), and
+ * nothing reports that. Use `isExcludedFromBackup` on a device to confirm a
+ * write.
  *
  * "missing" is not hypothetical. `expo.version` is 0.2.0 with a
  * `runtimeVersion` policy of `appVersion`, so the TestFlight build that adds
