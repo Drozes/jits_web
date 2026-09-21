@@ -1,4 +1,5 @@
 import { Directory, File, Paths } from "expo-file-system";
+import { excludeFromBackup } from "@/modules/backup-exclusion";
 
 /**
  * Custody of the local clip between "the camera finished writing it" and
@@ -14,6 +15,16 @@ import { Directory, File, Paths } from "expo-file-system";
  *
  * A move within the same volume is a rename, so this is cheap even for a
  * 600 MB clip, and it is what keeps the app from holding two copies.
+ *
+ * BACKUP. `Paths.document` is `<app>/Documents/` on iOS, which iCloud backs
+ * up by default, and `context.filesDir` on Android, which Auto Backup
+ * includes and caps at 25 MB per app. A parked 300-600 MB clip would
+ * therefore be uploaded to a user's 5 GB iCloud tier, and would make the
+ * Android backup of the whole app fail for as long as it sits there. The
+ * two platforms need different mechanisms and both are applied: iOS through
+ * the per-URL `NSURLIsExcludedFromBackupKey` set here (jits-vjbq), Android
+ * declaratively through `plugins/with-android-backup-rules.js`, because it
+ * has no per-file equivalent.
  */
 
 /** Subdirectory of the document directory that holds clips awaiting upload. */
@@ -31,6 +42,13 @@ export function retainRecording(fileUri: string, matchId: string, ext: string): 
   try {
     const dir = new Directory(Paths.document, RETAINED_DIR_NAME);
     if (!dir.exists) dir.create({ intermediates: true, idempotent: true });
+    // Unconditionally, not only on the create branch. The directory can
+    // exist because an EARLIER call created it and then failed to set the
+    // flag, or because it was restored by a device migration, and the flag
+    // is a per-inode attribute that does not survive being recreated. One
+    // idempotent metadata write per recording is cheaper than reasoning
+    // about which of those happened.
+    markExcludedFromBackup(dir.uri, matchId);
 
     const source = new File(fileUri);
     if (!source.exists) return fileUri;
@@ -42,10 +60,38 @@ export function retainRecording(fileUri: string, matchId: string, ext: string): 
 
     source.move(destination);
     // `move` rewrites the instance's uri in place.
+
+    // Belt and braces. Apple's QA1719 says excluding a directory excludes
+    // its contents, but that is the one claim in this change that cannot be
+    // checked without a device, and a clip that slips into a backup is the
+    // whole failure being prevented. Setting it on the file as well costs a
+    // second metadata write and removes the dependency on that reading.
+    markExcludedFromBackup(source.uri, matchId);
+
     return source.uri;
   } catch (err) {
     console.warn(`[video] could not retain recording for ${matchId}:`, err);
     return fileUri;
+  }
+}
+
+/**
+ * Best-effort backup exclusion. Never throws and never changes the outcome
+ * of retention: `retainRecording` exists to make the upload resumable, and
+ * an un-excluded clip that uploads beats an excluded one that does not.
+ *
+ * A `false` is expected on Android (handled declaratively) and on any build
+ * without the native module, so it is logged at debug level rather than
+ * warned, to keep a routine platform difference out of the noise that real
+ * upload failures live in.
+ */
+function markExcludedFromBackup(uri: string, matchId: string): void {
+  try {
+    if (!excludeFromBackup(uri) && __DEV__) {
+      console.log(`[video] backup exclusion not applied to ${uri} (match ${matchId})`);
+    }
+  } catch (err) {
+    console.warn(`[video] backup exclusion threw for ${uri}:`, err);
   }
 }
 

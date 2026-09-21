@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+**Parked match recordings no longer ride into iCloud or break Android's backup (jits-vjbq).**
+
+`retainRecording` moves an unfinished upload's clip into `<document>/match-uploads/` so it survives a process kill. That directory is `<app>/Documents/` on iOS, which iCloud backs up by default, and `context.filesDir` on Android, which Auto Backup includes and caps at 25 MB per app. A 300-600 MB clip parked overnight therefore consumed a user's 5 GB free iCloud tier, brushed the iOS Data Storage Guidelines (2.5.2) that App Review enforces, and on Android made the backup of the entire app fail for as long as it sat there, silently taking preferences and device-to-device transfer with it.
+
+**NATIVE CHANGE: this needs a TestFlight build, not an OTA.** It adds a local native module and an `app.json` plugin entry. The JS half is written so an OTA landing on an older build degrades instead of crashing (see below), but the exclusion itself cannot ship over the air.
+
+**Added**
+- `apps/mobile/modules/backup-exclusion/`: a local Expo module exposing `excludeFromBackup(uri)` and `isExcludedFromBackup(uri)`. iOS sets `NSURLIsExcludedFromBackupKey` through `setResourceValue`, which is a per-URL resource value written at runtime, so no config plugin can do it and `expo-file-system@19.0.22` exposes nothing for it (verified: no backup-related symbol in its iOS or Android sources). Synchronous `Function`s rather than `AsyncFunction`s, because the caller is synchronous and a floating promise in the retention path is exactly the kind of surprise that path must not grow. The Android half is a deliberate no-op that returns `false` honestly, because Android has no per-file equivalent.
+- `apps/mobile/plugins/with-android-backup-rules.js`: emits `res/xml/elo_data_extraction_rules.xml` (API 31+, covering cloud backup AND device-to-device transfer separately) and `res/xml/elo_backup_rules.xml` (API 23-30), and points `android:dataExtractionRules` / `android:fullBackupContent` at them. Both files are written because shipping only one leaves half the install base unprotected. `android:allowBackup` is deliberately left `true`: switching it off would also discard the preferences and auth material the user does want preserved.
+- Tests: `__tests__/modules/backup-exclusion.test.ts` (7), `__tests__/plugins/with-android-backup-rules.test.ts` (11), plus 6 in `recording-file.test.ts`. The plugin test runs the plugin's own prebuild mod against a temp project root and asserts the emitted XML byte for byte.
+
+**Changed**
+- `apps/mobile/lib/video/recording-file.ts`: `retainRecording` now asks for the exclusion on the directory AND on the retained clip. The directory call is unconditional rather than only on the create branch, because the flag is a per-inode attribute: a directory can exist because an earlier call created it and then failed to set the flag, or because a device migration restored it. The per-file call is belt and braces, since Apple's QA1719 says excluding a directory excludes its contents but that is the one claim here that cannot be checked without a device. Both are best-effort: a refusal or a throw is logged and retention proceeds, because an un-excluded clip that uploads beats an excluded one that does not.
+
+**Verified, and not verified**
+- Verified on a dev box: the module is discovered by `expo-modules-autolinking` for both apple and android with the right pod, swift module and Kotlin class names; Expo's config pipeline resolves the plugin from `app.json` and registers both its manifest and dangerous mods; the dangerous mod writes both XML files to the exact path prebuild uses; `npx expo export --platform ios` bundles the JS half; the whole suite is green.
+- NOT verified, and not verifiable without a device or TestFlight build: that iOS actually writes `NSURLIsExcludedFromBackupKey`, and that Android honours the rules. The JS tests prove the exclusion is REQUESTED and that a failure cannot break retention; they cannot prove the native flag was set, because the native module is absent under Jest. `isExcludedFromBackup()` exists precisely so this can be confirmed on a real build.
+
 **Match video uploads survive a dropped connection: resumable (tus) transfer, on-disk job records, jittered backoff, real progress, and a failed database write that no longer deletes the bytes.**
 
 The product is moving to recording EVERY match at up to 10 minutes, so a clip is 300-600 MB and a single subway ride used to lose it permanently. Mobile had no network resilience at all: one non-resumable `FileSystem.uploadAsync` POST, two immediate attempts with zero delay between them, nothing on disk, and an indeterminate spinner. Web had no retries whatsoever and advanced the wizard past a failed upload.

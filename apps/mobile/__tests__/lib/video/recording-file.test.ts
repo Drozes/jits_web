@@ -1,6 +1,14 @@
 /**
  * Tests for custody of the local clip (lib/video/recording-file.ts).
  *
+ * NOTE ON THE BACKUP-EXCLUSION TESTS BELOW. They assert that
+ * `retainRecording` ASKS for the exclusion and that a refusal or a throw
+ * cannot break retention. They do NOT and cannot prove that iOS actually
+ * wrote `NSURLIsExcludedFromBackupKey`: that is a native resource value,
+ * the native module is absent under Jest (`requireOptionalNativeModule`
+ * returns null), and it can only be confirmed on a device or TestFlight
+ * build via `isExcludedFromBackup()`.
+ *
  * `expo-camera` writes recordings into the app's CACHE directory, which
  * both platforms are free to purge and which iOS purges aggressively for
  * backgrounded apps. Persisting an upload job that points there would be
@@ -71,6 +79,13 @@ jest.mock("expo-file-system", () => {
   return { Directory, File, Paths: { document: "file:///docs" } };
 });
 
+const mockExcludeFromBackup = jest.fn((_uri: string) => true);
+
+jest.mock("@/modules/backup-exclusion", () => ({
+  excludeFromBackup: (uri: string) => mockExcludeFromBackup(uri),
+  isBackupExclusionSupported: true,
+}));
+
 import {
   RETAINED_DIR_NAME,
   releaseRecording,
@@ -89,6 +104,8 @@ beforeEach(() => {
   mockThrowOn.move = false;
   mockThrowOn.delete = false;
   mockFiles.set(CACHE_URI, { uri: CACHE_URI, exists: true });
+  mockExcludeFromBackup.mockReset();
+  mockExcludeFromBackup.mockReturnValue(true);
   warnSpy = jest.spyOn(console, "warn").mockImplementation(() => undefined);
 });
 
@@ -146,6 +163,63 @@ describe("retainRecording", () => {
     expect(retainRecording(CACHE_URI, "M1", "webm")).toBe(
       `file:///docs/${RETAINED_DIR_NAME}/M1.webm`,
     );
+  });
+});
+
+describe("backup exclusion (jits-vjbq)", () => {
+  it("excludes the retention directory AND the clip", () => {
+    // The directory covers backup traversal per Apple's QA1719; the file is
+    // belt and braces, because that reading is the one claim here that
+    // cannot be verified without a device.
+    retainRecording(CACHE_URI, "M1", "mp4");
+    expect(mockExcludeFromBackup.mock.calls.map((c) => c[0])).toEqual([
+      `file:///docs/${RETAINED_DIR_NAME}`,
+      RETAINED_URI,
+    ]);
+  });
+
+  it("asks again when the directory ALREADY exists", () => {
+    // The flag is a per-inode attribute. A directory can exist because an
+    // earlier call created it and then failed to set the flag, or because a
+    // device migration restored it, so "set it once at startup" would leave
+    // both cases unprotected.
+    mockDirs.set(`file:///docs/${RETAINED_DIR_NAME}`, { exists: true, created: false });
+    retainRecording(CACHE_URI, "M1", "mp4");
+    expect(mockExcludeFromBackup).toHaveBeenCalledWith(`file:///docs/${RETAINED_DIR_NAME}`);
+  });
+
+  it("still retains the clip when the exclusion is REFUSED", () => {
+    // False is the normal Android answer and the normal answer on any build
+    // without the native module. The upload matters more than the flag.
+    mockExcludeFromBackup.mockReturnValue(false);
+    expect(retainRecording(CACHE_URI, "M1", "mp4")).toBe(RETAINED_URI);
+    expect(mockFiles.get(RETAINED_URI)?.exists).toBe(true);
+  });
+
+  it("still retains the clip when the exclusion THROWS", () => {
+    mockExcludeFromBackup.mockImplementation(() => {
+      throw new Error("native module blew up");
+    });
+    expect(retainRecording(CACHE_URI, "M1", "mp4")).toBe(RETAINED_URI);
+    expect(mockFiles.get(RETAINED_URI)?.exists).toBe(true);
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringMatching(/backup exclusion threw/),
+      expect.anything(),
+    );
+  });
+
+  it("does not ask for the file when there was no clip to move", () => {
+    retainRecording("file:///cache/gone.mp4", "M1", "mp4");
+    // The directory is still worth excluding; the absent file is not, and
+    // setting the flag on a missing path would silently do nothing anyway.
+    expect(mockExcludeFromBackup).toHaveBeenCalledTimes(1);
+    expect(mockExcludeFromBackup).toHaveBeenCalledWith(`file:///docs/${RETAINED_DIR_NAME}`);
+  });
+
+  it("does not ask at all when the directory could not be created", () => {
+    mockThrowOn.create = true;
+    expect(retainRecording(CACHE_URI, "M1", "mp4")).toBe(CACHE_URI);
+    expect(mockExcludeFromBackup).not.toHaveBeenCalled();
   });
 });
 

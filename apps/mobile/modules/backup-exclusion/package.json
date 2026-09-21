@@ -1,0 +1,7 @@
+{
+  "name": "backup-exclusion",
+  "version": "1.0.0",
+  "description": "Marks a directory as excluded from iCloud/iTunes backup (iOS).",
+  "main": "index.ts",
+  "private": true
+}
