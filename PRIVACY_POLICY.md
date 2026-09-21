@@ -44,12 +44,18 @@ Depending on your jurisdiction, you may have the right to:
 - Object to certain processing activities.
 - Withdraw consent for optional features (push notifications, location, match recording).
 
-To exercise these rights, email **TBD** (placeholder, fill in before publishing).
+Push notifications and location can be switched off in the app at any time, and
+you choose per match whether to record. Withdrawing consent for a recording that
+has already been made is not self-service yet: there is no in-app delete for
+match recordings today. Email us and we will remove it for you.
+
+To exercise any of these rights, email **TBD** (placeholder, fill in before publishing).
 
 ## 6. Data Retention
 
 - Account data: retained until the user deletes their account.
-- Match recordings: retained until the user or another participant deletes them.
+- Match recordings: retained indefinitely. There is no in-app delete yet, so
+  removal is by email request. Either participant in the match can request it.
 - Crash reports: retained for 90 days by Sentry.
 - Location: not retained beyond the proximity check.
 
