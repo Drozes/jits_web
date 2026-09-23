@@ -25,6 +25,7 @@ import { Avatar32, EloTile, MetaTag, Wordmark } from "@/components/ui/elo-system
 import { ActiveSessionCard } from "@/components/dashboard/active-session-card";
 import { SessionDiscoverySection } from "@/components/dashboard/session-discovery-section";
 import { RecentActivitySection } from "@/components/dashboard/recent-activity-section";
+import { PendingChallengesSection } from "@/components/dashboard/pending-challenges-section";
 import { StatOverview } from "@/components/dashboard/stat-overview";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { toast } from "@/components/ui/toast";
@@ -36,6 +37,7 @@ import {
   SkeletonParticipantRow,
 } from "@/components/ui/skeleton";
 import { useCachedResource } from "@/lib/cache/use-cached-resource";
+import { useChallengeInbox } from "@/lib/arena/use-challenge-inbox";
 
 interface DashboardData {
   summary: DashboardSummary;
@@ -217,10 +219,20 @@ export default function DashboardScreen() {
     athlete?.primary_gym_id,
   );
 
+  /**
+   * Live challenges, read and subscribed separately from the cached dashboard
+   * payload. See `lib/arena/use-challenge-inbox.ts` for why: a warm stale
+   * paint is right for gyms and sessions and actively wrong for a challenge,
+   * which is answered or dead within minutes.
+   */
+  const challenges = useChallengeInbox(athlete?.id, athlete?.current_weight);
+
+  const refreshChallenges = challenges.refresh;
   const onRefresh = React.useCallback(() => {
     // SWR keeps stale data on screen while revalidating; no artificial delay.
     refresh();
-  }, [refresh]);
+    refreshChallenges();
+  }, [refresh, refreshChallenges]);
 
   if (!athlete) {
     return (
@@ -274,7 +286,7 @@ export default function DashboardScreen() {
         }}
         refreshControl={
           <RefreshControl
-            refreshing={isStale}
+            refreshing={isStale || challenges.isRefreshing}
             onRefresh={onRefresh}
             tintColor={tokens.accentCta}
           />
@@ -286,6 +298,25 @@ export default function DashboardScreen() {
             {athlete.display_name}
           </Text>
         </View>
+
+        {/*
+          Challenges sit above everything the dashboard fetches, and outside
+          its skeleton, on purpose. They are the only thing on Home that
+          another person is actively waiting on, and they have their own read,
+          so a slow gym query must not hold them back.
+        */}
+        <PendingChallengesSection
+          incoming={challenges.incoming}
+          outgoing={challenges.outgoing}
+          ready={challenges.ready}
+          busyId={challenges.busyId}
+          loadFailed={challenges.loadFailed}
+          onAccept={(id) => void challenges.accept(id)}
+          onDecline={(id) => void challenges.decline(id)}
+          onCancel={(id) => void challenges.cancel(id)}
+          onEnter={(id) => void challenges.enter(id)}
+          onRetry={challenges.refresh}
+        />
 
         {isLoading ? (
           <DashboardSkeleton />

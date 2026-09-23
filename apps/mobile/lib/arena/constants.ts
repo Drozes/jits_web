@@ -37,6 +37,25 @@ export const incomingTopic = (athleteId: string, instanceId: string) =>
   `arena-incoming:${athleteId}:${instanceId}`;
 
 /**
+ * Home's challenge-inbox `postgres_changes` topic.
+ *
+ * A SECOND subscriber on `challenges` for the same athlete, because the Arena
+ * prompt and the Home inbox have different lifetimes and neither owns the
+ * other. It carries the same per-instance suffix as `incomingTopic`, for the
+ * same reason: `supabase.channel(topic)` hands back the EXISTING channel when
+ * one with that topic is still registered, and `.on("postgres_changes", ...)`
+ * on an already-subscribed channel throws, which is exactly what a remount
+ * overlapping its own teardown produces.
+ *
+ * The PREFIX has to differ from `incomingTopic`'s too. Both hooks are mounted
+ * at once as soon as the athlete has visited the Arena tab (tabs stay
+ * mounted), so a shared prefix plus a colliding instance id would hand one
+ * hook the other's channel and throw on the second `.on`.
+ */
+export const challengeInboxTopic = (athleteId: string, instanceId: string) =>
+  `home-challenge-inbox:${athleteId}:${instanceId}`;
+
+/**
  * `get_arena_data` applies p_limit to the roster but presence is uncapped, so
  * the RPC's default of 20 silently hid live athletes below the cut and
  * under-reported the "Online now" count. Web learned this the hard way; do not

@@ -1,11 +1,28 @@
 /**
  * The Arena handshake: challenge, live prompt, accept, straight into the match.
  *
- * Ported from `apps/web/hooks/use-arena-challenge.ts`. There is NO inbox. The
- * challenge row still exists (`chk_match_origin` requires a challenge_id or a
- * session_id, and an Arena match has no session), it is just never left
- * sitting in a list. A prompt nobody saw falls back to the notification bell,
- * which mobile already renders.
+ * Ported from `apps/web/hooks/use-arena-challenge.ts`. The challenge row still
+ * exists (`chk_match_origin` requires a challenge_id or a session_id, and an
+ * Arena match has no session); what this hook does with it is raise a LIVE
+ * prompt, so an athlete standing in the lobby answers in the moment rather
+ * than out of a list.
+ *
+ * THERE IS NOW AN INBOX, AND IT IS NOT HERE. This hook only ever saw
+ * challenges that arrived while the Arena tab was mounted: it raises the
+ * prompt off a `postgres_changes` INSERT and has no backfill query, so a
+ * challenge sent while the recipient was anywhere else in the app was
+ * unreachable from the UI until it expired, and the notification bell (a
+ * count, with nothing to tap through to) was the whole of the fallback. Home
+ * now backfills and lists those rows,
+ * `apps/mobile/lib/arena/use-challenge-inbox.ts` +
+ * `apps/mobile/components/dashboard/pending-challenges-section.tsx`, in both
+ * directions. The two surfaces coexist deliberately: this one is the
+ * in-the-moment prompt for someone already in the lobby, the inbox is the
+ * catch-up list for everyone else.
+ *
+ * The accept ordering (accept, start, BROADCAST, then navigate) is shared with
+ * the inbox and lives in `challenge-handshake.ts`. Do not re-spell it here or
+ * there.
  *
  * Three realtime surfaces:
  *  - `postgres_changes` INSERT on `challenges` where I am the opponent: raises
@@ -20,14 +37,16 @@ import * as React from "react";
 import { useRouter } from "expo-router";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import {
-  acceptChallenge,
   cancelChallenge,
   createChallenge,
-  declineChallenge,
   startMatchFromChallenge,
 } from "@jits/shared/api/mutations";
 import { toast } from "@/components/ui/toast";
 import { supabase } from "../supabase/client";
+import {
+  acceptChallengeAndStart,
+  declineChallengeAndNotify,
+} from "./challenge-handshake";
 import { arenaMatchHref, challengeTopic, incomingTopic } from "./constants";
 
 export interface IncomingChallenge {
@@ -78,39 +97,6 @@ export interface UseArenaChallengeResult {
   decline: () => Promise<void>;
   cancelOutgoing: () => Promise<void>;
   clearCap: () => void;
-}
-
-/**
- * Both parties may call `start_match_from_challenge` for the same challenge,
- * and they converge on one match without any client-side retry:
- * `matches.challenge_id` is UNIQUE, and the function's own EXCEPTION block
- * catches `unique_violation`, re-selects the winner's match id and returns
- * `{ success: true, already_exists: true }`
- * (jr_be 20260219000000_start_match_enhancements.sql). No 23505 ever reaches
- * PostgREST, so a client retry on MATCH_ALREADY_EXISTS would be dead code
- * guarding a response the server cannot produce.
- */
-
-/**
- * Tell the other side the match exists.
- *
- * `send()` on a channel this client never joined falls back to a REST POST and
- * resolves to "ok" / "error" / "timed out". It does not reject, so success is
- * read off the returned status, never off a rejection. One retry, because a
- * lost broadcast strands the challenger on the waiting plate.
- */
-async function broadcast(
-  challengeId: string,
-  event: "match_started" | "declined",
-  payload: Record<string, unknown>,
-): Promise<boolean> {
-  const channel = supabase.channel(challengeTopic(challengeId));
-  let status = await channel.send({ type: "broadcast", event, payload });
-  if (status !== "ok") {
-    status = await channel.send({ type: "broadcast", event, payload });
-  }
-  await supabase.removeChannel(channel);
-  return status === "ok";
 }
 
 export function useArenaChallenge({
@@ -390,44 +376,20 @@ export function useArenaChallenge({
         const current = incomingRef.current;
         if (!current) return;
 
-        const accepted = await acceptChallenge(supabase, {
-          challengeId: current.challengeId,
-          opponentWeight: weightRef.current ?? undefined,
-        });
-        if (!accepted.ok) {
-          toast.error(
-            accepted.error.message || "Couldn't accept that challenge.",
-          );
-          setIncomingBoth(null);
-          return;
-        }
-
-        // `acceptChallenge` filters on `status = 'pending'`, and a PostgREST
-        // update that matches no rows is not an error, so a challenge that was
-        // cancelled or expired a moment ago still returns ok above. The real
-        // answer arrives here, as `not_accepted`.
-        const started = await startMatchFromChallenge(
-          supabase,
+        // accept -> start -> broadcast -> navigate, in that order. The
+        // ordering is the load-bearing part and it is shared with Home's
+        // inbox, so it lives in `challenge-handshake.ts`.
+        const result = await acceptChallengeAndStart(
           current.challengeId,
+          weightRef.current,
         );
-        if (!started.ok) {
+        if (!result.ok) {
           setIncomingBoth(null);
-          toast.error(
-            started.error.code === "CHALLENGE_NOT_ACCEPTED"
-              ? "That challenge is no longer available."
-              : started.error.message || "Couldn't start the match.",
-          );
+          toast.error(result.message);
           return;
         }
 
-        // Before navigating, always: this broadcast is what pulls the
-        // challenger off the waiting plate and into the same match. Navigate
-        // first and they sit there while we are already in the wizard.
-        await broadcast(current.challengeId, "match_started", {
-          matchId: started.data.match_id,
-        });
-
-        enterMatch(current.challengeId, started.data.match_id);
+        enterMatch(current.challengeId, result.matchId);
       }),
     [runExclusive, setIncomingBoth, enterMatch],
   );
@@ -438,8 +400,8 @@ export function useArenaChallenge({
         const current = incomingRef.current;
         if (!current) return;
 
-        const result = await declineChallenge(supabase, current.challengeId);
-        if (!result.ok) {
+        const told = await declineChallengeAndNotify(current.challengeId);
+        if (!told) {
           // Keep the prompt: the challenge is still pending server-side and
           // the challenger is still waiting, so dismissing it here would be a
           // lie to both of us.
@@ -447,7 +409,6 @@ export function useArenaChallenge({
           return;
         }
 
-        await broadcast(current.challengeId, "declined", {});
         setIncomingBoth(null);
       }),
     [runExclusive, setIncomingBoth],
