@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Where the FileProvider declared in this module's AndroidManifest is allowed
+  to mint content:// URIs from.
+
+  All four roots are covered because the clip's final home is not this
+  module's decision: `Paths.document` is filesDir, the camera and the render
+  download both land in cacheDir, and a device with adopted storage can put
+  either on external. A root that is missing here fails as an
+  IllegalArgumentException out of getUriForFile, not as a silent no-op, but
+  it fails at the exact moment a user tries to share.
+-->
+<paths>
+    <files-path name="elo_reels_files" path="." />
+    <cache-path name="elo_reels_cache" path="." />
+    <external-files-path name="elo_reels_external_files" path="." />
+    <external-cache-path name="elo_reels_external_cache" path="." />
+</paths>

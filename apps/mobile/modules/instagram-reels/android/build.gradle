@@ -1,0 +1,21 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'com.elorated.instagramreels'
+version = '1.0.0'
+
+android {
+  namespace "expo.modules.instagramreels"
+  defaultConfig {
+    versionCode 1
+    versionName "1.0.0"
+  }
+}
+
+// No `dependencies` block on purpose. `androidx.core.content.FileProvider`
+// is reachable because `expo-modules-core` declares
+// `api "androidx.core:core-ktx"`, and `expo-module-gradle-plugin` puts
+// expo-modules-core on this module's compile classpath. Pinning a version
+// here would risk forcing a different androidx.core onto the app.

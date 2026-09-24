@@ -1,0 +1,29 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!--
+      The FileProvider that turns the rendered clip's local path into a
+      content:// URI Instagram can be granted read access to. Instagram is a
+      different app, so a file:// URI is not an option (FileUriExposedException
+      since API 24).
+
+      The class name is fully qualified rather than relative. A relative name
+      in a LIBRARY manifest resolves against this module's namespace at merge
+      time, which is correct but non-obvious; spelling it out removes the
+      question.
+
+      The authority must stay in step with FILE_PROVIDER_SUFFIX in
+      InstagramReelsModule.kt. It is deliberately distinct from
+      expo-sharing's and expo-file-system's providers, so a grant made for a
+      shared clip does not widen an authority the rest of the app relies on.
+    -->
+    <application>
+        <provider
+            android:name="expo.modules.instagramreels.ReelsFileProvider"
+            android:authorities="${applicationId}.ReelsFileProvider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/elo_reels_provider_paths" />
+        </provider>
+    </application>
+</manifest>

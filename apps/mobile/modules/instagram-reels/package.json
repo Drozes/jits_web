@@ -1,0 +1,7 @@
+{
+  "name": "instagram-reels",
+  "version": "1.0.0",
+  "description": "Hands a local video file to the Instagram Reels composer (Meta \"Sharing to Reels\").",
+  "main": "index.ts",
+  "private": true
+}
