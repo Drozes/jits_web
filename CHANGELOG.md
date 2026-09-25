@@ -7,6 +7,35 @@
 **Fixed**
 - The notification bell did nothing when tapped. `apps/mobile/components/notifications/notification-panel.tsx` called gorhom's `dismiss()` on a sheet that was not showing (on first render, and again after a backdrop tap / pan-down had already closed it), which leaves `BottomSheetModal` stuck in DISMISSING so every later `present()` tore straight down. It now only dismisses a sheet it presented that has not closed itself, and sets `enableDynamicSizing={false}` so the fixed 65% list is not sized to a sliver. Regression test: `apps/mobile/__tests__/components/notifications/notification-panel.test.tsx`.
 
+### Mobile: stay live across the app, with a LIVE signal in the header (jits-pplr)
+
+Being live in the Arena now persists across Home, Arena, Rankings and Profile, the header shows it on every screen, and incoming challenges reach a live athlete wherever they are. Mobile only; JS-only, so OTA-eligible (no `app.json`, native, dependency or metro/babel change).
+
+**Added**
+- `apps/mobile/lib/arena/arena-bootstrap.tsx`: `<ArenaBootstrap />`, mounted once beside the Stack in `app/(app)/_layout.tsx` for an active athlete (keyed by athlete id). The single owner of `useArenaLive`, `useLobbyPresence`, `useArenaChallenge`, pending-challenge recovery and the `ChallengePromptSheet`.
+- `apps/mobile/lib/arena/arena-store.ts`: module-level external store (`useArenaState`, `useIsArenaLive`), stable `arenaActions` delegating to the registered owner, the roster-correction hand-off, and `takeArenaOfflineBeforeSignOut()`.
+- `apps/mobile/lib/arena/use-pending-challenge-recovery.ts`: reads `getPendingChallengesForAthlete()` at mount, on going live and on return from the background; offers the newest incoming challenge that is unexpired, at most 10 minutes old and whose challenger is in `lobby:online` (only while live, never over an open prompt, each once), and restores the athlete's own fresh outgoing challenge so the accept broadcast still lands.
+- `apps/mobile/components/layout/live-header-signal.tsx`: `LivePill` shown only while live; taps through to the Arena (static on the Arena itself).
+- `apps/mobile/components/layout/brand-header.tsx`: the Home / Rankings wordmark header (wordmark left; LIVE signal then notification bell right), replacing two inline copies.
+- `useArenaChallenge` gains `offerIncoming` / `restoreOutgoing` and remembers answered or withdrawn challenges so a stale read cannot re-raise one.
+- Tests: `__tests__/lib/arena/arena-store.test.ts`, `arena-bootstrap.test.tsx`, `use-pending-challenge-recovery.test.ts`, `__tests__/components/layout/live-header-signal.test.tsx`, `__tests__/screens/profile.test.tsx`; new lifecycle and recovery cases in `use-arena-live.test.ts` and `use-arena-challenge.test.ts`.
+
+**Changed**
+- Live lifecycle: switching tabs no longer takes the athlete offline. Entering a match takes them offline (flag and presence) and leaving the match screen by any exit restores live if they were live going in; no challenge prompt is raised or offered while a match screen is mounted (`useArenaMatchScreen()` counter in `arena-store.ts`, closes jits-u12o). Backgrounding still clears both signals; foregrounding restores live wherever the athlete lands if the background is what took them down, except mid-match, where the intent waits for the match to end; a failed restore says so in a toast. Launch with `looking_for_ranked` true resumes live, but only in the foreground: a background cold launch (silent push) parks the intent until the first "active". Sign-out clears `looking_for_ranked` before `supabase.auth.signOut()` (bounded at 4s); unmounting the owner still clears.
+- Match screen and profile-setup headers show the LIVE signal as static (not a link), so tapping it cannot pop a match and strand the opponent.
+- `use-lobby-presence.ts`: after the stale-channel backoff gives up, setup re-runs on the next foreground instead of leaving the lobby dead for the session.
+- Pending-challenge recovery re-checks freshness at offer time; the realtime INSERT re-checks for an existing prompt (and a match) after its challenger lookup.
+- `AppHeader` renders the LIVE signal in its right slot (new `liveSignal` prop, `"static"` on the Arena); its side slots now share the leftover width equally so the title stays centred and the pill never shifts it.
+- The Arena screen reads live and challenge state from the store and no longer mounts presence, the live writer, the challenge listener or the prompt itself.
+- Tab headers: on Home, Arena, Rankings and Profile the right side is exactly the LIVE signal (while live) then the notification bell. Home and Rankings drop the header avatar (it was not tappable; the Profile tab covers it) and Rankings gains the bell. Profile's header Share icon moves into the body as a secondary "Share profile" button under the profile header, opening the same share sheet. Pushed screens keep their right actions.
+- Help & Support: dropped the "keep the Arena open while you're live" caveat; describes staying live across the app and the header LIVE pill.
+
+**Fixed**
+- The first incoming challenge after every launch was invisible: `ChallengePromptSheet` called `dismiss()` on a never-presented gorhom modal on mount, leaving it stuck in DISMISSING so the next `present()` rendered nothing (it could also minimise an open notification panel). It now only dismisses a sheet it presented that has not closed itself, and sizes to its content (`enableDynamicSizing`, no percentage snap point). Regression test: `__tests__/components/arena/challenge-prompt-sheet.test.tsx`.
+
+**Removed**
+- `apps/mobile/lib/arena/use-arena-tab-focus.ts` and its test (no remaining caller).
+
 ### Mobile: Arena-only matchmaking; gym sessions, gym pages and the gym-manager portal removed (jits-gewv)
 
 Product decision 2026-09-25: on mobile the Arena (go live, send and receive live challenges) is the only way to get a match. Mobile only; `apps/web`, `packages/shared` (web uses every session symbol) and the backend are untouched. JS-only, so OTA-eligible: no `app.json`, native, dependency or metro/babel change (native cleanup such as the now-unused `expo-location` permission is jits-d3hb).

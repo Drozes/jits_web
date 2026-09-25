@@ -11,6 +11,7 @@ import { AccountSection } from "@/components/profile/account-section";
 import { PastMatchVideos } from "@/components/profile/past-match-videos";
 import { ShareProfileSheet } from "@/components/share-profile-sheet";
 import { AppHeader } from "@/components/layout/app-header";
+import { NotificationBell } from "@/components/notifications/notification-bell";
 import { PageContainer } from "@/components/layout/page-container";
 import { MetaTag, ParticipantRow, DeltaNumber } from "@/components/ui/elo-system";
 import {
@@ -33,19 +34,26 @@ type ShareAthlete = {
   gymName?: string | null;
 };
 
-function ShareButton({ athlete }: { athlete: ShareAthlete }) {
+/**
+ * Secondary, full-width, in the body rather than the header: the tab headers
+ * carry only the LIVE signal and the bell. Surface-styled like "View Detailed
+ * Stats", never Signal Red, so it does not compete with a primary CTA.
+ */
+function ShareProfileButton({ athlete }: { athlete: ShareAthlete }) {
   const tokens = useThemedTokens();
   return (
     <ShareProfileSheet athlete={athlete}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Share"
-        hitSlop={10}
-        className="w-8 h-8 items-center justify-center rounded-xs active:bg-surface-3"
+        accessibilityLabel="Share profile"
+        className="flex-row items-center justify-center gap-2 bg-surface-3 border border-hairline-strong rounded-sm px-5 py-3 active:bg-surface-4"
       >
         <View pointerEvents="none">
-          <ArrowUpRight size={18} color={tokens.textSecondary} />
+          <ArrowUpRight size={16} color={tokens.textSecondary} />
         </View>
+        <Text className="font-heading text-[12px] text-ink uppercase tracking-caps">
+          Share profile
+        </Text>
       </Pressable>
     </ShareProfileSheet>
   );
@@ -117,7 +125,10 @@ export default function ProfileScreen() {
 
   return (
     <View className="flex-1 bg-surface">
-      <AppHeader title="Profile" rightAction={<ShareButton athlete={shareAthlete} />} />
+      <AppHeader
+        title="Profile"
+        rightAction={<NotificationBell athleteId={athlete.id} />}
+      />
       <PageContainer
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={tokens.accentCta} />
@@ -129,6 +140,8 @@ export default function ProfileScreen() {
         ) : (
           <>
             <ProfileHeader athlete={athlete} gymName={gymName} />
+
+            <ShareProfileButton athlete={shareAthlete} />
 
             <ProfileQuickStats
               totalMatches={stats?.totalMatches ?? 0}

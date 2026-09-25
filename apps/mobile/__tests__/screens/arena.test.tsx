@@ -88,28 +88,22 @@ jest.mock("expo-router", () => ({
 }));
 
 let mockLobbyIds = new Set<string>();
+const mockUseLobbyPresence = jest.fn();
 jest.mock("@/lib/arena/use-lobby-presence", () => ({
-  useLobbyPresence: jest.fn(),
+  useLobbyPresence: (...a: unknown[]) => mockUseLobbyPresence(...a),
   useLobbyIds: () => mockLobbyIds,
 }));
 
-const mockUseIsTabSelected = jest.fn((_name: string) => true);
-jest.mock("@/lib/arena/use-arena-tab-focus", () => ({
-  useIsTabSelected: (name: string) => mockUseIsTabSelected(name),
-}));
-
-const mockToggle = jest.fn();
-let mockIsLive = false;
-const mockLiveArgs = jest.fn();
+// The screen must never own a live writer or a challenge listener of its own:
+// both are mounted once, app-wide, by <ArenaBootstrap />. These mocks exist
+// only so a regression that re-mounts them here is caught below.
+const mockUseArenaLive = jest.fn();
 jest.mock("@/lib/arena/use-arena-live", () => ({
-  useArenaLive: (args: Record<string, unknown>) => {
-    mockLiveArgs(args);
-    return {
-      isLive: mockIsLive,
-      isSaving: false,
-      toggle: mockToggle,
-    };
-  },
+  useArenaLive: (...a: unknown[]) => mockUseArenaLive(...a),
+}));
+const mockUseArenaChallenge = jest.fn();
+jest.mock("@/lib/arena/use-arena-challenge", () => ({
+  useArenaChallenge: (...a: unknown[]) => mockUseArenaChallenge(...a),
 }));
 
 const mockRefresh = jest.fn();
@@ -125,28 +119,29 @@ jest.mock("@/lib/arena/use-arena-roster", () => ({
   useArenaRoster: () => mockRoster,
 }));
 
+const mockToggle = jest.fn();
 const mockSendChallenge = jest.fn();
-const mockAccept = jest.fn();
-const mockDecline = jest.fn();
 const mockCancelOutgoing = jest.fn();
 const mockClearCap = jest.fn();
+const mockSetUnavailable = jest.fn();
+let mockIsLive = false;
 let mockChallenge = {
   incoming: null as unknown,
   outgoing: null as unknown,
   isBusy: false,
   capReached: false,
-  sendChallenge: mockSendChallenge,
-  accept: mockAccept,
-  decline: mockDecline,
-  cancelOutgoing: mockCancelOutgoing,
-  clearCap: mockClearCap,
 };
-const mockChallengeArgs = jest.fn();
-jest.mock("@/lib/arena/use-arena-challenge", () => ({
-  useArenaChallenge: (args: Record<string, unknown>) => {
-    mockChallengeArgs(args);
-    return mockChallenge;
+jest.mock("@/lib/arena/arena-store", () => ({
+  useArenaState: () => ({ isLive: mockIsLive, isSaving: false, ...mockChallenge }),
+  useIsArenaLive: () => mockIsLive,
+  arenaActions: {
+    toggle: (...a: unknown[]) => mockToggle(...a),
+    sendChallenge: (...a: unknown[]) => mockSendChallenge(...a),
+    cancelOutgoing: (...a: unknown[]) => mockCancelOutgoing(...a),
+    clearCap: (...a: unknown[]) => mockClearCap(...a),
+    goOffline: jest.fn(),
   },
+  setOpponentUnavailableHandler: (...a: unknown[]) => mockSetUnavailable(...a),
 }));
 
 import ArenaScreen from "@/app/(app)/(tabs)/arena/index";
@@ -184,11 +179,6 @@ beforeEach(() => {
     outgoing: null,
     isBusy: false,
     capReached: false,
-    sendChallenge: mockSendChallenge,
-    accept: mockAccept,
-    decline: mockDecline,
-    cancelOutgoing: mockCancelOutgoing,
-    clearCap: mockClearCap,
   };
 });
 
@@ -327,7 +317,9 @@ describe("Arena screen", () => {
     expect(mockCancelOutgoing).toHaveBeenCalled();
   });
 
-  it("raises the incoming prompt with both answers wired", () => {
+  it("does not render its own challenge prompt", () => {
+    // The prompt is app-wide (ArenaBootstrap). A second copy here would show
+    // two sheets for one challenge.
     mockChallenge.incoming = {
       challengeId: "ch-1",
       challengerId: "a-9",
@@ -335,15 +327,27 @@ describe("Arena screen", () => {
       challengerElo: 1350,
       challengerWeight: 190,
     };
-    const { getByText, getByLabelText } = render(<ArenaScreen />);
+    const { queryByText, queryByLabelText } = render(<ArenaScreen />);
 
-    expect(getByText("Rival wants to roll")).toBeTruthy();
-    expect(getByText("ELO 1350 · 190 lbs")).toBeTruthy();
+    expect(queryByText("Rival wants to roll")).toBeNull();
+    expect(queryByLabelText("Accept challenge")).toBeNull();
+  });
 
-    fireEvent.press(getByLabelText("Accept challenge"));
-    expect(mockAccept).toHaveBeenCalled();
-    fireEvent.press(getByLabelText("Decline challenge"));
-    expect(mockDecline).toHaveBeenCalled();
+  it("locks row actions while a challenge prompt is up", () => {
+    mockIsLive = true;
+    mockRoster.competitors = [competitor()];
+    mockLobbyIds = new Set(["a-1"]);
+    mockChallenge.incoming = {
+      challengeId: "ch-1",
+      challengerId: "a-9",
+      challengerName: "Rival",
+      challengerElo: 1350,
+      challengerWeight: 190,
+    };
+    const { getByLabelText } = render(<ArenaScreen />);
+
+    fireEvent.press(getByLabelText("Challenge Alpha"));
+    expect(mockSendChallenge).not.toHaveBeenCalled();
   });
 
   it("opens the athlete profile from a row", () => {
@@ -354,23 +358,32 @@ describe("Arena screen", () => {
     expect(mockPush).toHaveBeenCalledWith("/athlete/a-1");
   });
 
-  it("scopes staying-live to the TAB, not this screen", () => {
-    // A pushed profile or match blurs the screen while the tab stays
-    // selected, so the live state has to be keyed on the tab.
+  it("owns no live writer, presence channel or challenge listener", () => {
+    // Being live persists across tabs, so all three are mounted once by the
+    // app-wide owner. Mounting any of them here would double-write the flag,
+    // double-track presence, or double-prompt.
     render(<ArenaScreen />);
 
-    expect(mockUseIsTabSelected).toHaveBeenCalledWith("arena");
-    expect(mockLiveArgs).toHaveBeenCalledWith(
-      expect.objectContaining({ isArenaTabSelected: true }),
-    );
+    expect(mockUseArenaLive).not.toHaveBeenCalled();
+    expect(mockUseLobbyPresence).not.toHaveBeenCalled();
+    expect(mockUseArenaChallenge).not.toHaveBeenCalled();
+  });
+
+  it("shows the header LIVE signal as static, not as a link to itself", () => {
+    mockIsLive = true;
+    const { getByTestId, getByLabelText } = render(<ArenaScreen />);
+
+    expect(getByTestId("live-header-signal")).toBeTruthy();
+    expect(getByLabelText("You are live in the Arena")).toBeTruthy();
   });
 
   it("re-reads the roster when an opponent turns out to have left", () => {
     // The roster is a snapshot with no realtime feed on `athletes`, so the
     // stale row has to be corrected by something.
-    render(<ArenaScreen />);
+    const { unmount } = render(<ArenaScreen />);
 
-    const args = mockChallengeArgs.mock.calls[0][0];
-    expect(args.onOpponentUnavailable).toBe(mockRefresh);
+    expect(mockSetUnavailable).toHaveBeenCalledWith(mockRefresh);
+    unmount();
+    expect(mockSetUnavailable).toHaveBeenLastCalledWith(null);
   });
 });

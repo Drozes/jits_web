@@ -7,6 +7,11 @@
  * sitting in a list. A prompt nobody saw falls back to the notification bell,
  * which mobile already renders.
  *
+ * Mounted ONCE, app-wide, by `<ArenaBootstrap />`, so a live athlete on any
+ * tab gets the prompt. The Arena screen reads this hook's state through
+ * `arena-store.ts` and must never mount a second copy: two instances would
+ * mean two INSERT listeners and two prompts for one challenge.
+ *
  * Three realtime surfaces:
  *  - `postgres_changes` INSERT on `challenges` where I am the opponent: raises
  *    the incoming prompt.
@@ -55,6 +60,8 @@ interface ChallengeRow {
 export interface UseArenaChallengeArgs {
   athleteId: string;
   athleteWeight: number | null;
+  /** True while a match screen is mounted: no prompt is raised mid-match. */
+  inMatch?: boolean;
   /**
    * Called when an opponent turns out to have left the Arena between the
    * roster load and the tap. The roster has no realtime feed on `athletes`,
@@ -78,6 +85,38 @@ export interface UseArenaChallengeResult {
   decline: () => Promise<void>;
   cancelOutgoing: () => Promise<void>;
   clearCap: () => void;
+  /**
+   * Raise the prompt for a challenge found by a read rather than by the
+   * realtime INSERT (`use-pending-challenge-recovery.ts`). A no-op while a
+   * prompt is already up, or for a challenge this instance already answered.
+   */
+  offerIncoming: (challengeId: string, challengerId: string) => Promise<void>;
+  /**
+   * Put back the "Sent" state for my own still-pending challenge after a
+   * relaunch, so the accept broadcast still reaches me. A no-op when a
+   * challenge is already outgoing.
+   */
+  restoreOutgoing: (challenge: OutgoingChallenge) => void;
+}
+
+/** What the prompt shows, read off the challenger's row. */
+async function loadIncoming(
+  challengeId: string,
+  challengerId: string,
+): Promise<IncomingChallenge> {
+  const { data } = await supabase
+    .from("athletes")
+    .select("display_name, current_elo, current_weight")
+    .eq("id", challengerId)
+    .maybeSingle();
+
+  return {
+    challengeId,
+    challengerId,
+    challengerName: data?.display_name ?? "An athlete",
+    challengerElo: data?.current_elo ?? null,
+    challengerWeight: data?.current_weight ?? null,
+  };
 }
 
 /**
@@ -116,6 +155,7 @@ async function broadcast(
 export function useArenaChallenge({
   athleteId,
   athleteWeight,
+  inMatch = false,
   onOpponentUnavailable,
 }: UseArenaChallengeArgs): UseArenaChallengeResult {
   const router = useRouter();
@@ -129,6 +169,8 @@ export function useArenaChallenge({
   const busyRef = React.useRef(false);
   const incomingRef = React.useRef<IncomingChallenge | null>(null);
   const outgoingRef = React.useRef<OutgoingChallenge | null>(null);
+  const inMatchRef = React.useRef(inMatch);
+  inMatchRef.current = inMatch;
   const weightRef = React.useRef(athleteWeight);
   weightRef.current = athleteWeight;
   const unavailableRef = React.useRef(onOpponentUnavailable);
@@ -139,12 +181,19 @@ export function useArenaChallenge({
    * A match_started broadcast and the accepted-status fallback can both land
    * for the SAME challenge, and only one of them may push a screen. It is
    * keyed by challenge id rather than being a boolean, because this hook
-   * outlives a match: the Arena is a tab screen with no unmountOnBlur, so the
-   * instance survives the round trip into a match and back, and a boolean
+   * outlives a match: it is mounted app-wide, so the instance survives the
+   * round trip into a match and back, and a boolean
    * latch would make every later accept a silent no-op, leaving the opponent
    * alone in a match nobody joined.
    */
   const enteredForRef = React.useRef<string | null>(null);
+  /**
+   * Challenges this instance has already answered or seen withdrawn. The
+   * pending read can be a beat behind a decline, and presence syncs keep
+   * re-running the recovery pass, so without this a declined challenge could
+   * pop straight back up.
+   */
+  const settledRef = React.useRef<Set<string>>(new Set());
 
   const setIncomingBoth = React.useCallback(
     (next: IncomingChallenge | null) => {
@@ -165,6 +214,7 @@ export function useArenaChallenge({
     (challengeId: string, matchId: string) => {
       if (enteredForRef.current === challengeId) return;
       enteredForRef.current = challengeId;
+      settledRef.current.add(challengeId);
       setIncomingBoth(null);
       setOutgoingBoth(null);
       router.push(arenaMatchHref(matchId));
@@ -196,21 +246,14 @@ export function useArenaChallenge({
           if (row.expires_at && new Date(row.expires_at) <= new Date()) return;
           // Already showing a prompt: the first one keeps the surface rather
           // than being silently replaced mid-decision.
-          if (incomingRef.current) return;
+          if (incomingRef.current || inMatchRef.current) return;
 
-          const { data } = await supabase
-            .from("athletes")
-            .select("display_name, current_elo, current_weight")
-            .eq("id", row.challenger_id)
-            .maybeSingle();
-
-          setIncomingBoth({
-            challengeId: row.id,
-            challengerId: row.challenger_id,
-            challengerName: data?.display_name ?? "An athlete",
-            challengerElo: data?.current_elo ?? null,
-            challengerWeight: data?.current_weight ?? null,
-          });
+          const next = await loadIncoming(row.id, row.challenger_id);
+          // Re-checked after the read: another INSERT, a recovery offer or a
+          // match can land inside that await, and the first prompt keeps the
+          // surface.
+          if (incomingRef.current || inMatchRef.current) return;
+          setIncomingBoth(next);
         },
       )
       .on(
@@ -226,10 +269,9 @@ export function useArenaChallenge({
           // The challenger cancelled, or a sweep expired it. Either way the
           // prompt is no longer answerable, so it goes away on its own rather
           // than failing under the athlete's thumb.
-          if (
-            row.status !== "pending" &&
-            incomingRef.current?.challengeId === row.id
-          ) {
+          if (row.status === "pending") return;
+          settledRef.current.add(row.id);
+          if (incomingRef.current?.challengeId === row.id) {
             setIncomingBoth(null);
           }
         },
@@ -248,6 +290,7 @@ export function useArenaChallenge({
           if (!mine || mine.challengeId !== row.id) return;
 
           if (row.status === "declined" || row.status === "cancelled") {
+            settledRef.current.add(row.id);
             setOutgoingBoth(null);
             setCapReached(false);
             if (row.status === "declined") {
@@ -285,6 +328,7 @@ export function useArenaChallenge({
         if (matchId) enterMatch(outgoingId, matchId);
       })
       .on("broadcast", { event: "declined" }, () => {
+        settledRef.current.add(outgoingId);
         setOutgoingBoth(null);
         setCapReached(false);
         toast.info(`${outgoingName ?? "Your opponent"} declined.`);
@@ -447,6 +491,7 @@ export function useArenaChallenge({
           return;
         }
 
+        settledRef.current.add(current.challengeId);
         await broadcast(current.challengeId, "declined", {});
         setIncomingBoth(null);
       }),
@@ -464,6 +509,7 @@ export function useArenaChallenge({
           toast.error("Couldn't cancel that challenge. Try again.");
           return;
         }
+        settledRef.current.add(current.challengeId);
         setOutgoingBoth(null);
         // A cancel frees a slot, so the cap can no longer be asserted.
         setCapReached(false);
@@ -472,6 +518,32 @@ export function useArenaChallenge({
   );
 
   const clearCap = React.useCallback(() => setCapReached(false), []);
+
+  const offerIncoming = React.useCallback(
+    async (challengeId: string, challengerId: string) => {
+      const skip = () =>
+        inMatchRef.current ||
+        !!incomingRef.current ||
+        settledRef.current.has(challengeId) ||
+        enteredForRef.current === challengeId;
+      if (skip()) return;
+      const next = await loadIncoming(challengeId, challengerId);
+      // Re-checked after the read: the realtime INSERT or an answer can land
+      // inside that await, and the first prompt keeps the surface.
+      if (skip()) return;
+      setIncomingBoth(next);
+    },
+    [setIncomingBoth],
+  );
+
+  const restoreOutgoing = React.useCallback(
+    (challenge: OutgoingChallenge) => {
+      if (outgoingRef.current) return;
+      if (settledRef.current.has(challenge.challengeId)) return;
+      setOutgoingBoth(challenge);
+    },
+    [setOutgoingBoth],
+  );
 
   return {
     incoming,
@@ -483,5 +555,7 @@ export function useArenaChallenge({
     decline,
     cancelOutgoing,
     clearCap,
+    offerIncoming,
+    restoreOutgoing,
   };
 }

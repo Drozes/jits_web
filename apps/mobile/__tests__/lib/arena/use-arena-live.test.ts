@@ -86,12 +86,20 @@ const ARGS: UseArenaLiveArgs = {
   displayName: "Me",
   currentElo: 1200,
   initialRanked: false,
-  isArenaTabSelected: true,
 };
 
 let appStateHandler: ((s: AppStateStatus) => void) | null = null;
 
+function setAppState(state: AppStateStatus) {
+  Object.defineProperty(AppState, "currentState", {
+    value: state,
+    configurable: true,
+    writable: true,
+  });
+}
+
 beforeEach(() => {
+  setAppState("active");
   mockCalls.length = 0;
   jest.clearAllMocks();
   appStateHandler = null;
@@ -474,7 +482,10 @@ describe("coming back from the background", () => {
     expect(result.current.isLive).toBe(false);
   });
 
-  it("does not resume when the athlete has left the Arena tab", async () => {
+  it("resumes wherever the athlete lands, not only on the Arena", async () => {
+    // Live belongs to the athlete, not to a screen: there is no tab input any
+    // more, so a re-render between background and foreground (the athlete
+    // came back on Home, or Rankings) must not stop the resume.
     const { result, rerender } = mount();
     await act(async () => {
       await result.current.toggle();
@@ -484,7 +495,7 @@ describe("coming back from the background", () => {
       await Promise.resolve();
     });
     await act(async () => {
-      rerender({ ...ARGS, isArenaTabSelected: false });
+      rerender({ ...ARGS });
       await Promise.resolve();
     });
     mockCalls.length = 0;
@@ -494,8 +505,8 @@ describe("coming back from the background", () => {
       await Promise.resolve();
     });
 
-    expect(mockCalls).toEqual([]);
-    expect(result.current.isLive).toBe(false);
+    expect(mockCalls).toEqual(["flag:true", "joinLobby"]);
+    expect(result.current.isLive).toBe(true);
   });
 
   it("resumes only once per background, not on every later 'active'", async () => {
@@ -529,11 +540,11 @@ describe("coming back from the background", () => {
   });
 });
 
-describe("staying live inside the Arena", () => {
-  it("keeps you live while the Arena TAB is still selected", async () => {
-    // Pushing an athlete profile or a match blurs the Arena SCREEN while the
-    // tab stays selected. Keying on screen focus would drop the athlete out
-    // of the lobby for reading a profile, or for the match they just accepted.
+describe("staying live across the app", () => {
+  it("keeps you live across re-renders: switching tabs does not end live", async () => {
+    // The owner is mounted once for the signed-in app, so moving between
+    // Home, Arena, Rankings and Profile only ever re-renders it. Nothing in a
+    // re-render may clear either signal.
     const { result, rerender } = mount();
     await act(async () => {
       await result.current.toggle();
@@ -542,7 +553,8 @@ describe("staying live inside the Arena", () => {
     mockLeaveLobby.mockClear();
 
     await act(async () => {
-      rerender({ ...ARGS, isArenaTabSelected: true });
+      rerender({ ...ARGS });
+      rerender({ ...ARGS, currentElo: 1210 });
       await Promise.resolve();
     });
 
@@ -551,25 +563,39 @@ describe("staying live inside the Arena", () => {
     expect(result.current.isLive).toBe(true);
   });
 
-  it("clears BOTH signals when the athlete switches to another tab", async () => {
-    const { result, rerender } = mount();
+  it("goOffline clears BOTH signals, silently, and resolves true once landed", async () => {
+    // The sign-out path: no toast (there is no screen left to show it on),
+    // and the caller awaits the flag clear before dropping the session.
+    const { result } = mount();
     await act(async () => {
       await result.current.toggle();
     });
     mockToggleMatchPreferences.mockClear();
-    mockLeaveLobby.mockClear();
 
+    let ok: boolean | undefined;
     await act(async () => {
-      rerender({ ...ARGS, isArenaTabSelected: false });
-      await Promise.resolve();
+      ok = await result.current.goOffline();
     });
 
+    expect(ok).toBe(true);
     expect(mockLeaveLobby).toHaveBeenCalled();
     expect(lastFlagWrite()).toEqual({
       lookingForCasual: false,
       lookingForRanked: false,
     });
     expect(result.current.isLive).toBe(false);
+    expect(mockToastError).not.toHaveBeenCalled();
+  });
+
+  it("goOffline when already offline writes nothing", async () => {
+    const { result } = mount();
+
+    await act(async () => {
+      await result.current.goOffline();
+    });
+
+    expect(mockToggleMatchPreferences).not.toHaveBeenCalled();
+    expect(mockLeaveLobby).not.toHaveBeenCalled();
   });
 });
 
@@ -578,8 +604,8 @@ describe("overlapping transitions", () => {
     // The flag write is a round trip and can be two. If "am I live?" only
     // became true after it, this background would find nothing to clear and
     // return happy, leaving the athlete live and unreachable with no path
-    // that ever clears them: the AppState handler ignores "active" and the
-    // tab effect cannot fire until they come back.
+    // that ever clears them: the AppState handler only resumes on "active",
+    // it never clears there.
     let releaseWrite: (() => void) | null = null;
     mockToggleMatchPreferences.mockImplementationOnce(
       () =>
@@ -652,5 +678,137 @@ describe("overlapping transitions", () => {
       "flag:true",
       "flag:false",
     ]);
+  });
+});
+
+describe("launch resume", () => {
+  it("does NOT go live when the JS cold-launched in the background (silent push)", async () => {
+    setAppState("background");
+    const { result } = mount({ initialRanked: true });
+    await act(flush);
+
+    expect(mockToggleMatchPreferences).not.toHaveBeenCalled();
+    expect(mockJoinLobby).not.toHaveBeenCalled();
+    expect(result.current.isLive).toBe(false);
+
+    // The first time the athlete actually opens the app, they are live.
+    await act(async () => {
+      setAppState("active");
+      appStateHandler?.("active");
+      await flush();
+    });
+    expect(mockCalls).toEqual(["flag:true", "joinLobby"]);
+    expect(result.current.isLive).toBe(true);
+  });
+
+  it("does not go live at launch straight into a match, and goes live after it", async () => {
+    const { result, rerender } = mount({ initialRanked: true, inMatch: true });
+    await act(flush);
+    expect(mockJoinLobby).not.toHaveBeenCalled();
+
+    await act(async () => {
+      rerender({ ...ARGS, initialRanked: true, inMatch: false });
+      await flush();
+    });
+    expect(result.current.isLive).toBe(true);
+  });
+
+  it("tells the athlete when coming back live failed", async () => {
+    const { result } = mount();
+    await act(async () => {
+      await result.current.toggle();
+    });
+    await act(async () => {
+      appStateHandler?.("background");
+      await flush();
+    });
+    mockToggleMatchPreferences.mockResolvedValue({
+      ok: false,
+      error: { code: "UNKNOWN", message: "down" },
+    });
+
+    await act(async () => {
+      appStateHandler?.("active");
+      await flush();
+    });
+
+    expect(result.current.isLive).toBe(false);
+    expect(mockToastError).toHaveBeenCalledWith(
+      "You're offline. Go live again in the Arena.",
+    );
+  });
+});
+
+describe("offline during a match", () => {
+  async function liveThenMatch() {
+    const hook = mount();
+    await act(async () => {
+      await hook.result.current.toggle();
+    });
+    mockCalls.length = 0;
+    await act(async () => {
+      hook.rerender({ ...ARGS, inMatch: true });
+      await flush();
+    });
+    return hook;
+  }
+
+  it("clears BOTH signals when a match starts", async () => {
+    const { result } = await liveThenMatch();
+
+    expect(mockCalls).toEqual(["leaveLobby", "flag:false"]);
+    expect(result.current.isLive).toBe(false);
+  });
+
+  it("goes live again when the match screen is left", async () => {
+    const { result, rerender } = await liveThenMatch();
+    mockCalls.length = 0;
+
+    await act(async () => {
+      rerender({ ...ARGS, inMatch: false });
+      await flush();
+    });
+
+    expect(mockCalls).toEqual(["flag:true", "joinLobby"]);
+    expect(result.current.isLive).toBe(true);
+  });
+
+  it("does not go live after a match the athlete entered while offline", async () => {
+    const { result, rerender } = mount();
+    await act(async () => {
+      rerender({ ...ARGS, inMatch: true });
+      await flush();
+    });
+    await act(async () => {
+      rerender({ ...ARGS, inMatch: false });
+      await flush();
+    });
+
+    expect(mockToggleMatchPreferences).not.toHaveBeenCalled();
+    expect(result.current.isLive).toBe(false);
+  });
+
+  it("does NOT restore live on foreground while still in the match", async () => {
+    const { result, rerender } = await liveThenMatch();
+    await act(async () => {
+      appStateHandler?.("background");
+      await flush();
+    });
+    mockCalls.length = 0;
+
+    await act(async () => {
+      appStateHandler?.("active");
+      await flush();
+    });
+    expect(mockCalls).toEqual([]);
+    expect(result.current.isLive).toBe(false);
+
+    // ...but the intent survives to the end of the match.
+    await act(async () => {
+      rerender({ ...ARGS, inMatch: false });
+      await flush();
+    });
+    expect(mockCalls).toEqual(["flag:true", "joinLobby"]);
+    expect(result.current.isLive).toBe(true);
   });
 });

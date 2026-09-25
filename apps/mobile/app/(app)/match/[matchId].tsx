@@ -21,6 +21,7 @@ import { MatchFlowWizard } from "@/components/match-flow/match-flow-wizard";
 import type { MatchStep } from "@/lib/match-flow/step-router";
 import { AppHeader } from "@/components/layout/app-header";
 import { ARENA_EXIT_LABEL, ARENA_HREF } from "@/lib/arena/constants";
+import { useArenaMatchScreen } from "@/lib/arena/arena-store";
 
 /**
  * Steps where a live match is in flight and leaving via a back gesture would
@@ -38,6 +39,9 @@ export default function ArenaMatchScreen() {
   const { matchId } = useLocalSearchParams<{ matchId: string }>();
   const { athlete, isLoading: authLoading } = useRequireAthlete();
   const [step, setStep] = React.useState<MatchStep | null>(null);
+  // Offline for the match, no challenge prompts over it, and back to live on
+  // the way out (every exit path unmounts this screen). See arena-store.ts.
+  useArenaMatchScreen();
 
   const guarded = step != null && GUARDED_STEPS.has(step);
   usePreventRemove(guarded, () => {});
@@ -47,7 +51,7 @@ export default function ArenaMatchScreen() {
       <>
         <Stack.Screen options={{ headerShown: false }} />
         <View className="flex-1 bg-surface">
-          <AppHeader title="Match" />
+          <AppHeader title="Match" liveSignal="static" />
           <View className="flex-1 items-center justify-center">
             <ActivityIndicator color={tokens.textSecondary} />
           </View>
@@ -60,7 +64,7 @@ export default function ArenaMatchScreen() {
     <>
       <Stack.Screen options={{ headerShown: false, gestureEnabled: !guarded }} />
       <View className="flex-1 bg-surface">
-        <AppHeader title="Match" />
+        <AppHeader title="Match" liveSignal="static" />
         {/* The wizard derives its own starting step from `matches.status`, so
             backgrounding and reopening mid-match resumes where it left off. */}
         <MatchFlowWizard

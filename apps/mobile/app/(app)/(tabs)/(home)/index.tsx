@@ -3,14 +3,14 @@ import { ActivityIndicator, RefreshControl, ScrollView, Text, View } from "react
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRequireAthlete } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
+import { BrandHeader } from "@/components/layout/brand-header";
 import { supabase } from "@/lib/supabase/client";
 import { getDashboardSummary } from "@jits/shared/api/queries";
 import type { DashboardSummary } from "@jits/shared/types/composites";
-import { Avatar32, EloTile, MetaTag, Wordmark } from "@/components/ui/elo-system";
+import { EloTile, MetaTag } from "@/components/ui/elo-system";
 import { ArenaNudgeCard } from "@/components/dashboard/arena-nudge-card";
 import { RecentActivitySection } from "@/components/dashboard/recent-activity-section";
 import { StatOverview } from "@/components/dashboard/stat-overview";
-import { NotificationBell } from "@/components/notifications/notification-bell";
 import { toast } from "@/components/ui/toast";
 import {
   SkeletonProvider,
@@ -91,19 +91,7 @@ export default function DashboardScreen() {
 
   return (
     <View className="flex-1 bg-surface">
-      <View
-        className="bg-surface-2 border-b border-hairline flex-row items-center justify-between px-4"
-        style={{ paddingTop: insets.top, height: 56 + insets.top }}
-      >
-        <Wordmark size="md" />
-        <View className="flex-row items-center gap-2">
-          <NotificationBell athleteId={athlete.id} />
-          <Avatar32
-            name={athlete.display_name}
-            photoUrl={athlete.profile_photo_url}
-          />
-        </View>
-      </View>
+      <BrandHeader athleteId={athlete.id} />
 
       <ScrollView
         className="flex-1"

@@ -41,6 +41,7 @@
  */
 import * as React from "react";
 import { useSyncExternalStore } from "react";
+import { AppState } from "react-native";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabase } from "../supabase/client";
 import { LOBBY_TOPIC } from "./constants";
@@ -170,7 +171,10 @@ async function releaseChannel(): Promise<void> {
 // ---------------------------------------------------------------------------
 
 /**
- * Owns the single `lobby:online` channel. Mount once, on the Arena screen.
+ * Owns the single `lobby:online` channel. Mount once, app-wide, from
+ * `<ArenaBootstrap />` (`arena-bootstrap.tsx`), never from a screen. Observing
+ * the channel is not joining the lobby: nothing is tracked until
+ * `joinLobby()`, which only the live state machine calls.
  *
  * Going live and going offline run through the imperative API above rather
  * than through props, so a toggle never tears the channel down and re-joins
@@ -180,6 +184,12 @@ export function useLobbyPresence(athleteId: string): void {
   React.useEffect(() => {
     let cancelled = false;
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    /**
+     * The backoff ran out. The owner is app-wide now, so there is no "next
+     * Arena visit" to re-run setup; coming back to the foreground is the
+     * natural moment the socket is back, so that is when setup runs again.
+     */
+    let gaveUp = false;
 
     /**
      * Come back to a setup that could not complete. `attempt` is the try that
@@ -190,8 +200,9 @@ export function useLobbyPresence(athleteId: string): void {
       const delay = STALE_RETRY_DELAYS_MS[attempt];
       if (delay === undefined) {
         console.warn(
-          "[arena] gave up clearing the stale lobby channel; the lobby stays empty until the Arena is re-entered",
+          "[arena] gave up clearing the stale lobby channel; retrying when the app next returns to the foreground",
         );
+        gaveUp = true;
         return;
       }
       retryTimer = setTimeout(() => {
@@ -275,8 +286,15 @@ export function useLobbyPresence(athleteId: string): void {
 
     run(0);
 
+    const appStateSub = AppState.addEventListener("change", (next) => {
+      if (next !== "active" || !gaveUp || cancelled) return;
+      gaveUp = false;
+      run(0);
+    });
+
     return () => {
       cancelled = true;
+      appStateSub.remove();
       if (retryTimer) clearTimeout(retryTimer);
       // Leave the lobby, KEEP the channel. Removing it here is what creates
       // the zombie described at the top of this file, and an observer with

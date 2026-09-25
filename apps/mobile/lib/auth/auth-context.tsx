@@ -9,6 +9,7 @@ import {
 import { supabase } from "../supabase/client";
 import { setCachedElo } from "../splash/elo-cache";
 import { needsAthleteLoad } from "./athlete-load";
+import { takeArenaOfflineBeforeSignOut } from "../arena/arena-store";
 
 type AuthError = { message: string };
 
@@ -184,6 +185,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signOut = React.useCallback(async () => {
+    // Clear `looking_for_ranked` while the session can still write it; once
+    // signed out, RLS refuses the write and the athlete stays advertised.
+    await takeArenaOfflineBeforeSignOut();
     await supabase.auth.signOut();
     // onAuthStateChange will null out user/athlete; clear eagerly for snappier UI.
     setSession(null);

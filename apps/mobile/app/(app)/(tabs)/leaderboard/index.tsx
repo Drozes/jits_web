@@ -1,10 +1,10 @@
 import * as React from "react";
 import { ActivityIndicator, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Avatar32, Chip, MetaTag, Wordmark } from "@/components/ui/elo-system";
+import { Chip, MetaTag } from "@/components/ui/elo-system";
 import { SkeletonProvider, SkeletonRankRow } from "@/components/ui/skeleton";
 import { useRequireAthlete } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
+import { BrandHeader } from "@/components/layout/brand-header";
 import { useLeaderboardData } from "@/lib/leaderboard/use-leaderboard-data";
 import {
   GenderFilterRow,
@@ -33,7 +33,6 @@ function RankingsSkeleton() {
 }
 
 export default function LeaderboardScreen() {
-  const insets = useSafeAreaInsets();
   const { athlete, isLoading: authLoading } = useRequireAthlete();
   const tokens = useThemedTokens();
   const { athletes, gyms, isLoading, isRefreshing, refresh } = useLeaderboardData(
@@ -77,16 +76,7 @@ export default function LeaderboardScreen() {
 
   return (
     <View className="flex-1 bg-surface">
-      <View
-        className="bg-surface-2 border-b border-hairline flex-row items-center justify-between px-4"
-        style={{ paddingTop: insets.top, height: 56 + insets.top }}
-      >
-        <Wordmark size="md" />
-        <Avatar32
-          name={athlete.display_name}
-          photoUrl={athlete.profile_photo_url}
-        />
-      </View>
+      <BrandHeader athleteId={athlete.id} />
 
       <View className="px-4 py-3 border-b border-hairline-faint" style={{ gap: 8 }}>
         <View className="flex-row flex-wrap" style={{ gap: 8 }}>

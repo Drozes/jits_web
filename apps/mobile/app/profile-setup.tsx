@@ -34,7 +34,7 @@ export default function ProfileSetupScreen() {
 
   return (
     <View className="flex-1 bg-surface">
-      <AppHeader title={headerTitle} />
+      <AppHeader title={headerTitle} liveSignal="static" />
       <KeyboardAvoidingView
         className="flex-1"
         behavior={Platform.OS === "ios" ? "padding" : undefined}

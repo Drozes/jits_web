@@ -424,6 +424,59 @@ describe("useLobbyPresence", () => {
     warn.mockRestore();
   });
 
+  it("runs setup again on the next foreground after the backoff gives up", async () => {
+    // The owner is app-wide, so there is no "next Arena visit" to rescue a
+    // lobby whose stale channel never cleared: returning to the foreground is.
+    jest.useFakeTimers();
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    let appStateHandler: ((s: string) => void) | null = null;
+    const { AppState } = require("react-native");
+    // Swapped by hand rather than spyOn/mockRestore: jest-expo's AppState
+    // mock is itself a jest.fn, and mockRestore would reset it to one that
+    // returns undefined, breaking every later unmount.
+    const original = AppState.addEventListener;
+    AppState.addEventListener = (_e: unknown, h: unknown) => {
+      appStateHandler = h as (s: string) => void;
+      return { remove: jest.fn() };
+    };
+    mockRemoveChannel.mockReturnValue("timed out");
+    const first = mount();
+    await settle();
+    await act(async () => {
+      first.unmount();
+      await Promise.resolve();
+    });
+
+    const second = mount("someone-else");
+    await settle();
+    // Exhaust every backoff step.
+    for (let i = 0; i < 4; i++) {
+      await act(async () => {
+        jest.runOnlyPendingTimers();
+        await settle();
+      });
+    }
+    expect(mockChannels).toHaveLength(1);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining("retrying when the app next returns to the foreground"),
+    );
+
+    mockRemoveChannel.mockReturnValue("ok");
+    await act(async () => {
+      appStateHandler?.("active");
+      await settle();
+    });
+
+    expect(mockChannels).toHaveLength(2);
+    expect(mockChannels[1].config).toEqual({
+      config: { presence: { key: "someone-else" } },
+    });
+
+    second.unmount();
+    AppState.addEventListener = original;
+    warn.mockRestore();
+  });
+
   it("does nothing without an athlete id", async () => {
     const { unmount } = mount("");
     await settle();

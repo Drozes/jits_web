@@ -764,3 +764,187 @@ describe("teardown", () => {
     second.unmount();
   });
 });
+
+describe("recovery entry points (pending challenges read at mount)", () => {
+  it("offerIncoming raises the same prompt the realtime INSERT does", async () => {
+    const { result } = mount();
+
+    await act(async () => {
+      await result.current.offerIncoming(CHALLENGE, OPPONENT);
+    });
+
+    expect(result.current.incoming).toEqual({
+      challengeId: CHALLENGE,
+      challengerId: OPPONENT,
+      challengerName: "Rival",
+      challengerElo: 1350,
+      challengerWeight: 190,
+    });
+  });
+
+  it("offerIncoming never replaces a prompt that is already up", async () => {
+    const { result } = mount();
+    await raiseIncoming(result);
+
+    await act(async () => {
+      await result.current.offerIncoming("ch-other", "someone-else");
+    });
+
+    expect(result.current.incoming).toMatchObject({ challengeId: CHALLENGE });
+  });
+
+  it("offerIncoming does not re-raise a challenge this athlete declined", async () => {
+    // The pending read can be a beat behind the decline, and presence syncs
+    // keep re-running the recovery pass.
+    const { result } = mount();
+    await raiseIncoming(result);
+    await act(async () => {
+      await result.current.decline();
+    });
+    expect(result.current.incoming).toBeNull();
+
+    await act(async () => {
+      await result.current.offerIncoming(CHALLENGE, OPPONENT);
+    });
+
+    expect(result.current.incoming).toBeNull();
+  });
+
+  it("offerIncoming does not re-raise a challenge the challenger withdrew", async () => {
+    const { result } = mount();
+    await act(async () => {
+      await opponentUpdateBinding().handler({
+        new: {
+          id: CHALLENGE,
+          challenger_id: OPPONENT,
+          opponent_id: ME,
+          status: "cancelled",
+        },
+      });
+    });
+
+    await act(async () => {
+      await result.current.offerIncoming(CHALLENGE, OPPONENT);
+    });
+
+    expect(result.current.incoming).toBeNull();
+  });
+
+  it("restoreOutgoing puts the Sent state back so the accept broadcast is heard", async () => {
+    const { result } = mount();
+
+    act(() => {
+      result.current.restoreOutgoing({
+        challengeId: CHALLENGE,
+        opponentId: OPPONENT,
+        opponentName: "Rival",
+      });
+    });
+
+    expect(result.current.outgoing).toEqual({
+      challengeId: CHALLENGE,
+      opponentId: OPPONENT,
+      opponentName: "Rival",
+    });
+    expect(mockChannelTopics).toContain(challengeTopic(CHALLENGE));
+  });
+
+  it("restoreOutgoing leaves an existing outgoing challenge alone", async () => {
+    const { result } = mount();
+    await act(async () => {
+      await result.current.sendChallenge(OPPONENT, "Rival");
+    });
+
+    act(() => {
+      result.current.restoreOutgoing({
+        challengeId: "ch-old",
+        opponentId: "someone-else",
+        opponentName: "Old",
+      });
+    });
+
+    expect(result.current.outgoing).toMatchObject({ challengeId: CHALLENGE });
+  });
+});
+
+describe("during a match", () => {
+  function mountInMatch(inMatch: boolean) {
+    return renderHook(
+      (props: { inMatch: boolean }) =>
+        useArenaChallenge({ athleteId: ME, athleteWeight: 180, inMatch: props.inMatch }),
+      { initialProps: { inMatch } },
+    );
+  }
+
+  it("raises no prompt from a realtime INSERT while in a match", async () => {
+    const { result } = mountInMatch(true);
+
+    await act(async () => {
+      await incomingBinding().handler({
+        new: { id: CHALLENGE, challenger_id: OPPONENT, opponent_id: ME, status: "pending" },
+      });
+    });
+
+    expect(result.current.incoming).toBeNull();
+  });
+
+  it("drops an INSERT whose lookup finished after the match started", async () => {
+    let release: (v: unknown) => void = () => {};
+    mockMaybeSingle.mockImplementationOnce(
+      () => new Promise((resolve) => (release = resolve)),
+    );
+    const { result, rerender } = mountInMatch(false);
+
+    let pending: Promise<void> | void;
+    await act(async () => {
+      pending = incomingBinding().handler({
+        new: { id: CHALLENGE, challenger_id: OPPONENT, opponent_id: ME, status: "pending" },
+      });
+      await Promise.resolve();
+    });
+    rerender({ inMatch: true });
+    await act(async () => {
+      release({ data: { display_name: "Rival", current_elo: 1, current_weight: 1 }, error: null });
+      await pending;
+    });
+
+    expect(result.current.incoming).toBeNull();
+  });
+
+  it("offerIncoming is a no-op while in a match", async () => {
+    const { result } = mountInMatch(true);
+
+    await act(async () => {
+      await result.current.offerIncoming(CHALLENGE, OPPONENT);
+    });
+
+    expect(result.current.incoming).toBeNull();
+  });
+});
+
+describe("INSERT racing another prompt", () => {
+  it("keeps the first prompt when a second INSERT's lookup lands after it", async () => {
+    let release: (v: unknown) => void = () => {};
+    mockMaybeSingle.mockImplementationOnce(
+      () => new Promise((resolve) => (release = resolve)),
+    );
+    const { result } = mount();
+
+    let slow: Promise<void> | void;
+    await act(async () => {
+      slow = incomingBinding().handler({
+        new: { id: "ch-slow", challenger_id: "slow-1", opponent_id: ME, status: "pending" },
+      });
+      await Promise.resolve();
+    });
+    // A second challenge arrives and its lookup resolves first.
+    await raiseIncoming(result);
+
+    await act(async () => {
+      release({ data: { display_name: "Slow", current_elo: 1, current_weight: 1 }, error: null });
+      await slow;
+    });
+
+    expect(result.current.incoming).toMatchObject({ challengeId: CHALLENGE });
+  });
+});

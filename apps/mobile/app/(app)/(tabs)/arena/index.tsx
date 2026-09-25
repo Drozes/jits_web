@@ -6,13 +6,14 @@
  * "Open to challenges" is the `looking_for_ranked` column. Only the first can
  * answer a live prompt, so only those rows carry a Challenge.
  *
- * `lobby:online` is mounted HERE rather than in the app layout. On web that
- * was a hydration workaround; on React Native the reason is lifetime. The
- * channel and the database flag have to rise and fall together (see
- * `lib/arena/use-arena-live.ts`), and this screen is the only thing whose life
- * matches when an athlete is actually in the Arena. Mounting it app-wide would
- * keep every signed-in athlete in the matchmaking lobby for as long as the app
- * was open.
+ * This screen OWNS NOTHING realtime. Being live persists across tabs, so the
+ * live state machine, the `lobby:online` channel and the incoming-challenge
+ * listener and prompt are mounted once, app-wide, by `<ArenaBootstrap />`
+ * (`lib/arena/arena-bootstrap.tsx`), and this screen reads and drives them
+ * through `lib/arena/arena-store.ts`. Mounting any of them here as well would
+ * mean a second flag writer and a second prompt for every challenge.
+ * Observing the lobby is not joining it: an athlete is only tracked in
+ * `lobby:online` while they are live.
  */
 import * as React from "react";
 import { RefreshControl, Text, View } from "react-native";
@@ -22,14 +23,15 @@ import { useThemedTokens } from "@/lib/theme/use-theme";
 import { AppHeader } from "@/components/layout/app-header";
 import { PageContainer } from "@/components/layout/page-container";
 import { NotificationBell } from "@/components/notifications/notification-bell";
-import { useLobbyIds, useLobbyPresence } from "@/lib/arena/use-lobby-presence";
-import { useIsTabSelected } from "@/lib/arena/use-arena-tab-focus";
-import { useArenaLive } from "@/lib/arena/use-arena-live";
+import { useLobbyIds } from "@/lib/arena/use-lobby-presence";
 import { useArenaRoster } from "@/lib/arena/use-arena-roster";
-import { useArenaChallenge } from "@/lib/arena/use-arena-challenge";
+import {
+  arenaActions,
+  setOpponentUnavailableHandler,
+  useArenaState,
+} from "@/lib/arena/arena-store";
 import { GoLivePlate } from "@/components/arena/go-live-plate";
 import { CompetitorRow, type RowAction } from "@/components/arena/competitor-row";
-import { ChallengePromptSheet } from "@/components/arena/challenge-prompt-sheet";
 import { ArenaSkeleton } from "@/components/arena/arena-skeleton";
 import {
   CapPlate,
@@ -45,22 +47,10 @@ export default function ArenaScreen() {
   const tokens = useThemedTokens();
   const { athlete, isLoading: authLoading } = useRequireAthlete();
 
-  const athleteId = athlete?.id ?? "";
-  useLobbyPresence(athleteId);
   const lobbyIds = useLobbyIds();
-
-  // The TAB, not this screen: pushing an athlete profile or dropping into a
-  // match blurs the screen while the Arena tab stays selected, and neither is
-  // leaving the Arena.
-  const isArenaTabSelected = useIsTabSelected("arena");
-
-  const { isLive, isSaving, toggle } = useArenaLive({
-    athleteId,
-    displayName: athlete?.display_name ?? "",
-    currentElo: athlete?.current_elo ?? 0,
-    initialRanked: athlete?.looking_for_ranked ?? false,
-    isArenaTabSelected,
-  });
+  const { isLive, isSaving, incoming, outgoing, isBusy, capReached } =
+    useArenaState();
+  const { toggle, sendChallenge, cancelOutgoing, clearCap } = arenaActions;
 
   const {
     competitors,
@@ -71,23 +61,13 @@ export default function ArenaScreen() {
     refresh,
   } = useArenaRoster(athlete?.current_elo ?? 0);
 
-  const {
-    incoming,
-    outgoing,
-    isBusy,
-    capReached,
-    sendChallenge,
-    accept,
-    decline,
-    cancelOutgoing,
-    clearCap,
-  } = useArenaChallenge({
-    athleteId,
-    athleteWeight: athlete?.current_weight ?? null,
-    // An opponent who left between the roster load and the tap leaves a stale
-    // row behind; re-reading the roster is what corrects it.
-    onOpponentUnavailable: refresh,
-  });
+  // An opponent who left between the roster load and the tap leaves a stale
+  // row behind; re-reading the roster is what corrects it. The challenge hook
+  // lives app-wide, so the roster's refresh is handed to it here.
+  React.useEffect(() => {
+    setOpponentUnavailableHandler(refresh);
+    return () => setOpponentUnavailableHandler(null);
+  }, [refresh]);
 
   const online = competitors.filter((c) => lobbyIds.has(c.id));
   const offline = competitors.filter((c) => !lobbyIds.has(c.id));
@@ -129,7 +109,7 @@ export default function ArenaScreen() {
   if (authLoading || !athlete) {
     return (
       <View className="flex-1 bg-surface">
-        <AppHeader title="Arena" />
+        <AppHeader title="Arena" liveSignal="static" />
         <PageContainer contentContainerStyle={{ paddingTop: 16 }}>
           <ArenaSkeleton />
         </PageContainer>
@@ -141,6 +121,7 @@ export default function ArenaScreen() {
     <View className="flex-1 bg-surface">
       <AppHeader
         title="Arena"
+        liveSignal="static"
         rightAction={<NotificationBell athleteId={athlete.id} />}
       />
 
@@ -211,13 +192,6 @@ export default function ArenaScreen() {
           </>
         )}
       </PageContainer>
-
-      <ChallengePromptSheet
-        challenge={incoming}
-        busy={isBusy}
-        onAccept={() => void accept()}
-        onDecline={() => void decline()}
-      />
     </View>
   );
 }

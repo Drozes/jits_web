@@ -16,8 +16,8 @@
  *     it can be two. If "am I live?" only became true after that await, a
  *     background landing inside the window would find nothing to clear, return
  *     happy, and leave an athlete live and unreachable with no path that ever
- *     clears them: the AppState handler ignores "active" and the tab-selection
- *     effect cannot fire until they come back.
+ *     clears them: the AppState handler only ever re-asserts live on
+ *     "active", it never clears there.
  *  2. TRANSITIONS ARE SERIALIZED. Two unordered writes can reach the database
  *     in either order, so a clear racing a set can lose and leave the flag
  *     true. Every transition runs on one promise queue, so the clear is issued
@@ -32,6 +32,11 @@
  * `looking_for_casual: false`; casual was removed from the product and
  * `get_arena_data` filters on (casual OR ranked), so ranked alone is enough to
  * appear.
+ *
+ * Mounted ONCE for the signed-in athlete, by `<ArenaBootstrap />`
+ * (`lib/arena/arena-bootstrap.tsx`), and read everywhere else through
+ * `arena-store.ts`. A second mount would be a second writer racing this one's
+ * queue, so screens must never call it directly.
  */
 import * as React from "react";
 import { AppState, type AppStateStatus } from "react-native";
@@ -47,12 +52,11 @@ export interface UseArenaLiveArgs {
   /** `athletes.looking_for_ranked` as the auth context last read it. */
   initialRanked: boolean;
   /**
-   * Whether the Arena TAB is selected, which is not the same as whether the
-   * Arena SCREEN is focused. A pushed athlete profile or match blurs the
-   * screen while the tab stays selected, and neither of those is leaving the
-   * Arena. See `use-arena-tab-focus.ts`.
+   * True while a match screen is mounted (`arena-store.ts` match counter).
+   * The athlete is taken offline for the match and put back afterwards if
+   * they were live going in.
    */
-  isArenaTabSelected: boolean;
+  inMatch?: boolean;
 }
 
 export interface UseArenaLiveResult {
@@ -60,6 +64,11 @@ export interface UseArenaLiveResult {
   isSaving: boolean;
   /** Toggle. Resolves once the write has settled. */
   toggle: () => Promise<void>;
+  /**
+   * Go offline without a toast. Resolves true once the flag clear landed.
+   * For sign-out, which has to clear the flag while the session still exists.
+   */
+  goOffline: () => Promise<boolean>;
 }
 
 /**
@@ -68,8 +77,8 @@ export interface UseArenaLiveResult {
  * `toggleMatchPreferences` returns a `Result`, it does not throw: supabase-js
  * resolves transport failures into `{ data: null, error }` rather than
  * rejecting, so failure is read off the returned value and never off a
- * rejection. The retry exists because the paths that clear the flag (leaving
- * the tab, backgrounding) have no UI left to report into, and a dropped clear
+ * rejection. The retry exists because the paths that clear the flag
+ * (backgrounding, sign-out, teardown) have no UI left to report into, and a dropped clear
  * is the exact bug this hook exists to prevent.
  */
 async function writeLookingFlag(
@@ -91,7 +100,7 @@ export function useArenaLive({
   displayName,
   currentElo,
   initialRanked,
-  isArenaTabSelected,
+  inMatch = false,
 }: UseArenaLiveArgs): UseArenaLiveResult {
   const [isLive, setIsLive] = React.useState(false);
   const [isSaving, setIsSaving] = React.useState(false);
@@ -212,24 +221,12 @@ export function useArenaLive({
     }
   }, [requestLive, requestOffline]);
 
-  // Re-assert a flag the athlete arrived with. Writing it again rather than
-  // trusting it is deliberate: the auth context caches the athlete row, so a
-  // second visit in the same app session can hand us a `true` we ourselves
-  // cleared on the way out. Re-writing makes "present in the lobby" and
-  // "flagged as looking" true at the same instant, whatever the cache says.
-  const reconciledRef = React.useRef(false);
-  React.useEffect(() => {
-    if (!athleteId || !initialRanked || reconciledRef.current) return;
-    reconciledRef.current = true;
-    void requestLive();
-  }, [athleteId, initialRanked, requestLive]);
-
   const requestOfflineRef = React.useRef(requestOffline);
   requestOfflineRef.current = requestOffline;
   const requestLiveRef = React.useRef(requestLive);
   requestLiveRef.current = requestLive;
-  const isArenaTabSelectedRef = React.useRef(isArenaTabSelected);
-  isArenaTabSelectedRef.current = isArenaTabSelected;
+  const inMatchRef = React.useRef(inMatch);
+  inMatchRef.current = inMatch;
   /**
    * Whether the background that just happened took a live athlete down.
    *
@@ -239,15 +236,61 @@ export function useArenaLive({
    * undone, not a decision the athlete made.
    */
   const resumeLiveRef = React.useRef(false);
+  /** Same idea for a match: whether going into it is what took them down. */
+  const resumeAfterMatchRef = React.useRef(false);
 
-  // Leaving the Arena TAB takes the athlete offline. Pushing an athlete
-  // profile or dropping into a match does not: the tab is still selected and
-  // they have not left the Arena, they are inside it.
+  /**
+   * Put back a live state that the app, not the athlete, took away. A failure
+   * is said out loud: the athlete believes they are live, and nothing else
+   * on screen would tell them otherwise.
+   */
+  const restoreLive = React.useCallback(async () => {
+    const ok = await requestLiveRef.current();
+    if (!ok) toast.error("You're offline. Go live again in the Arena.");
+  }, []);
+
+  // Re-assert a flag the athlete arrived with. This hook is mounted once per
+  // signed-in athlete (by `<ArenaBootstrap />`), so `initialRanked` is the row
+  // as it stood at sign-in or cold start. A `true` there means the last clear
+  // never landed (the process was killed before the background write left
+  // the device) or the athlete is live on web. Re-writing it rather than
+  // trusting it makes "present in the lobby" and "flagged as looking" true at
+  // the same instant, and the header LIVE pill makes the state visible, so
+  // nobody is silently advertised.
+  //
+  // Only in the FOREGROUND. A silent push (remote-notification background
+  // mode) can cold-launch the JS with the app never shown, and going live
+  // then would advertise an athlete whose app is closed. In that case the
+  // intent is parked and the first "active" restores it. Same for a launch
+  // straight into a match: it waits for the match to end.
+  const reconciledRef = React.useRef(false);
   React.useEffect(() => {
-    if (isArenaTabSelected) return;
-    void requestOfflineRef.current();
-  }, [isArenaTabSelected]);
+    if (!athleteId || !initialRanked || reconciledRef.current) return;
+    reconciledRef.current = true;
+    if (inMatchRef.current) {
+      resumeAfterMatchRef.current = true;
+      return;
+    }
+    if (AppState.currentState !== "active") {
+      resumeLiveRef.current = true;
+      return;
+    }
+    void requestLive();
+  }, [athleteId, initialRanked, requestLive]);
 
+  // THE LIFECYCLE. Live belongs to the athlete, not to a screen:
+  //  - Switching tabs or pushing a profile: still live. The header LIVE pill
+  //    says so on every screen, and the app-wide challenge prompt means a
+  //    live athlete on Home or Rankings still gets their challenges.
+  //  - Entering a match: offline for the match (nobody can answer a prompt
+  //    mid-roll), and live again when the match screen is left, if they were
+  //    live going in.
+  //  - Backgrounding: offline (below). The app can no longer answer a prompt.
+  //  - Foregrounding: live again, wherever they land, if and only if the
+  //    background is what took them down, and not while still in a match
+  //    (that intent is handed to the end of the match instead).
+  //  - Sign-out or teardown of the authenticated app: offline.
+  //
   // Backgrounding is the case web gets wrong: the socket dies on its own and
   // presence lapses, but the flag survives and keeps advertising an athlete
   // who has closed the app.
@@ -258,34 +301,58 @@ export function useArenaLive({
       // alert and a half-swiped app switcher, none of which mean the athlete
       // left.
       if (next === "background") {
-        resumeLiveRef.current = desiredRef.current;
+        resumeLiveRef.current = resumeLiveRef.current || desiredRef.current;
         void requestOfflineRef.current();
         return;
       }
       // Put back exactly what the background took away. Without this the
       // athlete comes back silently offline with a toggle that still looks
       // live-capable, and nothing else can fix it: this handler ignores
-      // "active" otherwise, the arrival effect is one-shot, and the tab
-      // effect only ever takes people offline.
+      // "active" otherwise and the arrival effect is one-shot.
       if (next !== "active" || !resumeLiveRef.current) return;
       resumeLiveRef.current = false;
-      // Not if they came back somewhere else. The tab effect owns that case
-      // and it has already cleared them.
-      if (!isArenaTabSelectedRef.current) return;
-      void requestLiveRef.current();
+      if (inMatchRef.current) {
+        resumeAfterMatchRef.current = true;
+        return;
+      }
+      void restoreLive();
     };
     const sub = AppState.addEventListener("change", onChange);
     return () => sub.remove();
-  }, []);
+  }, [restoreLive]);
 
-  // A real teardown (sign-out, app shutdown) still clears. With the tab rule
-  // above this fires rarely, which is the point: a tab navigator keeps its
-  // screens mounted, so unmount alone was never a reliable "they left".
+  // Offline for the length of a match, back afterwards.
+  const wasInMatchRef = React.useRef(false);
+  React.useEffect(() => {
+    if (inMatch === wasInMatchRef.current) return;
+    wasInMatchRef.current = inMatch;
+    if (inMatch) {
+      resumeAfterMatchRef.current =
+        resumeAfterMatchRef.current || desiredRef.current || resumeLiveRef.current;
+      resumeLiveRef.current = false;
+      void requestOfflineRef.current();
+      return;
+    }
+    if (!resumeAfterMatchRef.current) return;
+    resumeAfterMatchRef.current = false;
+    // Left the match while backgrounded is not possible, but a match screen
+    // unmounted by a sign-out teardown is: never go live without a screen.
+    if (AppState.currentState !== "active") {
+      resumeLiveRef.current = true;
+      return;
+    }
+    void restoreLive();
+  }, [inMatch, restoreLive]);
+
+  // A real teardown (sign-out, switching athlete, app shutdown) still clears.
+  // Sign-out ALSO clears ahead of time through
+  // `takeArenaOfflineBeforeSignOut()`, because by the time this runs the
+  // session is gone and RLS refuses the write.
   React.useEffect(() => {
     return () => {
       void requestOfflineRef.current();
     };
   }, []);
 
-  return { isLive, isSaving, toggle };
+  return { isLive, isSaving, toggle, goOffline: requestOffline };
 }

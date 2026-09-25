@@ -2,8 +2,8 @@
  * The live incoming challenge prompt.
  *
  * A bottom sheet rather than a plate in the list: it has to be answerable
- * wherever the athlete happens to be on the Arena surface, including scrolled
- * to the bottom of a long roster.
+ * wherever the athlete happens to be, on any tab, because being live persists
+ * across the app. Mounted once, app-wide, by `<ArenaBootstrap />`.
  *
  * It cannot be swiped away. Both exits (Accept, Decline) send the challenger a
  * real answer; a dismissal that sent nothing would leave them waiting on a
@@ -32,10 +32,26 @@ export function ChallengePromptSheet({
   const ref = React.useRef<BottomSheetModal | null>(null);
   const tokens = useThemedTokens();
 
+  // Only dismiss a sheet this component presented and that has not closed
+  // itself. dismiss() on a gorhom modal that was never presented (this
+  // effect's first run, challenge=null, on every launch) leaves it stuck in
+  // DISMISSING, and the next present() mounts the portal but never renders
+  // it: the FIRST challenge after every launch was invisible. Same fix as
+  // `notification-panel.tsx`.
+  const presentedRef = React.useRef(false);
   React.useEffect(() => {
-    if (challenge) ref.current?.present();
-    else ref.current?.dismiss();
+    if (challenge) {
+      ref.current?.present();
+      presentedRef.current = true;
+    } else if (presentedRef.current) {
+      ref.current?.dismiss();
+      presentedRef.current = false;
+    }
   }, [challenge]);
+
+  const handleChange = React.useCallback((index: number) => {
+    if (index === -1) presentedRef.current = false;
+  }, []);
 
   const meta = challenge
     ? [
@@ -51,8 +67,13 @@ export function ChallengePromptSheet({
   return (
     <BottomSheetModal
       ref={ref}
-      snapPoints={["40%"]}
+      // Sized to its content (gorhom v5 dynamic sizing over a BottomSheetView)
+      // rather than a percentage snap point: the prompt is a fixed, short
+      // block, and a percentage either clips it on an SE or leaves dead
+      // space on a Pro Max.
+      enableDynamicSizing
       enablePanDownToClose={false}
+      onChange={handleChange}
       backgroundStyle={{ backgroundColor: tokens.bgSecondary }}
       handleIndicatorStyle={{ backgroundColor: tokens.textTertiary }}
     >

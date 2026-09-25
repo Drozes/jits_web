@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter, type Href } from "expo-router";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { cn } from "@/lib/cn";
+import { LiveHeaderSignal } from "./live-header-signal";
 
 interface AppHeaderProps {
   title?: string;
@@ -18,12 +19,23 @@ interface AppHeaderProps {
   backFallback?: Href;
   icon?: React.ReactNode;
   rightAction?: React.ReactNode;
+  /**
+   * How the LIVE pill behaves (it only renders while the athlete is live).
+   * "link" taps through to the Arena; the Arena itself passes "static".
+   */
+  liveSignal?: "link" | "static";
   className?: string;
 }
 
 /**
  * Mobile equivalent of apps/web/components/layout/app-header.tsx.
- * 56pt tall, [back | title | right] grid, font-heading caps title.
+ * 56pt tall, [back | title | live pill + right] grid, font-heading caps title.
+ *
+ * The two side slots share the leftover width equally (flex 1, basis 0), so
+ * the title stays optically centred whatever sits on the right, and the LIVE
+ * pill appearing or disappearing never moves it. The title is capped at half
+ * the bar, which leaves each side at least a quarter (about 86pt on a 375pt
+ * iPhone SE): room for the pill plus one 32pt action.
  */
 export function AppHeader({
   title,
@@ -31,6 +43,7 @@ export function AppHeader({
   backFallback,
   icon,
   rightAction,
+  liveSignal = "link",
   className,
 }: AppHeaderProps) {
   const insets = useSafeAreaInsets();
@@ -53,7 +66,7 @@ export function AppHeader({
       )}
       style={{ paddingTop: insets.top, height: 56 + insets.top }}
     >
-      <View style={{ width: 32, height: 32 }}>
+      <View style={{ flex: 1, flexBasis: 0, height: 32 }}>
         {back ? (
           <Pressable
             accessibilityRole="button"
@@ -69,11 +82,15 @@ export function AppHeader({
         ) : null}
       </View>
 
-      <View className="flex-1 flex-row items-center justify-center gap-2">
+      <View
+        className="flex-row items-center justify-center gap-2"
+        style={{ maxWidth: "50%", flexShrink: 1 }}
+      >
         {icon ? <View>{icon}</View> : null}
         {title ? (
           <Text
             numberOfLines={1}
+            style={{ flexShrink: 1 }}
             className="font-heading text-[12px] text-ink-2 uppercase tracking-caps-l"
           >
             {title}
@@ -82,9 +99,10 @@ export function AppHeader({
       </View>
 
       <View
-        className="flex-row items-center justify-end"
-        style={{ minWidth: 32, height: 32 }}
+        className="flex-row items-center justify-end gap-2"
+        style={{ flex: 1, flexBasis: 0, height: 32 }}
       >
+        <LiveHeaderSignal variant={liveSignal} />
         {rightAction}
       </View>
     </View>

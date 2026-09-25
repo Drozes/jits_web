@@ -36,10 +36,16 @@ jest.mock("@/lib/auth/hooks", () => ({
   useRequireAthlete: () => ({ athlete: { id: "me-1" }, isLoading: false }),
 }));
 
+const mockHeaderProps = jest.fn();
 jest.mock("@/components/layout/app-header", () => {
   const R = require("react");
   const RN = require("react-native");
-  return { AppHeader: () => R.createElement(RN.View, { testID: "app-header" }) };
+  return {
+    AppHeader: (props: Record<string, unknown>) => {
+      mockHeaderProps(props);
+      return R.createElement(RN.View, { testID: "app-header" });
+    },
+  };
 });
 
 const mockWizardProps = jest.fn();
@@ -57,6 +63,8 @@ jest.mock("@/components/match-flow/match-flow-wizard", () => {
 });
 
 import ArenaMatchScreen from "@/app/(app)/match/[matchId]";
+import { renderHook } from "@testing-library/react-native";
+import { useIsInArenaMatch } from "@/lib/arena/arena-store";
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -98,5 +106,23 @@ describe("ArenaMatchScreen", () => {
     expect(
       mockUsePreventRemove.mock.calls.some((c) => c[0] === true),
     ).toBe(true);
+  });
+
+  it("marks the athlete as in a match for exactly as long as it is mounted", () => {
+    // That bit is what takes a live athlete offline and holds challenge
+    // prompts back; every wizard exit unmounts this screen, which restores.
+    const probe = renderHook(() => useIsInArenaMatch());
+    const screen = render(<ArenaMatchScreen />);
+    expect(probe.result.current).toBe(true);
+
+    screen.unmount();
+    expect(probe.result.current).toBe(false);
+  });
+
+  it("shows the LIVE signal as static, so tapping it cannot pop the match", () => {
+    render(<ArenaMatchScreen />);
+    expect(mockHeaderProps).toHaveBeenCalledWith(
+      expect.objectContaining({ liveSignal: "static" }),
+    );
   });
 });

@@ -21,7 +21,8 @@ const HELP_SECTIONS: HelpSection[] = [
       "ELO RATED is a participation-only ranking platform. You find opponents in the Arena, complete ranked matches, and the system handles your rating.",
       "Open the Arena tab and tap Go live to join the lobby. Anyone else who is live can challenge you, and you can challenge them. You can have up to 3 challenges out at once.",
       "A challenge arrives as a live prompt. Accept it and you both drop straight into the match, so be on the mat together before you go live.",
-      "Keep the Arena open while you're live. A challenge that arrives while you're elsewhere in the app may not show up when you come back.",
+      "Once you're live you stay live across the whole app, on Home, Rankings and Profile too, and challenges reach you wherever you are. The LIVE pill in the header shows it; tap it to jump back to the Arena.",
+      "You stay live until you go offline in the Arena. Switching away from the app takes you offline, and you're put back live when you return.",
     ],
   },
   {
