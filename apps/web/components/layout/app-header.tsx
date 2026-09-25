@@ -1,8 +1,10 @@
 "use client";
 
+import { Suspense } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { LiveHeaderSignal } from "./live-header-signal";
 
 interface AppHeaderProps {
   title: string;
@@ -24,13 +26,15 @@ export function AppHeader({
   return (
     <header
       className={cn(
-        "sticky top-0 z-40 grid h-14 items-center gap-3 px-4 pt-[env(safe-area-inset-top)]",
+        "sticky top-0 z-40 grid h-[var(--shell-header-h)] items-center gap-3 px-4 pt-[env(safe-area-inset-top)]",
         className,
       )}
       style={{
         background: "var(--bg-secondary)",
         borderBottom: "1px solid var(--border-hairline)",
-        gridTemplateColumns: "auto 1fr auto",
+        // Symmetric side columns keep the title centred whatever the right
+        // side holds (LIVE pill, bell, share).
+        gridTemplateColumns: "1fr auto 1fr",
       }}
     >
       {back ? (
@@ -38,7 +42,7 @@ export function AppHeader({
           type="button"
           onClick={() => router.back()}
           aria-label="Go back"
-          className="grid place-items-center transition-colors hover:bg-[var(--bg-elevated)]"
+          className="grid place-items-center justify-self-start transition-colors hover:bg-[var(--bg-elevated)]"
           style={{
             width: 32,
             height: 32,
@@ -73,7 +77,10 @@ export function AppHeader({
         {title}
       </h1>
 
-      <div className="flex items-center justify-end" style={{ minWidth: 32 }}>
+      <div className="flex items-center justify-end gap-1" style={{ minWidth: 32 }}>
+        <Suspense fallback={null}>
+          <LiveHeaderSignal />
+        </Suspense>
         {rightAction}
       </div>
     </header>

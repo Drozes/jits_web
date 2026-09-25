@@ -4,14 +4,13 @@ import { requireAthlete } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
 import { RecentActivitySection } from "@/components/domain/recent-activity-section";
 import { PageContainer } from "@/components/layout/page-container";
-import { PageHeaderActions } from "@/components/layout/page-header-actions";
+import { DashboardHeaderShell } from "@/components/layout/dashboard-header-shell";
 import {
   Plate,
   EloTile,
   LivePill,
   MetaTag,
   Avatar32,
-  Wordmark,
 } from "@/components/ui/elo-system";
 import {
   getDashboardSummary,
@@ -96,24 +95,6 @@ async function DashboardHeader() {
         />
       }
     />
-  );
-}
-
-function DashboardHeaderShell({ avatar }: { avatar: React.ReactNode }) {
-  return (
-    <header
-      className="sticky top-0 z-40 flex h-14 items-center justify-between px-4 pt-[env(safe-area-inset-top)]"
-      style={{
-        background: "var(--bg-secondary)",
-        borderBottom: "1px solid var(--border-hairline)",
-      }}
-    >
-      <Wordmark size="md" />
-      <div className="flex items-center" style={{ gap: "var(--space-2)" }}>
-        <PageHeaderActions />
-        {avatar}
-      </div>
-    </header>
   );
 }
 

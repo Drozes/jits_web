@@ -1,11 +1,15 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { Plate, Avatar32, MetaTag, LivePill } from "@/components/ui/elo-system";
 import { getProfilePhotoUrl } from "@/lib/utils";
-import { useLobbyIds, useLobbyPresence } from "@/hooks/use-lobby-presence";
-import { useArenaChallenge } from "@/hooks/use-arena-challenge";
+import { useLobbyIds } from "@/hooks/use-lobby-presence";
+import {
+  arenaActions,
+  useArenaState,
+  useRegisterInlineChallengeSurface,
+} from "@/lib/arena/arena-store";
+import { IncomingChallengePlate } from "@/components/arena/incoming-challenge-plate";
 import { LookingForMatchToggle } from "./looking-for-match-toggle";
 
 /** Compact neutral action used for in-row Challenge. */
@@ -273,87 +277,6 @@ function EmptyLobby({ isLooking }: { isLooking: boolean }) {
   );
 }
 
-/** Live prompt when someone challenges you. Owns the surface's red CTA. */
-function IncomingChallengePlate({
-  name,
-  onAccept,
-  onDecline,
-  disabled,
-}: {
-  name: string;
-  onAccept: () => void;
-  onDecline: () => void;
-  disabled: boolean;
-}) {
-  return (
-    <Plate variant="live">
-      <div
-        className="font-mono uppercase"
-        style={{
-          fontSize: "var(--size-num-xs)",
-          color: "var(--text-secondary)",
-          letterSpacing: "var(--ls-caps-xl)",
-        }}
-      >
-        Incoming challenge
-      </div>
-      <h2
-        className="font-heading font-bold"
-        style={{
-          fontSize: "var(--size-heading-m)",
-          color: "var(--text-primary)",
-          margin: "var(--space-1) 0 0",
-        }}
-      >
-        {name} wants to roll
-      </h2>
-      <div
-        className="grid grid-cols-2"
-        style={{ gap: "var(--space-2)", marginTop: "var(--space-4)" }}
-      >
-        <button
-          type="button"
-          onClick={onDecline}
-          disabled={disabled}
-          className="font-heading font-bold uppercase"
-          style={{
-            minHeight: 44,
-            background: "transparent",
-            color: "var(--text-secondary)",
-            border: "1px solid var(--border-hairline-strong)",
-            borderRadius: "var(--radius-sm)",
-            fontSize: "var(--size-label-l)",
-            letterSpacing: "var(--ls-caps)",
-            cursor: disabled ? "default" : "pointer",
-            opacity: disabled ? 0.6 : 1,
-          }}
-        >
-          Decline
-        </button>
-        <button
-          type="button"
-          onClick={onAccept}
-          disabled={disabled}
-          className="font-heading font-bold uppercase"
-          style={{
-            minHeight: 44,
-            background: "var(--accent-cta)",
-            color: "var(--text-on-accent)",
-            border: "1px solid transparent",
-            borderRadius: "var(--radius-sm)",
-            fontSize: "var(--size-label-l)",
-            letterSpacing: "var(--ls-caps)",
-            cursor: disabled ? "default" : "pointer",
-            opacity: disabled ? 0.6 : 1,
-          }}
-        >
-          Accept
-        </button>
-      </div>
-    </Plate>
-  );
-}
-
 /** Shown to the challenger while the opponent decides. */
 function WaitingPlate({
   name,
@@ -421,38 +344,24 @@ function WaitingPlate({
 
 export function ArenaContent({
   lookingCompetitors,
-  currentAthleteId,
-  currentAthleteWeight,
   currentAthleteRanked,
   challengedIds = [],
 }: {
   lookingCompetitors: Competitor[];
-  currentAthleteId: string;
-  currentAthleteWeight: number | null;
   currentAthleteRanked: boolean;
   challengedIds?: string[];
 }) {
-  // Own the lobby:online channel here. Arena is the only consumer, this
-  // component is guaranteed to hydrate (it renders the list), and it keeps the
-  // channel off every other screen.
-  useLobbyPresence(currentAthleteId, false, currentAthleteRanked);
+  // Live state, presence and the challenge handshake are owned app-wide by
+  // <ArenaBootstrap /> (app/(app)/layout.tsx); this page only reads them.
   const challengedSet = new Set(challengedIds);
   const lobbyIds = useLobbyIds();
-  // Mirrors the toggle so the empty-state copy cannot contradict the button in
-  // the window between a successful write and router.refresh() landing.
-  const [isLooking, setIsLooking] = useState(currentAthleteRanked);
-  const {
-    incoming,
-    outgoing,
-    isBusy,
-    sendChallenge,
-    accept,
-    decline,
-    cancelOutgoing,
-  } = useArenaChallenge({
-    athleteId: currentAthleteId,
-    athleteWeight: currentAthleteWeight,
-  });
+  const { ready, isLive, incoming, outgoing, isBusy } = useArenaState();
+  // This page shows the challenge plates inline, so the overlay stands down.
+  useRegisterInlineChallengeSurface();
+  // Until the owner publishes (SSR, hydration) fall back to the server value
+  // so the empty-state copy and toggle never flash the wrong state.
+  const isLooking = ready ? isLive : currentAthleteRanked;
+  const { sendChallenge, accept, decline, cancelOutgoing } = arenaActions;
 
   const online = lookingCompetitors.filter((c) => lobbyIds.has(c.id));
   const offline = lookingCompetitors.filter((c) => !lobbyIds.has(c.id));
@@ -476,11 +385,7 @@ export function ArenaContent({
           disabled={isBusy}
         />
       ) : (
-        <LookingForMatchToggle
-          athleteId={currentAthleteId}
-          initialRanked={currentAthleteRanked}
-          onChange={setIsLooking}
-        />
+        <LookingForMatchToggle initialRanked={currentAthleteRanked} />
       )}
 
       {lookingCompetitors.length === 0 ? (

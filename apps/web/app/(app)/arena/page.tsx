@@ -77,8 +77,6 @@ async function ArenaData() {
   return (
     <ArenaContent
       lookingCompetitors={arena.data.looking_athletes.map((a) => toCompetitor(a))}
-      currentAthleteId={currentAthlete.id}
-      currentAthleteWeight={currentAthlete.current_weight}
       currentAthleteRanked={currentAthlete.looking_for_ranked}
       challengedIds={arena.data.challenged_opponent_ids}
     />

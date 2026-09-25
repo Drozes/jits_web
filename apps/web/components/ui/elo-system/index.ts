@@ -1,5 +1,6 @@
 export { Plate, type PlateVariant } from "./plate";
 export { LivePill } from "./live-pill";
+export { LiveDot } from "./live-dot";
 export { Chip } from "./chip";
 export { EloTile } from "./elo-tile";
 export { DeltaNumber } from "./delta-number";

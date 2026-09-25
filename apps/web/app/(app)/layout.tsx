@@ -9,6 +9,7 @@ import { GlobalNotificationsProvider } from "@/components/layout/global-notifica
 import { OnlinePresenceBootstrap } from "@/components/layout/online-presence-bootstrap";
 import { DeploymentCheckBootstrap } from "@/components/layout/deployment-check-bootstrap";
 import { PushRegistrationBootstrap } from "@/components/layout/push-registration-bootstrap";
+import { ArenaBootstrapGate } from "@/components/arena/arena-bootstrap-gate";
 import { getActiveAthlete } from "@/lib/guards";
 
 export default function AppLayout({
@@ -48,6 +49,11 @@ export default function AppLayout({
       <Suspense>
         <PushBootstrap />
       </Suspense>
+      {/* App-wide Arena owner: live flag, lobby:online presence and the
+          incoming-challenge prompt, so the athlete stays live on every page. */}
+      <Suspense>
+        <ArenaBootstrapGate />
+      </Suspense>
       <DeploymentCheckBootstrap />
     </div>
   );
@@ -62,9 +68,12 @@ async function NotificationsBootstrap() {
 async function PresenceBootstrap() {
   const athlete = await getActiveAthlete();
   if (!athlete) return null;
-  // NOTE: lobby:online is mounted by ArenaContent, not here. It is only
-  // meaningful on Arena, and a null-rendering client component nested in this
-  // Suspense-deferred server component did not hydrate reliably.
+  // NOTE: lobby:online is NOT mounted here; it belongs to <ArenaBootstrap />
+  // (mounted by ArenaBootstrapGate in AppLayout above). It previously lived in
+  // ArenaContent because a null-rendering client component nested in a
+  // Suspense-deferred server component did not hydrate reliably. The Arena
+  // owner avoids that by always rendering real DOM (the challenge prompt
+  // container), so it has a concrete node to hydrate against.
   return (
     <OnlinePresenceBootstrap
       athleteId={athlete.id}

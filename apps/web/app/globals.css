@@ -93,6 +93,27 @@
   }
 }
 
+/* Authed shell geometry, shared by the chrome and anything that must clear it
+   (the app-wide Arena overlay). Keep in sync with AppHeader, SidebarRail and
+   BottomNavBar, which read these vars. */
+:root {
+  --shell-header-h: 56px;
+  --shell-rail-w: 232px;
+  --shell-bottom-nav-h: 60px;
+  /* Floating shell surfaces (Arena challenge overlay): above page content and
+     the sticky headers (z-40), BELOW shadcn Dialog/Sheet and the nav (z-50),
+     so a modal the athlete opened always covers it. The design-system
+     --z-overlay (1000) would sit on top of every modal. */
+  --shell-z-overlay: 45;
+}
+
+/* The one sanctioned LIVE pulse (1400ms loop via --motion-pulse, which the
+   reduced-motion override sets to none). Used by the elo-system LiveDot. */
+@keyframes elo-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(0.8); }
+}
+
 @keyframes fade-in-up {
   from { transform: translateY(20px); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }

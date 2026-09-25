@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Wordmark } from "@/components/ui/elo-system";
 import { NAV_TABS, isActiveTab, isImmersiveRoute } from "./nav-config";
+import { ArenaNavStatus, ArenaNavStatusLabel } from "./arena-nav-status";
 
 /**
  * Persistent left nav rail, shown only at >= lg (below lg the <BottomNavBar/>
@@ -19,7 +20,7 @@ export function SidebarRail({ footer }: { footer: React.ReactNode }) {
     <aside
       className="hidden shrink-0 self-start lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col lg:justify-between"
       style={{
-        width: 232,
+        width: "var(--shell-rail-w)",
         background: "var(--bg-secondary)",
         borderRight: "1px solid var(--border-hairline)",
         padding: "var(--space-5) var(--space-4)",
@@ -28,13 +29,13 @@ export function SidebarRail({ footer }: { footer: React.ReactNode }) {
       <div className="flex flex-col gap-6">
         <Wordmark size="md" />
         <nav className="flex flex-col gap-1">
-          {NAV_TABS.map(({ href, label }) => {
+          {NAV_TABS.map(({ href, label, arenaStatus }) => {
             const active = isActiveTab(href, pathname);
             return (
               <Link
                 key={href}
                 href={href}
-                className="font-heading font-bold uppercase"
+                className="flex items-center gap-2 font-heading font-bold uppercase"
                 style={{
                   fontSize: "var(--size-label-l)",
                   letterSpacing: "var(--ls-caps)",
@@ -48,6 +49,8 @@ export function SidebarRail({ footer }: { footer: React.ReactNode }) {
                 }}
               >
                 {label}
+                {arenaStatus && <ArenaNavStatusLabel />}
+                {arenaStatus && <ArenaNavStatus variant="rail" />}
               </Link>
             );
           })}

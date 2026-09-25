@@ -25,7 +25,7 @@ const resultConfig = {
   [MATCH_OUTCOME.DRAW]: { label: "Draw", variant: "secondary" as const },
 } as const;
 
-function CardInner({ type, opponentName, opponentPhotoUrl, result, status, direction, matchType, eloDelta, date }: MatchCardProps) {
+function CardInner({ type, opponentName, opponentPhotoUrl, result, status, direction, eloDelta, date }: MatchCardProps) {
   return (
     <CardContent className="flex items-center justify-between py-3 px-4">
       <div className="flex items-center gap-3 min-w-0">

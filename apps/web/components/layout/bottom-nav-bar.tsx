@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { NAV_TABS, isActiveTab, isImmersiveRoute } from "./nav-config";
+import { ArenaNavStatus, ArenaNavStatusLabel } from "./arena-nav-status";
 
 export function BottomNavBar() {
   const pathname = usePathname();
@@ -24,7 +25,7 @@ export function BottomNavBar() {
           gridTemplateColumns: `repeat(${NAV_TABS.length}, 1fr)`,
         }}
       >
-        {NAV_TABS.map(({ href, label, icon: Icon }) => {
+        {NAV_TABS.map(({ href, label, icon: Icon, arenaStatus }) => {
           const isActive = isActiveTab(href, pathname);
 
           return (
@@ -41,7 +42,10 @@ export function BottomNavBar() {
                 textDecoration: "none",
               }}
             >
-              <Icon className="h-[18px] w-[18px]" strokeWidth={isActive ? 2.25 : 1.75} />
+              <span className="relative inline-flex">
+                <Icon className="h-[18px] w-[18px]" strokeWidth={isActive ? 2.25 : 1.75} />
+                {arenaStatus && <ArenaNavStatus variant="bar" />}
+              </span>
               <span
                 className="font-heading font-bold uppercase"
                 style={{
@@ -52,6 +56,7 @@ export function BottomNavBar() {
               >
                 {label}
               </span>
+              {arenaStatus && <ArenaNavStatusLabel />}
             </Link>
           );
         })}

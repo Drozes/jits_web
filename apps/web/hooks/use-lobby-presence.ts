@@ -118,6 +118,10 @@ export function useLobbyPresence(
     return () => {
       channelRef = null;
       supabase.removeChannel(channel);
+      // Drop the last roster so nothing reads a stale lobby after sign-out or
+      // an athlete switch (the next owner starts from an empty set).
+      lobbyIds = new Set();
+      emitChange();
     };
     // Only athleteId in deps — toggle changes go through the imperative API,
     // avoiding channel teardown/reconnect on every toggle. The flags are read

@@ -1,17 +1,11 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { toast } from "sonner";
-import { createClient } from "@/lib/supabase/client";
-import { toggleMatchPreferences } from "@jits/shared/api/mutations";
-import { joinLobby, leaveLobby } from "@/hooks/use-lobby-presence";
 import { Plate, LivePill } from "@/components/ui/elo-system";
+import { arenaActions, useArenaState } from "@/lib/arena/arena-store";
 
 interface LookingForMatchToggleProps {
-  athleteId: string;
+  /** Server value, shown until the app-wide owner has published. */
   initialRanked: boolean;
-  onChange?: (isLooking: boolean) => void;
 }
 
 /**
@@ -21,62 +15,17 @@ interface LookingForMatchToggleProps {
  * primary CTA per surface, and going visible is the most important action
  * here. The previous Radix Switch was an 18x32px target (below the 44px
  * minimum) sitting on a plate that looked tappable but was not.
+ *
+ * A pure view: the flag write, lobby track, rollback and double-tap guard all
+ * live in the app-wide owner (`hooks/use-arena-live.ts` via
+ * `<ArenaBootstrap />`), so going live here keeps the athlete live on every
+ * page and the nav updates without a refresh.
  */
 export function LookingForMatchToggle({
-  athleteId,
   initialRanked,
-  onChange,
 }: LookingForMatchToggleProps) {
-  const router = useRouter();
-  const [isLooking, setIsLooking] = useState(initialRanked);
-  const [isSaving, setIsSaving] = useState(false);
-  const [, startTransition] = useTransition();
-  // useTransition's pending flag is only true while the transition itself is
-  // in flight, i.e. false for the whole await below. A ref set synchronously
-  // before the await is what actually closes the double-tap window.
-  const inFlight = useRef(false);
-
-  async function handleToggle() {
-    if (inFlight.current) return;
-    inFlight.current = true;
-    setIsSaving(true);
-
-    // Ranked-only product: casual was removed in 47f166b, so the flag is
-    // always cleared. get_arena_data filters on (casual OR ranked), so ranked
-    // alone is enough to appear in the Arena list.
-    const next = !isLooking;
-    setIsLooking(next);
-    onChange?.(next);
-
-    const supabase = createClient();
-    const result = await toggleMatchPreferences(supabase, athleteId, {
-      lookingForCasual: false,
-      lookingForRanked: next,
-    });
-
-    if (!result.ok) {
-      setIsLooking(!next);
-      onChange?.(!next);
-      toast.error("Couldn't update your status. Try again.");
-      inFlight.current = false;
-      setIsSaving(false);
-      return;
-    }
-
-    if (next) {
-      joinLobby({
-        athlete_id: athleteId,
-        looking_for_casual: false,
-        looking_for_ranked: true,
-      });
-    } else {
-      leaveLobby();
-    }
-
-    inFlight.current = false;
-    setIsSaving(false);
-    startTransition(() => router.refresh());
-  }
+  const { ready, isLive, isSaving } = useArenaState();
+  const isLooking = ready ? isLive : initialRanked;
 
   return (
     <Plate variant={isLooking ? "live" : "default"}>
@@ -115,8 +64,8 @@ export function LookingForMatchToggle({
 
       <button
         type="button"
-        onClick={handleToggle}
-        disabled={isSaving}
+        onClick={() => void arenaActions.toggle()}
+        disabled={isSaving || !ready}
         className="font-heading font-bold uppercase"
         style={{
           marginTop: "var(--space-4)",

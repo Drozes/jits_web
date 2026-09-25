@@ -42,7 +42,6 @@ function eloDelta(athlete: RankedAthlete): number {
 export function LeaderboardContent({
   athletes,
   gyms,
-  challengedIds: _challengedIds = [],
 }: {
   athletes: RankedAthlete[];
   gyms: RankedGym[];

@@ -9,6 +9,8 @@ export interface NavTab {
   href: string;
   label: string;
   icon: LucideIcon;
+  /** Shows the Arena live dot + online count (see arena-nav-status.tsx). */
+  arenaStatus?: boolean;
 }
 
 // NOTE: /gyms is intentionally absent. Gym browsing is hidden from the primary
@@ -17,7 +19,7 @@ export interface NavTab {
 // still point at them. Gym SELECTION in signup/settings is untouched.
 export const NAV_TABS: readonly NavTab[] = [
   { href: "/", label: "Home", icon: Home },
-  { href: "/arena", label: "Arena", icon: Swords },
+  { href: "/arena", label: "Arena", icon: Swords, arenaStatus: true },
   { href: "/leaderboard", label: "Rankings", icon: Trophy },
   { href: "/profile", label: "Profile", icon: User },
 ] as const;

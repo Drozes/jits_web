@@ -25,8 +25,35 @@ export interface OutgoingChallenge {
   opponentName: string;
 }
 
+/** Shown when the challenge was cancelled or expired under the accepter. */
+export const CHALLENGE_GONE_MESSAGE = "That challenge is no longer available.";
+
 /** Broadcast channel shared by both parties to a single Arena challenge. */
 const channelName = (challengeId: string) => `arena-challenge:${challengeId}`;
+
+type ChallengeEvent = "match_started" | "declined" | "cancelled";
+
+/**
+ * Tell the other side something happened. Sends on `existing` when this client
+ * already holds the challenge's channel (supabase-js hands back the same
+ * channel for the same topic, so creating and removing one would tear down our
+ * own listener); otherwise opens a throwaway channel and removes it after.
+ */
+async function broadcast(
+  existing: RealtimeChannel | null,
+  challengeId: string,
+  event: ChallengeEvent,
+  payload: Record<string, unknown> = {},
+): Promise<void> {
+  if (existing) {
+    await existing.send({ type: "broadcast", event, payload });
+    return;
+  }
+  const supabase = createClient();
+  const channel = supabase.channel(channelName(challengeId));
+  await channel.send({ type: "broadcast", event, payload });
+  await supabase.removeChannel(channel);
+}
 
 /**
  * Instant Arena handshake.
@@ -36,37 +63,99 @@ const channelName = (challengeId: string) => `arena-challenge:${challengeId}`;
  * either a challenge_id or a session_id, and Arena matches have no session), it
  * is just never left sitting in a list.
  *
- * Two realtime surfaces:
+ * Realtime surfaces:
  *  - postgres_changes INSERT on `challenges` filtered to me as opponent, which
- *    is what raises the incoming prompt.
- *  - a per-challenge broadcast channel, which is how the accepting side tells
- *    the challenger the match exists so both navigate together.
+ *    raises the incoming prompt, but ONLY while `canReceive` (the athlete is
+ *    live and not in a match). There is no column that marks a challenge as
+ *    Arena-originated (the profile ChallengeSheet inserts an identical row),
+ *    so live-ness is the gate: a non-live athlete's challenges are left for
+ *    the regular challenge flow instead of hijacking them into the Arena.
+ *  - postgres_changes UPDATE on the same filter, which dismisses a prompt once
+ *    its row stops being pending (cancelled, expired, answered elsewhere).
+ *  - postgres_changes UPDATE filtered to me as challenger, which resolves my
+ *    "Waiting for X" without any broadcast (mirrors mobile): declined,
+ *    cancelled or expired clears it; "started" (the match already exists)
+ *    enters it via the idempotent start_match_from_challenge. "accepted" is
+ *    deliberately ignored: the accepter is creating the match at that moment,
+ *    and racing it from this side is how two clients fight over one row. The
+ *    match_started broadcast is the normal path; "started" is the fallback.
+ *  - a per-challenge broadcast channel: the accepting side tells the
+ *    challenger the match exists, the challenger's cancel tells the recipient.
  */
 export function useArenaChallenge({
   athleteId,
   athleteWeight,
+  canReceive = true,
 }: {
   athleteId: string;
   athleteWeight: number | null;
+  canReceive?: boolean;
 }) {
   const router = useRouter();
-  const [incoming, setIncoming] = useState<IncomingChallenge | null>(null);
-  const [outgoing, setOutgoing] = useState<OutgoingChallenge | null>(null);
+  const [incoming, setIncomingState] = useState<IncomingChallenge | null>(null);
+  const [outgoing, setOutgoingState] = useState<OutgoingChallenge | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const busyRef = useRef(false);
   const outgoingChannelRef = useRef<RealtimeChannel | null>(null);
+  const incomingChannelRef = useRef<RealtimeChannel | null>(null);
+  const canReceiveRef = useRef(canReceive);
+  canReceiveRef.current = canReceive;
+  // Mirrors of state for realtime handlers, which must not read stale closures.
+  const incomingRef = useRef<IncomingChallenge | null>(null);
+  const outgoingRef = useRef<OutgoingChallenge | null>(null);
+  /** The challenge being accepted right now; its own UPDATE must not clear it. */
+  const acceptingIdRef = useRef<string | null>(null);
+  /** Last challenge we navigated for: broadcast and UPDATE can both land. */
+  const enteredForRef = useRef<string | null>(null);
 
-  /** Navigate both parties into the shared wizard. */
+  const setIncoming = useCallback((next: IncomingChallenge | null) => {
+    incomingRef.current = next;
+    setIncomingState(next);
+  }, []);
+  const setOutgoing = useCallback((next: OutgoingChallenge | null) => {
+    outgoingRef.current = next;
+    setOutgoingState(next);
+  }, []);
+
+  // Going offline or into a match drops an unanswered prompt (the row stays
+  // pending for the regular flow; it is not declined on the athlete's behalf).
+  useEffect(() => {
+    if (!canReceive) setIncoming(null);
+  }, [canReceive, setIncoming]);
+
+  /** Navigate both parties into the shared wizard, once per challenge. */
   const enterMatch = useCallback(
-    (matchId: string) => {
+    (challengeId: string, matchId: string) => {
+      if (enteredForRef.current === challengeId) return;
+      enteredForRef.current = challengeId;
+      // Accepting someone else's challenge abandons my own pending one:
+      // withdraw it so its opponent is not left with a dead prompt.
+      const dropped = outgoingRef.current;
+      if (dropped && dropped.challengeId !== challengeId) {
+        void (async () => {
+          const res = await cancelChallenge(createClient(), dropped.challengeId);
+          if (res.ok) await broadcast(null, dropped.challengeId, "cancelled");
+        })();
+      }
       setIncoming(null);
       setOutgoing(null);
       router.push(`/arena/match/${matchId}`);
     },
-    [router],
+    [router, setIncoming, setOutgoing],
   );
 
-  // --- Incoming: someone challenged me -------------------------------------
+  /** Clear my outgoing challenge if it is still `challengeId`. */
+  const resolveOutgoing = useCallback(
+    (challengeId: string, declined: boolean) => {
+      const mine = outgoingRef.current;
+      if (mine?.challengeId !== challengeId) return;
+      setOutgoing(null);
+      if (declined) toast.info(`${mine.opponentName} declined.`);
+    },
+    [setOutgoing],
+  );
+
+  // --- Realtime: challenges involving me ------------------------------------
   useEffect(() => {
     if (!athleteId) return;
     const supabase = createClient();
@@ -86,13 +175,18 @@ export function useArenaChallenge({
             challenger_id: string;
             status: string;
           };
-          if (row.status !== "pending") return;
+          if (row.status !== "pending" || !canReceiveRef.current) return;
+          // The first open prompt keeps the surface rather than being
+          // replaced mid-decision.
+          if (incomingRef.current) return;
 
           const { data: challenger } = await supabase
             .from("athletes")
             .select("display_name")
             .eq("id", row.challenger_id)
             .single();
+          // Re-checked: offline, or another prompt, may have landed meanwhile.
+          if (!canReceiveRef.current || incomingRef.current) return;
 
           setIncoming({
             challengeId: row.id,
@@ -101,26 +195,84 @@ export function useArenaChallenge({
           });
         },
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "challenges",
+          filter: `opponent_id=eq.${athleteId}`,
+        },
+        (payload) => {
+          const row = payload.new as { id: string; status: string };
+          if (row.status === "pending") return;
+          // My own accept flips the row to accepted before the match exists.
+          if (acceptingIdRef.current === row.id) return;
+          if (incomingRef.current?.challengeId === row.id) setIncoming(null);
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "challenges",
+          filter: `challenger_id=eq.${athleteId}`,
+        },
+        async (payload) => {
+          const row = payload.new as { id: string; status: string };
+          if (outgoingRef.current?.challengeId !== row.id) return;
+          if (["declined", "cancelled", "expired"].includes(row.status)) {
+            resolveOutgoing(row.id, row.status === "declined");
+            return;
+          }
+          // Fallback when the match_started broadcast never arrived. Only
+          // "started": on "accepted" the match may not exist yet.
+          if (row.status === "started") {
+            const started = await startMatchFromChallenge(supabase, row.id);
+            if (started.ok) enterMatch(row.id, started.data.match_id);
+          }
+        },
+      )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [athleteId]);
+  }, [athleteId, enterMatch, resolveOutgoing, setIncoming]);
 
-  // --- Outgoing: wait for my challenge to be accepted -----------------------
+  // --- Incoming: the challenger may withdraw -------------------------------
+  const incomingId = incoming?.challengeId;
   useEffect(() => {
-    if (!outgoing) return;
+    if (!incomingId) return;
     const supabase = createClient();
     const channel = supabase
-      .channel(channelName(outgoing.challengeId))
+      .channel(channelName(incomingId))
+      .on("broadcast", { event: "cancelled" }, () => {
+        if (acceptingIdRef.current === incomingId) return;
+        if (incomingRef.current?.challengeId === incomingId) setIncoming(null);
+      })
+      .subscribe();
+    incomingChannelRef.current = channel;
+    return () => {
+      incomingChannelRef.current = null;
+      supabase.removeChannel(channel);
+    };
+  }, [incomingId, setIncoming]);
+
+  // --- Outgoing: wait for my challenge to be accepted -----------------------
+  const outgoingId = outgoing?.challengeId;
+  useEffect(() => {
+    if (!outgoingId) return;
+    const supabase = createClient();
+    const channel = supabase
+      .channel(channelName(outgoingId))
       .on("broadcast", { event: "match_started" }, ({ payload }) => {
         const matchId = (payload as { matchId?: string })?.matchId;
-        if (matchId) enterMatch(matchId);
+        if (matchId) enterMatch(outgoingId, matchId);
       })
       .on("broadcast", { event: "declined" }, () => {
-        setOutgoing(null);
-        toast.info(`${outgoing.opponentName} declined.`);
+        resolveOutgoing(outgoingId, true);
       })
       .subscribe();
 
@@ -129,7 +281,7 @@ export function useArenaChallenge({
       outgoingChannelRef.current = null;
       supabase.removeChannel(channel);
     };
-  }, [outgoing, enterMatch]);
+  }, [outgoingId, enterMatch, resolveOutgoing]);
 
   /** Guard every mutation against double-taps; a ref, because state is async. */
   const runExclusive = useCallback(async (fn: () => Promise<void>) => {
@@ -159,71 +311,110 @@ export function useArenaChallenge({
         }
         setOutgoing({ challengeId: result.data.id, opponentId, opponentName });
       }),
-    [athleteWeight, runExclusive],
+    [athleteWeight, runExclusive, setOutgoing],
   );
 
   const accept = useCallback(
     () =>
       runExclusive(async () => {
-        if (!incoming) return;
+        const current = incomingRef.current;
+        if (!current) return;
         const supabase = createClient();
-
-        const accepted = await acceptChallenge(supabase, {
-          challengeId: incoming.challengeId,
-          opponentWeight: athleteWeight ?? undefined,
-        });
-        if (!accepted.ok) {
-          toast.error(accepted.error.message || "Couldn't accept that challenge.");
-          setIncoming(null);
-          return;
-        }
-
-        const started = await startMatchFromChallenge(
-          supabase,
-          incoming.challengeId,
-        );
-        if (!started.ok) {
-          toast.error(started.error.message || "Couldn't start the match.");
-          return;
-        }
-
-        // Tell the challenger before navigating, so both land together.
-        await supabase
-          .channel(channelName(incoming.challengeId))
-          .send({
-            type: "broadcast",
-            event: "match_started",
-            payload: { matchId: started.data.match_id },
+        acceptingIdRef.current = current.challengeId;
+        try {
+          const accepted = await acceptChallenge(supabase, {
+            challengeId: current.challengeId,
+            opponentWeight: athleteWeight ?? undefined,
           });
+          if (!accepted.ok) {
+            toast.error(
+              accepted.error.code === "CHALLENGE_NOT_ACCEPTED"
+                ? CHALLENGE_GONE_MESSAGE
+                : accepted.error.message || "Couldn't accept that challenge.",
+            );
+            setIncoming(null);
+            return;
+          }
 
-        enterMatch(started.data.match_id);
+          // acceptChallenge filters on status = 'pending' and a no-row update
+          // is not an error, so a withdrawn challenge surfaces here as
+          // not_accepted. Any other failure is retried once: the RPC is
+          // idempotent and returns the existing match if one was created.
+          let started = await startMatchFromChallenge(
+            supabase,
+            current.challengeId,
+          );
+          if (!started.ok && started.error.code !== "CHALLENGE_NOT_ACCEPTED") {
+            started = await startMatchFromChallenge(supabase, current.challengeId);
+          }
+          if (!started.ok) {
+            toast.error(
+              started.error.code === "CHALLENGE_NOT_ACCEPTED"
+                ? CHALLENGE_GONE_MESSAGE
+                : started.error.message || "Couldn't start the match.",
+            );
+            setIncoming(null);
+            return;
+          }
+
+          // Tell the challenger before navigating, so both land together.
+          await broadcast(
+            incomingChannelRef.current,
+            current.challengeId,
+            "match_started",
+            { matchId: started.data.match_id },
+          );
+
+          enterMatch(current.challengeId, started.data.match_id);
+        } finally {
+          acceptingIdRef.current = null;
+        }
       }),
-    [incoming, athleteWeight, runExclusive, enterMatch],
+    [athleteWeight, runExclusive, enterMatch, setIncoming],
   );
 
   const decline = useCallback(
     () =>
       runExclusive(async () => {
-        if (!incoming) return;
+        const current = incomingRef.current;
+        if (!current) return;
         const supabase = createClient();
-        await declineChallenge(supabase, incoming.challengeId);
-        await supabase
-          .channel(channelName(incoming.challengeId))
-          .send({ type: "broadcast", event: "declined", payload: {} });
+        const result = await declineChallenge(supabase, current.challengeId);
+        if (!result.ok) {
+          // Keep the prompt: it is still pending and the challenger waiting.
+          toast.error("Couldn't decline that challenge. Try again.");
+          return;
+        }
+        await broadcast(
+          incomingChannelRef.current,
+          current.challengeId,
+          "declined",
+        );
         setIncoming(null);
       }),
-    [incoming, runExclusive],
+    [runExclusive, setIncoming],
   );
 
   const cancelOutgoing = useCallback(
     () =>
       runExclusive(async () => {
-        if (!outgoing) return;
+        const current = outgoingRef.current;
+        if (!current) return;
         const supabase = createClient();
-        await cancelChallenge(supabase, outgoing.challengeId);
+        const result = await cancelChallenge(supabase, current.challengeId);
+        if (!result.ok) {
+          // Keep the bar: the challenge is still live server-side.
+          toast.error("Couldn't cancel that challenge. Try again.");
+          return;
+        }
+        await broadcast(
+          outgoingChannelRef.current,
+          current.challengeId,
+          "cancelled",
+        );
         setOutgoing(null);
       }),
-    [outgoing, runExclusive],
+    [runExclusive, setOutgoing],
   );
 
   return {

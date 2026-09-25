@@ -39,7 +39,6 @@ export function ChallengeSheet({
   competitorElo,
   competitorWeight,
   currentAthleteElo,
-  defaultMatchType,
   currentAthleteWeight,
   open,
   onOpenChange,
