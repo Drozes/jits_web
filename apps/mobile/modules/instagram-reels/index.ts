@@ -34,20 +34,35 @@ import { requireOptionalNativeModule } from "expo-modules-core";
 
 /**
  * Meta's stated Reels media constraints, and the single source of truth for
- * them. They are passed down to the native halves on every call rather than
- * duplicated in Swift and Kotlin, so the three copies cannot drift: a limit
- * that disagrees across platforms is invisible until a user hits it.
+ * them. The duration window is passed down to the native halves on every
+ * call rather than duplicated in Swift and Kotlin, so the three copies
+ * cannot drift: a limit that disagrees across platforms is invisible until
+ * a user hits it.
  *
- * A clip shorter than 3s is REJECTED by Instagram. 60s is the documented
- * ceiling. 50 MB and 1080p are documented as recommendations rather than
- * hard caps, and this module still enforces the byte ceiling, because the
- * alternative is handing Instagram a payload it may silently drop, which is
- * the failure mode this whole path is built to avoid. Resolution is NOT
- * enforced here; the render pipeline owns the 9:16 1080p composition.
+ * THE TWO LIMITS ARE DIFFERENT IN KIND, and conflating them was a bug.
+ * Meta states 3 to 60 seconds as a REQUIREMENT: a clip under 3s is rejected
+ * outright. It states "under 50 MB" and 1080p as RECOMMENDATIONS. So the
+ * duration window is enforced and refuses the share; the byte ceiling is
+ * advisory and only sets `oversize` on an otherwise successful result.
+ *
+ * Enforcing both would make them mutually inconsistent: a 60s 1080p clip at
+ * 8 Mbps is roughly 60 MB and at 7 Mbps roughly 52 MB, so a clip sitting
+ * legally inside the duration requirement would be refused with copy
+ * blaming its length when the real cause is bitrate. The render pipeline
+ * owns the bitrate ceiling that keeps a 60s clip under 50 MB, and the 9:16
+ * 1080p composition with it.
  */
 export const REELS_MIN_DURATION_MS = 3_000;
 export const REELS_MAX_DURATION_MS = 60_000;
-export const REELS_MAX_BYTES = 50 * 1024 * 1024;
+export const REELS_RECOMMENDED_MAX_BYTES = 50 * 1024 * 1024;
+
+/**
+ * Copy for the advisory case. Not a failure: the handoff HAS happened and
+ * Instagram has the clip. This says only that Meta recommends staying
+ * under the ceiling and we did not.
+ */
+export const REELS_OVERSIZE_WARNING =
+  "That clip is larger than Instagram recommends, so it may take a while to upload or lose quality.";
 
 /**
  * Why a handoff did not happen, as a stable JS-level value.
@@ -65,7 +80,6 @@ export type ReelsShareFailure =
   | "unreadable-video"
   | "too-short"
   | "too-long"
-  | "too-large"
   | "instagram-unavailable"
   | "handoff-failed"
   | "unknown";
@@ -88,7 +102,6 @@ export const REELS_FAILURE_MESSAGES: Record<ReelsShareFailure, string> = {
   "unreadable-video": "That clip could not be read.",
   "too-short": "Instagram needs at least 3 seconds. Pick a longer moment.",
   "too-long": "Instagram caps Reels at 60 seconds. Pick a shorter moment.",
-  "too-large": "That clip is too large for Instagram. Try a shorter moment.",
   "instagram-unavailable": "Instagram is not installed on this device.",
   "handoff-failed": "Instagram could not be opened. Try again.",
   unknown: "Sharing to Instagram failed. Try again.",
@@ -105,13 +118,33 @@ const NATIVE_CODE_TO_FAILURE: Record<string, ReelsShareFailure> = {
   ERR_REELS_UNREADABLE_VIDEO: "unreadable-video",
   ERR_REELS_VIDEO_TOO_SHORT: "too-short",
   ERR_REELS_VIDEO_TOO_LONG: "too-long",
-  ERR_REELS_VIDEO_TOO_LARGE: "too-large",
   ERR_REELS_INSTAGRAM_UNAVAILABLE: "instagram-unavailable",
   ERR_REELS_HANDOFF_FAILED: "handoff-failed",
 };
 
 export type ReelsShareResult =
-  | { ok: true }
+  | {
+      ok: true;
+      /**
+       * Whether the optional overlay sticker was actually attached.
+       *
+       * Reported rather than assumed, because a sticker can be dropped for
+       * reasons the caller cannot see (an unreadable file, a URI outside
+       * the paths the Android FileProvider serves). "Never a silent no-op"
+       * has to cover the optional half of the payload too.
+       */
+      stickerApplied: boolean;
+      /** Size of the clip that was handed over, from the file itself. */
+      byteCount: number;
+      /**
+       * ADVISORY. True when `byteCount` exceeds Meta's RECOMMENDED ceiling.
+       * The handoff still happened; Instagram has the clip. Show
+       * `REELS_OVERSIZE_WARNING` if you want, but do not treat it as a
+       * failure, and do not block on it: the ceiling is a recommendation
+       * and the duration window is the requirement.
+       */
+      oversize: boolean;
+    }
   | { ok: false; failure: ReelsShareFailure; message: string; detail?: string };
 
 export interface ShareToReelsOptions {
@@ -119,8 +152,25 @@ export interface ShareToReelsOptions {
   videoUri: string;
   /** The registered Facebook App ID. Required by Meta since January 2023. */
   appId: string;
-  /** Optional overlay sticker. iOS only; see the note on the native halves. */
+  /**
+   * Optional overlay sticker, composited above the video by Instagram.
+   * Supported on BOTH platforms: the iOS pasteboard key
+   * `com.instagram.sharedSticker.stickerImage` and the Android
+   * `interactive_asset_uri` intent extra, both documented by Meta.
+   * Check `stickerApplied` on the result; it can be dropped.
+   */
   stickerImageUri?: string;
+}
+
+/**
+ * What the native halves resolve with. `maxBytes` is deliberately NOT sent
+ * down: native reports the size it measured and JS decides whether that is
+ * over the RECOMMENDED ceiling, which keeps the advisory threshold in one
+ * place and out of code that would have to refuse on it.
+ */
+interface NativeShareOutcome {
+  stickerApplied: boolean;
+  byteCount: number;
 }
 
 interface InstagramReelsNativeModule {
@@ -130,8 +180,7 @@ interface InstagramReelsNativeModule {
     stickerImageUri?: string;
     minDurationMs: number;
     maxDurationMs: number;
-    maxBytes: number;
-  }): Promise<void>;
+  }): Promise<NativeShareOutcome>;
 }
 
 /**
@@ -184,27 +233,28 @@ function nativeFailureOf(error: unknown): { reason: ReelsShareFailure; detail?: 
 /**
  * Hand `videoUri` to the Instagram Reels composer.
  *
- * Resolves `{ ok: true }` only once the composer has actually been opened.
- * It NEVER throws and never resolves ok for a clip that was not handed off:
+ * Resolves `ok: true` only once the composer has actually been opened. It
+ * NEVER throws and never resolves ok for a clip that was not handed off:
  * the documented failure mode of this whole mechanism is a silent no-op
  * (Instagram opens to an empty composer, or does not open at all, with no
  * error anywhere), so every branch that cannot complete returns a named
  * reason and a sentence a person can read.
  *
  * What it validates before touching the pasteboard or the intent: that an
- * App ID was supplied, that the file exists, that its duration is inside
- * Meta's 3-60s window, and that it is under the byte ceiling. The duration
- * is read from the file itself on the native side rather than trusted from
- * the caller, because the caller's idea of the length comes from the render
- * request and the clip is what Instagram will actually reject.
+ * App ID was supplied, that the file exists, and that its duration is
+ * inside Meta's 3-60s window. The duration is read from the file itself on
+ * the native side rather than trusted from the caller, because the caller's
+ * idea of the length comes from the render request and the clip is what
+ * Instagram will actually reject. SIZE IS NOT A REFUSAL: it comes back as
+ * `oversize` on a successful result, because Meta recommends the ceiling
+ * and requires the window.
  *
- * ON iOS THIS REPLACES THE USER'S CLIPBOARD. Meta's mechanism is a
+ * ON iOS THIS TOUCHES THE USER'S CLIPBOARD. Meta's mechanism is a
  * pasteboard handoff; there is no way to hand the composer a video without
- * writing to `UIPasteboard.general`. The items carry a five-minute
- * expiry, and they are cleared again if the composer does not open, but the
- * clipboard the user had is gone either way. Slice jits-s6mi.3's
- * availability check should therefore run BEFORE this function, so a user
- * without Instagram never pays that cost.
+ * writing to `UIPasteboard.general`. The items carry a five-minute expiry
+ * and are `localOnly`, and whatever was on the pasteboard is snapshotted
+ * and restored if the composer does not open, so a user without Instagram
+ * does not lose what they had copied.
  *
  * ALSO ON iOS: since iOS 16 the system can prompt before one app reads
  * pasteboard data another app wrote, and this handoff works by pasteboard.
@@ -213,22 +263,42 @@ function nativeFailureOf(error: unknown): { reason: ReelsShareFailure; detail?: 
 export async function shareToReels(options: ShareToReelsOptions): Promise<ReelsShareResult> {
   if (!native) return failure("module-unavailable");
   if (Platform.OS !== "ios" && Platform.OS !== "android") return failure("unsupported-platform");
-  // Checked here as well as natively so a misconfigured build fails before
-  // it clobbers the pasteboard. Meta has required a registered App ID since
-  // January 2023 and a missing one is a silent break on the Instagram side.
-  if (options.appId.trim().length === 0) return failure("missing-app-id");
-  if (options.videoUri.trim().length === 0) return failure("file-not-found");
 
+  // EVERYTHING that reads `options` is inside the try, including the two
+  // pre-flight checks. They used to sit outside it and were the only holes
+  // in the "never throws" contract: `appId` reaches this module from config,
+  // which is `string | undefined` at its source, so `options.appId.trim()`
+  // on an undefined value is a live TypeError, and a caller that passes no
+  // options at all throws on the first property access. A share button that
+  // throws is a crash, not a message.
   try {
-    await native.shareToReels({
+    // Checked here as well as natively so a misconfigured build fails before
+    // it touches the pasteboard. Meta has required a registered App ID since
+    // January 2023 and a missing one is a silent break on the Instagram side.
+    if (typeof options?.appId !== "string" || options.appId.trim().length === 0) {
+      return failure("missing-app-id");
+    }
+    if (typeof options.videoUri !== "string" || options.videoUri.trim().length === 0) {
+      return failure("file-not-found");
+    }
+
+    const outcome = await native.shareToReels({
       videoUri: options.videoUri,
       appId: options.appId,
       stickerImageUri: options.stickerImageUri,
       minDurationMs: REELS_MIN_DURATION_MS,
       maxDurationMs: REELS_MAX_DURATION_MS,
-      maxBytes: REELS_MAX_BYTES,
     });
-    return { ok: true };
+
+    // Read defensively: an OTA can land on a binary whose native half
+    // predates these fields, in which case they simply are not there.
+    const byteCount = typeof outcome?.byteCount === "number" ? outcome.byteCount : 0;
+    return {
+      ok: true,
+      stickerApplied: outcome?.stickerApplied === true,
+      byteCount,
+      oversize: byteCount > REELS_RECOMMENDED_MAX_BYTES,
+    };
   } catch (error) {
     const { reason, detail } = nativeFailureOf(error);
     return failure(reason, detail);

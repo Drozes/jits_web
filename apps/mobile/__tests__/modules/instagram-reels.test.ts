@@ -67,8 +67,15 @@ function load(native: unknown): typeof import("@/modules/instagram-reels") {
 }
 
 /** A native double that always succeeds, so callers can assert the payload. */
-function okNative(): { shareToReels: jest.Mock } {
-  return { shareToReels: jest.fn().mockResolvedValue(undefined) };
+function okNative(outcome: { stickerApplied?: boolean; byteCount?: number } = {}): {
+  shareToReels: jest.Mock;
+} {
+  return {
+    shareToReels: jest.fn().mockResolvedValue({
+      stickerApplied: outcome.stickerApplied ?? false,
+      byteCount: outcome.byteCount ?? 1_000_000,
+    }),
+  };
 }
 
 /** A native double that rejects the way Expo surfaces a coded rejection. */
@@ -162,32 +169,59 @@ describe("the payload handed to native", () => {
       stickerImageUri: undefined,
       minDurationMs: mod.REELS_MIN_DURATION_MS,
       maxDurationMs: mod.REELS_MAX_DURATION_MS,
-      maxBytes: mod.REELS_MAX_BYTES,
     });
+    // The RECOMMENDED byte ceiling is deliberately NOT sent: native reports
+    // the size it measured and this side decides whether to warn, so no
+    // code path can turn a recommendation into a refusal.
+    expect(native.shareToReels.mock.calls[0][0]).not.toHaveProperty("maxBytes");
   });
 
   it("passes an optional sticker through", async () => {
-    const native = okNative();
+    const native = okNative({ stickerApplied: true });
     const mod = load(native);
-    await mod.shareToReels({ videoUri: CLIP, appId: APP_ID, stickerImageUri: "file:///s.png" });
+    const result = await mod.shareToReels({
+      videoUri: CLIP,
+      appId: APP_ID,
+      stickerImageUri: "file:///s.png",
+    });
     expect(native.shareToReels).toHaveBeenCalledWith(
       expect.objectContaining({ stickerImageUri: "file:///s.png" }),
     );
+    expect(result).toMatchObject({ ok: true, stickerApplied: true });
   });
 
-  it("uses Meta's documented Reels window and byte ceiling", () => {
-    // Guards the numbers themselves. 3s is a hard Instagram rejection, 60s
-    // is the documented ceiling, 50 MB is Meta's recommendation which this
-    // module enforces rather than letting Instagram silently drop the clip.
+  it("reports a sticker that was DROPPED rather than pretending it landed", async () => {
+    // The sticker is optional on both platforms and both halves silently
+    // skip an unreadable one. "Never a silent no-op" has to cover the
+    // optional half of the payload too, or a caller that rendered an
+    // overlay has no way to learn it never arrived.
+    const mod = load(okNative({ stickerApplied: false }));
+    const result = await mod.shareToReels({
+      videoUri: CLIP,
+      appId: APP_ID,
+      stickerImageUri: "file:///gone.png",
+    });
+    expect(result).toMatchObject({ ok: true, stickerApplied: false });
+  });
+
+  it("uses Meta's documented Reels window and recommended ceiling", () => {
+    // Guards the numbers themselves. 3s is a hard Instagram rejection and
+    // 60s is the documented ceiling, so both are REQUIREMENTS. 50 MB is a
+    // recommendation and is named as one.
     const mod = load(okNative());
     expect(mod.REELS_MIN_DURATION_MS).toBe(3_000);
     expect(mod.REELS_MAX_DURATION_MS).toBe(60_000);
-    expect(mod.REELS_MAX_BYTES).toBe(50 * 1024 * 1024);
+    expect(mod.REELS_RECOMMENDED_MAX_BYTES).toBe(50 * 1024 * 1024);
   });
 
   it("reports success only when native resolved", async () => {
-    const mod = load(okNative());
-    await expect(mod.shareToReels({ videoUri: CLIP, appId: APP_ID })).resolves.toEqual({ ok: true });
+    const mod = load(okNative({ byteCount: 12 }));
+    await expect(mod.shareToReels({ videoUri: CLIP, appId: APP_ID })).resolves.toEqual({
+      ok: true,
+      stickerApplied: false,
+      byteCount: 12,
+      oversize: false,
+    });
   });
 });
 
@@ -198,7 +232,6 @@ describe("native rejections", () => {
     ["ERR_REELS_UNREADABLE_VIDEO", "unreadable-video"],
     ["ERR_REELS_VIDEO_TOO_SHORT", "too-short"],
     ["ERR_REELS_VIDEO_TOO_LONG", "too-long"],
-    ["ERR_REELS_VIDEO_TOO_LARGE", "too-large"],
     ["ERR_REELS_INSTAGRAM_UNAVAILABLE", "instagram-unavailable"],
     ["ERR_REELS_HANDOFF_FAILED", "handoff-failed"],
   ];
@@ -266,12 +299,86 @@ describe("user-facing copy", () => {
     // here is how "undefined" ends up in a toast.
     const mod = load(okNative());
     const failures = Object.keys(mod.REELS_FAILURE_MESSAGES);
-    expect(failures).toHaveLength(11);
+    expect(failures).toHaveLength(10);
     for (const failure of failures) {
       const copy = mod.REELS_FAILURE_MESSAGES[failure as keyof typeof mod.REELS_FAILURE_MESSAGES];
       expect(copy.length).toBeGreaterThan(10);
       expect(copy).not.toMatch(/ERR_|undefined|null/);
     }
+  });
+});
+
+describe("the advisory size ceiling", () => {
+  it("does not refuse an oversize clip, it flags one", async () => {
+    // Meta states "under 50 MB" as a RECOMMENDATION and 3-60s as a
+    // REQUIREMENT. Enforcing both makes them mutually inconsistent: a 60s
+    // 1080p clip at 8 Mbps is roughly 60 MB, so a clip sitting legally
+    // inside the duration window would be refused with copy blaming its
+    // length when the real cause is bitrate.
+    const mod = load(okNative({ byteCount: 60 * 1024 * 1024 }));
+    const result = await mod.shareToReels({ videoUri: CLIP, appId: APP_ID });
+    expect(result).toMatchObject({ ok: true, oversize: true, byteCount: 60 * 1024 * 1024 });
+  });
+
+  it("leaves a clip at exactly the ceiling alone", async () => {
+    const mod = load(okNative({ byteCount: 50 * 1024 * 1024 }));
+    await expect(mod.shareToReels({ videoUri: CLIP, appId: APP_ID })).resolves.toMatchObject({
+      oversize: false,
+    });
+  });
+
+  it("has warning copy that reads as advice, not as a failure", () => {
+    const mod = load(okNative());
+    expect(mod.REELS_OVERSIZE_WARNING.length).toBeGreaterThan(10);
+    expect(mod.REELS_OVERSIZE_WARNING).not.toMatch(/ERR_|failed|cannot/i);
+  });
+
+  it("survives a native half that predates these fields", async () => {
+    // An OTA can land on a binary whose native module resolves but returns
+    // the old `undefined`. Reading it blindly would put `NaN` and
+    // `undefined` into a result the caller renders.
+    const mod = load({ shareToReels: jest.fn().mockResolvedValue(undefined) });
+    await expect(mod.shareToReels({ videoUri: CLIP, appId: APP_ID })).resolves.toEqual({
+      ok: true,
+      stickerApplied: false,
+      byteCount: 0,
+      oversize: false,
+    });
+  });
+});
+
+describe("the never-throws contract", () => {
+  it("survives options with no appId at all", async () => {
+    // Live shape, not a hypothetical: the App ID will come from config,
+    // which is `string | undefined` at its source, so `options.appId.trim()`
+    // on an undefined value is a TypeError in the one function whose whole
+    // contract is that it does not throw.
+    const native = okNative();
+    const mod = load(native);
+    const result = await mod.shareToReels({ videoUri: CLIP } as never);
+    expect(result).toMatchObject({ ok: false, failure: "missing-app-id" });
+    expect(native.shareToReels).not.toHaveBeenCalled();
+  });
+
+  it("survives options with no videoUri at all", async () => {
+    const mod = load(okNative());
+    await expect(mod.shareToReels({ appId: APP_ID } as never)).resolves.toMatchObject({
+      ok: false,
+      failure: "file-not-found",
+    });
+  });
+
+  it("survives being called with no options object", async () => {
+    // A share button that throws is a crash, not a message.
+    const mod = load(okNative());
+    await expect(mod.shareToReels(undefined as never)).resolves.toMatchObject({ ok: false });
+  });
+
+  it("survives a non-string appId", async () => {
+    const mod = load(okNative());
+    await expect(
+      mod.shareToReels({ videoUri: CLIP, appId: 12345 as never }),
+    ).resolves.toMatchObject({ ok: false, failure: "missing-app-id" });
   });
 });
 

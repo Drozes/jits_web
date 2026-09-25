@@ -10,7 +10,11 @@ Pod::Spec.new do |s|
   s.license        = 'MIT'
   s.author         = 'ELO RATED'
   s.homepage       = 'https://elorated.com'
-  s.platforms      = { :ios => '15.1', :tvos => '15.1' }
+  # iOS only, unlike `backup-exclusion`'s podspec which also declares tvOS.
+  # The whole mechanism is `UIPasteboard` plus `UIApplication.open`, and
+  # `UIPasteboard` does not exist on tvOS, so declaring that platform would
+  # promise a build that cannot compile.
+  s.platforms      = { :ios => '15.1' }
   s.swift_version  = '5.9'
   s.source         = { git: 'https://elorated.com' }
   s.static_framework = true
