@@ -35,14 +35,24 @@ export function NotificationPanel({
   const ref = React.useRef<BottomSheetModal | null>(null);
   const tokens = useThemedTokens();
 
+  // Only dismiss a sheet that is actually showing. Calling dismiss() on a gorhom
+  // modal that was never presented (this effect's first run, open=false) or
+  // that already closed itself (backdrop tap / pan down) leaves it stuck in
+  // DISMISSING, so every later present() mounts and immediately tears down:
+  // the bell looked dead.
+  const wasOpen = React.useRef(false);
   React.useEffect(() => {
     if (open) ref.current?.present();
-    else ref.current?.dismiss();
+    else if (wasOpen.current) ref.current?.dismiss();
+    wasOpen.current = open;
   }, [open]);
 
   const handleSheetChange = React.useCallback(
     (idx: number) => {
-      if (idx === -1) onOpenChange(false);
+      if (idx === -1) {
+        wasOpen.current = false; // the sheet closed itself; don't dismiss again
+        onOpenChange(false);
+      }
     },
     [onOpenChange],
   );
@@ -65,6 +75,9 @@ export function NotificationPanel({
     <BottomSheetModal
       ref={ref}
       snapPoints={["65%"]}
+      // Fixed-height list with a BottomSheetScrollView, not a BottomSheetView,
+      // so gorhom v5's default dynamic sizing would size it to a sliver.
+      enableDynamicSizing={false}
       enablePanDownToClose
       onChange={handleSheetChange}
       backdropComponent={renderBackdrop}

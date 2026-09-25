@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Mobile: notification bell opens again
+
+**Fixed**
+- The notification bell did nothing when tapped. `apps/mobile/components/notifications/notification-panel.tsx` called gorhom's `dismiss()` on a sheet that was not showing (on first render, and again after a backdrop tap / pan-down had already closed it), which leaves `BottomSheetModal` stuck in DISMISSING so every later `present()` tore straight down. It now only dismisses a sheet it presented that has not closed itself, and sets `enableDynamicSizing={false}` so the fixed 65% list is not sized to a sliver. Regression test: `apps/mobile/__tests__/components/notifications/notification-panel.test.tsx`.
+
 ### Mobile: Arena-only matchmaking; gym sessions, gym pages and the gym-manager portal removed (jits-gewv)
 
 Product decision 2026-09-25: on mobile the Arena (go live, send and receive live challenges) is the only way to get a match. Mobile only; `apps/web`, `packages/shared` (web uses every session symbol) and the backend are untouched. JS-only, so OTA-eligible: no `app.json`, native, dependency or metro/babel change (native cleanup such as the now-unused `expo-location` permission is jits-d3hb).
