@@ -24,8 +24,7 @@ import { ARENA_EXIT_LABEL, ARENA_HREF } from "@/lib/arena/constants";
 
 /**
  * Steps where a live match is in flight and leaving via a back gesture would
- * orphan it `in_progress` with no resume path. Same set the session match
- * screen guards.
+ * orphan it `in_progress` with no resume path.
  */
 const GUARDED_STEPS: ReadonlySet<MatchStep> = new Set<MatchStep>([
   "live",

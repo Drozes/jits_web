@@ -14,6 +14,7 @@ import { MatchStepRenderer } from "./match-step-renderer";
 import { MatchRecorderProvider } from "./match-recorder-context";
 import { MatchRecorderCamera, MatchRecorderStatus } from "./match-recorder-surface";
 import { cn } from "@/lib/cn";
+import { ARENA_EXIT_LABEL } from "@/lib/arena/constants";
 
 interface MatchFlowWizardProps {
   /**
@@ -21,13 +22,13 @@ interface MatchFlowWizardProps {
    * splash, a cancelled ready check, and the summary step's primary cta.
    * The wizard has no session dependency (every RPC is keyed on `matchId`
    * and `matches.session_id` is nullable), so a match's origin only decides
-   * where its exits point. A session match passes its lobby; a sessionless
-   * match passes whatever surface it was started from.
+   * where its exits point. On mobile every match starts in the Arena (there
+   * are no gym sessions, jits-gewv), so the one caller passes the Arena.
    */
   exitHref: string;
   /**
    * Copy on the exit cta. Omitted, blank or whitespace-only falls back to
-   * the session lobby wording: a default parameter only covers `undefined`,
+   * the Arena wording (`ARENA_EXIT_LABEL`): a default parameter only covers `undefined`,
    * and an empty label would render a tappable but visually blank cta that
    * is also unlabeled to VoiceOver / TalkBack. Callers that derive the label
    * from data (an opponent name, a gym name) can pass whatever they have.
@@ -72,8 +73,7 @@ function computeOwnOutcome(
  * id, so it mounts unchanged for a match with no session at all.
  *
  * ELO design system: page-tinted surface with a meta-strip progress
- * indicator (mirrors `apps/mobile/components/session/wizard-progress.tsx`
- * from the join wizard). The live step keeps the same scroll container
+ * indicator. The live step keeps the same scroll container
  * but its internal layout is full-bleed within the padding.
  */
 export function MatchFlowWizard({
@@ -86,7 +86,7 @@ export function MatchFlowWizard({
   // Single resolution point for the label: every downstream consumer takes a
   // required non-empty string, so blank and whitespace-only are normalised
   // here rather than defended against three times further down.
-  const exitLabel = rawExitLabel?.trim() || "Back to Lobby";
+  const exitLabel = rawExitLabel?.trim() || ARENA_EXIT_LABEL;
   const insets = useSafeAreaInsets();
   const { match, submissionTypes, isLoading, error, refresh } = useMatchDetails(matchId);
   const [step, setStep] = React.useState<MatchStep | null>(null);

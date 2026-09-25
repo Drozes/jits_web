@@ -80,6 +80,7 @@ jest.mock("@jits/shared/hooks/use-session-match-sync", () => ({
 }));
 
 import { ReadyStep } from "@/components/match-flow/steps/ready-step";
+import { ARENA_HREF } from "@/lib/arena/constants";
 import { toast } from "@/components/ui/toast";
 import { startMatch } from "@jits/shared/api/mutations";
 import { getMatchDetails } from "@jits/shared/api/queries";
@@ -90,7 +91,7 @@ const mockGetMatchDetails = getMatchDetails as jest.Mock;
 function renderReadyStep(onStarted: jest.Mock) {
   return render(
     <ReadyStep
-      exitHref="/(app)/session/S1/lobby"
+      exitHref={ARENA_HREF}
       matchId="M1"
       currentAthleteId="me-1"
       opponentId="opp-1"

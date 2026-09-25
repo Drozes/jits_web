@@ -5,6 +5,7 @@ import { Chip, MetaTag } from "@/components/ui/elo-system";
 import { MatchCard } from "../match-card";
 import { ActivityFeedItem, type ActivityItem } from "./activity-feed-item";
 import type { MatchOutcome } from "@jits/shared/constants";
+import { ARENA_HREF } from "@/lib/arena/constants";
 
 export type { ActivityItem } from "./activity-feed-item";
 
@@ -28,7 +29,8 @@ interface RecentActivitySectionProps {
   myMatches: MyMatch[];
   allActivity: ActivityItem[];
   onPressMatch?: (matchId: string) => void;
-  onPressFindSession?: () => void;
+  /** Empty-state link target. Defaults to the Arena, the only way to a match. */
+  onPressFindMatch?: () => void;
 }
 
 function EmptyState({
@@ -52,8 +54,10 @@ function EmptyState({
           hitSlop={{ top: 14, bottom: 14, left: 8, right: 8 }}
           className="active:opacity-70"
         >
-          <Text className="font-mono-bold text-[10px] text-cta uppercase tracking-caps-l mt-2">
-            Find a session →
+          {/* Muted, not Signal Red: the Arena card above owns Home's one red
+              affordance. */}
+          <Text className="font-mono-bold text-[10px] text-ink-2 uppercase tracking-caps-l mt-2">
+            Find a match in the Arena →
           </Text>
         </Pressable>
       ) : null}
@@ -65,7 +69,7 @@ export function RecentActivitySection({
   myMatches,
   allActivity,
   onPressMatch,
-  onPressFindSession,
+  onPressFindMatch,
 }: RecentActivitySectionProps) {
   const router = useRouter();
   const [scope, setScope] = React.useState<Scope>("all");
@@ -122,7 +126,7 @@ export function RecentActivitySection({
           <EmptyState
             message="No matches yet, your first match is waiting."
             showLink
-            onPressLink={onPressFindSession ?? (() => router.push("/gyms"))}
+            onPressLink={onPressFindMatch ?? (() => router.push(ARENA_HREF))}
           />
         )
       ) : hasContent ? (
@@ -135,7 +139,7 @@ export function RecentActivitySection({
           ))}
         </View>
       ) : (
-        <EmptyState message="No recent activity yet, join a session to get started." />
+        <EmptyState message="No recent activity yet. Go live in the Arena to get started." />
       )}
     </View>
   );

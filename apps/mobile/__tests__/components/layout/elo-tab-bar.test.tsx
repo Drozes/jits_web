@@ -83,8 +83,8 @@ describe("EloTabBar", () => {
     const { queryByLabelText } = render(
       React.createElement(EloTabBar, buildProps(CURRENT_TABS)),
     );
-    // Both gym surfaces live outside the `(tabs)` group now: /gyms is entered
-    // from Home, /gym-manager from the manager affordance on /gyms/[id].
+    // Mobile has no gym surfaces at all: the gym list, gym detail and the
+    // gym-manager portal were removed (jits-gewv).
     expect(queryByLabelText("Gyms")).toBeNull();
     expect(queryByLabelText("Gym")).toBeNull();
   });

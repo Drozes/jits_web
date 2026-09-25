@@ -66,7 +66,7 @@ jest.mock("@/components/layout/elo-tab-bar", () => ({
 // If the layout ever reaches for managed gyms again, this mock records it. The
 // tab it used to gate is gone, and the query cost every app launch.
 const mockUseManagedGyms = jest.fn(() => ({ gyms: [], isReady: true }));
-jest.mock("@/lib/gym-manager/use-managed-gyms", () => ({
+jest.mock("@/lib/admin/use-managed-gyms", () => ({
   useManagedGyms: () => mockUseManagedGyms(),
 }));
 
@@ -104,17 +104,18 @@ describe("(tabs)/_layout", () => {
     expect(onDisk).toEqual([...EXPECTED_TABS].sort());
   });
 
-  it("keeps the gym routes outside the group", () => {
-    // They must stay siblings of (tabs) under (app): inside the group they
-    // would be tabs again regardless of what _layout.tsx declares.
+  it("has no gym, gym-manager or session routes anywhere under (app)", () => {
+    // Mobile dropped gym pages, sessions and the gym-manager portal
+    // (jits-gewv): the Arena is the only way to get a match. A route directory
+    // restored under (app) would come back live and reachable by link, and one
+    // restored under (tabs) would also be a tab.
     const onDisk = fs.readdirSync(TABS_DIR);
-    expect(onDisk).not.toContain("gyms");
-    expect(onDisk).not.toContain("gym-manager");
-
     const appDir = path.join(TABS_DIR, "..");
-    expect(fs.readdirSync(appDir)).toEqual(
-      expect.arrayContaining(["gyms", "gym-manager"]),
-    );
+    for (const dir of [onDisk, fs.readdirSync(appDir)]) {
+      expect(dir).not.toContain("gyms");
+      expect(dir).not.toContain("gym-manager");
+      expect(dir).not.toContain("session");
+    }
   });
 
   it("registers no gym tabs", () => {

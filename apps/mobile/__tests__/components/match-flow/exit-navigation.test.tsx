@@ -7,10 +7,13 @@
  * session silently produce `/(app)/session/undefined/lobby`.
  *
  * These tests pin the replacement contract:
- *  - the wizard mounts and exits correctly with a session-style `exitHref`,
- *    preserving today's session behaviour ("Back to Lobby" -> the lobby);
- *  - the wizard mounts and exits correctly with a non-session `exitHref`,
- *    with no session id anywhere in the tree;
+ *  - the wizard exits to whatever `exitHref` its caller supplies, with the
+ *    caller's label, for two different origins (the Arena, which is the only
+ *    real caller now that mobile has no gym sessions (jits-gewv), and an
+ *    arbitrary second surface, so the href is proven to be threaded rather
+ *    than hardcoded);
+ *  - the wizard mounts with no session id anywhere in the tree;
+ *  - an omitted or blank label falls back to the Arena wording;
  *  - no exit anywhere in the match-flow tree can still build a
  *    `/(app)/session/<something>/lobby` URL, so the `undefined` lobby
  *    regression cannot come back.
@@ -121,15 +124,18 @@ jest.mock("@/lib/match-flow/use-match-details", () => ({
 import { MatchFlowWizard } from "@/components/match-flow/match-flow-wizard";
 import { ReadyStep } from "@/components/match-flow/steps/ready-step";
 import { cancelSessionMatch } from "@jits/shared/api/mutations";
+import { ARENA_EXIT_LABEL, ARENA_HREF } from "@/lib/arena/constants";
 
 const mockCancelSessionMatch = cancelSessionMatch as jest.Mock;
 
 // ---- fixtures ----
 
-const SESSION_EXIT = "/(app)/session/S1/lobby";
-const SESSION_LABEL = "Back to Lobby";
-const ARENA_EXIT = "/(app)/arena";
-const ARENA_LABEL = "Back to Arena";
+const ARENA_EXIT = ARENA_HREF;
+const ARENA_LABEL = ARENA_EXIT_LABEL;
+// A second, non-Arena origin. Nothing on mobile passes it today; it exists so
+// the tests can tell a threaded exitHref from one hardcoded to the Arena.
+const OTHER_EXIT = "/(app)/(home)";
+const OTHER_LABEL = "Back to Home";
 
 function participant(id: string, name: string, outcome: string | null) {
   return {
@@ -206,20 +212,21 @@ beforeEach(() => {
 });
 
 describe("MatchFlowWizard exit navigation", () => {
-  it("exits a session match to its lobby with today's copy", async () => {
+  it("exits to a caller-supplied non-Arena href with the caller's copy", async () => {
     mockUseMatchDetails.mockReturnValue(completedMatchResult());
 
-    const { getByText } = render(
+    const { getByText, queryByText } = render(
       <MatchFlowWizard
-        exitHref={SESSION_EXIT}
-        exitLabel={SESSION_LABEL}
+        exitHref={OTHER_EXIT}
+        exitLabel={OTHER_LABEL}
         matchId="M1"
         currentAthleteId="me-1"
       />,
     );
 
-    fireEvent.press(getByText(SESSION_LABEL));
-    expect(mockRouterReplace).toHaveBeenCalledWith(SESSION_EXIT);
+    expect(queryByText(ARENA_LABEL)).toBeNull();
+    fireEvent.press(getByText(OTHER_LABEL));
+    expect(mockRouterReplace).toHaveBeenCalledWith(OTHER_EXIT);
   });
 
   it("mounts with no session at all and exits to the supplied href", async () => {
@@ -235,7 +242,7 @@ describe("MatchFlowWizard exit navigation", () => {
       />,
     );
 
-    expect(queryByText(SESSION_LABEL)).toBeNull();
+    expect(queryByText(OTHER_LABEL)).toBeNull();
     fireEvent.press(getByText(ARENA_LABEL));
     expect(mockRouterReplace).toHaveBeenCalledWith(ARENA_EXIT);
   });
@@ -243,18 +250,18 @@ describe("MatchFlowWizard exit navigation", () => {
   it("routes the not-a-participant splash through exitHref for both origins", () => {
     mockUseMatchDetails.mockReturnValue(notAParticipantResult());
 
-    const session = render(
+    const other = render(
       <MatchFlowWizard
-        exitHref={SESSION_EXIT}
-        exitLabel={SESSION_LABEL}
+        exitHref={OTHER_EXIT}
+        exitLabel={OTHER_LABEL}
         matchId="M1"
         currentAthleteId="me-1"
       />,
     );
-    session.getByText("Not a participant");
-    fireEvent.press(session.getByText(SESSION_LABEL));
-    expect(mockRouterReplace).toHaveBeenLastCalledWith(SESSION_EXIT);
-    session.unmount();
+    other.getByText("Not a participant");
+    fireEvent.press(other.getByText(OTHER_LABEL));
+    expect(mockRouterReplace).toHaveBeenLastCalledWith(OTHER_EXIT);
+    other.unmount();
 
     const arena = render(
       <MatchFlowWizard
@@ -292,15 +299,18 @@ describe("MatchFlowWizard exit navigation", () => {
     expect(mockRouterReplace).toHaveBeenLastCalledWith(ARENA_EXIT);
   });
 
-  it("defaults exitLabel to the session lobby wording when omitted", () => {
+  it("defaults exitLabel to the Arena wording when omitted", () => {
     mockUseMatchDetails.mockReturnValue(notAParticipantResult());
 
-    const { getByText } = render(
-      <MatchFlowWizard exitHref={SESSION_EXIT} matchId="M1" currentAthleteId="me-1" />,
+    const { getByText, queryByText } = render(
+      <MatchFlowWizard exitHref={OTHER_EXIT} matchId="M1" currentAthleteId="me-1" />,
     );
 
-    fireEvent.press(getByText(SESSION_LABEL));
-    expect(mockRouterReplace).toHaveBeenCalledWith(SESSION_EXIT);
+    // Mobile has no session lobby to go "back" to any more.
+    expect(queryByText("Back to Lobby")).toBeNull();
+    // The label defaults, the href never does: it is still the caller's.
+    fireEvent.press(getByText(ARENA_EXIT_LABEL));
+    expect(mockRouterReplace).toHaveBeenCalledWith(OTHER_EXIT);
   });
 
   // A default parameter only fires on `undefined`, so a blank label used to
@@ -324,7 +334,7 @@ describe("MatchFlowWizard exit navigation", () => {
     );
 
     // The cta is visible and reachable by its text, and still exits correctly.
-    fireEvent.press(getByText(SESSION_LABEL));
+    fireEvent.press(getByText(ARENA_EXIT_LABEL));
     expect(mockRouterReplace).toHaveBeenCalledWith(ARENA_EXIT);
   });
 
@@ -340,7 +350,7 @@ describe("MatchFlowWizard exit navigation", () => {
       />,
     );
 
-    fireEvent.press(getByText(SESSION_LABEL));
+    fireEvent.press(getByText(ARENA_EXIT_LABEL));
     expect(mockRouterReplace).toHaveBeenCalledWith(ARENA_EXIT);
   });
 
@@ -375,8 +385,8 @@ describe("ReadyStep exit navigation", () => {
   }
 
   it.each([
-    ["session", SESSION_EXIT],
-    ["non-session", ARENA_EXIT],
+    ["Arena", ARENA_EXIT],
+    ["non-Arena", OTHER_EXIT],
   ])("returns to the %s exitHref when the opponent cancels", (_name, exitHref) => {
     renderReady(exitHref);
 
@@ -388,8 +398,8 @@ describe("ReadyStep exit navigation", () => {
   });
 
   it.each([
-    ["session", SESSION_EXIT],
-    ["non-session", ARENA_EXIT],
+    ["Arena", ARENA_EXIT],
+    ["non-Arena", OTHER_EXIT],
   ])("returns to the %s exitHref when this athlete cancels", async (_name, exitHref) => {
     mockCancelSessionMatch.mockResolvedValue({ ok: true, data: {} });
     const alertSpy = jest
@@ -440,9 +450,8 @@ describe("no session-lobby URL can be rebuilt in the match-flow tree", () => {
    * comment, so stripping costs no true-positive coverage, and it removes the
    * whole class of false positives from prose that merely QUOTES a path. This
    * repo's house docblock style names the web file a component was ported
-   * from, and those paths contain the `(app)` group: see
-   * components/session/wizard/confirm-step.tsx:42, geo-step.tsx:22,
-   * waiver-step.tsx:26 and weight-step.tsx:18. The match-flow components
+   * from, and those paths contain the `(app)` group (the since-deleted mobile
+   * session join wizard steps did exactly that). The match-flow components
    * genuinely are native ports of web match-flow files, so someone will write
    * exactly that docblock in a scanned file. Without stripping it would fail
    * the route-literal scan (its `/session/` is preceded by ")", which the

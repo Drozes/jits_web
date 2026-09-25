@@ -5,11 +5,10 @@ import { EloTabBar } from "@/components/layout/elo-tab-bar";
 /**
  * Bottom tab navigator. Every route directory inside this `(tabs)` group gets a
  * slot in EloTabBar, so a screen that must NOT be a tab lives outside the group
- * instead: `/gyms` and `/gym-manager` are now siblings of `(tabs)` under
- * `(app)` and push over the bar as cards. Their URLs are unchanged (both
- * `(app)` and `(tabs)` are route groups, which do not appear in the path). Gym
- * and session discovery is entered from Home; the gym-manager portal is entered
- * from the manager affordance on `/gyms/[id]`.
+ * instead, as a sibling of `(tabs)` under `(app)` that pushes over the bar as a
+ * card (athlete/[id], match/[matchId], video/[id], settings). Mobile has no gym
+ * pages, sessions or gym-manager portal: the Arena tab is the only way to get a
+ * match.
  *
  * The bar is the target 4-up: Home, Arena, Rankings, Profile. A Screen and its
  * route file have to land together, because expo-router drops a Screen with no

@@ -171,8 +171,10 @@ describe("no outbound footage affordance is reachable", () => {
         (args) => [relative(file), args] as const,
       ),
     );
-    // Not vacuous: there really are four today.
-    expect(calls).toHaveLength(4);
+    // Not vacuous: there really are three today (athlete profile, own
+    // profile share sheet, match summary). The fourth, the session lobby's
+    // invite share, went with the session screens (jits-gewv).
+    expect(calls).toHaveLength(3);
 
     const offenders = calls
       .filter(([, args]) =>

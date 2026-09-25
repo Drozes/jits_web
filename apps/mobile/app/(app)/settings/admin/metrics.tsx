@@ -11,7 +11,9 @@ import { useAdminMetrics } from "@/lib/admin/use-admin-metrics";
 
 /**
  * Admin > Metrics. Platform-wide counters from `get_admin_metrics` grouped into
- * signups / activation funnel / matches / sessions. Self-guards like the hub.
+ * signups / activation funnel / matches. Self-guards like the hub. The RPC's
+ * `sessions_upcoming` is deliberately not shown: mobile has no sessions
+ * (jits-gewv); web's admin metrics still show it.
  */
 export default function AdminMetricsScreen() {
   const { isLoading: authLoading } = useAuth();
@@ -61,10 +63,6 @@ export default function AdminMetricsScreen() {
                 { label: "Today", value: metrics.matches_today },
                 { label: "Last 7 days", value: metrics.matches_7d },
               ]}
-            />
-            <MetricGroup
-              heading="SESSIONS"
-              rows={[{ label: "Upcoming", value: metrics.sessions_upcoming }]}
             />
             <Button variant="outline" size="sm" onPress={reload}>
               Refresh

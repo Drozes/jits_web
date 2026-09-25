@@ -192,10 +192,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const resetPassword = React.useCallback(async (email: string) => {
-    // Phase 5 B1: deep-link handler exists -- forward the reset email back
-    // into the app via the `elorated://reset-password` custom scheme. The
-    // dedicated reset-password screen is deferred (handler currently routes
-    // the token to /login). Universal-link flavor (`https://elorated.com/...`)
+    // Forward the reset email back into the app via the
+    // `elorated://reset-password` custom scheme. The dedicated reset-password
+    // screen is deferred: app/+native-intent.tsx rewrites this URL to /login
+    // (lib/deep-links/system-path.ts). Universal-link flavor (`https://elorated.com/...`)
     // is wired in app.json but requires AASA / assetlinks.json hosting.
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: "elorated://reset-password",

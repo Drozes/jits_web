@@ -9,7 +9,7 @@ import { buildShareUrl, buildShareText } from "@jits/shared/utils";
 import { EloTile, Plate } from "@/components/ui/elo-system";
 
 interface SummaryStepProps {
-  /** Where the primary exit cta returns to (session lobby, or elsewhere). */
+  /** Where the primary exit cta returns to (the Arena, on mobile). */
   exitHref: string;
   /** Copy on the primary exit cta. */
   exitLabel: string;

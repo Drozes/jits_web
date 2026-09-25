@@ -46,9 +46,10 @@ import {
  */
 const NON_TEXT_EXCEPTIONS: Record<string, number> = {
   // Brand red on the darkest light surface. Passing would require moving
-  // #E63946, which is locked. Live at components/gym-manager/elo-sparkline.tsx:42
-  // and gym-stats-trend.tsx:44, where the highlighted `bg-cta` bar sits directly
-  // against `bg-surface-4` bars. Pre-existing and accepted, not introduced here.
+  // #E63946, which is locked. First measured on the gym-manager sparkline and
+  // trend bars (a highlighted `bg-cta` bar directly against `bg-surface-4`
+  // bars); those screens were removed from mobile (jits-gewv) but the token
+  // pair is still valid anywhere, so the recorded value stays pinned.
   "light:accentCta:bgElevatedHover": 2.89,
 
   // The light pressed CTA fill. These are PERMANENT, not a todo: no pressed-fill

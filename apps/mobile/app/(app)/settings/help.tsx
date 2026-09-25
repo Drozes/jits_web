@@ -4,9 +4,10 @@ import { PageContainer } from "@/components/layout/page-container";
 import { Plate } from "@/components/ui/elo-system";
 
 /**
- * G4 Help & Support. Static 4-plate layout per wireframe lines 1653-1680 and
- * mirrors apps/web/app/(app)/settings/help/page.tsx 1:1. Each plate has an h2
- * heading + lede paragraph(s).
+ * G4 Help & Support. Static 4-plate layout per wireframe lines 1653-1680,
+ * structured like apps/web/app/(app)/settings/help/page.tsx. Each plate has an
+ * h2 heading + lede paragraph(s). The copy deliberately diverges from web on
+ * how to get a match: mobile has no gym sessions, only the Arena (jits-gewv).
  */
 type HelpSection = {
   title: string;
@@ -17,8 +18,10 @@ const HELP_SECTIONS: HelpSection[] = [
   {
     title: "Getting Started",
     paragraphs: [
-      "ELO RATED is a participation-only ranking platform. You join a session at a partner gym, complete matches, and the system handles your rating.",
-      "Start by attending an open mat at a gym tagged as an ELO session. Geofence plus waiver confirm you're on the mat before you can join the lobby.",
+      "ELO RATED is a participation-only ranking platform. You find opponents in the Arena, complete ranked matches, and the system handles your rating.",
+      "Open the Arena tab and tap Go live to join the lobby. Anyone else who is live can challenge you, and you can challenge them. You can have up to 3 challenges out at once.",
+      "A challenge arrives as a live prompt. Accept it and you both drop straight into the match, so be on the mat together before you go live.",
+      "Keep the Arena open while you're live. A challenge that arrives while you're elsewhere in the app may not show up when you come back.",
     ],
   },
   {
@@ -39,7 +42,7 @@ const HELP_SECTIONS: HelpSection[] = [
   {
     title: "Report a Problem",
     paragraphs: [
-      "Spotted a wrong result, a dispute that wasn't resolved, or a participant violating gym rules? Send a feedback note from Settings, Feedback.",
+      "Spotted a wrong result, a dispute that wasn't resolved, or an opponent breaking the rules? Send a feedback note from Settings, Feedback.",
       "For urgent issues (safety, abuse, account compromise), email support@elorated.com with the match ID.",
     ],
   },

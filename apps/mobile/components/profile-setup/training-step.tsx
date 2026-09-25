@@ -93,7 +93,7 @@ export function TrainingStep({
 
       <EloField
         label="City"
-        helper="Required to activate your profile. Helps you find local sessions and gyms."
+        helper="Required to activate your profile. The city you train in."
       >
         <CityAutocomplete
           value={values.city}

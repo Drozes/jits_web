@@ -2,6 +2,33 @@
 
 ## [Unreleased]
 
+### Mobile: Arena-only matchmaking; gym sessions, gym pages and the gym-manager portal removed (jits-gewv)
+
+Product decision 2026-09-25: on mobile the Arena (go live, send and receive live challenges) is the only way to get a match. Mobile only; `apps/web`, `packages/shared` (web uses every session symbol) and the backend are untouched. JS-only, so OTA-eligible: no `app.json`, native, dependency or metro/babel change (native cleanup such as the now-unused `expo-location` permission is jits-d3hb).
+
+**Removed**
+- Routes: `apps/mobile/app/(app)/session/` (join wizard, live lobby, session match screen), `app/(app)/gyms/` (gym list and detail), `app/(app)/gym-manager/` (hub, sessions, roster, stats, stats-by-elo, ladder, athlete detail), and their `Stack.Screen` registrations in `app/(app)/_layout.tsx`.
+- Session and gym-only code: `lib/session/`, `lib/gym-manager/`, `lib/location/use-location.ts` (no remaining importer), `components/session/`, `components/session-card.tsx`, `components/gym-manager/`, `components/gyms/`, `components/dashboard/active-session-card.tsx`, `components/dashboard/session-discovery-section.tsx`, plus their tests.
+- Home no longer reads `getActiveSession`, `getGymDetailResult` or `getGymsWithSessionsResult`; its only read is `getDashboardSummary`.
+- Admin Metrics drops the SESSIONS / Upcoming group (`app/(app)/settings/admin/metrics.tsx`).
+
+**Added**
+- `apps/mobile/components/dashboard/arena-nudge-card.tsx`: Home's "Find a match" card, the one Signal Red CTA on Home, pushing to the Arena tab (`ARENA_HREF`). Replaces the active-session card and session discovery.
+- `apps/mobile/lib/deep-links/retired-routes.ts`: `isRetiredRoute()` recognises `/session`, `/gyms` and `/gym-manager` paths with or without a leading slash or `(group)` segments, plus `HOME_HREF`.
+- `apps/mobile/app/+native-intent.tsx` and `apps/mobile/lib/deep-links/system-path.ts`: expo-router's `redirectSystemPath` hook, run on the launch URL and every URL received while running, before routing. Retired session/gym links (custom scheme or `elorated.com`) become `/`, `reset-password` becomes `/login` with its query and hash carried over unchanged, and every other URL (athlete links, `elorated://login`, the dev-client launcher URL) is returned untouched for expo-router to route.
+- Tests: `__tests__/lib/deep-links/system-path.test.ts`, `__tests__/lib/notifications/handlers.test.ts`, `__tests__/components/dashboard/recent-activity-section.test.tsx`; Home Arena-nudge and no-session-reads cases in `__tests__/screens/dashboard.test.tsx`.
+
+**Changed**
+- Deep links: `session/*`, `gyms/*` and `gym-manager/*` now land Home with nothing behind it, because they are rewritten in `+native-intent` before expo-router navigates, so its Unmatched Route screen never enters the stack. Push taps (`lib/notifications/handlers.ts`) whose payload `route` points into a removed family also go Home.
+- Recent Activity empty states point at the Arena ("Find a match in the Arena", "Go live in the Arena to get started"); the prop is renamed `onPressFindSession` to `onPressFindMatch` and defaults to the Arena.
+- `MatchFlowWizard`'s default exit label is now "Back to Arena" (`ARENA_EXIT_LABEL`) instead of "Back to Lobby".
+- Help & Support "Getting Started" describes the Arena flow instead of joining a gym session with geofence and waiver, and says to keep the Arena open while live (pending challenges are not fetched at mount).
+- Home paints the ELO tile and the Arena card on the first frame; only the summary-driven sections wait behind the skeleton. The Recent Activity "Find a match" link is muted (`text-ink-2`) so the Arena card is Home's one Signal Red affordance.
+- Profile setup City helper no longer promises "find local sessions and gyms".
+
+**Removed (deep linking)**
+- `apps/mobile/lib/deep-links/handler.ts` and its `<DeepLinkBootstrap />` mount in `app/_layout.tsx`. expo-router 6 already consumes incoming URLs itself (custom scheme and universal), so the bootstrap's `router.push` duplicated it: a universal `https://elorated.com/athlete/<id>` link could push the athlete screen twice. (Its own custom-scheme parsing never matched `elorated://athlete/<id>`, so those links were routed once, by expo-router, and users saw no bug there.) `elorated://reset-password` now reaches `/login` via `+native-intent` instead of an unmatched route (the old parser never matched it either); the recovery code is still not consumed (deferred).
+
 **A native module that can hand a clip to Instagram Reels, built and deliberately left unreachable (jits-s6mi.1, jits-s6mi.2).**
 
 Meta's documented "Sharing to Reels" integration: the app writes a local video to the iOS pasteboard and opens `instagram-reels://share`, or fires an Android `com.instagram.share.ADD_TO_REEL` intent at a FileProvider URI. `react-native-share` cannot do this (its targets are `INSTAGRAM` and `INSTAGRAM_STORIES` only) and no Expo module wraps it, so both halves are hand-written.

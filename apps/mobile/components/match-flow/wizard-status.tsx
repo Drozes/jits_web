@@ -31,7 +31,7 @@ export function WizardError({
   title,
   message,
 }: {
-  /** Where the escape-hatch cta goes (session lobby, or elsewhere). */
+  /** Where the escape-hatch cta goes (the Arena, on mobile). */
   exitHref: string;
   /** Copy on the escape-hatch cta. */
   exitLabel: string;

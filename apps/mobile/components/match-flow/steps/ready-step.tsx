@@ -11,7 +11,7 @@ import { ReadyPanel } from "./ready-panel";
 import { cn } from "@/lib/cn";
 
 interface ReadyStepProps {
-  /** Where a cancelled ready check returns to (session lobby, or elsewhere). */
+  /** Where a cancelled ready check returns to (the Arena, on mobile). */
   exitHref: string;
   matchId: string;
   currentAthleteId: string;

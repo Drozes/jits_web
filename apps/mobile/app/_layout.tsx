@@ -34,7 +34,6 @@ import { OnlinePresenceBootstrap } from "@/lib/presence/online-presence-bootstra
 import { VideoUploadBootstrap } from "@/lib/video/video-upload-bootstrap";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { OfflineBanner } from "@/components/offline-banner";
-import { DeepLinkBootstrap } from "@/lib/deep-links/handler";
 import { SplashReveal } from "@/components/ui/elo-system/splash-reveal";
 import { SplashStatement } from "@/components/ui/elo-system/splash-statement";
 import { SplashGlowStatement } from "@/components/ui/elo-system/splash-glow-statement";
@@ -131,7 +130,6 @@ function RootLayout() {
                 <SentryUserBootstrap />
                 <OnlinePresenceBootstrap />
                 <VideoUploadBootstrap />
-                <DeepLinkBootstrap />
                 <Stack screenOptions={{ headerShown: false }}>
                   <Stack.Screen name="(auth)" />
                   <Stack.Screen name="(app)" />
