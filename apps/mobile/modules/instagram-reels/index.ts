@@ -252,9 +252,9 @@ function nativeFailureOf(error: unknown): { reason: ReelsShareFailure; detail?: 
  * ON iOS THIS TOUCHES THE USER'S CLIPBOARD. Meta's mechanism is a
  * pasteboard handoff; there is no way to hand the composer a video without
  * writing to `UIPasteboard.general`. The items carry a five-minute expiry
- * and are `localOnly`, and whatever was on the pasteboard is snapshotted
- * and restored if the composer does not open, so a user without Instagram
- * does not lose what they had copied.
+ * and are `localOnly`. When Instagram looks absent the previous contents
+ * are snapshotted first and restored if iOS then refuses to open the URL,
+ * so a user without Instagram does not lose what they had copied.
  *
  * ALSO ON iOS: since iOS 16 the system can prompt before one app reads
  * pasteboard data another app wrote, and this handoff works by pasteboard.

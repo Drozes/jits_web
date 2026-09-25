@@ -354,6 +354,18 @@ describe("the Android FileProvider wiring", () => {
     );
   });
 
+  it("carries the exception class and the MIME string into the detail", () => {
+    // Four different causes reach ERR_REELS_INSTAGRAM_UNAVAILABLE and the
+    // code alone cannot tell them apart. Naming the type Instagram was
+    // asked to match is what turns "flip the MIME string" from a guess into
+    // a one-line experiment after a device test.
+    expect(kotlin).toMatch(/\$\{e\.javaClass\.name\}: no activity handles/);
+    expect(kotlin).toMatch(/with type '\$MEDIA_MIME'/);
+    // The catch-all carries it too; "the handoff failed" on its own says
+    // nothing about which step failed.
+    expect(kotlin).toMatch(/\$\{e\.javaClass\.name\}: \$\{e\.message \?: "no message"\}/);
+  });
+
   it("does not let a failed grant pre-empt the availability answer", () => {
     // A grant at a package that is not installed does nothing and on some
     // builds throws. Letting that propagate maps "Instagram is missing" to
@@ -396,19 +408,49 @@ describe("the iOS pasteboard contract", () => {
     expect(swift).toMatch(/\.localOnly: true/);
   });
 
-  it("restores the user's clipboard instead of destroying it", () => {
+  it("restores the user's clipboard when iOS REFUSES to open", () => {
     // Writing tens of MB and only THEN discovering Instagram is absent used
     // to cost the user whatever they had copied, in exchange for nothing.
-    expect(swift).toMatch(/let previousItems = await snapshotPasteboard\(\)/);
-    expect(swift).toMatch(/UIPasteboard\.general\.items = previousItems/);
-    expect(swift).not.toMatch(/UIPasteboard\.general\.items = \[\]/);
+    expect(swift).toMatch(
+      /let previousItems = await snapshotPasteboardIfInstagramLooksAbsent\(\)/,
+    );
+    expect(swift).toMatch(/case \.refused:[\s\S]*?UIPasteboard\.general\.items = previousItems \?\? \[\]/);
   });
 
-  it("does not take a snapshot it does not need", () => {
-    // Reading `items` is itself the cross-app read iOS 16 can prompt for.
-    // `numberOfItems` does not prompt, so an empty pasteboard, the common
-    // case, costs the user nothing.
+  it("restores NOTHING on a timeout", () => {
+    // A timeout most likely means the completion handler was DELAYED, not
+    // dropped, in which case iOS has already switched to Instagram.
+    // Restoring here would yank the payload out from under a handoff that
+    // is about to succeed and open the composer empty with no error
+    // anywhere: this module's cardinal failure mode. The five-minute
+    // expiry is what cleans up instead.
+    const timedOut = swift.slice(swift.indexOf("case .timedOut:"));
+    const untilThrow = timedOut.slice(0, timedOut.indexOf("throw ReelsFailure"));
+    expect(untilThrow).not.toContain("UIPasteboard");
+  });
+
+  it("gates the snapshot on Instagram looking absent", () => {
+    // Reading `items` IS the cross-app read iOS 16 can prompt for.
+    // Snapshotting every time makes the user risk a prompt on the SUCCESS
+    // path to insure the failure path, with a real chance of two prompts
+    // back to back: ours to read, then Instagram's. `canOpenURL` is
+    // metadata and prompts for nothing.
+    expect(swift).toMatch(
+      /private func snapshotPasteboardIfInstagramLooksAbsent\(\) -> \[\[String: Any\]\]\?/,
+    );
+    expect(swift).toMatch(/if UIApplication\.shared\.canOpenURL\(url\) \{ return nil \}/);
+    // `numberOfItems` does not prompt either, so an empty pasteboard is
+    // free even on the branch that does snapshot.
     expect(swift).toMatch(/guard UIPasteboard\.general\.numberOfItems > 0 else \{ return \[\] \}/);
+  });
+
+  it("never lets canOpenURL decide the RESULT", () => {
+    // The property that must survive the snapshot gate: a dropped plist
+    // entry makes `canOpenURL` answer false on a phone that has Instagram.
+    // If that decided the outcome, dropping the entry would break the
+    // share. It must only ever cost one wasted snapshot.
+    const opener = swift.slice(swift.indexOf("private func openReelsComposer()"));
+    expect(opener).not.toContain("canOpenURL");
   });
 
   it("cannot leave the promise unsettled if `open` never calls back", () => {
@@ -420,6 +462,23 @@ describe("the iOS pasteboard contract", () => {
     // And resuming a CheckedContinuation twice is a hard crash, so the
     // race has to be one-shot.
     expect(swift).toMatch(/if latch\.claim\(\)/);
+  });
+
+  it("does not report its own timeout as 'Instagram is not installed'", () => {
+    // The three-way outcome exists for exactly this. A slow or suspended
+    // transition on a phone that HAS Instagram must not be told it does
+    // not, which is the mis-report class this whole module is about, and
+    // which the first version of the timeout fix reintroduced.
+    expect(swift).toMatch(/private enum ReelsOpenOutcome \{\s*\n\s*case opened\s*\n\s*case refused\s*\n\s*case timedOut/);
+    // Asserted against the THROW, not the branch text: the comment above
+    // it has to say which code it is deliberately not using.
+    const timedOut = swift.slice(swift.indexOf("case .timedOut:"));
+    const thrown = timedOut.slice(timedOut.indexOf("throw ReelsFailure"));
+    expect(thrown.slice(0, thrown.indexOf(")"))).toMatch(/ReelsErrorCode\.handoffFailed/);
+    expect(thrown.slice(0, thrown.indexOf(")"))).not.toMatch(/instagramUnavailable/);
+    // And the refusal branch keeps the availability answer.
+    const refused = swift.slice(swift.indexOf("case .refused:"), swift.indexOf("case .timedOut:"));
+    expect(refused).toMatch(/ReelsErrorCode\.instagramUnavailable/);
   });
 });
 

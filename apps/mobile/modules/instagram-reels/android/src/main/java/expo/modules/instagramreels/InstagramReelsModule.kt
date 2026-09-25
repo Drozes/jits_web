@@ -81,15 +81,33 @@ class InstagramReelsModule : Module() {
       } catch (failure: ReelsFailure) {
         promise.reject(failure.errorCode, failure.message, null)
       } catch (e: ActivityNotFoundException) {
-        // Instagram is not installed, or is too old to declare the Reels
-        // action, or the <queries> declaration is missing so it is invisible.
+        // FOUR DIFFERENT CAUSES REACH THIS ONE CODE, and a device tester
+        // cannot tell them apart from the code alone: Instagram is absent,
+        // Instagram is too old to declare the Reels action, the <queries>
+        // declaration is missing so the package is invisible, or the intent
+        // simply did not MATCH Instagram's filter. The last one is live:
+        // MEDIA_MIME is Meta's combined "image/* video/*" string and
+        // `IntentFilter.findMimeType` splits on the first '/', so the
+        // combined form and a bare "video/*" are not interchangeable.
+        // Flipping it is a one-line experiment, and the detail below is
+        // what lets someone decide to run it rather than guessing.
         promise.reject(
           ReelsErrorCode.INSTAGRAM_UNAVAILABLE,
-          "No activity handles $REELS_ACTION in $INSTAGRAM_PACKAGE.",
+          "${e.javaClass.name}: no activity handles $REELS_ACTION in $INSTAGRAM_PACKAGE " +
+            "with type '$MEDIA_MIME'. Instagram absent, too old, invisible to <queries>, " +
+            "or its filter did not match that type. Original: ${e.message}",
           e,
         )
       } catch (e: Exception) {
-        promise.reject(ReelsErrorCode.HANDOFF_FAILED, e.message ?: "The handoff failed.", e)
+        // The exception class is carried too: this branch is a catch-all
+        // and "the handoff failed" on its own tells a device tester
+        // nothing about whether it was the FileProvider, the grant, the
+        // activity or the context.
+        promise.reject(
+          ReelsErrorCode.HANDOFF_FAILED,
+          "${e.javaClass.name}: ${e.message ?: "no message"}",
+          e,
+        )
       }
     }
   }
@@ -257,7 +275,19 @@ class InstagramReelsModule : Module() {
     internal const val APPLICATION_ID_EXTRA = "com.instagram.platform.extra.APPLICATION_ID"
     /** Meta's "Example with Sticker" extra, on the same Android page. */
     internal const val STICKER_ASSET_EXTRA = "interactive_asset_uri"
-    /** Exactly the string in Meta's single-media sample. Not narrowed. */
+    /**
+     * Exactly the string in Meta's single-media sample, and deliberately
+     * not narrowed to `"video/*"`.
+     *
+     * The two are NOT interchangeable: `IntentFilter.findMimeType` takes
+     * `type.substring(0, type.indexOf('/'))`, so this string tests as
+     * `"image"` and a bare `"video/*"` tests as `"video"`. What makes
+     * verbatim positively right rather than merely deferential is that Meta
+     * publishes BOTH strings against this same `ADD_TO_REEL` action on the
+     * same page: the combined form in the single-media sample and
+     * `"video/*"` in the sticker example. For both of Meta's own samples to
+     * work, Instagram's filter has to accept both.
+     */
     internal const val MEDIA_MIME = "image/* video/*"
     /** Must match `android:authorities` in this module's AndroidManifest. */
     internal const val FILE_PROVIDER_SUFFIX = ".ReelsFileProvider"

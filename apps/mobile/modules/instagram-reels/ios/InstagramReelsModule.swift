@@ -27,17 +27,21 @@ import UIKit
 
  WHAT THIS COSTS THE USER, AND WHAT IT NO LONGER COSTS THEM. `setItems`
  REPLACES the general pasteboard, and there is no way to hand the composer a
- video without doing that. So the previous contents are snapshotted first
- and PUT BACK if the composer does not open: a user without Instagram used
- to silently lose whatever they had copied, in exchange for nothing. While
- the handoff is live the items carry a five-minute expiry and `localOnly`.
+ video without doing that. So when Instagram looks absent the previous
+ contents are snapshotted first and PUT BACK if iOS then refuses to open the
+ URL: a user without Instagram used to silently lose whatever they had
+ copied, in exchange for nothing. While the handoff is live the items carry
+ a five-minute expiry and `localOnly`.
 
  iOS 16 PASTEBOARD PROMPT. Since iOS 16 the system may ask the user to allow
  one app to read pasteboard data written by another, and this handoff works
  BY pasteboard. Nothing here can suppress that, and nothing here should
  assume a silent transition. Spotify, Strava and Peloton all ship with this.
- Note the snapshot below is ITSELF such a read, which is why it is taken
- only when there is something to preserve; see `snapshotPasteboard`.
+ The snapshot is ITSELF such a read, which is why it is gated on Instagram
+ looking absent rather than taken every time; see
+ `snapshotPasteboardIfInstagramLooksAbsent`. And a TIMEOUT restores nothing
+ at all, because a merely delayed handoff must not have its payload pulled
+ out from under it; see `openReelsComposer`.
  */
 public final class InstagramReelsModule: Module {
   public func definition() -> ModuleDefinition {
@@ -197,7 +201,7 @@ private func handOffToReels(_ options: ReelsShareOptions) async throws -> ReelsS
     stickerApplied = true
   }
 
-  let previousItems = await snapshotPasteboard()
+  let previousItems = await snapshotPasteboardIfInstagramLooksAbsent()
 
   await MainActor.run {
     UIPasteboard.general.setItems(
@@ -215,36 +219,78 @@ private func handOffToReels(_ options: ReelsShareOptions) async throws -> ReelsS
     )
   }
 
-  let opened = await openReelsComposer()
-  guard opened else {
-    // Put the user's clipboard back. Clearing it outright, which is what
-    // this used to do, makes someone without Instagram pay for our failed
-    // handoff with whatever they had copied.
-    await MainActor.run { UIPasteboard.general.items = previousItems }
+  switch await openReelsComposer() {
+  case .opened:
+    return ReelsShareOutcome(stickerApplied: stickerApplied, byteCount: byteCount)
+
+  case .refused:
+    // iOS told us it did not open the URL, so nothing is going to read the
+    // pasteboard and it is safe to undo the write.
+    //
+    // `previousItems` is nil when no snapshot was taken, which is the case
+    // where `canOpenURL` said Instagram was there and `open` then refused
+    // anyway. The user's clipboard was overwritten by `setItems` and cannot
+    // be recovered either way, so the only remaining question is whether
+    // the OTHER ATHLETE'S VIDEO lingers for the five-minute expiry. It
+    // should not, so clear.
+    await MainActor.run { UIPasteboard.general.items = previousItems ?? [] }
     throw ReelsFailure(
       ReelsErrorCode.instagramUnavailable,
-      "iOS did not open \(reelsShareURLString) within \(Int(openTimeoutSeconds))s."
+      "iOS refused to open \(reelsShareURLString)."
+    )
+
+  case .timedOut:
+    // DELIBERATELY TOUCH NOTHING. A timeout means we do not know what
+    // happened, and the likeliest cause is a completion handler that was
+    // merely DELAYED (an app suspended mid-transition) rather than dropped.
+    // In that case iOS has already switched to Instagram and restoring the
+    // pasteboard here would yank the payload out from under a handoff that
+    // is about to succeed, opening the composer empty with no error
+    // anywhere: this module's cardinal failure mode. The five-minute
+    // expiry exists so a late read still works, and it is also what cleans
+    // up if the handoff really did die.
+    //
+    // Reported as `handoffFailed`, NOT `instagramUnavailable`. Telling a
+    // user with Instagram installed that it is not installed, because our
+    // own timer fired, is the same mis-report this module exists to
+    // prevent.
+    throw ReelsFailure(
+      ReelsErrorCode.handoffFailed,
+      "No callback from opening \(reelsShareURLString) within \(Int(openTimeoutSeconds))s."
     )
   }
-
-  return ReelsShareOutcome(stickerApplied: stickerApplied, byteCount: byteCount)
 }
 
 /**
- The pasteboard as it was, so it can be restored if the handoff fails.
+ The pasteboard as it was, so it can be restored if the handoff fails, or
+ `nil` when no snapshot was taken and the pasteboard must not be touched.
 
- `numberOfItems` is read first and does NOT trigger the iOS 16 cross-app
- paste prompt; reading `items` DOES. So an empty pasteboard, the common
- case, costs the user nothing, and the prompt is only risked when there is
- genuinely something to preserve.
+ TAKEN ONLY WHEN INSTAGRAM LOOKS ABSENT, and that gate is the point.
+ Reading `items` IS the cross-app read iOS 16 can prompt for. Snapshotting
+ on every share would make the user risk a paste prompt on the SUCCESS path
+ in order to insure the failure path, at the worst moment in a funnel
+ already known to be fragile, with a real chance of two prompts back to
+ back: ours to read, then Instagram's to read what we wrote.
 
- This is a real trade, not a free win: on a non-empty pasteboard the user
- may now meet a paste prompt they would not otherwise have seen, in exchange
- for not losing their clipboard when Instagram turns out to be absent. Which
- of those two a user actually prefers is a device-test question.
+ `canOpenURL` is metadata. It triggers no prompt, and it needs only the
+ `LSApplicationQueriesSchemes` entry `plugins/with-instagram-reels.js`
+ already ships. So: Instagram present, no snapshot and no prompt; Instagram
+ absent, snapshot, and that user was going to lose their clipboard anyway.
+
+ NOTE WHAT THIS DOES NOT DO. It does not decide the RESULT. `open`'s
+ completion handler remains the sole authority for that, exactly so a
+ dropped plist entry cannot break the share (see `openReelsComposer`). A
+ dropped entry now costs one unnecessary snapshot and nothing else.
+
+ `numberOfItems` is checked before reading `items` because it does not
+ prompt either, so an empty pasteboard is free even on this branch. It
+ returns `[]`, meaning "snapshotted, and there was nothing", which is
+ different from `nil`.
  */
 @MainActor
-private func snapshotPasteboard() -> [[String: Any]] {
+private func snapshotPasteboardIfInstagramLooksAbsent() -> [[String: Any]]? {
+  guard let url = URL(string: reelsShareURLString) else { return nil }
+  if UIApplication.shared.canOpenURL(url) { return nil }
   guard UIPasteboard.general.numberOfItems > 0 else { return [] }
   return UIPasteboard.general.items
 }
@@ -328,16 +374,35 @@ private final class ResumeOnce: @unchecked Sendable {
 }
 
 /**
- Open the composer and report whether iOS actually did it.
+ What happened when we asked iOS to open the composer.
 
- `canOpenURL` is NOT consulted first, on purpose. It answers only for
- schemes listed in `LSApplicationQueriesSchemes`, so if that declaration is
- ever dropped from `plugins/with-instagram-reels.js` this would start
- reporting "Instagram not installed" on devices where it plainly is, and the
- share would break for a reason that has nothing to do with Instagram.
- `open` needs no such declaration and its completion handler answers the
- same question directly. The plist entry still matters, for slice
- jits-s6mi.3's pre-flight availability check.
+ THREE VALUES AND NOT A BOOL, because two of them mean opposite things to a
+ user. `refused` is iOS saying it did not open the URL, which on this scheme
+ means Instagram is not there. `timedOut` is our own timer firing, which
+ says nothing at all about Instagram and happens on a phone that has it.
+ Collapsing them, which an earlier revision did, told a user with Instagram
+ installed that it was not installed: the same mis-report this module exists
+ to prevent, reintroduced by the fix for the hang.
+ */
+private enum ReelsOpenOutcome {
+  case opened
+  case refused
+  case timedOut
+}
+
+/**
+ Open the composer and report which of the three things happened.
+
+ `canOpenURL` is NOT consulted to decide the RESULT, on purpose. It answers
+ only for schemes listed in `LSApplicationQueriesSchemes`, so if that
+ declaration is ever dropped from `plugins/with-instagram-reels.js` this
+ would start reporting "Instagram not installed" on devices where it plainly
+ is, and the share would break for a reason that has nothing to do with
+ Instagram. `open` needs no such declaration and its completion handler
+ answers the same question directly. (`canOpenURL` IS used, upstream, to
+ decide whether a pasteboard snapshot is worth a possible paste prompt; a
+ wrong answer there costs one wasted snapshot and cannot change the
+ outcome.)
 
  The timeout exists because that completion handler is not guaranteed to
  arrive; the reported case is the app being suspended mid-transition. With
@@ -346,18 +411,18 @@ private final class ResumeOnce: @unchecked Sendable {
  caller's spinner never resolves and the user is told nothing at all.
  */
 @MainActor
-private func openReelsComposer() async -> Bool {
-  guard let url = URL(string: reelsShareURLString) else { return false }
+private func openReelsComposer() async -> ReelsOpenOutcome {
+  guard let url = URL(string: reelsShareURLString) else { return .refused }
   let latch = ResumeOnce()
-  return await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
+  return await withCheckedContinuation { (continuation: CheckedContinuation<ReelsOpenOutcome, Never>) in
     DispatchQueue.main.asyncAfter(deadline: .now() + openTimeoutSeconds) {
       if latch.claim() {
-        continuation.resume(returning: false)
+        continuation.resume(returning: .timedOut)
       }
     }
     UIApplication.shared.open(url, options: [:]) { success in
       if latch.claim() {
-        continuation.resume(returning: success)
+        continuation.resume(returning: success ? .opened : .refused)
       }
     }
   }
