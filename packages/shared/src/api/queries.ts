@@ -571,6 +571,77 @@ export async function getChallengeStatus(
   };
 }
 
+/** A challenge I accepted whose match is still waiting for me. */
+export interface StartedChallengeToJoin {
+  challengeId: string;
+  challengerId: string;
+  matchId: string;
+}
+
+/**
+ * Challenges I accepted (I am the opponent) that turned `started` at or after
+ * `sinceIso` and whose match the CHALLENGER started and nobody has begun yet,
+ * newest first.
+ *
+ * For an accepter whose app died or lost the network right after accepting:
+ * the challenger's fallback started the match alone, and this is how the
+ * accepter finds its way back in. Deliberately narrow, so it never pulls
+ * anyone back into a match they left:
+ *  - `opponent_id = me`: a row reaches `started` only through `accepted`,
+ *    which only the opponent can set, so these are challenges I accepted;
+ *  - match `status = 'pending'`: a match already under way (or over) is not
+ *    one I was stranded outside of;
+ *  - `initiated_by_athlete_id = challenger`: `start_match_from_challenge` sets
+ *    it to the caller (jr_be 20260219000000), so a match I started myself is
+ *    one I already entered, and only the challenger's fallback leaves the
+ *    challenger as initiator.
+ * Two reads rather than an embed, and a match I cannot see (RLS: participants
+ * only) is simply not returned.
+ */
+export async function getStartedChallengesToJoin(
+  supabase: Client,
+  athleteId: string,
+  sinceIso: string,
+): Promise<Result<StartedChallengeToJoin[]>> {
+  const { data: challenges, error } = await supabase
+    .from("challenges")
+    .select("id, challenger_id")
+    .eq("opponent_id", athleteId)
+    .eq("status", "started")
+    .gte("updated_at", sinceIso)
+    .order("updated_at", { ascending: false })
+    .limit(5);
+
+  if (error) return { ok: false, error: mapPostgrestError(error) };
+  if (!challenges || challenges.length === 0) return { ok: true, data: [] };
+
+  const { data: matches, error: matchError } = await supabase
+    .from("matches")
+    .select("id, challenge_id, initiated_by_athlete_id")
+    .in(
+      "challenge_id",
+      challenges.map((c) => c.id),
+    )
+    .eq("status", "pending");
+
+  if (matchError) return { ok: false, error: mapPostgrestError(matchError) };
+
+  const matchFor = new Map<string, { id: string; initiatedBy: string | null }>();
+  for (const m of matches ?? []) {
+    if (m.challenge_id) {
+      matchFor.set(m.challenge_id, { id: m.id, initiatedBy: m.initiated_by_athlete_id });
+    }
+  }
+  const data: StartedChallengeToJoin[] = [];
+  for (const c of challenges) {
+    const match = matchFor.get(c.id);
+    if (match && match.initiatedBy === c.challenger_id) {
+      data.push({ challengeId: c.id, challengerId: c.challenger_id, matchId: match.id });
+    }
+  }
+  return { ok: true, data };
+}
+
 /** Get IDs of all athletes who have a pending challenge with this athlete (either direction) */
 export async function getPendingChallengeOpponentIds(
   supabase: Client,
