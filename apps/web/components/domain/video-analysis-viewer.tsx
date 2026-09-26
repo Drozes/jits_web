@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { useVideoProgress, type VideoProgress } from "@jits/shared/hooks/use-video-progress";
 import { cn } from "@/lib/utils";
+import { getMatchVideoSignedUrlResult } from "@jits/shared/api/queries";
 
 // ---------------------------------------------------------------------------
 // Types (mirror BE `get_video_analysis` return shape — see jr_be
@@ -69,8 +70,8 @@ interface VideoAnalysisViewerProps {
   videoId: string;
   /**
    * Optional. When provided, used as the `<video>` element's src. If
-   * omitted, the viewer fetches `match_videos.storage_path` and builds
-   * a signed URL.
+   * omitted, the viewer signs the playback path via the shared
+   * `getMatchVideoSignedUrlResult` (normalized_path ?? storage_path).
    */
   videoSrc?: string;
   /** Optional title rendered above the player. */
@@ -135,17 +136,10 @@ export function VideoAnalysisViewer({ videoId, videoSrc, title }: VideoAnalysisV
     }
     let cancelled = false;
     (async () => {
-      const { data } = await supabase
-        .from("match_videos")
-        .select("storage_path")
-        .eq("id", videoId)
-        .maybeSingle();
-      if (cancelled || !data?.storage_path) return;
-      const { data: signed } = await supabase
-        .storage
-        .from("match-videos")
-        .createSignedUrl(data.storage_path, 60 * 60); // 1h
-      if (!cancelled && signed?.signedUrl) setResolvedVideoSrc(signed.signedUrl);
+      // Shared wrapper signs normalized_path ?? storage_path (jits-8t0m): the
+      // normalized MP4 is the only playable copy of a WebM upload on Safari.
+      const res = await getMatchVideoSignedUrlResult(supabase, videoId, 60 * 60); // 1h
+      if (!cancelled && res.ok && res.data) setResolvedVideoSrc(res.data);
     })();
     return () => { cancelled = true; };
   }, [supabase, videoId, videoSrc]);

@@ -83,7 +83,7 @@ export function RecentActivitySection({ myMatches, allActivity }: { myMatches: M
         hasContent ? (
           <div className="flex flex-col gap-2">
             {myMatches.map((m) => (
-              <MatchCard key={m.id} type="match" opponentName={m.opponentName} result={m.result} eloDelta={m.eloDelta} date={m.date} />
+              <MatchCard key={m.id} type="match" opponentName={m.opponentName} result={m.result} eloDelta={m.eloDelta} date={m.date} href={`/matches/${m.id}`} />
             ))}
           </div>
         ) : (

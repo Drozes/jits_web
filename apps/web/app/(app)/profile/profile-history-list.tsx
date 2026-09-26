@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { OutcomeTag } from "@/components/ui/elo-system";
 
 interface HistoryRow {
@@ -73,8 +74,11 @@ function Row({ row }: { row: HistoryRow }) {
         : "0";
 
   return (
-    <div
-      className="grid grid-cols-[auto_1fr_auto] items-center"
+    <Link
+      href={`/matches/${row.matchId}`}
+      prefetch={false}
+      aria-label={`Open match vs ${row.opponentName}`}
+      className="grid grid-cols-[auto_1fr_auto] items-center transition-colors hover:!bg-[var(--bg-elevated-hover)]"
       style={{
         background: "var(--bg-elevated)",
         padding: "var(--space-3) var(--space-4)",
@@ -116,6 +120,6 @@ function Row({ row }: { row: HistoryRow }) {
       >
         {deltaText}
       </span>
-    </div>
+    </Link>
   );
 }
