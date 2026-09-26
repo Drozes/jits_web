@@ -1,6 +1,7 @@
 import * as React from "react";
 import { ActivityIndicator, RefreshControl, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
 import { useRequireAthlete } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { BrandHeader } from "@/components/layout/brand-header";
@@ -19,13 +20,15 @@ import {
   SkeletonParticipantRow,
 } from "@/components/ui/skeleton";
 import { useCachedResource } from "@/lib/cache/use-cached-resource";
+import { usePullToRefresh, useRefetchOnRefocus } from "@/lib/cache/use-refocus-refetch";
+import { matchDetailHref } from "@/lib/match-detail/href";
 
 interface DashboardData {
   summary: DashboardSummary;
 }
 
 function useDashboardData(athleteId: string | undefined) {
-  const { data, isLoading, isStale, error, refresh } = useCachedResource<DashboardData>(
+  const { data, isLoading, isValidating, error, refresh } = useCachedResource<DashboardData>(
     `dashboard:${athleteId}`,
     async (_signal) => ({ summary: await getDashboardSummary(supabase) }),
     [athleteId],
@@ -35,7 +38,7 @@ function useDashboardData(athleteId: string | undefined) {
     if (error) toast.error("Could not load dashboard");
   }, [error]);
 
-  return { data, isLoading, isStale, refresh };
+  return { data, isLoading, isValidating, refresh };
 }
 
 /** Cold-start placeholder mirroring RecentActivity + StatOverview. */
@@ -56,12 +59,12 @@ export default function DashboardScreen() {
   const { athlete } = useRequireAthlete();
   const insets = useSafeAreaInsets();
   const tokens = useThemedTokens();
-  const { data, isLoading, isStale, refresh } = useDashboardData(athlete?.id);
-
-  const onRefresh = React.useCallback(() => {
-    // SWR keeps stale data on screen while revalidating; no artificial delay.
-    refresh();
-  }, [refresh]);
+  const router = useRouter();
+  const { data, isLoading, isValidating, refresh } = useDashboardData(athlete?.id);
+  // SWR keeps stale data on screen while revalidating; the spinner shows only
+  // for a pull, never for the silent refetch when the tab regains focus.
+  const { refreshing, onRefresh } = usePullToRefresh(refresh, isValidating);
+  useRefetchOnRefocus(refresh);
 
   if (!athlete) {
     return (
@@ -77,6 +80,8 @@ export default function DashboardScreen() {
     id: m.match_id,
     opponentName: m.opponent_name,
     result: m.outcome,
+    matchType:
+      m.match_type === "ranked" ? ("ranked" as const) : m.match_type === "casual" ? ("casual" as const) : undefined,
     eloDelta: m.elo_delta,
     date: m.completed_at,
   }));
@@ -103,7 +108,7 @@ export default function DashboardScreen() {
         }}
         refreshControl={
           <RefreshControl
-            refreshing={isStale}
+            refreshing={refreshing}
             onRefresh={onRefresh}
             tintColor={tokens.accentCta}
           />
@@ -134,7 +139,7 @@ export default function DashboardScreen() {
             <RecentActivitySection
               myMatches={recentMatches}
               allActivity={recentActivity}
-              onPressMatch={() => toast.info("Match details coming soon")}
+              onPressMatch={(id) => router.push(matchDetailHref(id))}
             />
 
             <StatOverview

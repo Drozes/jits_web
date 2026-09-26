@@ -4,7 +4,7 @@
  * body as a secondary button that opens the same share sheet.
  */
 import * as React from "react";
-import { act, render } from "@testing-library/react-native";
+import { act, fireEvent, render } from "@testing-library/react-native";
 
 type HostNode = ReturnType<typeof render>["UNSAFE_root"];
 
@@ -26,8 +26,19 @@ jest.mock("react-native-safe-area-context", () => ({
 jest.mock("@/lib/theme/use-theme", () => ({
   useThemedTokens: () => ({ accentCta: "#E63946", textSecondary: "#9CA3AF" }),
 }));
+const mockPush = jest.fn();
+// useFocusEffect runs its callback on mount (the first focus) and records it
+// so a test can simulate the tab regaining focus.
+const mockFocusCallbacks: (() => void)[] = [];
 jest.mock("expo-router", () => ({
-  useRouter: () => ({ push: jest.fn(), navigate: jest.fn(), back: jest.fn(), canGoBack: () => true }),
+  useRouter: () => ({ push: mockPush, navigate: jest.fn(), back: jest.fn(), canGoBack: () => true }),
+  useFocusEffect: (cb: () => void) => {
+    const R = require("react");
+    R.useEffect(() => {
+      mockFocusCallbacks.push(cb);
+      cb();
+    }, [cb]);
+  },
 }));
 jest.mock("@/lib/auth/hooks", () => ({
   useRequireAthlete: () => ({
@@ -40,15 +51,27 @@ jest.mock("@/lib/auth/hooks", () => ({
     },
   }),
 }));
+const mockProfileRefetch = jest.fn();
+const mockHistory: Record<string, unknown>[] = [];
 jest.mock("@/lib/profile/use-profile-data", () => ({
   useProfileData: () => ({
     stats: { wins: 3, losses: 1, totalMatches: 4, winStreak: 1, bestWinStreak: 2, winRate: 75 },
     gymName: null,
     eloThisMonth: 0,
-    history: [],
+    history: mockHistory,
     isLoading: false,
     refreshing: false,
-    onRefresh: jest.fn(),
+    onRefresh: mockProfileRefetch,
+  }),
+}));
+const mockVideosRefetch = jest.fn();
+jest.mock("@/lib/profile/use-my-match-videos", () => ({
+  useMyMatchVideos: () => ({
+    items: [],
+    isLoading: false,
+    isValidating: false,
+    error: null,
+    refetch: mockVideosRefetch,
   }),
 }));
 function mockStub(testID: string) {
@@ -83,6 +106,48 @@ import {
 beforeEach(() => {
   jest.clearAllMocks();
   __resetArenaStoreForTests();
+  mockFocusCallbacks.length = 0;
+  mockHistory.length = 0;
+});
+
+describe("Profile recent matches and refresh", () => {
+  it("opens the match detail screen from a recent match row", () => {
+    mockHistory.push({
+      match_id: "m-7",
+      opponent_display_name: "Demo Red",
+      completed_at: "2026-09-24T12:00:00.000Z",
+      match_type: "ranked",
+      elo_delta: -8,
+    });
+    const { getByLabelText } = render(<ProfileScreen />);
+
+    fireEvent.press(getByLabelText("Open match vs Demo Red"));
+    expect(mockPush).toHaveBeenCalledWith("/(app)/match-detail/m-7");
+  });
+
+  it("refetches profile and videos when the tab regains focus, not on the first focus", () => {
+    render(<ProfileScreen />);
+    expect(mockProfileRefetch).not.toHaveBeenCalled();
+    expect(mockVideosRefetch).not.toHaveBeenCalled();
+
+    act(() => {
+      mockFocusCallbacks.forEach((cb) => cb());
+    });
+    expect(mockProfileRefetch).toHaveBeenCalledTimes(1);
+    expect(mockVideosRefetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("pull-to-refresh reloads the videos list too", () => {
+    const { UNSAFE_root } = render(<ProfileScreen />);
+    const scroll = UNSAFE_root.find(
+      (n: HostNode) => typeof n.props.refreshControl === "object" && n.props.refreshControl != null,
+    );
+    act(() => {
+      scroll.props.refreshControl.props.onRefresh();
+    });
+    expect(mockProfileRefetch).toHaveBeenCalledTimes(1);
+    expect(mockVideosRefetch).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("Profile tab", () => {

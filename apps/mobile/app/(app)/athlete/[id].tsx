@@ -7,8 +7,8 @@ import {
   Text,
   View,
 } from "react-native";
-import { useLocalSearchParams } from "expo-router";
-import { ArrowUpRight, BarChart3, Swords } from "lucide-react-native";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { ArrowUpRight, BarChart3, ChevronRight, Swords } from "lucide-react-native";
 import { CompareStatsModal } from "@/components/compare-stats-modal";
 import { CompetitorHeader } from "@/components/athlete/competitor-header";
 import { HeadToHeadCard } from "@/components/athlete/head-to-head-card";
@@ -21,6 +21,7 @@ import { toast } from "@/components/ui";
 import { buildShareUrl, buildShareText, formatRelativeDate } from "@jits/shared/utils";
 import { supabase } from "@/lib/supabase/client";
 import { getMatchHistory } from "@jits/shared/api/queries";
+import { matchDetailHref } from "@/lib/match-detail/href";
 import type { MatchHistoryRow } from "@jits/shared/types/composites";
 
 function ShareButton({
@@ -59,6 +60,7 @@ function ShareButton({
 export default function AthleteProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const tokens = useThemedTokens();
+  const router = useRouter();
   const { athlete, isLoading: authLoading } = useRequireAthlete();
   const { data, isLoading, notFound } = useAthleteProfile(id, athlete?.id);
   const [compareOpen, setCompareOpen] = React.useState(false);
@@ -159,18 +161,28 @@ export default function AthleteProfileScreen() {
           </MetaTag>
           {recent.length > 0 ? (
             <View className="gap-[1px]">
-              {recent.map((m) => (
-                <ParticipantRow
-                  key={m.match_id}
-                  name={`vs ${m.opponent_display_name ?? data.competitor.display_name}`}
-                  subtitle={formatRelativeDate(m.completed_at)}
-                  action={
-                    m.match_type === "ranked" && m.elo_delta != null ? (
-                      <DeltaNumber value={m.elo_delta} size="m" showSign />
-                    ) : undefined
-                  }
-                />
-              ))}
+              {recent.map((m) => {
+                const name = m.opponent_display_name ?? data.competitor.display_name;
+                // These are the VIEWER's own matches (their history filtered to
+                // this opponent), so the detail screen will let them in.
+                return (
+                  <ParticipantRow
+                    key={m.match_id}
+                    name={`vs ${name}`}
+                    subtitle={formatRelativeDate(m.completed_at)}
+                    onPress={() => router.push(matchDetailHref(m.match_id))}
+                    accessibilityLabel={`Open match vs ${name}`}
+                    action={
+                      <View className="flex-row items-center gap-2">
+                        {m.match_type === "ranked" && m.elo_delta != null ? (
+                          <DeltaNumber value={m.elo_delta} size="m" showSign />
+                        ) : null}
+                        <ChevronRight size={16} color={tokens.textSecondary} />
+                      </View>
+                    }
+                  />
+                );
+              })}
             </View>
           ) : null}
         </View>

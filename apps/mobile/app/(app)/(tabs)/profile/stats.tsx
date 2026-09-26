@@ -7,6 +7,7 @@ import {
   View,
 } from "react-native";
 import { Swords } from "lucide-react-native";
+import { useRouter } from "expo-router";
 import { useRequireAthlete } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { supabase } from "@/lib/supabase/client";
@@ -25,6 +26,7 @@ import { MilestoneProgress } from "@/components/profile/milestone-progress";
 import { AppHeader } from "@/components/layout/app-header";
 import { MetaTag, Chip } from "@/components/ui/elo-system";
 import { toast } from "@/components/ui/toast";
+import { matchDetailHref } from "@/lib/match-detail/href";
 import type { MatchOutcome } from "@jits/shared/constants";
 
 type Filter = "all" | "ranked";
@@ -44,6 +46,7 @@ interface StatsData {
 export default function ProfileStatsScreen() {
   const { athlete } = useRequireAthlete();
   const tokens = useThemedTokens();
+  const router = useRouter();
   const [data, setData] = React.useState<StatsData | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const [refreshTick, setRefreshTick] = React.useState(0);
@@ -137,6 +140,7 @@ export default function ProfileStatsScreen() {
             matchType={item.match_type as "ranked" | "casual"}
             eloDelta={item.match_type === "ranked" ? item.elo_delta : undefined}
             date={item.completed_at}
+            onPress={() => router.push(matchDetailHref(item.match_id))}
           />
         )}
       />

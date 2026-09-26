@@ -4,7 +4,7 @@ import { useRouter } from "expo-router";
 import { Chip, MetaTag } from "@/components/ui/elo-system";
 import { MatchCard } from "../match-card";
 import { ActivityFeedItem, type ActivityItem } from "./activity-feed-item";
-import type { MatchOutcome } from "@jits/shared/constants";
+import type { MatchOutcome, MatchType } from "@jits/shared/constants";
 import { ARENA_HREF } from "@/lib/arena/constants";
 
 export type { ActivityItem } from "./activity-feed-item";
@@ -14,6 +14,7 @@ interface MyMatch {
   opponentName: string;
   opponentPhotoUrl?: string | null;
   result: MatchOutcome;
+  matchType?: MatchType;
   eloDelta: number;
   date: string;
 }
@@ -116,6 +117,7 @@ export function RecentActivitySection({
                 opponentName={m.opponentName}
                 opponentPhotoUrl={m.opponentPhotoUrl}
                 result={m.result}
+                matchType={m.matchType}
                 eloDelta={m.eloDelta}
                 date={m.date}
                 onPress={onPressMatch ? () => onPressMatch(m.id) : undefined}

@@ -1,10 +1,13 @@
 import * as React from "react";
 import { ActivityIndicator, Pressable, RefreshControl, Text, View } from "react-native";
 import { useRouter } from "expo-router";
-import { ArrowUpRight } from "lucide-react-native";
+import { ArrowUpRight, ChevronRight } from "lucide-react-native";
 import { useRequireAthlete } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { useProfileData } from "@/lib/profile/use-profile-data";
+import { useMyMatchVideos } from "@/lib/profile/use-my-match-videos";
+import { usePullToRefresh, useRefetchOnRefocus } from "@/lib/cache/use-refocus-refetch";
+import { matchDetailHref } from "@/lib/match-detail/href";
 import { ProfileHeader } from "@/components/profile/profile-header";
 import { ProfileQuickStats } from "@/components/profile/profile-quick-stats";
 import { AccountSection } from "@/components/profile/account-section";
@@ -98,8 +101,19 @@ export default function ProfileScreen() {
   const { athlete } = useRequireAthlete();
   const router = useRouter();
   const tokens = useThemedTokens();
-  const { stats, gymName, eloThisMonth, history, isLoading, refreshing, onRefresh } =
+  const { stats, gymName, eloThisMonth, history, isLoading, refreshing: profileBusy, onRefresh: refetchProfile } =
     useProfileData(athlete?.id, athlete?.primary_gym_id);
+  const videos = useMyMatchVideos(athlete?.id);
+  const refetchVideos = videos.refetch;
+
+  // Pull-to-refresh and returning to the tab both reload the profile AND the
+  // videos list, so a video uploaded from the match wizard shows up here.
+  const refetchAll = React.useCallback(() => {
+    refetchProfile();
+    refetchVideos();
+  }, [refetchProfile, refetchVideos]);
+  const { refreshing, onRefresh } = usePullToRefresh(refetchAll, profileBusy || videos.isValidating);
+  useRefetchOnRefocus(refetchAll);
 
   // Serve recent matches from the single cached history payload fetched by
   // useProfileData; no separate round-trip.
@@ -161,23 +175,31 @@ export default function ProfileScreen() {
                 </View>
               ) : (
                 <View className="gap-[1px]">
-                  {recent.map((m) => (
-                    <ParticipantRow
-                      key={m.match_id}
-                      name={`vs ${m.opponent_display_name ?? "Opponent"}`}
-                      subtitle={formatRelativeDate(m.completed_at)}
-                      action={
-                        m.match_type === "ranked" && m.elo_delta != null ? (
-                          <DeltaNumber value={m.elo_delta} size="m" showSign />
-                        ) : undefined
-                      }
-                    />
-                  ))}
+                  {recent.map((m) => {
+                    const name = m.opponent_display_name ?? "Opponent";
+                    return (
+                      <ParticipantRow
+                        key={m.match_id}
+                        name={`vs ${name}`}
+                        subtitle={formatRelativeDate(m.completed_at)}
+                        onPress={() => router.push(matchDetailHref(m.match_id))}
+                        accessibilityLabel={`Open match vs ${name}`}
+                        action={
+                          <View className="flex-row items-center gap-2">
+                            {m.match_type === "ranked" && m.elo_delta != null ? (
+                              <DeltaNumber value={m.elo_delta} size="m" showSign />
+                            ) : null}
+                            <ChevronRight size={16} color={tokens.textSecondary} />
+                          </View>
+                        }
+                      />
+                    );
+                  })}
                 </View>
               )}
             </View>
 
-            <PastMatchVideos athleteId={athlete.id} />
+            <PastMatchVideos videos={videos} />
 
             <View className="gap-2">
               <Pressable

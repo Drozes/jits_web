@@ -1,9 +1,11 @@
 import * as React from "react";
 import { Pressable, Text, View } from "react-native";
 import { Image } from "expo-image";
+import { ChevronRight } from "lucide-react-native";
 import { OutcomeTag } from "./ui/elo-system";
 import { cn } from "../lib/cn";
 import { athletePhotoSource } from "../lib/athlete-photo";
+import { useThemedTokens } from "../lib/theme/use-theme";
 import { formatRelativeDate, getInitials } from "@jits/shared/utils";
 import { MATCH_OUTCOME, type MatchOutcome, type MatchType } from "@jits/shared/constants";
 
@@ -18,6 +20,8 @@ interface MatchCardProps {
   eloDelta?: number;
   date: string;
   onPress?: () => void;
+  /** Defaults to "Open match vs <opponentName>" when `onPress` is set. */
+  accessibilityLabel?: string;
 }
 
 const outcomeMap: Record<MatchOutcome, "win" | "loss" | "draw"> = {
@@ -46,7 +50,8 @@ function ChallengePill({ children, accent }: { children: React.ReactNode; accent
   );
 }
 
-function CardInner({ type = "match", opponentName, opponentPhotoUrl, result, status, direction, matchType, eloDelta, date }: MatchCardProps) {
+function CardInner({ type = "match", opponentName, opponentPhotoUrl, result, status, direction, matchType, eloDelta, date, onPress }: MatchCardProps) {
+  const tokens = useThemedTokens();
   const photoSrc = athletePhotoSource(opponentPhotoUrl);
   const matchTypeLabel = matchType ? (matchType === "ranked" ? "Ranked" : "Casual") : null;
   const dateText = formatRelativeDate(date);
@@ -97,6 +102,8 @@ function CardInner({ type = "match", opponentName, opponentPhotoUrl, result, sta
         {type === "challenge" && !direction ? (
           <ChallengePill accent={status === "Accepted"}>{status ?? "Pending"}</ChallengePill>
         ) : null}
+
+        {onPress ? <ChevronRight size={16} color={tokens.textSecondary} /> : null}
       </View>
     </View>
   );
@@ -108,6 +115,7 @@ export function MatchCard(props: MatchCardProps) {
       <Pressable
         onPress={props.onPress}
         accessibilityRole="button"
+        accessibilityLabel={props.accessibilityLabel ?? `Open match vs ${props.opponentName}`}
         className="active:opacity-80"
       >
         <CardInner {...props} />
