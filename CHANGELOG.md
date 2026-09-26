@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Mobile: match exits and post-match refresh (jits-tlk3)
+
+JS-only, OTA-eligible for runtime 0.3.0.
+
+**Fixed**
+- Leaving a match (Back to Arena, Done, Rematch, the wizard error exit, a cancelled ready check) no longer stacks a second tab navigator under the app: every exit goes through `exitMatchTo` (new `apps/mobile/lib/match-flow/exit-to.ts`, `router.dismissTo`), which pops back to the existing tabs (and any athlete profile the match was entered from) instead of replacing the match with a new copy.
+- Because the tabs now stay mounted under a match, leaving one refreshes what it changed: the arena store counts match exits (`useMatchExitCount`), the Arena roster re-reads on it and computes ELO gaps against the current rating, the signed-in athlete is re-read with a soft refresh that never clears it on a failed read (`refreshAthleteSoft`), and Home and Profile refetch past their 30s refocus throttle. The Arena's rematch param is cleared when the tab loses focus so rematching the same opponent twice pins them again.
+
 ### Mobile: no live challenge prompt while offline (jits-sfry)
 
 **Fixed**
