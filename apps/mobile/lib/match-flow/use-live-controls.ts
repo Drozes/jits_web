@@ -73,6 +73,7 @@ export function useLiveControls({ matchId, timer, sync, endedRef, onEnded }: Use
         // opponent's broadcast was lost). Take the running state from the
         // DB rather than leaving this timer paused behind an error toast.
         const fresh = await getMatchDetails(supabase, matchId);
+        if (endedRef.current) return;
         if (fresh && fresh.status === "in_progress" && !fresh.paused_at) {
           timer.syncFromBroadcast({
             type: "resumed",
@@ -99,6 +100,7 @@ export function useLiveControls({ matchId, timer, sync, endedRef, onEnded }: Use
         // apply it through the tracked timer instead of toasting. No
         // broadcast: the opponent paused it and already knows.
         const fresh = await getMatchDetails(supabase, matchId);
+        if (endedRef.current) return;
         if (fresh && fresh.status === "in_progress" && fresh.paused_at) {
           timer.syncFromBroadcast({ type: "paused", pausedAt: fresh.paused_at });
           return;
