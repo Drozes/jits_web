@@ -12,8 +12,8 @@ export interface ActivityItem {
 /**
  * A single row in the dashboard's "Recent Activity, All" feed.
  * Styled with ELO tokens: surface-3 background (set by parent), mono caps
- * for the timestamp, body font for the sentence, positive accent on
- * submission text.
+ * for the timestamp, body font for the sentence, mono ink for the result
+ * (Gain Green is reserved for rating increases).
  */
 export function ActivityFeedItem({ item }: { item: ActivityItem }) {
   const isDraw = item.result === "draw";
@@ -26,7 +26,9 @@ export function ActivityFeedItem({ item }: { item: ActivityItem }) {
         {!isDraw && item.result ? (
           <Text>
             {" by "}
-            <Text className="font-mono-medium text-positive">{item.result}</Text>
+            <Text testID="activity-result" className="font-mono-medium text-ink">
+              {item.result}
+            </Text>
           </Text>
         ) : null}
       </Text>

@@ -203,7 +203,9 @@ describe("MatchDetailScreen", () => {
     expect(delta.props.className).toContain("text-positive");
     expect(utils.getByText("1200 → 1216")).toBeTruthy();
     expect(utils.getByText("RANKED")).toBeTruthy();
-    expect(utils.getByText("5:00")).toBeTruthy();
+    // The configured clock reads as a round length, not elapsed time.
+    expect(utils.getByTestId("match-round-length")).toHaveTextContent("5 MIN ROUND");
+    expect(utils.getByTestId("match-round-length").props.className).toContain("tabular-nums");
     expect(utils.getByText("Submission")).toBeTruthy();
     expect(utils.queryByTestId("match-disputed-badge")).toBeNull();
   });
@@ -282,6 +284,34 @@ describe("MatchDetailScreen", () => {
     expect(utils.getByText("Processing failed. The original recording may still play.")).toBeTruthy();
     fireEvent.press(utils.getByLabelText("Watch your recording"));
     expect(mockPush).toHaveBeenCalledWith("/(app)/video/v-mine");
+  });
+
+  it("plays from the poster area with the same action as Watch", async () => {
+    const utils = await renderLoaded(view({ videos: [video(), video(OPP_VIDEO)] }));
+    const play = utils.getByTestId("match-video-play-v-opp");
+    expect(play.props.accessibilityLabel).toBe("Play Demo Red's recording");
+    expect(utils.getByLabelText("Play your recording")).toBeTruthy();
+    // Not styled as a second primary: the poster area never carries the CTA fill.
+    expect(play.props.className ?? "").not.toContain("bg-cta");
+    fireEvent.press(play);
+    expect(mockPush).toHaveBeenCalledWith("/(app)/video/v-opp");
+    // The harness testID stays on Watch only.
+    expect(utils.getAllByTestId("match-video-watch-v-opp")).toHaveLength(1);
+    expect(utils.getByTestId("match-video-watch-v-opp").props.accessibilityLabel).toBe(
+      "Watch Demo Red's recording",
+    );
+  });
+
+  it("keeps the poster area inert while the video is processing", async () => {
+    const utils = await renderLoaded(
+      view({ videos: [video({ status: "uploading", playability: "processing" })] }),
+    );
+    const play = utils.getByTestId("match-video-play-v-mine");
+    expect(play.props.accessible).toBe(false);
+    fireEvent.press(play);
+    expect(mockPush).not.toHaveBeenCalled();
+    // "Processing" is announced once, by the Watch button.
+    expect(utils.getAllByLabelText("Processing")).toHaveLength(1);
   });
 
   it("shows the poster when there is one, the placeholder otherwise", async () => {
