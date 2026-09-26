@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+### Mobile: UX polish batch A (match summary and pre-match)
+
+JS-only, OTA-eligible for runtime 0.3.0.
+
+**Changed**
+- Match summary: the after rating ticks up or down over 480ms (ease-out, once) with a light haptic on landing; reduce motion shows the final value immediately, VoiceOver reads the final rating, and a mid-tick change jumps to the new value (jits-0b37). `apps/mobile/components/ui/elo-system/elo-tile.tsx`
+- Match summary: new secondary "Rematch <name>" button returns to the Arena with `?rematch=<opponent id>` (hidden for disputed matches); Back to Arena stays the one primary CTA, Watch/Share/Rematch are outline buttons and Done is a quiet text link (jits-00fr, summary half).
+- Weight step: ranked matches show an "At stake" Win / Draw / Loss row from `calculate_elo_stakes` (hidden while loading or on failure); the weight-class gap note comes only from the backend and is neutral with an amber icon (jits-48a6).
+- Ready and Live steps name the opponent ("Ranked · vs <name>") (jits-plt6).
+
+**Fixed**
+- Match summary: before/after ratings no longer overflow at 4-digit ratings (jits-v6ri); a draw's verdict and rating loss are amber, the new-rating tile border follows the outcome, and the disputed note is plainer (jits-9cgj).
+- Live timer: the clock stays ink at 00:00; PAUSED and a new TIME caption are amber (jits-4zp.2).
+- Tests added: `__tests__/components/ui/elo-tile.test.tsx`, `__tests__/components/match-flow/summary-step.test.tsx`, `weight-step.test.tsx`, `timer-display.test.tsx`.
+
 ### Mobile: UX polish batches B, C, D (demo-ux-polish audit)
 
 JS-only, OTA-eligible for runtime 0.3.0.
