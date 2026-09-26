@@ -98,6 +98,19 @@ describe("ResultBanner subtitle", () => {
     getByText("Confirm if this is right, or dispute it.");
   });
 
+  it("subtitle override replaces the default line (practice has no dispute)", () => {
+    const { getByText, queryByText } = render(
+      <ResultBanner
+        resultData={null}
+        currentAthleteId="me-1"
+        matchType="casual"
+        subtitle="Confirm if this is right."
+      />,
+    );
+    getByText("Confirm if this is right.");
+    expect(queryByText(/dispute/i)).toBeNull();
+  });
+
   it("keeps the harness verdict and testID", () => {
     const { getByTestId } = render(
       <ResultBanner

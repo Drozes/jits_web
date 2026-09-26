@@ -169,7 +169,12 @@ export function PracticeConfirm({
   return (
     <View className="gap-4">
       {/* Casual copy: never "Your rating is already updated". */}
-      <ResultBanner resultData={result} currentAthleteId={athleteId} matchType="casual" />
+      <ResultBanner
+        resultData={result}
+        currentAthleteId={athleteId}
+        matchType="casual"
+        subtitle="Confirm if this is right."
+      />
       <View className="flex-row gap-3">
         <ConfirmPanel label="You" side="you" state="your-call" />
         <ConfirmPanel

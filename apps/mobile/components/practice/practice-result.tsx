@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Text, View } from "react-native";
+import { Plate } from "@/components/ui/elo-system";
 import { OutcomeToggle, WinnerPicker } from "@/components/match-flow/steps/result-step-fields";
 import { SubmissionFields } from "@/components/match-flow/steps/submission-fields";
 import { isFinishTimeValid, parseFinishTime } from "@/lib/match-flow/parse-finish-time";
@@ -57,6 +58,14 @@ export function PracticeResult({
 
   return (
     <View className="gap-5 px-1 py-4">
+      <View className="items-center gap-2">
+        <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-xl">
+          Match Ended
+        </Text>
+        <Text className="font-display text-[28px] text-ink tracking-mark text-center">
+          RECORD RESULT
+        </Text>
+      </View>
       <OutcomeToggle value={outcome} onChange={setOutcome} />
       {outcome === "submission" && submissionTypes.length === 0 ? (
         <Text testID="practice-no-submissions" className="font-body text-[13px] text-ink-2">
@@ -85,6 +94,16 @@ export function PracticeResult({
             />
           ) : null}
         </>
+      ) : null}
+      {outcome === "draw" ? (
+        <Plate testID="practice-draw-plate" className="items-center gap-2">
+          <Text className="font-heading text-[13px] text-ink uppercase tracking-caps">
+            Match ends in a draw
+          </Text>
+          <Text className="font-body text-[12px] text-ink-2 text-center">
+            Practice: no rating change.
+          </Text>
+        </Plate>
       ) : null}
       <PracticeButton
         testID="result-record"

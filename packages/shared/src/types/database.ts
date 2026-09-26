@@ -2065,16 +2065,16 @@ export type Database = {
         Returns: boolean
       }
       is_video_visible: { Args: { p_video_id: string }; Returns: boolean }
-      mark_practice_match: {
-        Args: { p_event: string }
-        Returns: {
-          practice_match_completed_at: string
-          practice_match_offered_at: string
-        }[]
-      }
       mark_conversation_read: {
         Args: { p_conversation_id: string }
         Returns: Json
+      }
+      mark_practice_match: {
+        Args: { p_event: string }
+        Returns: {
+          practice_match_completed_at: string | null
+          practice_match_offered_at: string
+        }[]
       }
       merge_finalize: {
         Args: { p_analysis: Json; p_technique_tags: Json; p_video_id: string }

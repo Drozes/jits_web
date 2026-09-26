@@ -365,8 +365,12 @@ describe("PracticeScreen", () => {
     const s = render(<PracticeScreen />);
     await flush();
     await toResult(s);
+    expect(s.getByText("RECORD RESULT")).toBeTruthy();
     const record = () => s.getByTestId("result-record");
     expect(record()).toBeDisabled();
+    fireEvent.press(s.getByTestId("result-outcome-draw"));
+    expect(s.getByTestId("practice-draw-plate")).toBeTruthy();
+    expect(s.getByText("Practice: no rating change.")).toBeTruthy();
     fireEvent.press(s.getByTestId("result-outcome-submission"));
     fireEvent.press(s.getByTestId(`result-winner-${PRACTICE_BOT_ID}`));
     fireEvent.press(s.getByTestId("result-submission-armbar"));
@@ -379,6 +383,8 @@ describe("PracticeScreen", () => {
     expect(s.getByTestId("confirm-verdict")).toHaveTextContent("YOU LOST");
     expect(s.queryByTestId("confirm-dispute")).toBeNull();
     expect(s.queryByText(/rating is already updated/i)).toBeNull();
+    expect(s.getByText("Confirm if this is right.")).toBeTruthy();
+    expect(s.queryByText(/or dispute it/i)).toBeNull();
     expect(s.getByTestId("confirm-panel-opponent-confirming")).toBeTruthy();
     advance(BOT_CONFIRM_MS);
     expect(s.getByTestId("confirm-panel-opponent-confirmed")).toBeTruthy();
