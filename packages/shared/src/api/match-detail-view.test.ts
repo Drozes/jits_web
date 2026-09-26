@@ -51,6 +51,7 @@ function mockClient(opts: MockOpts) {
 const MATCH_ID = "11111111-2222-4333-8444-555555555555";
 const ME = "aaaaaaaa-0000-4000-8000-000000000001";
 const OPP = "bbbbbbbb-0000-4000-8000-000000000002";
+const VID = "dddddddd-0000-4000-8000-000000000004";
 
 function participant(id: string, name: string, outcome: string | null) {
   return {
@@ -313,10 +314,10 @@ describe("getMatchVideoPlaybackResult", () => {
         error: null,
       },
     });
-    await getMatchVideoPlaybackResult(m.client, "vid-1");
+    await getMatchVideoPlaybackResult(m.client, VID);
     expect(m.from).toHaveBeenCalledWith("match_videos");
     expect(m.select).toHaveBeenCalledWith("storage_path, normalized_path, thumbnail_url, status");
-    expect(m.eq).toHaveBeenCalledWith("id", "vid-1");
+    expect(m.eq).toHaveBeenCalledWith("id", VID);
   });
 
   it("prefers normalized_path over storage_path", async () => {
@@ -326,7 +327,7 @@ describe("getMatchVideoPlaybackResult", () => {
         error: null,
       },
     });
-    const r = await getMatchVideoPlaybackResult(m.client, "vid-1", 600);
+    const r = await getMatchVideoPlaybackResult(m.client, VID, 600);
     expect(m.createSignedUrl).toHaveBeenCalledWith("m/a/1.norm.mp4", 600);
     expect(r).toEqual({
       ok: true,
@@ -341,7 +342,7 @@ describe("getMatchVideoPlaybackResult", () => {
         error: null,
       },
     });
-    const r = await getMatchVideoPlaybackResult(m.client, "vid-1");
+    const r = await getMatchVideoPlaybackResult(m.client, VID);
     expect(m.createSignedUrl).toHaveBeenCalledWith("m/a/1.mp4", 3600);
     expect(r.ok && r.data?.url).toBe("https://signed/m/a/1.mp4");
   });
@@ -353,14 +354,14 @@ describe("getMatchVideoPlaybackResult", () => {
         error: null,
       },
     });
-    const r = await getMatchVideoPlaybackResult(m.client, "vid-1");
+    const r = await getMatchVideoPlaybackResult(m.client, VID);
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.data).toMatchObject({ url: "https://signed/m/a/1.mp4", status: "failed", playability: "failed" });
   });
 
   it("returns ok:true,null when no row is visible", async () => {
     const m = mockClient({ maybeSingle: { data: null, error: null } });
-    const r = await getMatchVideoPlaybackResult(m.client, "vid-1");
+    const r = await getMatchVideoPlaybackResult(m.client, VID);
     expect(r).toEqual({ ok: true, data: null });
     expect(m.createSignedUrl).not.toHaveBeenCalled();
   });
@@ -372,12 +373,12 @@ describe("getMatchVideoPlaybackResult", () => {
         error: null,
       },
     });
-    expect(await getMatchVideoPlaybackResult(m.client, "vid-1")).toEqual({ ok: true, data: null });
+    expect(await getMatchVideoPlaybackResult(m.client, VID)).toEqual({ ok: true, data: null });
   });
 
   it("maps a read error through mapPostgrestError", async () => {
     const m = mockClient({ maybeSingle: { data: null, error: pgError(null, "fetch failed", "") } });
-    const r = await getMatchVideoPlaybackResult(m.client, "vid-1");
+    const r = await getMatchVideoPlaybackResult(m.client, VID);
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error.code).toBe("UNKNOWN");
   });
@@ -392,13 +393,63 @@ describe("getMatchVideoPlaybackResult", () => {
         },
         sign: () => ({ data: null, error: { message } }),
       });
-      const r = await getMatchVideoPlaybackResult(m.client, "vid-1");
+      const r = await getMatchVideoPlaybackResult(m.client, VID);
       expect(r).toEqual({
         ok: false,
         error: { code: "VIDEO_FILE_MISSING", message: "The video file was not found." },
       });
     },
   );
+
+  it("returns ok:true,null for a malformed video id without reading", async () => {
+    const m = mockClient({});
+    expect(await getMatchVideoPlaybackResult(m.client, "not-a-uuid")).toEqual({ ok: true, data: null });
+    expect(m.from).not.toHaveBeenCalled();
+  });
+
+  it("returns ok:true,null for a deleted row without signing", async () => {
+    const m = mockClient({
+      maybeSingle: {
+        data: { storage_path: "m/a/1.mp4", normalized_path: null, thumbnail_url: null, status: "deleted" },
+        error: null,
+      },
+    });
+    expect(await getMatchVideoPlaybackResult(m.client, VID)).toEqual({ ok: true, data: null });
+    expect(m.createSignedUrl).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [{ message: "Bucket not found" }, "Bucket not found"],
+    [{ message: "Bucket not found", statusCode: "404" }, "Bucket not found"],
+    [{ message: "Object not found", statusCode: "500" }, "Object not found"],
+  ])("does not treat %j as a missing file", async (err, message) => {
+    const m = mockClient({
+      maybeSingle: {
+        data: { storage_path: "m/a/1.mp4", normalized_path: null, thumbnail_url: null, status: "ready" },
+        error: null,
+      },
+      sign: () => ({ data: null, error: err }),
+    });
+    expect(await getMatchVideoPlaybackResult(m.client, VID)).toEqual({
+      ok: false,
+      error: { code: "UNKNOWN", message },
+    });
+  });
+
+  it("maps a 404 Object not found (numeric or string statusCode) to VIDEO_FILE_MISSING", async () => {
+    for (const statusCode of ["404", 404]) {
+      const m = mockClient({
+        maybeSingle: {
+          data: { storage_path: "m/a/1.mp4", normalized_path: null, thumbnail_url: null, status: "ready" },
+          error: null,
+        },
+        sign: () => ({ data: null, error: { message: "Object not found", statusCode } }),
+      });
+      const r = await getMatchVideoPlaybackResult(m.client, VID);
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(r.error.code).toBe("VIDEO_FILE_MISSING");
+    }
+  });
 
   it("maps any other sign error to UNKNOWN", async () => {
     const m = mockClient({
@@ -408,7 +459,7 @@ describe("getMatchVideoPlaybackResult", () => {
       },
       sign: () => ({ data: null, error: { message: "Gateway timeout" } }),
     });
-    const r = await getMatchVideoPlaybackResult(m.client, "vid-1");
+    const r = await getMatchVideoPlaybackResult(m.client, VID);
     expect(r).toEqual({ ok: false, error: { code: "UNKNOWN", message: "Gateway timeout" } });
   });
 
@@ -420,7 +471,7 @@ describe("getMatchVideoPlaybackResult", () => {
       },
       sign: () => ({ data: { signedUrl: "" }, error: null }),
     });
-    const r = await getMatchVideoPlaybackResult(m.client, "vid-1");
+    const r = await getMatchVideoPlaybackResult(m.client, VID);
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error.code).toBe("UNKNOWN");
   });
@@ -433,11 +484,11 @@ describe("getMatchVideoPlaybackResult", () => {
       },
     });
     const ok = mockClient(row("m/a/poster/1.jpg"));
-    const r1 = await getMatchVideoPlaybackResult(ok.client, "vid-1");
+    const r1 = await getMatchVideoPlaybackResult(ok.client, VID);
     expect(r1.ok && r1.data?.posterUrl).toBe("https://signed/m/a/poster/1.jpg");
 
     const legacy = mockClient(row("http://old.example/p.jpg"));
-    const r2 = await getMatchVideoPlaybackResult(legacy.client, "vid-1");
+    const r2 = await getMatchVideoPlaybackResult(legacy.client, VID);
     expect(r2.ok && r2.data?.posterUrl).toBe("http://old.example/p.jpg");
 
     const failing = mockClient({
@@ -447,7 +498,7 @@ describe("getMatchVideoPlaybackResult", () => {
           ? { data: null, error: { message: "Object not found" } }
           : { data: { signedUrl: `https://signed/${path}` }, error: null },
     });
-    const r3 = await getMatchVideoPlaybackResult(failing.client, "vid-1");
+    const r3 = await getMatchVideoPlaybackResult(failing.client, VID);
     expect(r3).toEqual({
       ok: true,
       data: { url: "https://signed/m/a/1.mp4", posterUrl: null, status: "ready", playability: "playable" },
@@ -459,7 +510,7 @@ describe("getMatchVideoPlaybackResult", () => {
     (m.from as unknown as { mockImplementation: (f: () => never) => void }).mockImplementation(() => {
       throw new Error("offline");
     });
-    const r = await getMatchVideoPlaybackResult(m.client, "vid-1");
+    const r = await getMatchVideoPlaybackResult(m.client, VID);
     expect(r).toEqual({ ok: false, error: { code: "UNKNOWN", message: "offline" } });
   });
 });

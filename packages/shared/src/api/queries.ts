@@ -2557,6 +2557,8 @@ export async function getMatchVideoPlaybackResult(
   videoId: string,
   expiresInSeconds = 3600,
 ): Promise<Result<MatchVideoPlayback | null>> {
+  // A malformed id can match no row; skip the round trip (and its 22P02).
+  if (!UUID_RE.test(videoId)) return { ok: true, data: null };
   try {
     const { data, error } = await supabase
       .from("match_videos")
@@ -2573,7 +2575,10 @@ export async function getMatchVideoPlaybackResult(
     // Same single-source rule as loadMatchVideoSignedUrl (jits-8t0m): prefer
     // the normalized H.264/AAC MP4 when the slicer wrote one, else the original.
     const playbackPath = data?.normalized_path ?? data?.storage_path;
-    if (!data || !playbackPath) return { ok: true, data: null };
+    // A deleted row is absence, even though RLS still returns it.
+    if (!data || !playbackPath || data.status === "deleted") {
+      return { ok: true, data: null };
+    }
 
     const [{ data: signed, error: signError }, posterUrl] = await Promise.all([
       supabase.storage
@@ -2583,8 +2588,14 @@ export async function getMatchVideoPlaybackResult(
     ]);
     if (signError) {
       console.error("getMatchVideoPlaybackResult sign:", signError);
-      // Storage answers "Object not found" when the row outlived its file.
-      if (/not.?found/i.test(signError.message)) {
+      // Storage answers "Object not found" (404) when the row outlived its
+      // file. "Bucket not found" is a config failure, not a missing file.
+      const statusCode = (signError as { statusCode?: unknown }).statusCode;
+      if (
+        /not.?found/i.test(signError.message) &&
+        !/bucket/i.test(signError.message) &&
+        (statusCode == null || String(statusCode) === "404")
+      ) {
         return {
           ok: false,
           error: {
@@ -2653,6 +2664,10 @@ function asOutcome(
  * `get_match_details`, at most 20 calls; the rest are kept with null metadata
  * and `match_status: "unknown"`. A video is never dropped. The only failure
  * is the video list read itself.
+ *
+ * Known undercount: when exactly `limit` rows come back, the oldest group may
+ * be truncated (its `video_count` / `playable_count` too low, and older
+ * matches absent). Harmless at demo scale; raise `limit` if it matters.
  */
 export async function getMyMatchVideos(
   supabase: Client,
