@@ -11,12 +11,16 @@
  */
 import { HarnessError, run } from "../lib/util";
 
-/** Lines kept in realtime.log (the equivalent of `grep -E 'RateLimit|error'`). */
-export const REALTIME_LOG_FILTER = /RateLimit|error/;
+/** Lines kept in realtime.log (the equivalent of `grep -iE 'RateLimit|error'`). */
+export const REALTIME_LOG_FILTER = /RateLimit|error/i;
 export const PRESENCE_RATE_LIMIT = /ClientPresenceRateLimitReached/;
 
 const JWT = /eyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}/g;
 const SUPABASE_KEY = /\bsb_(publishable|secret)_[A-Za-z0-9_-]+/g;
+/** `password=...`, `jwt_secret: "..."`, `api_key=...` and the like. */
+const SECRET_ASSIGNMENT = /(jwt_secret|password|api_key|secret)\W*[:=]\W*\S+/gi;
+/** The `user:pass@` part of a URL (e.g. a postgres:// DSN). */
+const URL_USERINFO = /([a-z][a-z0-9+.-]*:\/\/)[^\s/@]+@/gi;
 
 export interface RealtimeLogScan {
   /** Filtered lines, tokens masked. */
@@ -25,9 +29,13 @@ export interface RealtimeLogScan {
   presenceRateLimited: string[];
 }
 
-/** Mask anything token-shaped a server log line might echo. */
+/** Mask anything token- or credential-shaped a server log line might echo. */
 export function maskTokens(line: string): string {
-  return line.replace(JWT, "<jwt>").replace(SUPABASE_KEY, "<sb-key>");
+  return line
+    .replace(JWT, "<jwt>")
+    .replace(SUPABASE_KEY, "<sb-key>")
+    .replace(URL_USERINFO, "$1<redacted>@")
+    .replace(SECRET_ASSIGNMENT, "$1=<redacted>");
 }
 
 export function scanRealtimeLog(text: string): RealtimeLogScan {

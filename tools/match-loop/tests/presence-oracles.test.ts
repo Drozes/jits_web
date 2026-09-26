@@ -35,6 +35,33 @@ test("scanRealtimeLog masks tokens and keys", () => {
   assert.equal(maskTokens("plain line"), "plain line");
 });
 
+test("scanRealtimeLog filters case-insensitively (Error, ERROR)", () => {
+  const s = scanRealtimeLog("12:00 [info] ok\n12:00 [warn] Error joining\n12:00 ERROR: boom\n12:00 ratelimit hit");
+  assert.equal(s.lines.length, 3);
+});
+
+test("maskTokens masks secret assignments and URL credentials", () => {
+  const cases: [string, string[]][] = [
+    ["[error] config jwt_secret=super-secret-jwt-token-value boot", ["super-secret-jwt-token-value"]],
+    ['[error] {"password": "hunter2hunter2"}', ["hunter2hunter2"]],
+    ["[error] API_KEY: abc123def456 rejected", ["abc123def456"]],
+    ["[error] secret=s3cr3tvalue", ["s3cr3tvalue"]],
+    ["[error] db connect failed postgres://supabase_admin:pgpass123@127.0.0.1:5432/postgres", ["supabase_admin", "pgpass123"]],
+  ];
+  for (const [line, leaked] of cases) {
+    const out = scanRealtimeLog(line).lines[0];
+    assert.ok(out, line);
+    for (const s of leaked) assert.ok(!out.includes(s), `${s} leaked in ${out}`);
+    assert.match(out, /<redacted>/);
+  }
+  // The URL keeps its scheme and host; only the user:pass@ part goes.
+  assert.match(scanRealtimeLog(cases[4][0]).lines[0], /postgres:\/\/<redacted>@127\.0\.0\.1:5432/);
+  // The real rate-limit line has nothing to mask and is still detected.
+  const rl = "04:53:01.941 project=realtime-dev error_code=ClientPresenceRateLimitReached sub=x [error] ClientPresenceRateLimitReached: :client_rate_limit_exceeded";
+  assert.equal(maskTokens(rl), rl);
+  assert.equal(scanRealtimeLog(rl).presenceRateLimited.length, 1);
+});
+
 test("scanRealtimeLog on an empty log finds nothing", () => {
   assert.deepEqual(scanRealtimeLog(""), { lines: [], presenceRateLimited: [] });
 });

@@ -197,7 +197,12 @@ async function realtimeOracle(ctx: ScenarioCtx): Promise<void> {
   }
   const scan = scanRealtimeLog(text);
   const path = join(ctx.dir, "realtime.log");
-  writeFileSync(path, redact(scan.lines.map((l) => `${l}\n`).join("")));
+  try {
+    writeFileSync(path, redact(scan.lines.map((l) => `${l}\n`).join("")));
+  } catch (e) {
+    ctx.skip(id, `could not write realtime.log: ${e instanceof Error ? e.message : String(e)}`);
+    return;
+  }
   ctx.artifacts.realtimeLog = path;
   const hits = scan.presenceRateLimited;
   ctx.oracle(
