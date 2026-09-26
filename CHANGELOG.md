@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Docs
+**Changed**
+- `CLAUDE.md`: corrected the `match_participants` RLS note (own rows readable), added the presence rate-limit / channel-rebuild rules, mobile match exits (`exitMatchTo`, `useMatchExitCount`), Arena concurrency rules, Resume/rejoin scope, the narrowed web pending-challenge gap, and the `tools/match-loop` harness.
+
 ### Mobile: Resume your match (jits-r9a, partial)
 
 JS-only, OTA-eligible for runtime 0.3.0.
