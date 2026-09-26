@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Mobile: presence channels survive a server close (jits-fa9x)
+
+JS-only, OTA-eligible for runtime 0.3.0.
+
+**Fixed**
+- Realtime closes a channel that exceeds its presence rate limit (5 calls / 30s) and realtime-js never rejoins it, which left a live athlete invisible in `lobby:online` for the rest of the app process. `apps/mobile/lib/arena/use-lobby-presence.ts` and `apps/mobile/lib/presence/use-online-presence.ts` now rebuild a closed channel on a bounded backoff (1s, 5s, 15s, 30s, then next foreground) and re-track the current payload, without tearing down the already-closed instance. Every lobby track/untrack is bounded (released at once when its channel is lost, 12s hard limit, one 2s re-sync when unconfirmed); lobby presence skips unchanged calls and coalesces rapid toggles; `apps/mobile/lib/arena/use-arena-live.ts` waits at most 12s on joining the lobby so a hung presence call can no longer freeze the live toggle or the go-offline on match entry. `app:online` no longer adopts a still-leaving channel on remount. New test `apps/mobile/__tests__/lib/presence/use-online-presence.test.ts`.
+
 ### Mobile: match exits and post-match refresh (jits-tlk3)
 
 JS-only, OTA-eligible for runtime 0.3.0.
