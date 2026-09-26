@@ -39,7 +39,7 @@ interface MatchFlowWizardProps {
   onStepChange?: (step: MatchStep | null) => void;
 }
 
-const STEP_LABELS: Record<MatchStep, string> = {
+export const STEP_LABELS: Record<MatchStep, string> = {
   wait: "Waiting",
   weight: "Weights",
   ready: "Ready",
@@ -253,7 +253,7 @@ export function MatchFlowWizard({
  * with "STEP N / T" mono label, current-step name, and a row of
  * hairline bars that fill with the CTA color as the athlete advances.
  */
-function WizardStepHeader({
+export function WizardStepHeader({
   step,
   currentIdx,
   label,

@@ -149,6 +149,7 @@ export function LiveStep(props: LiveStepProps) {
   // re-arms it; an in-flight pause/resume (`busy`) defers it rather than
   // letting `handleEnd` drop it. `endedRef` makes the end one-shot, whether
   // this device ended it or the opponent's `match_ended` arrived first.
+  // The practice match (components/practice/practice-live.tsx) mirrors this auto-end.
   const handleEndRef = React.useRef(handleEnd);
   handleEndRef.current = handleEnd;
   const autoEndDue =

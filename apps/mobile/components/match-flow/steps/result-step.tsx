@@ -61,6 +61,7 @@ export function ResultStep({
   const finishTimeValid = isFinishTimeValid(finishTimeStr, durationSeconds);
   const finishTimeProvided = finishTimeStr.trim() !== "";
 
+  // The practice match (components/practice/practice-result.tsx) mirrors this rule; keep them in step.
   const canSubmit =
     outcome === "draw" ||
     (outcome === "submission" &&
