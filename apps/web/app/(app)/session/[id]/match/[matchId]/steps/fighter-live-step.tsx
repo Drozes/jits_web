@@ -79,14 +79,27 @@ export function FighterLiveStep({ onNext, exitHref, matchId, durationSeconds, st
 
   const supabase = useMemo(() => createClient(), []);
   const timer = useSessionMatchTimer({ durationSeconds, startedAt, pausedAt, totalPausedDuration });
+  /**
+   * Bumped on every pause/resume broadcast applied here. A DB read issued
+   * before the latest one may predate it (a read taken while paused that
+   * lands just after a resume would re-pause the timer until the next poll),
+   * so the reconciler drops the pause state of such a read (mobile parity,
+   * `usePauseResync`). The known paused total only grows (resume_match adds
+   * each pause), so a read with a smaller total is older too.
+   */
+  const pauseChangeRef = useRef(0);
+  const knownTotalRef = useRef(totalPausedDuration);
   const sync = useSessionMatchSync({
     supabase,
     matchId,
     onTimerPaused: (p) => {
+      pauseChangeRef.current += 1;
       timer.syncFromBroadcast({ type: "paused", pausedAt: p });
       setStatusMessage("Match paused");
     },
     onTimerResumed: (d) => {
+      pauseChangeRef.current += 1;
+      knownTotalRef.current = Math.max(knownTotalRef.current, d);
       timer.syncFromBroadcast({ type: "resumed", totalPausedDuration: d });
       setStatusMessage("Match resumed");
     },
@@ -111,6 +124,7 @@ export function FighterLiveStep({ onNext, exitHref, matchId, durationSeconds, st
    * once a result is recorded, and leave a cancelled / voided match.
    */
   const reconcile = useCallback(async () => {
+    const issuedAt = pauseChangeRef.current;
     const match = await getMatchDetails(supabase, matchId);
     if (!match || unmountedRef.current || endedRef.current) return;
     const reason = exitReasonFor(match.status);
@@ -125,6 +139,11 @@ export function FighterLiveStep({ onNext, exitHref, matchId, durationSeconds, st
       onNext();
       return;
     }
+    // Issued before the latest pause/resume broadcast, or older than the
+    // paused total already applied: the next poll reads again.
+    if (issuedAt !== pauseChangeRef.current) return;
+    if (match.total_paused_duration < knownTotalRef.current) return;
+    knownTotalRef.current = match.total_paused_duration;
     if (match.paused_at) {
       timer.syncFromBroadcast({ type: "paused", pausedAt: match.paused_at });
     } else {

@@ -1,8 +1,13 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { act, renderHook } from "@testing-library/react";
 import {
+  ACCEPTED_FALLBACK_MS,
+  ACCEPT_FAILED_MESSAGE,
   CHALLENGE_CAP_MESSAGE,
+  CHALLENGE_GONE_MESSAGE,
   CHALLENGE_SEND_FAILED_MESSAGE,
+  START_RETRY_MS,
+  couldNotStartMessage,
   opponentLeftMessage,
   useArenaChallenge,
 } from "./use-arena-challenge";
@@ -12,8 +17,9 @@ interface FakeChannel {
   topic: string;
   handlers: { type: string; filter: Record<string, string>; fn: Handler }[];
   sent: { event: string; payload: unknown }[];
+  statusCb: ((status: string) => void) | null;
   on: (type: string, filter: Record<string, string>, fn: Handler) => FakeChannel;
-  subscribe: () => FakeChannel;
+  subscribe: (cb?: (status: string) => void) => FakeChannel;
   send: (m: { event: string; payload: unknown }) => Promise<string>;
 }
 
@@ -27,6 +33,11 @@ const rt = vi.hoisted(() => ({
     data: null | { looking_for_ranked: boolean; status: string };
     error: null | { message: string };
   },
+  /**
+   * When true, a broadcast is delivered to every OTHER live channel on the
+   * same topic (the fake server shared by two clients).
+   */
+  deliver: false,
 }));
 
 vi.mock("@/lib/supabase/client", () => ({
@@ -36,13 +47,27 @@ vi.mock("@/lib/supabase/client", () => ({
         topic,
         handlers: [],
         sent: [],
+        statusCb: null,
         on(type, filter, fn) {
           ch.handlers.push({ type, filter, fn });
           return ch;
         },
-        subscribe: () => ch,
+        subscribe: (cb) => {
+          ch.statusCb = cb ?? null;
+          return ch;
+        },
         send: async (m) => {
           ch.sent.push({ event: m.event, payload: m.payload });
+          if (rt.deliver) {
+            for (const other of [...rt.channels]) {
+              if (other === ch || other.topic !== ch.topic || rt.removed.includes(other)) continue;
+              for (const h of other.handlers) {
+                if (h.type === "broadcast" && h.filter.event === m.event) {
+                  await h.fn({ payload: m.payload });
+                }
+              }
+            }
+          }
           return "ok";
         },
       };
@@ -80,7 +105,10 @@ const m = vi.hoisted(() => ({
   startMatchFromChallenge: vi.fn(),
 }));
 vi.mock("@jits/shared/api/mutations", () => m);
-const q = vi.hoisted(() => ({ getPendingChallengesForAthlete: vi.fn() }));
+const q = vi.hoisted(() => ({
+  getPendingChallengesForAthlete: vi.fn(),
+  getChallengeStatus: vi.fn(),
+}));
 vi.mock("@jits/shared/api/queries", () => q);
 
 /** A pending challenge row as `getPendingChallengesForAthlete` returns it. */
@@ -137,6 +165,7 @@ beforeEach(() => {
   rt.channels = [];
   rt.removed = [];
   rt.lookup = null;
+  rt.deliver = false;
   rt.opponent = { data: { looking_for_ranked: true, status: "active" }, error: null };
   vi.clearAllMocks();
   m.acceptChallenge.mockResolvedValue({ ok: true, data: null });
@@ -153,13 +182,18 @@ beforeEach(() => {
     ok: true,
     data: { incoming: [], outgoing: [] },
   });
+  q.getChallengeStatus.mockResolvedValue({
+    ok: true,
+    data: { status: "pending", expiresAt: null },
+  });
 });
 
-function mount(canReceive = true, inMatch = false) {
+type MountProps = { canReceive: boolean; inMatch?: boolean; lobbyIds?: Set<string> };
+function mount(canReceive = true, inMatch = false, lobbyIds?: Set<string>) {
   return renderHook(
-    ({ canReceive, inMatch }: { canReceive: boolean; inMatch?: boolean }) =>
-      useArenaChallenge({ athleteId: "me", athleteWeight: 170, canReceive, inMatch }),
-    { initialProps: { canReceive, inMatch } as { canReceive: boolean; inMatch?: boolean } },
+    ({ canReceive, inMatch, lobbyIds }: MountProps) =>
+      useArenaChallenge({ athleteId: "me", athleteWeight: 170, canReceive, inMatch, lobbyIds }),
+    { initialProps: { canReceive, inMatch, lobbyIds } as MountProps },
   );
 }
 
@@ -315,12 +349,20 @@ describe("useArenaChallenge", () => {
     });
 
     it("accepting another challenge does not broadcast a cancel for an already-over one", async () => {
+      q.getChallengeStatus.mockResolvedValue({
+        ok: true,
+        data: { status: "declined", expiresAt: null },
+      });
       const { result } = mount(true);
       await act(() => result.current.sendChallenge("bo", "Bo"));
       await insertChallenge("c1");
       await act(() => result.current.accept());
       expect(push).toHaveBeenCalledWith("/arena/match/m1");
-      expect(m.cancelChallenge).toHaveBeenCalledWith(expect.anything(), "out1");
+      expect(m.cancelChallenge).toHaveBeenCalledWith(expect.anything(), "out1", {
+        onlyIfPending: true,
+      });
+      // Declined meanwhile: dropped quietly, not toasted.
+      expect(toast.info).not.toHaveBeenCalled();
       const sent = rt.channels
         .filter((c) => c.topic === "arena-challenge:out1")
         .flatMap((c) => c.sent);
@@ -449,7 +491,7 @@ describe("useArenaChallenge", () => {
       expect(result.current.incoming).toBeNull();
     });
 
-    it("maps not_accepted to 'no longer available' without retrying", async () => {
+    it("maps not_accepted to 'no longer available' after one retry (a lost row lock, jits-njyd)", async () => {
       m.startMatchFromChallenge.mockResolvedValue({
         ok: false,
         error: { code: "CHALLENGE_NOT_ACCEPTED", message: "raw" },
@@ -457,7 +499,9 @@ describe("useArenaChallenge", () => {
       const { result } = mount(true);
       await insertChallenge();
       await act(() => result.current.accept());
-      expect(m.startMatchFromChallenge).toHaveBeenCalledTimes(1);
+      expect(m.startMatchFromChallenge).toHaveBeenCalledTimes(2);
+      // A dead challenge is not withdrawn (there is nothing accepted to free).
+      expect(m.cancelChallenge).not.toHaveBeenCalled();
       expect(toast.error).toHaveBeenCalledWith("That challenge is no longer available.");
     });
 
@@ -494,13 +538,18 @@ describe("useArenaChallenge", () => {
     });
   });
 
-  it("accepting an incoming challenge withdraws my own pending one", async () => {
+  it("accepting an incoming challenge withdraws my own pending one FIRST", async () => {
     const { result } = mount(true);
     await act(() => result.current.sendChallenge("bo", "Bo"));
     await insertChallenge("c1");
     await act(() => result.current.accept());
     expect(push).toHaveBeenCalledWith("/arena/match/m1");
-    expect(m.cancelChallenge).toHaveBeenCalledWith(expect.anything(), "out1");
+    expect(m.cancelChallenge).toHaveBeenCalledWith(expect.anything(), "out1", {
+      onlyIfPending: true,
+    });
+    expect(m.cancelChallenge.mock.invocationCallOrder[0]).toBeLessThan(
+      m.acceptChallenge.mock.invocationCallOrder[0],
+    );
     const sent = rt.channels
       .filter((c) => c.topic === "arena-challenge:out1")
       .flatMap((c) => c.sent);
@@ -867,6 +916,608 @@ describe("entering a match settles my other incoming challenges (mobile parity)"
       .filter((c) => c.topic !== "arena-challenge:c1")
       .flatMap((c) => c.sent);
     expect(sent).toEqual([]);
+    expect(push).toHaveBeenCalledWith("/arena/match/m1");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Mobile concurrency parity (jits-7dqt)
+// ---------------------------------------------------------------------------
+
+const flushAll = () => act(async () => {});
+const sentOn = (topic: string) =>
+  rt.channels.filter((c) => c.topic === topic).flatMap((c) => c.sent);
+
+async function insertFor(
+  athleteId: string,
+  id: string,
+  challengerId: string,
+): Promise<void> {
+  await act(async () => {
+    await fire(live(`arena-incoming:${athleteId}`)[0], "postgres_changes", "INSERT", {
+      new: { id, challenger_id: challengerId, opponent_id: athleteId, status: "pending" },
+    });
+  });
+}
+
+async function sendAs(
+  result: { current: ReturnType<typeof useArenaChallenge> },
+  id: string,
+  opponentId: string,
+): Promise<void> {
+  m.createChallenge.mockResolvedValueOnce({ ok: true, data: { id } });
+  await act(() => result.current.sendChallenge(opponentId, opponentId));
+  expect(result.current.outgoing?.challengeId).toBe(id);
+}
+
+describe("accepting while my own challenge is out", () => {
+  it("joins MY match instead when it had already started", async () => {
+    m.cancelChallenge.mockResolvedValueOnce({ ok: true, data: { cancelled: false } });
+    q.getChallengeStatus.mockResolvedValue({ ok: true, data: { status: "started", expiresAt: null } });
+    m.startMatchFromChallenge.mockResolvedValue({ ok: true, data: { match_id: "m-mine" } });
+    const { result } = mount(true);
+    await sendAs(result, "out1", "bo");
+    await insertChallenge("c1");
+
+    await act(() => result.current.accept());
+
+    expect(m.acceptChallenge).not.toHaveBeenCalled();
+    expect(m.startMatchFromChallenge).toHaveBeenCalledWith(expect.anything(), "out1");
+    expect(push).toHaveBeenCalledTimes(1);
+    expect(push).toHaveBeenCalledWith("/arena/match/m-mine");
+    await flushAll();
+    // Entering declines everyone else waiting on me, c1 included.
+    expect(m.declineOtherPendingChallenges).toHaveBeenCalledWith(expect.anything(), "me", {
+      keepChallengeId: "out1",
+      exceptChallengerId: "bo",
+    });
+  });
+
+  it("keeps waiting when mine was just accepted, and declines the incoming", async () => {
+    m.cancelChallenge.mockResolvedValueOnce({ ok: true, data: { cancelled: false } });
+    q.getChallengeStatus.mockResolvedValue({ ok: true, data: { status: "accepted", expiresAt: null } });
+    const { result } = mount(true);
+    await sendAs(result, "out1", "bo");
+    await insertChallenge("c1");
+
+    await act(() => result.current.accept());
+
+    expect(m.acceptChallenge).not.toHaveBeenCalled();
+    expect(m.startMatchFromChallenge).not.toHaveBeenCalled();
+    expect(m.declineChallenge).toHaveBeenCalledWith(expect.anything(), "c1");
+    expect(sentOn("arena-challenge:c1")).toEqual([{ event: "declined", payload: {} }]);
+    expect(result.current.incoming).toBeNull();
+    expect(result.current.outgoing?.challengeId).toBe("out1");
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("keeps the prompt when mine could not be withdrawn (network)", async () => {
+    m.cancelChallenge.mockResolvedValueOnce({ ok: false, error: { code: "UNKNOWN", message: "x" } });
+    const { result } = mount(true);
+    await sendAs(result, "out1", "bo");
+    await insertChallenge("c1");
+
+    await act(() => result.current.accept());
+
+    expect(toast.error).toHaveBeenCalledWith(ACCEPT_FAILED_MESSAGE);
+    expect(m.acceptChallenge).not.toHaveBeenCalled();
+    expect(result.current.incoming?.challengeId).toBe("c1");
+    expect(result.current.outgoing?.challengeId).toBe("out1");
+  });
+});
+
+describe("crossing challenges (A and B challenge each other)", () => {
+  // The lower id is canonical on both clients.
+  const LOW = "ch-a";
+  const HIGH = "ch-b";
+
+  it("accepts the canonical one straight away, then withdraws my own", async () => {
+    const { result } = mount(true);
+    await sendAs(result, HIGH, "ana");
+    await insertChallenge(LOW);
+
+    await act(() => result.current.accept());
+
+    expect(m.acceptChallenge).toHaveBeenCalledWith(expect.anything(), {
+      challengeId: LOW,
+      opponentWeight: 170,
+    });
+    expect(push).toHaveBeenCalledTimes(1);
+    await flushAll();
+    // My own is withdrawn after entry, pending-guarded, never before the accept.
+    expect(m.cancelChallenge).toHaveBeenCalledWith(expect.anything(), HIGH, {
+      onlyIfPending: true,
+    });
+    expect(m.cancelChallenge.mock.invocationCallOrder[0]).toBeGreaterThan(
+      m.acceptChallenge.mock.invocationCallOrder[0],
+    );
+    expect(m.declineOtherPendingChallenges).toHaveBeenCalledWith(expect.anything(), "me", {
+      keepChallengeId: LOW,
+      exceptChallengerId: "ana",
+    });
+  });
+
+  it("says nothing when the other side won the canonical row, and joins via its broadcast", async () => {
+    m.startMatchFromChallenge.mockResolvedValue({
+      ok: false,
+      error: { code: "CHALLENGE_NOT_ACCEPTED", message: "no" },
+    });
+    const { result } = mount(true);
+    await sendAs(result, HIGH, "ana");
+    await insertChallenge(LOW);
+
+    await act(() => result.current.accept());
+
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(result.current.incoming).toBeNull();
+    expect(result.current.outgoing?.challengeId).toBe(HIGH);
+    await act(async () => {
+      fire(live(`arena-challenge:${HIGH}`)[0], "broadcast", "match_started", {
+        payload: { matchId: "m-high" },
+      });
+    });
+    expect(push).toHaveBeenCalledTimes(1);
+    expect(push).toHaveBeenCalledWith("/arena/match/m-high");
+  });
+
+  it("withdraws the canonical one first when my incoming is the other", async () => {
+    const { result } = mount(true);
+    await sendAs(result, LOW, "ana");
+    await insertChallenge(HIGH);
+
+    await act(() => result.current.accept());
+
+    expect(m.cancelChallenge.mock.calls[0]).toEqual([
+      expect.anything(),
+      LOW,
+      { onlyIfPending: true },
+    ]);
+    expect(m.acceptChallenge).toHaveBeenCalledWith(expect.anything(), {
+      challengeId: HIGH,
+      opponentWeight: 170,
+    });
+  });
+
+  it("withdraws (never declines) the other half when the canonical one was already accepted", async () => {
+    m.cancelChallenge.mockImplementation(async (_c: unknown, id: string) => ({
+      ok: true,
+      data: { cancelled: id !== LOW },
+    }));
+    q.getChallengeStatus.mockResolvedValue({ ok: true, data: { status: "accepted", expiresAt: null } });
+    const { result } = mount(true);
+    await sendAs(result, LOW, "ana");
+    await insertChallenge(HIGH);
+
+    await act(() => result.current.accept());
+
+    expect(m.declineChallenge).not.toHaveBeenCalled();
+    expect(m.cancelChallenge).toHaveBeenCalledWith(expect.anything(), HIGH, {
+      onlyIfPending: true,
+    });
+    expect(result.current.outgoing?.challengeId).toBe(LOW);
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  /**
+   * Both clients against one fake server: rows, the match table, and
+   * broadcasts delivered to whichever instance listens on the topic.
+   */
+  function fakeServer(x: string, y: string) {
+    const rows: Record<string, { status: string; challenger: string; opponent: string }> = {
+      [LOW]: { status: "pending", challenger: x, opponent: y },
+      [HIGH]: { status: "pending", challenger: y, opponent: x },
+    };
+    const matches: Record<string, string> = {};
+    m.cancelChallenge.mockImplementation(
+      async (_c: unknown, id: string, opts?: { onlyIfPending?: boolean }) => {
+        const ok = opts?.onlyIfPending
+          ? rows[id].status === "pending"
+          : ["pending", "accepted"].includes(rows[id].status);
+        if (ok) rows[id].status = "cancelled";
+        return { ok: true, data: { cancelled: ok } };
+      },
+    );
+    m.acceptChallenge.mockImplementation(async (_c: unknown, p: { challengeId: string }) => {
+      if (rows[p.challengeId].status === "pending") rows[p.challengeId].status = "accepted";
+      return { ok: true, data: null };
+    });
+    m.startMatchFromChallenge.mockImplementation(async (_c: unknown, id: string) => {
+      if (matches[id]) return { ok: true, data: { match_id: matches[id] } };
+      if (rows[id].status !== "accepted") {
+        return { ok: false, error: { code: "CHALLENGE_NOT_ACCEPTED", message: "no" } };
+      }
+      matches[id] = `m-${id}`;
+      rows[id].status = "started";
+      return { ok: true, data: { match_id: matches[id] } };
+    });
+    q.getChallengeStatus.mockImplementation(async (_c: unknown, id: string) => ({
+      ok: true,
+      data: { status: rows[id].status, expiresAt: null },
+    }));
+    rt.deliver = true;
+    return { rows, matches };
+  }
+
+  async function mountPair() {
+    const X = "me";
+    const Y = "ana";
+    const x = renderHook(() => useArenaChallenge({ athleteId: X, athleteWeight: 170 }));
+    const y = renderHook(() => useArenaChallenge({ athleteId: Y, athleteWeight: 170 }));
+    await flushAll();
+    // X sent the canonical (lower id) one, Y the other; each has the other's prompt.
+    await sendAs(x.result, LOW, Y);
+    await sendAs(y.result, HIGH, X);
+    await insertFor(X, HIGH, Y);
+    await insertFor(Y, LOW, X);
+    expect(x.result.current.incoming?.challengeId).toBe(HIGH);
+    expect(y.result.current.incoming?.challengeId).toBe(LOW);
+    return { x, y };
+  }
+
+  it.each([
+    ["X taps first", "x-first"],
+    ["Y taps first", "y-first"],
+    ["both at once, X's write first", "both-x"],
+    ["both at once, Y's write first", "both-y"],
+  ])("both land in ONE match: %s", async (_label, order) => {
+    const server = fakeServer("me", "ana");
+    const { x, y } = await mountPair();
+
+    await act(async () => {
+      if (order === "x-first") {
+        await x.result.current.accept();
+        await y.result.current.accept();
+      } else if (order === "y-first") {
+        await y.result.current.accept();
+        await x.result.current.accept();
+      } else if (order === "both-x") {
+        await Promise.all([x.result.current.accept(), y.result.current.accept()]);
+      } else {
+        await Promise.all([y.result.current.accept(), x.result.current.accept()]);
+      }
+    });
+    await flushAll();
+
+    expect(push).toHaveBeenCalledTimes(2);
+    const hrefs = push.mock.calls.map((c) => c[0]);
+    expect(new Set(hrefs).size).toBe(1);
+    expect(Object.keys(server.matches)).toHaveLength(1);
+    expect(toast.error).not.toHaveBeenCalled();
+    x.unmount();
+    y.unmount();
+  });
+});
+
+describe("the challenger's safety net for a row stuck at 'accepted'", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+  const advance = (ms: number) =>
+    act(async () => {
+      await vi.advanceTimersByTimeAsync(ms);
+    });
+
+  async function waitingOnAccepted() {
+    const hook = mount(true);
+    await sendAs(hook.result, "out1", "ana");
+    await challengerUpdate("out1", "accepted");
+    return hook;
+  }
+
+  it("starts the match itself when the row is still 'accepted' 12s later", async () => {
+    const { result } = await waitingOnAccepted();
+    q.getChallengeStatus.mockResolvedValue({ ok: true, data: { status: "accepted", expiresAt: null } });
+    await advance(ACCEPTED_FALLBACK_MS - 1);
+    expect(m.startMatchFromChallenge).not.toHaveBeenCalled();
+    await advance(1);
+    expect(m.startMatchFromChallenge).toHaveBeenCalledWith(expect.anything(), "out1");
+    expect(push).toHaveBeenCalledWith("/arena/match/m1");
+    expect(result.current.outgoing).toBeNull();
+  });
+
+  it("does nothing extra when the accepter's broadcast arrived in time", async () => {
+    await waitingOnAccepted();
+    await act(async () => {
+      fire(live("arena-challenge:out1")[0], "broadcast", "match_started", {
+        payload: { matchId: "m5" },
+      });
+    });
+    await advance(ACCEPTED_FALLBACK_MS);
+    expect(m.startMatchFromChallenge).not.toHaveBeenCalled();
+    expect(push).toHaveBeenCalledTimes(1);
+  });
+
+  it("says the match could not start when the accepter withdrew it", async () => {
+    const { result } = await waitingOnAccepted();
+    await challengerUpdate("out1", "cancelled");
+    expect(result.current.outgoing).toBeNull();
+    expect(toast.info).toHaveBeenCalledWith(couldNotStartMessage("ana"));
+    await advance(ACCEPTED_FALLBACK_MS);
+    expect(m.startMatchFromChallenge).not.toHaveBeenCalled();
+  });
+
+  it("stays quiet for my own cancel of a challenge seen accepted", async () => {
+    const { result } = await waitingOnAccepted();
+    await act(() => result.current.cancelOutgoing());
+    await challengerUpdate("out1", "cancelled");
+    expect(toast.info).not.toHaveBeenCalled();
+  });
+
+  it("a failed fallback start re-reads once and joins a row that turned 'started'", async () => {
+    await waitingOnAccepted();
+    q.getChallengeStatus.mockResolvedValue({ ok: true, data: { status: "accepted", expiresAt: null } });
+    m.startMatchFromChallenge.mockResolvedValueOnce({
+      ok: false,
+      error: { code: "UNKNOWN", message: "lock" },
+    });
+    await advance(ACCEPTED_FALLBACK_MS);
+    expect(push).not.toHaveBeenCalled();
+    q.getChallengeStatus.mockResolvedValue({ ok: true, data: { status: "started", expiresAt: null } });
+    await advance(START_RETRY_MS);
+    expect(m.startMatchFromChallenge).toHaveBeenCalledTimes(2);
+    expect(push).toHaveBeenCalledWith("/arena/match/m1");
+  });
+
+  it("is cancelled on unmount", async () => {
+    const { unmount } = await waitingOnAccepted();
+    unmount();
+    await advance(ACCEPTED_FALLBACK_MS);
+    expect(q.getChallengeStatus).not.toHaveBeenCalled();
+  });
+});
+
+describe("an INSERT while I am busy is declined, not ignored", () => {
+  it("declines and tells the challenger when I am in a match", async () => {
+    mount(false, true);
+    await flushAll();
+    await insertChallenge("c9");
+    expect(m.declineChallenge).toHaveBeenCalledWith(expect.anything(), "c9");
+    await flushAll();
+    expect(sentOn("arena-challenge:c9")).toEqual([{ event: "declined", payload: {} }]);
+  });
+
+  it("declines one that lands between accept and the match screen", async () => {
+    const { result } = mount(true);
+    await insertChallenge("c1");
+    await act(() => result.current.accept());
+    await act(async () => {
+      await fire(incomingChannel(), "postgres_changes", "INSERT", {
+        new: { id: "c2", challenger_id: "bo", status: "pending" },
+      });
+    });
+    expect(m.declineChallenge).toHaveBeenCalledWith(expect.anything(), "c2");
+    expect(result.current.incoming).toBeNull();
+  });
+
+  it("withdraws the peer's late challenge quietly, never declines it", async () => {
+    const { result } = mount(true);
+    await insertChallenge("c1");
+    await act(() => result.current.accept());
+    // "ana" is the athlete I am entering a match with.
+    await insertChallenge("c2");
+    expect(m.declineChallenge).not.toHaveBeenCalled();
+    expect(m.cancelChallenge).toHaveBeenCalledWith(expect.anything(), "c2", {
+      onlyIfPending: true,
+    });
+  });
+
+  it("forgets the peer once I leave the match", async () => {
+    const { result, rerender } = mount(true);
+    await insertChallenge("c1");
+    await act(() => result.current.accept());
+    rerender({ canReceive: false, inMatch: true });
+    rerender({ canReceive: true, inMatch: false });
+    await flushAll();
+    await insertChallenge("c2");
+    expect(m.cancelChallenge).not.toHaveBeenCalledWith(expect.anything(), "c2", expect.anything());
+    expect(result.current.incoming?.challengeId).toBe("c2");
+  });
+
+  it("still only ignores (never declines) one that lands while another prompt is up", async () => {
+    const { result } = mount(true);
+    await insertChallenge("c1");
+    await insertChallenge("c2");
+    expect(result.current.incoming?.challengeId).toBe("c1");
+    expect(m.declineChallenge).not.toHaveBeenCalled();
+  });
+});
+
+describe("pending challenges are read again when a prompt clears (mobile parity)", () => {
+  const incomingPending = (id: string, challengerId: string) =>
+    pending(id, { challengerId, opponentId: "me" });
+
+  it("offers the next queued challenger when I decline", async () => {
+    const lobby = new Set(["ana", "bo"]);
+    const { result } = mount(true, false, lobby);
+    await flushAll();
+    await insertChallenge("c1");
+    q.getPendingChallengesForAthlete.mockClear();
+    q.getPendingChallengesForAthlete.mockResolvedValue({
+      ok: true,
+      data: { incoming: [incomingPending("c1", "ana"), incomingPending("c2", "bo")], outgoing: [] },
+    });
+    rt.lookup = () => Promise.resolve({ data: { display_name: "Bo" } });
+
+    await act(() => result.current.decline());
+    await flushAll();
+
+    expect(q.getPendingChallengesForAthlete).toHaveBeenCalledTimes(1);
+    // The one I just declined is never raised again; the next one is.
+    expect(result.current.incoming).toEqual({
+      challengeId: "c2",
+      challengerId: "bo",
+      challengerName: "Bo",
+    });
+  });
+
+  it("re-reads when the challenger withdraws the prompt", async () => {
+    mount(true);
+    await flushAll();
+    await insertChallenge("c1");
+    q.getPendingChallengesForAthlete.mockClear();
+    await act(async () => {
+      fire(incomingChannel(), "postgres_changes", "UPDATE", { new: { id: "c1", status: "cancelled" } });
+    });
+    expect(q.getPendingChallengesForAthlete).toHaveBeenCalledTimes(1);
+  });
+
+  it("re-reads on the challenger's cancelled broadcast", async () => {
+    mount(true);
+    await flushAll();
+    await insertChallenge("c1");
+    q.getPendingChallengesForAthlete.mockClear();
+    await act(async () => {
+      fire(live("arena-challenge:c1")[0], "broadcast", "cancelled", {});
+    });
+    expect(q.getPendingChallengesForAthlete).toHaveBeenCalledTimes(1);
+  });
+
+  it("re-reads when an accept finds the challenge dead", async () => {
+    m.startMatchFromChallenge.mockResolvedValue({
+      ok: false,
+      error: { code: "CHALLENGE_NOT_ACCEPTED", message: "x" },
+    });
+    const { result } = mount(true);
+    await flushAll();
+    await insertChallenge("c1");
+    q.getPendingChallengesForAthlete.mockClear();
+    await act(() => result.current.accept());
+    expect(toast.error).toHaveBeenCalledWith(CHALLENGE_GONE_MESSAGE);
+    expect(q.getPendingChallengesForAthlete).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not re-read for my own accept landing on the prompt's UPDATE", async () => {
+    mount(true);
+    await flushAll();
+    await insertChallenge("c1");
+    q.getPendingChallengesForAthlete.mockClear();
+    await act(async () => {
+      fire(incomingChannel(), "postgres_changes", "UPDATE", { new: { id: "c1", status: "accepted" } });
+    });
+    expect(q.getPendingChallengesForAthlete).not.toHaveBeenCalled();
+  });
+
+  it("offers a fresh pending challenge at mount only once its challenger is in the lobby", async () => {
+    q.getPendingChallengesForAthlete.mockResolvedValue({
+      ok: true,
+      data: { incoming: [incomingPending("c7", "ana")], outgoing: [] },
+    });
+    const { result, rerender } = mount(true, false, new Set());
+    await flushAll();
+    expect(result.current.incoming).toBeNull();
+    rerender({ canReceive: true, lobbyIds: new Set(["ana"]) });
+    await flushAll();
+    expect(result.current.incoming?.challengeId).toBe("c7");
+  });
+
+  it("never offers while offline, nor a stale one", async () => {
+    q.getPendingChallengesForAthlete.mockResolvedValue({
+      ok: true,
+      data: {
+        incoming: [pending("old", { challengerId: "ana", opponentId: "me", ageMs: 11 * 60_000 })],
+        outgoing: [],
+      },
+    });
+    const lobby = new Set(["ana"]);
+    const offline = mount(false, false, lobby);
+    await flushAll();
+    expect(offline.result.current.incoming).toBeNull();
+    const liveHook = mount(true, false, lobby);
+    await flushAll();
+    expect(liveHook.result.current.incoming).toBeNull();
+  });
+});
+
+describe("accept succeeded but the start did not", () => {
+  it("retries the start once, then withdraws the accepted row", async () => {
+    m.startMatchFromChallenge.mockResolvedValue({ ok: false, error: { code: "UNKNOWN", message: "down" } });
+    const { result } = mount(true);
+    await insertChallenge("c1");
+    await act(() => result.current.accept());
+    expect(m.startMatchFromChallenge).toHaveBeenCalledTimes(2);
+    expect(m.cancelChallenge).toHaveBeenCalledWith(expect.anything(), "c1");
+    expect(toast.error).toHaveBeenCalledWith("down");
+  });
+
+  it("recovers when the start had landed and only its reply was lost", async () => {
+    m.startMatchFromChallenge
+      .mockResolvedValueOnce({ ok: false, error: { code: "UNKNOWN", message: "lost" } })
+      .mockResolvedValueOnce({ ok: false, error: { code: "UNKNOWN", message: "lost" } })
+      .mockResolvedValue({ ok: true, data: { match_id: "m4" } });
+    m.cancelChallenge.mockResolvedValue({ ok: true, data: { cancelled: false } });
+    const { result } = mount(true);
+    await insertChallenge("c1");
+    await act(() => result.current.accept());
+    expect(push).toHaveBeenCalledWith("/arena/match/m4");
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it("joins on the 'started' UPDATE the challenger's fallback produced", async () => {
+    m.startMatchFromChallenge.mockResolvedValue({ ok: false, error: { code: "UNKNOWN", message: "down" } });
+    m.cancelChallenge.mockResolvedValue({ ok: false, error: { code: "UNKNOWN", message: "down" } });
+    const { result } = mount(true);
+    await insertChallenge("c1");
+    await act(() => result.current.accept());
+    expect(push).not.toHaveBeenCalled();
+
+    m.startMatchFromChallenge.mockResolvedValue({ ok: true, data: { match_id: "m8" } });
+    await act(async () => {
+      await fire(incomingChannel(), "postgres_changes", "UPDATE", {
+        new: { id: "c1", challenger_id: "ana", status: "started" },
+      });
+    });
+    expect(push).toHaveBeenCalledWith("/arena/match/m8");
+  });
+
+  it("ignores a 'started' UPDATE for a challenge I never accepted", async () => {
+    mount(true);
+    await act(async () => {
+      await fire(incomingChannel(), "postgres_changes", "UPDATE", {
+        new: { id: "zz", challenger_id: "ana", status: "started" },
+      });
+    });
+    expect(m.startMatchFromChallenge).not.toHaveBeenCalled();
+  });
+});
+
+describe("one client never pushes two match screens", () => {
+  it("refuses a second entry for a DIFFERENT challenge before the first screen mounts", async () => {
+    const { result } = mount(true);
+    await insertChallenge("c1");
+    await act(() => result.current.accept());
+    // A started UPDATE for an unrelated challenge of mine lands right after.
+    await act(async () => {
+      await fire(
+        incomingChannel(),
+        "postgres_changes",
+        "UPDATE",
+        {
+          new: {
+            id: "other",
+            status: "started",
+            challenger_id: "me",
+            opponent_id: "bo",
+            created_at: new Date().toISOString(),
+          },
+        },
+        "challenger",
+      );
+    });
+    expect(push).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("the outgoing channel re-reads its row once it is subscribed", () => {
+  it("joins a match that started before the listener was up", async () => {
+    const { result } = mount(true);
+    await sendAs(result, "out1", "ana");
+    q.getChallengeStatus.mockResolvedValue({ ok: true, data: { status: "started", expiresAt: null } });
+    await act(async () => {
+      live("arena-challenge:out1")[0].statusCb?.("SUBSCRIBED");
+    });
     expect(push).toHaveBeenCalledWith("/arena/match/m1");
   });
 });

@@ -238,6 +238,19 @@ describe("MatchSummaryStep (web confirm step)", () => {
     getByText("Confirm Result");
   });
 
+  it("a failed dispute advances when the DB shows the match already disputed, with no error (jits-u7vd)", async () => {
+    mockDispute.mockResolvedValue({ ok: false, error: { code: "UNKNOWN", message: "" } });
+    const { onNext, getByText } = renderStep();
+    await flush();
+    mockDetails.mockResolvedValue({ id: "M1", status: "disputed" });
+    await act(async () => {
+      fireEvent.click(getByText("Dispute result"));
+    });
+    await flush();
+    expect(mockToastError).not.toHaveBeenCalled();
+    expect(onNext).toHaveBeenCalledTimes(1);
+  });
+
   it("a failed dispute shows the mapped message when there is one", async () => {
     mockDispute.mockResolvedValue({
       ok: false,

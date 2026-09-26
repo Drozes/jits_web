@@ -34,12 +34,16 @@ export function ArenaBootstrap({
   const live = useArenaLive({ athleteId, initialLive, inMatch });
   // Observing is not joining: self is tracked only while live.
   useLobbyPresence(athleteId, false, live.isLive);
-  const onlineCount = useActiveLobbyCount(useLobbyIds(), athleteId);
+  const lobbyIds = useLobbyIds();
+  const onlineCount = useActiveLobbyCount(lobbyIds, athleteId);
   const challenge = useArenaChallenge({
     athleteId,
     athleteWeight,
     canReceive: live.isLive && !inMatch,
     inMatch,
+    // A pending challenge found by a read is offered only while its
+    // challenger is still in the lobby (mobile parity).
+    lobbyIds,
   });
   useRegisterArenaController(live, challenge);
 

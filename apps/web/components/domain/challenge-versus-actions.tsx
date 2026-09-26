@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { cancelChallenge } from "@jits/shared/api/mutations";
+import { cancelChallenge, startMatchFromChallenge } from "@jits/shared/api/mutations";
 import { ChallengeResponseSheet } from "@/components/domain/challenge-response-sheet";
 import { ExpiryBadge } from "@/components/domain/expiry-badge";
 import { Button } from "@/components/ui/button";
@@ -36,8 +36,19 @@ export function ChallengeVersusActions({
     setError(null);
     const supabase = createClient();
     const result = await cancelChallenge(supabase, challengeId);
+    if (!result.ok) { setCancelling(false); setError(result.error.message); return; }
+    if (!result.data.cancelled) {
+      // No row changed (a 0-row update is not an error): the challenge was
+      // already over, or the opponent has just started the match. The RPC is
+      // idempotent and returns an existing match, so join it rather than
+      // leave the opponent in it alone (Arena parity, 91c08de).
+      const started = await startMatchFromChallenge(supabase, challengeId);
+      if (started.ok) {
+        router.push(`/arena/match/${started.data.match_id}`);
+        return;
+      }
+    }
     setCancelling(false);
-    if (!result.ok) { setError(result.error.message); return; }
     router.refresh();
   }
 

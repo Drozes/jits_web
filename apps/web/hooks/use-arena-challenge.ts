@@ -14,7 +14,11 @@ import {
   declineOtherPendingChallenges,
   startMatchFromChallenge,
 } from "@jits/shared/api/mutations";
-import { getPendingChallengesForAthlete } from "@jits/shared/api/queries";
+import {
+  getChallengeStatus,
+  getPendingChallengesForAthlete,
+} from "@jits/shared/api/queries";
+import type { PendingChallenge } from "@jits/shared/types/composites";
 import { isFreshChallenge } from "@/lib/arena/challenge-freshness";
 
 export interface IncomingChallenge {
@@ -42,10 +46,62 @@ export const opponentLeftMessage = (name: string) => `${name} just left the Aren
 /** Shown when a refused insert cannot be explained. */
 export const CHALLENGE_SEND_FAILED_MESSAGE = "Couldn't send that challenge. Try again.";
 
+/** Shown when an accept cannot tell whether my own challenge is still live. */
+export const ACCEPT_FAILED_MESSAGE = "Couldn't accept that challenge. Try again.";
+
+/** Shown when the accepter withdrew my accepted challenge after a failed start. */
+export const couldNotStartMessage = (name: string) =>
+  `Couldn't start the match with ${name}.`;
+
+/**
+ * How long my outgoing challenge may sit at `accepted` before I start the
+ * match myself: well past a normal accept-to-start (about a second), short
+ * enough that a stranded challenger is not left staring at the bar. Same
+ * value as mobile.
+ */
+export const ACCEPTED_FALLBACK_MS = 12_000;
+
+/**
+ * How long after a failed start of my own accepted challenge (the fallback
+ * above) I read the row once more: long enough for a start the accepter was
+ * making at the same moment to land.
+ */
+export const START_RETRY_MS = 2_000;
+
+/**
+ * How long after `enterMatch` pushed a route a second entry stays refused
+ * while the match screen has not reported itself mounted (`inMatch`). Only a
+ * fallback: `inMatch` normally takes over within a render, and a push that
+ * never mounted must not lock entry forever.
+ */
+export const ENTRY_SETTLE_MS = 5_000;
+
+/**
+ * Statuses in which my outgoing challenge can still turn into a match.
+ * Anything else (`declined`, `cancelled`, `expired`) is terminal for the bar.
+ */
+const LIVE_CHALLENGE_STATUSES = new Set(["pending", "accepted", "started"]);
+
 /** Broadcast channel shared by both parties to a single Arena challenge. */
 const channelName = (challengeId: string) => `arena-challenge:${challengeId}`;
 
 type ChallengeEvent = "match_started" | "declined" | "cancelled";
+
+interface ChallengeRow {
+  id: string;
+  challenger_id: string;
+  opponent_id?: string;
+  status: string;
+  created_at?: string;
+  expires_at?: string | null;
+}
+
+/**
+ * What `offerIncoming` did. `retry`: the surface was busy (another prompt up,
+ * a match starting or on screen), offer again on the next pass; `final`: it
+ * was answered, withdrawn or entered, never offer it again.
+ */
+type OfferResult = "raised" | "retry" | "final";
 
 /**
  * Tell the other side something happened. Sends on `existing` when this client
@@ -69,35 +125,61 @@ async function broadcast(
   await supabase.removeChannel(channel);
 }
 
+/** A pending incoming challenge that is still a LIVE prompt (mobile parity). */
+function isFreshPending(c: PendingChallenge, now: number): boolean {
+  const expires = Date.parse(c.expiresAt);
+  if (Number.isNaN(expires) || expires <= now) return false;
+  return isFreshChallenge(c.createdAt, now);
+}
+
 /**
- * After entering a match, decline every other fresh pending challenge I
- * received and tell each challenger (UPDATE + broadcast), so nobody is left
- * waiting on someone who is now busy (mobile parity, `settleOthersAfterEntry`).
- * A challenge from the person I am now matched with is the other half of a
- * crossing pair: withdrawn quietly, so they are not told "declined" on the way
- * into the same match. Best effort and fire-and-forget.
+ * After entering a match, settle every other challenge that involves me, so
+ * nobody is left waiting on someone who is now busy (mobile parity,
+ * `settleOthersAfterEntry`):
+ *  - my own outgoing that did NOT become this match (the crossing case) is
+ *    withdrawn, pending-guarded, and its recipient told;
+ *  - every other fresh pending challenge I received is declined and the
+ *    challenger told (UPDATE + broadcast), except one from the person I am
+ *    now matched with: that is the other half of a crossing pair, withdrawn
+ *    quietly so they are not told "declined" on the way into the same match.
+ * Best effort and fire-and-forget.
  */
-async function settleIncomingAfterEntry(
+async function settleOthersAfterEntry(
   athleteId: string,
   enteredChallengeId: string,
   peerId: string | null,
+  strandedOutgoingId: string | null,
+  settled: Set<string>,
 ): Promise<void> {
   const supabase = createClient();
+  if (strandedOutgoingId) {
+    const res = await cancelChallenge(supabase, strandedOutgoingId, {
+      onlyIfPending: true,
+    });
+    // Only a row that actually changed was withdrawn; an already-over one
+    // has nothing to tell the recipient.
+    if (res.ok && res.data.cancelled) {
+      await broadcast(null, strandedOutgoingId, "cancelled");
+    }
+  }
   const result = await declineOtherPendingChallenges(supabase, athleteId, {
     keepChallengeId: enteredChallengeId,
     exceptChallengerId: peerId,
   });
   if (!result.ok) return;
   for (const c of result.data.skipped) {
+    settled.add(c.challengeId);
     void cancelChallenge(supabase, c.challengeId, { onlyIfPending: true });
   }
+  for (const c of result.data.declined) settled.add(c.challengeId);
   await Promise.all(
     result.data.declined.map((c) => broadcast(null, c.challengeId, "declined")),
   );
 }
 
 /**
- * Instant Arena handshake.
+ * Instant Arena handshake, the web port of
+ * `apps/mobile/lib/arena/use-arena-challenge.ts`.
  *
  * Challenge -> live prompt -> accept -> straight into the match wizard, with no
  * inbox round trip. The challenge row still exists (chk_match_origin requires
@@ -107,47 +189,60 @@ async function settleIncomingAfterEntry(
  * Realtime surfaces:
  *  - postgres_changes INSERT on `challenges` filtered to me as opponent, which
  *    raises the incoming prompt, but ONLY while `canReceive` (the athlete is
- *    live and not in a match). There is no column that marks a challenge as
- *    Arena-originated, so live-ness is the gate: a non-live athlete's
- *    challenges are left for the regular challenge flow instead of hijacking
- *    them into the Arena. The profile ChallengeSheet sends through this hook
- *    too (`arenaActions.sendChallenge`), so its challenger gets the same
- *    waiting bar and match entry.
+ *    live and not in a match). While I am entering or in a match it is
+ *    declined as busy instead (the peer's own is withdrawn quietly), so its
+ *    challenger is not left waiting on a prompt nobody will answer.
  *  - postgres_changes UPDATE on the same filter, which dismisses a prompt once
- *    its row stops being pending (cancelled, expired, answered elsewhere).
+ *    its row stops being pending, and joins a match the challenger started
+ *    for a challenge I accepted but never entered.
  *  - postgres_changes UPDATE filtered to me as challenger, which resolves my
- *    "Waiting for X" without any broadcast (mirrors mobile): declined,
- *    cancelled or expired clears it; "started" (the match already exists)
- *    enters it via the idempotent start_match_from_challenge. "accepted" is
- *    deliberately ignored: the accepter is creating the match at that moment,
- *    and racing it from this side is how two clients fight over one row. The
- *    match_started broadcast is the normal path; "started" is the fallback.
- *    A "started" row that is NOT on my waiting bar (the tab was reloaded, so
- *    the in-memory bar is gone) is still joined when it is mine and fresh.
+ *    waiting bar: declined, cancelled or expired clears it; `started` enters
+ *    it via the idempotent start_match_from_challenge. `accepted` never starts
+ *    it (the accepter is creating the match, jits-njyd) but arms a 12s safety
+ *    net (`ACCEPTED_FALLBACK_MS`) that starts it if the accepter never does.
  *  - a per-challenge broadcast channel: the accepting side tells the
  *    challenger the match exists, the challenger's cancel tells the recipient.
  *
+ * Concurrency (the group demo, mobile parity):
+ *  - accepting while my own challenge is out withdraws mine first
+ *    (pending-guarded), or joins mine if it already started;
+ *  - crossing challenges (A and B challenge each other) tie-break on the
+ *    LOWER challenge id as canonical, so both land in ONE match;
+ *  - one client never pushes two match routes (`entryRef`).
+ *
  * Recovery (mobile parity, `use-pending-challenge-recovery.ts`): on mount, on
- * going live / leaving a match and when the tab comes back, my own newest
- * fresh pending outgoing challenge is put back on the waiting bar, so a reload
- * does not strand the challenger without its bar or its accept listener.
+ * going live / leaving a match, when the tab comes back and whenever a prompt
+ * clears without a match, my pending challenges are read again: my own newest
+ * fresh outgoing is put back on the waiting bar, the newest fresh incoming
+ * whose challenger is in `lobbyIds` is offered, and my stale outgoing ones are
+ * withdrawn.
  */
 export function useArenaChallenge({
   athleteId,
   athleteWeight,
   canReceive = true,
   inMatch = false,
+  lobbyIds,
 }: {
   athleteId: string;
   athleteWeight: number | null;
   canReceive?: boolean;
   /** A match screen is mounted: nothing is restored or joined behind it. */
   inMatch?: boolean;
+  /**
+   * Athlete ids in `lobby:online`. A pending incoming challenge found by a
+   * read is offered only when its challenger is here; without it, only the
+   * realtime INSERT raises prompts.
+   */
+  lobbyIds?: ReadonlySet<string>;
 }) {
   const router = useRouter();
   const [incoming, setIncomingState] = useState<IncomingChallenge | null>(null);
   const [outgoing, setOutgoingState] = useState<OutgoingChallenge | null>(null);
   const [isBusy, setIsBusy] = useState(false);
+  const [candidates, setCandidates] = useState<PendingChallenge[]>([]);
+  /** Re-runs the offer pass after an offer turned out final. */
+  const [offerPass, setOfferPass] = useState(0);
   const busyRef = useRef(false);
   const outgoingChannelRef = useRef<RealtimeChannel | null>(null);
   const incomingChannelRef = useRef<RealtimeChannel | null>(null);
@@ -155,7 +250,11 @@ export function useArenaChallenge({
   canReceiveRef.current = canReceive;
   const inMatchRef = useRef(inMatch);
   inMatchRef.current = inMatch;
-  /** Challenges this instance already resolved; never restored again. */
+  const weightRef = useRef(athleteWeight);
+  weightRef.current = athleteWeight;
+  const athleteIdRef = useRef(athleteId);
+  athleteIdRef.current = athleteId;
+  /** Challenges this instance already resolved; never restored or offered again. */
   const settledRef = useRef<Set<string>>(new Set());
   // Mirrors of state for realtime handlers, which must not read stale closures.
   const incomingRef = useRef<IncomingChallenge | null>(null);
@@ -164,6 +263,29 @@ export function useArenaChallenge({
   const acceptingIdRef = useRef<string | null>(null);
   /** Last challenge we navigated for: broadcast and UPDATE can both land. */
   const enteredForRef = useRef<string | null>(null);
+  /** Every challenge this instance entered a match for. */
+  const enteredIdsRef = useRef<Set<string>>(new Set());
+  /**
+   * A match route this instance pushed that has not reported itself mounted
+   * yet (`inMatch`). Together with `inMatch` it makes entry exclusive.
+   */
+  const entryRef = useRef<{ challengeId: string; at: number } | null>(null);
+  /**
+   * The athlete in the match I am entering or in, until I leave it. A
+   * challenge from them meanwhile is the late other half of a crossing pair,
+   * withdrawn quietly, never "declined".
+   */
+  const entryPeerRef = useRef<string | null>(null);
+  /** Challenges I accepted and have not entered yet (the challenger may start it). */
+  const acceptedNotEnteredRef = useRef<Set<string>>(new Set());
+  /** My outgoing challenges I have seen at `accepted`. */
+  const acceptedSeenRef = useRef<Set<string>>(new Set());
+  /** My outgoing challenges I cancelled myself: their end is never news. */
+  const selfCancelledRef = useRef<Set<string>>(new Set());
+  /** Incoming challenges whose prompt this instance raised from a read. */
+  const offeredRef = useRef<Set<string>>(new Set());
+  /** Offers still waiting on their challenger read; never doubled up. */
+  const offeringRef = useRef<Set<string>>(new Set());
 
   const setIncoming = useCallback((next: IncomingChallenge | null) => {
     incomingRef.current = next;
@@ -174,11 +296,221 @@ export function useArenaChallenge({
     setOutgoingState(next);
   }, []);
 
+  const entryBlocked = useCallback(
+    () =>
+      inMatchRef.current ||
+      (entryRef.current !== null &&
+        Date.now() - entryRef.current.at < ENTRY_SETTLE_MS),
+    [],
+  );
+
+  /** Read pending challenges again (a prompt cleared without a match). */
+  const recoverRef = useRef<() => Promise<void>>(async () => {});
+  const resync = useCallback(() => {
+    if (!inMatchRef.current) void recoverRef.current();
+  }, []);
+
   // Going offline or into a match drops an unanswered prompt (the row stays
-  // pending for the regular flow; it is not declined on the athlete's behalf).
+  // pending; it is not declined on the athlete's behalf, and recovery offers
+  // it again later if it is still fresh).
   useEffect(() => {
     if (!canReceive) setIncoming(null);
   }, [canReceive, setIncoming]);
+
+  /**
+   * Navigate into the match for `challengeId`, once. `peerId` is the other
+   * athlete in it: a pending challenge from them is the other half of a
+   * crossing pair and is withdrawn quietly rather than declined.
+   */
+  const enterMatch = useCallback(
+    (challengeId: string, matchId: string, peerId: string | null) => {
+      if (enteredForRef.current === challengeId) return;
+      if (entryBlocked()) {
+        console.warn(
+          `[arena] not entering the match for ${challengeId}: another match screen is already up`,
+        );
+        return;
+      }
+      enteredForRef.current = challengeId;
+      entryRef.current = { challengeId, at: Date.now() };
+      entryPeerRef.current = peerId;
+      enteredIdsRef.current.add(challengeId);
+      acceptedNotEnteredRef.current.delete(challengeId);
+      settledRef.current.add(challengeId);
+      // My own challenge that did not become this match is over too. Settled
+      // now, so recovery cannot put its bar back while it is withdrawn.
+      const mine = outgoingRef.current;
+      const stranded = mine && mine.challengeId !== challengeId ? mine.challengeId : null;
+      if (stranded) settledRef.current.add(stranded);
+      setIncoming(null);
+      setOutgoing(null);
+      router.push(`/arena/match/${matchId}`);
+      void settleOthersAfterEntry(
+        athleteIdRef.current,
+        challengeId,
+        peerId,
+        stranded,
+        settledRef.current,
+      );
+    },
+    [router, entryBlocked, setIncoming, setOutgoing],
+  );
+
+  /**
+   * My outgoing challenge is over without a match: drop the waiting bar.
+   * `toastMessage` is null for a quiet end (my own cancel, a sweep).
+   */
+  const endOutgoing = useCallback(
+    (challengeId: string, toastMessage: string | null) => {
+      settledRef.current.add(challengeId);
+      if (outgoingRef.current?.challengeId !== challengeId) return;
+      setOutgoing(null);
+      if (toastMessage) toast.info(toastMessage);
+    },
+    [setOutgoing],
+  );
+
+  /** Why my outgoing challenge ended, as a toast (null for a quiet end). */
+  const outgoingEndedToast = useCallback(
+    (challengeId: string, status: string, opponentName: string): string | null => {
+      if (status === "declined") return `${opponentName} declined.`;
+      if (
+        status === "cancelled" &&
+        acceptedSeenRef.current.has(challengeId) &&
+        !selfCancelledRef.current.has(challengeId)
+      ) {
+        return couldNotStartMessage(opponentName);
+      }
+      return null;
+    },
+    [],
+  );
+
+  /**
+   * An INSERT that landed while I am entering or in a match. From the athlete
+   * I am matched with, it is the late other half of a crossing pair,
+   * withdrawn quietly; anyone else is declined as busy and told, so their
+   * bar clears instead of waiting on me.
+   */
+  const settleBusyInsert = useCallback((row: ChallengeRow) => {
+    if (settledRef.current.has(row.id)) return;
+    settledRef.current.add(row.id);
+    const supabase = createClient();
+    if (row.challenger_id === entryPeerRef.current) {
+      void cancelChallenge(supabase, row.id, { onlyIfPending: true });
+      return;
+    }
+    void declineChallenge(supabase, row.id).then((result) => {
+      if (result.ok) void broadcast(null, row.id, "declined");
+    });
+  }, []);
+
+  // --- The challenger's safety nets ----------------------------------------
+  const scheduleAcceptedFallbackRef = useRef<(challengeId: string) => void>(() => {});
+  const scheduleStartRetryRef = useRef<(challengeId: string) => void>(() => {});
+  /** Outgoing challenges whose fallback was re-armed after a retry. */
+  const fallbackRearmedRef = useRef<Set<string>>(new Set());
+
+  /**
+   * Re-read my outgoing challenge's row and act on it: the recovery for a
+   * challenger that missed the realtime UPDATE and the broadcast. Only
+   * `started` enters: on `accepted` the accepter is mid-way through starting
+   * it (jits-njyd). `mode`: "read" is the plain re-read; "fallback" also
+   * starts a row still at `accepted`; "retry" is the single re-read after a
+   * failed start, which arms nothing further, so it cannot loop.
+   */
+  const recheckOutgoing = useCallback(
+    async (challengeId: string, mode: "read" | "fallback" | "retry" = "read") => {
+      const mine = outgoingRef.current;
+      if (!mine || mine.challengeId !== challengeId) return;
+      const supabase = createClient();
+      const read = await getChallengeStatus(supabase, challengeId);
+      if (!read.ok || !read.data) return;
+      if (outgoingRef.current?.challengeId !== challengeId) return;
+      const { status } = read.data;
+      if (status === "accepted") acceptedSeenRef.current.add(challengeId);
+      if (status === "started" || (status === "accepted" && mode === "fallback")) {
+        const started = await startMatchFromChallenge(supabase, challengeId);
+        if (started.ok) {
+          enterMatch(challengeId, started.data.match_id, mine.opponentId);
+          return;
+        }
+        // Most likely the accepter was starting it at the same moment, or
+        // withdrew it: read once more shortly and follow the row.
+        if (mode !== "retry") scheduleStartRetryRef.current(challengeId);
+        return;
+      }
+      if (status === "accepted") {
+        if (mode !== "retry") {
+          scheduleAcceptedFallbackRef.current(challengeId);
+        } else if (!fallbackRearmedRef.current.has(challengeId)) {
+          fallbackRearmedRef.current.add(challengeId);
+          scheduleAcceptedFallbackRef.current(challengeId);
+        }
+        return;
+      }
+      if (!LIVE_CHALLENGE_STATUSES.has(status)) {
+        endOutgoing(challengeId, outgoingEndedToast(challengeId, status, mine.opponentName));
+      }
+    },
+    [enterMatch, endOutgoing, outgoingEndedToast],
+  );
+  const recheckOutgoingRef = useRef(recheckOutgoing);
+  recheckOutgoingRef.current = recheckOutgoing;
+
+  /**
+   * Safety net for my challenge sitting at `accepted`: normally the accepter
+   * starts it within a second. If its start failed or its tab died, one
+   * re-read `ACCEPTED_FALLBACK_MS` later that still finds `accepted` starts
+   * it from here (the RPC is idempotent).
+   */
+  const acceptedFallbackRef = useRef<{
+    challengeId: string;
+    timer: ReturnType<typeof setTimeout>;
+  } | null>(null);
+  scheduleAcceptedFallbackRef.current = (challengeId: string) => {
+    if (acceptedFallbackRef.current?.challengeId === challengeId) return;
+    if (acceptedFallbackRef.current) clearTimeout(acceptedFallbackRef.current.timer);
+    const timer = setTimeout(() => {
+      acceptedFallbackRef.current = null;
+      void recheckOutgoingRef.current(challengeId, "fallback");
+    }, ACCEPTED_FALLBACK_MS);
+    acceptedFallbackRef.current = { challengeId, timer };
+  };
+
+  /** The one re-read after a failed start of my outgoing (`START_RETRY_MS`). */
+  const startRetryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  scheduleStartRetryRef.current = (challengeId: string) => {
+    if (startRetryRef.current) clearTimeout(startRetryRef.current);
+    startRetryRef.current = setTimeout(() => {
+      startRetryRef.current = null;
+      void recheckOutgoingRef.current(challengeId, "retry");
+    }, START_RETRY_MS);
+  };
+
+  useEffect(
+    () => () => {
+      if (acceptedFallbackRef.current) clearTimeout(acceptedFallbackRef.current.timer);
+      acceptedFallbackRef.current = null;
+      if (startRetryRef.current) clearTimeout(startRetryRef.current);
+      startRetryRef.current = null;
+    },
+    [],
+  );
+
+  /**
+   * The `started` UPDATE for a challenge I accepted but never entered (my
+   * start failed, or its reply was lost): the challenger's fallback started
+   * it, so ask for that match and join it. Left to `accept` while it runs.
+   */
+  const joinAccepted = useCallback(
+    async (challengeId: string, challengerId: string) => {
+      if (busyRef.current || enteredIdsRef.current.has(challengeId)) return;
+      const started = await startMatchFromChallenge(createClient(), challengeId);
+      if (started.ok) enterMatch(challengeId, started.data.match_id, challengerId);
+    },
+    [enterMatch],
+  );
 
   /**
    * Withdraw my own outgoing challenges older than the Arena freshness window
@@ -192,15 +524,17 @@ export function useArenaChallenge({
       keepChallengeId: outgoingRef.current?.challengeId ?? null,
     });
     if (!swept.ok || swept.data.cancelled.length === 0) return 0;
+    for (const c of swept.data.cancelled) settledRef.current.add(c.challengeId);
     // The Arena roster marks already-challenged athletes from a server read.
     router.refresh();
     return swept.data.cancelled.length;
   }, [athleteId, router]);
 
   /**
-   * Read my pending challenges once, put my newest fresh outgoing back on the
-   * waiting bar if the bar is empty (a reload loses it), then withdraw my
-   * stale ones from the same read.
+   * Read my pending challenges once: put my newest fresh outgoing back on the
+   * waiting bar if the bar is empty (a reload loses it), keep the fresh
+   * incoming ones as prompt candidates, then withdraw my stale outgoing ones
+   * from the same read.
    */
   const recover = useCallback(async (): Promise<void> => {
     if (!athleteId) return;
@@ -211,7 +545,8 @@ export function useArenaChallenge({
       return;
     }
     const now = Date.now();
-    // Newest first; `expires_at` is already filtered by the read.
+    // Both lists arrive newest first; `expires_at` is already filtered.
+    setCandidates(read.data.incoming.filter((c) => isFreshPending(c, now)));
     const mine = read.data.outgoing.find(
       (c) => c.challengerId === athleteId && isFreshChallenge(c.createdAt, now),
     );
@@ -220,7 +555,7 @@ export function useArenaChallenge({
       !outgoingRef.current &&
       // A send, accept or cancel in flight decides the bar itself.
       !busyRef.current &&
-      !inMatchRef.current &&
+      !entryBlocked() &&
       !settledRef.current.has(mine.challengeId) &&
       enteredForRef.current !== mine.challengeId
     ) {
@@ -236,62 +571,114 @@ export function useArenaChallenge({
       now,
     });
     // The Arena roster marks already-challenged athletes from a server read.
-    if (swept.ok && swept.data.cancelled.length > 0) router.refresh();
-  }, [athleteId, router, setOutgoing, sweepStale]);
+    if (swept.ok && swept.data.cancelled.length > 0) {
+      for (const c of swept.data.cancelled) settledRef.current.add(c.challengeId);
+      router.refresh();
+    }
+  }, [athleteId, router, entryBlocked, setOutgoing, sweepStale]);
+  recoverRef.current = recover;
 
   // On mount, on going live / leaving a match, and when the tab comes back.
-  const sweepRef = useRef(recover);
-  sweepRef.current = recover;
   useEffect(() => {
-    void sweepRef.current();
+    void recoverRef.current();
   }, [athleteId, canReceive, inMatch]);
   useEffect(() => {
     const onVisible = () => {
-      if (document.visibilityState === "visible") void sweepRef.current();
+      if (document.visibilityState !== "visible") return;
+      void recoverRef.current();
+      // The accept broadcast and the status UPDATE may both have been missed
+      // while the tab was hidden.
+      const mine = outgoingRef.current;
+      if (mine) void recheckOutgoingRef.current(mine.challengeId);
     };
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
   }, []);
 
-  /** Navigate both parties into the shared wizard, once per challenge. */
-  const enterMatch = useCallback(
-    (challengeId: string, matchId: string, peerId: string | null) => {
-      if (enteredForRef.current === challengeId) return;
-      enteredForRef.current = challengeId;
-      settledRef.current.add(challengeId);
-      // Accepting someone else's challenge abandons my own pending one:
-      // withdraw it so its opponent is not left with a dead prompt.
-      const dropped = outgoingRef.current;
-      if (dropped && dropped.challengeId !== challengeId) {
-        void (async () => {
-          const res = await cancelChallenge(createClient(), dropped.challengeId);
-          // Only a row that actually changed was withdrawn; an already-over
-          // one has nothing to tell the recipient.
-          if (res.ok && res.data.cancelled) {
-            await broadcast(null, dropped.challengeId, "cancelled");
-          }
-        })();
-        settledRef.current.add(dropped.challengeId);
-      }
-      void settleIncomingAfterEntry(athleteId, challengeId, peerId);
-      setIncoming(null);
-      setOutgoing(null);
-      router.push(`/arena/match/${matchId}`);
+  // The match screen is up: `inMatch` guards entry from here. Leaving a match
+  // forgets the peer, lets a dropped prompt be offered again, and re-reads a
+  // bar still up (its events may have landed while I was busy).
+  const wasInMatchRef = useRef(inMatch);
+  useEffect(() => {
+    if (inMatch) entryRef.current = null;
+    if (inMatch === wasInMatchRef.current) return;
+    wasInMatchRef.current = inMatch;
+    if (inMatch) return;
+    entryPeerRef.current = null;
+    offeredRef.current.clear();
+    const mine = outgoingRef.current;
+    if (mine) void recheckOutgoingRef.current(mine.challengeId);
+  }, [inMatch]);
+
+  /**
+   * Raise the prompt for a challenge found by a read rather than by the
+   * realtime INSERT. See `OfferResult`.
+   */
+  const offerIncoming = useCallback(
+    async (challengeId: string, challengerId: string): Promise<OfferResult> => {
+      const check = (): OfferResult | null => {
+        if (
+          settledRef.current.has(challengeId) ||
+          enteredForRef.current === challengeId
+        ) {
+          return "final";
+        }
+        if (entryBlocked() || incomingRef.current || !canReceiveRef.current) {
+          return "retry";
+        }
+        return null;
+      };
+      const before = check();
+      if (before) return before;
+      const { data } = await createClient()
+        .from("athletes")
+        .select("display_name")
+        .eq("id", challengerId)
+        .single();
+      // Re-checked after the read: the INSERT or an answer can land meanwhile.
+      const after = check();
+      if (after) return after;
+      setIncoming({
+        challengeId,
+        challengerId,
+        challengerName: data?.display_name ?? "An athlete",
+      });
+      return "raised";
     },
-    [athleteId, router, setIncoming, setOutgoing],
+    [entryBlocked, setIncoming],
   );
 
-  /** Clear my outgoing challenge if it is still `challengeId`. */
-  const resolveOutgoing = useCallback(
-    (challengeId: string, declined: boolean) => {
-      const mine = outgoingRef.current;
-      if (mine?.challengeId !== challengeId) return;
-      settledRef.current.add(challengeId);
-      setOutgoing(null);
-      if (declined) toast.info(`${mine.opponentName} declined.`);
-    },
-    [setOutgoing],
-  );
+  // Offer at most one: the newest candidate whose challenger is still in the
+  // lobby. Re-evaluated as presence syncs (the lobby is usually still empty
+  // on the first render) and whenever the prompt clears.
+  useEffect(() => {
+    if (!lobbyIds || !canReceive || incoming) return;
+    const now = Date.now();
+    // Answered, withdrawn or entered ones are skipped here, so one cannot sit
+    // at the head of the list blocking the challenger queued behind it.
+    const pick = candidates.find(
+      (c) =>
+        !offeredRef.current.has(c.challengeId) &&
+        !offeringRef.current.has(c.challengeId) &&
+        !settledRef.current.has(c.challengeId) &&
+        lobbyIds.has(c.challengerId) &&
+        isFreshPending(c, now),
+    );
+    if (!pick) return;
+    const id = pick.challengeId;
+    offeringRef.current.add(id);
+    void offerIncoming(id, pick.challengerId)
+      .then((outcome) => {
+        if (outcome === "retry") return;
+        offeredRef.current.add(id);
+        // Settled meanwhile: look at the next candidate now, not on the next
+        // presence sync.
+        if (outcome === "final") setOfferPass((n) => n + 1);
+      })
+      .finally(() => {
+        offeringRef.current.delete(id);
+      });
+  }, [candidates, lobbyIds, canReceive, incoming, offerIncoming, offerPass]);
 
   // --- Realtime: challenges involving me ------------------------------------
   useEffect(() => {
@@ -308,23 +695,35 @@ export function useArenaChallenge({
           filter: `opponent_id=eq.${athleteId}`,
         },
         async (payload) => {
-          const row = payload.new as {
-            id: string;
-            challenger_id: string;
-            status: string;
-          };
-          if (row.status !== "pending" || !canReceiveRef.current) return;
-          // The first open prompt keeps the surface rather than being
-          // replaced mid-decision.
-          if (incomingRef.current) return;
+          const row = payload.new as ChallengeRow;
+          if (row.status !== "pending") return;
+          if (row.expires_at && Date.parse(row.expires_at) <= Date.now()) return;
+          if (settledRef.current.has(row.id)) return;
+          // Entering or in a match: I am busy, so the challenger is told now
+          // rather than left waiting on a prompt nobody will answer.
+          if (entryBlocked()) {
+            settleBusyInsert(row);
+            return;
+          }
+          // Offline: no live prompt. Another prompt up: the first keeps the
+          // surface rather than being replaced mid-decision.
+          const skip = () =>
+            !canReceiveRef.current ||
+            !!incomingRef.current ||
+            settledRef.current.has(row.id);
+          if (skip()) return;
 
           const { data: challenger } = await supabase
             .from("athletes")
             .select("display_name")
             .eq("id", row.challenger_id)
             .single();
-          // Re-checked: offline, or another prompt, may have landed meanwhile.
-          if (!canReceiveRef.current || incomingRef.current) return;
+          // Re-checked: a match, offline, or another prompt may have landed.
+          if (entryBlocked()) {
+            settleBusyInsert(row);
+            return;
+          }
+          if (skip()) return;
 
           setIncoming({
             challengeId: row.id,
@@ -342,11 +741,26 @@ export function useArenaChallenge({
           filter: `opponent_id=eq.${athleteId}`,
         },
         (payload) => {
-          const row = payload.new as { id: string; status: string };
+          const row = payload.new as ChallengeRow;
           if (row.status === "pending") return;
+          settledRef.current.add(row.id);
+          // One I accepted but never entered, now started by the challenger's
+          // fallback: join it. Any other end means there is nothing to join.
+          if (acceptedNotEnteredRef.current.has(row.id)) {
+            if (row.status === "started") {
+              void joinAccepted(row.id, row.challenger_id);
+            } else if (row.status !== "accepted") {
+              acceptedNotEnteredRef.current.delete(row.id);
+            }
+          }
           // My own accept flips the row to accepted before the match exists.
           if (acceptingIdRef.current === row.id) return;
-          if (incomingRef.current?.challengeId === row.id) setIncoming(null);
+          if (incomingRef.current?.challengeId === row.id) {
+            setIncoming(null);
+            // Not for an accept landing: a re-read could raise the next
+            // prompt under the navigation.
+            if (!LIVE_CHALLENGE_STATUSES.has(row.status)) resync();
+          }
         },
       )
       .on(
@@ -358,14 +772,9 @@ export function useArenaChallenge({
           filter: `challenger_id=eq.${athleteId}`,
         },
         async (payload) => {
-          const row = payload.new as {
-            id: string;
-            status: string;
-            challenger_id?: string;
-            opponent_id?: string;
-            created_at?: string;
-          };
-          if (outgoingRef.current?.challengeId !== row.id) {
+          const row = payload.new as ChallengeRow;
+          const mine = outgoingRef.current;
+          if (mine?.challengeId !== row.id) {
             // Not on my bar: the bar was lost to a reload. Only a fresh
             // "started" row of mine is still worth joining (the opponent is
             // in the match waiting), and never behind a match on screen.
@@ -378,22 +787,31 @@ export function useArenaChallenge({
             ) {
               return;
             }
+            const started = await startMatchFromChallenge(supabase, row.id);
+            if (started.ok) {
+              enterMatch(row.id, started.data.match_id, row.opponent_id ?? null);
+            }
+            return;
           }
-          if (["declined", "cancelled", "expired"].includes(row.status)) {
-            resolveOutgoing(row.id, row.status === "declined");
+          if (!LIVE_CHALLENGE_STATUSES.has(row.status)) {
+            endOutgoing(row.id, outgoingEndedToast(row.id, row.status, mine.opponentName));
             return;
           }
           // Fallback when the match_started broadcast never arrived. Only
-          // "started": on "accepted" the match may not exist yet.
+          // "started": on "accepted" the accepter is creating the match.
           if (row.status === "started") {
             const started = await startMatchFromChallenge(supabase, row.id);
             if (started.ok) {
-              enterMatch(
-                row.id,
-                started.data.match_id,
-                outgoingRef.current?.opponentId ?? row.opponent_id ?? null,
-              );
+              enterMatch(row.id, started.data.match_id, mine.opponentId);
+            } else {
+              scheduleStartRetryRef.current(row.id);
             }
+            return;
+          }
+          if (row.status === "accepted") {
+            // Wait for the accepter, with a safety net if its start never lands.
+            acceptedSeenRef.current.add(row.id);
+            scheduleAcceptedFallbackRef.current(row.id);
           }
         },
       )
@@ -402,7 +820,17 @@ export function useArenaChallenge({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [athleteId, enterMatch, resolveOutgoing, setIncoming]);
+  }, [
+    athleteId,
+    enterMatch,
+    endOutgoing,
+    entryBlocked,
+    joinAccepted,
+    outgoingEndedToast,
+    resync,
+    setIncoming,
+    settleBusyInsert,
+  ]);
 
   // --- Incoming: the challenger may withdraw -------------------------------
   const incomingId = incoming?.challengeId;
@@ -413,7 +841,10 @@ export function useArenaChallenge({
       .channel(channelName(incomingId))
       .on("broadcast", { event: "cancelled" }, () => {
         if (acceptingIdRef.current === incomingId) return;
-        if (incomingRef.current?.challengeId === incomingId) setIncoming(null);
+        settledRef.current.add(incomingId);
+        if (incomingRef.current?.challengeId !== incomingId) return;
+        setIncoming(null);
+        resync();
       })
       .subscribe();
     incomingChannelRef.current = channel;
@@ -421,10 +852,12 @@ export function useArenaChallenge({
       incomingChannelRef.current = null;
       supabase.removeChannel(channel);
     };
-  }, [incomingId, setIncoming]);
+  }, [incomingId, setIncoming, resync]);
 
   // --- Outgoing: wait for my challenge to be accepted -----------------------
   const outgoingId = outgoing?.challengeId;
+  const outgoingName = outgoing?.opponentName;
+  const outgoingPeer = outgoing?.opponentId ?? null;
   useEffect(() => {
     if (!outgoingId) return;
     const supabase = createClient();
@@ -432,21 +865,23 @@ export function useArenaChallenge({
       .channel(channelName(outgoingId))
       .on("broadcast", { event: "match_started" }, ({ payload }) => {
         const matchId = (payload as { matchId?: string })?.matchId;
-        if (matchId) {
-          enterMatch(outgoingId, matchId, outgoingRef.current?.opponentId ?? null);
-        }
+        if (matchId) enterMatch(outgoingId, matchId, outgoingPeer);
       })
       .on("broadcast", { event: "declined" }, () => {
-        resolveOutgoing(outgoingId, true);
+        endOutgoing(outgoingId, `${outgoingName ?? "Your opponent"} declined.`);
       })
-      .subscribe();
+      // Every SUBSCRIBED re-reads the row: the first closes the window between
+      // the insert and this listener, a rejoin may have missed the broadcast.
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") void recheckOutgoingRef.current(outgoingId);
+      });
 
     outgoingChannelRef.current = channel;
     return () => {
       outgoingChannelRef.current = null;
       supabase.removeChannel(channel);
     };
-  }, [outgoingId, enterMatch, resolveOutgoing]);
+  }, [outgoingId, outgoingName, outgoingPeer, enterMatch, endOutgoing]);
 
   /** Guard every mutation against double-taps; a ref, because state is async. */
   const runExclusive = useCallback(async (fn: () => Promise<void>) => {
@@ -502,7 +937,7 @@ export function useArenaChallenge({
           createChallenge(supabase, {
             opponentId,
             matchType: "ranked", // ranked-only product
-            challengerWeight: athleteWeight ?? undefined,
+            challengerWeight: weightRef.current ?? undefined,
           });
         let result = await create();
         // The cap may be held by my own stale challenges: withdraw them and
@@ -524,7 +959,85 @@ export function useArenaChallenge({
         }
         setOutgoing({ challengeId: result.data.id, opponentId, opponentName });
       }),
-    [athleteWeight, runExclusive, setOutgoing, sweepStale, explainRefusedInsert],
+    [runExclusive, setOutgoing, sweepStale, explainRefusedInsert],
+  );
+
+  /**
+   * I am accepting `current` while my own challenge `mine` is still out
+   * (mobile parity). Mine is withdrawn FIRST, pending-guarded, so nobody can
+   * accept it while I walk into a different match. When no row changed, mine
+   * is already past pending, and its status decides:
+   *  - `started`: its match exists, so I join THAT one;
+   *  - `accepted`: the other side is starting it right now and its broadcast
+   *    (or the `started` UPDATE) takes me in, so I let go of `current` and
+   *    keep waiting (starting it here would be the jits-njyd race);
+   *  - anything else: mine is over without a match, and the accept goes on.
+   * Resolves "proceed" to go on accepting `current`, "stop" when finished.
+   */
+  const resolveOwnOutgoing = useCallback(
+    async (
+      mine: OutgoingChallenge,
+      current: IncomingChallenge,
+    ): Promise<"proceed" | "stop"> => {
+      const supabase = createClient();
+      const crossing = mine.opponentId === current.challengerId;
+      const withdrawn = await cancelChallenge(supabase, mine.challengeId, {
+        onlyIfPending: true,
+      });
+      if (!withdrawn.ok) {
+        // Unknown whether mine is still live: accepting now could put me in
+        // two matches. Keep the prompt, the athlete can try again.
+        toast.error(ACCEPT_FAILED_MESSAGE);
+        return "stop";
+      }
+      if (withdrawn.data.cancelled) {
+        // Tell its recipient, so their prompt goes, then drop my bar quietly.
+        await broadcast(outgoingChannelRef.current, mine.challengeId, "cancelled");
+        endOutgoing(mine.challengeId, null);
+        return "proceed";
+      }
+
+      const read = await getChallengeStatus(supabase, mine.challengeId);
+      if (!read.ok) {
+        toast.error(ACCEPT_FAILED_MESSAGE);
+        return "stop";
+      }
+      const status = read.data?.status ?? null;
+
+      if (status === "started") {
+        const started = await startMatchFromChallenge(supabase, mine.challengeId);
+        if (!started.ok) {
+          toast.error("Couldn't start the match. Try again.");
+          return "stop";
+        }
+        enterMatch(mine.challengeId, started.data.match_id, mine.opponentId);
+        return "stop";
+      }
+
+      if (status === "accepted") {
+        acceptedSeenRef.current.add(mine.challengeId);
+        scheduleAcceptedFallbackRef.current(mine.challengeId);
+        settledRef.current.add(current.challengeId);
+        if (crossing) {
+          // The other half of a crossing pair: its sender is walking into a
+          // match with me, so it is withdrawn quietly, never "declined".
+          await cancelChallenge(supabase, current.challengeId, { onlyIfPending: true });
+        } else {
+          const declined = await declineChallenge(supabase, current.challengeId);
+          // On the prompt's own channel, while it is still up (see `broadcast`).
+          if (declined.ok) {
+            await broadcast(incomingChannelRef.current, current.challengeId, "declined");
+          }
+        }
+        setIncoming(null);
+        return "stop";
+      }
+
+      // Quietly: I am walking into a different match.
+      endOutgoing(mine.challengeId, null);
+      return "proceed";
+    },
+    [endOutgoing, enterMatch, setIncoming],
   );
 
   const accept = useCallback(
@@ -535,9 +1048,23 @@ export function useArenaChallenge({
         const supabase = createClient();
         acceptingIdRef.current = current.challengeId;
         try {
+          // Crossing challenges: A challenged B and B challenged A, and both
+          // may tap Accept at once. One tie-break both clients compute the
+          // same way: the LOWER challenge id is canonical. Its recipient
+          // accepts it straight away; the other side withdraws the canonical
+          // one first (pending-guarded). Exactly one of those two writes wins
+          // the row, and each outcome leaves exactly one match both reach.
+          const mine = outgoingRef.current;
+          const crossing = !!mine && mine.opponentId === current.challengerId;
+          const acceptCanonical =
+            crossing && !!mine && current.challengeId < mine.challengeId;
+          if (mine && !acceptCanonical) {
+            if ((await resolveOwnOutgoing(mine, current)) === "stop") return;
+          }
+
           const accepted = await acceptChallenge(supabase, {
             challengeId: current.challengeId,
-            opponentWeight: athleteWeight ?? undefined,
+            opponentWeight: weightRef.current ?? undefined,
           });
           if (!accepted.ok) {
             toast.error(
@@ -545,28 +1072,60 @@ export function useArenaChallenge({
                 ? CHALLENGE_GONE_MESSAGE
                 : accepted.error.message || "Couldn't accept that challenge.",
             );
+            settledRef.current.add(current.challengeId);
             setIncoming(null);
+            resync();
             return;
           }
+          // Until I am in its match: if my start below never lands, the
+          // challenger's fallback starts it and its `started` UPDATE brings
+          // me in.
+          acceptedNotEnteredRef.current.add(current.challengeId);
 
           // acceptChallenge filters on status = 'pending' and a no-row update
           // is not an error, so a withdrawn challenge surfaces here as
-          // not_accepted. Any other failure is retried once: the RPC is
-          // idempotent and returns the existing match if one was created.
-          let started = await startMatchFromChallenge(
-            supabase,
-            current.challengeId,
-          );
-          if (!started.ok && started.error.code !== "CHALLENGE_NOT_ACCEPTED") {
+          // not_accepted. That can also be a lost race with the challenger's
+          // own start (jits-njyd): the row lock made my call re-read
+          // `started`, and once more finds the match. Any other failure
+          // (network) gets the same one retry; the RPC is idempotent.
+          let started = await startMatchFromChallenge(supabase, current.challengeId);
+          if (!started.ok) {
             started = await startMatchFromChallenge(supabase, current.challengeId);
           }
+          if (!started.ok && started.error.code !== "CHALLENGE_NOT_ACCEPTED") {
+            // Accepted but could not start it: left alone the row sits at
+            // `accepted` and the challenger waits on me. Withdraw it so their
+            // UPDATE clears the bar. No row changed means it is not `accepted`
+            // any more: most likely my start DID land and only its reply was
+            // lost, so ask once more for the match that now exists.
+            const withdrawn = await cancelChallenge(supabase, current.challengeId);
+            if (withdrawn.ok && withdrawn.data.cancelled) {
+              acceptedNotEnteredRef.current.delete(current.challengeId);
+            }
+            if (withdrawn.ok && !withdrawn.data.cancelled) {
+              started = await startMatchFromChallenge(supabase, current.challengeId);
+            }
+          }
           if (!started.ok) {
+            settledRef.current.add(current.challengeId);
+            setIncoming(null);
+            // Crossing, and the other side won the canonical row by
+            // withdrawing it to accept mine instead: its broadcast is on its
+            // way to my bar, so there is nothing to apologise for.
+            if (
+              acceptCanonical &&
+              outgoingRef.current?.challengeId === mine?.challengeId
+            ) {
+              return;
+            }
+            // Already on the way into a match by another path.
+            if (entryBlocked()) return;
             toast.error(
               started.error.code === "CHALLENGE_NOT_ACCEPTED"
                 ? CHALLENGE_GONE_MESSAGE
                 : started.error.message || "Couldn't start the match.",
             );
-            setIncoming(null);
+            resync();
             return;
           }
 
@@ -578,12 +1137,14 @@ export function useArenaChallenge({
             { matchId: started.data.match_id },
           );
 
+          // Entering also declines everyone else waiting on me and withdraws
+          // my own challenge if it is still out (the crossing case).
           enterMatch(current.challengeId, started.data.match_id, current.challengerId);
         } finally {
           acceptingIdRef.current = null;
         }
       }),
-    [athleteWeight, runExclusive, enterMatch, setIncoming],
+    [runExclusive, resolveOwnOutgoing, entryBlocked, enterMatch, setIncoming, resync],
   );
 
   const decline = useCallback(
@@ -598,14 +1159,17 @@ export function useArenaChallenge({
           toast.error("Couldn't decline that challenge. Try again.");
           return;
         }
+        settledRef.current.add(current.challengeId);
         await broadcast(
           incomingChannelRef.current,
           current.challengeId,
           "declined",
         );
         setIncoming(null);
+        // The next challenger queued behind this one gets offered.
+        resync();
       }),
-    [runExclusive, setIncoming],
+    [runExclusive, setIncoming, resync],
   );
 
   const cancelOutgoing = useCallback(
@@ -614,6 +1178,7 @@ export function useArenaChallenge({
         const current = outgoingRef.current;
         if (!current) return;
         const supabase = createClient();
+        selfCancelledRef.current.add(current.challengeId);
         const result = await cancelChallenge(supabase, current.challengeId);
         if (!result.ok) {
           // Keep the bar: the challenge is still live server-side.
@@ -634,19 +1199,17 @@ export function useArenaChallenge({
             enterMatch(current.challengeId, started.data.match_id, current.opponentId);
             return;
           }
-          settledRef.current.add(current.challengeId);
-          setOutgoing(null);
+          endOutgoing(current.challengeId, null);
           return;
         }
-        settledRef.current.add(current.challengeId);
         await broadcast(
           outgoingChannelRef.current,
           current.challengeId,
           "cancelled",
         );
-        setOutgoing(null);
+        endOutgoing(current.challengeId, null);
       }),
-    [runExclusive, setOutgoing, enterMatch],
+    [runExclusive, endOutgoing, enterMatch],
   );
 
   return {

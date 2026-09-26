@@ -201,10 +201,15 @@ export function MatchSummaryStep({ onNext, matchId, matchType, currentAthleteId,
     setDisputing(true);
     const res = await disputeMatchResult(supabase, matchId);
     if (!res.ok) {
-      // Stay on the step: nothing was disputed, and Confirm / Dispute are
-      // both still the athlete's to choose.
+      // Most often the match is already disputed (the opponent's dispute, or
+      // ours landed and only the response was lost): let the DB decide
+      // before erroring, like a failed confirm. Still in flight meanwhile, so
+      // the row event is not toasted as the opponent's.
+      await checkDb();
       disputeInFlightRef.current = false;
       if (advancedRef.current) return;
+      // Stay on the step: nothing was disputed, and Confirm / Dispute are
+      // both still the athlete's to choose.
       setDisputing(false);
       toast.error(res.error.message || DISPUTE_FAILED_MESSAGE);
       return;

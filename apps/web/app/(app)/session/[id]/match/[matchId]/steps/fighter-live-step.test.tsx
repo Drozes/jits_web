@@ -30,7 +30,11 @@ vi.mock("@jits/shared/hooks/use-session-match-timer", () => ({
   }),
 }));
 
-type SyncOpts = { onMatchEnded?: () => void };
+type SyncOpts = {
+  onMatchEnded?: () => void;
+  onTimerPaused?: (pausedAt: string) => void;
+  onTimerResumed?: (totalPausedDuration: number) => void;
+};
 const sync = vi.hoisted(() => ({ opts: null as null | SyncOpts, broadcastMatchEnded: vi.fn() }));
 vi.mock("@jits/shared/hooks/use-session-match-sync", () => ({
   useSessionMatchSync: (opts: SyncOpts) => {
@@ -176,5 +180,61 @@ describe("FighterLiveStep reconciliation", () => {
     onNext.unmount();
     await tick();
     expect(api.getMatchDetails).not.toHaveBeenCalled();
+  });
+
+  describe("a read issued before the latest pause/resume broadcast is dropped (jits-u7vd)", () => {
+    function deferRead() {
+      let release!: (v: unknown) => void;
+      api.getMatchDetails.mockReturnValueOnce(new Promise((r) => (release = r)));
+      return (v: unknown) =>
+        act(async () => {
+          release(v);
+        });
+    }
+
+    it("does not re-pause after a resume broadcast that landed mid-read", async () => {
+      renderStep();
+      const land = deferRead();
+      await becomeVisible();
+      act(() => sync.opts?.onTimerResumed?.(5));
+      timer.syncFromBroadcast.mockClear();
+      await land(row({ paused_at: "2026-09-26T10:01:00.000Z", total_paused_duration: 0 }));
+      expect(timer.syncFromBroadcast).not.toHaveBeenCalled();
+      // The next read, issued after the broadcast, is trusted again.
+      api.getMatchDetails.mockResolvedValue(row({ total_paused_duration: 5 }));
+      await tick();
+      expect(timer.syncFromBroadcast).toHaveBeenCalledWith({
+        type: "resumed",
+        totalPausedDuration: 5,
+      });
+    });
+
+    it("does not resume after a pause broadcast that landed mid-read", async () => {
+      renderStep();
+      const land = deferRead();
+      await becomeVisible();
+      act(() => sync.opts?.onTimerPaused?.("2026-09-26T10:02:00.000Z"));
+      timer.syncFromBroadcast.mockClear();
+      await land(row());
+      expect(timer.syncFromBroadcast).not.toHaveBeenCalled();
+    });
+
+    it("never applies a read with a smaller paused total than already applied", async () => {
+      renderStep();
+      act(() => sync.opts?.onTimerResumed?.(30));
+      timer.syncFromBroadcast.mockClear();
+      api.getMatchDetails.mockResolvedValue(row({ total_paused_duration: 10 }));
+      await tick();
+      expect(timer.syncFromBroadcast).not.toHaveBeenCalled();
+    });
+
+    it("still leaves a cancelled match on a read that is stale for the pause state", async () => {
+      renderStep();
+      const land = deferRead();
+      await becomeVisible();
+      act(() => sync.opts?.onTimerResumed?.(5));
+      await land(row({ status: "cancelled" }));
+      expect(nav.replace).toHaveBeenCalledWith("/arena");
+    });
   });
 });
