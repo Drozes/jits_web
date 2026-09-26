@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### Mobile: Arena challenge concurrency for a full room (jits-njyd)
+
+JS-only, OTA-eligible for runtime 0.3.0.
+
+**Fixed**
+- Entering a match declines every other fresh pending challenge you received and tells each challenger; a challenge that arrives while you are entering or in a match is declined the same way instead of being ignored.
+- A prompt that clears, or any incoming-channel re-subscribe, re-reads pending so a queued challenger is offered; a skip caused by a busy surface stays eligible (`offerIncoming` returns `raised` / `retry` / `final`).
+- Accepting while your own challenge is out withdraws it first, or joins its match if it already started.
+- Crossing challenges resolve to one match through a lower-id-canonical tie-break, and a client never pushes two match screens.
+- The waiting plate re-reads its row on foreground, on (re)subscribe and on match exit, and joins on `started`; if the row sits at `accepted` for 12s the challenger starts the match itself.
+- An accept whose match start fails retries once, then withdraws the accepted row so the challenger's plate clears (or joins if the start actually landed).
+- The incoming and outgoing Arena realtime channels are rebuilt after a server close with bounded backoff.
+- New typed wrappers: `declineOtherPendingChallenges` (`packages/shared/src/api/mutations.ts`) and `getChallengeStatus` (`packages/shared/src/api/queries.ts`).
+
 ### Web: Arena and session match-flow fixes (demo bug hunt)
 
 **Fixed**
