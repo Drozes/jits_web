@@ -22,12 +22,19 @@ interface MockChannel {
   topic: string;
   config: unknown;
   joined: boolean;
+  /** Phoenix channel state, which the hook reads before pushing. */
+  state: "closed" | "joining" | "joined" | "errored" | "leaving";
   syncHandler: (() => void) | null;
+  /**
+   * Fires a subscribe status the way realtime-js does: SUBSCRIBED lands on a
+   * channel phoenix has already marked joined.
+   */
   subscribeHandler: ((status: string) => void) | null;
   on: jest.Mock;
   subscribe: jest.Mock;
   track: jest.Mock;
   untrack: jest.Mock;
+  teardown: jest.Mock;
   presenceState: jest.Mock;
 }
 
@@ -43,6 +50,7 @@ function mockMakeChannel(topic: string, config: unknown): MockChannel {
     topic: `realtime:${topic}`,
     config,
     joined: false,
+    state: "closed",
     syncHandler: null,
     subscribeHandler: null,
     on: jest.fn((_type: string, _filter: unknown, handler: () => void) => {
@@ -60,15 +68,28 @@ function mockMakeChannel(topic: string, config: unknown): MockChannel {
       return channel;
     }),
     subscribe: jest.fn((handler: (status: string) => void) => {
-      channel.subscribeHandler = handler;
+      channel.subscribeHandler = (status: string) => {
+        if (status === "SUBSCRIBED") channel.state = "joined";
+        handler(status);
+      };
       channel.joined = true;
+      channel.state = "joining";
       return channel;
     }),
-    track: jest.fn().mockResolvedValue(undefined),
-    untrack: jest.fn().mockResolvedValue(undefined),
+    track: jest.fn().mockResolvedValue("ok"),
+    untrack: jest.fn().mockResolvedValue("ok"),
+    teardown: jest.fn(),
     presenceState: jest.fn(() => ({})),
   };
   return channel;
+}
+
+/** A channel closing: out of the registry, then CLOSED to its callback. */
+function mockClose(channel: MockChannel) {
+  channel.state = "closed";
+  const i = mockRegistry.indexOf(channel);
+  if (i >= 0) mockRegistry.splice(i, 1);
+  channel.subscribeHandler?.("CLOSED");
 }
 
 jest.mock("@/lib/supabase/client", () => ({
@@ -85,8 +106,10 @@ jest.mock("@/lib/supabase/client", () => ({
     removeChannel: (channel: MockChannel) => {
       const status = mockRemoveChannel(channel) ?? "ok";
       if (status === "ok") {
-        const i = mockRegistry.indexOf(channel);
-        if (i >= 0) mockRegistry.splice(i, 1);
+        // Like realtime-js: the leave closes the channel, which drops it from
+        // the registry and fires CLOSED to its subscribe callback. The hook
+        // must read that CLOSED as its own teardown, never as a loss.
+        mockClose(channel);
       }
       return Promise.resolve(status);
     },
@@ -502,5 +525,386 @@ describe("useLobbyPresence", () => {
     const second = mount("someone-else");
     await waitFor(() => expect(second.result.current.size).toBe(0));
     second.unmount();
+  });
+});
+
+/**
+ * jits-fa9x. Realtime's per-channel presence rate limit (5 calls / 30s) makes
+ * the server CLOSE the channel. realtime-js drops a closed channel from its
+ * registry and never rejoins it, so a module that kept pointing at it pushed
+ * every later track into a dead channel: LIVE in the UI, invisible to
+ * everyone else, for the rest of the app process.
+ */
+describe("useLobbyPresence: server-closed channel recovery (jits-fa9x)", () => {
+  /** Advance fake time by `ms` and let the async setup settle. */
+  async function advance(ms: number) {
+    await act(async () => {
+      jest.advanceTimersByTime(ms);
+      await settle();
+    });
+  }
+
+  /** Mount, join the channel and go live on it. */
+  async function mountLive() {
+    const hook = mount();
+    await settle();
+    const channel = mockChannels[0];
+    await act(async () => {
+      channel.subscribeHandler?.("SUBSCRIBED");
+      await joinLobby(PAYLOAD);
+    });
+    expect(channel.track).toHaveBeenCalledTimes(1);
+    return { hook, channel };
+  }
+
+  it("rebuilds a server-closed channel and re-tracks the athlete on it", async () => {
+    jest.useFakeTimers();
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    const { hook, channel } = await mountLive();
+    channel.presenceState.mockReturnValue({ [ME]: [{}], "athlete-a": [{}] });
+    act(() => {
+      channel.syncHandler?.();
+    });
+    expect(hook.result.current.size).toBe(2);
+
+    // The server closes it (ClientPresenceRateLimitReached).
+    act(() => {
+      mockClose(channel);
+    });
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining("lobby channel lost (CLOSED)"),
+    );
+    // We no longer receive syncs, so the stale roster is dropped.
+    expect(hook.result.current.size).toBe(0);
+
+    // A go-live that lands before the rebuild must not push into the corpse.
+    await act(async () => {
+      await joinLobby(PAYLOAD);
+    });
+    expect(channel.track).toHaveBeenCalledTimes(1);
+
+    await advance(1_000);
+    expect(mockChannels).toHaveLength(2);
+    const rebuilt = mockChannels[1];
+    expect(rebuilt.config).toEqual({ config: { presence: { key: ME } } });
+    expect(mockRegistry).toEqual([rebuilt]);
+    // Torn down locally, never "removed": a leave for this topic could
+    // unregister the replacement, since realtime-js removes by topic.
+    expect(channel.teardown).toHaveBeenCalled();
+    expect(mockRemoveChannel).not.toHaveBeenCalledWith(channel);
+
+    await act(async () => {
+      rebuilt.subscribeHandler?.("SUBSCRIBED");
+    });
+    expect(rebuilt.track).toHaveBeenCalledWith(PAYLOAD);
+
+    // And the rebuilt channel is the one feeding the roster now.
+    rebuilt.presenceState.mockReturnValue({ [ME]: [{}] });
+    act(() => {
+      rebuilt.syncHandler?.();
+    });
+    expect([...hook.result.current]).toEqual([ME]);
+
+    hook.unmount();
+    warn.mockRestore();
+  });
+
+  it("rebuilds when a track finds the owned channel unregistered", async () => {
+    // Belt and braces for a close whose CLOSED callback never reached us.
+    jest.useFakeTimers();
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    const { hook, channel } = await mountLive();
+    await act(async () => {
+      await leaveLobby();
+    });
+    channel.state = "closed";
+    mockRegistry.splice(mockRegistry.indexOf(channel), 1);
+
+    await act(async () => {
+      await joinLobby(PAYLOAD);
+    });
+    expect(channel.track).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining("no longer registered"),
+    );
+
+    await advance(1_000);
+    expect(mockChannels).toHaveLength(2);
+    await act(async () => {
+      mockChannels[1].subscribeHandler?.("SUBSCRIBED");
+    });
+    expect(mockChannels[1].track).toHaveBeenCalledWith(PAYLOAD);
+
+    hook.unmount();
+    warn.mockRestore();
+  });
+
+  it("does not rebuild on its own intentional release", async () => {
+    jest.useFakeTimers();
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    const { hook, channel } = await mountLive();
+    await act(async () => {
+      hook.unmount();
+      await Promise.resolve();
+    });
+
+    // Athlete change: the old channel is released (its removal fires CLOSED),
+    // and exactly one replacement is built.
+    const other = mount("someone-else");
+    await settle();
+    expect(mockRemoveChannel).toHaveBeenCalledWith(channel);
+    expect(mockChannels).toHaveLength(2);
+
+    await advance(120_000);
+    expect(mockChannels).toHaveLength(2);
+    expect(warn).not.toHaveBeenCalledWith(
+      expect.stringContaining("lobby channel lost"),
+    );
+
+    other.unmount();
+    warn.mockRestore();
+  });
+
+  it("leaves a CHANNEL_ERROR / TIMED_OUT channel to phoenix's own rejoin", async () => {
+    jest.useFakeTimers();
+    const { hook, channel } = await mountLive();
+
+    // Still registered: phoenix rejoins this exact instance itself.
+    act(() => {
+      channel.state = "errored";
+      channel.subscribeHandler?.("CHANNEL_ERROR");
+      channel.subscribeHandler?.("TIMED_OUT");
+    });
+    await advance(60_000);
+    expect(mockChannels).toHaveLength(1);
+
+    // The rejoin re-tracks, because a fresh join holds nothing server-side.
+    await act(async () => {
+      channel.subscribeHandler?.("SUBSCRIBED");
+    });
+    expect(channel.track).toHaveBeenCalledTimes(2);
+
+    hook.unmount();
+  });
+
+  it("backs off across repeated losses, then waits for the foreground", async () => {
+    jest.useFakeTimers();
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    let appStateHandler: ((s: string) => void) | null = null;
+    const { AppState } = require("react-native");
+    const original = AppState.addEventListener;
+    AppState.addEventListener = (_e: unknown, h: unknown) => {
+      appStateHandler = h as (s: string) => void;
+      return { remove: jest.fn() };
+    };
+
+    const { hook } = await mountLive();
+
+    // Every rebuilt channel is closed straight after it joins and tracks,
+    // which is what a server that keeps rate-limiting us looks like.
+    const expectedDelays = [1_000, 5_000, 15_000, 30_000];
+    for (const [i, delay] of expectedDelays.entries()) {
+      const current = mockChannels[i];
+      act(() => {
+        mockClose(current);
+      });
+      await advance(delay - 1);
+      expect(mockChannels).toHaveLength(i + 1);
+      await advance(1);
+      expect(mockChannels).toHaveLength(i + 2);
+      await act(async () => {
+        mockChannels[i + 1].subscribeHandler?.("SUBSCRIBED");
+      });
+      expect(mockChannels[i + 1].track).toHaveBeenCalledWith(PAYLOAD);
+    }
+
+    // A fifth loss in a row gives up rather than hammering the server.
+    act(() => {
+      mockClose(mockChannels[4]);
+    });
+    await advance(10 * 60_000);
+    expect(mockChannels).toHaveLength(5);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining("gave up rebuilding the lost lobby channel"),
+    );
+
+    // Coming back to the foreground tries again.
+    await act(async () => {
+      appStateHandler?.("active");
+      await settle();
+    });
+    expect(mockChannels).toHaveLength(6);
+    await act(async () => {
+      mockChannels[5].subscribeHandler?.("SUBSCRIBED");
+    });
+    expect(mockChannels[5].track).toHaveBeenCalledWith(PAYLOAD);
+
+    hook.unmount();
+    AppState.addEventListener = original;
+    warn.mockRestore();
+  });
+
+  it("an explicit go-live retries setup after the backoff gave up", async () => {
+    jest.useFakeTimers();
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    const { hook } = await mountLive();
+    for (let i = 0; i < 5; i++) {
+      act(() => {
+        mockClose(mockChannels[i]);
+      });
+      await advance(30_000);
+      if (i < 4) {
+        await act(async () => {
+          mockChannels[i + 1].subscribeHandler?.("SUBSCRIBED");
+        });
+      }
+    }
+    expect(mockChannels).toHaveLength(5);
+
+    await act(async () => {
+      await leaveLobby();
+      await joinLobby(PAYLOAD);
+      await settle();
+    });
+    expect(mockChannels).toHaveLength(6);
+
+    hook.unmount();
+    warn.mockRestore();
+  });
+
+  it("starts the backoff over after a channel stayed healthy", async () => {
+    jest.useFakeTimers();
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    const { hook, channel } = await mountLive();
+
+    act(() => {
+      mockClose(channel);
+    });
+    await advance(1_000);
+    await act(async () => {
+      mockChannels[1].subscribeHandler?.("SUBSCRIBED");
+    });
+
+    // Healthy for the whole rate-limit window, then lost again: 1s, not 5s.
+    await advance(30_000);
+    act(() => {
+      mockClose(mockChannels[1]);
+    });
+    await advance(1_000);
+    expect(mockChannels).toHaveLength(3);
+
+    hook.unmount();
+    warn.mockRestore();
+  });
+});
+
+describe("useLobbyPresence: presence churn", () => {
+  it("does not re-track an unchanged payload or untrack twice", async () => {
+    const { unmount } = mount();
+    await settle();
+    const channel = mockChannels[0];
+    await act(async () => {
+      channel.subscribeHandler?.("SUBSCRIBED");
+    });
+
+    await act(async () => {
+      await joinLobby(PAYLOAD);
+      await joinLobby(PAYLOAD);
+      await joinLobby({ ...PAYLOAD });
+    });
+    expect(channel.track).toHaveBeenCalledTimes(1);
+
+    // A changed payload is a real update.
+    await act(async () => {
+      await joinLobby({ ...PAYLOAD, current_elo: 1210 });
+    });
+    expect(channel.track).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      await leaveLobby();
+      await leaveLobby();
+    });
+    expect(channel.untrack).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      unmount();
+      await Promise.resolve();
+    });
+    // Nothing tracked, so unmount's leave costs no presence call either.
+    expect(channel.untrack).toHaveBeenCalledTimes(1);
+  });
+
+  it("never untracks what it never tracked", async () => {
+    const { unmount } = mount();
+    await settle();
+    const channel = mockChannels[0];
+    await act(async () => {
+      channel.subscribeHandler?.("SUBSCRIBED");
+      await leaveLobby();
+    });
+    expect(channel.untrack).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it("coalesces a burst of toggles into the final state", async () => {
+    const { unmount } = mount();
+    await settle();
+    const channel = mockChannels[0];
+    await act(async () => {
+      channel.subscribeHandler?.("SUBSCRIBED");
+    });
+
+    let resolveTrack: (s: string) => void = () => {};
+    channel.track.mockImplementationOnce(
+      () => new Promise<string>((r) => (resolveTrack = r)),
+    );
+
+    await act(async () => {
+      const first = joinLobby(PAYLOAD);
+      // Offline and live again while the first track is still in flight.
+      const second = leaveLobby();
+      const third = joinLobby(PAYLOAD);
+      resolveTrack("ok");
+      await Promise.all([first, second, third]);
+    });
+    expect(channel.track).toHaveBeenCalledTimes(1);
+    expect(channel.untrack).not.toHaveBeenCalled();
+
+    // Ending offline after a burst still lands the untrack.
+    await act(async () => {
+      const a = leaveLobby();
+      const b = joinLobby(PAYLOAD);
+      const c = leaveLobby();
+      await Promise.all([a, b, c]);
+    });
+    expect(channel.untrack).toHaveBeenCalledTimes(1);
+    expect(channel.track).toHaveBeenCalledTimes(1);
+
+    unmount();
+  });
+
+  it("retries a track the server did not confirm", async () => {
+    const { unmount } = mount();
+    await settle();
+    const channel = mockChannels[0];
+    await act(async () => {
+      channel.subscribeHandler?.("SUBSCRIBED");
+    });
+    channel.track.mockResolvedValueOnce("timed out");
+    await act(async () => {
+      await joinLobby(PAYLOAD);
+      await joinLobby(PAYLOAD);
+    });
+    expect(channel.track).toHaveBeenCalledTimes(2);
+
+    // Unconfirmed also means an untrack must still go out.
+    channel.track.mockResolvedValueOnce("timed out");
+    await act(async () => {
+      await joinLobby({ ...PAYLOAD, current_elo: 1300 });
+      await leaveLobby();
+    });
+    expect(channel.untrack).toHaveBeenCalledTimes(1);
+
+    unmount();
   });
 });
