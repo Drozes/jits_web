@@ -14,6 +14,7 @@
  * `arena-store.ts`, which is the only way the rest of the app reads it.
  */
 import * as React from "react";
+import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
 import { ATHLETE_STATUS } from "@jits/shared/constants";
 import type { AthleteGuardRow } from "@jits/shared/api/queries";
 import { ChallengePromptSheet } from "@/components/arena/challenge-prompt-sheet";
@@ -31,6 +32,29 @@ import { useArenaChallenge } from "./use-arena-challenge";
 import { useArenaLive } from "./use-arena-live";
 import { useLobbyIds, useLobbyPresence } from "./use-lobby-presence";
 import { usePendingChallengeRecovery } from "./use-pending-challenge-recovery";
+
+const ARENA_KEEP_AWAKE_TAG = "arena-live";
+
+/**
+ * Hold the screen awake while the athlete is live. Auto-lock backgrounds the
+ * app, and backgrounding takes a live athlete out of the lobby, so without
+ * this a phone left on the table silently stops being challengeable. Same
+ * imperative API (and module, already in the shipped binary) as the match
+ * live step's `useMatchKeepAwake`, under its own tag so the two never release
+ * each other's lock. Not held in a match: the live step owns that.
+ */
+function useArenaLiveKeepAwake(active: boolean) {
+  React.useEffect(() => {
+    if (!active) return;
+    void activateKeepAwakeAsync(ARENA_KEEP_AWAKE_TAG).catch(() => {
+      // Non-fatal: the athlete just stays subject to auto-lock.
+    });
+    return () => {
+      // Async: a rejection would otherwise surface as an unhandled promise.
+      void deactivateKeepAwake(ARENA_KEEP_AWAKE_TAG).catch(() => {});
+    };
+  }, [active]);
+}
 
 export function ArenaBootstrap() {
   const { athlete, refreshAthleteSoft } = useAuth();
@@ -90,6 +114,7 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
 
   const { isLive, isSaving } = live;
   const { incoming, outgoing, isBusy, capReached } = challenge;
+  useArenaLiveKeepAwake(isLive && !inMatch);
   React.useEffect(() => {
     publishArenaState({ isLive, isSaving, incoming, outgoing, isBusy, capReached });
   }, [isLive, isSaving, incoming, outgoing, isBusy, capReached]);

@@ -16,6 +16,9 @@ export interface SetupAthleteRow {
   free_agent: boolean;
 }
 
+export const ATHLETE_READ_FAILED_MESSAGE =
+  "Couldn't load your profile. Check your connection and try again.";
+
 export interface GymOption {
   id: string;
   name: string;
@@ -73,7 +76,7 @@ export function useSetupData(authUserId: string | null) {
     setLoading(true);
     setError(null);
     try {
-      const [{ data: athlete }, { data: gyms }, { data: waiver }] =
+      const [{ data: athlete, error: athleteError }, { data: gyms }, { data: waiver }] =
         await Promise.all([
           supabase
             .from("athletes")
@@ -94,6 +97,16 @@ export function useSetupData(authUserId: string | null) {
             .eq("is_active", true)
             .maybeSingle(),
         ]);
+
+      // A failed athlete read must NOT look like "no row yet": the wizard
+      // would take the INSERT path, which RLS refuses (athletes has no INSERT
+      // policy), and the athlete is stuck. Surface it on the Try Again state.
+      if (athleteError) {
+        console.warn("[profile-setup] athlete read failed", athleteError);
+        setData(null);
+        setError(ATHLETE_READ_FAILED_MESSAGE);
+        return;
+      }
 
       let hasAcceptedTos = false;
       if (waiver && athlete) {

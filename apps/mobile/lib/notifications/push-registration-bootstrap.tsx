@@ -3,9 +3,11 @@
  * notification handlers (foreground display + tap deep-linking).
  *
  * Mounts inside the existing `<AuthProvider>` in `app/_layout.tsx`. Renders
- * null. Re-runs registration whenever the active athlete id changes.
+ * null. Re-runs registration whenever the athlete id changes (pending
+ * athletes are skipped).
  */
 import * as React from "react";
+import { ATHLETE_STATUS } from "@jits/shared/constants";
 import { useAuth } from "@/lib/auth/hooks";
 import { supabase } from "@/lib/supabase/client";
 import { registerForPushNotifications } from "./register-push";
@@ -13,7 +15,12 @@ import { setupNotificationHandlers } from "./handlers";
 
 export function PushRegistrationBootstrap() {
   const { athlete } = useAuth();
-  const athleteId = athlete?.id ?? null;
+  // Never for a PENDING athlete: they are still on the TOS / profile steps,
+  // and the iOS permission prompt there (before they have seen the app) is a
+  // one-shot we would waste (jits-r75.1). Activation flips status, so this
+  // runs as soon as setup completes. Any other status still registers.
+  const athleteId =
+    athlete && athlete.status !== ATHLETE_STATUS.PENDING ? athlete.id : null;
 
   // Configure foreground display + tap handler exactly once.
   React.useEffect(() => {

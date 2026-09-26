@@ -104,17 +104,33 @@ export async function getCurrentAthlete(
   supabase: Client,
   authUserId: string,
 ): Promise<AthleteGuardRow | null> {
+  const result = await getCurrentAthleteResult(supabase, authUserId);
+  if (!result.ok) {
+    console.error("getCurrentAthlete:", result.error.raw ?? result.error);
+    return null;
+  }
+  return result.data;
+}
+
+/**
+ * `getCurrentAthlete`, but a failed read is `{ ok: false }` instead of the
+ * same `null` a missing row gets. Mobile auth needs the difference: treating
+ * a flaky cold-start read as "no athlete" sends an active athlete to
+ * `/profile-setup`, where the wizard has no row to UPDATE.
+ */
+export async function getCurrentAthleteResult(
+  supabase: Client,
+  authUserId: string,
+): Promise<Result<AthleteGuardRow | null>> {
   const { data, error } = await supabase
     .from("athletes")
     .select(ATHLETE_GUARD_SELECT)
     .eq("auth_user_id", authUserId)
     .maybeSingle();
-
   if (error) {
-    console.error("getCurrentAthlete:", error);
-    return null;
+    return { ok: false, error: mapPostgrestError(error, "athlete_guard") };
   }
-  return (data as AthleteGuardRow | null) ?? null;
+  return { ok: true, data: (data as AthleteGuardRow | null) ?? null };
 }
 
 // ---------------------------------------------------------------------------
