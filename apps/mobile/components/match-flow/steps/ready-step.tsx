@@ -27,6 +27,8 @@ interface ReadyStepProps {
   matchId: string;
   currentAthleteId: string;
   opponentId: string;
+  /** Shown on the opponent's panel; falls back to "Opponent". */
+  opponentName?: string | null;
   /** Called once start_match completes (or the broadcast says it did). */
   onStarted: (startedAt: string) => void;
 }
@@ -43,8 +45,15 @@ interface ReadyStepProps {
 export function ReadyStep(props: ReadyStepProps) {
   const tokens = useThemedTokens();
   const router = useRouter();
-  const { exitHref, onCancelledRemotely, matchId, currentAthleteId, opponentId, onStarted } =
-    props;
+  const {
+    exitHref,
+    onCancelledRemotely,
+    matchId,
+    currentAthleteId,
+    opponentId,
+    opponentName,
+    onStarted,
+  } = props;
   const [myReady, setMyReady] = React.useState(false);
   const [opponentReady, setOpponentReady] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
@@ -180,7 +189,14 @@ export function ReadyStep(props: ReadyStepProps) {
 
       <View className="flex-row gap-3">
         <ReadyPanel label="You" ready={myReady} />
-        <ReadyPanel label="Opponent" ready={opponentReady} />
+        {/* Named, but the testID and the "Opponent, ready|waiting" label
+            stay fixed: the match-loop harness reads both. */}
+        <ReadyPanel
+          label={opponentName?.trim() || "Opponent"}
+          ready={opponentReady}
+          testID="ready-panel-opponent"
+          accessibilityName="Opponent"
+        />
       </View>
 
       {!myReady ? (

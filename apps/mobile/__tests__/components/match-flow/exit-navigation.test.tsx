@@ -100,6 +100,8 @@ jest.mock("@jits/shared/api/mutations", () => ({
 jest.mock("@jits/shared/api/queries", () => ({
   getMatchDetails: jest.fn(),
   getMatchConfirmations: jest.fn(() => Promise.resolve([])),
+  // The ranked weight step's "At stake" preview; null hides the row.
+  getEloStakes: jest.fn(() => Promise.resolve(null)),
 }));
 
 interface CapturedSyncParams {
@@ -372,6 +374,22 @@ describe("MatchFlowWizard exit navigation", () => {
 
     fireEvent.press(getByText(ARENA_EXIT_LABEL));
     expect(mockRouterReplace).toHaveBeenCalledWith(ARENA_EXIT);
+  });
+
+  it("offers a Rematch of the opponent that replaces the match with the Arena (jits-00fr)", () => {
+    mockUseMatchDetails.mockReturnValue(completedMatchResult());
+
+    const { getByTestId, getByText } = render(
+      <MatchFlowWizard exitHref={ARENA_EXIT} exitLabel={ARENA_LABEL} matchId="M1" currentAthleteId="me-1" />,
+    );
+
+    const rematch = getByTestId("summary-rematch");
+    expect(rematch.props.accessibilityLabel).toBe("Rematch Opponent");
+    fireEvent.press(rematch);
+    expect(mockRouterReplace).toHaveBeenCalledWith(`${ARENA_HREF}?rematch=opp-1`);
+    // Done and the exit cta are still there.
+    getByText("Done");
+    getByText(ARENA_LABEL);
   });
 
   it("keeps a caller label that merely has surrounding whitespace", () => {

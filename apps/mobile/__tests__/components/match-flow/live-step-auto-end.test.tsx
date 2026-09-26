@@ -66,6 +66,8 @@ jest.mock("@/components/ui/toast", () => ({
 }));
 jest.mock("@/lib/theme/use-theme", () => ({
   useThemedTokens: () => ({ textPrimary: "#E8EDF2", textOnAccent: "#FFFFFF", accentCta: "#E5484D" }),
+  // The amber PAUSED / TIME captions read the scheme.
+  useResolvedColorScheme: () => "dark",
 }));
 jest.mock("lucide-react-native", () => {
   const RN = require("react-native");

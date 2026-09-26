@@ -98,6 +98,8 @@ export function MatchStepRenderer({
         currentWeight={me.current_weight}
         opponentDisplayName={opponent.display_name}
         opponentWeight={opponent.current_weight}
+        currentElo={me.current_elo}
+        opponentElo={opponent.current_elo}
         matchType={matchType}
         onConfirm={() => setStep("ready")}
       />
@@ -111,6 +113,7 @@ export function MatchStepRenderer({
         matchId={matchId}
         currentAthleteId={me.athlete_id}
         opponentId={opponent.athlete_id}
+        opponentName={opponent.display_name}
         onStarted={(s) => {
           setStartedAt(s);
           setStep("live");
@@ -123,6 +126,7 @@ export function MatchStepRenderer({
       <LiveStep
         matchId={matchId}
         matchType={matchType}
+        opponentName={opponent.display_name}
         durationSeconds={durationSeconds}
         startedAt={startedAt}
         pausedAt={pausedAt}
@@ -195,6 +199,8 @@ export function MatchStepRenderer({
         weightDivisionGap={weightDivisionGap}
         videoId={upload?.videoId ?? null}
         videoPending={upload?.status === "uploading" || recorder.state === "stopping"}
+        opponentId={opponent.athlete_id}
+        opponentName={opponent.display_name}
       />
     );
   }

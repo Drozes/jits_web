@@ -282,6 +282,8 @@ jest.mock("@/lib/theme/use-theme", () => ({
     stateNegative: "#F85149",
     accentCta: "#E5484D",
   }),
+  // The summary's draw verdict and delta are amber, which reads the scheme.
+  useResolvedColorScheme: () => "dark",
 }));
 
 jest.mock("@/components/ui/toast", () => ({

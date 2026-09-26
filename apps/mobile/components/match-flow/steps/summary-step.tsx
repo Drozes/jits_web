@@ -1,3 +1,4 @@
+import type * as React from "react";
 import { Pressable, Share, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { Share2, Scale, PlayCircle } from "lucide-react-native";
@@ -8,6 +9,9 @@ import { cn } from "@/lib/cn";
 import { buildShareUrl, buildShareText } from "@jits/shared/utils";
 import { matchDetailHref } from "@/lib/match-detail/href";
 import { EloTile, Plate } from "@/components/ui/elo-system";
+import type { EloTileTone } from "@/components/ui/elo-system/elo-tile";
+import { useAmber } from "@/components/match-detail/use-amber";
+import { ARENA_HREF } from "@/lib/arena/constants";
 
 interface SummaryStepProps {
   /** Match id, for the "View match details" fallback link. */
@@ -39,17 +43,39 @@ interface SummaryStepProps {
    * (jits-p75q). Derived from the match-keyed upload store, so it stays
    * right across a remount and across a late-finishing upload. */
   videoPending?: boolean;
+  /** Opponent's athlete id, for the Rematch shortcut (jits-00fr). */
+  opponentId?: string | null;
+  /** Opponent's display name, for the Rematch shortcut copy. */
+  opponentName?: string | null;
+}
+
+/**
+ * The Arena with the opponent to run it back against. The Arena reads
+ * `rematch`; an Arena that ignores it is just the Arena. Navigated with a
+ * replace, never a push: the match screen must unmount, because while it is
+ * mounted the athlete stays offline and challenge prompts are suppressed
+ * (useArenaMatchScreen).
+ */
+export function rematchHref(opponentId: string): string {
+  return `${ARENA_HREF}?rematch=${encodeURIComponent(opponentId)}`;
+}
+
+/** Draw copy in amber; the hook is only mounted when a draw renders. */
+function AmberText(props: React.ComponentProps<typeof Text>) {
+  const amber = useAmber();
+  return <Text {...props} className={cn(props.className, amber.text)} />;
 }
 
 /**
  * Step 8: terminal summary screen. Mirrors D9 / D10 wireframes (lines
  * 1275-1337). Hero EloTile with before -> after for the rating tick,
- * a delta plate (positive / negative / draw), and the caller-supplied
- * exit cta plus a Done cta back to Home.
+ * a delta plate (positive / negative / draw), a Rematch shortcut, and the
+ * caller-supplied exit cta plus a Done cta back to Home.
  *
  * The animated tick (480ms) is handled by EloTile when both `before`
  * and `after` are supplied. ELO RATED brand rule: the rating tick is
- * the only auto-animated brand moment.
+ * the only auto-animated brand moment. Draws are amber, never red: both
+ * athletes lose rating on a draw, but it is pressure, not a loss.
  */
 export function SummaryStep(props: SummaryStepProps) {
   const tokens = useThemedTokens();
@@ -68,6 +94,8 @@ export function SummaryStep(props: SummaryStepProps) {
     weightDivisionGap,
     videoId,
     videoPending = false,
+    opponentId,
+    opponentName,
   } = props;
   const disputed = matchStatus === "disputed";
   const gap = weightDivisionGap ?? 0;
@@ -111,6 +139,20 @@ export function SummaryStep(props: SummaryStepProps) {
       : outcome === "loss"
         ? "text-negative"
         : "text-ink";
+  const isDraw = !disputed && outcome === "draw";
+  const VerdictText = isDraw ? AmberText : Text;
+  // The delta follows the outcome, not the sign: a draw's loss is amber.
+  const DeltaText = isDraw ? AmberText : Text;
+  const deltaColor = isDraw ? undefined : (eloDelta ?? 0) > 0 ? "text-positive" : "text-negative";
+  const tileTone: EloTileTone | undefined = isDraw
+    ? "amber"
+    : eloDelta == null || eloDelta === 0
+      ? undefined
+      : eloDelta > 0
+        ? "positive"
+        : "negative";
+  const rematchName = opponentName?.trim() || null;
+  const rematchFirst = rematchName?.split(/\s+/)[0] ?? null;
 
   const plateVariant = disputed
     ? "loss"
@@ -126,32 +168,28 @@ export function SummaryStep(props: SummaryStepProps) {
         <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-xl">
           Match Summary
         </Text>
-        <Text
+        <VerdictText
           testID="summary-verdict"
-          className={cn("font-display text-[40px] tracking-mark", verdictColor)}
+          className={cn("font-display text-[40px] tracking-mark", !isDraw && verdictColor)}
         >
           {verdictText}
-        </Text>
+        </VerdictText>
         {disputed ? (
           <Text
             testID="summary-disputed-note"
             className="text-center font-body text-[12px] text-ink-2"
           >
-            This result was disputed. An admin will review it; any rating
-            change stands until then.
+            An admin will review it. Your rating change stands until they do.
           </Text>
         ) : null}
         {eloDelta != null && eloDelta !== 0 ? (
-          <Text
+          <DeltaText
             testID="summary-elo-delta"
-            className={cn(
-              "font-mono-bold text-[20px] tabular-nums",
-              eloDelta > 0 ? "text-positive" : "text-negative",
-            )}
+            className={cn("font-mono-bold text-[20px] tabular-nums", deltaColor)}
           >
             {eloDelta > 0 ? "▲ +" : "▼ "}
             {Math.abs(eloDelta)}
-          </Text>
+          </DeltaText>
         ) : null}
       </Plate>
 
@@ -162,7 +200,7 @@ export function SummaryStep(props: SummaryStepProps) {
             before={before}
             after={after}
             size="large"
-            accent
+            tone={tileTone}
           />
         </View>
       ) : after != null ? (
@@ -237,6 +275,23 @@ export function SummaryStep(props: SummaryStepProps) {
             </View>
             <Text className="font-heading text-[13px] text-ink uppercase tracking-caps">
               Share Result
+            </Text>
+          </Pressable>
+        ) : null}
+        {opponentId && rematchName && !disputed ? (
+          // Secondary outline: Back to Arena stays the one Signal Red cta.
+          <Pressable
+            testID="summary-rematch"
+            accessibilityRole="button"
+            accessibilityLabel={`Rematch ${rematchName}`}
+            onPress={() => router.replace(rematchHref(opponentId))}
+            className="items-center justify-center border border-hairline-strong rounded-sm bg-surface-3 py-3 active:bg-surface-4"
+          >
+            <Text
+              className="font-heading text-[13px] text-ink uppercase tracking-caps"
+              numberOfLines={1}
+            >
+              Rematch {rematchFirst}
             </Text>
           </Pressable>
         ) : null}

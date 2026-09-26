@@ -3,6 +3,16 @@ import { Check } from "lucide-react-native";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { cn } from "@/lib/cn";
 
+interface ReadyPanelProps {
+  /** Visible name on the panel ("You", or the opponent's display name). */
+  label: string;
+  ready: boolean;
+  /** Defaults to `ready-panel-<label>`; pass one when the label is a name. */
+  testID?: string;
+  /** Role spoken before the state; defaults to the label. */
+  accessibilityName?: string;
+}
+
 /**
  * Single "ready" indicator panel used in the ready-check step.
  *
@@ -10,13 +20,13 @@ import { cn } from "@/lib/cn";
  * Spinner while waiting, positive check once the athlete has tapped Ready.
  * Mirrors D5 wireframe (lines 1180-1183).
  */
-export function ReadyPanel({ label, ready }: { label: string; ready: boolean }) {
+export function ReadyPanel({ label, ready, testID, accessibilityName }: ReadyPanelProps) {
   const tokens = useThemedTokens();
   return (
     <View
-      testID={`ready-panel-${label.toLowerCase()}`}
+      testID={testID ?? `ready-panel-${label.toLowerCase()}`}
       accessible
-      accessibilityLabel={`${label}, ${ready ? "ready" : "waiting"}`}
+      accessibilityLabel={`${accessibilityName ?? label}, ${ready ? "ready" : "waiting"}`}
       className={cn(
         "flex-1 items-center gap-2 rounded-md bg-surface-3 border px-3 py-5",
         ready ? "border-positive" : "border-hairline-strong",

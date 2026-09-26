@@ -1,5 +1,6 @@
 import { Text, View } from "react-native";
 import { LivePill } from "@/components/ui/elo-system";
+import { useAmber } from "@/components/match-detail/use-amber";
 import { cn } from "@/lib/cn";
 
 interface TimerDisplayProps {
@@ -7,6 +8,21 @@ interface TimerDisplayProps {
   remaining: number;
   paused: boolean;
   matchType: "ranked" | "casual";
+  /** Opponent's display name for the caption ("RANKED · VS DEMO RED"). */
+  opponentName?: string | null;
+}
+
+/** Pressure state caption; amber is behind a hook, so it mounts only when shown. */
+function AmberCaption({ testID, children }: { testID: string; children: string }) {
+  const amber = useAmber();
+  return (
+    <Text
+      testID={testID}
+      className={cn("font-mono-bold text-[10px] uppercase tracking-caps-l", amber.text)}
+    >
+      {children}
+    </Text>
+  );
 }
 
 /**
@@ -14,18 +30,25 @@ interface TimerDisplayProps {
  * timekeeper-style live view (D7 wireframe lines 1213-1238): hero
  * mono numeric timer, LivePill, and ranked / casual meta tag below.
  *
- * Color rule: signal-red (negative) when remaining hits 0, otherwise
- * primary ink so the numeric reads as data, not a warning.
+ * Color rule: the numeral is always primary ink, it is data. Pause and
+ * time-up are pressure, not losses, so their captions are amber, never
+ * Signal Red (jits-4zp.2).
  */
-export function TimerDisplay({ formatted, remaining, paused, matchType }: TimerDisplayProps) {
+export function TimerDisplay({
+  formatted,
+  remaining,
+  paused,
+  matchType,
+  opponentName,
+}: TimerDisplayProps) {
+  const kind = matchType === "ranked" ? "Ranked" : "Casual";
+  const name = opponentName?.trim();
   return (
     <View className="items-center gap-3">
       <LivePill label="LIVE" />
       <Text
-        className={cn(
-          "font-mono-bold tabular-nums",
-          remaining === 0 ? "text-negative" : "text-ink",
-        )}
+        testID="live-timer"
+        className="font-mono-bold tabular-nums text-ink"
         style={{
           fontSize: 72,
           lineHeight: 86,
@@ -34,13 +57,16 @@ export function TimerDisplay({ formatted, remaining, paused, matchType }: TimerD
       >
         {formatted}
       </Text>
-      <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-xl">
-        {matchType === "ranked" ? "Ranked Match" : "Casual Match"}
+      <Text
+        className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-xl text-center"
+        numberOfLines={1}
+      >
+        {name ? `${kind} · vs ${name}` : `${kind} Match`}
       </Text>
       {paused ? (
-        <Text className="font-mono-bold text-[10px] text-negative uppercase tracking-caps-l">
-          Paused
-        </Text>
+        <AmberCaption testID="live-paused">Paused</AmberCaption>
+      ) : remaining === 0 ? (
+        <AmberCaption testID="live-time-up">Time</AmberCaption>
       ) : null}
     </View>
   );
