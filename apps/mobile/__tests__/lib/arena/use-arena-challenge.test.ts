@@ -1450,12 +1450,12 @@ describe("a match started by another route (jits-yiwx)", () => {
       rerender({ inMatch: false });
     });
 
-    let raised = false;
+    let outcome = "";
     await act(async () => {
-      raised = await result.current.offerIncoming(CHALLENGE, OPPONENT);
+      outcome = await result.current.offerIncoming(CHALLENGE, OPPONENT);
     });
 
-    expect(raised).toBe(true);
+    expect(outcome).toBe("raised");
     expect(result.current.incoming).toMatchObject({ challengeId: CHALLENGE });
   });
 
@@ -1464,12 +1464,13 @@ describe("a match started by another route (jits-yiwx)", () => {
       useArenaChallenge({ athleteId: ME, athleteWeight: 180, inMatch: true }),
     );
 
-    let raised = true;
+    let outcome = "";
     await act(async () => {
-      raised = await result.current.offerIncoming(CHALLENGE, OPPONENT);
+      outcome = await result.current.offerIncoming(CHALLENGE, OPPONENT);
     });
 
-    expect(raised).toBe(false);
+    // In a match: the surface is busy, not the challenge dead.
+    expect(outcome).toBe("retry");
   });
 });
 
@@ -1567,11 +1568,11 @@ describe("three challengers, one target", () => {
     rerender({ inMatch: true });
     rerender({ inMatch: false });
 
-    let raised = true;
+    let outcome = "";
     await act(async () => {
-      raised = await result.current.offerIncoming("ch-b", "opp-b");
+      outcome = await result.current.offerIncoming("ch-b", "opp-b");
     });
-    expect(raised).toBe(false);
+    expect(outcome).toBe("final");
   });
 
   it("entering as the CHALLENGER also clears everyone waiting on me", async () => {
@@ -1746,7 +1747,7 @@ describe("accepting while my own challenge is out", () => {
     expect(mockPush).toHaveBeenCalledWith("/match/match-mine");
   });
 
-  it("drops mine with its own toast when it was declined meanwhile, then accepts", async () => {
+  it("drops mine QUIETLY when it was declined meanwhile, then accepts", async () => {
     mockCancelChallenge.mockResolvedValue({ ok: true, data: { cancelled: false } });
     mockGetStatus.mockResolvedValue({ ok: true, data: { status: "declined", expiresAt: FAR_EXPIRY } });
     const { result } = mount();
@@ -1757,7 +1758,9 @@ describe("accepting while my own challenge is out", () => {
       await result.current.accept();
     });
 
-    expect(mockToastInfo).toHaveBeenCalledWith("Bee declined.");
+    // I am walking into a different match: no "Bee declined." noise.
+    expect(mockToastInfo).not.toHaveBeenCalled();
+    expect(result.current.outgoing).toBeNull();
     expect(mockAcceptChallenge).toHaveBeenCalled();
     expect(mockPush).toHaveBeenCalledWith(`/match/${MATCH}`);
   });
@@ -2090,6 +2093,18 @@ describe("a backgrounded challenger catches up on return", () => {
   });
 });
 
+/** A plate for "ch-other" put up by a send (restore is refused mid-entry). */
+async function sendOther(result: { current: ReturnType<typeof useArenaChallenge> }) {
+  mockCreateChallenge.mockResolvedValueOnce({
+    ok: true,
+    data: { id: "ch-other", expiresAt: FAR_EXPIRY },
+  });
+  await act(async () => {
+    await result.current.sendChallenge("opp-9", "Nine");
+  });
+  expect(result.current.outgoing?.challengeId).toBe("ch-other");
+}
+
 describe("one client never pushes two match screens", () => {
   it("refuses a second entry for a DIFFERENT challenge before the first screen mounts", async () => {
     const { result } = mount();
@@ -2101,7 +2116,7 @@ describe("one client never pushes two match screens", () => {
 
     // A late broadcast for some other challenge of mine.
     jest.spyOn(console, "warn").mockImplementation(() => {});
-    await withOutgoing(result, "ch-other", "opp-9");
+    await sendOther(result);
     const b = mockBindings.find(
       (x) => x.topic === challengeTopic("ch-other") && x.filter.event === "match_started",
     );
@@ -2117,7 +2132,7 @@ describe("one client never pushes two match screens", () => {
     const { result } = renderHook(() =>
       useArenaChallenge({ athleteId: ME, athleteWeight: 180, inMatch: true }),
     );
-    await withOutgoing(result, "ch-other", "opp-9");
+    await sendOther(result);
     const b = mockBindings.find(
       (x) => x.topic === challengeTopic("ch-other") && x.filter.event === "match_started",
     );
@@ -2272,5 +2287,318 @@ describe("my own accept landing on the prompt's UPDATE", () => {
       });
     });
     expect(mockResync).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Review follow-ups (liveness)
+// ---------------------------------------------------------------------------
+
+async function flushAsync() {
+  for (let i = 0; i < 10; i++) await Promise.resolve();
+}
+
+describe("accept succeeded but the start did not (review item 1a)", () => {
+  const networkError = { ok: false, error: { code: "UNKNOWN", message: "network" } };
+
+  it("retries the start once, then withdraws the accepted row so the challenger's plate clears", async () => {
+    mockStartMatch.mockResolvedValue(networkError);
+    const { result } = mount();
+    await raiseIncoming(result);
+
+    await act(async () => {
+      await result.current.accept();
+    });
+
+    expect(mockStartMatch).toHaveBeenCalledTimes(2);
+    // No onlyIfPending: `challenges_update_cancel` allows `accepted`.
+    expect(mockCancelChallenge).toHaveBeenCalledWith(expect.anything(), CHALLENGE);
+    expect(mockToastError).toHaveBeenCalled();
+    expect(mockPush).not.toHaveBeenCalled();
+    expect(result.current.incoming).toBeNull();
+  });
+
+  it("recovers when the start had landed and only its reply was lost", async () => {
+    mockStartMatch
+      .mockResolvedValueOnce(networkError)
+      .mockResolvedValueOnce(networkError)
+      .mockResolvedValue({
+        ok: true,
+        data: { success: true, match_id: MATCH, challenge_id: CHALLENGE },
+      });
+    // Not `accepted` any more (it is `started`): nothing to withdraw.
+    mockCancelChallenge.mockResolvedValue({ ok: true, data: { cancelled: false } });
+    const { result } = mount();
+    await raiseIncoming(result);
+
+    await act(async () => {
+      await result.current.accept();
+    });
+
+    expect(mockStartMatch).toHaveBeenCalledTimes(3);
+    expect(mockToastError).not.toHaveBeenCalled();
+    expect(mockPush).toHaveBeenCalledWith(`/match/${MATCH}`);
+  });
+
+  it("does not withdraw a challenge that is simply dead (not_accepted)", async () => {
+    mockStartMatch.mockResolvedValue({
+      ok: false,
+      error: { code: "CHALLENGE_NOT_ACCEPTED", message: "no" },
+    });
+    const { result } = mount();
+    await raiseIncoming(result);
+    await act(async () => {
+      await result.current.accept();
+    });
+    expect(mockCancelChallenge).not.toHaveBeenCalled();
+    expect(mockToastError).toHaveBeenCalledWith("That challenge is no longer available.");
+  });
+});
+
+describe("the challenger's safety net for a row stuck at 'accepted' (review item 1b)", () => {
+  let handlers: Array<(s: string) => void> = [];
+  beforeEach(() => {
+    jest.useFakeTimers();
+    handlers = [];
+    const { AppState } = jest.requireActual("react-native") as typeof import("react-native");
+    jest.spyOn(AppState, "addEventListener").mockImplementation(((
+      _e: string,
+      handler: (s: string) => void,
+    ) => {
+      handlers.push(handler);
+      return { remove: jest.fn() };
+    }) as never);
+  });
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.restoreAllMocks();
+  });
+
+  async function acceptedUpdate() {
+    await act(async () => {
+      await challengerUpdateBinding().handler({
+        new: { id: CHALLENGE, challenger_id: ME, opponent_id: OPPONENT, status: "accepted" },
+      });
+    });
+  }
+
+  it("starts the match itself when the row is still 'accepted' 12s later", async () => {
+    const { result } = mount();
+    await sendOne(result);
+    await acceptedUpdate();
+    mockGetStatus.mockResolvedValue({ ok: true, data: { status: "accepted", expiresAt: FAR_EXPIRY } });
+
+    await act(async () => {
+      jest.advanceTimersByTime(11_999);
+      await flushAsync();
+    });
+    expect(mockStartMatch).not.toHaveBeenCalled();
+
+    await act(async () => {
+      jest.advanceTimersByTime(1);
+      await flushAsync();
+    });
+    expect(mockStartMatch).toHaveBeenCalledWith(expect.anything(), CHALLENGE);
+    expect(mockPush).toHaveBeenCalledWith(`/match/${MATCH}`);
+  });
+
+  it("does nothing extra when the accepter's broadcast arrived in time", async () => {
+    const { result } = mount();
+    await sendOne(result);
+    await acceptedUpdate();
+    const b = mockBindings.find(
+      (x) => x.topic === challengeTopic(CHALLENGE) && x.filter.event === "match_started",
+    );
+    await act(async () => {
+      await b?.handler({ payload: { matchId: MATCH } });
+    });
+    await act(async () => {
+      jest.advanceTimersByTime(20_000);
+      await flushAsync();
+    });
+    expect(mockGetStatus).not.toHaveBeenCalled();
+    expect(mockPush).toHaveBeenCalledTimes(1);
+  });
+
+  it("clears the plate if the accepter withdrew it meanwhile", async () => {
+    const { result } = mount();
+    await sendOne(result);
+    await acceptedUpdate();
+    mockGetStatus.mockResolvedValue({ ok: true, data: { status: "cancelled", expiresAt: FAR_EXPIRY } });
+    await act(async () => {
+      jest.advanceTimersByTime(12_000);
+      await flushAsync();
+    });
+    expect(mockStartMatch).not.toHaveBeenCalled();
+    expect(result.current.outgoing).toBeNull();
+  });
+
+  it("is also armed by a foreground re-read that finds 'accepted'", async () => {
+    const { result } = mount();
+    await sendOne(result);
+    mockGetStatus.mockResolvedValue({ ok: true, data: { status: "accepted", expiresAt: FAR_EXPIRY } });
+    await act(async () => {
+      handlers.forEach((h) => h("background"));
+      handlers.forEach((h) => h("active"));
+      await flushAsync();
+    });
+    expect(mockStartMatch).not.toHaveBeenCalled();
+
+    await act(async () => {
+      jest.advanceTimersByTime(12_000);
+      await flushAsync();
+    });
+    expect(mockPush).toHaveBeenCalledWith(`/match/${MATCH}`);
+  });
+
+  it("is armed by the accept-while-outgoing 'accepted' wait path", async () => {
+    mockCancelChallenge.mockResolvedValue({ ok: true, data: { cancelled: false } });
+    mockGetStatus.mockResolvedValue({ ok: true, data: { status: "accepted", expiresAt: FAR_EXPIRY } });
+    mockStartMatch.mockResolvedValue({
+      ok: true,
+      data: { success: true, match_id: "match-mine", challenge_id: "ch-mine" },
+    });
+    const { result } = mount();
+    await withOutgoing(result, "ch-mine", "opp-b");
+    await raiseIncoming(result);
+    await act(async () => {
+      await result.current.accept();
+    });
+    expect(mockPush).not.toHaveBeenCalled();
+
+    await act(async () => {
+      jest.advanceTimersByTime(12_000);
+      await flushAsync();
+    });
+    expect(mockStartMatch).toHaveBeenCalledWith(expect.anything(), "ch-mine");
+    expect(mockPush).toHaveBeenCalledWith("/match/match-mine");
+  });
+
+  it("is cancelled on unmount", async () => {
+    const { result, unmount } = mount();
+    await sendOne(result);
+    await acceptedUpdate();
+    unmount();
+    await act(async () => {
+      jest.advanceTimersByTime(20_000);
+      await flushAsync();
+    });
+    expect(mockGetStatus).not.toHaveBeenCalled();
+  });
+});
+
+describe("an INSERT while I am busy is declined, not ignored (review item 2)", () => {
+  it("declines and tells the challenger when I am in a match", async () => {
+    const { result } = renderHook(() =>
+      useArenaChallenge({ athleteId: ME, athleteWeight: 180, inMatch: true }),
+    );
+    mockCalls.length = 0;
+    await act(async () => {
+      await incomingBinding().handler({
+        new: { id: "ch-late", challenger_id: "opp-late", opponent_id: ME, status: "pending" },
+      });
+      await flushAsync();
+    });
+
+    expect(result.current.incoming).toBeNull();
+    expect(mockDeclineChallenge).toHaveBeenCalledWith(expect.anything(), "ch-late");
+    expect(mockCalls).toEqual(["send:declined"]);
+  });
+
+  it("declines one that lands in the moment between accept and the match screen", async () => {
+    const { result } = mount();
+    await raiseIncoming(result);
+    await act(async () => {
+      await result.current.accept();
+    });
+    mockDeclineChallenge.mockClear();
+
+    await act(async () => {
+      await incomingBinding().handler({
+        new: { id: "ch-late", challenger_id: "opp-late", opponent_id: ME, status: "pending" },
+      });
+      await flushAsync();
+    });
+    expect(mockDeclineChallenge).toHaveBeenCalledWith(expect.anything(), "ch-late");
+    expect(result.current.incoming).toBeNull();
+  });
+
+  it("still only ignores (never declines) one that lands while another prompt is up", async () => {
+    const { result } = mount();
+    await raiseIncoming(result);
+    await act(async () => {
+      await incomingBinding().handler({
+        new: { id: "ch-2", challenger_id: "opp-2", opponent_id: ME, status: "pending" },
+      });
+    });
+    expect(mockDeclineChallenge).not.toHaveBeenCalled();
+    expect(result.current.incoming?.challengeId).toBe(CHALLENGE);
+  });
+});
+
+describe("every re-subscribe of the incoming channel re-reads (review item 4)", () => {
+  it("re-reads pending on a phoenix rejoin, not on the first SUBSCRIBED", async () => {
+    mount();
+    const [ch] = mockBuilt.filter((c) => c.topic.startsWith(`arena-incoming:${ME}:`));
+    act(() => ch.statusCb?.("SUBSCRIBED"));
+    expect(mockResync).not.toHaveBeenCalled();
+
+    // A network blip: CHANNEL_ERROR, the instance stays registered, phoenix
+    // rejoins it, SUBSCRIBED again.
+    act(() => {
+      ch.statusCb?.("CHANNEL_ERROR");
+      ch.statusCb?.("SUBSCRIBED");
+    });
+    expect(mockResync).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("restoreOutgoing is refused mid-accept or mid-entry (review item 7)", () => {
+  it("does not resurrect a plate while an accept is running", async () => {
+    let finishAccept!: () => void;
+    mockAcceptChallenge.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finishAccept = () => resolve({ ok: true, data: undefined });
+        }),
+    );
+    const { result } = mount();
+    await raiseIncoming(result);
+
+    let accepting!: Promise<void>;
+    act(() => {
+      accepting = result.current.accept();
+    });
+    act(() => {
+      result.current.restoreOutgoing({
+        challengeId: "ch-old",
+        opponentId: "opp-9",
+        opponentName: "Nine",
+        expiresAt: FAR_EXPIRY,
+      });
+    });
+    expect(result.current.outgoing).toBeNull();
+
+    await act(async () => {
+      finishAccept();
+      await accepting;
+    });
+  });
+
+  it("does not resurrect a plate on the way into a match", async () => {
+    const { result } = mount();
+    await raiseIncoming(result);
+    await act(async () => {
+      await result.current.accept();
+    });
+    act(() => {
+      result.current.restoreOutgoing({
+        challengeId: "ch-old",
+        opponentId: "opp-9",
+        opponentName: "Nine",
+        expiresAt: FAR_EXPIRY,
+      });
+    });
+    expect(result.current.outgoing).toBeNull();
   });
 });

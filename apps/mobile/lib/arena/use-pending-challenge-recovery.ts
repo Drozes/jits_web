@@ -43,7 +43,7 @@ import { cancelStaleOutgoingChallenges } from "@jits/shared/api/mutations";
 import { getPendingChallengesForAthlete } from "@jits/shared/api/queries";
 import type { PendingChallenge } from "@jits/shared/types/composites";
 import { supabase } from "../supabase/client";
-import type { OutgoingChallenge } from "./use-arena-challenge";
+import type { OfferResult, OutgoingChallenge } from "./use-arena-challenge";
 
 /**
  * How old a pending challenge can be and still be a LIVE prompt. The shared
@@ -74,8 +74,8 @@ export interface UsePendingChallengeRecoveryArgs {
   hasIncoming: boolean;
   /** Athlete ids present in `lobby:online`. */
   lobbyIds: Set<string>;
-  /** Resolves true only when the prompt was actually raised. */
-  offerIncoming: (challengeId: string, challengerId: string) => Promise<boolean>;
+  /** What happened to the offer; see `OfferResult`. */
+  offerIncoming: (challengeId: string, challengerId: string) => Promise<OfferResult>;
   restoreOutgoing: (challenge: OutgoingChallenge) => void;
   /** The challenge on my waiting plate right now; never swept as stale. */
   outgoingChallengeId?: string | null;
@@ -218,17 +218,17 @@ export function usePendingChallengeRecovery({
         isFreshPending(c, now),
     );
     if (!pick) return;
-    // Marked offered once the prompt was really raised. An offer the
-    // challenge hook skipped because a match started during the challenger
-    // read stays eligible and is offered again after the match. Any other
-    // skip (already answered, another prompt up) is final, as before, so a
-    // settled challenge cannot sit at the head of the list blocking newer
-    // candidates.
+    // Marked offered once the prompt was raised, or once the challenge hook
+    // says it is final (answered, withdrawn, entered), so a settled challenge
+    // cannot sit at the head of the list blocking newer candidates. A
+    // retryable skip (another prompt up, a match starting or on screen) stays
+    // eligible, and the next pass (a resync, the prompt clearing, the match
+    // exit) offers it again.
     const id = pick.challengeId;
     offeringRef.current.add(id);
     void offerIncoming(id, pick.challengerId)
-      .then((raised) => {
-        if (raised || !inMatchRef.current) offeredRef.current.add(id);
+      .then((outcome) => {
+        if (outcome !== "retry") offeredRef.current.add(id);
       })
       .finally(() => {
         offeringRef.current.delete(id);

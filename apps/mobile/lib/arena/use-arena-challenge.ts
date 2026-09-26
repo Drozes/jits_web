@@ -98,6 +98,13 @@ const ENTRY_SETTLE_MS = 5_000;
  */
 const CHANNEL_LOSS_RETRY_DELAYS_MS = [1_000, 5_000, 15_000, 30_000];
 
+/**
+ * How long my outgoing challenge may sit at `accepted` before I start the
+ * match myself: well past a normal accept-to-start (about a second), short
+ * enough that a stranded challenger is not left staring at the plate.
+ */
+const ACCEPTED_FALLBACK_MS = 12_000;
+
 /** A channel that stayed up this long ends the losing streak. */
 const CHANNEL_LOSS_STREAK_RESET_MS = 30_000;
 
@@ -121,6 +128,14 @@ interface ChallengeRow {
   status: string;
   expires_at?: string | null;
 }
+
+/**
+ * What `offerIncoming` did. `retry` means the surface was busy (another prompt
+ * up, a match starting or on screen) and the challenge should be offered again
+ * on the next pass; `final` means it was answered, withdrawn or entered and
+ * must never be offered again.
+ */
+export type OfferResult = "raised" | "retry" | "final";
 
 export interface UseArenaChallengeArgs {
   athleteId: string;
@@ -168,10 +183,10 @@ export interface UseArenaChallengeResult {
    * Raise the prompt for a challenge found by a read rather than by the
    * realtime INSERT (`use-pending-challenge-recovery.ts`). A no-op while a
    * prompt is already up, or for a challenge this instance already answered.
-   * Resolves true only when the prompt was actually raised, so the caller
-   * can offer it again later when it was skipped.
+   * Resolves "raised", "retry" (surface busy: offer again on the next pass)
+   * or "final" (answered, withdrawn or entered: never offer again).
    */
-  offerIncoming: (challengeId: string, challengerId: string) => Promise<boolean>;
+  offerIncoming: (challengeId: string, challengerId: string) => Promise<OfferResult>;
   /**
    * Put back the "Sent" state for my own still-pending challenge after a
    * relaunch, so the accept broadcast still reaches me. A no-op when a
@@ -504,6 +519,18 @@ export function useArenaChallenge({
   );
 
   /**
+   * Decline a challenge that arrived while I am entering or in a match, and
+   * tell its challenger, so their plate clears instead of waiting on me.
+   */
+  const declineAsBusy = React.useCallback((challengeId: string) => {
+    if (settledRef.current.has(challengeId)) return;
+    settledRef.current.add(challengeId);
+    void declineChallenge(supabase, challengeId).then((result) => {
+      if (result.ok) void broadcast(challengeId, "declined", {});
+    });
+  }, []);
+
+  /**
    * Re-read my outgoing challenge's row and act on it: the recovery for a
    * challenger that missed the realtime UPDATE and the broadcast (backgrounded
    * while waiting, socket down, channel rebuilt). Only `started` enters: on
@@ -512,16 +539,20 @@ export function useArenaChallenge({
    * fails `not_accepted`); its broadcast or the `started` UPDATE follows.
    */
   const recheckOutgoing = React.useCallback(
-    async (challengeId: string) => {
+    async (challengeId: string, startIfAccepted = false) => {
       const mine = outgoingRef.current;
       if (!mine || mine.challengeId !== challengeId) return;
       const read = await getChallengeStatus(supabase, challengeId);
       if (!read.ok || !read.data) return;
       if (outgoingRef.current?.challengeId !== challengeId) return;
       const { status } = read.data;
-      if (status === "started") {
+      if (status === "started" || (status === "accepted" && startIfAccepted)) {
         const started = await startMatchFromChallenge(supabase, challengeId);
         if (started.ok) enterMatch(challengeId, started.data.match_id, mine.opponentId);
+        return;
+      }
+      if (status === "accepted") {
+        scheduleAcceptedFallbackRef.current(challengeId);
         return;
       }
       if (!LIVE_CHALLENGE_STATUSES.has(status)) {
@@ -532,6 +563,39 @@ export function useArenaChallenge({
   );
   const recheckOutgoingRef = React.useRef(recheckOutgoing);
   recheckOutgoingRef.current = recheckOutgoing;
+
+  /**
+   * Safety net for a challenge that sits at `accepted`. Normally the accepter
+   * starts it within a second and its broadcast (or the `started` UPDATE)
+   * takes me in; I never start it myself at that point, because that is the
+   * jits-njyd race. But if the accepter's start failed or its app died, the
+   * row stays `accepted` and my plate would wait forever. So one re-read
+   * `ACCEPTED_FALLBACK_MS` later: still `accepted` means nobody is starting
+   * it, and I start it myself (the RPC is idempotent, and the accepter's
+   * accept retries a start that lost the row lock).
+   */
+  const acceptedFallbackRef = React.useRef<{
+    challengeId: string;
+    timer: ReturnType<typeof setTimeout>;
+  } | null>(null);
+  const scheduleAcceptedFallback = React.useCallback((challengeId: string) => {
+    if (acceptedFallbackRef.current?.challengeId === challengeId) return;
+    if (acceptedFallbackRef.current) clearTimeout(acceptedFallbackRef.current.timer);
+    const timer = setTimeout(() => {
+      acceptedFallbackRef.current = null;
+      void recheckOutgoingRef.current(challengeId, true);
+    }, ACCEPTED_FALLBACK_MS);
+    acceptedFallbackRef.current = { challengeId, timer };
+  }, []);
+  const scheduleAcceptedFallbackRef = React.useRef(scheduleAcceptedFallback);
+  scheduleAcceptedFallbackRef.current = scheduleAcceptedFallback;
+  React.useEffect(
+    () => () => {
+      if (acceptedFallbackRef.current) clearTimeout(acceptedFallbackRef.current.timer);
+      acceptedFallbackRef.current = null;
+    },
+    [],
+  );
 
   // A match that starts by ANOTHER route (a deep link, a notification) while
   // a prompt is up: drop the prompt rather than hold it over the match. It is
@@ -595,13 +659,20 @@ export function useArenaChallenge({
             const row = payload.new as ChallengeRow;
             if (row.status !== "pending") return;
             if (row.expires_at && new Date(row.expires_at) <= new Date()) return;
+            // Entering or in a match: I am busy, so the challenger is told
+            // now (declined, with the broadcast) rather than left waiting on
+            // a plate nobody will answer.
+            if (settledRef.current.has(row.id)) return;
+            if (entryBlocked()) {
+              declineAsBusy(row.id);
+              return;
+            }
             // Already showing a prompt: the first one keeps the surface rather
             // than being silently replaced mid-decision (recovery offers the
-            // next one when it clears). Offline or entering a match: no live
-            // prompt; recovery offers it later if it is still fresh.
+            // next one when it clears). Offline: no live prompt; recovery
+            // offers it on going live if it is still fresh.
             const skip = () =>
               !!incomingRef.current ||
-              entryBlocked() ||
               !isLiveRef.current ||
               settledRef.current.has(row.id);
             if (skip()) return;
@@ -610,6 +681,10 @@ export function useArenaChallenge({
             // Re-checked after the read: another INSERT, a recovery offer, a
             // match or going offline can land inside that await, and the first
             // prompt keeps the surface.
+            if (entryBlocked()) {
+              declineAsBusy(row.id);
+              return;
+            }
             if (skip()) return;
             setIncomingBoth(next);
           },
@@ -671,19 +746,28 @@ export function useArenaChallenge({
             if (row.status === "started") {
               const started = await startMatchFromChallenge(supabase, row.id);
               if (started.ok) enterMatch(row.id, started.data.match_id, mine.opponentId);
+              return;
             }
+            // `accepted`: wait for the accepter, with a safety net if its
+            // start never lands.
+            scheduleAcceptedFallbackRef.current(row.id);
           },
         );
 
-    // A rebuild after a server close may have missed an INSERT (recovery reads
-    // pending challenges again) or my plate's UPDATE (re-read it).
-    return superviseChannel("incoming challenge", build, (rebuilt) => {
-      if (!rebuilt) return;
+    // Any SUBSCRIBED after the first (a phoenix rejoin after a network drop,
+    // or a rebuild after a server close) may have missed an INSERT (recovery
+    // reads pending challenges again) or my plate's UPDATE (re-read it).
+    let subscribedBefore = false;
+    return superviseChannel("incoming challenge", build, () => {
+      if (!subscribedBefore) {
+        subscribedBefore = true;
+        return;
+      }
       requestPendingChallengeResync();
       const mine = outgoingRef.current;
       if (mine) void recheckOutgoingRef.current(mine.challengeId);
     });
-  }, [athleteId, enterMatch, endOutgoing, entryBlocked, setIncomingBoth]);
+  }, [athleteId, enterMatch, endOutgoing, entryBlocked, declineAsBusy, setIncomingBoth]);
 
   // --- Client-side expiry of my outgoing challenge ---------------------------
   // Belt and braces for the realtime UPDATE above: a sweep that expired the
@@ -907,6 +991,7 @@ export function useArenaChallenge({
       }
 
       if (status === "accepted") {
+        scheduleAcceptedFallbackRef.current(mine.challengeId);
         settledRef.current.add(current.challengeId);
         setIncomingBoth(null);
         if (crossing) {
@@ -922,10 +1007,9 @@ export function useArenaChallenge({
         return "stop";
       }
 
-      endOutgoing(
-        mine.challengeId,
-        status ? endedToast(status, mine.opponentName) : null,
-      );
+      // Quietly: I am walking into a different match, so "declined" or
+      // "expired" for my own challenge is noise at this moment.
+      endOutgoing(mine.challengeId, null);
       return "proceed";
     },
     [endOutgoing, enterMatch, setIncomingBoth],
@@ -974,9 +1058,22 @@ export function useArenaChallenge({
         // lost race with the challenger's own start (an older build that
         // starts on `accepted`, jits-njyd): the row lock made my call re-read
         // `started`. Once more then finds the match that call created.
+        // Any other failure (network) gets the same one retry.
         let started = await startMatchFromChallenge(supabase, current.challengeId);
-        if (!started.ok && started.error.code === "CHALLENGE_NOT_ACCEPTED") {
+        if (!started.ok) {
           started = await startMatchFromChallenge(supabase, current.challengeId);
+        }
+        if (!started.ok && started.error.code !== "CHALLENGE_NOT_ACCEPTED") {
+          // I accepted but could not start it: left alone the row sits at
+          // `accepted` and the challenger's plate waits on me. Withdraw it
+          // (`challenges_update_cancel` allows `accepted`) so their UPDATE
+          // clears the plate. No row changed means it is not `accepted` any
+          // more: most likely my start DID land and only its reply was lost,
+          // so ask once more for the match that now exists.
+          const withdrawn = await cancelChallenge(supabase, current.challengeId);
+          if (withdrawn.ok && !withdrawn.data.cancelled) {
+            started = await startMatchFromChallenge(supabase, current.challengeId);
+          }
         }
         if (!started.ok) {
           settledRef.current.add(current.challengeId);
@@ -1085,19 +1182,28 @@ export function useArenaChallenge({
   const clearCap = React.useCallback(() => setCapReached(false), []);
 
   const offerIncoming = React.useCallback(
-    async (challengeId: string, challengerId: string) => {
-      const skip = () =>
-        entryBlocked() ||
-        !!incomingRef.current ||
-        settledRef.current.has(challengeId) ||
-        enteredForRef.current === challengeId;
-      if (skip()) return false;
+    async (challengeId: string, challengerId: string): Promise<OfferResult> => {
+      const check = (): OfferResult | null => {
+        // Final: this challenge has been answered, withdrawn or entered.
+        if (
+          settledRef.current.has(challengeId) ||
+          enteredForRef.current === challengeId
+        ) {
+          return "final";
+        }
+        // Retryable: the surface is busy right now, not the challenge dead.
+        if (entryBlocked() || incomingRef.current) return "retry";
+        return null;
+      };
+      const before = check();
+      if (before) return before;
       const next = await loadIncoming(challengeId, challengerId);
       // Re-checked after the read: the realtime INSERT or an answer can land
       // inside that await, and the first prompt keeps the surface.
-      if (skip()) return false;
+      const after = check();
+      if (after) return after;
       setIncomingBoth(next);
-      return true;
+      return "raised";
     },
     [entryBlocked, setIncomingBoth],
   );
@@ -1106,9 +1212,12 @@ export function useArenaChallenge({
     (challenge: OutgoingChallenge) => {
       if (outgoingRef.current) return;
       if (settledRef.current.has(challenge.challengeId)) return;
+      // Mid-accept (my own outgoing may be being withdrawn right now) or on
+      // the way into a match: a restore would resurrect a plate that is over.
+      if (busyRef.current || entryBlocked()) return;
       setOutgoingBoth(challenge);
     },
-    [setOutgoingBoth],
+    [entryBlocked, setOutgoingBoth],
   );
 
   return {

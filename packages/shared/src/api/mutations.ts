@@ -232,10 +232,12 @@ interface DeclineOtherPendingOptions {
   exceptChallengerId?: string | null;
   /** The athlete's incoming pending challenges, when just read. */
   incoming?: PendingChallenge[];
+  /** Clock override, for tests. */
+  now?: number;
 }
 
 /**
- * Decline every OTHER pending challenge the athlete has received.
+ * Decline every OTHER fresh pending challenge the athlete has received.
  *
  * For the moment the athlete enters a match: nobody else waiting on them can
  * be answered live any more, and a decline is what tells each challenger so
@@ -263,8 +265,16 @@ export async function declineOtherPendingChallenges(
     incoming = read.data.incoming;
   }
 
+  // Only FRESH ones (inside `ARENA_CHALLENGE_FRESH_MS`): those are the
+  // challengers plausibly still waiting on a plate. An older pending row is
+  // not a live Arena challenge any more, and declining it would push a
+  // "declined" at someone who moved on long ago.
+  const now = options.now ?? Date.now();
   const others = incoming.filter(
-    (c) => c.opponentId === athleteId && c.challengeId !== options.keepChallengeId,
+    (c) =>
+      c.opponentId === athleteId &&
+      c.challengeId !== options.keepChallengeId &&
+      !isStaleOutgoingChallenge(c, now),
   );
   const skipped = others.filter(
     (c) => !!options.exceptChallengerId && c.challengerId === options.exceptChallengerId,

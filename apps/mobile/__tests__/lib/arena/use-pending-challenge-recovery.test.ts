@@ -83,7 +83,7 @@ function mount(over: Partial<UsePendingChallengeRecoveryArgs> = {}) {
 beforeEach(() => {
   jest.clearAllMocks();
   jest.spyOn(Date, "now").mockReturnValue(NOW);
-  mockOffer.mockResolvedValue(true);
+  mockOffer.mockResolvedValue("raised");
   mockSweep.mockResolvedValue({ ok: true, data: { cancelled: [] } });
   reply();
   appStateHandler = null;
@@ -392,20 +392,20 @@ describe("offers skipped by a match (jits-yiwx)", () => {
     reply([pending()]);
     // The offer is still reading the challenger when a match starts, and the
     // hook then skips it.
-    let finishOffer!: (raised: boolean) => void;
+    let finishOffer!: (outcome: string) => void;
     mockOffer.mockImplementationOnce(
-      () => new Promise<boolean>((resolve) => (finishOffer = resolve)),
+      () => new Promise<string>((resolve) => (finishOffer = resolve)),
     );
     const { rerender } = mount();
     await act(flush);
     expect(mockOffer).toHaveBeenCalledTimes(1);
     await act(async () => {
       rerender(baseArgs({ inMatch: true }));
-      finishOffer(false);
+      finishOffer("retry");
       await flush();
     });
 
-    mockOffer.mockResolvedValue(true);
+    mockOffer.mockResolvedValue("raised");
     await act(async () => {
       rerender(baseArgs({ inMatch: false }));
       await flush();
@@ -417,7 +417,7 @@ describe("offers skipped by a match (jits-yiwx)", () => {
 
   it("does not keep re-offering one the hook refused for good (already answered)", async () => {
     reply([pending()]);
-    mockOffer.mockResolvedValue(false);
+    mockOffer.mockResolvedValue("final");
     const { rerender } = mount();
     await act(flush);
 
@@ -521,5 +521,35 @@ describe("re-reading on request (a prompt cleared, a channel rebuilt)", () => {
     requestPendingChallengeResync();
     await flush();
     expect(mockGetPending).not.toHaveBeenCalled();
+  });
+});
+
+describe("a retryable skip stays eligible (review item 3)", () => {
+  it("offers again on the next resync after a 'retry' (another prompt was up)", async () => {
+    reply([pending()]);
+    mockOffer.mockResolvedValueOnce("retry");
+    mount();
+    await act(flush);
+    expect(mockOffer).toHaveBeenCalledTimes(1);
+
+    mockOffer.mockResolvedValue("raised");
+    await act(async () => {
+      requestPendingChallengeResync();
+      await flush();
+    });
+    expect(mockOffer).toHaveBeenCalledTimes(2);
+    expect(mockOffer).toHaveBeenLastCalledWith("ch-1", "rival-1");
+  });
+
+  it("never offers again after 'final', even on a resync", async () => {
+    reply([pending()]);
+    mockOffer.mockResolvedValue("final");
+    mount();
+    await act(flush);
+    await act(async () => {
+      requestPendingChallengeResync();
+      await flush();
+    });
+    expect(mockOffer).toHaveBeenCalledTimes(1);
   });
 });

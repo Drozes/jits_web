@@ -259,6 +259,7 @@ describe("declineOtherPendingChallenges (three challengers, one target)", () => 
     }));
     const result = await declineOtherPendingChallenges(client, ME, {
       keepChallengeId: "entered",
+      now: NOW,
       incoming: [
         incoming("entered", "a"),
         incoming("b1", "b"),
@@ -289,6 +290,7 @@ describe("declineOtherPendingChallenges (three challengers, one target)", () => 
     const { client, from } = mockUpdateClient((id) => ({ data: [{ id }], error: null }));
     const result = await declineOtherPendingChallenges(client, ME, {
       keepChallengeId: "entered",
+      now: NOW,
       exceptChallengerId: "peer",
       incoming: [incoming("cross", "peer")],
     });
@@ -309,15 +311,30 @@ describe("declineOtherPendingChallenges (three challengers, one target)", () => 
     );
     const result = await declineOtherPendingChallenges(client, ME, {
       keepChallengeId: "entered",
+      now: NOW,
       incoming: [incoming("lapsed", "x"), incoming("moved", "y"), incoming("ok", "z")],
     });
     expect(result.ok && result.data.declined.map((c) => c.challengeId)).toEqual(["ok"]);
+  });
+
+  it("leaves challenges older than the Arena freshness window alone", async () => {
+    const { client } = mockUpdateClient((id) => ({ data: [{ id }], error: null }));
+    const result = await declineOtherPendingChallenges(client, ME, {
+      keepChallengeId: "entered",
+      now: NOW,
+      incoming: [
+        pending("old", ARENA_CHALLENGE_FRESH_MS + 1, { challengerId: "x", opponentId: ME }),
+        pending("fresh", ARENA_CHALLENGE_FRESH_MS - 1, { challengerId: "y", opponentId: ME }),
+      ],
+    });
+    expect(result.ok && result.data.declined.map((c) => c.challengeId)).toEqual(["fresh"]);
   });
 
   it("never touches a challenge I SENT", async () => {
     const { client, from } = mockUpdateClient((id) => ({ data: [{ id }], error: null }));
     await declineOtherPendingChallenges(client, ME, {
       keepChallengeId: "entered",
+      now: NOW,
       incoming: [pending("mine", 60_000, { challengerId: ME, opponentId: "other" })],
     });
     expect(from).not.toHaveBeenCalled();
