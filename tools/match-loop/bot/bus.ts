@@ -49,7 +49,7 @@ export class Bus<T> {
   waitFor(what: string, pred: (v: T) => boolean, timeoutMs: number, since: number): Promise<T> {
     const hit = this.find(pred, since);
     if (hit !== undefined) return Promise.resolve(hit);
-    return new Promise<T>((resolve, reject) => {
+    const p = new Promise<T>((resolve, reject) => {
       const waiter: Waiter<T> = {
         pred,
         since,
@@ -64,5 +64,10 @@ export class Bus<T> {
       }, timeoutMs);
       this.waiters.push(waiter);
     });
+    // Mark the promise handled so a wait that nobody awaits any more (the
+    // scenario already failed or moved on) cannot crash the whole run with an
+    // unhandled rejection. Callers that do await it still get the rejection.
+    p.catch(() => undefined);
+    return p;
   }
 }

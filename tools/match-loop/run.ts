@@ -262,6 +262,12 @@ async function runOne(env: Env, s: Scenario, dir: string, known: Map<string, str
 
 async function main(): Promise<number> {
   installSignalHandlers();
+  // Safety net: a stray rejected promise (e.g. a bot wait nobody awaits after
+  // its scenario failed) must be logged, not kill the run before result.json
+  // is written. Scenario failures are still recorded by runOne's try/catch.
+  process.on("unhandledRejection", (reason) => {
+    console.error("[match-loop] unhandled rejection (ignored, run continues):", redact(String((reason as Error)?.message ?? reason)));
+  });
   const args = parseArgs(process.argv.slice(2));
   const cfg = loadConfig();
   // A previous run killed mid-E8 could have left realtime paused. Always
