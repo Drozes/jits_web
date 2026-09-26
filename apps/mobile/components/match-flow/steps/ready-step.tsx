@@ -152,6 +152,7 @@ export function ReadyStep(props: ReadyStepProps) {
 
       {!myReady ? (
         <Pressable
+          testID="ready-button"
           accessibilityRole="button"
           onPress={handleTapReady}
           disabled={loading}

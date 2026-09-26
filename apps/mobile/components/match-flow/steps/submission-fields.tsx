@@ -44,6 +44,7 @@ export function SubmissionFields({
             return (
               <Chip
                 key={st.code}
+                testID={`result-submission-${st.code}`}
                 active={active}
                 onPress={() => onSubmissionChange(st.code)}
                 className="min-w-[46%] flex-grow justify-center"
@@ -60,6 +61,7 @@ export function SubmissionFields({
           Finish Time
         </Text>
         <TextInput
+          testID="result-finish-time"
           placeholder="mm:ss or seconds"
           placeholderTextColor={tokens.textTertiary}
           value={finishTimeStr}

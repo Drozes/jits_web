@@ -48,6 +48,7 @@ export function WizardError({
         <Text className="text-center font-body text-[13px] text-ink-2">{message}</Text>
       ) : null}
       <Pressable
+        testID="wizard-error-exit"
         accessibilityRole="button"
         onPress={() => router.replace(exitHref)}
         className="mt-2 bg-cta items-center justify-center py-3 px-5 rounded-sm active:bg-cta-hover"

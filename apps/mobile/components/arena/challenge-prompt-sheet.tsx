@@ -79,7 +79,7 @@ export function ChallengePromptSheet({
     >
       <BottomSheetView>
         {challenge ? (
-          <View className="px-4 pb-8 pt-2">
+          <View testID="challenge-prompt" className="px-4 pb-8 pt-2">
             <Text className="font-mono-bold text-[10px] text-ink-2 uppercase tracking-caps-xl">
               Incoming challenge
             </Text>

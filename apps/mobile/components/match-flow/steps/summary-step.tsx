@@ -122,11 +122,15 @@ export function SummaryStep(props: SummaryStepProps) {
         <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-xl">
           Match Summary
         </Text>
-        <Text className={cn("font-display text-[40px] tracking-mark", verdictColor)}>
+        <Text
+          testID="summary-verdict"
+          className={cn("font-display text-[40px] tracking-mark", verdictColor)}
+        >
           {verdictText}
         </Text>
         {eloDelta != null && eloDelta !== 0 ? (
           <Text
+            testID="summary-elo-delta"
             className={cn(
               "font-mono-bold text-[20px] tabular-nums",
               eloDelta > 0 ? "text-positive" : "text-negative",
@@ -208,6 +212,7 @@ export function SummaryStep(props: SummaryStepProps) {
           </Pressable>
         ) : null}
         <Pressable
+          testID="summary-exit"
           accessibilityRole="button"
           onPress={() => router.replace(exitHref)}
           className="bg-cta items-center justify-center py-3 rounded-sm active:bg-cta-hover"
@@ -217,6 +222,7 @@ export function SummaryStep(props: SummaryStepProps) {
           </Text>
         </Pressable>
         <Pressable
+          testID="summary-done"
           accessibilityRole="button"
           onPress={() => router.replace("/")}
           className="items-center justify-center border border-hairline-strong rounded-sm py-3 active:bg-surface-4"

@@ -1,0 +1,9 @@
+{
+  "udid": "<simulator UDID, from `xcrun simctl list devices booted`>",
+  "idbPython": "/opt/homebrew/opt/python@3.14/bin/python3.14",
+  "metroLog": "/path/to/metro.log (stdout of `npx expo start`, e.g. `npx expo start --dev-client > metro.log 2>&1`)",
+  "requireMetroLog": true,
+  "metroUrl": "http://127.0.0.1:8081",
+  "bundleId": "com.elorated.mobile",
+  "realtimeContainer": "supabase_realtime_jr_be"
+}

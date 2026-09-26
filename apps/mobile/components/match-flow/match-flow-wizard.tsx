@@ -182,7 +182,7 @@ export function MatchFlowWizard({
         uploaderAthleteId={me.athlete_id}
         matchDurationSeconds={match.duration_seconds}
       >
-        <WizardStepHeader currentIdx={stepIdx} label={STEP_LABELS[step]} />
+        <WizardStepHeader step={step} currentIdx={stepIdx} label={STEP_LABELS[step]} />
         <QueueStatusBanner />
         {/* Above the step, never inside one: the upload begins after the
             live step has already unmounted, so this is the only place its
@@ -221,15 +221,33 @@ export function MatchFlowWizard({
  * with "STEP N / T" mono label, current-step name, and a row of
  * hairline bars that fill with the CTA color as the athlete advances.
  */
-function WizardStepHeader({ currentIdx, label }: { currentIdx: number; label: string }) {
+function WizardStepHeader({
+  step,
+  currentIdx,
+  label,
+}: {
+  step: MatchStep;
+  currentIdx: number;
+  label: string;
+}) {
   const total = MATCH_STEPS.length;
   return (
     <View className="gap-2">
       <View className="flex-row items-center justify-between">
-        <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-xl">
+        <Text
+          testID={`match-step-${step}`}
+          accessibilityLabel={`Step ${currentIdx + 1} of ${total}, ${label}`}
+          className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-xl"
+        >
           Step {currentIdx + 1} / {total}
         </Text>
-        <Text className="font-mono text-[10px] text-ink-2 uppercase tracking-caps-l">
+        {/* The step marker's label already says the step name; hide this
+            visual duplicate from VoiceOver so it is not read twice. */}
+        <Text
+          accessibilityElementsHidden
+          importantForAccessibility="no"
+          className="font-mono text-[10px] text-ink-2 uppercase tracking-caps-l"
+        >
           {label}
         </Text>
       </View>

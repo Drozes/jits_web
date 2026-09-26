@@ -70,3 +70,14 @@ next-env.d.ts
 # build output / tooling artifacts
 /dist/
 .playwright-mcp/
+
+# match-loop harness run artifacts (screenshots, traces, result.json) and
+# the machine-specific harness config (UDID, idb python, Metro log path)
+tools/match-loop/.runs/
+tools/match-loop/local.config.json
+
+# Any env file or backup of one (.env.bak-preflight, .env.local.hosted-bak...),
+# at any depth. Only the *.example templates are committed.
+.env*
+!.env.example
+!.env.*.example

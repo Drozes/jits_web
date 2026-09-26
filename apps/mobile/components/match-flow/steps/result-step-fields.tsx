@@ -32,6 +32,7 @@ export function OutcomeToggle({
           return (
             <Pressable
               key={opt}
+              testID={`result-outcome-${opt}`}
               accessibilityRole="button"
               accessibilityState={{ selected: active }}
               onPress={() => onChange(opt)}
@@ -92,6 +93,7 @@ export function WinnerPicker({
           return (
             <Pressable
               key={p.id}
+              testID={`result-winner-${p.id}`}
               accessibilityRole="button"
               accessibilityState={{ selected: active }}
               onPress={() => onChange(p.id)}

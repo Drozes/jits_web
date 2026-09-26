@@ -1,97 +1,63 @@
 import { useEffect, useRef, useCallback } from "react";
-import type { RealtimeChannel, SupabaseClient } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import {
+  createSessionMatchChannel,
+  SESSION_MATCH_EVENTS as E,
+  type BroadcastResult,
+  type SessionMatchChannel,
+  type SessionMatchHandlers,
+} from "./session-match-channel";
 
-export interface BroadcastResult {
-  result: "submission" | "draw";
-  winnerId?: string;
-  submissionCode?: string;
-  finishTimeSeconds?: number;
-}
+// Re-exported so existing `@jits/shared/hooks/use-session-match-sync` imports
+// keep resolving. The protocol itself lives in `session-match-channel.ts`.
+export {
+  createSessionMatchChannel,
+  SESSION_MATCH_EVENTS,
+  sessionMatchTopic,
+  type BroadcastResult,
+  type SessionMatchChannel,
+  type SessionMatchEvent,
+  type SessionMatchHandlers,
+} from "./session-match-channel";
 
-interface UseSessionMatchSyncParams {
+interface UseSessionMatchSyncParams extends SessionMatchHandlers {
   supabase: SupabaseClient;
   matchId: string;
-  onTimerStarted?: (startedAt: string) => void;
-  onTimerPaused?: (pausedAt: string) => void;
-  onTimerResumed?: (totalPausedDuration: number) => void;
-  onMatchEnded?: () => void;
-  onReadySignal?: (athleteId: string) => void;
-  onResultSubmitted?: (result: BroadcastResult) => void;
-  onResultConfirmed?: (athleteId: string) => void;
-  onMatchCancelled?: () => void;
 }
 
+/**
+ * Per-step in-match realtime channel. Mounts `session-match:<matchId>` for
+ * the component's lifetime and removes it on unmount; a thin React wrapper
+ * over `createSessionMatchChannel`.
+ */
 export function useSessionMatchSync(params: UseSessionMatchSyncParams) {
-  const channelRef = useRef<RealtimeChannel | null>(null);
-  // Tracks whether the websocket JOIN has completed. Broadcasts fired before
-  // this is true would otherwise trip realtime-js's REST fallback warning, so
-  // we route them through the explicit httpSend REST path instead.
-  const subscribedRef = useRef(false);
+  const handleRef = useRef<SessionMatchChannel | null>(null);
   const cbRefs = useRef(params);
   cbRefs.current = params;
 
   const { supabase, matchId } = params;
 
   useEffect(() => {
-    subscribedRef.current = false;
-    const channel = supabase
-      .channel(`session-match:${matchId}`)
-      .on("broadcast", { event: "timer_started" }, ({ payload }) => {
-        cbRefs.current.onTimerStarted?.(payload.started_at as string);
-      })
-      .on("broadcast", { event: "timer_paused" }, ({ payload }) => {
-        cbRefs.current.onTimerPaused?.(payload.paused_at as string);
-      })
-      .on("broadcast", { event: "timer_resumed" }, ({ payload }) => {
-        cbRefs.current.onTimerResumed?.(payload.total_paused_duration as number);
-      })
-      .on("broadcast", { event: "match_ended" }, () => {
-        cbRefs.current.onMatchEnded?.();
-      })
-      .on("broadcast", { event: "ready_signal" }, ({ payload }) => {
-        cbRefs.current.onReadySignal?.(payload.athlete_id as string);
-      })
-      .on("broadcast", { event: "result_submitted" }, ({ payload }) => {
-        cbRefs.current.onResultSubmitted?.(payload as BroadcastResult);
-      })
-      .on("broadcast", { event: "result_confirmed" }, ({ payload }) => {
-        cbRefs.current.onResultConfirmed?.(payload.athlete_id as string);
-      })
-      .on("broadcast", { event: "match_cancelled" }, () => {
-        cbRefs.current.onMatchCancelled?.();
-      })
-      .subscribe((status) => {
-        subscribedRef.current = status === "SUBSCRIBED";
-      });
-    channelRef.current = channel;
+    const handle = createSessionMatchChannel(supabase, matchId, () => cbRefs.current);
+    handleRef.current = handle;
     return () => {
-      subscribedRef.current = false;
-      supabase.removeChannel(channel);
+      handle.remove();
     };
   }, [supabase, matchId]);
 
-  // Use the websocket push once joined; otherwise use the explicit httpSend
-  // REST path. Both deliver to subscribers; httpSend avoids the realtime-js
-  // "send() falling back to REST" warning that fires when send() is called
-  // before JOIN completes.
   const send = useCallback((event: string, payload: Record<string, unknown>) => {
-    const channel = channelRef.current;
-    if (!channel) return;
-    if (subscribedRef.current) {
-      channel.send({ type: "broadcast", event, payload });
-    } else {
-      void channel.httpSend(event, payload);
-    }
+    // Fire and forget, as before the extraction.
+    void handleRef.current?.send(event, payload);
   }, []);
 
   return {
-    broadcastTimerStarted: useCallback((startedAt: string) => send("timer_started", { started_at: startedAt }), [send]),
-    broadcastTimerPaused: useCallback((pausedAt: string) => send("timer_paused", { paused_at: pausedAt }), [send]),
-    broadcastTimerResumed: useCallback((d: number) => send("timer_resumed", { total_paused_duration: d }), [send]),
-    broadcastMatchEnded: useCallback(() => send("match_ended", {}), [send]),
-    broadcastReady: useCallback((athleteId: string) => send("ready_signal", { athlete_id: athleteId }), [send]),
-    broadcastResultSubmitted: useCallback((r: BroadcastResult) => send("result_submitted", r as unknown as Record<string, unknown>), [send]),
-    broadcastResultConfirmed: useCallback((athleteId: string) => send("result_confirmed", { athlete_id: athleteId }), [send]),
-    broadcastMatchCancelled: useCallback(() => send("match_cancelled", {}), [send]),
+    broadcastTimerStarted: useCallback((startedAt: string) => send(E.TIMER_STARTED, { started_at: startedAt }), [send]),
+    broadcastTimerPaused: useCallback((pausedAt: string) => send(E.TIMER_PAUSED, { paused_at: pausedAt }), [send]),
+    broadcastTimerResumed: useCallback((d: number) => send(E.TIMER_RESUMED, { total_paused_duration: d }), [send]),
+    broadcastMatchEnded: useCallback(() => send(E.MATCH_ENDED, {}), [send]),
+    broadcastReady: useCallback((athleteId: string) => send(E.READY_SIGNAL, { athlete_id: athleteId }), [send]),
+    broadcastResultSubmitted: useCallback((r: BroadcastResult) => send(E.RESULT_SUBMITTED, r as unknown as Record<string, unknown>), [send]),
+    broadcastResultConfirmed: useCallback((athleteId: string) => send(E.RESULT_CONFIRMED, { athlete_id: athleteId }), [send]),
+    broadcastMatchCancelled: useCallback(() => send(E.MATCH_CANCELLED, {}), [send]),
   };
 }

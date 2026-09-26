@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+### Tooling: mobile match-flow verification harness (match-loop)
+
+An end-to-end harness that drives the real iOS simulator app as Demo Blue (via idb) against a headless Demo Red / Demo Green opponent bot speaking the app's own realtime protocol, then checks the database, the UI, the bot trace and the Metro log. LOCAL stack only. The app-side changes are JS-only (testIDs, one copy line), so OTA-eligible.
+
+**Added**
+- `tools/match-loop/` (not a workspace; own `tsconfig.json`): `config.ts` (hard local-only guards: API `127.0.0.1:54321`, a fixed local DB target with PG* env vars stripped, every Expo dotenv file pointed at the local stack, publishable bot key, `supabase_realtime_*` container), `bot/` (opponent + per-step match side with strict/lenient channel fidelity and human/fast timing, spy socket, JSONL trace), `sim/` (idb + simctl drivers, page objects), `oracle/` (DB, UI, Metro log), `fixtures/reset.ts`, `preflight.ts` (incl. a runtime check that the simulator app is on the local realtime), `scenarios/` (core C1-C6, extended E1-E16 + E3B; E13 documented as not implemented), `run.ts` (`result.json`, fingerprints, `known` via beads, history), `LOOP.md` (unattended loop runbook), `local.config.example.json`.
+- Root `package.json`: devDependency `tsx`; scripts `match-loop` and `match-loop:typecheck`.
+- `packages/shared/src/hooks/session-match-channel.ts`: the in-match realtime protocol extracted framework-free (`createSessionMatchChannel`, `SESSION_MATCH_EVENTS`, `sessionMatchTopic`). `useSessionMatchSync` now wraps it with unchanged behaviour (web unaffected); `send` returns realtime-js's status for non-React callers. Test: `session-match-channel.test.ts`.
+- Mobile testIDs (JS-only): wizard step marker `match-step-<step>` with accessibility label "Step N of 8, <Label>" (the duplicate visual step name is hidden from VoiceOver), `weight-confirm`, `ready-button`, `ready-panel-you|opponent` (with "Opponent, ready" labels), `live-pause-toggle`, `live-end`, `result-outcome-*`, `result-winner-<id>`, `result-submission-<code>`, `result-finish-time`, `result-record`, `confirm-result`, `confirm-dispute`, `confirm-verdict`, `dispute-reason|submit|back`, `summary-verdict|elo-delta|exit|done`, `wizard-error-exit`, `login-email|password|submit`, `arena-waiting-plate`, `challenge-prompt`.
+- A third LOCAL-only test account, `demo-green@elorated.dev` (active, 170 lbs, ELO 1000, seed password), created with jr_be's seeding engine; used for mid-match challenge and 3-cap scenarios. Not present in any hosted environment.
+
+**Changed**
+- Confirm step copy (`apps/mobile/components/match-flow/steps/confirm-step-panels.tsx`): "Ranked. ELO updates on confirmation." was wrong (ELO is applied when the result is recorded); now "Ranked. ELO already applied. Disputes are reviewed by an admin."
+- `.gitignore`: ignores `tools/match-loop/.runs/`, `tools/match-loop/local.config.json`, and every `.env*` file or backup at any depth except `*.example` templates.
+
 ### Mobile: notification bell opens again
 
 **Fixed**

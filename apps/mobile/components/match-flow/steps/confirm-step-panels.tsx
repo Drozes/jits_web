@@ -45,13 +45,14 @@ export function ResultBanner({
         Match Recorded
       </Text>
       <Text
+        testID="confirm-verdict"
         className={cn("font-display text-[36px] tracking-mark", verdictColor)}
       >
         {verdictText}
       </Text>
       {matchType === "ranked" ? (
         <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">
-          Ranked. ELO updates on confirmation.
+          Ranked. ELO already applied. Disputes are reviewed by an admin.
         </Text>
       ) : null}
     </Plate>

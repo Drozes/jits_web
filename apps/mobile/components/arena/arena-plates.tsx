@@ -71,7 +71,7 @@ export function WaitingPlate({
   disabled: boolean;
 }) {
   return (
-    <Plate variant="live">
+    <Plate variant="live" testID="arena-waiting-plate">
       <View className="flex-row items-start justify-between gap-3">
         <View className="flex-1">
           <Text className="font-heading text-[16px] text-ink">

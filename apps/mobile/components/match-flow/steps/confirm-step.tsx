@@ -124,6 +124,7 @@ export function ConfirmStep(props: ConfirmStepProps) {
 
       {!myConfirmed ? (
         <Pressable
+          testID="confirm-result"
           accessibilityRole="button"
           onPress={handleConfirm}
           className="bg-cta items-center justify-center py-3 rounded-sm active:bg-cta-hover flex-row gap-2"
@@ -141,6 +142,7 @@ export function ConfirmStep(props: ConfirmStepProps) {
 
       {!myConfirmed ? (
         <Pressable
+          testID="confirm-dispute"
           accessibilityRole="button"
           onPress={() => setShowDispute(true)}
           className="items-center py-2 active:opacity-70"

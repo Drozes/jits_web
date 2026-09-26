@@ -12,12 +12,14 @@ interface CtaButtonProps {
   onPress: () => void;
   disabled?: boolean;
   className?: string;
+  testID?: string;
 }
 
 /** Primary CTA button: bg-cta, ink-on-cta, uppercase heading typography. */
-export function CtaButton({ label, onPress, disabled, className }: CtaButtonProps) {
+export function CtaButton({ label, onPress, disabled, className, testID }: CtaButtonProps) {
   return (
     <Pressable
+      testID={testID}
       accessibilityRole="button"
       onPress={onPress}
       disabled={disabled}

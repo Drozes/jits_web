@@ -50,6 +50,7 @@ export function DisputeForm({ matchId, onCancel, onSubmitted }: DisputeFormProps
       </View>
 
       <TextInput
+        testID="dispute-reason"
         placeholder="Reason (optional)"
         placeholderTextColor={tokens.textTertiary}
         value={reason}
@@ -60,6 +61,7 @@ export function DisputeForm({ matchId, onCancel, onSubmitted }: DisputeFormProps
       />
 
       <Pressable
+        testID="dispute-submit"
         accessibilityRole="button"
         onPress={handleSubmit}
         disabled={submitting}
@@ -74,6 +76,7 @@ export function DisputeForm({ matchId, onCancel, onSubmitted }: DisputeFormProps
       </Pressable>
 
       <Pressable
+        testID="dispute-back"
         accessibilityRole="button"
         onPress={onCancel}
         disabled={submitting}

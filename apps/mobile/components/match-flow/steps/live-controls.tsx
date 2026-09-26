@@ -21,6 +21,7 @@ export function LiveControls({ paused, disabled, onPauseResume, onEnd }: LiveCon
   return (
     <View className="w-full flex-row gap-3 pt-4">
       <Pressable
+        testID="live-pause-toggle"
         accessibilityRole="button"
         onPress={onPauseResume}
         disabled={disabled}
@@ -41,6 +42,7 @@ export function LiveControls({ paused, disabled, onPauseResume, onEnd }: LiveCon
         </Text>
       </Pressable>
       <Pressable
+        testID="live-end"
         accessibilityRole="button"
         onPress={onEnd}
         disabled={disabled}

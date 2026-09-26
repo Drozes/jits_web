@@ -115,6 +115,7 @@ export function ResultStep({
       ) : null}
 
       <Pressable
+        testID="result-record"
         accessibilityRole="button"
         onPress={handleSubmit}
         disabled={!canSubmit || loading}

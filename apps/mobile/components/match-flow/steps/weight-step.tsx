@@ -73,6 +73,7 @@ export function WeightStep(props: WeightStepProps) {
       ) : null}
 
       <Pressable
+        testID="weight-confirm"
         accessibilityRole="button"
         onPress={onConfirm}
         className="bg-cta items-center justify-center py-3 rounded-sm active:bg-cta-hover"

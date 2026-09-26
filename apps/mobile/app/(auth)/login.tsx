@@ -95,6 +95,7 @@ export default function LoginScreen() {
 
           <Plate className="gap-5">
             <AuthFormField
+              testID="login-email"
               label="Email"
               autoCapitalize="none"
               autoComplete="email"
@@ -108,6 +109,7 @@ export default function LoginScreen() {
               showError={touched.email}
             />
             <AuthFormField
+              testID="login-password"
               label="Password"
               autoCapitalize="none"
               autoComplete="current-password"
@@ -121,6 +123,7 @@ export default function LoginScreen() {
               showError={touched.password}
             />
             <CtaButton
+              testID="login-submit"
               label={submitting ? "Signing in..." : "Sign In"}
               onPress={onSubmit}
               disabled={submitting || (allTouched && formInvalid)}

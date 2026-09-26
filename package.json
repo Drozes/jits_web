@@ -14,7 +14,9 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "db:types": "cd ../jr_be && supabase gen types typescript --local > ../jits_web/packages/shared/src/types/database.ts",
-    "prepare": "husky"
+    "prepare": "husky",
+    "match-loop": "tsx tools/match-loop/run.ts",
+    "match-loop:typecheck": "tsc -p tools/match-loop"
   },
   "overrides": {
     "react": "19.1.0",
@@ -23,6 +25,7 @@
   },
   "devDependencies": {
     "husky": "^9.1.7",
+    "tsx": "^4.23.15",
     "typescript": "^5"
   }
 }

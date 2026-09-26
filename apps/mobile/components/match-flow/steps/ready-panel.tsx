@@ -14,6 +14,9 @@ export function ReadyPanel({ label, ready }: { label: string; ready: boolean }) 
   const tokens = useThemedTokens();
   return (
     <View
+      testID={`ready-panel-${label.toLowerCase()}`}
+      accessible
+      accessibilityLabel={`${label}, ${ready ? "ready" : "waiting"}`}
       className={cn(
         "flex-1 items-center gap-2 rounded-md bg-surface-3 border px-3 py-5",
         ready ? "border-positive" : "border-hairline-strong",
