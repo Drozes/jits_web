@@ -15,16 +15,12 @@ interface MatchVideoCardProps {
   onWatch: () => void;
 }
 
-/** "Your recording" reads "Play your recording"; a name keeps its case. */
-function playLabel(angleLabel: string): string {
-  return angleLabel === "Your recording" ? "Play your recording" : `Play ${angleLabel}`;
-}
-
 /**
  * One recording: poster (or placeholder), angle label, status, Watch.
- * The poster area plays too (same `onWatch`); Watch keeps the harness testID
- * and stays the card's one styled button. While processing the poster is
- * inert and hidden from accessibility so "Processing" is announced once.
+ * The poster area is a large touch target running the same `onWatch`, but it
+ * is hidden from assistive tech in every state so Watch (harness testID) is
+ * the card's single accessible action. While processing it is inert and the
+ * placeholder drops its play glyph.
  */
 export function MatchVideoCard({ video, primary, onWatch }: MatchVideoCardProps) {
   const tokens = useThemedTokens();
@@ -38,10 +34,9 @@ export function MatchVideoCard({ video, primary, onWatch }: MatchVideoCardProps)
     >
       <Pressable
         testID={`match-video-play-${video.id}`}
-        accessible={!processing}
-        accessibilityRole="button"
-        accessibilityLabel={processing ? undefined : playLabel(video.angle_label)}
-        accessibilityState={{ disabled: processing }}
+        accessible={false}
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
         disabled={processing}
         onPress={onWatch}
         className="bg-surface-4 items-center justify-center active:opacity-70"
@@ -59,7 +54,7 @@ export function MatchVideoCard({ video, primary, onWatch }: MatchVideoCardProps)
           />
         ) : (
           <View testID="match-video-placeholder" pointerEvents="none">
-            <PlayCircle size={32} color={tokens.textTertiary} />
+            {processing ? null : <PlayCircle size={32} color={tokens.textTertiary} />}
           </View>
         )}
       </Pressable>

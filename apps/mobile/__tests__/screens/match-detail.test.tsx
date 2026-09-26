@@ -288,11 +288,18 @@ describe("MatchDetailScreen", () => {
 
   it("plays from the poster area with the same action as Watch", async () => {
     const utils = await renderLoaded(view({ videos: [video(), video(OPP_VIDEO)] }));
-    const play = utils.getByTestId("match-video-play-v-opp");
-    expect(play.props.accessibilityLabel).toBe("Play Demo Red's recording");
-    expect(utils.getByLabelText("Play your recording")).toBeTruthy();
+    const play = utils.getByTestId("match-video-play-v-opp", { includeHiddenElements: true });
+    // A touch target only: hidden from assistive tech so Watch is the single
+    // accessible action per card.
+    expect(play.props.accessible).toBe(false);
+    expect(play.props.accessibilityElementsHidden).toBe(true);
+    expect(play.props.importantForAccessibility).toBe("no-hide-descendants");
+    expect(play.props.accessibilityLabel).toBeUndefined();
+    expect(utils.queryByLabelText(/^Play /)).toBeNull();
     // Not styled as a second primary: the poster area never carries the CTA fill.
     expect(play.props.className ?? "").not.toContain("bg-cta");
+    // Still a touch target: RNTL skips hidden elements by default, so this
+    // query opts in, and the press runs the same onWatch as Watch.
     fireEvent.press(play);
     expect(mockPush).toHaveBeenCalledWith("/(app)/video/v-opp");
     // The harness testID stays on Watch only.
@@ -306,8 +313,11 @@ describe("MatchDetailScreen", () => {
     const utils = await renderLoaded(
       view({ videos: [video({ status: "uploading", playability: "processing" })] }),
     );
-    const play = utils.getByTestId("match-video-play-v-mine");
+    const play = utils.getByTestId("match-video-play-v-mine", { includeHiddenElements: true });
     expect(play.props.accessible).toBe(false);
+    expect(play.props.accessibilityElementsHidden).toBe(true);
+    // The placeholder drops its play glyph while nothing can play.
+    expect(within(utils.getByTestId("match-video-placeholder", { includeHiddenElements: true })).queryByTestId("icon", { includeHiddenElements: true })).toBeNull();
     fireEvent.press(play);
     expect(mockPush).not.toHaveBeenCalled();
     // "Processing" is announced once, by the Watch button.
@@ -318,14 +328,15 @@ describe("MatchDetailScreen", () => {
     const utils = await renderLoaded(
       view({ videos: [video({ poster_url: "https://signed/p.jpg" }), video(OPP_VIDEO)] }),
     );
-    const poster = within(utils.getByTestId("match-video-card-v-mine")).getByTestId("match-video-poster");
+    const poster = within(utils.getByTestId("match-video-card-v-mine")).getByTestId("match-video-poster", { includeHiddenElements: true });
     // Cached by video id so a re-signed URL on refetch does not flash.
     expect(poster.props.source).toEqual({
       uri: "https://signed/p.jpg",
       cacheKey: "match-video-poster-v-mine",
     });
     expect(poster.props.recyclingKey).toBe("v-mine");
-    expect(within(utils.getByTestId("match-video-card-v-opp")).getByTestId("match-video-placeholder")).toBeTruthy();
+    const placeholder = within(utils.getByTestId("match-video-card-v-opp")).getByTestId("match-video-placeholder", { includeHiddenElements: true });
+    expect(within(placeholder).getByTestId("icon", { includeHiddenElements: true })).toBeTruthy();
   });
 
   it("shows the no-video plate when nothing was recorded", async () => {

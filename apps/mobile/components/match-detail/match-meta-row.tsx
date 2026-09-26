@@ -37,7 +37,7 @@ export function MatchMetaRow({ match }: { match: MatchDetailView["match"] }) {
       {duration ? (
         <Text
           testID="match-round-length"
-          className="font-mono text-[12px] text-ink-3 uppercase tabular-nums"
+          className="font-mono text-[12px] text-ink-3 tabular-nums"
         >
           {duration}
         </Text>
