@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Mobile: release-review match-flow fixes
+
+JS-only, OTA-eligible for runtime 0.3.0.
+
+**Fixed**
+- Match wizard: the camera-denied card no longer offers "Open Settings" (iOS kills the app when a camera/mic privacy switch changes, stranding the athlete mid-match); it says the match runs unrecorded and to change the setting after the match.
+- Match summary: "View match details" is always shown below Watch / Uploading, so both athletes' recordings are reachable.
+- Live step: tapping Pause on a match the opponent already paused takes the paused state from the DB instead of "Couldn't pause".
+- Profile: Past Match Videos refetches once when a match's upload lands (`useRefetchOnUploadSettled`).
+
 ### Mobile: release-review Arena fixes
 
 JS-only, OTA-eligible for runtime 0.3.0.
