@@ -28,6 +28,13 @@ export type AuthState = {
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: AuthError | null }>;
   refreshAthlete: () => Promise<void>;
+  /**
+   * Re-read the athlete row, but keep the current one when the read fails.
+   * `getCurrentAthlete` returns null on ANY error, and a null athlete sends
+   * the mounted tabs to /profile-setup and tears down live state, so a
+   * background refresh (after a match, jits-tlk3) must never apply it.
+   */
+  refreshAthleteSoft: () => Promise<void>;
 };
 
 let googleConfigured = false;
@@ -122,6 +129,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     const row = await getCurrentAthlete(supabase, user.id);
+    setAthlete(row);
+  }, [user]);
+
+  const refreshAthleteSoft = React.useCallback(async () => {
+    const uid = user?.id;
+    if (!uid) return;
+    const row = await getCurrentAthlete(supabase, uid);
+    // A failed read, or a sign-out / account switch while it was in flight:
+    // leave whatever the athlete is now alone.
+    if (!row || loadedAthleteForUserId.current !== uid) return;
     setAthlete(row);
   }, [user]);
 
@@ -222,6 +239,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signOut,
       resetPassword,
       refreshAthlete,
+      refreshAthleteSoft,
     }),
     [
       user,
@@ -235,6 +253,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signOut,
       resetPassword,
       refreshAthlete,
+      refreshAthleteSoft,
     ],
   );
 

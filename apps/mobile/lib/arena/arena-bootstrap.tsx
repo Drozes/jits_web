@@ -33,18 +33,20 @@ import { useLobbyIds, useLobbyPresence } from "./use-lobby-presence";
 import { usePendingChallengeRecovery } from "./use-pending-challenge-recovery";
 
 export function ArenaBootstrap() {
-  const { athlete, refreshAthlete } = useAuth();
+  const { athlete, refreshAthleteSoft } = useAuth();
 
   // A finished match changed this athlete's rating, and nothing else re-reads
   // the auth row: the tab screens that show it (Home's ELO hero, Profile, the
-  // Arena's gaps) stay mounted under the match now (jits-tlk3).
+  // Arena's gaps) stay mounted under the match now (jits-tlk3). Soft: a failed
+  // read keeps the current athlete instead of nulling it, which would bounce
+  // the tabs to /profile-setup and tear this owner (live, presence) down.
   const matchExits = useMatchExitCount();
   const seenExits = React.useRef(matchExits);
   React.useEffect(() => {
     if (matchExits === seenExits.current) return;
     seenExits.current = matchExits;
-    void refreshAthlete();
-  }, [matchExits, refreshAthlete]);
+    void refreshAthleteSoft();
+  }, [matchExits, refreshAthleteSoft]);
 
   if (!athlete || athlete.status !== ATHLETE_STATUS.ACTIVE) return null;
   return <ArenaOwner key={athlete.id} athlete={athlete} />;

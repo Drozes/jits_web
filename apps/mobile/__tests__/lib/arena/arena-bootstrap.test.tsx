@@ -29,9 +29,9 @@ jest.mock("@/lib/theme/use-theme", () => ({
 }));
 
 let mockAthlete: Record<string, unknown> | null = null;
-const mockRefreshAthlete = jest.fn(() => Promise.resolve());
+const mockRefreshAthleteSoft = jest.fn(() => Promise.resolve());
 jest.mock("@/lib/auth/hooks", () => ({
-  useAuth: () => ({ athlete: mockAthlete, refreshAthlete: mockRefreshAthlete }),
+  useAuth: () => ({ athlete: mockAthlete, refreshAthleteSoft: mockRefreshAthleteSoft }),
 }));
 
 const mockUseLobbyPresence = jest.fn();
@@ -128,16 +128,16 @@ beforeEach(() => {
 describe("ArenaBootstrap", () => {
   it("re-reads the athlete once each time a match is left (jits-tlk3)", () => {
     render(<ArenaBootstrap />);
-    expect(mockRefreshAthlete).not.toHaveBeenCalled();
+    expect(mockRefreshAthleteSoft).not.toHaveBeenCalled();
 
     const match = renderHook(() => useArenaMatchScreen());
-    expect(mockRefreshAthlete).not.toHaveBeenCalled();
+    expect(mockRefreshAthleteSoft).not.toHaveBeenCalled();
     act(() => match.unmount());
-    expect(mockRefreshAthlete).toHaveBeenCalledTimes(1);
+    expect(mockRefreshAthleteSoft).toHaveBeenCalledTimes(1);
 
     const next = renderHook(() => useArenaMatchScreen());
     act(() => next.unmount());
-    expect(mockRefreshAthlete).toHaveBeenCalledTimes(2);
+    expect(mockRefreshAthleteSoft).toHaveBeenCalledTimes(2);
   });
 
   it("mounts the live writer, lobby channel, challenge listener and recovery for the athlete", () => {
