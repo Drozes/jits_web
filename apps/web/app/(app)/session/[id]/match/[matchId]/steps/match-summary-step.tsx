@@ -13,6 +13,11 @@ import { settleWithin } from "@jits/shared/hooks/session-match-channel";
 /** How often a confirmer who is waiting on the opponent re-reads the DB. */
 const WAITING_POLL_MS = 5_000;
 
+/** After this athlete has confirmed, how long before they may stop waiting
+ * on an opponent who never confirms (the result and ELO are already final
+ * at record time; the confirmation does not change them). Mirrors mobile. */
+export const LEAVE_AFTER_MS = 20_000;
+
 /**
  * Whether the confirm step is finished, from the DB. `completed` alone is
  * NOT enough: record_match_result sets it at RECORD time, before anyone has
@@ -52,6 +57,7 @@ export function MatchSummaryStep({ onNext, matchId, matchType, currentAthleteId,
   const [myConfirmed, setMyConfirmed] = useState(false);
   const [opponentConfirmed, setOpponentConfirmed] = useState(false);
   const [disputing, setDisputing] = useState(false);
+  const [canLeave, setCanLeave] = useState(false);
   const confirmedRef = useRef(false);
   const onNextRaw = useRef(onNext);
   onNextRaw.current = onNext;
@@ -127,6 +133,14 @@ export function MatchSummaryStep({ onNext, matchId, matchType, currentAthleteId,
     return () => clearInterval(id);
   }, [myConfirmed, opponentConfirmed, checkDb]);
 
+  // An opponent who closes the app never confirms; do not hold this athlete
+  // on the confirm step forever for a formality.
+  useEffect(() => {
+    if (!myConfirmed || opponentConfirmed) return;
+    const t = setTimeout(() => setCanLeave(true), LEAVE_AFTER_MS);
+    return () => clearTimeout(t);
+  }, [myConfirmed, opponentConfirmed]);
+
   async function handleConfirm() {
     if (confirmedRef.current) return;
     confirmedRef.current = true;
@@ -135,7 +149,13 @@ export function MatchSummaryStep({ onNext, matchId, matchType, currentAthleteId,
     if (!res.ok) {
       confirmedRef.current = false;
       setMyConfirmed(false);
-      toast.error("Failed to confirm result. Please try again.");
+      // Most often the opponent disputed, or our confirmation landed and
+      // only the response was lost: let the DB decide before erroring.
+      await checkDb();
+      if (advancedRef.current || confirmedRef.current) return;
+      toast.error("Failed to confirm result. Please try again.", {
+        action: { label: "Retry", onClick: () => void handleConfirm() },
+      });
       return;
     }
     sync.broadcastResultConfirmed(currentAthleteId);
@@ -167,6 +187,11 @@ export function MatchSummaryStep({ onNext, matchId, matchType, currentAthleteId,
       {myConfirmed && !opponentConfirmed && (
         <p className="text-sm text-muted-foreground">Waiting for opponent to confirm...</p>
       )}
+      {myConfirmed && !opponentConfirmed && canLeave && (
+        <button type="button" onClick={() => onNextRef.current()} className="text-xs text-muted-foreground underline hover:text-foreground">
+          Continue without waiting
+        </button>
+      )}
 
       {!myConfirmed && !disputing && (
         <button type="button" onClick={handleDispute} className="text-xs text-muted-foreground underline hover:text-foreground">
@@ -189,7 +214,7 @@ function ResultBanner({ resultData, currentAthleteId, matchType }: { resultData:
       {resultData?.result === "draw" && <p className="text-3xl font-bold text-amber-500">Draw</p>}
       {!resultData && <p className="text-xl font-semibold">Match Complete</p>}
       {matchType === "ranked" && (
-        <p className="text-xs text-muted-foreground">Ranked match. ELO will update on confirmation.</p>
+        <p className="text-xs text-muted-foreground">Ranked. ELO already applied. Disputes are reviewed by an admin.</p>
       )}
     </div>
   );
