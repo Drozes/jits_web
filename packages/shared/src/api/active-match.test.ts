@@ -73,19 +73,40 @@ describe("getMyActiveMatch", () => {
     ]);
   });
 
-  it("leaves out matches the caller already left", async () => {
+  const A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+  const orArg = (calls: Array<[string, ...unknown[]]>) =>
+    calls.find((c) => c[0] === "or")?.[1] as string;
+
+  it("leaves out left matches from the PENDING branch only", async () => {
     const { client, calls } = mockClient({ rows: [] });
-    await getMyActiveMatch(client, ME, NOW, ["m-a", "m-b"]);
-    expect(calls).toContainEqual(["not", "id", "in", "(m-a,m-b)"]);
-    // The exclusion goes on before the terminal order/limit.
-    const at = (name: string) => calls.findIndex((c) => c[0] === name);
-    expect(at("not")).toBeLessThan(at("order"));
+    await getMyActiveMatch(client, ME, NOW, [A, B]);
+
+    const live = new Date(NOW - MATCH_RESUME_WINDOW_MS).toISOString();
+    const pending = new Date(NOW - ARENA_CHALLENGE_FRESH_MS).toISOString();
+    // An in_progress match left by accident (load error, back while loading)
+    // stays resumable: its branch carries no exclusion.
+    expect(orArg(calls)).toBe(
+      `and(status.eq.in_progress,or(created_at.gte.${live},started_at.gte.${live})),` +
+        `and(status.eq.pending,created_at.gte.${pending},id.not.in.(${A},${B}))`,
+    );
+    expect(calls.some((c) => c[0] === "not")).toBe(false);
   });
 
-  it("sends no exclusion filter when nothing was left", async () => {
+  it("drops anything that is not a UUID before it reaches the filter", async () => {
     const { client, calls } = mockClient({ rows: [] });
-    await getMyActiveMatch(client, ME, NOW, []);
-    expect(calls.some((c) => c[0] === "not")).toBe(false);
+    await getMyActiveMatch(client, ME, NOW, ["m-1),id.eq.x", A, "nope"]);
+    expect(orArg(calls)).toContain(`id.not.in.(${A}))`);
+    expect(orArg(calls)).not.toContain("nope");
+    expect(orArg(calls)).not.toContain("id.eq.x");
+  });
+
+  it("sends no exclusion when nothing (valid) was left", async () => {
+    for (const ids of [[], ["not-a-uuid"]]) {
+      const { client, calls } = mockClient({ rows: [] });
+      await getMyActiveMatch(client, ME, NOW, ids);
+      expect(orArg(calls)).not.toContain("id.not.in");
+    }
   });
 
   it("returns null, with no details read, when nothing is open", async () => {

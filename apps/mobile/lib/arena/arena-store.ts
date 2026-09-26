@@ -20,6 +20,7 @@
  */
 import * as React from "react";
 import { useSyncExternalStore } from "react";
+import { isUuid } from "@jits/shared/utils";
 import type {
   IncomingChallenge,
   OutgoingChallenge,
@@ -218,7 +219,8 @@ export function useArenaMatchScreen(matchId?: string): void {
     for (const l of matchListeners) l();
     return () => {
       // Before the listeners run, so a refresh keyed off the exit sees it.
-      if (matchId) leftMatchIds.add(matchId);
+      // Only real ids: a malformed route param must never reach a filter.
+      if (matchId && isUuid(matchId)) leftMatchIds.add(matchId);
       const wasInMatch = matchScreens > 0;
       matchScreens = Math.max(0, matchScreens - 1);
       if (wasInMatch && matchScreens === 0) matchExits += 1;
@@ -254,6 +256,8 @@ export const SIGN_OUT_OFFLINE_TIMEOUT_MS = 4_000;
 export async function takeArenaOfflineBeforeSignOut(
   timeoutMs = SIGN_OUT_OFFLINE_TIMEOUT_MS,
 ): Promise<void> {
+  // Left matches belong to this athlete; the next one to sign in starts clean.
+  leftMatchIds.clear();
   // Not gated on `isLive`: a go-live still in flight has not flipped it yet,
   // and the reconcile queue turns an already-offline call into a no-op.
   if (!controller) return;

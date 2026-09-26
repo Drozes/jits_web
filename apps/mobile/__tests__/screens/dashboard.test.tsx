@@ -478,7 +478,7 @@ describe("DashboardScreen resume-match card", () => {
   const store = require("@/lib/arena/arena-store") as typeof import("@/lib/arena/arena-store");
   const open = {
     ok: true,
-    data: { matchId: "m-9", status: "in_progress", opponentName: "Demo Red" },
+    data: { matchId: "99999999-9999-4999-8999-999999999999", status: "in_progress", opponentName: "Demo Red" },
   };
 
   afterEach(() => {
@@ -513,14 +513,14 @@ describe("DashboardScreen resume-match card", () => {
     expect(arena.props.className).toContain("border-hairline-strong");
 
     fireEvent.press(resume);
-    expect(mockPush).toHaveBeenCalledWith("/match/m-9");
+    expect(mockPush).toHaveBeenCalledWith("/match/99999999-9999-4999-8999-999999999999");
   });
 
   it("words a not-yet-started match as waiting", async () => {
     const queries = require("@jits/shared/api/queries") as QueryMocks;
     queries.getMyActiveMatch.mockResolvedValue({
       ok: true,
-      data: { matchId: "m-9", status: "pending", opponentName: null },
+      data: { matchId: "99999999-9999-4999-8999-999999999999", status: "pending", opponentName: null },
     });
     const { findByText, queryByText } = render(React.createElement(DashboardScreen));
     expect(await findByText("Match waiting to start")).toBeTruthy();
@@ -551,7 +551,7 @@ describe("DashboardScreen resume-match card", () => {
     // A match screen mounts and unmounts: the exit counter bumps.
     queries.getMyActiveMatch.mockResolvedValue({ ok: true, data: null });
     function MatchScreen() {
-      store.useArenaMatchScreen("m-other");
+      store.useArenaMatchScreen("00000000-0000-4000-8000-000000000000");
       return null;
     }
     const matchScreen = render(React.createElement(MatchScreen));
@@ -571,7 +571,7 @@ describe("DashboardScreen resume-match card", () => {
 
     // The athlete opens m-9 and backs out of it on purpose.
     function MatchScreen() {
-      store.useArenaMatchScreen("m-9");
+      store.useArenaMatchScreen("99999999-9999-4999-8999-999999999999");
       return null;
     }
     const matchScreen = render(React.createElement(MatchScreen));
@@ -579,7 +579,7 @@ describe("DashboardScreen resume-match card", () => {
 
     // The exit re-read asks the server to leave m-9 out.
     await waitFor(() => expect(queries.getMyActiveMatch).toHaveBeenCalledTimes(2));
-    expect(queries.getMyActiveMatch.mock.calls[1][3]).toEqual(["m-9"]);
+    expect(queries.getMyActiveMatch.mock.calls[1][3]).toEqual(["99999999-9999-4999-8999-999999999999"]);
   });
 
   it("tags the card In progress / Waiting", async () => {

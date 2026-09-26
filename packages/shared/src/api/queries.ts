@@ -38,6 +38,7 @@ import type {
 } from "../types/gym-portal";
 import { mapPostgrestError, type DomainError, type Result } from "./errors";
 import { ARENA_CHALLENGE_FRESH_MS, MATCH_RESUME_WINDOW_MS } from "../constants";
+import { isUuid } from "../utils/shared";
 import {
   videoPlayability,
   videoAngleLabel,
@@ -656,7 +657,10 @@ export interface MyActiveMatch {
  *  - `in_progress` created or started within `MATCH_RESUME_WINDOW_MS`;
  *  - `pending` created within `ARENA_CHALLENGE_FRESH_MS` (a match nobody has
  *    begun goes stale as fast as the challenge that made it);
- *  - never one of `excludeMatchIds` (matches the caller already left).
+ *  - a pending match is never one of `excludeMatchIds` (matches the caller
+ *    backed out of). In-progress matches ignore the list: leaving one by
+ *    accident (a load error, back while loading) must stay resumable.
+ *    Anything that is not a UUID is dropped before it reaches the filter.
  *
  * Authorization is plain RLS, no SECURITY DEFINER shortcut: the
  * `matches_select_participant` policy returns only matches I take part in, and
@@ -673,7 +677,9 @@ export async function getMyActiveMatch(
 ): Promise<Result<MyActiveMatch | null>> {
   const liveSince = new Date(now - MATCH_RESUME_WINDOW_MS).toISOString();
   const pendingSince = new Date(now - ARENA_CHALLENGE_FRESH_MS).toISOString();
-  let query = supabase
+  const excluded = excludeMatchIds.filter(isUuid);
+  const notLeft = excluded.length > 0 ? `,id.not.in.(${excluded.join(",")})` : "";
+  const { data, error } = await supabase
     .from("matches")
     .select("id, status, match_participants!inner(athlete_id, status)")
     .eq("match_participants.athlete_id", athleteId)
@@ -682,12 +688,10 @@ export async function getMyActiveMatch(
     .in("status", ["pending", "in_progress"])
     .or(
       `and(status.eq.in_progress,or(created_at.gte.${liveSince},started_at.gte.${liveSince})),` +
-        `and(status.eq.pending,created_at.gte.${pendingSince})`,
-    );
-  if (excludeMatchIds.length > 0) {
-    query = query.not("id", "in", `(${excludeMatchIds.join(",")})`);
-  }
-  const { data, error } = await query.order("created_at", { ascending: false }).limit(1);
+        `and(status.eq.pending,created_at.gte.${pendingSince}${notLeft})`,
+    )
+    .order("created_at", { ascending: false })
+    .limit(1);
 
   if (error) return { ok: false, error: mapPostgrestError(error) };
   const row = data?.[0];
@@ -2549,9 +2553,6 @@ export async function getMatchVideoSignedUrlResult(
 // Result-shaped and never throws.
 // ---------------------------------------------------------------------------
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 const MATCH_NOT_FOUND_ERROR: DomainError = {
   code: "MATCH_NOT_FOUND",
   message: "Match not found.",
@@ -2648,7 +2649,7 @@ export async function getMatchDetailView(
 ): Promise<Result<MatchDetailView>> {
   // Deep links and route params are untrusted; a malformed id would only earn
   // a 22P02 from Postgres, so answer "not found" without the round trip.
-  if (!UUID_RE.test(matchId)) return { ok: false, error: MATCH_NOT_FOUND_ERROR };
+  if (!isUuid(matchId)) return { ok: false, error: MATCH_NOT_FOUND_ERROR };
 
   try {
     const { data, error } = await supabase.rpc("get_match_details", {
@@ -2737,7 +2738,7 @@ export async function getMatchVideoPlaybackResult(
   expiresInSeconds = 3600,
 ): Promise<Result<MatchVideoPlayback | null>> {
   // A malformed id can match no row; skip the round trip (and its 22P02).
-  if (!UUID_RE.test(videoId)) return { ok: true, data: null };
+  if (!isUuid(videoId)) return { ok: true, data: null };
   try {
     const { data, error } = await supabase
       .from("match_videos")
