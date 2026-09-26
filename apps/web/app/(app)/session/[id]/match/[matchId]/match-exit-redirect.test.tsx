@@ -1,4 +1,5 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { StrictMode } from "react";
 import { render } from "@testing-library/react";
 
 const nav = vi.hoisted(() => ({ replace: vi.fn() }));
@@ -9,6 +10,19 @@ vi.mock("sonner", () => ({ toast: toasts }));
 import { MatchExitRedirect } from "./match-exit-redirect";
 
 describe("MatchExitRedirect", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("toasts and navigates exactly once under Strict Mode", () => {
+    render(
+      <StrictMode>
+        <MatchExitRedirect exitHref="/arena" reason="cancelled" />
+      </StrictMode>,
+    );
+    expect(toasts.info).toHaveBeenCalledTimes(1);
+    expect(nav.replace).toHaveBeenCalledTimes(1);
+    expect(nav.replace).toHaveBeenCalledWith("/arena");
+  });
+
   it("toasts why and leaves a cancelled match for the exit", () => {
     render(<MatchExitRedirect exitHref="/arena" reason="cancelled" />);
     expect(toasts.info).toHaveBeenCalledWith("This match was cancelled.");

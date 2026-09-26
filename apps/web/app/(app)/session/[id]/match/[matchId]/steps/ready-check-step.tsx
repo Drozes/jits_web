@@ -37,9 +37,16 @@ export function ReadyCheckStep({ onNext, exitHref, matchId, currentAthleteId, op
   const cancelledRef = useRef(false);
   /** Our own start_match call is awaiting its answer. */
   const startInFlightRef = useRef(false);
-  /** Set on unmount: late awaits must not toast, navigate or advance. */
+  /** Set on unmount: late awaits must not toast, navigate or advance. Reset
+   * on mount too: Strict Mode (next dev) mounts, cleans up and mounts again,
+   * and a ref left true would make every path bail and hang the wizard. */
   const unmountedRef = useRef(false);
-  useEffect(() => () => { unmountedRef.current = true; }, []);
+  useEffect(() => {
+    unmountedRef.current = false;
+    return () => {
+      unmountedRef.current = true;
+    };
+  }, []);
 
   const supabase = useMemo(() => createClient(), []);
 

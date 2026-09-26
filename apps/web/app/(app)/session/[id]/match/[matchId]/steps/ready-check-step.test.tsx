@@ -7,6 +7,7 @@
  *    is picked up from the DB and leaves for the exit.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { StrictMode } from "react";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 const nav = vi.hoisted(() => ({ replace: vi.fn() }));
@@ -173,6 +174,48 @@ describe("ReadyCheckStep", () => {
     expect(toasts.error).not.toHaveBeenCalled();
     expect(onNext).not.toHaveBeenCalled();
     expect(api.getMatchDetails).toHaveBeenCalledTimes(1);
+  });
+
+  describe("under React Strict Mode (next dev mounts, cleans up, remounts)", () => {
+    function renderStrict() {
+      const onNext = vi.fn();
+      render(
+        <StrictMode>
+          <ReadyCheckStep
+            onNext={onNext}
+            exitHref="/arena"
+            matchId="M1"
+            currentAthleteId="me"
+            opponentId="op"
+            timekeeperEnabled={false}
+            hasTimekeeper={false}
+            isTimekeeper={false}
+          />
+        </StrictMode>,
+      );
+      return onNext;
+    }
+
+    it("advances on the opponent's timer_started", async () => {
+      const onNext = renderStrict();
+      await act(async () => sync.opts?.onTimerStarted?.(STARTED));
+      expect(onNext).toHaveBeenCalledWith({ startedAt: STARTED });
+    });
+
+    it("starts, broadcasts and advances when both are ready", async () => {
+      api.startMatch.mockResolvedValue({ ok: true, data: { started_at: STARTED } });
+      const onNext = renderStrict();
+      await bothReady();
+      await waitFor(() => expect(onNext).toHaveBeenCalledWith({ startedAt: STARTED }));
+      expect(sync.broadcastTimerStarted).toHaveBeenCalledWith(STARTED);
+      expect(onNext).toHaveBeenCalledTimes(1);
+    });
+
+    it("still exits on a cancelled match read from the DB", async () => {
+      api.getMatchDetails.mockResolvedValue({ status: "cancelled", started_at: null });
+      renderStrict();
+      await waitFor(() => expect(nav.replace).toHaveBeenCalledWith("/arena"));
+    });
   });
 
   it("exits once on an opponent cancel broadcast", async () => {
