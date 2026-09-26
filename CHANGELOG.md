@@ -2,6 +2,28 @@
 
 ## [Unreleased]
 
+### Mobile: UX polish batches B, C, D (demo-ux-polish audit)
+
+JS-only, OTA-eligible for runtime 0.3.0.
+
+**Changed**
+- Match flow, confirm step (jits-g2zv): plain-English subtitle ("Your rating is already updated. Confirm if this is right, or dispute it and an admin will review."; casual: "Confirm if this is right, or dispute it."); the viewer's pending panel reads "Your call" instead of a spinner, the opponent's reads "Confirming..."; the wait line names the opponent. Panel testIDs are `confirm-panel-you-<state>` / `confirm-panel-opponent-<state>`.
+- Match flow, dispute form (jits-sdh3): explains that an admin reviews every dispute and ratings stay as recorded until then; placeholder "What went wrong? (optional)"; warning glyph amber instead of red.
+- Toasts (jits-4zp.4): `components/ui/toast.tsx` renders a branded card (surface-3, hairline border, 4px radius, no shadow; ink / Signal Red / ink-3 rule for success / error / info) and announces each toast to VoiceOver. `toast.*` API unchanged.
+- Haptics (jits-4zp.7): Warning buzz when an incoming challenge prompt appears; Success buzz when a result is recorded (light impact when only queued offline); light impact on confirm and on Challenge; error buzz on record / confirm / dispute failures.
+- `components/match-detail/use-amber.ts`: `useAmber()` also returns an `icon` hex for lucide icons.
+- Arena copy no longer contradicts itself (jits-v203): "You're offline" / "Looking for a match" plate titles; live-aware empty Online now note; clearer Open to challenges subtitle.
+- Home's Arena card is live-aware (jits-sq3a): "You're live" with a LIVE pill while live, reading the arena store only (`components/dashboard/arena-nudge-card.tsx`).
+- Match detail: tapping a video's poster plays it (touch target only, hidden from VoiceOver; Watch stays the single accessible action); the match clock reads as a round length ("10 MIN ROUND") (jits-32ah).
+
+**Added**
+- Arena rematch handoff (jits-00fr, Arena half): `/arena?rematch=<athlete id>` pins that opponent to the top of Online now with a "Rematch" tag when they are in the lobby, or shows "<Name> isn't back in the Arena yet. Their Challenge button appears here the moment they are."; the param is cleared on read (route-scoped); the pin ends once a challenge to them is actually sent or on leaving the tab. Never auto-challenges. New `apps/mobile/lib/arena/use-rematch-pin.ts`.
+
+**Fixed**
+- Match flow, result step (jits-feq5): a draw shows on a neutral plate with an amber handshake instead of a red loss plate. End step: neutral plate and ink check; "Up next: record the result" replaces the misleading "Recording result..." and its spinner.
+- Data colours (jits-4zp.8): Home feed finishing method is ink mono (not green); the Profile / competitor rank caption is ink mono tabular-nums (not Signal Red).
+- Tests added: `__tests__/components/match-flow/confirm-step-clarity.test.tsx`, `result-end-dispute-copy.test.tsx`, `__tests__/components/ui/toast.test.tsx`, `__tests__/lib/match-flow/record-result-haptics.test.tsx`, `__tests__/lib/match-detail/round-length.test.ts`, `__tests__/components/dashboard/activity-feed-item.test.tsx`, `__tests__/components/profile/rank-caption.test.tsx`.
+
 ### Shared/Mobile: live timer works when entered into an already-paused match
 
 JS-only, OTA-eligible for runtime 0.3.0 (no native dependency, `app.json` or config change).

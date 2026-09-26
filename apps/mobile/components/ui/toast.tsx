@@ -116,8 +116,8 @@ function render(type: BrandToastType) {
   );
 }
 
-// Any type not listed here (e.g. a raw `toast.show({ type: "custom" })`)
-// falls back to the library's stock, unbranded card.
+// Any other type (e.g. a raw `toast.show({ type: "custom" })`) throws at
+// render: the library only knows success, error and info, all overridden here.
 export const toastConfig: ToastConfig = {
   success: render("success"),
   error: render("error"),
