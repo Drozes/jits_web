@@ -555,9 +555,16 @@ describe("DashboardScreen resume-match card", () => {
       return null;
     }
     const matchScreen = render(React.createElement(MatchScreen));
-    matchScreen.unmount();
+    // Unmount inside an async act: the exit bumps the counter, Home's exit
+    // effect starts the re-read, and act only returns once that read has
+    // resolved and its state update has been committed. Awaiting the update
+    // itself, not a timeout, is what keeps this deterministic on a slow runner.
+    await act(async () => {
+      matchScreen.unmount();
+    });
 
-    await waitFor(() => expect(queryByLabelText("Resume your match")).toBeNull());
+    expect(queries.getMyActiveMatch).toHaveBeenCalledTimes(2);
+    expect(queryByLabelText("Resume your match")).toBeNull();
     expect(getByLabelText("Go to the Arena").props.className).toContain("bg-cta");
   });
 
