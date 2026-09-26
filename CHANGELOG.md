@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+### Web: Arena concurrency parity with mobile (jits-7dqt, jits-u7vd, jits-q9x8, jits-zasq, jits-itjn)
+
+**Added**
+- Accepter rejoin after a reload (jits-itjn, web port of mobile's `rejoinStartedMatch`): the accepted challenge is persisted in `localStorage` (new `apps/web/lib/arena/accepted-record.ts`, same key as mobile, every access in try/catch), and a reloaded tab joins the match the challenger started for it only within 10 minutes and only if it never entered it. Checked at mount (visible tab only), on returning to the tab, and on that challenge's `started` update while the tab is visible.
+- Pending incoming challenges on web: at mount, on going live, on leaving a match, on returning to the tab and whenever a prompt clears without a match, the newest fresh pending incoming challenge whose challenger is in `lobby:online` is offered (`ArenaBootstrap` passes `lobbyIds`), after re-reading its row so one withdrawn while the tab was hidden is not raised.
+- `isMatchRoute()` in `apps/web/components/layout/nav-config.ts`: a mounted match screen only, the web equivalent of mobile's "in a match".
+
+**Fixed**
+- Arena concurrency (jits-7dqt, `apps/web/hooks/use-arena-challenge.ts`, mirrors `apps/mobile/lib/arena/use-arena-challenge.ts`): crossing challenges tie-break on the lower challenge id so both athletes land in one match; accepting while your own challenge is out withdraws it first (or joins it if it already started, or keeps waiting if it was just accepted); a challenger stuck at `accepted` starts the match itself after 12s (`ACCEPTED_FALLBACK_MS`), with one re-read 2s after a failed start; an accepter whose start failed withdraws the accepted row, or joins the match the challenger's fallback started; one tab never opens two match screens; a challenge arriving while a match screen is up is declined as busy (the match peer's is withdrawn quietly); the waiting bar re-reads its row once its channel is subscribed.
+- The incoming challenge channel gets a per-mount topic suffix (`incomingTopic`), so a remount that overlaps its own teardown (Strict Mode, HMR) no longer goes deaf on realtime-js's reused, still-leaving channel.
+- The Arena no longer races a session lobby or join wizard (jits-zasq): entering `/session/*/lobby` or `/session/*/join` withdraws your own pending Arena challenge (and tells its recipient), and an Arena match that starts while you are there shows a "Your Arena match started" toast with a Join action instead of navigating. Dismissing the toast or letting it time out cancels that match (`cancelSessionMatch` plus the `match_cancelled` broadcast) so the opponent is not left alone in it, and an offer that was not taken is never entered automatically later.
+- Busy-decline and the one-match-screen gate apply only on match screens (`isMatchRoute`); the session lobby and join wizard still take the athlete offline and hide the prompt, but leave new challenges pending.
+- Fighter live step drops the pause state of a database read issued before the latest pause/resume broadcast, or with a smaller paused total (jits-u7vd).
+- A failed dispute re-reads the match first, so an already-disputed match advances instead of erroring (jits-u7vd).
+- Cancelling a challenge from its card joins the match when the opponent had already started it, instead of treating a 0-row cancel as success (jits-q9x8, `apps/web/components/domain/challenge-versus-actions.tsx`, new test `challenge-versus-actions.test.tsx`).
+
 ### Docs
 **Changed**
 - `CLAUDE.md`: corrected the `match_participants` RLS note (own rows readable), added the presence rate-limit / channel-rebuild rules, mobile match exits (`exitMatchTo`, `useMatchExitCount`), Arena concurrency rules, Resume/rejoin scope, the narrowed web pending-challenge gap, and the `tools/match-loop` harness.

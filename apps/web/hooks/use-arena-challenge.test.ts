@@ -24,6 +24,7 @@ interface FakeChannel {
   on: (type: string, filter: Record<string, string>, fn: Handler) => FakeChannel;
   subscribe: (cb?: (status: string) => void) => FakeChannel;
   send: (m: { event: string; payload: unknown }) => Promise<string>;
+  httpSend: (event: string, payload: unknown) => Promise<{ success: boolean }>;
 }
 
 const rt = vi.hoisted(() => ({
@@ -85,6 +86,10 @@ vi.mock("@/lib/supabase/client", () => ({
           ch.subscribed = true;
           ch.statusCb = cb ?? null;
           return ch;
+        },
+        httpSend: async (event, payload) => {
+          ch.sent.push({ event, payload });
+          return { success: true };
         },
         send: async (m) => {
           ch.sent.push({ event: m.event, payload: m.payload });
@@ -148,6 +153,7 @@ const m = vi.hoisted(() => ({
   declineChallenge: vi.fn(),
   declineOtherPendingChallenges: vi.fn(),
   startMatchFromChallenge: vi.fn(),
+  cancelSessionMatch: vi.fn(),
 }));
 vi.mock("@jits/shared/api/mutations", () => m);
 const q = vi.hoisted(() => ({
@@ -231,6 +237,7 @@ beforeEach(() => {
   m.cancelChallenge.mockResolvedValue({ ok: true, data: { cancelled: true } });
   m.createChallenge.mockResolvedValue({ ok: true, data: { id: "out1" } });
   m.startMatchFromChallenge.mockResolvedValue({ ok: true, data: { match_id: "m1" } });
+  m.cancelSessionMatch.mockResolvedValue({ ok: true, data: undefined });
   m.cancelStaleOutgoingChallenges.mockResolvedValue({ ok: true, data: { cancelled: [] } });
   m.declineOtherPendingChallenges.mockResolvedValue({
     ok: true,
@@ -1943,5 +1950,160 @@ describe("an accepter whose tab reloaded finds its way back in (jits-itjn)", () 
       spy.mockRestore();
       set.mockRestore();
     }
+  });
+});
+
+describe("an unanswered Join toast never strands the opponent or auto-enters later", () => {
+  type Props = { inSessionFlow: boolean };
+  type ToastOptions = {
+    id: string;
+    action: { label: string; onClick: () => void };
+    onDismiss: () => void;
+    onAutoClose: () => void;
+  };
+  const KEY = `${ACCEPTED_KEY_PREFIX}me`;
+
+  function mountFlow(inSessionFlow: boolean) {
+    return renderHook(
+      ({ inSessionFlow }: Props) =>
+        useArenaChallenge({
+          athleteId: "me",
+          athleteWeight: 170,
+          canReceive: !inSessionFlow,
+          inSessionFlow,
+        }),
+      { initialProps: { inSessionFlow } as Props },
+    );
+  }
+  function joinToast(): ToastOptions {
+    const call = toast.info.mock.calls.find((c) => c[0] === ARENA_MATCH_STARTED_MESSAGE);
+    expect(call).toBeDefined();
+    return call![1] as ToastOptions;
+  }
+  /** My outgoing challenge "out1" was already started when I entered the session flow. */
+  async function offeredOnEntry() {
+    const hook = mountFlow(false);
+    await sendAs(hook.result, "out1", "ana");
+    m.cancelChallenge.mockResolvedValueOnce({ ok: true, data: { cancelled: false } });
+    q.getChallengeStatus.mockResolvedValue({ ok: true, data: { status: "started", expiresAt: null } });
+    m.startMatchFromChallenge.mockResolvedValue({ ok: true, data: { match_id: "m6" } });
+    hook.rerender({ inSessionFlow: true });
+    await flushAll();
+    await flushAll();
+    return hook;
+  }
+  const cancelledSent = () => sentOn("session-match:m6");
+
+  it.each(["onAutoClose", "onDismiss"] as const)(
+    "%s cancels the match and tells the opponent's match screen",
+    async (handler) => {
+      await offeredOnEntry();
+      await act(async () => {
+        joinToast()[handler]();
+      });
+      await flushAll();
+      expect(m.cancelSessionMatch).toHaveBeenCalledTimes(1);
+      expect(m.cancelSessionMatch).toHaveBeenCalledWith(expect.anything(), "m6");
+      expect(cancelledSent()).toEqual([{ event: "match_cancelled", payload: {} }]);
+      expect(push).not.toHaveBeenCalled();
+    },
+  );
+
+  it("cancels only once when dismissed and then auto-closed", async () => {
+    await offeredOnEntry();
+    await act(async () => {
+      joinToast().onDismiss();
+      joinToast().onAutoClose();
+    });
+    expect(m.cancelSessionMatch).toHaveBeenCalledTimes(1);
+  });
+
+  it("Join enters the match and never cancels it, even if the toast then closes", async () => {
+    await offeredOnEntry();
+    act(() => joinToast().action.onClick());
+    expect(push).toHaveBeenCalledWith("/arena/match/m6");
+    await act(async () => {
+      joinToast().onDismiss();
+      joinToast().onAutoClose();
+    });
+    expect(m.cancelSessionMatch).not.toHaveBeenCalled();
+    expect(cancelledSent()).toEqual([]);
+  });
+
+  it("an ignored offer is not auto-entered after leaving the flow (broadcast, UPDATE, tab-visible)", async () => {
+    const hook = await offeredOnEntry();
+    hook.rerender({ inSessionFlow: false });
+    await flushAll();
+    await challengerUpdate("out1", "started");
+    await act(async () => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    await flushAll();
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("clears the accept record when offering, and an ignored rejoin offer is never auto-entered later", async () => {
+    window.localStorage.setItem(KEY, JSON.stringify({ challengeId: "c1", at: Date.now() - 5_000 }));
+    q.getStartedChallengesToJoin.mockResolvedValue({
+      ok: true,
+      data: [{ challengeId: "c1", challengerId: "ana", matchId: "m-re" }],
+    });
+    const hook = mountFlow(true);
+    await flushAll();
+    expect(joinToast().id).toBe("arena-join:c1");
+    expect(window.localStorage.getItem(KEY)).toBeNull();
+
+    // Even if a record for it came back (another tab), leaving the flow and
+    // every rejoin trigger still never navigate into it.
+    window.localStorage.setItem(KEY, JSON.stringify({ challengeId: "c1", at: Date.now() - 5_000 }));
+    hook.rerender({ inSessionFlow: false });
+    await flushAll();
+    await act(async () => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    await act(async () => {
+      await fire(incomingChannel(), "postgres_changes", "UPDATE", {
+        new: { id: "c1", challenger_id: "ana", status: "started" },
+      });
+    });
+    await flushAll();
+    expect(push).not.toHaveBeenCalled();
+  });
+});
+
+describe("the started-UPDATE rejoin trigger waits for a visible tab", () => {
+  const KEY = `${ACCEPTED_KEY_PREFIX}me`;
+  function setVisibility(state: "visible" | "hidden") {
+    Object.defineProperty(document, "visibilityState", { configurable: true, get: () => state });
+  }
+  afterEach(() => {
+    setVisibility("visible");
+  });
+
+  it("does not read while hidden, and catches up on visibilitychange", async () => {
+    window.localStorage.setItem(KEY, JSON.stringify({ challengeId: "c1", at: Date.now() - 5_000 }));
+    mount(true);
+    await flushAll();
+    q.getStartedChallengesToJoin.mockClear();
+    q.getStartedChallengesToJoin.mockResolvedValue({
+      ok: true,
+      data: [{ challengeId: "c1", challengerId: "ana", matchId: "m-re" }],
+    });
+    setVisibility("hidden");
+    await act(async () => {
+      await fire(incomingChannel(), "postgres_changes", "UPDATE", {
+        new: { id: "c1", challenger_id: "ana", status: "started" },
+      });
+    });
+    await flushAll();
+    expect(q.getStartedChallengesToJoin).not.toHaveBeenCalled();
+    expect(push).not.toHaveBeenCalled();
+
+    setVisibility("visible");
+    await act(async () => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    await flushAll();
+    expect(push).toHaveBeenCalledWith("/arena/match/m-re");
   });
 });

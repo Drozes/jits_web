@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import {
   acceptChallenge,
   cancelChallenge,
+  cancelSessionMatch,
   cancelStaleOutgoingChallenges,
   createChallenge,
   declineChallenge,
@@ -20,6 +21,10 @@ import {
   getStartedChallengesToJoin,
 } from "@jits/shared/api/queries";
 import { ARENA_CHALLENGE_FRESH_MS } from "@jits/shared/constants";
+import {
+  SESSION_MATCH_EVENTS,
+  sessionMatchTopic,
+} from "@jits/shared/hooks/session-match-channel";
 import type { PendingChallenge } from "@jits/shared/types/composites";
 import { isFreshChallenge } from "@/lib/arena/challenge-freshness";
 import { clearAccepted, readAccepted, writeAccepted } from "@/lib/arena/accepted-record";
@@ -146,6 +151,27 @@ async function broadcast(
   const supabase = createClient();
   const channel = supabase.channel(channelName(challengeId));
   await channel.send({ type: "broadcast", event, payload });
+  await supabase.removeChannel(channel);
+}
+
+/**
+ * A Join toast went unanswered (dismissed, or it timed out): the athlete is
+ * not coming, so cancel the match rather than leave the opponent alone in it,
+ * and tell their match screen, whose ready step exits on it
+ * (`exitReasonFor("cancelled")`). Best effort: the reconciler's DB read
+ * catches a lost broadcast. The broadcast goes over `httpSend` because this
+ * throwaway channel is never joined.
+ */
+async function abandonOfferedMatch(matchId: string): Promise<void> {
+  const supabase = createClient();
+  const cancelled = await cancelSessionMatch(supabase, matchId);
+  if (!cancelled.ok) return;
+  const channel = supabase.channel(sessionMatchTopic(matchId));
+  try {
+    await channel.httpSend(SESSION_MATCH_EVENTS.MATCH_CANCELLED, {});
+  } catch {
+    // Best effort, see above.
+  }
   await supabase.removeChannel(channel);
 }
 
@@ -400,26 +426,40 @@ export function useArenaChallenge({
    */
   const enterMatch = useCallback(
     (challengeId: string, matchId: string, peerId: string | null) => {
+      // Offered once as a Join toast: only the athlete's tap enters it. A
+      // dismissed or expired offer never turns into an automatic entry later.
+      if (joinOfferedRef.current.has(challengeId)) return;
       if (!inSessionFlowRef.current) {
         enterMatchNow(challengeId, matchId, peerId);
         return;
       }
-      if (
-        enteredForRef.current === challengeId ||
-        joinOfferedRef.current.has(challengeId)
-      ) {
-        return;
-      }
+      if (enteredForRef.current === challengeId) return;
       joinOfferedRef.current.add(challengeId);
       settledRef.current.add(challengeId);
+      // The rejoin record is answered by this offer either way.
+      clearAccepted(athleteIdRef.current);
       if (outgoingRef.current?.challengeId === challengeId) setOutgoing(null);
+      // Exactly one outcome: Join enters it; dismissing it or letting it
+      // time out cancels the match, so the opponent is not left alone in it.
+      let answered = false;
+      const decline = () => {
+        if (answered || enteredForRef.current === challengeId) return;
+        answered = true;
+        void abandonOfferedMatch(matchId);
+      };
       toast.info(ARENA_MATCH_STARTED_MESSAGE, {
         id: `arena-join:${challengeId}`,
         duration: ARENA_JOIN_TOAST_MS,
         action: {
           label: "Join",
-          onClick: () => enterMatchNow(challengeId, matchId, peerId),
+          onClick: () => {
+            if (answered) return;
+            answered = true;
+            enterMatchNow(challengeId, matchId, peerId);
+          },
         },
+        onDismiss: decline,
+        onAutoClose: decline,
       });
     },
     [enterMatchNow, setOutgoing],
@@ -605,7 +645,9 @@ export function useArenaChallenge({
     if (!stored) return;
     if (
       Date.now() - stored.at > ARENA_CHALLENGE_FRESH_MS ||
-      enteredIdsRef.current.has(stored.challengeId)
+      enteredIdsRef.current.has(stored.challengeId) ||
+      // Already offered as a Join toast: answered by the athlete, not us.
+      joinOfferedRef.current.has(stored.challengeId)
     ) {
       clearAccepted(me);
       return;
@@ -919,10 +961,12 @@ export function useArenaChallenge({
             }
           } else if (
             row.status === "started" &&
+            document.visibilityState === "visible" &&
             readAccepted(athleteId)?.challengeId === row.id
           ) {
             // The challenger's fallback started one I accepted before a
-            // reload: the same narrow rejoin check decides (jits-itjn).
+            // reload: the same narrow rejoin check decides (jits-itjn). A
+            // hidden tab catches up on its next visibilitychange instead.
             void rejoinRef.current();
           }
           // My own accept flips the row to accepted before the match exists.
