@@ -59,6 +59,8 @@ export function MatchSummaryStep({ onNext, matchId, matchType, currentAthleteId,
   const [disputing, setDisputing] = useState(false);
   const [canLeave, setCanLeave] = useState(false);
   const confirmedRef = useRef(false);
+  // The failed-confirm toast (with Retry); dismissed once this step is done.
+  const retryToastRef = useRef<string | number | null>(null);
   const onNextRaw = useRef(onNext);
   onNextRaw.current = onNext;
   // Several signals can finish this step (broadcasts, the row listener, the
@@ -67,8 +69,14 @@ export function MatchSummaryStep({ onNext, matchId, matchType, currentAthleteId,
   const onNextRef = useRef(() => {
     if (advancedRef.current) return;
     advancedRef.current = true;
+    dismissRetryToast();
     onNextRaw.current();
   });
+  function dismissRetryToast() {
+    if (retryToastRef.current !== null) toast.dismiss(retryToastRef.current);
+    retryToastRef.current = null;
+  }
+  useEffect(() => () => dismissRetryToast(), []);
 
   const supabase = useMemo(() => createClient(), []);
   const sync = useSessionMatchSync({
@@ -142,18 +150,26 @@ export function MatchSummaryStep({ onNext, matchId, matchType, currentAthleteId,
   }, [myConfirmed, opponentConfirmed]);
 
   async function handleConfirm() {
-    if (confirmedRef.current) return;
+    if (advancedRef.current || confirmedRef.current) return;
+    dismissRetryToast();
     confirmedRef.current = true;
     setMyConfirmed(true);
     const res = await confirmMatchResult(supabase, matchId);
     if (!res.ok) {
-      confirmedRef.current = false;
-      setMyConfirmed(false);
       // Most often the opponent disputed, or our confirmation landed and
       // only the response was lost: let the DB decide before erroring.
+      // The UI stays in its confirmed state meanwhile (no flash back to
+      // Confirm/Dispute); checkDb sets the ref again if our row exists.
+      confirmedRef.current = false;
       await checkDb();
-      if (advancedRef.current || confirmedRef.current) return;
-      toast.error("Failed to confirm result. Please try again.", {
+      if (advancedRef.current) return;
+      if (confirmedRef.current) {
+        void sync.broadcastResultConfirmed(currentAthleteId);
+        return;
+      }
+      setMyConfirmed(false);
+      setCanLeave(false);
+      retryToastRef.current = toast.error("Failed to confirm result. Please try again.", {
         action: { label: "Retry", onClick: () => void handleConfirm() },
       });
       return;

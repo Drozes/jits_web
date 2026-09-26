@@ -6,7 +6,7 @@
 
 **Fixed**
 - `apps/web/app/(app)/session/[id]/match/[matchId]/steps/match-summary-step.tsx`: after confirming, a secondary "Continue without waiting" link appears after 20s (`LEAVE_AFTER_MS`, same timing and copy as mobile) so an opponent who leaves cannot hold the athlete on the step; it moves on to the match-recorded screen, like mobile's move to its summary.
-- Same file: a failed `confirmMatchResult` now re-reads the match + confirmations from the DB before erroring. A disputed (or both-confirmed) match advances, an own confirmation that did land shows the waiting state, and only an unexplained failure toasts the error, now with a "Retry" action (the Confirm Result button also returns).
+- Same file: a failed `confirmMatchResult` now re-reads the match + confirmations from the DB before erroring. The UI stays in its confirmed state while it checks (no flash back to Confirm/Dispute). A disputed (or both-confirmed) match advances, an own confirmation that did land shows the waiting state and re-broadcasts `result_confirmed`, and only an unexplained failure toasts the error, now with a "Retry" action (dismissed when the step advances or unmounts) and restarts the 20s leave clock on the next confirm.
 - Same file: the ranked copy said "ELO will update on confirmation", but ELO is applied when the result is recorded. It now matches mobile: "Ranked. ELO already applied. Disputes are reviewed by an admin." Tests: `apps/web/.../steps/match-summary-step.test.tsx`.
 
 ### Mobile/Web: Arena reliability (jits-1o4l, jits-celf, jits-yiwx, jits-ef2a)
