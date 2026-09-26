@@ -14,27 +14,19 @@
  * mean a second flag writer and a second prompt for every challenge.
  * Observing the lobby is not joining it: an athlete is only tracked in
  * `lobby:online` while they are live.
- *
- * Rematch (jits-00fr): a match summary sends the athlete here with
- * `?rematch=<opponent athlete id>`. That opponent's row is pinned to the top
- * of Online now when they are in the lobby, and a one-line hint says so when
- * they are not. The existing Challenge button does the rest; nothing is ever
- * sent automatically.
+ * Rematch (jits-00fr): see `lib/arena/use-rematch-pin.ts`. Never auto-sends.
  */
 import * as React from "react";
 import { RefreshControl, Text, View } from "react-native";
-import * as Haptics from "expo-haptics";
-import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import { useRequireAthlete } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { AppHeader } from "@/components/layout/app-header";
 import { PageContainer } from "@/components/layout/page-container";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { useLobbyIds } from "@/lib/arena/use-lobby-presence";
-import {
-  useArenaRoster,
-  type ArenaCompetitor,
-} from "@/lib/arena/use-arena-roster";
+import { useArenaRoster } from "@/lib/arena/use-arena-roster";
+import { pinFirst, useRematchPin } from "@/lib/arena/use-rematch-pin";
 import {
   arenaActions,
   setOpponentUnavailableHandler,
@@ -80,15 +72,19 @@ export default function ArenaScreen() {
     return () => setOpponentUnavailableHandler(null);
   }, [refresh]);
 
-  const rematch = useRematchPin(competitors, lobbyIds, isLoading, refresh);
+  const rematch = useRematchPin({
+    competitors,
+    lobbyIds,
+    isLoading,
+    refresh,
+    outgoingOpponentId: outgoing?.opponentId ?? null,
+  });
 
-  const online = competitors.filter((c) => lobbyIds.has(c.id));
+  const online = pinFirst(
+    competitors.filter((c) => lobbyIds.has(c.id)),
+    rematch.isOnline ? rematch.pinnedId : null,
+  );
   const offline = competitors.filter((c) => !lobbyIds.has(c.id));
-  // The pinned opponent leads Online now; everyone else keeps roster order.
-  if (rematch.isOnline) {
-    const i = online.findIndex((c) => c.id === rematch.pinnedId);
-    if (i > 0) online.unshift(...online.splice(i, 1));
-  }
 
   // One challenge at a time: a second outgoing prompt while one is unanswered
   // would give the athlete two matches to walk into.
@@ -118,15 +114,7 @@ export default function ArenaScreen() {
           action={actionFor(c.id, c.acceptsRanked, inLobby)}
           disabled={actionsLocked || isSaving}
           pinned={inLobby && c.id === rematch.pinnedId}
-          onChallenge={() => {
-            // The one tap that sends something to another person gets a
-            // light acknowledgement. Haptics are feedback only, never fatal.
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
-              () => undefined,
-            );
-            if (c.id === rematch.pinnedId) rematch.clear();
-            void sendChallenge(c.id, c.displayName);
-          }}
+          onChallenge={() => void sendChallenge(c.id, c.displayName)}
           onGoLive={() => void toggle()}
           onOpenProfile={() => router.push(`/athlete/${c.id}`)}
         />
@@ -225,59 +213,4 @@ export default function ArenaScreen() {
       </PageContainer>
     </View>
   );
-}
-
-/**
- * The `?rematch=<athlete id>` handoff from a match summary.
- *
- * The param is copied into local state and then cleared from the route at
- * once, so a later visit to the tab never re-pins a stale opponent. The pin
- * itself ends when the athlete challenges that opponent or leaves the tab.
- *
- * The roster is a snapshot with no realtime feed, but presence is live: an
- * opponent who goes live after the roster loaded is in the lobby yet missing
- * from the list, so the roster is re-read once for them.
- */
-function useRematchPin(
-  competitors: ArenaCompetitor[],
-  lobbyIds: Set<string>,
-  isLoading: boolean,
-  refresh: () => void,
-) {
-  const router = useRouter();
-  const params = useLocalSearchParams<{ rematch?: string | string[] }>();
-  const param = Array.isArray(params.rematch)
-    ? params.rematch[0]
-    : params.rematch;
-  const [pinnedId, setPinnedId] = React.useState<string | null>(null);
-  const refreshedFor = React.useRef<string | null>(null);
-
-  React.useEffect(() => {
-    if (!param) return;
-    setPinnedId(param);
-    refreshedFor.current = null;
-    router.setParams({ rematch: undefined });
-  }, [param, router]);
-
-  const clear = React.useCallback(() => setPinnedId(null), []);
-  useFocusEffect(React.useCallback(() => clear, [clear]));
-
-  const pinned = pinnedId
-    ? (competitors.find((c) => c.id === pinnedId) ?? null)
-    : null;
-  const inLobby = !!pinnedId && lobbyIds.has(pinnedId);
-
-  React.useEffect(() => {
-    if (!pinnedId || !inLobby || pinned || isLoading) return;
-    if (refreshedFor.current === pinnedId) return;
-    refreshedFor.current = pinnedId;
-    refresh();
-  }, [pinnedId, inLobby, pinned, isLoading, refresh]);
-
-  return {
-    pinnedId,
-    name: pinned?.displayName ?? null,
-    isOnline: inLobby && !!pinned,
-    clear,
-  };
 }

@@ -175,7 +175,7 @@ export function NobodyOnlineNote({ isLive }: { isLive: boolean }) {
 /**
  * Arrived from a match summary's Rematch (`/arena?rematch=<id>`) while that
  * opponent is not in the lobby. Their row pins to the top of Online now the
- * moment they are; this line only says why it is not there yet. The name is
+ * moment they are; this line says so. The name is
  * known only when they are on the roster, so it falls back to a neutral one.
  */
 export function RematchHint({ name }: { name: string | null }) {
@@ -184,7 +184,7 @@ export function RematchHint({ name }: { name: string | null }) {
       testID="arena-rematch-hint"
       className="font-body text-[12px] text-ink-3"
     >
-      {`${name ?? "Your opponent"} is not live right now.`}
+      {`${name ?? "Your opponent"} isn't back in the Arena yet. Their Challenge button appears here the moment they are.`}
     </Text>
   );
 }

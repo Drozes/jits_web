@@ -10,6 +10,7 @@
  */
 import * as React from "react";
 import { Pressable, Text, View } from "react-native";
+import * as Haptics from "expo-haptics";
 import { Plate, Avatar32, LivePill, MetaTag } from "@/components/ui/elo-system";
 import type { ArenaCompetitor } from "@/lib/arena/use-arena-roster";
 
@@ -65,7 +66,7 @@ export function CompetitorRow({
       <View className="flex-row items-center gap-3">
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`${displayName}, ELO ${currentElo}`}
+          accessibilityLabel={`${displayName}, ELO ${currentElo}${pinned ? ", rematch" : ""}`}
           onPress={onOpenProfile}
           className="flex-1 flex-row items-center gap-3"
         >
@@ -103,7 +104,14 @@ export function CompetitorRow({
               accessibilityRole="button"
               accessibilityLabel={`Challenge ${displayName}`}
               accessibilityState={{ disabled }}
-              onPress={onChallenge}
+              onPress={() => {
+                // The one tap that sends something to another person gets a
+                // light acknowledgement. Feedback only, never fatal.
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
+                  () => undefined,
+                );
+                onChallenge();
+              }}
               disabled={disabled}
               className="min-h-[44px] justify-center rounded-sm border border-hairline-strong px-3 active:bg-surface-4"
               style={disabled ? { opacity: 0.5 } : undefined}
