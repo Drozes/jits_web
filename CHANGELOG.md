@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Mobile: v0.3.0 TestFlight release
+
+**Changed**
+- `apps/mobile/app.json` `expo.version` 0.2.0 -> 0.3.0. This build carries native changes since build 21 (Instagram Reels module + config plugins), so the version bump forks `runtimeVersion` (policy `appVersion`) and later OTA updates target only 0.3.0 binaries, never build 21's older native module set. Ships the Arena-only app (jits-gewv), notification bell fix (jits-iddq) and app-wide live + LIVE/bell headers (jits-pplr) against hosted Supabase.
+
 ### Tooling: mobile match-flow verification harness (match-loop)
 
 An end-to-end harness that drives the real iOS simulator app as Demo Blue (via idb) against a headless Demo Red / Demo Green opponent bot speaking the app's own realtime protocol, then checks the database, the UI, the bot trace and the Metro log. LOCAL stack only. The app-side changes are JS-only (testIDs, one copy line), so OTA-eligible.
