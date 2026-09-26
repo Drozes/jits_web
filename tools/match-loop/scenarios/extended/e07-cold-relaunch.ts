@@ -39,7 +39,7 @@ const scenario: Scenario = {
       return "confirm";
     });
     if (onConfirm) {
-      await bothConfirm(ctx, side);
+      await bothConfirm(ctx, side, "informational");
       const conf = await pollUntil(
         "2 confirmations",
         async () => {

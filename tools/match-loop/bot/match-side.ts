@@ -136,7 +136,7 @@ const CHANNEL_STEPS: ReadonlySet<BotStep> = new Set(["weight", "ready", "live", 
 
 export type ReadyOutcome =
   | { kind: "started"; startedAt: string; via: "self" | "broadcast" | "fallback" | "reconciler" }
-  | { kind: "cancelled" };
+  | { kind: "cancelled"; via: "broadcast" | "weight_channel" | "reconciler" };
 
 export interface ConfirmOutcome {
   kind: "confirmed" | "disputed";
@@ -485,7 +485,7 @@ export class MatchSide {
     if (this.step === "exited" || (this.step === "weight" && this.cancelledOnWeight())) {
       this.trace.note(this.actor, "ready_outcome", { kind: "cancelled", via: "weight_channel" });
       if (this.step !== "exited") this.enter("exited");
-      return { kind: "cancelled" };
+      return { kind: "cancelled", via: "weight_channel" };
     }
     if (this.step !== "ready") this.enter("ready");
     const deadline = Date.now() + timeoutMs;
@@ -523,7 +523,7 @@ export class MatchSide {
       }
       if (this.seenOn("ready", E.MATCH_CANCELLED)) {
         this.enter("exited");
-        return { kind: "cancelled" };
+        return { kind: "cancelled", via: "broadcast" };
       }
       const started = this.seenOn("ready", E.TIMER_STARTED);
       if (started) {
@@ -540,7 +540,7 @@ export class MatchSide {
       if (fromDb === "cancelled") {
         this.trace.note(this.actor, "ready_outcome", { kind: "cancelled", via: "reconciler" });
         this.enter("exited");
-        return { kind: "cancelled" };
+        return { kind: "cancelled", via: "reconciler" };
       }
       if (fromDb === "started") {
         const startedAt = snap!.startedAt ?? new Date().toISOString();
@@ -710,6 +710,15 @@ export class MatchSide {
       }
       await pace(TICK_MS);
     }
+  }
+
+  /**
+   * Did the opponent's result_confirmed reach this side's confirm channel?
+   * (The confirm step can also finish from the DB, which would hide a lost
+   * broadcast; this is the delivery check.)
+   */
+  confirmReceivedOnChannel(): boolean {
+    return this.stepMarks.has("confirm") && !!this.seenOn("confirm", E.RESULT_CONFIRMED, (a) => a[0] === this.opponentId);
   }
 
   /**

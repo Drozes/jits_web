@@ -19,14 +19,22 @@ const scenario: Scenario = {
       await ctx.ui.waitStep("ready", T.step);
     });
     // Cancel only once Red is on the ready step and has readied (the case where
-    // Red is still on the weight step is E3B: nothing tells Red).
+    // Red is still on the weight step is E3B: the weight step's channel).
     await ctx.step("Red is ready (Blue's opponent panel)", async () => {
       await side.spy.waitFor("Red's ready_signal", (e) => e.event === "ready_signal" && e.payload.athlete_id === ctx.ids.red, T.handshake, 0);
       await ctx.ui.waitOpponentReady(10_000);
     });
     await ctx.step("Blue cancels the match", () => ctx.ui.cancelMatch());
     const outcome = await ctx.step("bot is told the match was cancelled", () => botReady);
-    ctx.eq("bot:ready-cancelled", { kind: "cancelled" }, outcome);
+    ctx.eq("bot:ready-cancelled", { kind: "cancelled" }, { kind: outcome.kind });
+    // The bot's ready step can also exit from a DB snapshot, so check that
+    // Blue's app actually broadcast the cancel. `via` is not asserted: the RPC
+    // lands before the broadcast and a poll may legitimately win the race.
+    await ctx.expect("protocol:blue-sent-match_cancelled", true, async () => {
+      await side.spy.waitFor("Blue's match_cancelled", (e) => e.event === "match_cancelled", T.broadcast, 0);
+      return true;
+    });
+    ctx.oracle("bot:ready-cancelled-via", true, "informational", outcome.kind === "cancelled" ? outcome.via : null);
     await ctx.step("Blue is back on the Arena", () =>
       ctx.idb.waitAny([{ label: "Go live", type: "Button" }, { label: "Go offline", type: "Button" }], T.step),
     );

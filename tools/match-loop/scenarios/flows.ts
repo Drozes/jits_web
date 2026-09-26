@@ -249,7 +249,13 @@ export async function blueRecordsDraw(ctx: ScenarioCtx, side: MatchSide): Promis
  * finish as the app's would (Blue's result_confirmed, or the DB showing both
  * confirmations; never a bare `completed` row).
  */
-export async function bothConfirm(ctx: ScenarioCtx, side: MatchSide): Promise<void> {
+export async function bothConfirm(
+  ctx: ScenarioCtx,
+  side: MatchSide,
+  /** "informational" where a relaunch or outage may legitimately lose the
+   * broadcast (E7); everywhere else the confirm channel must receive it. */
+  channelCheck: "hard" | "informational" = "hard",
+): Promise<void> {
   const botRun = (async () => {
     await side.confirm();
     return side.waitConfirmDone(T.handshake);
@@ -273,6 +279,9 @@ export async function bothConfirm(ctx: ScenarioCtx, side: MatchSide): Promise<vo
     );
     return true;
   });
+  const received = side.confirmReceivedOnChannel();
+  if (channelCheck === "hard") ctx.eq("bot:confirm-channel-received-blue-result_confirmed", true, received);
+  else ctx.oracle("bot:confirm-channel-received-blue-result_confirmed", true, "informational", received, `bot finished confirm via ${outcome.via}`);
 }
 
 export async function checkSummary(ctx: ScenarioCtx, verdict: string, delta: number | null): Promise<void> {

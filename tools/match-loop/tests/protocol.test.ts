@@ -54,6 +54,17 @@ test("the confirm step does not treat a completed status as done (app source)", 
   assert.doesNotMatch(confirm, /matchStatus/, "ConfirmStep reads the match status again: re-check the bot's confirm logic");
 });
 
+test("the bot pulls in no React / React Native / Expo module", () => {
+  // match-side (and through it protocol, reconcile, @jits/shared) is loaded
+  // by the imports above. Anything from React land would mean the bot is
+  // importing app code that is not pure, and could break or diverge.
+  const bad = Object.keys(require.cache).filter((p) =>
+    /[\\/]node_modules[\\/](react|react-native|expo[^\\/]*|@expo[\\/][^\\/]+|react-native-[^\\/]+)[\\/]/.test(p),
+  );
+  assert.ok(Object.keys(require.cache).some((p) => /bot[\\/]match-side\.ts$/.test(p)), "match-side not in require.cache");
+  assert.deepEqual(bad, []);
+});
+
 // --- events and payloads ------------------------------------------------------
 
 test("every session-match event has a payload validator and a handler name", () => {

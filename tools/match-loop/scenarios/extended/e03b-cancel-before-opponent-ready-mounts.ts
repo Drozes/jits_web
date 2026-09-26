@@ -24,7 +24,11 @@ const scenario: Scenario = {
     ctx.eq("bot:red-weight-step-received-cancel", true, side.cancelledOnWeight());
     // Red leaves from the weight step; were the broadcast lost, the ready
     // step's DB reconciler (status cancelled) would still exit.
-    await ctx.expect("bot:red-learns-cancel", { kind: "cancelled" }, () => side.readyAndStart(20_000));
+    await ctx.expect("bot:red-learns-cancel", { kind: "cancelled" }, async () => {
+      const outcome = await side.readyAndStart(20_000);
+      ctx.trace.note("harness", "red_cancel_via", outcome.kind === "cancelled" ? outcome.via : null);
+      return { kind: outcome.kind };
+    });
   },
 };
 export default scenario;
