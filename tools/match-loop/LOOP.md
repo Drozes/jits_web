@@ -242,3 +242,16 @@ already appends a `{"type":"run",...}` line per run):
   the DB is not a failure; its `ready_outcome` / ReadyOutcome `via` says so.
   A `completed` row never finishes the confirm step (only a dispute or both
   confirmations do).
+- E17 (match video history) seeds one real MP4 per athlete through the
+  publishable key (`lib/video-seed.ts`) and removes the rows and objects
+  again as each uploader (sign-out is LOCAL scope, so the simulator's Blue
+  session survives). It assumes NO local video slicer/worker is running:
+  `db:video-rows` expects status `ready`, and a worker could move it on.
+  The backend caps uploads at 10 per athlete per rolling 24h, counted from
+  the append-only `public.video_upload_events` ledger, which a row DELETE
+  does not refund; E17 deletes its own ledger rows through the local psql
+  in its cleanup, checks the remaining budget before seeding, and reports a
+  spent cap as `env_error` with the reason.
+- History rows near the bottom of a tab sit under the tab bar: a tap on
+  their centre lands on a tab. `sim/match-detail.ts` scrolls every target
+  into the band between the header and the tab bar before tapping.

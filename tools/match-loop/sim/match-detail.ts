@@ -23,6 +23,12 @@ export const DETAIL_MARKER_ID = "match-detail-screen";
 export const PLAYER_STATE_ID = "video-player-state";
 const DETAIL_LABEL_RE = /^Match detail vs (.+)$/i;
 const PLAYER_LABEL_RE = /^Video state: (\w+)$/i;
+const TAB_LABELS = ["Home", "Arena", "Rankings", "Profile"];
+/** An element only that tab's root renders. */
+const TAB_PROOF: Record<"Home" | "Profile", Query> = {
+  Home: { label: "Me", type: "Button" },
+  Profile: { label: /^(share profile|view detailed stats)$/i, type: "Button" },
+};
 
 /**
  * Player failure panels: the testIDs sit on container Views (not visible to
@@ -84,14 +90,49 @@ export class MatchDetailPages {
     );
   }
 
-  /** Scroll the current screen until `q` is on screen: down first, then back up. */
+  /**
+   * Top of the tab bar, or the screen bottom on a pushed screen. A row whose
+   * centre sits under the tab bar is NOT hittable: a tap there lands on a
+   * tab (E17's first live run tapped "Rankings" instead of a Profile row).
+   */
+  private hittableBottom(els: AXElement[]): number {
+    const tabs = els.filter(
+      (e) =>
+        TAB_LABELS.includes(e.AXLabel ?? "") &&
+        e.type !== "StaticText" &&
+        e.frame.y > this.idb.screenH * 0.75,
+    );
+    return tabs.length > 0 ? Math.min(...tabs.map((t) => t.frame.y)) : this.idb.screenH;
+  }
+
+  /**
+   * Scroll the current screen until `q` is on screen AND hittable (clear of
+   * the header and the tab bar): content up first, then back down. Returns the
+   * settled element.
+   */
   async scrollToAny(q: Query): Promise<AXElement> {
+    let el: AXElement;
     try {
-      return await this.idb.scrollTo(q, 6, "up");
+      el = await this.idb.scrollTo(q, 6, "up", 130);
     } catch (e) {
       if (!(e instanceof ExpectationTimeout)) throw e;
-      return this.idb.scrollTo(q, 10, "down");
+      el = await this.idb.scrollTo(q, 10, "down", 130);
     }
+    const x = this.idb.screenW / 2;
+    for (let i = 0; i < 4; i++) {
+      const els = await this.idb.describe();
+      const cur = els.find((e) => matches(e, q)) ?? el;
+      const cy = cur.frame.y + cur.frame.height / 2;
+      const bottom = this.hittableBottom(els) - 12;
+      if (cy > 100 && cy < bottom) return cur;
+      // Nudge it into the hittable band: small swipe towards the centre.
+      const dy = cy >= bottom ? -Math.min(220, cy - bottom + 80) : Math.min(220, 180 - cy);
+      const from = this.idb.screenH * 0.5;
+      await this.idb.swipe(x, from, x, from + dy, 0.3);
+      await new Promise((r) => setTimeout(r, 400));
+      el = (await this.idb.settled(q)) ?? cur;
+    }
+    throw new ExpectationTimeout(`UI element ${JSON.stringify(q.label ?? q.id)} in the hittable band`, 4, null);
   }
 
   /** Swipe the current scroll view back to its top. */
@@ -133,7 +174,7 @@ export class MatchDetailPages {
   }
 
   /** Pop pushed screens (header "Go back") until a tab root is showing. */
-  async backToTabRoot(max = 5): Promise<void> {
+  async backToTabRoot(max = 6): Promise<void> {
     for (let i = 0; i < max; i++) {
       const els = await this.idb.describe();
       const back = els.find((e) => e.AXLabel === "Go back" && e.type !== "StaticText");
@@ -156,17 +197,44 @@ export class MatchDetailPages {
    * up in a tab's lists after an explicit refresh.
    */
   async refreshTab(tab: "Home" | "Profile"): Promise<void> {
-    await this.ui.tab(tab);
+    await this.openTab(tab);
     await this.scrollToTop();
     await this.idb.pullToRefresh();
     await new Promise((r) => setTimeout(r, 1_500));
   }
 
+  /**
+   * Tap the tab by its exact label, then prove the tab root is showing via an
+   * element only that tab renders (retry the tap once).
+   */
+  async openTab(tab: "Home" | "Profile"): Promise<void> {
+    const proof: Query = TAB_PROOF[tab];
+    for (let attempt = 0; attempt < 2; attempt++) {
+      await this.backToTabRoot();
+      await this.ui.tab(tab);
+      try {
+        await this.idb.waitFor(proof, 8_000);
+        return;
+      } catch (e) {
+        if (!(e instanceof ExpectationTimeout) || attempt === 1) throw e;
+      }
+    }
+  }
+
   /** Home (refreshed) -> Recent Activity "Me" scope (the default is "All") -> newest row. */
   async openFromHome(opponent: string): Promise<void> {
     await this.refreshTab("Home");
-    const me = await this.scrollToAny({ label: "Me", type: "Button" });
-    await this.idb.tap(me);
+    // "View all" only renders in the Me scope with matches: proof the scope switched.
+    const viewAll: Query = { label: /^view all$/i, type: "Button" };
+    for (let attempt = 0; attempt < 2; attempt++) {
+      await this.idb.tap(await this.scrollToAny({ label: "Me", type: "Button" }));
+      try {
+        await this.idb.waitFor(viewAll, 5_000);
+        break;
+      } catch (e) {
+        if (!(e instanceof ExpectationTimeout) || attempt === 1) throw e;
+      }
+    }
     await this.tapFirstRow(opponent);
   }
 
@@ -178,15 +246,22 @@ export class MatchDetailPages {
 
   /** Profile -> "View Detailed Stats" -> full history -> newest row. */
   async openFromStats(opponent: string): Promise<void> {
-    await this.ui.tab("Profile");
+    await this.openTab("Profile");
     const btn = await this.scrollToAny({ label: /^view detailed stats$/i, type: "Button" });
     await this.idb.tap(btn);
     await this.idb.waitFor({ label: "Go back", type: "Button" }, 10_000);
     await this.tapFirstRow(opponent);
   }
 
-  /** From a loaded detail screen: opponent row -> athlete page -> newest head-to-head row. */
+  /**
+   * Independent of the other entry points: Stats history -> detail (loaded)
+   * -> opponent row -> athlete page -> newest head-to-head row.
+   */
   async openFromAthlete(opponent: string): Promise<void> {
+    await this.openFromStats(opponent);
+    await pollUntil("match detail marker", async () => (this.detailMarker(await this.idb.describe()) ? true : undefined), {
+      timeoutMs: 15_000,
+    });
     await this.idb.tap(await this.scrollToAny({ label: `View ${opponent}'s profile`, type: "Button" }));
     // The detail we came from must be off screen, or the next read could see it.
     await this.idb.waitGone({ label: DETAIL_LABEL_RE }, 10_000);
@@ -201,10 +276,25 @@ export class MatchDetailPages {
 
   // --- player ------------------------------------------------------------------
 
+  /**
+   * Scroll the Watch button into the hittable band before tapping: the
+   * second card sits below the fold, and idb lists off-screen scroll content,
+   * so a tap on its raw frame lands nowhere. Then wait for the player marker
+   * (proof the tap pushed the player), retrying the tap once.
+   */
   async tapWatch(videoId: string, label: string): Promise<void> {
     const els = await this.idb.describe();
-    const el = this.find(els, { id: watchButtonId(videoId) }) ?? this.find(els, { label, type: "Button" });
-    await this.idb.tap(el ?? (await this.scrollToAny({ id: watchButtonId(videoId) })));
+    const q: Query = this.find(els, { id: watchButtonId(videoId) }) ? { id: watchButtonId(videoId) } : { label, type: "Button" };
+    const marker: Query = { label: PLAYER_LABEL_RE };
+    for (let attempt = 0; attempt < 2; attempt++) {
+      await this.idb.tap(await this.scrollToAny(q));
+      try {
+        await this.idb.waitFor(marker, 8_000);
+        return;
+      } catch (e) {
+        if (!(e instanceof ExpectationTimeout) || attempt === 1) throw e;
+      }
+    }
   }
 
   /** Poll the player marker until it reads `want`; returns the last state seen. */

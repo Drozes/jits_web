@@ -20,6 +20,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@jits/shared/types/database";
 import { buildMatchVideoStoragePath, upsertMatchVideo } from "@jits/shared/api/mutations";
 import { assertBotKey, type Config } from "../config";
+import { lit, psql, queryJson } from "./psql";
 import { EnvError, HarnessError } from "./util";
 
 export const VIDEO_BUCKET = "match-videos";
@@ -101,26 +102,89 @@ export async function seedMatchVideo(
   });
   if (!row.ok) {
     await client.storage.from(VIDEO_BUCKET).remove([storagePath]).catch(() => undefined);
+    await client.auth.signOut({ scope: "local" }).catch(() => undefined);
+    if (isUploadRateLimited(row.error)) {
+      throw new EnvError(
+        `video seed (${who}) hit the backend upload cap (P0001 upload_rate_limited: ${UPLOAD_DAILY_CAP} per athlete per ` +
+          `rolling 24h, counted from public.video_upload_events). E17 clears its own ledger rows; clear stale ones ` +
+          `locally or wait for the window to roll.`,
+      );
+    }
     throw new HarnessError(`video seed row (${who}) refused: ${row.error.code} ${row.error.message}`);
   }
   return { who, matchId, athleteId, videoId: row.data.id, storagePath, client };
+}
+
+/** The backend default for `app.settings.video_upload_daily_cap` (jr_be 20260918020000). */
+export const UPLOAD_DAILY_CAP = 10;
+
+/** True for the BEFORE INSERT upload-cap trigger's P0001 HINT upload_rate_limited. */
+export function isUploadRateLimited(error: { message?: string; raw?: { code?: string; hint?: string | null } | null }): boolean {
+  return error.raw?.hint === "upload_rate_limited" || /upload limit reached/i.test(error.message ?? "");
 }
 
 /**
  * Remove what `seedMatchVideo` created, as the same uploader (the row and
  * storage DELETE policies allow the uploader's own folder). Returns what
  * could not be removed instead of throwing, so cleanup never masks the
- * scenario's real result.
+ * scenario's real result. The upload-ledger row is NOT removed here (the
+ * ledger is deny-all to clients); see `clearUploadLedger`.
  */
 export async function removeSeededVideo(seed: SeededVideo): Promise<string[]> {
   const problems: string[] = [];
-  const del = await seed.client.from("match_videos").delete().eq("id", seed.videoId);
-  if (del.error) problems.push(`row ${seed.videoId}: ${del.error.message}`);
-  const rm = await seed.client.storage.from(VIDEO_BUCKET).remove([seed.storagePath]);
-  if (rm.error) problems.push(`object ${seed.storagePath}: ${rm.error.message}`);
-  else if ((rm.data ?? []).length === 0) problems.push(`object ${seed.storagePath}: not removed (0 objects)`);
+  try {
+    const del = await seed.client.from("match_videos").delete().eq("id", seed.videoId).select("id");
+    if (del.error) problems.push(`row ${seed.videoId}: ${del.error.message}`);
+    else if ((del.data ?? []).length !== 1) problems.push(`row ${seed.videoId}: deleted ${(del.data ?? []).length} rows, expected 1`);
+  } catch (e) {
+    problems.push(`row ${seed.videoId}: ${e instanceof Error ? e.message : String(e)}`);
+  }
+  try {
+    const rm = await seed.client.storage.from(VIDEO_BUCKET).remove([seed.storagePath]);
+    if (rm.error) problems.push(`object ${seed.storagePath}: ${rm.error.message}`);
+    else if ((rm.data ?? []).length === 0) problems.push(`object ${seed.storagePath}: not removed (0 objects)`);
+  } catch (e) {
+    problems.push(`object ${seed.storagePath}: ${e instanceof Error ? e.message : String(e)}`);
+  }
   // LOCAL scope only: the default (global) would revoke every session of the
   // uploader, including the simulator app's own session when who = "blue".
   await seed.client.auth.signOut({ scope: "local" }).catch(() => undefined);
   return problems;
+}
+
+/**
+ * SQL that deletes the upload-ledger rows of the given seeded videos. The
+ * ledger (public.video_upload_events, jr_be 20260918020000) survives a
+ * match_videos DELETE on purpose and caps inserts per athlete per rolling
+ * 24h, so without this E17 would exhaust Blue's and Red's budget within a few
+ * iterations. Ids are validated as UUIDs; an empty list deletes nothing.
+ */
+export function uploadLedgerCleanupSql(videoIds: string[]): string | null {
+  if (videoIds.length === 0) return null;
+  for (const id of videoIds) {
+    if (!new RegExp(`^${UUID}$`, "i").test(id)) throw new HarnessError(`uploadLedgerCleanupSql: not a UUID: ${id}`);
+  }
+  return `delete from public.video_upload_events where video_id in (${videoIds.map(lit).join(", ")})`;
+}
+
+/** Run `uploadLedgerCleanupSql` through the harness's fixed LOCAL psql. Returns problems. */
+export async function clearUploadLedger(videoIds: string[]): Promise<string[]> {
+  const sql = uploadLedgerCleanupSql(videoIds);
+  if (!sql) return [];
+  try {
+    await psql(sql);
+    return [];
+  } catch (e) {
+    return [`upload ledger: ${e instanceof Error ? e.message : String(e)}`];
+  }
+}
+
+/** Uploads counted against each athlete's rolling 24h cap right now (LOCAL psql). */
+export async function uploadBudgetUsed(athleteIds: string[]): Promise<Record<string, number>> {
+  const rows = await queryJson<{ athlete_id: string; n: number }>(
+    `select athlete_id, count(*)::int as n from public.video_upload_events
+     where athlete_id in (${athleteIds.map(lit).join(", ")}) and created_at > now() - interval '24 hours'
+     group by athlete_id`,
+  );
+  return Object.fromEntries(athleteIds.map((id) => [id, rows.find((r) => r.athlete_id === id)?.n ?? 0]));
 }

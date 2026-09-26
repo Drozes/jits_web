@@ -15,7 +15,16 @@ import {
 import { db } from "../../oracle/db";
 import { waitLivePill } from "../../oracle/ui";
 import { lit, queryJson } from "../../lib/psql";
-import { removeSeededVideo, seedMatchVideo, VIDEO_BUCKET, type SeededVideo } from "../../lib/video-seed";
+import {
+  clearUploadLedger,
+  removeSeededVideo,
+  seedMatchVideo,
+  UPLOAD_DAILY_CAP,
+  uploadBudgetUsed,
+  VIDEO_BUCKET,
+  type SeededVideo,
+} from "../../lib/video-seed";
+import { EnvError, ExpectationTimeout } from "../../lib/util";
 import { MatchDetailPages, watchLabelFor } from "../../sim/match-detail";
 
 /**
@@ -61,6 +70,8 @@ const scenario: Scenario = {
     } finally {
       const problems: string[] = [];
       for (const s of seeds) problems.push(...(await removeSeededVideo(s).catch((e) => [String(e)])));
+      // The upload ledger survives the row delete and caps uploads per 24h.
+      problems.push(...(await clearUploadLedger(seeds.map((s) => s.videoId))));
       ctx.trace.note("harness", "video_seed_cleanup", { removed: seeds.map((s) => s.storagePath), problems });
       if (seeds.length > 0) ctx.eq("harness:seeded-videos-removed", [], problems);
     }
@@ -73,6 +84,16 @@ async function runHistory(ctx: ScenarioCtx, matchId: string, seeds: SeededVideo[
   const pages = new MatchDetailPages(ctx.idb, ctx.ui);
 
   await ctx.step("seed Blue's and Red's recordings", async () => {
+    const used = await uploadBudgetUsed([ctx.ids.blue, ctx.ids.red]);
+    ctx.trace.note("harness", "video_upload_budget_used_24h", used);
+    const spent = Object.entries(used).filter(([, n]) => n >= UPLOAD_DAILY_CAP);
+    if (spent.length > 0) {
+      throw new EnvError(
+        `upload cap already spent (${UPLOAD_DAILY_CAP}/24h in public.video_upload_events) for ${spent
+          .map(([id]) => (id === ctx.ids.blue ? "Demo Blue" : "Demo Red"))
+          .join(", ")}: clear stale local ledger rows or wait for the window to roll`,
+      );
+    }
     seeds.push(await seedMatchVideo(ctx.cfg, ctx.password, "blue", matchId, ctx.ids.blue));
     seeds.push(await seedMatchVideo(ctx.cfg, ctx.password, "red", matchId, ctx.ids.red));
     ctx.trace.note("harness", "video_seeded", seeds.map(({ who, videoId, storagePath }) => ({ who, videoId, storagePath })));
@@ -112,13 +133,16 @@ async function runHistory(ctx: ScenarioCtx, matchId: string, seeds: SeededVideo[
   await entry("ui:detail-from-home", "detail from Home (Me scope)", () => pages.openFromHome(redName));
   await pages.backToTabRoot();
 
-  // 2. Profile Recent Matches, then 3. the athlete page's head-to-head from there.
+  // 2. Profile Recent Matches.
   await entry("ui:detail-from-profile", "detail from Profile recent matches", () => pages.openFromProfile(redName));
-  await entry("ui:detail-from-athlete", "detail from Demo Red's head-to-head", () => pages.openFromAthlete(redName));
   await pages.backToTabRoot();
 
-  // 4. Profile > View Detailed Stats > full history.
+  // 3. Profile > View Detailed Stats > full history.
   await entry("ui:detail-from-stats", "detail from Stats history", () => pages.openFromStats(redName));
+  await pages.backToTabRoot();
+
+  // 4. Athlete head-to-head, reached on its own (Stats -> detail -> opponent row -> athlete page).
+  await entry("ui:detail-from-athlete", "detail from Demo Red's head-to-head", () => pages.openFromAthlete(redName));
   await pages.backToTabRoot();
 
   // 5. Profile > Past Match Videos (pull-to-refresh first), then the player.
@@ -133,7 +157,12 @@ async function runHistory(ctx: ScenarioCtx, matchId: string, seeds: SeededVideo[
       [watchLabelFor(null), watchLabelFor(redName)],
       [view.watch[blueVid.videoId], view.watch[redVid.videoId]],
     );
-    await ctx.step(`Blue taps ${watchLabelFor(redName)}`, () => pages.tapWatch(redVid.videoId, watchLabelFor(redName)));
+    // A missed tap is recorded by ctx.step (ui:<step>) and by ui:player-loaded below; keep going to clean up.
+    await ctx
+      .step(`Blue taps ${watchLabelFor(redName)}`, () => pages.tapWatch(redVid.videoId, watchLabelFor(redName)))
+      .catch((e) => {
+        if (!(e instanceof ExpectationTimeout)) throw e;
+      });
     const state = await pages.waitPlayerState("loaded", 20_000);
     ctx.eq("ui:player-loaded", "loaded", state);
     ctx.eq("ui:no-error-panel", [], await pages.playerErrorPanels());
