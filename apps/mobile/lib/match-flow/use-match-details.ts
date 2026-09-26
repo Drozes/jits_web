@@ -45,11 +45,27 @@ export function useMatchDetails(matchId: string): UseMatchDetailsResult {
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [tick, setTick] = React.useState(0);
+  // The match in hand, readable from the fetch below without making it a
+  // dependency (that would re-fetch on every successful load). Synced in an
+  // effect declared BEFORE the fetch effect, so it is current when that runs.
+  const matchRef = React.useRef<MatchDetails | null>(null);
+  React.useEffect(() => {
+    matchRef.current = match;
+  }, [match]);
 
   React.useEffect(() => {
     let cancelled = false;
     setIsLoading(true);
     setError(null);
+    // A RE-fetch of the match already on screen, as opposed to a first load
+    // (or a load for a different matchId). `getMatchDetails` returns null on
+    // ANY failure, a network blip included, so a failed re-fetch is not
+    // evidence the match is gone. Treating it as one nulled the match and
+    // set `error`, and the wizard swapped a finished match's summary for
+    // "Match unavailable" (and disabled its reconciler) because the confirm
+    // step's refresh() hit a dead zone. Keep what we have; the reconciler
+    // and the next refresh() get another go.
+    const revalidating = matchRef.current?.id === matchId;
 
     (async () => {
       try {
@@ -59,6 +75,10 @@ export function useMatchDetails(matchId: string): UseMatchDetailsResult {
         ]);
         if (cancelled) return;
         if (!matchResult) {
+          if (revalidating) {
+            console.warn("[match-flow] re-fetch returned no match; keeping the loaded one");
+            return;
+          }
           setError("Match not found");
           setMatch(null);
           setSubmissionTypes([]);
@@ -68,6 +88,10 @@ export function useMatchDetails(matchId: string): UseMatchDetailsResult {
         setSubmissionTypes(types);
       } catch (err) {
         if (cancelled) return;
+        if (revalidating) {
+          console.warn("[match-flow] re-fetch failed; keeping the loaded match", err);
+          return;
+        }
         console.error("[match-flow] fetch failed", err);
         setError(err instanceof Error ? err.message : "Failed to load match");
       } finally {

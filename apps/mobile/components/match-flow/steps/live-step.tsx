@@ -4,7 +4,6 @@ import { useStepMatchSync } from "@/lib/match-flow/match-sync-context";
 import { useSessionMatchTimer } from "@jits/shared/hooks/use-session-match-timer";
 import { useLiveControls } from "@/lib/match-flow/use-live-controls";
 import { usePauseResync } from "@/lib/match-flow/use-pause-resync";
-import { useMatchKeepAwake } from "@/lib/match-flow/use-keep-awake";
 import { matchHaptics } from "@/lib/match-flow/use-haptics";
 import type { UseVideoRecorderReturn } from "@/lib/video/use-video-recorder";
 import { AUTO_END_DELAY_MS } from "@/lib/video/recording-limits";
@@ -37,9 +36,9 @@ const TIME_WARNING_SECONDS = 10;
 
 /**
  * Step 4: live timer with pause / resume / end controls. Auto-starts the
- * wizard's recorder on entry and stops it on end. Activates the screen
- * wake-lock for the duration of the step and fires haptics on key events
- * (match start, time-warning, match end).
+ * wizard's recorder on entry and stops it on end, and fires haptics on key
+ * events (match start, time-warning, match end). The screen wake-lock is
+ * held by the wizard across ready AND live, so it is not taken here.
  *
  * The viewfinder and the upload status chip are rendered by the wizard,
  * not here: the camera has to be warm BEFORE this step mounts, and the
@@ -69,8 +68,6 @@ export function LiveStep(props: LiveStepProps) {
   const startHapticFiredRef = React.useRef(false);
   const warnHapticFiredRef = React.useRef(false);
   const recordingStartedRef = React.useRef(false);
-
-  useMatchKeepAwake(true);
 
   // Every pause/resume (tap, broadcast, DB re-read) goes through this timer,
   // which re-applies the DB pause state after a missed broadcast but ignores
@@ -116,12 +113,20 @@ export function LiveStep(props: LiveStepProps) {
 
   // Auto-start recording once the camera ref is ready and permission is
   // granted. We retry on permission flip via the dep array.
+  //
+  // Not on a clock that has already run out. Re-entering the live step of
+  // an expired match (reopened from Arena, or a resync landing late) would
+  // otherwise record the second or two before auto-end fires and upload it
+  // as a success, spending the one (match_id, uploaded_by) video row and an
+  // upload-cap slot on a clip of nothing.
+  const expired = timer.remaining === 0;
   React.useEffect(() => {
     if (recordingStartedRef.current) return;
     if (!recorder.permission?.granted) return;
+    if (expired) return;
     recordingStartedRef.current = true;
     void recorder.start();
-  }, [recorder.permission?.granted, recorder]);
+  }, [recorder.permission?.granted, recorder, expired]);
 
   // Time-warning haptic once at <= 10s remaining, on a ticking clock (not on
   // mounting into a match already paused inside the last 10 s).

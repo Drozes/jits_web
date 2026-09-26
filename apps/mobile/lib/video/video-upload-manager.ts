@@ -7,6 +7,7 @@ import {
   removeUploadedObject,
   uploadFileResumable,
   writeMatchVideoRow,
+  type MatchVideoGate,
 } from "./upload-recording";
 import { releaseRecording, retainRecording } from "./recording-file";
 import {
@@ -130,6 +131,12 @@ let lastKnownConnected = true;
 
 function messageOf(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
+}
+
+/** The upload gate a `match_videos` write failure carries, if any. */
+function gateOf(err: unknown): MatchVideoGate | null {
+  const gate = (err as { gate?: unknown } | null)?.gate;
+  return typeof gate === "string" ? (gate as MatchVideoGate) : null;
 }
 
 function ratio(bytes: number, total: number): number {
@@ -419,7 +426,9 @@ async function writeRow(
   job: PendingUploadJob,
   handle: RunnerHandle,
   isCurrent: () => boolean,
-): Promise<{ ok: true; videoId: string } | { ok: false; error: string }> {
+): Promise<
+  { ok: true; videoId: string } | { ok: false; error: string; gated?: boolean }
+> {
   let lastError = "Saving the video record failed";
 
   for (let attempt = 1; attempt <= ROW_MAX_ATTEMPTS; attempt++) {
@@ -441,6 +450,12 @@ async function writeRow(
       // superseded runner must not stamp its attempt count on the new job.
       if (!isCurrent()) return { ok: false, error: "Superseded by a newer recording" };
       await patchUploadJob(job.matchId, { attempt, lastError });
+      // A server-side upload gate (daily cap, uploads off, not in the beta
+      // cohort) does not lift within a backoff window, so the remaining
+      // attempts would only hit it again. Park now; the next foreground or
+      // reconnect resumes the job. Duck-typed rather than `instanceof` so
+      // the check survives the module being doubled in tests.
+      if (gateOf(err)) return { ok: false, error: lastError, gated: true };
       if (attempt >= ROW_MAX_ATTEMPTS) break;
       await backoffSleep(handle, backoffDelayMs(attempt, ROW_BACKOFF));
     }
@@ -533,7 +548,10 @@ async function runJob(job: PendingUploadJob, handle: RunnerHandle): Promise<Uplo
     return { ok: false, error: "Superseded by a newer recording", willRetryLater: false };
   }
   if (!row.ok) {
-    const message = `Video uploaded, but saving the record failed: ${row.error}. It will retry automatically.`;
+    // A gate's message is already final copy (see MatchVideoDbError).
+    const message = row.gated
+      ? row.error
+      : `Video uploaded, but saving the record failed: ${row.error}. It will retry automatically.`;
     setMatchUpload(current.matchId, { status: "error", error: message });
     return { ok: false, error: message, willRetryLater: true };
   }

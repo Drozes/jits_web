@@ -118,6 +118,7 @@ import {
   buildVideoPath,
   classifyUploadError,
   getRecordingSize,
+  matchVideoGateFor,
   removeUploadedObject,
   statusOfUploadError,
   uploadFileResumable,
@@ -387,6 +388,46 @@ describe("writeMatchVideoRow", () => {
     expect((thrown as MatchVideoDbError).storageObjectPersisted).toBe(true);
     expect((thrown as MatchVideoDbError).path).toBe("M/A/42.mp4");
     expect(mockRemove).not.toHaveBeenCalled();
+  });
+});
+
+describe("writeMatchVideoRow upload-gate copy", () => {
+  async function thrownFor(hint: string | undefined, message = "raw db message") {
+    mockUpsertMatchVideo.mockResolvedValue({
+      ok: false,
+      error: { code: "UNKNOWN", message, raw: { code: "P0001", hint, message } },
+    });
+    try {
+      await writeMatchVideoRow({ matchId: "M", uploaderAthleteId: "A", storagePath: "M/A/42.mp4" });
+    } catch (err) {
+      return err as MatchVideoDbError;
+    }
+    throw new Error("expected writeMatchVideoRow to throw");
+  }
+
+  it.each([
+    ["upload_rate_limited", "rate_limited", /^Daily video limit reached\. It will upload automatically later\.$/],
+    ["video_upload_disabled", "disabled", /^Video uploads are turned off right now\./],
+    ["upload_not_in_cohort", "not_in_cohort", /^Video uploads are not enabled for your account yet\./],
+  ])("maps HINT %s to clear copy and a gate", async (hint, gate, copy) => {
+    const err = await thrownFor(hint);
+    expect(err).toBeInstanceOf(MatchVideoDbError);
+    expect(err.gate).toBe(gate);
+    expect(err.message).toMatch(copy);
+    expect(err.message).not.toMatch(/saving the record failed/i);
+    expect(err.storageObjectPersisted).toBe(true);
+  });
+
+  it("leaves any other failure ungated and unprefixed, so the caller frames it once", async () => {
+    const err = await thrownFor(undefined, "permission denied");
+    expect(err.gate).toBeNull();
+    expect(err.message).toBe("permission denied");
+  });
+
+  it("exposes the hint lookup", () => {
+    expect(matchVideoGateFor("upload_rate_limited")?.gate).toBe("rate_limited");
+    expect(matchVideoGateFor("something_else")).toBeNull();
+    expect(matchVideoGateFor(null)).toBeNull();
   });
 });
 

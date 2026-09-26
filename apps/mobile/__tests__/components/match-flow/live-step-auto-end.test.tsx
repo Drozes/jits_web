@@ -96,9 +96,9 @@ import type { UseVideoRecorderReturn } from "@/lib/video/use-video-recorder";
 const NOW = new Date("2026-09-26T12:00:00.000Z").getTime();
 const DURATION = 300;
 
-function makeRecorder() {
+function makeRecorder(granted = false) {
   return {
-    permission: { granted: false },
+    permission: { granted },
     start: jest.fn(() => Promise.resolve()),
     stop: jest.fn(() => Promise.resolve()),
   } as unknown as UseVideoRecorderReturn & { stop: jest.Mock };
@@ -109,8 +109,8 @@ function makeRecorder() {
  * `pausedForSeconds`, the step mounts into a match that was paused that many
  * seconds ago with `remainingSeconds` left (cold start / re-entry).
  */
-function renderLive(remainingSeconds: number, pausedForSeconds?: number) {
-  const recorder = makeRecorder();
+function renderLive(remainingSeconds: number, pausedForSeconds?: number, granted = false) {
+  const recorder = makeRecorder(granted);
   const onEnded = jest.fn();
   const pauseMs = (pausedForSeconds ?? 0) * 1000;
   const startedAt = new Date(NOW - pauseMs - (DURATION - remainingSeconds) * 1000).toISOString();
@@ -297,5 +297,20 @@ describe("LiveStep mounted into a paused match", () => {
     await advanceWithRerenders(AUTO_END_DELAY_MS + 3_000, rerender);
     expect(mockBroadcastMatchEnded).toHaveBeenCalledTimes(1);
     expect(onEnded).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("LiveStep recorder auto-start", () => {
+  it("starts recording on entry to a live clock", () => {
+    const { recorder } = renderLive(120, undefined, true);
+    expect(recorder.start).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not record when entering a live step whose clock already ran out", async () => {
+    // Re-entering an expired match used to record the second or two before
+    // auto-end and upload it as a success, spending the one video row.
+    const { recorder, rerender } = renderLive(0, undefined, true);
+    await advanceWithRerenders(AUTO_END_DELAY_MS + 2_000, rerender);
+    expect(recorder.start).not.toHaveBeenCalled();
   });
 });

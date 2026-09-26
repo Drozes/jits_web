@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useMatchDetails } from "@/lib/match-flow/use-match-details";
 import { MATCH_STEPS, type MatchStep } from "@/lib/match-flow/step-router";
 import { useWizardSync } from "@/lib/match-flow/use-wizard-sync";
+import { useMatchKeepAwake } from "@/lib/match-flow/use-keep-awake";
 import { MatchSyncProvider } from "@/lib/match-flow/match-sync-context";
 import type { BroadcastResult } from "@jits/shared/hooks/use-session-match-sync";
 import { WizardError, WizardLoading } from "./wizard-status";
@@ -119,6 +120,14 @@ export function MatchFlowWizard({
     onStepChange?.(step);
   }, [step, onStepChange]);
 
+  // Screen wake-lock for every step the recorder camera is up, not just
+  // live. The ready check shows the preview and the phone is typically
+  // already propped against the wall; auto-lock there tore the capture
+  // session down and nothing was recorded. Owned here, once, rather than
+  // per step: two holders of the one lock tag would release it for each
+  // other on the ready -> live handoff.
+  useMatchKeepAwake(step === "ready" || step === "live");
+
   const advanceToResult = React.useCallback(() => setStep("result"), [setStep]);
 
   // LOAD-BEARING. Do not delete this as a mere optimisation.
@@ -146,10 +155,12 @@ export function MatchFlowWizard({
 
   // The error guard runs FIRST, above the loading guard, and has to.
   //
-  // `getMatchDetails` returns null on any failure, and `useMatchDetails`
-  // turns that into `{ match: null, error: "Match not found" }` (see
-  // lib/match-flow/use-match-details.ts:44-48; its catch branch does the
-  // same with the thrown message). So on a FIRST-load failure `error` is
+  // `getMatchDetails` returns null on any failure, and on a FIRST load
+  // `useMatchDetails` turns that into `{ match: null, error: "Match not
+  // found" }` (its catch branch does the same with the thrown message). A
+  // failed RE-fetch of the match already in hand sets neither: it keeps the
+  // loaded match, so a blip after the result lands cannot replace the
+  // summary with this splash. So on a FIRST-load failure `error` is
   // set and `match` is still null, and with the loading guard first the
   // `!match` term won and `WizardError` was unreachable: the user sat on a
   // permanent "Loading match..." spinner for a match that had already

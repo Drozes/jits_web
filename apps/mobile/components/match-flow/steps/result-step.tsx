@@ -18,6 +18,8 @@ import { cn } from "@/lib/cn";
 
 interface ResultStepProps {
   matchId: string;
+  /** Only a ranked draw moves rating; casual matches never do. */
+  matchType: "ranked" | "casual";
   /** Match length in seconds; finish time can't exceed it. */
   durationSeconds: number;
   participants: ResultParticipant[];
@@ -36,6 +38,7 @@ interface ResultStepProps {
  */
 export function ResultStep({
   matchId,
+  matchType,
   durationSeconds,
   participants,
   submissionTypes,
@@ -113,7 +116,9 @@ export function ResultStep({
             Match ends in a draw
           </Text>
           <Text className="font-body text-[12px] text-ink-2 text-center">
-            Draws cost both athletes rating.
+            {matchType === "ranked"
+              ? "Draws cost both athletes rating."
+              : "Casual match: no rating change."}
           </Text>
         </Plate>
       ) : null}

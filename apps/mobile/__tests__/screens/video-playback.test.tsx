@@ -20,6 +20,7 @@ jest.mock("expo-router", () => ({
  */
 const mockSetPosition = jest.fn(async () => undefined);
 const mockPlayers: Array<Record<string, any>> = [];
+const mockSetAudioMode = jest.fn(async (_mode: Record<string, unknown>) => undefined);
 
 jest.mock("expo-av", () => {
   const R = require("react");
@@ -31,7 +32,11 @@ jest.mock("expo-av", () => {
     }, []);
     return R.createElement(RN.Text, { testID: "video-player" }, props.source.uri);
   });
-  return { ResizeMode: { CONTAIN: "contain" }, Video };
+  return {
+    ResizeMode: { CONTAIN: "contain" },
+    Video,
+    Audio: { setAudioModeAsync: (mode: Record<string, unknown>) => mockSetAudioMode(mode) },
+  };
 });
 
 jest.mock("@/lib/supabase/client", () => ({ supabase: {} }));
@@ -116,6 +121,19 @@ beforeEach(() => {
  * path production cannot produce (jits-icei.5).
  */
 describe("MatchVideoScreen", () => {
+  it("plays through the iOS silent switch while open, and hands it back on exit", async () => {
+    queries().getMatchVideoPlaybackResult.mockResolvedValue(
+      playable("https://signed.example/v.mp4"),
+    );
+
+    const utils = render(React.createElement(MatchVideoScreen));
+    expect(mockSetAudioMode).toHaveBeenCalledWith({ playsInSilentModeIOS: true });
+    await waitFor(() => expect(utils.getByTestId("video-player")).toBeTruthy());
+
+    utils.unmount();
+    expect(mockSetAudioMode).toHaveBeenLastCalledWith({ playsInSilentModeIOS: false });
+  });
+
   it("plays the signed URL and reports loaded once the player has it", async () => {
     queries().getMatchVideoPlaybackResult.mockResolvedValue(
       playable("https://signed.example/v.mp4"),
