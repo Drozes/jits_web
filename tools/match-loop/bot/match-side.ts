@@ -2,16 +2,34 @@
  * The bot's half of the 8-step match wizard.
  *
  * Emulates `apps/mobile/components/match-flow/steps/*` and
- * `apps/mobile/lib/match-flow/*`:
- *   weight  local only
- *   ready   ready_signal; when both ready, race start_match, broadcast
- *           timer_started, loser falls back to get_match_details
- *   live    pause/resume RPC + broadcast; End = broadcast match_ended (no RPC)
+ * `apps/mobile/lib/match-flow/*` (Team A protocol, 55061f5):
+ *   weight  mounts a channel; a match_cancelled here exits the match
+ *   ready   ready_signal, repeated every READY_REPEAT_MS until the
+ *           opponent's arrives; when both ready, race start_match, broadcast
+ *           timer_started (awaited, bounded), loser falls back to
+ *           get_match_details
+ *   live    pause/resume RPC + broadcast; End = broadcast match_ended
+ *           (awaited, bounded; no RPC)
  *   end     local 800ms, then result
- *   result  record_match_result + result_submitted; or receive it
- *   confirm confirm_match_result + result_confirmed; dispute = RPC only;
- *           plus the dead `matches` postgres_changes listener the app mounts
+ *   result  record_match_result + result_submitted (awaited); or receive it
+ *   confirm confirm_match_result + result_confirmed; dispute = RPC +
+ *           match_disputed (awaited). Leaves confirm ONLY on the opponent's
+ *           match_disputed, on both confirmations (1.5s later), or on a DB
+ *           snapshot that is `disputed` or has both confirmations. A
+ *           `completed` row is NOT a signal: record_match_result sets it at
+ *           record time, before anyone confirmed.
  *   summary terminal
+ *
+ * DB reconciler (use-match-reconciler.ts): the bot re-reads getMatchDetails +
+ * getMatchConfirmations on every step change, on every step channel
+ * SUBSCRIBED, on a `matches` row UPDATE (`match-row:<id>`, whole match), and
+ * on a poll (`pollIntervalFor`: ready/result/confirm 4s, live 10s). What a
+ * snapshot means comes from the app's own pure `targetFor`. Snapshots are
+ * consumed where the app acts on them in the flows the harness drives: the
+ * ready step (in_progress -> live, cancelled -> exit) and the confirm step.
+ * Broadcast-specific waits (`waitEvent`, `waitForEnd`, `waitForResult`,
+ * `waitDisputeSignal`) stay broadcast-only, because they are the oracles for
+ * delivery.
  *
  * FIDELITY
  *   strict  (default) one `session-match:<id>` channel PER STEP, created on
@@ -37,12 +55,18 @@ import {
   resumeMatch,
   startMatch,
 } from "@jits/shared/api/mutations";
-import { getMatchDetails } from "@jits/shared/api/queries";
+import { getMatchConfirmations, getMatchDetails } from "@jits/shared/api/queries";
 import {
+  APP_TIMING,
   createSessionMatchChannel,
+  MATCH_STEPS,
+  pollIntervalFor,
   SESSION_MATCH_EVENTS as E,
   sessionMatchTopic,
+  settleWithin,
+  targetFor,
   type BroadcastResult,
+  type MatchStep,
   type SessionMatchChannel,
 } from "./protocol";
 import { Bus } from "./bus";
@@ -51,7 +75,8 @@ import type { Trace } from "./trace";
 import type { Config } from "../config";
 import { EnvError, ExpectationTimeout, jitter, pace } from "../lib/util";
 
-export type BotStep = "weight" | "ready" | "live" | "end" | "result" | "confirm" | "summary";
+/** `exited` = the app left the wizard (a cancelled match). */
+export type BotStep = "weight" | "ready" | "live" | "end" | "result" | "confirm" | "summary" | "exited";
 export type Fidelity = "strict" | "lenient";
 export type Timing = "human" | "fast";
 
@@ -72,6 +97,17 @@ export interface SpyEvent {
   payload: Record<string, unknown>;
 }
 
+/** One DB read by the bot's app-equivalent reconciler. */
+export interface Snapshot {
+  status: string;
+  startedAt: string | null;
+  /** Athletes with a positive confirmation row; null = the read failed. */
+  confirmed: string[] | null;
+  /** What the app's `targetFor` makes of it. */
+  target: MatchStep | "exit" | null;
+  reason: string;
+}
+
 const HANDLER_EVENT: Record<string, string> = {
   onTimerStarted: E.TIMER_STARTED,
   onTimerPaused: E.TIMER_PAUSED,
@@ -81,10 +117,11 @@ const HANDLER_EVENT: Record<string, string> = {
   onResultSubmitted: E.RESULT_SUBMITTED,
   onResultConfirmed: E.RESULT_CONFIRMED,
   onMatchCancelled: E.MATCH_CANCELLED,
+  onMatchDisputed: E.MATCH_DISPUTED,
 };
 
 /** `onMatchDisputed` -> `match_disputed`, for events added after this file. */
-function handlerToEvent(prop: string): string {
+export function handlerToEvent(prop: string): string {
   return (
     HANDLER_EVENT[prop] ??
     prop
@@ -94,22 +131,91 @@ function handlerToEvent(prop: string): string {
   );
 }
 
+/** Steps that mount a `session-match` channel in the app (strict mode). */
+const CHANNEL_STEPS: ReadonlySet<BotStep> = new Set(["weight", "ready", "live", "result", "confirm"]);
+
 export type ReadyOutcome =
-  | { kind: "started"; startedAt: string; via: "self" | "broadcast" | "fallback" }
+  | { kind: "started"; startedAt: string; via: "self" | "broadcast" | "fallback" | "reconciler" }
   | { kind: "cancelled" };
+
+export interface ConfirmOutcome {
+  kind: "confirmed" | "disputed";
+  via: "broadcast" | "reconciler";
+}
+
+/**
+ * What the ready step does with a DB snapshot (the wizard's reconciler):
+ * a cancelled match exits, a started (or later) one goes live. Pending and
+ * unknown statuses say nothing.
+ */
+export function readyFromSnapshot(target: Snapshot["target"]): "cancelled" | "started" | null {
+  if (target === "exit") return "cancelled";
+  if (target && MATCH_STEPS.indexOf(target) >= MATCH_STEPS.indexOf("live")) return "started";
+  return null;
+}
+
+export interface ConfirmSignals {
+  meId: string;
+  opponentId: string;
+  /** This side has confirmed (tap + RPC ok). */
+  myConfirmed: boolean;
+  /** The opponent's result_confirmed arrived on the confirm channel. */
+  opponentConfirmed: boolean;
+  /** The opponent's match_disputed arrived on the confirm channel. */
+  opponentDisputed: boolean;
+  /** The newest reconciler snapshot, if any. */
+  snapshot: Pick<Snapshot, "status" | "confirmed"> | null;
+}
+
+/**
+ * When the confirm step ends, mirroring ConfirmStep + useWizardSync:
+ *  - the opponent's match_disputed ends it at once;
+ *  - a snapshot `targetFor` maps to summary (disputed, or BOTH confirmed)
+ *    ends it at once;
+ *  - both confirmed (broadcast or DB rows) ends it CONFIRM_ADVANCE_MS later.
+ * A `completed` status on its own never ends it. Null = keep waiting.
+ */
+export function confirmDecision(s: ConfirmSignals): { outcome: ConfirmOutcome; delayMs: number } | null {
+  if (s.opponentDisputed) return { outcome: { kind: "disputed", via: "broadcast" }, delayMs: 0 };
+  const snap = s.snapshot;
+  if (snap && targetFor({ status: snap.status, confirmedAthleteIds: snap.confirmed }, s.meId, s.opponentId) === "summary") {
+    return { outcome: { kind: snap.status === "disputed" ? "disputed" : "confirmed", via: "reconciler" }, delayMs: 0 };
+  }
+  const ids = snap?.confirmed ?? [];
+  const mine = s.myConfirmed || ids.includes(s.meId);
+  const theirs = s.opponentConfirmed || ids.includes(s.opponentId);
+  if (mine && theirs) {
+    return {
+      outcome: { kind: "confirmed", via: s.opponentConfirmed ? "broadcast" : "reconciler" },
+      delayMs: APP_TIMING.CONFIRM_ADVANCE_MS,
+    };
+  }
+  return null;
+}
+
+const TICK_MS = 100;
 
 export class MatchSide {
   readonly received = new Bus<Received>();
   readonly spy = new Bus<SpyEvent>();
+  /** Every reconciler read, oldest first. */
+  readonly snapshots = new Bus<Snapshot>();
   /** Status values seen by the app-equivalent `matches` postgres_changes listener. */
   readonly matchRowUpdates = new Bus<{ status: string }>();
   step: BotStep | null = null;
   private handle: SessionMatchChannel | null = null;
   private stepMark = 0;
+  /** `received` / `snapshots` marks taken when each step was (last) entered. */
+  private readonly stepMarks = new Map<BotStep, { received: number; snapshots: number }>();
   private spyClient: Client | null = null;
   private spyChannel: RealtimeChannel | null = null;
-  private completionChannel: RealtimeChannel | null = null;
-  private readonly pendingSends: Promise<void>[] = [];
+  private rowChannel: RealtimeChannel | null = null;
+  private pollTimer: ReturnType<typeof setInterval> | null = null;
+  private reconcileInFlight = false;
+  private reconcileAgain = false;
+  private closed = false;
+  private myConfirmed = false;
+  private readonly pendingSends: Promise<unknown>[] = [];
 
   constructor(
     private readonly cfg: Config,
@@ -126,7 +232,11 @@ export class MatchSide {
     return this.actorName;
   }
 
-  /** Open the spy (and, in lenient mode, the whole-match channel). */
+  private get strict() {
+    return this.opts.fidelity === "strict";
+  }
+
+  /** Open the spy, the whole-match row listener and (lenient) the match channel. */
   async start(): Promise<void> {
     const topic = sessionMatchTopic(this.matchId);
     this.spyClient = makeClient(this.cfg);
@@ -148,10 +258,9 @@ export class MatchSide {
       // Without the spy the protocol oracle and H3 evidence are blind.
       throw new EnvError(`spy channel on ${topic} did not join within 10s (state ${this.spyChannel.state})`);
     }
-    if (this.opts.fidelity === "lenient") {
-      this.openChannel("match");
-      this.openCompletionListener();
-    }
+    // The app mounts the row listener for the whole wizard (reconciler (e)).
+    this.openRowListener();
+    if (!this.strict) this.openChannel("match");
   }
 
   private openChannel(label: string): void {
@@ -170,15 +279,21 @@ export class MatchSide {
       },
     );
     this.handle = createSessionMatchChannel(this.client, this.matchId, () => handlers, {
-      onStatus: (status, err) =>
-        this.trace.add({ actor: this.actor, kind: "channel_status", name: status, topic, step: label, payload: err?.message }),
+      onStatus: (status, err) => {
+        this.trace.add({ actor: this.actor, kind: "channel_status", name: status, topic, step: label, payload: err?.message });
+        // Reconciler (b): a (re)join is exactly when broadcasts may have been missed.
+        if (status === "SUBSCRIBED") this.reconcile(`subscribed:${label}`);
+      },
     });
   }
 
-  /** Emulates `useMatchCompletion` (postgres_changes on `matches`). */
-  private openCompletionListener(): void {
-    const topic = `match-complete:${this.matchId}`;
-    this.completionChannel = this.client
+  /**
+   * Emulates use-match-reconciler's `match-row:<id>` listener: a row UPDATE
+   * only TRIGGERS a re-read; it never moves a step by itself.
+   */
+  private openRowListener(): void {
+    const topic = `match-row:${this.matchId}`;
+    this.rowChannel = this.client
       .channel(topic)
       .on(
         "postgres_changes",
@@ -187,16 +302,50 @@ export class MatchSide {
           const status = String((row as { status?: string }).status);
           this.trace.add({ actor: this.actor, kind: "pg_change", name: "matches_update", topic, payload: { status } });
           this.matchRowUpdates.push({ status });
+          this.reconcile("row_update");
         },
       )
       .subscribe((status) => this.trace.add({ actor: this.actor, kind: "channel_status", name: status, topic }));
   }
 
-  private closeCompletionListener(): void {
-    if (this.completionChannel) {
-      void this.client.removeChannel(this.completionChannel);
-      this.completionChannel = null;
+  /**
+   * One DB read, like `reconcileNow`: at most one in flight, a trigger that
+   * lands meanwhile schedules exactly one trailing read. Never mutates.
+   */
+  reconcile(reason: string): void {
+    if (this.closed) return;
+    if (this.reconcileInFlight) {
+      this.reconcileAgain = true;
+      return;
     }
+    this.reconcileInFlight = true;
+    void (async () => {
+      try {
+        const [match, ids] = await Promise.all([
+          getMatchDetails(this.client, this.matchId),
+          getMatchConfirmations(this.client, this.matchId),
+        ]);
+        if (this.closed || !match) return;
+        const confirmed = ids ?? null;
+        const snap: Snapshot = {
+          status: match.status,
+          startedAt: match.started_at ?? null,
+          confirmed,
+          target: targetFor({ status: match.status, confirmedAthleteIds: confirmed }, this.meId, this.opponentId),
+          reason,
+        };
+        this.trace.add({ actor: this.actor, kind: "reconcile", name: reason, step: this.step ?? undefined, payload: snap });
+        this.snapshots.push(snap);
+      } catch (e) {
+        this.trace.note(this.actor, "reconcile_failed", e instanceof Error ? e.message : String(e));
+      } finally {
+        this.reconcileInFlight = false;
+        if (this.reconcileAgain && !this.closed) {
+          this.reconcileAgain = false;
+          this.reconcile("trailing");
+        }
+      }
+    })();
   }
 
   /** Step transition: unmount the old step's channel, mount the new one. */
@@ -204,16 +353,22 @@ export class MatchSide {
     const prev = this.step;
     this.step = step;
     this.stepMark = this.received.mark();
+    this.stepMarks.set(step, { received: this.stepMark, snapshots: this.snapshots.mark() });
     this.trace.add({ actor: this.actor, kind: "step", name: step, payload: { from: prev } });
-    if (this.opts.fidelity === "strict") {
+    if (this.strict || step === "exited") {
       this.handle?.remove();
       this.handle = null;
-      if (prev === "confirm") this.closeCompletionListener();
-      // weight / end / summary mount no channel in the app.
-      if (step === "ready" || step === "live" || step === "result" || step === "confirm") {
-        this.openChannel(step);
-      }
-      if (step === "confirm") this.openCompletionListener();
+      if (this.strict && CHANNEL_STEPS.has(step)) this.openChannel(step);
+    }
+    if (this.pollTimer) clearInterval(this.pollTimer);
+    this.pollTimer = null;
+    if (step === "exited") return;
+    // Reconciler (d) every step change, and (c) the poll on waiting steps.
+    this.reconcile(`step:${step}`);
+    const every = pollIntervalFor(step);
+    if (every != null) {
+      this.pollTimer = setInterval(() => this.reconcile("poll"), every);
+      this.pollTimer.unref?.();
     }
   }
 
@@ -224,70 +379,127 @@ export class MatchSide {
   }
 
   /**
-   * Send exactly like the app (fire and forget: the caller transitions
-   * immediately, so "send then unmount" races are reproduced), and trace
-   * realtime-js's real status when it resolves.
+   * Send like the app and trace realtime-js's real status when it resolves.
+   * Returns the settle promise (never rejects) so the callers the app awaits
+   * (timer_started, match_cancelled, match_ended, result_submitted,
+   * match_disputed) can wait on it with `settleWithin(.., SEND_GRACE_MS)`
+   * before leaving the step, exactly as the app does since jits-mzfu;
+   * everything else stays fire and forget.
    *
-   * CAUTION: the status is NOT a delivery acknowledgement. The app's channels
-   * use the default `broadcast: { ack: false }`, so a websocket "ok" only
-   * means the push left this socket (the httpSend `{ success }` only means
-   * the REST endpoint accepted it). Whether the other side RECEIVED it is
-   * what the spy socket and the receiving side's oracles establish. `close()` awaits the
+   * The channel uses broadcast `ack: true`, so a websocket "ok" means the
+   * server received it (the httpSend `{ success }` only means the REST
+   * endpoint accepted it). Whether the other side RECEIVED it is what the spy
+   * socket and the receiving side's oracles establish. `close()` awaits the
    * outstanding sends so the protocol oracle sees every status.
    */
-  private send(event: string, payload: Record<string, unknown>): void {
+  private send(event: string, payload: Record<string, unknown>): Promise<unknown> {
     const topic = sessionMatchTopic(this.matchId);
     if (!this.handle) {
       this.trace.add({ actor: this.actor, kind: "note", name: "send_without_channel", topic, payload: { event } });
-      return;
+      return Promise.resolve(undefined);
     }
     const via = this.handle.isSubscribed() ? "ws" : "http";
     const step = this.step ?? undefined;
-    const p = this.handle
-      .send(event, payload)
+    // Synchronously, on the channel mounted NOW: a step change right after a
+    // fire-and-forget send must race the send exactly as in the app.
+    let raw: Promise<unknown>;
+    try {
+      raw = Promise.resolve(this.handle.send(event, payload));
+    } catch (e) {
+      raw = Promise.reject(e);
+    }
+    const p = raw
       .catch((e: unknown) => ({ threw: e instanceof Error ? e.message : String(e) }))
       .then((status) => {
         const ok =
           status === "ok" ||
           (typeof status === "object" && status !== null && (status as { success?: boolean }).success === true);
         this.trace.add({ actor: this.actor, kind: "broadcast_sent", name: event, topic, step, payload, result: { via, status }, ok });
+        return status;
       });
     this.pendingSends.push(p);
+    return p;
+  }
+
+  /** Send, then give it SEND_GRACE_MS to leave before the step unmounts. */
+  private async sendAwaited(event: string, payload: Record<string, unknown>): Promise<void> {
+    await settleWithin(this.send(event, payload), APP_TIMING.SEND_GRACE_MS);
+  }
+
+  private channelLabel(step: BotStep): string {
+    return this.strict ? step : "match";
+  }
+
+  private receivedMark(step: BotStep): number {
+    return this.strict ? (this.stepMarks.get(step)?.received ?? this.received.mark()) : 0;
+  }
+
+  /** An event delivered to `step`'s channel while that step was mounted. */
+  private seenOn(step: BotStep, event: string, pred: (args: unknown[]) => boolean = () => true): Received | undefined {
+    const label = this.channelLabel(step);
+    return this.received.find((r) => r.event === event && r.channelStep === label && pred(r.args), this.receivedMark(step));
+  }
+
+  /** The newest snapshot read since `step` was entered. */
+  private latestSnapshot(step: BotStep): Snapshot | null {
+    const since = this.stepMarks.get(step)?.snapshots ?? this.snapshots.mark();
+    const items = this.snapshots.items.filter((i) => i.seq >= since);
+    return items.length ? items[items.length - 1].value : null;
   }
 
   /** An event delivered to the CURRENT step's channel since it mounted. */
   waitEvent(event: string, timeoutMs: number, pred: (args: unknown[]) => boolean = () => true): Promise<Received> {
-    const channelStep = this.opts.fidelity === "strict" ? this.step : "match";
+    const channelStep = this.strict ? this.step : "match";
     return this.received.waitFor(
       `${event} on the ${channelStep} channel`,
       (r) => r.event === event && r.channelStep === channelStep && pred(r.args),
       timeoutMs,
-      this.opts.fidelity === "strict" ? this.stepMark : 0,
+      this.strict ? this.stepMark : 0,
     );
   }
 
   // --- weight / ready ---------------------------------------------------------
 
+  /** The weight step's channel delivered match_cancelled (jits-bh2v). */
+  cancelledOnWeight(): boolean {
+    return this.stepMarks.has("weight") && !!this.seenOn("weight", E.MATCH_CANCELLED);
+  }
+
   async confirmWeights(): Promise<void> {
     this.enter("weight");
     await this.think("read");
+    // The app's weight step leaves the match on the opponent's cancel.
+    if (this.cancelledOnWeight()) {
+      this.enter("exited");
+      return;
+    }
     this.enter("ready");
   }
 
   /**
-   * Tap Ready, then behave like ReadyStep until the match is live or
-   * cancelled. `tapReady=false` models an athlete who never taps.
+   * Tap Ready, then behave like ReadyStep (plus the wizard's reconciler)
+   * until the match is live or cancelled. `tapReady=false` models an athlete
+   * who never taps.
    */
   async readyAndStart(timeoutMs: number, tapReady = true): Promise<ReadyOutcome> {
+    if (this.step === "exited" || (this.step === "weight" && this.cancelledOnWeight())) {
+      this.trace.note(this.actor, "ready_outcome", { kind: "cancelled", via: "weight_channel" });
+      if (this.step !== "exited") this.enter("exited");
+      return { kind: "cancelled" };
+    }
     if (this.step !== "ready") this.enter("ready");
-    const mark = this.stepMark;
     const deadline = Date.now() + timeoutMs;
     let myReady = false;
     let opponentReady = false;
+    let lastReadySent = 0;
+    const sendReady = () => {
+      lastReadySent = Date.now();
+      this.send(E.READY_SIGNAL, { athlete_id: this.meId });
+    };
     if (tapReady) {
       await this.think();
       myReady = true;
-      this.send(E.READY_SIGNAL, { athlete_id: this.meId });
+      sendReady();
     }
     for (;;) {
       if (myReady && opponentReady) {
@@ -296,7 +508,7 @@ export class MatchSide {
         );
         if (r.ok) {
           const startedAt = r.data.started_at ?? new Date().toISOString();
-          this.send(E.TIMER_STARTED, { started_at: startedAt });
+          await this.sendAwaited(E.TIMER_STARTED, { started_at: startedAt });
           this.enter("live");
           return { kind: "started", startedAt, via: "self" };
         }
@@ -309,36 +521,44 @@ export class MatchSide {
         }
         throw new Error(`startMatch failed and match is ${m?.status}: ${r.error.message}`);
       }
-      const remaining = deadline - Date.now();
-      if (remaining <= 0) {
+      if (this.seenOn("ready", E.MATCH_CANCELLED)) {
+        this.enter("exited");
+        return { kind: "cancelled" };
+      }
+      const started = this.seenOn("ready", E.TIMER_STARTED);
+      if (started) {
+        this.enter("live");
+        return { kind: "started", startedAt: String(started.args[0]), via: "broadcast" };
+      }
+      // Repeated ready_signals are harmless: once is enough.
+      if (!opponentReady && this.seenOn("ready", E.READY_SIGNAL, (a) => a[0] === this.opponentId)) {
+        opponentReady = true;
+        continue;
+      }
+      const snap = this.latestSnapshot("ready");
+      const fromDb = snap ? readyFromSnapshot(snap.target) : null;
+      if (fromDb === "cancelled") {
+        this.trace.note(this.actor, "ready_outcome", { kind: "cancelled", via: "reconciler" });
+        this.enter("exited");
+        return { kind: "cancelled" };
+      }
+      if (fromDb === "started") {
+        const startedAt = snap!.startedAt ?? new Date().toISOString();
+        this.enter("live");
+        return { kind: "started", startedAt, via: "reconciler" };
+      }
+      // ReadyStep repeats ready_signal until the opponent's arrives, because
+      // a ready sent before the opponent's channel joined is simply gone.
+      if (myReady && !opponentReady && Date.now() - lastReadySent >= APP_TIMING.READY_REPEAT_MS) sendReady();
+      if (Date.now() >= deadline) {
         throw new ExpectationTimeout("the ready handshake to complete (bot side)", timeoutMs, {
           myReady,
           opponentReady,
           spy: this.spy.items.map((i) => i.value.event),
+          snapshot: snap,
         });
       }
-      const ev = await this.received
-        .waitFor(
-          "ready-step event",
-          (r) =>
-            r.channelStep === (this.opts.fidelity === "strict" ? "ready" : "match") &&
-            ((r.event === E.READY_SIGNAL && (r.args[0] as string) === this.opponentId && !opponentReady) ||
-              r.event === E.TIMER_STARTED ||
-              r.event === E.MATCH_CANCELLED),
-          remaining,
-          this.opts.fidelity === "strict" ? mark : 0,
-        )
-        .catch((e) => {
-          if (e instanceof ExpectationTimeout) return null;
-          throw e;
-        });
-      if (!ev) continue;
-      if (ev.event === E.MATCH_CANCELLED) return { kind: "cancelled" };
-      if (ev.event === E.TIMER_STARTED) {
-        this.enter("live");
-        return { kind: "started", startedAt: String(ev.args[0]), via: "broadcast" };
-      }
-      opponentReady = true;
+      await pace(TICK_MS);
     }
   }
 
@@ -348,8 +568,8 @@ export class MatchSide {
       cancelSessionMatch(this.client, this.matchId),
     );
     if (!r.ok) throw new Error(`cancelSessionMatch failed: ${r.error.message}`);
-    this.send(E.MATCH_CANCELLED, {});
-    this.enter("summary");
+    await this.sendAwaited(E.MATCH_CANCELLED, {});
+    this.enter("exited");
   }
 
   // --- live -------------------------------------------------------------------
@@ -370,10 +590,10 @@ export class MatchSide {
     return r.data.total_paused_duration;
   }
 
-  /** Tap End: broadcast only (no RPC), then end -> result. */
+  /** Tap End: broadcast only (no RPC, awaited like useLiveControls), then end -> result. */
   async endMatch(): Promise<void> {
     await this.think();
-    this.send(E.MATCH_ENDED, {});
+    await this.sendAwaited(E.MATCH_ENDED, {});
     await this.passEndStep();
   }
 
@@ -396,7 +616,7 @@ export class MatchSide {
       return "received";
     } catch (e) {
       if (!(e instanceof ExpectationTimeout)) throw e;
-      this.send(E.MATCH_ENDED, {});
+      await this.sendAwaited(E.MATCH_ENDED, {});
       await this.passEndStep();
       return "auto";
     }
@@ -422,7 +642,7 @@ export class MatchSide {
       }),
     );
     if (!r.ok) return { ok: false, error: r.error.message };
-    this.send(E.RESULT_SUBMITTED, result as unknown as Record<string, unknown>);
+    await this.sendAwaited(E.RESULT_SUBMITTED, result as unknown as Record<string, unknown>);
     this.enter("confirm");
     return { ok: true };
   }
@@ -438,55 +658,90 @@ export class MatchSide {
     const r = await this.trace.rpc(this.actor, "confirmMatchResult", { matchId: this.matchId }, () =>
       confirmMatchResult(this.client, this.matchId),
     );
-    if (!r.ok) throw new Error(`confirmMatchResult failed: ${r.error.message}`);
+    if (!r.ok) {
+      // ConfirmStep re-reads the match: most often the opponent disputed.
+      this.reconcile("confirm_failed");
+      throw new Error(`confirmMatchResult failed: ${r.error.message}`);
+    }
+    this.myConfirmed = true;
+    // Not awaited in the app: the confirm step stays mounted afterwards.
     this.send(E.RESULT_CONFIRMED, { athlete_id: this.meId });
   }
 
+  /** Dispute from the confirm step: RPC, tell the opponent (awaited), summary. */
   async dispute(reason: string): Promise<void> {
     await this.think("read");
     const r = await this.trace.rpc(this.actor, "disputeMatchResult", { matchId: this.matchId, reason }, () =>
       disputeMatchResult(this.client, this.matchId, reason),
     );
     if (!r.ok) throw new Error(`disputeMatchResult failed: ${r.error.message}`);
-    this.enter("summary");
-  }
-
-  async waitOpponentConfirmed(timeoutMs: number): Promise<void> {
-    await this.waitEvent(E.RESULT_CONFIRMED, timeoutMs, (a) => a[0] === this.opponentId);
-    // ConfirmStep advances 1.5s after both confirmed locally.
-    await pace(1500);
+    await this.sendAwaited(E.MATCH_DISPUTED, { athlete_id: this.meId });
     this.enter("summary");
   }
 
   /**
-   * Would the app on this side learn of a dispute? Only through channels the
-   * app actually has: the `matches` postgres_changes listener, or a
-   * session-match broadcast whose name mentions a dispute.
+   * Wait on the confirm step until the app would leave it (`confirmDecision`),
+   * then enter the summary. Never leaves on a `completed` row alone.
    */
-  async waitDisputeSignal(timeoutMs: number): Promise<string> {
+  async waitConfirmDone(timeoutMs: number): Promise<ConfirmOutcome> {
+    if (this.step !== "confirm") throw new Error(`waitConfirmDone on step ${this.step}`);
     const deadline = Date.now() + timeoutMs;
-    const channelStep = this.opts.fidelity === "strict" ? "confirm" : "match";
-    while (Date.now() < deadline) {
-      // Whole-match buses (one MatchSide per match): any time counts.
-      if (this.matchRowUpdates.find((u) => u.status === "disputed", 0)) return "postgres_changes matches.status=disputed";
-      const b = this.received.find(
-        (r) => /disput/i.test(r.event) && r.channelStep === channelStep,
-        this.opts.fidelity === "strict" ? this.stepMark : 0,
-      );
-      if (b) return `broadcast ${b.event}`;
-      await new Promise((r) => setTimeout(r, 200));
+    for (;;) {
+      const signals: ConfirmSignals = {
+        meId: this.meId,
+        opponentId: this.opponentId,
+        myConfirmed: this.myConfirmed,
+        opponentConfirmed: !!this.seenOn("confirm", E.RESULT_CONFIRMED, (a) => a[0] === this.opponentId),
+        opponentDisputed: !!this.seenOn("confirm", E.MATCH_DISPUTED, (a) => a[0] === this.opponentId),
+        snapshot: this.latestSnapshot("confirm"),
+      };
+      const d = confirmDecision(signals);
+      if (d) {
+        this.trace.note(this.actor, "confirm_outcome", d.outcome);
+        if (d.delayMs) await pace(d.delayMs);
+        this.enter("summary");
+        return d.outcome;
+      }
+      if (Date.now() >= deadline) {
+        throw new ExpectationTimeout("the confirm step to finish (bot side)", timeoutMs, {
+          ...signals,
+          spy: this.spy.items.map((i) => i.value.event),
+        });
+      }
+      await pace(TICK_MS);
     }
-    throw new ExpectationTimeout("a dispute signal on the non-disputing side (H1/H2)", timeoutMs, {
+  }
+
+  /**
+   * Did the opponent's match_disputed broadcast reach this side's confirm
+   * channel? Broadcast only: the DB reconciler is a backstop, not the signal
+   * this oracle is about. Resolves with the event and its payload athlete.
+   */
+  async waitDisputeSignal(timeoutMs: number): Promise<{ event: string; athlete_id: string }> {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const b = this.stepMarks.has("confirm") ? this.seenOn("confirm", E.MATCH_DISPUTED) : undefined;
+      if (b) return { event: b.event, athlete_id: String(b.args[0]) };
+      await pace(200);
+    }
+    throw new ExpectationTimeout("match_disputed on the non-disputing side's confirm channel", timeoutMs, {
       matchRowUpdates: this.matchRowUpdates.items.map((i) => i.value),
+      snapshots: this.snapshots.items.slice(-3).map((i) => i.value),
       spy: this.spy.items.map((i) => i.value.event),
     });
   }
 
   async close(): Promise<void> {
+    this.closed = true;
+    if (this.pollTimer) clearInterval(this.pollTimer);
+    this.pollTimer = null;
     await Promise.race([Promise.allSettled(this.pendingSends), pace(10_000)]);
     this.handle?.remove();
     this.handle = null;
-    this.closeCompletionListener();
+    if (this.rowChannel) {
+      void this.client.removeChannel(this.rowChannel);
+      this.rowChannel = null;
+    }
     if (this.spyClient) {
       await this.spyClient.removeAllChannels().catch(() => undefined);
       this.spyClient.realtime.disconnect();

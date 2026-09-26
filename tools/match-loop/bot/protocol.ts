@@ -13,9 +13,36 @@ export {
   type BroadcastResult,
   type SessionMatchChannel,
   type SessionMatchEvent,
+  settleWithin,
 } from "@jits/shared/hooks/session-match-channel";
 
+/**
+ * The mobile wizard's DB reconciliation, imported (it is pure) so the bot
+ * advances on exactly the snapshots the app advances on. In particular a
+ * `completed` row alone maps to `confirm`, never `summary`: only a
+ * `disputed` row or a confirmation from BOTH athletes finishes confirm.
+ */
+export { pollIntervalFor, targetFor } from "../../../apps/mobile/lib/match-flow/reconcile";
+export { MATCH_STEPS, type MatchStep } from "../../../apps/mobile/lib/match-flow/step-router";
+
 import { SESSION_MATCH_EVENTS } from "@jits/shared/hooks/session-match-channel";
+
+/**
+ * App timing constants that live in modules the bot cannot import (they pull
+ * in React Native). `tests/protocol.test.ts` reads the app sources and fails
+ * when these drift.
+ */
+export const APP_TIMING = {
+  /** `SEND_GRACE_MS` (apps/mobile/lib/match-flow/match-sync-context.tsx): how
+   * long a step waits for an awaited send before it unmounts the channel. */
+  SEND_GRACE_MS: 1_500,
+  /** `READY_REPEAT_MS` (apps/mobile/components/match-flow/steps/ready-step.tsx):
+   * a ready athlete repeats ready_signal until the opponent's arrives. */
+  READY_REPEAT_MS: 3_000,
+  /** ConfirmStep's delay between "both confirmed" and the summary
+   * (apps/mobile/components/match-flow/steps/confirm-step.tsx). */
+  CONFIRM_ADVANCE_MS: 1_500,
+} as const;
 
 /** App-wide presence tier (apps/mobile/lib/presence/use-online-presence.ts). */
 export const APP_ONLINE_TOPIC = "app:online";

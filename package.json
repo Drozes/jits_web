@@ -17,7 +17,7 @@
     "prepare": "husky",
     "match-loop": "tsx tools/match-loop/run.ts",
     "match-loop:typecheck": "tsc -p tools/match-loop",
-    "match-loop:test": "tsx --test tools/match-loop/tests/guards.test.ts"
+    "match-loop:test": "tsx --test tools/match-loop/tests/guards.test.ts tools/match-loop/tests/protocol.test.ts"
   },
   "overrides": {
     "react": "19.1.0",

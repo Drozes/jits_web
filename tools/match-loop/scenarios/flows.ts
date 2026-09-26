@@ -244,17 +244,35 @@ export async function blueRecordsDraw(ctx: ScenarioCtx, side: MatchSide): Promis
   ]);
 }
 
-/** Both confirm; Blue must reach the summary and the bot must see Blue's confirm. */
+/**
+ * Both confirm; Blue must reach the summary and the bot's confirm step must
+ * finish as the app's would (Blue's result_confirmed, or the DB showing both
+ * confirmations; never a bare `completed` row).
+ */
 export async function bothConfirm(ctx: ScenarioCtx, side: MatchSide): Promise<void> {
   const botRun = (async () => {
     await side.confirm();
-    await side.waitOpponentConfirmed(T.handshake);
+    return side.waitConfirmDone(T.handshake);
   })();
+  botRun.catch(() => undefined); // awaited below; never an unhandled rejection
   await ctx.step("Blue confirms", () => ctx.ui.confirmResult());
-  await Promise.all([
+  const [outcome] = await Promise.all([
     ctx.step("bot sees Blue's confirmation", () => botRun),
     ctx.step("Blue reaches the summary", () => ctx.ui.waitStep("summary", T.handshake)),
   ]);
+  ctx.eq("bot:confirm-step-outcome", "confirmed", outcome.kind);
+  ctx.trace.note("harness", "bot_confirm_via", outcome.via);
+  // The DB reconciler can finish the bot's confirm step on its own, so check
+  // separately that Blue's app actually broadcast its confirmation.
+  await ctx.expect("protocol:blue-sent-result_confirmed", true, async () => {
+    await side.spy.waitFor(
+      "Blue's result_confirmed",
+      (e) => e.event === "result_confirmed" && e.payload.athlete_id === ctx.ids.blue,
+      8_000,
+      0, // one MatchSide per match
+    );
+    return true;
+  });
 }
 
 export async function checkSummary(ctx: ScenarioCtx, verdict: string, delta: number | null): Promise<void> {

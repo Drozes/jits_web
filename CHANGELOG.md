@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Tooling: match-loop bot speaks the Team A match protocol (P0.4)
+
+**Added**
+- `tools/match-loop/tests/protocol.test.ts`: pins the bot to the app protocol (the app's `SEND_GRACE_MS`, `READY_REPEAT_MS` and confirm delay read from source, every session-match event validated and bound, `match_disputed`, repeated `ready_signal`, and the confirm-step decision table: a `completed` row alone never finishes confirm). Run by `npm run match-loop:test`.
+- The bot now runs an app-equivalent DB reconciler (`MatchSide.reconcile`): re-reads `getMatchDetails` + `getMatchConfirmations` on every step change, every step channel SUBSCRIBED, every `match-row:<id>` UPDATE (whole match) and a poll from the app's own `pollIntervalFor`; snapshots are interpreted with the app's `targetFor` (imported from `apps/mobile/lib/match-flow/reconcile.ts`). Traced as `reconcile`.
+
+**Changed**
+- `tools/match-loop/bot/match-side.ts`: the weight step mounts a channel and leaves on `match_cancelled`; ready repeats `ready_signal` every 3s until the opponent's arrives and also goes live / exits from a DB snapshot; `timer_started`, `match_cancelled`, `match_ended`, `result_submitted` and the new `match_disputed` sends are awaited (bounded by `SEND_GRACE_MS`) before the step changes, like the app; `dispute()` broadcasts `match_disputed`; the new `waitConfirmDone()` (replaces `waitOpponentConfirmed`) leaves confirm only on the opponent's `match_disputed`, both confirmations (broadcast, 1.5s later, or DB rows) or a `disputed` row, never on `completed`; `waitDisputeSignal()` is broadcast-only. The old `match-complete:` completion listener is gone.
+- `tools/match-loop/bot/protocol.ts`: re-exports `settleWithin`, `targetFor`, `pollIntervalFor`, `MATCH_STEPS` from the app; `APP_TIMING` constants.
+- Scenarios: `bothConfirm` asserts the bot's confirm outcome and that Blue's `result_confirmed` reached the spy; C6 expects Blue's `match_disputed` (spy payload, Red's confirm channel, Red leaves confirm on it) and is no longer an expected failure; E3B expects the weight channel to receive the cancel (no longer an expected failure); E6 expects Blue on confirm after foregrounding (no longer an expected failure); E7 expects the relaunch to land on confirm and both to confirm; E8 lets the bot finish confirm from the DB after the outage.
+- `tools/match-loop/run.ts`: the protocol oracle no longer waves through unknown event names containing "disput" (`match_disputed` is validated now).
+
 ### Mobile/Web: Arena reliability (jits-1o4l, jits-celf, jits-yiwx, jits-ef2a)
 
 JS-only, OTA-eligible for runtime 0.3.0 (no native dependency, `app.json` or config change). Web ships with it from main.

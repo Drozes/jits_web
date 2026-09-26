@@ -50,9 +50,12 @@ const scenario: Scenario = {
       await ctx.ui.waitStep("summary", 45_000);
       return true;
     });
+    // Blue's result_confirmed may die in the outage; like the app, Red's
+    // confirm step then finishes from the DB (both confirmation rows).
     await ctx.expect("bot:red-sees-blue-confirm-after-outage", true, async () => {
-      await side.waitOpponentConfirmed(T.handshake);
-      return true;
+      const outcome = await side.waitConfirmDone(T.handshake);
+      ctx.trace.note("harness", "bot_confirm_via", outcome.via);
+      return outcome.kind === "confirmed";
     });
     if ((await ctx.ui.currentStep()) === "summary") await exitToArena(ctx);
   },
