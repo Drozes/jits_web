@@ -931,6 +931,75 @@ describe("during a match", () => {
   });
 });
 
+describe("while offline", () => {
+  function mountLive(isLive: boolean) {
+    return renderHook(
+      (props: { isLive: boolean }) =>
+        useArenaChallenge({ athleteId: ME, athleteWeight: 180, isLive: props.isLive }),
+      { initialProps: { isLive } },
+    );
+  }
+
+  it("raises no prompt from a realtime INSERT while offline (recovery offers it on going live)", async () => {
+    const { result } = mountLive(false);
+
+    await act(async () => {
+      await incomingBinding().handler({
+        new: { id: CHALLENGE, challenger_id: OPPONENT, opponent_id: ME, status: "pending" },
+      });
+    });
+
+    expect(result.current.incoming).toBeNull();
+    expect(mockMaybeSingle).not.toHaveBeenCalled();
+  });
+
+  it("drops an INSERT whose lookup finished after going offline", async () => {
+    let release: (v: unknown) => void = () => {};
+    mockMaybeSingle.mockImplementationOnce(
+      () => new Promise((resolve) => (release = resolve)),
+    );
+    const { result, rerender } = mountLive(true);
+
+    let pending: Promise<void> | void;
+    await act(async () => {
+      pending = incomingBinding().handler({
+        new: { id: CHALLENGE, challenger_id: OPPONENT, opponent_id: ME, status: "pending" },
+      });
+      await Promise.resolve();
+    });
+    rerender({ isLive: false });
+    await act(async () => {
+      release({ data: { display_name: "Rival", current_elo: 1, current_weight: 1 }, error: null });
+      await pending;
+    });
+
+    expect(result.current.incoming).toBeNull();
+  });
+
+  it("raises the prompt from an INSERT once the athlete goes live", async () => {
+    // Production mounts offline (isLive starts false) and flips on go-live.
+    const { result, rerender } = mountLive(false);
+    rerender({ isLive: true });
+
+    await raiseIncoming(result);
+
+    expect(result.current.incoming).toMatchObject({
+      challengeId: CHALLENGE,
+      challengerId: OPPONENT,
+    });
+  });
+
+  it("offerIncoming still raises the prompt (recovery gates on live itself)", async () => {
+    const { result } = mountLive(true);
+
+    await act(async () => {
+      await result.current.offerIncoming(CHALLENGE, OPPONENT);
+    });
+
+    expect(result.current.incoming).toMatchObject({ challengeId: CHALLENGE });
+  });
+});
+
 describe("INSERT racing another prompt", () => {
   it("keeps the first prompt when a second INSERT's lookup lands after it", async () => {
     let release: (v: unknown) => void = () => {};

@@ -14,7 +14,7 @@
  *
  * Three realtime surfaces:
  *  - `postgres_changes` INSERT on `challenges` where I am the opponent: raises
- *    the incoming prompt.
+ *    the incoming prompt, only while I am live.
  *  - `postgres_changes` UPDATE on the same table, both directions: dismisses a
  *    prompt the challenger cancelled, and recovers a challenger whose
  *    broadcast went missing.
@@ -86,6 +86,15 @@ export interface UseArenaChallengeArgs {
   athleteWeight: number | null;
   /** True while a match screen is mounted: no prompt is raised mid-match. */
   inMatch?: boolean;
+  /**
+   * Whether I am live. The realtime INSERT raises a prompt only while I am:
+   * a challenge that lands while I am offline (it can race my going offline,
+   * since the server only checks the flag at insert time) is left to
+   * `use-pending-challenge-recovery.ts`, which offers it when I go live if it
+   * is still fresh and its challenger is still in the lobby. Defaults to true
+   * so a caller that does not track live state keeps the old behaviour.
+   */
+  isLive?: boolean;
   /**
    * Called when an opponent turns out to have left the Arena between the
    * roster load and the tap. The roster has no realtime feed on `athletes`,
@@ -187,6 +196,7 @@ export function useArenaChallenge({
   athleteId,
   athleteWeight,
   inMatch = false,
+  isLive = true,
   onOpponentUnavailable,
   onStaleCancelled,
 }: UseArenaChallengeArgs): UseArenaChallengeResult {
@@ -203,6 +213,8 @@ export function useArenaChallenge({
   const outgoingRef = React.useRef<OutgoingChallenge | null>(null);
   const inMatchRef = React.useRef(inMatch);
   inMatchRef.current = inMatch;
+  const isLiveRef = React.useRef(isLive);
+  isLiveRef.current = isLive;
   const weightRef = React.useRef(athleteWeight);
   weightRef.current = athleteWeight;
   const unavailableRef = React.useRef(onOpponentUnavailable);
@@ -306,14 +318,15 @@ export function useArenaChallenge({
           if (row.status !== "pending") return;
           if (row.expires_at && new Date(row.expires_at) <= new Date()) return;
           // Already showing a prompt: the first one keeps the surface rather
-          // than being silently replaced mid-decision.
-          if (incomingRef.current || inMatchRef.current) return;
+          // than being silently replaced mid-decision. Offline: no live
+          // prompt; recovery offers it on going live.
+          if (incomingRef.current || inMatchRef.current || !isLiveRef.current) return;
 
           const next = await loadIncoming(row.id, row.challenger_id);
-          // Re-checked after the read: another INSERT, a recovery offer or a
-          // match can land inside that await, and the first prompt keeps the
-          // surface.
-          if (incomingRef.current || inMatchRef.current) return;
+          // Re-checked after the read: another INSERT, a recovery offer, a
+          // match or going offline can land inside that await, and the first
+          // prompt keeps the surface.
+          if (incomingRef.current || inMatchRef.current || !isLiveRef.current) return;
           setIncomingBoth(next);
         },
       )

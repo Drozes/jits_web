@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Mobile: no live challenge prompt while offline (jits-sfry)
+
+**Fixed**
+- The realtime INSERT listener in `apps/mobile/lib/arena/use-arena-challenge.ts` raised the incoming prompt even when the athlete was offline (a challenge that raced their going offline, or harness scenario E14's simulated insert). It now raises it only while live (checked before and after the challenger lookup), matching `use-pending-challenge-recovery.ts`, which offers the same challenge when the athlete goes live. `useArenaChallenge` takes a new optional `isLive` (defaults to true); `lib/arena/arena-bootstrap.tsx` passes `live.isLive`.
+
 ### Mobile: UX polish batch A (match summary and pre-match)
 
 JS-only, OTA-eligible for runtime 0.3.0.

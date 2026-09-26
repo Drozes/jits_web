@@ -137,10 +137,19 @@ describe("ArenaBootstrap", () => {
       inMatch: false,
     });
     expect(mockUseArenaChallenge).toHaveBeenLastCalledWith(
-      expect.objectContaining({ athleteId: "me-1", athleteWeight: 180 }),
+      expect.objectContaining({ athleteId: "me-1", athleteWeight: 180, isLive: false }),
     );
     expect(mockRecovery).toHaveBeenLastCalledWith(
       expect.objectContaining({ athleteId: "me-1", isLive: false, hasIncoming: false }),
+    );
+  });
+
+  it("passes isLive: true to the challenge listener while live", () => {
+    mockIsLive = true;
+    render(<ArenaBootstrap />);
+
+    expect(mockUseArenaChallenge).toHaveBeenLastCalledWith(
+      expect.objectContaining({ athleteId: "me-1", isLive: true }),
     );
   });
 
