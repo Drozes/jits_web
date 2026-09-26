@@ -53,6 +53,15 @@ describe("getCurrentStep", () => {
       expect(getCurrentStep({ status: "disputed" })).toBe("summary");
     });
 
+    it('returns "summary" (never the weight step) for a voided match', () => {
+      // A voided match is terminal; the reconciler exits it from the summary.
+      expect(getCurrentStep({ status: "voided" })).toBe("summary");
+    });
+
+    it('returns "weight" for a cancelled match (the reconciler exits it)', () => {
+      expect(getCurrentStep({ status: "cancelled" })).toBe("weight");
+    });
+
     it('defaults to "weight" for an unknown status', () => {
       expect(getCurrentStep({ status: "some_future_status" })).toBe("weight");
     });

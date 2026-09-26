@@ -26,9 +26,12 @@ export interface MatchSnapshot {
   confirmedAthleteIds: string[] | null;
 }
 
+/** Why a terminal match leaves the wizard: the toast copy differs. */
+export type ExitReason = "cancelled" | "voided";
+
 export type ReconcileAction =
   | { type: "none" }
-  | { type: "exit" }
+  | { type: "exit"; reason: ExitReason }
   | { type: "goto"; step: MatchStep };
 
 interface PlanParams {
@@ -65,8 +68,10 @@ export function pollIntervalFor(step: MatchStep | null): number | null {
   return null;
 }
 
-/** The step the DB implies, or "exit" for a cancelled match, or null when
- * the snapshot says nothing about the step (pending, unknown statuses). */
+/** The step the DB implies, or "exit" for a cancelled or voided match, or
+ * null when the snapshot says nothing about the step (pending, unknown
+ * statuses). `voided` is set only by an admin resolving a dispute (ELO
+ * reverted, no winner), so there is nothing left for the wizard to show. */
 export function targetFor(
   snapshot: MatchSnapshot,
   currentAthleteId: string,
@@ -74,6 +79,7 @@ export function targetFor(
 ): MatchStep | "exit" | null {
   switch (snapshot.status) {
     case "cancelled":
+    case "voided":
       return "exit";
     case "in_progress":
       return "live";
@@ -99,8 +105,11 @@ export function planReconcile({
   const target = targetFor(snapshot, currentAthleteId, opponentId);
   if (target == null) return { type: "none" };
   if (target === "exit") {
-    // A finished wizard stays put; anything else leaves like match_cancelled.
-    return current === "summary" ? { type: "none" } : { type: "exit" };
+    // A voided result leaves even the summary: the verdict and ELO it shows
+    // were reverted. A cancel cannot follow a result, so a finished wizard
+    // stays put; anything else leaves like match_cancelled.
+    if (snapshot.status === "voided") return { type: "exit", reason: "voided" };
+    return current === "summary" ? { type: "none" } : { type: "exit", reason: "cancelled" };
   }
   if (idx(target) > idx(current)) return { type: "goto", step: target };
   if (
@@ -124,6 +133,8 @@ const STATUS_RANK: Record<string, number> = {
   // results, so they share a rank and either may replace the other.
   disputed: 2,
   cancelled: 3,
+  // Only reachable from disputed (resolve_dispute), and final.
+  voided: 3,
 };
 
 /** True when `next` must not replace `prev` because it is older. */

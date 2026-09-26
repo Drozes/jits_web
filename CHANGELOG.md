@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Mobile: match-flow review nits (follow-up to match sync reliability)
+
+JS-only, OTA-eligible for runtime 0.3.0 (no native dependency, `app.json` or config change).
+
+**Fixed**
+- Mobile: an opponent's cancel during the ready check could toast "Match cancelled" and navigate twice (the ready step exited on its own, then the reconciler read `status=cancelled` and exited again). `ReadyStep` now leaves through the wizard's single `exitCancelled` path (passed as `onCancelledRemotely`, like the weight step), which marks the wizard exiting so the reconciler stays quiet.
+- Mobile: a `voided` match (an admin voiding a disputed result, ELO reverted) was unhandled. `lib/match-flow/reconcile.ts` now exits it like a cancelled match, from every step including the summary (whose verdict and rating change are no longer true), with a "Match voided" toast; `voided` ranks as terminal so a stale read cannot un-void it. `lib/match-flow/step-router.ts` mounts a voided match on the summary (its only action is the exit), never on the weight step.
+- Mobile: the live step's DB pause re-sync could apply a read that straddled a pause or resume already applied on the device (own tap or the opponent's broadcast), re-pausing a running timer (or restarting a paused one) until the next poll, up to 10 s. New `apps/mobile/lib/match-flow/use-pause-resync.ts` records every applied pause/resume and ignores a DB read older than one of them (`total_paused_duration` orders reads against resumes).
+
+**Tests**
+- `exit-navigation.test.tsx` and `upload-status-visibility.test.tsx` now mock `getMatchConfirmations` (the reconciler read it through an unmocked export and swallowed the throw); each asserts the mount-time reads hit the mocks. New `__tests__/lib/match-flow/use-pause-resync.test.ts`; ready-cancel-once and voided cases in `wizard-reconcile.test.tsx`, `reconcile.test.ts` and `step-router.test.ts`.
+
 ### Mobile/Web: Arena reliability (jits-1o4l, jits-celf, jits-yiwx, jits-ef2a)
 
 JS-only, OTA-eligible for runtime 0.3.0 (no native dependency, `app.json` or config change). Web ships with it from main.

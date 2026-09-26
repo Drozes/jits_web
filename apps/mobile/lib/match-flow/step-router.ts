@@ -69,7 +69,15 @@ export function getCurrentStep(
       // Disputed matches surface in the summary state so users can see
       // what happened and exit; the wizard does not let them re-record.
       return "summary";
+    case "voided":
+      // An admin voided a disputed result (resolve_dispute). Terminal: mount
+      // on the summary, whose only action is the exit, never on the weight
+      // step, whose confirm would walk a finished match into a ready check.
+      // The reconciler's first snapshot then exits with a "Match voided"
+      // toast (planReconcile exits voided even from the summary).
+      return "summary";
     default:
+      // Includes `cancelled`: the reconciler's first snapshot exits it.
       return "weight";
   }
 }

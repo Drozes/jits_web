@@ -71,11 +71,15 @@ export function useWizardSync({
     );
   }, []);
 
+  /** The wizard's one exit for a match that ended without a result (remote
+   * cancel, or a DB snapshot that is cancelled or voided). Idempotent: it
+   * marks the wizard exiting, so a second trigger neither toasts nor
+   * navigates again. */
   const exitCancelled = React.useCallback(
-    (description = "This match was cancelled.") => {
+    (description = "This match was cancelled.", title = "Match cancelled") => {
       if (exitingRef.current) return;
       exitingRef.current = true;
-      toast.info({ text1: "Match cancelled", description });
+      toast.info({ text1: title, description });
       router.replace(exitHref);
     },
     [router, exitHref],
@@ -104,7 +108,14 @@ export function useWizardSync({
         initial,
       });
       if (action.type === "exit") {
-        exitCancelled();
+        if (action.reason === "voided") {
+          exitCancelled(
+            "This result was voided on review. Any rating change was reversed.",
+            "Match voided",
+          );
+        } else {
+          exitCancelled();
+        }
         return;
       }
       if (action.type !== "goto") return;

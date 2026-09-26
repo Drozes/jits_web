@@ -92,6 +92,7 @@ function renderReadyStep(onStarted: jest.Mock) {
   return render(
     <ReadyStep
       exitHref={ARENA_HREF}
+      onCancelledRemotely={jest.fn()}
       matchId="M1"
       currentAthleteId="me-1"
       opponentId="opp-1"

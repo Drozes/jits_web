@@ -427,6 +427,60 @@ describe("cancel during the weight step (jits-bh2v, E3B)", () => {
   });
 });
 
+describe("cancel during the ready step leaves exactly once", () => {
+  it("a remote cancel, then the reconciler seeing status=cancelled: one toast, one navigation", async () => {
+    const screen = await mountAt("pending");
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("weight-confirm"));
+    });
+    await flush();
+    screen.getByTestId("match-step-ready");
+
+    act(() => handlerOf("onMatchCancelled")());
+    // The ready step's own poll (and any rejoin) now reads the cancelled row.
+    mockGetMatchDetails.mockResolvedValue(row("cancelled"));
+    await tick(4_000);
+    await tick(4_000);
+
+    expect(mockRouterReplace).toHaveBeenCalledTimes(1);
+    expect(mockRouterReplace).toHaveBeenCalledWith(EXIT);
+    expect(toast.info).toHaveBeenCalledTimes(1);
+    expect(toast.info).toHaveBeenCalledWith({
+      text1: "Match cancelled",
+      description: "Your opponent left the ready check.",
+    });
+  });
+});
+
+describe("a voided match exits the wizard", () => {
+  const VOIDED_TOAST = expect.objectContaining({ text1: "Match voided" });
+
+  it("opening a voided match exits once with a clear toast", async () => {
+    await mountAt("voided", { outcome: "win" });
+    expect(mockRouterReplace).toHaveBeenCalledTimes(1);
+    expect(mockRouterReplace).toHaveBeenCalledWith(EXIT);
+    expect(toast.info).toHaveBeenCalledTimes(1);
+    expect(toast.info).toHaveBeenCalledWith(VOIDED_TOAST);
+  });
+
+  it("a dispute voided while this athlete sits on the summary exits once", async () => {
+    const screen = await mountAt("disputed", { outcome: "win" });
+    screen.getByTestId("match-step-summary");
+    expect(mockRouterReplace).not.toHaveBeenCalled();
+
+    mockGetMatchDetails.mockResolvedValue(row("voided", { outcome: "win" }));
+    await act(async () => mockRow.handler?.({ new: { status: "voided" } }));
+    await flush();
+    await act(async () => mockRow.handler?.({ new: { status: "voided" } }));
+    await flush();
+
+    expect(mockRouterReplace).toHaveBeenCalledTimes(1);
+    expect(mockRouterReplace).toHaveBeenCalledWith(EXIT);
+    expect(toast.info).toHaveBeenCalledTimes(1);
+    expect(toast.info).toHaveBeenCalledWith(VOIDED_TOAST);
+  });
+});
+
 describe("monotonic: a stale read never moves the wizard back", () => {
   it("an in_progress snapshot arriving on the confirm step changes nothing", async () => {
     const screen = await mountAt("completed", { outcome: "win" });

@@ -234,6 +234,7 @@ describe("ReadyStep repeats ready_signal until the opponent's arrives", () => {
     const screen = render(
       <ReadyStep
         exitHref="/(app)/(tabs)/arena"
+        onCancelledRemotely={jest.fn()}
         matchId="M1"
         currentAthleteId="me-1"
         opponentId="opp-1"

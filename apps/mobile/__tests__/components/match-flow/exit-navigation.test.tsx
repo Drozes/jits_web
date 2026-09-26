@@ -95,8 +95,11 @@ jest.mock("@jits/shared/api/mutations", () => ({
   cancelSessionMatch: jest.fn(),
 }));
 
+// The wizard's reconciler reads both on mount; mock both so it never calls
+// through to an unmocked export (which throws into its catch and warns).
 jest.mock("@jits/shared/api/queries", () => ({
   getMatchDetails: jest.fn(),
+  getMatchConfirmations: jest.fn(() => Promise.resolve([])),
 }));
 
 interface CapturedSyncParams {
@@ -276,6 +279,23 @@ describe("MatchFlowWizard exit navigation", () => {
     expect(mockRouterReplace).toHaveBeenLastCalledWith(ARENA_EXIT);
   });
 
+  it("the reconciler's mount-time reads both hit mocks, never an unmocked export", async () => {
+    const { getMatchConfirmations } = jest.requireMock("@jits/shared/api/queries") as {
+      getMatchConfirmations: jest.Mock;
+    };
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    mockUseMatchDetails.mockReturnValue(completedMatchResult());
+    render(
+      <MatchFlowWizard exitHref={ARENA_EXIT} exitLabel={ARENA_LABEL} matchId="M1" currentAthleteId="me-1" />,
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(getMatchConfirmations).toHaveBeenCalledWith(expect.anything(), "M1");
+    expect(warn).not.toHaveBeenCalledWith("[match-flow] reconcile failed", expect.anything());
+    warn.mockRestore();
+  });
+
   it("routes a FIRST-LOAD failure to the error splash, not a permanent spinner", () => {
     // The loading guard used to run first and include `|| !match`, so on a
     // failed first load the `!match` term won and `WizardError` was
@@ -372,10 +392,11 @@ describe("MatchFlowWizard exit navigation", () => {
 });
 
 describe("ReadyStep exit navigation", () => {
-  function renderReady(exitHref: string) {
+  function renderReady(exitHref: string, onCancelledRemotely: jest.Mock = jest.fn()) {
     return render(
       <ReadyStep
         exitHref={exitHref}
+        onCancelledRemotely={onCancelledRemotely}
         matchId="M1"
         currentAthleteId="me-1"
         opponentId="opp-1"
@@ -384,16 +405,42 @@ describe("ReadyStep exit navigation", () => {
     );
   }
 
+  it("leaves through the wizard's exit (once) when the opponent cancels", () => {
+    // The wizard's exitCancelled does the toast + navigation to exitHref and
+    // marks the wizard exiting, so the reconciler cannot exit a second time.
+    // The step itself must not navigate or toast on its own.
+    const onCancelledRemotely = jest.fn();
+    renderReady(ARENA_EXIT, onCancelledRemotely);
+
+    act(() => {
+      mockSyncParams?.onMatchCancelled?.();
+      mockSyncParams?.onMatchCancelled?.();
+    });
+
+    expect(onCancelledRemotely).toHaveBeenCalledTimes(1);
+    expect(onCancelledRemotely).toHaveBeenCalledWith("Your opponent left the ready check.");
+    expect(mockRouterReplace).not.toHaveBeenCalled();
+  });
+
   it.each([
     ["Arena", ARENA_EXIT],
     ["non-Arena", OTHER_EXIT],
   ])("returns to the %s exitHref when the opponent cancels", (_name, exitHref) => {
-    renderReady(exitHref);
+    mockUseMatchDetails.mockReturnValue({
+      ...completedMatchResult(),
+      match: { ...completedMatchResult().match, status: "pending", started_at: null },
+    });
+    const { getByTestId } = render(
+      <MatchFlowWizard exitHref={exitHref} exitLabel="Back" matchId="M1" currentAthleteId="me-1" />,
+    );
+    fireEvent.press(getByTestId("weight-confirm"));
+    getByTestId("match-step-ready");
 
     act(() => {
       mockSyncParams?.onMatchCancelled?.();
     });
 
+    expect(mockRouterReplace).toHaveBeenCalledTimes(1);
     expect(mockRouterReplace).toHaveBeenCalledWith(exitHref);
   });
 
