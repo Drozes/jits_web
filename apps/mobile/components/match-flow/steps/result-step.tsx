@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { Handshake } from "lucide-react-native";
 import { Plate } from "@/components/ui/elo-system";
 import { useThemedTokens } from "@/lib/theme/use-theme";
+import { useAmber } from "@/components/match-detail/use-amber";
 import { useRecordResult } from "@/lib/match-flow/use-record-result";
 import { isFinishTimeValid } from "@/lib/match-flow/parse-finish-time";
 import type { BroadcastResult } from "@jits/shared/hooks/use-session-match-sync";
@@ -41,6 +42,8 @@ export function ResultStep({
   onRecorded,
 }: ResultStepProps) {
   const tokens = useThemedTokens();
+  // Amber for draws (Pressure Score).
+  const amberIcon = useAmber().icon;
   const [outcome, setOutcome] = React.useState<"submission" | "draw" | null>(null);
   const [winnerId, setWinnerId] = React.useState("");
   const [submissionCode, setSubmissionCode] = React.useState("");
@@ -103,13 +106,14 @@ export function ResultStep({
       ) : null}
 
       {outcome === "draw" ? (
-        <Plate variant="loss" className="items-center gap-2">
-          <Handshake size={24} color={tokens.stateNegative} />
+        // A draw is pressure, not a loss: default plate, amber glyph.
+        <Plate className="items-center gap-2">
+          <Handshake size={24} color={amberIcon} />
           <Text className="font-heading text-[13px] text-ink uppercase tracking-caps">
             Match ends in a draw
           </Text>
           <Text className="font-body text-[12px] text-ink-2 text-center">
-            Both athletes lose ELO on a draw.
+            Draws cost both athletes rating.
           </Text>
         </Plate>
       ) : null}

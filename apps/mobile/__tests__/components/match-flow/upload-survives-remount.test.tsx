@@ -282,6 +282,7 @@ jest.mock("@/lib/theme/use-theme", () => ({
     stateNegative: "#F85149",
     accentCta: "#E5484D",
   }),
+  useResolvedColorScheme: () => "dark",
 }));
 
 jest.mock("@/components/ui/toast", () => ({

@@ -1,4 +1,5 @@
 import * as React from "react";
+import * as Haptics from "expo-haptics";
 import { toast } from "@/components/ui/toast";
 import { supabase } from "@/lib/supabase/client";
 import { recordMatchResult } from "@jits/shared/api/mutations";
@@ -6,6 +7,7 @@ import type { BroadcastResult } from "@jits/shared/hooks/use-session-match-sync"
 import { settleWithin } from "@jits/shared/hooks/session-match-channel";
 import { mutationQueue, isQueuedResult } from "@/lib/network/mutation-queue";
 import { parseFinishTime } from "./parse-finish-time";
+import { matchHaptics } from "./use-haptics";
 import { SEND_GRACE_MS, useMatchSyncContext, useStepMatchSync } from "./match-sync-context";
 
 interface UseRecordResultParams {
@@ -64,6 +66,7 @@ export function useRecordResult({ matchId, onRecorded }: UseRecordResultParams) 
       );
       if (!res.ok) {
         setLoading(false);
+        void matchHaptics.error();
         toast.error({ text1: "Couldn't record result", description: res.error.message });
         // The usual cause is that the opponent recorded first and their
         // result_submitted never arrived: re-read the match now so the
@@ -73,6 +76,13 @@ export function useRecordResult({ matchId, onRecorded }: UseRecordResultParams) 
       }
       const queued = isQueuedResult(res.data);
       recordedRef.current = true;
+      // Success only once the server has it; a result queued offline is not
+      // recorded yet, so it gets a light acknowledgement instead.
+      if (queued) {
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
+      } else {
+        void matchHaptics.resultRecorded();
+      }
       const broadcast: BroadcastResult = {
         result: outcome,
         winnerId: outcome === "submission" ? winnerId : undefined,
