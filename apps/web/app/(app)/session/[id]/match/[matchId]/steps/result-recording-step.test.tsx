@@ -58,6 +58,7 @@ function renderStep() {
 }
 
 const recordBtn = () => screen.getByRole("button", { name: /record result/i });
+const flushMountRead = () => act(async () => {});
 
 function fillSubmission() {
   fireEvent.click(screen.getByRole("button", { name: "Submission" }));
@@ -122,6 +123,9 @@ describe("ResultRecordingStep", () => {
 
   it("moves on from the DB when the record fails because the opponent recorded first", async () => {
     api.recordMatchResult.mockResolvedValue({ ok: false, error: { message: "x" } });
+    // The mount read still sees the match in progress.
+    const onNext = renderStep();
+    await flushMountRead();
     api.getMatchDetails.mockResolvedValue({
       status: "completed",
       participants: [
@@ -129,7 +133,6 @@ describe("ResultRecordingStep", () => {
         { athlete_id: "op", outcome: "win" },
       ],
     });
-    const onNext = renderStep();
     fireEvent.click(screen.getByRole("button", { name: "Draw" }));
     fireEvent.click(recordBtn());
     await waitFor(() =>
@@ -141,11 +144,13 @@ describe("ResultRecordingStep", () => {
   });
 
   it("re-reads the match when the tab becomes visible", async () => {
+    const onNext = renderStep();
+    await flushMountRead();
+    expect(onNext).not.toHaveBeenCalled();
     api.getMatchDetails.mockResolvedValue({
       status: "disputed",
       participants: [{ athlete_id: "me", outcome: "draw" }],
     });
-    const onNext = renderStep();
     await act(async () => {
       document.dispatchEvent(new Event("visibilitychange"));
     });
@@ -153,5 +158,31 @@ describe("ResultRecordingStep", () => {
       expect(onNext).toHaveBeenCalledWith({ resultData: { result: "draw" } }),
     );
     expect(onNext).toHaveBeenCalledTimes(1);
+  });
+
+  it("moves on at mount when the result is already on the row", async () => {
+    api.getMatchDetails.mockResolvedValue({
+      status: "completed",
+      participants: [
+        { athlete_id: "me", outcome: "win" },
+        { athlete_id: "op", outcome: "loss" },
+      ],
+    });
+    const onNext = renderStep();
+    await waitFor(() =>
+      expect(onNext).toHaveBeenCalledWith({
+        resultData: { result: "submission", winnerId: "me" },
+      }),
+    );
+    expect(api.getMatchDetails).toHaveBeenCalledTimes(1);
+    expect(onNext).toHaveBeenCalledTimes(1);
+  });
+
+  it("stays on the form at mount while the match is still in progress", async () => {
+    const onNext = renderStep();
+    await flushMountRead();
+    expect(api.getMatchDetails).toHaveBeenCalledTimes(1);
+    expect(onNext).not.toHaveBeenCalled();
+    expect(recordBtn()).toBeInTheDocument();
   });
 });

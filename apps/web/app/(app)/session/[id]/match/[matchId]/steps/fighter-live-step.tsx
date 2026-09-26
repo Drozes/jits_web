@@ -1,16 +1,25 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { createClient } from "@/lib/supabase/client";
+import { getMatchDetails } from "@jits/shared/api/queries";
 import { useSessionMatchTimer } from "@jits/shared/hooks/use-session-match-timer";
 import { useSessionMatchSync } from "@jits/shared/hooks/use-session-match-sync";
+import { MATCH_EXIT_COPY, exitReasonFor, hasRecordedResult } from "@/lib/match-flow/match-state";
 import { cn } from "@/lib/utils";
+
+/** How often the live step re-reads the match in case a broadcast was missed. */
+export const LIVE_RECONCILE_MS = 10_000;
 
 interface FighterLiveStepProps {
   onNext: () => void;
+  /** Where a cancelled / voided match leaves to (session lobby, or Arena). */
+  exitHref: string;
   matchId: string;
   durationSeconds: number;
   startedAt: string;
@@ -52,8 +61,18 @@ function fireExpirySignals() {
   }
 }
 
-export function FighterLiveStep({ onNext, matchId, durationSeconds, startedAt, pausedAt, totalPausedDuration, matchType, timekeeperEnabled, hasTimekeeper }: FighterLiveStepProps) {
+export function FighterLiveStep({ onNext, exitHref, matchId, durationSeconds, startedAt, pausedAt, totalPausedDuration, matchType, timekeeperEnabled, hasTimekeeper }: FighterLiveStepProps) {
+  const router = useRouter();
   const endedRef = useRef(false);
+  /** Set on unmount so a late re-read cannot advance or navigate. Reset in
+   * the effect body: Strict Mode mounts, cleans up and mounts again. */
+  const unmountedRef = useRef(false);
+  useEffect(() => {
+    unmountedRef.current = false;
+    return () => {
+      unmountedRef.current = true;
+    };
+  }, []);
   const hasFiredRef = useRef(false);
   const [expired, setExpired] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
@@ -85,6 +104,48 @@ export function FighterLiveStep({ onNext, matchId, durationSeconds, startedAt, p
     sync.broadcastMatchEnded();
     onNext();
   }
+
+  /**
+   * The DB is the authority when a pause, resume or end broadcast was missed
+   * (a backgrounded tab, a dropped socket): re-apply the pause state, move on
+   * once a result is recorded, and leave a cancelled / voided match.
+   */
+  const reconcile = useCallback(async () => {
+    const match = await getMatchDetails(supabase, matchId);
+    if (!match || unmountedRef.current || endedRef.current) return;
+    const reason = exitReasonFor(match.status);
+    if (reason) {
+      endedRef.current = true;
+      toast.info(MATCH_EXIT_COPY[reason]);
+      router.replace(exitHref);
+      return;
+    }
+    if (hasRecordedResult(match.status)) {
+      endedRef.current = true;
+      onNext();
+      return;
+    }
+    if (match.paused_at) {
+      timer.syncFromBroadcast({ type: "paused", pausedAt: match.paused_at });
+    } else {
+      timer.syncFromBroadcast({ type: "resumed", totalPausedDuration: match.total_paused_duration });
+    }
+  }, [supabase, matchId, onNext, router, exitHref, timer]);
+
+  // Through a ref so a parent re-render does not restart the interval.
+  const reconcileRef = useRef(reconcile);
+  reconcileRef.current = reconcile;
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void reconcileRef.current();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    const id = setInterval(() => void reconcileRef.current(), LIVE_RECONCILE_MS);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      clearInterval(id);
+    };
+  }, []);
 
   useEffect(() => {
     if (timer.remaining === 0 && timer.running && !hasFiredRef.current) {

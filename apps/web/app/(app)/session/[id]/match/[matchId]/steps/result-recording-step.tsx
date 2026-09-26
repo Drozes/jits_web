@@ -82,6 +82,15 @@ export function ResultRecordingStep({ onNext, matchId, currentAthleteId, duratio
     return true;
   }, [supabase, matchId, currentAthleteId, advance]);
 
+  // Once on mount too: the result may already be on the row (the opponent
+  // recorded while this athlete was still on the live step, or a reload).
+  // Through a ref so a parent re-render (a new onNext) does not re-read.
+  const reconcileRef = useRef(reconcile);
+  reconcileRef.current = reconcile;
+  useEffect(() => {
+    void reconcileRef.current();
+  }, []);
+
   useEffect(() => {
     const onVisible = () => {
       if (document.visibilityState === "visible") void reconcile();

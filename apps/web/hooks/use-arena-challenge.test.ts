@@ -76,9 +76,31 @@ const m = vi.hoisted(() => ({
   cancelStaleOutgoingChallenges: vi.fn(),
   createChallenge: vi.fn(),
   declineChallenge: vi.fn(),
+  declineOtherPendingChallenges: vi.fn(),
   startMatchFromChallenge: vi.fn(),
 }));
 vi.mock("@jits/shared/api/mutations", () => m);
+const q = vi.hoisted(() => ({ getPendingChallengesForAthlete: vi.fn() }));
+vi.mock("@jits/shared/api/queries", () => q);
+
+/** A pending challenge row as `getPendingChallengesForAthlete` returns it. */
+function pending(
+  id: string,
+  over: Partial<{ challengerId: string; opponentId: string; opponentName: string; ageMs: number }> = {},
+) {
+  return {
+    challengeId: id,
+    challengerId: over.challengerId ?? "me",
+    opponentId: over.opponentId ?? "ana",
+    challengerName: "Me",
+    opponentName: over.opponentName ?? "Ana",
+    matchType: "ranked",
+    createdAt: new Date(Date.now() - (over.ageMs ?? 60_000)).toISOString(),
+    expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
+    challengerWeight: null,
+    opponentWeight: null,
+  };
+}
 
 const live = (topic: string) =>
   rt.channels.filter((c) => c.topic === topic && !rt.removed.includes(c));
@@ -123,13 +145,21 @@ beforeEach(() => {
   m.createChallenge.mockResolvedValue({ ok: true, data: { id: "out1" } });
   m.startMatchFromChallenge.mockResolvedValue({ ok: true, data: { match_id: "m1" } });
   m.cancelStaleOutgoingChallenges.mockResolvedValue({ ok: true, data: { cancelled: [] } });
+  m.declineOtherPendingChallenges.mockResolvedValue({
+    ok: true,
+    data: { declined: [], skipped: [] },
+  });
+  q.getPendingChallengesForAthlete.mockResolvedValue({
+    ok: true,
+    data: { incoming: [], outgoing: [] },
+  });
 });
 
-function mount(canReceive = true) {
+function mount(canReceive = true, inMatch = false) {
   return renderHook(
-    ({ canReceive }) =>
-      useArenaChallenge({ athleteId: "me", athleteWeight: 170, canReceive }),
-    { initialProps: { canReceive } },
+    ({ canReceive, inMatch }: { canReceive: boolean; inMatch?: boolean }) =>
+      useArenaChallenge({ athleteId: "me", athleteWeight: 170, canReceive, inMatch }),
+    { initialProps: { canReceive, inMatch } as { canReceive: boolean; inMatch?: boolean } },
   );
 }
 
@@ -504,7 +534,7 @@ describe("useArenaChallenge", () => {
       expect(m.cancelStaleOutgoingChallenges).toHaveBeenCalledWith(
         expect.anything(),
         "me",
-        { keepChallengeId: null },
+        expect.objectContaining({ keepChallengeId: null }),
       );
 
       rerender({ canReceive: true });
@@ -534,7 +564,7 @@ describe("useArenaChallenge", () => {
       expect(m.cancelStaleOutgoingChallenges).toHaveBeenCalledWith(
         expect.anything(),
         "me",
-        { keepChallengeId: "out1" },
+        expect.objectContaining({ keepChallengeId: "out1" }),
       );
     });
 
@@ -627,5 +657,216 @@ describe("useArenaChallenge", () => {
       expect(m.cancelStaleOutgoingChallenges).not.toHaveBeenCalled();
       expect(toast.error).toHaveBeenCalledWith("down");
     });
+  });
+});
+
+describe("challenger recovery after a reload (the waiting bar is in-memory only)", () => {
+  const flush = () => act(async () => {});
+  const STALE_MS = 11 * 60_000;
+
+  it("restores my newest fresh outgoing on mount and listens for its accept", async () => {
+    q.getPendingChallengesForAthlete.mockResolvedValue({
+      ok: true,
+      data: { incoming: [], outgoing: [pending("out9"), pending("older", { ageMs: 120_000 })] },
+    });
+    const { result } = mount(true);
+    await flush();
+    expect(result.current.outgoing).toEqual({
+      challengeId: "out9",
+      opponentId: "ana",
+      opponentName: "Ana",
+    });
+    // The sweep reuses the same read and keeps the restored one.
+    expect(m.cancelStaleOutgoingChallenges).toHaveBeenCalledWith(
+      expect.anything(),
+      "me",
+      expect.objectContaining({ keepChallengeId: "out9", outgoing: expect.any(Array) }),
+    );
+    const [ch] = live("arena-challenge:out9");
+    await act(async () => {
+      fire(ch, "broadcast", "match_started", { payload: { matchId: "m3" } });
+    });
+    expect(push).toHaveBeenCalledWith("/arena/match/m3");
+  });
+
+  it("does not restore a stale outgoing challenge", async () => {
+    q.getPendingChallengesForAthlete.mockResolvedValue({
+      ok: true,
+      data: { incoming: [], outgoing: [pending("old", { ageMs: STALE_MS })] },
+    });
+    const { result } = mount(true);
+    await flush();
+    expect(result.current.outgoing).toBeNull();
+  });
+
+  it("does not restore behind a match on screen", async () => {
+    q.getPendingChallengesForAthlete.mockResolvedValue({
+      ok: true,
+      data: { incoming: [], outgoing: [pending("out9")] },
+    });
+    const { result } = mount(false, true);
+    await flush();
+    expect(result.current.outgoing).toBeNull();
+  });
+
+  it("never replaces the bar that is already up", async () => {
+    const { result } = mount(true);
+    await act(() => result.current.sendChallenge("bo", "Bo"));
+    q.getPendingChallengesForAthlete.mockResolvedValue({
+      ok: true,
+      data: { incoming: [], outgoing: [pending("other")] },
+    });
+    await act(async () => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    expect(result.current.outgoing?.challengeId).toBe("out1");
+  });
+
+  it("does not bring back a challenge this tab just withdrew", async () => {
+    const { result } = mount(true);
+    await act(() => result.current.sendChallenge("ana", "Ana"));
+    await act(() => result.current.cancelOutgoing());
+    // A read that raced the cancel still lists it as pending.
+    q.getPendingChallengesForAthlete.mockResolvedValue({
+      ok: true,
+      data: { incoming: [], outgoing: [pending("out1")] },
+    });
+    await act(async () => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    expect(result.current.outgoing).toBeNull();
+  });
+
+  it("falls back to the plain sweep when the read fails", async () => {
+    q.getPendingChallengesForAthlete.mockResolvedValue({
+      ok: false,
+      error: { code: "UNKNOWN", message: "x" },
+    });
+    const { result } = mount(true);
+    await flush();
+    expect(result.current.outgoing).toBeNull();
+    expect(m.cancelStaleOutgoingChallenges).toHaveBeenCalledWith(expect.anything(), "me", {
+      keepChallengeId: null,
+    });
+  });
+
+  describe("a 'started' UPDATE for a challenge not on the bar", () => {
+    async function started(row: Record<string, unknown>, hook = mount(true)) {
+      await flush();
+      await act(async () => {
+        await fire(incomingChannel(), "postgres_changes", "UPDATE", { new: row }, "challenger");
+      });
+      return hook;
+    }
+    const fresh = () => new Date(Date.now() - 30_000).toISOString();
+
+    it("joins a fresh one of mine", async () => {
+      await started({
+        id: "lost",
+        status: "started",
+        challenger_id: "me",
+        opponent_id: "ana",
+        created_at: fresh(),
+      });
+      expect(m.startMatchFromChallenge).toHaveBeenCalledWith(expect.anything(), "lost");
+      expect(push).toHaveBeenCalledWith("/arena/match/m1");
+      await flush();
+      expect(m.declineOtherPendingChallenges).toHaveBeenCalledWith(expect.anything(), "me", {
+        keepChallengeId: "lost",
+        exceptChallengerId: "ana",
+      });
+    });
+
+    it("ignores a stale one", async () => {
+      await started({
+        id: "lost",
+        status: "started",
+        challenger_id: "me",
+        created_at: new Date(Date.now() - STALE_MS).toISOString(),
+      });
+      expect(m.startMatchFromChallenge).not.toHaveBeenCalled();
+    });
+
+    it("ignores one without a timestamp", async () => {
+      await started({ id: "lost", status: "started", challenger_id: "me" });
+      expect(m.startMatchFromChallenge).not.toHaveBeenCalled();
+    });
+
+    it("ignores it while a match is on screen", async () => {
+      await started(
+        { id: "lost", status: "started", challenger_id: "me", created_at: fresh() },
+        mount(false, true),
+      );
+      expect(m.startMatchFromChallenge).not.toHaveBeenCalled();
+    });
+
+    it("still ignores other statuses", async () => {
+      await started({ id: "lost", status: "declined", challenger_id: "me", created_at: fresh() });
+      expect(toast.info).not.toHaveBeenCalled();
+      expect(m.startMatchFromChallenge).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("entering a match settles my other incoming challenges (mobile parity)", () => {
+  const flush = () => act(async () => {});
+
+  it("declines the other fresh ones, tells each challenger, and quietly withdraws the peer's", async () => {
+    m.declineOtherPendingChallenges.mockResolvedValue({
+      ok: true,
+      data: {
+        declined: [
+          pending("x1", { challengerId: "bo", opponentId: "me" }),
+          pending("x2", { challengerId: "cy", opponentId: "me" }),
+        ],
+        skipped: [pending("x3", { challengerId: "ana", opponentId: "me" })],
+      },
+    });
+    const { result } = mount(true);
+    await insertChallenge("c1");
+    await act(() => result.current.accept());
+    await flush();
+    expect(m.declineOtherPendingChallenges).toHaveBeenCalledWith(expect.anything(), "me", {
+      keepChallengeId: "c1",
+      exceptChallengerId: "ana",
+    });
+    const sentOn = (topic: string) =>
+      rt.channels.filter((c) => c.topic === topic).flatMap((c) => c.sent);
+    expect(sentOn("arena-challenge:x1")).toEqual([{ event: "declined", payload: {} }]);
+    expect(sentOn("arena-challenge:x2")).toEqual([{ event: "declined", payload: {} }]);
+    expect(sentOn("arena-challenge:x3")).toEqual([]);
+    expect(m.cancelChallenge).toHaveBeenCalledWith(expect.anything(), "x3", {
+      onlyIfPending: true,
+    });
+  });
+
+  it("uses the opponent as the peer when my own challenge was accepted", async () => {
+    const { result } = mount(true);
+    await act(() => result.current.sendChallenge("ana", "Ana"));
+    const [ch] = live("arena-challenge:out1");
+    await act(async () => {
+      fire(ch, "broadcast", "match_started", { payload: { matchId: "m9" } });
+    });
+    await flush();
+    expect(m.declineOtherPendingChallenges).toHaveBeenCalledWith(expect.anything(), "me", {
+      keepChallengeId: "out1",
+      exceptChallengerId: "ana",
+    });
+  });
+
+  it("a failed read broadcasts nothing", async () => {
+    m.declineOtherPendingChallenges.mockResolvedValue({
+      ok: false,
+      error: { code: "UNKNOWN", message: "x" },
+    });
+    const { result } = mount(true);
+    await insertChallenge("c1");
+    await act(() => result.current.accept());
+    await flush();
+    const sent = rt.channels
+      .filter((c) => c.topic !== "arena-challenge:c1")
+      .flatMap((c) => c.sent);
+    expect(sent).toEqual([]);
+    expect(push).toHaveBeenCalledWith("/arena/match/m1");
   });
 });

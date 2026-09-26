@@ -11,8 +11,11 @@ import {
   cancelStaleOutgoingChallenges,
   createChallenge,
   declineChallenge,
+  declineOtherPendingChallenges,
   startMatchFromChallenge,
 } from "@jits/shared/api/mutations";
+import { getPendingChallengesForAthlete } from "@jits/shared/api/queries";
+import { isFreshChallenge } from "@/lib/arena/challenge-freshness";
 
 export interface IncomingChallenge {
   challengeId: string;
@@ -67,6 +70,33 @@ async function broadcast(
 }
 
 /**
+ * After entering a match, decline every other fresh pending challenge I
+ * received and tell each challenger (UPDATE + broadcast), so nobody is left
+ * waiting on someone who is now busy (mobile parity, `settleOthersAfterEntry`).
+ * A challenge from the person I am now matched with is the other half of a
+ * crossing pair: withdrawn quietly, so they are not told "declined" on the way
+ * into the same match. Best effort and fire-and-forget.
+ */
+async function settleIncomingAfterEntry(
+  athleteId: string,
+  enteredChallengeId: string,
+  peerId: string | null,
+): Promise<void> {
+  const supabase = createClient();
+  const result = await declineOtherPendingChallenges(supabase, athleteId, {
+    keepChallengeId: enteredChallengeId,
+    exceptChallengerId: peerId,
+  });
+  if (!result.ok) return;
+  for (const c of result.data.skipped) {
+    void cancelChallenge(supabase, c.challengeId, { onlyIfPending: true });
+  }
+  await Promise.all(
+    result.data.declined.map((c) => broadcast(null, c.challengeId, "declined")),
+  );
+}
+
+/**
  * Instant Arena handshake.
  *
  * Challenge -> live prompt -> accept -> straight into the match wizard, with no
@@ -92,17 +122,27 @@ async function broadcast(
  *    deliberately ignored: the accepter is creating the match at that moment,
  *    and racing it from this side is how two clients fight over one row. The
  *    match_started broadcast is the normal path; "started" is the fallback.
+ *    A "started" row that is NOT on my waiting bar (the tab was reloaded, so
+ *    the in-memory bar is gone) is still joined when it is mine and fresh.
  *  - a per-challenge broadcast channel: the accepting side tells the
  *    challenger the match exists, the challenger's cancel tells the recipient.
+ *
+ * Recovery (mobile parity, `use-pending-challenge-recovery.ts`): on mount, on
+ * going live / leaving a match and when the tab comes back, my own newest
+ * fresh pending outgoing challenge is put back on the waiting bar, so a reload
+ * does not strand the challenger without its bar or its accept listener.
  */
 export function useArenaChallenge({
   athleteId,
   athleteWeight,
   canReceive = true,
+  inMatch = false,
 }: {
   athleteId: string;
   athleteWeight: number | null;
   canReceive?: boolean;
+  /** A match screen is mounted: nothing is restored or joined behind it. */
+  inMatch?: boolean;
 }) {
   const router = useRouter();
   const [incoming, setIncomingState] = useState<IncomingChallenge | null>(null);
@@ -113,6 +153,10 @@ export function useArenaChallenge({
   const incomingChannelRef = useRef<RealtimeChannel | null>(null);
   const canReceiveRef = useRef(canReceive);
   canReceiveRef.current = canReceive;
+  const inMatchRef = useRef(inMatch);
+  inMatchRef.current = inMatch;
+  /** Challenges this instance already resolved; never restored again. */
+  const settledRef = useRef<Set<string>>(new Set());
   // Mirrors of state for realtime handlers, which must not read stale closures.
   const incomingRef = useRef<IncomingChallenge | null>(null);
   const outgoingRef = useRef<OutgoingChallenge | null>(null);
@@ -153,12 +197,54 @@ export function useArenaChallenge({
     return swept.data.cancelled.length;
   }, [athleteId, router]);
 
+  /**
+   * Read my pending challenges once, put my newest fresh outgoing back on the
+   * waiting bar if the bar is empty (a reload loses it), then withdraw my
+   * stale ones from the same read.
+   */
+  const recover = useCallback(async (): Promise<void> => {
+    if (!athleteId) return;
+    const supabase = createClient();
+    const read = await getPendingChallengesForAthlete(supabase, athleteId);
+    if (!read.ok) {
+      await sweepStale();
+      return;
+    }
+    const now = Date.now();
+    // Newest first; `expires_at` is already filtered by the read.
+    const mine = read.data.outgoing.find(
+      (c) => c.challengerId === athleteId && isFreshChallenge(c.createdAt, now),
+    );
+    if (
+      mine &&
+      !outgoingRef.current &&
+      // A send, accept or cancel in flight decides the bar itself.
+      !busyRef.current &&
+      !inMatchRef.current &&
+      !settledRef.current.has(mine.challengeId) &&
+      enteredForRef.current !== mine.challengeId
+    ) {
+      setOutgoing({
+        challengeId: mine.challengeId,
+        opponentId: mine.opponentId,
+        opponentName: mine.opponentName,
+      });
+    }
+    const swept = await cancelStaleOutgoingChallenges(supabase, athleteId, {
+      keepChallengeId: outgoingRef.current?.challengeId ?? null,
+      outgoing: read.data.outgoing,
+      now,
+    });
+    // The Arena roster marks already-challenged athletes from a server read.
+    if (swept.ok && swept.data.cancelled.length > 0) router.refresh();
+  }, [athleteId, router, setOutgoing, sweepStale]);
+
   // On mount, on going live / leaving a match, and when the tab comes back.
-  const sweepRef = useRef(sweepStale);
-  sweepRef.current = sweepStale;
+  const sweepRef = useRef(recover);
+  sweepRef.current = recover;
   useEffect(() => {
     void sweepRef.current();
-  }, [athleteId, canReceive]);
+  }, [athleteId, canReceive, inMatch]);
   useEffect(() => {
     const onVisible = () => {
       if (document.visibilityState === "visible") void sweepRef.current();
@@ -169,9 +255,10 @@ export function useArenaChallenge({
 
   /** Navigate both parties into the shared wizard, once per challenge. */
   const enterMatch = useCallback(
-    (challengeId: string, matchId: string) => {
+    (challengeId: string, matchId: string, peerId: string | null) => {
       if (enteredForRef.current === challengeId) return;
       enteredForRef.current = challengeId;
+      settledRef.current.add(challengeId);
       // Accepting someone else's challenge abandons my own pending one:
       // withdraw it so its opponent is not left with a dead prompt.
       const dropped = outgoingRef.current;
@@ -184,12 +271,14 @@ export function useArenaChallenge({
             await broadcast(null, dropped.challengeId, "cancelled");
           }
         })();
+        settledRef.current.add(dropped.challengeId);
       }
+      void settleIncomingAfterEntry(athleteId, challengeId, peerId);
       setIncoming(null);
       setOutgoing(null);
       router.push(`/arena/match/${matchId}`);
     },
-    [router, setIncoming, setOutgoing],
+    [athleteId, router, setIncoming, setOutgoing],
   );
 
   /** Clear my outgoing challenge if it is still `challengeId`. */
@@ -197,6 +286,7 @@ export function useArenaChallenge({
     (challengeId: string, declined: boolean) => {
       const mine = outgoingRef.current;
       if (mine?.challengeId !== challengeId) return;
+      settledRef.current.add(challengeId);
       setOutgoing(null);
       if (declined) toast.info(`${mine.opponentName} declined.`);
     },
@@ -268,8 +358,27 @@ export function useArenaChallenge({
           filter: `challenger_id=eq.${athleteId}`,
         },
         async (payload) => {
-          const row = payload.new as { id: string; status: string };
-          if (outgoingRef.current?.challengeId !== row.id) return;
+          const row = payload.new as {
+            id: string;
+            status: string;
+            challenger_id?: string;
+            opponent_id?: string;
+            created_at?: string;
+          };
+          if (outgoingRef.current?.challengeId !== row.id) {
+            // Not on my bar: the bar was lost to a reload. Only a fresh
+            // "started" row of mine is still worth joining (the opponent is
+            // in the match waiting), and never behind a match on screen.
+            if (
+              row.status !== "started" ||
+              row.challenger_id !== athleteId ||
+              !isFreshChallenge(row.created_at) ||
+              inMatchRef.current ||
+              settledRef.current.has(row.id)
+            ) {
+              return;
+            }
+          }
           if (["declined", "cancelled", "expired"].includes(row.status)) {
             resolveOutgoing(row.id, row.status === "declined");
             return;
@@ -278,7 +387,13 @@ export function useArenaChallenge({
           // "started": on "accepted" the match may not exist yet.
           if (row.status === "started") {
             const started = await startMatchFromChallenge(supabase, row.id);
-            if (started.ok) enterMatch(row.id, started.data.match_id);
+            if (started.ok) {
+              enterMatch(
+                row.id,
+                started.data.match_id,
+                outgoingRef.current?.opponentId ?? row.opponent_id ?? null,
+              );
+            }
           }
         },
       )
@@ -317,7 +432,9 @@ export function useArenaChallenge({
       .channel(channelName(outgoingId))
       .on("broadcast", { event: "match_started" }, ({ payload }) => {
         const matchId = (payload as { matchId?: string })?.matchId;
-        if (matchId) enterMatch(outgoingId, matchId);
+        if (matchId) {
+          enterMatch(outgoingId, matchId, outgoingRef.current?.opponentId ?? null);
+        }
       })
       .on("broadcast", { event: "declined" }, () => {
         resolveOutgoing(outgoingId, true);
@@ -461,7 +578,7 @@ export function useArenaChallenge({
             { matchId: started.data.match_id },
           );
 
-          enterMatch(current.challengeId, started.data.match_id);
+          enterMatch(current.challengeId, started.data.match_id, current.challengerId);
         } finally {
           acceptingIdRef.current = null;
         }
@@ -514,12 +631,14 @@ export function useArenaChallenge({
             current.challengeId,
           );
           if (started.ok) {
-            enterMatch(current.challengeId, started.data.match_id);
+            enterMatch(current.challengeId, started.data.match_id, current.opponentId);
             return;
           }
+          settledRef.current.add(current.challengeId);
           setOutgoing(null);
           return;
         }
+        settledRef.current.add(current.challengeId);
         await broadcast(
           outgoingChannelRef.current,
           current.challengeId,

@@ -64,7 +64,7 @@ export function MatchFlowWizard(props: MatchFlowWizardProps) {
     case "ready-check":
       return <ReadyCheckStep onNext={handleNext} exitHref={exitHref} matchId={matchId} currentAthleteId={currentAthlete.id} opponentId={opponent.id} timekeeperEnabled={timekeeperEnabled} hasTimekeeper={hasTimekeeper} isTimekeeper={isTimekeeper} />;
     case "fighter-live":
-      return <FighterLiveStep onNext={handleNext} matchId={matchId} durationSeconds={durationSeconds} startedAt={startedAt ?? ""} pausedAt={props.pausedAt} totalPausedDuration={props.totalPausedDuration} matchType={matchType} timekeeperEnabled={timekeeperEnabled} hasTimekeeper={hasTimekeeper} />;
+      return <FighterLiveStep onNext={handleNext} exitHref={exitHref} matchId={matchId} durationSeconds={durationSeconds} startedAt={startedAt ?? ""} pausedAt={props.pausedAt} totalPausedDuration={props.totalPausedDuration} matchType={matchType} timekeeperEnabled={timekeeperEnabled} hasTimekeeper={hasTimekeeper} />;
     case "timekeeper-live":
       return <TimekeeperLiveStep onNext={handleNext} matchId={matchId} durationSeconds={durationSeconds} startedAt={startedAt ?? ""} pausedAt={props.pausedAt} totalPausedDuration={props.totalPausedDuration} currentAthleteId={currentAthlete.id} />;
     case "result-recording":

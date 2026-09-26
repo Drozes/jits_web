@@ -524,14 +524,16 @@ export async function getPendingChallengeBetween(
   supabase: Client,
   athleteA: string,
   athleteB: string,
-): Promise<{ id: string } | null> {
+): Promise<{ id: string; createdAt: string } | null> {
+  // Newest first, so a caller judging freshness sees the most recent one.
   const { data, error } = await supabase
     .from("challenges")
-    .select("id")
+    .select("id, created_at")
     .eq("status", "pending")
     .or(
       `and(challenger_id.eq.${athleteA},opponent_id.eq.${athleteB}),and(challenger_id.eq.${athleteB},opponent_id.eq.${athleteA})`,
     )
+    .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
@@ -539,7 +541,7 @@ export async function getPendingChallengeBetween(
     console.error("getPendingChallengeBetween:", error);
     return null;
   }
-  return data ? { id: data.id } : null;
+  return data ? { id: data.id, createdAt: data.created_at } : null;
 }
 
 /**

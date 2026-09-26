@@ -39,6 +39,7 @@ export function ArenaBootstrap({
     athleteId,
     athleteWeight,
     canReceive: live.isLive && !inMatch,
+    inMatch,
   });
   useRegisterArenaController(live, challenge);
 
