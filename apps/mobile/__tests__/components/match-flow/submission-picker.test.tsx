@@ -4,7 +4,7 @@
  * Shared by the Arena result step and the practice match.
  */
 import * as React from "react";
-import { fireEvent, render } from "@testing-library/react-native";
+import { act, fireEvent, render } from "@testing-library/react-native";
 import type { SubmissionType } from "@jits/shared/types/submission-type";
 
 jest.mock("react-native-safe-area-context", () => ({
@@ -77,7 +77,7 @@ describe("SubmissionFields picker", () => {
     const field = s.getByTestId("result-submission");
     expect(field).toHaveTextContent(/Select submission/);
     expect(field.props.accessibilityRole).toBe("button");
-    expect(s.getByLabelText("Submission")).toBeTruthy();
+    expect(s.getByLabelText("Submission, Select submission")).toBeTruthy();
     expect(s.queryByTestId("result-submission-option-guillotine")).toBeNull();
   });
 
@@ -112,6 +112,8 @@ describe("SubmissionFields picker", () => {
     expect(onChange).toHaveBeenCalledWith("guillotine");
     expect(s.queryByTestId("result-submission-search")).toBeNull();
     expect(s.getByTestId("result-submission")).toHaveTextContent(/Guillotine/);
+    // Screen readers hear the selection in the name, not only in the hint.
+    expect(s.getByLabelText("Submission, Guillotine")).toBeTruthy();
   });
 
   it("marks the selected option when reopened", () => {
@@ -166,5 +168,40 @@ describe("SubmissionFields picker", () => {
     expect(s.queryByTestId("result-submission-search")).toBeNull();
     expect(onChange).not.toHaveBeenCalled();
     expect(s.getByTestId("result-submission")).toHaveTextContent(/Select submission/);
+  });
+
+  it("close after typing keeps the previously chosen submission", () => {
+    const onChange = jest.fn();
+    const s = render(<Harness onChange={onChange} />);
+    open(s);
+    fireEvent.press(s.getByTestId("result-submission-option-guillotine"));
+    open(s);
+    type(s, "dar");
+    fireEvent.press(s.getByTestId("result-submission-close"));
+    expect(s.queryByTestId("result-submission-search")).toBeNull();
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(s.getByTestId("result-submission")).toHaveTextContent(/Guillotine/);
+  });
+
+  it("Android back (onRequestClose) dismisses without changing the value", () => {
+    const onChange = jest.fn();
+    const s = render(<Harness onChange={onChange} />);
+    open(s);
+    type(s, "dar");
+    const { Modal } = require("react-native");
+    act(() => s.UNSAFE_getByType(Modal).props.onRequestClose());
+    expect(s.queryByTestId("result-submission-search")).toBeNull();
+    expect(onChange).not.toHaveBeenCalled();
+    expect(s.getByTestId("result-submission")).toHaveTextContent(/Select submission/);
+  });
+
+  it("a whitespace-only query shows every option and no empty state", () => {
+    const s = render(<Harness />);
+    open(s);
+    type(s, "   ");
+    for (const st of TYPES) {
+      expect(s.getByTestId(`result-submission-option-${st.code}`)).toBeTruthy();
+    }
+    expect(s.queryByTestId("result-submission-empty")).toBeNull();
   });
 });

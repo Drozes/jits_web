@@ -43,7 +43,10 @@ interface SearchSelectProps {
    * `-search`, `-clear`, `-close`, `-empty`, `-option-<value>`.
    */
   testID?: string;
-  /** Accessible name for the closed trigger (defaults to `title`). */
+  /**
+   * Field name for the closed trigger (defaults to `title`). The accessible
+   * label is `<name>, <selected label or placeholder>`.
+   */
   accessibilityLabel?: string;
   /** Copy shown when a non-empty query matches nothing. */
   noMatchesText?: string;
@@ -166,8 +169,10 @@ export function SearchSelect({
         onPress={openPicker}
         disabled={disabled}
         accessibilityRole="button"
-        accessibilityLabel={accessibilityLabel ?? title}
-        accessibilityHint={shown ? `Selected: ${shown}` : placeholder}
+        // The value lives in the name (not only the hint): hints are optional on
+        // iOS and read after a pause, so the current selection must be spoken first.
+        accessibilityLabel={`${accessibilityLabel ?? title}, ${shown || placeholder}`}
+        accessibilityHint="Opens search"
         accessibilityState={{ disabled: !!disabled }}
         className="active:opacity-70"
       >
