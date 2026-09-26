@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+### Mobile: match record, upload and watch hardening
+
+JS-only, OTA-eligible for runtime 0.3.0.
+
+**Fixed**
+- Match wizard: the screen stays awake on the ready step (camera preview) as well as live, so a propped phone no longer auto-locks and records nothing (`components/match-flow/match-flow-wizard.tsx`).
+- Live step no longer starts recording when re-entered with the clock already at 00:00 (it uploaded a 1-2s clip and used up the match's video row).
+- A failed re-fetch of an already-loaded match no longer replaces the wizard (e.g. the summary) with "Match unavailable"; only a first load errors (`lib/match-flow/use-match-details.ts`).
+- The recorder no longer holds "error" for an upload that is parked to resume later, so a later success shows as uploaded.
+- Match video playback has sound with the iOS silent switch on (`app/(app)/video/[id].tsx`).
+- Camera permission is re-checked on return to the foreground, and the denied card offers "Open Settings".
+- Video upload gate errors (daily limit, uploads disabled, not in cohort) show clear copy and park after one try instead of retrying 5 times; removed the doubled "saving the record failed" prefix.
+- Result step: "Draws cost both athletes rating." only for ranked matches; casual draws say there is no rating change.
+- Tests: `__tests__/lib/match-flow/use-match-details.test.ts`, `__tests__/components/match-flow/camera-overlay.test.tsx`.
+
 ### Mobile: Arena roster stays live; green dot steadier (jits-hlm1.4)
 
 JS-only, OTA-eligible for runtime 0.3.0.
