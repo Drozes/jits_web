@@ -165,12 +165,22 @@ describe("ArenaBootstrap state", () => {
     expect(live.args?.inMatch).toBe(true);
     expect(challenge.args?.canReceive).toBe(false);
     expect(challenge.args?.inMatch).toBe(false);
+    // The session flow withdraws my own challenge (jits-zasq).
+    expect(challenge.args?.inSessionFlow).toBe(true);
+    nav.pathname = "/session/s1/join";
+    rerender(tree());
+    expect(challenge.args?.inSessionFlow).toBe(true);
     nav.pathname = "/session/s1/match/m1";
     rerender(tree());
     expect(challenge.args?.inMatch).toBe(true);
+    expect(challenge.args?.inSessionFlow).toBe(false);
     nav.pathname = "/arena/match/m1";
     rerender(tree());
     expect(challenge.args?.inMatch).toBe(true);
+    expect(challenge.args?.inSessionFlow).toBe(false);
+    nav.pathname = "/arena";
+    rerender(tree());
+    expect(challenge.args?.inSessionFlow).toBe(false);
     nav.pathname = "/";
   });
 

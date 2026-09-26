@@ -49,6 +49,15 @@ export const CHALLENGE_SEND_FAILED_MESSAGE = "Couldn't send that challenge. Try 
 /** Shown when an accept cannot tell whether my own challenge is still live. */
 export const ACCEPT_FAILED_MESSAGE = "Couldn't accept that challenge. Try again.";
 
+/**
+ * Shown instead of navigating when an Arena match starts while the athlete is
+ * in a session lobby or join wizard (jits-zasq): joining is their tap.
+ */
+export const ARENA_MATCH_STARTED_MESSAGE = "Your Arena match started";
+
+/** How long the Join toast stays up (the opponent is waiting in the match). */
+export const ARENA_JOIN_TOAST_MS = 60_000;
+
 /** Shown when the accepter withdrew my accepted challenge after a failed start. */
 export const couldNotStartMessage = (name: string) =>
   `Couldn't start the match with ${name}.`;
@@ -234,6 +243,7 @@ export function useArenaChallenge({
   athleteWeight,
   canReceive = true,
   inMatch = false,
+  inSessionFlow = false,
   lobbyIds,
 }: {
   athleteId: string;
@@ -241,6 +251,13 @@ export function useArenaChallenge({
   canReceive?: boolean;
   /** A match screen is mounted: nothing is restored or joined behind it. */
   inMatch?: boolean;
+  /**
+   * The athlete is in a session lobby or join wizard (an immersive route that
+   * is not a match screen, jits-zasq). Entering one withdraws my own pending
+   * outgoing challenge, and a match that starts anyway is offered as a Join
+   * toast instead of pushed, so the Arena never races the session flow.
+   */
+  inSessionFlow?: boolean;
   /**
    * Athlete ids in `lobby:online`. A pending incoming challenge found by a
    * read is offered only when its challenger is here; without it, only the
@@ -262,6 +279,10 @@ export function useArenaChallenge({
   canReceiveRef.current = canReceive;
   const inMatchRef = useRef(inMatch);
   inMatchRef.current = inMatch;
+  const inSessionFlowRef = useRef(inSessionFlow);
+  inSessionFlowRef.current = inSessionFlow;
+  /** Matches already offered as a Join toast; one toast per challenge. */
+  const joinOfferedRef = useRef<Set<string>>(new Set());
   const weightRef = useRef(athleteWeight);
   weightRef.current = athleteWeight;
   const athleteIdRef = useRef(athleteId);
@@ -334,7 +355,7 @@ export function useArenaChallenge({
    * athlete in it: a pending challenge from them is the other half of a
    * crossing pair and is withdrawn quietly rather than declined.
    */
-  const enterMatch = useCallback(
+  const enterMatchNow = useCallback(
     (challengeId: string, matchId: string, peerId: string | null) => {
       if (enteredForRef.current === challengeId) return;
       if (entryBlocked()) {
@@ -366,6 +387,38 @@ export function useArenaChallenge({
       );
     },
     [router, entryBlocked, setIncoming, setOutgoing],
+  );
+
+  /**
+   * Every automatic entry goes through here. In a session lobby or join
+   * wizard it does not navigate (that would race the session flow's own
+   * push, jits-zasq): the waiting bar goes and a Join toast offers the match.
+   */
+  const enterMatch = useCallback(
+    (challengeId: string, matchId: string, peerId: string | null) => {
+      if (!inSessionFlowRef.current) {
+        enterMatchNow(challengeId, matchId, peerId);
+        return;
+      }
+      if (
+        enteredForRef.current === challengeId ||
+        joinOfferedRef.current.has(challengeId)
+      ) {
+        return;
+      }
+      joinOfferedRef.current.add(challengeId);
+      settledRef.current.add(challengeId);
+      if (outgoingRef.current?.challengeId === challengeId) setOutgoing(null);
+      toast.info(ARENA_MATCH_STARTED_MESSAGE, {
+        id: `arena-join:${challengeId}`,
+        duration: ARENA_JOIN_TOAST_MS,
+        action: {
+          label: "Join",
+          onClick: () => enterMatchNow(challengeId, matchId, peerId),
+        },
+      });
+    },
+    [enterMatchNow, setOutgoing],
   );
 
   /**
@@ -568,6 +621,8 @@ export function useArenaChallenge({
       // A send, accept or cancel in flight decides the bar itself.
       !busyRef.current &&
       !entryBlocked() &&
+      // Entering a session flow withdrew it; never bring it back there.
+      !inSessionFlowRef.current &&
       !settledRef.current.has(mine.challengeId) &&
       enteredForRef.current !== mine.challengeId
     ) {
@@ -621,6 +676,33 @@ export function useArenaChallenge({
     const mine = outgoingRef.current;
     if (mine) void recheckOutgoingRef.current(mine.challengeId);
   }, [inMatch]);
+
+  // Entering a session lobby or join wizard withdraws my own pending
+  // challenge (pending-guarded, and its recipient told), so its accept cannot
+  // pull me out of the session flow (jits-zasq). If it is already past
+  // pending, the row decides: `started` is offered as a Join toast (see
+  // `enterMatch`), `accepted` keeps waiting for the accepter's broadcast.
+  useEffect(() => {
+    if (!inSessionFlow) return;
+    const mine = outgoingRef.current;
+    if (!mine) return;
+    const id = mine.challengeId;
+    void (async () => {
+      selfCancelledRef.current.add(id);
+      const res = await cancelChallenge(createClient(), id, { onlyIfPending: true });
+      if (!res.ok) {
+        selfCancelledRef.current.delete(id);
+        return;
+      }
+      if (res.data.cancelled) {
+        await broadcast(outgoingChannelRef.current, id, "cancelled");
+        endOutgoing(id, null);
+        return;
+      }
+      selfCancelledRef.current.delete(id);
+      void recheckOutgoingRef.current(id);
+    })();
+  }, [inSessionFlow, endOutgoing]);
 
   /**
    * Raise the prompt for a challenge found by a read rather than by the

@@ -3,6 +3,7 @@ import { act, renderHook } from "@testing-library/react";
 import {
   ACCEPTED_FALLBACK_MS,
   ACCEPT_FAILED_MESSAGE,
+  ARENA_MATCH_STARTED_MESSAGE,
   CHALLENGE_CAP_MESSAGE,
   CHALLENGE_GONE_MESSAGE,
   CHALLENGE_SEND_FAILED_MESSAGE,
@@ -1641,5 +1642,127 @@ describe("a pending challenge found by a read is re-checked before its prompt is
     rerender({ canReceive: true, lobbyIds: new Set(["ana"]) });
     await flushAll();
     expect(result.current.incoming?.challengeId).toBe("c7");
+  });
+});
+
+describe("a session lobby or join wizard never races an Arena push (jits-zasq)", () => {
+  type Props = { inSessionFlow: boolean };
+  function mountFlow(inSessionFlow = false) {
+    return renderHook(
+      ({ inSessionFlow }: Props) =>
+        useArenaChallenge({
+          athleteId: "me",
+          athleteWeight: 170,
+          canReceive: !inSessionFlow,
+          inSessionFlow,
+        }),
+      { initialProps: { inSessionFlow } as Props },
+    );
+  }
+  /** The Join toast's options, from the last `toast.info` for it. */
+  function joinToast() {
+    const call = toast.info.mock.calls.find((c) => c[0] === ARENA_MATCH_STARTED_MESSAGE);
+    return call?.[1] as
+      | { id: string; duration: number; action: { label: string; onClick: () => void } }
+      | undefined;
+  }
+
+  it("withdraws my pending challenge on entering, and tells its recipient", async () => {
+    const hook = mountFlow(false);
+    await sendAs(hook.result, "out1", "ana");
+    hook.rerender({ inSessionFlow: true });
+    await flushAll();
+    expect(m.cancelChallenge).toHaveBeenCalledWith(expect.anything(), "out1", {
+      onlyIfPending: true,
+    });
+    expect(sentOn("arena-challenge:out1")).toEqual([{ event: "cancelled", payload: {} }]);
+    expect(hook.result.current.outgoing).toBeNull();
+    expect(toast.info).not.toHaveBeenCalled();
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("does nothing on entering without a challenge out", async () => {
+    const hook = mountFlow(false);
+    await flushAll();
+    hook.rerender({ inSessionFlow: true });
+    await flushAll();
+    expect(m.cancelChallenge).not.toHaveBeenCalled();
+  });
+
+  it("offers a Join toast, not a push, when mine had already started", async () => {
+    const hook = mountFlow(false);
+    await sendAs(hook.result, "out1", "ana");
+    m.cancelChallenge.mockResolvedValueOnce({ ok: true, data: { cancelled: false } });
+    q.getChallengeStatus.mockResolvedValue({ ok: true, data: { status: "started", expiresAt: null } });
+    m.startMatchFromChallenge.mockResolvedValue({ ok: true, data: { match_id: "m6" } });
+    hook.rerender({ inSessionFlow: true });
+    await flushAll();
+    await flushAll();
+
+    expect(push).not.toHaveBeenCalled();
+    expect(hook.result.current.outgoing).toBeNull();
+    const options = joinToast();
+    expect(options?.id).toBe("arena-join:out1");
+    expect(options?.action.label).toBe("Join");
+
+    act(() => options?.action.onClick());
+    expect(push).toHaveBeenCalledWith("/arena/match/m6");
+  });
+
+  it("keeps waiting when mine was just accepted, and the accepter's broadcast becomes a Join toast", async () => {
+    const hook = mountFlow(false);
+    await sendAs(hook.result, "out1", "ana");
+    m.cancelChallenge.mockResolvedValueOnce({ ok: true, data: { cancelled: false } });
+    q.getChallengeStatus.mockResolvedValue({ ok: true, data: { status: "accepted", expiresAt: null } });
+    hook.rerender({ inSessionFlow: true });
+    await flushAll();
+    expect(hook.result.current.outgoing?.challengeId).toBe("out1");
+
+    await act(async () => {
+      fire(live("arena-challenge:out1")[0], "broadcast", "match_started", {
+        payload: { matchId: "m2" },
+      });
+    });
+    // The broadcast and the `started` UPDATE both landing: one toast.
+    await challengerUpdate("out1", "started");
+    expect(push).not.toHaveBeenCalled();
+    expect(toast.info.mock.calls.filter((c) => c[0] === ARENA_MATCH_STARTED_MESSAGE)).toHaveLength(1);
+    act(() => joinToast()?.action.onClick());
+    expect(push).toHaveBeenCalledTimes(1);
+    expect(push).toHaveBeenCalledWith("/arena/match/m2");
+  });
+
+  it("does not restore my outgoing bar while in the session flow", async () => {
+    q.getPendingChallengesForAthlete.mockResolvedValue({
+      ok: true,
+      data: { incoming: [], outgoing: [pending("out9")] },
+    });
+    const { result } = mountFlow(true);
+    await flushAll();
+    expect(result.current.outgoing).toBeNull();
+  });
+
+  it("offers a reload-lost started challenge as a Join toast too", async () => {
+    mountFlow(true);
+    await flushAll();
+    await act(async () => {
+      await fire(
+        incomingChannel(),
+        "postgres_changes",
+        "UPDATE",
+        {
+          new: {
+            id: "lost",
+            status: "started",
+            challenger_id: "me",
+            opponent_id: "ana",
+            created_at: new Date().toISOString(),
+          },
+        },
+        "challenger",
+      );
+    });
+    expect(push).not.toHaveBeenCalled();
+    expect(joinToast()?.id).toBe("arena-join:lost");
   });
 });

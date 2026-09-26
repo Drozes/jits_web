@@ -47,6 +47,9 @@ export function ArenaBootstrap({
     athleteWeight,
     canReceive: live.isLive && !inMatch,
     inMatch: onMatchScreen,
+    // A session lobby or join wizard: my own pending challenge is withdrawn
+    // and a match that starts anyway is a Join toast, not a push (jits-zasq).
+    inSessionFlow: inMatch && !onMatchScreen,
     // A pending challenge found by a read is offered only while its
     // challenger is still in the lobby (mobile parity).
     lobbyIds,
