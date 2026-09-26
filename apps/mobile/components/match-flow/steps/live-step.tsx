@@ -63,7 +63,6 @@ export function LiveStep(props: LiveStepProps) {
     onEnded,
   } = props;
   const endedRef = React.useRef(false);
-  const expiryFiredRef = React.useRef(false);
   const startHapticFiredRef = React.useRef(false);
   const warnHapticFiredRef = React.useRef(false);
   const recordingStartedRef = React.useRef(false);
@@ -130,16 +129,32 @@ export function LiveStep(props: LiveStepProps) {
     }
   }, [timer.remaining, timer.running]);
 
-  // Auto-end on time expiry, mirroring web
+  // Auto-end on time expiry, mirroring web. `handleEnd` is a new function
+  // on every render (its `sync` and `onEnded` are), and the timer keeps
+  // re-rendering every second at 00:00, so it is read through a ref: with it
+  // in the deps, the first tick inside AUTO_END_DELAY_MS cancelled the armed
+  // timeout and the match sat LIVE at 00:00 forever (jits-2y8i). The effect
+  // keys only on whether an auto-end is due, so it arms once and is cancelled
+  // only by unmount or by the match stopping being due: a pause at 00:00
+  // holds it (the timekeeper stopped the clock on purpose) and resuming
+  // re-arms it; an in-flight pause/resume (`busy`) defers it rather than
+  // letting `handleEnd` drop it. `endedRef` makes the end one-shot, whether
+  // this device ended it or the opponent's `match_ended` arrived first.
+  const handleEndRef = React.useRef(handleEnd);
+  handleEndRef.current = handleEnd;
+  const autoEndDue =
+    timer.remaining === 0 &&
+    timer.running &&
+    !timer.paused &&
+    busy === null &&
+    !endedRef.current;
   React.useEffect(() => {
-    if (timer.remaining === 0 && timer.running && !expiryFiredRef.current) {
-      expiryFiredRef.current = true;
-      const t = setTimeout(() => {
-        if (!endedRef.current) void handleEnd();
-      }, AUTO_END_DELAY_MS);
-      return () => clearTimeout(t);
-    }
-  }, [timer.remaining, timer.running, handleEnd]);
+    if (!autoEndDue) return;
+    const t = setTimeout(() => {
+      if (!endedRef.current) handleEndRef.current();
+    }, AUTO_END_DELAY_MS);
+    return () => clearTimeout(t);
+  }, [autoEndDue]);
 
   return (
     <View className="items-center gap-5 px-1 py-2">
