@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### Mobile: Resume your match (jits-r9a, partial)
+
+JS-only, OTA-eligible for runtime 0.3.0.
+
+**Added**
+- Home offers "Resume your match" when the app was killed or restarted mid-match: a compact card shows an open sessionless match the athlete takes part in (in progress within 60 min, or pending within 10 min) with the opponent's name; Resume pushes the same `/match/<id>` route the Arena uses. Never navigates on its own; a pending match the athlete left during this app run (cleared on sign-out) is not offered back; an in-progress one stays resumable. While it shows, Resume holds Home's one red CTA and the Arena card's button drops to the outline style. New `apps/mobile/components/dashboard/resume-match-card.tsx`, `apps/mobile/lib/match-flow/use-my-active-match.ts`; `useArenaMatchScreen(matchId)` + `getLeftMatchIds()` in `apps/mobile/lib/arena/arena-store.ts`.
+
+### Shared
+**Added**
+- `getMyActiveMatch(supabase, athleteId, now?, excludeMatchIds?)` (plain RLS: `matches_select_participant` + own-row `match_participants_select`; opponent name via `get_match_details`), `MATCH_RESUME_WINDOW_MS`, and `isUuid()` in `@jits/shared/utils`.
+
 ### Web: release-review cross-platform fixes
 
 **Fixed**
