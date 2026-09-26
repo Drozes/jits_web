@@ -373,7 +373,10 @@ describe("PracticeScreen", () => {
     expect(s.getByText("Practice: no rating change.")).toBeTruthy();
     fireEvent.press(s.getByTestId("result-outcome-submission"));
     fireEvent.press(s.getByTestId(`result-winner-${PRACTICE_BOT_ID}`));
-    fireEvent.press(s.getByTestId("result-submission-armbar"));
+    fireEvent.press(s.getByTestId("result-submission"));
+    fireEvent.changeText(s.getByTestId("result-submission-search"), "arm");
+    fireEvent.press(s.getByTestId("result-submission-option-armbar"));
+    expect(s.getByTestId("result-submission")).toHaveTextContent(/Armbar/);
     expect(record()).toBeDisabled(); // finish time required
     fireEvent.changeText(s.getByTestId("result-finish-time"), "0:45");
     expect(record()).toBeDisabled(); // past the 30s practice clock

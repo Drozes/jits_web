@@ -1,6 +1,7 @@
 import * as React from "react";
 import { FlatList, Modal, Pressable, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { X } from "lucide-react-native";
 import { cn } from "@/lib/cn";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 
@@ -37,6 +38,17 @@ interface SearchSelectProps {
   /** Fired when the overlay opens, e.g. to lazy-load a dataset. */
   onOpen?: () => void;
   disabled?: boolean;
+  /**
+   * Base testID. The trigger gets it verbatim; overlay parts derive from it:
+   * `-search`, `-clear`, `-close`, `-empty`, `-option-<value>`.
+   */
+  testID?: string;
+  /** Accessible name for the closed trigger (defaults to `title`). */
+  accessibilityLabel?: string;
+  /** Copy shown when a non-empty query matches nothing. */
+  noMatchesText?: string;
+  /** Options still offered under the no-matches copy (e.g. an "Other" catch-all). */
+  noMatchesOptions?: SearchSelectOption[];
 }
 
 type Row =
@@ -75,6 +87,10 @@ export function SearchSelect({
   emptyHint = "Start typing to search.",
   onOpen,
   disabled,
+  testID,
+  accessibilityLabel,
+  noMatchesText,
+  noMatchesOptions,
 }: SearchSelectProps) {
   const tokens = useThemedTokens();
   const insets = useSafeAreaInsets();
@@ -108,6 +124,33 @@ export function SearchSelect({
   };
 
   const shown = displayLabel || value;
+  const tid = (suffix: string) => (testID ? `${testID}-${suffix}` : undefined);
+
+  const renderOption = (item: Row) => {
+    const selected = item.kind === "option" && item.value === value;
+    return (
+      <Pressable
+        key={`${item.kind}:${item.value}`}
+        testID={item.kind === "option" ? tid(`option-${item.value}`) : tid("free")}
+        onPress={() => select(item.value)}
+        accessibilityRole="button"
+        accessibilityLabel={item.kind === "free" ? `Use ${item.label}` : item.label}
+        accessibilityState={{ selected }}
+        className="px-4 min-h-11 flex-row items-center justify-between border-b border-hairline active:bg-surface-3"
+      >
+        <Text
+          className={cn(
+            "text-[14px] font-body flex-1 py-3",
+            selected ? "text-cta" : "text-ink",
+          )}
+          numberOfLines={1}
+        >
+          {item.kind === "free" ? `Use "${item.label}"` : item.label}
+        </Text>
+        {selected ? <Text className="text-cta text-[14px] ml-2">{"✓"}</Text> : null}
+      </Pressable>
+    );
+  };
 
   return (
     <>
@@ -119,9 +162,13 @@ export function SearchSelect({
        * trigger looks dead). This mirrors the working ui/select.tsx trigger.
        */}
       <Pressable
+        testID={testID}
         onPress={openPicker}
         disabled={disabled}
         accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel ?? title}
+        accessibilityHint={shown ? `Selected: ${shown}` : placeholder}
+        accessibilityState={{ disabled: !!disabled }}
         className="active:opacity-70"
       >
         <View
@@ -163,7 +210,9 @@ export function SearchSelect({
                 {title}
               </Text>
               <Pressable
+                testID={tid("close")}
                 onPress={close}
+                accessibilityLabel="Close"
                 hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
                 accessibilityRole="button"
               >
@@ -172,20 +221,36 @@ export function SearchSelect({
                 </Text>
               </Pressable>
             </View>
-            <TextInput
-              value={query}
-              onChangeText={setQuery}
-              placeholder={searchPlaceholder}
-              placeholderTextColor={tokens.textTertiary}
-              autoFocus
-              autoCapitalize="words"
-              autoCorrect={false}
-              returnKeyType={allowFreeText ? "done" : "search"}
-              onSubmitEditing={() => {
-                if (allowFreeText && trimmed) select(trimmed);
-              }}
-              className="bg-surface-3 border border-hairline-strong rounded-xs px-4 py-3 text-[14px] font-body text-ink"
-            />
+            <View className="justify-center">
+              <TextInput
+                testID={tid("search")}
+                accessibilityLabel={`Search ${title}`}
+                value={query}
+                onChangeText={setQuery}
+                placeholder={searchPlaceholder}
+                placeholderTextColor={tokens.textTertiary}
+                autoFocus
+                autoCapitalize="words"
+                autoCorrect={false}
+                returnKeyType={allowFreeText ? "done" : "search"}
+                onSubmitEditing={() => {
+                  if (allowFreeText && trimmed) select(trimmed);
+                }}
+                className="bg-surface-3 border border-hairline-strong rounded-xs pl-4 pr-11 py-3 text-[14px] font-body text-ink"
+              />
+              {query.length > 0 ? (
+                <Pressable
+                  testID={tid("clear")}
+                  onPress={() => setQuery("")}
+                  accessibilityRole="button"
+                  accessibilityLabel="Clear search"
+                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                  className="absolute right-3 h-7 w-7 items-center justify-center active:opacity-70"
+                >
+                  <X size={16} color={tokens.textTertiary} />
+                </Pressable>
+              ) : null}
+            </View>
           </View>
 
           <FlatList
@@ -200,39 +265,22 @@ export function SearchSelect({
               // (iOS-only, no-op elsewhere) since there is no KeyboardAvoidingView.
               automaticallyAdjustKeyboardInsets
               ListEmptyComponent={
-                <View className="px-4 py-6">
-                  <Text className="font-body text-[13px] text-ink-3">
-                    {trimmed.length === 0
-                      ? emptyHint
-                      : allowFreeText
-                        ? "No matches. Press Done to keep what you typed."
-                        : "No matches."}
-                  </Text>
+                <View>
+                  <View className="px-4 py-6">
+                    <Text testID={tid("empty")} className="font-body text-[13px] text-ink-3">
+                      {trimmed.length === 0
+                        ? emptyHint
+                        : allowFreeText
+                          ? "No matches. Press Done to keep what you typed."
+                          : (noMatchesText ?? "No matches.")}
+                    </Text>
+                  </View>
+                  {trimmed.length > 0
+                    ? noMatchesOptions?.map((o) => renderOption({ kind: "option", ...o }))
+                    : null}
                 </View>
               }
-              renderItem={({ item }) => {
-                const selected = item.kind === "option" && item.value === value;
-                return (
-                  <Pressable
-                    onPress={() => select(item.value)}
-                    accessibilityRole="button"
-                    className="px-4 min-h-11 flex-row items-center justify-between border-b border-hairline active:bg-surface-3"
-                  >
-                    <Text
-                      className={cn(
-                        "text-[14px] font-body flex-1 py-3",
-                        selected ? "text-cta" : "text-ink",
-                      )}
-                      numberOfLines={1}
-                    >
-                      {item.kind === "free" ? `Use "${item.label}"` : item.label}
-                    </Text>
-                    {selected ? (
-                      <Text className="text-cta text-[14px] ml-2">{"✓"}</Text>
-                    ) : null}
-                  </Pressable>
-                );
-              }}
+              renderItem={({ item }) => renderOption(item)}
             />
         </View>
       </Modal>

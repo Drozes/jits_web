@@ -32,8 +32,8 @@ interface ResultStepProps {
  * (for submissions) winner + submission type + optional finish time.
  * The actual mutation + broadcast logic lives in `useRecordResult`.
  *
- * ELO design system: meta heading, OutcomeToggle, WinnerPicker, Chip
- * grid of submission types (D8 wireframe lines 1239-1273), and a
+ * ELO design system: meta heading, OutcomeToggle, WinnerPicker, a
+ * full-screen autocomplete submission select (SubmissionFields), and a
  * Signal Red record-result cta.
  */
 export function ResultStep({
