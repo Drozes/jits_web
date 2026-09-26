@@ -220,6 +220,76 @@ export async function cancelStaleOutgoingChallenges(
   return { ok: true, data: { cancelled } };
 }
 
+interface DeclineOtherPendingOptions {
+  /** The challenge the athlete just entered a match for; never touched. */
+  keepChallengeId: string;
+  /**
+   * Challenges from this challenger are left alone and handed back in
+   * `skipped`: the Arena withdraws those quietly instead (the crossing case,
+   * where the challenger is the very person the match is with), so they are
+   * not told "declined" on the way into the same match.
+   */
+  exceptChallengerId?: string | null;
+  /** The athlete's incoming pending challenges, when just read. */
+  incoming?: PendingChallenge[];
+}
+
+/**
+ * Decline every OTHER pending challenge the athlete has received.
+ *
+ * For the moment the athlete enters a match: nobody else waiting on them can
+ * be answered live any more, and a decline is what tells each challenger so
+ * (their realtime UPDATE clears the waiting plate) and frees their slot under
+ * the 3-pending cap.
+ *
+ * RLS: `challenges_update_opponent` (jr_be
+ * `20260217800000_fix_expired_challenge_accept.sql`) lets the opponent move a
+ * `pending`, unexpired row to `declined`. Rows are declined ONE BY ONE and
+ * each is guarded on `status = 'pending'`: a row that lapsed server-side
+ * between the read and the write fails that policy's WITH CHECK with an
+ * error, and a bulk UPDATE would then lose every other decline with it.
+ * Returns what was actually declined; a failed individual decline is left
+ * out, a failed read is returned as a failure.
+ */
+export async function declineOtherPendingChallenges(
+  supabase: Client,
+  athleteId: string,
+  options: DeclineOtherPendingOptions,
+): Promise<Result<{ declined: PendingChallenge[]; skipped: PendingChallenge[] }>> {
+  let incoming = options.incoming;
+  if (!incoming) {
+    const read = await getPendingChallengesForAthlete(supabase, athleteId);
+    if (!read.ok) return read;
+    incoming = read.data.incoming;
+  }
+
+  const others = incoming.filter(
+    (c) => c.opponentId === athleteId && c.challengeId !== options.keepChallengeId,
+  );
+  const skipped = others.filter(
+    (c) => !!options.exceptChallengerId && c.challengerId === options.exceptChallengerId,
+  );
+  const targets = others.filter((c) => !skipped.includes(c));
+  if (targets.length === 0) return { ok: true, data: { declined: [], skipped } };
+
+  const results = await Promise.all(
+    targets.map((c) =>
+      supabase
+        .from("challenges")
+        .update({ status: "declined", updated_at: new Date().toISOString() })
+        .eq("id", c.challengeId)
+        .eq("opponent_id", athleteId)
+        .eq("status", "pending")
+        .select("id"),
+    ),
+  );
+  const declined = targets.filter((_, i) => {
+    const r = results[i];
+    return !r.error && (r.data?.length ?? 0) > 0;
+  });
+  return { ok: true, data: { declined, skipped } };
+}
+
 // ---------------------------------------------------------------------------
 // Match lifecycle mutations (RPC wrappers)
 // ---------------------------------------------------------------------------

@@ -7,7 +7,12 @@
  * that gap. It runs:
  *  - when the owner mounts (cold start, sign-in),
  *  - when the athlete goes live,
- *  - when the app returns from the background.
+ *  - when the app returns from the background,
+ *  - whenever the challenge hook asks for it (`requestPendingChallengeResync`):
+ *    a prompt cleared without a match (declined, withdrawn, expired, dead on
+ *    accept), so the next challenger queued behind it is offered, and the
+ *    incoming realtime channel was rebuilt after a server close, so an INSERT
+ *    that landed while it was down is not lost.
  *
  * What counts as ACTIONABLE is narrower than "pending", on purpose. A
  * challenge stays `pending` for up to 7 days (`expires_at`), but the prompt
@@ -45,6 +50,20 @@ import type { OutgoingChallenge } from "./use-arena-challenge";
  * constant, so web and mobile agree on what "stale" means.
  */
 export const PENDING_PROMPT_MAX_AGE_MS = ARENA_CHALLENGE_FRESH_MS;
+
+/** Mounted recovery passes; one in practice (`<ArenaBootstrap />`). */
+const resyncListeners = new Set<() => void>();
+
+/**
+ * Read pending challenges again now. Called by the challenge hook when a
+ * prompt clears without a match, or its incoming channel was rebuilt. A
+ * module-level signal rather than a prop, so the two hooks stay wired only
+ * through `<ArenaBootstrap />`'s existing arguments. Ignored mid-match: the
+ * match exit re-reads anyway.
+ */
+export function requestPendingChallengeResync(): void {
+  for (const listener of [...resyncListeners]) listener();
+}
 
 export interface UsePendingChallengeRecoveryArgs {
   athleteId: string;
@@ -153,6 +172,17 @@ export function usePendingChallengeRecovery({
     offeredRef.current.clear();
     void fetchRef.current();
   }, [inMatch]);
+
+  // The challenge hook asked for a fresh read (see the header).
+  React.useEffect(() => {
+    const listener = () => {
+      if (!inMatchRef.current) void fetchRef.current();
+    };
+    resyncListeners.add(listener);
+    return () => {
+      resyncListeners.delete(listener);
+    };
+  }, []);
 
   // Back from the background. Tracked from "background" specifically, for
   // the same reason the live hook ignores "inactive": Control Center and the

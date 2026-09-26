@@ -23,6 +23,7 @@ jest.mock("@/lib/supabase/client", () => ({ supabase: {} }));
 import {
   PENDING_PROMPT_MAX_AGE_MS,
   isFreshPending,
+  requestPendingChallengeResync,
   usePendingChallengeRecovery,
   type UsePendingChallengeRecoveryArgs,
 } from "@/lib/arena/use-pending-challenge-recovery";
@@ -467,5 +468,58 @@ describe("offers skipped by a match (jits-yiwx)", () => {
     });
 
     expect(mockOffer).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("re-reading on request (a prompt cleared, a channel rebuilt)", () => {
+  it("offers the next challenger queued behind a declined prompt", async () => {
+    // Three challengers, one target: B's INSERT landed while A's prompt was
+    // up, so it was never shown. A is declined; the re-read offers B.
+    const lobby = new Set(["rival-a", "rival-b"]);
+    reply([pending({ challengeId: "ch-a", challengerId: "rival-a" })]);
+    const { rerender } = mount({ lobbyIds: lobby });
+    await act(flush);
+    expect(mockOffer).toHaveBeenCalledWith("ch-a", "rival-a");
+
+    // A's prompt is up, then declined.
+    await act(async () => {
+      rerender(baseArgs({ hasIncoming: true, lobbyIds: lobby }));
+      await flush();
+    });
+    reply([pending({ challengeId: "ch-b", challengerId: "rival-b" })]);
+    mockOffer.mockClear();
+    mockGetPending.mockClear();
+    await act(async () => {
+      rerender(baseArgs({ hasIncoming: false, lobbyIds: lobby }));
+      requestPendingChallengeResync();
+      await flush();
+    });
+
+    expect(mockGetPending).toHaveBeenCalledTimes(1);
+    expect(mockOffer).toHaveBeenCalledTimes(1);
+    expect(mockOffer).toHaveBeenCalledWith("ch-b", "rival-b");
+  });
+
+  it("is ignored mid-match (the match exit reads anyway)", async () => {
+    mount({ inMatch: true });
+    await act(flush);
+    mockGetPending.mockClear();
+
+    await act(async () => {
+      requestPendingChallengeResync();
+      await flush();
+    });
+    expect(mockGetPending).not.toHaveBeenCalled();
+  });
+
+  it("stops listening once unmounted", async () => {
+    const { unmount } = mount();
+    await act(flush);
+    unmount();
+    mockGetPending.mockClear();
+
+    requestPendingChallengeResync();
+    await flush();
+    expect(mockGetPending).not.toHaveBeenCalled();
   });
 });
