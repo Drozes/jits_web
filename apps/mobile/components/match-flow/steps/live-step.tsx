@@ -14,6 +14,8 @@ import { LiveControls } from "./live-controls";
 interface LiveStepProps {
   matchId: string;
   matchType: "ranked" | "casual";
+  /** Named under the clock so the athletes know who they are rolling with. */
+  opponentName?: string | null;
   durationSeconds: number;
   startedAt: string;
   pausedAt: string | null;
@@ -55,6 +57,7 @@ export function LiveStep(props: LiveStepProps) {
   const {
     matchId,
     matchType,
+    opponentName,
     durationSeconds,
     startedAt,
     pausedAt,
@@ -164,6 +167,7 @@ export function LiveStep(props: LiveStepProps) {
         remaining={timer.remaining}
         paused={timer.paused}
         matchType={matchType}
+        opponentName={opponentName}
       />
       <LiveControls
         paused={timer.paused}

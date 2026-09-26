@@ -171,3 +171,42 @@ describe("ReadyStep", () => {
     utils.unmount();
   });
 });
+
+describe("ReadyStep opponent panel (jits-plt6)", () => {
+  function renderNamed(opponentName?: string | null) {
+    return render(
+      <ReadyStep
+        exitHref={ARENA_HREF}
+        onCancelledRemotely={jest.fn()}
+        matchId="M1"
+        currentAthleteId="me-1"
+        opponentId="opp-1"
+        opponentName={opponentName}
+        onStarted={jest.fn()}
+      />,
+    );
+  }
+
+  it("shows the opponent's name but keeps the harness testID and label", () => {
+    const utils = renderNamed("Demo Red");
+    const panel = utils.getByTestId("ready-panel-opponent");
+    expect(panel.props.accessibilityLabel).toBe("Opponent, waiting");
+    expect(utils.getByText("Demo Red")).toBeTruthy();
+    expect(utils.queryByText("Opponent")).toBeNull();
+
+    act(() => {
+      mockSyncParams?.onReadySignal?.("opp-1");
+    });
+    expect(utils.getByTestId("ready-panel-opponent").props.accessibilityLabel).toBe(
+      "Opponent, ready",
+    );
+    // The viewer's own panel is unchanged.
+    expect(utils.getByTestId("ready-panel-you").props.accessibilityLabel).toBe("You, waiting");
+  });
+
+  it.each([undefined, null, "  "])("falls back to 'Opponent' when the name is %p", (name) => {
+    const utils = renderNamed(name);
+    expect(utils.getByTestId("ready-panel-opponent")).toBeTruthy();
+    expect(utils.getByText("Opponent")).toBeTruthy();
+  });
+});
