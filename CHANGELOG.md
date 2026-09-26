@@ -2,6 +2,41 @@
 
 ## [Unreleased]
 
+### Web: Arena and session match-flow fixes (demo bug hunt)
+
+**Fixed**
+- Profile Challenge now goes through the Arena handshake (`arenaActions.sendChallenge`): the challenger gets the waiting bar and drops into the match when a live opponent accepts. The sheet no longer takes a weight (the Arena sends the profile weight; the wizard verifies it), is disabled until the Arena is ready, and says "<name> isn't in the Arena right now." for an opponent who is not live. A pending challenge links to `/arena` instead of the hidden `/athlete/[id]/challenges`.
+- Arena: a refused challenge no longer always claims "You have 3 challenges out"; it says "<name> just left the Arena." when they are no longer live (port of mobile's `explainRefusedInsert`).
+- Match result: a submission requires a finish time between 0:01 and the match length; "(optional)" removed, readable backend messages, and a time entered for a different winner is dropped. New `apps/web/lib/match-flow/match-state.ts`.
+- Ready check: losing the `start_match` race re-reads the match and advances; `timer_started` is honoured while the start call is in flight; the DB is polled (paused during our own start call) so a cancel during weight verify is not lost; unmount-safe under React Strict Mode.
+- Cancelled or voided matches leave the wizard with a toast instead of restarting at weight verify. New `app/(app)/session/[id]/match/[matchId]/match-exit-redirect.tsx`.
+- Result recording re-reads the match on a failed record or tab refocus and moves on if already recorded.
+- No more "Challenge Accepted!"/"Declined" toasts on web (the Arena owns them; the accepted toast linked to the hidden `/match/lobby`).
+- Auth callback and confirm routes accept only a single-slash same-origin `next` (open-redirect fix). New `apps/web/lib/auth/safe-next-path.ts`.
+
+### Shared
+**Added**
+- `getCurrentAthleteResult()` (Result-returning athlete-guard read that distinguishes a failed read from "no row"; `getCurrentAthlete` unchanged).
+**Changed**
+- `useGlobalNotifications`: `challengeOutcomeToasts` option (default true); no `/match/lobby` fallback href. Clearer `missing_fields` / `invalid_finish_time` messages.
+
+### Mobile: first-run robustness
+
+JS-only, OTA-eligible for runtime 0.3.0.
+
+**Added**
+- Keep the screen awake while live in the Arena (not in a match), so auto-lock no longer silently drops a live athlete from the lobby (`lib/arena/arena-bootstrap.tsx`, tag `arena-live`).
+**Changed**
+- `refreshAthlete(fallback?)` retries once and applies a caller-verified row when both reads fail; setup submit passes the verified active row.
+- Push registration is skipped only for pending athletes (no prompt on the TOS step, jits-r75.1).
+**Fixed**
+- A flaky cold-start athlete read no longer redirects an active athlete to /profile-setup: `AuthProvider` retries with backoff and `app/index.tsx` shows Try Again / Sign Out after 3 failures.
+- Profile setup shows Try Again on a failed athlete read (was an endless spinner or an RLS-refused INSERT).
+- Sign Out always lands on /login; an offline sign-out also removes the persisted session from SecureStore.
+- Home greets a zero-match athlete with "Welcome" instead of "Welcome back".
+**Removed**
+- The disabled "coming soon" Challenge button on another athlete's profile (jits-qwn5).
+
 ### Mobile: match record, upload and watch hardening
 
 JS-only, OTA-eligible for runtime 0.3.0.
