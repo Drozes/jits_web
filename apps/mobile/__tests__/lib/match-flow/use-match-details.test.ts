@@ -15,6 +15,7 @@ jest.mock("@jits/shared/api/queries", () => ({
   getSubmissionTypes: (...a: unknown[]) => mockGetSubmissionTypes(...a),
 }));
 
+import * as React from "react";
 import { act, renderHook, waitFor } from "@testing-library/react-native";
 import { REFETCH_RETRY_DELAY_MS, useMatchDetails } from "@/lib/match-flow/use-match-details";
 
@@ -141,6 +142,33 @@ describe("useMatchDetails: one delayed retry after a failed re-fetch (jits-w2h7)
     });
     await flush();
     expect(mockGetMatchDetails).toHaveBeenCalledTimes(3);
+    expect(result.current.match?.id).toBe("M1");
+  });
+
+  it("retries exactly once under StrictMode's double-invoked effects too", async () => {
+    mockGetMatchDetails.mockResolvedValue(match("M1", "pending_confirmation"));
+    const { result } = renderHook(() => useMatchDetails("M1"), { wrapper: React.StrictMode });
+    await waitFor(() => expect(result.current.match?.id).toBe("M1"));
+    jest.useFakeTimers();
+
+    mockGetMatchDetails.mockClear();
+    mockGetMatchDetails.mockResolvedValue(null);
+    act(() => result.current.refresh());
+    await flush();
+    const afterRefresh = mockGetMatchDetails.mock.calls.length;
+
+    await act(async () => {
+      jest.advanceTimersByTime(REFETCH_RETRY_DELAY_MS);
+    });
+    await flush();
+    const afterRetry = mockGetMatchDetails.mock.calls.length;
+    expect(afterRetry).toBeGreaterThan(afterRefresh);
+
+    await act(async () => {
+      jest.advanceTimersByTime(REFETCH_RETRY_DELAY_MS * 5);
+    });
+    await flush();
+    expect(mockGetMatchDetails.mock.calls.length).toBe(afterRetry);
     expect(result.current.match?.id).toBe("M1");
   });
 

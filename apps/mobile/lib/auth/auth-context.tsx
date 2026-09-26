@@ -7,8 +7,7 @@ import {
   type AthleteGuardRow,
 } from "@jits/shared/api/queries";
 import { backoffDelayMs } from "@jits/shared/utils";
-import { env } from "../env";
-import { pauseAuthAutoRefresh, supabase } from "../supabase/client";
+import { authStorageKey, pauseAuthAutoRefresh, supabase } from "../supabase/client";
 import { SecureStoreAdapter } from "../supabase/secure-storage";
 import { setCachedElo } from "../splash/elo-cache";
 import { needsAthleteLoad } from "./athlete-load";
@@ -59,17 +58,6 @@ export type AuthState = {
 export const ATHLETE_LOAD_BACKOFF = { baseMs: 1_000, maxMs: 8_000 };
 /** Failed reads before `athleteLoadFailed` swaps "Loading..." for a retry state. */
 export const ATHLETE_LOAD_FAILURES_BEFORE_RETRY_UI = 3;
-
-/**
- * The key auth-js persists the session under. It is `protected` on the
- * client, so read it at runtime and fall back to auth-js's default
- * (`sb-<project ref>-auth-token`), which is what our client uses.
- */
-function authStorageKey(): string {
-  const key = (supabase.auth as unknown as { storageKey?: unknown }).storageKey;
-  if (typeof key === "string" && key) return key;
-  return `sb-${new URL(env.supabaseUrl).hostname.split(".")[0]}-auth-token`;
-}
 
 /** Remove the persisted session exactly as auth-js's own `_removeSession` does. */
 async function clearPersistedSession(): Promise<void> {

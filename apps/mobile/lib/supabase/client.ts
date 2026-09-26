@@ -55,10 +55,38 @@ export const supabase = createClient<Database>(
  * still-stored refresh token and write a new session back. It is restarted
  * here on the next `SIGNED_IN` and, as a backstop, on the next foreground.
  *
+ * The foreground backstop resumes only when a session is stored AND it is
+ * not the one that was stored when the pause began. If the sign-out's own
+ * clear failed, that leftover session is still on disk, and resuming the
+ * ticker would refresh it and sign the user straight back in. It reads the
+ * raw stored value (no `getSession()`: that takes the auth lock and itself
+ * refreshes an expired session, the exact write this guards against).
+ *
  * Only a pause made through `pauseAuthAutoRefresh` is resumed: the running
  * ticker is otherwise left exactly as auth-js manages it.
  */
 let autoRefreshPaused = false;
+/** The raw stored session at pause time, to recognise a leftover. */
+let sessionAtPause: string | null = null;
+
+/**
+ * The key auth-js persists the session under. It is `protected` on the
+ * client, so read it at runtime and fall back to auth-js's default
+ * (`sb-<project ref>-auth-token`), which is what our client uses.
+ */
+export function authStorageKey(): string {
+  const key = (supabase.auth as unknown as { storageKey?: unknown }).storageKey;
+  if (typeof key === "string" && key) return key;
+  return `sb-${new URL(env.supabaseUrl).hostname.split(".")[0]}-auth-token`;
+}
+
+async function readStoredSession(): Promise<string | null> {
+  try {
+    return await SecureStoreAdapter.getItem(authStorageKey());
+  } catch {
+    return null;
+  }
+}
 
 export async function pauseAuthAutoRefresh(): Promise<void> {
   autoRefreshPaused = true;
@@ -67,11 +95,13 @@ export async function pauseAuthAutoRefresh(): Promise<void> {
   } catch (e) {
     console.warn("[auth] could not stop token auto-refresh", e);
   }
+  sessionAtPause = await readStoredSession();
 }
 
 function resumeAuthAutoRefresh(): void {
   if (!autoRefreshPaused) return;
   autoRefreshPaused = false;
+  sessionAtPause = null;
   // Not awaited: this can run inside an `onAuthStateChange` callback, which
   // holds the auth lock. `startAutoRefresh` takes no lock itself (its first
   // tick is deferred to a timer), so firing it here cannot deadlock.
@@ -81,10 +111,18 @@ function resumeAuthAutoRefresh(): void {
   });
 }
 
+/** Foreground backstop: resume only for a NEW stored session (see above). */
+export async function resumeAuthAutoRefreshOnForeground(): Promise<void> {
+  if (!autoRefreshPaused) return;
+  const stored = await readStoredSession();
+  if (!stored || stored === sessionAtPause) return;
+  resumeAuthAutoRefresh();
+}
+
 supabase.auth.onAuthStateChange((event) => {
   if (event === "SIGNED_IN") resumeAuthAutoRefresh();
 });
 
 AppState.addEventListener("change", (state) => {
-  if (state === "active") resumeAuthAutoRefresh();
+  if (state === "active") void resumeAuthAutoRefreshOnForeground();
 });

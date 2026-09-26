@@ -31,11 +31,9 @@ export function useMatchKeepAwake(active: boolean, tag: string = MATCH_LIVE_KEEP
       // Wake-lock failures are non-fatal -- match continues.
     });
     return () => {
-      try {
-        deactivateKeepAwake(tag);
-      } catch {
-        /* noop */
-      }
+      // Async in this expo-keep-awake version: a try/catch would not see a
+      // rejection. Same shape as arena-bootstrap.
+      void deactivateKeepAwake(tag).catch(() => {});
     };
   }, [active, tag]);
 }

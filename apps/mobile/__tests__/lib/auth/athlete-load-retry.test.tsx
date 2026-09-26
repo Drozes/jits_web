@@ -27,6 +27,7 @@ const mockPauseAutoRefresh = jest.fn(async () => {
 });
 jest.mock("@/lib/supabase/client", () => ({
   pauseAuthAutoRefresh: () => mockPauseAutoRefresh(),
+  authStorageKey: () => "sb-test-auth-token",
   supabase: {
     auth: {
       storageKey: "sb-test-auth-token",

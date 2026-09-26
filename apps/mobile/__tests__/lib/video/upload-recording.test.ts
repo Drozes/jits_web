@@ -425,7 +425,7 @@ describe("writeMatchVideoRow upload-gate copy", () => {
       // These gates rarely lift inside the retention window, after which the
       // sweep deletes the local clip; the copy must not promise otherwise.
       const err = await thrownFor(hint);
-      expect(err.message).toMatch(/kept on this device for 7 days/);
+      expect(err.message).toMatch(/kept on this device for up to 7 days after the match/);
       expect(err.message).not.toMatch(/saved on this device/);
     },
   );

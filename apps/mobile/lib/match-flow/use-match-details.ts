@@ -61,9 +61,12 @@ export function useMatchDetails(matchId: string): UseMatchDetailsResult {
   React.useEffect(() => {
     matchRef.current = match;
   }, [match]);
-  // True while the fetch about to run IS the automatic retry, so a retry
-  // that also fails does not schedule another (one retry, never a loop).
-  const retryingRef = React.useRef(false);
+  // The `tick` the automatic retry targets, so a retry that also fails does
+  // not schedule another (one retry, never a loop). Keyed on the tick rather
+  // than a consume-once flag so it survives StrictMode's double-invoked
+  // effects: the second run sees the same tick and still knows it is the
+  // retry.
+  const retryTickRef = React.useRef<number | null>(null);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -78,17 +81,17 @@ export function useMatchDetails(matchId: string): UseMatchDetailsResult {
     // step's refresh() hit a dead zone. Keep what we have; the reconciler
     // and the next refresh() get another go.
     const revalidating = matchRef.current?.id === matchId;
-    const isRetry = retryingRef.current;
-    retryingRef.current = false;
+    const isRetry = retryTickRef.current === tick;
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
     // A failed re-fetch keeps the match in hand (above) and gets exactly one
     // delayed retry. A manual refresh() or a matchId change in the meantime
-    // runs this effect's cleanup, which cancels the pending retry.
+    // runs this effect's cleanup, which cancels the pending retry, so `tick`
+    // is still current when the timer fires.
     const scheduleRetry = () => {
       if (isRetry) return;
       retryTimer = setTimeout(() => {
-        retryingRef.current = true;
-        setTick((n) => n + 1);
+        retryTickRef.current = tick + 1;
+        setTick(tick + 1);
       }, REFETCH_RETRY_DELAY_MS);
     };
 

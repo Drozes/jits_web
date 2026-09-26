@@ -75,7 +75,9 @@ export function contentTypeFor(ext: string): string {
 export type MatchVideoGate = "rate_limited" | "disabled" | "not_in_cohort" | "reslice_limit";
 
 const RETENTION_DAYS = Math.round(UPLOAD_JOB_MAX_AGE_MS / (24 * 60 * 60 * 1000));
-const KEPT_ON_DEVICE = `The recording is kept on this device for ${RETENTION_DAYS} days`;
+// Retention counts from when the job was created (the end of the match),
+// not from when this message is shown, hence "up to ... after the match".
+const KEPT_ON_DEVICE = `The recording is kept on this device for up to ${RETENTION_DAYS} days after the match`;
 
 const GATE_BY_HINT: Record<string, { gate: MatchVideoGate; message: string }> = {
   upload_rate_limited: {
