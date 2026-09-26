@@ -75,6 +75,7 @@ export function PracticeLive({ onEnd }: { onEnd: () => void }) {
         remaining={timer.remaining}
         paused={timer.paused}
         matchType="casual"
+        kindLabel="Practice"
         opponentName={PRACTICE_BOT_NAME}
       />
       <LiveControls paused={timer.paused} disabled={false} onPauseResume={pauseResume} onEnd={end} />

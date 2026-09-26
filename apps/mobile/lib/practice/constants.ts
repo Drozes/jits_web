@@ -20,8 +20,8 @@ export const PRACTICE_BOT_ID = "practice-bot";
 export const PRACTICE_BOT_NAME = "Practice Partner";
 
 /**
- * The bot as an Arena roster row. Same rating and weight as the user, so no
- * gap is shown and nothing suggests stakes.
+ * The bot as an Arena roster row. Same weight as the user; the row shows
+ * "No rating" instead of a number, so nothing suggests stakes.
  */
 export function practiceBot(athlete: {
   current_elo: number;
@@ -61,16 +61,22 @@ export const PRACTICE_TIPS: Record<PracticePhase, string | null> = {
   live: "No need to actually roll. Either of you can pause. Tap End Match when someone taps.",
   end: null,
   result:
-    "Record how it ended: a submission and winner, or a draw. Every Arena match is ranked; this one is not.",
+    "Record how it ended: a submission and winner, or a draw. Real Arena matches are ranked; practice is not.",
   confirm:
     "Your opponent confirms the result. In a real match you can dispute a wrong result here.",
   summary: null,
 };
 
 export const PRACTICE_SUMMARY_TIP_CLIP =
-  "Your practice clip stays on this phone and is deleted when you leave.";
+  "Real match clips upload to the match for review. This one stays on your phone, deleted when you leave.";
+/** No clip because the camera was not allowed. */
 export const PRACTICE_SUMMARY_TIP_NO_CLIP =
-  "No clip this time. You can allow camera access before your first real match.";
+  "No clip this time. Allow camera access before your first real match; real clips upload to the match for review.";
+/** Camera allowed, but no clip came out (for example, the run was too short). */
+export const PRACTICE_SUMMARY_TIP_NO_CLIP_GRANTED =
+  "No clip this time. Real match clips upload to the match for review.";
+
+export const PRACTICE_LOBBY_BODY = "Practice lobby. Only your practice partner is here.";
 
 export const PRACTICE_OFFER_TITLE = "Try a practice match";
 export const PRACTICE_OFFER_BODY =

@@ -406,7 +406,8 @@ describe("PracticeScreen", () => {
     await toSummary(s);
     expect(mockCamera.recordAsync).toHaveBeenCalledTimes(1);
     expect(s.queryByText(/share|rematch|view match details/i)).toBeNull();
-    expect(s.getByText(/clip stays on this phone/)).toBeTruthy();
+    expect(s.getByText(/stays on your phone, deleted when you leave/)).toBeTruthy();
+    expect(s.getByText(/Real match clips upload to the match for review/)).toBeTruthy();
     fireEvent.press(s.getByTestId("practice-watch-clip"));
     const player = s.getByTestId("practice-clip-player");
     expect(player.props.source).toEqual({ uri: CLIP });
@@ -449,6 +450,95 @@ describe("PracticeScreen", () => {
     expect(s.queryByTestId("practice-watch-clip")).toBeNull();
     expect(s.getByText(/No clip this time/)).toBeTruthy();
   });
+
+  it("shows Step 1 / 8 while waiting and practice copy in the lobby", async () => {
+    const s = render(<PracticeScreen />);
+    await flush();
+    fireEvent.press(s.getByLabelText("Go live"));
+    expect(s.getByText("Practice lobby. Only your practice partner is here.")).toBeTruthy();
+    expect(s.queryByText(/Opponents can challenge you now/)).toBeNull();
+    // The bot row is not a button and shows no borrowed rating.
+    expect(s.queryByLabelText(/Practice Partner, ELO/)).toBeNull();
+    expect(s.getByText("No rating")).toBeTruthy();
+    expect(s.queryByText("1000")).toBeNull();
+    fireEvent.press(s.getByLabelText("Challenge Practice Partner"));
+    expect(s.getByTestId("match-step-wait")).toHaveTextContent("Step 1 / 8");
+  });
+
+  it("labels the clock and the confirm banner as practice", async () => {
+    const s = render(<PracticeScreen />);
+    await flush();
+    toLive(s);
+    expect(s.getByText("Practice · vs Practice Partner")).toBeTruthy();
+    expect(s.queryByText(/Casual/)).toBeNull();
+    await flush();
+    fireEvent.press(s.getByTestId("live-end"));
+    await flush();
+    advance(1000);
+    fireEvent.press(s.getByTestId("result-outcome-draw"));
+    fireEvent.press(s.getByTestId("result-record"));
+    expect(s.getByText("Practice result")).toBeTruthy();
+    expect(s.queryByText("Match Recorded")).toBeNull();
+  });
+
+  it("does not blame camera permission when it was granted but no clip came out", async () => {
+    mockCamera.stopRecording.mockImplementation(() => undefined);
+    mockCamera.recordAsync.mockResolvedValue(undefined);
+    const s = render(<PracticeScreen />);
+    await flush();
+    await toSummary(s);
+    expect(s.queryByTestId("practice-watch-clip")).toBeNull();
+    expect(s.getByText(/No clip this time/)).toBeTruthy();
+    expect(s.queryByText(/Allow camera access/)).toBeNull();
+    expect(s.getByText(/clips upload to the match for review/)).toBeTruthy();
+  });
+
+  const reach: Record<string, (s: Screen) => void | Promise<void>> = {
+    waiting: (s) => {
+      fireEvent.press(s.getByLabelText("Go live"));
+      fireEvent.press(s.getByLabelText("Challenge Practice Partner"));
+    },
+    weight: toWeight,
+    ready: (s) => {
+      toWeight(s);
+      fireEvent.press(s.getByTestId("weight-confirm"));
+      fireEvent.press(s.getByTestId("ready-button"));
+    },
+    live: toLive,
+    end: async (s) => {
+      toLive(s);
+      await flush();
+      fireEvent.press(s.getByTestId("live-end"));
+      await flush();
+    },
+    result: toResult,
+    confirm: async (s) => {
+      await toResult(s);
+      fireEvent.press(s.getByTestId("result-outcome-draw"));
+      fireEvent.press(s.getByTestId("result-record"));
+    },
+  };
+
+  it.each(Object.keys(reach))(
+    "exit from %s leaves nothing behind and discards the clip",
+    async (phase) => {
+      const errors = jest.spyOn(console, "error").mockImplementation(() => undefined);
+      const s = render(<PracticeScreen />);
+      await flush();
+      await reach[phase](s);
+      fireEvent.press(s.getByTestId("practice-exit"));
+      expect(mockRouter.back).toHaveBeenCalled();
+      s.unmount();
+      expect(discardLocalClip).toHaveBeenCalled();
+      // Run out every timer: nothing may error, mark completed or upload. The
+      // bot timer itself is cleared on unmount (use-practice-match.test.ts).
+      advance(60_000);
+      await flush();
+      expect(errors).not.toHaveBeenCalled();
+      expect(markPracticeMatch).not.toHaveBeenCalledWith({}, "completed");
+      expect(startMatchVideoUpload).not.toHaveBeenCalled();
+    },
+  );
 
   it("exits from live with no bot timer or recording left behind", async () => {
     const s = render(<PracticeScreen />);

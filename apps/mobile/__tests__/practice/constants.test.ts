@@ -5,7 +5,9 @@ import {
   PRACTICE_OFFER_BODY,
   PRACTICE_OFFER_TITLE,
   PRACTICE_SUMMARY_TIP_CLIP,
+  PRACTICE_LOBBY_BODY,
   PRACTICE_SUMMARY_TIP_NO_CLIP,
+  PRACTICE_SUMMARY_TIP_NO_CLIP_GRANTED,
   PRACTICE_TIPS,
   practiceBot,
   shouldOfferPracticeMatch,
@@ -15,6 +17,8 @@ const COACH_LINES = [
   ...Object.values(PRACTICE_TIPS).filter((t): t is string => t != null),
   PRACTICE_SUMMARY_TIP_CLIP,
   PRACTICE_SUMMARY_TIP_NO_CLIP,
+  PRACTICE_SUMMARY_TIP_NO_CLIP_GRANTED,
+  PRACTICE_LOBBY_BODY,
 ];
 
 // Built from code points so this file itself carries no dash characters.
@@ -36,7 +40,7 @@ describe("practice copy", () => {
 });
 
 describe("practiceBot", () => {
-  it("mirrors the athlete's rating and weight so no gap or stakes show", () => {
+  it("mirrors the athlete's weight with no rating gap (the row shows No rating)", () => {
     expect(practiceBot({ current_elo: 1234, current_weight: 180 })).toMatchObject({
       id: "practice-bot",
       displayName: "Practice Partner",

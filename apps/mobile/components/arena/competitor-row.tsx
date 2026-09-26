@@ -36,7 +36,10 @@ interface CompetitorRowProps {
   disabled: boolean;
   onChallenge: () => void;
   onGoLive: () => void;
-  onOpenProfile: () => void;
+  /** Omitted: the name block is plain text, not a button (the practice bot). */
+  onOpenProfile?: () => void;
+  /** Replaces the rating number (the practice bot has no real rating). */
+  ratingLabel?: string;
   /** The opponent a match summary's Rematch pointed here: tagged, not recoloured. */
   pinned?: boolean;
 }
@@ -53,6 +56,7 @@ export function CompetitorRow({
   onChallenge,
   onGoLive,
   onOpenProfile,
+  ratingLabel,
   pinned = false,
 }: CompetitorRowProps) {
   const { displayName, currentElo, eloDiff, gymName, weight } = competitor;
@@ -61,41 +65,52 @@ export function CompetitorRow({
     .filter(Boolean)
     .join(" · ");
 
+  const rating = ratingLabel ?? String(currentElo);
+  const identity = (
+    <>
+      <Avatar32
+        name={displayName}
+        photoUrl={competitor.profilePhotoUrl ?? null}
+      />
+      <View className="flex-1">
+        <Text numberOfLines={1} className="font-heading text-[14px] text-ink">
+          {displayName}
+        </Text>
+        <Text
+          className="mt-0.5 font-mono-bold text-[12px] text-ink"
+          style={{ fontVariant: ["tabular-nums"] }}
+        >
+          {rating}
+          {ratingLabel == null && eloDiff !== 0 ? (
+            <Text className="font-mono text-[12px] text-ink-2">
+              {`  ${gap} vs you`}
+            </Text>
+          ) : null}
+        </Text>
+        {meta ? (
+          <Text numberOfLines={1} className="mt-0.5 font-body text-[11px] text-ink-2">
+            {meta}
+          </Text>
+        ) : null}
+      </View>
+    </>
+  );
+
   return (
     <Plate variant={inLobby ? "live" : "default"} className="px-4 py-3">
       <View className="flex-row items-center gap-3">
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`${displayName}, ELO ${currentElo}${pinned ? ", rematch" : ""}`}
-          onPress={onOpenProfile}
-          className="flex-1 flex-row items-center gap-3"
-        >
-          <Avatar32
-            name={displayName}
-            photoUrl={competitor.profilePhotoUrl ?? null}
-          />
-          <View className="flex-1">
-            <Text numberOfLines={1} className="font-heading text-[14px] text-ink">
-              {displayName}
-            </Text>
-            <Text
-              className="mt-0.5 font-mono-bold text-[12px] text-ink"
-              style={{ fontVariant: ["tabular-nums"] }}
-            >
-              {currentElo}
-              {eloDiff !== 0 ? (
-                <Text className="font-mono text-[12px] text-ink-2">
-                  {`  ${gap} vs you`}
-                </Text>
-              ) : null}
-            </Text>
-            {meta ? (
-              <Text numberOfLines={1} className="mt-0.5 font-body text-[11px] text-ink-2">
-                {meta}
-              </Text>
-            ) : null}
-          </View>
-        </Pressable>
+        {onOpenProfile ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`${displayName}, ELO ${rating}${pinned ? ", rematch" : ""}`}
+            onPress={onOpenProfile}
+            className="flex-1 flex-row items-center gap-3"
+          >
+            {identity}
+          </Pressable>
+        ) : (
+          <View className="flex-1 flex-row items-center gap-3">{identity}</View>
+        )}
 
         <View className="shrink-0 items-end gap-1">
           {pinned ? <Tag label="Rematch" /> : null}

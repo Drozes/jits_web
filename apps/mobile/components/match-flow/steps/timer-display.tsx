@@ -10,6 +10,8 @@ interface TimerDisplayProps {
   matchType: "ranked" | "casual";
   /** Opponent's display name for the caption ("RANKED · VS DEMO RED"). */
   opponentName?: string | null;
+  /** Replaces the Ranked / Casual word in the caption (practice says "Practice"). */
+  kindLabel?: string;
 }
 
 /** Pressure state caption; amber is behind a hook, so it mounts only when shown. */
@@ -40,8 +42,9 @@ export function TimerDisplay({
   paused,
   matchType,
   opponentName,
+  kindLabel,
 }: TimerDisplayProps) {
-  const kind = matchType === "ranked" ? "Ranked" : "Casual";
+  const kind = kindLabel ?? (matchType === "ranked" ? "Ranked" : "Casual");
   const name = opponentName?.trim();
   return (
     <View className="items-center gap-3">

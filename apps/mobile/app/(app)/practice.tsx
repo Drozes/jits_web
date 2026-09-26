@@ -37,8 +37,12 @@ import { exitMatchTo } from "@/lib/match-flow/exit-to";
 import { ARENA_HREF } from "@/lib/arena/constants";
 import { discardLocalClip } from "@/lib/video/recording-file";
 
-/** Practice phases from weight on share the real wizard step's name and header. */
+/**
+ * Waiting and every phase from weight on share the real wizard step's name
+ * and header, so the count starts at Step 1 / 8.
+ */
 function stepFor(phase: PracticePhase): MatchStep | null {
+  if (phase === "waiting") return "wait";
   return (MATCH_STEPS as readonly string[]).includes(phase)
     ? (phase as MatchStep)
     : null;

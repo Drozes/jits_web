@@ -14,7 +14,11 @@ import { ReadyPanel } from "@/components/match-flow/steps/ready-panel";
 import { ConfirmPanel, ResultBanner } from "@/components/match-flow/steps/confirm-step-panels";
 import type { ArenaCompetitor } from "@/lib/arena/use-arena-roster";
 import type { BroadcastResult } from "@jits/shared/hooks/use-session-match-sync";
-import { PRACTICE_BOT_NAME, type PracticePhase } from "@/lib/practice/constants";
+import {
+  PRACTICE_BOT_NAME,
+  PRACTICE_LOBBY_BODY,
+  type PracticePhase,
+} from "@/lib/practice/constants";
 import { cn } from "@/lib/cn";
 
 const BUTTON_STYLES = {
@@ -91,7 +95,12 @@ export function PracticeLobby({
   return (
     <View className="gap-4">
       {/* Local only: going live here never touches the real Arena state. */}
-      <GoLivePlate isLive={live} isSaving={false} onToggle={live ? onGoOffline : onGoLive} />
+      <GoLivePlate
+        isLive={live}
+        isSaving={false}
+        onToggle={live ? onGoOffline : onGoLive}
+        body={live ? PRACTICE_LOBBY_BODY : undefined}
+      />
       {live ? (
         <>
           <SectionLabel label="Online now" count={1} />
@@ -102,7 +111,7 @@ export function PracticeLobby({
             disabled={false}
             onChallenge={onChallenge}
             onGoLive={noop}
-            onOpenProfile={noop}
+            ratingLabel="No rating"
           />
         </>
       ) : null}
@@ -173,6 +182,7 @@ export function PracticeConfirm({
         resultData={result}
         currentAthleteId={athleteId}
         matchType="casual"
+        kicker="Practice result"
         subtitle="Confirm if this is right."
       />
       <View className="flex-row gap-3">

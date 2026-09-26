@@ -7,6 +7,7 @@ import type { BroadcastResult } from "@jits/shared/hooks/use-session-match-sync"
 import {
   PRACTICE_SUMMARY_TIP_CLIP,
   PRACTICE_SUMMARY_TIP_NO_CLIP,
+  PRACTICE_SUMMARY_TIP_NO_CLIP_GRANTED,
 } from "@/lib/practice/constants";
 import { PracticeButton, PracticeTip } from "./practice-steps";
 
@@ -33,7 +34,7 @@ export function PracticeSummary({
   onDone: () => void;
   onAgain: () => void;
 }) {
-  const { localUri } = useMatchRecorder();
+  const { localUri, permission } = useMatchRecorder();
   const [watching, setWatching] = React.useState(false);
 
   React.useEffect(() => {
@@ -47,7 +48,15 @@ export function PracticeSummary({
 
   return (
     <View className="gap-4">
-      <PracticeTip text={localUri ? PRACTICE_SUMMARY_TIP_CLIP : PRACTICE_SUMMARY_TIP_NO_CLIP} />
+      <PracticeTip
+        text={
+          localUri
+            ? PRACTICE_SUMMARY_TIP_CLIP
+            : permission?.granted
+              ? PRACTICE_SUMMARY_TIP_NO_CLIP_GRANTED
+              : PRACTICE_SUMMARY_TIP_NO_CLIP
+        }
+      />
       <Plate className="items-center gap-2">
         <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-xl">
           Practice complete
