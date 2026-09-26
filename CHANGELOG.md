@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Mobile: Arena roster stays live; green dot steadier (jits-hlm1.4)
+
+JS-only, OTA-eligible for runtime 0.3.0.
+
+**Fixed**
+- Arena roster: athletes who go live after the Arena loaded now appear without a manual pull. New `apps/mobile/lib/arena/use-roster-lobby-sync.ts` quietly re-reads the roster when a `lobby:online` id is missing from it (1s after the first change, later changes coalesce; 3s minimum gap; one read in flight; each missing id tried once until the roster changes or they leave; a failed own read retried after the gap up to 3 times), re-reads once when the viewer goes live, and schedules nothing while the Arena is not focused. `useArenaRoster` exposes `isFetching`, `refreshQuietly` and `lastReadOk`; a failed quiet read keeps a good roster without the error plate; a thrown roster read is treated as failed instead of hanging.
+- Online presence: `app:online` no longer untracks on iOS `inactive` (notification shade, Control Center, system prompts), only on `background`, saving presence calls against the 5 per 30s channel limit and stopping the green dot blinking.
+
 ### Web: presence parity with mobile (jits-ifvw) and Arena cancel
 
 **Fixed**
