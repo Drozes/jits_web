@@ -1,53 +1,102 @@
-import { View } from "react-native";
+import * as React from "react";
+import { Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { Play } from "lucide-react-native";
 import { useThemedTokens } from "@/lib/theme/use-theme";
-import { useAthleteVideos } from "@/lib/profile/use-athlete-videos";
+import { matchDetailHref } from "@/lib/match-detail/href";
+import type { MyMatchVideos } from "@/lib/profile/use-my-match-videos";
 import { MetaTag, ParticipantRow } from "@/components/ui/elo-system";
 import { formatRelativeDate } from "@jits/shared/utils";
-import type { AthleteVideoRow } from "@jits/shared/api/queries";
+import type { MatchVideoListItem } from "@jits/shared/api/queries";
 
-function subtitle(v: AthleteVideoRow): string {
-  const parts: string[] = [];
-  if (v.match_date) parts.push(formatRelativeDate(v.match_date));
-  if (v.duration_seconds != null && v.duration_seconds > 0) {
-    const m = Math.floor(v.duration_seconds / 60);
-    const s = Math.round(v.duration_seconds % 60)
-      .toString()
-      .padStart(2, "0");
-    parts.push(`${m}:${s}`);
-  }
-  if (v.has_analysis) parts.push("Analyzed");
+/** Rows shown before "Show all". */
+const COLLAPSED_COUNT = 5;
+
+function subtitle(item: MatchVideoListItem): string {
+  const parts: string[] = [formatRelativeDate(item.match_date ?? item.latest_video_at)];
+  if (item.video_count > 1) parts.push(`${item.video_count} videos`);
+  if (item.match_status === "disputed") parts.push("Disputed");
+  if (item.playable_count === 0) parts.push("Processing");
   return parts.join(" · ");
 }
 
+function MutedRow({ testID, text, onPress }: { testID: string; text: string; onPress?: () => void }) {
+  const Wrapper: React.ElementType = onPress ? Pressable : View;
+  return (
+    <Wrapper
+      testID={testID}
+      onPress={onPress}
+      accessibilityRole={onPress ? "button" : undefined}
+      className="bg-surface-3 border border-hairline-faint rounded-xs px-4 py-3 active:bg-surface-4"
+    >
+      <Text className="font-body text-[12px] text-ink-3">{text}</Text>
+    </Wrapper>
+  );
+}
+
 /**
- * "Past Match Videos" section on the Profile tab. Renders nothing until the
- * athlete has at least one recorded video: an empty plate here would read as
- * a broken surface to a first-run user (jits-r75.7 concern).
+ * "Past Match Videos" on the Profile tab: one row per match (both angles
+ * grouped, jits-7b7v), disputed matches and failed-status videos included.
+ * A row opens the match detail screen, which explains each video's state.
+ * Always visible once the first load settles: an empty list says so, and a
+ * failed load shows a retry row that stays up until a retry succeeds.
+ * Renders nothing only while cold-loading.
  */
-export function PastMatchVideos({ athleteId }: { athleteId: string }) {
+export function PastMatchVideos({ videos }: { videos: MyMatchVideos }) {
   const router = useRouter();
   const tokens = useThemedTokens();
-  const { videos } = useAthleteVideos(athleteId);
+  const [expanded, setExpanded] = React.useState(false);
+  const { items, isLoading, error, refetch } = videos;
 
-  if (videos.length === 0) return null;
+  if (items.length === 0 && !error && isLoading) return null;
+
+  const shown = expanded ? items : items.slice(0, COLLAPSED_COUNT);
 
   return (
     <View className="gap-3">
       <MetaTag>Past Match Videos</MetaTag>
-      <View className="gap-[1px]">
-        {videos.map((v) => (
-          <ParticipantRow
-            key={v.video_id}
-            name={`vs ${v.opponent_name ?? "Opponent"}`}
-            subtitle={subtitle(v)}
-            onPress={() => router.push(`/(app)/video/${v.video_id}`)}
-            accessibilityLabel={`Play match video vs ${v.opponent_name ?? "opponent"}`}
-            action={<Play size={16} color={tokens.textSecondary} />}
-          />
-        ))}
-      </View>
+      {items.length === 0 && error ? (
+        <MutedRow
+          testID="past-videos-error"
+          text="Couldn't load your videos. Tap to retry."
+          onPress={refetch}
+        />
+      ) : items.length === 0 ? (
+        <MutedRow
+          testID="past-videos-empty"
+          text="No match videos yet. Record your next match to watch it here."
+        />
+      ) : (
+        <View className="gap-[1px]">
+          {shown.map((item) => {
+            const name = item.opponent_name ?? "Opponent";
+            return (
+              <ParticipantRow
+                key={item.match_id}
+                testID={`past-video-row-${item.match_id}`}
+                name={`vs ${name}`}
+                subtitle={subtitle(item)}
+                onPress={() => router.push(matchDetailHref(item.match_id))}
+                accessibilityLabel={`Open match video vs ${name}`}
+                action={<Play size={16} color={tokens.textSecondary} />}
+              />
+            );
+          })}
+        </View>
+      )}
+      {items.length > COLLAPSED_COUNT ? (
+        <Pressable
+          testID="past-videos-toggle"
+          onPress={() => setExpanded((v) => !v)}
+          accessibilityRole="button"
+          hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
+          className="self-start active:opacity-70"
+        >
+          <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-l">
+            {expanded ? "Show fewer" : `Show all (${items.length})`}
+          </Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }

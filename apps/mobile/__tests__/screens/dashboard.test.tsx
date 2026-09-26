@@ -1,14 +1,33 @@
 import * as React from "react";
-import { fireEvent, render, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, render, waitFor } from "@testing-library/react-native";
 
 // ---- mocks ----
 
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
 
+// useFocusEffect runs its callback on mount (the first focus) and records it
+// so a test can simulate the tab regaining focus.
+const mockFocusCallbacks: (() => void)[] = [];
 jest.mock("expo-router", () => ({
   useRouter: () => ({ push: mockPush, replace: mockReplace }),
+  useFocusEffect: (cb: () => void) => {
+    const R = require("react");
+    R.useEffect(() => {
+      mockFocusCallbacks.push(cb);
+      cb();
+    }, [cb]);
+  },
 }));
+
+// Focus refetches are throttled to one per 30s, so step the clock past it.
+let mockNow = 1_000_000;
+function refocus() {
+  mockNow += 31_000;
+  act(() => {
+    mockFocusCallbacks.forEach((cb) => cb());
+  });
+}
 
 // Stub all lucide icons
 jest.mock("lucide-react-native", () => {
@@ -80,11 +99,30 @@ jest.mock("@/components/dashboard/stat-overview", () => ({
   },
 }));
 
+// Renders the section title plus one pressable per "Me" row, so the screen's
+// onPressMatch wiring is exercised without the real section.
 jest.mock("@/components/dashboard/recent-activity-section", () => ({
-  RecentActivitySection: () => {
+  RecentActivitySection: ({
+    myMatches,
+    onPressMatch,
+  }: {
+    myMatches: { id: string; opponentName: string }[];
+    onPressMatch?: (id: string) => void;
+  }) => {
     const R = require("react");
     const RN = require("react-native");
-    return R.createElement(RN.Text, {}, "RecentActivitySection");
+    return R.createElement(
+      RN.View,
+      {},
+      R.createElement(RN.Text, {}, "RecentActivitySection"),
+      ...myMatches.map((m) =>
+        R.createElement(RN.Pressable, {
+          key: m.id,
+          accessibilityLabel: `row ${m.id}`,
+          onPress: () => onPressMatch?.(m.id),
+        }),
+      ),
+    );
   },
 }));
 
@@ -175,6 +213,12 @@ beforeEach(() => {
   queries.getGymsWithSessionsResult.mockResolvedValue({ ok: true, data: [] });
   mockAthlete.primary_gym_id = null;
   mockAthlete.id = `a${++athleteSeq}`;
+  mockFocusCallbacks.length = 0;
+  jest.spyOn(Date, "now").mockImplementation(() => mockNow);
+});
+
+afterEach(() => {
+  jest.restoreAllMocks();
 });
 
 describe("DashboardScreen", () => {
@@ -240,6 +284,51 @@ describe("DashboardScreen", () => {
     });
     expect(queryByText(/session/i)).toBeNull();
     expect(queryByText(/Enter Lobby|Check In/)).toBeNull();
+  });
+
+  it("opens the match detail screen from a Me row, with no coming-soon toast", async () => {
+    const queries = require("@jits/shared/api/queries") as QueryMocks;
+    queries.getDashboardSummary.mockResolvedValue({
+      ...mockSummary,
+      recent_matches: [
+        {
+          match_id: "m-42",
+          opponent_name: "Demo Red",
+          outcome: "win",
+          match_type: "ranked",
+          elo_delta: 12,
+          completed_at: "2026-09-24T12:00:00.000Z",
+        },
+      ],
+    });
+    const { toast } = require("@/components/ui/toast") as { toast: { info: jest.Mock } };
+    const { findByLabelText } = render(React.createElement(DashboardScreen));
+
+    fireEvent.press(await findByLabelText("row m-42"));
+
+    expect(mockPush).toHaveBeenCalledWith("/(app)/match-detail/m-42");
+    expect(toast.info).not.toHaveBeenCalled();
+  });
+
+  it("refetches the summary when the tab regains focus, not on the first focus", async () => {
+    const queries = require("@jits/shared/api/queries") as QueryMocks;
+    const { getByText } = render(React.createElement(DashboardScreen));
+    await waitFor(() => {
+      expect(getByText("5W")).toBeTruthy();
+    });
+    expect(queries.getDashboardSummary).toHaveBeenCalledTimes(1);
+
+    // A quick tab switch inside the throttle window does not refetch.
+    act(() => {
+      mockFocusCallbacks.forEach((cb) => cb());
+    });
+    expect(queries.getDashboardSummary).toHaveBeenCalledTimes(1);
+
+    refocus();
+
+    await waitFor(() => {
+      expect(queries.getDashboardSummary).toHaveBeenCalledTimes(2);
+    });
   });
 
   it("renders the recent activity section", async () => {

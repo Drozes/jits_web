@@ -183,6 +183,7 @@ export function MatchStepRenderer({
     const weightDivisionGap = isRanked ? me.weight_division_gap ?? null : null;
     return (
       <SummaryStep
+        matchId={matchId}
         exitHref={exitHref}
         exitLabel={exitLabel}
         matchType={matchType}

@@ -6,9 +6,12 @@ import { useThemedTokens } from "@/lib/theme/use-theme";
 import { useAuth } from "@/lib/auth/hooks";
 import { cn } from "@/lib/cn";
 import { buildShareUrl, buildShareText } from "@jits/shared/utils";
+import { matchDetailHref } from "@/lib/match-detail/href";
 import { EloTile, Plate } from "@/components/ui/elo-system";
 
 interface SummaryStepProps {
+  /** Match id, for the "View match details" fallback link. */
+  matchId: string;
   /** Where the primary exit cta returns to (the Arena, on mobile). */
   exitHref: string;
   /** Copy on the primary exit cta. */
@@ -53,6 +56,7 @@ export function SummaryStep(props: SummaryStepProps) {
   const router = useRouter();
   const { athlete } = useAuth();
   const {
+    matchId,
     exitHref,
     exitLabel,
     matchType,
@@ -205,7 +209,23 @@ export function SummaryStep(props: SummaryStepProps) {
               Video Uploading...
             </Text>
           </View>
-        ) : null}
+        ) : (
+          // A reopened completed or disputed match has an empty in-memory
+          // upload store, so no video id: the detail screen lists every video
+          // on the match from the server (jits-p75q). A text link, never a
+          // second red CTA.
+          <Pressable
+            testID="summary-view-match-details"
+            accessibilityRole="button"
+            onPress={() => router.push(matchDetailHref(matchId))}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            className="items-center py-2 active:opacity-70"
+          >
+            <Text className="font-heading text-[12px] text-ink-2 uppercase tracking-caps">
+              View match details
+            </Text>
+          </Pressable>
+        )}
         {outcome && !disputed ? (
           <Pressable
             accessibilityRole="button"

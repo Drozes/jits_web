@@ -339,10 +339,34 @@ describe("watching the match back from the summary (jits-p75q)", () => {
     expect(mockRouterPush).toHaveBeenCalledWith("/(app)/video/VID-9");
   });
 
-  it("offers nothing when there is no video and none is coming", () => {
+  it("offers no playback when there is no video and none is coming", () => {
     const { queryByText } = renderSummary(null);
     expect(queryByText("Watch Match Video")).toBeNull();
     expect(queryByText(/video uploading/i)).toBeNull();
+  });
+
+  it("links a reopened match with no video id to the match detail screen", () => {
+    // Reopening a completed match starts with an empty upload store, so the
+    // detail screen (which reads every video from the server) is the way in.
+    const { getByText } = renderSummary(null);
+
+    fireEvent.press(getByText("View match details"));
+    expect(mockRouterPush).toHaveBeenCalledWith("/(app)/match-detail/M1");
+  });
+
+  it("links a reopened DISPUTED match to the match detail screen too", () => {
+    const { getByText } = renderSummary(null, { status: "disputed" });
+
+    fireEvent.press(getByText("View match details"));
+    expect(mockRouterPush).toHaveBeenCalledWith("/(app)/match-detail/M1");
+  });
+
+  it("does not show the details link while a video is available or uploading", () => {
+    expect(
+      renderSummary({ status: "uploaded", videoId: "VID-1" }).queryByText("View match details"),
+    ).toBeNull();
+    resetMatchUploadStore();
+    expect(renderSummary({ status: "uploading" }).queryByText("View match details")).toBeNull();
   });
 });
 

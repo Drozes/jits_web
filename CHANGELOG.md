@@ -26,6 +26,29 @@ JS-only, OTA-eligible for runtime 0.3.0 (expo-av and expo-image are already in t
 **Changed**
 - `apps/mobile/app/(app)/video/[id].tsx`: reads through `getMatchVideoPlaybackResult` (normalized MP4 preferred, signed poster passed to expo-av). Distinct panels for no row ("Video unavailable", Back), still uploading ("Still uploading", Try again, no player mounted), storage miss ("Video file not found", Back) and any other failure ("Couldn't play this video", Try again). A player error re-signs silently, remounts on the new URL and seeks back to the last position. Bounded: a second error before playback has moved 3s past the resume point shows the retry panel, at most 2 silent re-signs happen per screen (only Retry resets that), and errors while a sign is in flight are ignored. A route with no id shows "Video unavailable". New `video-player-state` accessible 1x1 harness marker with label "Video state: loading|loaded|error|absent|processing|missing" for the match-loop harness; new testIDs `video-processing`, `video-file-missing` (existing `video-load-failed`, `video-unavailable` kept). Tests: `apps/mobile/__tests__/screens/video-playback.test.tsx`.
 
+### Mobile: every match history row opens match detail; Past Match Videos overhaul (jits-5tj9.8)
+
+JS-only, OTA-eligible (no native dependency or config change). Pushes `/(app)/match-detail/<matchId>`, the screen S2 (jits-5tj9.7) adds; ship both together.
+
+**Added**
+- `apps/mobile/lib/match-detail/href.ts`: `matchDetailHref(matchId)`, the one builder of the match detail route.
+- `apps/mobile/lib/profile/use-my-match-videos.ts`: `useMyMatchVideos(athleteId)` on `getMyMatchVideos` (limit 100, cached, `ok: false` becomes the hook's `error`).
+- `apps/mobile/lib/cache/use-refocus-refetch.ts`: `useRefetchOnRefocus` (refetch when a tab regains focus, skipping the first focus and throttled to once per 30s per screen, `REFOCUS_REFETCH_MIN_MS`, so tab switches and back navigation do not re-run the reads or re-toast an offline error; pull-to-refresh stays unthrottled) and `usePullToRefresh` (the pull spinner shows only for a pull, not for a silent focus refetch).
+- "View match details" text link on the match wizard summary step when there is no video id and none is uploading (a reopened completed or disputed match), pushing the detail screen (`components/match-flow/steps/summary-step.tsx`, new `matchId` prop passed from `match-step-renderer.tsx`).
+- `ParticipantRow` (`components/ui/elo-system/participant-row.tsx`) takes an optional `testID`.
+- `apps/mobile/components/profile/history-row-action.tsx`: `HistoryRowAction` (ranked ELO delta + chevron), shared by the Profile Recent Matches and athlete head-to-head rows.
+
+**Changed**
+- Home Recent Activity ("Me" scope), Profile Recent Matches, Stats full history and the athlete page head-to-head rows all open the match detail screen, with accessibility labels "Open match vs <name>" and a trailing chevron. The "Match details coming soon" toast is gone. "All" scope rows stay non-pressable (they can be other athletes' matches). Home "Me" rows now show Ranked/Casual next to the date.
+- `components/match-card.tsx`: optional `accessibilityLabel` (defaults to "Open match vs <opponent>" when pressable) and a chevron when pressable.
+- `components/profile/past-match-videos.tsx`: one row per match (both uploaders grouped, "2 videos"), includes disputed matches and failed-status videos, no 10-video cap, subtitle flags "Disputed" / "Processing", first 5 with a "Show all (N)" / "Show fewer" toggle, rows open the match detail screen (label "Open match video vs <name>", testID `past-video-row-<matchId>`). A failed load shows a "Couldn't load your videos. Tap to retry." row instead of hiding, and it stays up through the retry until a load succeeds (`useMyMatchVideos` keeps the last error). An empty list shows "No match videos yet. Record your next match to watch it here." (testID `past-videos-empty`, product decision overriding spec 5.1); only cold-loading renders nothing.
+- Home and Profile refetch when their tab regains focus; Profile's pull-to-refresh and focus refetch reload the videos list too.
+
+**Removed**
+- `apps/mobile/lib/profile/use-athlete-videos.ts` (its only consumer moved to `useMyMatchVideos`).
+
+Tests: `__tests__/lib/match-detail/href.test.ts`, `__tests__/components/profile/past-match-videos.test.tsx`, `__tests__/lib/profile/use-my-match-videos.test.tsx`, `__tests__/lib/cache/use-refocus-refetch.test.tsx`, `__tests__/screens/match-history-rows.test.tsx` (new); `dashboard.test.tsx`, `profile.test.tsx`, `recent-activity-section.test.tsx`, `upload-status-visibility.test.tsx` (updated).
+
 ### Shared: match detail + video playback data layer (jits-5tj9.6)
 
 **Added**

@@ -65,3 +65,28 @@ describe("RecentActivitySection empty states", () => {
     expect(queryByText(/session/i)).toBeNull();
   });
 });
+
+describe("RecentActivitySection Me rows", () => {
+  it("opens a match by id, labelled for assistive tech", () => {
+    const onPressMatch = jest.fn();
+    const { getByText, getByLabelText } = render(
+      <RecentActivitySection
+        myMatches={[
+          {
+            id: "m-3",
+            opponentName: "Demo Blue",
+            result: "win",
+            matchType: "ranked",
+            eloDelta: 10,
+            date: "2026-09-24T12:00:00.000Z",
+          },
+        ]}
+        allActivity={[]}
+        onPressMatch={onPressMatch}
+      />,
+    );
+    fireEvent.press(getByText("Me"));
+    fireEvent.press(getByLabelText("Open match vs Demo Blue"));
+    expect(onPressMatch).toHaveBeenCalledWith("m-3");
+  });
+});
