@@ -175,6 +175,8 @@ export type Database = {
           looking_for_casual: boolean
           looking_for_ranked: boolean
           platform_role: Database["public"]["Enums"]["platform_role"]
+          practice_match_completed_at: string | null
+          practice_match_offered_at: string | null
           primary_gym_id: string | null
           profile_photo_url: string | null
           role: Database["public"]["Enums"]["athlete_role"]
@@ -201,6 +203,8 @@ export type Database = {
           looking_for_casual?: boolean
           looking_for_ranked?: boolean
           platform_role?: Database["public"]["Enums"]["platform_role"]
+          practice_match_completed_at?: string | null
+          practice_match_offered_at?: string | null
           primary_gym_id?: string | null
           profile_photo_url?: string | null
           role?: Database["public"]["Enums"]["athlete_role"]
@@ -227,6 +231,8 @@ export type Database = {
           looking_for_casual?: boolean
           looking_for_ranked?: boolean
           platform_role?: Database["public"]["Enums"]["platform_role"]
+          practice_match_completed_at?: string | null
+          practice_match_offered_at?: string | null
           primary_gym_id?: string | null
           profile_photo_url?: string | null
           role?: Database["public"]["Enums"]["athlete_role"]
@@ -2062,6 +2068,13 @@ export type Database = {
       mark_conversation_read: {
         Args: { p_conversation_id: string }
         Returns: Json
+      }
+      mark_practice_match: {
+        Args: { p_event: string }
+        Returns: {
+          practice_match_completed_at: string | null
+          practice_match_offered_at: string
+        }[]
       }
       merge_finalize: {
         Args: { p_analysis: Json; p_technique_tags: Json; p_video_id: string }

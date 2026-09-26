@@ -13,6 +13,11 @@ interface MatchRecorderProviderProps {
   uploaderAthleteId: string | null;
   /** The match's configured `duration_seconds`; sizes the OS recording cap. */
   matchDurationSeconds: number | null;
+  /**
+   * Default true. `false` (practice match) keeps the clip on the device and
+   * exposes it as `localUri` on the recorder; nothing is uploaded.
+   */
+  upload?: boolean;
   children: React.ReactNode;
 }
 
@@ -41,9 +46,15 @@ export function MatchRecorderProvider({
   matchId,
   uploaderAthleteId,
   matchDurationSeconds,
+  upload,
   children,
 }: MatchRecorderProviderProps) {
-  const recorder = useVideoRecorder(matchId, uploaderAthleteId, matchDurationSeconds);
+  const recorder = useVideoRecorder(
+    matchId,
+    uploaderAthleteId,
+    matchDurationSeconds,
+    upload === false ? { upload: false } : undefined,
+  );
   return (
     <MatchRecorderContext.Provider value={recorder}>{children}</MatchRecorderContext.Provider>
   );

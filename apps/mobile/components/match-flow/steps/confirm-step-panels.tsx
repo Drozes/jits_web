@@ -14,10 +14,16 @@ export function ResultBanner({
   resultData,
   currentAthleteId,
   matchType,
+  subtitle,
+  kicker = "Match Recorded",
 }: {
   resultData: BroadcastResult | null;
   currentAthleteId: string;
   matchType: "ranked" | "casual";
+  /** Overrides the default line under the verdict (practice has no dispute). */
+  subtitle?: string;
+  /** Overrides the small line above the verdict. */
+  kicker?: string;
 }) {
   const isWinner =
     resultData?.result === "submission" && resultData.winnerId === currentAthleteId;
@@ -42,7 +48,7 @@ export function ResultBanner({
   return (
     <Plate variant={variant} className="items-center gap-2">
       <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-xl">
-        Match Recorded
+        {kicker}
       </Text>
       <Text
         testID="confirm-verdict"
@@ -51,9 +57,10 @@ export function ResultBanner({
         {verdictText}
       </Text>
       <Text className="text-center font-body text-[12px] text-ink-2">
-        {matchType === "ranked"
+        {subtitle ??
+          (matchType === "ranked"
           ? "Your rating is already updated. Confirm if this is right, or dispute it and an admin will review."
-          : "Confirm if this is right, or dispute it."}
+          : "Confirm if this is right, or dispute it.")}
       </Text>
     </Plate>
   );

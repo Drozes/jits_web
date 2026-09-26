@@ -5,6 +5,7 @@ import { useSessionMatchTimer } from "@jits/shared/hooks/use-session-match-timer
 import { useLiveControls } from "@/lib/match-flow/use-live-controls";
 import { usePauseResync } from "@/lib/match-flow/use-pause-resync";
 import { matchHaptics } from "@/lib/match-flow/use-haptics";
+import { clampFinishSeconds } from "@/lib/match-flow/clamp-finish-seconds";
 import type { UseVideoRecorderReturn } from "@/lib/video/use-video-recorder";
 import { AUTO_END_DELAY_MS } from "@/lib/video/recording-limits";
 import { TimerDisplay } from "./timer-display";
@@ -28,8 +29,10 @@ interface LiveStepProps {
    */
   recorder: UseVideoRecorderReturn;
   /** Advance to the result step. Called after end_match completes or
-   * after we receive a `match_ended` broadcast from the opponent. */
-  onEnded: () => void;
+   * after we receive a `match_ended` broadcast from the opponent, with the
+   * match clock at that moment (pause-aware, clamped to 1..duration) so the
+   * result step can prefill the finish time. */
+  onEnded: (finishSeconds: number) => void;
 }
 
 const TIME_WARNING_SECONDS = 10;
@@ -77,6 +80,10 @@ export function LiveStep(props: LiveStepProps) {
     pausedAt,
     totalPausedDuration,
   );
+  // The clock at the end moment, clamped to what record_match_result accepts
+  // (above 0, at most the duration: auto-end fires a beat after 00:00).
+  const elapsedRef = React.useRef(timer.elapsed);
+  elapsedRef.current = timer.elapsed;
   const sync = useStepMatchSync({
     matchId,
     onTimerPaused: (p) => timer.syncFromBroadcast({ type: "paused", pausedAt: p }),
@@ -86,15 +93,18 @@ export function LiveStep(props: LiveStepProps) {
       if (endedRef.current) return;
       endedRef.current = true;
       void recorder.stop();
-      onEnded();
+      onEnded(clampFinishSeconds(elapsedRef.current, durationSeconds));
     },
   });
 
-  const wrappedOnEnded = React.useCallback(() => {
-    void recorder.stop();
-    void matchHaptics.matchEnd();
-    onEnded();
-  }, [recorder, onEnded]);
+  const wrappedOnEnded = React.useCallback(
+    (elapsed: number) => {
+      void recorder.stop();
+      void matchHaptics.matchEnd();
+      onEnded(clampFinishSeconds(elapsed, durationSeconds));
+    },
+    [recorder, onEnded, durationSeconds],
+  );
 
   const { busy, handleEnd, handlePauseResume } = useLiveControls({
     matchId,
@@ -149,6 +159,7 @@ export function LiveStep(props: LiveStepProps) {
   // re-arms it; an in-flight pause/resume (`busy`) defers it rather than
   // letting `handleEnd` drop it. `endedRef` makes the end one-shot, whether
   // this device ended it or the opponent's `match_ended` arrived first.
+  // The practice match (components/practice/practice-live.tsx) mirrors this auto-end.
   const handleEndRef = React.useRef(handleEnd);
   handleEndRef.current = handleEnd;
   const autoEndDue =

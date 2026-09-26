@@ -2,6 +2,26 @@
 
 ## [Unreleased]
 
+### Mobile: practice match onboarding (jits-82by, jr_be spec 014)
+
+JS-only, OTA-eligible, but ship only AFTER the jr_be `practice_match_onboarding` migration is live in prod: `ATHLETE_GUARD_SELECT` now reads two new athlete columns and every athlete load fails without them (web `requireAthlete()` shares the constant, so the next web deploy must follow the migration too).
+
+**Added**
+- `/practice` (`apps/mobile/app/(app)/practice.tsx`): a client-side walk through one Arena match (go live, challenge, accept, weights, ready, 30s clock, result, confirm, summary) against a scripted "Practice Partner" bot. Reuses the real presentational leaves (`GoLivePlate`, `CompetitorRow`, `WaitingPlate`, `WizardStepHeader`, `WeightTile`, `ReadyPanel`, `TimerDisplay`, `LiveControls`, `EndStep`, result fields, `ResultBanner`, `ConfirmPanel`) with a local reducer and bot timers (`apps/mobile/lib/practice/use-practice-match.ts`, `apps/mobile/lib/practice/constants.ts`, `apps/mobile/components/practice/`). A PRACTICE tag and a coach line on every phase; no rating numbers, share, rematch or dispute. Writes no challenge, match, result, confirmation or video; the only network write is `markPracticeMatch`. Mounts `useArenaMatchScreen()` so no real challenge prompt lands over it.
+- One recorded clip per run, played back locally (muted by default) on the summary and deleted when the athlete leaves or taps Practice again. Never uploaded.
+- Home: a one-time "Try a practice match" card (`apps/mobile/components/dashboard/practice-offer-card.tsx`) for an athlete who has not answered the offer, is not a bot, has no match in flight and no completed matches. It holds Home's red CTA while shown (the Arena card steps down). Not now marks the offer skipped.
+- Settings: a PRACTICE MATCH row, always visible, to replay it.
+
+**Changed**
+- `useVideoRecorder` takes an optional `{ upload?: boolean }` (default true) and `MatchRecorderProvider` an optional `upload` prop. With `upload: false` the clip is exposed as `localUri` and nothing is uploaded or written to the match-upload store; a clip that settles after unmount is deleted. Default behavior unchanged.
+- `discardLocalClip(uri)` in `apps/mobile/lib/video/recording-file.ts`.
+- Exported `WizardStepHeader` and `STEP_LABELS` (`match-flow-wizard.tsx`) and `WeightTile` (`weight-step.tsx`) for reuse.
+
+### Shared
+**Added**
+- `practice_match_offered_at` and `practice_match_completed_at` in `ATHLETE_GUARD_SELECT` / `AthleteGuardRow` and the generated types (hand-added with the `mark_practice_match` RPC; regenerate with `npm run db:types` once the migration is local).
+- `markPracticeMatch(supabase, "offered" | "skipped" | "completed")` in `@jits/shared/api/mutations`: fire and forget, never through the mutation queue.
+
 ### Docs
 **Changed**
 - `CLAUDE.md`: corrected the `match_participants` RLS note (own rows readable), added the presence rate-limit / channel-rebuild rules, mobile match exits (`exitMatchTo`, `useMatchExitCount`), Arena concurrency rules, Resume/rejoin scope, the narrowed web pending-challenge gap, and the `tools/match-loop` harness.

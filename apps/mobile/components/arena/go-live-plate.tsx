@@ -13,9 +13,11 @@ interface GoLivePlateProps {
   isLive: boolean;
   isSaving: boolean;
   onToggle: () => void;
+  /** Replaces the line under the heading (practice has no real opponents). */
+  body?: string;
 }
 
-export function GoLivePlate({ isLive, isSaving, onToggle }: GoLivePlateProps) {
+export function GoLivePlate({ isLive, isSaving, onToggle, body }: GoLivePlateProps) {
   return (
     <Plate variant={isLive ? "live" : "default"}>
       <View className="flex-row items-start justify-between gap-3">
@@ -25,9 +27,10 @@ export function GoLivePlate({ isLive, isSaving, onToggle }: GoLivePlateProps) {
             {isLive ? "Looking for a match" : "You're offline"}
           </Text>
           <Text className="mt-1 font-body text-[13px] text-ink-2">
-            {isLive
+            {body ??
+              (isLive
               ? "You're in the lobby. Opponents can challenge you now."
-              : "Go live to appear in the lobby and challenge anyone else who is."}
+              : "Go live to appear in the lobby and challenge anyone else who is.")}
           </Text>
         </View>
         {isLive ? <LivePill label="Live" /> : null}

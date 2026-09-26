@@ -18,7 +18,8 @@ interface UseLiveControlsParams {
   timer: Timer;
   sync: Sync;
   endedRef: React.MutableRefObject<boolean>;
-  onEnded: () => void;
+  /** Called with the pause-aware clock reading taken at the End tap. */
+  onEnded: (elapsedSeconds: number) => void;
 }
 
 /**
@@ -28,10 +29,15 @@ interface UseLiveControlsParams {
  */
 export function useLiveControls({ matchId, timer, sync, endedRef, onEnded }: UseLiveControlsParams) {
   const [busy, setBusy] = React.useState<Action | null>(null);
+  // Read through a ref: handleEnd does not re-memoise on every clock tick.
+  const elapsedRef = React.useRef(timer.elapsed);
+  elapsedRef.current = timer.elapsed;
 
   const handleEnd = React.useCallback(() => {
     if (endedRef.current || busy) return;
     endedRef.current = true;
+    // The finish time is the moment of the tap, not after the broadcast settles.
+    const elapsed = elapsedRef.current;
     // Do NOT call end_match here. end_match flips the match to 'completed',
     // but record_match_result (the next step) requires status='in_progress'
     // and would fail with invalid_status, so the result + ELO would never be
@@ -49,7 +55,7 @@ export function useLiveControls({ matchId, timer, sync, endedRef, onEnded }: Use
     setBusy("end");
     void settleWithin(sync.broadcastMatchEnded(), SEND_GRACE_MS).then(() => {
       setBusy(null);
-      onEnded();
+      onEnded(elapsed);
     });
   }, [busy, endedRef, onEnded, sync]);
 

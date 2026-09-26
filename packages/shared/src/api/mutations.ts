@@ -1373,3 +1373,41 @@ export async function removeGymManager(
   }
   return { ok: true, data: undefined };
 }
+
+// ---------------------------------------------------------------------------
+// Practice match onboarding (jr_be spec 014)
+// ---------------------------------------------------------------------------
+
+export type PracticeMatchEvent = "offered" | "skipped" | "completed";
+
+export interface PracticeMatchState {
+  practice_match_offered_at: string | null;
+  practice_match_completed_at: string | null;
+}
+
+/**
+ * Record a practice-match onboarding event on the caller's athlete row via
+ * the `mark_practice_match` SECURITY DEFINER RPC (the columns are guarded
+ * against direct client writes). Idempotent: the first timestamp wins.
+ * Callers fire and forget it; never route it through the mutation queue.
+ */
+export async function markPracticeMatch(
+  supabase: Client,
+  event: PracticeMatchEvent,
+): Promise<Result<PracticeMatchState>> {
+  const { data, error } = await supabase.rpc("mark_practice_match", {
+    p_event: event,
+  });
+
+  if (error) {
+    return { ok: false, error: mapPostgrestError(error) };
+  }
+  const row = Array.isArray(data) ? data[0] : data;
+  return {
+    ok: true,
+    data: {
+      practice_match_offered_at: row?.practice_match_offered_at ?? null,
+      practice_match_completed_at: row?.practice_match_completed_at ?? null,
+    },
+  };
+}

@@ -203,7 +203,7 @@ function GapNote({ gap }: { gap: number }) {
   );
 }
 
-function WeightTile({ name, weight }: { name: string; weight: number | null }) {
+export function WeightTile({ name, weight }: { name: string; weight: number | null }) {
   return (
     <View className="flex-1 items-center gap-2">
       <Text

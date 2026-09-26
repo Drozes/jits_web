@@ -35,6 +35,9 @@ export default function AppLayout() {
         <Stack.Screen name="match-detail/[matchId]" />
         <Stack.Screen name="video/[id]" />
         <Stack.Screen name="settings" />
+        {/* The practice match: a local walk through one Arena match against
+          a scripted bot. Writes no match data. */}
+        <Stack.Screen name="practice" />
       </Stack>
       {/* Live state, lobby presence and the incoming-challenge prompt, once for
         the whole signed-in app, so being live survives switching tabs and a
