@@ -153,6 +153,17 @@ describe("Rematch shortcut", () => {
     expect(s.getByText("Done")).toBeTruthy();
   });
 
+  it("demotes Done to a text link that still goes Home", () => {
+    const s = renderSummary();
+    const done = s.getByTestId("summary-done");
+    expect(done.props.className).not.toContain("border");
+    expect(done.props.className).not.toContain("bg-cta");
+    expect(done.props.hitSlop).toEqual({ top: 8, bottom: 8, left: 8, right: 8 });
+    expect(s.getByText("Done").props.className).toContain("text-ink-2");
+    fireEvent.press(done);
+    expect(mockReplace).toHaveBeenCalledWith("/");
+  });
+
   it("works after a draw and a loss too", () => {
     expect(renderSummary({ outcome: "draw", eloDelta: -8 }).getByTestId("summary-rematch")).toBeTruthy();
     expect(renderSummary({ outcome: "loss", eloDelta: -16 }).getByTestId("summary-rematch")).toBeTruthy();

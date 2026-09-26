@@ -158,6 +158,50 @@ describe("weight gap note", () => {
     expect(s.getByText(/classes apart\. The heavier athlete’s rating is adjusted\./)).toBeTruthy();
   });
 
+  it("never shows a locally estimated gap: nothing while loading or after a failure", async () => {
+    // 150 vs 180 lbs is a clear multi-class gap, but only the RPC decides.
+    let resolve: (v: unknown) => void = () => undefined;
+    mockGetEloStakes.mockReturnValue(new Promise((r) => (resolve = r)));
+    const loading = renderWeight({ currentWeight: 150, opponentWeight: 180 });
+    expect(loading.queryByTestId("weight-gap-note")).toBeNull();
+    await act(async () => {
+      resolve({ ...STAKES, weight_division_gap: 2 });
+      await Promise.resolve();
+    });
+    loading.getByTestId("weight-gap-note");
+
+    mockGetEloStakes.mockRejectedValue(new Error("offline"));
+    const failed = renderWeight({ currentWeight: 150, opponentWeight: 180 });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(failed.queryByTestId("weight-gap-note")).toBeNull();
+  });
+
+  it("never shows stale stakes while new inputs are loading", async () => {
+    mockGetEloStakes.mockResolvedValueOnce(STAKES);
+    const s = renderWeight();
+    await waitFor(() => s.getByTestId("weight-stakes"));
+
+    mockGetEloStakes.mockReturnValueOnce(new Promise(() => undefined));
+    s.rerender(
+      <WeightStep
+        matchId="M1"
+        onCancelledRemotely={jest.fn()}
+        currentDisplayName="Demo Blue"
+        currentWeight={170}
+        currentElo={1016}
+        opponentDisplayName="Demo Red"
+        opponentWeight={172}
+        opponentElo={1040}
+        matchType="ranked"
+        onConfirm={jest.fn()}
+      />,
+    );
+    expect(mockGetEloStakes).toHaveBeenCalledTimes(2);
+    expect(s.queryByTestId("weight-stakes")).toBeNull();
+  });
+
   it("uses the backend's division gap once the stakes land", async () => {
     // 11 lbs apart estimates one class locally, but the RPC says none.
     mockGetEloStakes.mockResolvedValue({ ...STAKES, weight_division_gap: 0 });

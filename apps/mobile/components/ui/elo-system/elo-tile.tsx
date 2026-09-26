@@ -109,7 +109,9 @@ function easeOutCubic(t: number): number {
  * The 480ms rating tick: counts from `from` to `to` once per mount, in
  * integer steps with an ease-out curve, then fires one light haptic. With
  * reduce motion on it jumps straight to `to` (the haptic still lands, it is
- * not motion). A non-numeric pair, or a later prop change, never animates.
+ * not motion). A non-numeric pair, or a later prop change, never animates:
+ * a change mid-tick jumps to the new value and lands (one haptic, never two),
+ * and a change after landing just jumps.
  */
 export function useRatingTick(from: string | number, to: string | number): string | number {
   const start = typeof from === "number" ? from : Number(from);
@@ -119,6 +121,9 @@ export function useRatingTick(from: string | number, to: string | number): strin
   // Set only when the tick lands, so an effect torn down mid-tick (a dev
   // StrictMode double run) replays it rather than skipping it.
   const landedRef = React.useRef(false);
+  // Set once frames are actually running (after the async reduce-motion
+  // read), so only a real mid-tick change takes the jump-and-land path.
+  const tickingRef = React.useRef(false);
 
   React.useEffect(() => {
     if (!numeric || landedRef.current) {
@@ -130,9 +135,15 @@ export function useRatingTick(from: string | number, to: string | number): strin
     const land = () => {
       if (cancelled) return;
       landedRef.current = true;
+      tickingRef.current = false;
       setShown(end);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
     };
+    if (tickingRef.current) {
+      // The pair changed mid-tick: never restart from `start`.
+      land();
+      return;
+    }
     AccessibilityInfo.isReduceMotionEnabled()
       .catch(() => false)
       .then((reduce) => {
@@ -142,6 +153,7 @@ export function useRatingTick(from: string | number, to: string | number): strin
           return;
         }
         const t0 = Date.now();
+        tickingRef.current = true;
         const step = () => {
           if (cancelled) return;
           const t = Math.min(1, (Date.now() - t0) / RATING_TICK_MS);

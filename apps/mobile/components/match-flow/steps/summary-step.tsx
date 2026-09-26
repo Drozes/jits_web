@@ -305,13 +305,16 @@ export function SummaryStep(props: SummaryStepProps) {
             {exitLabel}
           </Text>
         </Pressable>
+        {/* A text link, like View match details: below the outline buttons
+            and the one red cta, it is the quiet way out. */}
         <Pressable
           testID="summary-done"
           accessibilityRole="button"
           onPress={() => router.replace("/")}
-          className="items-center justify-center border border-hairline-strong rounded-sm py-3 active:bg-surface-4"
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          className="items-center py-2 active:opacity-70"
         >
-          <Text className="font-heading text-[13px] text-ink uppercase tracking-caps">
+          <Text className="font-heading text-[12px] text-ink-2 uppercase tracking-caps">
             Done
           </Text>
         </Pressable>

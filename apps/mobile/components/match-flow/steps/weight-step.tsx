@@ -25,12 +25,6 @@ interface WeightStepProps {
   onConfirm: () => void;
 }
 
-const DIVISION_SIZE_LBS = 11; // ~5 kg IBJJF division gap, mirrors web
-
-function divisionGap(a: number, b: number): number {
-  return Math.floor(Math.abs(a - b) / DIVISION_SIZE_LBS);
-}
-
 /** Signed whole-number delta: "+16", "-8". */
 function signed(n: number): string {
   return n > 0 ? `+${n}` : `${n}`;
@@ -54,6 +48,8 @@ function useViewerStakes(
 ): EloStakes | null {
   const [stakes, setStakes] = React.useState<EloStakes | null>(null);
   React.useEffect(() => {
+    // Inputs changed: never show stakes computed for the old ones.
+    setStakes(null);
     if (!enabled || myElo == null || oppElo == null) return;
     let cancelled = false;
     (async () => {
@@ -108,13 +104,11 @@ export function WeightStep(props: WeightStepProps) {
 
   const both = currentWeight != null && opponentWeight != null;
   const diff = both ? Math.abs(currentWeight! - opponentWeight!) : 0;
-  // The BE's IBJJF division gap once the stakes land; the local estimate
-  // until then (and when the RPC is unavailable).
-  const gap = stakes
-    ? stakes.weight_division_gap
-    : both
-      ? divisionGap(currentWeight!, opponentWeight!)
-      : 0;
+  // The gap note is ranked-only and comes solely from the RPC's IBJJF
+  // division gap: it is what the result will actually use, and a local
+  // estimate that the RPC then contradicted made the note flicker. No
+  // stakes (loading or failed) means no note.
+  const gap = stakes?.weight_division_gap ?? 0;
 
   return (
     <View className="gap-5 px-1 py-4">

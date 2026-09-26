@@ -105,6 +105,31 @@ describe("rating tick", () => {
     expect(mockImpact).toHaveBeenCalledTimes(1);
   });
 
+  it("a new after value mid-tick jumps to it and lands once, never restarting from before", async () => {
+    const utils = render(<EloTile label="ELO Rating" before={1000} after={1016} />);
+    await flushReduceMotion();
+    act(() => {
+      jest.advanceTimersByTime(200);
+    });
+    const mid = Number(afterValue(utils).text);
+    expect(mid).toBeGreaterThan(1000);
+    expect(mid).toBeLessThan(1016);
+
+    utils.rerender(<EloTile label="ELO Rating" before={1000} after={1020} />);
+    expect(afterValue(utils).text).toBe("1020");
+    expect(mockImpact).toHaveBeenCalledTimes(1);
+
+    const seen: string[] = [];
+    for (let t = 0; t < 2 * RATING_TICK_MS; t += 16) {
+      act(() => {
+        jest.advanceTimersByTime(16);
+      });
+      seen.push(afterValue(utils).text);
+    }
+    expect(new Set(seen)).toEqual(new Set(["1020"]));
+    expect(mockImpact).toHaveBeenCalledTimes(1);
+  });
+
   it("with reduce motion on, shows the final value with no intermediate frames", async () => {
     reduceMotion = true;
     const utils = render(<EloTile label="ELO Rating" before={1000} after={1016} />);
