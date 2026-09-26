@@ -23,7 +23,8 @@ type SettingsRoute =
   | "/settings/video"
   | "/settings/feedback"
   | "/settings/help"
-  | "/settings/admin";
+  | "/settings/admin"
+  | "/practice";
 
 export default function SettingsScreen() {
   const { user, signOut } = useAuth();
@@ -114,6 +115,9 @@ function SupportPlate() {
       <SettingsRow href="/settings/help" label="HELP & SUPPORT" />
       <RowDivider />
       <SettingsRow href="/settings/video" label="VIDEO SETTINGS" />
+      <RowDivider />
+      {/* Replayable any time, whatever the onboarding state. */}
+      <SettingsRow href="/practice" label="PRACTICE MATCH" />
     </Plate>
   );
 }

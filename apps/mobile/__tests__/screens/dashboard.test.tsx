@@ -137,6 +137,8 @@ const mockAthlete: {
   status: string;
   profile_photo_url: string | null;
   primary_gym_id: string | null;
+  is_bot: boolean;
+  practice_match_offered_at: string | null;
 } = {
   id: "a1",
   display_name: "TestUser",
@@ -145,7 +147,11 @@ const mockAthlete: {
   status: "active",
   profile_photo_url: null,
   primary_gym_id: null,
+  is_bot: false,
+  practice_match_offered_at: null,
 };
+
+const mockRefreshSoft = jest.fn(async () => undefined);
 
 jest.mock("@/lib/auth/hooks", () => ({
   useRequireAthlete: () => ({
@@ -153,6 +159,11 @@ jest.mock("@/lib/auth/hooks", () => ({
     athlete: mockAthlete,
     isLoading: false,
   }),
+  useAuth: () => ({ refreshAthleteSoft: mockRefreshSoft }),
+}));
+
+jest.mock("@jits/shared/api/mutations", () => ({
+  markPracticeMatch: jest.fn(async () => ({ ok: true, data: {} })),
 }));
 
 jest.mock("@/lib/auth/auth-context", () => {
@@ -215,6 +226,8 @@ beforeEach(() => {
   queries.getGymsWithSessionsResult.mockResolvedValue({ ok: true, data: [] });
   queries.getMyActiveMatch.mockResolvedValue({ ok: true, data: null });
   mockAthlete.primary_gym_id = null;
+  mockAthlete.is_bot = false;
+  mockAthlete.practice_match_offered_at = null;
   mockAthlete.id = `a${++athleteSeq}`;
   mockFocusCallbacks.length = 0;
   jest.spyOn(Date, "now").mockImplementation(() => mockNow);
@@ -612,5 +625,79 @@ describe("DashboardScreen resume-match card", () => {
     });
     await waitFor(() => expect(queries.getMyActiveMatch).toHaveBeenCalledTimes(2));
     expect(getByLabelText("Resume your match")).toBeTruthy();
+  });
+});
+
+describe("DashboardScreen practice match offer", () => {
+  const ZERO = { wins: 0, losses: 0, draws: 0, win_streak: 0, best_win_streak: 0 };
+
+  function zeroMatches() {
+    const queries = require("@jits/shared/api/queries") as QueryMocks;
+    queries.getDashboardSummary.mockResolvedValue({ ...mockSummary, stats: ZERO });
+  }
+
+  it("offers the practice match to a brand-new athlete and steps the Arena CTA down", async () => {
+    zeroMatches();
+    const { findByTestId, getByLabelText, getByTestId } = render(
+      React.createElement(DashboardScreen),
+    );
+    expect(await findByTestId("practice-offer-card")).toBeTruthy();
+    // One Signal Red CTA: the practice card holds it, the Arena steps down.
+    expect(getByTestId("practice-offer-start").props.className).toContain("bg-cta");
+    const arena = getByLabelText("Go to the Arena");
+    expect(arena.props.className).not.toContain("bg-cta");
+    expect(arena.props.className).toContain("border-hairline-strong");
+  });
+
+  it("does not offer to an athlete with completed matches", async () => {
+    const { getByText, queryByTestId } = render(React.createElement(DashboardScreen));
+    await waitFor(() => expect(getByText("5W")).toBeTruthy());
+    expect(queryByTestId("practice-offer-card")).toBeNull();
+  });
+
+  it("does not offer once the athlete has answered", async () => {
+    zeroMatches();
+    mockAthlete.practice_match_offered_at = "2026-09-26T00:00:00Z";
+    const { getByText, queryByTestId } = render(React.createElement(DashboardScreen));
+    await waitFor(() => expect(getByText("0W")).toBeTruthy());
+    expect(queryByTestId("practice-offer-card")).toBeNull();
+  });
+
+  it("does not offer to a bot", async () => {
+    zeroMatches();
+    mockAthlete.is_bot = true;
+    const { getByText, queryByTestId } = render(React.createElement(DashboardScreen));
+    await waitFor(() => expect(getByText("0W")).toBeTruthy());
+    expect(queryByTestId("practice-offer-card")).toBeNull();
+  });
+
+  it("does not offer over a match in flight", async () => {
+    zeroMatches();
+    const queries = require("@jits/shared/api/queries") as QueryMocks;
+    queries.getMyActiveMatch.mockResolvedValue({
+      ok: true,
+      data: { matchId: "m1", status: "in_progress", opponentName: "X" },
+    });
+    const { getByText, queryByTestId } = render(React.createElement(DashboardScreen));
+    await waitFor(() => expect(getByText("0W")).toBeTruthy());
+    await waitFor(() => expect(getByText("Match in progress")).toBeTruthy());
+    expect(queryByTestId("practice-offer-card")).toBeNull();
+  });
+
+  it("Not now hides the card at once and marks skipped once", async () => {
+    zeroMatches();
+    const { markPracticeMatch } = require("@jits/shared/api/mutations") as {
+      markPracticeMatch: jest.Mock;
+    };
+    const { findByTestId, queryByTestId, getByTestId } = render(
+      React.createElement(DashboardScreen),
+    );
+    await findByTestId("practice-offer-card");
+    fireEvent.press(getByTestId("practice-offer-not-now"));
+    expect(queryByTestId("practice-offer-card")).toBeNull();
+    expect(markPracticeMatch).toHaveBeenCalledTimes(1);
+    expect(markPracticeMatch).toHaveBeenCalledWith({}, "skipped");
+    await waitFor(() => expect(mockRefreshSoft).toHaveBeenCalled());
+    expect(queryByTestId("practice-offer-card")).toBeNull();
   });
 });
