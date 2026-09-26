@@ -379,8 +379,9 @@ describe("getStartedChallengesToJoin (an accepter's way back in, jits-6ziw)", ()
   const SINCE = "2026-09-25T11:50:00Z";
 
   /**
-   * `challenges` answers the first read, `matches` the second; every filter
-   * is recorded as [table, method, ...args].
+   * `challenges` answers the first read (ends in `.limit`), `matches` the
+   * second (ends in `.eq("status", ...)`); every call is recorded as
+   * [table, method, ...args].
    */
   function joinClient(
     challenges: { data: unknown; error: unknown },
@@ -390,19 +391,11 @@ describe("getStartedChallengesToJoin (an accepter's way back in, jits-6ziw)", ()
     const from = vi.fn((table: string) => {
       const result = table === "challenges" ? challenges : matches;
       const chain: Record<string, unknown> = {};
-      for (const method of ["select", "eq", "gte", "order", "in"]) {
+      for (const method of ["select", "eq", "gte", "order", "in", "limit"]) {
         chain[method] = (...args: unknown[]) => {
           calls.push([table, method, ...args]);
-          // The last filter of each read resolves it.
-          if (table === "challenges" && method === "order") {
-            return {
-              limit: (n: number) => {
-                calls.push([table, "limit", n]);
-                return Promise.resolve(result);
-              },
-            };
-          }
-          if (table === "matches" && method === "in" && args[0] === "status") {
+          if (table === "challenges" && method === "limit") return Promise.resolve(result);
+          if (table === "matches" && method === "eq" && args[0] === "status") {
             return Promise.resolve(result);
           }
           return chain;
@@ -424,24 +417,44 @@ describe("getStartedChallengesToJoin (an accepter's way back in, jits-6ziw)", ()
     expect(calls.some(([t]) => t === "matches")).toBe(false);
   });
 
-  it("returns only challenges whose match is still pending or in progress", async () => {
+  it("asks only for PENDING matches of those challenges (never one under way)", async () => {
     const { client, calls } = joinClient(
+      { data: [{ id: "c1", challenger_id: "a" }], error: null },
+      { data: [], error: null },
+    );
+    await getStartedChallengesToJoin(client, ME, SINCE);
+    expect(calls).toContainEqual(["matches", "in", "challenge_id", ["c1"]]);
+    expect(calls).toContainEqual(["matches", "eq", "status", "pending"]);
+    expect(
+      calls.some(([t, m, col]) => t === "matches" && m === "in" && col === "status"),
+    ).toBe(false);
+  });
+
+  it("returns only a match the CHALLENGER started (the fallback), never one I started", async () => {
+    const { client } = joinClient(
       {
         data: [
-          { id: "c-new", challenger_id: "a" },
-          { id: "c-done", challenger_id: "b" },
+          { id: "c-fallback", challenger_id: "a" },
+          { id: "c-mine", challenger_id: "b" },
+          { id: "c-unknown", challenger_id: "c" },
+          { id: "c-nomatch", challenger_id: "d" },
         ],
         error: null,
       },
-      { data: [{ id: "m-new", challenge_id: "c-new" }], error: null },
+      {
+        data: [
+          { id: "m-fallback", challenge_id: "c-fallback", initiated_by_athlete_id: "a" },
+          { id: "m-mine", challenge_id: "c-mine", initiated_by_athlete_id: ME },
+          { id: "m-unknown", challenge_id: "c-unknown", initiated_by_athlete_id: null },
+        ],
+        error: null,
+      },
     );
     const result = await getStartedChallengesToJoin(client, ME, SINCE);
     expect(result).toEqual({
       ok: true,
-      data: [{ challengeId: "c-new", challengerId: "a", matchId: "m-new" }],
+      data: [{ challengeId: "c-fallback", challengerId: "a", matchId: "m-fallback" }],
     });
-    expect(calls).toContainEqual(["matches", "in", "challenge_id", ["c-new", "c-done"]]);
-    expect(calls).toContainEqual(["matches", "in", "status", ["pending", "in_progress"]]);
   });
 
   it("maps a failed read of either table to a failed Result", async () => {

@@ -39,6 +39,7 @@
  */
 import * as React from "react";
 import { AppState } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import {
@@ -118,6 +119,42 @@ const ACCEPTED_FALLBACK_MS = 12_000;
  * making at the same moment to land, short enough to feel immediate.
  */
 const START_RETRY_MS = 2_000;
+
+/**
+ * The challenge I last accepted and have not entered yet, persisted so a
+ * relaunch after my app died mid-accept still knows it (F1). One record per
+ * athlete, `{ challengeId, at }`; best effort like every other small cache.
+ */
+const ACCEPTED_KEY_PREFIX = "elo-rated:arena-accepted:";
+
+interface AcceptedRecord {
+  challengeId: string;
+  at: number;
+}
+
+async function readAccepted(athleteId: string): Promise<AcceptedRecord | null> {
+  try {
+    const raw = await AsyncStorage.getItem(ACCEPTED_KEY_PREFIX + athleteId);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<AcceptedRecord>;
+    if (typeof parsed.challengeId !== "string" || typeof parsed.at !== "number") {
+      return null;
+    }
+    return { challengeId: parsed.challengeId, at: parsed.at };
+  } catch {
+    return null;
+  }
+}
+
+function writeAccepted(athleteId: string, record: AcceptedRecord): void {
+  AsyncStorage.setItem(ACCEPTED_KEY_PREFIX + athleteId, JSON.stringify(record)).catch(
+    () => {},
+  );
+}
+
+function clearAccepted(athleteId: string): void {
+  AsyncStorage.removeItem(ACCEPTED_KEY_PREFIX + athleteId).catch(() => {});
+}
 
 /** A channel that stayed up this long ends the losing streak. */
 const CHANNEL_LOSS_STREAK_RESET_MS = 30_000;
@@ -531,6 +568,7 @@ export function useArenaChallenge({
       entryPeerRef.current = peerId;
       enteredIdsRef.current.add(challengeId);
       acceptedNotEnteredRef.current.delete(challengeId);
+      clearAccepted(athleteIdRef.current);
       settledRef.current.add(challengeId);
       // My own challenge that did not become this match is over too. Settled
       // now, so recovery's restore cannot put its plate back while the
@@ -646,7 +684,15 @@ export function useArenaChallenge({
         return;
       }
       if (status === "accepted") {
-        if (mode !== "retry") scheduleAcceptedFallbackRef.current(challengeId);
+        // After a failed fallback start the row may still be `accepted`
+        // (nobody started it): arm the fallback once more, and only once, so
+        // a start that keeps failing cannot loop.
+        if (mode !== "retry") {
+          scheduleAcceptedFallbackRef.current(challengeId);
+        } else if (!fallbackRearmedRef.current.has(challengeId)) {
+          fallbackRearmedRef.current.add(challengeId);
+          scheduleAcceptedFallbackRef.current(challengeId);
+        }
         return;
       }
       if (!LIVE_CHALLENGE_STATUSES.has(status)) {
@@ -657,6 +703,8 @@ export function useArenaChallenge({
   );
   const recheckOutgoingRef = React.useRef(recheckOutgoing);
   recheckOutgoingRef.current = recheckOutgoing;
+  /** Outgoing challenges whose fallback was re-armed after a retry (N2). */
+  const fallbackRearmedRef = React.useRef<Set<string>>(new Set());
 
   /**
    * Safety net for a challenge that sits at `accepted`. Normally the accepter
@@ -711,29 +759,56 @@ export function useArenaChallenge({
    *
    * I accepted, then my app died or lost the network before my start or its
    * broadcast went out; the challenger's `ACCEPTED_FALLBACK_MS` safety net
-   * started the match alone, and nothing on my side knows. So on mount (a
-   * relaunch), on return from the background and on a re-subscribe, read my
-   * challenges that turned `started` within the live window and whose match
-   * is still pending or in progress, and join the newest one. Bounded: only
-   * rows where I am the opponent (only the opponent can accept), never one
-   * this instance already entered (that screen was left on purpose), never
-   * over an accept in flight or a match screen.
+   * started the match alone, and nothing on my side knows. So on launch (once
+   * the app is in the foreground), on return from the background and on a
+   * re-subscribe, check the ONE challenge I persisted on accept and never
+   * entered. It is joined only when all of these hold:
+   *  - it is within the live window (`ARENA_CHALLENGE_FRESH_MS`) of my accept;
+   *  - the server says it is `started`, its match is still `pending`, and
+   *    the challenger (not I) started it, see `getStartedChallengesToJoin`;
+   *  - this instance never entered it, and no accept, prompt or match screen
+   *    is in the way.
+   * A match I entered clears the record, so a match I left on purpose (or one
+   * entered by another route) is never joined again.
    */
   const rejoinStartedMatch = React.useCallback(async () => {
     const me = athleteIdRef.current;
-    if (!me || busyRef.current || entryBlocked()) return;
+    const blocked = () =>
+      busyRef.current || entryBlocked() || !!incomingRef.current;
+    if (!me || blocked()) return;
+    const stored = await readAccepted(me);
+    if (!stored) return;
+    if (
+      Date.now() - stored.at > ARENA_CHALLENGE_FRESH_MS ||
+      enteredIdsRef.current.has(stored.challengeId)
+    ) {
+      clearAccepted(me);
+      return;
+    }
     const since = new Date(Date.now() - ARENA_CHALLENGE_FRESH_MS).toISOString();
     const read = await getStartedChallengesToJoin(supabase, me, since);
     if (!read.ok) return;
-    const pick = read.data.find((c) => !enteredIdsRef.current.has(c.challengeId));
-    if (!pick || busyRef.current || entryBlocked()) return;
+    // Not there (yet): the challenger's fallback may still be counting down,
+    // so the record stays until it goes stale or a later check finds it.
+    const pick = read.data.find((c) => c.challengeId === stored.challengeId);
+    if (!pick || blocked()) return;
     enterMatch(pick.challengeId, pick.matchId, pick.challengerId);
   }, [entryBlocked, enterMatch]);
   const rejoinRef = React.useRef(rejoinStartedMatch);
   rejoinRef.current = rejoinStartedMatch;
 
+  /**
+   * A launch in the background (a silent push) must not navigate: the
+   * launch-time check waits for the first "active" instead.
+   */
+  const pendingLaunchRejoinRef = React.useRef(false);
   React.useEffect(() => {
-    if (athleteId) void rejoinRef.current();
+    if (!athleteId) return;
+    if (AppState.currentState === "active") {
+      void rejoinRef.current();
+    } else {
+      pendingLaunchRejoinRef.current = true;
+    }
   }, [athleteId]);
 
   /**
@@ -785,7 +860,15 @@ export function useArenaChallenge({
         wasBackground = true;
         return;
       }
-      if (next !== "active" || !wasBackground) return;
+      if (next !== "active") return;
+      // The launch-time rejoin deferred by a background launch, on the first
+      // "active" whatever came before it.
+      const launchRejoin = pendingLaunchRejoinRef.current;
+      pendingLaunchRejoinRef.current = false;
+      if (!wasBackground) {
+        if (launchRejoin) void rejoinRef.current();
+        return;
+      }
       wasBackground = false;
       const mine = outgoingRef.current;
       if (mine) void recheckOutgoingRef.current(mine.challengeId);
@@ -871,6 +954,7 @@ export function useArenaChallenge({
                 void joinAccepted(row.id, row.challenger_id);
               } else if (row.status !== "accepted") {
                 acceptedNotEnteredRef.current.delete(row.id);
+                clearAccepted(athleteId);
               }
             }
             if (incomingRef.current?.challengeId === row.id) {
@@ -1242,6 +1326,10 @@ export function useArenaChallenge({
         // challenger's fallback starts it, and its `started` UPDATE (or the
         // rejoin read) brings me in.
         acceptedNotEnteredRef.current.add(current.challengeId);
+        writeAccepted(athleteIdRef.current, {
+          challengeId: current.challengeId,
+          at: Date.now(),
+        });
 
         // `acceptChallenge` filters on `status = 'pending'`, and a PostgREST
         // update that matches no rows is not an error, so a challenge that was
@@ -1265,6 +1353,7 @@ export function useArenaChallenge({
           const withdrawn = await cancelChallenge(supabase, current.challengeId);
           if (withdrawn.ok && withdrawn.data.cancelled) {
             acceptedNotEnteredRef.current.delete(current.challengeId);
+            clearAccepted(athleteIdRef.current);
           }
           if (withdrawn.ok && !withdrawn.data.cancelled) {
             started = await startMatchFromChallenge(supabase, current.challengeId);

@@ -564,15 +564,23 @@ export interface StartedChallengeToJoin {
 
 /**
  * Challenges I accepted (I am the opponent) that turned `started` at or after
- * `sinceIso` and whose match is still `pending` or `in_progress`, newest
- * first.
+ * `sinceIso` and whose match the CHALLENGER started and nobody has begun yet,
+ * newest first.
  *
  * For an accepter whose app died or lost the network right after accepting:
  * the challenger's fallback started the match alone, and this is how the
- * accepter finds its way back in. Only `opponent_id = me` rows: a row reaches
- * `started` only through `accepted`, which only the opponent can set, so these
- * are challenges I actually accepted. Two reads rather than an embed, and a
- * match I cannot see (RLS: participants only) is simply not returned.
+ * accepter finds its way back in. Deliberately narrow, so it never pulls
+ * anyone back into a match they left:
+ *  - `opponent_id = me`: a row reaches `started` only through `accepted`,
+ *    which only the opponent can set, so these are challenges I accepted;
+ *  - match `status = 'pending'`: a match already under way (or over) is not
+ *    one I was stranded outside of;
+ *  - `initiated_by_athlete_id = challenger`: `start_match_from_challenge` sets
+ *    it to the caller (jr_be 20260219000000), so a match I started myself is
+ *    one I already entered, and only the challenger's fallback leaves the
+ *    challenger as initiator.
+ * Two reads rather than an embed, and a match I cannot see (RLS: participants
+ * only) is simply not returned.
  */
 export async function getStartedChallengesToJoin(
   supabase: Client,
@@ -593,23 +601,27 @@ export async function getStartedChallengesToJoin(
 
   const { data: matches, error: matchError } = await supabase
     .from("matches")
-    .select("id, challenge_id")
+    .select("id, challenge_id, initiated_by_athlete_id")
     .in(
       "challenge_id",
       challenges.map((c) => c.id),
     )
-    .in("status", ["pending", "in_progress"]);
+    .eq("status", "pending");
 
   if (matchError) return { ok: false, error: mapPostgrestError(matchError) };
 
-  const matchFor = new Map<string, string>();
+  const matchFor = new Map<string, { id: string; initiatedBy: string | null }>();
   for (const m of matches ?? []) {
-    if (m.challenge_id) matchFor.set(m.challenge_id, m.id);
+    if (m.challenge_id) {
+      matchFor.set(m.challenge_id, { id: m.id, initiatedBy: m.initiated_by_athlete_id });
+    }
   }
   const data: StartedChallengeToJoin[] = [];
   for (const c of challenges) {
-    const matchId = matchFor.get(c.id);
-    if (matchId) data.push({ challengeId: c.id, challengerId: c.challenger_id, matchId });
+    const match = matchFor.get(c.id);
+    if (match && match.initiatedBy === c.challenger_id) {
+      data.push({ challengeId: c.id, challengerId: c.challenger_id, matchId: match.id });
+    }
   }
   return { ok: true, data };
 }

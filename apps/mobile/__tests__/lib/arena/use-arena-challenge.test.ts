@@ -14,6 +14,7 @@
  * cannot produce.
  */
 import { act, renderHook, waitFor } from "@testing-library/react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { challengeTopic } from "@/lib/arena/constants";
 
 // ---- mocks ----
@@ -198,7 +199,8 @@ async function raiseIncoming(
   await waitFor(() => expect(result.current.incoming).not.toBeNull());
 }
 
-beforeEach(() => {
+beforeEach(async () => {
+  await AsyncStorage.clear();
   mockCalls.length = 0;
   mockBindings.length = 0;
   mockChannelTopics.length = 0;
@@ -2633,9 +2635,33 @@ function mountWithMatch(inMatch: boolean) {
 
 const STARTED_ROW = { challengeId: CHALLENGE, challengerId: OPPONENT, matchId: MATCH };
 
+const ACCEPTED_KEY = `elo-rated:arena-accepted:${ME}`;
+
+function setAppStateNow(state: string) {
+  const { AppState } = jest.requireActual("react-native") as typeof import("react-native");
+  Object.defineProperty(AppState, "currentState", {
+    value: state,
+    configurable: true,
+    writable: true,
+  });
+}
+
+async function storedAccepted(): Promise<{ challengeId: string; at: number } | null> {
+  const raw = await AsyncStorage.getItem(ACCEPTED_KEY);
+  return raw ? JSON.parse(raw) : null;
+}
+
+async function seedAccepted(challengeId = CHALLENGE, at = Date.now()) {
+  await AsyncStorage.setItem(ACCEPTED_KEY, JSON.stringify({ challengeId, at }));
+}
+
 describe("an accepter whose start never landed finds its way back in (F1)", () => {
   const networkError = { ok: false, error: { code: "UNKNOWN", message: "network" } };
 
+  beforeEach(async () => {
+    setAppStateNow("active");
+    await AsyncStorage.clear();
+  });
   afterEach(() => {
     jest.restoreAllMocks();
   });
@@ -2669,6 +2695,7 @@ describe("an accepter whose start never landed finds its way back in (F1)", () =
 
     expect(mockStartMatch).toHaveBeenCalledWith(expect.anything(), CHALLENGE);
     expect(mockPush).toHaveBeenCalledWith(`/match/${MATCH}`);
+    expect(await storedAccepted()).toBeNull();
   });
 
   it("ignores a 'started' UPDATE for a challenge I never accepted", async () => {
@@ -2696,20 +2723,98 @@ describe("an accepter whose start never landed finds its way back in (F1)", () =
       await flushAsync();
     });
     expect(mockPush).not.toHaveBeenCalled();
+    expect(await storedAccepted()).toBeNull();
   });
 
-  it("on mount (a relaunch), joins a match the challenger started without me", async () => {
-    mockGetStarted.mockResolvedValue({ ok: true, data: [STARTED_ROW] });
-    const before = Date.now();
-    mount();
-    await waitFor(() => expect(mockPush).toHaveBeenCalledWith(`/match/${MATCH}`));
+  describe("the persisted accept record", () => {
+    it("is written on accept and cleared once the match is entered", async () => {
+      let finishStart!: () => void;
+      mockStartMatch.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finishStart = () =>
+              resolve({ ok: true, data: { success: true, match_id: MATCH, challenge_id: CHALLENGE } });
+          }),
+      );
+      const { result } = mount();
+      await raiseIncoming(result);
+      let accepting!: Promise<void>;
+      act(() => {
+        accepting = result.current.accept();
+      });
+      await waitFor(async () =>
+        expect((await storedAccepted())?.challengeId).toBe(CHALLENGE),
+      );
+      await act(async () => {
+        finishStart();
+        await accepting;
+      });
+      expect(mockPush).toHaveBeenCalledWith(`/match/${MATCH}`);
+      expect(await storedAccepted()).toBeNull();
+    });
 
-    const [, athlete, since] = mockGetStarted.mock.calls[0];
-    expect(athlete).toBe(ME);
-    // The live window: ten minutes back, no further.
-    const sinceMs = Date.parse(since as string);
-    expect(before - sinceMs).toBeGreaterThanOrEqual(10 * 60_000 - 50);
-    expect(before - sinceMs).toBeLessThanOrEqual(10 * 60_000 + 1_000);
+    it("is cleared when my failed start was withdrawn", async () => {
+      mockStartMatch.mockResolvedValue(networkError);
+      const { result } = mount();
+      await raiseIncoming(result);
+      await act(async () => {
+        await result.current.accept();
+      });
+      expect(mockCancelChallenge).toHaveBeenCalledWith(expect.anything(), CHALLENGE);
+      expect(await storedAccepted()).toBeNull();
+    });
+
+    it("survives a start AND withdrawal lost to the network, and a relaunch joins", async () => {
+      const first = mount();
+      await acceptIntoTheVoid(first.result);
+      expect((await storedAccepted())?.challengeId).toBe(CHALLENGE);
+      first.unmount();
+
+      // The app is killed and relaunched after the challenger's fallback.
+      mockGetStarted.mockResolvedValue({ ok: true, data: [STARTED_ROW] });
+      const before = Date.now();
+      mount();
+      await waitFor(() => expect(mockPush).toHaveBeenCalledWith(`/match/${MATCH}`));
+
+      const [, athlete, since] = mockGetStarted.mock.calls[0];
+      expect(athlete).toBe(ME);
+      const sinceMs = Date.parse(since as string);
+      expect(before - sinceMs).toBeGreaterThanOrEqual(10 * 60_000 - 50);
+      expect(before - sinceMs).toBeLessThanOrEqual(10 * 60_000 + 1_000);
+      expect(await storedAccepted()).toBeNull();
+    });
+  });
+
+  it("never rejoins without a persisted accept, whatever the server returns", async () => {
+    mockGetStarted.mockResolvedValue({ ok: true, data: [STARTED_ROW] });
+    mount();
+    await act(async () => {
+      await flushAsync();
+    });
+    expect(mockGetStarted).not.toHaveBeenCalled();
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it("joins only the persisted challenge, not another started one", async () => {
+    await seedAccepted("ch-accepted");
+    mockGetStarted.mockResolvedValue({ ok: true, data: [STARTED_ROW] });
+    mount();
+    await waitFor(() => expect(mockGetStarted).toHaveBeenCalled());
+    await act(async () => {
+      await flushAsync();
+    });
+    expect(mockPush).not.toHaveBeenCalled();
+    // Kept: the fallback may not have fired yet.
+    expect((await storedAccepted())?.challengeId).toBe("ch-accepted");
+  });
+
+  it("drops a stale record without asking the server", async () => {
+    await seedAccepted(CHALLENGE, Date.now() - 10 * 60_000 - 1_000);
+    mockGetStarted.mockResolvedValue({ ok: true, data: [STARTED_ROW] });
+    mount();
+    await waitFor(async () => expect(await storedAccepted()).toBeNull());
+    expect(mockGetStarted).not.toHaveBeenCalled();
+    expect(mockPush).not.toHaveBeenCalled();
   });
 
   it("on return from the background, joins it", async () => {
@@ -2720,6 +2825,7 @@ describe("an accepter whose start never landed finds its way back in (F1)", () =
     });
     expect(mockPush).not.toHaveBeenCalled();
 
+    await seedAccepted();
     mockGetStarted.mockResolvedValue({ ok: true, data: [STARTED_ROW] });
     await act(async () => {
       appState("background");
@@ -2736,21 +2842,22 @@ describe("an accepter whose start never landed finds its way back in (F1)", () =
     await act(async () => {
       await flushAsync();
     });
-    mockGetStarted.mockClear();
 
+    await seedAccepted();
     mockGetStarted.mockResolvedValue({ ok: true, data: [STARTED_ROW] });
     await act(async () => {
       ch.statusCb?.("CHANNEL_ERROR");
       ch.statusCb?.("SUBSCRIBED");
       await flushAsync();
     });
-    expect(mockGetStarted).toHaveBeenCalledTimes(1);
-    expect(mockPush).toHaveBeenCalledWith(`/match/${MATCH}`);
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith(`/match/${MATCH}`));
   });
 
   it("does nothing on a read that fails", async () => {
+    await seedAccepted();
     mockGetStarted.mockResolvedValue({ ok: false, error: { code: "UNKNOWN", message: "x" } });
     mount();
+    await waitFor(() => expect(mockGetStarted).toHaveBeenCalled());
     await act(async () => {
       await flushAsync();
     });
@@ -2758,12 +2865,32 @@ describe("an accepter whose start never landed finds its way back in (F1)", () =
   });
 
   it("does not rejoin while a match screen is up", async () => {
+    await seedAccepted();
     mockGetStarted.mockResolvedValue({ ok: true, data: [STARTED_ROW] });
     mountWithMatch(true);
     await act(async () => {
       await flushAsync();
     });
     expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it("does not rejoin over a prompt that is up (R1c)", async () => {
+    const appState = mockAppStateHandlers();
+    const { result } = mount();
+    await raiseIncoming(result);
+    await seedAccepted("ch-accepted");
+    mockGetStarted.mockResolvedValue({
+      ok: true,
+      data: [{ challengeId: "ch-accepted", challengerId: "opp-a", matchId: "match-a" }],
+    });
+    await act(async () => {
+      appState("background");
+      appState("active");
+      await flushAsync();
+    });
+    expect(mockGetStarted).not.toHaveBeenCalled();
+    expect(mockPush).not.toHaveBeenCalled();
+    expect(result.current.incoming?.challengeId).toBe(CHALLENGE);
   });
 
   it("never drags me back into a match this instance already entered and left", async () => {
@@ -2778,17 +2905,57 @@ describe("an accepter whose start never landed finds its way back in (F1)", () =
     rerender({ inMatch: true });
     rerender({ inMatch: false });
 
-    mockGetStarted.mockClear();
     mockGetStarted.mockResolvedValue({ ok: true, data: [STARTED_ROW] });
     await act(async () => {
       appState("background");
       appState("active");
       await flushAsync();
     });
-    expect(mockGetStarted).toHaveBeenCalled();
     expect(mockPush).toHaveBeenCalledTimes(1);
   });
+
+  describe("a launch in the background (R2)", () => {
+    it("waits for the first 'active' before rejoining", async () => {
+      setAppStateNow("background");
+      const appState = mockAppStateHandlers();
+      await seedAccepted();
+      mockGetStarted.mockResolvedValue({ ok: true, data: [STARTED_ROW] });
+      mount();
+      await act(async () => {
+        await flushAsync();
+      });
+      expect(mockGetStarted).not.toHaveBeenCalled();
+      expect(mockPush).not.toHaveBeenCalled();
+
+      // No "background" event first: a background launch goes straight to
+      // "active" when the athlete opens the app.
+      await act(async () => {
+        appState("active");
+        await flushAsync();
+      });
+      await waitFor(() => expect(mockPush).toHaveBeenCalledWith(`/match/${MATCH}`));
+    });
+
+    it("runs the deferred check only once", async () => {
+      setAppStateNow("background");
+      const appState = mockAppStateHandlers();
+      await seedAccepted("ch-accepted");
+      mount();
+      await act(async () => {
+        appState("active");
+        await flushAsync();
+      });
+      await waitFor(() => expect(mockGetStarted).toHaveBeenCalledTimes(1));
+      await act(async () => {
+        appState("inactive");
+        appState("active");
+        await flushAsync();
+      });
+      expect(mockGetStarted).toHaveBeenCalledTimes(1);
+    });
+  });
 });
+
 
 describe("a late challenge from the peer I am entering a match with (F2)", () => {
   async function enterWithOpponent(
@@ -2918,17 +3085,47 @@ describe("a failed fallback start re-reads once (F3)", () => {
     expect(mockToastInfo).toHaveBeenCalledWith("Couldn't start the match with Rival.");
   });
 
-  it("re-reads only once: a row still 'accepted' is left for the next foreground", async () => {
+  it("re-arms the 12s fallback once when the row is still 'accepted' (N2)", async () => {
     const { result } = mount();
     await stuckAtAccepted(result);
-    const readsBefore = mockGetStatus.mock.calls.length;
+    mockStartMatch.mockResolvedValueOnce(networkError);
+
+    // The 2s re-read finds `accepted` and re-arms the fallback.
     await act(async () => {
-      jest.advanceTimersByTime(60_000);
+      jest.advanceTimersByTime(2_000);
       await flushAsync();
     });
     expect(mockStartMatch).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      jest.advanceTimersByTime(12_000);
+      await flushAsync();
+    });
+    expect(mockStartMatch).toHaveBeenCalledTimes(2);
+
+    // That start failed too: one more re-read, then nothing further.
+    const readsBefore = mockGetStatus.mock.calls.length;
+    await act(async () => {
+      jest.advanceTimersByTime(120_000);
+      await flushAsync();
+    });
+    expect(mockStartMatch).toHaveBeenCalledTimes(2);
     expect(mockGetStatus.mock.calls.length - readsBefore).toBe(1);
+    expect(mockPush).not.toHaveBeenCalled();
     expect(result.current.outgoing?.challengeId).toBe(CHALLENGE);
+  });
+
+  it("joins on the re-armed fallback when its start succeeds (N2)", async () => {
+    const { result } = mount();
+    await stuckAtAccepted(result);
+    await act(async () => {
+      jest.advanceTimersByTime(2_000);
+      await flushAsync();
+    });
+    await act(async () => {
+      jest.advanceTimersByTime(12_000);
+      await flushAsync();
+    });
+    expect(mockPush).toHaveBeenCalledWith(`/match/${MATCH}`);
   });
 
   it("is cancelled on unmount", async () => {
