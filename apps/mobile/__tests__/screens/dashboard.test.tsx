@@ -20,7 +20,10 @@ jest.mock("expo-router", () => ({
   },
 }));
 
+// Focus refetches are throttled to one per 30s, so step the clock past it.
+let mockNow = 1_000_000;
 function refocus() {
+  mockNow += 31_000;
   act(() => {
     mockFocusCallbacks.forEach((cb) => cb());
   });
@@ -211,6 +214,11 @@ beforeEach(() => {
   mockAthlete.primary_gym_id = null;
   mockAthlete.id = `a${++athleteSeq}`;
   mockFocusCallbacks.length = 0;
+  jest.spyOn(Date, "now").mockImplementation(() => mockNow);
+});
+
+afterEach(() => {
+  jest.restoreAllMocks();
 });
 
 describe("DashboardScreen", () => {
@@ -307,6 +315,12 @@ describe("DashboardScreen", () => {
     const { getByText } = render(React.createElement(DashboardScreen));
     await waitFor(() => {
       expect(getByText("5W")).toBeTruthy();
+    });
+    expect(queries.getDashboardSummary).toHaveBeenCalledTimes(1);
+
+    // A quick tab switch inside the throttle window does not refetch.
+    act(() => {
+      mockFocusCallbacks.forEach((cb) => cb());
     });
     expect(queries.getDashboardSummary).toHaveBeenCalledTimes(1);
 

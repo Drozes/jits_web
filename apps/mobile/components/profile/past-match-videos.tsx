@@ -20,36 +20,52 @@ function subtitle(item: MatchVideoListItem): string {
   return parts.join(" · ");
 }
 
+function MutedRow({ testID, text, onPress }: { testID: string; text: string; onPress?: () => void }) {
+  const Wrapper: React.ElementType = onPress ? Pressable : View;
+  return (
+    <Wrapper
+      testID={testID}
+      onPress={onPress}
+      accessibilityRole={onPress ? "button" : undefined}
+      className="bg-surface-3 border border-hairline-faint rounded-xs px-4 py-3 active:bg-surface-4"
+    >
+      <Text className="font-body text-[12px] text-ink-3">{text}</Text>
+    </Wrapper>
+  );
+}
+
 /**
  * "Past Match Videos" on the Profile tab: one row per match (both angles
  * grouped, jits-7b7v), disputed matches and failed-status videos included.
  * A row opens the match detail screen, which explains each video's state.
- * Renders nothing while cold-loading or when there are no videos (an empty
- * plate reads as broken to a first-run user, jits-r75.7), but a failed load
- * shows a retry row rather than silently hiding the section.
+ * Always visible once the first load settles: an empty list says so, and a
+ * failed load shows a retry row that stays up until a retry succeeds.
+ * Renders nothing only while cold-loading.
  */
 export function PastMatchVideos({ videos }: { videos: MyMatchVideos }) {
   const router = useRouter();
   const tokens = useThemedTokens();
   const [expanded, setExpanded] = React.useState(false);
-  const { items, error, refetch } = videos;
+  const { items, isLoading, error, refetch } = videos;
 
-  if (items.length === 0 && !error) return null;
+  if (items.length === 0 && !error && isLoading) return null;
 
   const shown = expanded ? items : items.slice(0, COLLAPSED_COUNT);
 
   return (
     <View className="gap-3">
       <MetaTag>Past Match Videos</MetaTag>
-      {items.length === 0 ? (
-        <Pressable
+      {items.length === 0 && error ? (
+        <MutedRow
           testID="past-videos-error"
+          text="Couldn't load your videos. Tap to retry."
           onPress={refetch}
-          accessibilityRole="button"
-          className="bg-surface-3 border border-hairline-faint rounded-xs px-4 py-3 active:bg-surface-4"
-        >
-          <Text className="font-body text-[12px] text-ink-3">Couldn't load your videos. Tap to retry.</Text>
-        </Pressable>
+        />
+      ) : items.length === 0 ? (
+        <MutedRow
+          testID="past-videos-empty"
+          text="No match videos yet. Record your next match to watch it here."
+        />
       ) : (
         <View className="gap-[1px]">
           {shown.map((item) => {

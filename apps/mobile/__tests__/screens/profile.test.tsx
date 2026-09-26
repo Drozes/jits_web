@@ -108,7 +108,15 @@ beforeEach(() => {
   __resetArenaStoreForTests();
   mockFocusCallbacks.length = 0;
   mockHistory.length = 0;
+  jest.spyOn(Date, "now").mockImplementation(() => mockNow);
 });
+
+afterEach(() => {
+  jest.restoreAllMocks();
+});
+
+// Focus refetches are throttled to one per 30s; tests move this clock.
+let mockNow = 1_000_000;
 
 describe("Profile recent matches and refresh", () => {
   it("opens the match detail screen from a recent match row", () => {
@@ -130,6 +138,7 @@ describe("Profile recent matches and refresh", () => {
     expect(mockProfileRefetch).not.toHaveBeenCalled();
     expect(mockVideosRefetch).not.toHaveBeenCalled();
 
+    mockNow += 31_000;
     act(() => {
       mockFocusCallbacks.forEach((cb) => cb());
     });

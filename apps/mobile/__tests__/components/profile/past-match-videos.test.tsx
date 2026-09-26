@@ -135,9 +135,23 @@ describe("PastMatchVideos", () => {
     expect(queryByTestId("past-videos-error")).toBeNull();
   });
 
-  it("renders nothing when there are no videos", () => {
-    const { toJSON } = render(<PastMatchVideos videos={videos()} />);
-    expect(toJSON()).toBeNull();
+  it("shows an empty row, not nothing, when there are no videos", () => {
+    const { getByTestId, getByText, queryByTestId } = render(<PastMatchVideos videos={videos()} />);
+    getByText("Past Match Videos");
+    getByTestId("past-videos-empty");
+    getByText("No match videos yet. Record your next match to watch it here.");
+    expect(queryByTestId("past-videos-error")).toBeNull();
+  });
+
+  it("keeps the retry row up while a retry is loading", () => {
+    // During a retry the hook reports the kept error with isLoading true.
+    const { getByTestId, queryByTestId } = render(
+      <PastMatchVideos
+        videos={videos({ isLoading: true, isValidating: true, error: new Error("boom") })}
+      />,
+    );
+    getByTestId("past-videos-error");
+    expect(queryByTestId("past-videos-empty")).toBeNull();
   });
 
   it("renders nothing while cold-loading", () => {

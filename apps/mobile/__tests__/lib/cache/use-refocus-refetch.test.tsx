@@ -17,21 +17,55 @@ jest.mock("expo-router", () => ({
   },
 }));
 
-import { usePullToRefresh, useRefetchOnRefocus } from "@/lib/cache/use-refocus-refetch";
+import {
+  REFOCUS_REFETCH_MIN_MS,
+  usePullToRefresh,
+  useRefetchOnRefocus,
+} from "@/lib/cache/use-refocus-refetch";
+
+let now = 1_000_000;
+function focusAfter(ms: number) {
+  now += ms;
+  act(() => mockFocusCallbacks.forEach((cb) => cb()));
+}
 
 beforeEach(() => {
   mockFocusCallbacks.length = 0;
   jest.useRealTimers();
+  jest.spyOn(Date, "now").mockImplementation(() => now);
+});
+
+afterEach(() => {
+  jest.restoreAllMocks();
 });
 
 describe("useRefetchOnRefocus", () => {
-  it("does not refetch on the first focus, then refetches on every later one", () => {
+  it("does not refetch on the first focus, then refetches on later ones past the throttle", () => {
     const refetch = jest.fn();
     renderHook(() => useRefetchOnRefocus(refetch));
     expect(refetch).not.toHaveBeenCalled();
 
-    act(() => mockFocusCallbacks.forEach((cb) => cb()));
-    act(() => mockFocusCallbacks.forEach((cb) => cb()));
+    focusAfter(REFOCUS_REFETCH_MIN_MS);
+    focusAfter(REFOCUS_REFETCH_MIN_MS);
+    expect(refetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("refetches at most once per 30s, counted from mount", () => {
+    expect(REFOCUS_REFETCH_MIN_MS).toBe(30_000);
+    const refetch = jest.fn();
+    renderHook(() => useRefetchOnRefocus(refetch));
+
+    focusAfter(5_000); // quick tab switch right after mount
+    expect(refetch).not.toHaveBeenCalled();
+
+    focusAfter(26_000); // 31s since mount
+    expect(refetch).toHaveBeenCalledTimes(1);
+
+    focusAfter(10_000); // 10s since the last refetch
+    focusAfter(10_000); // 20s
+    expect(refetch).toHaveBeenCalledTimes(1);
+
+    focusAfter(10_000); // 30s
     expect(refetch).toHaveBeenCalledTimes(2);
   });
 
@@ -44,7 +78,7 @@ describe("useRefetchOnRefocus", () => {
     rerender({ fn: second });
     expect(mockFocusCallbacks).toHaveLength(1);
 
-    act(() => mockFocusCallbacks.forEach((cb) => cb()));
+    focusAfter(REFOCUS_REFETCH_MIN_MS);
     expect(first).not.toHaveBeenCalled();
     expect(second).toHaveBeenCalledTimes(1);
   });

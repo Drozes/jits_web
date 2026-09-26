@@ -1,14 +1,20 @@
 import * as React from "react";
 import { useFocusEffect } from "expo-router";
 
+/** Minimum gap between two focus refetches of one screen. */
+export const REFOCUS_REFETCH_MIN_MS = 30_000;
+
 /**
- * Re-run `refetch` every time the screen regains focus, skipping the first
- * focus (mount already fetched). Tabs stay mounted, so without this a match
- * or video that landed while another tab was open would not show until a
- * manual pull-to-refresh.
+ * Re-run `refetch` when the screen regains focus, skipping the first focus
+ * (mount already fetched) and at most once per `REFOCUS_REFETCH_MIN_MS`
+ * (counted from mount), so quick tab switches and back navigation do not
+ * re-run the reads or re-toast an offline error. Tabs stay mounted, so
+ * without this a match or video that landed while another tab was open
+ * would not show until a manual pull-to-refresh (which stays unthrottled).
  */
 export function useRefetchOnRefocus(refetch: () => void): void {
   const firstFocus = React.useRef(true);
+  const lastRefetchAt = React.useRef(Date.now());
   const refetchRef = React.useRef(refetch);
   refetchRef.current = refetch;
 
@@ -18,6 +24,9 @@ export function useRefetchOnRefocus(refetch: () => void): void {
         firstFocus.current = false;
         return;
       }
+      const now = Date.now();
+      if (now - lastRefetchAt.current < REFOCUS_REFETCH_MIN_MS) return;
+      lastRefetchAt.current = now;
       refetchRef.current();
     }, []),
   );

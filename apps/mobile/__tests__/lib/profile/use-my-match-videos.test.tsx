@@ -45,6 +45,25 @@ describe("useMyMatchVideos", () => {
     expect(result.current.isLoading).toBe(false);
   });
 
+  it("keeps the error through a retry until a load succeeds", async () => {
+    let resolveRetry: (v: unknown) => void = () => {};
+    mockGetMyMatchVideos
+      .mockResolvedValueOnce({ ok: false, error: { code: "UNKNOWN", message: "offline" } })
+      .mockImplementationOnce(() => new Promise((r) => (resolveRetry = r)));
+    const id = nextId();
+    const { result } = renderHook(() => useMyMatchVideos(id));
+    await waitFor(() => expect(result.current.error?.message).toBe("offline"));
+
+    act(() => result.current.refetch());
+    await waitFor(() => expect(mockGetMyMatchVideos).toHaveBeenCalledTimes(2));
+    expect(result.current.isValidating).toBe(true);
+    expect(result.current.error?.message).toBe("offline");
+
+    await act(async () => resolveRetry({ ok: true, data: [] }));
+    await waitFor(() => expect(result.current.error).toBeNull());
+    expect(result.current.items).toEqual([]);
+  });
+
   it("refetch reads again", async () => {
     mockGetMyMatchVideos.mockResolvedValue({ ok: true, data: [] });
     const id = nextId();

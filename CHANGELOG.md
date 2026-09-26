@@ -9,14 +9,15 @@ JS-only, OTA-eligible (no native dependency or config change). Pushes `/(app)/ma
 **Added**
 - `apps/mobile/lib/match-detail/href.ts`: `matchDetailHref(matchId)`, the one builder of the match detail route.
 - `apps/mobile/lib/profile/use-my-match-videos.ts`: `useMyMatchVideos(athleteId)` on `getMyMatchVideos` (limit 100, cached, `ok: false` becomes the hook's `error`).
-- `apps/mobile/lib/cache/use-refocus-refetch.ts`: `useRefetchOnRefocus` (refetch when a tab regains focus, skipping the first focus) and `usePullToRefresh` (the pull spinner shows only for a pull, not for a silent focus refetch).
+- `apps/mobile/lib/cache/use-refocus-refetch.ts`: `useRefetchOnRefocus` (refetch when a tab regains focus, skipping the first focus and throttled to once per 30s per screen, `REFOCUS_REFETCH_MIN_MS`, so tab switches and back navigation do not re-run the reads or re-toast an offline error; pull-to-refresh stays unthrottled) and `usePullToRefresh` (the pull spinner shows only for a pull, not for a silent focus refetch).
 - "View match details" text link on the match wizard summary step when there is no video id and none is uploading (a reopened completed or disputed match), pushing the detail screen (`components/match-flow/steps/summary-step.tsx`, new `matchId` prop passed from `match-step-renderer.tsx`).
 - `ParticipantRow` (`components/ui/elo-system/participant-row.tsx`) takes an optional `testID`.
+- `apps/mobile/components/profile/history-row-action.tsx`: `HistoryRowAction` (ranked ELO delta + chevron), shared by the Profile Recent Matches and athlete head-to-head rows.
 
 **Changed**
 - Home Recent Activity ("Me" scope), Profile Recent Matches, Stats full history and the athlete page head-to-head rows all open the match detail screen, with accessibility labels "Open match vs <name>" and a trailing chevron. The "Match details coming soon" toast is gone. "All" scope rows stay non-pressable (they can be other athletes' matches). Home "Me" rows now show Ranked/Casual next to the date.
 - `components/match-card.tsx`: optional `accessibilityLabel` (defaults to "Open match vs <opponent>" when pressable) and a chevron when pressable.
-- `components/profile/past-match-videos.tsx`: one row per match (both uploaders grouped, "2 videos"), includes disputed matches and failed-status videos, no 10-video cap, subtitle flags "Disputed" / "Processing", first 5 with a "Show all (N)" / "Show fewer" toggle, rows open the match detail screen (label "Open match video vs <name>", testID `past-video-row-<matchId>`). A failed load shows a "Couldn't load your videos. Tap to retry." row instead of hiding; empty and cold-loading still render nothing.
+- `components/profile/past-match-videos.tsx`: one row per match (both uploaders grouped, "2 videos"), includes disputed matches and failed-status videos, no 10-video cap, subtitle flags "Disputed" / "Processing", first 5 with a "Show all (N)" / "Show fewer" toggle, rows open the match detail screen (label "Open match video vs <name>", testID `past-video-row-<matchId>`). A failed load shows a "Couldn't load your videos. Tap to retry." row instead of hiding, and it stays up through the retry until a load succeeds (`useMyMatchVideos` keeps the last error). An empty list shows "No match videos yet. Record your next match to watch it here." (testID `past-videos-empty`, product decision overriding spec 5.1); only cold-loading renders nothing.
 - Home and Profile refetch when their tab regains focus; Profile's pull-to-refresh and focus refetch reload the videos list too.
 
 **Removed**

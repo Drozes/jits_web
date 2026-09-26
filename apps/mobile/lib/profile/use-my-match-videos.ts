@@ -1,3 +1,4 @@
+import * as React from "react";
 import { supabase } from "@/lib/supabase/client";
 import { getMyMatchVideos, type MatchVideoListItem } from "@jits/shared/api/queries";
 import { useCachedResource } from "@/lib/cache/use-cached-resource";
@@ -10,6 +11,7 @@ export type MyMatchVideos = {
   isLoading: boolean;
   /** A fetch is running (cold or background). */
   isValidating: boolean;
+  /** Last load error, kept through a retry until a load succeeds. */
   error: Error | null;
   refetch: () => void;
 };
@@ -33,5 +35,13 @@ export function useMyMatchVideos(athleteId: string | undefined): MyMatchVideos {
     [athleteId],
   );
 
-  return { items: data ?? [], isLoading, isValidating, error, refetch };
+  // The cache clears `error` as soon as a retry starts; keep the last one
+  // until a load actually succeeds so a retry row does not blink away.
+  const [lastError, setLastError] = React.useState<Error | null>(null);
+  React.useEffect(() => {
+    if (error) setLastError(error);
+    else if (!isValidating && data !== undefined) setLastError(null);
+  }, [error, isValidating, data]);
+
+  return { items: data ?? [], isLoading, isValidating, error: error ?? lastError, refetch };
 }

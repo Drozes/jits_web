@@ -1,7 +1,7 @@
 import * as React from "react";
 import { ActivityIndicator, Pressable, RefreshControl, Text, View } from "react-native";
 import { useRouter } from "expo-router";
-import { ArrowUpRight, ChevronRight } from "lucide-react-native";
+import { ArrowUpRight } from "lucide-react-native";
 import { useRequireAthlete } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { useProfileData } from "@/lib/profile/use-profile-data";
@@ -16,7 +16,8 @@ import { ShareProfileSheet } from "@/components/share-profile-sheet";
 import { AppHeader } from "@/components/layout/app-header";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { PageContainer } from "@/components/layout/page-container";
-import { MetaTag, ParticipantRow, DeltaNumber } from "@/components/ui/elo-system";
+import { MetaTag, ParticipantRow } from "@/components/ui/elo-system";
+import { HistoryRowAction } from "@/components/profile/history-row-action";
 import {
   SkeletonProvider,
   SkeletonPlate,
@@ -184,14 +185,7 @@ export default function ProfileScreen() {
                         subtitle={formatRelativeDate(m.completed_at)}
                         onPress={() => router.push(matchDetailHref(m.match_id))}
                         accessibilityLabel={`Open match vs ${name}`}
-                        action={
-                          <View className="flex-row items-center gap-2">
-                            {m.match_type === "ranked" && m.elo_delta != null ? (
-                              <DeltaNumber value={m.elo_delta} size="m" showSign />
-                            ) : null}
-                            <ChevronRight size={16} color={tokens.textSecondary} />
-                          </View>
-                        }
+                        action={<HistoryRowAction matchType={m.match_type} eloDelta={m.elo_delta} />}
                       />
                     );
                   })}

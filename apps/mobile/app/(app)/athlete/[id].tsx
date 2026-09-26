@@ -8,12 +8,13 @@ import {
   View,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ArrowUpRight, BarChart3, ChevronRight, Swords } from "lucide-react-native";
+import { ArrowUpRight, BarChart3, Swords } from "lucide-react-native";
 import { CompareStatsModal } from "@/components/compare-stats-modal";
 import { CompetitorHeader } from "@/components/athlete/competitor-header";
 import { HeadToHeadCard } from "@/components/athlete/head-to-head-card";
 import { AppHeader } from "@/components/layout/app-header";
-import { MetaTag, ParticipantRow, DeltaNumber } from "@/components/ui/elo-system";
+import { MetaTag, ParticipantRow } from "@/components/ui/elo-system";
+import { HistoryRowAction } from "@/components/profile/history-row-action";
 import { useRequireAthlete } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { useAthleteProfile } from "@/lib/athlete/use-athlete-profile";
@@ -172,14 +173,7 @@ export default function AthleteProfileScreen() {
                     subtitle={formatRelativeDate(m.completed_at)}
                     onPress={() => router.push(matchDetailHref(m.match_id))}
                     accessibilityLabel={`Open match vs ${name}`}
-                    action={
-                      <View className="flex-row items-center gap-2">
-                        {m.match_type === "ranked" && m.elo_delta != null ? (
-                          <DeltaNumber value={m.elo_delta} size="m" showSign />
-                        ) : null}
-                        <ChevronRight size={16} color={tokens.textSecondary} />
-                      </View>
-                    }
+                    action={<HistoryRowAction matchType={m.match_type} eloDelta={m.elo_delta} />}
                   />
                 );
               })}
