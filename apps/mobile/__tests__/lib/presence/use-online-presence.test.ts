@@ -166,6 +166,30 @@ describe("useOnlinePresence", () => {
     unmount();
   });
 
+  it("stays tracked through iOS 'inactive' (shade, Control Center, prompts)", async () => {
+    const { unmount } = mount();
+    await settle();
+    const channel = mockChannels[0];
+    await subscribed(channel);
+    expect(channel.track).toHaveBeenCalledTimes(1);
+
+    // Pull the shade down and back up: no presence calls at all.
+    await act(async () => {
+      appStateHandler?.("inactive");
+      appStateHandler?.("active");
+    });
+    expect(channel.untrack).not.toHaveBeenCalled();
+    expect(channel.track).toHaveBeenCalledTimes(1);
+
+    // A real background still untracks, exactly once.
+    await act(async () => {
+      appStateHandler?.("inactive");
+      appStateHandler?.("background");
+    });
+    expect(channel.untrack).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
   it("rebuilds a server-closed channel and tracks on the new one", async () => {
     jest.useFakeTimers();
     const warn = jest.spyOn(console, "warn").mockImplementation(() => {});

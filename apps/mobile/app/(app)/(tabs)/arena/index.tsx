@@ -15,10 +15,13 @@
  * Observing the lobby is not joining it: an athlete is only tracked in
  * `lobby:online` while they are live.
  * Rematch (jits-00fr): see `lib/arena/use-rematch-pin.ts`. Never auto-sends.
+ * Someone who goes live after the roster loaded re-reads it
+ * (`lib/arena/use-roster-lobby-sync.ts`, jits-hlm1.4).
  */
 import * as React from "react";
 import { RefreshControl, Text, View } from "react-native";
 import { useRouter } from "expo-router";
+import { useIsFocused } from "@react-navigation/native";
 import { useRequireAthlete } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { AppHeader } from "@/components/layout/app-header";
@@ -26,6 +29,7 @@ import { PageContainer } from "@/components/layout/page-container";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { useLobbyIds } from "@/lib/arena/use-lobby-presence";
 import { useArenaRoster } from "@/lib/arena/use-arena-roster";
+import { useRosterLobbySync } from "@/lib/arena/use-roster-lobby-sync";
 import { pinFirst, useRematchPin } from "@/lib/arena/use-rematch-pin";
 import {
   arenaActions,
@@ -61,8 +65,30 @@ export default function ArenaScreen() {
     isLoading,
     isRefreshing,
     hasError,
+    isFetching,
+    lastReadOk,
     refresh,
+    refreshQuietly,
   } = useArenaRoster(athlete?.current_elo ?? 0);
+
+  const rosterIds = React.useMemo(
+    () => competitors.map((c) => c.id),
+    [competitors],
+  );
+  // A pushed profile or another tab keeps this screen mounted: read nothing
+  // then, and catch up on return.
+  const isFocused = useIsFocused();
+  useRosterLobbySync({
+    rosterIds,
+    lobbyIds,
+    selfId: athlete?.id ?? null,
+    isLive,
+    isLoading,
+    isFetching,
+    lastReadOk,
+    enabled: isFocused,
+    refresh: refreshQuietly,
+  });
 
   // An opponent who left between the roster load and the tap leaves a stale
   // row behind; re-reading the roster is what corrects it. The challenge hook
