@@ -174,8 +174,30 @@ export async function blueAccepts(ctx: ScenarioCtx, red: MobileOpponent, challen
 
 // --- in-match live/offline --------------------------------------------------------
 
-/** Blue must be offline for the whole match: flag, pill and presence. */
+const BLUE_IN_LOBBY_BEFORE_MATCH = "presence:blue-in-lobby-before-match";
+
+/**
+ * Before the challenge: Red's lobby observer must see live Blue in
+ * `lobby:online`. Without it "Blue left the lobby" passes vacuously when Blue
+ * was never there (jits-fa9x: the server closed Blue's lobby channel on a
+ * presence rate limit and the app never rejoined).
+ */
+export async function checkBlueInLobbyBeforeMatch(ctx: ScenarioCtx, red: MobileOpponent): Promise<void> {
+  await ctx.expect(BLUE_IN_LOBBY_BEFORE_MATCH, true, async () => {
+    await red.waitLobby(ctx.ids.blue, true, T.db);
+    return true;
+  });
+}
+
+/**
+ * Blue must be offline for the whole match: flag, pill and presence. Requires
+ * `checkBlueInLobbyBeforeMatch` earlier in the scenario, so the presence
+ * oracle here is never vacuous.
+ */
 export async function checkOfflineInMatch(ctx: ScenarioCtx, red: MobileOpponent): Promise<void> {
+  if (!ctx.oracles.some((o) => o.id === BLUE_IN_LOBBY_BEFORE_MATCH)) {
+    throw new HarnessError(`checkOfflineInMatch needs ${BLUE_IN_LOBBY_BEFORE_MATCH} recorded before the match starts`);
+  }
   await ctx.expect("db:blue-offline-in-match", true, () => db.waitLooking(ctx.ids.blue, false, T.db));
   ctx.eq("ui:no-live-pill-in-match", false, await waitLivePill(ctx.ui, false, 8_000));
   await ctx.expect("presence:blue-left-lobby-in-match", true, async () => {

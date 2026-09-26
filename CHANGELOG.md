@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Match-loop harness: non-vacuous lobby presence oracle and realtime log (jits-fa9x)
+
+**Added**
+- `presence:blue-in-lobby-before-match` (`checkBlueInLobbyBeforeMatch` in `tools/match-loop/scenarios/flows.ts`): Red's lobby observer must see Blue in `lobby:online` right after Red goes live, before the challenge, in C1, C2, C3, C5 and C6. `checkOfflineInMatch` now throws a HarnessError when it was not recorded, so `presence:blue-left-lobby-in-match` can no longer pass vacuously. Existing oracle ids and expected values are unchanged.
+- `tools/match-loop/oracle/realtime.ts`: each scenario writes the local `supabase_realtime_*` container's `RateLimit|error` log lines since its start to `realtime.log` (tokens masked) and records the informational oracle `env:realtime-no-rate-limit` (always ok) listing any `ClientPresenceRateLimitReached` lines in result.json.
+- `tools/match-loop/tests/presence-oracles.test.ts` (added to `npm run match-loop:test`).
+
+**Changed**
+- `tools/match-loop/LOOP.md`: known harness facts on the realtime presence rate limit (5 per 30s per channel), back-to-back presence-churning scenarios tripping it, and never raising the local limit.
+
 ### Mobile: no live challenge prompt while offline (jits-sfry)
 
 **Fixed**

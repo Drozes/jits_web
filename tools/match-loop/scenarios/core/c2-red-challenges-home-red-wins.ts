@@ -3,6 +3,7 @@ import {
   blueAccepts,
   blueOnWeight,
   bothConfirm,
+  checkBlueInLobbyBeforeMatch,
   checkDecisiveDb,
   checkLiveAfterExit,
   checkOfflineInMatch,
@@ -23,6 +24,7 @@ const scenario: Scenario = {
     await prepare(ctx, { tab: "Home" });
     const red = await ctx.bot("red");
     await red.goLive();
+    await checkBlueInLobbyBeforeMatch(ctx, red);
     const stakes = await stakesFor(red); // Red is the challenger
     const challengeId = await redChallengesBlue(ctx, red);
     const h = await blueAccepts(ctx, red, challengeId);
