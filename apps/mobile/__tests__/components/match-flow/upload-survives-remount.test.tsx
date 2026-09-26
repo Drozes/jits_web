@@ -6,10 +6,10 @@
  * recorder above the step boundary, which handles a step unmounting, and
  * stopped there. Two paths still destroyed the result:
  *
- *  1. REMOUNT, on every single match. The confirm step calls `refresh()`
- *     the moment the row flips to completed or disputed (see
- *     use-match-completion.ts, which fires on BOTH terminal statuses and
- *     also on a 1s timer if the row is already terminal when it mounts).
+ *  1. REMOUNT, on every single match. The wizard calls `refresh()` the
+ *     moment it moves to the summary, whether the confirm step advanced
+ *     itself or the match reconciler (lib/match-flow/use-wizard-sync.ts)
+ *     moved it there from the DB (both confirmations in, or disputed).
  *     `useMatchDetails` opens its effect with an unconditional
  *     `setIsLoading(true)`, and the wizard returned `<WizardLoading/>`
  *     above the provider. So the provider subtree was torn down and a
@@ -145,7 +145,8 @@ jest.mock("tus-js-client/lib.es5/browser/index.js", () => ({
 
 // ---- Supabase client: resolved responses, plus a drivable realtime channel ----
 
-/** Captured postgres_changes handler from useMatchCompletion. */
+/** Captured postgres_changes handler: the match reconciler's `matches` row
+ * listener, which re-reads the match (and its confirmations) on any UPDATE. */
 const mockRowChange: { handler: ((p: { new: { status?: string } }) => void) | null } = {
   handler: null,
 };
@@ -183,9 +184,11 @@ jest.mock("@/lib/error-tracking/sentry", () => ({ captureException: jest.fn() })
 
 const mockGetMatchDetails = jest.fn();
 const mockGetSubmissionTypes = jest.fn();
+const mockGetMatchConfirmations = jest.fn();
 jest.mock("@jits/shared/api/queries", () => ({
   getMatchDetails: (...a: unknown[]) => mockGetMatchDetails(...a),
   getSubmissionTypes: (...a: unknown[]) => mockGetSubmissionTypes(...a),
+  getMatchConfirmations: (...a: unknown[]) => mockGetMatchConfirmations(...a),
 }));
 
 // The result step's RPC. Stubbed so a draw submits in two taps; the step,
@@ -382,6 +385,8 @@ beforeEach(() => {
   mockUpsertMatchVideo.mockResolvedValue({ ok: true, data: { id: "VID-1" } });
   mockGetSubmissionTypes.mockResolvedValue([]);
   mockGetMatchDetails.mockResolvedValue(matchRow("in_progress"));
+  // Nobody has confirmed until completeMatch() says so.
+  mockGetMatchConfirmations.mockResolvedValue([]);
 });
 
 afterEach(() => {
@@ -391,7 +396,11 @@ afterEach(() => {
 
 /** Walk live -> end -> result -> confirm through the real steps. */
 async function advanceToConfirm(screen: ReturnType<typeof render>) {
-  await waitFor(() => expect(mockCamera.recordAsync).toHaveBeenCalledTimes(1));
+  // The first live render in this file pays the one-off cost of loading the
+  // live-step/recorder module graph; on a cold jest cache under a full
+  // parallel run that alone measured ~1s, right at waitFor's default budget
+  // (every later render: ~50ms). A wider budget, same assertion.
+  await waitFor(() => expect(mockCamera.recordAsync).toHaveBeenCalledTimes(1), { timeout: 5000 });
 
   await act(async () => {
     fireEvent.press(screen.getByText("End Match"));
@@ -408,12 +417,14 @@ async function advanceToConfirm(screen: ReturnType<typeof render>) {
 }
 
 /**
- * The row flips terminal. This is the REAL trigger: useMatchCompletion's
- * postgres_changes subscription, which calls the wizard's
+ * The match finishes: both athletes confirmed (or it was disputed), and the
+ * row changes. This is the REAL trigger: the reconciler's postgres_changes
+ * listener re-reads the match + confirmations and the wizard takes
  * `{ refresh(); setStep("summary"); }`.
  */
 async function completeMatch(status: "completed" | "disputed" = "completed") {
   mockGetMatchDetails.mockResolvedValue(matchRow(status));
+  if (status === "completed") mockGetMatchConfirmations.mockResolvedValue(["me-1", "opp-1"]);
   await act(async () => {
     mockRowChange.handler?.({ new: { status } });
   });

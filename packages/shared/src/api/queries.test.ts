@@ -6,6 +6,7 @@ import {
   getGymDetailResult,
   getGymsWithSessions,
   getGymsWithSessionsResult,
+  getMatchConfirmations,
   getPendingChallengesForAthlete,
 } from "./queries";
 
@@ -842,5 +843,54 @@ describe("getPendingChallengesForAthlete", () => {
     const result = await getPendingChallengesForAthlete(client, ME);
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.data).toEqual({ incoming: [], outgoing: [] });
+  });
+});
+
+describe("getMatchConfirmations", () => {
+  function confirmationsClient(result: { data: unknown; error: unknown }) {
+    const calls: { table?: string; select?: string; eq: [string, unknown][] } = { eq: [] };
+    const chain: Record<string, unknown> = {
+      select(cols: string) {
+        calls.select = cols;
+        return chain;
+      },
+      eq(col: string, val: unknown) {
+        calls.eq.push([col, val]);
+        return chain;
+      },
+      then(resolve: (v: unknown) => unknown) {
+        return resolve(result);
+      },
+    };
+    const client = {
+      from(table: string) {
+        calls.table = table;
+        return chain;
+      },
+    } as never;
+    return { client, calls };
+  }
+
+  it("returns the ids of athletes with a positive confirmation for the match", async () => {
+    const { client, calls } = confirmationsClient({
+      data: [{ athlete_id: "a" }, { athlete_id: "b" }],
+      error: null,
+    });
+    await expect(getMatchConfirmations(client, "m-1")).resolves.toEqual(["a", "b"]);
+    expect(calls.table).toBe("match_confirmations");
+    expect(calls.eq).toEqual([
+      ["match_id", "m-1"],
+      ["confirmed", true],
+    ]);
+  });
+
+  it("returns [] when nobody has confirmed yet", async () => {
+    const { client } = confirmationsClient({ data: [], error: null });
+    await expect(getMatchConfirmations(client, "m-1")).resolves.toEqual([]);
+  });
+
+  it("returns null (unknown, not 'nobody') on an error", async () => {
+    const { client } = confirmationsClient({ data: null, error: { message: "rls" } });
+    await expect(getMatchConfirmations(client, "m-1")).resolves.toBeNull();
   });
 });

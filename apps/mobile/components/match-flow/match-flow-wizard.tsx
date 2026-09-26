@@ -2,16 +2,14 @@ import * as React from "react";
 import { ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useMatchDetails } from "@/lib/match-flow/use-match-details";
-import {
-  getCurrentStep,
-  MATCH_STEPS,
-  type MatchStep,
-} from "@/lib/match-flow/step-router";
+import { MATCH_STEPS, type MatchStep } from "@/lib/match-flow/step-router";
+import { useWizardSync } from "@/lib/match-flow/use-wizard-sync";
+import { MatchSyncProvider } from "@/lib/match-flow/match-sync-context";
 import type { BroadcastResult } from "@jits/shared/hooks/use-session-match-sync";
 import { WizardError, WizardLoading } from "./wizard-status";
 import { QueueStatusBanner } from "./queue-status-banner";
 import { MatchStepRenderer } from "./match-step-renderer";
-import { MatchRecorderProvider } from "./match-recorder-context";
+import { MatchRecorderProvider, useMatchRecorder } from "./match-recorder-context";
 import { MatchRecorderCamera, MatchRecorderStatus } from "./match-recorder-surface";
 import { cn } from "@/lib/cn";
 import { ARENA_EXIT_LABEL } from "@/lib/arena/constants";
@@ -88,22 +86,40 @@ export function MatchFlowWizard({
   // here rather than defended against three times further down.
   const exitLabel = rawExitLabel?.trim() || ARENA_EXIT_LABEL;
   const insets = useSafeAreaInsets();
-  const { match, submissionTypes, isLoading, error, refresh } = useMatchDetails(matchId);
-  const [step, setStep] = React.useState<MatchStep | null>(null);
-  const [startedAt, setStartedAt] = React.useState<string | null>(null);
-  const [resultData, setResultData] = React.useState<BroadcastResult | null>(null);
-
-  React.useEffect(() => {
-    if (!match) return;
-    setStep((prev) => prev ?? getCurrentStep(match));
-    setStartedAt((prev) => prev ?? match.started_at);
-  }, [match]);
+  const { match, submissionTypes, isLoading, error, refresh, applyMatch } =
+    useMatchDetails(matchId);
+  const isParticipant =
+    !!match &&
+    match.participants.some((p) => p.athlete_id === currentAthleteId) &&
+    match.participants.some((p) => p.athlete_id !== currentAthleteId);
+  // Step state + the DB reconciler that keeps it honest when a broadcast is
+  // missed (jits-wfpo, -bh2v, -vh7m, -bmei, -mzfu). See use-wizard-sync.ts.
+  const {
+    step,
+    setStep,
+    startedAt,
+    setStartedAt,
+    resultData,
+    setResultData,
+    confirmedAthleteIds,
+    exitCancelled,
+    stopRecorderRef,
+    syncContext,
+  } = useWizardSync({
+    matchId,
+    currentAthleteId,
+    exitHref,
+    match,
+    ready: isParticipant && !error,
+    applyMatch,
+    refresh,
+  });
 
   React.useEffect(() => {
     onStepChange?.(step);
   }, [step, onStepChange]);
 
-  const advanceToResult = React.useCallback(() => setStep("result"), []);
+  const advanceToResult = React.useCallback(() => setStep("result"), [setStep]);
 
   // LOAD-BEARING. Do not delete this as a mere optimisation.
   //
@@ -182,35 +198,40 @@ export function MatchFlowWizard({
         uploaderAthleteId={me.athlete_id}
         matchDurationSeconds={match.duration_seconds}
       >
-        <WizardStepHeader step={step} currentIdx={stepIdx} label={STEP_LABELS[step]} />
-        <QueueStatusBanner />
-        {/* Above the step, never inside one: the upload begins after the
-            live step has already unmounted, so this is the only place its
-            outcome (success, stall or failure) can be seen. jits-od3. */}
-        <MatchRecorderStatus matchId={matchId} />
-        <MatchRecorderCamera step={step} />
-        <MatchStepRenderer
-          step={step}
-          exitHref={exitHref}
-          exitLabel={exitLabel}
-          matchId={matchId}
-          matchType={matchType}
-          matchStatus={match.status}
-          durationSeconds={match.duration_seconds}
-          startedAt={startedAt ?? match.started_at ?? new Date().toISOString()}
-          pausedAt={match.paused_at}
-          totalPausedDuration={match.total_paused_duration}
-          me={me}
-          opponent={opponent}
-          submissionTypes={submissionTypes}
-          resultData={resultData}
-          ownOutcome={ownOutcome}
-          setStep={setStep}
-          setStartedAt={setStartedAt}
-          setResultData={setResultData}
-          advanceToResult={advanceToResult}
-          refresh={refresh}
-        />
+        <MatchSyncProvider value={syncContext}>
+          <RecorderStopBridge stopRef={stopRecorderRef} />
+          <WizardStepHeader step={step} currentIdx={stepIdx} label={STEP_LABELS[step]} />
+          <QueueStatusBanner />
+          {/* Above the step, never inside one: the upload begins after the
+              live step has already unmounted, so this is the only place its
+              outcome (success, stall or failure) can be seen. jits-od3. */}
+          <MatchRecorderStatus matchId={matchId} />
+          <MatchRecorderCamera step={step} />
+          <MatchStepRenderer
+            step={step}
+            exitHref={exitHref}
+            exitLabel={exitLabel}
+            matchId={matchId}
+            matchType={matchType}
+            matchStatus={match.status}
+            durationSeconds={match.duration_seconds}
+            startedAt={startedAt ?? match.started_at ?? new Date().toISOString()}
+            pausedAt={match.paused_at}
+            totalPausedDuration={match.total_paused_duration}
+            me={me}
+            opponent={opponent}
+            submissionTypes={submissionTypes}
+            resultData={resultData}
+            ownOutcome={ownOutcome}
+            confirmedAthleteIds={confirmedAthleteIds}
+            setStep={setStep}
+            setStartedAt={setStartedAt}
+            setResultData={setResultData}
+            advanceToResult={advanceToResult}
+            refresh={refresh}
+            onCancelledRemotely={exitCancelled}
+          />
+        </MatchSyncProvider>
       </MatchRecorderProvider>
     </ScrollView>
   );
@@ -269,4 +290,28 @@ function WizardStepHeader({
       </View>
     </View>
   );
+}
+
+/**
+ * Hands the wizard-level sync hook a way to stop the recorder, which lives
+ * in the provider rendered BELOW that hook. When the reconciler moves the
+ * wizard off the live step (the opponent recorded while our `match_ended`
+ * was lost), the recorder has to enter `stopping` in the same tick as the
+ * step change, or the camera surface unmounts under a running recording.
+ */
+function RecorderStopBridge({
+  stopRef,
+}: {
+  stopRef: React.MutableRefObject<(() => void) | null>;
+}) {
+  const recorder = useMatchRecorder();
+  React.useEffect(() => {
+    stopRef.current = () => {
+      void recorder.stop();
+    };
+    return () => {
+      stopRef.current = null;
+    };
+  }, [recorder, stopRef]);
+  return null;
 }

@@ -3,6 +3,7 @@ import {
   createSessionMatchChannel,
   SESSION_MATCH_EVENTS,
   sessionMatchTopic,
+  settleWithin,
   type SessionMatchHandlers,
 } from "./session-match-channel";
 
@@ -14,6 +15,7 @@ function createMockSupabase() {
   const httpSent: { event: string; payload: Record<string, unknown> }[] = [];
   let statusCb: ((status: string, err?: Error) => void) | null = null;
   let topic = "";
+  let channelOpts: unknown = undefined;
   const channel = {
     on(_type: string, opts: { event: string }, handler: BroadcastHandler) {
       handlers.set(opts.event, handler);
@@ -33,8 +35,9 @@ function createMockSupabase() {
     },
   };
   const supabase = {
-    channel: vi.fn((name: string) => {
+    channel: vi.fn((name: string, opts?: unknown) => {
       topic = name;
+      channelOpts = opts;
       return channel;
     }),
     removeChannel: vi.fn(() => Promise.resolve("ok")),
@@ -47,6 +50,9 @@ function createMockSupabase() {
     httpSent,
     get topic() {
       return topic;
+    },
+    get channelOpts() {
+      return channelOpts;
     },
     status(s: string) {
       statusCb?.(s);
@@ -79,6 +85,7 @@ describe("createSessionMatchChannel", () => {
       onResultSubmitted: vi.fn(),
       onResultConfirmed: vi.fn(),
       onMatchCancelled: vi.fn(),
+      onMatchDisputed: vi.fn(),
     };
     createSessionMatchChannel(m.supabase as never, "m-1", h);
     m.fire("timer_started", { started_at: "t0" });
@@ -89,6 +96,7 @@ describe("createSessionMatchChannel", () => {
     m.fire("result_submitted", { result: "draw" });
     m.fire("result_confirmed", { athlete_id: "b" });
     m.fire("match_cancelled");
+    m.fire("match_disputed", { athlete_id: "c" });
     expect(h.onTimerStarted).toHaveBeenCalledWith("t0");
     expect(h.onTimerPaused).toHaveBeenCalledWith("t1");
     expect(h.onTimerResumed).toHaveBeenCalledWith(7);
@@ -97,6 +105,17 @@ describe("createSessionMatchChannel", () => {
     expect(h.onResultSubmitted).toHaveBeenCalledWith({ result: "draw" });
     expect(h.onResultConfirmed).toHaveBeenCalledWith("b");
     expect(h.onMatchCancelled).toHaveBeenCalledOnce();
+    expect(h.onMatchDisputed).toHaveBeenCalledWith("c");
+  });
+
+  it("exposes match_disputed as a protocol event (jits-wfpo)", () => {
+    expect(SESSION_MATCH_EVENTS.MATCH_DISPUTED).toBe("match_disputed");
+  });
+
+  it("opens the channel with broadcast acks so an awaited send means the server has it (jits-mzfu)", () => {
+    const m = createMockSupabase();
+    createSessionMatchChannel(m.supabase as never, "m-1", {});
+    expect(m.channelOpts).toEqual({ config: { broadcast: { ack: true } } });
   });
 
   it("reads handlers through a getter at event time", () => {
@@ -141,5 +160,32 @@ describe("createSessionMatchChannel", () => {
     handle.remove();
     expect(handle.isSubscribed()).toBe(false);
     expect(m.supabase.removeChannel).toHaveBeenCalledWith(m.channel);
+  });
+});
+
+describe("settleWithin", () => {
+  it("resolves with the promise's value when it settles in time", async () => {
+    await expect(settleWithin(Promise.resolve("ok"), 1000)).resolves.toBe("ok");
+  });
+
+  it("resolves 'timed out' when the promise is slower than the budget", async () => {
+    vi.useFakeTimers();
+    try {
+      const never = new Promise<string>(() => {});
+      const p = settleWithin(never, 1500);
+      vi.advanceTimersByTime(1500);
+      await expect(p).resolves.toBe("timed out");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("never rejects: a rejected send resolves to { error }", async () => {
+    const err = new Error("socket gone");
+    await expect(settleWithin(Promise.reject(err), 1000)).resolves.toEqual({ error: err });
+  });
+
+  it("accepts a non-promise (a fire-and-forget mock) and resolves immediately", async () => {
+    await expect(settleWithin(undefined, 1000)).resolves.toBeUndefined();
   });
 });

@@ -3,11 +3,14 @@ import { toast } from "@/components/ui/toast";
 import { supabase } from "@/lib/supabase/client";
 import { pauseMatch, resumeMatch } from "@jits/shared/api/mutations";
 import type { useSessionMatchSync } from "@jits/shared/hooks/use-session-match-sync";
+// From the protocol module, not the hook module: tests mock the hook module.
+import { settleWithin } from "@jits/shared/hooks/session-match-channel";
+import { SEND_GRACE_MS } from "./match-sync-context";
 import type { useSessionMatchTimer } from "@jits/shared/hooks/use-session-match-timer";
 
 type Sync = ReturnType<typeof useSessionMatchSync>;
 type Timer = ReturnType<typeof useSessionMatchTimer>;
-type Action = "pause" | "resume";
+type Action = "pause" | "resume" | "end";
 
 interface UseLiveControlsParams {
   matchId: string;
@@ -37,8 +40,16 @@ export function useLiveControls({ matchId, timer, sync, endedRef, onEnded }: Use
     // the in_progress -> completed transition). This mirrors the web flow,
     // which goes start -> record with no end_match in between. We only need to
     // stop the local timer, tell the opponent, and advance to result entry.
-    sync.broadcastMatchEnded();
-    onEnded();
+    //
+    // Advancing unmounts this step and removes the channel carrying
+    // match_ended, so let the broadcast leave the device first (bounded):
+    // a lost match_ended strands the opponent on the live timer
+    // (jits-mzfu). `busy` disables the controls meanwhile.
+    setBusy("end");
+    void settleWithin(sync.broadcastMatchEnded(), SEND_GRACE_MS).then(() => {
+      setBusy(null);
+      onEnded();
+    });
   }, [busy, endedRef, onEnded, sync]);
 
   const handlePauseResume = React.useCallback(async () => {

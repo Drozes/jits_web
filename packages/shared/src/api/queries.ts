@@ -431,6 +431,29 @@ export async function getMatchDetails(
   };
 }
 
+/**
+ * Athlete ids that have positively confirmed a match's recorded result.
+ *
+ * `record_match_result` already flips `matches.status` to `completed` (and
+ * applies ELO), so `completed` does NOT mean "both athletes confirmed"; the
+ * confirmations live only in `match_confirmations`. RLS lets a participant
+ * read every confirmation row of their own matches. Returns null on any
+ * failure so callers can tell "nobody confirmed" from "unknown".
+ */
+export async function getMatchConfirmations(
+  supabase: Client,
+  matchId: string,
+): Promise<string[] | null> {
+  const { data, error } = await supabase
+    .from("match_confirmations")
+    .select("athlete_id")
+    .eq("match_id", matchId)
+    .eq("confirmed", true);
+
+  if (error || !data) return null;
+  return (data as { athlete_id: string }[]).map((r) => r.athlete_id);
+}
+
 export interface ChallengeBetween {
   id: string;
   status: string;
