@@ -54,6 +54,7 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
     athleteId: athlete.id,
     athleteWeight: athlete.current_weight ?? null,
     inMatch,
+    isLive: live.isLive,
     onOpponentUnavailable: notifyOpponentUnavailable,
     onStaleCancelled: notifyStaleChallengesCancelled,
   });
