@@ -157,6 +157,23 @@ describe("ArenaBootstrap state", () => {
     expect(challenge.args?.canReceive).toBe(false);
   });
 
+  it("is busy for the handshake only on a match screen, not the session lobby", () => {
+    live.value.isLive = true;
+    nav.pathname = "/session/s1/lobby";
+    const { rerender } = mount();
+    // Immersive: offline and no prompt, but a challenge is left pending.
+    expect(live.args?.inMatch).toBe(true);
+    expect(challenge.args?.canReceive).toBe(false);
+    expect(challenge.args?.inMatch).toBe(false);
+    nav.pathname = "/session/s1/match/m1";
+    rerender(tree());
+    expect(challenge.args?.inMatch).toBe(true);
+    nav.pathname = "/arena/match/m1";
+    rerender(tree());
+    expect(challenge.args?.inMatch).toBe(true);
+    nav.pathname = "/";
+  });
+
   it("registers stable actions and resets the store on unmount", async () => {
     live.value.isLive = true;
     const { unmount } = mount();

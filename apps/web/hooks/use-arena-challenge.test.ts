@@ -18,6 +18,7 @@ interface FakeChannel {
   handlers: { type: string; filter: Record<string, string>; fn: Handler }[];
   sent: { event: string; payload: unknown }[];
   statusCb: ((status: string) => void) | null;
+  subscribed: boolean;
   on: (type: string, filter: Record<string, string>, fn: Handler) => FakeChannel;
   subscribe: (cb?: (status: string) => void) => FakeChannel;
   send: (m: { event: string; payload: unknown }) => Promise<string>;
@@ -34,39 +35,72 @@ const rt = vi.hoisted(() => ({
     error: null | { message: string };
   },
   /**
-   * When true, a broadcast is delivered to every OTHER live channel on the
-   * same topic (the fake server shared by two clients).
+   * When true, a broadcast is delivered, on a later microtask, to every OTHER
+   * live channel on the same topic (the fake server shared by two clients).
    */
   deliver: false,
+  /**
+   * realtime-js 2.105.4 semantics: `channel(topic)` hands back a registered
+   * instance with that topic, including one still LEAVING after
+   * `removeChannel` (the leave lands a macrotask later); `subscribe()` on a
+   * leaving instance does nothing; `on("postgres_changes")` on a joined one
+   * throws. A leaving instance is dead once its leave lands.
+   */
+  realistic: false,
+  leaving: [] as FakeChannel[],
 }));
 
 vi.mock("@/lib/supabase/client", () => ({
   createClient: () => ({
     channel: (topic: string) => {
+      // Two fake clients share this one registry, so per-challenge topics
+      // (cross-client by design) are not reused in two-client mode; the
+      // incoming topic is per athlete, so it stands in for one client's.
+      if (rt.realistic && (!rt.deliver || topic.startsWith("arena-incoming:"))) {
+        const existing = rt.channels.find((c) => c.topic === topic && !rt.removed.includes(c));
+        if (existing) return existing;
+      }
       const ch: FakeChannel = {
         topic,
         handlers: [],
         sent: [],
         statusCb: null,
+        subscribed: false,
         on(type, filter, fn) {
+          if (
+            rt.realistic &&
+            ch.subscribed &&
+            !rt.leaving.includes(ch) &&
+            type === "postgres_changes"
+          ) {
+            throw new Error(`cannot add \`${type}\` callbacks for ${topic} after \`subscribe()\`.`);
+          }
           ch.handlers.push({ type, filter, fn });
           return ch;
         },
         subscribe: (cb) => {
+          if (rt.realistic && rt.leaving.includes(ch)) return ch;
+          ch.subscribed = true;
           ch.statusCb = cb ?? null;
           return ch;
         },
         send: async (m) => {
           ch.sent.push({ event: m.event, payload: m.payload });
           if (rt.deliver) {
-            for (const other of [...rt.channels]) {
-              if (other === ch || other.topic !== ch.topic || rt.removed.includes(other)) continue;
-              for (const h of other.handlers) {
-                if (h.type === "broadcast" && h.filter.event === m.event) {
-                  await h.fn({ payload: m.payload });
+            // Delivered later, as a real socket would, never inside send().
+            const targets = rt.channels.filter(
+              (o) => o !== ch && o.topic === ch.topic && !rt.removed.includes(o),
+            );
+            queueMicrotask(() => {
+              for (const other of targets) {
+                if (rt.removed.includes(other)) continue;
+                for (const h of other.handlers) {
+                  if (h.type === "broadcast" && h.filter.event === m.event) {
+                    void h.fn({ payload: m.payload });
+                  }
                 }
               }
-            }
+            });
           }
           return "ok";
         },
@@ -75,6 +109,13 @@ vi.mock("@/lib/supabase/client", () => ({
       return ch;
     },
     removeChannel: async (ch: FakeChannel) => {
+      if (!rt.realistic) {
+        rt.removed.push(ch);
+        return;
+      }
+      rt.leaving.push(ch);
+      await new Promise((r) => setTimeout(r, 0));
+      rt.leaving.splice(rt.leaving.indexOf(ch), 1);
       rt.removed.push(ch);
     },
     from: () => {
@@ -90,9 +131,11 @@ vi.mock("@/lib/supabase/client", () => ({
   }),
 }));
 
-const push = vi.fn();
-const refresh = vi.fn();
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push, refresh }) }));
+// One stable router, as Next's `useRouter()` returns: a fresh object per
+// render would re-run every effect keyed on it and hide remount bugs.
+const router = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn() }));
+const { push, refresh } = router;
+vi.mock("next/navigation", () => ({ useRouter: () => router }));
 const toast = vi.hoisted(() => ({ error: vi.fn(), info: vi.fn() }));
 vi.mock("sonner", () => ({ toast }));
 const m = vi.hoisted(() => ({
@@ -131,8 +174,18 @@ function pending(
 }
 
 const live = (topic: string) =>
-  rt.channels.filter((c) => c.topic === topic && !rt.removed.includes(c));
-const incomingChannel = () => live("arena-incoming:me")[0];
+  rt.channels.filter(
+    (c) => c.topic === topic && !rt.removed.includes(c) && !rt.leaving.includes(c),
+  );
+/** The live incoming postgres_changes channel (its topic carries a per-build suffix). */
+const incomingOf = (athleteId: string) =>
+  rt.channels.filter(
+    (c) =>
+      c.topic.startsWith(`arena-incoming:${athleteId}:`) &&
+      !rt.removed.includes(c) &&
+      !rt.leaving.includes(c),
+  )[0];
+const incomingChannel = () => incomingOf("me");
 function fire(
   ch: FakeChannel,
   type: string,
@@ -166,6 +219,8 @@ beforeEach(() => {
   rt.removed = [];
   rt.lookup = null;
   rt.deliver = false;
+  rt.realistic = false;
+  rt.leaving = [];
   rt.opponent = { data: { looking_for_ranked: true, status: "active" }, error: null };
   vi.clearAllMocks();
   m.acceptChallenge.mockResolvedValue({ ok: true, data: null });
@@ -934,7 +989,7 @@ async function insertFor(
   challengerId: string,
 ): Promise<void> {
   await act(async () => {
-    await fire(live(`arena-incoming:${athleteId}`)[0], "postgres_changes", "INSERT", {
+    await fire(incomingOf(athleteId), "postgres_changes", "INSERT", {
       new: { id, challenger_id: challengerId, opponent_id: athleteId, status: "pending" },
     });
   });
@@ -1138,12 +1193,19 @@ describe("crossing challenges (A and B challenge each other)", () => {
     return { rows, matches };
   }
 
-  async function mountPair() {
+  /** Lets pending leaves (a macrotask in realistic mode) and deliveries land. */
+  const settle = () =>
+    act(async () => {
+      await new Promise((r) => setTimeout(r, 5));
+    });
+
+  async function mountPair(strict: boolean) {
     const X = "me";
     const Y = "ana";
-    const x = renderHook(() => useArenaChallenge({ athleteId: X, athleteWeight: 170 }));
-    const y = renderHook(() => useArenaChallenge({ athleteId: Y, athleteWeight: 170 }));
-    await flushAll();
+    const opts = { reactStrictMode: strict };
+    const x = renderHook(() => useArenaChallenge({ athleteId: X, athleteWeight: 170 }), opts);
+    const y = renderHook(() => useArenaChallenge({ athleteId: Y, athleteWeight: 170 }), opts);
+    await settle();
     // X sent the canonical (lower id) one, Y the other; each has the other's prompt.
     await sendAs(x.result, LOW, Y);
     await sendAs(y.result, HIGH, X);
@@ -1154,14 +1216,21 @@ describe("crossing challenges (A and B challenge each other)", () => {
     return { x, y };
   }
 
-  it.each([
+  const ORDERS = [
     ["X taps first", "x-first"],
     ["Y taps first", "y-first"],
     ["both at once, X's write first", "both-x"],
     ["both at once, Y's write first", "both-y"],
-  ])("both land in ONE match: %s", async (_label, order) => {
+  ] as const;
+  it.each([
+    ...ORDERS.map(([label, order]) => [label, order, false] as const),
+    // Strict Mode double-mounts every effect, against realtime-js's reuse of
+    // a still-leaving channel instance (see `rt.realistic`).
+    ...ORDERS.map(([label, order]) => [`${label}, Strict Mode`, order, true] as const),
+  ])("both land in ONE match: %s", async (_label, order, strict) => {
     const server = fakeServer("me", "ana");
-    const { x, y } = await mountPair();
+    rt.realistic = strict;
+    const { x, y } = await mountPair(strict);
 
     await act(async () => {
       if (order === "x-first") {
@@ -1176,7 +1245,7 @@ describe("crossing challenges (A and B challenge each other)", () => {
         await Promise.all([y.result.current.accept(), x.result.current.accept()]);
       }
     });
-    await flushAll();
+    await settle();
 
     expect(push).toHaveBeenCalledTimes(2);
     const hrefs = push.mock.calls.map((c) => c[0]);
@@ -1519,5 +1588,58 @@ describe("the outgoing channel re-reads its row once it is subscribed", () => {
       live("arena-challenge:out1")[0].statusCb?.("SUBSCRIBED");
     });
     expect(push).toHaveBeenCalledWith("/arena/match/m1");
+  });
+});
+
+describe("the incoming channel survives a remount that overlaps its own teardown", () => {
+  it("still hears INSERTs under Strict Mode with realtime-js channel reuse", async () => {
+    rt.realistic = true;
+    const { result } = renderHook(
+      () => useArenaChallenge({ athleteId: "me", athleteWeight: 170, canReceive: true }),
+      { reactStrictMode: true },
+    );
+    // Let the first mount's leave land.
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 5));
+    });
+    const ch = incomingChannel();
+    expect(ch).toBeDefined();
+    expect(ch.subscribed).toBe(true);
+    await act(async () => {
+      await fire(ch, "postgres_changes", "INSERT", {
+        new: { id: "c1", challenger_id: "ana", status: "pending" },
+      });
+    });
+    expect(result.current.incoming?.challengeId).toBe("c1");
+  });
+});
+
+describe("a pending challenge found by a read is re-checked before its prompt is raised", () => {
+  it("does not raise one the challenger withdrew while the tab was hidden", async () => {
+    q.getPendingChallengesForAthlete.mockResolvedValue({
+      ok: true,
+      data: { incoming: [pending("c7", { challengerId: "ana", opponentId: "me" })], outgoing: [] },
+    });
+    q.getChallengeStatus.mockResolvedValue({ ok: true, data: { status: "cancelled", expiresAt: null } });
+    const { result } = mount(true, false, new Set(["ana"]));
+    await flushAll();
+    await flushAll();
+    expect(q.getChallengeStatus).toHaveBeenCalledWith(expect.anything(), "c7");
+    expect(result.current.incoming).toBeNull();
+  });
+
+  it("offers it again later when the status read failed", async () => {
+    q.getPendingChallengesForAthlete.mockResolvedValue({
+      ok: true,
+      data: { incoming: [pending("c7", { challengerId: "ana", opponentId: "me" })], outgoing: [] },
+    });
+    q.getChallengeStatus.mockResolvedValueOnce({ ok: false, error: { code: "UNKNOWN", message: "x" } });
+    const { result, rerender } = mount(true, false, new Set(["ana"]));
+    await flushAll();
+    expect(result.current.incoming).toBeNull();
+    // The next presence sync retries it; the row is still pending.
+    rerender({ canReceive: true, lobbyIds: new Set(["ana"]) });
+    await flushAll();
+    expect(result.current.incoming?.challengeId).toBe("c7");
   });
 });

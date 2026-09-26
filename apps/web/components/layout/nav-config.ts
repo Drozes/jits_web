@@ -39,6 +39,25 @@ const HIDE_PATTERNS = [
   /^\/profile\/setup/,
 ];
 
+/**
+ * Routes that mount a match screen (the match wizard, and the hidden live /
+ * results pages). Narrower than `isImmersiveRoute`, which also covers the
+ * session lobby and join wizard: this is mobile's "a match screen is mounted"
+ * (`useArenaMatchScreen`), the gate for the Arena busy-decline and entry
+ * exclusivity in `use-arena-challenge.ts`.
+ */
+const MATCH_PATTERNS = [
+  /^\/session\/[^/]+\/match\//,
+  /^\/arena\/match\//,
+  /^\/match\/[^/]+\/live/,
+  /^\/match\/[^/]+\/results/,
+];
+
+/** True while a match screen is mounted (see `MATCH_PATTERNS`). */
+export function isMatchRoute(pathname: string): boolean {
+  return MATCH_PATTERNS.some((p) => p.test(pathname));
+}
+
 /** True on immersive routes where the persistent shell chrome is hidden. */
 export function isImmersiveRoute(pathname: string): boolean {
   return HIDE_PATTERNS.some((p) => p.test(pathname));

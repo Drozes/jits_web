@@ -85,6 +85,18 @@ const LIVE_CHALLENGE_STATUSES = new Set(["pending", "accepted", "started"]);
 /** Broadcast channel shared by both parties to a single Arena challenge. */
 const channelName = (challengeId: string) => `arena-challenge:${challengeId}`;
 
+/**
+ * The incoming `postgres_changes` topic, with a per-build suffix (mobile's
+ * `incomingTopic`, same defence as shared `use-pending-challenges.ts`). Not
+ * cross-client, so the name is free. realtime-js 2.105.4 `channel(topic)`
+ * returns the EXISTING instance while one with that topic is still
+ * registered, including one still leaving after `removeChannel`: a remount
+ * that overlaps its own teardown (Strict Mode, HMR, a bootstrap re-gate)
+ * would bind to the dying instance and go silently deaf once its leave lands.
+ */
+export const incomingTopic = (athleteId: string, instanceId: string) =>
+  `arena-incoming:${athleteId}:${instanceId}`;
+
 type ChallengeEvent = "match_started" | "declined" | "cancelled";
 
 interface ChallengeRow {
@@ -630,7 +642,17 @@ export function useArenaChallenge({
       };
       const before = check();
       if (before) return before;
-      const { data } = await createClient()
+      // The candidate list can be a read old: the challenger may have
+      // withdrawn it since (while the tab was hidden, say, with the UPDATE
+      // missed). Only a row still pending is offered.
+      const supabase = createClient();
+      const status = await getChallengeStatus(supabase, challengeId);
+      if (!status.ok) return "retry";
+      if (status.data?.status !== "pending") {
+        settledRef.current.add(challengeId);
+        return "final";
+      }
+      const { data } = await supabase
         .from("athletes")
         .select("display_name")
         .eq("id", challengerId)
@@ -685,7 +707,7 @@ export function useArenaChallenge({
     if (!athleteId) return;
     const supabase = createClient();
     const channel = supabase
-      .channel(`arena-incoming:${athleteId}`)
+      .channel(incomingTopic(athleteId, Math.random().toString(36).slice(2, 10)))
       .on(
         "postgres_changes",
         {
