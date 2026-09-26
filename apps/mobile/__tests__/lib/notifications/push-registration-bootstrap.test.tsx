@@ -49,6 +49,13 @@ describe("PushRegistrationBootstrap", () => {
     expect(mockRegister).toHaveBeenCalledWith({}, "me-1");
   });
 
+  it("still registers a non-pending, non-active athlete (e.g. inactive)", async () => {
+    mockAthlete = { id: "me-1", status: "inactive" };
+    render(<PushRegistrationBootstrap />);
+    await flush();
+    expect(mockRegister).toHaveBeenCalledTimes(1);
+  });
+
   it("does not register with no athlete", async () => {
     render(<PushRegistrationBootstrap />);
     await flush();

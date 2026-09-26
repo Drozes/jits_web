@@ -7,7 +7,9 @@ import {
   type AthleteGuardRow,
 } from "@jits/shared/api/queries";
 import { backoffDelayMs } from "@jits/shared/utils";
+import { env } from "../env";
 import { supabase } from "../supabase/client";
+import { SecureStoreAdapter } from "../supabase/secure-storage";
 import { setCachedElo } from "../splash/elo-cache";
 import { needsAthleteLoad } from "./athlete-load";
 import { takeArenaOfflineBeforeSignOut } from "../arena/arena-store";
@@ -38,7 +40,12 @@ export type AuthState = {
   ) => Promise<{ error: AuthError | null; needsEmailConfirmation: boolean }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: AuthError | null }>;
-  refreshAthlete: () => Promise<void>;
+  /**
+   * Re-read the athlete row (retrying once). Resolves true when a read
+   * succeeded. When both fail, applies `fallback` if given (a row the caller
+   * has just verified), else keeps the current athlete.
+   */
+  refreshAthlete: (fallback?: AthleteGuardRow) => Promise<boolean>;
   /**
    * Re-read the athlete row, but keep the current one when the read fails or
    * finds no row. A null athlete sends
@@ -52,6 +59,29 @@ export type AuthState = {
 export const ATHLETE_LOAD_BACKOFF = { baseMs: 1_000, maxMs: 8_000 };
 /** Failed reads before `athleteLoadFailed` swaps "Loading..." for a retry state. */
 export const ATHLETE_LOAD_FAILURES_BEFORE_RETRY_UI = 3;
+
+/**
+ * The key auth-js persists the session under. It is `protected` on the
+ * client, so read it at runtime and fall back to auth-js's default
+ * (`sb-<project ref>-auth-token`), which is what our client uses.
+ */
+function authStorageKey(): string {
+  const key = (supabase.auth as unknown as { storageKey?: unknown }).storageKey;
+  if (typeof key === "string" && key) return key;
+  return `sb-${new URL(env.supabaseUrl).hostname.split(".")[0]}-auth-token`;
+}
+
+/** Remove the persisted session exactly as auth-js's own `_removeSession` does. */
+async function clearPersistedSession(): Promise<void> {
+  try {
+    const key = authStorageKey();
+    for (const k of [key, `${key}-code-verifier`, `${key}-user`]) {
+      await SecureStoreAdapter.removeItem(k);
+    }
+  } catch (e) {
+    console.warn("[auth] could not clear the persisted session", e);
+  }
+}
 
 /** The athlete read, with a thrown call folded into the failure branch. */
 async function readAthlete(uid: string) {
@@ -173,15 +203,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [athlete?.current_elo]);
 
-  const refreshAthlete = React.useCallback(async () => {
+  const refreshAthlete = React.useCallback(async (fallback?: AthleteGuardRow) => {
     if (!user) {
       setAthlete(null);
-      return;
+      return false;
     }
-    const result = await readAthlete(user.id);
-    // A failed read keeps the current athlete; only a successful read (which
-    // may genuinely be "no row") replaces it.
-    if (result.ok) setAthlete(result.data);
+    // One retry: this runs right after activation, where a failed read would
+    // leave the context "pending" and route a just-activated athlete back
+    // into setup.
+    let result = await readAthlete(user.id);
+    if (!result.ok) result = await readAthlete(user.id);
+    if (result.ok) {
+      // May genuinely be "no row".
+      setAthlete(result.data);
+      return true;
+    }
+    // Both failed: apply the caller's already-verified row if it has one,
+    // otherwise keep the current athlete (never null it on a failed read).
+    if (fallback) setAthlete(fallback);
+    return false;
   }, [user]);
 
   const refreshAthleteSoft = React.useCallback(async () => {
@@ -257,11 +297,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Clear `looking_for_ranked` while the session can still write it; once
     // signed out, RLS refuses the write and the athlete stays advertised.
     await takeArenaOfflineBeforeSignOut();
-    await supabase.auth.signOut();
-    // onAuthStateChange will null out user/athlete; clear eagerly for snappier UI.
+    let signOutError: unknown = null;
+    try {
+      ({ error: signOutError } = await supabase.auth.signOut());
+    } catch (e) {
+      signOutError = e;
+    }
+    if (signOutError) {
+      // Offline (the retry screen's usual case): auth-js returns the error
+      // WITHOUT removing the stored session or emitting SIGNED_OUT, so the
+      // user would silently be signed back in on the next launch. Drop the
+      // persisted session ourselves; the server-side token just expires.
+      console.warn("[auth] signOut failed, clearing the local session", signOutError);
+      await clearPersistedSession();
+    }
+    // onAuthStateChange normally nulls these; clear eagerly (and always, since
+    // a failed sign-out emits nothing) and drop the loading gate so Index
+    // goes to /login instead of sitting on "Loading...".
+    loadedAthleteForUserId.current = null;
     setSession(null);
     setUser(null);
     setAthlete(null);
+    setAthleteLoadFailed(false);
+    setIsLoading(false);
   }, []);
 
   const resetPassword = React.useCallback(async (email: string) => {

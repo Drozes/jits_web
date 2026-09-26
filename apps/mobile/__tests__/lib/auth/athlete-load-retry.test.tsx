@@ -19,10 +19,11 @@ jest.mock("@jits/shared/api/queries", () => ({
   getCurrentAthleteResult: (...a: unknown[]) => mockRead(...a),
 }));
 
-const mockSignOut = jest.fn(() => Promise.resolve({ error: null }));
+const mockSignOut = jest.fn<Promise<{ error: unknown }>, []>();
 jest.mock("@/lib/supabase/client", () => ({
   supabase: {
     auth: {
+      storageKey: "sb-test-auth-token",
       onAuthStateChange: (cb: (event: string, session: unknown) => void) => {
         cb("INITIAL_SESSION", { user: { id: "u-1" } });
         return { data: { subscription: { unsubscribe: jest.fn() } } };
@@ -30,6 +31,11 @@ jest.mock("@/lib/supabase/client", () => ({
       signOut: () => mockSignOut(),
     },
   },
+}));
+
+const mockRemoveItem = jest.fn((_key: string) => Promise.resolve());
+jest.mock("@/lib/supabase/secure-storage", () => ({
+  SecureStoreAdapter: { removeItem: (key: string) => mockRemoveItem(key) },
 }));
 
 jest.mock("@/lib/splash/elo-cache", () => ({ setCachedElo: jest.fn(() => Promise.resolve()) }));
@@ -48,6 +54,7 @@ jest.mock("expo-router", () => ({
 import {
   ATHLETE_LOAD_FAILURES_BEFORE_RETRY_UI,
   AuthProvider,
+  type AuthState,
 } from "@/lib/auth/auth-context";
 import { useAuth } from "@/lib/auth/hooks";
 import Index from "@/app/index";
@@ -59,10 +66,12 @@ const OK = (data: unknown) => ({ ok: true, data });
 // Longer than any backoff step (the cap is 8s).
 const PAST_BACKOFF = 10_000;
 
-let refreshAthlete: (() => Promise<void>) | null = null;
+let refreshAthlete: AuthState["refreshAthlete"] | null = null;
+let signOut: AuthState["signOut"] | null = null;
 function Probe() {
   const auth = useAuth();
   refreshAthlete = auth.refreshAthlete;
+  signOut = auth.signOut;
   return <Text testID="athlete">{auth.athlete ? auth.athlete.status : "none"}</Text>;
 }
 
@@ -86,7 +95,11 @@ async function advance(ms: number) {
 beforeEach(() => {
   jest.useFakeTimers();
   jest.clearAllMocks();
+  mockRead.mockReset();
+  mockSignOut.mockReset();
+  mockSignOut.mockResolvedValue({ error: null });
   refreshAthlete = null;
+  signOut = null;
   jest.spyOn(console, "warn").mockImplementation(() => {});
 });
 
@@ -143,7 +156,7 @@ describe("cold-start athlete load", () => {
     expect(r.getByTestId("redirect").props.children).toBe("/(app)/(home)");
   });
 
-  it("offers Sign Out from the retry state", async () => {
+  it("offers Sign Out from the retry state, which lands on /login", async () => {
     mockRead.mockResolvedValue(FAIL);
     const r = render(<App />);
     await flush();
@@ -152,31 +165,107 @@ describe("cold-start athlete load", () => {
     fireEvent.press(r.getByText("Sign Out"));
     await flush();
     expect(mockSignOut).toHaveBeenCalledTimes(1);
+    expect(r.getByTestId("redirect").props.children).toBe("/login");
+    // A clean sign-out removed the session itself.
+    expect(mockRemoveItem).not.toHaveBeenCalled();
   });
 
-  it("refreshAthlete keeps the current athlete when its read fails", async () => {
-    mockRead.mockResolvedValueOnce(OK(ACTIVE));
+  it("a Sign Out that fails offline still lands on /login and clears the stored session", async () => {
+    mockRead.mockResolvedValue(FAIL);
+    mockSignOut.mockResolvedValueOnce({ error: { message: "Network request failed" } });
+    const r = render(<App />);
+    await flush();
+    for (let i = 1; i < ATHLETE_LOAD_FAILURES_BEFORE_RETRY_UI; i++) await advance(PAST_BACKOFF);
+    expect(r.getByTestId("athlete-load-retry")).toBeTruthy();
+
+    fireEvent.press(r.getByText("Sign Out"));
+    await flush();
+
+    expect(r.getByTestId("redirect").props.children).toBe("/login");
+    expect(r.queryByText("Loading...")).toBeNull();
+    expect(mockRemoveItem.mock.calls.map((c) => c[0])).toEqual([
+      "sb-test-auth-token",
+      "sb-test-auth-token-code-verifier",
+      "sb-test-auth-token-user",
+    ]);
+    // The retry loop stopped with the user gone.
+    const reads = mockRead.mock.calls.length;
+    await advance(PAST_BACKOFF);
+    expect(mockRead.mock.calls.length).toBe(reads);
+  });
+
+  it("a Sign Out that throws is treated the same way", async () => {
+    mockRead.mockResolvedValue(OK(ACTIVE));
+    mockSignOut.mockRejectedValueOnce(new Error("offline"));
+    const r = render(<App />);
+    await flush();
+
+    await act(async () => {
+      await signOut!();
+    });
+    expect(r.getByTestId("redirect").props.children).toBe("/login");
+    expect(mockRemoveItem).toHaveBeenCalledWith("sb-test-auth-token");
+  });
+});
+
+describe("refreshAthlete", () => {
+  it("keeps the current athlete when both reads fail, and reports failure", async () => {
+    mockRead.mockResolvedValueOnce(OK(ACTIVE)).mockResolvedValue(FAIL);
     const r = render(<App />);
     await flush();
     expect(r.getByTestId("athlete").props.children).toBe("active");
 
-    mockRead.mockResolvedValueOnce(FAIL);
+    let ok: boolean | undefined;
     await act(async () => {
-      await refreshAthlete!();
+      ok = await refreshAthlete!();
+    });
+    expect(ok).toBe(false);
+    expect(mockRead).toHaveBeenCalledTimes(3); // load + read + one retry
+    expect(r.getByTestId("athlete").props.children).toBe("active");
+    expect(r.getByTestId("redirect").props.children).toBe("/(app)/(home)");
+  });
+
+  it("retries once and applies the second read", async () => {
+    const PENDING = { ...ACTIVE, status: "pending" };
+    mockRead
+      .mockResolvedValueOnce(OK(PENDING))
+      .mockResolvedValueOnce(FAIL)
+      .mockResolvedValueOnce(OK(ACTIVE));
+    const r = render(<App />);
+    await flush();
+    expect(r.getByTestId("redirect").props.children).toBe("/profile-setup");
+
+    let ok: boolean | undefined;
+    await act(async () => {
+      ok = await refreshAthlete!();
+    });
+    expect(ok).toBe(true);
+    expect(r.getByTestId("athlete").props.children).toBe("active");
+  });
+
+  it("applies the caller's verified row when both reads fail (post-activation)", async () => {
+    const PENDING = { ...ACTIVE, status: "pending" };
+    mockRead.mockResolvedValueOnce(OK(PENDING)).mockResolvedValue(FAIL);
+    const r = render(<App />);
+    await flush();
+    expect(r.getByTestId("athlete").props.children).toBe("pending");
+
+    await act(async () => {
+      await refreshAthlete!(ACTIVE as never);
     });
     expect(r.getByTestId("athlete").props.children).toBe("active");
     expect(r.getByTestId("redirect").props.children).toBe("/(app)/(home)");
   });
 
-  it("refreshAthlete folds a thrown read into a failure, keeping the athlete", async () => {
-    mockRead.mockResolvedValueOnce(OK(ACTIVE));
+  it("folds a thrown read into a failure, keeping the athlete", async () => {
+    mockRead.mockResolvedValueOnce(OK(ACTIVE)).mockRejectedValue(new Error("socket hang up"));
     const r = render(<App />);
     await flush();
 
-    mockRead.mockRejectedValueOnce(new Error("socket hang up"));
     await act(async () => {
       await refreshAthlete!();
     });
     expect(r.getByTestId("athlete").props.children).toBe("active");
   });
 });
+

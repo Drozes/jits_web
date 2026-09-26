@@ -29,7 +29,9 @@ export default function ProfileSetupScreen() {
   const { data, loading, error, reload } = useSetupData(user?.id ?? null);
   const tokens = useThemedTokens();
 
-  const isLoading = authLoading || loading || (!!user && !data);
+  // `data` is null after a failed read too, so without `!error` the Try Again
+  // state below would never render (an endless spinner).
+  const isLoading = authLoading || loading || (!!user && !data && !error);
   const headerTitle = data?.isEditing ? "Edit Profile" : "Setup";
 
   return (

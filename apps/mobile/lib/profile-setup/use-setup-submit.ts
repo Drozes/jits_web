@@ -1,6 +1,7 @@
 import * as React from "react";
 import { useRouter } from "expo-router";
 import { ATHLETE_STATUS } from "@jits/shared/constants";
+import { ATHLETE_GUARD_SELECT, type AthleteGuardRow } from "@jits/shared/api/queries";
 import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth/hooks";
 import { toast } from "@/components/ui/toast";
@@ -152,9 +153,11 @@ export function useSetupSubmit({
         }
       }
 
+      // Read the full guard row, so it can stand in for the auth athlete if
+      // the context refresh below fails.
       const { data: updated } = await supabase
         .from("athletes")
-        .select("status")
+        .select(ATHLETE_GUARD_SELECT)
         .eq("id", resolvedAthleteId!)
         .single();
       if (updated?.status !== ATHLETE_STATUS.ACTIVE) {
@@ -163,7 +166,9 @@ export function useSetupSubmit({
         return;
       }
 
-      await refreshAthlete();
+      // Never navigate with a stale "pending" athlete in the context: that
+      // routes a just-activated athlete back into setup (as Edit Profile).
+      await refreshAthlete(updated as unknown as AthleteGuardRow);
 
       if (isEditing) {
         toast.success("Profile updated successfully");

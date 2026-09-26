@@ -11,7 +11,7 @@ import * as React from "react";
 import { act, render, renderHook } from "@testing-library/react-native";
 
 const mockActivate = jest.fn((_tag: string) => Promise.resolve());
-const mockDeactivate = jest.fn((_tag: string) => {});
+const mockDeactivate = jest.fn((_tag: string) => Promise.resolve());
 jest.mock("expo-keep-awake", () => ({
   activateKeepAwakeAsync: (tag: string) => mockActivate(tag),
   deactivateKeepAwake: (tag: string) => mockDeactivate(tag),

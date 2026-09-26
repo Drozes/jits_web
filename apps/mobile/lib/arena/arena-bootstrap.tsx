@@ -50,11 +50,8 @@ function useArenaLiveKeepAwake(active: boolean) {
       // Non-fatal: the athlete just stays subject to auto-lock.
     });
     return () => {
-      try {
-        deactivateKeepAwake(ARENA_KEEP_AWAKE_TAG);
-      } catch {
-        /* noop */
-      }
+      // Async: a rejection would otherwise surface as an unhandled promise.
+      void deactivateKeepAwake(ARENA_KEEP_AWAKE_TAG).catch(() => {});
     };
   }, [active]);
 }
