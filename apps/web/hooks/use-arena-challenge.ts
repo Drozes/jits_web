@@ -170,7 +170,11 @@ export function useArenaChallenge({
       if (dropped && dropped.challengeId !== challengeId) {
         void (async () => {
           const res = await cancelChallenge(createClient(), dropped.challengeId);
-          if (res.ok) await broadcast(null, dropped.challengeId, "cancelled");
+          // Only a row that actually changed was withdrawn; an already-over
+          // one has nothing to tell the recipient.
+          if (res.ok && res.data.cancelled) {
+            await broadcast(null, dropped.challengeId, "cancelled");
+          }
         })();
       }
       setIncoming(null);
@@ -458,6 +462,23 @@ export function useArenaChallenge({
           toast.error("Couldn't cancel that challenge. Try again.");
           return;
         }
+        if (!result.data.cancelled) {
+          // No row changed (a 0-row update is not an error): the challenge
+          // was already over, or the opponent has just started the match.
+          // start_match_from_challenge is idempotent and returns the existing
+          // match, so join it rather than leave the opponent in it alone
+          // (mirrors mobile). Nothing was withdrawn, so nothing to broadcast.
+          const started = await startMatchFromChallenge(
+            supabase,
+            current.challengeId,
+          );
+          if (started.ok) {
+            enterMatch(current.challengeId, started.data.match_id);
+            return;
+          }
+          setOutgoing(null);
+          return;
+        }
         await broadcast(
           outgoingChannelRef.current,
           current.challengeId,
@@ -465,7 +486,7 @@ export function useArenaChallenge({
         );
         setOutgoing(null);
       }),
-    [runExclusive, setOutgoing],
+    [runExclusive, setOutgoing, enterMatch],
   );
 
   return {
