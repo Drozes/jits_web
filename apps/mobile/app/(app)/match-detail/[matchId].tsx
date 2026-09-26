@@ -9,6 +9,7 @@ import {
   MatchDetailError,
   MatchDetailSkeleton,
 } from "@/components/match-detail/match-detail-states";
+import { HarnessMarker } from "@/components/match-detail/harness-marker";
 import { useMatchDetail } from "@/lib/match-detail/use-match-detail";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 
@@ -35,10 +36,10 @@ export default function MatchDetailScreen() {
   const label =
     state === "ready" && data
       ? `Match detail vs ${data.opponent?.display_name ?? "Opponent"}`
-      : undefined;
+      : "Match detail";
 
   return (
-    <View testID="match-detail-screen" accessibilityLabel={label} className="flex-1 bg-surface">
+    <View className="flex-1 bg-surface">
       <AppHeader title="Match" back backFallback="/" />
       {state === "ready" && data ? (
         <ScrollView
@@ -68,6 +69,7 @@ export default function MatchDetailScreen() {
       ) : (
         <MatchDetailSkeleton />
       )}
+      <HarnessMarker testID="match-detail-screen" label={label} />
     </View>
   );
 }

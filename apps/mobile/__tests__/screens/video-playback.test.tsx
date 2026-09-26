@@ -6,8 +6,10 @@ import { act, fireEvent, render, waitFor } from "@testing-library/react-native";
 const mockBack = jest.fn();
 const mockReplace = jest.fn();
 
+let mockId: string | undefined = "vid-1";
+
 jest.mock("expo-router", () => ({
-  useLocalSearchParams: () => ({ id: "vid-1" }),
+  useLocalSearchParams: () => ({ id: mockId }),
   useRouter: () => ({ back: mockBack, replace: mockReplace, canGoBack: () => true }),
 }));
 
@@ -77,12 +79,35 @@ function lastPlayer() {
 }
 
 function stateLabel(utils: ReturnType<typeof render>) {
-  return utils.getByTestId("video-player-state").props.accessibilityLabel;
+  // Exactly one element carries the id, and it must be a real accessibility
+  // element: idb (the harness) never sees a testID on a non-accessible View.
+  const markers = utils.getAllByTestId("video-player-state");
+  expect(markers).toHaveLength(1);
+  expect(markers[0].props.accessible).toBe(true);
+  return markers[0].props.accessibilityLabel;
+}
+
+/** First status (load), then a status at `ms` (real playback progress). */
+function loadAndPlayTo(ms: number) {
+  act(() => {
+    lastPlayer().onPlaybackStatusUpdate({ isLoaded: true, positionMillis: 0 });
+  });
+  act(() => {
+    lastPlayer().onPlaybackStatusUpdate({ isLoaded: true, positionMillis: ms });
+  });
+}
+
+async function playerErrors(count: number) {
+  await act(async () => {
+    lastPlayer().onError("player error");
+  });
+  await waitFor(() => expect(mockPlayers.length).toBe(count + 1));
 }
 
 beforeEach(() => {
   jest.clearAllMocks();
   mockPlayers.length = 0;
+  mockId = "vid-1";
 });
 
 /**
@@ -198,9 +223,7 @@ describe("MatchVideoScreen", () => {
 
     const utils = render(React.createElement(MatchVideoScreen));
     await waitFor(() => expect(mockPlayers.length).toBe(1));
-    act(() => {
-      lastPlayer().onPlaybackStatusUpdate({ isLoaded: true, positionMillis: 42_000 });
-    });
+    loadAndPlayTo(42_000);
 
     // The 1h URL expires mid-match.
     await act(async () => {
@@ -224,12 +247,14 @@ describe("MatchVideoScreen", () => {
     const utils = render(React.createElement(MatchVideoScreen));
     await waitFor(() => expect(mockPlayers.length).toBe(1));
 
-    await act(async () => {
-      lastPlayer().onError("bad");
-    });
-    await waitFor(() => expect(mockPlayers.length).toBe(2));
+    await playerErrors(1);
     expect(stateLabel(utils)).toBe("Video state: loading");
 
+    // The re-signed URL loads and seeks back, then fails at the same spot:
+    // a load alone is not progress, so this must not re-sign again.
+    act(() => {
+      lastPlayer().onPlaybackStatusUpdate({ isLoaded: true, positionMillis: 0 });
+    });
     await act(async () => {
       lastPlayer().onError("bad again");
     });
@@ -237,5 +262,69 @@ describe("MatchVideoScreen", () => {
     expect(stateLabel(utils)).toBe("Video state: error");
     // One initial sign plus exactly one silent re-sign.
     expect(mock).toHaveBeenCalledTimes(2);
+  });
+
+  it("caps silent re-signs at two per screen, even with progress between", async () => {
+    const mock = queries().getMatchVideoPlaybackResult;
+    mock.mockResolvedValue(playable("https://signed.example/v.mp4"));
+
+    const utils = render(React.createElement(MatchVideoScreen));
+    await waitFor(() => expect(mockPlayers.length).toBe(1));
+    loadAndPlayTo(10_000);
+
+    await playerErrors(1); // re-sign 1
+    loadAndPlayTo(20_000); // real progress clears the streak
+    await playerErrors(2); // re-sign 2
+    loadAndPlayTo(30_000);
+    await act(async () => {
+      lastPlayer().onError("third");
+    });
+
+    expect(utils.getByTestId("video-load-failed")).toBeTruthy();
+    expect(mock).toHaveBeenCalledTimes(3);
+
+    // The user's Retry resets the cap.
+    await act(async () => {
+      fireEvent.press(utils.getByLabelText("Retry loading video"));
+    });
+    await waitFor(() => expect(mock).toHaveBeenCalledTimes(4));
+    await waitFor(() => expect(utils.getByTestId("video-player")).toBeTruthy());
+    loadAndPlayTo(5_000);
+    await playerErrors(mockPlayers.length);
+    expect(mock).toHaveBeenCalledTimes(5);
+  });
+
+  it("ignores player errors while a silent re-sign is in flight", async () => {
+    const mock = queries().getMatchVideoPlaybackResult;
+    mock.mockResolvedValueOnce(playable("https://signed.example/old.mp4"));
+    let resolveSign!: (v: unknown) => void;
+    mock.mockReturnValueOnce(new Promise((r) => (resolveSign = r)));
+
+    const utils = render(React.createElement(MatchVideoScreen));
+    await waitFor(() => expect(mockPlayers.length).toBe(1));
+    loadAndPlayTo(8_000);
+
+    await act(async () => {
+      lastPlayer().onError("expired");
+    });
+    // The dying player reports again before the new URL arrives.
+    await act(async () => {
+      lastPlayer().onError("expired again");
+    });
+    expect(utils.queryByTestId("video-load-failed")).toBeNull();
+    expect(mock).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      resolveSign(playable("https://signed.example/new.mp4"));
+    });
+    await waitFor(() => expect(utils.getByText("https://signed.example/new.mp4")).toBeTruthy());
+  });
+
+  it("shows unavailable without a read when the route has no id", async () => {
+    mockId = undefined;
+    const utils = render(React.createElement(MatchVideoScreen));
+    await waitFor(() => expect(utils.getByTestId("video-unavailable")).toBeTruthy());
+    expect(queries().getMatchVideoPlaybackResult).not.toHaveBeenCalled();
+    expect(stateLabel(utils)).toBe("Video state: absent");
   });
 });

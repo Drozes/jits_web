@@ -1,6 +1,7 @@
 import * as React from "react";
 import { Text, View } from "react-native";
 import { cn } from "@/lib/cn";
+import { useAmber } from "./use-amber";
 
 const MUTED: Record<string, string> = {
   voided: "VOIDED",
@@ -12,10 +13,11 @@ const MUTED: Record<string, string> = {
  * muted chip; every other status (completed, in progress) renders nothing.
  */
 export function MatchStatusBadge({ status }: { status: string }) {
+  const amber = useAmber();
   if (status === "disputed") {
     return (
       <View testID="match-disputed-badge" className="gap-2">
-        <Chip label="DISPUTED" className="border-amber-500" textClassName="text-amber-500" />
+        <Chip label="DISPUTED" className={amber.border} textClassName={amber.text} />
         <Text className="font-body text-[12px] text-ink-3">
           This result is disputed and under review.
         </Text>

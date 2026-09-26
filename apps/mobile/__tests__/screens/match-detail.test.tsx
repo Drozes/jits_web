@@ -7,6 +7,7 @@ const mockPush = jest.fn();
 const mockBack = jest.fn();
 const mockReplace = jest.fn();
 let mockMatchId = "11111111-1111-4111-8111-111111111111";
+let mockScheme: "light" | "dark" = "light";
 
 jest.mock("expo-router", () => ({
   useLocalSearchParams: () => ({ matchId: mockMatchId }),
@@ -50,6 +51,7 @@ jest.mock("@/lib/auth/hooks", () => ({
 }));
 
 jest.mock("@/lib/theme/use-theme", () => ({
+  useResolvedColorScheme: () => mockScheme,
   useThemedTokens: () => ({
     accentCta: "#E63946",
     textSecondary: "#4B5563",
@@ -169,20 +171,30 @@ async function renderLoaded(result: unknown) {
 beforeEach(() => {
   jest.clearAllMocks();
   mockMatchId = "11111111-1111-4111-8111-111111111111";
+  mockScheme = "light";
 });
+
+/** The harness marker: exactly one, and a real (accessible) element for idb. */
+function screenMarker(utils: ReturnType<typeof render>) {
+  const markers = utils.getAllByTestId("match-detail-screen");
+  expect(markers).toHaveLength(1);
+  expect(markers[0].props.accessible).toBe(true);
+  return markers[0];
+}
 
 describe("MatchDetailScreen", () => {
   it("shows the skeleton while loading", () => {
     mockGetMatchDetailView.mockReturnValue(new Promise(() => undefined));
-    const { getByTestId, getByLabelText } = render(React.createElement(MatchDetailScreen));
-    expect(getByTestId("match-detail-loading")).toBeTruthy();
-    expect(getByLabelText("Loading match")).toBeTruthy();
+    const utils = render(React.createElement(MatchDetailScreen));
+    expect(utils.getByTestId("match-detail-loading")).toBeTruthy();
+    expect(utils.getByLabelText("Loading match")).toBeTruthy();
+    expect(screenMarker(utils).props.accessibilityLabel).toBe("Match detail");
   });
 
   it("renders a ranked win: verdict, green delta, rating before/after, meta", async () => {
     const utils = await renderLoaded(view());
     expect(mockGetMatchDetailView).toHaveBeenCalledWith({}, mockMatchId, "me-1");
-    expect(utils.getByTestId("match-detail-screen").props.accessibilityLabel).toBe(
+    expect(screenMarker(utils).props.accessibilityLabel).toBe(
       "Match detail vs Demo Red",
     );
     expect(utils.getByTestId("match-verdict")).toHaveTextContent("WIN");
@@ -204,8 +216,15 @@ describe("MatchDetailScreen", () => {
 
     const draw = await renderLoaded(view({ me: { outcome: "draw", elo_delta: -4 } }));
     expect(draw.getByTestId("match-verdict")).toHaveTextContent("DRAW");
-    expect(draw.getByTestId("match-verdict").props.className).toContain("text-amber-500");
-    expect(draw.getByTestId("match-elo-delta").props.className).toContain("text-amber-500");
+    // Light surfaces get the darker amber for contrast.
+    expect(draw.getByTestId("match-verdict").props.className).toContain("text-amber-600");
+    expect(draw.getByTestId("match-elo-delta").props.className).toContain("text-amber-600");
+    draw.unmount();
+
+    mockScheme = "dark";
+    const dark = await renderLoaded(view({ me: { outcome: "draw", elo_delta: -4 } }));
+    expect(dark.getByTestId("match-verdict").props.className).toContain("text-amber-500");
+    expect(dark.getByTestId("match-elo-delta").props.className).toContain("text-amber-500");
   });
 
   it("says Casual, unrated instead of a delta for a casual match", async () => {
@@ -226,6 +245,8 @@ describe("MatchDetailScreen", () => {
     const utils = await renderLoaded(view());
     fireEvent.press(utils.getByLabelText("View Demo Red's profile"));
     expect(mockPush).toHaveBeenCalledWith("/(app)/athlete/opp-1");
+    // Avatars stay circular on this row.
+    expect(utils.getByLabelText("Demo Red").props.className).toContain("rounded-full");
   });
 
   it("renders two labelled cards with exactly one primary Watch", async () => {
@@ -237,7 +258,9 @@ describe("MatchDetailScreen", () => {
     expect(theirs.props.className).not.toContain("bg-cta");
     expect(within(utils.getByTestId("match-video-card-v-opp")).getByText("Demo Red's recording")).toBeTruthy();
 
-    fireEvent.press(theirs);
+    // Harness tap targets: one per Watch, keyed by video id.
+    expect(utils.getByTestId("match-video-watch-v-mine")).toBe(mine);
+    fireEvent.press(utils.getByTestId("match-video-watch-v-opp"));
     expect(mockPush).toHaveBeenCalledWith("/(app)/video/v-opp");
   });
 
@@ -245,7 +268,7 @@ describe("MatchDetailScreen", () => {
     const utils = await renderLoaded(
       view({ videos: [video({ status: "uploading", playability: "processing" }), video(OPP_VIDEO)] }),
     );
-    expect(utils.getByText("UPLOADING")).toBeTruthy();
+    expect(utils.getByText("UPLOADING").props.className).toContain("text-amber-600");
     expect(utils.getByText("Still uploading. Pull down to refresh.")).toBeTruthy();
     const processing = utils.getByLabelText("Processing");
     expect(processing.props.accessibilityState).toMatchObject({ disabled: true });
@@ -265,7 +288,13 @@ describe("MatchDetailScreen", () => {
     const utils = await renderLoaded(
       view({ videos: [video({ poster_url: "https://signed/p.jpg" }), video(OPP_VIDEO)] }),
     );
-    expect(within(utils.getByTestId("match-video-card-v-mine")).getByTestId("match-video-poster")).toBeTruthy();
+    const poster = within(utils.getByTestId("match-video-card-v-mine")).getByTestId("match-video-poster");
+    // Cached by video id so a re-signed URL on refetch does not flash.
+    expect(poster.props.source).toEqual({
+      uri: "https://signed/p.jpg",
+      cacheKey: "match-video-poster-v-mine",
+    });
+    expect(poster.props.recyclingKey).toBe("v-mine");
     expect(within(utils.getByTestId("match-video-card-v-opp")).getByTestId("match-video-placeholder")).toBeTruthy();
   });
 

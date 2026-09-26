@@ -5,11 +5,13 @@ import { cn } from "@/lib/cn";
 import type { MatchDetailView } from "@jits/shared/api/queries";
 import { MatchMetaRow } from "./match-meta-row";
 import { MatchStatusBadge } from "./match-status-badge";
+import { useAmber } from "./use-amber";
 
 const VERDICT: Record<string, { text: string; className: string }> = {
   win: { text: "WIN", className: "text-ink" },
   loss: { text: "LOSS", className: "text-negative" },
-  draw: { text: "DRAW", className: "text-amber-500" },
+  // Draw color comes from useAmber (theme-aware), filled in at render.
+  draw: { text: "DRAW", className: "" },
 };
 const NO_RESULT = { text: "NO RESULT", className: "text-ink-3" };
 
@@ -17,8 +19,8 @@ const NO_RESULT = { text: "NO RESULT", className: "text-ink-3" };
  * Delta color: Gain Green only for an increase, Signal Red for a decrease,
  * amber on a draw (draws always cost ELO, the Pressure Score rule).
  */
-function deltaClass(delta: number, outcome: string | null): string {
-  if (outcome === "draw") return "text-amber-500";
+function deltaClass(delta: number, outcome: string | null, amber: string): string {
+  if (outcome === "draw") return amber;
   if (delta > 0) return "text-positive";
   if (delta < 0) return "text-negative";
   return "text-ink-3";
@@ -33,13 +35,15 @@ export function MatchResultHeader({ view }: { view: MatchDetailView }) {
   const { match, me } = view;
   const verdict = (me.outcome && VERDICT[me.outcome]) || NO_RESULT;
   const ranked = match.match_type === "ranked";
+  const amber = useAmber().text;
+  const verdictClass = me.outcome === "draw" ? amber : verdict.className;
 
   return (
     <Plate testID="match-result-header" className="gap-3">
       <View className="flex-row items-end justify-between gap-3">
         <Text
           testID="match-verdict"
-          className={cn("font-display text-[40px] tracking-mark", verdict.className)}
+          className={cn("font-display text-[40px] tracking-mark", verdictClass)}
         >
           {verdict.text}
         </Text>
@@ -49,7 +53,7 @@ export function MatchResultHeader({ view }: { view: MatchDetailView }) {
               testID="match-elo-delta"
               className={cn(
                 "font-mono-bold text-[24px] tabular-nums",
-                deltaClass(me.elo_delta, me.outcome),
+                deltaClass(me.elo_delta, me.outcome, amber),
               )}
             >
               {signed(me.elo_delta)}

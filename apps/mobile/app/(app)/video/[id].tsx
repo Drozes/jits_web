@@ -3,6 +3,7 @@ import { ActivityIndicator, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ResizeMode, Video } from "expo-av";
 import { AppHeader } from "@/components/layout/app-header";
+import { HarnessMarker } from "@/components/match-detail/harness-marker";
 import { VideoStatePanel } from "@/components/match-detail/video-state-panel";
 import { useVideoPlayback } from "@/lib/match-detail/use-video-playback";
 import { useThemedTokens } from "@/lib/theme/use-theme";
@@ -19,7 +20,7 @@ import { useThemedTokens } from "@/lib/theme/use-theme";
  * planned with the Phase 2 TestFlight build (jits-kaf.2.6): an OTA must
  * never reference a native module the installed binary does not carry.
  *
- * The `video-player-state` wrapper exposes the phase to the match-loop
+ * The `video-player-state` marker exposes the phase to the match-loop
  * harness as "Video state: <state>"; `loaded` means the player reported
  * `isLoaded` at least once for the current URL.
  */
@@ -38,11 +39,7 @@ export default function MatchVideoScreen() {
   return (
     <View className="flex-1 bg-surface">
       <AppHeader title="Match Video" back />
-      <View
-        testID="video-player-state"
-        accessibilityLabel={`Video state: ${stateLabel}`}
-        className="flex-1"
-      >
+      <View className="flex-1">
         {phase === "ready" && source ? (
           <Video
             key={`${source.generation}:${source.url}`}
@@ -67,6 +64,7 @@ export default function MatchVideoScreen() {
           <VideoStatePanel kind={phase} onRetry={retry} onBack={goBack} />
         )}
       </View>
+      <HarnessMarker testID="video-player-state" label={`Video state: ${stateLabel}`} />
     </View>
   );
 }

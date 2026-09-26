@@ -45,8 +45,12 @@ export function useMatchDetail(
   const loadedFor = React.useRef<string | null>(null);
 
   React.useEffect(() => {
-    // Auth still resolving: stay in the loading state.
-    if (!athleteId) return;
+    // Auth still resolving (or signed out mid-refresh): no read, and never
+    // leave a cancelled refresh's spinner running.
+    if (!athleteId) {
+      setRefreshing(false);
+      return;
+    }
     let cancelled = false;
     const id = matchId ?? "";
     const hasData = loadedFor.current === id;

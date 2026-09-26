@@ -39,6 +39,11 @@ export interface PlaybackSource {
   generation: number;
 }
 
+/** Silent re-signs one screen instance may make; only the user's Retry resets it. */
+const MAX_SILENT_RESIGNS = 2;
+/** Playback past the resume point that proves a re-signed URL really works. */
+const PROGRESS_MS = 3000;
+
 function phaseFor(result: Result<MatchVideoPlayback | null>): PlaybackPhase {
   if (!result.ok) {
     return result.error.code === "VIDEO_FILE_MISSING" ? "missing" : "failed";
@@ -50,10 +55,17 @@ function phaseFor(result: Result<MatchVideoPlayback | null>): PlaybackPhase {
 }
 
 /**
- * Signs one match video and keeps it playable. A player error gets ONE
- * silent re-sign (the usual cause is the 1h URL expiring mid-match), a
- * remount on the new URL and a seek back to where playback was; a second
- * consecutive error surfaces the retry panel. `retry` always re-signs.
+ * Signs one match video and keeps it playable. A player error gets a silent
+ * re-sign (the usual cause is the 1h URL expiring mid-match), a remount on
+ * the new URL and a seek back to where playback was.
+ *
+ * Re-signing is bounded two ways, so a file that fails at one spot cannot
+ * loop load, seek, fail, re-sign forever: after a re-sign the error streak
+ * only clears once playback has really moved PROGRESS_MS past the resume
+ * point, and at most MAX_SILENT_RESIGNS happen per screen instance. Past
+ * either, the retry panel shows. Errors while a sign is in flight are
+ * ignored (the player being replaced can still report). `retry` always
+ * re-signs and resets both limits.
  */
 export function useVideoPlayback(id: string | undefined) {
   const [phase, setPhase] = React.useState<PlaybackPhase>("loading");
@@ -64,20 +76,31 @@ export function useVideoPlayback(id: string | undefined) {
   const epochRef = React.useRef(0);
   const positionRef = React.useRef(0);
   const resumeAtRef = React.useRef<number | null>(null);
+  const progressBaseRef = React.useRef(0);
   const loadedRef = React.useRef(false);
-  const resignedRef = React.useRef(false);
+  const signingRef = React.useRef(false);
+  /** A silent re-sign happened and playback has not progressed since. */
+  const streakRef = React.useRef(false);
+  const silentCountRef = React.useRef(0);
 
   const sign = React.useCallback(
     async (silent: boolean) => {
-      if (!id) return;
+      if (!id) {
+        setPhase("absent");
+        return;
+      }
       const epoch = ++epochRef.current;
+      signingRef.current = true;
       if (!silent) setPhase("loading");
       const result = await getMatchVideoPlaybackResult(supabase, id);
       // A newer sign started, or the screen unmounted.
       if (epoch !== epochRef.current) return;
+      signingRef.current = false;
       const next = phaseFor(result);
       if (next === "ready" && result.ok && result.data) {
-        resumeAtRef.current = positionRef.current > 0 ? positionRef.current : null;
+        const resumeAt = positionRef.current > 0 ? positionRef.current : null;
+        resumeAtRef.current = resumeAt;
+        progressBaseRef.current = resumeAt ?? 0;
         loadedRef.current = false;
         setLoaded(false);
         setSource({ url: result.data.url, posterUrl: result.data.posterUrl, generation: epoch });
@@ -88,37 +111,46 @@ export function useVideoPlayback(id: string | undefined) {
   );
 
   React.useEffect(() => {
-    resignedRef.current = false;
+    streakRef.current = false;
+    silentCountRef.current = 0;
     void sign(false);
     return () => {
       epochRef.current += 1;
+      signingRef.current = false;
     };
   }, [sign, attempt]);
 
   const retry = React.useCallback(() => setAttempt((n) => n + 1), []);
 
   const onPlayerError = React.useCallback(() => {
+    if (signingRef.current) return;
     loadedRef.current = false;
     setLoaded(false);
-    if (resignedRef.current) {
+    if (streakRef.current || silentCountRef.current >= MAX_SILENT_RESIGNS) {
       setPhase("failed");
       return;
     }
-    resignedRef.current = true;
+    streakRef.current = true;
+    silentCountRef.current += 1;
     void sign(true);
   }, [sign]);
 
   const onPlayerStatus = React.useCallback((status: AVPlaybackStatus) => {
     if (!status.isLoaded) return;
+    if (!loadedRef.current) {
+      loadedRef.current = true;
+      setLoaded(true);
+      // The first loaded status still reports the pre-seek position, so it
+      // neither updates the position nor counts as progress.
+      const at = resumeAtRef.current;
+      resumeAtRef.current = null;
+      if (at) videoRef.current?.setPositionAsync(at).catch(() => undefined);
+      return;
+    }
     positionRef.current = status.positionMillis;
-    if (loadedRef.current) return;
-    loadedRef.current = true;
-    // A good load ends the error streak: a later expiry earns its own re-sign.
-    resignedRef.current = false;
-    setLoaded(true);
-    const at = resumeAtRef.current;
-    resumeAtRef.current = null;
-    if (at) videoRef.current?.setPositionAsync(at).catch(() => undefined);
+    if (streakRef.current && status.positionMillis > progressBaseRef.current + PROGRESS_MS) {
+      streakRef.current = false;
+    }
   }, []);
 
   const stateLabel: PlayerStateLabel =

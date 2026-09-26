@@ -21,7 +21,12 @@ export function OpponentLinkRow({ opponent, onPress }: OpponentLinkRowProps) {
       onPress={onPress}
       className="flex-row items-center gap-3 bg-surface-3 border border-hairline-faint rounded-xs px-4 py-3 active:bg-surface-4"
     >
-      <Avatar32 name={opponent.display_name} photoUrl={opponent.profile_photo_url} />
+      {/* Avatars stay circular (brand rule); local override, Avatar32 unchanged. */}
+      <Avatar32
+        name={opponent.display_name}
+        photoUrl={opponent.profile_photo_url}
+        className="rounded-full"
+      />
       <View className="flex-1 min-w-0">
         <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">
           Opponent

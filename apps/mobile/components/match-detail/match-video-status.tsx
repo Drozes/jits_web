@@ -1,6 +1,8 @@
 import * as React from "react";
 import { Text, View } from "react-native";
+import { cn } from "@/lib/cn";
 import type { MatchDetailVideo } from "@jits/shared/api/queries";
+import { useAmber } from "./use-amber";
 
 /**
  * The status line under a video card's label. Playable renders nothing;
@@ -8,11 +10,17 @@ import type { MatchDetailVideo } from "@jits/shared/api/queries";
  * usually still in storage) with a muted note.
  */
 export function MatchVideoStatus({ video }: { video: MatchDetailVideo }) {
+  const amber = useAmber();
   if (video.playability === "processing") {
     return (
       <View className="gap-2">
-        <View className="self-start px-2 py-1 border border-amber-500 rounded-xs">
-          <Text className="font-mono-bold text-[10px] text-amber-500 uppercase tracking-caps-l">
+        <View className={cn("self-start px-2 py-1 border rounded-xs", amber.border)}>
+          <Text
+            className={cn(
+              "font-mono-bold text-[10px] uppercase tracking-caps-l",
+              amber.text,
+            )}
+          >
             {video.status === "uploading" ? "UPLOADING" : "PROCESSING"}
           </Text>
         </View>
