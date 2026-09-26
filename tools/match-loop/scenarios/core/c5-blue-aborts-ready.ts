@@ -1,5 +1,5 @@
 import type { Scenario } from "../context";
-import { blueChallengesRed, blueOnWeight, checkAbortDb, checkLiveAfterExit, checkOfflineInMatch, prepare, T } from "../flows";
+import { blueChallengesRed, blueOnWeight, checkAbortDb, checkBlueInLobbyBeforeMatch, checkLiveAfterExit, checkOfflineInMatch, prepare, T } from "../flows";
 
 const scenario: Scenario = {
   id: "C5",
@@ -9,6 +9,7 @@ const scenario: Scenario = {
     await prepare(ctx);
     const red = await ctx.bot("red");
     await red.goLive();
+    await checkBlueInLobbyBeforeMatch(ctx, red);
     const h = await blueChallengesRed(ctx, red);
     const side = await ctx.matchSide(red, h.matchId);
     await blueOnWeight(ctx);

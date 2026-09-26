@@ -3,6 +3,7 @@ import { db } from "../../oracle/db";
 import {
   blueChallengesRed,
   blueOnWeight,
+  checkBlueInLobbyBeforeMatch,
   checkLiveAfterExit,
   checkOfflineInMatch,
   checkSummary,
@@ -21,6 +22,7 @@ const scenario: Scenario = {
     await prepare(ctx);
     const red = await ctx.bot("red");
     await red.goLive();
+    await checkBlueInLobbyBeforeMatch(ctx, red);
     const stakes = await stakesFor(red); // Blue is the challenger
     const h = await blueChallengesRed(ctx, red);
     const side = await ctx.matchSide(red, h.matchId);

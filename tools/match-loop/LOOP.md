@@ -4,7 +4,8 @@ This is the orchestrator's per-iteration procedure for the mobile match-flow
 verification loop. The harness lives in `tools/match-loop/`; runs land in
 `tools/match-loop/.runs/<iso>/` (gitignored), with `result.json`, one folder
 per scenario (screenshots per step, `trace.jsonl`, `metro.slice.log`,
-`device.log`, `scenario.json`) and `idb-commands.log` (redacted).
+`device.log`, `realtime.log`, `scenario.json`) and `idb-commands.log`
+(redacted).
 
 Hard rules, every iteration (these run UNATTENDED, so they are absolute):
 
@@ -252,6 +253,28 @@ already appends a `{"type":"run",...}` line per run):
   does not refund; E17 deletes its own ledger rows through the local psql
   in its cleanup, checks the remaining budget before seeding, and reports a
   spent cap as `env_error` with the reason.
+- The local realtime server rate-limits presence: 5 presence events per 30
+  seconds per channel. Past it the server logs
+  `ClientPresenceRateLimitReached` and CLOSES that client's channel; the app
+  does not rejoin it (jits-fa9x), so e.g. Blue is never in `lobby:online`
+  again until the app relaunches. Running presence-churning scenarios back
+  to back (go live, go offline, match, back live, repeated) can trip it.
+  Do NOT raise the local limit to make runs green: the app must survive a
+  server-closed channel, and raising the limit would hide exactly this class
+  of product bug.
+  Every scenario writes the realtime container's `RateLimit|error` lines
+  since its start to `realtime.log` (tokens masked, local
+  `supabase_realtime_*` container only) and records the informational oracle
+  `env:realtime-no-rate-limit` (always ok; its actual value counts and lists
+  any `ClientPresenceRateLimitReached` lines). When it reports a hit, treat
+  later presence failures in that scenario as possibly environmental, but
+  the app not rejoining a closed channel is itself the product bug.
+- Every scenario that asserts `presence:blue-left-lobby-in-match`
+  (`checkOfflineInMatch`) first asserts `presence:blue-in-lobby-before-match`
+  (`checkBlueInLobbyBeforeMatch`, right after Red goes live, before the
+  challenge), so "left the lobby" cannot pass vacuously when Blue was never
+  in it. `checkOfflineInMatch` throws a HarnessError if the pre-match oracle
+  was not recorded.
 - History rows near the bottom of a tab sit under the tab bar: a tap on
   their centre lands on a tab. `sim/match-detail.ts` scrolls every target
   into the band between the header and the tab bar before tapping.

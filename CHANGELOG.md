@@ -10,6 +10,16 @@ JS-only, OTA-eligible for runtime 0.3.0.
 - Leaving a match (Back to Arena, Done, Rematch, the wizard error exit, a cancelled ready check) no longer stacks a second tab navigator under the app: every exit goes through `exitMatchTo` (new `apps/mobile/lib/match-flow/exit-to.ts`, `router.dismissTo`), which pops back to the existing tabs (and any athlete profile the match was entered from) instead of replacing the match with a new copy.
 - Because the tabs now stay mounted under a match, leaving one refreshes what it changed: the arena store counts match exits (`useMatchExitCount`), the Arena roster re-reads on it and computes ELO gaps against the current rating, the signed-in athlete is re-read with a soft refresh that never clears it on a failed read (`refreshAthleteSoft`), and Home and Profile refetch past their 30s refocus throttle. The Arena's rematch param is cleared when the tab loses focus so rematching the same opponent twice pins them again.
 
+### Match-loop harness: non-vacuous lobby presence oracle and realtime log (jits-fa9x)
+
+**Added**
+- `presence:blue-in-lobby-before-match` (`checkBlueInLobbyBeforeMatch` in `tools/match-loop/scenarios/flows.ts`): Red's lobby observer must see Blue in `lobby:online` right after Red goes live, before the challenge, in C1, C2, C3, C5 and C6. `checkOfflineInMatch` now throws a HarnessError when it was not recorded, so `presence:blue-left-lobby-in-match` can no longer pass vacuously. Existing oracle ids and expected values are unchanged.
+- `tools/match-loop/oracle/realtime.ts`: each scenario writes the local `supabase_realtime_*` container's `RateLimit|error` log lines (case-insensitive) since its start to `realtime.log` (JWTs, Supabase keys, `password`/`secret`/`jwt_secret`/`api_key` assignments and URL `user:pass@` masked; a failed write records a skip) and records the informational oracle `env:realtime-no-rate-limit` (always ok) listing any `ClientPresenceRateLimitReached` lines in result.json.
+- `tools/match-loop/tests/presence-oracles.test.ts` (added to `npm run match-loop:test`).
+
+**Changed**
+- `tools/match-loop/LOOP.md`: known harness facts on the realtime presence rate limit (5 per 30s per channel), back-to-back presence-churning scenarios tripping it, and never raising the local limit.
+
 ### Mobile: no live challenge prompt while offline (jits-sfry)
 
 **Fixed**

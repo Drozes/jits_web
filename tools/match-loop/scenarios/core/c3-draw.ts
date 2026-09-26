@@ -5,6 +5,7 @@ import {
   blueOnWeight,
   blueRecordsDraw,
   bothConfirm,
+  checkBlueInLobbyBeforeMatch,
   checkDrawDb,
   checkLiveAfterExit,
   checkOfflineInMatch,
@@ -23,6 +24,7 @@ const scenario: Scenario = {
     await prepare(ctx);
     const red = await ctx.bot("red");
     await red.goLive();
+    await checkBlueInLobbyBeforeMatch(ctx, red);
     const stakes = await stakesFor(red);
     ctx.eq("stakes:draw-symmetric", stakes.challenger_draw, stakes.opponent_draw);
     const h = await blueChallengesRed(ctx, red);

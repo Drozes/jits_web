@@ -22,6 +22,7 @@ import { Idb } from "./sim/idb";
 import { Simctl } from "./sim/simctl";
 import { Screens } from "./sim/screens";
 import { MetroLog } from "./oracle/logs";
+import { readRealtimeLog, scanRealtimeLog } from "./oracle/realtime";
 import { preflight, signInBlue } from "./preflight";
 import { ScenarioCtx, type OracleRecord, type Scenario, type StepRecord, type RunOptions } from "./scenarios/context";
 import { SCENARIOS, NOT_IMPLEMENTED } from "./scenarios";
@@ -179,6 +180,42 @@ function logOracles(ctx: ScenarioCtx): void {
   ctx.eq("logs:metro-clean", [], MetroLog.scan(text));
 }
 
+/**
+ * Informational: the local realtime server's error lines since the scenario
+ * started go to realtime.log, and any presence rate-limit hit is surfaced in
+ * result.json (jits-fa9x). Never fails a scenario (ok is always true), so it
+ * never adds a fingerprint.
+ */
+async function realtimeOracle(ctx: ScenarioCtx): Promise<void> {
+  const id = "env:realtime-no-rate-limit";
+  let text: string;
+  try {
+    text = await readRealtimeLog(ctx.cfg.realtimeContainer, ctx.startedAt);
+  } catch (e) {
+    ctx.skip(id, `docker logs unavailable: ${e instanceof Error ? e.message.split("\n")[0] : String(e)}`);
+    return;
+  }
+  const scan = scanRealtimeLog(text);
+  const path = join(ctx.dir, "realtime.log");
+  try {
+    writeFileSync(path, redact(scan.lines.map((l) => `${l}\n`).join("")));
+  } catch (e) {
+    ctx.skip(id, `could not write realtime.log: ${e instanceof Error ? e.message : String(e)}`);
+    return;
+  }
+  ctx.artifacts.realtimeLog = path;
+  const hits = scan.presenceRateLimited;
+  ctx.oracle(
+    id,
+    true,
+    "informational",
+    { presenceRateLimited: hits.length, lines: hits.slice(0, 20) },
+    hits.length
+      ? "ClientPresenceRateLimitReached: the server closed a channel, so later presence oracles may be environmental"
+      : undefined,
+  );
+}
+
 interface Env {
   cfg: Config;
   ids: AthleteIds;
@@ -210,6 +247,7 @@ async function runOne(env: Env, s: Scenario, dir: string, known: Map<string, str
     await ctx.dispose();
     stopLog?.();
   }
+  await realtimeOracle(ctx);
   let status: Status;
   const errMsg = error instanceof Error ? `${error.name}: ${error.message}` : error ? String(error) : undefined;
   if (error instanceof EnvError) {
