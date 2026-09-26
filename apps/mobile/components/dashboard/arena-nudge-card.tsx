@@ -3,6 +3,7 @@ import { useRouter } from "expo-router";
 import { LivePill, MetaTag, Plate } from "@/components/ui/elo-system";
 import { ARENA_HREF } from "@/lib/arena/constants";
 import { useIsArenaLive } from "@/lib/arena/arena-store";
+import { cn } from "@/lib/cn";
 
 /**
  * Home's way into a match. The Arena is the only matchmaking path on mobile
@@ -11,8 +12,11 @@ import { useIsArenaLive } from "@/lib/arena/arena-store";
  * Live-aware (jits-sq3a): while the header says LIVE, telling the athlete to
  * go live contradicts it. The live bit is only READ from the arena store;
  * the live writer is mounted once, app-wide, by <ArenaBootstrap />.
+ *
+ * `secondary`: another card holds Home's red CTA (Resume, jits-r9a), so this
+ * button steps down to the outline style to keep one Signal Red per surface.
  */
-export function ArenaNudgeCard() {
+export function ArenaNudgeCard({ secondary = false }: { secondary?: boolean }) {
   const router = useRouter();
   const isLive = useIsArenaLive();
 
@@ -33,9 +37,19 @@ export function ArenaNudgeCard() {
         onPress={() => router.push(ARENA_HREF)}
         accessibilityRole="button"
         accessibilityLabel="Go to the Arena"
-        className="bg-cta rounded-sm min-h-[44px] py-3 px-5 items-center justify-center active:bg-cta-hover"
+        className={cn(
+          "rounded-sm min-h-[44px] py-3 px-5 items-center justify-center",
+          secondary
+            ? "border border-hairline-strong bg-surface-3 active:bg-surface-4"
+            : "bg-cta active:bg-cta-hover",
+        )}
       >
-        <Text className="font-heading text-[13px] text-ink-on-cta uppercase tracking-caps">
+        <Text
+          className={cn(
+            "font-heading text-[13px] uppercase tracking-caps",
+            secondary ? "text-ink" : "text-ink-on-cta",
+          )}
+        >
           {isLive ? "Open the Arena →" : "Enter the Arena →"}
         </Text>
       </Pressable>

@@ -23,6 +23,8 @@ import { useCachedResource } from "@/lib/cache/use-cached-resource";
 import { usePullToRefresh, useRefetchOnRefocus } from "@/lib/cache/use-refocus-refetch";
 import { useMatchExitCount } from "@/lib/arena/arena-store";
 import { matchDetailHref } from "@/lib/match-detail/href";
+import { ResumeMatchCard } from "@/components/dashboard/resume-match-card";
+import { useMyActiveMatch } from "@/lib/match-flow/use-my-active-match";
 
 interface DashboardData {
   summary: DashboardSummary;
@@ -64,7 +66,12 @@ export default function DashboardScreen() {
   const { data, isLoading, isValidating, refresh } = useDashboardData(athlete?.id);
   // SWR keeps stale data on screen while revalidating; the spinner shows only
   // for a pull, never for the silent refetch when the tab regains focus.
-  const { refreshing, onRefresh } = usePullToRefresh(refresh, isValidating);
+  const { match: activeMatch, refresh: refreshActiveMatch } = useMyActiveMatch(athlete?.id);
+  const refreshAll = React.useCallback(() => {
+    refresh();
+    refreshActiveMatch();
+  }, [refresh, refreshActiveMatch]);
+  const { refreshing, onRefresh } = usePullToRefresh(refreshAll, isValidating);
   useRefetchOnRefocus(refresh, useMatchExitCount());
 
   if (!athlete) {
@@ -125,6 +132,10 @@ export default function DashboardScreen() {
           </Text>
         </View>
 
+        {/* A match the app lost (killed mid-match, jits-r9a) comes first and
+            takes Home's one red CTA; the Arena card steps down while it shows. */}
+        {activeMatch ? <ResumeMatchCard match={activeMatch} /> : null}
+
         {/* Both read only the athlete, never the summary, so they paint on the
             first frame. The Arena is the only way to a match on mobile
             (jits-gewv), so its CTA must not wait behind a skeleton. */}
@@ -134,7 +145,7 @@ export default function DashboardScreen() {
           value={athlete.current_elo}
           accentBar
         />
-        <ArenaNudgeCard />
+        <ArenaNudgeCard secondary={!!activeMatch} />
 
         {isLoading ? (
           <DashboardSkeleton />

@@ -37,6 +37,7 @@ import type {
   GymLadderRow,
 } from "../types/gym-portal";
 import { mapPostgrestError, type DomainError, type Result } from "./errors";
+import { MATCH_RESUME_WINDOW_MS } from "../constants";
 import {
   videoPlayability,
   videoAngleLabel,
@@ -640,6 +641,57 @@ export async function getStartedChallengesToJoin(
     }
   }
   return { ok: true, data };
+}
+
+export interface MyActiveMatch {
+  matchId: string;
+  status: "pending" | "in_progress";
+  /** Opponent's display name, or null when the details read failed. */
+  opponentName: string | null;
+}
+
+/**
+ * My newest match that is still open (`pending` or `in_progress`) and was
+ * created or started within `MATCH_RESUME_WINDOW_MS`, for Home's "Resume your
+ * match" card (jits-r9a: an app killed mid-match leaves no way back in).
+ *
+ * Authorization is plain RLS, no SECURITY DEFINER shortcut: the
+ * `matches_select_participant` policy returns only matches I take part in, and
+ * `match_participants_select` (jr_be 20260218000000) returns only my own rows,
+ * so the `!inner` embed filtered to my athlete id is exactly "matches I am an
+ * active participant in". The opponent's name comes from `get_match_details`,
+ * which re-checks that the caller is a participant.
+ */
+export async function getMyActiveMatch(
+  supabase: Client,
+  athleteId: string,
+  now: number = Date.now(),
+): Promise<Result<MyActiveMatch | null>> {
+  const sinceIso = new Date(now - MATCH_RESUME_WINDOW_MS).toISOString();
+  const { data, error } = await supabase
+    .from("matches")
+    .select("id, status, match_participants!inner(athlete_id, status)")
+    .eq("match_participants.athlete_id", athleteId)
+    .eq("match_participants.status", "active")
+    .in("status", ["pending", "in_progress"])
+    .or(`created_at.gte.${sinceIso},started_at.gte.${sinceIso}`)
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  if (error) return { ok: false, error: mapPostgrestError(error) };
+  const row = data?.[0];
+  if (!row) return { ok: true, data: null };
+
+  const details = await getMatchDetails(supabase, row.id);
+  const opponent = details?.participants.find((p) => p.athlete_id !== athleteId);
+  return {
+    ok: true,
+    data: {
+      matchId: row.id,
+      status: row.status === "in_progress" ? "in_progress" : "pending",
+      opponentName: opponent?.display_name ?? null,
+    },
+  };
 }
 
 /** Get IDs of all athletes who have a pending challenge with this athlete (either direction) */
