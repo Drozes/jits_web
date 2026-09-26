@@ -144,13 +144,16 @@ jest.mock("@/lib/arena/use-arena-challenge", () => ({
 }));
 
 const mockRefresh = jest.fn();
+const mockRefreshQuietly = jest.fn();
 let mockRoster = {
   competitors: [] as unknown[],
   challengedIds: new Set<string>(),
   isLoading: false,
   isRefreshing: false,
   hasError: false,
+  isFetching: false,
   refresh: mockRefresh,
+  refreshQuietly: mockRefreshQuietly,
 };
 jest.mock("@/lib/arena/use-arena-roster", () => ({
   useArenaRoster: () => mockRoster,
@@ -211,7 +214,9 @@ beforeEach(() => {
     isLoading: false,
     isRefreshing: false,
     hasError: false,
+    isFetching: false,
     refresh: mockRefresh,
+    refreshQuietly: mockRefreshQuietly,
   };
   mockChallenge = {
     incoming: null,
@@ -219,6 +224,10 @@ beforeEach(() => {
     isBusy: false,
     capReached: false,
   };
+});
+
+afterEach(() => {
+  jest.useRealTimers();
 });
 
 describe("Arena screen", () => {
@@ -644,6 +653,38 @@ describe("Arena screen: rematch handoff (jits-00fr)", () => {
     const { rerender } = render(<ArenaScreen />);
     rerender(<ArenaScreen />);
     expect(mockRefresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("quietly re-reads the roster when someone goes live after it loaded (jits-hlm1.4)", () => {
+    jest.useFakeTimers();
+    mockRoster.competitors = [competitor({ id: "a-1" })];
+    mockLobbyIds = new Set(["a-1"]);
+    const { rerender } = render(<ArenaScreen />);
+    act(() => {
+      jest.advanceTimersByTime(5_000);
+    });
+    expect(mockRefreshQuietly).not.toHaveBeenCalled();
+
+    mockLobbyIds = new Set(["a-1", "late-joiner"]);
+    rerender(<ArenaScreen />);
+    act(() => {
+      jest.advanceTimersByTime(5_000);
+    });
+    expect(mockRefreshQuietly).toHaveBeenCalledTimes(1);
+    // No pull spinner for a read nobody asked for.
+    expect(mockRefresh).not.toHaveBeenCalled();
+  });
+
+  it("never re-reads the roster for the viewer's own lobby entry", () => {
+    jest.useFakeTimers();
+    mockIsLive = true;
+    mockRoster.competitors = [competitor({ id: "a-1" })];
+    mockLobbyIds = new Set(["a-1", mockAthlete.id]);
+    render(<ArenaScreen />);
+    act(() => {
+      jest.advanceTimersByTime(5_000);
+    });
+    expect(mockRefreshQuietly).not.toHaveBeenCalled();
   });
 
   it("does not re-read the roster for an opponent who is simply offline", () => {

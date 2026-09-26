@@ -15,6 +15,8 @@
  * Observing the lobby is not joining it: an athlete is only tracked in
  * `lobby:online` while they are live.
  * Rematch (jits-00fr): see `lib/arena/use-rematch-pin.ts`. Never auto-sends.
+ * Someone who goes live after the roster loaded re-reads it
+ * (`lib/arena/use-roster-lobby-sync.ts`, jits-hlm1.4).
  */
 import * as React from "react";
 import { RefreshControl, Text, View } from "react-native";
@@ -26,6 +28,7 @@ import { PageContainer } from "@/components/layout/page-container";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { useLobbyIds } from "@/lib/arena/use-lobby-presence";
 import { useArenaRoster } from "@/lib/arena/use-arena-roster";
+import { useRosterLobbySync } from "@/lib/arena/use-roster-lobby-sync";
 import { pinFirst, useRematchPin } from "@/lib/arena/use-rematch-pin";
 import {
   arenaActions,
@@ -61,8 +64,24 @@ export default function ArenaScreen() {
     isLoading,
     isRefreshing,
     hasError,
+    isFetching,
     refresh,
+    refreshQuietly,
   } = useArenaRoster(athlete?.current_elo ?? 0);
+
+  const rosterIds = React.useMemo(
+    () => competitors.map((c) => c.id),
+    [competitors],
+  );
+  useRosterLobbySync({
+    rosterIds,
+    lobbyIds,
+    selfId: athlete?.id ?? null,
+    isLive,
+    isLoading,
+    isFetching,
+    refresh: refreshQuietly,
+  });
 
   // An opponent who left between the roster load and the tap leaves a stale
   // row behind; re-reading the roster is what corrects it. The challenge hook

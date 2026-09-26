@@ -39,7 +39,12 @@ export interface UseArenaRosterResult {
   isRefreshing: boolean;
   /** True when the last read failed. Distinct from an empty roster. */
   hasError: boolean;
+  /** A read is in flight (any cause: mount, pull, match exit, background). */
+  isFetching: boolean;
+  /** Pull-to-refresh: re-reads with the pull spinner. */
   refresh: () => void;
+  /** Re-reads with no spinner, for reads the athlete did not ask for. */
+  refreshQuietly: () => void;
 }
 
 export function useArenaRoster(currentElo: number): UseArenaRosterResult {
@@ -50,6 +55,8 @@ export function useArenaRoster(currentElo: number): UseArenaRosterResult {
   const [isLoading, setIsLoading] = React.useState(true);
   const [isRefreshing, setIsRefreshing] = React.useState(false);
   const [hasError, setHasError] = React.useState(false);
+  // Starts true: the mount read is in flight from the first render.
+  const [isFetching, setIsFetching] = React.useState(true);
   const [tick, setTick] = React.useState(0);
 
   // Re-read after every match: the Arena stays mounted under the match
@@ -63,8 +70,13 @@ export function useArenaRoster(currentElo: number): UseArenaRosterResult {
     setTick((t) => t + 1);
   }, []);
 
+  const refreshQuietly = React.useCallback(() => {
+    setTick((t) => t + 1);
+  }, []);
+
   React.useEffect(() => {
     let cancelled = false;
+    setIsFetching(true);
 
     async function load() {
       // `getArenaData` logs the PostgREST error and returns the raw payload,
@@ -72,12 +84,14 @@ export function useArenaRoster(currentElo: number): UseArenaRosterResult {
       // does NOT mean "nobody is looking", it means "we do not know", and
       // rendering it as an empty lobby would be the list lying about its
       // contents. Failed read and empty roster are different states.
-      const arena = (await getArenaData(
-        supabase,
-        ARENA_ROSTER_LIMIT,
+      // A throw (network, not PostgREST) is the same "we do not know", and
+      // must not leave `isFetching` stuck, which would stall the lobby sync.
+      const arena = (await getArenaData(supabase, ARENA_ROSTER_LIMIT).catch(
+        () => null,
       )) as ArenaData | null;
 
       if (cancelled) return;
+      setIsFetching(false);
 
       if (!arena || !Array.isArray(arena.looking_athletes)) {
         setHasError(true);
@@ -124,6 +138,8 @@ export function useArenaRoster(currentElo: number): UseArenaRosterResult {
     isLoading,
     isRefreshing,
     hasError,
+    isFetching,
     refresh,
+    refreshQuietly,
   };
 }

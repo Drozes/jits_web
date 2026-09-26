@@ -110,8 +110,7 @@ export function useOnlinePresence(
     /**
      * Whether the joined channel holds our presence. Keeps presence calls to
      * the ones that change something: every call counts toward the server's
-     * rate limit, and `inactive` then `background` would otherwise untrack
-     * twice.
+     * rate limit, and a background SUBSCRIBED must not re-track.
      */
     let tracked = false;
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
@@ -262,8 +261,13 @@ export function useOnlinePresence(
           return;
         }
         void trackIfActive();
-      } else {
-        // background / inactive
+      } else if (next === "background") {
+        // "background" only. iOS reports "inactive" for the notification
+        // shade, Control Center, the app switcher and system prompts, all
+        // moments the app is still open. Untracking there spent presence calls
+        // against the 5 per 30s channel limit (jits-fa9x) and blinked the
+        // green dot for everyone watching. The lobby draws the same line
+        // (`lib/arena/use-arena-live.ts`).
         void untrack();
       }
     };
