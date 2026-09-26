@@ -377,7 +377,13 @@ describe("PracticeScreen", () => {
     fireEvent.changeText(s.getByTestId("result-submission-search"), "arm");
     fireEvent.press(s.getByTestId("result-submission-option-armbar"));
     expect(s.getByTestId("result-submission")).toHaveTextContent(/Armbar/);
+    // Ended at once: the clock prefill is floored at 1 s.
+    expect(s.getByTestId("result-finish-time").props.value).toBe("00:01");
+    expect(record()).not.toBeDisabled();
+    fireEvent.changeText(s.getByTestId("result-finish-time"), "");
     expect(record()).toBeDisabled(); // finish time required
+    fireEvent.changeText(s.getByTestId("result-finish-time"), "0");
+    expect(record()).toBeDisabled(); // the BE rejects 0
     fireEvent.changeText(s.getByTestId("result-finish-time"), "0:45");
     expect(record()).toBeDisabled(); // past the 30s practice clock
     fireEvent.changeText(s.getByTestId("result-finish-time"), "0:20");
@@ -391,6 +397,44 @@ describe("PracticeScreen", () => {
     expect(s.getByTestId("confirm-panel-opponent-confirming")).toBeTruthy();
     advance(BOT_CONFIRM_MS);
     expect(s.getByTestId("confirm-panel-opponent-confirmed")).toBeTruthy();
+  });
+
+  it("prefills the finish time from the practice clock, pause-aware and editable", async () => {
+    const s = render(<PracticeScreen />);
+    await flush();
+    toLive(s);
+    await flush();
+    advance(4000);
+    fireEvent.press(s.getByTestId("live-pause-toggle"));
+    advance(6000); // paused time does not count
+    fireEvent.press(s.getByTestId("live-pause-toggle"));
+    advance(3000);
+    fireEvent.press(s.getByTestId("live-end"));
+    await flush();
+    advance(1000);
+    expect(s.getByTestId("match-step-result")).toBeTruthy();
+    fireEvent.press(s.getByTestId("result-outcome-submission"));
+    fireEvent.press(s.getByTestId(`result-winner-${PRACTICE_BOT_ID}`));
+    const field = () => s.getByTestId("result-finish-time");
+    expect(field().props.value).toBe("00:07");
+    expect(s.getByTestId("result-finish-time-hint")).toHaveTextContent("From match clock");
+    fireEvent.changeText(field(), "0:05");
+    expect(field().props.value).toBe("0:05");
+    expect(s.queryByTestId("result-finish-time-hint")).toBeNull();
+  });
+
+  it("caps the prefill at the practice length after the clock runs out", async () => {
+    const s = render(<PracticeScreen />);
+    await flush();
+    toLive(s);
+    advance(30000);
+    advance(AUTO_END_DELAY_MS);
+    await flush();
+    advance(1000);
+    expect(s.getByTestId("match-step-result")).toBeTruthy();
+    fireEvent.press(s.getByTestId("result-outcome-submission"));
+    fireEvent.press(s.getByTestId(`result-winner-${PRACTICE_BOT_ID}`));
+    expect(s.getByTestId("result-finish-time").props.value).toBe("00:30");
   });
 
   it("offers only a draw when the submission list could not load", async () => {

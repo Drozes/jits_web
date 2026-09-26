@@ -49,6 +49,10 @@ interface MatchStepRendererProps {
   setStartedAt: (s: string) => void;
   setResultData: (r: BroadcastResult) => void;
   advanceToResult: () => void;
+  /** Match clock at End Match, seeds the result step's finish time. */
+  initialFinishSeconds?: number;
+  /** Records the match clock reading taken when the live step ended. */
+  setFinishSeconds: (seconds: number) => void;
   refresh: () => void;
   /** The opponent cancelled before the match went live (weight or ready step). */
   onCancelledRemotely: (description?: string) => void;
@@ -75,6 +79,8 @@ export function MatchStepRenderer({
   setStartedAt,
   setResultData,
   advanceToResult,
+  initialFinishSeconds,
+  setFinishSeconds,
   refresh,
   onCancelledRemotely,
 }: MatchStepRendererProps) {
@@ -132,7 +138,10 @@ export function MatchStepRenderer({
         pausedAt={pausedAt}
         totalPausedDuration={totalPausedDuration}
         recorder={recorder}
-        onEnded={() => setStep("end")}
+        onEnded={(seconds) => {
+          setFinishSeconds(seconds);
+          setStep("end");
+        }}
       />
     );
   }
@@ -145,6 +154,7 @@ export function MatchStepRenderer({
         matchId={matchId}
         matchType={matchType}
         durationSeconds={durationSeconds}
+        initialFinishSeconds={initialFinishSeconds}
         participants={[
           { id: me.athlete_id, displayName: me.display_name },
           { id: opponent.athlete_id, displayName: opponent.display_name },

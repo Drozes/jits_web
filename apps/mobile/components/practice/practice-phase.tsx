@@ -60,7 +60,11 @@ export function PracticePhaseView({
         />
       );
     case "live":
-      return <PracticeLive onEnd={() => dispatch({ type: "END_MATCH" })} />;
+      return (
+        <PracticeLive
+          onEnd={(finishSeconds) => dispatch({ type: "END_MATCH", finishSeconds })}
+        />
+      );
     case "end":
       return <EndStep onAdvance={onEnded} />;
     case "result":
@@ -68,6 +72,7 @@ export function PracticePhaseView({
         <PracticeResult
           athleteId={athlete.id}
           submissionTypes={submissionTypes}
+          initialFinishSeconds={state.finishSeconds ?? undefined}
           onSubmit={(result) => dispatch({ type: "SUBMIT_RESULT", result })}
         />
       );

@@ -54,6 +54,24 @@ describe("practiceReducer", () => {
     expect(s.botConfirmed).toBe(true);
   });
 
+  it("END_MATCH carries the clock reading into state, and RESET clears it", () => {
+    const live = run([
+      { type: "GO_LIVE" },
+      { type: "CHALLENGE" },
+      { type: "BOT_ACCEPTED" },
+      { type: "CONFIRM_WEIGHTS" },
+      { type: "USER_READY" },
+      { type: "BOT_READY" },
+    ]);
+    expect(live.finishSeconds).toBeNull();
+    const ended = practiceReducer(live, { type: "END_MATCH", finishSeconds: 17 });
+    expect(ended.finishSeconds).toBe(17);
+    expect(practiceReducer(ended, { type: "ENDED" }).finishSeconds).toBe(17);
+    expect(practiceReducer(ended, { type: "RESET" }).finishSeconds).toBeNull();
+    // Ignored outside live, like every other action.
+    expect(practiceReducer(ended, { type: "END_MATCH", finishSeconds: 3 }).finishSeconds).toBe(17);
+  });
+
   it("goes live only when both athletes are ready, in either order", () => {
     const atReady = run([{ type: "GO_LIVE" }, { type: "CHALLENGE" }, { type: "BOT_ACCEPTED" }, { type: "CONFIRM_WEIGHTS" }]);
     expect(run([{ type: "BOT_READY" }], atReady).phase).toBe("ready");

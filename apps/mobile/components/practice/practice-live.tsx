@@ -14,7 +14,7 @@ import { PRACTICE_BOT_NAME, PRACTICE_DURATION_SECONDS } from "@/lib/practice/con
  * the camera is allowed) and stops on End Match or when the clock runs out,
  * exactly like a real match. The clip is never uploaded.
  */
-export function PracticeLive({ onEnd }: { onEnd: () => void }) {
+export function PracticeLive({ onEnd }: { onEnd: (finishSeconds: number) => void }) {
   const recorder = useMatchRecorder();
   const [startedAt] = React.useState(() => new Date().toISOString());
   const timer = useSessionMatchTimer({
@@ -26,6 +26,9 @@ export function PracticeLive({ onEnd }: { onEnd: () => void }) {
   const pausedAtRef = React.useRef<number | null>(null);
   const totalPausedRef = React.useRef(0);
   const endedRef = React.useRef(false);
+  // Same capture as the real live step: the clock at the end, clamped to 1..duration.
+  const elapsedRef = React.useRef(timer.elapsed);
+  elapsedRef.current = timer.elapsed;
   const recordingStartedRef = React.useRef(false);
 
   React.useEffect(() => {
@@ -43,7 +46,7 @@ export function PracticeLive({ onEnd }: { onEnd: () => void }) {
     endedRef.current = true;
     void recorder.stop();
     void matchHaptics.matchEnd();
-    onEnd();
+    onEnd(Math.min(PRACTICE_DURATION_SECONDS, Math.max(1, elapsedRef.current)));
   }, [recorder, onEnd]);
 
   const pauseResume = React.useCallback(() => {

@@ -18,6 +18,8 @@ interface SubmissionFieldsProps {
   durationSeconds: number;
   /** True when the entered finish time is malformed or past the duration. */
   finishTimeInvalid: boolean;
+  /** True while the finish time is the untouched match-clock prefill. */
+  finishTimeFromClock?: boolean;
   onSubmissionChange: (v: string) => void;
   onFinishTimeChange: (v: string) => void;
 }
@@ -41,6 +43,7 @@ export function SubmissionFields({
   finishTimeStr,
   durationSeconds,
   finishTimeInvalid,
+  finishTimeFromClock = false,
   onSubmissionChange,
   onFinishTimeChange,
 }: SubmissionFieldsProps) {
@@ -99,6 +102,13 @@ export function SubmissionFields({
           <Text className="font-mono text-[10px] text-negative uppercase tracking-caps-l">
             Must be within match length (
             <Text className="tabular-nums">{formatElapsed(durationSeconds)}</Text>)
+          </Text>
+        ) : finishTimeFromClock ? (
+          <Text
+            testID="result-finish-time-hint"
+            className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l"
+          >
+            From match clock
           </Text>
         ) : null}
       </View>

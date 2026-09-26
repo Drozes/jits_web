@@ -14,6 +14,8 @@ export interface PracticeState {
   /** Same shape the real confirm step reads, so its leaves reuse as-is. */
   result: BroadcastResult | null;
   botConfirmed: boolean;
+  /** Practice clock at End Match; prefills the result's finish time. */
+  finishSeconds: number | null;
 }
 
 export type PracticeAction =
@@ -25,7 +27,7 @@ export type PracticeAction =
   | { type: "CONFIRM_WEIGHTS" }
   | { type: "USER_READY" }
   | { type: "BOT_READY" }
-  | { type: "END_MATCH" }
+  | { type: "END_MATCH"; finishSeconds?: number }
   | { type: "ENDED" }
   | { type: "SUBMIT_RESULT"; result: BroadcastResult }
   | { type: "BOT_CONFIRMED" }
@@ -38,6 +40,7 @@ export const INITIAL_PRACTICE_STATE: PracticeState = {
   botReady: false,
   result: null,
   botConfirmed: false,
+  finishSeconds: null,
 };
 
 /**
@@ -69,7 +72,9 @@ export function practiceReducer(state: PracticeState, action: PracticeAction): P
       if (phase !== "ready") return state;
       return { ...state, botReady: true, phase: state.userReady ? "live" : "ready" };
     case "END_MATCH":
-      return phase === "live" ? { ...state, phase: "end" } : state;
+      return phase === "live"
+        ? { ...state, phase: "end", finishSeconds: action.finishSeconds ?? null }
+        : state;
     case "ENDED":
       return phase === "end" ? { ...state, phase: "result" } : state;
     case "SUBMIT_RESULT":

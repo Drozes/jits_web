@@ -6,6 +6,7 @@ import { useThemedTokens } from "@/lib/theme/use-theme";
 import { useAmber } from "@/components/match-detail/use-amber";
 import { useRecordResult } from "@/lib/match-flow/use-record-result";
 import { isFinishTimeValid } from "@/lib/match-flow/parse-finish-time";
+import { formatElapsed } from "@/lib/match-flow/format-elapsed";
 import type { BroadcastResult } from "@jits/shared/hooks/use-session-match-sync";
 import type { SubmissionType } from "@jits/shared/types/submission-type";
 import {
@@ -22,6 +23,8 @@ interface ResultStepProps {
   matchType: "ranked" | "casual";
   /** Match length in seconds; finish time can't exceed it. */
   durationSeconds: number;
+  /** Match clock at End Match; prefills the (still editable) finish time. */
+  initialFinishSeconds?: number;
   participants: ResultParticipant[];
   submissionTypes: SubmissionType[];
   onRecorded: (result: BroadcastResult) => void;
@@ -40,6 +43,7 @@ export function ResultStep({
   matchId,
   matchType,
   durationSeconds,
+  initialFinishSeconds,
   participants,
   submissionTypes,
   onRecorded,
@@ -50,7 +54,14 @@ export function ResultStep({
   const [outcome, setOutcome] = React.useState<"submission" | "draw" | null>(null);
   const [winnerId, setWinnerId] = React.useState("");
   const [submissionCode, setSubmissionCode] = React.useState("");
-  const [finishTimeStr, setFinishTimeStr] = React.useState("");
+  const [finishTimeStr, setFinishTimeStr] = React.useState(() =>
+    initialFinishSeconds != null ? formatElapsed(initialFinishSeconds) : "",
+  );
+  const [finishFromClock, setFinishFromClock] = React.useState(initialFinishSeconds != null);
+  const onFinishTimeChange = React.useCallback((v: string) => {
+    setFinishFromClock(false);
+    setFinishTimeStr(v);
+  }, []);
   const { loading, submit } = useRecordResult({ matchId, onRecorded });
 
   // Finish time is REQUIRED for submissions: the BE `record_match_result`
@@ -102,8 +113,9 @@ export function ResultStep({
               finishTimeStr={finishTimeStr}
               durationSeconds={durationSeconds}
               finishTimeInvalid={!finishTimeValid}
+              finishTimeFromClock={finishFromClock}
               onSubmissionChange={setSubmissionCode}
-              onFinishTimeChange={setFinishTimeStr}
+              onFinishTimeChange={onFinishTimeChange}
             />
           ) : null}
         </>

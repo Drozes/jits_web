@@ -128,9 +128,17 @@ describe("isFinishTimeValid", () => {
       expect(isFinishTimeValid("600", DURATION)).toBe(true);
     });
 
-    it("accepts 0", () => {
-      expect(isFinishTimeValid("0", DURATION)).toBe(true);
-      expect(isFinishTimeValid("0:00", DURATION)).toBe(true);
+    it("accepts 1 second (the smallest time the BE takes)", () => {
+      expect(isFinishTimeValid("1", DURATION)).toBe(true);
+      expect(isFinishTimeValid("0:01", DURATION)).toBe(true);
+    });
+  });
+
+  describe("zero is rejected", () => {
+    it("rejects 0 because record_match_result requires a finish time above 0", () => {
+      expect(isFinishTimeValid("0", DURATION)).toBe(false);
+      expect(isFinishTimeValid("0:00", DURATION)).toBe(false);
+      expect(isFinishTimeValid("00:00", DURATION)).toBe(false);
     });
   });
 

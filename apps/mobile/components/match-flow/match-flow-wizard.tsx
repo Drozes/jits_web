@@ -130,6 +130,18 @@ export function MatchFlowWizard({
 
   const advanceToResult = React.useCallback(() => setStep("result"), [setStep]);
 
+  // The match clock when the live step ended, keyed to its match so a later
+  // match never inherits it. Only set by ending live on this device: a cold
+  // start or re-entry straight into result has no reading and stays empty.
+  const [clockFinish, setClockFinish] = React.useState<{ matchId: string; seconds: number } | null>(
+    null,
+  );
+  const setFinishSeconds = React.useCallback(
+    (seconds: number) => setClockFinish({ matchId, seconds }),
+    [matchId],
+  );
+  const initialFinishSeconds = clockFinish?.matchId === matchId ? clockFinish.seconds : undefined;
+
   // LOAD-BEARING. Do not delete this as a mere optimisation.
   //
   // The confirm step calls refresh() the instant the row completes, which
@@ -239,6 +251,8 @@ export function MatchFlowWizard({
             setStartedAt={setStartedAt}
             setResultData={setResultData}
             advanceToResult={advanceToResult}
+            initialFinishSeconds={initialFinishSeconds}
+            setFinishSeconds={setFinishSeconds}
             refresh={refresh}
             onCancelledRemotely={exitCancelled}
           />

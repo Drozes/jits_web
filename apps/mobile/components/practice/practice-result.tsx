@@ -4,6 +4,7 @@ import { Plate } from "@/components/ui/elo-system";
 import { OutcomeToggle, WinnerPicker } from "@/components/match-flow/steps/result-step-fields";
 import { SubmissionFields } from "@/components/match-flow/steps/submission-fields";
 import { isFinishTimeValid, parseFinishTime } from "@/lib/match-flow/parse-finish-time";
+import { formatElapsed } from "@/lib/match-flow/format-elapsed";
 import type { BroadcastResult } from "@jits/shared/hooks/use-session-match-sync";
 import type { SubmissionType } from "@jits/shared/types/submission-type";
 import {
@@ -22,16 +23,26 @@ import { PracticeButton } from "./practice-steps";
 export function PracticeResult({
   athleteId,
   submissionTypes,
+  initialFinishSeconds,
   onSubmit,
 }: {
   athleteId: string;
   submissionTypes: SubmissionType[];
+  /** Practice clock at End Match; prefills the (still editable) finish time. */
+  initialFinishSeconds?: number;
   onSubmit: (result: BroadcastResult) => void;
 }) {
   const [outcome, setOutcome] = React.useState<"submission" | "draw" | null>(null);
   const [winnerId, setWinnerId] = React.useState("");
   const [submissionCode, setSubmissionCode] = React.useState("");
-  const [finishTimeStr, setFinishTimeStr] = React.useState("");
+  const [finishTimeStr, setFinishTimeStr] = React.useState(() =>
+    initialFinishSeconds != null ? formatElapsed(initialFinishSeconds) : "",
+  );
+  const [finishFromClock, setFinishFromClock] = React.useState(initialFinishSeconds != null);
+  const onFinishTimeChange = React.useCallback((v: string) => {
+    setFinishFromClock(false);
+    setFinishTimeStr(v);
+  }, []);
 
   const finishTimeValid = isFinishTimeValid(finishTimeStr, PRACTICE_DURATION_SECONDS);
   const canSubmit =
@@ -89,8 +100,9 @@ export function PracticeResult({
               finishTimeStr={finishTimeStr}
               durationSeconds={PRACTICE_DURATION_SECONDS}
               finishTimeInvalid={!finishTimeValid}
+              finishTimeFromClock={finishFromClock}
               onSubmissionChange={setSubmissionCode}
-              onFinishTimeChange={setFinishTimeStr}
+              onFinishTimeChange={onFinishTimeChange}
             />
           ) : null}
         </>

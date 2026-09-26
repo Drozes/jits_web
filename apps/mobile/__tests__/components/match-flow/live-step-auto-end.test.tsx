@@ -125,7 +125,7 @@ function renderLive(remainingSeconds: number, pausedForSeconds?: number, granted
       totalPausedDuration={0}
       recorder={recorder}
       // A fresh inline callback per render, like the match-step renderer.
-      onEnded={() => onEnded()}
+      onEnded={(s: number) => onEnded(s)}
     />
   );
   const utils = render(element());
@@ -312,5 +312,49 @@ describe("LiveStep recorder auto-start", () => {
     const { recorder, rerender } = renderLive(0, undefined, true);
     await advanceWithRerenders(AUTO_END_DELAY_MS + 2_000, rerender);
     expect(recorder.start).not.toHaveBeenCalled();
+  });
+});
+
+describe("LiveStep reports the finish time from the match clock", () => {
+  it("END MATCH tap passes the elapsed seconds at the tap", async () => {
+    // 300 s bout with 120 s left: 180 s on the clock.
+    const { onEnded, getByText } = renderLive(120);
+    await act(async () => {
+      fireEvent.press(getByText(/end match/i));
+    });
+    expect(onEnded).toHaveBeenCalledWith(180);
+  });
+
+  it("is pause-aware: a paused clock reports the paused reading", async () => {
+    // Paused 40 s ago with 100 s left: the 40 s of pause do not count.
+    const { onEnded, getByText } = renderLive(100, 40);
+    await act(async () => {
+      fireEvent.press(getByText(/end match/i));
+    });
+    expect(onEnded).toHaveBeenCalledWith(200);
+  });
+
+  it("auto-end at 00:00 caps the reading at the duration", async () => {
+    const { rerender, onEnded } = renderLive(0);
+    await advanceWithRerenders(AUTO_END_DELAY_MS + 3_000, rerender);
+    expect(onEnded).toHaveBeenCalledTimes(1);
+    expect(onEnded).toHaveBeenCalledWith(DURATION);
+  });
+
+  it("the opponent's match_ended passes this device's clock reading", async () => {
+    const { rerender, onEnded } = renderLive(250);
+    await advanceWithRerenders(5_000, rerender);
+    act(() => {
+      mockSyncParams.current?.onMatchEnded?.();
+    });
+    expect(onEnded).toHaveBeenCalledWith(55);
+  });
+
+  it("floors the reading at 1 s when ended right at the start", async () => {
+    const { onEnded, getByText } = renderLive(DURATION);
+    await act(async () => {
+      fireEvent.press(getByText(/end match/i));
+    });
+    expect(onEnded).toHaveBeenCalledWith(1);
   });
 });

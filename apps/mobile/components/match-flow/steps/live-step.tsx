@@ -28,8 +28,10 @@ interface LiveStepProps {
    */
   recorder: UseVideoRecorderReturn;
   /** Advance to the result step. Called after end_match completes or
-   * after we receive a `match_ended` broadcast from the opponent. */
-  onEnded: () => void;
+   * after we receive a `match_ended` broadcast from the opponent, with the
+   * match clock at that moment (pause-aware, clamped to 1..duration) so the
+   * result step can prefill the finish time. */
+  onEnded: (finishSeconds: number) => void;
 }
 
 const TIME_WARNING_SECONDS = 10;
@@ -77,6 +79,14 @@ export function LiveStep(props: LiveStepProps) {
     pausedAt,
     totalPausedDuration,
   );
+  // The clock at the end moment, clamped to what record_match_result accepts
+  // (above 0, at most the duration: auto-end fires a beat after 00:00).
+  const elapsedRef = React.useRef(timer.elapsed);
+  elapsedRef.current = timer.elapsed;
+  const clampFinish = React.useCallback(
+    (elapsed: number) => Math.min(durationSeconds, Math.max(1, elapsed)),
+    [durationSeconds],
+  );
   const sync = useStepMatchSync({
     matchId,
     onTimerPaused: (p) => timer.syncFromBroadcast({ type: "paused", pausedAt: p }),
@@ -86,15 +96,18 @@ export function LiveStep(props: LiveStepProps) {
       if (endedRef.current) return;
       endedRef.current = true;
       void recorder.stop();
-      onEnded();
+      onEnded(clampFinish(elapsedRef.current));
     },
   });
 
-  const wrappedOnEnded = React.useCallback(() => {
-    void recorder.stop();
-    void matchHaptics.matchEnd();
-    onEnded();
-  }, [recorder, onEnded]);
+  const wrappedOnEnded = React.useCallback(
+    (elapsed: number) => {
+      void recorder.stop();
+      void matchHaptics.matchEnd();
+      onEnded(clampFinish(elapsed));
+    },
+    [recorder, onEnded, clampFinish],
+  );
 
   const { busy, handleEnd, handlePauseResume } = useLiveControls({
     matchId,
