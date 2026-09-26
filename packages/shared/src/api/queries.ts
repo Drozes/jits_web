@@ -37,6 +37,8 @@ import type {
   GymLadderRow,
 } from "../types/gym-portal";
 import { mapPostgrestError, type DomainError, type Result } from "./errors";
+import { ARENA_CHALLENGE_FRESH_MS, MATCH_RESUME_WINDOW_MS } from "../constants";
+import { isUuid } from "../utils/shared";
 import {
   videoPlayability,
   videoAngleLabel,
@@ -642,6 +644,71 @@ export async function getStartedChallengesToJoin(
     }
   }
   return { ok: true, data };
+}
+
+export interface MyActiveMatch {
+  matchId: string;
+  status: "pending" | "in_progress";
+  /** Opponent's display name, or null when the details read failed. */
+  opponentName: string | null;
+}
+
+/**
+ * My newest sessionless (Arena) match that is still open, for Home's "Resume
+ * your match" card (jits-r9a: an app killed mid-match leaves no way back in):
+ *  - `in_progress` created or started within `MATCH_RESUME_WINDOW_MS`;
+ *  - `pending` created within `ARENA_CHALLENGE_FRESH_MS` (a match nobody has
+ *    begun goes stale as fast as the challenge that made it);
+ *  - a pending match is never one of `excludeMatchIds` (matches the caller
+ *    backed out of). In-progress matches ignore the list: leaving one by
+ *    accident (a load error, back while loading) must stay resumable.
+ *    Anything that is not a UUID is dropped before it reaches the filter.
+ *
+ * Authorization is plain RLS, no SECURITY DEFINER shortcut: the
+ * `matches_select_participant` policy returns only matches I take part in, and
+ * `match_participants_select` (jr_be 20260218000000) returns only my own rows,
+ * so the `!inner` embed filtered to my athlete id is exactly "matches I am an
+ * active participant in". The opponent's name comes from `get_match_details`,
+ * which re-checks that the caller is a participant.
+ */
+export async function getMyActiveMatch(
+  supabase: Client,
+  athleteId: string,
+  now: number = Date.now(),
+  excludeMatchIds: readonly string[] = [],
+): Promise<Result<MyActiveMatch | null>> {
+  const liveSince = new Date(now - MATCH_RESUME_WINDOW_MS).toISOString();
+  const pendingSince = new Date(now - ARENA_CHALLENGE_FRESH_MS).toISOString();
+  const excluded = excludeMatchIds.filter(isUuid);
+  const notLeft = excluded.length > 0 ? `,id.not.in.(${excluded.join(",")})` : "";
+  const { data, error } = await supabase
+    .from("matches")
+    .select("id, status, match_participants!inner(athlete_id, status)")
+    .eq("match_participants.athlete_id", athleteId)
+    .eq("match_participants.status", "active")
+    .is("session_id", null)
+    .in("status", ["pending", "in_progress"])
+    .or(
+      `and(status.eq.in_progress,or(created_at.gte.${liveSince},started_at.gte.${liveSince})),` +
+        `and(status.eq.pending,created_at.gte.${pendingSince}${notLeft})`,
+    )
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  if (error) return { ok: false, error: mapPostgrestError(error) };
+  const row = data?.[0];
+  if (!row) return { ok: true, data: null };
+
+  const details = await getMatchDetails(supabase, row.id);
+  const opponent = details?.participants.find((p) => p.athlete_id !== athleteId);
+  return {
+    ok: true,
+    data: {
+      matchId: row.id,
+      status: row.status === "in_progress" ? "in_progress" : "pending",
+      opponentName: opponent?.display_name ?? null,
+    },
+  };
 }
 
 /** Get IDs of all athletes who have a pending challenge with this athlete (either direction) */
@@ -2488,9 +2555,6 @@ export async function getMatchVideoSignedUrlResult(
 // Result-shaped and never throws.
 // ---------------------------------------------------------------------------
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 const MATCH_NOT_FOUND_ERROR: DomainError = {
   code: "MATCH_NOT_FOUND",
   message: "Match not found.",
@@ -2587,7 +2651,7 @@ export async function getMatchDetailView(
 ): Promise<Result<MatchDetailView>> {
   // Deep links and route params are untrusted; a malformed id would only earn
   // a 22P02 from Postgres, so answer "not found" without the round trip.
-  if (!UUID_RE.test(matchId)) return { ok: false, error: MATCH_NOT_FOUND_ERROR };
+  if (!isUuid(matchId)) return { ok: false, error: MATCH_NOT_FOUND_ERROR };
 
   try {
     const { data, error } = await supabase.rpc("get_match_details", {
@@ -2676,7 +2740,7 @@ export async function getMatchVideoPlaybackResult(
   expiresInSeconds = 3600,
 ): Promise<Result<MatchVideoPlayback | null>> {
   // A malformed id can match no row; skip the round trip (and its 22P02).
-  if (!UUID_RE.test(videoId)) return { ok: true, data: null };
+  if (!isUuid(videoId)) return { ok: true, data: null };
   try {
     const { data, error } = await supabase
       .from("match_videos")

@@ -8,6 +8,7 @@ import {
   IDLE_ARENA_STATE,
   __resetArenaStoreForTests,
   arenaActions,
+  getLeftMatchIds,
   notifyOpponentUnavailable,
   publishArenaState,
   registerArenaController,
@@ -147,6 +148,57 @@ describe("match-exit count (jits-tlk3)", () => {
     expect(probe.result.current).toBe(start + 1);
     c.unmount();
     expect(probe.result.current).toBe(start + 2);
+  });
+});
+
+describe("left match ids (jits-r9a)", () => {
+  it("records a match id once its screen unmounts, before exit listeners run", () => {
+    __resetArenaStoreForTests();
+    expect([...getLeftMatchIds()]).toEqual([]);
+
+    const seenAtExit: string[][] = [];
+    const probe = renderHook(() => {
+      const exits = useMatchExitCount();
+      seenAtExit.push([...getLeftMatchIds()]);
+      return exits;
+    });
+    const start = probe.result.current;
+
+    const screen = renderHook(() => useArenaMatchScreen("11111111-1111-4111-8111-111111111111"));
+    // Still on the match: not left yet.
+    expect(getLeftMatchIds().has("11111111-1111-4111-8111-111111111111")).toBe(false);
+    screen.unmount();
+
+    expect(probe.result.current).toBe(start + 1);
+    expect(getLeftMatchIds().has("11111111-1111-4111-8111-111111111111")).toBe(true);
+    // The render the exit caused already saw the id.
+    expect(seenAtExit[seenAtExit.length - 1]).toEqual(["11111111-1111-4111-8111-111111111111"]);
+  });
+
+  it("records nothing for a screen mounted without an id, and resets for tests", () => {
+    __resetArenaStoreForTests();
+    renderHook(() => useArenaMatchScreen()).unmount();
+    expect(getLeftMatchIds().size).toBe(0);
+
+    renderHook(() => useArenaMatchScreen("22222222-2222-4222-8222-222222222222")).unmount();
+    expect(getLeftMatchIds().has("22222222-2222-4222-8222-222222222222")).toBe(true);
+    __resetArenaStoreForTests();
+    expect(getLeftMatchIds().size).toBe(0);
+  });
+
+  it("never records an id that is not a UUID", () => {
+    __resetArenaStoreForTests();
+    renderHook(() => useArenaMatchScreen("m-1),id.eq.x")).unmount();
+    renderHook(() => useArenaMatchScreen("not-a-uuid")).unmount();
+    expect(getLeftMatchIds().size).toBe(0);
+  });
+
+  it("forgets left matches on sign-out, even with no owner mounted", async () => {
+    __resetArenaStoreForTests();
+    renderHook(() => useArenaMatchScreen("22222222-2222-4222-8222-222222222222")).unmount();
+    expect(getLeftMatchIds().size).toBe(1);
+    await takeArenaOfflineBeforeSignOut();
+    expect(getLeftMatchIds().size).toBe(0);
   });
 });
 

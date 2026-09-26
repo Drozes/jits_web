@@ -31,6 +31,16 @@ export type ChallengeStatus =
  */
 export const ARENA_CHALLENGE_FRESH_MS = 10 * 60_000;
 
+/**
+ * How recently a still-open match (`pending` / `in_progress`) must have been
+ * created or started for Home to offer "Resume your match" (jits-r9a).
+ *
+ * An app killed mid-match leaves the match open with no way back in. Matches
+ * run 10 minutes by default, so an hour is generous for a real resume while
+ * keeping long-dead strays (there is no server sweep yet) off Home.
+ */
+export const MATCH_RESUME_WINDOW_MS = 60 * 60_000;
+
 /** Match outcome for a participant */
 export const MATCH_OUTCOME = {
   WIN: "win",

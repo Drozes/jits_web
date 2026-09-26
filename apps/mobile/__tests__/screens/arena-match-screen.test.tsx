@@ -19,7 +19,7 @@ jest.mock("expo-router", () => {
   const R = require("react");
   return {
     Stack: { Screen: () => R.createElement(R.Fragment, null) },
-    useLocalSearchParams: () => ({ matchId: "M9" }),
+    useLocalSearchParams: () => ({ matchId: "99999999-9999-4999-8999-999999999999" }),
   };
 });
 
@@ -64,7 +64,11 @@ jest.mock("@/components/match-flow/match-flow-wizard", () => {
 
 import ArenaMatchScreen from "@/app/(app)/match/[matchId]";
 import { renderHook } from "@testing-library/react-native";
-import { useIsInArenaMatch } from "@/lib/arena/arena-store";
+import {
+  __resetArenaStoreForTests,
+  getLeftMatchIds,
+  useIsInArenaMatch,
+} from "@/lib/arena/arena-store";
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -81,7 +85,7 @@ describe("ArenaMatchScreen", () => {
     expect(props.exitHref).toBe(ARENA_HREF);
     expect(props.exitLabel).toBe(ARENA_EXIT_LABEL);
     expect(props.exitLabel).toBe("Back to Arena");
-    expect(props.matchId).toBe("M9");
+    expect(props.matchId).toBe("99999999-9999-4999-8999-999999999999");
     expect(props.currentAthleteId).toBe("me-1");
     // A sessionless match must never reintroduce the prop jits-3929 removed.
     expect(props.sessionId).toBeUndefined();
@@ -117,6 +121,14 @@ describe("ArenaMatchScreen", () => {
 
     screen.unmount();
     expect(probe.result.current).toBe(false);
+  });
+
+  it("remembers its match id on the way out, so Home does not offer it back (jits-r9a)", () => {
+    __resetArenaStoreForTests();
+    const screen = render(<ArenaMatchScreen />);
+    expect(getLeftMatchIds().has("99999999-9999-4999-8999-999999999999")).toBe(false);
+    screen.unmount();
+    expect(getLeftMatchIds().has("99999999-9999-4999-8999-999999999999")).toBe(true);
   });
 
   it("shows the LIVE signal as static, so tapping it cannot pop the match", () => {

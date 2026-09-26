@@ -20,6 +20,7 @@
  */
 import * as React from "react";
 import { useSyncExternalStore } from "react";
+import { isUuid } from "@jits/shared/utils";
 import type {
   IncomingChallenge,
   OutgoingChallenge,
@@ -206,18 +207,34 @@ export function useMatchExitCount(): number {
  * athlete is offline and no challenge prompt is raised; every exit path
  * (summary exits via `exitMatchTo`, abort, back gesture) removes the route and
  * unmounts the screen, which is what restores live.
+ *
+ * `matchId` (the match route passes it) is remembered on the way out, so
+ * Home's Resume card does not offer a match the athlete just left on purpose
+ * (jits-r9a). Only for this app process: a kill clears it, which is exactly
+ * the case Resume exists for.
  */
-export function useArenaMatchScreen(): void {
+export function useArenaMatchScreen(matchId?: string): void {
   React.useEffect(() => {
     matchScreens += 1;
     for (const l of matchListeners) l();
     return () => {
+      // Before the listeners run, so a refresh keyed off the exit sees it.
+      // Only real ids: a malformed route param must never reach a filter.
+      if (matchId && isUuid(matchId)) leftMatchIds.add(matchId);
       const wasInMatch = matchScreens > 0;
       matchScreens = Math.max(0, matchScreens - 1);
       if (wasInMatch && matchScreens === 0) matchExits += 1;
       for (const l of matchListeners) l();
     };
-  }, []);
+  }, [matchId]);
+}
+
+/** Match ids whose screen unmounted during this app process. */
+const leftMatchIds = new Set<string>();
+
+/** The matches the athlete has left (not a snapshot: read it when needed). */
+export function getLeftMatchIds(): ReadonlySet<string> {
+  return leftMatchIds;
 }
 
 // ---------------------------------------------------------------------------
@@ -239,6 +256,8 @@ export const SIGN_OUT_OFFLINE_TIMEOUT_MS = 4_000;
 export async function takeArenaOfflineBeforeSignOut(
   timeoutMs = SIGN_OUT_OFFLINE_TIMEOUT_MS,
 ): Promise<void> {
+  // Left matches belong to this athlete; the next one to sign in starts clean.
+  leftMatchIds.clear();
   // Not gated on `isLive`: a go-live still in flight has not flipped it yet,
   // and the reconcile queue turns an already-offline call into a no-op.
   if (!controller) return;
@@ -263,4 +282,5 @@ export function __resetArenaStoreForTests(): void {
   listeners.clear();
   matchScreens = 0;
   matchListeners.clear();
+  leftMatchIds.clear();
 }

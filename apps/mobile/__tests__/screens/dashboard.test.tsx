@@ -178,6 +178,7 @@ jest.mock("@jits/shared/api/queries", () => ({
   getGymsWithSessions: jest.fn().mockResolvedValue([]),
   getGymDetailResult: jest.fn().mockResolvedValue({ ok: true, data: null }),
   getGymsWithSessionsResult: jest.fn().mockResolvedValue({ ok: true, data: [] }),
+  getMyActiveMatch: jest.fn().mockResolvedValue({ ok: true, data: null }),
 }));
 
 jest.mock("@jits/shared/types/composites", () => ({}), { virtual: true });
@@ -192,6 +193,7 @@ interface QueryMocks {
   getGymsWithSessions: jest.Mock;
   getGymDetailResult: jest.Mock;
   getGymsWithSessionsResult: jest.Mock;
+  getMyActiveMatch: jest.Mock;
 }
 
 // useCachedResource's store is a module-level Map that jest never clears
@@ -211,6 +213,7 @@ beforeEach(() => {
   queries.getGymsWithSessions.mockResolvedValue([]);
   queries.getGymDetailResult.mockResolvedValue({ ok: true, data: null });
   queries.getGymsWithSessionsResult.mockResolvedValue({ ok: true, data: [] });
+  queries.getMyActiveMatch.mockResolvedValue({ ok: true, data: null });
   mockAthlete.primary_gym_id = null;
   mockAthlete.id = `a${++athleteSeq}`;
   mockFocusCallbacks.length = 0;
@@ -465,5 +468,142 @@ describe("DashboardScreen Arena card (live-aware)", () => {
     });
     expect(getByText("Find a match")).toBeTruthy();
     expect(queryByText("You're live")).toBeNull();
+  });
+});
+
+// jits-r9a: an app killed mid-match leaves the match open with no way back.
+// Home offers it as a card (never an automatic navigation), and while it shows
+// Resume is Home's one red CTA and the Arena button steps down.
+describe("DashboardScreen resume-match card", () => {
+  const store = require("@/lib/arena/arena-store") as typeof import("@/lib/arena/arena-store");
+  const open = {
+    ok: true,
+    data: { matchId: "99999999-9999-4999-8999-999999999999", status: "in_progress", opponentName: "Demo Red" },
+  };
+
+  afterEach(() => {
+    store.__resetArenaStoreForTests();
+  });
+
+  it("shows nothing extra when no match is open, and the Arena CTA stays red", async () => {
+    const queries = require("@jits/shared/api/queries") as QueryMocks;
+    const { getByLabelText, queryByLabelText } = render(React.createElement(DashboardScreen));
+    await waitFor(() => expect(queries.getMyActiveMatch).toHaveBeenCalledTimes(1));
+    expect(queries.getMyActiveMatch.mock.calls[0][1]).toBe(mockAthlete.id);
+    expect(queryByLabelText("Resume your match")).toBeNull();
+    expect(getByLabelText("Go to the Arena").props.className).toContain("bg-cta");
+  });
+
+  it("offers the open match, pushes the Arena match route on tap, and never navigates by itself", async () => {
+    const queries = require("@jits/shared/api/queries") as QueryMocks;
+    queries.getMyActiveMatch.mockResolvedValue(open);
+    const { findByLabelText, getByText, getByLabelText } = render(
+      React.createElement(DashboardScreen),
+    );
+
+    const resume = await findByLabelText("Resume your match");
+    expect(getByText("Match in progress")).toBeTruthy();
+    expect(getByText(/vs Demo Red/)).toBeTruthy();
+    expect(mockPush).not.toHaveBeenCalled();
+
+    // One Signal Red CTA per surface: Resume takes it, the Arena steps down.
+    expect(resume.props.className).toContain("bg-cta");
+    const arena = getByLabelText("Go to the Arena");
+    expect(arena.props.className).not.toContain("bg-cta");
+    expect(arena.props.className).toContain("border-hairline-strong");
+
+    fireEvent.press(resume);
+    expect(mockPush).toHaveBeenCalledWith("/match/99999999-9999-4999-8999-999999999999");
+  });
+
+  it("words a not-yet-started match as waiting", async () => {
+    const queries = require("@jits/shared/api/queries") as QueryMocks;
+    queries.getMyActiveMatch.mockResolvedValue({
+      ok: true,
+      data: { matchId: "99999999-9999-4999-8999-999999999999", status: "pending", opponentName: null },
+    });
+    const { findByText, queryByText } = render(React.createElement(DashboardScreen));
+    expect(await findByText("Match waiting to start")).toBeTruthy();
+    expect(queryByText("Waiting")).toBeTruthy();
+    expect(queryByText(/vs /)).toBeNull();
+  });
+
+  it("re-reads on every focus, without the summary's throttle", async () => {
+    const queries = require("@jits/shared/api/queries") as QueryMocks;
+    render(React.createElement(DashboardScreen));
+    await waitFor(() => expect(queries.getMyActiveMatch).toHaveBeenCalledTimes(1));
+
+    queries.getMyActiveMatch.mockResolvedValue(open);
+    act(() => {
+      mockFocusCallbacks.forEach((cb) => cb());
+    });
+    await waitFor(() => expect(queries.getMyActiveMatch).toHaveBeenCalledTimes(2));
+  });
+
+  it("drops the card once a match screen closes and the match is over", async () => {
+    const queries = require("@jits/shared/api/queries") as QueryMocks;
+    queries.getMyActiveMatch.mockResolvedValue(open);
+    const { findByLabelText, queryByLabelText, getByLabelText } = render(
+      React.createElement(DashboardScreen),
+    );
+    await findByLabelText("Resume your match");
+
+    // A match screen mounts and unmounts: the exit counter bumps.
+    queries.getMyActiveMatch.mockResolvedValue({ ok: true, data: null });
+    function MatchScreen() {
+      store.useArenaMatchScreen("00000000-0000-4000-8000-000000000000");
+      return null;
+    }
+    const matchScreen = render(React.createElement(MatchScreen));
+    matchScreen.unmount();
+
+    await waitFor(() => expect(queryByLabelText("Resume your match")).toBeNull());
+    expect(getByLabelText("Go to the Arena").props.className).toContain("bg-cta");
+  });
+
+  it("never offers a match the athlete left in this app process", async () => {
+    const queries = require("@jits/shared/api/queries") as QueryMocks;
+    queries.getMyActiveMatch.mockResolvedValue(open);
+    const { findByLabelText } = render(React.createElement(DashboardScreen));
+    await findByLabelText("Resume your match");
+    // Nothing left yet: the first read excludes nothing.
+    expect(queries.getMyActiveMatch.mock.calls[0][3]).toEqual([]);
+
+    // The athlete opens m-9 and backs out of it on purpose.
+    function MatchScreen() {
+      store.useArenaMatchScreen("99999999-9999-4999-8999-999999999999");
+      return null;
+    }
+    const matchScreen = render(React.createElement(MatchScreen));
+    matchScreen.unmount();
+
+    // The exit re-read asks the server to leave m-9 out.
+    await waitFor(() => expect(queries.getMyActiveMatch).toHaveBeenCalledTimes(2));
+    expect(queries.getMyActiveMatch.mock.calls[1][3]).toEqual(["99999999-9999-4999-8999-999999999999"]);
+  });
+
+  it("tags the card In progress / Waiting", async () => {
+    const queries = require("@jits/shared/api/queries") as QueryMocks;
+    queries.getMyActiveMatch.mockResolvedValue(open);
+    const { findByText, queryByText } = render(React.createElement(DashboardScreen));
+    expect(await findByText("In progress")).toBeTruthy();
+    expect(queryByText("Live")).toBeNull();
+  });
+
+  it("keeps the card when a re-read fails", async () => {
+    const queries = require("@jits/shared/api/queries") as QueryMocks;
+    queries.getMyActiveMatch.mockResolvedValue(open);
+    const { findByLabelText, getByLabelText } = render(React.createElement(DashboardScreen));
+    await findByLabelText("Resume your match");
+
+    queries.getMyActiveMatch.mockResolvedValue({
+      ok: false,
+      error: { code: "UNKNOWN", message: "offline" },
+    });
+    act(() => {
+      mockFocusCallbacks.forEach((cb) => cb());
+    });
+    await waitFor(() => expect(queries.getMyActiveMatch).toHaveBeenCalledTimes(2));
+    expect(getByLabelText("Resume your match")).toBeTruthy();
   });
 });
