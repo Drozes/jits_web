@@ -5,6 +5,7 @@ import { useSessionMatchTimer } from "@jits/shared/hooks/use-session-match-timer
 import { useLiveControls } from "@/lib/match-flow/use-live-controls";
 import { usePauseResync } from "@/lib/match-flow/use-pause-resync";
 import { matchHaptics } from "@/lib/match-flow/use-haptics";
+import { clampFinishSeconds } from "@/lib/match-flow/clamp-finish-seconds";
 import type { UseVideoRecorderReturn } from "@/lib/video/use-video-recorder";
 import { AUTO_END_DELAY_MS } from "@/lib/video/recording-limits";
 import { TimerDisplay } from "./timer-display";
@@ -83,10 +84,6 @@ export function LiveStep(props: LiveStepProps) {
   // (above 0, at most the duration: auto-end fires a beat after 00:00).
   const elapsedRef = React.useRef(timer.elapsed);
   elapsedRef.current = timer.elapsed;
-  const clampFinish = React.useCallback(
-    (elapsed: number) => Math.min(durationSeconds, Math.max(1, elapsed)),
-    [durationSeconds],
-  );
   const sync = useStepMatchSync({
     matchId,
     onTimerPaused: (p) => timer.syncFromBroadcast({ type: "paused", pausedAt: p }),
@@ -96,7 +93,7 @@ export function LiveStep(props: LiveStepProps) {
       if (endedRef.current) return;
       endedRef.current = true;
       void recorder.stop();
-      onEnded(clampFinish(elapsedRef.current));
+      onEnded(clampFinishSeconds(elapsedRef.current, durationSeconds));
     },
   });
 
@@ -104,9 +101,9 @@ export function LiveStep(props: LiveStepProps) {
     (elapsed: number) => {
       void recorder.stop();
       void matchHaptics.matchEnd();
-      onEnded(clampFinish(elapsed));
+      onEnded(clampFinishSeconds(elapsed, durationSeconds));
     },
-    [recorder, onEnded, clampFinish],
+    [recorder, onEnded, durationSeconds],
   );
 
   const { busy, handleEnd, handlePauseResume } = useLiveControls({

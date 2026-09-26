@@ -6,7 +6,7 @@ import { useThemedTokens } from "@/lib/theme/use-theme";
 import { useAmber } from "@/components/match-detail/use-amber";
 import { useRecordResult } from "@/lib/match-flow/use-record-result";
 import { isFinishTimeValid } from "@/lib/match-flow/parse-finish-time";
-import { formatElapsed } from "@/lib/match-flow/format-elapsed";
+import { useFinishTimeField } from "@/lib/match-flow/use-finish-time-field";
 import type { BroadcastResult } from "@jits/shared/hooks/use-session-match-sync";
 import type { SubmissionType } from "@jits/shared/types/submission-type";
 import {
@@ -54,14 +54,11 @@ export function ResultStep({
   const [outcome, setOutcome] = React.useState<"submission" | "draw" | null>(null);
   const [winnerId, setWinnerId] = React.useState("");
   const [submissionCode, setSubmissionCode] = React.useState("");
-  const [finishTimeStr, setFinishTimeStr] = React.useState(() =>
-    initialFinishSeconds != null ? formatElapsed(initialFinishSeconds) : "",
-  );
-  const [finishFromClock, setFinishFromClock] = React.useState(initialFinishSeconds != null);
-  const onFinishTimeChange = React.useCallback((v: string) => {
-    setFinishFromClock(false);
-    setFinishTimeStr(v);
-  }, []);
+  const {
+    finishTimeStr,
+    fromClock: finishFromClock,
+    onChange: onFinishTimeChange,
+  } = useFinishTimeField(initialFinishSeconds);
   const { loading, submit } = useRecordResult({ matchId, onRecorded });
 
   // Finish time is REQUIRED for submissions: the BE `record_match_result`

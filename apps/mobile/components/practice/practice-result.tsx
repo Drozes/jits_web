@@ -4,7 +4,7 @@ import { Plate } from "@/components/ui/elo-system";
 import { OutcomeToggle, WinnerPicker } from "@/components/match-flow/steps/result-step-fields";
 import { SubmissionFields } from "@/components/match-flow/steps/submission-fields";
 import { isFinishTimeValid, parseFinishTime } from "@/lib/match-flow/parse-finish-time";
-import { formatElapsed } from "@/lib/match-flow/format-elapsed";
+import { useFinishTimeField } from "@/lib/match-flow/use-finish-time-field";
 import type { BroadcastResult } from "@jits/shared/hooks/use-session-match-sync";
 import type { SubmissionType } from "@jits/shared/types/submission-type";
 import {
@@ -35,14 +35,11 @@ export function PracticeResult({
   const [outcome, setOutcome] = React.useState<"submission" | "draw" | null>(null);
   const [winnerId, setWinnerId] = React.useState("");
   const [submissionCode, setSubmissionCode] = React.useState("");
-  const [finishTimeStr, setFinishTimeStr] = React.useState(() =>
-    initialFinishSeconds != null ? formatElapsed(initialFinishSeconds) : "",
-  );
-  const [finishFromClock, setFinishFromClock] = React.useState(initialFinishSeconds != null);
-  const onFinishTimeChange = React.useCallback((v: string) => {
-    setFinishFromClock(false);
-    setFinishTimeStr(v);
-  }, []);
+  const {
+    finishTimeStr,
+    fromClock: finishFromClock,
+    onChange: onFinishTimeChange,
+  } = useFinishTimeField(initialFinishSeconds);
 
   const finishTimeValid = isFinishTimeValid(finishTimeStr, PRACTICE_DURATION_SECONDS);
   const canSubmit =

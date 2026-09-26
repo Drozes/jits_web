@@ -5,6 +5,7 @@ import { TimerDisplay } from "@/components/match-flow/steps/timer-display";
 import { LiveControls } from "@/components/match-flow/steps/live-controls";
 import { useMatchRecorder } from "@/components/match-flow/match-recorder-context";
 import { matchHaptics } from "@/lib/match-flow/use-haptics";
+import { clampFinishSeconds } from "@/lib/match-flow/clamp-finish-seconds";
 import { AUTO_END_DELAY_MS } from "@/lib/video/recording-limits";
 import { PRACTICE_BOT_NAME, PRACTICE_DURATION_SECONDS } from "@/lib/practice/constants";
 
@@ -26,7 +27,7 @@ export function PracticeLive({ onEnd }: { onEnd: (finishSeconds: number) => void
   const pausedAtRef = React.useRef<number | null>(null);
   const totalPausedRef = React.useRef(0);
   const endedRef = React.useRef(false);
-  // Same capture as the real live step: the clock at the end, clamped to 1..duration.
+  // The clock at the end, read through a ref (clamped on end, like the real live step).
   const elapsedRef = React.useRef(timer.elapsed);
   elapsedRef.current = timer.elapsed;
   const recordingStartedRef = React.useRef(false);
@@ -46,7 +47,7 @@ export function PracticeLive({ onEnd }: { onEnd: (finishSeconds: number) => void
     endedRef.current = true;
     void recorder.stop();
     void matchHaptics.matchEnd();
-    onEnd(Math.min(PRACTICE_DURATION_SECONDS, Math.max(1, elapsedRef.current)));
+    onEnd(clampFinishSeconds(elapsedRef.current, PRACTICE_DURATION_SECONDS));
   }, [recorder, onEnd]);
 
   const pauseResume = React.useCallback(() => {
