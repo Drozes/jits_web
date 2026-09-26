@@ -278,3 +278,18 @@ already appends a `{"type":"run",...}` line per run):
 - History rows near the bottom of a tab sit under the tab bar: a tap on
   their centre lands on a tab. `sim/match-detail.ts` scrolls every target
   into the band between the header and the tab bar before tapping.
+- E18 to E20 exercise the Arena concurrency rules in
+  `apps/mobile/lib/arena/use-arena-challenge.ts`. E18 (crossing) has two
+  legitimate branches, picked by which challenge id is lower (random per
+  run); the trace's `crossing` and `red_accept_outcome` notes say which ran,
+  and both must end in ONE match. E19 reads which challenger Blue accepted
+  from the DB (the prompt sheet's children are not in the accessibility
+  tree). E20 deliberately waits out the app's 12 s accepted fallback, so it
+  takes about 20 s longer than a plain handshake. All three end the match by
+  Blue cancelling from the ready step (`blueCancelsFromReady`), not by
+  playing it.
+- The toast oracles (`ui:no-error-toast`, `ui:no-info-toast`) sample the
+  screen in the background for BrandToast testIDs (`toast-<type>`). Their
+  note records how many snapshots were read. They cannot prove the toast
+  host is visible to idb at all: if a scenario that should toast never
+  shows one, check the Pressable's testID surfaces before trusting a pass.

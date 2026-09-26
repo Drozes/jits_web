@@ -26,6 +26,20 @@ JS-only, OTA-eligible for runtime 0.3.0.
 - The incoming and outgoing Arena realtime channels are rebuilt after a server close with bounded backoff.
 - New typed wrappers: `declineOtherPendingChallenges` (`packages/shared/src/api/mutations.ts`) and `getChallengeStatus` (`packages/shared/src/api/queries.ts`).
 
+### Tooling: match-loop scenarios for Arena concurrency (E18, E19, E20)
+
+**Added**
+- `tools/match-loop/scenarios/extended/e18-crossing-challenges.ts` (E18): Blue and Red challenge each other (Red's insert right after Blue's tap), then both accept at once; the bot runs the app's lower-challenge-id tie-break, so either branch can run (the trace notes which). Oracles: `db:exactly-one-match`, `db:red-in-the-db-match`, `db:match-is-blue-vs-red`, `db:match-challenge-started`, `db:other-challenge-withdrawn` (cancelled or declined), `ui:no-prompt-in-match`, `ui:no-waiting-plate-in-match`, `ui:no-error-toast`, `ui:no-info-toast`, plus the shared cancel-from-ready oracles below; `env:crossing-insert-gap-ms` is informational.
+- `tools/match-loop/scenarios/extended/e19-many-on-one.ts` (E19): Red and Green both challenge Blue; Blue accepts the prompt on screen (which one is read from the DB). Oracles: the accepted challenger lands in the one match, `db:other-challenge-declined`, `bot:other-challenger-received-declined` (the broadcast), `bot:other-challenger-plate-clears`, `ui:no-second-prompt-mid-match` (sampled for 6 s), `ui:no-error-toast`, `ui:no-info-toast`, `ui:no-prompt-after-match`.
+- `tools/match-loop/scenarios/extended/e20-accepted-stuck.ts` (E20): Red accepts Blue's challenge but never starts it. Oracles: `app:holds-while-accepted` (5 s in: row still `accepted`, plate up, no wizard), `app:fallback-start-timing` (Blue's app starts it between `ACCEPTED_FALLBACK_MS` - 1 s and + 4 s after the accept), Blue on the weight step, `bot:red-sees-started-update`, `db:one-match-red-joined`, no toasts.
+- `tools/match-loop/scenarios/flows.ts`: `blueCancelsFromReady` (bot on the weight step, Blue confirms weights and cancels from ready; `protocol:blue-in-the-same-match` proves Blue's app is in the bot's match id via Blue's `match_cancelled` on that match topic, then `bot:learns-cancel`, `db:match-cancelled`), `checkToasts`, `settledChallenge`, `promptShownWithin`, `matchesFor`.
+- `tools/match-loop/oracle/ui.ts`: `ToastWatch` samples the screen in the background and collects BrandToast testIDs (`toast-error|info|success`); `toastsIn` / `mergeToasts` are pure.
+- `tools/match-loop/bot/opponent.ts`: `acceptLikeApp` (the app's `accept()`: crossing tie-break via `crossingPlan`, `resolveOwnOutgoing`, one start retry, withdraw on a failed start), `acceptWithoutStart`, `waitIncomingStatus`, `joinStarted`, and the app's post-entry settle (withdraw my stranded outgoing challenge, decline other fresh pending ones with the `declined` broadcast, withdraw a crossing peer's quietly; awaitable as `lastSettle`).
+- `tools/match-loop/tests/arena-concurrency.test.ts` (added to `npm run match-loop:test`): drift guards against `use-arena-challenge.ts` (`ACCEPTED_FALLBACK_MS`, `LIVE_CHALLENGE_STATUSES`, the tie-break expression, the broadcast event names), the tie-break property (exactly one side of a crossing pair accepts canonically), `waitOutgoingOutcome` against a stubbed client, and the toast parser.
+
+**Changed**
+- `tools/match-loop/bot/opponent.ts` `waitOutgoingOutcome` mirrors the current app: it no longer starts the match on an `accepted` UPDATE (the jits-njyd race); it waits for the broadcast or `started`, and starts it itself only when the row is still `accepted` `ACCEPTED_FALLBACK_MS` (12 s, now in `APP_TIMING`) later (`via: "accepted_fallback"`). Entering a match drops the bot's plate and runs the settle above. This also applies to the existing scenarios that use it (C2, C4 and every `blueAccepts`).
+
 ### Web: Arena and session match-flow fixes (demo bug hunt)
 
 **Fixed**

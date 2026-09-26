@@ -6,8 +6,8 @@ import { getEloStakes } from "@jits/shared/api/queries";
 import type { EloStakes } from "@jits/shared/types/composites";
 import type { MobileOpponent } from "../bot/opponent";
 import type { MatchSide, ReadyOutcome } from "../bot/match-side";
-import { db } from "../oracle/db";
-import { parseDelta, waitLivePill } from "../oracle/ui";
+import { db, type ChallengeDb, type MatchDb } from "../oracle/db";
+import { parseDelta, waitLivePill, type ToastWatch } from "../oracle/ui";
 import { resetFixtures, type ResetOptions } from "../fixtures/reset";
 import { proveAppOnLocalStack } from "../bot/app-on-local";
 import { ExpectationTimeout, HarnessError, pollUntil } from "../lib/util";
@@ -155,8 +155,9 @@ export async function blueAccepts(ctx: ScenarioCtx, red: MobileOpponent, challen
     ctx.eq("bot:challenger-lands-in-match", "match_started", outcome.kind);
     throw new ExpectationTimeout("match_started for the challenger", T.prompt, outcome);
   }
-  // The challenger's app takes whichever lands first: the accepted-status
-  // UPDATE (recovery path) usually beats the broadcast. Both must agree.
+  // The challenger's app takes whichever lands first: the broadcast, or the
+  // `started` UPDATE (recovery path; it never starts on `accepted`, see
+  // `waitOutgoingOutcome`). Both must agree.
   const ms = await db.matchesForChallenge(challengeId);
   ctx.eq("bot:challenger-lands-in-the-db-match", [outcome.matchId], ms.map((m) => m.id));
   ctx.trace.note("harness", "challenger_path", outcome.via);
@@ -170,6 +171,71 @@ export async function blueAccepts(ctx: ScenarioCtx, red: MobileOpponent, challen
     return (ev as { matchId: string }).matchId;
   });
   return { challengeId, matchId: outcome.matchId };
+}
+
+// --- Arena concurrency (E18-E20) ----------------------------------------------------
+
+/**
+ * Stop a toast watch and record the toast oracles: no error toast ever, and
+ * (unless `infoAllowed`) no info toast either, e.g. a "declined." or
+ * "expired." that a quiet crossing withdrawal must never produce.
+ */
+export async function checkToasts(ctx: ScenarioCtx, watch: ToastWatch, infoAllowed = false): Promise<void> {
+  const { toasts, samples } = await watch.stop();
+  const note = `${samples} screen samples`;
+  ctx.eq("ui:no-error-toast", [], toasts.filter((t) => t.type === "error"), note);
+  if (!infoAllowed) ctx.eq("ui:no-info-toast", [], toasts.filter((t) => t.type === "info"), note);
+  if (samples === 0) ctx.skip("ui:toast-watch-sampled", "the toast watch read no screen snapshot");
+}
+
+/**
+ * End a match both sides are in without playing it: the bot sits on the
+ * weight step, Blue confirms weights and cancels from the ready step. The
+ * spy seeing Blue's match_cancelled on THIS match's topic proves Blue's app
+ * is in the same match id as the bot.
+ */
+export async function blueCancelsFromReady(ctx: ScenarioCtx, side: MatchSide): Promise<void> {
+  side.enter("weight");
+  await ctx.step("Blue confirms weights", async () => {
+    await ctx.ui.confirmWeights();
+    await ctx.ui.waitStep("ready", T.step);
+  });
+  await ctx.step("Blue cancels the match", () => ctx.ui.cancelMatch());
+  await ctx.expect("protocol:blue-in-the-same-match", true, async () => {
+    await side.spy.waitFor("Blue's match_cancelled on the bot's match topic", (e) => e.event === "match_cancelled", 10_000, 0);
+    return true;
+  });
+  await ctx.expect("bot:learns-cancel", "cancelled", async () => (await side.readyAndStart(20_000)).kind);
+  const m = await db.waitMatchStatus(side.matchId, ["cancelled"], T.db).catch(() => db.match(side.matchId));
+  ctx.eq("db:match-cancelled", "cancelled", m?.status);
+}
+
+/** The challenge row once it has left `pending` (or the timeout). */
+export function settledChallenge(id: string, timeoutMs = T.db): Promise<ChallengeDb> {
+  return pollUntil(
+    `challenge ${id} to leave pending`,
+    async () => {
+      const c = await db.challenge(id);
+      return c && c.status !== "pending" ? c : undefined;
+    },
+    { timeoutMs, intervalMs: 300 },
+  );
+}
+
+/** Whether the incoming prompt shows at any point in the next `ms`. */
+export async function promptShownWithin(ctx: ScenarioCtx, ms: number): Promise<boolean> {
+  const until = Date.now() + ms;
+  while (Date.now() < until) {
+    if (await ctx.ui.isPromptVisible()) return true;
+    await new Promise((r) => setTimeout(r, 400));
+  }
+  return false;
+}
+
+/** Every match created for any of `challengeIds`. */
+export async function matchesFor(challengeIds: string[]): Promise<MatchDb[]> {
+  const all = await Promise.all(challengeIds.map((id) => db.matchesForChallenge(id)));
+  return all.flat();
 }
 
 // --- in-match live/offline --------------------------------------------------------

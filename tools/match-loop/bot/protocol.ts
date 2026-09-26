@@ -42,6 +42,10 @@ export const APP_TIMING = {
   /** ConfirmStep's delay between "both confirmed" and the summary
    * (apps/mobile/components/match-flow/steps/confirm-step.tsx). */
   CONFIRM_ADVANCE_MS: 1_500,
+  /** `ACCEPTED_FALLBACK_MS` (apps/mobile/lib/arena/use-arena-challenge.ts): how
+   * long a challenger lets its challenge sit at `accepted` before it starts
+   * the match itself (the accepter's start failed or its app died). */
+  ACCEPTED_FALLBACK_MS: 12_000,
 } as const;
 
 /** App-wide presence tier (apps/mobile/lib/presence/use-online-presence.ts). */
