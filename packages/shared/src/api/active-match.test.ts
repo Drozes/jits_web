@@ -8,7 +8,7 @@
  */
 import { describe, it, expect, vi } from "vitest";
 import { getMyActiveMatch } from "./queries";
-import { MATCH_RESUME_WINDOW_MS } from "../constants";
+import { ARENA_CHALLENGE_FRESH_MS, MATCH_RESUME_WINDOW_MS } from "../constants";
 
 const NOW = Date.parse("2026-09-26T12:00:00Z");
 const ME = "me-1";
@@ -21,7 +21,7 @@ function mockClient(opts: {
 }) {
   const calls: Array<[string, ...unknown[]]> = [];
   const chain: Record<string, (...args: unknown[]) => unknown> = {};
-  for (const m of ["select", "eq", "in", "or", "order"]) {
+  for (const m of ["select", "eq", "is", "in", "or", "not", "order"]) {
     chain[m] = (...args: unknown[]) => {
       calls.push([m, ...args]);
       return chain;
@@ -47,21 +47,45 @@ const details = {
 };
 
 describe("getMyActiveMatch", () => {
-  it("reads only my open matches inside the resume window, newest first", async () => {
+  it("reads only my open Arena matches, 60 min in progress / 10 min pending, newest first", async () => {
     const { client, from, calls } = mockClient({ rows: [] });
     await getMyActiveMatch(client, ME, NOW);
 
-    const since = new Date(NOW - MATCH_RESUME_WINDOW_MS).toISOString();
+    const live = new Date(NOW - MATCH_RESUME_WINDOW_MS).toISOString();
+    const pending = new Date(NOW - ARENA_CHALLENGE_FRESH_MS).toISOString();
+    expect(MATCH_RESUME_WINDOW_MS).toBe(60 * 60_000);
+    expect(ARENA_CHALLENGE_FRESH_MS).toBe(10 * 60_000);
     expect(from).toHaveBeenCalledWith("matches");
     expect(calls).toEqual([
       ["select", "id, status, match_participants!inner(athlete_id, status)"],
       ["eq", "match_participants.athlete_id", ME],
       ["eq", "match_participants.status", "active"],
+      // Mobile is Arena-only: session matches are never offered.
+      ["is", "session_id", null],
       ["in", "status", ["pending", "in_progress"]],
-      ["or", `created_at.gte.${since},started_at.gte.${since}`],
+      [
+        "or",
+        `and(status.eq.in_progress,or(created_at.gte.${live},started_at.gte.${live})),` +
+          `and(status.eq.pending,created_at.gte.${pending})`,
+      ],
       ["order", "created_at", { ascending: false }],
       ["limit", 1],
     ]);
+  });
+
+  it("leaves out matches the caller already left", async () => {
+    const { client, calls } = mockClient({ rows: [] });
+    await getMyActiveMatch(client, ME, NOW, ["m-a", "m-b"]);
+    expect(calls).toContainEqual(["not", "id", "in", "(m-a,m-b)"]);
+    // The exclusion goes on before the terminal order/limit.
+    const at = (name: string) => calls.findIndex((c) => c[0] === name);
+    expect(at("not")).toBeLessThan(at("order"));
+  });
+
+  it("sends no exclusion filter when nothing was left", async () => {
+    const { client, calls } = mockClient({ rows: [] });
+    await getMyActiveMatch(client, ME, NOW, []);
+    expect(calls.some((c) => c[0] === "not")).toBe(false);
   });
 
   it("returns null, with no details read, when nothing is open", async () => {

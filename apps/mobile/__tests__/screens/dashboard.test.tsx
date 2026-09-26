@@ -524,6 +524,7 @@ describe("DashboardScreen resume-match card", () => {
     });
     const { findByText, queryByText } = render(React.createElement(DashboardScreen));
     expect(await findByText("Match waiting to start")).toBeTruthy();
+    expect(queryByText("Waiting")).toBeTruthy();
     expect(queryByText(/vs /)).toBeNull();
   });
 
@@ -550,7 +551,7 @@ describe("DashboardScreen resume-match card", () => {
     // A match screen mounts and unmounts: the exit counter bumps.
     queries.getMyActiveMatch.mockResolvedValue({ ok: true, data: null });
     function MatchScreen() {
-      store.useArenaMatchScreen();
+      store.useArenaMatchScreen("m-other");
       return null;
     }
     const matchScreen = render(React.createElement(MatchScreen));
@@ -558,6 +559,35 @@ describe("DashboardScreen resume-match card", () => {
 
     await waitFor(() => expect(queryByLabelText("Resume your match")).toBeNull());
     expect(getByLabelText("Go to the Arena").props.className).toContain("bg-cta");
+  });
+
+  it("never offers a match the athlete left in this app process", async () => {
+    const queries = require("@jits/shared/api/queries") as QueryMocks;
+    queries.getMyActiveMatch.mockResolvedValue(open);
+    const { findByLabelText } = render(React.createElement(DashboardScreen));
+    await findByLabelText("Resume your match");
+    // Nothing left yet: the first read excludes nothing.
+    expect(queries.getMyActiveMatch.mock.calls[0][3]).toEqual([]);
+
+    // The athlete opens m-9 and backs out of it on purpose.
+    function MatchScreen() {
+      store.useArenaMatchScreen("m-9");
+      return null;
+    }
+    const matchScreen = render(React.createElement(MatchScreen));
+    matchScreen.unmount();
+
+    // The exit re-read asks the server to leave m-9 out.
+    await waitFor(() => expect(queries.getMyActiveMatch).toHaveBeenCalledTimes(2));
+    expect(queries.getMyActiveMatch.mock.calls[1][3]).toEqual(["m-9"]);
+  });
+
+  it("tags the card In progress / Waiting", async () => {
+    const queries = require("@jits/shared/api/queries") as QueryMocks;
+    queries.getMyActiveMatch.mockResolvedValue(open);
+    const { findByText, queryByText } = render(React.createElement(DashboardScreen));
+    expect(await findByText("In progress")).toBeTruthy();
+    expect(queryByText("Live")).toBeNull();
   });
 
   it("keeps the card when a re-read fails", async () => {

@@ -41,7 +41,7 @@ export default function ArenaMatchScreen() {
   const [step, setStep] = React.useState<MatchStep | null>(null);
   // Offline for the match, no challenge prompts over it, and back to live on
   // the way out (every exit path unmounts this screen). See arena-store.ts.
-  useArenaMatchScreen();
+  useArenaMatchScreen(matchId);
 
   const guarded = step != null && GUARDED_STEPS.has(step);
   usePreventRemove(guarded, () => {});

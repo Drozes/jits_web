@@ -37,7 +37,7 @@ import type {
   GymLadderRow,
 } from "../types/gym-portal";
 import { mapPostgrestError, type DomainError, type Result } from "./errors";
-import { MATCH_RESUME_WINDOW_MS } from "../constants";
+import { ARENA_CHALLENGE_FRESH_MS, MATCH_RESUME_WINDOW_MS } from "../constants";
 import {
   videoPlayability,
   videoAngleLabel,
@@ -651,9 +651,12 @@ export interface MyActiveMatch {
 }
 
 /**
- * My newest match that is still open (`pending` or `in_progress`) and was
- * created or started within `MATCH_RESUME_WINDOW_MS`, for Home's "Resume your
- * match" card (jits-r9a: an app killed mid-match leaves no way back in).
+ * My newest sessionless (Arena) match that is still open, for Home's "Resume
+ * your match" card (jits-r9a: an app killed mid-match leaves no way back in):
+ *  - `in_progress` created or started within `MATCH_RESUME_WINDOW_MS`;
+ *  - `pending` created within `ARENA_CHALLENGE_FRESH_MS` (a match nobody has
+ *    begun goes stale as fast as the challenge that made it);
+ *  - never one of `excludeMatchIds` (matches the caller already left).
  *
  * Authorization is plain RLS, no SECURITY DEFINER shortcut: the
  * `matches_select_participant` policy returns only matches I take part in, and
@@ -666,17 +669,25 @@ export async function getMyActiveMatch(
   supabase: Client,
   athleteId: string,
   now: number = Date.now(),
+  excludeMatchIds: readonly string[] = [],
 ): Promise<Result<MyActiveMatch | null>> {
-  const sinceIso = new Date(now - MATCH_RESUME_WINDOW_MS).toISOString();
-  const { data, error } = await supabase
+  const liveSince = new Date(now - MATCH_RESUME_WINDOW_MS).toISOString();
+  const pendingSince = new Date(now - ARENA_CHALLENGE_FRESH_MS).toISOString();
+  let query = supabase
     .from("matches")
     .select("id, status, match_participants!inner(athlete_id, status)")
     .eq("match_participants.athlete_id", athleteId)
     .eq("match_participants.status", "active")
+    .is("session_id", null)
     .in("status", ["pending", "in_progress"])
-    .or(`created_at.gte.${sinceIso},started_at.gte.${sinceIso}`)
-    .order("created_at", { ascending: false })
-    .limit(1);
+    .or(
+      `and(status.eq.in_progress,or(created_at.gte.${liveSince},started_at.gte.${liveSince})),` +
+        `and(status.eq.pending,created_at.gte.${pendingSince})`,
+    );
+  if (excludeMatchIds.length > 0) {
+    query = query.not("id", "in", `(${excludeMatchIds.join(",")})`);
+  }
+  const { data, error } = await query.order("created_at", { ascending: false }).limit(1);
 
   if (error) return { ok: false, error: mapPostgrestError(error) };
   const row = data?.[0];

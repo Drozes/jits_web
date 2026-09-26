@@ -2,7 +2,7 @@ import * as React from "react";
 import { useFocusEffect } from "expo-router";
 import { supabase } from "@/lib/supabase/client";
 import { getMyActiveMatch, type MyActiveMatch } from "@jits/shared/api/queries";
-import { useMatchExitCount } from "@/lib/arena/arena-store";
+import { getLeftMatchIds, useMatchExitCount } from "@/lib/arena/arena-store";
 
 /**
  * The signed-in athlete's still-open match, for Home's "Resume your match"
@@ -45,7 +45,10 @@ export function useMyActiveMatch(athleteId: string | undefined): {
       setMatch(null);
       return;
     }
-    void getMyActiveMatch(supabase, athleteId).then((res) => {
+    // Never offer a match the athlete left in this app process (backed out
+    // of on purpose); a kill clears the set, which is the case to recover.
+    const left = [...getLeftMatchIds()];
+    void getMyActiveMatch(supabase, athleteId, Date.now(), left).then((res) => {
       if (id !== seq.current || !res.ok) return;
       setMatch(res.data);
     });

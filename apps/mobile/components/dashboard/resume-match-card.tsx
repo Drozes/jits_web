@@ -24,7 +24,7 @@ export function ResumeMatchCard({ match }: { match: MyActiveMatch }) {
         <Text className="font-heading text-[18px] text-ink flex-1" numberOfLines={1}>
           {started ? "Match in progress" : "Match waiting to start"}
         </Text>
-        <MetaTag>{started ? "Live" : "Ready"}</MetaTag>
+        <MetaTag>{started ? "In progress" : "Waiting"}</MetaTag>
       </View>
       <Text className="font-body text-[13px] text-ink-2 mb-3" numberOfLines={2}>
         {match.opponentName ? `vs ${match.opponentName}. ` : ""}

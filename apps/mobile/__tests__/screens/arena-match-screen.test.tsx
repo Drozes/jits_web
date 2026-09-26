@@ -64,7 +64,11 @@ jest.mock("@/components/match-flow/match-flow-wizard", () => {
 
 import ArenaMatchScreen from "@/app/(app)/match/[matchId]";
 import { renderHook } from "@testing-library/react-native";
-import { useIsInArenaMatch } from "@/lib/arena/arena-store";
+import {
+  __resetArenaStoreForTests,
+  getLeftMatchIds,
+  useIsInArenaMatch,
+} from "@/lib/arena/arena-store";
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -117,6 +121,14 @@ describe("ArenaMatchScreen", () => {
 
     screen.unmount();
     expect(probe.result.current).toBe(false);
+  });
+
+  it("remembers its match id on the way out, so Home does not offer it back (jits-r9a)", () => {
+    __resetArenaStoreForTests();
+    const screen = render(<ArenaMatchScreen />);
+    expect(getLeftMatchIds().has("M9")).toBe(false);
+    screen.unmount();
+    expect(getLeftMatchIds().has("M9")).toBe(true);
   });
 
   it("shows the LIVE signal as static, so tapping it cannot pop the match", () => {

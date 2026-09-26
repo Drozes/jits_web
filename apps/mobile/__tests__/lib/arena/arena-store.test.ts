@@ -8,6 +8,7 @@ import {
   IDLE_ARENA_STATE,
   __resetArenaStoreForTests,
   arenaActions,
+  getLeftMatchIds,
   notifyOpponentUnavailable,
   publishArenaState,
   registerArenaController,
@@ -147,6 +148,42 @@ describe("match-exit count (jits-tlk3)", () => {
     expect(probe.result.current).toBe(start + 1);
     c.unmount();
     expect(probe.result.current).toBe(start + 2);
+  });
+});
+
+describe("left match ids (jits-r9a)", () => {
+  it("records a match id once its screen unmounts, before exit listeners run", () => {
+    __resetArenaStoreForTests();
+    expect([...getLeftMatchIds()]).toEqual([]);
+
+    const seenAtExit: string[][] = [];
+    const probe = renderHook(() => {
+      const exits = useMatchExitCount();
+      seenAtExit.push([...getLeftMatchIds()]);
+      return exits;
+    });
+    const start = probe.result.current;
+
+    const screen = renderHook(() => useArenaMatchScreen("m-1"));
+    // Still on the match: not left yet.
+    expect(getLeftMatchIds().has("m-1")).toBe(false);
+    screen.unmount();
+
+    expect(probe.result.current).toBe(start + 1);
+    expect(getLeftMatchIds().has("m-1")).toBe(true);
+    // The render the exit caused already saw the id.
+    expect(seenAtExit[seenAtExit.length - 1]).toEqual(["m-1"]);
+  });
+
+  it("records nothing for a screen mounted without an id, and resets for tests", () => {
+    __resetArenaStoreForTests();
+    renderHook(() => useArenaMatchScreen()).unmount();
+    expect(getLeftMatchIds().size).toBe(0);
+
+    renderHook(() => useArenaMatchScreen("m-2")).unmount();
+    expect(getLeftMatchIds().has("m-2")).toBe(true);
+    __resetArenaStoreForTests();
+    expect(getLeftMatchIds().size).toBe(0);
   });
 });
 
