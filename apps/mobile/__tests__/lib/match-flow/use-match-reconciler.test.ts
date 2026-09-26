@@ -81,13 +81,35 @@ afterEach(() => {
 describe("useMatchReconciler triggers", () => {
   it("(d) fetches on mount and hands over match + confirmations", async () => {
     mockGetMatchConfirmations.mockResolvedValue(["opp-1"]);
+    const sentAt = 1_234_567;
+    const nowSpy = jest.spyOn(Date, "now").mockReturnValue(sentAt);
     const { onSnapshot } = setup("weight");
     await flush();
     expect(mockGetMatchDetails).toHaveBeenCalledWith(expect.anything(), "M1");
     expect(onSnapshot).toHaveBeenCalledWith({
       match: row("in_progress"),
       confirmedAthleteIds: ["opp-1"],
+      sentAt,
     });
+    nowSpy.mockRestore();
+  });
+
+  it("stamps each snapshot with the time its read was SENT, not when it landed (jits-igku)", async () => {
+    let now = 5_000;
+    const nowSpy = jest.spyOn(Date, "now").mockImplementation(() => now);
+    let release: ((m: unknown) => void) | null = null;
+    mockGetMatchDetails.mockImplementationOnce(
+      () => new Promise((res) => {
+        release = res;
+      }),
+    );
+    const { onSnapshot } = setup("weight");
+    await flush();
+    now = 60_000; // a slow read: lands long after it was issued
+    release!(row("in_progress"));
+    await flush();
+    expect(onSnapshot).toHaveBeenCalledWith(expect.objectContaining({ sentAt: 5_000 }));
+    nowSpy.mockRestore();
   });
 
   it("(d) fetches again on every step change", async () => {

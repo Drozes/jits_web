@@ -57,9 +57,20 @@ import {
 } from "@jits/shared/api/queries";
 import { ARENA_CHALLENGE_FRESH_MS } from "@jits/shared/constants";
 import { toast } from "@/components/ui/toast";
+import { matchHaptics } from "@/lib/match-flow/use-haptics";
 import { supabase } from "../supabase/client";
 import { arenaMatchHref, challengeTopic, incomingTopic } from "./constants";
 import { requestPendingChallengeResync } from "./use-pending-challenge-recovery";
+
+/**
+ * An Accept or Decline that failed: the toast plus the error haptic the
+ * match flow uses for a failed mutation, so a refused tap on the challenge
+ * prompt is felt as well as read (jits-23o8).
+ */
+function answerFailed(message: string): void {
+  toast.error(message);
+  void matchHaptics.error();
+}
 
 export interface IncomingChallenge {
   challengeId: string;
@@ -1236,7 +1247,7 @@ export function useArenaChallenge({
       if (!withdrawn.ok) {
         // Unknown whether mine is still live: accepting now could put me in
         // two matches. Keep the prompt, the athlete can try again.
-        toast.error("Couldn't accept that challenge. Try again.");
+        answerFailed("Couldn't accept that challenge. Try again.");
         return "stop";
       }
       if (withdrawn.data.cancelled) {
@@ -1246,7 +1257,7 @@ export function useArenaChallenge({
 
       const read = await getChallengeStatus(supabase, mine.challengeId);
       if (!read.ok) {
-        toast.error("Couldn't accept that challenge. Try again.");
+        answerFailed("Couldn't accept that challenge. Try again.");
         return "stop";
       }
       const status = read.data?.status ?? null;
@@ -1254,7 +1265,7 @@ export function useArenaChallenge({
       if (status === "started") {
         const started = await startMatchFromChallenge(supabase, mine.challengeId);
         if (!started.ok) {
-          toast.error("Couldn't start the match. Try again.");
+          answerFailed("Couldn't start the match. Try again.");
           return "stop";
         }
         enterMatch(mine.challengeId, started.data.match_id, mine.opponentId);
@@ -1315,7 +1326,7 @@ export function useArenaChallenge({
           opponentWeight: weightRef.current ?? undefined,
         });
         if (!accepted.ok) {
-          toast.error(
+          answerFailed(
             accepted.error.message || "Couldn't accept that challenge.",
           );
           setIncomingBoth(null);
@@ -1373,7 +1384,7 @@ export function useArenaChallenge({
           }
           // Already on the way into a match by another path.
           if (entryBlocked()) return;
-          toast.error(
+          answerFailed(
             started.error.code === "CHALLENGE_NOT_ACCEPTED"
               ? "That challenge is no longer available."
               : started.error.message || "Couldn't start the match.",
@@ -1407,7 +1418,7 @@ export function useArenaChallenge({
           // Keep the prompt: the challenge is still pending server-side and
           // the challenger is still waiting, so dismissing it here would be a
           // lie to both of us.
-          toast.error("Couldn't decline that challenge. Try again.");
+          answerFailed("Couldn't decline that challenge. Try again.");
           return;
         }
 

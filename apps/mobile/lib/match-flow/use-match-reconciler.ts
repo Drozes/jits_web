@@ -13,6 +13,14 @@ export interface ReconcileSnapshot {
   match: MatchDetails;
   /** Null when the confirmations read failed (unknown, not "nobody"). */
   confirmedAthleteIds: string[] | null;
+  /**
+   * `Date.now()` when this read was ISSUED. A read reflects the row as of
+   * some moment after this, never before, so anything this device applied
+   * earlier than `sentAt` is already in it. Arrival time says nothing: a
+   * slow read on poor cellular can land seconds after a change it predates
+   * (jits-igku).
+   */
+  sentAt: number;
 }
 
 interface UseMatchReconcilerParams {
@@ -72,6 +80,7 @@ export function useMatchReconciler({ matchId, step, enabled, onSnapshot }: UseMa
     }
     s.inFlight = true;
     const seq = ++s.seq;
+    const sentAt = Date.now();
     void (async () => {
       try {
         const [match, confirmedAthleteIds] = await Promise.all([
@@ -80,7 +89,7 @@ export function useMatchReconciler({ matchId, step, enabled, onSnapshot }: UseMa
         ]);
         if (!s.mounted || !match || seq <= s.applied) return;
         s.applied = seq;
-        onSnapshotRef.current({ match, confirmedAthleteIds: confirmedAthleteIds ?? null });
+        onSnapshotRef.current({ match, confirmedAthleteIds: confirmedAthleteIds ?? null, sentAt });
       } catch (err) {
         // Best effort: the next trigger tries again.
         console.warn("[match-flow] reconcile failed", err);

@@ -409,6 +409,7 @@ describe("writeMatchVideoRow upload-gate copy", () => {
     ["upload_rate_limited", "rate_limited", /^Daily video limit reached\. It will upload automatically later\.$/],
     ["video_upload_disabled", "disabled", /^Video uploads are turned off right now\./],
     ["upload_not_in_cohort", "not_in_cohort", /^Video uploads are not enabled for your account yet\./],
+    ["video_reslice_limit", "reslice_limit", /replaced too many times.*Contact support/],
   ])("maps HINT %s to clear copy and a gate", async (hint, gate, copy) => {
     const err = await thrownFor(hint);
     expect(err).toBeInstanceOf(MatchVideoDbError);
@@ -417,6 +418,17 @@ describe("writeMatchVideoRow upload-gate copy", () => {
     expect(err.message).not.toMatch(/saving the record failed/i);
     expect(err.storageObjectPersisted).toBe(true);
   });
+
+  it.each(["video_upload_disabled", "upload_not_in_cohort", "video_reslice_limit"])(
+    "tells the user how long the clip is kept for %s, never that it is simply saved",
+    async (hint) => {
+      // These gates rarely lift inside the retention window, after which the
+      // sweep deletes the local clip; the copy must not promise otherwise.
+      const err = await thrownFor(hint);
+      expect(err.message).toMatch(/kept on this device for 7 days/);
+      expect(err.message).not.toMatch(/saved on this device/);
+    },
+  );
 
   it("leaves any other failure ungated and unprefixed, so the caller frames it once", async () => {
     const err = await thrownFor(undefined, "permission denied");

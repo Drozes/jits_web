@@ -8,15 +8,6 @@ import { useMatchSyncContext } from "./match-sync-context";
 
 type Timer = ReturnType<typeof useSessionMatchTimer>;
 
-/**
- * How long after a pause/resume applied here a same-total DB read that
- * disagrees with it is treated as possibly in flight across that change. A
- * reconciler fetch is tens to hundreds of milliseconds; the live poll is
- * 10 s, so the first poll after the window is always a read that started
- * after the change and is trusted.
- */
-export const PAUSE_STALE_WINDOW_MS = 3_000;
-
 /** The pause state this device has already applied to its timer. */
 export interface KnownPauseState {
   pausedAt: string | null;
@@ -61,15 +52,20 @@ export function isSamePauseState(known: KnownPauseState, db: DbPauseState): bool
  * while paused here is either from before our pause or a real resume that
  * added 0 s (the RPC rounds, so a pause under 0.5 s) whose broadcast was
  * missed; a paused read of a pause already seen resumed is either stale or
- * that resume was itself misread. Those are held back only within
- * `PAUSE_STALE_WINDOW_MS` of the last applied change, so a genuine state is
- * applied by the next poll and the timer can never stick.
+ * that resume was itself misread. Those are held back only when the read was
+ * ISSUED at or before the last applied change (`sentAt`, not arrival: a slow
+ * read on poor cellular can land long after a change it predates, jits-igku).
+ * Every change is applied here only after its RPC committed (own tap) or
+ * after the opponent's RPC committed (their broadcast), so a read issued
+ * later already reflects it: the next poll is trusted and the timer can never
+ * stick. A read issued in the same millisecond is held back, which costs at
+ * most one poll.
  */
-export function isStalePauseRead(known: KnownPauseState, db: DbPauseState, now: number): boolean {
+export function isStalePauseRead(known: KnownPauseState, db: DbPauseState, sentAt: number): boolean {
   if (db.totalPausedDuration < known.totalPausedDuration) return true;
   if (db.totalPausedDuration > known.totalPausedDuration) return false;
-  const inWindow = known.lastChangeAt != null && now - known.lastChangeAt < PAUSE_STALE_WINDOW_MS;
-  if (!inWindow) return false;
+  const predatesChange = known.lastChangeAt != null && sentAt <= known.lastChangeAt;
+  if (!predatesChange) return false;
   if (db.pausedAt) {
     const t = instant(db.pausedAt);
     return t != null && known.resumed.includes(t);
@@ -121,11 +117,11 @@ export function usePauseResync(
 
   React.useEffect(
     () =>
-      subscribeSnapshot((m: MatchDetails) => {
+      subscribeSnapshot((m: MatchDetails, { sentAt }) => {
         if (m.status !== "in_progress") return;
         const db = { pausedAt: m.paused_at, totalPausedDuration: m.total_paused_duration };
         const known = knownRef.current;
-        if (isSamePauseState(known, db) || isStalePauseRead(known, db, Date.now())) return;
+        if (isSamePauseState(known, db) || isStalePauseRead(known, db, sentAt)) return;
         if (db.pausedAt) track({ type: "paused", pausedAt: db.pausedAt });
         else track({ type: "resumed", totalPausedDuration: db.totalPausedDuration });
       }),

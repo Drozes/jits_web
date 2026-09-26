@@ -69,6 +69,44 @@ it("MATCH_NOT_PAUSED applies the DB's running state instead of only toasting", a
   expect(sync.broadcastTimerResumed).not.toHaveBeenCalled();
 });
 
+it("stays busy until the MATCH_NOT_PAUSED recovery re-read finishes (jits-igku)", async () => {
+  mockResume.mockResolvedValue(NOT_PAUSED);
+  let release: ((v: unknown) => void) | null = null;
+  mockGetMatchDetails.mockImplementation(
+    () =>
+      new Promise((res) => {
+        release = res;
+      }),
+  );
+  const { result, syncFromBroadcast } = setup();
+  let pending: Promise<void> | undefined;
+  await act(async () => {
+    pending = result.current.handlePauseResume();
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+  });
+  // The RPC has answered but the re-read is still out: the controls stay
+  // locked, so a second tap cannot race the recovery.
+  expect(mockGetMatchDetails).toHaveBeenCalled();
+  expect(result.current.busy).toBe("resume");
+
+  await act(async () => {
+    release!({ status: "in_progress", paused_at: null, total_paused_duration: 0 });
+    await pending;
+  });
+  expect(syncFromBroadcast).toHaveBeenCalledWith({ type: "resumed", totalPausedDuration: 0 });
+  expect(result.current.busy).toBeNull();
+});
+
+it("releases busy even when the recovery re-read throws", async () => {
+  mockResume.mockResolvedValue(NOT_PAUSED);
+  mockGetMatchDetails.mockRejectedValue(new Error("offline"));
+  const { result } = setup();
+  await act(async () => {
+    await result.current.handlePauseResume().catch(() => undefined);
+  });
+  expect(result.current.busy).toBeNull();
+});
+
 it("still toasts when the DB read cannot confirm the match is running", async () => {
   mockResume.mockResolvedValue(NOT_PAUSED);
   mockGetMatchDetails.mockResolvedValue(null);

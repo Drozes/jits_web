@@ -12,6 +12,7 @@ import {
   ExpoFileReader,
   type TusFileInput,
 } from "./tus-rn-shims";
+import { UPLOAD_JOB_MAX_AGE_MS } from "./upload-persistence";
 
 /**
  * Bucket + path convention per BE contract
@@ -53,7 +54,7 @@ export function contentTypeFor(ext: string): string {
 }
 
 /**
- * A server-side gate on `match_videos` INSERT (jr_be triggers, raised as
+ * A server-side gate on the `match_videos` write (jr_be triggers, raised as
  * P0001 with these HINTs). None of them is fixed by retrying seconds later,
  * so the upload manager parks the job on the first one instead of burning
  * its row budget, and the next foreground or reconnect tries again:
@@ -61,8 +62,20 @@ export function contentTypeFor(ext: string): string {
  *   rate_limited   : HINT upload_rate_limited (rolling 24h per-athlete cap)
  *   disabled       : HINT video_upload_disabled (feature flag off)
  *   not_in_cohort  : HINT upload_not_in_cohort (uploader not allowlisted)
+ *   reslice_limit  : HINT video_reslice_limit (this video's storage_path has
+ *                    been replaced the maximum number of times; BE
+ *                    20260918020000, GUC app.settings.video_reslice_max)
+ *
+ * A parked job is still ABANDONED once it outlives the retention window
+ * (`UPLOAD_JOB_MAX_AGE_MS`), which deletes the local clip. Only the rate
+ * limit reliably lifts inside that window, so the copy for the other three
+ * says how long the clip is kept rather than promising it is "saved": the
+ * user is told up front, not surprised a week later.
  */
-export type MatchVideoGate = "rate_limited" | "disabled" | "not_in_cohort";
+export type MatchVideoGate = "rate_limited" | "disabled" | "not_in_cohort" | "reslice_limit";
+
+const RETENTION_DAYS = Math.round(UPLOAD_JOB_MAX_AGE_MS / (24 * 60 * 60 * 1000));
+const KEPT_ON_DEVICE = `The recording is kept on this device for ${RETENTION_DAYS} days`;
 
 const GATE_BY_HINT: Record<string, { gate: MatchVideoGate; message: string }> = {
   upload_rate_limited: {
@@ -71,12 +84,15 @@ const GATE_BY_HINT: Record<string, { gate: MatchVideoGate; message: string }> = 
   },
   video_upload_disabled: {
     gate: "disabled",
-    message: "Video uploads are turned off right now. The recording is saved on this device.",
+    message: `Video uploads are turned off right now. ${KEPT_ON_DEVICE} and uploads if they are turned back on.`,
   },
   upload_not_in_cohort: {
     gate: "not_in_cohort",
-    message:
-      "Video uploads are not enabled for your account yet. The recording is saved on this device.",
+    message: `Video uploads are not enabled for your account yet. ${KEPT_ON_DEVICE} and uploads if your account is enabled.`,
+  },
+  video_reslice_limit: {
+    gate: "reslice_limit",
+    message: `This match video has been replaced too many times, so this recording can't be uploaded. Contact support. ${KEPT_ON_DEVICE}.`,
   },
 };
 

@@ -20,8 +20,16 @@ interface MatchSyncContextValue {
   /** Called with every reconciler snapshot, including one identical to the
    * last (which leaves the match object, and so every prop, unchanged).
    * Returns the unsubscribe. */
-  subscribeSnapshot: (listener: (match: MatchDetails) => void) => () => void;
+  subscribeSnapshot: (listener: SnapshotListener) => () => void;
 }
+
+/** What a snapshot listener learns about the read besides the row. */
+export interface SnapshotMeta {
+  /** `Date.now()` when the read was issued (see `ReconcileSnapshot.sentAt`). */
+  sentAt: number;
+}
+
+export type SnapshotListener = (match: MatchDetails, meta: SnapshotMeta) => void;
 
 const MatchSyncContext = React.createContext<MatchSyncContextValue | null>(null);
 

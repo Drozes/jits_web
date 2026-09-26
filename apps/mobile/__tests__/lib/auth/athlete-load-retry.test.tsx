@@ -20,7 +20,13 @@ jest.mock("@jits/shared/api/queries", () => ({
 }));
 
 const mockSignOut = jest.fn<Promise<{ error: unknown }>, []>();
+/** Every auth-storage side effect in order, to pin stop-before-clear. */
+const mockAuthOrder: string[] = [];
+const mockPauseAutoRefresh = jest.fn(async () => {
+  mockAuthOrder.push("pauseAutoRefresh");
+});
 jest.mock("@/lib/supabase/client", () => ({
+  pauseAuthAutoRefresh: () => mockPauseAutoRefresh(),
   supabase: {
     auth: {
       storageKey: "sb-test-auth-token",
@@ -33,7 +39,10 @@ jest.mock("@/lib/supabase/client", () => ({
   },
 }));
 
-const mockRemoveItem = jest.fn((_key: string) => Promise.resolve());
+const mockRemoveItem = jest.fn((key: string) => {
+  mockAuthOrder.push(`remove:${key}`);
+  return Promise.resolve();
+});
 jest.mock("@/lib/supabase/secure-storage", () => ({
   SecureStoreAdapter: { removeItem: (key: string) => mockRemoveItem(key) },
 }));
@@ -98,6 +107,7 @@ beforeEach(() => {
   mockRead.mockReset();
   mockSignOut.mockReset();
   mockSignOut.mockResolvedValue({ error: null });
+  mockAuthOrder.length = 0;
   refreshAthlete = null;
   signOut = null;
   jest.spyOn(console, "warn").mockImplementation(() => {});
@@ -166,8 +176,10 @@ describe("cold-start athlete load", () => {
     await flush();
     expect(mockSignOut).toHaveBeenCalledTimes(1);
     expect(r.getByTestId("redirect").props.children).toBe("/login");
-    // A clean sign-out removed the session itself.
+    // A clean sign-out removed the session itself, and auth-js keeps
+    // managing its own refresh ticker.
     expect(mockRemoveItem).not.toHaveBeenCalled();
+    expect(mockPauseAutoRefresh).not.toHaveBeenCalled();
   });
 
   it("a Sign Out that fails offline still lands on /login and clears the stored session", async () => {
@@ -187,6 +199,14 @@ describe("cold-start athlete load", () => {
       "sb-test-auth-token",
       "sb-test-auth-token-code-verifier",
       "sb-test-auth-token-user",
+    ]);
+    // jits-oz9q: the refresh ticker is stopped BEFORE the session is wiped,
+    // so a tick firing when the network returns cannot write one back.
+    expect(mockAuthOrder).toEqual([
+      "pauseAutoRefresh",
+      "remove:sb-test-auth-token",
+      "remove:sb-test-auth-token-code-verifier",
+      "remove:sb-test-auth-token-user",
     ]);
     // The retry loop stopped with the user gone.
     const reads = mockRead.mock.calls.length;

@@ -55,51 +55,57 @@ export function useLiveControls({ matchId, timer, sync, endedRef, onEnded }: Use
 
   const handlePauseResume = React.useCallback(async () => {
     if (busy || endedRef.current) return;
-    if (timer.paused) {
-      setBusy("resume");
-      const res = await resumeMatch(supabase, matchId);
-      setBusy(null);
-      if (!res.ok && res.error.code === "MATCH_NOT_PAUSED") {
-        // The match is already running (a resume we missed, e.g. the
-        // opponent's broadcast was lost). Take the running state from the
-        // DB rather than leaving this timer paused behind an error toast.
-        const fresh = await getMatchDetails(supabase, matchId);
-        if (fresh && fresh.status === "in_progress" && !fresh.paused_at) {
-          timer.syncFromBroadcast({
-            type: "resumed",
-            totalPausedDuration: fresh.total_paused_duration,
-          });
+    // `busy` is held until EVERYTHING this tap does has settled, including
+    // the recovery re-read below. Clearing it right after the RPC left the
+    // button live during that read, so a second tap could fire a second
+    // pause/resume against a state this device had not caught up to yet
+    // (jits-igku).
+    setBusy(timer.paused ? "resume" : "pause");
+    try {
+      if (timer.paused) {
+        const res = await resumeMatch(supabase, matchId);
+        if (!res.ok && res.error.code === "MATCH_NOT_PAUSED") {
+          // The match is already running (a resume we missed, e.g. the
+          // opponent's broadcast was lost). Take the running state from the
+          // DB rather than leaving this timer paused behind an error toast.
+          const fresh = await getMatchDetails(supabase, matchId);
+          if (fresh && fresh.status === "in_progress" && !fresh.paused_at) {
+            timer.syncFromBroadcast({
+              type: "resumed",
+              totalPausedDuration: fresh.total_paused_duration,
+            });
+            return;
+          }
+        }
+        if (!res.ok) {
+          toast.error({ text1: "Couldn't resume", description: res.error.message });
           return;
         }
-      }
-      if (!res.ok) {
-        toast.error({ text1: "Couldn't resume", description: res.error.message });
-        return;
-      }
-      timer.syncFromBroadcast({ type: "resumed", totalPausedDuration: res.data.total_paused_duration });
-      sync.broadcastTimerResumed(res.data.total_paused_duration);
-    } else {
-      setBusy("pause");
-      const res = await pauseMatch(supabase, matchId);
-      setBusy(null);
-      if (!res.ok && res.error.code === "MATCH_NOT_IN_PROGRESS") {
-        // pause_match maps "already paused" here (as well as a match that is
-        // no longer running). Mirror of the resume recovery above: if the DB
-        // says it is paused, this device missed the opponent's pause, so
-        // apply it through the tracked timer instead of toasting. No
-        // broadcast: the opponent paused it and already knows.
-        const fresh = await getMatchDetails(supabase, matchId);
-        if (fresh && fresh.status === "in_progress" && fresh.paused_at) {
-          timer.syncFromBroadcast({ type: "paused", pausedAt: fresh.paused_at });
+        timer.syncFromBroadcast({ type: "resumed", totalPausedDuration: res.data.total_paused_duration });
+        sync.broadcastTimerResumed(res.data.total_paused_duration);
+      } else {
+        const res = await pauseMatch(supabase, matchId);
+        if (!res.ok && res.error.code === "MATCH_NOT_IN_PROGRESS") {
+          // pause_match maps "already paused" here (as well as a match that is
+          // no longer running). Mirror of the resume recovery above: if the DB
+          // says it is paused, this device missed the opponent's pause, so
+          // apply it through the tracked timer instead of toasting. No
+          // broadcast: the opponent paused it and already knows.
+          const fresh = await getMatchDetails(supabase, matchId);
+          if (fresh && fresh.status === "in_progress" && fresh.paused_at) {
+            timer.syncFromBroadcast({ type: "paused", pausedAt: fresh.paused_at });
+            return;
+          }
+        }
+        if (!res.ok) {
+          toast.error({ text1: "Couldn't pause", description: res.error.message });
           return;
         }
+        timer.syncFromBroadcast({ type: "paused", pausedAt: res.data.paused_at });
+        sync.broadcastTimerPaused(res.data.paused_at);
       }
-      if (!res.ok) {
-        toast.error({ text1: "Couldn't pause", description: res.error.message });
-        return;
-      }
-      timer.syncFromBroadcast({ type: "paused", pausedAt: res.data.paused_at });
-      sync.broadcastTimerPaused(res.data.paused_at);
+    } finally {
+      setBusy(null);
     }
   }, [busy, endedRef, matchId, sync, timer]);
 

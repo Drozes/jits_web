@@ -1,11 +1,12 @@
 import * as React from "react";
 import { ActivityIndicator, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Audio, ResizeMode, Video } from "expo-av";
+import { ResizeMode, Video } from "expo-av";
 import { AppHeader } from "@/components/layout/app-header";
 import { HarnessMarker } from "@/components/match-detail/harness-marker";
 import { VideoStatePanel } from "@/components/match-detail/video-state-panel";
 import { useVideoPlayback } from "@/lib/match-detail/use-video-playback";
+import { usePlaysInSilentMode } from "@/lib/match-detail/silent-mode";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 
 /**
@@ -31,15 +32,9 @@ export default function MatchVideoScreen() {
   const { phase, source, stateLabel, videoRef, retry, onPlayerError, onPlayerStatus } =
     useVideoPlayback(id);
 
-  // iOS routes audio through the ringer switch by default, so with the
-  // silent switch on a match video played with no sound at all. Play
-  // through it while this screen is up, then hand the session back.
-  React.useEffect(() => {
-    void Audio.setAudioModeAsync({ playsInSilentModeIOS: true }).catch(() => undefined);
-    return () => {
-      void Audio.setAudioModeAsync({ playsInSilentModeIOS: false }).catch(() => undefined);
-    };
-  }, []);
+  // Play through the iOS silent switch while this screen is up. Ref-counted,
+  // so a second player stacked on top cannot switch it off for this one.
+  usePlaysInSilentMode();
 
   const goBack = React.useCallback(() => {
     if (router.canGoBack()) router.back();

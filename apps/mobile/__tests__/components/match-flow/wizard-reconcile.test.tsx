@@ -91,7 +91,9 @@ jest.mock("@/components/ui/elo-system", () => {
 jest.mock("@/lib/error-tracking/sentry", () => ({ captureException: jest.fn() }));
 const mockKeepAwake = jest.fn();
 jest.mock("@/lib/match-flow/use-keep-awake", () => ({
-  useMatchKeepAwake: (active: boolean) => mockKeepAwake(active),
+  MATCH_LIVE_KEEP_AWAKE_TAG: "match-live",
+  MATCH_UPLOAD_KEEP_AWAKE_TAG: "match-upload",
+  useMatchKeepAwake: (active: boolean, tag = "match-live") => mockKeepAwake(active, tag),
 }));
 jest.mock("@/lib/match-flow/use-haptics", () => ({
   matchHaptics: {
@@ -183,6 +185,7 @@ function handlerOf(name: string) {
 
 import { MatchFlowWizard } from "@/components/match-flow/match-flow-wizard";
 import { toast } from "@/components/ui/toast";
+import { resetMatchUploadStore, setMatchUpload } from "@/lib/video/match-upload-store";
 
 // ---- fixtures ----
 
@@ -604,7 +607,8 @@ describe("a realtime matches UPDATE never skips confirmation", () => {
 });
 
 describe("screen wake-lock spans the camera steps", () => {
-  const lastKeepAwake = () => mockKeepAwake.mock.calls.at(-1)?.[0];
+  const lastKeepAwake = (tag = "match-live") =>
+    mockKeepAwake.mock.calls.filter((c) => c[1] === tag).at(-1)?.[0];
 
   it("is off on weight and ON through the ready check", async () => {
     const screen = await mountAt("pending");
@@ -630,5 +634,29 @@ describe("screen wake-lock spans the camera steps", () => {
     await tick(800);
     screen.getByTestId("match-step-result");
     expect(lastKeepAwake()).toBe(false);
+  });
+
+  it("holds a separate upload lock while this match's video uploads, and drops it on settle", async () => {
+    resetMatchUploadStore();
+    const screen = await mountAt("in_progress");
+    act(() => handlerOf("onMatchEnded")());
+    await tick(800);
+    screen.getByTestId("match-step-result");
+    expect(lastKeepAwake("match-upload")).toBe(false);
+
+    act(() => {
+      setMatchUpload("M1", { status: "uploading", progress: 0.2 });
+    });
+    expect(lastKeepAwake("match-upload")).toBe(true);
+    // The live lock stays released: the two tags are independent holders.
+    expect(lastKeepAwake()).toBe(false);
+
+    // Another match's upload does not keep this screen on.
+    act(() => {
+      setMatchUpload("M1", { status: "uploaded", videoId: "v1", progress: 1 });
+      setMatchUpload("OTHER", { status: "uploading" });
+    });
+    expect(lastKeepAwake("match-upload")).toBe(false);
+    resetMatchUploadStore();
   });
 });

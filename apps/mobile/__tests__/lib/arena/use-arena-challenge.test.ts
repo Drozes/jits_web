@@ -134,6 +134,17 @@ jest.mock("@/components/ui/toast", () => ({
   },
 }));
 
+const mockHapticError = jest.fn(() => Promise.resolve());
+jest.mock("@/lib/match-flow/use-haptics", () => ({
+  matchHaptics: {
+    error: () => mockHapticError(),
+    resultRecorded: () => Promise.resolve(),
+    matchStart: () => Promise.resolve(),
+    matchEnd: () => Promise.resolve(),
+    timeWarning: () => Promise.resolve(),
+  },
+}));
+
 import { useArenaChallenge } from "@/lib/arena/use-arena-challenge";
 
 // ---- fixtures ----
@@ -409,6 +420,8 @@ describe("sending a challenge", () => {
 
     expect(result.current.outgoing).not.toBeNull();
     expect(mockToastError).toHaveBeenCalled();
+    // Only Accept / Decline answers carry the haptic.
+    expect(mockHapticError).not.toHaveBeenCalled();
   });
 });
 
@@ -617,6 +630,8 @@ describe("accepting", () => {
     expect(mockToastError).toHaveBeenCalledWith(
       "That challenge is no longer available.",
     );
+    // jits-23o8: a failed Accept is felt, not only read.
+    expect(mockHapticError).toHaveBeenCalledTimes(1);
     expect(result.current.incoming).toBeNull();
     expect(mockPush).not.toHaveBeenCalled();
   });
@@ -649,6 +664,7 @@ describe("declining", () => {
     expect(mockDeclineChallenge).toHaveBeenCalledWith(expect.anything(), CHALLENGE);
     expect(mockCalls).toEqual(["send:declined"]);
     expect(result.current.incoming).toBeNull();
+    expect(mockHapticError).not.toHaveBeenCalled();
   });
 
   it("keeps the prompt up when the decline write failed", async () => {
@@ -667,6 +683,8 @@ describe("declining", () => {
 
     expect(result.current.incoming).not.toBeNull();
     expect(mockToastError).toHaveBeenCalled();
+    // jits-23o8: the failure toast carries the error haptic.
+    expect(mockHapticError).toHaveBeenCalledTimes(1);
   });
 });
 

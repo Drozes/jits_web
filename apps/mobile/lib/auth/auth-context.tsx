@@ -8,7 +8,7 @@ import {
 } from "@jits/shared/api/queries";
 import { backoffDelayMs } from "@jits/shared/utils";
 import { env } from "../env";
-import { supabase } from "../supabase/client";
+import { pauseAuthAutoRefresh, supabase } from "../supabase/client";
 import { SecureStoreAdapter } from "../supabase/secure-storage";
 import { setCachedElo } from "../splash/elo-cache";
 import { needsAthleteLoad } from "./athlete-load";
@@ -309,6 +309,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // user would silently be signed back in on the next launch. Drop the
       // persisted session ourselves; the server-side token just expires.
       console.warn("[auth] signOut failed, clearing the local session", signOutError);
+      // Stop the refresh ticker FIRST (jits-oz9q). Otherwise a tick that
+      // fires once the network returns refreshes with the still-stored
+      // refresh token and persists a new session over the one cleared
+      // below, signing the user back in. Restarted by the client on the next
+      // SIGNED_IN or foreground (see pauseAuthAutoRefresh).
+      await pauseAuthAutoRefresh();
       await clearPersistedSession();
     }
     // onAuthStateChange normally nulls these; clear eagerly (and always, since

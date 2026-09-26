@@ -134,6 +134,24 @@ describe("MatchVideoScreen", () => {
     expect(mockSetAudioMode).toHaveBeenLastCalledWith({ playsInSilentModeIOS: false });
   });
 
+  it("keeps the silent-switch override while a second stacked player is still open", async () => {
+    queries().getMatchVideoPlaybackResult.mockResolvedValue(
+      playable("https://signed.example/v.mp4"),
+    );
+
+    const under = render(React.createElement(MatchVideoScreen));
+    const top = render(React.createElement(MatchVideoScreen));
+    await waitFor(() => expect(top.getAllByTestId("video-player").length).toBeGreaterThan(0));
+    mockSetAudioMode.mockClear();
+
+    top.unmount();
+    expect(mockSetAudioMode).not.toHaveBeenCalled();
+
+    under.unmount();
+    expect(mockSetAudioMode).toHaveBeenCalledTimes(1);
+    expect(mockSetAudioMode).toHaveBeenLastCalledWith({ playsInSilentModeIOS: false });
+  });
+
   it("plays the signed URL and reports loaded once the player has it", async () => {
     queries().getMatchVideoPlaybackResult.mockResolvedValue(
       playable("https://signed.example/v.mp4"),

@@ -7,6 +7,7 @@ import type { BroadcastResult } from "@jits/shared/hooks/use-session-match-sync"
 import { planReconcile, resultFromOutcome } from "./reconcile";
 import { getCurrentStep, MATCH_STEPS, type MatchStep } from "./step-router";
 import { useMatchReconciler, type ReconcileSnapshot } from "./use-match-reconciler";
+import type { SnapshotListener } from "./match-sync-context";
 
 interface UseWizardSyncParams {
   matchId: string;
@@ -90,8 +91,8 @@ export function useWizardSync({
     exitingRef.current = true;
   }, []);
 
-  const snapshotListenersRef = React.useRef(new Set<(m: MatchDetails) => void>());
-  const subscribeSnapshot = React.useCallback((listener: (m: MatchDetails) => void) => {
+  const snapshotListenersRef = React.useRef(new Set<SnapshotListener>());
+  const subscribeSnapshot = React.useCallback((listener: SnapshotListener) => {
     const listeners = snapshotListenersRef.current;
     listeners.add(listener);
     return () => {
@@ -100,13 +101,13 @@ export function useWizardSync({
   }, []);
 
   const onSnapshot = React.useCallback(
-    ({ match: fresh, confirmedAthleteIds: ids }: ReconcileSnapshot) => {
+    ({ match: fresh, confirmedAthleteIds: ids, sentAt }: ReconcileSnapshot) => {
       applyMatch(fresh);
       if (ids) setConfirmedAthleteIds(ids);
       // Every snapshot, even one identical to the last (applyMatch keeps the
       // old object then, so no prop changes): the live step's pause re-sync
       // must be able to re-apply a read it deferred as possibly stale.
-      for (const listener of snapshotListenersRef.current) listener(fresh);
+      for (const listener of snapshotListenersRef.current) listener(fresh, { sentAt });
       const current = stepRef.current;
       const me = fresh.participants.find((p) => p.athlete_id === currentAthleteId);
       const opponent = fresh.participants.find((p) => p.athlete_id !== currentAthleteId);

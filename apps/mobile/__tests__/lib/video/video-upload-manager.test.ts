@@ -404,11 +404,9 @@ describe("a failed match_videos write never destroys the uploaded bytes", () => 
 
   it.each([
     ["rate_limited", "Daily video limit reached. It will upload automatically later."],
-    ["disabled", "Video uploads are turned off right now. The recording is saved on this device."],
-    [
-      "not_in_cohort",
-      "Video uploads are not enabled for your account yet. The recording is saved on this device.",
-    ],
+    ["disabled", "Video uploads are turned off right now."],
+    ["not_in_cohort", "Video uploads are not enabled for your account yet."],
+    ["reslice_limit", "This match video has been replaced too many times."],
   ])("parks on the FIRST %s gate instead of spending the row budget", async (gate, copy) => {
     mockWriteMatchVideoRow.mockRejectedValue(Object.assign(new Error(copy), { gate }));
 

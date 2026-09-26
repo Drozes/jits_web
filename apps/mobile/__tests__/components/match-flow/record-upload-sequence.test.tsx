@@ -184,9 +184,13 @@ jest.mock("@/lib/match-flow/use-keep-awake", () => ({ useMatchKeepAwake: () => {
 
 jest.mock("@/lib/match-flow/use-haptics", () => ({
   matchHaptics: {
+    // The full vocabulary, so a step that fires resultRecorded or error in
+    // this sequence cannot throw "is not a function" inside a handler.
     matchStart: () => Promise.resolve(),
     matchEnd: () => Promise.resolve(),
     timeWarning: () => Promise.resolve(),
+    resultRecorded: () => Promise.resolve(),
+    error: () => Promise.resolve(),
   },
 }));
 

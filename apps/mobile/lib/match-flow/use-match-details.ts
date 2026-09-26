@@ -22,6 +22,15 @@ interface UseMatchDetailsResult {
 }
 
 /**
+ * Delay before the ONE automatic retry of a failed re-fetch. The confirm
+ * step's refresh() is what brings in the post-ELO ratings for the summary;
+ * when it hit a dead zone the summary kept the pre-ELO snapshot until the
+ * next foreground. Long enough for a blip to clear, short enough that the
+ * athlete is still looking at the summary.
+ */
+export const REFETCH_RETRY_DELAY_MS = 3_000;
+
+/**
  * Keep the newer of two reads of the same match. Two fetch paths write here
  * (this hook's own load/refresh and the reconciler) and their responses can
  * land out of order, so an older status never replaces a newer one.
@@ -52,6 +61,9 @@ export function useMatchDetails(matchId: string): UseMatchDetailsResult {
   React.useEffect(() => {
     matchRef.current = match;
   }, [match]);
+  // True while the fetch about to run IS the automatic retry, so a retry
+  // that also fails does not schedule another (one retry, never a loop).
+  const retryingRef = React.useRef(false);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -66,6 +78,19 @@ export function useMatchDetails(matchId: string): UseMatchDetailsResult {
     // step's refresh() hit a dead zone. Keep what we have; the reconciler
     // and the next refresh() get another go.
     const revalidating = matchRef.current?.id === matchId;
+    const isRetry = retryingRef.current;
+    retryingRef.current = false;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    // A failed re-fetch keeps the match in hand (above) and gets exactly one
+    // delayed retry. A manual refresh() or a matchId change in the meantime
+    // runs this effect's cleanup, which cancels the pending retry.
+    const scheduleRetry = () => {
+      if (isRetry) return;
+      retryTimer = setTimeout(() => {
+        retryingRef.current = true;
+        setTick((n) => n + 1);
+      }, REFETCH_RETRY_DELAY_MS);
+    };
 
     (async () => {
       try {
@@ -77,6 +102,7 @@ export function useMatchDetails(matchId: string): UseMatchDetailsResult {
         if (!matchResult) {
           if (revalidating) {
             console.warn("[match-flow] re-fetch returned no match; keeping the loaded one");
+            scheduleRetry();
             return;
           }
           setError("Match not found");
@@ -90,6 +116,7 @@ export function useMatchDetails(matchId: string): UseMatchDetailsResult {
         if (cancelled) return;
         if (revalidating) {
           console.warn("[match-flow] re-fetch failed; keeping the loaded match", err);
+          scheduleRetry();
           return;
         }
         console.error("[match-flow] fetch failed", err);
@@ -101,6 +128,7 @@ export function useMatchDetails(matchId: string): UseMatchDetailsResult {
 
     return () => {
       cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
     };
   }, [matchId, tick]);
 

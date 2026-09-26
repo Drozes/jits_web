@@ -8,8 +8,10 @@
  * re-paused (or a paused one restarted) until the next poll.
  *
  * And the stuck case it must never cause: an equal-total disagreement is
- * held back only within PAUSE_STALE_WINDOW_MS, and every snapshot (even an
- * identical one) is re-evaluated, so a genuine state lands on the next poll.
+ * held back only when the read was ISSUED at or before the last change
+ * applied here (jits-igku: keyed on send time, not arrival), and every
+ * snapshot (even an identical one) is re-evaluated, so a genuine state lands
+ * on the next poll.
  */
 import * as React from "react";
 import { act, renderHook } from "@testing-library/react-native";
@@ -19,20 +21,22 @@ jest.mock("@/lib/supabase/client", () => ({ supabase: {} }));
 import {
   isSamePauseState,
   isStalePauseRead,
-  PAUSE_STALE_WINDOW_MS,
   usePauseResync,
   type KnownPauseState,
 } from "@/lib/match-flow/use-pause-resync";
-import { MatchSyncProvider } from "@/lib/match-flow/match-sync-context";
+import { MatchSyncProvider, type SnapshotListener } from "@/lib/match-flow/match-sync-context";
 import type { MatchDetails } from "@jits/shared/api/queries";
 
 const P1 = "2026-09-25T12:01:00.000Z";
 // The same instant as the row formats it (the RPC and the row may differ).
 const P1_ROW = "2026-09-25T12:01:00+00:00";
 const P2 = "2026-09-25T12:03:00.000Z";
-const NOW = 1_000_000;
-const IN = NOW - 1_000; // a change 1 s ago: inside the window
-const OUT = NOW - PAUSE_STALE_WINDOW_MS - 1; // just outside it
+/** When the last pause/resume was applied on this device. */
+const CHANGE = 1_000_000;
+/** A read issued before that change (it may carry the old state). */
+const SENT_BEFORE = CHANGE - 1_000;
+/** A read issued after it (it already reflects the change). */
+const SENT_AFTER = CHANGE + 1;
 
 function known(
   pausedAt: string | null,
@@ -51,34 +55,46 @@ const db = (pausedAt: string | null, total: number) => ({ pausedAt, totalPausedD
 
 describe("isStalePauseRead", () => {
   it("a smaller total always predates a resume already applied", () => {
-    expect(isStalePauseRead(known(null, 12, OUT, [P1]), db(P1_ROW, 0), NOW)).toBe(true);
-    expect(isStalePauseRead(known(P2, 12, OUT, [P1]), db(null, 0), NOW)).toBe(true);
+    expect(isStalePauseRead(known(null, 12, CHANGE, [P1]), db(P1_ROW, 0), SENT_AFTER)).toBe(true);
+    expect(isStalePauseRead(known(P2, 12, CHANGE, [P1]), db(null, 0), SENT_AFTER)).toBe(true);
   });
 
   it("a larger total is a resume this device missed", () => {
-    expect(isStalePauseRead(known(P1, 0, IN), db(null, 12), NOW)).toBe(false);
-    expect(isStalePauseRead(known(P1, 0, IN), db(P2, 12), NOW)).toBe(false);
+    expect(isStalePauseRead(known(P1, 0, CHANGE), db(null, 12), SENT_BEFORE)).toBe(false);
+    expect(isStalePauseRead(known(P1, 0, CHANGE), db(P2, 12), SENT_BEFORE)).toBe(false);
   });
 
-  it("same total, running read while paused here: stale only inside the window", () => {
-    expect(isStalePauseRead(known(P1, 0, IN), db(null, 0), NOW)).toBe(true);
-    // After the window it may be a real 0 s resume whose broadcast was lost.
-    expect(isStalePauseRead(known(P1, 0, OUT), db(null, 0), NOW)).toBe(false);
+  it("same total, running read while paused here: stale only when issued before the change", () => {
+    expect(isStalePauseRead(known(P1, 0, CHANGE), db(null, 0), SENT_BEFORE)).toBe(true);
+    // Issued after it: a real 0 s resume whose broadcast was lost.
+    expect(isStalePauseRead(known(P1, 0, CHANGE), db(null, 0), SENT_AFTER)).toBe(false);
     // Paused since mount (no change applied here): trusted.
-    expect(isStalePauseRead(known(P1, 0, null), db(null, 0), NOW)).toBe(false);
+    expect(isStalePauseRead(known(P1, 0, null), db(null, 0), SENT_BEFORE)).toBe(false);
   });
 
-  it("same total, paused read of a pause already seen resumed: stale only inside the window", () => {
-    expect(isStalePauseRead(known(null, 0, IN, [P1]), db(P1_ROW, 0), NOW)).toBe(true);
-    expect(isStalePauseRead(known(null, 0, OUT, [P1]), db(P1_ROW, 0), NOW)).toBe(false);
+  it("same total, paused read of a pause already seen resumed: stale only when issued before", () => {
+    expect(isStalePauseRead(known(null, 0, CHANGE, [P1]), db(P1_ROW, 0), SENT_BEFORE)).toBe(true);
+    expect(isStalePauseRead(known(null, 0, CHANGE, [P1]), db(P1_ROW, 0), SENT_AFTER)).toBe(false);
+  });
+
+  it("a read issued in the same millisecond as the change is held back (costs one poll)", () => {
+    expect(isStalePauseRead(known(P1, 0, CHANGE), db(null, 0), CHANGE)).toBe(true);
+  });
+
+  it("a slow read issued before the change is stale however late it lands (jits-igku)", () => {
+    // Under the old arrival-time window, a read landing 3 s+ after the change
+    // was applied and flapped the timer. Arrival time is not an input now.
+    expect(isStalePauseRead(known(P1, 0, CHANGE), db(null, 0), CHANGE - 1)).toBe(true);
   });
 
   it("same total, a new pause this device missed is applied at once", () => {
-    expect(isStalePauseRead(known(null, 0, IN, [P1]), db(P2, 0), NOW)).toBe(false);
+    expect(isStalePauseRead(known(null, 0, CHANGE, [P1]), db(P2, 0), SENT_BEFORE)).toBe(false);
   });
 
   it("an unparseable paused_at never matches a recorded resume", () => {
-    expect(isStalePauseRead(known(null, 0, IN, [P1]), db("not-a-date", 0), NOW)).toBe(false);
+    expect(isStalePauseRead(known(null, 0, CHANGE, [P1]), db("not-a-date", 0), SENT_BEFORE)).toBe(
+      false,
+    );
   });
 });
 
@@ -96,21 +112,21 @@ describe("isSamePauseState", () => {
 });
 
 describe("usePauseResync", () => {
-  let now = NOW;
+  let now = CHANGE;
   beforeEach(() => {
-    now = NOW;
+    now = CHANGE;
     jest.spyOn(Date, "now").mockImplementation(() => now);
   });
   afterEach(() => jest.restoreAllMocks());
 
   function setup(initial: { pausedAt: string | null; total: number }) {
     const inner = jest.fn();
-    let listener: ((m: MatchDetails) => void) | null = null;
+    let listener: SnapshotListener | null = null;
     const ctx = {
       onChannelStatus: jest.fn(),
       reconcileNow: jest.fn(),
       markExiting: jest.fn(),
-      subscribeSnapshot: (l: (m: MatchDetails) => void) => {
+      subscribeSnapshot: (l: SnapshotListener) => {
         listener = l;
         return () => {
           listener = null;
@@ -132,13 +148,21 @@ describe("usePauseResync", () => {
     const hook = renderHook(() => usePauseResync(baseTimer, initial.pausedAt, initial.total), {
       wrapper,
     });
-    const snapshot = (pausedAt: string | null, total: number, status = "in_progress") =>
+    /** A read that lands now. `sentAt` defaults to "issued just now". */
+    const snapshot = (
+      pausedAt: string | null,
+      total: number,
+      opts: { status?: string; sentAt?: number } = {},
+    ) =>
       act(() =>
-        listener?.({
-          status,
-          paused_at: pausedAt,
-          total_paused_duration: total,
-        } as MatchDetails),
+        listener?.(
+          {
+            status: opts.status ?? "in_progress",
+            paused_at: pausedAt,
+            total_paused_duration: total,
+          } as MatchDetails,
+          { sentAt: opts.sentAt ?? now },
+        ),
       );
     return { inner, hook, snapshot };
   }
@@ -153,20 +177,32 @@ describe("usePauseResync", () => {
     const { inner, hook, snapshot } = setup({ pausedAt: null, total: 0 });
     act(() => hook.result.current.syncFromBroadcast({ type: "paused", pausedAt: P1 }));
     now += 5_000;
+    const sentWhilePaused = now - 100;
     act(() => hook.result.current.syncFromBroadcast({ type: "resumed", totalPausedDuration: 0 }));
     inner.mockClear();
 
-    now += 300; // the straddling read lands inside the window
-    snapshot(P1_ROW, 0);
+    now += 300; // the straddling read lands
+    snapshot(P1_ROW, 0, { sentAt: sentWhilePaused });
     expect(inner).not.toHaveBeenCalled();
   });
 
   it("the race the other way: a running read landing just after a pause is ignored", () => {
     const { inner, hook, snapshot } = setup({ pausedAt: null, total: 0 });
+    const sentWhileRunning = now - 100;
     act(() => hook.result.current.syncFromBroadcast({ type: "paused", pausedAt: P1 }));
     inner.mockClear();
     now += 300;
-    snapshot(null, 0);
+    snapshot(null, 0, { sentAt: sentWhileRunning });
+    expect(inner).not.toHaveBeenCalled();
+  });
+
+  it("a SLOW straddling read is still ignored, however long after the change it lands (jits-igku)", () => {
+    const { inner, hook, snapshot } = setup({ pausedAt: null, total: 0 });
+    const sentWhileRunning = now - 100;
+    act(() => hook.result.current.syncFromBroadcast({ type: "paused", pausedAt: P1 }));
+    inner.mockClear();
+    now += 8_000; // poor cellular: lands 8 s later, past the old 3 s window
+    snapshot(null, 0, { sentAt: sentWhileRunning });
     expect(inner).not.toHaveBeenCalled();
   });
 
@@ -177,22 +213,26 @@ describe("usePauseResync", () => {
     act(() => hook.result.current.syncFromBroadcast({ type: "paused", pausedAt: P1 }));
     inner.mockClear();
 
-    now += 1_000; // a poll inside the window: held back
-    snapshot(null, 0);
+    // A poll that was already in flight when the pause arrived: held back.
+    now += 1_000;
+    snapshot(null, 0, { sentAt: now - 1_500 });
     expect(inner).not.toHaveBeenCalled();
 
-    now += 10_000; // the next poll, an identical read, after the window
+    // The next poll, an identical read, issued after the change: applied,
+    // even though it lands well inside what used to be the 3 s window.
+    now += 200;
     snapshot(null, 0);
     expect(inner).toHaveBeenCalledWith({ type: "resumed", totalPausedDuration: 0 });
   });
 
   it("a later genuine state is applied even when the stale one was never seen as a change", () => {
     const { inner, hook, snapshot } = setup({ pausedAt: null, total: 0 });
+    const sentWhilePaused = now;
     act(() => hook.result.current.syncFromBroadcast({ type: "paused", pausedAt: P1 }));
     act(() => hook.result.current.syncFromBroadcast({ type: "resumed", totalPausedDuration: 0 }));
     inner.mockClear();
     now += 300;
-    snapshot(P1_ROW, 0); // straddling read, ignored
+    snapshot(P1_ROW, 0, { sentAt: sentWhilePaused }); // straddling read, ignored
     now += 10_000;
     snapshot(null, 0); // matches the state in hand: nothing to do
     expect(inner).not.toHaveBeenCalled();
@@ -209,7 +249,7 @@ describe("usePauseResync", () => {
 
   it("ignores snapshots once the match is no longer in progress", () => {
     const { inner, snapshot } = setup({ pausedAt: null, total: 0 });
-    snapshot(P1_ROW, 0, "completed");
+    snapshot(P1_ROW, 0, { status: "completed" });
     expect(inner).not.toHaveBeenCalled();
   });
 

@@ -4,7 +4,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useMatchDetails } from "@/lib/match-flow/use-match-details";
 import { MATCH_STEPS, type MatchStep } from "@/lib/match-flow/step-router";
 import { useWizardSync } from "@/lib/match-flow/use-wizard-sync";
-import { useMatchKeepAwake } from "@/lib/match-flow/use-keep-awake";
+import { MATCH_UPLOAD_KEEP_AWAKE_TAG, useMatchKeepAwake } from "@/lib/match-flow/use-keep-awake";
+import { useMatchUpload } from "@/lib/video/match-upload-store";
 import { MatchSyncProvider } from "@/lib/match-flow/match-sync-context";
 import type { BroadcastResult } from "@jits/shared/hooks/use-session-match-sync";
 import { WizardError, WizardLoading } from "./wizard-status";
@@ -127,6 +128,14 @@ export function MatchFlowWizard({
   // per step: two holders of the one lock tag would release it for each
   // other on the ready -> live handoff.
   useMatchKeepAwake(step === "ready" || step === "live");
+
+  // A second, separately tagged lock for as long as this match's video is
+  // uploading. The upload starts as the live step ends, i.e. exactly when the
+  // lock above lets go, and the athlete then sits on result / confirm while
+  // hundreds of MB go up. Auto-lock there suspended the transfer until the
+  // next foreground. Released when the upload settles or the screen unmounts.
+  const upload = useMatchUpload(matchId);
+  useMatchKeepAwake(upload?.status === "uploading", MATCH_UPLOAD_KEEP_AWAKE_TAG);
 
   const advanceToResult = React.useCallback(() => setStep("result"), [setStep]);
 
