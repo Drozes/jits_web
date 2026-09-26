@@ -107,7 +107,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   m.acceptChallenge.mockResolvedValue({ ok: true, data: null });
   m.declineChallenge.mockResolvedValue({ ok: true, data: null });
-  m.cancelChallenge.mockResolvedValue({ ok: true, data: null });
+  m.cancelChallenge.mockResolvedValue({ ok: true, data: { cancelled: true } });
   m.createChallenge.mockResolvedValue({ ok: true, data: { id: "out1" } });
   m.startMatchFromChallenge.mockResolvedValue({ ok: true, data: { match_id: "m1" } });
   m.cancelStaleOutgoingChallenges.mockResolvedValue({ ok: true, data: { cancelled: [] } });
@@ -240,6 +240,50 @@ describe("useArenaChallenge", () => {
     expect(m.cancelChallenge).toHaveBeenCalled();
     expect(result.current.outgoing).toBeNull();
     expect(live("arena-challenge:out1")).toHaveLength(0);
+  });
+
+  describe("cancelling a challenge that is already over (0 rows changed)", () => {
+    beforeEach(() => {
+      m.cancelChallenge.mockResolvedValue({ ok: true, data: { cancelled: false } });
+    });
+
+    it("joins the match the opponent already started, without broadcasting cancelled", async () => {
+      const { result } = mount(true);
+      await act(() => result.current.sendChallenge("ana", "Ana"));
+      m.startMatchFromChallenge.mockResolvedValue({ ok: true, data: { match_id: "m7" } });
+      await act(() => result.current.cancelOutgoing());
+      expect(m.startMatchFromChallenge).toHaveBeenCalledWith(expect.anything(), "out1");
+      expect(push).toHaveBeenCalledWith("/arena/match/m7");
+      expect(rt.channels.flatMap((c) => c.sent)).toEqual([]);
+      expect(result.current.outgoing).toBeNull();
+    });
+
+    it("just drops the bar when there is no match to join", async () => {
+      const { result } = mount(true);
+      await act(() => result.current.sendChallenge("ana", "Ana"));
+      m.startMatchFromChallenge.mockResolvedValue({
+        ok: false,
+        error: { code: "CHALLENGE_NOT_ACCEPTED", message: "x" },
+      });
+      await act(() => result.current.cancelOutgoing());
+      expect(push).not.toHaveBeenCalled();
+      expect(rt.channels.flatMap((c) => c.sent)).toEqual([]);
+      expect(result.current.outgoing).toBeNull();
+      expect(toast.error).not.toHaveBeenCalled();
+    });
+
+    it("accepting another challenge does not broadcast a cancel for an already-over one", async () => {
+      const { result } = mount(true);
+      await act(() => result.current.sendChallenge("bo", "Bo"));
+      await insertChallenge("c1");
+      await act(() => result.current.accept());
+      expect(push).toHaveBeenCalledWith("/arena/match/m1");
+      expect(m.cancelChallenge).toHaveBeenCalledWith(expect.anything(), "out1");
+      const sent = rt.channels
+        .filter((c) => c.topic === "arena-challenge:out1")
+        .flatMap((c) => c.sent);
+      expect(sent).toEqual([]);
+    });
   });
 
   describe("outgoing resolved by the challenger-side UPDATE (no broadcast)", () => {
