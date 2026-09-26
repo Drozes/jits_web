@@ -394,6 +394,51 @@ describe("a failed match_videos write never destroys the uploaded bytes", () => 
     expect(getMatchUpload("M1")?.error).toMatch(/retry automatically/);
   });
 
+  it("does not frame the row failure twice", async () => {
+    mockWriteMatchVideoRow.mockRejectedValue(new Error("permission denied"));
+    await startMatchVideoUpload(START);
+    const message = getMatchUpload("M1")?.error ?? "";
+    expect(message.match(/saving the record failed/gi)).toHaveLength(1);
+    expect(message).toMatch(/permission denied/);
+  });
+
+  it.each([
+    ["rate_limited", "Daily video limit reached. It will upload automatically later."],
+    ["disabled", "Video uploads are turned off right now. The recording is saved on this device."],
+    [
+      "not_in_cohort",
+      "Video uploads are not enabled for your account yet. The recording is saved on this device.",
+    ],
+  ])("parks on the FIRST %s gate instead of spending the row budget", async (gate, copy) => {
+    mockWriteMatchVideoRow.mockRejectedValue(Object.assign(new Error(copy), { gate }));
+
+    const outcome = await startMatchVideoUpload(START);
+
+    // One try, not ROW_MAX_ATTEMPTS: a server gate does not lift inside a
+    // backoff window.
+    expect(mockWriteMatchVideoRow).toHaveBeenCalledTimes(1);
+    expect(outcome).toEqual({ ok: false, error: copy, willRetryLater: true });
+    expect(mockRemoveUploadedObject).not.toHaveBeenCalled();
+    expect(await loadUploadJob("M1")).toMatchObject({ phase: "row" });
+    // The gate's copy is final: not wrapped in the generic row-failure text.
+    expect(getMatchUpload("M1")).toMatchObject({ status: "error", error: copy });
+  });
+
+  it("retries a gated row on the next resume and lands it", async () => {
+    mockWriteMatchVideoRow.mockRejectedValueOnce(
+      Object.assign(new Error("Daily video limit reached."), { gate: "rate_limited" }),
+    );
+    await startMatchVideoUpload(START);
+    expect(mockWriteMatchVideoRow).toHaveBeenCalledTimes(1);
+
+    await resumeMatchVideoUploads();
+    await flush();
+
+    expect(mockUploadFileResumable).toHaveBeenCalledTimes(1);
+    expect(mockWriteMatchVideoRow).toHaveBeenCalledTimes(2);
+    expect(getMatchUpload("M1")).toMatchObject({ status: "uploaded", videoId: "VID-1" });
+  });
+
   it("resumes a phase 'row' job without re-uploading a single byte", async () => {
     seedJob({ phase: "row", bytesUploaded: SIZE, uploadUrl: "https://up/abc" });
 

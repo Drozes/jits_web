@@ -1,7 +1,7 @@
 import * as React from "react";
-import { Pressable, Text, View } from "react-native";
+import { Linking, Pressable, Text, View } from "react-native";
 import { CameraView } from "expo-camera";
-import { Camera, CameraOff } from "lucide-react-native";
+import { Camera, CameraOff, Settings } from "lucide-react-native";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { cn } from "@/lib/cn";
 
@@ -66,7 +66,23 @@ export function CameraOverlay({
               Grant Access
             </Text>
           </Pressable>
-        ) : null}
+        ) : (
+          // iOS will not show the prompt again once denied, so the only way
+          // back is Settings. The recorder re-reads the permission when the
+          // app returns to the foreground, so the preview comes back on its
+          // own after the user flips the switch.
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => void Linking.openSettings().catch(() => undefined)}
+            hitSlop={10}
+            className="mt-3 self-start flex-row items-center gap-2 border border-hairline-strong rounded-xs bg-surface-3 px-3 py-2 active:bg-surface-4"
+          >
+            <Settings size={14} color={tokens.textPrimary} />
+            <Text className="font-heading text-[10px] text-ink uppercase tracking-caps">
+              Open Settings
+            </Text>
+          </Pressable>
+        )}
       </View>
     );
   }

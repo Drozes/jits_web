@@ -1,4 +1,5 @@
 import * as React from "react";
+import { AppState } from "react-native";
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from "expo-camera";
 import { buildVideoPath } from "./upload-recording";
 import { startMatchVideoUpload } from "./video-upload-manager";
@@ -178,8 +179,21 @@ export function useVideoRecorder(
   matchDurationSeconds?: number | null,
 ): UseVideoRecorderReturn {
   const cameraRef = React.useRef<CameraView | null>(null);
-  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
-  const [micPermission, requestMicPermission] = useMicrophonePermissions();
+  const [cameraPermission, requestCameraPermission, getCameraPermission] = useCameraPermissions();
+  const [micPermission, requestMicPermission, getMicPermission] = useMicrophonePermissions();
+  // expo's permission hooks read the OS status once, on mount. A user who
+  // denied the camera, granted it in Settings, then came back would still
+  // be shown "camera access denied" (and never record) for the rest of this
+  // wizard. Re-read on every return to the foreground.
+  React.useEffect(() => {
+    const sub = AppState.addEventListener("change", (next) => {
+      if (next !== "active") return;
+      void getCameraPermission?.().catch(() => undefined);
+      void getMicPermission?.().catch(() => undefined);
+    });
+    // Optional: the test renderer's AppState returns no subscription.
+    return () => sub?.remove?.();
+  }, [getCameraPermission, getMicPermission]);
   const [state, setState] = React.useState<RecordingState>("idle");
   const [error, setError] = React.useState<string | null>(null);
   // The upload's OUTCOME is not component state. It is keyed on the match
@@ -318,6 +332,13 @@ export function useVideoRecorder(
       truncation: truncationRef.current,
     });
     if (outcome.ok) transition("uploaded");
+    // A PARKED upload is not a recorder failure. The job is on disk and the
+    // manager resumes it on the next foreground or reconnect, reporting to
+    // the match store, which already carries the "paused" copy. Holding
+    // "error" here outranked that store in the status chip
+    // (upload-banner-state.ts), so a resume that later succeeded still
+    // read as failed for as long as this recorder lived.
+    else if (outcome.willRetryLater) transition("idle");
     else transition("error", outcome.error);
   }, [matchId, uploaderAthleteId, transition]);
 

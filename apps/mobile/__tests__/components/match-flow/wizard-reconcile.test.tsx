@@ -89,7 +89,10 @@ jest.mock("@/components/ui/elo-system", () => {
 });
 
 jest.mock("@/lib/error-tracking/sentry", () => ({ captureException: jest.fn() }));
-jest.mock("@/lib/match-flow/use-keep-awake", () => ({ useMatchKeepAwake: () => {} }));
+const mockKeepAwake = jest.fn();
+jest.mock("@/lib/match-flow/use-keep-awake", () => ({
+  useMatchKeepAwake: (active: boolean) => mockKeepAwake(active),
+}));
 jest.mock("@/lib/match-flow/use-haptics", () => ({
   matchHaptics: {
     matchStart: () => Promise.resolve(),
@@ -597,5 +600,35 @@ describe("a realtime matches UPDATE never skips confirmation", () => {
     await tick(5_000);
     screen.getByTestId("match-step-confirm");
     screen.getByTestId("confirm-result");
+  });
+});
+
+describe("screen wake-lock spans the camera steps", () => {
+  const lastKeepAwake = () => mockKeepAwake.mock.calls.at(-1)?.[0];
+
+  it("is off on weight and ON through the ready check", async () => {
+    const screen = await mountAt("pending");
+    screen.getByTestId("match-step-weight");
+    expect(lastKeepAwake()).toBe(false);
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("weight-confirm"));
+    });
+    await flush();
+    screen.getByTestId("match-step-ready");
+    // The P1: the preview is up and the phone is propped, so auto-lock here
+    // killed the capture session before the match started.
+    expect(lastKeepAwake()).toBe(true);
+  });
+
+  it("holds through live and releases once the match has ended", async () => {
+    const screen = await mountAt("in_progress");
+    screen.getByTestId("match-step-live");
+    expect(lastKeepAwake()).toBe(true);
+
+    act(() => handlerOf("onMatchEnded")());
+    await tick(800);
+    screen.getByTestId("match-step-result");
+    expect(lastKeepAwake()).toBe(false);
   });
 });

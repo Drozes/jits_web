@@ -69,10 +69,11 @@ beforeEach(() => {
 });
 
 describe("ResultStep draw", () => {
-  function renderResult() {
+  function renderResult(matchType: "ranked" | "casual" = "ranked") {
     return render(
       <ResultStep
         matchId="M1"
+        matchType={matchType}
         durationSeconds={300}
         participants={[
           { id: "me-1", displayName: "Me" },
@@ -101,6 +102,14 @@ describe("ResultStep draw", () => {
     expect(icon.props.color).toBe("#F59E0B");
     expect(icon.props.color).not.toBe(TOKENS.stateNegative);
     expect(plateClass(icon)).not.toMatch(/border-l-negative/);
+  });
+
+  it("does not claim a casual draw costs rating", () => {
+    const screen = renderResult("casual");
+    fireEvent.press(screen.getByText("Draw"));
+    screen.getByText("Match ends in a draw");
+    expect(screen.queryByText(/cost both athletes rating/i)).toBeNull();
+    screen.getByText("Casual match: no rating change.");
   });
 
   it("uses the darker amber on light surfaces", () => {

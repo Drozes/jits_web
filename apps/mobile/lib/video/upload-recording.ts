@@ -53,22 +53,70 @@ export function contentTypeFor(ext: string): string {
 }
 
 /**
+ * A server-side gate on `match_videos` INSERT (jr_be triggers, raised as
+ * P0001 with these HINTs). None of them is fixed by retrying seconds later,
+ * so the upload manager parks the job on the first one instead of burning
+ * its row budget, and the next foreground or reconnect tries again:
+ *
+ *   rate_limited   : HINT upload_rate_limited (rolling 24h per-athlete cap)
+ *   disabled       : HINT video_upload_disabled (feature flag off)
+ *   not_in_cohort  : HINT upload_not_in_cohort (uploader not allowlisted)
+ */
+export type MatchVideoGate = "rate_limited" | "disabled" | "not_in_cohort";
+
+const GATE_BY_HINT: Record<string, { gate: MatchVideoGate; message: string }> = {
+  upload_rate_limited: {
+    gate: "rate_limited",
+    message: "Daily video limit reached. It will upload automatically later.",
+  },
+  video_upload_disabled: {
+    gate: "disabled",
+    message: "Video uploads are turned off right now. The recording is saved on this device.",
+  },
+  upload_not_in_cohort: {
+    gate: "not_in_cohort",
+    message:
+      "Video uploads are not enabled for your account yet. The recording is saved on this device.",
+  },
+};
+
+/** The gate behind a `match_videos` write failure, if it was one. */
+export function matchVideoGateFor(
+  hint: string | null | undefined,
+): { gate: MatchVideoGate; message: string } | null {
+  return (hint && GATE_BY_HINT[hint]) || null;
+}
+
+/**
  * The storage write succeeded but the `match_videos` DB write failed.
  * `storageObjectPersisted` tells the caller whether the uploaded object
  * is still in the bucket and therefore needs cleanup if the row can never
  * be written.
+ *
+ * `gate` is set when a server-side upload gate rejected the row; its
+ * `message` is then final user-facing copy and must not be wrapped again.
+ * Otherwise `message` is the raw cause, and the caller supplies the
+ * "Video uploaded, but saving the record failed" framing exactly once.
  */
 export class MatchVideoDbError extends Error {
   /** Object key inside `match-videos` that was written before the DB failure. */
   readonly path: string;
   /** True when the object is still in the bucket. */
   readonly storageObjectPersisted: boolean;
+  /** The server-side gate that rejected the row, or null for any other failure. */
+  readonly gate: MatchVideoGate | null;
 
-  constructor(message: string, path: string, storageObjectPersisted: boolean) {
+  constructor(
+    message: string,
+    path: string,
+    storageObjectPersisted: boolean,
+    gate: MatchVideoGate | null = null,
+  ) {
     super(message);
     this.name = "MatchVideoDbError";
     this.path = path;
     this.storageObjectPersisted = storageObjectPersisted;
+    this.gate = gate;
   }
 }
 
@@ -273,8 +321,8 @@ export interface MatchVideoRowParams {
  * slicer trigger fires. Returns the row id.
  *
  * Throws `MatchVideoDbError` with `storageObjectPersisted: true` on failure:
- * the caller decides whether to retry (it should) or compensate (only when
- * abandoning the job outright).
+ * the caller decides whether to retry (it should, unless `gate` is set) or
+ * compensate (only when abandoning the job outright).
  */
 export async function writeMatchVideoRow({
   matchId,
@@ -291,11 +339,11 @@ export async function writeMatchVideoRow({
     recordedBy: uploaderAthleteId,
   });
   if (!upserted.ok) {
-    throw new MatchVideoDbError(
-      `Video uploaded but saving the record failed: ${upserted.error.message}`,
-      storagePath,
-      true,
-    );
+    const gated = matchVideoGateFor(upserted.error.raw?.hint);
+    if (gated) throw new MatchVideoDbError(gated.message, storagePath, true, gated.gate);
+    // The raw cause only: the upload manager adds the "Video uploaded, but
+    // saving the record failed" framing, and adding it here too doubled it.
+    throw new MatchVideoDbError(upserted.error.message, storagePath, true);
   }
   return upserted.data.id;
 }

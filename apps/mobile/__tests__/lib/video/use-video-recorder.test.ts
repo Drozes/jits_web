@@ -29,15 +29,20 @@ jest.mock("@/lib/video/video-upload-manager", () => ({
   startMatchVideoUpload: (...args: unknown[]) => mockStartUpload(...args),
 }));
 
+const mockGetCameraPermission = jest.fn(async () => ({ granted: true, canAskAgain: true }));
+const mockGetMicPermission = jest.fn(async () => ({ granted: true, canAskAgain: true }));
+
 jest.mock("expo-camera", () => ({
   CameraView: () => null,
   useCameraPermissions: () => [
     { granted: true, canAskAgain: true },
     jest.fn(),
+    mockGetCameraPermission,
   ],
   useMicrophonePermissions: () => [
     { granted: true, canAskAgain: true },
     jest.fn(),
+    mockGetMicPermission,
   ],
 }));
 
@@ -231,6 +236,60 @@ describe("useVideoRecorder", () => {
     await waitFor(() => expect(result.current.state).toBe("error"));
     expect(mockStartUpload).toHaveBeenCalledTimes(1);
     expect(result.current.error).toMatch(/network died/);
+  });
+
+  it("does not hold 'error' for an upload the runner PARKED to resume later", async () => {
+    // The runner keeps the job on disk and resumes it on the next foreground
+    // or reconnect, writing its progress and outcome to the match store. A
+    // recorder stuck in "error" outranked that store in the status chip, so
+    // a resume that later succeeded still read as a failure.
+    mockStartUpload.mockImplementationOnce(async ({ matchId }: { matchId: string }) => {
+      const error = "Upload paused: offline. It will resume automatically.";
+      setMatchUpload(matchId, { status: "error", error });
+      return { ok: false, error, willRetryLater: true };
+    });
+
+    const { result } = renderHook(() => useVideoRecorder("M", "A"));
+    const cam = makeFakeCamera();
+    result.current.cameraRef.current = cam as never;
+    act(() => result.current.markCameraReady());
+
+    let startPromise: Promise<void>;
+    act(() => {
+      startPromise = result.current.start();
+    });
+    await act(async () => {
+      await result.current.stop();
+      await startPromise;
+    });
+
+    await waitFor(() => expect(mockStartUpload).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(result.current.state).toBe("idle"));
+    expect(result.current.error).toBeNull();
+    // The paused copy still reaches the user, through the store.
+    expect(getMatchUpload("M")?.error).toMatch(/resume automatically/);
+  });
+
+  it("re-reads camera and mic permission when the app returns to the foreground", () => {
+    const { AppState } = require("react-native");
+    const listeners: Array<(s: string) => void> = [];
+    const spy = jest
+      .spyOn(AppState, "addEventListener")
+      .mockImplementation((...args: unknown[]) => {
+        listeners.push(args[1] as (s: string) => void);
+        return { remove: jest.fn() } as never;
+      });
+    try {
+      renderHook(() => useVideoRecorder("M", "A"));
+      expect(listeners.length).toBeGreaterThan(0);
+      act(() => listeners.forEach((l) => l("background")));
+      expect(mockGetCameraPermission).not.toHaveBeenCalled();
+      act(() => listeners.forEach((l) => l("active")));
+      expect(mockGetCameraPermission).toHaveBeenCalled();
+      expect(mockGetMicPermission).toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it("passes a truncation through so a resumed upload can still warn", async () => {

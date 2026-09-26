@@ -1,7 +1,7 @@
 import * as React from "react";
 import { ActivityIndicator, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ResizeMode, Video } from "expo-av";
+import { Audio, ResizeMode, Video } from "expo-av";
 import { AppHeader } from "@/components/layout/app-header";
 import { HarnessMarker } from "@/components/match-detail/harness-marker";
 import { VideoStatePanel } from "@/components/match-detail/video-state-panel";
@@ -30,6 +30,16 @@ export default function MatchVideoScreen() {
   const tokens = useThemedTokens();
   const { phase, source, stateLabel, videoRef, retry, onPlayerError, onPlayerStatus } =
     useVideoPlayback(id);
+
+  // iOS routes audio through the ringer switch by default, so with the
+  // silent switch on a match video played with no sound at all. Play
+  // through it while this screen is up, then hand the session back.
+  React.useEffect(() => {
+    void Audio.setAudioModeAsync({ playsInSilentModeIOS: true }).catch(() => undefined);
+    return () => {
+      void Audio.setAudioModeAsync({ playsInSilentModeIOS: false }).catch(() => undefined);
+    };
+  }, []);
 
   const goBack = React.useCallback(() => {
     if (router.canGoBack()) router.back();

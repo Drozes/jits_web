@@ -143,6 +143,7 @@ export function MatchStepRenderer({
     return (
       <ResultStep
         matchId={matchId}
+        matchType={matchType}
         durationSeconds={durationSeconds}
         participants={[
           { id: me.athlete_id, displayName: me.display_name },
