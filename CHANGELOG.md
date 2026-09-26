@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+### Mobile/Web: Arena reliability (jits-1o4l, jits-celf, jits-yiwx, jits-ef2a)
+
+JS-only, OTA-eligible for runtime 0.3.0 (no native dependency, `app.json` or config change). Web ships with it from main.
+
+**Fixed**
+- Mobile: an expired outgoing challenge left the "Waiting for <name>" plate stuck until a relaunch (jits-1o4l). `apps/mobile/lib/arena/use-arena-challenge.ts` now treats every status that cannot become a match (`declined`, `cancelled`, `expired`, anything unknown) as terminal on the challenger side, toasts "Your challenge to <name> expired." for an expiry, and also clears the plate on its own at `expires_at` (timer plus a re-check on every return to the foreground). Cancel on the plate always resolves: a cancel that changed no row (the challenge was already over) clears the plate, or joins the match if the opponent had just started it; an `RLS_VIOLATION`, or a failed cancel of a locally expired challenge, clears it too; only a plain network failure on a live challenge keeps it.
+- Mobile + web: stale pending challenges no longer hold the 3-pending cap for 7 days (jits-celf, frontend mitigation; the backend sweep is a separate bead). The athlete's OWN outgoing pending challenges older than the 10-minute Arena freshness window are withdrawn on bootstrap mount, on going live and on return to the foreground (mobile via `use-pending-challenge-recovery.ts`, web via `apps/web/hooks/use-arena-challenge.ts` on mount, on going live / leaving a match and on tab `visibilitychange`). The challenge on the athlete's own waiting plate is never swept. A `MAX_PENDING_CHALLENGES` insert withdraws stale ones and retries exactly once; if still refused, mobile shows the cap plate (new copy: "Unanswered challenges clear automatically after 10 minutes, so try again shortly.") and web toasts the same explanation. The roster is re-read after a sweep that withdrew something.
+- Mobile live-state nits (jits-yiwx): `use-arena-live.ts` seeds its committed state from `initialRanked`, so a stale `looking_for_ranked = true` is actually cleared on a cold launch straight into a match and on a silent-push background launch (it previously stayed true all match, challengeable from web); a prompt that is up when a match starts by another route (deep link) is dropped instead of held, and recovery re-reads after the match and re-offers it only if still fresh with its challenger in the lobby; recovery marks a challenge offered only once the prompt was really raised (`offerIncoming` now resolves a boolean). Documented: watching the match video from the summary step keeps the athlete offline until they leave the match screen.
+- Mobile a11y (jits-ef2a): the challenge prompt exposed only "Bottom Sheet" to VoiceOver/idb, so Accept/Decline were unreachable. `apps/mobile/components/arena/challenge-prompt-sheet.tsx` sets `accessible={false}` on the `BottomSheetModal` (gorhom made its content container an accessible leaf labelled "Bottom Sheet") and swaps the stock background (an accessible "adjustable" element) for a purely visual one (top corners 8px, the brand modal cap, was gorhom's 15px). The `challenge-prompt` container keeps its testID and is `accessibilityViewIsModal`; "Accept challenge" / "Decline challenge" are individually reachable buttons.
+
+**Added**
+- `@jits/shared/constants`: `ARENA_CHALLENGE_FRESH_MS` (10 minutes); mobile's `PENDING_PROMPT_MAX_AGE_MS` now aliases it.
+- `@jits/shared/api/mutations`: `isStaleOutgoingChallenge()` and `cancelStaleOutgoingChallenges()` (own rows only, pending-guarded so an accept landing in between is never cancelled, skips a `keepChallengeId`). Tests: `packages/shared/src/api/arena-challenges.test.ts`.
+- `apps/mobile/lib/arena/arena-store.ts`: `notifyStaleChallengesCancelled()` (roster refresh after a sweep).
+
+**Changed**
+- `cancelChallenge()` returns `Result<{ cancelled: boolean }>` (whether a row changed) and takes `{ onlyIfPending }`; `createChallenge()` also returns `expiresAt`. Existing callers only read `ok`.
+
 ### Mobile: v0.3.0 TestFlight release
 
 **Changed**

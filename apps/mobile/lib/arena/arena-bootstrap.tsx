@@ -21,6 +21,7 @@ import { useAuth } from "../auth/hooks";
 import {
   IDLE_ARENA_STATE,
   notifyOpponentUnavailable,
+  notifyStaleChallengesCancelled,
   useIsInArenaMatch,
   publishArenaState,
   registerArenaController,
@@ -54,8 +55,11 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
     athleteWeight: athlete.current_weight ?? null,
     inMatch,
     onOpponentUnavailable: notifyOpponentUnavailable,
+    onStaleCancelled: notifyStaleChallengesCancelled,
   });
 
+  // Also withdraws my own stale outgoing challenges (jits-celf) on the same
+  // triggers: mount, going live, foreground. The one on my plate is kept.
   usePendingChallengeRecovery({
     athleteId: athlete.id,
     isLive: live.isLive,
@@ -64,6 +68,8 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
     lobbyIds,
     offerIncoming: challenge.offerIncoming,
     restoreOutgoing: challenge.restoreOutgoing,
+    outgoingChallengeId: challenge.outgoing?.challengeId ?? null,
+    onStaleCancelled: notifyStaleChallengesCancelled,
   });
 
   const { isLive, isSaving } = live;
@@ -93,8 +99,11 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
   }, []);
 
   return (
-    // Never over a match: a prompt still pending when the match starts is
-    // held back and comes back when the athlete leaves the match screen.
+    // Never over a match. A prompt that is up when a match starts by another
+    // route (deep link) is dropped by the challenge hook, not held, and
+    // recovery re-offers it after the match only if it is still fresh and
+    // its challenger is still in the lobby (jits-yiwx). The `inMatch` guard
+    // here covers the render between the match starting and that clear.
     <ChallengePromptSheet
       challenge={inMatch ? null : incoming}
       busy={isBusy}

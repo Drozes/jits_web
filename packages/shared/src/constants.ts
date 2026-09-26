@@ -18,6 +18,19 @@ export const CHALLENGE_STATUS = {
 export type ChallengeStatus =
   (typeof CHALLENGE_STATUS)[keyof typeof CHALLENGE_STATUS];
 
+/**
+ * How old a pending challenge can be and still be a LIVE Arena challenge.
+ *
+ * An Arena challenge promises "accept and you both drop straight into the
+ * match", which is only true while both athletes are still there. The row
+ * itself stays `pending` until `expires_at` (7 days by default), and every
+ * pending row counts toward the 3-pending cap (`can_create_challenge`), so a
+ * challenge older than this window is never offered as a prompt and a
+ * challenger's own stale ones are withdrawn by the client
+ * (`cancelStaleOutgoingChallenges`) instead of locking them out for a week.
+ */
+export const ARENA_CHALLENGE_FRESH_MS = 10 * 60_000;
+
 /** Match outcome for a participant */
 export const MATCH_OUTCOME = {
   WIN: "win",

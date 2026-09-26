@@ -22,11 +22,13 @@
  *    challenger the match exists so both navigate together.
  */
 import * as React from "react";
+import { AppState } from "react-native";
 import { useRouter } from "expo-router";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import {
   acceptChallenge,
   cancelChallenge,
+  cancelStaleOutgoingChallenges,
   createChallenge,
   declineChallenge,
   startMatchFromChallenge,
@@ -47,6 +49,28 @@ export interface OutgoingChallenge {
   challengeId: string;
   opponentId: string;
   opponentName: string;
+  /**
+   * The row's `expires_at`, when known. The challenger clears the waiting
+   * plate on its own once this passes, so a sweep whose realtime UPDATE never
+   * arrived (socket down, app suspended) cannot leave the plate up forever.
+   */
+  expiresAt?: string | null;
+}
+
+/**
+ * Statuses in which my outgoing challenge can still turn into a match.
+ * Anything else (`declined`, `cancelled`, `expired`, or a value added later)
+ * is terminal for the waiting plate: nobody can accept it any more.
+ */
+const LIVE_CHALLENGE_STATUSES = new Set(["pending", "accepted", "started"]);
+
+/** setTimeout's ceiling (2^31 - 1 ms, about 24.8 days); longer overflows to 0. */
+const MAX_TIMER_MS = 2_147_483_647;
+
+function hasExpired(expiresAt: string | null | undefined, now: number): boolean {
+  if (!expiresAt) return false;
+  const at = Date.parse(expiresAt);
+  return !Number.isNaN(at) && at <= now;
 }
 
 interface ChallengeRow {
@@ -68,6 +92,11 @@ export interface UseArenaChallengeArgs {
    * so this is how the stale row gets corrected.
    */
   onOpponentUnavailable?: (opponentId: string) => void;
+  /**
+   * Called after stale outgoing challenges were withdrawn to free the cap, so
+   * the roster's "Pending" rows (read at load) can be re-read.
+   */
+  onStaleCancelled?: () => void;
 }
 
 export interface UseArenaChallengeResult {
@@ -89,8 +118,10 @@ export interface UseArenaChallengeResult {
    * Raise the prompt for a challenge found by a read rather than by the
    * realtime INSERT (`use-pending-challenge-recovery.ts`). A no-op while a
    * prompt is already up, or for a challenge this instance already answered.
+   * Resolves true only when the prompt was actually raised, so the caller
+   * can offer it again later when it was skipped.
    */
-  offerIncoming: (challengeId: string, challengerId: string) => Promise<void>;
+  offerIncoming: (challengeId: string, challengerId: string) => Promise<boolean>;
   /**
    * Put back the "Sent" state for my own still-pending challenge after a
    * relaunch, so the accept broadcast still reaches me. A no-op when a
@@ -157,6 +188,7 @@ export function useArenaChallenge({
   athleteWeight,
   inMatch = false,
   onOpponentUnavailable,
+  onStaleCancelled,
 }: UseArenaChallengeArgs): UseArenaChallengeResult {
   const router = useRouter();
   const [incoming, setIncoming] = React.useState<IncomingChallenge | null>(null);
@@ -175,6 +207,10 @@ export function useArenaChallenge({
   weightRef.current = athleteWeight;
   const unavailableRef = React.useRef(onOpponentUnavailable);
   unavailableRef.current = onOpponentUnavailable;
+  const staleCancelledRef = React.useRef(onStaleCancelled);
+  staleCancelledRef.current = onStaleCancelled;
+  const athleteIdRef = React.useRef(athleteId);
+  athleteIdRef.current = athleteId;
   /**
    * The challenge we have already navigated for.
    *
@@ -221,6 +257,31 @@ export function useArenaChallenge({
     },
     [router, setIncomingBoth, setOutgoingBoth],
   );
+
+  /**
+   * My outgoing challenge is over without a match: drop the waiting plate.
+   * `toastMessage` is null for a quiet end (my own cancel, a cancel sweep).
+   */
+  const endOutgoing = React.useCallback(
+    (challengeId: string, toastMessage: string | null) => {
+      settledRef.current.add(challengeId);
+      if (outgoingRef.current?.challengeId !== challengeId) return;
+      setOutgoingBoth(null);
+      // A slot freed up, so the cap can no longer be asserted.
+      setCapReached(false);
+      if (toastMessage) toast.info(toastMessage);
+    },
+    [setOutgoingBoth],
+  );
+
+  // A match that starts by ANOTHER route (a deep link, a notification) while
+  // a prompt is up: drop the prompt rather than hold it over the match. It is
+  // not settled, so recovery re-offers it after the match if it is still
+  // fresh and its challenger is still in the lobby; held instead, it could
+  // reappear long after the challenger gave up.
+  React.useEffect(() => {
+    if (inMatch && incomingRef.current) setIncomingBoth(null);
+  }, [inMatch, setIncomingBoth]);
 
   // --- Realtime: challenges involving me ------------------------------------
   React.useEffect(() => {
@@ -289,13 +350,18 @@ export function useArenaChallenge({
           const mine = outgoingRef.current;
           if (!mine || mine.challengeId !== row.id) return;
 
-          if (row.status === "declined" || row.status === "cancelled") {
-            settledRef.current.add(row.id);
-            setOutgoingBoth(null);
-            setCapReached(false);
-            if (row.status === "declined") {
-              toast.info(`${mine.opponentName} declined.`);
-            }
+          // Terminal: declined, cancelled, expired (the sweep), or any status
+          // that cannot become a match. Ignoring `expired` here is what left
+          // the waiting plate stuck until a relaunch (jits-1o4l).
+          if (!LIVE_CHALLENGE_STATUSES.has(row.status)) {
+            endOutgoing(
+              row.id,
+              row.status === "declined"
+                ? `${mine.opponentName} declined.`
+                : row.status === "expired"
+                  ? `Your challenge to ${mine.opponentName} expired.`
+                  : null,
+            );
             return;
           }
 
@@ -314,7 +380,42 @@ export function useArenaChallenge({
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [athleteId, enterMatch, setIncomingBoth, setOutgoingBoth]);
+  }, [athleteId, enterMatch, endOutgoing, setIncomingBoth]);
+
+  // --- Client-side expiry of my outgoing challenge ---------------------------
+  // Belt and braces for the realtime UPDATE above: a sweep that expired the
+  // row while the socket was down never reaches us, so the plate also clears
+  // itself at `expires_at`, and re-checks on every return to the foreground
+  // (timers do not run while iOS has the app suspended).
+  const outgoingExpiresAt = outgoing?.expiresAt;
+  const outgoingIdForExpiry = outgoing?.challengeId;
+  React.useEffect(() => {
+    if (!outgoingIdForExpiry || !outgoingExpiresAt) return;
+    const at = Date.parse(outgoingExpiresAt);
+    if (Number.isNaN(at)) return;
+
+    const expireIfDue = () => {
+      const mine = outgoingRef.current;
+      if (!mine || mine.challengeId !== outgoingIdForExpiry) return;
+      if (!hasExpired(mine.expiresAt, Date.now())) return;
+      endOutgoing(mine.challengeId, `Your challenge to ${mine.opponentName} expired.`);
+    };
+
+    const delay = at - Date.now();
+    if (delay <= 0) {
+      expireIfDue();
+      return;
+    }
+    const timer =
+      delay <= MAX_TIMER_MS ? setTimeout(expireIfDue, delay) : null;
+    const sub = AppState.addEventListener("change", (next) => {
+      if (next === "active") expireIfDue();
+    });
+    return () => {
+      if (timer) clearTimeout(timer);
+      sub.remove();
+    };
+  }, [outgoingIdForExpiry, outgoingExpiresAt, endOutgoing]);
 
   // --- Realtime: my outgoing challenge's own channel -------------------------
   const outgoingId = outgoing?.challengeId;
@@ -328,10 +429,7 @@ export function useArenaChallenge({
         if (matchId) enterMatch(outgoingId, matchId);
       })
       .on("broadcast", { event: "declined" }, () => {
-        settledRef.current.add(outgoingId);
-        setOutgoingBoth(null);
-        setCapReached(false);
-        toast.info(`${outgoingName ?? "Your opponent"} declined.`);
+        endOutgoing(outgoingId, `${outgoingName ?? "Your opponent"} declined.`);
       })
       .subscribe();
 
@@ -341,7 +439,7 @@ export function useArenaChallenge({
         channel = null;
       }
     };
-  }, [outgoingId, outgoingName, enterMatch, setOutgoingBoth]);
+  }, [outgoingId, outgoingName, enterMatch, endOutgoing]);
 
   /** Guard every mutation against double taps; a ref, because state is async. */
   const runExclusive = React.useCallback(async (fn: () => Promise<void>) => {
@@ -403,11 +501,32 @@ export function useArenaChallenge({
   const sendChallenge = React.useCallback(
     (opponentId: string, opponentName: string) =>
       runExclusive(async () => {
-        const result = await createChallenge(supabase, {
-          opponentId,
-          matchType: "ranked", // ranked-only product
-          challengerWeight: weightRef.current ?? undefined,
-        });
+        const create = () =>
+          createChallenge(supabase, {
+            opponentId,
+            matchType: "ranked", // ranked-only product
+            challengerWeight: weightRef.current ?? undefined,
+          });
+        let result = await create();
+
+        // The cap may be held by my own stale challenges: pending rows nobody
+        // will answer live that count for 7 days (jits-celf). Withdraw those
+        // and try exactly once more; if the insert is still refused, the
+        // explanation below decides what to say.
+        if (!result.ok && result.error.code === "MAX_PENDING_CHALLENGES") {
+          const swept = await cancelStaleOutgoingChallenges(
+            supabase,
+            athleteIdRef.current,
+            { keepChallengeId: outgoingRef.current?.challengeId ?? null },
+          );
+          if (swept.ok && swept.data.cancelled.length > 0) {
+            for (const c of swept.data.cancelled) {
+              settledRef.current.add(c.challengeId);
+            }
+            staleCancelledRef.current?.();
+            result = await create();
+          }
+        }
 
         if (!result.ok) {
           if (result.error.code === "MAX_PENDING_CHALLENGES") {
@@ -423,6 +542,7 @@ export function useArenaChallenge({
           challengeId: result.data.id,
           opponentId,
           opponentName,
+          expiresAt: result.data.expiresAt ?? null,
         });
       }),
     [runExclusive, setOutgoingBoth, explainRefusedInsert],
@@ -506,15 +626,39 @@ export function useArenaChallenge({
 
         const result = await cancelChallenge(supabase, current.challengeId);
         if (!result.ok) {
+          // Nothing to withdraw: the challenge expired (locally known), or
+          // the database refused it as not cancellable. Either way nobody
+          // can accept it, so the plate just goes. Anything else (network)
+          // keeps the plate: the challenge may still be live server-side.
+          if (
+            hasExpired(current.expiresAt, Date.now()) ||
+            result.error.code === "RLS_VIOLATION"
+          ) {
+            endOutgoing(current.challengeId, null);
+            return;
+          }
           toast.error("Couldn't cancel that challenge. Try again.");
           return;
         }
-        settledRef.current.add(current.challengeId);
-        setOutgoingBoth(null);
-        // A cancel frees a slot, so the cap can no longer be asserted.
-        setCapReached(false);
+
+        if (!result.data.cancelled) {
+          // No row changed: the challenge was already over (expired,
+          // declined, cancelled) or the opponent has just started the match.
+          // `start_match_from_challenge` is idempotent and returns the
+          // existing match for a started challenge, so ask it: joining beats
+          // leaving the opponent alone in a match nobody else entered.
+          const started = await startMatchFromChallenge(
+            supabase,
+            current.challengeId,
+          );
+          if (started.ok) {
+            enterMatch(current.challengeId, started.data.match_id);
+            return;
+          }
+        }
+        endOutgoing(current.challengeId, null);
       }),
-    [runExclusive, setOutgoingBoth],
+    [runExclusive, endOutgoing, enterMatch],
   );
 
   const clearCap = React.useCallback(() => setCapReached(false), []);
@@ -526,12 +670,13 @@ export function useArenaChallenge({
         !!incomingRef.current ||
         settledRef.current.has(challengeId) ||
         enteredForRef.current === challengeId;
-      if (skip()) return;
+      if (skip()) return false;
       const next = await loadIncoming(challengeId, challengerId);
       // Re-checked after the read: the realtime INSERT or an answer can land
       // inside that await, and the first prompt keeps the surface.
-      if (skip()) return;
+      if (skip()) return false;
       setIncomingBoth(next);
+      return true;
     },
     [setIncomingBoth],
   );

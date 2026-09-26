@@ -14,6 +14,10 @@ const mockGetPending = jest.fn();
 jest.mock("@jits/shared/api/queries", () => ({
   getPendingChallengesForAthlete: (...a: unknown[]) => mockGetPending(...a),
 }));
+const mockSweep = jest.fn();
+jest.mock("@jits/shared/api/mutations", () => ({
+  cancelStaleOutgoingChallenges: (...a: unknown[]) => mockSweep(...a),
+}));
 jest.mock("@/lib/supabase/client", () => ({ supabase: {} }));
 
 import {
@@ -78,7 +82,8 @@ function mount(over: Partial<UsePendingChallengeRecoveryArgs> = {}) {
 beforeEach(() => {
   jest.clearAllMocks();
   jest.spyOn(Date, "now").mockReturnValue(NOW);
-  mockOffer.mockResolvedValue(undefined);
+  mockOffer.mockResolvedValue(true);
+  mockSweep.mockResolvedValue({ ok: true, data: { cancelled: [] } });
   reply();
   appStateHandler = null;
   jest
@@ -288,6 +293,7 @@ describe("restoring my own outgoing challenge", () => {
       challengeId: "out-1",
       opponentId: "opp-1",
       opponentName: "Opp",
+      expiresAt: new Date(NOW + 7 * 86_400_000).toISOString(),
     });
   });
 
@@ -307,5 +313,159 @@ describe("restoring my own outgoing challenge", () => {
     await act(flush);
 
     expect(mockRestore).not.toHaveBeenCalled();
+  });
+});
+
+describe("withdrawing my own stale outgoing challenges (jits-celf)", () => {
+  const STALE = () =>
+    pending({
+      challengeId: "old-1",
+      challengerId: ME,
+      opponentId: "opp-1",
+      createdAt: new Date(NOW - PENDING_PROMPT_MAX_AGE_MS - 1).toISOString(),
+    });
+
+  it("sweeps on mount, reusing the read and keeping the challenge on my plate", async () => {
+    const outgoing = [STALE()];
+    reply([], outgoing);
+    mount({ isLive: false, outgoingChallengeId: "on-plate" });
+    await act(flush);
+
+    expect(mockSweep).toHaveBeenCalledTimes(1);
+    expect(mockSweep).toHaveBeenCalledWith({}, ME, {
+      outgoing,
+      keepChallengeId: "on-plate",
+      now: NOW,
+    });
+  });
+
+  it("sweeps again on going live and on return from the background", async () => {
+    const { rerender } = mount({ isLive: false });
+    await act(flush);
+    mockSweep.mockClear();
+
+    await act(async () => {
+      rerender(baseArgs({ isLive: true }));
+      await flush();
+    });
+    expect(mockSweep).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      appStateHandler?.("background");
+      appStateHandler?.("active");
+      await flush();
+    });
+    expect(mockSweep).toHaveBeenCalledTimes(2);
+  });
+
+  it("asks for a roster refresh only when something was actually withdrawn", async () => {
+    const onStaleCancelled = jest.fn();
+    reply([], [STALE()]);
+    mount({ onStaleCancelled });
+    await act(flush);
+    expect(onStaleCancelled).not.toHaveBeenCalled();
+
+    mockSweep.mockResolvedValue({ ok: true, data: { cancelled: [STALE()] } });
+    await act(async () => {
+      appStateHandler?.("background");
+      appStateHandler?.("active");
+      await flush();
+    });
+    expect(onStaleCancelled).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not sweep on a failed read", async () => {
+    mockGetPending.mockResolvedValue({
+      ok: false,
+      error: { code: "UNKNOWN", message: "down" },
+    });
+    mount();
+    await act(flush);
+
+    expect(mockSweep).not.toHaveBeenCalled();
+  });
+});
+
+describe("offers skipped by a match (jits-yiwx)", () => {
+  it("re-offers a challenge whose offer was skipped because a match started", async () => {
+    reply([pending()]);
+    // The offer is still reading the challenger when a match starts, and the
+    // hook then skips it.
+    let finishOffer!: (raised: boolean) => void;
+    mockOffer.mockImplementationOnce(
+      () => new Promise<boolean>((resolve) => (finishOffer = resolve)),
+    );
+    const { rerender } = mount();
+    await act(flush);
+    expect(mockOffer).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      rerender(baseArgs({ inMatch: true }));
+      finishOffer(false);
+      await flush();
+    });
+
+    mockOffer.mockResolvedValue(true);
+    await act(async () => {
+      rerender(baseArgs({ inMatch: false }));
+      await flush();
+    });
+
+    expect(mockOffer).toHaveBeenCalledTimes(2);
+    expect(mockOffer).toHaveBeenLastCalledWith("ch-1", "rival-1");
+  });
+
+  it("does not keep re-offering one the hook refused for good (already answered)", async () => {
+    reply([pending()]);
+    mockOffer.mockResolvedValue(false);
+    const { rerender } = mount();
+    await act(flush);
+
+    await act(async () => {
+      rerender(baseArgs({ lobbyIds: new Set(["rival-1", "x"]) }));
+      await flush();
+    });
+
+    expect(mockOffer).toHaveBeenCalledTimes(1);
+  });
+
+  it("reads again after a match and re-offers a prompt the match dropped", async () => {
+    reply([pending()]);
+    const { rerender } = mount();
+    await act(flush);
+    expect(mockOffer).toHaveBeenCalledTimes(1);
+
+    // A deep link starts a match while the prompt is up; the challenge hook
+    // drops the prompt (not settled).
+    await act(async () => {
+      rerender(baseArgs({ inMatch: true }));
+      await flush();
+    });
+    mockGetPending.mockClear();
+
+    await act(async () => {
+      rerender(baseArgs({ inMatch: false }));
+      await flush();
+    });
+
+    expect(mockGetPending).toHaveBeenCalledTimes(1);
+    expect(mockOffer).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not re-offer after the match once the challenge went stale", async () => {
+    reply([pending()]);
+    const { rerender } = mount();
+    await act(flush);
+    await act(async () => {
+      rerender(baseArgs({ inMatch: true }));
+      await flush();
+    });
+
+    (Date.now as jest.Mock).mockReturnValue(NOW + PENDING_PROMPT_MAX_AGE_MS);
+    await act(async () => {
+      rerender(baseArgs({ inMatch: false }));
+      await flush();
+    });
+
+    expect(mockOffer).toHaveBeenCalledTimes(1);
   });
 });
