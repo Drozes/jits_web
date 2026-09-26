@@ -179,3 +179,34 @@ describe("Rematch shortcut", () => {
     expect(renderSummary({ opponentName: "  " }).queryByTestId("summary-rematch")).toBeNull();
   });
 });
+
+describe("View match details link", () => {
+  const cases: Array<[string, Partial<Props>]> = [
+    ["with this device's video", { videoId: "vid-1" }],
+    ["while the video is uploading", { videoPending: true }],
+    ["with no video at all", {}],
+    ["for a disputed match", { matchStatus: "disputed", videoId: "vid-1" }],
+  ];
+
+  it.each(cases)("is always offered %s, so both recordings are reachable", (_label, overrides) => {
+    const s = renderSummary(overrides);
+    const link = s.getByTestId("summary-view-match-details");
+    // A text link, never a second red cta.
+    expect(link.props.className).not.toContain("bg-cta");
+    expect(link.props.className).not.toContain("border");
+    fireEvent.press(link);
+    expect(mockPush).toHaveBeenCalledWith("/(app)/match-detail/M1");
+  });
+
+  it("sits below the Watch button, which still plays this device's clip", () => {
+    const s = renderSummary({ videoId: "vid-1" });
+    fireEvent.press(s.getByText("Watch Match Video"));
+    expect(mockPush).toHaveBeenCalledWith("/(app)/video/vid-1");
+    const texts = s.UNSAFE_root.findAll(
+      (n: { type: unknown; props: { children?: unknown } }) =>
+        n.type === "Text" && typeof n.props.children === "string",
+    ).map((n: { props: { children?: unknown } }) => n.props.children as string);
+    expect(texts.indexOf("Watch Match Video")).toBeGreaterThanOrEqual(0);
+    expect(texts.indexOf("Watch Match Video")).toBeLessThan(texts.indexOf("View match details"));
+  });
+});

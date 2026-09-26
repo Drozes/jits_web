@@ -65,7 +65,11 @@ jest.mock("@/lib/profile/use-profile-data", () => ({
   }),
 }));
 const mockVideosRefetch = jest.fn();
+jest.mock("@/lib/supabase/client", () => ({ supabase: {} }));
 jest.mock("@/lib/profile/use-my-match-videos", () => ({
+  // The real upload-settled refetch, driven by the real upload store below.
+  useRefetchOnUploadSettled: jest.requireActual("@/lib/profile/use-my-match-videos")
+    .useRefetchOnUploadSettled,
   useMyMatchVideos: () => ({
     items: [],
     isLoading: false,
@@ -102,6 +106,7 @@ import {
   __resetArenaStoreForTests,
   publishArenaState,
 } from "@/lib/arena/arena-store";
+import { resetMatchUploadStore, setMatchUpload } from "@/lib/video/match-upload-store";
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -155,6 +160,40 @@ describe("Profile recent matches and refresh", () => {
       scroll.props.refreshControl.props.onRefresh();
     });
     expect(mockProfileRefetch).toHaveBeenCalledTimes(1);
+    expect(mockVideosRefetch).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("Past Match Videos after an upload lands", () => {
+  it("refetches the videos once when a history match's upload settles after the refocus", () => {
+    resetMatchUploadStore();
+    mockHistory.push({
+      match_id: "m-9",
+      opponent_display_name: "Demo Blue",
+      completed_at: "2026-09-26T12:00:00.000Z",
+      match_type: "ranked",
+      elo_delta: 12,
+    });
+    act(() => {
+      setMatchUpload("m-9", { status: "uploading", progress: 0.2 });
+    });
+    render(<ProfileScreen />);
+    expect(mockVideosRefetch).not.toHaveBeenCalled();
+
+    act(() => {
+      setMatchUpload("m-9", { progress: 0.9 });
+    });
+    expect(mockVideosRefetch).not.toHaveBeenCalled();
+
+    act(() => {
+      setMatchUpload("m-9", { status: "uploaded", videoId: "v-1", progress: 1 });
+    });
+    expect(mockVideosRefetch).toHaveBeenCalledTimes(1);
+    // Neither the profile refetch nor a later store write re-fires it.
+    expect(mockProfileRefetch).not.toHaveBeenCalled();
+    act(() => {
+      setMatchUpload("m-9", { progress: 1 });
+    });
     expect(mockVideosRefetch).toHaveBeenCalledTimes(1);
   });
 });

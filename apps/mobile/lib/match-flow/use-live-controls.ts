@@ -82,6 +82,18 @@ export function useLiveControls({ matchId, timer, sync, endedRef, onEnded }: Use
       setBusy("pause");
       const res = await pauseMatch(supabase, matchId);
       setBusy(null);
+      if (!res.ok && res.error.code === "MATCH_NOT_IN_PROGRESS") {
+        // pause_match maps "already paused" here (as well as a match that is
+        // no longer running). Mirror of the resume recovery above: if the DB
+        // says it is paused, this device missed the opponent's pause, so
+        // apply it through the tracked timer instead of toasting. No
+        // broadcast: the opponent paused it and already knows.
+        const fresh = await getMatchDetails(supabase, matchId);
+        if (fresh && fresh.status === "in_progress" && fresh.paused_at) {
+          timer.syncFromBroadcast({ type: "paused", pausedAt: fresh.paused_at });
+          return;
+        }
+      }
       if (!res.ok) {
         toast.error({ text1: "Couldn't pause", description: res.error.message });
         return;
