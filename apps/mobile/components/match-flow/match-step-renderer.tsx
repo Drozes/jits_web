@@ -43,11 +43,15 @@ interface MatchStepRendererProps {
   submissionTypes: SubmissionType[];
   resultData: BroadcastResult | null;
   ownOutcome: "win" | "loss" | "draw" | null;
+  /** Athletes with a confirmation row in the DB (from the reconciler). */
+  confirmedAthleteIds: string[];
   setStep: (step: MatchStep) => void;
   setStartedAt: (s: string) => void;
   setResultData: (r: BroadcastResult) => void;
   advanceToResult: () => void;
   refresh: () => void;
+  /** The opponent cancelled before the match went live. */
+  onCancelledRemotely: (description?: string) => void;
 }
 
 export function MatchStepRenderer({
@@ -66,11 +70,13 @@ export function MatchStepRenderer({
   submissionTypes,
   resultData,
   ownOutcome,
+  confirmedAthleteIds,
   setStep,
   setStartedAt,
   setResultData,
   advanceToResult,
   refresh,
+  onCancelledRemotely,
 }: MatchStepRendererProps) {
   // One recorder for the whole wizard, owned by MatchRecorderProvider above
   // this component; the live step drives it. The summary step's playback
@@ -86,6 +92,8 @@ export function MatchStepRenderer({
   if (step === "weight") {
     return (
       <WeightStep
+        matchId={matchId}
+        onCancelledRemotely={onCancelledRemotely}
         currentDisplayName={me.display_name}
         currentWeight={me.current_weight}
         opponentDisplayName={opponent.display_name}
@@ -148,11 +156,11 @@ export function MatchStepRenderer({
       <ConfirmStep
         matchId={matchId}
         matchType={matchType}
-        matchStatus={matchStatus}
         currentAthleteId={me.athlete_id}
         opponentId={opponent.athlete_id}
         opponentDisplayName={opponent.display_name}
         resultData={resultData}
+        confirmedAthleteIds={confirmedAthleteIds}
         onCompleted={() => {
           refresh();
           setStep("summary");

@@ -2,12 +2,11 @@ import * as React from "react";
 import { toast } from "@/components/ui/toast";
 import { supabase } from "@/lib/supabase/client";
 import { recordMatchResult } from "@jits/shared/api/mutations";
-import {
-  useSessionMatchSync,
-  type BroadcastResult,
-} from "@jits/shared/hooks/use-session-match-sync";
+import type { BroadcastResult } from "@jits/shared/hooks/use-session-match-sync";
+import { settleWithin } from "@jits/shared/hooks/session-match-channel";
 import { mutationQueue, isQueuedResult } from "@/lib/network/mutation-queue";
 import { parseFinishTime } from "./parse-finish-time";
+import { SEND_GRACE_MS, useMatchSyncContext, useStepMatchSync } from "./match-sync-context";
 
 interface UseRecordResultParams {
   matchId: string;
@@ -35,8 +34,8 @@ export function useRecordResult({ matchId, onRecorded }: UseRecordResultParams) 
   const [loading, setLoading] = React.useState(false);
   const recordedRef = React.useRef(false);
 
-  const sync = useSessionMatchSync({
-    supabase,
+  const { reconcileNow } = useMatchSyncContext();
+  const sync = useStepMatchSync({
     matchId,
     onResultSubmitted: (r) => {
       if (recordedRef.current) return;
@@ -66,6 +65,10 @@ export function useRecordResult({ matchId, onRecorded }: UseRecordResultParams) 
       if (!res.ok) {
         setLoading(false);
         toast.error({ text1: "Couldn't record result", description: res.error.message });
+        // The usual cause is that the opponent recorded first and their
+        // result_submitted never arrived: re-read the match now so the
+        // wizard moves on instead of offering a form that cannot succeed.
+        reconcileNow();
         return;
       }
       const queued = isQueuedResult(res.data);
@@ -76,9 +79,14 @@ export function useRecordResult({ matchId, onRecorded }: UseRecordResultParams) 
         submissionCode: outcome === "submission" ? submissionCode : undefined,
         finishTimeSeconds: finishSeconds ?? undefined,
       };
-      // Broadcast may noop while offline; the opponent will pick up the
-      // result via postgres-changes when our queued write actually lands.
-      sync.broadcastResultSubmitted(broadcast);
+      // onRecorded unmounts this step, and with it the channel, so the
+      // broadcast used to be torn down a millisecond after it was queued
+      // and the opponent sat on the result step (jits-mzfu). Wait for the
+      // server's ack, bounded. Offline there is nothing to wait for: the
+      // opponent's wizard picks the result up from the DB (reconciler) once
+      // the queued write lands.
+      const sent = sync.broadcastResultSubmitted(broadcast);
+      if (!queued) await settleWithin(sent, SEND_GRACE_MS);
       if (queued) {
         toast.success({
           text1: "Saved locally",
@@ -87,7 +95,7 @@ export function useRecordResult({ matchId, onRecorded }: UseRecordResultParams) 
       }
       onRecorded(broadcast);
     },
-    [matchId, onRecorded, sync],
+    [matchId, onRecorded, sync, reconcileNow],
   );
 
   return { loading, submit };

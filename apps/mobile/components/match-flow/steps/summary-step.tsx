@@ -128,6 +128,15 @@ export function SummaryStep(props: SummaryStepProps) {
         >
           {verdictText}
         </Text>
+        {disputed ? (
+          <Text
+            testID="summary-disputed-note"
+            className="text-center font-body text-[12px] text-ink-2"
+          >
+            This result was disputed. An admin will review it; any rating
+            change stands until then.
+          </Text>
+        ) : null}
         {eloDelta != null && eloDelta !== 0 ? (
           <Text
             testID="summary-elo-delta"

@@ -462,3 +462,84 @@ describe("useSessionMatchSync", () => {
     expect(onMatchEnded2).toHaveBeenCalledOnce();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Match sync reliability (jits-wfpo, jits-bmei, jits-mzfu)
+// ---------------------------------------------------------------------------
+
+describe("useSessionMatchSync: dispute, status and awaited sends", () => {
+  let mockChannel: ReturnType<typeof createMockChannel>;
+  let mockSupabase: ReturnType<typeof createMockSupabase>;
+
+  beforeEach(() => {
+    mockChannel = createMockChannel();
+    mockSupabase = createMockSupabase(mockChannel);
+  });
+
+  it("broadcasts match_disputed with the disputer's athlete id", () => {
+    const { result } = renderHook(() =>
+      useSessionMatchSync({ supabase: mockSupabase as never, matchId: "m-1" }),
+    );
+
+    act(() => {
+      void result.current.broadcastMatchDisputed("athlete-a");
+    });
+
+    expect(mockChannel.sentMessages).toContainEqual({
+      event: "match_disputed",
+      payload: { athlete_id: "athlete-a" },
+    });
+  });
+
+  it("fires onMatchDisputed with the disputer's id", () => {
+    const onMatchDisputed = vi.fn();
+    renderHook(() =>
+      useSessionMatchSync({ supabase: mockSupabase as never, matchId: "m-1", onMatchDisputed }),
+    );
+
+    act(() => {
+      mockChannel.simulateBroadcast("match_disputed", { athlete_id: "athlete-b" });
+    });
+
+    expect(onMatchDisputed).toHaveBeenCalledWith("athlete-b");
+  });
+
+  it("reports every channel status to onStatus (the reconciler's rejoin trigger)", async () => {
+    mockChannel = createMockChannel({ autoSubscribe: false });
+    mockSupabase = createMockSupabase(mockChannel);
+    const onStatus = vi.fn();
+    renderHook(() =>
+      useSessionMatchSync({ supabase: mockSupabase as never, matchId: "m-1", onStatus }),
+    );
+
+    await act(async () => {
+      await mockChannel.triggerSubscribed();
+    });
+
+    expect(onStatus).toHaveBeenCalledWith("SUBSCRIBED", undefined);
+  });
+
+  it("returns the send's promise so a caller can await it before unmounting", async () => {
+    mockChannel.channel.send = ((msg: { event: string; payload: Record<string, unknown> }) => {
+      mockChannel.sentMessages.push({ event: msg.event, payload: msg.payload });
+      return Promise.resolve("ok");
+    }) as unknown as typeof mockChannel.channel.send;
+    const { result } = renderHook(() =>
+      useSessionMatchSync({ supabase: mockSupabase as never, matchId: "m-1" }),
+    );
+
+    await expect(result.current.broadcastResultSubmitted({ result: "draw" })).resolves.toBe("ok");
+  });
+
+  it("never rejects, even when the transport throws", async () => {
+    mockChannel.channel.send = (() => {
+      throw new Error("socket closed");
+    }) as unknown as typeof mockChannel.channel.send;
+    const { result } = renderHook(() =>
+      useSessionMatchSync({ supabase: mockSupabase as never, matchId: "m-1" }),
+    );
+
+    const settled = await result.current.broadcastMatchEnded();
+    expect(settled).toEqual({ error: expect.any(Error) });
+  });
+});

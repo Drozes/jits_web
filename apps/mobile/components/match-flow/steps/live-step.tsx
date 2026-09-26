@@ -1,7 +1,6 @@
 import * as React from "react";
 import { View } from "react-native";
-import { supabase } from "@/lib/supabase/client";
-import { useSessionMatchSync } from "@jits/shared/hooks/use-session-match-sync";
+import { useStepMatchSync } from "@/lib/match-flow/match-sync-context";
 import { useSessionMatchTimer } from "@jits/shared/hooks/use-session-match-timer";
 import { useLiveControls } from "@/lib/match-flow/use-live-controls";
 import { useMatchKeepAwake } from "@/lib/match-flow/use-keep-awake";
@@ -71,8 +70,7 @@ export function LiveStep(props: LiveStepProps) {
   useMatchKeepAwake(true);
 
   const timer = useSessionMatchTimer({ durationSeconds, startedAt, pausedAt, totalPausedDuration });
-  const sync = useSessionMatchSync({
-    supabase,
+  const sync = useStepMatchSync({
     matchId,
     onTimerPaused: (p) => timer.syncFromBroadcast({ type: "paused", pausedAt: p }),
     onTimerResumed: (d) =>
@@ -98,6 +96,20 @@ export function LiveStep(props: LiveStepProps) {
     endedRef,
     onEnded: wrappedOnEnded,
   });
+
+  // The timer only takes its pause state from props at mount. When the
+  // wizard re-syncs the match from the DB (foreground, channel rejoin, poll)
+  // after a pause/resume broadcast was missed, apply the newer state.
+  const pauseSyncMountedRef = React.useRef(false);
+  React.useEffect(() => {
+    if (!pauseSyncMountedRef.current) {
+      pauseSyncMountedRef.current = true;
+      return;
+    }
+    if (pausedAt) timer.syncFromBroadcast({ type: "paused", pausedAt });
+    else timer.syncFromBroadcast({ type: "resumed", totalPausedDuration });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- react only to DB changes
+  }, [pausedAt, totalPausedDuration]);
 
   // Fire match-start haptic once when the step mounts
   React.useEffect(() => {

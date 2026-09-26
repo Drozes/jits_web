@@ -6,9 +6,17 @@ import { useThemedTokens } from "@/lib/theme/use-theme";
 import { supabase } from "@/lib/supabase/client";
 import { cancelSessionMatch, startMatch } from "@jits/shared/api/mutations";
 import { getMatchDetails } from "@jits/shared/api/queries";
-import { useSessionMatchSync } from "@jits/shared/hooks/use-session-match-sync";
+import { settleWithin } from "@jits/shared/hooks/session-match-channel";
+import {
+  SEND_GRACE_MS,
+  useMatchSyncContext,
+  useStepMatchSync,
+} from "@/lib/match-flow/match-sync-context";
 import { ReadyPanel } from "./ready-panel";
 import { cn } from "@/lib/cn";
+
+/** How often a ready athlete repeats ready_signal until the opponent's arrives. */
+const READY_REPEAT_MS = 3_000;
 
 interface ReadyStepProps {
   /** Where a cancelled ready check returns to (the Arena, on mobile). */
@@ -40,8 +48,8 @@ export function ReadyStep(props: ReadyStepProps) {
   const startedRef = React.useRef(false);
   const cancelledRef = React.useRef(false);
 
-  const sync = useSessionMatchSync({
-    supabase,
+  const { markExiting } = useMatchSyncContext();
+  const sync = useStepMatchSync({
     matchId,
     onReadySignal: (athleteId) => {
       if (athleteId === opponentId) setOpponentReady(true);
@@ -86,7 +94,10 @@ export function ReadyStep(props: ReadyStepProps) {
       return;
     }
     const startedAt = result.data.started_at ?? new Date().toISOString();
-    sync.broadcastTimerStarted(startedAt);
+    // Let timer_started leave the device before onStarted unmounts this
+    // step and its channel (jits-mzfu). Bounded; the opponent's ready step
+    // also polls the DB and sees in_progress if this is lost anyway.
+    await settleWithin(sync.broadcastTimerStarted(startedAt), SEND_GRACE_MS);
     onStarted(startedAt);
   }, [matchId, sync, onStarted]);
 
@@ -99,8 +110,24 @@ export function ReadyStep(props: ReadyStepProps) {
   function handleTapReady() {
     if (myReady) return;
     setMyReady(true);
-    sync.broadcastReady(currentAthleteId);
+    void sync.broadcastReady(currentAthleteId);
   }
+
+  // Ready is the one signal the DB cannot back up (there is no ready column),
+  // so a ready_signal sent before the opponent's ready step had joined was
+  // simply gone, and two ready athletes could wait on each other forever.
+  // Repeat ours until theirs arrives; receiving it twice is harmless.
+  // Keyed on the (stable) callback, not the per-render `sync` object, so a
+  // wizard re-render (the reconciler applies a snapshot every poll) does
+  // not keep resetting the interval before it fires.
+  const { broadcastReady } = sync;
+  React.useEffect(() => {
+    if (!myReady || opponentReady) return;
+    const id = setInterval(() => {
+      if (!startedRef.current && !cancelledRef.current) void broadcastReady(currentAthleteId);
+    }, READY_REPEAT_MS);
+    return () => clearInterval(id);
+  }, [myReady, opponentReady, broadcastReady, currentAthleteId]);
 
   const doCancel = React.useCallback(async () => {
     if (cancelledRef.current || startedRef.current) return;
@@ -113,10 +140,13 @@ export function ReadyStep(props: ReadyStepProps) {
       toast.error({ text1: "Could not cancel", description: result.error.message });
       return;
     }
-    // Tell the opponent's ready step to abort too, then head back out.
-    sync.broadcastMatchCancelled();
+    // Tell the opponent's ready step to abort too, then head back out. The
+    // wizard is told first so its reconciler, which may see status=cancelled
+    // while the broadcast settles, does not also navigate.
+    markExiting();
+    await settleWithin(sync.broadcastMatchCancelled(), SEND_GRACE_MS);
     router.replace(exitHref);
-  }, [matchId, exitHref, sync, router]);
+  }, [matchId, exitHref, sync, router, markExiting]);
 
   function handleCancelPress() {
     if (cancelling || loading || startedRef.current) return;

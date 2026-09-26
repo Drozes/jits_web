@@ -54,6 +54,7 @@ export const PAYLOAD_VALIDATORS: Record<string, Validator> = {
   },
   [SESSION_MATCH_EVENTS.RESULT_CONFIRMED]: (p) => (isStr(p.athlete_id) ? null : "athlete_id missing"),
   [SESSION_MATCH_EVENTS.MATCH_CANCELLED]: () => null,
+  [SESSION_MATCH_EVENTS.MATCH_DISPUTED]: (p) => (isStr(p.athlete_id) ? null : "athlete_id missing"),
   [CHALLENGE_EVENTS.MATCH_STARTED]: (p) => (isStr(p.matchId) ? null : "matchId missing"),
   [CHALLENGE_EVENTS.DECLINED]: () => null,
 };

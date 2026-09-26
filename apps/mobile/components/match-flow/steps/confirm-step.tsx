@@ -5,11 +5,13 @@ import { toast } from "@/components/ui/toast";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { supabase } from "@/lib/supabase/client";
 import { confirmMatchResult } from "@jits/shared/api/mutations";
+import type { BroadcastResult } from "@jits/shared/hooks/use-session-match-sync";
+import { settleWithin } from "@jits/shared/hooks/session-match-channel";
 import {
-  useSessionMatchSync,
-  type BroadcastResult,
-} from "@jits/shared/hooks/use-session-match-sync";
-import { useMatchCompletion } from "@/lib/match-flow/use-match-completion";
+  SEND_GRACE_MS,
+  useMatchSyncContext,
+  useStepMatchSync,
+} from "@/lib/match-flow/match-sync-context";
 import { mutationQueue, isQueuedResult } from "@/lib/network/mutation-queue";
 import { ConfirmPanel, ResultBanner } from "./confirm-step-panels";
 import { DisputeForm } from "./dispute-form";
@@ -18,19 +20,32 @@ import { cn } from "@/lib/cn";
 interface ConfirmStepProps {
   matchId: string;
   matchType: "ranked" | "casual";
-  matchStatus: string;
   currentAthleteId: string;
   opponentId: string;
   opponentDisplayName: string;
   resultData: BroadcastResult | null;
+  /** Athletes the DB has a confirmation for (from the wizard's reconciler),
+   * so a missed result_confirmed, or a remount, cannot hide one. */
+  confirmedAthleteIds: string[];
   onCompleted: () => void;
 }
 
+/** After this athlete has confirmed, how long before they may stop waiting
+ * on an opponent who never confirms (the result and ELO are already final
+ * at record time; the confirmation does not change them). */
+const LEAVE_AFTER_MS = 20_000;
+
 /**
  * Step 7: both athletes confirm the recorded result. Either side can
- * dispute (which surfaces a reason input). When the matches row flips
- * to `completed` or `disputed` we advance to the summary so the user
- * isn't stranded.
+ * dispute (which surfaces a reason input). Advances to the summary when
+ * both have confirmed or either has disputed.
+ *
+ * Signals, fastest first: the result_confirmed / match_disputed broadcasts;
+ * then the wizard's reconciler (it polls this step and re-reads the match on
+ * foreground and on every channel rejoin), which feeds `confirmedAthleteIds`
+ * and moves the wizard to the summary itself once both rows exist or the
+ * match is disputed. `completed` alone is NOT a signal here:
+ * record_match_result sets it at record time, before anyone confirmed.
  *
  * ELO design system: hero ResultBanner verdict, two ConfirmPanels, a
  * Signal Red confirm cta, and an underlined dispute escape. Mirrors D9
@@ -41,37 +56,61 @@ export function ConfirmStep(props: ConfirmStepProps) {
   const {
     matchId,
     matchType,
-    matchStatus,
     currentAthleteId,
     opponentId,
     opponentDisplayName,
     resultData,
+    confirmedAthleteIds,
     onCompleted,
   } = props;
-  const [myConfirmed, setMyConfirmed] = React.useState(false);
-  const [opponentConfirmed, setOpponentConfirmed] = React.useState(false);
+  const [myConfirmedLocal, setMyConfirmed] = React.useState(false);
+  const [opponentConfirmedLocal, setOpponentConfirmed] = React.useState(false);
   const [showDispute, setShowDispute] = React.useState(false);
+  const [canLeave, setCanLeave] = React.useState(false);
+  const { reconcileNow } = useMatchSyncContext();
+  const myConfirmed = myConfirmedLocal || confirmedAthleteIds.includes(currentAthleteId);
+  const opponentConfirmed = opponentConfirmedLocal || confirmedAthleteIds.includes(opponentId);
 
-  const { fire: advance } = useMatchCompletion({ matchId, matchStatus, onCompleted });
+  const advancedRef = React.useRef(false);
+  const onCompletedRef = React.useRef(onCompleted);
+  onCompletedRef.current = onCompleted;
+  const advance = React.useCallback(() => {
+    if (advancedRef.current) return;
+    advancedRef.current = true;
+    onCompletedRef.current();
+  }, []);
 
-  const sync = useSessionMatchSync({
-    supabase,
+  const sync = useStepMatchSync({
     matchId,
     onResultConfirmed: (athleteId) => {
       if (athleteId === opponentId) setOpponentConfirmed(true);
     },
+    onMatchDisputed: (athleteId) => {
+      // The opponent disputed: nothing left to confirm (jits-wfpo).
+      if (athleteId === currentAthleteId) return;
+      toast.info({
+        text1: "Result disputed",
+        description: `${opponentDisplayName} disputed the result. An admin will review it.`,
+      });
+      advance();
+    },
   });
 
-  // Auto-advance when both sides have confirmed locally. The realtime
-  // postgres_changes listener in useMatchCompletion may fire first, but
-  // if the DB update is delayed (or matchStatus prop is stale from the
-  // initial fetch), this ensures the user is never stranded.
+  // Auto-advance when both sides have confirmed.
   React.useEffect(() => {
     if (myConfirmed && opponentConfirmed) {
       const t = setTimeout(advance, 1500);
       return () => clearTimeout(t);
     }
   }, [myConfirmed, opponentConfirmed, advance]);
+
+  // An opponent who closes the app never confirms; do not hold this athlete
+  // on the confirm step forever for a formality.
+  React.useEffect(() => {
+    if (!myConfirmed || opponentConfirmed) return;
+    const t = setTimeout(() => setCanLeave(true), LEAVE_AFTER_MS);
+    return () => clearTimeout(t);
+  }, [myConfirmed, opponentConfirmed]);
 
   async function handleConfirm() {
     if (myConfirmed) return;
@@ -86,6 +125,8 @@ export function ConfirmStep(props: ConfirmStepProps) {
     if (!res.ok) {
       setMyConfirmed(false);
       toast.error({ text1: "Couldn't confirm", description: res.error.message });
+      // Most often the opponent disputed and that signal was missed.
+      reconcileNow();
       return;
     }
     if (isQueuedResult(res.data)) {
@@ -94,9 +135,16 @@ export function ConfirmStep(props: ConfirmStepProps) {
         description: "Confirmation will sync when you're back online.",
       });
     }
-    // Broadcast is a no-op offline; opponent will see the confirmation
-    // via postgres-changes once our queued write lands on reconnect.
-    sync.broadcastResultConfirmed(currentAthleteId);
+    // Broadcast is a no-op offline; the opponent's reconciler reads the
+    // confirmation from the DB once our queued write lands.
+    void sync.broadcastResultConfirmed(currentAthleteId);
+  }
+
+  async function handleDisputed() {
+    // Tell the opponent before this step (and its channel) goes away; they
+    // would otherwise wait on a confirmation that can never come.
+    await settleWithin(sync.broadcastMatchDisputed(currentAthleteId), SEND_GRACE_MS);
+    advance();
   }
 
   if (showDispute) {
@@ -104,7 +152,7 @@ export function ConfirmStep(props: ConfirmStepProps) {
       <DisputeForm
         matchId={matchId}
         onCancel={() => setShowDispute(false)}
-        onSubmitted={advance}
+        onSubmitted={() => void handleDisputed()}
       />
     );
   }
@@ -138,6 +186,20 @@ export function ConfirmStep(props: ConfirmStepProps) {
         <Text className="text-center font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">
           Waiting for opponent to confirm...
         </Text>
+      ) : null}
+
+      {myConfirmed && !opponentConfirmed && canLeave ? (
+        <Pressable
+          testID="confirm-leave"
+          accessibilityRole="button"
+          onPress={advance}
+          className="items-center py-2 active:opacity-70"
+          hitSlop={8}
+        >
+          <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l underline">
+            Continue without waiting
+          </Text>
+        </Pressable>
       ) : null}
 
       {!myConfirmed ? (

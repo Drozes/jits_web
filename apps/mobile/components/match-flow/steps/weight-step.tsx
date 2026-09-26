@@ -2,8 +2,12 @@ import { Pressable, Text, View } from "react-native";
 import { AlertTriangle } from "lucide-react-native";
 import { EloTile, Plate } from "@/components/ui/elo-system";
 import { useThemedTokens } from "@/lib/theme/use-theme";
+import { useStepMatchSync } from "@/lib/match-flow/match-sync-context";
 
 interface WeightStepProps {
+  matchId: string;
+  /** The opponent cancelled while this athlete was still on the scale. */
+  onCancelledRemotely: (description?: string) => void;
   currentDisplayName: string;
   currentWeight: number | null;
   opponentDisplayName: string;
@@ -30,6 +34,8 @@ function divisionGap(a: number, b: number): number {
 export function WeightStep(props: WeightStepProps) {
   const tokens = useThemedTokens();
   const {
+    matchId,
+    onCancelledRemotely,
     currentDisplayName,
     currentWeight,
     opponentDisplayName,
@@ -37,6 +43,15 @@ export function WeightStep(props: WeightStepProps) {
     matchType,
     onConfirm,
   } = props;
+  // This step used to mount no channel at all, so a cancel sent while this
+  // athlete was on the scale was lost and they sat on the ready check
+  // forever (jits-bh2v). The reconciler also sees status=cancelled on the
+  // next step mount, as the backstop.
+  useStepMatchSync({
+    matchId,
+    onMatchCancelled: () => onCancelledRemotely("Your opponent cancelled the match."),
+  });
+
   const both = currentWeight != null && opponentWeight != null;
   const diff = both ? Math.abs(currentWeight! - opponentWeight!) : 0;
   const gap = both ? divisionGap(currentWeight!, opponentWeight!) : 0;

@@ -6,6 +6,7 @@ import {
   type MatchDetails,
 } from "@jits/shared/api/queries";
 import type { SubmissionType } from "@jits/shared/types/submission-type";
+import { isStatusRegression } from "./reconcile";
 
 interface UseMatchDetailsResult {
   match: MatchDetails | null;
@@ -15,6 +16,22 @@ interface UseMatchDetailsResult {
   /** Force a re-fetch (e.g. after a Postgres Changes event signals the
    * row has updated and we need fresh started_at / paused_at / status). */
   refresh: () => void;
+  /** Replace the match in hand with a snapshot fetched elsewhere (the
+   * reconciler), without entering the loading state. */
+  applyMatch: (next: MatchDetails) => void;
+}
+
+/**
+ * Keep the newer of two reads of the same match. Two fetch paths write here
+ * (this hook's own load/refresh and the reconciler) and their responses can
+ * land out of order, so an older status never replaces a newer one.
+ */
+function newer(prev: MatchDetails | null, next: MatchDetails): MatchDetails {
+  if (prev && prev.id === next.id && isStatusRegression(prev.status, next.status)) return prev;
+  // An identical re-read (most polls) keeps the same object, so the wizard
+  // and the live step do not re-render every few seconds for nothing.
+  if (prev && JSON.stringify(prev) === JSON.stringify(next)) return prev;
+  return next;
 }
 
 /**
@@ -47,7 +64,7 @@ export function useMatchDetails(matchId: string): UseMatchDetailsResult {
           setSubmissionTypes([]);
           return;
         }
-        setMatch(matchResult);
+        setMatch((prev) => newer(prev, matchResult));
         setSubmissionTypes(types);
       } catch (err) {
         if (cancelled) return;
@@ -64,6 +81,9 @@ export function useMatchDetails(matchId: string): UseMatchDetailsResult {
   }, [matchId, tick]);
 
   const refresh = React.useCallback(() => setTick((n) => n + 1), []);
+  const applyMatch = React.useCallback((next: MatchDetails) => {
+    setMatch((prev) => (prev && prev.id !== next.id ? prev : newer(prev, next)));
+  }, []);
 
-  return { match, submissionTypes, isLoading, error, refresh };
+  return { match, submissionTypes, isLoading, error, refresh, applyMatch };
 }

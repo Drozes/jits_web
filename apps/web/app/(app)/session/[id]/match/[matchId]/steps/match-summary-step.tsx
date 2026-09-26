@@ -1,12 +1,34 @@
 "use client";
 
-import { useMemo, useState, useEffect, useRef } from "react";
+import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { Check, Loader2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { confirmMatchResult, disputeMatchResult } from "@jits/shared/api/mutations";
+import { getMatchConfirmations, getMatchDetails } from "@jits/shared/api/queries";
 import { useSessionMatchSync, type BroadcastResult } from "@jits/shared/hooks/use-session-match-sync";
+import { settleWithin } from "@jits/shared/hooks/session-match-channel";
+
+/** How often a confirmer who is waiting on the opponent re-reads the DB. */
+const WAITING_POLL_MS = 5_000;
+
+/**
+ * Whether the confirm step is finished, from the DB. `completed` alone is
+ * NOT enough: record_match_result sets it at RECORD time, before anyone has
+ * confirmed, so advancing on it skipped confirmation and dispute entirely
+ * once `matches` joined the realtime publication. Finished means disputed,
+ * or a confirmation row from BOTH athletes.
+ */
+export function isConfirmStepDone(
+  status: string | null | undefined,
+  confirmedIds: string[] | null,
+  currentAthleteId: string,
+  opponentId: string,
+): boolean {
+  if (status === "disputed") return true;
+  return !!confirmedIds && confirmedIds.includes(currentAthleteId) && confirmedIds.includes(opponentId);
+}
 
 interface MatchSummaryStepProps {
   onNext: () => void;
@@ -26,13 +48,21 @@ interface MatchSummaryStepProps {
   videoId?: string | null;
 }
 
-export function MatchSummaryStep({ onNext, matchId, matchType, matchStatus, currentAthleteId, opponent, resultData }: MatchSummaryStepProps) {
+export function MatchSummaryStep({ onNext, matchId, matchType, currentAthleteId, opponent, resultData }: MatchSummaryStepProps) {
   const [myConfirmed, setMyConfirmed] = useState(false);
   const [opponentConfirmed, setOpponentConfirmed] = useState(false);
   const [disputing, setDisputing] = useState(false);
   const confirmedRef = useRef(false);
-  const onNextRef = useRef(onNext);
-  onNextRef.current = onNext;
+  const onNextRaw = useRef(onNext);
+  onNextRaw.current = onNext;
+  // Several signals can finish this step (broadcasts, the row listener, the
+  // poll, the local both-confirmed timer); advance exactly once.
+  const advancedRef = useRef(false);
+  const onNextRef = useRef(() => {
+    if (advancedRef.current) return;
+    advancedRef.current = true;
+    onNextRaw.current();
+  });
 
   const supabase = useMemo(() => createClient(), []);
   const sync = useSessionMatchSync({
@@ -40,6 +70,11 @@ export function MatchSummaryStep({ onNext, matchId, matchType, matchStatus, curr
     matchId,
     onResultConfirmed: (athleteId) => {
       if (athleteId === opponent.id) setOpponentConfirmed(true);
+    },
+    // The opponent disputed: there is nothing left to confirm, so move on
+    // exactly like the disputer does (jits-wfpo).
+    onMatchDisputed: (athleteId) => {
+      if (athleteId !== currentAthleteId) onNextRef.current();
     },
   });
 
@@ -51,26 +86,46 @@ export function MatchSummaryStep({ onNext, matchId, matchType, matchStatus, curr
     }
   }, [myConfirmed, opponentConfirmed]);
 
-  // Listen for match completion via Postgres Changes
+  // Re-read the match + confirmations and decide from the DB. Also seeds
+  // the panels, so a refresh after confirming shows the waiting state.
+  const checkDb = useCallback(async () => {
+    const [match, ids] = await Promise.all([
+      getMatchDetails(supabase, matchId),
+      getMatchConfirmations(supabase, matchId),
+    ]);
+    if (advancedRef.current) return;
+    if (ids?.includes(currentAthleteId)) {
+      confirmedRef.current = true;
+      setMyConfirmed(true);
+    }
+    if (ids?.includes(opponent.id)) setOpponentConfirmed(true);
+    if (isConfirmStepDone(match?.status, ids, currentAthleteId, opponent.id)) onNextRef.current();
+  }, [supabase, matchId, currentAthleteId, opponent.id]);
+
+  // On mount (page refresh mid-confirm), and whenever the matches row
+  // changes. The row event is only a trigger to re-read, never the
+  // decision: its `completed` arrives at record time.
   useEffect(() => {
+    void checkDb();
     const channel = supabase
       .channel(`match-complete:${matchId}`)
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "matches", filter: `id=eq.${matchId}` }, ({ new: row }) => {
         const r = row as { status?: string };
-        if (r.status === "completed") onNextRef.current();
+        if (r.status === "disputed") onNextRef.current();
+        else void checkDb();
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [matchId, supabase]);
+  }, [matchId, supabase, checkDb]);
 
-  // If the match is already completed on mount (e.g., after page refresh),
-  // auto-advance since the PG Changes event will never fire.
+  // A confirmation inserts a row but does not update `matches` (the status
+  // is already completed), so a missed result_confirmed has no row event
+  // to catch it: poll while waiting on the opponent.
   useEffect(() => {
-    if (matchStatus === "completed") {
-      const timer = setTimeout(() => onNextRef.current(), 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [matchStatus]);
+    if (!myConfirmed || opponentConfirmed) return;
+    const id = setInterval(() => void checkDb(), WAITING_POLL_MS);
+    return () => clearInterval(id);
+  }, [myConfirmed, opponentConfirmed, checkDb]);
 
   async function handleConfirm() {
     if (confirmedRef.current) return;
@@ -88,8 +143,10 @@ export function MatchSummaryStep({ onNext, matchId, matchType, matchStatus, curr
 
   async function handleDispute() {
     setDisputing(true);
-    await disputeMatchResult(supabase, matchId);
-    onNext();
+    const res = await disputeMatchResult(supabase, matchId);
+    // Tell the opponent (bounded) before this step and its channel go away.
+    if (res.ok) await settleWithin(sync.broadcastMatchDisputed(currentAthleteId), 1500);
+    onNextRef.current();
   }
 
   return (

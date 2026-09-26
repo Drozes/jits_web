@@ -2,6 +2,36 @@
 
 ## [Unreleased]
 
+### Mobile: match sync reliability (jits-wfpo, jits-bh2v, jits-vh7m, jits-bmei, jits-mzfu)
+
+The match wizard advanced only on per-step `session-match:<id>` broadcasts (`postgres_changes` on `matches` never fire: the table is not in the realtime publication), so any missed broadcast stranded an athlete. The DB is now the backstop. JS-only (no native, `app.json`, dependency or metro/babel change), so OTA-eligible for runtime 0.3.0.
+
+**Added**
+- `apps/mobile/lib/match-flow/reconcile.ts`: pure mapping from a DB snapshot (status + confirmations) to a wizard action. `cancelled` exits like `match_cancelled`, `in_progress` goes live, `completed` goes to confirm until both `match_confirmations` rows exist (then summary; `completed` is set at record time, so it never means "confirmed"), `disputed` goes to summary. Forward-only, with one initial summary -> confirm correction for an athlete who never confirmed.
+- `apps/mobile/lib/match-flow/use-match-reconciler.ts`: re-reads `getMatchDetails` + confirmations on step change / mount, app foreground, every step-channel SUBSCRIBED (join and rejoin), a `matches` row UPDATE (dormant until the backend publishes the table), and a poll only on waiting steps (ready, result, confirm every 4s; live every 10s; paused in the background). One fetch in flight, one trailing fetch, stale reads dropped.
+- `apps/mobile/lib/match-flow/use-wizard-sync.ts`: the wizard's step state (now monotonic) plus reconciler wiring; stops the recorder before leaving live, rebuilds the confirm verdict from the stamped outcome when `result_submitted` was missed, refreshes on summary.
+- `apps/mobile/lib/match-flow/match-sync-context.tsx`: `useStepMatchSync` (per-step channel that reports its status to the reconciler), `SEND_GRACE_MS`.
+- `@jits/shared`: `getMatchConfirmations()` query; `SESSION_MATCH_EVENTS.MATCH_DISPUTED` (`match_disputed {athlete_id}`) with `onMatchDisputed` / `broadcastMatchDisputed`; `useSessionMatchSync` `onStatus` param; `settleWithin()`. Additive; web unaffected.
+- Confirm step: after confirming, "Continue without waiting" appears after 20s so an opponent who leaves cannot hold this athlete on the step (result and ELO are already final at record time).
+- Summary step: a disputed match explains that an admin will review it.
+
+**Fixed**
+- URGENT (live since the backend published `matches` to realtime, jr_be 20260925120100): the confirm step skipped straight to the summary without anyone confirming, and disputing became impossible, because `use-match-completion.ts` treated a `matches` UPDATE to `completed` (and a `completed` status at mount) as "both confirmed", while `record_match_result` sets `completed` at RECORD time. Mobile now advances only on `disputed` or a `match_confirmations` row from both athletes; the row UPDATE only triggers a re-read. Web parity in `apps/web/app/(app)/session/[id]/match/[matchId]/steps/match-summary-step.tsx` (`isConfirmStepDone`; re-reads match + confirmations on mount, on every row UPDATE and every 5s while waiting on the opponent). Tests: `apps/mobile/__tests__/components/match-flow/wizard-reconcile.test.tsx`, `apps/web/.../steps/match-summary-step.test.tsx`.
+- Dispute never reached the other athlete (jits-wfpo): the disputer now broadcasts `match_disputed` (awaited) and the other side moves to the summary with a toast; the confirm poll catches a missed one. Web's session summary step sends and handles it too.
+- Cancel during the opponent's weight step was lost (jits-bh2v): the weight step now listens for `match_cancelled`, and the reconciler exits on `cancelled` at the next step mount.
+- Backgrounded athlete stranded after the opponent recorded (jits-vh7m): foreground re-sync moves them on (live or result -> confirm).
+- Missed `result_confirmed` after a realtime reconnect (jits-bmei): the rejoin and the confirm poll read `match_confirmations` and advance to summary.
+- `result_submitted` lost when the step unmounted right after sending (jits-mzfu): the session-match channel now uses broadcast acks and result, `match_ended`, `timer_started`, `match_cancelled` and dispute sends are awaited (bounded by `SEND_GRACE_MS`) before the step unmounts.
+- Two ready athletes could wait on each other forever when a `ready_signal` was sent before the other's ready step joined: a ready athlete now repeats it every 3s until the opponent's arrives.
+- The live step applies a newer pause state from a re-sync.
+
+**Removed**
+- `apps/mobile/lib/match-flow/use-match-completion.ts`: its `completed` trigger skips confirmation now that `matches` is published (the status flips at record time); superseded by the reconciler.
+
+**Tests**
+- New: `apps/mobile/__tests__/lib/match-flow/reconcile.test.ts`, `use-match-reconciler.test.ts`, `awaited-sends.test.tsx`, `apps/mobile/__tests__/components/match-flow/wizard-reconcile.test.tsx`, `apps/web/.../steps/match-summary-step.test.tsx`; shared additions in `session-match-channel.test.ts`, `use-session-match-sync.test.ts`, `queries.test.ts`.
+- `upload-survives-remount.test.tsx` now drives the summary through the reconciler's row listener (with both confirmations) instead of the deleted hook, and gives its first cold live render a 5s budget (it measured ~1s on a cold jest cache under a full parallel run).
+
 ### Mobile: v0.3.0 TestFlight release
 
 **Changed**
