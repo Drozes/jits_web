@@ -76,6 +76,9 @@ export default function DashboardScreen() {
   }
 
   const stats = data?.summary.stats;
+  // "Welcome back" only for someone who has actually been here: a brand-new
+  // athlete (zero matches) and the pre-load frame both get a plain "Welcome".
+  const hasMatches = !!stats && stats.wins + stats.losses + stats.draws > 0;
 
   const recentMatches = (data?.summary.recent_matches ?? []).map((m) => ({
     id: m.match_id,
@@ -116,7 +119,7 @@ export default function DashboardScreen() {
         }
       >
         <View>
-          <MetaTag>Welcome back</MetaTag>
+          <MetaTag>{hasMatches ? "Welcome back" : "Welcome"}</MetaTag>
           <Text className="font-heading text-[26px] text-ink mt-2" numberOfLines={1}>
             {athlete.display_name}
           </Text>

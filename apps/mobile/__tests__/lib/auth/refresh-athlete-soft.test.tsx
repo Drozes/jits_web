@@ -1,9 +1,8 @@
 /**
  * The post-match athlete refresh must never null the athlete (jits-tlk3).
  *
- * `getCurrentAthlete` returns null on ANY error. The plain `refreshAthlete`
- * applies that null, which is right for profile setup but fatal for a
- * background refresh: `useRequireAthlete` on the still-mounted tabs would
+ * A null athlete is fatal for a background refresh: `useRequireAthlete` on
+ * the still-mounted tabs would
  * `router.replace("/profile-setup")` and `ArenaBootstrap` would unmount its
  * owner, dropping live state and presence.
  *
@@ -18,9 +17,16 @@ import { act, render } from "@testing-library/react-native";
 
 // ---- auth provider dependencies ----
 
+// Resolves to a row, or to `null` for a failed read (a network blip). The
+// provider reads through the Result variant, so a null here is `{ ok: false }`.
 const mockGetCurrentAthlete = jest.fn();
 jest.mock("@jits/shared/api/queries", () => ({
-  getCurrentAthlete: (...a: unknown[]) => mockGetCurrentAthlete(...a),
+  getCurrentAthleteResult: async (...a: unknown[]) => {
+    const row = await mockGetCurrentAthlete(...a);
+    return row
+      ? { ok: true, data: row }
+      : { ok: false, error: { code: "UNKNOWN", message: "blip" } };
+  },
 }));
 
 jest.mock("@/lib/supabase/client", () => ({

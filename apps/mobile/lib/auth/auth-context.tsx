@@ -3,9 +3,10 @@ import { Platform } from "react-native";
 import type { Session, User } from "@supabase/supabase-js";
 import { ATHLETE_STATUS } from "@jits/shared/constants";
 import {
-  getCurrentAthlete,
+  getCurrentAthleteResult,
   type AthleteGuardRow,
 } from "@jits/shared/api/queries";
+import { backoffDelayMs } from "@jits/shared/utils";
 import { supabase } from "../supabase/client";
 import { setCachedElo } from "../splash/elo-cache";
 import { needsAthleteLoad } from "./athlete-load";
@@ -19,6 +20,16 @@ export type AuthState = {
   athlete: AthleteGuardRow | null;
   isLoading: boolean;
   isAthleteActive: boolean;
+  /**
+   * True while the signed-in user's athlete row has failed to load several
+   * times in a row. `isLoading` stays true meanwhile (a failed read is NOT "no
+   * athlete", which would send an active athlete to /profile-setup); the
+   * provider keeps retrying with backoff, and `app/index.tsx` shows a retry
+   * state instead of the bare "Loading...".
+   */
+  athleteLoadFailed: boolean;
+  /** Retry the athlete load now instead of waiting out the backoff. */
+  retryAthleteLoad: () => void;
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
   signInWithGoogle: () => Promise<{ error: AuthError | null; cancelled?: boolean }>;
   signUp: (
@@ -29,13 +40,28 @@ export type AuthState = {
   resetPassword: (email: string) => Promise<{ error: AuthError | null }>;
   refreshAthlete: () => Promise<void>;
   /**
-   * Re-read the athlete row, but keep the current one when the read fails.
-   * `getCurrentAthlete` returns null on ANY error, and a null athlete sends
+   * Re-read the athlete row, but keep the current one when the read fails or
+   * finds no row. A null athlete sends
    * the mounted tabs to /profile-setup and tears down live state, so a
    * background refresh (after a match, jits-tlk3) must never apply it.
    */
   refreshAthleteSoft: () => Promise<void>;
 };
+
+/** Backoff between cold-start athlete reads: about 1s, 2s, 4s, then 8s apart. */
+export const ATHLETE_LOAD_BACKOFF = { baseMs: 1_000, maxMs: 8_000 };
+/** Failed reads before `athleteLoadFailed` swaps "Loading..." for a retry state. */
+export const ATHLETE_LOAD_FAILURES_BEFORE_RETRY_UI = 3;
+
+/** The athlete read, with a thrown call folded into the failure branch. */
+async function readAthlete(uid: string) {
+  try {
+    return await getCurrentAthleteResult(supabase, uid);
+  } catch (e) {
+    console.warn("[auth] athlete read threw", e);
+    return { ok: false as const };
+  }
+}
 
 let googleConfigured = false;
 async function ensureGoogleConfigured() {
@@ -95,26 +121,50 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => sub.subscription.unsubscribe();
   }, []);
 
+  const [athleteLoadFailed, setAthleteLoadFailed] = React.useState(false);
+  const [loadNonce, setLoadNonce] = React.useState(0);
+
   // Load the athlete guard row whenever the signed-in user changes. Runs outside
   // the auth-state callback (no lock held) so it can't deadlock, and keeps
-  // `isLoading` true until the first fetch resolves so Index() doesn't flash the
-  // profile-setup redirect for an already-active athlete.
+  // `isLoading` true until a read SUCCEEDS so Index() doesn't flash the
+  // profile-setup redirect for an already-active athlete. A failed read (a
+  // flaky cold start) is retried with backoff and never stored as "no
+  // athlete": that null would send an active athlete to /profile-setup, whose
+  // wizard has no row to update and dead-ends on an RLS error.
   React.useEffect(() => {
     const uid = user?.id;
-    if (!uid) return;
+    if (!uid) {
+      setAthleteLoadFailed(false);
+      return;
+    }
     let cancelled = false;
-    void (async () => {
-      const row = await getCurrentAthlete(supabase, uid);
-      if (!cancelled) {
-        setAthlete(row);
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let failures = 0;
+    const attempt = async () => {
+      const result = await readAthlete(uid);
+      if (cancelled) return;
+      if (result.ok) {
+        setAthlete(result.data);
         loadedAthleteForUserId.current = uid;
+        setAthleteLoadFailed(false);
         setIsLoading(false);
+        return;
       }
-    })();
+      failures += 1;
+      if (failures >= ATHLETE_LOAD_FAILURES_BEFORE_RETRY_UI) setAthleteLoadFailed(true);
+      timer = setTimeout(() => void attempt(), backoffDelayMs(failures, ATHLETE_LOAD_BACKOFF));
+    };
+    void attempt();
     return () => {
       cancelled = true;
+      if (timer) clearTimeout(timer);
     };
-  }, [user?.id]);
+  }, [user?.id, loadNonce]);
+
+  const retryAthleteLoad = React.useCallback(() => {
+    // Restarting the effect above drops the pending backoff timer and reads now.
+    setLoadNonce((n) => n + 1);
+  }, []);
 
   // Persist the real ELO so the next cold-start "Climb" rolls to it, not 1481.
   React.useEffect(() => {
@@ -128,18 +178,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setAthlete(null);
       return;
     }
-    const row = await getCurrentAthlete(supabase, user.id);
-    setAthlete(row);
+    const result = await readAthlete(user.id);
+    // A failed read keeps the current athlete; only a successful read (which
+    // may genuinely be "no row") replaces it.
+    if (result.ok) setAthlete(result.data);
   }, [user]);
 
   const refreshAthleteSoft = React.useCallback(async () => {
     const uid = user?.id;
     if (!uid) return;
-    const row = await getCurrentAthlete(supabase, uid);
-    // A failed read, or a sign-out / account switch while it was in flight:
-    // leave whatever the athlete is now alone.
-    if (!row || loadedAthleteForUserId.current !== uid) return;
-    setAthlete(row);
+    const result = await readAthlete(uid);
+    // A failed read, a missing row, or a sign-out / account switch while it
+    // was in flight: leave whatever the athlete is now alone.
+    if (!result.ok || !result.data || loadedAthleteForUserId.current !== uid) return;
+    setAthlete(result.data);
   }, [user]);
 
   const signIn = React.useCallback(
@@ -233,6 +285,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       athlete,
       isLoading,
       isAthleteActive,
+      athleteLoadFailed,
+      retryAthleteLoad,
       signIn,
       signInWithGoogle,
       signUp,
@@ -247,6 +301,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       athlete,
       isLoading,
       isAthleteActive,
+      athleteLoadFailed,
+      retryAthleteLoad,
       signIn,
       signInWithGoogle,
       signUp,

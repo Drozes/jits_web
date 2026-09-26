@@ -8,7 +8,7 @@ import {
   View,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ArrowUpRight, BarChart3, Swords } from "lucide-react-native";
+import { ArrowUpRight, BarChart3 } from "lucide-react-native";
 import { CompareStatsModal } from "@/components/compare-stats-modal";
 import { CompetitorHeader } from "@/components/athlete/competitor-header";
 import { HeadToHeadCard } from "@/components/athlete/head-to-head-card";
@@ -126,20 +126,9 @@ export default function AthleteProfileScreen() {
           stats={data.compStats}
         />
 
+        {/* No Challenge button here (jits-qwn5): challenges happen in the
+            Arena, and a disabled "coming soon" CTA read as broken. */}
         <View className="gap-2">
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => toast.info("Challenges coming soon")}
-            disabled
-            className="flex-row items-center justify-center gap-2 bg-cta rounded-sm px-5 py-4 opacity-60"
-          >
-            <View pointerEvents="none">
-              <Swords size={16} color={tokens.textOnAccent} />
-            </View>
-            <Text className="font-heading text-[12px] text-ink-on-cta uppercase tracking-caps">
-              Challenge
-            </Text>
-          </Pressable>
           <Pressable
             accessibilityRole="button"
             onPress={() => setCompareOpen(true)}

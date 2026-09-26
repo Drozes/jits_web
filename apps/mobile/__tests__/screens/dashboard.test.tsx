@@ -339,6 +339,35 @@ describe("DashboardScreen", () => {
   });
 });
 
+describe("DashboardScreen greeting", () => {
+  it("says Welcome back to an athlete with matches", async () => {
+    const { findByText, queryByText } = render(React.createElement(DashboardScreen));
+    expect(await findByText("Welcome back")).toBeTruthy();
+    expect(queryByText("Welcome")).toBeNull();
+  });
+
+  it("says Welcome (not back) to a brand-new athlete with zero matches", async () => {
+    const queries = require("@jits/shared/api/queries") as QueryMocks;
+    queries.getDashboardSummary.mockResolvedValue({
+      ...mockSummary,
+      stats: { wins: 0, losses: 0, draws: 0, win_streak: 0, best_win_streak: 0, total_matches: 0 },
+    });
+    const { getByText, queryByText } = render(React.createElement(DashboardScreen));
+    await waitFor(() => expect(getByText("0W")).toBeTruthy());
+    expect(getByText("Welcome")).toBeTruthy();
+    expect(queryByText("Welcome back")).toBeNull();
+  });
+
+  it("says Welcome when the summary has no stats (brand-new athlete)", async () => {
+    const queries = require("@jits/shared/api/queries") as QueryMocks;
+    queries.getDashboardSummary.mockResolvedValue({ ...mockSummary, stats: null });
+    const { getByText, queryByText } = render(React.createElement(DashboardScreen));
+    await waitFor(() => expect(getByText("0W")).toBeTruthy());
+    expect(getByText("Welcome")).toBeTruthy();
+    expect(queryByText("Welcome back")).toBeNull();
+  });
+});
+
 describe("DashboardScreen (zero state)", () => {
   it("renders zero values when there are no matches", async () => {
     const queries = require("@jits/shared/api/queries") as {

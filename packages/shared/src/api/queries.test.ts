@@ -2,6 +2,8 @@ import { describe, it, expect, vi } from "vitest";
 import {
   getArenaData,
   getArenaDataResult,
+  getCurrentAthlete,
+  getCurrentAthleteResult,
   getGymDetail,
   getGymDetailResult,
   getGymsWithSessions,
@@ -892,5 +894,49 @@ describe("getMatchConfirmations", () => {
   it("returns null (unknown, not 'nobody') on an error", async () => {
     const { client } = confirmationsClient({ data: null, error: { message: "rls" } });
     await expect(getMatchConfirmations(client, "m-1")).resolves.toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getCurrentAthleteResult: a failed read is not "no athlete row"
+// ---------------------------------------------------------------------------
+
+function athleteGuardClient(result: { data: unknown; error: unknown }) {
+  const eq = vi.fn(() => ({ maybeSingle: () => Promise.resolve(result) }));
+  const select = vi.fn(() => ({ eq }));
+  const from = vi.fn(() => ({ select }));
+  return { client: { from } as never, from, eq };
+}
+
+const NETWORK_ERROR = { code: "PGRST000", message: "network", details: "", hint: "" };
+
+describe("getCurrentAthleteResult", () => {
+  const ROW = { id: "me-1", status: "active" };
+
+  it("returns the row for the auth user", async () => {
+    const { client, from, eq } = athleteGuardClient({ data: ROW, error: null });
+    await expect(getCurrentAthleteResult(client, "u-1")).resolves.toEqual({ ok: true, data: ROW });
+    expect(from).toHaveBeenCalledWith("athletes");
+    expect(eq).toHaveBeenCalledWith("auth_user_id", "u-1");
+  });
+
+  it("returns ok with null when there is genuinely no row", async () => {
+    const { client } = athleteGuardClient({ data: null, error: null });
+    await expect(getCurrentAthleteResult(client, "u-1")).resolves.toEqual({ ok: true, data: null });
+  });
+
+  it("returns a failure (not ok/null) on a read error", async () => {
+    const { client } = athleteGuardClient({ data: null, error: NETWORK_ERROR });
+    const result = await getCurrentAthleteResult(client, "u-1");
+    expect(result.ok).toBe(false);
+  });
+
+  it("leaves getCurrentAthlete's null-on-error semantics unchanged", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const failed = athleteGuardClient({ data: null, error: NETWORK_ERROR });
+    await expect(getCurrentAthlete(failed.client, "u-1")).resolves.toBeNull();
+    const ok = athleteGuardClient({ data: ROW, error: null });
+    await expect(getCurrentAthlete(ok.client, "u-1")).resolves.toEqual(ROW);
+    spy.mockRestore();
   });
 });
