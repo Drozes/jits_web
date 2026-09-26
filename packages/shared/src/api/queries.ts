@@ -37,6 +37,12 @@ import type {
   GymLadderRow,
 } from "../types/gym-portal";
 import { mapPostgrestError, type DomainError, type Result } from "./errors";
+import {
+  videoPlayability,
+  videoAngleLabel,
+  sortMatchVideosForViewer,
+  type VideoPlayability,
+} from "../utils/match-video";
 
 type Client = SupabaseClient<Database>;
 
@@ -2353,4 +2359,397 @@ export async function getMatchVideoSignedUrlResult(
     expiresInSeconds,
   );
   return error ? { ok: false, error } : { ok: true, data: url };
+}
+
+// ---------------------------------------------------------------------------
+// Match detail view (history + playback), V-epic jits-5tj9.6
+//
+// Additive on purpose: `getMatchDetails` (null on any error, drops `videos`)
+// is what the match wizard and reconciler rely on, and the two signed-URL
+// functions above keep their exact contracts. Everything here is
+// Result-shaped and never throws.
+// ---------------------------------------------------------------------------
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const MATCH_NOT_FOUND_ERROR: DomainError = {
+  code: "MATCH_NOT_FOUND",
+  message: "Match not found.",
+};
+
+/** Max `get_match_details` fallback calls one `getMyMatchVideos` may make. */
+const MY_MATCH_VIDEOS_DETAIL_CAP = 20;
+
+function unexpectedError(context: string, err: unknown): DomainError {
+  console.error(`${context}:`, err);
+  return {
+    code: "UNKNOWN",
+    message: err instanceof Error ? err.message : "Something went wrong.",
+  };
+}
+
+/**
+ * Sign a `match_videos.thumbnail_url` for display. The column holds a STORAGE
+ * KEY in the private bucket (jits-fjzy), not a URL; a legacy `http...` value
+ * passes through. Best effort: any failure yields null, never an error.
+ */
+async function signPosterKey(
+  supabase: Client,
+  key: string | null | undefined,
+  expiresInSeconds: number,
+): Promise<string | null> {
+  if (!key) return null;
+  if (/^https?:\/\//i.test(key)) return key;
+  try {
+    const { data, error } = await supabase.storage
+      .from(MATCH_VIDEO_BUCKET)
+      .createSignedUrl(key, expiresInSeconds);
+    if (error || !data?.signedUrl) return null;
+    return data.signedUrl;
+  } catch {
+    return null;
+  }
+}
+
+/** One entry of `get_match_details().videos` (deleted rows never present). */
+interface MatchDetailsVideoRow {
+  id: string;
+  uploaded_by: string;
+  uploaded_by_name: string | null;
+  status: string;
+  duration_seconds: number | null;
+  thumbnail_url: string | null;
+  camera_angle: string | null;
+  angle_quality: number | null;
+  has_analysis: boolean | null;
+  analysis_tier: string | null;
+}
+
+export interface MatchDetailVideo {
+  /** match_videos.id (the player route param). */
+  id: string;
+  /** Uploader athlete id. */
+  uploaded_by: string;
+  uploaded_by_name: string | null;
+  /** Raw match_videos.status. */
+  status: string;
+  playability: VideoPlayability;
+  duration_seconds: number | null;
+  camera_angle: string | null;
+  has_analysis: boolean;
+  /** uploaded_by === viewer. */
+  is_mine: boolean;
+  /** "Your recording" / "<name>'s recording". */
+  angle_label: string;
+  /** Signed thumbnail key (1h), http passthrough, or null. */
+  poster_url: string | null;
+}
+
+export interface MatchDetailView {
+  match: Omit<MatchDetails, "participants">;
+  /** The viewer's participant row. */
+  me: MatchParticipant;
+  /** The other participant (null only on corrupt data). */
+  opponent: MatchParticipant | null;
+  /** Viewer's own first; deleted rows are never present, failed ones are. */
+  videos: MatchDetailVideo[];
+}
+
+/**
+ * Match detail for a history row, via `get_match_details` (SECURITY DEFINER,
+ * participant-gated, no status filter, so disputed matches are included).
+ * Result-shaped so the UI can tell "not yours" (NOT_PARTICIPANT) from "gone"
+ * (MATCH_NOT_FOUND) from "network" (anything else).
+ */
+export async function getMatchDetailView(
+  supabase: Client,
+  matchId: string,
+  viewerAthleteId: string,
+): Promise<Result<MatchDetailView>> {
+  // Deep links and route params are untrusted; a malformed id would only earn
+  // a 22P02 from Postgres, so answer "not found" without the round trip.
+  if (!UUID_RE.test(matchId)) return { ok: false, error: MATCH_NOT_FOUND_ERROR };
+
+  try {
+    const { data, error } = await supabase.rpc("get_match_details", {
+      p_match_id: matchId,
+    });
+    if (error) {
+      console.error("getMatchDetailView:", error);
+      return { ok: false, error: mapPostgrestError(error, "match_detail") };
+    }
+    if (!data) return { ok: false, error: MATCH_NOT_FOUND_ERROR };
+
+    const payload = data as unknown as {
+      match: Omit<MatchDetails, "participants">;
+      participants: MatchParticipant[] | null;
+      videos?: MatchDetailsVideoRow[] | null;
+    };
+    const participants = payload.participants ?? [];
+    const me = participants.find((p) => p.athlete_id === viewerAthleteId);
+    // The RPC also admits the timekeeper, who has no participant row.
+    if (!me) {
+      return {
+        ok: false,
+        error: {
+          code: "NOT_PARTICIPANT",
+          message: "You are not a participant in this match.",
+        },
+      };
+    }
+    const opponent =
+      participants.find((p) => p.athlete_id !== viewerAthleteId) ?? null;
+
+    const rows = sortMatchVideosForViewer(payload.videos ?? [], viewerAthleteId);
+    const posters = await Promise.all(
+      rows.map((v) => signPosterKey(supabase, v.thumbnail_url, 3600)),
+    );
+    const videos: MatchDetailVideo[] = rows.map((v, i) => {
+      const isMine = v.uploaded_by === viewerAthleteId;
+      return {
+        id: v.id,
+        uploaded_by: v.uploaded_by,
+        uploaded_by_name: v.uploaded_by_name,
+        status: v.status,
+        playability: videoPlayability(v.status),
+        duration_seconds: v.duration_seconds,
+        camera_angle: v.camera_angle,
+        has_analysis: v.has_analysis === true,
+        is_mine: isMine,
+        angle_label: videoAngleLabel(
+          v.uploaded_by,
+          viewerAthleteId,
+          v.uploaded_by_name ?? (isMine ? null : opponent?.display_name ?? null),
+        ),
+        poster_url: posters[i],
+      };
+    });
+
+    return { ok: true, data: { match: payload.match, me, opponent, videos } };
+  } catch (err) {
+    return { ok: false, error: unexpectedError("getMatchDetailView", err) };
+  }
+}
+
+export interface MatchVideoPlayback {
+  /** Signed URL of normalized_path ?? storage_path. */
+  url: string;
+  /** Signed thumbnail key, best effort. */
+  posterUrl: string | null;
+  /** match_videos.status at read time. */
+  status: string;
+  playability: VideoPlayability;
+}
+
+/**
+ * Everything the player needs for one video id.
+ *
+ *   { ok: true, data: MatchVideoPlayback }   sign it and play
+ *   { ok: true, data: null }                 no row visible (deleted, or not a
+ *                                            participant) or no path yet
+ *   { ok: false, error: VIDEO_FILE_MISSING } row exists, storage says the
+ *                                            object does not
+ *   { ok: false, error: <other> }            read or sign failed, retryable
+ */
+export async function getMatchVideoPlaybackResult(
+  supabase: Client,
+  videoId: string,
+  expiresInSeconds = 3600,
+): Promise<Result<MatchVideoPlayback | null>> {
+  try {
+    const { data, error } = await supabase
+      .from("match_videos")
+      .select("storage_path, normalized_path, thumbnail_url, status")
+      .eq("id", videoId)
+      .maybeSingle();
+    if (error) {
+      console.error("getMatchVideoPlaybackResult:", error);
+      return {
+        ok: false,
+        error: mapPostgrestError(error, "match_video_playback"),
+      };
+    }
+    // Same single-source rule as loadMatchVideoSignedUrl (jits-8t0m): prefer
+    // the normalized H.264/AAC MP4 when the slicer wrote one, else the original.
+    const playbackPath = data?.normalized_path ?? data?.storage_path;
+    if (!data || !playbackPath) return { ok: true, data: null };
+
+    const [{ data: signed, error: signError }, posterUrl] = await Promise.all([
+      supabase.storage
+        .from(MATCH_VIDEO_BUCKET)
+        .createSignedUrl(playbackPath, expiresInSeconds),
+      signPosterKey(supabase, data.thumbnail_url, expiresInSeconds),
+    ]);
+    if (signError) {
+      console.error("getMatchVideoPlaybackResult sign:", signError);
+      // Storage answers "Object not found" when the row outlived its file.
+      if (/not.?found/i.test(signError.message)) {
+        return {
+          ok: false,
+          error: {
+            code: "VIDEO_FILE_MISSING",
+            message: "The video file was not found.",
+          },
+        };
+      }
+      return { ok: false, error: { code: "UNKNOWN", message: signError.message } };
+    }
+    if (!signed?.signedUrl) {
+      return {
+        ok: false,
+        error: { code: "UNKNOWN", message: "Storage returned no signed URL." },
+      };
+    }
+    return {
+      ok: true,
+      data: {
+        url: signed.signedUrl,
+        posterUrl,
+        status: data.status,
+        playability: videoPlayability(data.status),
+      },
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      error: unexpectedError("getMatchVideoPlaybackResult", err),
+    };
+  }
+}
+
+export interface MatchVideoListItem {
+  match_id: string;
+  /** "completed" for history matches, else get_match_details status ("disputed", ...), or "unknown". */
+  match_status: string;
+  /** "ranked" | "casual" */
+  match_type: string | null;
+  /** completed_at, else the newest video's created_at. */
+  match_date: string | null;
+  opponent_id: string | null;
+  opponent_name: string | null;
+  outcome: "win" | "loss" | "draw" | null;
+  video_count: number;
+  /** Videos whose playability !== "processing" (failed still counts). */
+  playable_count: number;
+  /** Max created_at of the group. */
+  latest_video_at: string;
+}
+
+function asOutcome(
+  value: string | null | undefined,
+): MatchVideoListItem["outcome"] {
+  return value === "win" || value === "loss" || value === "draw" ? value : null;
+}
+
+/**
+ * Every non-deleted video in the caller's matches (both uploaders, failed
+ * included, disputed matches included), grouped one item per match, newest
+ * first. Composed client-side because `get_athlete_videos` hides failed
+ * videos and disputed matches and caps at 10 with no offset.
+ *
+ * `opts.limit` caps the video ROWS read (default 100). Matches missing from
+ * `get_match_history` (disputed, voided, in progress) are enriched through
+ * `get_match_details`, at most 20 calls; the rest are kept with null metadata
+ * and `match_status: "unknown"`. A video is never dropped. The only failure
+ * is the video list read itself.
+ */
+export async function getMyMatchVideos(
+  supabase: Client,
+  athleteId: string,
+  opts?: { limit?: number },
+): Promise<Result<MatchVideoListItem[]>> {
+  const limit = opts?.limit ?? 100;
+  try {
+    // RLS (match_videos_select_participant) scopes this to the caller's
+    // matches. No embedded joins: match_participants is RLS-blocked and the
+    // metadata comes from the RPCs below.
+    const { data, error } = await supabase
+      .from("match_videos")
+      .select("id, match_id, uploaded_by, status, created_at")
+      .neq("status", "deleted")
+      .order("created_at", { ascending: false })
+      .limit(limit);
+    if (error) {
+      console.error("getMyMatchVideos:", error);
+      return { ok: false, error: mapPostgrestError(error, "match_video_list") };
+    }
+
+    // Map keeps first-seen order, which is newest-first from the query.
+    const groups = new Map<
+      string,
+      { video_count: number; playable_count: number; latest_video_at: string }
+    >();
+    for (const row of data ?? []) {
+      const g = groups.get(row.match_id) ?? {
+        video_count: 0,
+        playable_count: 0,
+        latest_video_at: row.created_at,
+      };
+      g.video_count += 1;
+      if (videoPlayability(row.status) !== "processing") g.playable_count += 1;
+      if (row.created_at > g.latest_video_at) g.latest_video_at = row.created_at;
+      groups.set(row.match_id, g);
+    }
+    if (groups.size === 0) return { ok: true, data: [] };
+
+    // getMatchHistory already returns [] on failure; the fallback below then
+    // covers whatever it can within the cap.
+    const history = await getMatchHistory(supabase, athleteId);
+    const historyById = new Map(history.map((h) => [h.match_id, h]));
+
+    const fallbackIds = [...groups.keys()]
+      .filter((id) => !historyById.has(id))
+      .slice(0, MY_MATCH_VIDEOS_DETAIL_CAP);
+    const details = await Promise.all(
+      fallbackIds.map((id) => getMatchDetails(supabase, id).catch(() => null)),
+    );
+    const detailsById = new Map(fallbackIds.map((id, i) => [id, details[i]]));
+
+    const items: MatchVideoListItem[] = [];
+    for (const [matchId, g] of groups) {
+      const base = { match_id: matchId, ...g };
+      const h = historyById.get(matchId);
+      if (h) {
+        items.push({
+          ...base,
+          match_status: "completed",
+          match_type: h.match_type ?? null,
+          match_date: h.completed_at ?? g.latest_video_at,
+          opponent_id: h.opponent_id ?? null,
+          opponent_name: h.opponent_display_name ?? null,
+          outcome: asOutcome(h.athlete_outcome),
+        });
+        continue;
+      }
+      const d = detailsById.get(matchId);
+      if (d) {
+        const me = d.participants?.find((p) => p.athlete_id === athleteId);
+        const opp = d.participants?.find((p) => p.athlete_id !== athleteId);
+        items.push({
+          ...base,
+          match_status: d.status,
+          match_type: d.match_type ?? null,
+          match_date: d.completed_at ?? g.latest_video_at,
+          opponent_id: opp?.athlete_id ?? null,
+          opponent_name: opp?.display_name ?? null,
+          outcome: asOutcome(me?.outcome),
+        });
+        continue;
+      }
+      // Detail call failed, or beyond the cap: keep the video, drop the metadata.
+      items.push({
+        ...base,
+        match_status: "unknown",
+        match_type: null,
+        match_date: g.latest_video_at,
+        opponent_id: null,
+        opponent_name: null,
+        outcome: null,
+      });
+    }
+    return { ok: true, data: items };
+  } catch (err) {
+    return { ok: false, error: unexpectedError("getMyMatchVideos", err) };
+  }
 }

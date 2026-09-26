@@ -31,6 +31,8 @@ export type DomainErrorCode =
   | "NOT_ADMIN"
   | "ATHLETE_NOT_FOUND"
   | "GYM_NOT_FOUND"
+  | "MATCH_NOT_FOUND"
+  | "VIDEO_FILE_MISSING"
   | "RLS_VIOLATION"
   | "UNKNOWN";
 
@@ -52,6 +54,7 @@ const HINT_TO_CODE: Record<string, { code: DomainErrorCode; message: string }> =
       message: "You are not a participant in this match.",
     },
     not_found: { code: "UNKNOWN", message: "Match not found." },
+    match_not_found: { code: "MATCH_NOT_FOUND", message: "Match not found." },
     invalid_status: {
       code: "MATCH_NOT_PENDING",
       message: "This match has already been started.",

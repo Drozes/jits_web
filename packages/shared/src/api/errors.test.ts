@@ -33,6 +33,13 @@ describe("mapPostgrestError", () => {
       expect(result.message).toBe("Match not found.");
     });
 
+    it("maps 'match_not_found' hint to MATCH_NOT_FOUND", () => {
+      const result = mapPostgrestError(pgError("P0001", "err", "match_not_found"));
+      expect(result.code).toBe("MATCH_NOT_FOUND");
+      expect(result.message).toBe("Match not found.");
+      expect(result.raw).toBeDefined();
+    });
+
     it("maps 'invalid_status' hint to MATCH_NOT_PENDING", () => {
       const result = mapPostgrestError(pgError("P0001", "err", "invalid_status"));
       expect(result.code).toBe("MATCH_NOT_PENDING");
