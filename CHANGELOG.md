@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### Shared: match detail + video playback data layer (jits-5tj9.6)
+
+**Added**
+- `packages/shared/src/api/queries.ts`, new "Match detail view (history + playback)" section (all `Result`-shaped, never throw):
+  - `getMatchDetailView(supabase, matchId, viewerAthleteId)`: `get_match_details` including its `videos` (failed kept, deleted never present), split into `me` / `opponent`, viewer's video first, per-video `playability`, `angle_label`, and a best-effort signed `poster_url` (thumbnail keys are storage keys, `http` values pass through, signing failure is `null`). A non-UUID id returns `MATCH_NOT_FOUND` without a round trip; a viewer with no participant row (timekeeper) gets `NOT_PARTICIPANT`.
+  - `getMatchVideoPlaybackResult(supabase, videoId, expiresInSeconds = 3600)`: signed `normalized_path ?? storage_path` plus poster, status and playability; a malformed id, no row, a `deleted` row or no path is `ok: true, null`; a storage "Object not found" (404 when a status code is present, never "Bucket not found") is `VIDEO_FILE_MISSING`.
+  - `getMyMatchVideos(supabase, athleteId, { limit })`: every non-deleted video in the caller's matches (both uploaders, failed and disputed included) grouped one item per match, newest first, enriched from `get_match_history` and, for matches missing from it, up to 20 `get_match_details` calls; no video is ever dropped (when exactly `limit` rows return, the oldest group may be undercounted, documented in the JSDoc).
+- `packages/shared/src/utils/match-video.ts`: `videoPlayability`, `videoAngleLabel`, `sortMatchVideosForViewer`, `formatVideoDuration` (exported from `@jits/shared/utils`).
+- `packages/shared/src/api/errors.ts`: `MATCH_NOT_FOUND` and `VIDEO_FILE_MISSING` codes; hint `match_not_found` maps to `MATCH_NOT_FOUND`.
+- Tests: `packages/shared/src/api/match-detail-view.test.ts`, `packages/shared/src/utils/match-video.test.ts`, `errors.test.ts`. Existing `getMatchDetails`, `getMatchVideoSignedUrl`, `getMatchVideoSignedUrlResult` and `getAthleteVideos` are unchanged.
+
 ### Web: session match confirm-step parity with mobile
 
 **Fixed**
