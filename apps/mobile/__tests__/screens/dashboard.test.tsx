@@ -385,3 +385,56 @@ describe("DashboardScreen (loading)", () => {
     expect(queryByText("RecentActivitySection")).toBeNull();
   });
 });
+
+// Home's Arena card reads the live bit from the app-wide arena store and
+// nothing else (jits-sq3a): while the header says LIVE, it must not tell the
+// athlete to go live.
+describe("DashboardScreen Arena card (live-aware)", () => {
+  const store = require("@/lib/arena/arena-store") as typeof import("@/lib/arena/arena-store");
+
+  afterEach(() => {
+    store.__resetArenaStoreForTests();
+  });
+
+  it("invites an offline athlete to go live", () => {
+    const { getByText, queryByText } = render(React.createElement(DashboardScreen));
+    expect(getByText("Find a match")).toBeTruthy();
+    expect(getByText(/Go live in the Arena/)).toBeTruthy();
+    expect(getByText("Enter the Arena →")).toBeTruthy();
+    expect(queryByText("You're live")).toBeNull();
+  });
+
+  it("says the athlete is already live, and still leads to the Arena", () => {
+    act(() => {
+      store.publishArenaState({ ...store.IDLE_ARENA_STATE, isLive: true });
+    });
+    const { getByText, queryByText, getByLabelText } = render(
+      React.createElement(DashboardScreen),
+    );
+
+    expect(getByText("You're live")).toBeTruthy();
+    expect(
+      getByText("You're in the lobby. Challenges reach you on any tab."),
+    ).toBeTruthy();
+    expect(getByText("Open the Arena →")).toBeTruthy();
+    expect(queryByText("Find a match")).toBeNull();
+    expect(queryByText(/Go live in the Arena/)).toBeNull();
+
+    fireEvent.press(getByLabelText("Go to the Arena"));
+    expect(mockPush).toHaveBeenCalledWith(ARENA_HREF);
+  });
+
+  it("flips back when the athlete goes offline", () => {
+    act(() => {
+      store.publishArenaState({ ...store.IDLE_ARENA_STATE, isLive: true });
+    });
+    const { getByText, queryByText } = render(React.createElement(DashboardScreen));
+    expect(getByText("You're live")).toBeTruthy();
+
+    act(() => {
+      store.publishArenaState({ ...store.IDLE_ARENA_STATE, isLive: false });
+    });
+    expect(getByText("Find a match")).toBeTruthy();
+    expect(queryByText("You're live")).toBeNull();
+  });
+});

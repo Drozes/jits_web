@@ -20,8 +20,9 @@ export function GoLivePlate({ isLive, isSaving, onToggle }: GoLivePlateProps) {
     <Plate variant={isLive ? "live" : "default"}>
       <View className="flex-row items-start justify-between gap-3">
         <View className="flex-1">
+          {/* Offline is stated as a fact, never as a search already running. */}
           <Text className="font-heading text-[16px] text-ink">
-            Looking for Match
+            {isLive ? "Looking for a match" : "You're offline"}
           </Text>
           <Text className="mt-1 font-body text-[13px] text-ink-2">
             {isLive

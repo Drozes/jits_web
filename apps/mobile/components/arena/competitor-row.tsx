@@ -36,6 +36,8 @@ interface CompetitorRowProps {
   onChallenge: () => void;
   onGoLive: () => void;
   onOpenProfile: () => void;
+  /** The opponent a match summary's Rematch pointed here: tagged, not recoloured. */
+  pinned?: boolean;
 }
 
 function Tag({ label }: { label: string }) {
@@ -50,6 +52,7 @@ export function CompetitorRow({
   onChallenge,
   onGoLive,
   onOpenProfile,
+  pinned = false,
 }: CompetitorRowProps) {
   const { displayName, currentElo, eloDiff, gymName, weight } = competitor;
   const gap = eloDiff > 0 ? `+${eloDiff}` : String(eloDiff);
@@ -94,6 +97,7 @@ export function CompetitorRow({
         </Pressable>
 
         <View className="shrink-0 items-end gap-1">
+          {pinned ? <Tag label="Rematch" /> : null}
           {action.kind === "challenge" ? (
             <Pressable
               accessibilityRole="button"

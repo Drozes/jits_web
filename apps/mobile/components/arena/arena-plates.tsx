@@ -157,12 +157,34 @@ export function EmptyLobbyPlate({ isLive }: { isLive: boolean }) {
   );
 }
 
-/** Roster has people, but none of them are present right now. */
-export function NobodyOnlineNote() {
+/**
+ * Roster has people, but none of them are present right now. The viewer may
+ * be live themselves, so "nobody" never includes them, and the copy never
+ * promises that the offline rows below can take a challenge.
+ */
+export function NobodyOnlineNote({ isLive }: { isLive: boolean }) {
   return (
     <Text className="font-body text-[13px] text-ink-2">
-      Nobody has the app open right now. The athletes below are open to
-      challenges and will see it next time they are on.
+      {isLive
+        ? "Nobody else is live right now. Stay live and anyone who goes live shows up here."
+        : "Nobody is live right now. Go live and you'll be first in the lobby."}
+    </Text>
+  );
+}
+
+/**
+ * Arrived from a match summary's Rematch (`/arena?rematch=<id>`) while that
+ * opponent is not in the lobby. Their row pins to the top of Online now the
+ * moment they are; this line only says why it is not there yet. The name is
+ * known only when they are on the roster, so it falls back to a neutral one.
+ */
+export function RematchHint({ name }: { name: string | null }) {
+  return (
+    <Text
+      testID="arena-rematch-hint"
+      className="font-body text-[12px] text-ink-3"
+    >
+      {`${name ?? "Your opponent"} is not live right now.`}
     </Text>
   );
 }
