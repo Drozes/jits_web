@@ -135,7 +135,9 @@ Exit code: 0 when every scenario is `pass`, `flake` or `known`; 1 when any is
 `fail`, `harness_error` or `env_error`; 2 for a preflight/env refusal.
 
 Target: the core tier takes about 2.5 to 3 minutes; the extended tier about
-8 to 10 minutes.
+13 to 16 minutes (E18 to E20 add roughly 1.5 to 2 minutes each: the toast
+control once per run, the 12 s accepted fallback in E20, and the
+accept + 14 s re-count in E18 and E19).
 
 ## 5. Triage (per fingerprint)
 
@@ -285,11 +287,18 @@ already appends a `{"type":"run",...}` line per run):
   and both must end in ONE match. E19 reads which challenger Blue accepted
   from the DB (the prompt sheet's children are not in the accessibility
   tree). E20 deliberately waits out the app's 12 s accepted fallback, so it
-  takes about 20 s longer than a plain handshake. All three end the match by
-  Blue cancelling from the ready step (`blueCancelsFromReady`), not by
-  playing it.
+  takes about 20 s longer than a plain handshake (the observed start delay
+  is the trace note `fallback_start_observed_ms`). All three end the match
+  by Blue cancelling from the ready step (`blueCancelsFromReady`), not by
+  playing it, and E18 / E19 then re-count the matches once the fallback
+  window has passed (`db:still-one-match-after-fallback-window`).
 - The toast oracles (`ui:no-error-toast`, `ui:no-info-toast`) sample the
-  screen in the background for BrandToast testIDs (`toast-<type>`). Their
-  note records how many snapshots were read. They cannot prove the toast
-  host is visible to idb at all: if a scenario that should toast never
-  shows one, check the Pressable's testID surfaces before trusting a pass.
+  screen in the background for BrandToast testIDs (`toast-<type>`). A watch
+  that cannot see toasts would pass them vacuously, so the first of E18 to
+  E20 in a run first runs a positive control (Blue challenges Red, Red
+  declines, `ui:toast-visible` must capture the info toast "Demo Red
+  declined."). Only when that control passed in the SAME run are the
+  no-toast oracles hard; otherwise they are informational (ok, with the
+  toasts seen as the actual value), and with zero screen samples they are
+  skipped. A failing `ui:toast-visible` is either the app not toasting a
+  decline or idb not surfacing the toast's testID: check the screenshot.

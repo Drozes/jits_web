@@ -329,6 +329,7 @@ export class MobileOpponent {
     const what = `outcome of outgoing challenge ${id}`;
     const deadline = Date.now() + timeoutMs;
     let acceptedAt: number | null = null;
+    let netSpent = false;
     const enter = async (via: "status_fallback" | "accepted_fallback"): Promise<OutgoingOutcome> => {
       const started = await this.trace.rpc(this.actor, "startMatchFromChallenge", { challengeId: id, via }, () =>
         startMatchFromChallenge(this.client, id),
@@ -356,9 +357,10 @@ export class MobileOpponent {
             (e.kind === "outgoing_update" &&
               e.row.id === id &&
               e.row.status !== "pending" &&
-              // Once the safety net is armed, the same `accepted` UPDATE in
-              // the backlog must not re-arm it.
-              !(e.row.status === "accepted" && acceptedAt !== null)),
+              // Once the safety net is armed (or has fired), the same
+              // `accepted` UPDATE in the backlog must not arm it again: the
+              // app's UPDATE arrives once, so its net fires at most once.
+              !(e.row.status === "accepted" && (acceptedAt !== null || netSpent))),
           Math.max(1, Math.min(remaining, fallbackIn)),
           0, // filtered by this challenge's id, so any time since sign-in counts
         );
@@ -370,10 +372,16 @@ export class MobileOpponent {
         if (!(e instanceof ExpectationTimeout) || !netDue) throw e;
         // The safety net fired: re-read the row, as `recheckOutgoing(id, true)`.
         acceptedAt = null;
+        netSpent = true;
         const read = await this.trace.rpc(this.actor, "getChallengeStatus", { challengeId: id, why: "accepted_fallback" }, () =>
           getChallengeStatus(this.client, id),
         );
-        if (!read.ok || !read.data) continue;
+        if (!read.ok || !read.data) {
+          // `recheckOutgoing` just returns on a failed read: no retry, no
+          // re-arm. Only a broadcast or a status UPDATE can still end the wait.
+          this.trace.note(this.actor, "accepted_fallback_read_failed", { challengeId: id, rearmed: false });
+          continue;
+        }
         const st = read.data.status;
         if (st === "accepted" || st === "started") return enter("accepted_fallback");
         if (!LIVE_CHALLENGE_STATUSES.has(st)) return ended(st);

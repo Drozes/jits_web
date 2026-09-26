@@ -17,7 +17,8 @@ import {
   type ArenaEvent,
 } from "../bot/opponent";
 import { Trace } from "../bot/trace";
-import { mergeToasts, toastsIn } from "../oracle/ui";
+import { mergeToasts, secondPromptSeen, toastsIn } from "../oracle/ui";
+import { toastOracleMode } from "../scenarios/flows";
 import type { AXElement } from "../sim/idb";
 import type { Config } from "../config";
 
@@ -92,8 +93,10 @@ test("outgoingStatusAction: enter only on started, arm the net on accepted, end 
 interface Stub {
   bot: MobileOpponent;
   rpcCalls: string[];
-  /** What getChallengeStatus reads. */
+  /** What getChallengeStatus reads ("__error__" makes the read fail). */
   status: { value: string };
+  /** How many times the status was read. */
+  reads: { count: number };
 }
 
 /** A bot whose Supabase client never touches the network. */
@@ -102,11 +105,17 @@ function stubBot(): Stub {
   const bot = new MobileOpponent(cfg, { id: "red", email: "r@example.test", displayName: "Red", key: "red" }, new Trace(null), "x");
   const rpcCalls: string[] = [];
   const status = { value: "accepted" };
+  const reads = { count: 0 };
   // A chainable query builder: every filter returns itself; `maybeSingle` is
   // the status read, awaiting the chain is the pending-challenges read.
   const chain: Record<string, unknown> = {};
   for (const k of ["select", "eq", "gt", "or", "order", "update", "in"]) chain[k] = () => chain;
-  chain.maybeSingle = async () => ({ data: { status: status.value, expires_at: null }, error: null });
+  chain.maybeSingle = async () => {
+    reads.count++;
+    return status.value === "__error__"
+      ? { data: null, error: { code: "08006", message: "connection failure", details: "", hint: "" } }
+      : { data: { status: status.value, expires_at: null }, error: null };
+  };
   chain.then = (resolve: (v: unknown) => void) => resolve({ data: [], error: null });
   const client = bot.client as unknown as Record<string, unknown>;
   client.from = () => chain;
@@ -116,7 +125,7 @@ function stubBot(): Stub {
   };
   bot.outgoingId = "c1";
   bot.outgoingOpponentId = "blue";
-  return { bot, rpcCalls, status };
+  return { bot, rpcCalls, status, reads };
 }
 
 const row = (status: string): ArenaEvent => ({
@@ -154,6 +163,30 @@ test("waitOutgoingOutcome: a row that went terminal during the fallback ends the
   bot.events.push(row("accepted"));
   assert.deepEqual(await bot.waitOutgoingOutcome(2_000, 100), { kind: "cancelled" });
   assert.deepEqual(rpcCalls, []);
+  await bot.close();
+});
+
+test("waitOutgoingOutcome: a failed re-read does not re-arm the net (like recheckOutgoing)", async () => {
+  const { bot, rpcCalls, status, reads } = stubBot();
+  status.value = "__error__";
+  bot.events.push(row("accepted"));
+  // The net fires once at ~80ms and its read fails; nothing may re-arm it, so
+  // with no broadcast the wait runs out instead of re-reading every 80ms.
+  await assert.rejects(bot.waitOutgoingOutcome(600, 80), /timed out/);
+  assert.equal(reads.count, 1);
+  assert.deepEqual(rpcCalls, []);
+  assert.ok(bot["trace"].entries.some((e) => e.name === "accepted_fallback_read_failed"));
+  await bot.close();
+});
+
+test("waitOutgoingOutcome: after a failed re-read, the broadcast still takes it in", async () => {
+  const { bot, status, reads } = stubBot();
+  status.value = "__error__";
+  bot.events.push(row("accepted"));
+  setTimeout(() => bot.events.push({ kind: "match_started", challengeId: "c1", matchId: "m7" }), 250);
+  assert.deepEqual(await bot.waitOutgoingOutcome(2_000, 50), { kind: "match_started", matchId: "m7", via: "broadcast" });
+  assert.equal(reads.count, 1);
+  await bot.lastSettle;
   await bot.close();
 });
 
@@ -202,6 +235,22 @@ test("toastsIn reads BrandToast testIDs and ignores everything else", () => {
     { type: "error", label: "Couldn't accept that challenge. Try again." },
     { type: "info", label: "Demo Red declined." },
   ]);
+});
+
+test("toastOracleMode: skip with no samples, hard only after a passed control", () => {
+  assert.equal(toastOracleMode("passed", 0), "skip");
+  assert.equal(toastOracleMode("unproven", 0), "skip");
+  assert.equal(toastOracleMode("passed", 12), "hard");
+  assert.equal(toastOracleMode("unproven", 12), "informational");
+  assert.equal(toastOracleMode("failed", 12), "informational");
+});
+
+test("secondPromptSeen: the closing accepted prompt is not a second one", () => {
+  assert.equal(secondPromptSeen([]), false);
+  assert.equal(secondPromptSeen([true, true, false, false]), false);
+  assert.equal(secondPromptSeen([false, false]), false);
+  assert.equal(secondPromptSeen([true, false, true]), true);
+  assert.equal(secondPromptSeen([false, false, true]), true);
 });
 
 test("mergeToasts keeps one entry per distinct toast across samples", () => {

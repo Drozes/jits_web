@@ -1,13 +1,15 @@
 import type { Scenario } from "../context";
 import { db } from "../../oracle/db";
-import { ToastWatch } from "../../oracle/ui";
+import { PromptSampler, ToastWatch } from "../../oracle/ui";
 import { ExpectationTimeout, pace, pollUntil } from "../../lib/util";
 import {
   blueCancelsFromReady,
   blueOnWeight,
+  checkStillOneMatch,
   checkToasts,
   matchesFor,
   prepare,
+  toastPositiveControl,
   promptShownWithin,
   settledChallenge,
   T,
@@ -31,6 +33,7 @@ const scenario: Scenario = {
     const green = await ctx.bot("green");
     await red.goLive();
     await green.goLive();
+    await toastPositiveControl(ctx, red);
 
     const [redChallenge, greenChallenge] = await ctx.step("Red and Green both challenge Blue", async () => {
       const r = await red.challenge(ctx.ids.blue);
@@ -43,8 +46,15 @@ const scenario: Scenario = {
     const toasts = new ToastWatch(ctx.idb);
     let winnerMatchId: string;
     let winner = red;
+    let acceptedAt = Date.now();
+    let prompts: PromptSampler | null = null;
     try {
       await ctx.step("Blue accepts the prompt on screen", () => ctx.ui.acceptPrompt());
+      acceptedAt = Date.now();
+      // From the tap on: the accepted prompt closes, and none may come back
+      // while Blue enters and sits in the match (the other challenger's row
+      // is declined, never re-offered).
+      prompts = new PromptSampler(ctx.ui);
       // The sheet's children are not in the accessibility tree, so which
       // challenger was on screen is read from the database.
       const acceptedId = await ctx.step("one challenge is accepted", () =>
@@ -94,15 +104,20 @@ const scenario: Scenario = {
       // What the other challenger's app concludes: its plate clears.
       await ctx.expect("bot:other-challenger-plate-clears", "declined", async () => (await loser.waitOutgoingOutcome(5_000)).kind);
 
-      ctx.eq("ui:no-second-prompt-mid-match", false, await promptShownWithin(ctx, 6_000));
+      await pace(3_000); // a few more samples on the weight step
+      const sampled = await prompts.stop();
+      if (sampled.samples === 0) ctx.skip("ui:no-second-prompt-mid-match", "the prompt sampler read no screen snapshot");
+      else ctx.eq("ui:no-second-prompt-mid-match", false, sampled.second, `${sampled.samples} samples since Accept`);
       ctx.eq("ui:still-on-weight-step", "weight", await ctx.ui.currentStep());
       await checkToasts(ctx, toasts);
     } finally {
+      await prompts?.stop();
       await toasts.stop();
     }
 
     const side = await ctx.matchSide(winner, winnerMatchId);
     await blueCancelsFromReady(ctx, side);
+    await checkStillOneMatch(ctx, [redChallenge, greenChallenge], winnerMatchId, acceptedAt);
     // The declined challenge must not come back as a queued re-offer.
     ctx.eq("ui:no-prompt-after-match", false, await promptShownWithin(ctx, 5_000));
   },

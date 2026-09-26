@@ -5,9 +5,11 @@ import { ExpectationTimeout } from "../../lib/util";
 import {
   blueCancelsFromReady,
   blueOnWeight,
+  checkStillOneMatch,
   checkToasts,
   matchesFor,
   prepare,
+  toastPositiveControl,
   settledChallenge,
   T,
 } from "../flows";
@@ -29,6 +31,7 @@ const scenario: Scenario = {
     await prepare(ctx);
     const red = await ctx.bot("red");
     await red.goLive();
+    await toastPositiveControl(ctx, red);
 
     const redChallenge = await ctx.step("Blue and Red challenge each other (Red right after Blue's tap)", async () => {
       await ctx.ui.challenge(ctx.cfg.names.red);
@@ -52,9 +55,11 @@ const scenario: Scenario = {
 
     const toasts = new ToastWatch(ctx.idb);
     let botMatchId: string;
+    let acceptedAt = Date.now();
     try {
       const accepted = await ctx.step("Blue and Red both accept", async () => {
         await ctx.ui.acceptPrompt();
+        acceptedAt = Date.now();
         return red.acceptLikeApp(blueChallenge, ctx.ids.blue);
       });
       ctx.trace.note("harness", "red_accept_outcome", accepted);
@@ -104,6 +109,7 @@ const scenario: Scenario = {
     // bot's match proves both apps are in the same match id.
     const side = await ctx.matchSide(red, botMatchId);
     await blueCancelsFromReady(ctx, side);
+    await checkStillOneMatch(ctx, [blueChallenge, redChallenge], botMatchId, acceptedAt);
   },
 };
 export default scenario;

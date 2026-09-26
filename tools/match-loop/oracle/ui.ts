@@ -76,7 +76,10 @@ export function mergeToasts(seen: SeenToast[], next: SeenToast[]): SeenToast[] {
  */
 export class ToastWatch {
   private seen: SeenToast[] = [];
+  /** Toasts in the most recent snapshot (what is on screen right now). */
+  current: SeenToast[] = [];
   private running = true;
+  private paused = false;
   private samples = 0;
   private readonly loop: Promise<void>;
 
@@ -92,14 +95,31 @@ export class ToastWatch {
   private async run(): Promise<void> {
     const until = Date.now() + this.maxMs;
     while (this.running && Date.now() < until) {
-      try {
-        this.seen = mergeToasts(this.seen, toastsIn(await this.idb.describe()));
-        this.samples++;
-      } catch {
-        /* one failed sample is not evidence either way */
+      if (!this.paused) {
+        try {
+          this.current = toastsIn(await this.idb.describe());
+          this.seen = mergeToasts(this.seen, this.current);
+          this.samples++;
+        } catch {
+          /* one failed sample is not evidence either way */
+        }
       }
       if (this.running) await new Promise((r) => setTimeout(r, this.intervalMs));
     }
+  }
+
+  /** Stop sampling for a while (a timing-sensitive wait), without losing what was seen. */
+  pause(): void {
+    this.paused = true;
+  }
+
+  resume(): void {
+    this.paused = false;
+  }
+
+  /** Every distinct toast seen so far. */
+  toasts(): SeenToast[] {
+    return this.seen;
   }
 
   /** Stop sampling; every distinct toast seen, and how many snapshots were read. */
@@ -107,5 +127,53 @@ export class ToastWatch {
     this.running = false;
     await this.loop;
     return { toasts: this.seen, samples: this.samples };
+  }
+}
+
+/**
+ * Whether a prompt came back after it had gone: `samples` is the prompt's
+ * visibility, in order, from the moment Blue tapped Accept. The accepted
+ * prompt is still up (closing) for the first samples; only a prompt seen
+ * AFTER a sample without one is a second prompt.
+ */
+export function secondPromptSeen(samples: boolean[]): boolean {
+  let gone = false;
+  for (const visible of samples) {
+    if (!visible) gone = true;
+    else if (gone) return true;
+  }
+  return false;
+}
+
+/** Samples prompt visibility in the background (E19's mid-match check). */
+export class PromptSampler {
+  readonly samples: boolean[] = [];
+  private running = true;
+  private readonly loop: Promise<void>;
+
+  constructor(
+    private readonly ui: Screens,
+    private readonly intervalMs = 300,
+    private readonly maxMs = 180_000,
+  ) {
+    this.loop = this.run();
+  }
+
+  private async run(): Promise<void> {
+    const until = Date.now() + this.maxMs;
+    while (this.running && Date.now() < until) {
+      try {
+        this.samples.push(await this.ui.isPromptVisible());
+      } catch {
+        /* skip a failed sample */
+      }
+      if (this.running) await new Promise((r) => setTimeout(r, this.intervalMs));
+    }
+  }
+
+  async stop(): Promise<{ second: boolean; samples: number }> {
+    this.running = false;
+    await this.loop;
+    return { second: secondPromptSeen(this.samples), samples: this.samples.length };
   }
 }

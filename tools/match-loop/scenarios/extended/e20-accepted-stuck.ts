@@ -3,7 +3,7 @@ import { db } from "../../oracle/db";
 import { ToastWatch } from "../../oracle/ui";
 import { APP_TIMING } from "../../bot/protocol";
 import { pace, pollUntil } from "../../lib/util";
-import { blueCancelsFromReady, blueOnWeight, checkToasts, prepare, T } from "../flows";
+import { blueCancelsFromReady, blueOnWeight, checkToasts, prepare, T, toastPositiveControl } from "../flows";
 
 /** How early the app may start relative to the accept, for sampling slack. */
 const EARLY_SLACK_MS = 1_000;
@@ -25,6 +25,7 @@ const scenario: Scenario = {
     await prepare(ctx);
     const red = await ctx.bot("red");
     await red.goLive();
+    await toastPositiveControl(ctx, red);
 
     await ctx.step("Blue challenges Demo Red", () => ctx.ui.challenge(ctx.cfg.names.red));
     await ctx.step("Blue sees the waiting plate", () => ctx.ui.waitWaitingPlate(ctx.cfg.names.red));
@@ -39,6 +40,8 @@ const scenario: Scenario = {
       });
       ctx.eq("db:challenge-accepted", "accepted", (await db.challenge(row.id))?.status);
 
+      // No background idb load while the fallback timing is measured.
+      toasts.pause();
       // Mid-way through the fallback window: nothing may have started it yet.
       await pace(5_000);
       const els = await ctx.idb.describe();
@@ -60,6 +63,12 @@ const scenario: Scenario = {
           { timeoutMs: maxMs + 5_000, intervalMs: 250 },
         ),
       );
+      toasts.resume();
+      ctx.trace.note("harness", "fallback_start_observed_ms", {
+        startedAfterMs,
+        appFallbackMs: APP_TIMING.ACCEPTED_FALLBACK_MS,
+        pollIntervalMs: 250,
+      });
       ctx.oracle(
         "app:fallback-start-timing",
         startedAfterMs >= APP_TIMING.ACCEPTED_FALLBACK_MS - EARLY_SLACK_MS && startedAfterMs <= maxMs,

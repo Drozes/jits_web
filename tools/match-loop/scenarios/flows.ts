@@ -7,9 +7,10 @@ import type { EloStakes } from "@jits/shared/types/composites";
 import type { MobileOpponent } from "../bot/opponent";
 import type { MatchSide, ReadyOutcome } from "../bot/match-side";
 import { db, type ChallengeDb, type MatchDb } from "../oracle/db";
-import { parseDelta, waitLivePill, type ToastWatch } from "../oracle/ui";
+import { parseDelta, ToastWatch, waitLivePill } from "../oracle/ui";
 import { resetFixtures, type ResetOptions } from "../fixtures/reset";
 import { proveAppOnLocalStack } from "../bot/app-on-local";
+import { APP_TIMING } from "../bot/protocol";
 import { ExpectationTimeout, HarnessError, pollUntil } from "../lib/util";
 import type { ScenarioCtx } from "./context";
 
@@ -176,16 +177,85 @@ export async function blueAccepts(ctx: ScenarioCtx, red: MobileOpponent, challen
 // --- Arena concurrency (E18-E20) ----------------------------------------------------
 
 /**
+ * Whether this run has proven that idb can see a BrandToast at all (the
+ * positive control). Module state, so it lives exactly as long as one
+ * `npm run match-loop` process: a control passed in one run never vouches
+ * for another.
+ */
+let toastControl: "unproven" | "passed" | "failed" = "unproven";
+
+/**
+ * The positive control for the no-toast oracles: Blue challenges Red, Red
+ * declines, and Blue's app must show the info toast "Demo Red declined."
+ * (`endOutgoing` in use-arena-challenge.ts). Runs once per run, in the first
+ * scenario that needs it; the no-toast oracles are hard only once it passed.
+ */
+export async function toastPositiveControl(ctx: ScenarioCtx, red: MobileOpponent): Promise<void> {
+  if (toastControl !== "unproven") return;
+  const expected = `${ctx.cfg.names.red} declined.`;
+  toastControl = "failed";
+  await ctx.step("toast control: Blue challenges Demo Red", () => ctx.ui.challenge(ctx.cfg.names.red));
+  const row = await ctx.step("toast control: Red receives it", () => red.waitForIncoming(T.prompt, ctx.ids.blue));
+  const watch = new ToastWatch(ctx.idb);
+  try {
+    await ctx.step("toast control: Red declines", () => red.decline(row.id));
+    const seen = await pollUntil(
+      `a toast-info "${expected}"`,
+      () => watch.toasts().find((t) => t.type === "info" && (t.label ?? "").toLowerCase().includes(expected.toLowerCase())),
+      { timeoutMs: 8_000, intervalMs: 200, lastSeen: () => watch.toasts() },
+    ).catch(() => null);
+    const ok = ctx.oracle("ui:toast-visible", !!seen, { type: "info", label: expected }, seen ?? { seen: watch.toasts() });
+    if (ok) toastControl = "passed";
+    // Let it go away, so it cannot leak into the next toast watch.
+    await pollUntil("the control toast to clear", () => (watch.current.length === 0 ? true : undefined), {
+      timeoutMs: 8_000,
+      intervalMs: 200,
+    }).catch(() => undefined);
+  } finally {
+    await watch.stop();
+  }
+  ctx.eq("db:toast-control-declined", "declined", (await db.challenge(row.id))?.status);
+}
+
+/**
  * Stop a toast watch and record the toast oracles: no error toast ever, and
  * (unless `infoAllowed`) no info toast either, e.g. a "declined." or
- * "expired." that a quiet crossing withdrawal must never produce.
+ * "expired." that a quiet crossing withdrawal must never produce. Hard only
+ * when the positive control passed in this run; otherwise informational
+ * (ok, with what was seen as the actual value), since a watch that cannot
+ * see toasts would pass them vacuously.
  */
 export async function checkToasts(ctx: ScenarioCtx, watch: ToastWatch, infoAllowed = false): Promise<void> {
   const { toasts, samples } = await watch.stop();
-  const note = `${samples} screen samples`;
-  ctx.eq("ui:no-error-toast", [], toasts.filter((t) => t.type === "error"), note);
-  if (!infoAllowed) ctx.eq("ui:no-info-toast", [], toasts.filter((t) => t.type === "info"), note);
-  if (samples === 0) ctx.skip("ui:toast-watch-sampled", "the toast watch read no screen snapshot");
+  const ids = ["ui:no-error-toast", ...(infoAllowed ? [] : ["ui:no-info-toast"])];
+  const mode = toastOracleMode(toastControl, samples);
+  const actual = (id: string) => toasts.filter((t) => t.type === (id === "ui:no-error-toast" ? "error" : "info"));
+  for (const id of ids) {
+    if (mode === "skip") ctx.skip(id, "the toast watch read no screen snapshot");
+    else if (mode === "hard") ctx.eq(id, [], actual(id), `${samples} screen samples`);
+    else ctx.oracle(id, true, "informational", actual(id), `toast control ${toastControl} in this run; ${samples} screen samples`);
+  }
+}
+
+/**
+ * How the no-toast oracles are recorded: skipped when nothing was sampled,
+ * hard only once the positive control passed in this run, else informational.
+ */
+export function toastOracleMode(control: "unproven" | "passed" | "failed", samples: number): "skip" | "hard" | "informational" {
+  if (samples === 0) return "skip";
+  return control === "passed" ? "hard" : "informational";
+}
+
+/**
+ * Re-count after the challenger's `ACCEPTED_FALLBACK_MS` safety net could
+ * have fired (accept + 14 s): a late fallback start must not have created a
+ * second match.
+ */
+export async function checkStillOneMatch(ctx: ScenarioCtx, challengeIds: string[], matchId: string, acceptedAt: number): Promise<void> {
+  const wait = acceptedAt + APP_TIMING.ACCEPTED_FALLBACK_MS + 2_000 - Date.now();
+  if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+  const ms = await matchesFor(challengeIds);
+  ctx.eq("db:still-one-match-after-fallback-window", [matchId], ms.map((m) => m.id), `${Date.now() - acceptedAt}ms after the accept`);
 }
 
 /**
