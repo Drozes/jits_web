@@ -38,6 +38,20 @@
  * joined instance, `on()` throws, `channelRef` is never assigned, and from
  * then on the identity guard in the sync handler rejects every update while
  * `track()` has nothing to push to.
+ *
+ * THE SERVER CAN CLOSE THE CHANNEL UNDER US (jits-fa9x). Realtime enforces a
+ * per-channel presence rate limit (5 track/untrack calls per 30s); over it the
+ * server stops the channel process (`ClientPresenceRateLimitReached`) and the
+ * client receives `phx_close`. That is terminal for the instance: phoenix
+ * marks it closed and realtime-js drops it from the registry, and nothing in
+ * the library ever rejoins it. So a CLOSED for the channel the module still
+ * owns (and no longer registered) is treated as a loss: the refs are cleared,
+ * the dead instance is torn down, and setup runs again on a bounded backoff,
+ * keeping `desiredPayload` so the new channel re-tracks on SUBSCRIBED.
+ * CHANNEL_ERROR and TIMED_OUT are NOT losses while the instance is still
+ * registered: phoenix already rejoins that exact instance on its own timer
+ * (and on socket reopen), which fires SUBSCRIBED again. Tearing it down there
+ * would fight the library on every network blip.
  */
 import * as React from "react";
 import { useSyncExternalStore } from "react";
@@ -74,6 +88,45 @@ const REGISTERED_TOPIC = `realtime:${LOBBY_TOPIC}`;
  * change re-runs setup anyway.
  */
 const STALE_RETRY_DELAYS_MS = [1_000, 2_000, 4_000];
+
+/**
+ * Backoff for rebuilding a channel the server closed (jits-fa9x), indexed by
+ * how many losses have happened in a row.
+ *
+ * The first rebuild is quick, because the usual cause (the presence rate
+ * limit) is cleared by a fresh channel and an athlete who is live should be
+ * visible again within a couple of seconds. The steps then widen so a server
+ * that keeps closing the channel is not hammered with joins and tracks, and
+ * past the last step setup waits for the next foreground (or an explicit
+ * go-live) instead.
+ */
+const LOSS_RETRY_DELAYS_MS = [1_000, 5_000, 15_000, 30_000];
+
+/**
+ * A channel that stayed joined this long before it was lost ends the losing
+ * streak, so the next loss starts the backoff over. Matches the server's
+ * presence rate-limit window.
+ */
+const LOSS_STREAK_RESET_MS = 30_000;
+
+/**
+ * `trackedKey` value for a presence call whose outcome we could not confirm.
+ * It equals no payload key and is not `null`, so the next sync re-sends
+ * whichever of track or untrack is wanted.
+ */
+const UNCONFIRMED = "\u0000unconfirmed";
+
+/**
+ * Hard upper bound on one track/untrack. phoenix normally answers a push that
+ * got no reply with 'timed out' after 10s, but not always: a server that
+ * rate-limits a call does not reply at all, and once the channel it went out
+ * on has been torn down, nothing is left to fire that timeout into, so the
+ * promise never settles. The serialized sync loop must never wait on that.
+ */
+const PRESENCE_CALL_TIMEOUT_MS = 12_000;
+
+/** Delay before the one follow-up sync after an unconfirmed call. */
+const UNCONFIRMED_RESYNC_MS = 2_000;
 
 // ---------------------------------------------------------------------------
 // External store
@@ -124,21 +177,214 @@ let channelAthleteId: string | null = null;
  */
 let desiredPayload: LobbyPayload | null = null;
 
-async function trackDesired(): Promise<void> {
-  if (!channelRef || !desiredPayload) return;
-  await channelRef.track(desiredPayload);
+/**
+ * What the owned channel's server-side presence holds for us, as a payload key
+ * (`null`: nothing, `UNCONFIRMED`: unknown). Reset on every SUBSCRIBED,
+ * because a fresh join starts with nothing tracked.
+ *
+ * This is what keeps presence churn down: the server allows 5 presence calls
+ * per 30s per channel and CLOSES the channel past that, so a track of the
+ * payload already held, or an untrack of nothing, is a call we must not make.
+ */
+let trackedKey: string | null = null;
+
+/** When the owned channel last reached SUBSCRIBED, for the loss streak. */
+let ownedSubscribedAt: number | null = null;
+/** Losses in a row without a channel that stayed healthy in between. */
+let consecutiveLosses = 0;
+/** A channel the server closed, waiting to be torn down by the next setup. */
+let lostChannel: RealtimeChannel | null = null;
+
+/**
+ * Hooks into the mounted owner (`useLobbyPresence`), which is the only place
+ * that knows the athlete id and owns the retry timer. `null` while nothing is
+ * mounted, in which case the next mount's setup does the rebuild.
+ */
+let owner: {
+  /** The owned channel was lost: rebuild it on the loss backoff. */
+  onChannelLost: () => void;
+  /** Setup gave up earlier and something now wants the lobby: try again. */
+  resume: () => void;
+} | null = null;
+
+function payloadKey(payload: LobbyPayload | null): string | null {
+  return payload ? JSON.stringify(payload) : null;
+}
+
+/**
+ * Per-channel "this channel is gone" signal, resolved when the module stops
+ * owning the channel (server loss or deliberate release). A presence call in
+ * flight on that channel is raced against it, so the sync loop lets go the
+ * moment the channel is lost instead of holding every later join or leave
+ * (including the untrack on entering a match) behind a call that may never
+ * settle.
+ */
+const channelGone = new WeakMap<
+  RealtimeChannel,
+  { promise: Promise<"lost">; resolve: () => void }
+>();
+
+function goneSignal(channel: RealtimeChannel) {
+  let signal = channelGone.get(channel);
+  if (!signal) {
+    let resolve!: () => void;
+    const promise = new Promise<"lost">((r) => {
+      resolve = () => r("lost");
+    });
+    signal = { promise, resolve };
+    channelGone.set(channel, signal);
+  }
+  return signal;
+}
+
+let resyncTimer: ReturnType<typeof setTimeout> | null = null;
+/** The one follow-up for the current run of unconfirmed calls is spent. */
+let resyncSpent = false;
+
+/**
+ * An unconfirmed call left us not knowing what the server holds. Sync once
+ * more a little later, but only once per run of unconfirmed calls: a server
+ * that keeps not answering is not helped by more presence calls, and the rate
+ * limit counts every one of them.
+ */
+function scheduleResync(): void {
+  if (resyncTimer || resyncSpent) return;
+  resyncSpent = true;
+  resyncTimer = setTimeout(() => {
+    resyncTimer = null;
+    void syncPresence();
+  }, UNCONFIRMED_RESYNC_MS);
+}
+
+function cancelResync(): void {
+  if (resyncTimer) clearTimeout(resyncTimer);
+  resyncTimer = null;
+  resyncSpent = false;
+}
+
+/**
+ * The owned channel is gone for good (server close). Clear the refs and ask
+ * the owner to build a new one, KEEPING `desiredPayload` so the new channel
+ * re-tracks on SUBSCRIBED. The identity guard is what stops an intentional
+ * teardown from looping: `releaseChannel()` nulls `channelRef` before its
+ * removal fires CLOSED, so that CLOSED never gets here.
+ */
+function handleChannelLoss(channel: RealtimeChannel, reason: string): void {
+  if (channelRef !== channel) return;
+  const wasHealthy =
+    ownedSubscribedAt !== null &&
+    Date.now() - ownedSubscribedAt >= LOSS_STREAK_RESET_MS;
+  consecutiveLosses = wasHealthy ? 1 : consecutiveLosses + 1;
+  console.warn(
+    `[arena] lobby channel lost (${reason}); rebuilding it (loss ${consecutiveLosses} in a row)`,
+  );
+  channelRef = null;
+  channelAthleteId = null;
+  trackedKey = null;
+  ownedSubscribedAt = null;
+  lostChannel = channel;
+  goneSignal(channel).resolve();
+  cancelResync();
+  // We no longer receive syncs, so the roster we hold is going stale.
+  lobbyIds = new Set();
+  emitChange();
+  owner?.onChannelLost();
+}
+
+/**
+ * One reconciliation of the owned channel's presence toward `desiredPayload`.
+ * Only pushes on a JOINED channel: while it is joining or errored, phoenix
+ * would buffer the push and the SUBSCRIBED callback would then track again,
+ * two presence calls for one intent. SUBSCRIBED re-syncs instead.
+ */
+async function syncOnce(): Promise<void> {
+  const channel = channelRef;
+  if (!channel) {
+    if (desiredPayload) owner?.resume();
+    return;
+  }
+  if (!isRegistered(channel)) {
+    // Closed without the CLOSED callback reaching us (or before it did).
+    // Pushing into it would fail silently for the rest of the session.
+    handleChannelLoss(channel, "no longer registered");
+    return;
+  }
+  if (channel.state !== "joined") return;
+
+  const want = payloadKey(desiredPayload);
+  if (want === trackedKey) return;
+  trackedKey = want;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  try {
+    const call = desiredPayload
+      ? channel.track(desiredPayload)
+      : channel.untrack();
+    // Whichever loses the race must not surface as an unhandled rejection.
+    call.catch(() => {});
+    const status = await Promise.race([
+      call,
+      goneSignal(channel).promise,
+      new Promise<"timed out">((resolve) => {
+        timer = setTimeout(() => resolve("timed out"), PRESENCE_CALL_TIMEOUT_MS);
+      }),
+    ]);
+    if (channelRef !== channel || trackedKey !== want) return;
+    if (status === "ok") {
+      resyncSpent = false;
+      return;
+    }
+    trackedKey = UNCONFIRMED;
+    scheduleResync();
+  } catch (error: unknown) {
+    console.warn("[arena] lobby presence update failed:", error);
+    if (channelRef !== channel || trackedKey !== want) return;
+    trackedKey = UNCONFIRMED;
+    scheduleResync();
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+let syncing: Promise<void> | null = null;
+let syncAgain = false;
+
+/**
+ * Reconcile presence, coalescing overlapping requests. A request that lands
+ * while a track or untrack is in flight does not queue its own call: it marks
+ * the pass dirty, and the loop re-reads `desiredPayload` once the in-flight
+ * call settles. A burst of live/offline toggles therefore costs at most one
+ * call in flight plus one for the final state, with no added delay (a time
+ * debounce would also have held back the "left the lobby on entering a
+ * match" untrack). Never rejects.
+ */
+function syncPresence(): Promise<void> {
+  if (syncing) {
+    syncAgain = true;
+    return syncing;
+  }
+  syncing = (async () => {
+    try {
+      do {
+        syncAgain = false;
+        await syncOnce();
+      } while (syncAgain);
+    } finally {
+      syncing = null;
+    }
+  })();
+  return syncing;
 }
 
 /** Appear in the lobby. Safe to call before the channel has joined. */
 export async function joinLobby(payload: LobbyPayload): Promise<void> {
   desiredPayload = payload;
-  await trackDesired();
+  await syncPresence();
 }
 
 /** Disappear from the lobby. */
 export async function leaveLobby(): Promise<void> {
   desiredPayload = null;
-  await channelRef?.untrack();
+  await syncPresence();
 }
 
 /** True while the client still holds this exact channel instance. */
@@ -157,9 +403,15 @@ async function releaseChannel(): Promise<void> {
   channelRef = null;
   channelAthleteId = null;
   desiredPayload = null;
+  trackedKey = null;
+  ownedSubscribedAt = null;
+  // A deliberate release (athlete change, sign-out) starts a new story.
+  consecutiveLosses = 0;
+  cancelResync();
   lobbyIds = new Set();
   emitChange();
   if (!channel) return;
+  goneSignal(channel).resolve();
   const status = await supabase.removeChannel(channel);
   if (status !== "ok") {
     console.warn("[arena] lobby channel did not confirm teardown:", status);
@@ -184,10 +436,15 @@ export function useLobbyPresence(athleteId: string): void {
   React.useEffect(() => {
     let cancelled = false;
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    /** A setup pass is running; a second one would race it to `channel()`. */
+    let running = false;
+    /** Setup was requested while a pass was running: run once more after. */
+    let rerunQueued = false;
     /**
      * The backoff ran out. The owner is app-wide now, so there is no "next
      * Arena visit" to re-run setup; coming back to the foreground is the
-     * natural moment the socket is back, so that is when setup runs again.
+     * natural moment the socket is back, so that is when setup runs again
+     * (as does an explicit go-live, through `owner.resume`).
      */
     let gaveUp = false;
 
@@ -211,7 +468,43 @@ export function useLobbyPresence(athleteId: string): void {
       }, delay);
     }
 
+    /**
+     * Rebuild after the server closed the owned channel. Stepped by the
+     * losing streak rather than by setup attempts, so a server that keeps
+     * closing fresh channels (the rate limit, say) is backed off from instead
+     * of being handed a new join and track every second.
+     */
+    function recoverLater() {
+      if (cancelled || retryTimer) return;
+      const delay = LOSS_RETRY_DELAYS_MS[consecutiveLosses - 1];
+      if (delay === undefined) {
+        console.warn(
+          "[arena] gave up rebuilding the lost lobby channel; retrying when the app next returns to the foreground",
+        );
+        gaveUp = true;
+        return;
+      }
+      retryTimer = setTimeout(() => {
+        retryTimer = null;
+        run(0);
+      }, delay);
+    }
+
     async function ensure(attempt: number) {
+      // A channel the server CLOSED needs nothing more: phoenix's close has
+      // already reset its rejoin timer and dropped it from the socket.
+      // Tearing it down as well would clear its reply bindings, so a push
+      // still waiting on it could never time out and would hang forever.
+      // Only an instance lost some other way (unregistered, not closed) is
+      // torn down, locally: `removeChannel()` would push a leave for this
+      // topic, and realtime-js drops registry entries BY TOPIC on close, so
+      // a late close from it could unregister the replacement built below.
+      if (lostChannel) {
+        const dead = lostChannel;
+        lostChannel = null;
+        if (dead.state !== "closed") dead.teardown();
+      }
+
       if (!athleteId) {
         await releaseChannel();
         return;
@@ -221,7 +514,7 @@ export function useLobbyPresence(athleteId: string): void {
       // presence binding is still wired to the module store, so nothing needs
       // re-binding, which is fortunate, because `on()` would throw.
       if (isRegistered(channelRef) && channelAthleteId === athleteId) {
-        await trackDesired();
+        await syncPresence();
         return;
       }
 
@@ -264,12 +557,28 @@ export function useLobbyPresence(athleteId: string): void {
       });
 
       channel.subscribe((status) => {
-        if (status !== "SUBSCRIBED") return;
-        void trackDesired();
+        // Released or superseded. `releaseChannel()` nulls `channelRef`
+        // before its removal fires CLOSED, so an intentional teardown stops
+        // here and can never loop back into a rebuild.
+        if (channelRef !== channel) return;
+        if (status === "SUBSCRIBED") {
+          // A fresh join (first or a phoenix rejoin) holds nothing for us
+          // server-side, so the desired payload has to be tracked again.
+          ownedSubscribedAt = Date.now();
+          trackedKey = null;
+          void syncPresence();
+          return;
+        }
+        // CLOSED lands after realtime-js has already dropped the instance
+        // from the registry, and nothing will ever rejoin it. CHANNEL_ERROR
+        // and TIMED_OUT leave it registered while phoenix rejoins it itself.
+        if (!isRegistered(channel)) handleChannelLoss(channel, status);
       });
 
       channelRef = channel;
       channelAthleteId = athleteId;
+      trackedKey = null;
+      ownedSubscribedAt = null;
     }
 
     /**
@@ -278,22 +587,45 @@ export function useLobbyPresence(athleteId: string): void {
      * looks exactly like a lobby that is empty because nobody is in it.
      */
     function run(attempt: number) {
-      void ensure(attempt).catch((error: unknown) => {
-        console.warn("[arena] lobby channel setup failed:", error);
-        retryLater(attempt);
-      });
+      if (cancelled) return;
+      if (running) {
+        // e.g. the adopt path's sync found the channel gone mid-pass.
+        rerunQueued = true;
+        return;
+      }
+      running = true;
+      void ensure(attempt)
+        .catch((error: unknown) => {
+          console.warn("[arena] lobby channel setup failed:", error);
+          retryLater(attempt);
+        })
+        .finally(() => {
+          running = false;
+          if (!rerunQueued) return;
+          rerunQueued = false;
+          // A pending backoff timer already owns the next pass.
+          if (!retryTimer) run(0);
+        });
     }
+
+    function resume() {
+      if (!gaveUp || cancelled) return;
+      gaveUp = false;
+      run(0);
+    }
+
+    const self = { onChannelLost: recoverLater, resume };
+    owner = self;
 
     run(0);
 
     const appStateSub = AppState.addEventListener("change", (next) => {
-      if (next !== "active" || !gaveUp || cancelled) return;
-      gaveUp = false;
-      run(0);
+      if (next === "active") resume();
     });
 
     return () => {
       cancelled = true;
+      if (owner === self) owner = null;
       appStateSub.remove();
       if (retryTimer) clearTimeout(retryTimer);
       // Leave the lobby, KEEP the channel. Removing it here is what creates

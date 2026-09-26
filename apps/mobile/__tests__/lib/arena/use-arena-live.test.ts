@@ -848,3 +848,62 @@ describe("offline during a match", () => {
     expect(result.current.isLive).toBe(true);
   });
 });
+
+describe("a lobby join that never settles (jits-fa9x)", () => {
+  // A rate-limited presence call can go unanswered, and the transition queue
+  // is serialized. Unbounded, one hung join froze the toggle on "saving" and
+  // queued every later transition behind it, including the go-offline on
+  // match entry, so `looking_for_ranked` was never cleared.
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it("settles the go-live within the bound and still lets the athlete go offline", async () => {
+    jest.useFakeTimers();
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    mockJoinLobby.mockReturnValue(new Promise(() => {}));
+    const { result } = mount();
+
+    let toggled = false;
+    await act(async () => {
+      void result.current.toggle().then(() => {
+        toggled = true;
+      });
+      await flush();
+    });
+    expect(result.current.isLive).toBe(true);
+    expect(toggled).toBe(false);
+
+    await act(async () => {
+      jest.advanceTimersByTime(12_000);
+      await flush();
+    });
+    expect(toggled).toBe(true);
+    expect(result.current.isSaving).toBe(false);
+    expect(mockToastError).not.toHaveBeenCalled();
+
+    let ok: boolean | undefined;
+    await act(async () => {
+      ok = await result.current.goOffline();
+    });
+    expect(ok).toBe(true);
+    expect(lastFlagWrite()).toEqual({
+      lookingForCasual: false,
+      lookingForRanked: false,
+    });
+    expect(result.current.isLive).toBe(false);
+    warn.mockRestore();
+  });
+
+  it("does not fail the go-live when the lobby join rejects", async () => {
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    mockJoinLobby.mockRejectedValue(new Error("socket gone"));
+    const { result } = mount();
+    await act(async () => {
+      await result.current.toggle();
+    });
+    expect(result.current.isLive).toBe(true);
+    expect(mockToastError).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+});
