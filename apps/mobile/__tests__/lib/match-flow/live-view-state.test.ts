@@ -5,9 +5,8 @@
 import {
   deriveLiveView,
   formatAthleteMeta,
-  formatClock,
-  parseClock,
   spokenDuration,
+  toLiveAthlete,
   type LiveViewInput,
 } from "@/lib/match-flow/live-view-state";
 
@@ -21,6 +20,7 @@ function view(overrides: Partial<LiveViewInput> = {}) {
     recorderState: "recording",
     permission: GRANTED,
     opponentEnded: false,
+    hasRecorded: true,
     ...overrides,
   });
 }
@@ -34,17 +34,17 @@ describe("strip", () => {
     // Everything true at once: hold wins.
     expect(view({ holding: true, paused: true, remaining: 0 }).strip).toBe("hold");
     expect(view({ holding: true, remaining: 5 }).strip).toBe("hold");
-    expect(view({ holding: true, recorderState: "idle" }).strip).toBe("hold");
+    expect(view({ holding: true, recorderState: "idle", hasRecorded: false }).strip).toBe("hold");
     // Paused beats time up and final 10.
     expect(view({ paused: true, remaining: 0 }).strip).toBe("paused");
     expect(view({ paused: true, remaining: 7 }).strip).toBe("paused");
-    expect(view({ paused: true, recorderState: "idle" }).strip).toBe("paused");
+    expect(view({ paused: true, recorderState: "idle", hasRecorded: false }).strip).toBe("paused");
     // Time up beats starting.
     expect(view({ remaining: 0 }).strip).toBe("timeup");
-    expect(view({ remaining: 0, recorderState: "idle" }).strip).toBe("timeup");
+    expect(view({ remaining: 0, recorderState: "idle", hasRecorded: false }).strip).toBe("timeup");
     // Final 10 beats starting.
-    expect(view({ remaining: 7, recorderState: "idle" }).strip).toBe("final10");
-    expect(view({ recorderState: "idle" }).strip).toBe("starting");
+    expect(view({ remaining: 7, recorderState: "idle", hasRecorded: false }).strip).toBe("final10");
+    expect(view({ recorderState: "idle", hasRecorded: false }).strip).toBe("starting");
   });
 
   it("shows final 10 only for 1..10 seconds left", () => {
@@ -59,7 +59,7 @@ describe("strip", () => {
   });
 
   it("does not show starting without camera permission", () => {
-    expect(view({ recorderState: "idle", permission: { granted: false, canAskAgain: true } }).strip).toBeNull();
+    expect(view({ recorderState: "idle", hasRecorded: false, permission: { granted: false, canAskAgain: true } }).strip).toBeNull();
   });
 });
 
@@ -75,13 +75,13 @@ describe("autoEndPending", () => {
 describe("tally", () => {
   it("says REC only while recording", () => {
     expect(view().tally).toBe("rec");
-    expect(view({ recorderState: "idle" }).tally).toBe("starting");
-    expect(view({ recorderState: "stopping" }).tally).toBe("starting");
+    expect(view({ recorderState: "idle", hasRecorded: false }).tally).toBe("starting");
+    expect(view({ recorderState: "stopping", hasRecorded: false }).tally).toBe("starting");
   });
 
   it("says no video when the camera is unavailable", () => {
     expect(view({ permission: { granted: false, canAskAgain: false } }).tally).toBe("noVideo");
-    expect(view({ permission: null, recorderState: "idle" }).tally).toBe("noVideo");
+    expect(view({ permission: null, recorderState: "idle", hasRecorded: false }).tally).toBe("noVideo");
     expect(view({ recorderState: "error" }).tally).toBe("noVideo");
   });
 
@@ -89,8 +89,26 @@ describe("tally", () => {
     for (const s of ["recording", "stopping", "uploading", "uploaded"] as const) {
       expect(view({ opponentEnded: true, recorderState: s }).tally).toBe("saving");
     }
-    expect(view({ opponentEnded: true, recorderState: "idle" }).tally).toBe("noVideo");
+    expect(view({ opponentEnded: true, recorderState: "idle", hasRecorded: false }).tally).toBe("noVideo");
     expect(view({ opponentEnded: true, recorderState: "error" }).tally).toBe("noVideo");
+  });
+});
+
+describe("after the recording stopped mid-match (interruption or cap)", () => {
+  for (const s of ["idle", "stopping", "uploading", "uploaded"] as const) {
+    it(`${s}: no video, no starting strip, no dim`, () => {
+      const v = view({ recorderState: s, hasRecorded: true });
+      expect(v.tally).toBe("noVideo");
+      expect(v.strip).toBeNull();
+      expect(v.camera).toBe("live");
+    });
+  }
+
+  it("re-entering an expired match (idle at 00:00, never recorded) is not starting", () => {
+    const v = view({ recorderState: "idle", hasRecorded: false, remaining: 0 });
+    expect(v.tally).toBe("noVideo");
+    expect(v.strip).toBe("timeup");
+    expect(v.camera).toBe("live");
   });
 });
 
@@ -98,7 +116,7 @@ describe("slab label", () => {
   it("is LIVE while the clock runs, including final 10, starting and no video", () => {
     expect(view().slab).toBe("live");
     expect(view({ remaining: 7 }).slab).toBe("live");
-    expect(view({ recorderState: "idle" }).slab).toBe("live");
+    expect(view({ recorderState: "idle", hasRecorded: false }).slab).toBe("live");
     expect(view({ permission: { granted: false, canAskAgain: false } }).slab).toBe("live");
   });
 
@@ -113,8 +131,8 @@ describe("slab label", () => {
 describe("camera treatment", () => {
   it("dims while starting and after the opponent ended", () => {
     expect(view().camera).toBe("live");
-    expect(view({ recorderState: "idle" }).camera).toBe("starting-dim");
-    expect(view({ recorderState: "idle", remaining: 0 }).camera).toBe("live");
+    expect(view({ recorderState: "idle", hasRecorded: false }).camera).toBe("starting-dim");
+    expect(view({ recorderState: "idle", hasRecorded: false, remaining: 0 }).camera).toBe("live");
     expect(view({ opponentEnded: true }).camera).toBe("saving-dim");
   });
 
@@ -129,12 +147,18 @@ describe("camera treatment", () => {
   });
 });
 
+describe("toLiveAthlete", () => {
+  it("maps a participant to the athlete bar's name and meta", () => {
+    expect(toLiveAthlete({ display_name: "K. Reyes", current_elo: 1512, current_weight: 77 })).toEqual({
+      name: "K. Reyes",
+      meta: "1512 · 77 KG",
+    });
+    expect(toLiveAthlete({ display_name: "Bot", current_elo: null, current_weight: null }).meta).toBeNull();
+  });
+});
+
 describe("formatting helpers", () => {
   it("formats the clock and speaks durations", () => {
-    expect(formatClock(600)).toBe("10:00");
-    expect(formatClock(134)).toBe("02:14");
-    expect(parseClock("07:43")).toBe(463);
-    expect(parseClock("nope")).toBe(0);
     expect(spokenDuration(463)).toBe("7 minutes 43 seconds");
     expect(spokenDuration(61)).toBe("1 minute 1 second");
     expect(spokenDuration(120)).toBe("2 minutes");

@@ -5,9 +5,7 @@ import { Camera, CameraOff } from "lucide-react-native";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { cn } from "@/lib/cn";
 import { fitRecordedFrame } from "@/lib/video/recorded-frame";
-
-/** Solid ground behind the live screen when there is no camera feed. */
-const NO_FEED_GROUND = "#0D0F14";
+import { BROADCAST } from "./live/broadcast-tokens";
 
 interface CameraOverlayProps {
   cameraRef: React.MutableRefObject<CameraView | null>;
@@ -65,7 +63,7 @@ export function CameraOverlay({
     return (
       <View
         testID="camera-no-feed-ground"
-        style={[StyleSheet.absoluteFill, { backgroundColor: NO_FEED_GROUND }]}
+        style={[StyleSheet.absoluteFill, { backgroundColor: BROADCAST.ground }]}
       />
     );
   }
@@ -109,7 +107,7 @@ export function CameraOverlay({
       className={
         fullscreen ? undefined : "w-full overflow-hidden rounded-md border border-hairline-strong bg-black"
       }
-      style={fullscreen ? [StyleSheet.absoluteFill, { backgroundColor: "#000000", overflow: "hidden" }] : undefined}
+      style={fullscreen ? [StyleSheet.absoluteFill, { backgroundColor: BROADCAST.black, overflow: "hidden" }] : undefined}
     >
       <View
         testID="camera-frame"

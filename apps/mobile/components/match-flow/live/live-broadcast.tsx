@@ -1,9 +1,10 @@
 import * as React from "react";
-import { AccessibilityInfo, StyleSheet, View } from "react-native";
+import { AccessibilityInfo, Platform, StyleSheet, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { UseVideoRecorderReturn } from "@/lib/video/use-video-recorder";
-import { deriveLiveView, formatClock, type StripVariant } from "@/lib/match-flow/live-view-state";
+import { deriveLiveView, type StripVariant } from "@/lib/match-flow/live-view-state";
+import { formatElapsed } from "@/lib/match-flow/format-elapsed";
 import { useRecordingElapsed } from "@/lib/match-flow/use-recording-elapsed";
 import { BROADCAST, BROADCAST_SIZE } from "./broadcast-tokens";
 import { Scrims } from "./scrims";
@@ -37,7 +38,7 @@ export interface LiveBroadcastProps {
   /** Called once, when the hold completes or a screen reader action fires. */
   onEnd: () => void;
   /** R-P8, real match only: the opponent ended it; the clock is frozen. */
-  opponentEnded?: { name: string; finalFormatted: string } | null;
+  opponentEnded?: { name: string; finalFormatted: string; finalRemaining: number } | null;
   /** Extra HUD item right of the tag (the practice EXIT pill). */
   hudExtra?: React.ReactNode;
   /** Practice copy on the no-video plate. */
@@ -71,6 +72,10 @@ export function LiveBroadcast(props: LiveBroadcastProps) {
   const insets = useSafeAreaInsets();
   const [holding, setHolding] = React.useState(false);
   const recordingSeconds = useRecordingElapsed(recorder.state);
+  // Set on render (not in an effect) so the frame after a recording ends
+  // already reads "stopped", never "camera starting".
+  const hasRecordedRef = React.useRef(false);
+  if (recorder.state === "recording") hasRecordedRef.current = true;
   const view = deriveLiveView({
     remaining,
     paused,
@@ -78,18 +83,33 @@ export function LiveBroadcast(props: LiveBroadcastProps) {
     recorderState: recorder.state,
     permission: recorder.permission,
     opponentEnded: !!opponentEnded,
+    hasRecorded: hasRecordedRef.current,
   });
 
-  // One announcement per strip change (iOS; Android reads the live region).
+  // One announcement per strip change on iOS; Android reads the strip's
+  // polite live region, so announcing there too would speak it twice.
   // Segment steps inside final 10 are not changes.
   const lastStripRef = React.useRef<StripVariant | null>(null);
   React.useEffect(() => {
     if (view.strip === lastStripRef.current) return;
     lastStripRef.current = view.strip;
-    if (view.strip) AccessibilityInfo.announceForAccessibility(stripAnnouncement(view.strip));
+    if (view.strip && Platform.OS === "ios") {
+      AccessibilityInfo.announceForAccessibility(stripAnnouncement(view.strip));
+    }
   }, [view.strip]);
 
-  const durationFormatted = formatClock(durationSeconds);
+  const durationFormatted = formatElapsed(durationSeconds);
+
+  // R-P8: VoiceOver does not speak role "alert" on its own, so announce the
+  // opponent's end once on iOS. Android announces the alert plate itself.
+  const opponentEndedName = opponentEnded?.name ?? null;
+  const opponentEndedFinal = opponentEnded?.finalFormatted ?? null;
+  React.useEffect(() => {
+    if (opponentEndedName == null || opponentEndedFinal == null || Platform.OS !== "ios") return;
+    AccessibilityInfo.announceForAccessibility(
+      `${opponentEndedName} ended the match. Final clock ${opponentEndedFinal}`,
+    );
+  }, [opponentEndedName, opponentEndedFinal]);
   const holdDisabled = controlsDisabled || endPending || view.autoEndPending;
 
   return (
@@ -157,6 +177,7 @@ export function LiveBroadcast(props: LiveBroadcastProps) {
             <ClockSlab
               label={view.slab}
               formatted={opponentEnded ? opponentEnded.finalFormatted : formatted}
+              seconds={opponentEnded ? opponentEnded.finalRemaining : remaining}
               durationFormatted={durationFormatted}
             />
           </View>

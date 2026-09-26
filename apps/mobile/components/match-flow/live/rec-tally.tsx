@@ -1,7 +1,8 @@
 import { Text, View } from "react-native";
 import { CameraOff } from "lucide-react-native";
 import type { TallyVariant } from "@/lib/match-flow/live-view-state";
-import { formatClock, spokenDuration } from "@/lib/match-flow/live-view-state";
+import { spokenDuration } from "@/lib/match-flow/live-view-state";
+import { formatElapsed } from "@/lib/match-flow/format-elapsed";
 import { BROADCAST, BROADCAST_RADIUS, BROADCAST_SIZE, TABULAR } from "./broadcast-tokens";
 
 /**
@@ -12,7 +13,7 @@ export function RecTally({ variant, recordingSeconds }: { variant: TallyVariant;
   const rec = variant === "rec";
   const label =
     variant === "rec"
-      ? `REC ${formatClock(recordingSeconds)}`
+      ? `REC ${formatElapsed(recordingSeconds)}`
       : variant === "starting"
         ? "CAMERA STARTING"
         : variant === "saving"

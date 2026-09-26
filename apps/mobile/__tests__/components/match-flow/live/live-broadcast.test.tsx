@@ -187,7 +187,7 @@ it("R-P8 opponent ended: plate, 55 percent dim, SAVING VIDEO, FINAL slab with th
         state: "stopping",
         formatted: "06:10",
         remaining: 370,
-        opponentEnded: { name: "M. Park", finalFormatted: "06:18" },
+        opponentEnded: { name: "M. Park", finalFormatted: "06:18", finalRemaining: 378 },
       })}
     />,
   );
@@ -201,6 +201,39 @@ it("R-P8 opponent ended: plate, 55 percent dim, SAVING VIDEO, FINAL slab with th
   expect(s.getByTestId("live-timer")).toHaveTextContent("06:18");
   expect(s.queryByTestId("live-end")).toBeNull();
   expect(s.queryByTestId("live-pause-toggle")).toBeNull();
+  expect(s.getByLabelText("6 minutes 18 seconds remaining")).toBeTruthy();
+  expect(announce).toHaveBeenCalledTimes(1);
+  expect(announce).toHaveBeenCalledWith("M. Park ended the match. Final clock 06:18");
+});
+
+it("a recording that stopped mid-match reads NO VIDEO, never CAMERA STARTING", () => {
+  const s = render(<LiveBroadcast {...props({ state: "recording" })} />);
+  expect(s.getByTestId("live-tally")).toHaveTextContent(/^REC/);
+  for (const state of ["uploading", "uploaded", "idle"] as const) {
+    s.rerender(<LiveBroadcast {...props({ state })} />);
+    expect(s.getByTestId("live-tally")).toHaveTextContent("NO VIDEO");
+    expect(s.queryByTestId("live-strip-starting")).toBeNull();
+    expect(s.queryByTestId("live-dim-starting-dim")).toBeNull();
+  }
+});
+
+it("idle before the first recording still reads CAMERA STARTING", () => {
+  const s = render(<LiveBroadcast {...props({ state: "idle" })} />);
+  expect(s.getByTestId("live-tally")).toHaveTextContent("CAMERA STARTING");
+  s.getByTestId("live-strip-starting");
+  s.getByTestId("live-dim-starting-dim");
+});
+
+it("announces strip changes only on iOS (Android uses the live region)", () => {
+  const { Platform } = require("react-native");
+  const original = Platform.OS;
+  Platform.OS = "android";
+  try {
+    render(<LiveBroadcast {...props({ paused: true })} />);
+    expect(announce).not.toHaveBeenCalled();
+  } finally {
+    Platform.OS = original;
+  }
 });
 
 it("keeps the digits one color in every state (never amber or red)", () => {
@@ -211,7 +244,7 @@ it("keeps the digits one color in every state (never amber or red)", () => {
     props({ formatted: "00:00", remaining: 0 }),
     props({ state: "idle" }),
     props({ state: "error" }),
-    props({ opponentEnded: { name: "M. Park", finalFormatted: "06:18" } }),
+    props({ opponentEnded: { name: "M. Park", finalFormatted: "06:18", finalRemaining: 378 } }),
   ].map((p) => digitsColor(render(<LiveBroadcast {...p} />)));
   expect(new Set(colors)).toEqual(new Set(["#E8EDF2"]));
 });

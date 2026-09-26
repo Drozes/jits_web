@@ -136,7 +136,6 @@ export function HoldToEndButton({ disabled, ending, onEnd, onHoldChange }: HoldT
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
       onLongPress={handleLongPress}
-      onPress={() => undefined}
       style={{
         flex: 1.4,
         minWidth: 0,

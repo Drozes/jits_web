@@ -10,20 +10,12 @@ import type { UseVideoRecorderReturn } from "@/lib/video/use-video-recorder";
 import { AUTO_END_DELAY_MS } from "@/lib/video/recording-limits";
 import {
   OPPONENT_ENDED_INTERSTITIAL_MS,
-  formatAthleteMeta,
+  toLiveAthlete,
+  type LiveParticipant,
 } from "@/lib/match-flow/live-view-state";
-import { LiveBroadcast, type LiveAthlete } from "../live/live-broadcast";
+import { LiveBroadcast } from "../live/live-broadcast";
 
-/** The participant fields the live screen shows. */
-export interface LiveParticipant {
-  display_name: string;
-  current_elo: number | null;
-  current_weight: number | null;
-}
-
-function toLiveAthlete(p: LiveParticipant): LiveAthlete {
-  return { name: p.display_name, meta: formatAthleteMeta(p.current_elo, p.current_weight) };
-}
+export type { LiveParticipant } from "@/lib/match-flow/live-view-state";
 
 interface LiveStepProps {
   matchId: string;
@@ -98,6 +90,7 @@ export function LiveStep(props: LiveStepProps) {
   const [opponentEnded, setOpponentEnded] = React.useState<{
     name: string;
     finalFormatted: string;
+    finalRemaining: number;
   } | null>(null);
 
   // The final whistle, at most once per mount: a completed hold fires it at
@@ -123,6 +116,8 @@ export function LiveStep(props: LiveStepProps) {
   elapsedRef.current = timer.elapsed;
   const formattedRef = React.useRef(timer.formatted);
   formattedRef.current = timer.formatted;
+  const remainingRef = React.useRef(timer.remaining);
+  remainingRef.current = timer.remaining;
   const sync = useStepMatchSync({
     matchId,
     onTimerPaused: (p) => timer.syncFromBroadcast({ type: "paused", pausedAt: p }),
@@ -136,7 +131,11 @@ export function LiveStep(props: LiveStepProps) {
       const finish = clampFinishSeconds(elapsedRef.current, durationSeconds);
       void recorder.stop();
       fireEndHaptic();
-      setOpponentEnded({ name: opponent.display_name, finalFormatted: formattedRef.current });
+      setOpponentEnded({
+        name: opponent.display_name,
+        finalFormatted: formattedRef.current,
+        finalRemaining: remainingRef.current,
+      });
       interstitialTimerRef.current = setTimeout(() => onEnded(finish), OPPONENT_ENDED_INTERSTITIAL_MS);
     },
   });

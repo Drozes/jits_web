@@ -9,7 +9,8 @@ interface StripCopy {
   right: string | null;
   background: string;
   leftColor: string;
-  rightColor: string;
+  /** Unset when `right` is null (final 10 shows segments instead). */
+  rightColor?: string;
 }
 
 /** The strip's words per variant; also what screen readers hear on a change. */
@@ -26,7 +27,6 @@ export const STRIP_COPY: Record<StripVariant, StripCopy> = {
     right: null,
     background: BROADCAST.slab,
     leftColor: BROADCAST.amber,
-    rightColor: BROADCAST.amber,
   },
   timeup: {
     left: "TIME",

@@ -1,6 +1,6 @@
 import { Text, View } from "react-native";
 import { LivePill } from "@/components/ui/elo-system";
-import { parseClock, spokenDuration, type SlabLabel } from "@/lib/match-flow/live-view-state";
+import { spokenDuration, type SlabLabel } from "@/lib/match-flow/live-view-state";
 import { BROADCAST, BROADCAST_RADIUS, BROADCAST_SIZE, TABULAR } from "./broadcast-tokens";
 
 const LABEL_TEXT = { fontSize: 10, lineHeight: 12, letterSpacing: 2.52 };
@@ -23,10 +23,13 @@ function StaticLabel({ text, color, dot }: { text: string; color: string; dot: b
 export function ClockSlab({
   label,
   formatted,
+  seconds,
   durationFormatted,
 }: {
   label: SlabLabel;
   formatted: string;
+  /** The same remaining time as `formatted`, in seconds, for the spoken label. */
+  seconds: number;
   durationFormatted: string;
 }) {
   return (
@@ -61,7 +64,7 @@ export function ClockSlab({
       <Text
         testID="live-timer"
         accessibilityRole="timer"
-        accessibilityLabel={`${spokenDuration(parseClock(formatted))} remaining`}
+        accessibilityLabel={`${spokenDuration(seconds)} remaining`}
         className="font-mono-bold"
         style={[
           { fontSize: 88, lineHeight: 92, letterSpacing: -3.52, color: BROADCAST.inkDark, paddingTop: 10 },

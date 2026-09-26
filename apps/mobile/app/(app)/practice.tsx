@@ -72,6 +72,13 @@ export default function PracticeScreen() {
   useArenaMatchScreen();
   useMatchKeepAwake(phase === "ready" || phase === "live");
 
+  // Live shrinks the content to the viewport with scrolling off. Reset any
+  // offset left from scrolling the ready step (see the match wizard).
+  const scrollRef = React.useRef<ScrollView>(null);
+  React.useEffect(() => {
+    if (phase === "live") scrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, [phase]);
+
   const mark = React.useCallback(
     (event: PracticeMatchEvent) => {
       void markPracticeMatch(supabase, event)
@@ -142,6 +149,7 @@ export default function PracticeScreen() {
           <AppHeader title="Practice Match" back backFallback="/" liveSignal="static" />
         )}
         <ScrollView
+          ref={scrollRef}
           className={live ? "flex-1 bg-black" : "flex-1"}
           scrollEnabled={!live}
           contentContainerStyle={

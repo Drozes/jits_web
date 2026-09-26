@@ -20,6 +20,12 @@ export interface LiveViewInput {
   recorderState: RecordingState;
   permission: { granted: boolean; canAskAgain: boolean } | null;
   opponentEnded: boolean;
+  /**
+   * The recorder has reached `recording` at least once this live step. After
+   * that, a non-recording state means the recording stopped (interruption,
+   * duration cap), not that the camera is still starting.
+   */
+  hasRecorded: boolean;
 }
 
 export interface LiveView {
@@ -42,7 +48,7 @@ const SAVING_STATES: ReadonlySet<RecordingState> = new Set<RecordingState>([
 
 /** Everything the live broadcast screen shows, derived from the live state. */
 export function deriveLiveView(input: LiveViewInput): LiveView {
-  const { remaining, paused, holding, recorderState, permission, opponentEnded } = input;
+  const { remaining, paused, holding, recorderState, permission, opponentEnded, hasRecorded } = input;
   const granted = permission?.granted ?? false;
   const autoEndPending = remaining === 0 && !paused && !opponentEnded;
 
@@ -50,7 +56,9 @@ export function deriveLiveView(input: LiveViewInput): LiveView {
   if (!granted) unavailable = permission?.canAskAgain === false ? "denied" : "canAsk";
   else if (recorderState === "error") unavailable = "error";
 
-  const starting = granted && recorderState === "idle" && remaining > 0 && !opponentEnded;
+  // Only before the first recording: the live step never restarts one.
+  const starting =
+    granted && !hasRecorded && recorderState === "idle" && remaining > 0 && !opponentEnded;
 
   let strip: StripVariant | null = null;
   if (opponentEnded) strip = null;
@@ -64,7 +72,10 @@ export function deriveLiveView(input: LiveViewInput): LiveView {
   if (opponentEnded) tally = SAVING_STATES.has(recorderState) ? "saving" : "noVideo";
   else if (unavailable) tally = "noVideo";
   else if (recorderState === "recording") tally = "rec";
-  else tally = "starting";
+  // Before the first recording the camera is on its way (unless the clock
+  // already ran out); after it, anything but recording means it stopped.
+  else if (!hasRecorded && remaining > 0) tally = "starting";
+  else tally = "noVideo";
 
   let slab: SlabLabel;
   if (opponentEnded) slab = "final";
@@ -88,13 +99,6 @@ export function deriveLiveView(input: LiveViewInput): LiveView {
   };
 }
 
-/** Seconds as MM:SS, the match clock's format. */
-export function formatClock(totalSeconds: number): string {
-  const s = Math.max(0, Math.floor(totalSeconds));
-  const m = Math.floor(s / 60);
-  return `${String(m).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
-}
-
 /** Seconds as speech, for screen readers: "2 minutes 14 seconds". */
 export function spokenDuration(totalSeconds: number): string {
   const s = Math.max(0, Math.floor(totalSeconds));
@@ -107,13 +111,6 @@ export function spokenDuration(totalSeconds: number): string {
   return `${min} ${sec}`;
 }
 
-/** "MM:SS" back to seconds (NaN-safe: returns 0 on anything else). */
-export function parseClock(formatted: string): number {
-  const match = /^(\d+):(\d{2})$/.exec(formatted.trim());
-  if (!match) return 0;
-  return Number(match[1]) * 60 + Number(match[2]);
-}
-
 /**
  * The athlete bar's meta line: "1512 · 77 KG". Either part is left out when
  * missing, and the line is null when both are. Weight keeps at most one
@@ -124,4 +121,16 @@ export function formatAthleteMeta(elo: number | null | undefined, weightKg: numb
   if (elo != null && Number.isFinite(elo)) parts.push(String(Math.round(elo)));
   if (weightKg != null && Number.isFinite(weightKg)) parts.push(`${Number(weightKg.toFixed(1))} KG`);
   return parts.length ? parts.join(" · ") : null;
+}
+
+/** The participant fields the live screen shows. */
+export interface LiveParticipant {
+  display_name: string;
+  current_elo: number | null;
+  current_weight: number | null;
+}
+
+/** A participant as the athlete bar shows it: name plus the meta line. */
+export function toLiveAthlete(p: LiveParticipant): { name: string; meta: string | null } {
+  return { name: p.display_name, meta: formatAthleteMeta(p.current_elo, p.current_weight) };
 }

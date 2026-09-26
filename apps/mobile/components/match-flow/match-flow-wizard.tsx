@@ -128,6 +128,15 @@ export function MatchFlowWizard({
   // other on the ready -> live handoff.
   useMatchKeepAwake(step === "ready" || step === "live");
 
+  // Live shrinks the content to the viewport with scrolling off. Reset any
+  // offset left from scrolling the ready step, or every full-screen layer
+  // would sit shifted up with no way to scroll it back. scrollTo keeps the
+  // tree as is, so the camera is not remounted.
+  const scrollRef = React.useRef<ScrollView>(null);
+  React.useEffect(() => {
+    if (step === "live") scrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, [step]);
+
   const advanceToResult = React.useCallback(() => setStep("result"), [setStep]);
 
   // The match clock when the live step ended, keyed to its match so a later
@@ -212,6 +221,7 @@ export function MatchFlowWizard({
 
   return (
     <ScrollView
+      ref={scrollRef}
       className={cn("flex-1", live ? "bg-black" : "bg-surface")}
       scrollEnabled={!live}
       contentContainerStyle={
