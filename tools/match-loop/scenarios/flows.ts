@@ -244,17 +244,44 @@ export async function blueRecordsDraw(ctx: ScenarioCtx, side: MatchSide): Promis
   ]);
 }
 
-/** Both confirm; Blue must reach the summary and the bot must see Blue's confirm. */
-export async function bothConfirm(ctx: ScenarioCtx, side: MatchSide): Promise<void> {
+/**
+ * Both confirm; Blue must reach the summary and the bot's confirm step must
+ * finish as the app's would (Blue's result_confirmed, or the DB showing both
+ * confirmations; never a bare `completed` row).
+ */
+export async function bothConfirm(
+  ctx: ScenarioCtx,
+  side: MatchSide,
+  /** "informational" where a relaunch or outage may legitimately lose the
+   * broadcast (E7); everywhere else the confirm channel must receive it. */
+  channelCheck: "hard" | "informational" = "hard",
+): Promise<void> {
   const botRun = (async () => {
     await side.confirm();
-    await side.waitOpponentConfirmed(T.handshake);
+    return side.waitConfirmDone(T.handshake);
   })();
+  botRun.catch(() => undefined); // awaited below; never an unhandled rejection
   await ctx.step("Blue confirms", () => ctx.ui.confirmResult());
-  await Promise.all([
+  const [outcome] = await Promise.all([
     ctx.step("bot sees Blue's confirmation", () => botRun),
     ctx.step("Blue reaches the summary", () => ctx.ui.waitStep("summary", T.handshake)),
   ]);
+  ctx.eq("bot:confirm-step-outcome", "confirmed", outcome.kind);
+  ctx.trace.note("harness", "bot_confirm_via", outcome.via);
+  // The DB reconciler can finish the bot's confirm step on its own, so check
+  // separately that Blue's app actually broadcast its confirmation.
+  await ctx.expect("protocol:blue-sent-result_confirmed", true, async () => {
+    await side.spy.waitFor(
+      "Blue's result_confirmed",
+      (e) => e.event === "result_confirmed" && e.payload.athlete_id === ctx.ids.blue,
+      8_000,
+      0, // one MatchSide per match
+    );
+    return true;
+  });
+  const received = side.confirmReceivedOnChannel();
+  if (channelCheck === "hard") ctx.eq("bot:confirm-channel-received-blue-result_confirmed", true, received);
+  else ctx.oracle("bot:confirm-channel-received-blue-result_confirmed", true, "informational", received, `bot finished confirm via ${outcome.via}`);
 }
 
 export async function checkSummary(ctx: ScenarioCtx, verdict: string, delta: number | null): Promise<void> {

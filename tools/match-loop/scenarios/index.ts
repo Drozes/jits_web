@@ -9,6 +9,7 @@ import c3 from "./core/c3-draw";
 import c4 from "./core/c4-blue-declines";
 import c5 from "./core/c5-blue-aborts-ready";
 import c6 from "./core/c6-blue-disputes";
+import c6b from "./core/c6b-red-disputes";
 import e1 from "./extended/e01-red-withdraws";
 import e2 from "./extended/e02-expiry";
 import e3 from "./extended/e03-red-aborts-ready";
@@ -27,7 +28,7 @@ import e15 from "./extended/e15-cap-plate";
 import e16 from "./extended/e16-challenge-mid-match";
 
 export const SCENARIOS: Scenario[] = [
-  c1, c2, c3, c4, c5, c6,
+  c1, c2, c3, c4, c5, c6, c6b,
   e1, e2, e3, e3b, e4, e5, e6, e7, e8, e9, e10, e11, e12, e14, e15, e16,
 ];
 

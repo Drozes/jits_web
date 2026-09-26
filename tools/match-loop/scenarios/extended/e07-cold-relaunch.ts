@@ -1,6 +1,7 @@
 import type { Scenario } from "../context";
 import { db } from "../../oracle/db";
-import { blueEnds, blueRecordsDraw, exitToArena, openToLive, prepare, T } from "../flows";
+import { pollUntil } from "../../lib/util";
+import { blueEnds, blueRecordsDraw, bothConfirm, exitToArena, openToLive, prepare, T } from "../flows";
 
 const scenario: Scenario = {
   id: "E7",
@@ -30,16 +31,26 @@ const scenario: Scenario = {
       await ctx.idb.waitFor({ label: "Home", type: "Button" }, 30_000).catch(() => undefined);
       await ctx.simctl.openUrl(url);
     });
-    // The row is 'completed' after record, so getCurrentStep maps it to summary:
-    // Blue skips its own confirmation. Recorded, not asserted as a failure.
-    const step = await ctx.idb
-      .waitAny([{ label: /^Step \d+ of \d+, (Confirm|Summary)$/ }], T.step)
-      .then(() => ctx.ui.currentStep());
-    ctx.oracle("ui:resumes-after-confirm-kill", step === "summary" || step === "confirm", "confirm|summary", step);
-    await side.confirm();
-    const conf = await db.confirmations(h.matchId);
-    ctx.oracle("db:blue-confirmation-after-relaunch", true, "informational", conf.map((c) => c.athlete_id), "Blue lands on summary and never confirms when relaunched on confirm");
-    if (step === "summary") await exitToArena(ctx);
+    // The row is 'completed' after record, so the mount-time step is summary;
+    // the wizard's first DB snapshot moves an athlete who has not confirmed
+    // back to confirm (jits-bmei). A brief summary before that is expected.
+    const onConfirm = await ctx.expect("ui:resumes-on-confirm-after-kill", "confirm", async () => {
+      await ctx.ui.waitStep("confirm", T.step);
+      return "confirm";
+    });
+    if (onConfirm) {
+      await bothConfirm(ctx, side, "informational");
+      const conf = await pollUntil(
+        "2 confirmations",
+        async () => {
+          const c = await db.confirmations(h.matchId);
+          return c.length >= 2 ? c : undefined;
+        },
+        { timeoutMs: 8_000 },
+      ).catch(() => db.confirmations(h.matchId));
+      ctx.eq("db:both-confirmed-after-relaunch", [ctx.ids.blue, ctx.ids.red].sort(), conf.map((c) => c.athlete_id).sort());
+    }
+    if ((await ctx.ui.currentStep()) === "summary") await exitToArena(ctx);
   },
 };
 export default scenario;

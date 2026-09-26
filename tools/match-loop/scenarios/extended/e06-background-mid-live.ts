@@ -7,7 +7,6 @@ const scenario: Scenario = {
   id: "E6",
   tier: "extended",
   title: "Blue backgrounds mid-live for 20s while Red ends and records: Blue must not be stranded (H7)",
-  expectedFailure: "H7: broadcasts sent while backgrounded are lost and the live step never re-reads the row",
   async run(ctx) {
     await prepare(ctx);
     const red = await ctx.bot("red");
@@ -27,7 +26,13 @@ const scenario: Scenario = {
       ctx.trace.note("harness", "blue_landed", index === 0 ? "confirm" : "summary");
       return true;
     });
-    if (ok && (await ctx.ui.currentStep()) === "confirm") await bothConfirm(ctx, side);
+    // The foreground re-read maps a completed, unconfirmed match to confirm;
+    // landing on the summary would be the old confirm-skip bug.
+    const onConfirm = ok && (await ctx.expect("ui:blue-lands-on-confirm", true, async () => {
+      await ctx.ui.waitStep("confirm", T.step);
+      return true;
+    }));
+    if (onConfirm) await bothConfirm(ctx, side);
     if (ok) await exitToArena(ctx);
   },
 };

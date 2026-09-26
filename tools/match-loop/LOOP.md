@@ -228,7 +228,17 @@ already appends a `{"type":"run",...}` line per run):
   what else is mounted; selectors match by label/testID, not type.
 - A dev-build LogBox toast can cover the tab bar; the harness closes it.
 - E13 (camera granted) is not implemented: the simulator has no camera.
-- A broadcast "ok" in the trace is not a delivery ack (channels use
-  `ack: false`); delivery is judged by the spy socket and receiver oracles.
+- Session-match channels use `ack: true` since 55061f5, so a websocket "ok"
+  means the server received the broadcast, not that the other side did;
+  delivery is judged by the spy socket and receiver oracles.
 - Scenario E3B is an addition to the spec: Blue cancels while Red is still on
-  the weight step (no channel mounted there).
+  the weight step (the weight step mounts a channel since jits-bh2v).
+- The bot mirrors the app's DB reconciler (`reconcile` entries in
+  `trace.jsonl`): the ready and confirm steps can advance from a DB snapshot
+  when a broadcast was lost, exactly like the app. Delivery of match_ended,
+  result_submitted, result_confirmed and match_disputed is still asserted
+  separately (`waitEvent`, spy oracles, `waitDisputeSignal`), so those show
+  up as a failed delivery oracle, not a stuck bot. A ready step finished from
+  the DB is not a failure; its `ready_outcome` / ReadyOutcome `via` says so.
+  A `completed` row never finishes the confirm step (only a dispute or both
+  confirmations do).

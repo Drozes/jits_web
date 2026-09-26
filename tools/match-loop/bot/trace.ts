@@ -11,6 +11,7 @@ export type TraceKind =
   | "presence"
   | "spy" // every broadcast on a match topic, seen by the observer socket
   | "step" // bot entered/left a wizard step
+  | "reconcile" // a DB snapshot the bot's app-equivalent reconciler read
   | "note";
 
 export interface TraceEntry {

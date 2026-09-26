@@ -148,9 +148,10 @@ function protocolOracles(ctx: ScenarioCtx, s: Scenario): void {
   const unknown: string[] = [];
   for (const e of spy) {
     const err = validatePayload(e.name, e.payload);
-    if (err?.startsWith("unknown event")) {
-      if (!/disput/i.test(e.name)) unknown.push(e.name);
-    } else if (err) shapeErrors.push(`${e.name}: ${err}`);
+    // match_disputed is a protocol event now (validated like the rest), so
+    // no event name gets a pass any more.
+    if (err?.startsWith("unknown event")) unknown.push(e.name);
+    else if (err) shapeErrors.push(`${e.name}: ${err}`);
   }
   const recv = ctx.trace.filter((e) => e.kind === "broadcast_recv" && !!e.topic?.startsWith("arena-challenge:"));
   for (const e of recv) {
