@@ -17,6 +17,7 @@ import {
   BottomSheetView,
   type BottomSheetBackgroundProps,
 } from "@gorhom/bottom-sheet";
+import * as Haptics from "expo-haptics";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import type { IncomingChallenge } from "@/lib/arena/use-arena-challenge";
 
@@ -61,10 +62,20 @@ export function ChallengePromptSheet({
   // it: the FIRST challenge after every launch was invisible. Same fix as
   // `notification-panel.tsx`.
   const presentedRef = React.useRef(false);
+  // The prompt can appear on any tab, so it buzzes once per challenge (a
+  // Warning notification: it wants an answer). Keyed by id so a re-render
+  // with the same challenge never buzzes twice.
+  const buzzedIdRef = React.useRef<string | null>(null);
   React.useEffect(() => {
     if (challenge) {
       ref.current?.present();
       presentedRef.current = true;
+      if (buzzedIdRef.current !== challenge.challengeId) {
+        buzzedIdRef.current = challenge.challengeId;
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(
+          () => undefined,
+        );
+      }
     } else if (presentedRef.current) {
       ref.current?.dismiss();
       presentedRef.current = false;

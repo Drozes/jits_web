@@ -50,31 +50,49 @@ export function ResultBanner({
       >
         {verdictText}
       </Text>
-      {matchType === "ranked" ? (
-        <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">
-          Ranked. ELO already applied. Disputes are reviewed by an admin.
-        </Text>
-      ) : null}
+      <Text className="text-center font-body text-[12px] text-ink-2">
+        {matchType === "ranked"
+          ? "Your rating is already updated. Confirm if this is right, or dispute it and an admin will review."
+          : "Confirm if this is right, or dispute it."}
+      </Text>
     </Plate>
   );
 }
 
 /**
+ * Where one athlete stands on the confirm step:
+ * - `your-call`: the viewer has not acted yet (their turn, not a wait),
+ * - `confirming`: the opponent has not confirmed yet,
+ * - `confirmed`: the confirmation is in.
+ */
+export type ConfirmPanelState = "your-call" | "confirming" | "confirmed";
+
+const STATUS_COPY: Record<ConfirmPanelState, string> = {
+  "your-call": "Your call",
+  confirming: "Confirming...",
+  confirmed: "Confirmed",
+};
+
+/**
  * Single athlete confirm-state panel used in the confirm step.
  *
- * ELO design system: hairline-bordered plate, swaps to positive border
- * + check glyph once the athlete has confirmed.
+ * ELO design system: hairline-bordered plate. The viewer's own pending
+ * panel shows an empty hairline circle (a spinner there read as "waiting on
+ * something" rather than "your turn"); the opponent's pending panel keeps
+ * the spinner; either swaps to a positive border + check once confirmed.
  */
 export function ConfirmPanel({
   label,
-  confirmed,
+  state,
 }: {
   label: string;
-  confirmed: boolean;
+  state: ConfirmPanelState;
 }) {
   const tokens = useThemedTokens();
+  const confirmed = state === "confirmed";
   return (
     <View
+      testID={`confirm-panel-${state}`}
       className={cn(
         "flex-1 items-center gap-2 rounded-md bg-surface-3 border px-3 py-4",
         confirmed ? "border-positive" : "border-hairline-strong",
@@ -84,8 +102,12 @@ export function ConfirmPanel({
         <View className="h-8 w-8 items-center justify-center rounded-full border border-positive">
           <Check size={16} color={tokens.statePositive} />
         </View>
+      ) : state === "your-call" ? (
+        <View className="h-8 w-8 rounded-full border border-hairline-strong" />
       ) : (
-        <ActivityIndicator color={tokens.textSecondary} />
+        <View className="h-8 w-8 items-center justify-center">
+          <ActivityIndicator color={tokens.textSecondary} />
+        </View>
       )}
       <Text
         className={cn(
@@ -95,6 +117,9 @@ export function ConfirmPanel({
         numberOfLines={1}
       >
         {label}
+      </Text>
+      <Text className="font-body text-[12px] text-ink-3" numberOfLines={1}>
+        {STATUS_COPY[state]}
       </Text>
     </View>
   );

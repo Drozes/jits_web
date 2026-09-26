@@ -36,6 +36,7 @@ jest.mock("react-native-safe-area-context", () => ({
 
 jest.mock("@/lib/theme/use-theme", () => ({
   useThemedTokens: () => ({ textPrimary: "#fff", textSecondary: "#aaa", statePositive: "#0f0" }),
+  useResolvedColorScheme: () => "dark",
 }));
 
 // The reconciler's `matches` row listener (now live: the backend published
@@ -94,6 +95,8 @@ jest.mock("@/lib/match-flow/use-haptics", () => ({
     matchStart: () => Promise.resolve(),
     matchEnd: () => Promise.resolve(),
     timeWarning: () => Promise.resolve(),
+    resultRecorded: () => Promise.resolve(),
+    error: () => Promise.resolve(),
   },
 }));
 const mockTimerSync = jest.fn();
@@ -312,7 +315,7 @@ describe("missed result_confirmed (jits-bmei, E8)", () => {
       fireEvent.press(screen.getByTestId("confirm-result"));
     });
     await flush();
-    screen.getByText("Waiting for opponent to confirm...");
+    screen.getByText("Waiting for Opponent to confirm...");
 
     mockGetMatchConfirmations.mockResolvedValue(["me-1", "opp-1"]);
     await tick(4_000);
@@ -556,7 +559,7 @@ describe("a realtime matches UPDATE never skips confirmation", () => {
     await act(async () => mockRow.handler?.({ new: { status: "completed" } }));
     await flush();
     screen.getByTestId("match-step-confirm");
-    screen.getByText("Waiting for opponent to confirm...");
+    screen.getByText("Waiting for Opponent to confirm...");
   });
 
   it("advances once both confirmations exist", async () => {

@@ -35,6 +35,12 @@ jest.mock("@gorhom/bottom-sheet", () => {
   };
 });
 
+const mockNotify = jest.fn((_type: unknown) => Promise.resolve());
+jest.mock("expo-haptics", () => ({
+  notificationAsync: (t: unknown) => mockNotify(t),
+  NotificationFeedbackType: { Success: "success", Warning: "warning", Error: "error" },
+}));
+
 jest.mock("@/lib/theme/use-theme", () => ({
   useThemedTokens: () => ({ bgSecondary: "#13151B", textTertiary: "#8D929D" }),
 }));
@@ -64,6 +70,7 @@ function Harness({ challenge }: { challenge: IncomingChallenge | null }) {
 beforeEach(() => {
   mockPresent.mockClear();
   mockDismiss.mockClear();
+  mockNotify.mockClear();
   mockOnChange = undefined;
 });
 
@@ -158,5 +165,37 @@ describe("ChallengePromptSheet accessibility (jits-ef2a)", () => {
     expect(prompt.props.accessibilityViewIsModal).toBe(true);
     // A container, not a leaf: its buttons must stay individually reachable.
     expect(prompt.props.accessible).not.toBe(true);
+  });
+});
+
+describe("ChallengePromptSheet haptic (jits-4zp.7)", () => {
+  it("buzzes a Warning once when a challenge is presented", () => {
+    const { rerender } = render(<Harness challenge={null} />);
+    expect(mockNotify).not.toHaveBeenCalled();
+    rerender(<Harness challenge={RIVAL} />);
+    expect(mockNotify).toHaveBeenCalledTimes(1);
+    expect(mockNotify).toHaveBeenCalledWith("warning");
+  });
+
+  it("does not buzz again for the same challenge re-rendered as a new object", () => {
+    const { rerender } = render(<Harness challenge={RIVAL} />);
+    rerender(<Harness challenge={{ ...RIVAL }} />);
+    expect(mockNotify).toHaveBeenCalledTimes(1);
+  });
+
+  it("buzzes again for the next, different challenge", () => {
+    const { rerender } = render(<Harness challenge={RIVAL} />);
+    rerender(<Harness challenge={null} />);
+    rerender(<Harness challenge={{ ...RIVAL, challengeId: "ch-2" }} />);
+    expect(mockNotify).toHaveBeenCalledTimes(2);
+  });
+
+  it("never lets a haptics failure escape", async () => {
+    mockNotify.mockImplementationOnce(() => Promise.reject(new Error("no engine")));
+    render(<Harness challenge={RIVAL} />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(mockPresent).toHaveBeenCalledTimes(1);
   });
 });

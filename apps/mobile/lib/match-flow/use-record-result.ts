@@ -6,6 +6,7 @@ import type { BroadcastResult } from "@jits/shared/hooks/use-session-match-sync"
 import { settleWithin } from "@jits/shared/hooks/session-match-channel";
 import { mutationQueue, isQueuedResult } from "@/lib/network/mutation-queue";
 import { parseFinishTime } from "./parse-finish-time";
+import { matchHaptics } from "./use-haptics";
 import { SEND_GRACE_MS, useMatchSyncContext, useStepMatchSync } from "./match-sync-context";
 
 interface UseRecordResultParams {
@@ -64,6 +65,7 @@ export function useRecordResult({ matchId, onRecorded }: UseRecordResultParams) 
       );
       if (!res.ok) {
         setLoading(false);
+        void matchHaptics.error();
         toast.error({ text1: "Couldn't record result", description: res.error.message });
         // The usual cause is that the opponent recorded first and their
         // result_submitted never arrived: re-read the match now so the
@@ -73,6 +75,7 @@ export function useRecordResult({ matchId, onRecorded }: UseRecordResultParams) 
       }
       const queued = isQueuedResult(res.data);
       recordedRef.current = true;
+      void matchHaptics.resultRecorded();
       const broadcast: BroadcastResult = {
         result: outcome,
         winnerId: outcome === "submission" ? winnerId : undefined,

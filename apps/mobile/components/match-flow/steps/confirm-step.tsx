@@ -1,6 +1,7 @@
 import * as React from "react";
 import { Pressable, Text, View } from "react-native";
 import { Check } from "lucide-react-native";
+import * as Haptics from "expo-haptics";
 import { toast } from "@/components/ui/toast";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { supabase } from "@/lib/supabase/client";
@@ -13,6 +14,7 @@ import {
   useStepMatchSync,
 } from "@/lib/match-flow/match-sync-context";
 import { mutationQueue, isQueuedResult } from "@/lib/network/mutation-queue";
+import { matchHaptics } from "@/lib/match-flow/use-haptics";
 import { ConfirmPanel, ResultBanner } from "./confirm-step-panels";
 import { DisputeForm } from "./dispute-form";
 import { cn } from "@/lib/cn";
@@ -124,11 +126,14 @@ export function ConfirmStep(props: ConfirmStepProps) {
     );
     if (!res.ok) {
       setMyConfirmed(false);
+      void matchHaptics.error();
       toast.error({ text1: "Couldn't confirm", description: res.error.message });
       // Most often the opponent disputed and that signal was missed.
       reconcileNow();
       return;
     }
+    // A light tick, not the Success buzz: the result was already recorded.
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
     if (isQueuedResult(res.data)) {
       toast.success({
         text1: "Saved locally",
@@ -166,8 +171,11 @@ export function ConfirmStep(props: ConfirmStepProps) {
       />
 
       <View className="flex-row gap-3">
-        <ConfirmPanel label="You" confirmed={myConfirmed} />
-        <ConfirmPanel label={opponentDisplayName} confirmed={opponentConfirmed} />
+        <ConfirmPanel label="You" state={myConfirmed ? "confirmed" : "your-call"} />
+        <ConfirmPanel
+          label={opponentDisplayName}
+          state={opponentConfirmed ? "confirmed" : "confirming"}
+        />
       </View>
 
       {!myConfirmed ? (
@@ -184,7 +192,7 @@ export function ConfirmStep(props: ConfirmStepProps) {
         </Pressable>
       ) : !opponentConfirmed ? (
         <Text className="text-center font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">
-          Waiting for opponent to confirm...
+          {`Waiting for ${opponentDisplayName} to confirm...`}
         </Text>
       ) : null}
 
