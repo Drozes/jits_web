@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Web: presence parity with mobile (jits-ifvw) and Arena cancel
+
+**Fixed**
+- Presence: `app:online` and `lobby:online` no longer die silently when Realtime closes the channel (presence rate limit). They rebuild it on a bounded backoff (1s/5s/15s/30s, then on tab visible or going live) and re-track; a remount waits for the previous removal; lobby track/untrack is deduped and coalesced; presence calls are bounded to 12s. New `apps/web/lib/realtime/presence-channel.ts` (shared helpers) and `apps/web/lib/realtime/fake-realtime-client.ts` (test double).
+- Arena: cancelling an outgoing challenge the opponent already started (0 rows changed) now joins that match instead of clearing the waiting bar and broadcasting "cancelled"; the withdrawal on accepting another challenge broadcasts only when a row changed (mirrors mobile).
+- Arena: regression test for going offline mid-lookup on the challenge INSERT prompt gate (jits-dwq1; already gated).
+
 ### Mobile: presence channels survive a server close (jits-fa9x)
 
 JS-only, OTA-eligible for runtime 0.3.0.
