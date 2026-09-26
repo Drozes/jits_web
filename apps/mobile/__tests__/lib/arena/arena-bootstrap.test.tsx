@@ -144,6 +144,15 @@ describe("ArenaBootstrap", () => {
     );
   });
 
+  it("passes isLive: true to the challenge listener while live", () => {
+    mockIsLive = true;
+    render(<ArenaBootstrap />);
+
+    expect(mockUseArenaChallenge).toHaveBeenLastCalledWith(
+      expect.objectContaining({ athleteId: "me-1", isLive: true }),
+    );
+  });
+
   it("owns nothing for a signed-out or not-yet-active athlete", () => {
     mockAthlete = null;
     const { rerender } = render(<ArenaBootstrap />);

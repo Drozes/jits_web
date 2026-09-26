@@ -976,6 +976,19 @@ describe("while offline", () => {
     expect(result.current.incoming).toBeNull();
   });
 
+  it("raises the prompt from an INSERT once the athlete goes live", async () => {
+    // Production mounts offline (isLive starts false) and flips on go-live.
+    const { result, rerender } = mountLive(false);
+    rerender({ isLive: true });
+
+    await raiseIncoming(result);
+
+    expect(result.current.incoming).toMatchObject({
+      challengeId: CHALLENGE,
+      challengerId: OPPONENT,
+    });
+  });
+
   it("offerIncoming still raises the prompt (recovery gates on live itself)", async () => {
     const { result } = mountLive(true);
 
