@@ -680,6 +680,28 @@ export class MatchSide {
   }
 
   /**
+   * HARNESS-ONLY reorder of `dispute()` (C6B): broadcast match_disputed
+   * BEFORE the RPC, while the row is still `completed` with no
+   * confirmations, so the opponent's DB reconciler cannot move them (it maps
+   * that row to confirm) and only the broadcast path can. Stays on confirm;
+   * call `disputeRpcAfterBroadcast()` next. The app never does this order.
+   */
+  async disputeBroadcastOnly(): Promise<void> {
+    if (this.step !== "confirm") throw new Error(`disputeBroadcastOnly on step ${this.step}`);
+    await this.think("read");
+    await this.sendAwaited(E.MATCH_DISPUTED, { athlete_id: this.meId });
+  }
+
+  /** Second half of the C6B reorder: the dispute RPC, then the summary. */
+  async disputeRpcAfterBroadcast(reason: string): Promise<void> {
+    const r = await this.trace.rpc(this.actor, "disputeMatchResult", { matchId: this.matchId, reason }, () =>
+      disputeMatchResult(this.client, this.matchId, reason),
+    );
+    if (!r.ok) throw new Error(`disputeMatchResult failed: ${r.error.message}`);
+    this.enter("summary");
+  }
+
+  /**
    * Wait on the confirm step until the app would leave it (`confirmDecision`),
    * then enter the summary. Never leaves on a `completed` row alone.
    */
