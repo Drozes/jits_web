@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Shared/Mobile: live timer works when entered into an already-paused match
+
+JS-only, OTA-eligible for runtime 0.3.0 (no native dependency, `app.json` or config change).
+
+**Fixed**
+- `packages/shared/src/hooks/use-session-match-timer.ts`: `running` was seeded as `!!startedAt && !pausedAt`, so a live step mounted into an in-progress match that was paused (cold start, re-entry, reload) started with `running=false`, and nothing ever set it back (`resumed` only clears `pausedAt`). `paused` (`running && !!pausedAt`) then read false: the toggle offered PAUSE on a paused match (tapping it errored), the clock stayed frozen after a resume because no interval ran, and mobile's auto-end at 00:00 (which requires `running`) never fired. `running` now means "started and not ended", independent of pause (`!!startedAt`); `paused` still carries the pause. The test that pinned `running=false` for a paused mount was rewritten to assert the corrected state, and new cases cover resume-then-tick, resume-then-reach-zero and pause-again after a paused mount (`use-session-match-timer.test.ts`).
+- `apps/mobile/components/match-flow/steps/live-step.tsx`: the 10 s time-warning haptic now also requires an unpaused clock, so re-entering a match paused inside its last 10 s does not buzz until it resumes. Tests: `apps/mobile/__tests__/components/match-flow/live-step-auto-end.test.tsx` ("LiveStep mounted into a paused match": RESUME shown, resume tap ticks and auto-ends once, opponent resume broadcast auto-ends once, 00:00 held while paused).
+- Web session live steps (`fighter-live-step.tsx`, `timekeeper-live-step.tsx`) are unchanged but benefit: a reload into a paused session match now shows Paused / Resume and ticks after resume. Note that web auto-end does not check `paused`, so a web step mounted into a match paused at exactly 00:00 now ends it on mount (matching what an already-mounted web step does at 00:00), where before it froze.
+
 ### Mobile: timed match auto-ends at 00:00 again (jits-2y8i)
 
 JS-only, OTA-eligible for runtime 0.3.0 (no native dependency, `app.json` or config change).

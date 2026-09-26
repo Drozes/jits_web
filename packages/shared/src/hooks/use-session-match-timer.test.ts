@@ -162,8 +162,14 @@ describe("useSessionMatchTimer", () => {
       expect(result.current.elapsed).toBe(60);
     });
 
-    it("uses pausedAt as anchor when initialized in paused state", () => {
+    it("mounts running-and-paused when initialized in paused state", () => {
+      // This used to pin running=false for a mount into a paused match. That
+      // was the bug: nothing ever set running back to true (`resumed` only
+      // clears pausedAt), so paused read false (the button offered PAUSE on
+      // a paused match), the clock froze after resume, and auto-end never
+      // fired. A started, not-ended match is running; the pause is `paused`.
       const pausedAt = new Date(STARTED_AT_MS + 60_000).toISOString();
+      vi.setSystemTime(STARTED_AT_MS + 90_000);
 
       const { result } = renderHook(() =>
         useSessionMatchTimer({
@@ -174,17 +180,135 @@ describe("useSessionMatchTimer", () => {
         }),
       );
 
-      // When initialized with pausedAt, running is false (!!startedAt && !pausedAt)
-      // but elapsed is still computed from the pausedAt anchor
+      // Elapsed is anchored at pausedAt, not now.
       expect(result.current.elapsed).toBe(60);
-      expect(result.current.running).toBe(false);
+      expect(result.current.running).toBe(true);
+      expect(result.current.paused).toBe(true);
 
-      // Advancing real time does not change elapsed since not running
+      // Frozen while paused.
       act(() => {
         vi.advanceTimersByTime(30_000);
       });
 
       expect(result.current.elapsed).toBe(60);
+      expect(result.current.remaining).toBe(DURATION - 60);
+    });
+
+    it("ticks again after resuming a match mounted while paused", () => {
+      // Paused at 60 s, mounted 30 s later, resumed 10 s after that: 40 s paused.
+      const pausedAt = new Date(STARTED_AT_MS + 60_000).toISOString();
+      vi.setSystemTime(STARTED_AT_MS + 90_000);
+
+      const { result } = renderHook(() =>
+        useSessionMatchTimer({
+          durationSeconds: DURATION,
+          startedAt: STARTED_AT,
+          pausedAt,
+          totalPausedDuration: 0,
+        }),
+      );
+
+      act(() => {
+        vi.advanceTimersByTime(10_000);
+      });
+      act(() => {
+        result.current.syncFromBroadcast({ type: "resumed", totalPausedDuration: 40 });
+      });
+
+      expect(result.current.running).toBe(true);
+      expect(result.current.paused).toBe(false);
+      expect(result.current.elapsed).toBe(60);
+      expect(result.current.remaining).toBe(DURATION - 60);
+
+      // The interval is live: the display advances on its own.
+      act(() => {
+        vi.advanceTimersByTime(5_000);
+      });
+
+      expect(result.current.elapsed).toBe(65);
+      expect(result.current.remaining).toBe(DURATION - 65);
+      expect(result.current.formatted).toBe("03:55");
+    });
+
+    it("reaches zero after resuming a match mounted while paused", () => {
+      // 5 s left at the pause.
+      const pausedAt = new Date(STARTED_AT_MS + (DURATION - 5) * 1000).toISOString();
+      vi.setSystemTime(STARTED_AT_MS + (DURATION + 20) * 1000);
+
+      const { result } = renderHook(() =>
+        useSessionMatchTimer({
+          durationSeconds: DURATION,
+          startedAt: STARTED_AT,
+          pausedAt,
+          totalPausedDuration: 0,
+        }),
+      );
+
+      expect(result.current.remaining).toBe(5);
+      expect(result.current.paused).toBe(true);
+
+      act(() => {
+        result.current.syncFromBroadcast({ type: "resumed", totalPausedDuration: 25 });
+      });
+
+      expect(result.current.remaining).toBe(5);
+
+      act(() => {
+        vi.advanceTimersByTime(5_000);
+      });
+
+      expect(result.current.remaining).toBe(0);
+      expect(result.current.running).toBe(true);
+      expect(result.current.paused).toBe(false);
+      expect(result.current.percentComplete).toBe(100);
+    });
+
+    it("can pause again after resuming a match mounted while paused", () => {
+      const pausedAt = new Date(STARTED_AT_MS + 60_000).toISOString();
+      vi.setSystemTime(STARTED_AT_MS + 70_000);
+
+      const { result } = renderHook(() =>
+        useSessionMatchTimer({
+          durationSeconds: DURATION,
+          startedAt: STARTED_AT,
+          pausedAt,
+          totalPausedDuration: 0,
+        }),
+      );
+
+      act(() => {
+        result.current.syncFromBroadcast({ type: "resumed", totalPausedDuration: 10 });
+      });
+      act(() => {
+        vi.advanceTimersByTime(20_000);
+      });
+      act(() => {
+        result.current.syncFromBroadcast({
+          type: "paused",
+          pausedAt: new Date(STARTED_AT_MS + 90_000).toISOString(),
+        });
+      });
+
+      expect(result.current.paused).toBe(true);
+      expect(result.current.elapsed).toBe(80);
+    });
+
+    it("an ended match mounted while paused is neither running nor paused after 'ended'", () => {
+      const { result } = renderHook(() =>
+        useSessionMatchTimer({
+          durationSeconds: DURATION,
+          startedAt: STARTED_AT,
+          pausedAt: new Date(STARTED_AT_MS).toISOString(),
+          totalPausedDuration: 0,
+        }),
+      );
+
+      act(() => {
+        result.current.syncFromBroadcast({ type: "ended" });
+      });
+
+      expect(result.current.running).toBe(false);
+      expect(result.current.paused).toBe(false);
     });
   });
 

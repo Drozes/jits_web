@@ -52,12 +52,13 @@ jest.mock("@jits/shared/hooks/use-session-match-sync", () => ({
   },
 }));
 
+const mockTimeWarning = jest.fn(() => Promise.resolve());
 jest.mock("@/lib/match-flow/use-keep-awake", () => ({ useMatchKeepAwake: () => {} }));
 jest.mock("@/lib/match-flow/use-haptics", () => ({
   matchHaptics: {
     matchStart: () => Promise.resolve(),
     matchEnd: () => Promise.resolve(),
-    timeWarning: () => Promise.resolve(),
+    timeWarning: () => mockTimeWarning(),
   },
 }));
 jest.mock("@/components/ui/toast", () => ({
@@ -101,18 +102,24 @@ function makeRecorder() {
   } as unknown as UseVideoRecorderReturn & { stop: jest.Mock };
 }
 
-/** Render a live step whose clock has `remainingSeconds` left right now. */
-function renderLive(remainingSeconds: number) {
+/**
+ * Render a live step whose clock has `remainingSeconds` left right now. With
+ * `pausedForSeconds`, the step mounts into a match that was paused that many
+ * seconds ago with `remainingSeconds` left (cold start / re-entry).
+ */
+function renderLive(remainingSeconds: number, pausedForSeconds?: number) {
   const recorder = makeRecorder();
   const onEnded = jest.fn();
-  const startedAt = new Date(NOW - (DURATION - remainingSeconds) * 1000).toISOString();
+  const pauseMs = (pausedForSeconds ?? 0) * 1000;
+  const startedAt = new Date(NOW - pauseMs - (DURATION - remainingSeconds) * 1000).toISOString();
+  const pausedAt = pausedForSeconds == null ? null : new Date(NOW - pauseMs).toISOString();
   const element = () => (
     <LiveStep
       matchId="M1"
       matchType="ranked"
       durationSeconds={DURATION}
       startedAt={startedAt}
-      pausedAt={null}
+      pausedAt={pausedAt}
       totalPausedDuration={0}
       recorder={recorder}
       // A fresh inline callback per render, like the match-step renderer.
@@ -137,6 +144,7 @@ async function advanceWithRerenders(ms: number, rerender: () => void, slice = 25
 beforeEach(() => {
   jest.useFakeTimers({ now: NOW });
   mockBroadcastMatchEnded.mockClear();
+  mockTimeWarning.mockClear();
   mockPauseMatch.mockReset();
   mockResumeMatch.mockReset();
   mockSyncParams.current = null;
@@ -225,5 +233,67 @@ describe("LiveStep auto-end at 00:00 (jits-2y8i)", () => {
 
     expect(mockBroadcastMatchEnded).not.toHaveBeenCalled();
     expect(onEnded).not.toHaveBeenCalled();
+  });
+});
+
+describe("LiveStep mounted into a paused match", () => {
+  it("shows RESUME, ticks after the resume tap, and auto-ends once", async () => {
+    const { rerender, onEnded, getByText, queryByText } = renderLive(3, 20);
+
+    // Paused on mount: the toggle offers RESUME and the clock is frozen.
+    expect(getByText("Resume")).toBeTruthy();
+    expect(queryByText("Pause")).toBeNull();
+    expect(getByText("00:03")).toBeTruthy();
+    await advanceWithRerenders(AUTO_END_DELAY_MS + 5_000, rerender);
+    expect(getByText("00:03")).toBeTruthy();
+    expect(mockBroadcastMatchEnded).not.toHaveBeenCalled();
+    // The 10 s warning is for a ticking clock, not a paused re-entry.
+    expect(mockTimeWarning).not.toHaveBeenCalled();
+
+    // Mount-time `now` + 6 s: resume_match adds this pause to the total.
+    mockResumeMatch.mockResolvedValue({ ok: true, data: { total_paused_duration: 26 } });
+    await act(async () => {
+      fireEvent.press(getByText("Resume"));
+    });
+    expect(mockResumeMatch).toHaveBeenCalledTimes(1);
+    expect(mockPauseMatch).not.toHaveBeenCalled();
+    expect(getByText("Pause")).toBeTruthy();
+
+    expect(mockTimeWarning).toHaveBeenCalledTimes(1);
+    await advanceWithRerenders(1_000, rerender);
+    expect(getByText("00:02")).toBeTruthy();
+
+    await advanceWithRerenders(2_000 + AUTO_END_DELAY_MS + 3_000, rerender);
+    expect(mockBroadcastMatchEnded).toHaveBeenCalledTimes(1);
+    expect(onEnded).toHaveBeenCalledTimes(1);
+  });
+
+  it("ticks and auto-ends once after the opponent's resume broadcast", async () => {
+    const { rerender, onEnded, getByText } = renderLive(2, 30);
+
+    await advanceWithRerenders(4_000, rerender);
+    expect(getByText("00:02")).toBeTruthy();
+
+    act(() => {
+      mockSyncParams.current?.onTimerResumed?.(34);
+    });
+    await advanceWithRerenders(2_000 + AUTO_END_DELAY_MS + 3_000, rerender);
+
+    expect(mockBroadcastMatchEnded).toHaveBeenCalledTimes(1);
+    expect(onEnded).toHaveBeenCalledTimes(1);
+  });
+
+  it("holds at 00:00 while still paused and ends once after resume", async () => {
+    const { rerender, onEnded } = renderLive(0, 10);
+
+    await advanceWithRerenders(AUTO_END_DELAY_MS + 5_000, rerender);
+    expect(mockBroadcastMatchEnded).not.toHaveBeenCalled();
+
+    act(() => {
+      mockSyncParams.current?.onTimerResumed?.(16);
+    });
+    await advanceWithRerenders(AUTO_END_DELAY_MS + 3_000, rerender);
+    expect(mockBroadcastMatchEnded).toHaveBeenCalledTimes(1);
+    expect(onEnded).toHaveBeenCalledTimes(1);
   });
 });
