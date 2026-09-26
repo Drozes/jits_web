@@ -20,7 +20,7 @@
  * failure, is covered in `record-upload-sequence.test.tsx`.
  */
 import * as React from "react";
-import { render, fireEvent } from "@testing-library/react-native";
+import { render, fireEvent, act } from "@testing-library/react-native";
 import type { RecordingState, RecordingTruncation } from "@/lib/video/use-video-recorder";
 
 // ---- the recorder under the wizard ----
@@ -128,7 +128,12 @@ jest.mock("@jits/shared/api/mutations", () => ({
   cancelSessionMatch: jest.fn(),
 }));
 
-jest.mock("@jits/shared/api/queries", () => ({ getMatchDetails: jest.fn() }));
+// The wizard's reconciler reads both on mount; mock both so it never calls
+// through to an unmocked export (which throws into its catch and warns).
+jest.mock("@jits/shared/api/queries", () => ({
+  getMatchDetails: jest.fn(),
+  getMatchConfirmations: jest.fn(() => Promise.resolve([])),
+}));
 
 jest.mock("@jits/shared/hooks/use-session-match-sync", () => ({
   useSessionMatchSync: () => ({
@@ -225,6 +230,20 @@ beforeEach(() => {
 });
 
 describe("upload status survives the step that started it", () => {
+  it("the reconciler's mount-time reads both hit mocks, never an unmocked export", async () => {
+    const { getMatchConfirmations } = jest.requireMock("@jits/shared/api/queries") as {
+      getMatchConfirmations: jest.Mock;
+    };
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    renderSummary(null);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(getMatchConfirmations).toHaveBeenCalledWith(expect.anything(), "M1");
+    expect(warn).not.toHaveBeenCalledWith("[match-flow] reconcile failed", expect.anything());
+    warn.mockRestore();
+  });
+
   it("shows an in-flight upload on the summary step", () => {
     const { getByTestId, getByText } = renderSummary({ status: "uploading" });
 

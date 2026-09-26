@@ -96,13 +96,14 @@ jest.mock("@/lib/match-flow/use-haptics", () => ({
     timeWarning: () => Promise.resolve(),
   },
 }));
+const mockTimerSync = jest.fn();
 jest.mock("@jits/shared/hooks/use-session-match-timer", () => ({
   useSessionMatchTimer: () => ({
     formatted: "05:00",
     remaining: 300,
     paused: false,
     running: true,
-    syncFromBroadcast: jest.fn(),
+    syncFromBroadcast: (...a: unknown[]) => mockTimerSync(...a),
   }),
 }));
 
@@ -424,6 +425,73 @@ describe("cancel during the weight step (jits-bh2v, E3B)", () => {
     await flush();
     expect(mockRouterReplace).toHaveBeenCalledWith(EXIT);
     expect(mockRouterReplace).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("live pause re-sync is fed every snapshot", () => {
+  it("a lost zero-length resume is recovered by the next (identical) poll", async () => {
+    await mountAt("in_progress");
+    // The opponent pauses (broadcast arrives) and resumes 0.3 s later; that
+    // broadcast is lost and resume_match added 0 s, so every read is
+    // identical to the mount-time row: no prop ever changes.
+    act(() => handlerOf("onTimerPaused")("2026-09-25T12:01:00.000Z"));
+    mockTimerSync.mockClear();
+    await tick(10_000);
+    expect(mockTimerSync).toHaveBeenCalledWith({ type: "resumed", totalPausedDuration: 0 });
+  });
+});
+
+describe("cancel during the ready step leaves exactly once", () => {
+  it("a remote cancel, then the reconciler seeing status=cancelled: one toast, one navigation", async () => {
+    const screen = await mountAt("pending");
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("weight-confirm"));
+    });
+    await flush();
+    screen.getByTestId("match-step-ready");
+
+    act(() => handlerOf("onMatchCancelled")());
+    // The ready step's own poll (and any rejoin) now reads the cancelled row.
+    mockGetMatchDetails.mockResolvedValue(row("cancelled"));
+    await tick(4_000);
+    await tick(4_000);
+
+    expect(mockRouterReplace).toHaveBeenCalledTimes(1);
+    expect(mockRouterReplace).toHaveBeenCalledWith(EXIT);
+    expect(toast.info).toHaveBeenCalledTimes(1);
+    expect(toast.info).toHaveBeenCalledWith({
+      text1: "Match cancelled",
+      description: "Your opponent left the ready check.",
+    });
+  });
+});
+
+describe("a voided match exits the wizard", () => {
+  const VOIDED_TOAST = expect.objectContaining({ text1: "Match voided" });
+
+  it("opening a voided match exits once with a clear toast", async () => {
+    await mountAt("voided", { outcome: "win" });
+    expect(mockRouterReplace).toHaveBeenCalledTimes(1);
+    expect(mockRouterReplace).toHaveBeenCalledWith(EXIT);
+    expect(toast.info).toHaveBeenCalledTimes(1);
+    expect(toast.info).toHaveBeenCalledWith(VOIDED_TOAST);
+  });
+
+  it("a dispute voided while this athlete sits on the summary exits once", async () => {
+    const screen = await mountAt("disputed", { outcome: "win" });
+    screen.getByTestId("match-step-summary");
+    expect(mockRouterReplace).not.toHaveBeenCalled();
+
+    mockGetMatchDetails.mockResolvedValue(row("voided", { outcome: "win" }));
+    await act(async () => mockRow.handler?.({ new: { status: "voided" } }));
+    await flush();
+    await act(async () => mockRow.handler?.({ new: { status: "voided" } }));
+    await flush();
+
+    expect(mockRouterReplace).toHaveBeenCalledTimes(1);
+    expect(mockRouterReplace).toHaveBeenCalledWith(EXIT);
+    expect(toast.info).toHaveBeenCalledTimes(1);
+    expect(toast.info).toHaveBeenCalledWith(VOIDED_TOAST);
   });
 });
 

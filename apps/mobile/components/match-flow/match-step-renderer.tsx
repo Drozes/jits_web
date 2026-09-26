@@ -50,7 +50,7 @@ interface MatchStepRendererProps {
   setResultData: (r: BroadcastResult) => void;
   advanceToResult: () => void;
   refresh: () => void;
-  /** The opponent cancelled before the match went live. */
+  /** The opponent cancelled before the match went live (weight or ready step). */
   onCancelledRemotely: (description?: string) => void;
 }
 
@@ -107,6 +107,7 @@ export function MatchStepRenderer({
     return (
       <ReadyStep
         exitHref={exitHref}
+        onCancelledRemotely={onCancelledRemotely}
         matchId={matchId}
         currentAthleteId={me.athlete_id}
         opponentId={opponent.athlete_id}

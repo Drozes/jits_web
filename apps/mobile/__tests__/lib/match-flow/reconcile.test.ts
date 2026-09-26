@@ -30,6 +30,9 @@ describe("targetFor: what each status implies", () => {
   it("cancelled -> exit", () => {
     expect(targetFor(snap("cancelled"), ME, OPP)).toBe("exit");
   });
+  it("voided -> exit (terminal, like cancelled)", () => {
+    expect(targetFor(snap("voided"), ME, OPP)).toBe("exit");
+  });
   it("pending -> no opinion (stay pre-live)", () => {
     expect(targetFor(snap("pending"), ME, OPP)).toBeNull();
   });
@@ -60,12 +63,21 @@ describe("targetFor: what each status implies", () => {
 describe("planReconcile", () => {
   it("exits a cancelled match from any pre-live step (jits-bh2v)", () => {
     for (const step of ["wait", "weight", "ready"] as const) {
-      expect(plan(step, snap("cancelled"))).toEqual({ type: "exit" });
+      expect(plan(step, snap("cancelled"))).toEqual({ type: "exit", reason: "cancelled" });
     }
   });
 
   it("does not exit a finished wizard that is already on the summary", () => {
     expect(plan("summary", snap("cancelled"))).toEqual({ type: "none" });
+  });
+
+  it("exits a voided match from every step, the summary included", () => {
+    // voided = an admin voided a disputed result (ELO reverted): the summary's
+    // verdict and rating change are no longer true, so it leaves too.
+    for (const step of MATCH_STEPS) {
+      expect(plan(step, snap("voided"))).toEqual({ type: "exit", reason: "voided" });
+      expect(plan(step, snap("voided"), true)).toEqual({ type: "exit", reason: "voided" });
+    }
   });
 
   it("stays put on pending", () => {
@@ -115,7 +127,7 @@ describe("planReconcile", () => {
     });
 
     it("never produces a goto to an earlier or equal step for any status", () => {
-      const statuses = ["pending", "in_progress", "completed", "disputed", "cancelled"];
+      const statuses = ["pending", "in_progress", "completed", "disputed", "cancelled", "voided"];
       const confirmSets: (string[] | null)[] = [null, [], [ME], [OPP], [ME, OPP]];
       for (const current of MATCH_STEPS) {
         for (const status of statuses) {
@@ -176,6 +188,12 @@ describe("isStatusRegression", () => {
     expect(isStatusRegression("completed", "in_progress")).toBe(true);
     expect(isStatusRegression("in_progress", "pending")).toBe(true);
     expect(isStatusRegression("cancelled", "pending")).toBe(true);
+    // A stale disputed read cannot un-void a match.
+    expect(isStatusRegression("voided", "disputed")).toBe(true);
+    expect(isStatusRegression("voided", "completed")).toBe(true);
+  });
+  it("lets voided replace the dispute it resolves", () => {
+    expect(isStatusRegression("disputed", "voided")).toBe(false);
   });
   it("allows forward moves and same-rank swaps", () => {
     expect(isStatusRegression("pending", "in_progress")).toBe(false);

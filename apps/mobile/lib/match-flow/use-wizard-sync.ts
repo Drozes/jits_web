@@ -71,11 +71,15 @@ export function useWizardSync({
     );
   }, []);
 
+  /** The wizard's one exit for a match that ended without a result (remote
+   * cancel, or a DB snapshot that is cancelled or voided). Idempotent: it
+   * marks the wizard exiting, so a second trigger neither toasts nor
+   * navigates again. */
   const exitCancelled = React.useCallback(
-    (description = "This match was cancelled.") => {
+    (description = "This match was cancelled.", title = "Match cancelled") => {
       if (exitingRef.current) return;
       exitingRef.current = true;
-      toast.info({ text1: "Match cancelled", description });
+      toast.info({ text1: title, description });
       router.replace(exitHref);
     },
     [router, exitHref],
@@ -85,10 +89,23 @@ export function useWizardSync({
     exitingRef.current = true;
   }, []);
 
+  const snapshotListenersRef = React.useRef(new Set<(m: MatchDetails) => void>());
+  const subscribeSnapshot = React.useCallback((listener: (m: MatchDetails) => void) => {
+    const listeners = snapshotListenersRef.current;
+    listeners.add(listener);
+    return () => {
+      listeners.delete(listener);
+    };
+  }, []);
+
   const onSnapshot = React.useCallback(
     ({ match: fresh, confirmedAthleteIds: ids }: ReconcileSnapshot) => {
       applyMatch(fresh);
       if (ids) setConfirmedAthleteIds(ids);
+      // Every snapshot, even one identical to the last (applyMatch keeps the
+      // old object then, so no prop changes): the live step's pause re-sync
+      // must be able to re-apply a read it deferred as possibly stale.
+      for (const listener of snapshotListenersRef.current) listener(fresh);
       const current = stepRef.current;
       const me = fresh.participants.find((p) => p.athlete_id === currentAthleteId);
       const opponent = fresh.participants.find((p) => p.athlete_id !== currentAthleteId);
@@ -104,7 +121,14 @@ export function useWizardSync({
         initial,
       });
       if (action.type === "exit") {
-        exitCancelled();
+        if (action.reason === "voided") {
+          exitCancelled(
+            "This result was voided on review. Any rating change was reversed.",
+            "Match voided",
+          );
+        } else {
+          exitCancelled();
+        }
         return;
       }
       if (action.type !== "goto") return;
@@ -133,8 +157,8 @@ export function useWizardSync({
   });
 
   const syncContext = React.useMemo(
-    () => ({ onChannelStatus, reconcileNow, markExiting }),
-    [onChannelStatus, reconcileNow, markExiting],
+    () => ({ onChannelStatus, reconcileNow, markExiting, subscribeSnapshot }),
+    [onChannelStatus, reconcileNow, markExiting, subscribeSnapshot],
   );
 
   return {

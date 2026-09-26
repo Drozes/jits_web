@@ -21,6 +21,9 @@ const READY_REPEAT_MS = 3_000;
 interface ReadyStepProps {
   /** Where a cancelled ready check returns to (the Arena, on mobile). */
   exitHref: string;
+  /** The opponent cancelled: the wizard's `exitCancelled`, which toasts and
+   * navigates once and stops the reconciler from exiting a second time. */
+  onCancelledRemotely: (description?: string) => void;
   matchId: string;
   currentAthleteId: string;
   opponentId: string;
@@ -40,7 +43,8 @@ interface ReadyStepProps {
 export function ReadyStep(props: ReadyStepProps) {
   const tokens = useThemedTokens();
   const router = useRouter();
-  const { exitHref, matchId, currentAthleteId, opponentId, onStarted } = props;
+  const { exitHref, onCancelledRemotely, matchId, currentAthleteId, opponentId, onStarted } =
+    props;
   const [myReady, setMyReady] = React.useState(false);
   const [opponentReady, setOpponentReady] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
@@ -60,15 +64,14 @@ export function ReadyStep(props: ReadyStepProps) {
       onStarted(startedAt);
     },
     onMatchCancelled: () => {
-      // The opponent cancelled. Abort our own ready step and head back out.
+      // The opponent cancelled. Leave through the wizard's single exit, like
+      // the weight step: toasting and navigating here directly left the
+      // reconciler free to see status=cancelled on its next poll and toast
+      // and navigate a second time. `exitCancelled` marks the wizard exiting.
       // Guard so we only act once and not after we ourselves cancelled.
       if (cancelledRef.current || startedRef.current) return;
       cancelledRef.current = true;
-      toast.info({
-        text1: "Match cancelled",
-        description: "Your opponent left the ready check.",
-      });
-      router.replace(exitHref);
+      onCancelledRemotely("Your opponent left the ready check.");
     },
   });
 
