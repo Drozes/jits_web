@@ -2107,3 +2107,49 @@ describe("the started-UPDATE rejoin trigger waits for a visible tab", () => {
     expect(push).toHaveBeenCalledWith("/arena/match/m-re");
   });
 });
+
+describe("a Join that cannot enter releases the opponent (jits-jitg)", () => {
+  type Props = { inSessionFlow: boolean; inMatch: boolean };
+  it("cancels the offered match when Join is refused because another match screen is up", async () => {
+    const hook = renderHook(
+      ({ inSessionFlow, inMatch }: Props) =>
+        useArenaChallenge({
+          athleteId: "me",
+          athleteWeight: 170,
+          canReceive: false,
+          inSessionFlow,
+          inMatch,
+        }),
+      { initialProps: { inSessionFlow: false, inMatch: false } as Props },
+    );
+    await sendAs(hook.result, "out1", "ana");
+    m.cancelChallenge.mockResolvedValueOnce({ ok: true, data: { cancelled: false } });
+    q.getChallengeStatus.mockResolvedValue({ ok: true, data: { status: "started", expiresAt: null } });
+    m.startMatchFromChallenge.mockResolvedValue({ ok: true, data: { match_id: "m6" } });
+    hook.rerender({ inSessionFlow: true, inMatch: false });
+    await flushAll();
+    await flushAll();
+    const call = toast.info.mock.calls.find((c) => c[0] === ARENA_MATCH_STARTED_MESSAGE);
+    const options = call![1] as {
+      action: { onClick: () => void };
+      onDismiss: () => void;
+    };
+
+    // Another match screen is up by the time the athlete taps Join.
+    hook.rerender({ inSessionFlow: false, inMatch: true });
+    await act(async () => {
+      options.action.onClick();
+    });
+    await flushAll();
+
+    expect(push).not.toHaveBeenCalled();
+    expect(m.cancelSessionMatch).toHaveBeenCalledTimes(1);
+    expect(m.cancelSessionMatch).toHaveBeenCalledWith(expect.anything(), "m6");
+    expect(sentOn("session-match:m6")).toEqual([{ event: "match_cancelled", payload: {} }]);
+    // The toast closing afterwards does not cancel a second time.
+    await act(async () => {
+      options.onDismiss();
+    });
+    expect(m.cancelSessionMatch).toHaveBeenCalledTimes(1);
+  });
+});

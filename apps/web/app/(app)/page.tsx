@@ -1,8 +1,11 @@
 import { Suspense } from "react";
+import { cookies } from "next/headers";
 import Link from "next/link";
 import { requireAthlete } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
 import { RecentActivitySection } from "@/components/domain/recent-activity-section";
+import { ResumeMatchCard } from "@/components/domain/resume-match-card";
+import { LEFT_MATCHES_COOKIE, parseLeftMatches } from "@/lib/arena/left-matches";
 import { PageContainer } from "@/components/layout/page-container";
 import { DashboardHeaderShell } from "@/components/layout/dashboard-header-shell";
 import {
@@ -15,6 +18,7 @@ import {
 import {
   getDashboardSummary,
   getActiveSession,
+  getMyActiveMatch,
   type AthleteGuardRow,
 } from "@jits/shared/api/queries";
 import type { ActiveSessionInfo } from "@jits/shared/types/session";
@@ -101,11 +105,20 @@ async function DashboardHeader() {
 async function DashboardContent() {
   const { athlete } = await requireAthlete();
   const supabase = await createClient();
+  // Pending Arena matches the athlete left on purpose are not offered again
+  // (mobile parity, see `lib/arena/left-matches.ts`).
+  const left = parseLeftMatches(
+    (await cookies()).get(LEFT_MATCHES_COOKIE)?.value,
+    athlete.id,
+  );
 
-  const [summary, activeSession] = await Promise.all([
+  const [summary, activeSession, activeMatchRead] = await Promise.all([
     getDashboardSummary(supabase),
     getActiveSession(supabase, athlete.id),
+    getMyActiveMatch(supabase, athlete.id, Date.now(), left),
   ]);
+  // A failed read just shows no card; Home still renders.
+  const activeMatch = activeMatchRead.ok ? activeMatchRead.data : null;
 
   const recentMatches = summary.recent_matches.map((m) => ({
     id: m.match_id,
@@ -151,6 +164,8 @@ async function DashboardContent() {
         </h1>
       </div>
 
+      {activeMatch ? <ResumeMatchCard match={activeMatch} /> : null}
+
       <EloTile
         size="hero"
         label="Current ELO Rating"
@@ -159,7 +174,8 @@ async function DashboardContent() {
       />
 
       {isSessionLive ? (
-        <LiveSessionPlate session={activeSession} />
+        // Resume, when offered, is Home's one Signal Red CTA.
+        <LiveSessionPlate session={activeSession} secondary={!!activeMatch} />
       ) : (
         <UpcomingSessionPlate session={activeSession} athlete={athlete} />
       )}
@@ -215,7 +231,13 @@ function MetaLabel({
   );
 }
 
-function LiveSessionPlate({ session }: { session: ActiveSessionInfo }) {
+function LiveSessionPlate({
+  session,
+  secondary = false,
+}: {
+  session: ActiveSessionInfo;
+  secondary?: boolean;
+}) {
   const startedAt = new Date(session.scheduledStart).getTime();
   const minsAgo = Math.max(0, Math.floor((Date.now() - startedAt) / 60_000));
   const href = session.isCheckedIn
@@ -257,8 +279,9 @@ function LiveSessionPlate({ session }: { session: ActiveSessionInfo }) {
         href={href}
         className="inline-flex w-full items-center justify-center font-heading font-bold uppercase transition-colors"
         style={{
-          background: "var(--accent-cta)",
-          color: "var(--text-on-accent)",
+          background: secondary ? "transparent" : "var(--accent-cta)",
+          color: secondary ? "var(--text-primary)" : "var(--text-on-accent)",
+          border: secondary ? "1px solid var(--border-hairline)" : "none",
           padding: "var(--space-3) var(--space-5)",
           fontSize: "var(--size-label-l)",
           letterSpacing: "var(--ls-caps)",

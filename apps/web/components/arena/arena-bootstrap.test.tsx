@@ -9,6 +9,7 @@ import {
 } from "@/lib/arena/arena-store";
 import { LOBBY_RESOLVE_DEBOUNCE_MS } from "@/hooks/use-active-lobby-count";
 import { ArenaBootstrap } from "./arena-bootstrap";
+import { LEFT_MATCHES_COOKIE, parseLeftMatches } from "@/lib/arena/left-matches";
 
 const nav = vi.hoisted(() => ({ pathname: "/" }));
 vi.mock("next/navigation", () => ({ usePathname: () => nav.pathname }));
@@ -181,6 +182,27 @@ describe("ArenaBootstrap state", () => {
     nav.pathname = "/arena";
     rerender(tree());
     expect(challenge.args?.inSessionFlow).toBe(false);
+    nav.pathname = "/";
+  });
+
+  it("remembers an Arena match navigated away from, not one merely open (jits-jitg)", () => {
+    const M = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    document.cookie = `${LEFT_MATCHES_COOKIE}=; path=/; max-age=0`;
+    const read = () =>
+      parseLeftMatches(
+        document.cookie
+          .split(";")
+          .map((c) => c.trim())
+          .find((c) => c.startsWith(`${LEFT_MATCHES_COOKIE}=`))
+          ?.slice(LEFT_MATCHES_COOKIE.length + 1),
+        "me",
+      );
+    nav.pathname = `/arena/match/${M}`;
+    const { rerender } = mount();
+    expect(read()).toEqual([]);
+    nav.pathname = "/";
+    rerender(tree());
+    expect(read()).toEqual([M]);
     nav.pathname = "/";
   });
 

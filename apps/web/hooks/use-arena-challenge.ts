@@ -382,16 +382,17 @@ export function useArenaChallenge({
   /**
    * Navigate into the match for `challengeId`, once. `peerId` is the other
    * athlete in it: a pending challenge from them is the other half of a
-   * crossing pair and is withdrawn quietly rather than declined.
+   * crossing pair and is withdrawn quietly rather than declined. Resolves
+   * false only when entry was refused (another match screen is up).
    */
   const enterMatchNow = useCallback(
-    (challengeId: string, matchId: string, peerId: string | null) => {
-      if (enteredForRef.current === challengeId) return;
+    (challengeId: string, matchId: string, peerId: string | null): boolean => {
+      if (enteredForRef.current === challengeId) return true;
       if (entryBlocked()) {
         console.warn(
           `[arena] not entering the match for ${challengeId}: another match screen is already up`,
         );
-        return;
+        return false;
       }
       enteredForRef.current = challengeId;
       entryRef.current = { challengeId, at: Date.now() };
@@ -415,6 +416,7 @@ export function useArenaChallenge({
         stranded,
         settledRef.current,
       );
+      return true;
     },
     [router, entryBlocked, setIncoming, setOutgoing],
   );
@@ -455,7 +457,11 @@ export function useArenaChallenge({
           onClick: () => {
             if (answered) return;
             answered = true;
-            enterMatchNow(challengeId, matchId, peerId);
+            // Refused (another match screen is up): the athlete cannot join
+            // it now, so release the opponent as a decline would (jits-jitg).
+            if (!enterMatchNow(challengeId, matchId, peerId)) {
+              void abandonOfferedMatch(matchId);
+            }
           },
         },
         onDismiss: decline,

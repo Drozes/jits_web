@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { useArenaLive } from "@/hooks/use-arena-live";
 import { useArenaChallenge } from "@/hooks/use-arena-challenge";
@@ -9,6 +9,7 @@ import { useActiveLobbyCount } from "@/hooks/use-active-lobby-count";
 import { useRegisterArenaController } from "@/hooks/use-register-arena-controller";
 import { publishArenaState } from "@/lib/arena/arena-store";
 import { isImmersiveRoute, isMatchRoute } from "@/components/layout/nav-config";
+import { arenaMatchIdFromPath, rememberLeftMatch } from "@/lib/arena/left-matches";
 import { ArenaChallengeOverlay } from "./arena-challenge-overlay";
 
 interface ArenaBootstrapProps {
@@ -31,6 +32,15 @@ export function ArenaBootstrap({
   initialLive,
 }: ArenaBootstrapProps) {
   const pathname = usePathname();
+  // Navigating away from an Arena match route is leaving it on purpose: Home's
+  // Resume card does not offer it again (a closed tab is not leaving).
+  const lastMatchIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    const current = arenaMatchIdFromPath(pathname);
+    const previous = lastMatchIdRef.current;
+    if (previous && previous !== current) rememberLeftMatch(athleteId, previous);
+    lastMatchIdRef.current = current;
+  }, [pathname, athleteId]);
   // Immersive (a match, the session lobby or join wizard): offline, no prompt.
   const inMatch = isImmersiveRoute(pathname);
   // Only a mounted match screen makes the athlete busy for the handshake
