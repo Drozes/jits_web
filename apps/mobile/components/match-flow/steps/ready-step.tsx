@@ -2,6 +2,7 @@ import * as React from "react";
 import { useRouter } from "expo-router";
 import { ActivityIndicator, Alert, Pressable, Text, View } from "react-native";
 import { toast } from "@/components/ui/toast";
+import { exitMatchTo } from "@/lib/match-flow/exit-to";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { supabase } from "@/lib/supabase/client";
 import { cancelSessionMatch, startMatch } from "@jits/shared/api/mutations";
@@ -157,7 +158,7 @@ export function ReadyStep(props: ReadyStepProps) {
     // while the broadcast settles, does not also navigate.
     markExiting();
     await settleWithin(sync.broadcastMatchCancelled(), SEND_GRACE_MS);
-    router.replace(exitHref);
+    exitMatchTo(router, exitHref);
   }, [matchId, exitHref, sync, router, markExiting]);
 
   function handleCancelPress() {

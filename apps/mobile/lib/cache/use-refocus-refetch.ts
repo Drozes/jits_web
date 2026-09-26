@@ -11,25 +11,52 @@ export const REFOCUS_REFETCH_MIN_MS = 30_000;
  * re-run the reads or re-toast an offline error. Tabs stay mounted, so
  * without this a match or video that landed while another tab was open
  * would not show until a manual pull-to-refresh (which stays unthrottled).
+ *
+ * `bypassKey` is an event counter (Home and Profile pass the arena store's
+ * match-exit count). When it has moved since the last refetch, the next focus
+ * refetches regardless of the throttle, and so does the change itself if the
+ * screen is already focused when it lands. Leaving a match pops back to these
+ * screens without remounting them (jits-tlk3), so without it a match that
+ * ended inside the 30 s window would still show the old rating and activity.
  */
-export function useRefetchOnRefocus(refetch: () => void): void {
+export function useRefetchOnRefocus(refetch: () => void, bypassKey?: number): void {
   const firstFocus = React.useRef(true);
+  const focused = React.useRef(false);
   const lastRefetchAt = React.useRef(Date.now());
   const refetchRef = React.useRef(refetch);
   refetchRef.current = refetch;
+  const keyRef = React.useRef(bypassKey);
+  keyRef.current = bypassKey;
+  const seenKey = React.useRef(bypassKey);
+
+  const run = React.useCallback(() => {
+    lastRefetchAt.current = Date.now();
+    seenKey.current = keyRef.current;
+    refetchRef.current();
+  }, []);
 
   useFocusEffect(
     React.useCallback(() => {
+      focused.current = true;
+      const blur = () => {
+        focused.current = false;
+      };
       if (firstFocus.current) {
         firstFocus.current = false;
-        return;
+        seenKey.current = keyRef.current;
+        return blur;
       }
-      const now = Date.now();
-      if (now - lastRefetchAt.current < REFOCUS_REFETCH_MIN_MS) return;
-      lastRefetchAt.current = now;
-      refetchRef.current();
-    }, []),
+      const bypass = keyRef.current !== seenKey.current;
+      if (!bypass && Date.now() - lastRefetchAt.current < REFOCUS_REFETCH_MIN_MS) return blur;
+      run();
+      return blur;
+    }, [run]),
   );
+
+  React.useEffect(() => {
+    if (!focused.current || bypassKey === seenKey.current) return;
+    run();
+  }, [bypassKey, run]);
 }
 
 /** Upper bound on the pull spinner, in case a refetch never reports busy. */

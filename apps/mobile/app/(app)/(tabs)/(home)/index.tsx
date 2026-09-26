@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/skeleton";
 import { useCachedResource } from "@/lib/cache/use-cached-resource";
 import { usePullToRefresh, useRefetchOnRefocus } from "@/lib/cache/use-refocus-refetch";
+import { useMatchExitCount } from "@/lib/arena/arena-store";
 import { matchDetailHref } from "@/lib/match-detail/href";
 
 interface DashboardData {
@@ -64,7 +65,7 @@ export default function DashboardScreen() {
   // SWR keeps stale data on screen while revalidating; the spinner shows only
   // for a pull, never for the silent refetch when the tab regains focus.
   const { refreshing, onRefresh } = usePullToRefresh(refresh, isValidating);
-  useRefetchOnRefocus(refresh);
+  useRefetchOnRefocus(refresh, useMatchExitCount());
 
   if (!athlete) {
     return (

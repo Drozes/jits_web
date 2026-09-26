@@ -61,9 +61,9 @@ jest.mock("@/components/ui/toast", () => ({
   toast: { success: jest.fn(), error: jest.fn(), info: jest.fn() },
 }));
 
-const mockRouterReplace = jest.fn();
+const mockRouterDismissTo = jest.fn();
 jest.mock("expo-router", () => ({
-  useRouter: () => ({ replace: mockRouterReplace, push: jest.fn(), back: jest.fn() }),
+  useRouter: () => ({ dismissTo: mockRouterDismissTo, push: jest.fn(), back: jest.fn() }),
 }));
 
 jest.mock("@/lib/auth/hooks", () => ({ useAuth: () => ({ athlete: { id: "me-1" } }) }));
@@ -415,7 +415,7 @@ describe("cancel during the weight step (jits-bh2v, E3B)", () => {
     const screen = await mountAt("pending");
     screen.getByTestId("match-step-weight");
     act(() => handlerOf("onMatchCancelled")());
-    expect(mockRouterReplace).toHaveBeenCalledWith(EXIT);
+    expect(mockRouterDismissTo).toHaveBeenCalledWith(EXIT);
     expect(toast.info).toHaveBeenCalledWith(expect.objectContaining({ text1: "Match cancelled" }));
   });
 
@@ -426,8 +426,8 @@ describe("cancel during the weight step (jits-bh2v, E3B)", () => {
       fireEvent.press(screen.getByTestId("weight-confirm"));
     });
     await flush();
-    expect(mockRouterReplace).toHaveBeenCalledWith(EXIT);
-    expect(mockRouterReplace).toHaveBeenCalledTimes(1);
+    expect(mockRouterDismissTo).toHaveBeenCalledWith(EXIT);
+    expect(mockRouterDismissTo).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -459,8 +459,8 @@ describe("cancel during the ready step leaves exactly once", () => {
     await tick(4_000);
     await tick(4_000);
 
-    expect(mockRouterReplace).toHaveBeenCalledTimes(1);
-    expect(mockRouterReplace).toHaveBeenCalledWith(EXIT);
+    expect(mockRouterDismissTo).toHaveBeenCalledTimes(1);
+    expect(mockRouterDismissTo).toHaveBeenCalledWith(EXIT);
     expect(toast.info).toHaveBeenCalledTimes(1);
     expect(toast.info).toHaveBeenCalledWith({
       text1: "Match cancelled",
@@ -474,8 +474,8 @@ describe("a voided match exits the wizard", () => {
 
   it("opening a voided match exits once with a clear toast", async () => {
     await mountAt("voided", { outcome: "win" });
-    expect(mockRouterReplace).toHaveBeenCalledTimes(1);
-    expect(mockRouterReplace).toHaveBeenCalledWith(EXIT);
+    expect(mockRouterDismissTo).toHaveBeenCalledTimes(1);
+    expect(mockRouterDismissTo).toHaveBeenCalledWith(EXIT);
     expect(toast.info).toHaveBeenCalledTimes(1);
     expect(toast.info).toHaveBeenCalledWith(VOIDED_TOAST);
   });
@@ -483,7 +483,7 @@ describe("a voided match exits the wizard", () => {
   it("a dispute voided while this athlete sits on the summary exits once", async () => {
     const screen = await mountAt("disputed", { outcome: "win" });
     screen.getByTestId("match-step-summary");
-    expect(mockRouterReplace).not.toHaveBeenCalled();
+    expect(mockRouterDismissTo).not.toHaveBeenCalled();
 
     mockGetMatchDetails.mockResolvedValue(row("voided", { outcome: "win" }));
     await act(async () => mockRow.handler?.({ new: { status: "voided" } }));
@@ -491,8 +491,8 @@ describe("a voided match exits the wizard", () => {
     await act(async () => mockRow.handler?.({ new: { status: "voided" } }));
     await flush();
 
-    expect(mockRouterReplace).toHaveBeenCalledTimes(1);
-    expect(mockRouterReplace).toHaveBeenCalledWith(EXIT);
+    expect(mockRouterDismissTo).toHaveBeenCalledTimes(1);
+    expect(mockRouterDismissTo).toHaveBeenCalledWith(EXIT);
     expect(toast.info).toHaveBeenCalledTimes(1);
     expect(toast.info).toHaveBeenCalledWith(VOIDED_TOAST);
   });

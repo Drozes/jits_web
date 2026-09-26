@@ -15,7 +15,7 @@ jest.mock("@/components/ui/toast", () => ({
   toast: { success: jest.fn(), error: jest.fn(), info: jest.fn() },
 }));
 jest.mock("expo-router", () => ({
-  useRouter: () => ({ replace: jest.fn(), push: jest.fn(), back: jest.fn() }),
+  useRouter: () => ({ dismissTo: jest.fn(), push: jest.fn(), back: jest.fn() }),
 }));
 jest.mock("@/lib/theme/use-theme", () => ({
   useThemedTokens: () => ({ textSecondary: "#aaa", statePositive: "#0f0" }),

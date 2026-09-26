@@ -58,9 +58,9 @@ jest.mock("@/components/ui/toast", () => ({
   toast: { success: jest.fn(), error: jest.fn(), info: jest.fn() },
 }));
 
-const mockRouterReplace = jest.fn();
+const mockRouterDismissTo = jest.fn();
 jest.mock("expo-router", () => ({
-  useRouter: () => ({ replace: mockRouterReplace, push: jest.fn(), back: jest.fn() }),
+  useRouter: () => ({ dismissTo: mockRouterDismissTo, push: jest.fn(), back: jest.fn() }),
 }));
 
 jest.mock("@/lib/auth/hooks", () => ({
@@ -231,7 +231,7 @@ describe("MatchFlowWizard exit navigation", () => {
 
     expect(queryByText(ARENA_LABEL)).toBeNull();
     fireEvent.press(getByText(OTHER_LABEL));
-    expect(mockRouterReplace).toHaveBeenCalledWith(OTHER_EXIT);
+    expect(mockRouterDismissTo).toHaveBeenCalledWith(OTHER_EXIT);
   });
 
   it("mounts with no session at all and exits to the supplied href", async () => {
@@ -249,7 +249,7 @@ describe("MatchFlowWizard exit navigation", () => {
 
     expect(queryByText(OTHER_LABEL)).toBeNull();
     fireEvent.press(getByText(ARENA_LABEL));
-    expect(mockRouterReplace).toHaveBeenCalledWith(ARENA_EXIT);
+    expect(mockRouterDismissTo).toHaveBeenCalledWith(ARENA_EXIT);
   });
 
   it("routes the not-a-participant splash through exitHref for both origins", () => {
@@ -265,7 +265,7 @@ describe("MatchFlowWizard exit navigation", () => {
     );
     other.getByText("Not a participant");
     fireEvent.press(other.getByText(OTHER_LABEL));
-    expect(mockRouterReplace).toHaveBeenLastCalledWith(OTHER_EXIT);
+    expect(mockRouterDismissTo).toHaveBeenLastCalledWith(OTHER_EXIT);
     other.unmount();
 
     const arena = render(
@@ -278,7 +278,7 @@ describe("MatchFlowWizard exit navigation", () => {
     );
     arena.getByText("Not a participant");
     fireEvent.press(arena.getByText(ARENA_LABEL));
-    expect(mockRouterReplace).toHaveBeenLastCalledWith(ARENA_EXIT);
+    expect(mockRouterDismissTo).toHaveBeenLastCalledWith(ARENA_EXIT);
   });
 
   it("the reconciler's mount-time reads both hit mocks, never an unmocked export", async () => {
@@ -318,7 +318,7 @@ describe("MatchFlowWizard exit navigation", () => {
     getByText("Match unavailable");
     getByText("Match not found");
     fireEvent.press(getByText(ARENA_LABEL));
-    expect(mockRouterReplace).toHaveBeenLastCalledWith(ARENA_EXIT);
+    expect(mockRouterDismissTo).toHaveBeenLastCalledWith(ARENA_EXIT);
   });
 
   it("defaults exitLabel to the Arena wording when omitted", () => {
@@ -332,7 +332,7 @@ describe("MatchFlowWizard exit navigation", () => {
     expect(queryByText("Back to Lobby")).toBeNull();
     // The label defaults, the href never does: it is still the caller's.
     fireEvent.press(getByText(ARENA_EXIT_LABEL));
-    expect(mockRouterReplace).toHaveBeenCalledWith(OTHER_EXIT);
+    expect(mockRouterDismissTo).toHaveBeenCalledWith(OTHER_EXIT);
   });
 
   // A default parameter only fires on `undefined`, so a blank label used to
@@ -357,7 +357,7 @@ describe("MatchFlowWizard exit navigation", () => {
 
     // The cta is visible and reachable by its text, and still exits correctly.
     fireEvent.press(getByText(ARENA_EXIT_LABEL));
-    expect(mockRouterReplace).toHaveBeenCalledWith(ARENA_EXIT);
+    expect(mockRouterDismissTo).toHaveBeenCalledWith(ARENA_EXIT);
   });
 
   it("falls back to the default label on the summary step too", () => {
@@ -373,10 +373,10 @@ describe("MatchFlowWizard exit navigation", () => {
     );
 
     fireEvent.press(getByText(ARENA_EXIT_LABEL));
-    expect(mockRouterReplace).toHaveBeenCalledWith(ARENA_EXIT);
+    expect(mockRouterDismissTo).toHaveBeenCalledWith(ARENA_EXIT);
   });
 
-  it("offers a Rematch of the opponent that replaces the match with the Arena (jits-00fr)", () => {
+  it("offers a Rematch of the opponent that dismisses the match to the Arena (jits-00fr)", () => {
     mockUseMatchDetails.mockReturnValue(completedMatchResult());
 
     const { getByTestId, getByText } = render(
@@ -386,7 +386,7 @@ describe("MatchFlowWizard exit navigation", () => {
     const rematch = getByTestId("summary-rematch");
     expect(rematch.props.accessibilityLabel).toBe("Rematch Opponent");
     fireEvent.press(rematch);
-    expect(mockRouterReplace).toHaveBeenCalledWith(`${ARENA_HREF}?rematch=opp-1`);
+    expect(mockRouterDismissTo).toHaveBeenCalledWith(`${ARENA_HREF}?rematch=opp-1`);
     // Done and the exit cta are still there.
     getByText("Done");
     getByText(ARENA_LABEL);
@@ -405,7 +405,7 @@ describe("MatchFlowWizard exit navigation", () => {
     );
 
     fireEvent.press(getByText(ARENA_LABEL));
-    expect(mockRouterReplace).toHaveBeenCalledWith(ARENA_EXIT);
+    expect(mockRouterDismissTo).toHaveBeenCalledWith(ARENA_EXIT);
   });
 });
 
@@ -437,7 +437,7 @@ describe("ReadyStep exit navigation", () => {
 
     expect(onCancelledRemotely).toHaveBeenCalledTimes(1);
     expect(onCancelledRemotely).toHaveBeenCalledWith("Your opponent left the ready check.");
-    expect(mockRouterReplace).not.toHaveBeenCalled();
+    expect(mockRouterDismissTo).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -458,8 +458,8 @@ describe("ReadyStep exit navigation", () => {
       mockSyncParams?.onMatchCancelled?.();
     });
 
-    expect(mockRouterReplace).toHaveBeenCalledTimes(1);
-    expect(mockRouterReplace).toHaveBeenCalledWith(exitHref);
+    expect(mockRouterDismissTo).toHaveBeenCalledTimes(1);
+    expect(mockRouterDismissTo).toHaveBeenCalledWith(exitHref);
   });
 
   it.each([
@@ -477,7 +477,7 @@ describe("ReadyStep exit navigation", () => {
     const { getByLabelText } = renderReady(exitHref);
     fireEvent.press(getByLabelText("Cancel match"));
 
-    await waitFor(() => expect(mockRouterReplace).toHaveBeenCalledWith(exitHref));
+    await waitFor(() => expect(mockRouterDismissTo).toHaveBeenCalledWith(exitHref));
     alertSpy.mockRestore();
   });
 });
@@ -592,8 +592,8 @@ describe("no session-lobby URL can be rebuilt in the match-flow tree", () => {
     fireEvent.press(getByText(ARENA_LABEL));
     fireEvent.press(getByText("Done"));
 
-    expect(mockRouterReplace.mock.calls.length).toBeGreaterThan(0);
-    for (const [href] of mockRouterReplace.mock.calls) {
+    expect(mockRouterDismissTo.mock.calls.length).toBeGreaterThan(0);
+    for (const [href] of mockRouterDismissTo.mock.calls) {
       expect(String(href)).not.toContain("undefined");
       expect(String(href)).not.toMatch(SESSION_ROUTE_LITERAL);
     }

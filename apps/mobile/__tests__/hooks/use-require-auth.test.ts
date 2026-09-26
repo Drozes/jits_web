@@ -45,6 +45,7 @@ jest.mock("@/lib/auth/auth-context", () => {
     signOut: jest.fn(),
     resetPassword: jest.fn(),
     refreshAthlete: jest.fn(),
+    refreshAthleteSoft: jest.fn(),
   });
   return { AuthContext: mockCtx };
 });

@@ -21,6 +21,7 @@ jest.mock("@jits/shared/api/queries", () => ({
 jest.mock("@/lib/supabase/client", () => ({ supabase: {} }));
 
 import { useArenaRoster } from "@/lib/arena/use-arena-roster";
+import { useArenaMatchScreen } from "@/lib/arena/arena-store";
 
 // ---- fixtures ----
 
@@ -91,6 +92,30 @@ describe("useArenaRoster", () => {
     ]);
     expect([...result.current.challengedIds]).toEqual(["a-2"]);
     expect(result.current.hasError).toBe(false);
+  });
+
+  it("re-reads after a match is left, with no pull spinner (jits-tlk3)", async () => {
+    const { result } = renderHook(() => useArenaRoster(1200));
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(mockGetArenaData).toHaveBeenCalledTimes(1);
+
+    const match = renderHook(() => useArenaMatchScreen());
+    expect(mockGetArenaData).toHaveBeenCalledTimes(1);
+    act(() => match.unmount());
+    expect(result.current.isRefreshing).toBe(false);
+    await waitFor(() => expect(mockGetArenaData).toHaveBeenCalledTimes(2));
+  });
+
+  it("takes the gap against the athlete's current rating, not the one at load", async () => {
+    const { result, rerender } = renderHook(({ elo }: { elo: number }) => useArenaRoster(elo), {
+      initialProps: { elo: 1200 },
+    });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.competitors.map((c) => c.eloDiff)).toEqual([100, -100]);
+
+    rerender({ elo: 1250 });
+    expect(result.current.competitors.map((c) => c.eloDiff)).toEqual([50, -150]);
+    expect(mockGetArenaData).toHaveBeenCalledTimes(1);
   });
 
   it("reports a failed read as an error, NOT as an empty lobby", async () => {

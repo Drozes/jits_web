@@ -98,9 +98,9 @@ jest.mock("@/components/ui/toast", () => ({
 }));
 
 const mockRouterPush = jest.fn();
-const mockRouterReplace = jest.fn();
+const mockRouterDismissTo = jest.fn();
 jest.mock("expo-router", () => ({
-  useRouter: () => ({ replace: mockRouterReplace, push: mockRouterPush, back: jest.fn() }),
+  useRouter: () => ({ dismissTo: mockRouterDismissTo, push: mockRouterPush, back: jest.fn() }),
 }));
 
 jest.mock("@/lib/auth/hooks", () => ({

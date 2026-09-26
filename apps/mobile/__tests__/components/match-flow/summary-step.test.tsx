@@ -5,8 +5,9 @@
  * - A draw's verdict and ELO loss are amber, never Signal Red; the delta keeps
  *   its ▼ prefix the harness reads.
  * - The after tile gets an outcome tone (never the old always-red accent).
- * - Rematch is a secondary outline button that replaces the match screen with
- *   the Arena carrying `rematch=<opponent id>`; hidden for disputed matches.
+ * - Rematch is a secondary outline button that dismisses the match screen to
+ *   the Arena carrying `rematch=<opponent id>` (exitMatchTo, jits-tlk3);
+ *   hidden for disputed matches.
  * - Back to Arena stays the single Signal Red cta; Share and Done stay.
  */
 import * as React from "react";
@@ -31,10 +32,10 @@ jest.mock("@/components/ui/toast", () => ({
   toast: { success: jest.fn(), error: jest.fn(), info: jest.fn() },
 }));
 
-const mockReplace = jest.fn();
+const mockDismissTo = jest.fn();
 const mockPush = jest.fn();
 jest.mock("expo-router", () => ({
-  useRouter: () => ({ replace: mockReplace, push: mockPush, back: jest.fn() }),
+  useRouter: () => ({ dismissTo: mockDismissTo, push: mockPush, back: jest.fn() }),
 }));
 
 jest.mock("@/lib/auth/hooks", () => ({ useAuth: () => ({ athlete: { id: "me-1" } }) }));
@@ -122,13 +123,13 @@ describe("outcome colours", () => {
 });
 
 describe("Rematch shortcut", () => {
-  it("names the opponent and replaces the match with the Arena carrying rematch=<id>", () => {
+  it("names the opponent and dismisses the match to the Arena carrying rematch=<id>", () => {
     const s = renderSummary();
     const btn = s.getByTestId("summary-rematch");
     expect(btn.props.accessibilityLabel).toBe("Rematch Demo Red");
     expect(s.getByText("Rematch Demo")).toBeTruthy();
     fireEvent.press(btn);
-    expect(mockReplace).toHaveBeenCalledWith("/arena?rematch=opp-1");
+    expect(mockDismissTo).toHaveBeenCalledWith("/arena?rematch=opp-1");
     // A push would leave the match screen mounted, which keeps the athlete
     // offline and suppresses challenge prompts.
     expect(mockPush).not.toHaveBeenCalled();
@@ -161,7 +162,7 @@ describe("Rematch shortcut", () => {
     expect(done.props.hitSlop).toEqual({ top: 8, bottom: 8, left: 8, right: 8 });
     expect(s.getByText("Done").props.className).toContain("text-ink-2");
     fireEvent.press(done);
-    expect(mockReplace).toHaveBeenCalledWith("/");
+    expect(mockDismissTo).toHaveBeenCalledWith("/");
   });
 
   it("works after a draw and a loss too", () => {

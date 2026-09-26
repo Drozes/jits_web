@@ -6,13 +6,16 @@
  */
 import { act, renderHook } from "@testing-library/react-native";
 
-const mockFocusCallbacks: (() => void)[] = [];
+const mockFocusCallbacks: (() => void | (() => void))[] = [];
+// Cleanups the focus callbacks returned: calling them is a blur.
+const mockBlurs: (() => void)[] = [];
 jest.mock("expo-router", () => ({
-  useFocusEffect: (cb: () => void) => {
+  useFocusEffect: (cb: () => void | (() => void)) => {
     const R = require("react");
     R.useEffect(() => {
       mockFocusCallbacks.push(cb);
-      cb();
+      const c = cb();
+      if (c) mockBlurs.push(c);
     }, [cb]);
   },
 }));
@@ -26,11 +29,20 @@ import {
 let now = 1_000_000;
 function focusAfter(ms: number) {
   now += ms;
-  act(() => mockFocusCallbacks.forEach((cb) => cb()));
+  act(() =>
+    mockFocusCallbacks.forEach((cb) => {
+      const c = cb();
+      if (c) mockBlurs.push(c);
+    }),
+  );
+}
+function blur() {
+  act(() => mockBlurs.splice(0).forEach((c) => c()));
 }
 
 beforeEach(() => {
   mockFocusCallbacks.length = 0;
+  mockBlurs.length = 0;
   jest.useRealTimers();
   jest.spyOn(Date, "now").mockImplementation(() => now);
 });
@@ -81,6 +93,48 @@ describe("useRefetchOnRefocus", () => {
     focusAfter(REFOCUS_REFETCH_MIN_MS);
     expect(first).not.toHaveBeenCalled();
     expect(second).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("useRefetchOnRefocus bypassKey (jits-tlk3)", () => {
+  function renderWithKey(refetch: jest.Mock, key: number) {
+    return renderHook(({ k }: { k: number }) => useRefetchOnRefocus(refetch, k), {
+      initialProps: { k: key },
+    });
+  }
+
+  it("skips the throttle on the next focus after the key moved while away", () => {
+    const refetch = jest.fn();
+    const { rerender } = renderWithKey(refetch, 0);
+    blur();
+    rerender({ k: 1 }); // a match ended while another screen was up
+    expect(refetch).not.toHaveBeenCalled();
+
+    focusAfter(1_000); // well inside the 30 s window
+    expect(refetch).toHaveBeenCalledTimes(1);
+
+    // Consumed: the throttle applies again until the key moves again.
+    blur();
+    focusAfter(1_000);
+    expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("refetches at once when the key moves while the screen is focused", () => {
+    // Done: the exit can focus Home before the match screen's unmount bumps
+    // the count, so the change itself has to trigger the refetch.
+    const refetch = jest.fn();
+    const { rerender } = renderWithKey(refetch, 0);
+    rerender({ k: 1 });
+    expect(refetch).toHaveBeenCalledTimes(1);
+    rerender({ k: 1 });
+    focusAfter(1_000);
+    expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not refetch on mount for a non-zero starting key", () => {
+    const refetch = jest.fn();
+    renderWithKey(refetch, 3);
+    expect(refetch).not.toHaveBeenCalled();
   });
 });
 

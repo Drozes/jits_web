@@ -54,6 +54,9 @@ export function useRematchPin({
   const [pinnedId, setPinnedId] = React.useState<string | null>(null);
   const refreshedFor = React.useRef<string | null>(null);
 
+  const paramRef = React.useRef(param);
+  paramRef.current = param;
+
   React.useEffect(() => {
     if (!param) return;
     setPinnedId(param);
@@ -62,7 +65,22 @@ export function useRematchPin({
   }, [param, navigation]);
 
   const clear = React.useCallback(() => setPinnedId(null), []);
-  useFocusEffect(React.useCallback(() => clear, [clear]));
+  // Leaving the tab also drops the param itself. When the match exits into an
+  // Arena that is already mounted (exitMatchTo's dismissTo, jits-tlk3), the
+  // navigator applies the incoming params in an update scheduled AFTER this
+  // screen's effects, so the setParams above is overwritten and the param
+  // lingers. Left there, a second rematch of the same opponent would not
+  // change it and would never re-pin. Blur is past that update, so this one
+  // sticks. Guarded so an unmount with nothing to clear dispatches nothing.
+  useFocusEffect(
+    React.useCallback(
+      () => () => {
+        clear();
+        if (paramRef.current) navigation.setParams({ rematch: undefined });
+      },
+      [clear, navigation],
+    ),
+  );
 
   React.useEffect(() => {
     if (pinnedId && outgoingOpponentId === pinnedId) clear();

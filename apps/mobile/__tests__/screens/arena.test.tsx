@@ -671,6 +671,35 @@ describe("Arena screen: rematch handoff (jits-00fr)", () => {
     expect(queryByText("Rematch")).toBeNull();
   });
 
+  it("clears a param that outlived the read when the tab loses focus (jits-tlk3)", () => {
+    // A match exit into an already-mounted Arena (dismissTo) re-applies the
+    // params after the read-time clear, so the param can still be there.
+    rematchRoster();
+    mockLobbyIds = new Set(["a-1", "a-3"]);
+    mockParams = { rematch: "a-3" };
+    const { rerender } = render(<ArenaScreen />);
+    mockParams = { rematch: "a-3" };
+    rerender(<ArenaScreen />);
+    mockSetParams.mockClear();
+
+    act(() => {
+      mockFocusCleanups.forEach((c) => c());
+    });
+    expect(mockSetParams).toHaveBeenCalledWith({ rematch: undefined });
+    expect(mockParams.rematch).toBeUndefined();
+    expect(mockRouter.setParams).not.toHaveBeenCalled();
+  });
+
+  it("dispatches nothing on blur when there is no param to clear", () => {
+    rematchRoster();
+    render(<ArenaScreen />);
+
+    act(() => {
+      mockFocusCleanups.forEach((c) => c());
+    });
+    expect(mockSetParams).not.toHaveBeenCalled();
+  });
+
   it("is inert without the param", () => {
     rematchRoster();
     mockLobbyIds = new Set(["a-1", "a-3"]);

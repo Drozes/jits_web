@@ -3,6 +3,7 @@ import { Pressable, Share, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { Share2, Scale, PlayCircle } from "lucide-react-native";
 import { toast } from "@/components/ui/toast";
+import { exitMatchTo } from "@/lib/match-flow/exit-to";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { useAuth } from "@/lib/auth/hooks";
 import { cn } from "@/lib/cn";
@@ -51,9 +52,9 @@ interface SummaryStepProps {
 
 /**
  * The Arena with the opponent to run it back against. The Arena reads
- * `rematch`; an Arena that ignores it is just the Arena. Navigated with a
- * replace, never a push: the match screen must unmount, because while it is
- * mounted the athlete stays offline and challenge prompts are suppressed
+ * `rematch`; an Arena that ignores it is just the Arena. Navigated with
+ * exitMatchTo, never a push: the match screen must unmount, because while it
+ * is mounted the athlete stays offline and challenge prompts are suppressed
  * (useArenaMatchScreen).
  */
 export function rematchHref(opponentId: string): string {
@@ -284,7 +285,7 @@ export function SummaryStep(props: SummaryStepProps) {
             testID="summary-rematch"
             accessibilityRole="button"
             accessibilityLabel={`Rematch ${rematchName}`}
-            onPress={() => router.replace(rematchHref(opponentId))}
+            onPress={() => exitMatchTo(router, rematchHref(opponentId))}
             className="items-center justify-center border border-hairline-strong rounded-sm bg-surface-3 py-3 active:bg-surface-4"
           >
             <Text
@@ -298,7 +299,7 @@ export function SummaryStep(props: SummaryStepProps) {
         <Pressable
           testID="summary-exit"
           accessibilityRole="button"
-          onPress={() => router.replace(exitHref)}
+          onPress={() => exitMatchTo(router, exitHref)}
           className="bg-cta items-center justify-center py-3 rounded-sm active:bg-cta-hover"
         >
           <Text className="font-heading text-[13px] text-ink-on-cta uppercase tracking-caps">
@@ -310,7 +311,7 @@ export function SummaryStep(props: SummaryStepProps) {
         <Pressable
           testID="summary-done"
           accessibilityRole="button"
-          onPress={() => router.replace("/")}
+          onPress={() => exitMatchTo(router, "/")}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           className="items-center py-2 active:opacity-70"
         >
