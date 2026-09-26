@@ -43,7 +43,12 @@ export function useSessionMatchTimer(params: UseSessionMatchTimerParams): UseSes
   const [startedAt, setStartedAt] = useState(params.startedAt);
   const [pausedAt, setPausedAt] = useState(params.pausedAt);
   const [totalPaused, setTotalPaused] = useState(params.totalPausedDuration);
-  const [running, setRunning] = useState(!!params.startedAt && !params.pausedAt);
+  // `running` means "started and not ended", independent of pause: `paused`
+  // below carries the pause. Seeding it from `!pausedAt` left a step mounted
+  // into an already-paused match (cold start, re-entry) with running=false
+  // forever, since `resumed` only clears pausedAt: paused read false, the
+  // clock never ticked after resume, and auto-end never fired.
+  const [running, setRunning] = useState(!!params.startedAt);
   const [tick, setTick] = useState(0);
 
   const paused = running && !!pausedAt;

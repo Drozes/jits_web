@@ -120,14 +120,15 @@ export function LiveStep(props: LiveStepProps) {
     void recorder.start();
   }, [recorder.permission?.granted, recorder]);
 
-  // Time-warning haptic once at <= 10s remaining
+  // Time-warning haptic once at <= 10s remaining, on a ticking clock (not on
+  // mounting into a match already paused inside the last 10 s).
   React.useEffect(() => {
     if (warnHapticFiredRef.current) return;
-    if (timer.running && timer.remaining > 0 && timer.remaining <= TIME_WARNING_SECONDS) {
+    if (timer.running && !timer.paused && timer.remaining > 0 && timer.remaining <= TIME_WARNING_SECONDS) {
       warnHapticFiredRef.current = true;
       void matchHaptics.timeWarning();
     }
-  }, [timer.remaining, timer.running]);
+  }, [timer.remaining, timer.running, timer.paused]);
 
   // Auto-end on time expiry, mirroring web. `handleEnd` is a new function
   // on every render (its `sync` and `onEnded` are), and the timer keeps
