@@ -9,10 +9,21 @@ const RESULT_LABEL: Record<string, string> = {
   draw: "Draw",
 };
 
-/** Date, RANKED / CASUAL, match length and how it ended. */
+/**
+ * `matches.duration_seconds` is the configured clock, not elapsed time, so it
+ * reads as a round length: "10 MIN ROUND", or "3:05 ROUND" off the minute.
+ */
+export function formatRoundLength(seconds: number | null | undefined): string | null {
+  const clock = formatVideoDuration(seconds);
+  if (!clock) return null;
+  const [min, sec] = clock.split(":");
+  return sec === "00" ? `${min} MIN ROUND` : `${clock} ROUND`;
+}
+
+/** Date, RANKED / CASUAL, round length and how it ended. */
 export function MatchMetaRow({ match }: { match: MatchDetailView["match"] }) {
   const when = match.completed_at ?? match.started_at;
-  const duration = formatVideoDuration(match.duration_seconds);
+  const duration = formatRoundLength(match.duration_seconds);
   const result = match.result ? RESULT_LABEL[match.result] : undefined;
 
   return (
@@ -24,7 +35,10 @@ export function MatchMetaRow({ match }: { match: MatchDetailView["match"] }) {
       ) : null}
       <MetaTag>{match.match_type === "ranked" ? "RANKED" : "CASUAL"}</MetaTag>
       {duration ? (
-        <Text className="font-mono text-[12px] text-ink-3 tabular-nums">
+        <Text
+          testID="match-round-length"
+          className="font-mono text-[12px] text-ink-3 tabular-nums"
+        >
           {duration}
         </Text>
       ) : null}

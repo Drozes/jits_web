@@ -203,7 +203,9 @@ describe("MatchDetailScreen", () => {
     expect(delta.props.className).toContain("text-positive");
     expect(utils.getByText("1200 → 1216")).toBeTruthy();
     expect(utils.getByText("RANKED")).toBeTruthy();
-    expect(utils.getByText("5:00")).toBeTruthy();
+    // The configured clock reads as a round length, not elapsed time.
+    expect(utils.getByTestId("match-round-length")).toHaveTextContent("5 MIN ROUND");
+    expect(utils.getByTestId("match-round-length").props.className).toContain("tabular-nums");
     expect(utils.getByText("Submission")).toBeTruthy();
     expect(utils.queryByTestId("match-disputed-badge")).toBeNull();
   });
@@ -284,18 +286,57 @@ describe("MatchDetailScreen", () => {
     expect(mockPush).toHaveBeenCalledWith("/(app)/video/v-mine");
   });
 
+  it("plays from the poster area with the same action as Watch", async () => {
+    const utils = await renderLoaded(view({ videos: [video(), video(OPP_VIDEO)] }));
+    const play = utils.getByTestId("match-video-play-v-opp", { includeHiddenElements: true });
+    // A touch target only: hidden from assistive tech so Watch is the single
+    // accessible action per card.
+    expect(play.props.accessible).toBe(false);
+    expect(play.props.accessibilityElementsHidden).toBe(true);
+    expect(play.props.importantForAccessibility).toBe("no-hide-descendants");
+    expect(play.props.accessibilityLabel).toBeUndefined();
+    expect(utils.queryByLabelText(/^Play /)).toBeNull();
+    // Not styled as a second primary: the poster area never carries the CTA fill.
+    expect(play.props.className ?? "").not.toContain("bg-cta");
+    // Still a touch target: RNTL skips hidden elements by default, so this
+    // query opts in, and the press runs the same onWatch as Watch.
+    fireEvent.press(play);
+    expect(mockPush).toHaveBeenCalledWith("/(app)/video/v-opp");
+    // The harness testID stays on Watch only.
+    expect(utils.getAllByTestId("match-video-watch-v-opp")).toHaveLength(1);
+    expect(utils.getByTestId("match-video-watch-v-opp").props.accessibilityLabel).toBe(
+      "Watch Demo Red's recording",
+    );
+  });
+
+  it("keeps the poster area inert while the video is processing", async () => {
+    const utils = await renderLoaded(
+      view({ videos: [video({ status: "uploading", playability: "processing" })] }),
+    );
+    const play = utils.getByTestId("match-video-play-v-mine", { includeHiddenElements: true });
+    expect(play.props.accessible).toBe(false);
+    expect(play.props.accessibilityElementsHidden).toBe(true);
+    // The placeholder drops its play glyph while nothing can play.
+    expect(within(utils.getByTestId("match-video-placeholder", { includeHiddenElements: true })).queryByTestId("icon", { includeHiddenElements: true })).toBeNull();
+    fireEvent.press(play);
+    expect(mockPush).not.toHaveBeenCalled();
+    // "Processing" is announced once, by the Watch button.
+    expect(utils.getAllByLabelText("Processing")).toHaveLength(1);
+  });
+
   it("shows the poster when there is one, the placeholder otherwise", async () => {
     const utils = await renderLoaded(
       view({ videos: [video({ poster_url: "https://signed/p.jpg" }), video(OPP_VIDEO)] }),
     );
-    const poster = within(utils.getByTestId("match-video-card-v-mine")).getByTestId("match-video-poster");
+    const poster = within(utils.getByTestId("match-video-card-v-mine")).getByTestId("match-video-poster", { includeHiddenElements: true });
     // Cached by video id so a re-signed URL on refetch does not flash.
     expect(poster.props.source).toEqual({
       uri: "https://signed/p.jpg",
       cacheKey: "match-video-poster-v-mine",
     });
     expect(poster.props.recyclingKey).toBe("v-mine");
-    expect(within(utils.getByTestId("match-video-card-v-opp")).getByTestId("match-video-placeholder")).toBeTruthy();
+    const placeholder = within(utils.getByTestId("match-video-card-v-opp")).getByTestId("match-video-placeholder", { includeHiddenElements: true });
+    expect(within(placeholder).getByTestId("icon", { includeHiddenElements: true })).toBeTruthy();
   });
 
   it("shows the no-video plate when nothing was recorded", async () => {

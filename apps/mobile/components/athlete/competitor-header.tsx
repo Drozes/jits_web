@@ -9,7 +9,7 @@ interface CompetitorHeaderProps {
   athlete: Athlete;
   gymName: string | null;
   stats: AthleteStatsRpc;
-  /** Optional global rank for accent caption (e.g. "#01 GLOBAL"). */
+  /** Optional global rank caption, ink not red (e.g. "#01 GLOBAL"). */
   rank?: number;
 }
 
@@ -70,8 +70,12 @@ export function CompetitorHeader({ athlete, gymName, stats, rank }: CompetitorHe
           {athlete.current_elo}
         </Text>
         {rank != null ? (
-          <Text className="font-mono-bold text-cta text-[12px] uppercase tracking-caps-l mt-2">
-            #{rank}  ·  Global
+          <Text
+            testID="competitor-rank"
+            className="font-mono-bold text-ink text-[12px] uppercase tracking-caps-l tabular-nums mt-2"
+          >
+            #{rank}
+            <Text className="text-ink-3">  ·  Global</Text>
           </Text>
         ) : null}
       </View>

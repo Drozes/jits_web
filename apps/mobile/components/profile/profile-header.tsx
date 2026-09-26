@@ -12,7 +12,7 @@ interface ProfileHeaderProps {
     "display_name" | "current_elo" | "highest_elo" | "current_weight" | "profile_photo_url" | "gender"
   >;
   gymName: string | null;
-  /** Optional global rank for accent caption (e.g. "#847 GLOBAL"). */
+  /** Optional global rank caption, ink not red (e.g. "#847 GLOBAL"). */
   rank?: number;
 }
 
@@ -74,8 +74,12 @@ export function ProfileHeader({ athlete, gymName, rank }: ProfileHeaderProps) {
             {athlete.current_elo}
           </Text>
           {rank != null ? (
-            <Text className="font-mono-bold text-cta text-[12px] uppercase tracking-caps-l mt-2">
-              #{rank}  ·  Global
+            <Text
+              testID="profile-rank"
+              className="font-mono-bold text-ink text-[12px] uppercase tracking-caps-l tabular-nums mt-2"
+            >
+              #{rank}
+              <Text className="text-ink-3">  ·  Global</Text>
             </Text>
           ) : athlete.highest_elo && athlete.highest_elo > athlete.current_elo ? (
             <Text className="font-mono text-ink-3 text-[10px] uppercase tracking-caps-l mt-2">

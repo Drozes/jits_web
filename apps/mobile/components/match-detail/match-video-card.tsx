@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { Image } from "expo-image";
 import { PlayCircle } from "lucide-react-native";
 import { useThemedTokens } from "@/lib/theme/use-theme";
@@ -15,17 +15,33 @@ interface MatchVideoCardProps {
   onWatch: () => void;
 }
 
-/** One recording: poster (or placeholder), angle label, status, Watch. */
+/**
+ * One recording: poster (or placeholder), angle label, status, Watch.
+ * The poster area is a large touch target running the same `onWatch`, but it
+ * is hidden from assistive tech in every state so Watch (harness testID) is
+ * the card's single accessible action. While processing it is inert and the
+ * placeholder drops its play glyph.
+ */
 export function MatchVideoCard({ video, primary, onWatch }: MatchVideoCardProps) {
   const tokens = useThemedTokens();
   const duration = formatVideoDuration(video.duration_seconds);
+  const processing = video.playability === "processing";
 
   return (
     <View
       testID={`match-video-card-${video.id}`}
       className="bg-surface-3 border border-hairline rounded-md overflow-hidden"
     >
-      <View className="bg-surface-4 items-center justify-center" style={{ aspectRatio: 16 / 9 }}>
+      <Pressable
+        testID={`match-video-play-${video.id}`}
+        accessible={false}
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        disabled={processing}
+        onPress={onWatch}
+        className="bg-surface-4 items-center justify-center active:opacity-70"
+        style={{ aspectRatio: 16 / 9 }}
+      >
         {video.poster_url ? (
           <Image
             testID="match-video-poster"
@@ -38,10 +54,10 @@ export function MatchVideoCard({ video, primary, onWatch }: MatchVideoCardProps)
           />
         ) : (
           <View testID="match-video-placeholder" pointerEvents="none">
-            <PlayCircle size={32} color={tokens.textTertiary} />
+            {processing ? null : <PlayCircle size={32} color={tokens.textTertiary} />}
           </View>
         )}
-      </View>
+      </Pressable>
       <View className="p-4 gap-3">
         <View className="flex-row items-center justify-between gap-3">
           <Text numberOfLines={1} className="flex-1 font-heading text-[12px] text-ink">
