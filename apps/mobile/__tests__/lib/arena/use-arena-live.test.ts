@@ -739,6 +739,48 @@ describe("launch resume", () => {
     expect(mockToggleMatchPreferences).not.toHaveBeenCalled();
   });
 
+  it("does not re-run the arrival resume when the athlete prop later flips to true", async () => {
+    // The post-match `refreshAthleteSoft` hands a fresh `looking_for_ranked`
+    // down as a new prop. Arrival already happened: re-running on it would be
+    // an extra flag write and lobby track against the presence rate limit.
+    const { result, rerender } = mount({ initialRanked: false });
+    await act(flush);
+    expect(mockCalls).toEqual([]);
+
+    await act(async () => {
+      rerender({ ...ARGS, initialRanked: true });
+      await flush();
+    });
+
+    expect(mockCalls).toEqual([]);
+    expect(result.current.isLive).toBe(false);
+  });
+
+  it("does not force back live an athlete who tapped offline when the prop re-reads true", async () => {
+    const { result, rerender } = mount({ initialRanked: true });
+    await act(flush);
+    expect(result.current.isLive).toBe(true);
+
+    await act(async () => {
+      await result.current.toggle();
+    });
+    expect(result.current.isLive).toBe(false);
+
+    // A soft athlete re-read races the clear and still says `true`.
+    mockCalls.length = 0;
+    await act(async () => {
+      rerender({ ...ARGS, initialRanked: false });
+      await flush();
+    });
+    await act(async () => {
+      rerender({ ...ARGS, initialRanked: true });
+      await flush();
+    });
+
+    expect(mockCalls).toEqual([]);
+    expect(result.current.isLive).toBe(false);
+  });
+
   it("still runs a full go-live (flag AND lobby) for a flag it arrived with", async () => {
     // The seed marks the flag committed; the foreground path must not let
     // that skip the lobby join.

@@ -35,6 +35,7 @@ import {
   arenaActions,
   setOpponentUnavailableHandler,
   useArenaState,
+  useIsInArenaMatch,
 } from "@/lib/arena/arena-store";
 import { GoLivePlate } from "@/components/arena/go-live-plate";
 import { CompetitorRow, type RowAction } from "@/components/arena/competitor-row";
@@ -92,17 +93,26 @@ export default function ArenaScreen() {
 
   // An opponent who left between the roster load and the tap leaves a stale
   // row behind; re-reading the roster is what corrects it. The challenge hook
-  // lives app-wide, so the roster's refresh is handed to it here.
+  // lives app-wide, so the roster's refresh is handed to it here. An empty id
+  // is the stale-challenge sweep (`notifyStaleChallengesCancelled`), which
+  // nobody tapped for, so it reads in the background: no spinner, and a
+  // failed read keeps the roster instead of swapping in the error plate.
   React.useEffect(() => {
-    setOpponentUnavailableHandler(refresh);
+    setOpponentUnavailableHandler((id) => (id ? refresh() : refreshQuietly()));
     return () => setOpponentUnavailableHandler(null);
-  }, [refresh]);
+  }, [refresh, refreshQuietly]);
+
+  useRefreshOnChallengeEnd(
+    outgoing?.challengeId ?? null,
+    incoming?.challengeId ?? null,
+    refreshQuietly,
+  );
 
   const rematch = useRematchPin({
     competitors,
     lobbyIds,
     isLoading,
-    refresh,
+    refresh: refreshQuietly,
     outgoingOpponentId: outgoing?.opponentId ?? null,
   });
 
@@ -239,4 +249,54 @@ export default function ArenaScreen() {
       </PageContainer>
     </View>
   );
+}
+
+/**
+ * How long a challenge end waits before its roster read, so a challenge that
+ * ended INTO a match (enterMatch clears the slot, then pushes the match
+ * screen) is recognised as one and skipped.
+ */
+const CHALLENGE_END_SETTLE_MS = 300;
+
+/**
+ * A challenge that ends without a match (declined, cancelled, expired,
+ * withdrawn) leaves its "Pending" tag on the roster row: that tag comes from
+ * `challengedIds` in the last roster read, and nothing in those paths reads
+ * the roster again. So re-read it, quietly, when either slot goes from a
+ * challenge to empty. Skipped when the end was a match: the match-exit read
+ * (`useArenaRoster`) covers that one.
+ */
+function useRefreshOnChallengeEnd(
+  outgoingId: string | null,
+  incomingId: string | null,
+  refreshQuietly: () => void,
+): void {
+  const inMatch = useIsInArenaMatch();
+  const inMatchRef = React.useRef(inMatch);
+  inMatchRef.current = inMatch;
+  const prev = React.useRef({ outgoingId, incomingId });
+  const timer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const cancel = React.useCallback(() => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+  }, []);
+
+  React.useEffect(() => {
+    const was = prev.current;
+    prev.current = { outgoingId, incomingId };
+    const ended =
+      (!!was.outgoingId && !outgoingId) || (!!was.incomingId && !incomingId);
+    if (!ended || inMatchRef.current || timer.current) return;
+    timer.current = setTimeout(() => {
+      timer.current = null;
+      if (!inMatchRef.current) refreshQuietly();
+    }, CHALLENGE_END_SETTLE_MS);
+  }, [outgoingId, incomingId, refreshQuietly]);
+
+  React.useEffect(() => {
+    if (inMatch) cancel();
+  }, [inMatch, cancel]);
+
+  React.useEffect(() => cancel, [cancel]);
 }

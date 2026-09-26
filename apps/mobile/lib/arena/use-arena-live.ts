@@ -308,10 +308,18 @@ export function useArenaLive({
   // straight into a match: it waits for the match to end. In both parked
   // cases the stale `true` is CLEARED now (the flag is seeded as committed,
   // see `actualRef`), so nobody can challenge an athlete who cannot answer.
+  //
+  // ONCE, on arrival, with the value captured at mount. The post-match
+  // `refreshAthleteSoft` hands this hook a fresh `looking_for_ranked` as a new
+  // prop; re-running on it would be an extra flag write and lobby track
+  // (presence is rate limited), or would force back live an athlete who had
+  // just tapped offline. After mount, this hook's own state is the truth.
+  const arrivedRankedRef = React.useRef(initialRanked);
   const reconciledRef = React.useRef(false);
   React.useEffect(() => {
-    if (!athleteId || !initialRanked || reconciledRef.current) return;
+    if (!athleteId || reconciledRef.current) return;
     reconciledRef.current = true;
+    if (!arrivedRankedRef.current) return;
     if (inMatchRef.current) {
       // The match effect below issues the clear as it records the resume.
       resumeAfterMatchRef.current = true;
@@ -319,15 +327,15 @@ export function useArenaLive({
     }
     if (AppState.currentState !== "active") {
       resumeLiveRef.current = true;
-      void requestOffline();
+      void requestOfflineRef.current();
       return;
     }
     // Only the flag is committed; presence has not been joined. Mark it
     // uncommitted so the reconcile loop runs a full transition (flag AND
     // lobby) instead of seeing desired === actual and doing nothing.
     actualRef.current = false;
-    void requestLive();
-  }, [athleteId, initialRanked, requestLive, requestOffline]);
+    void requestLiveRef.current();
+  }, [athleteId]);
 
   // THE LIFECYCLE. Live belongs to the athlete, not to a screen:
   //  - Switching tabs or pushing a profile: still live. The header LIVE pill
