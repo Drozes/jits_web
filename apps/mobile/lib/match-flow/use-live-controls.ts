@@ -2,6 +2,7 @@ import * as React from "react";
 import { toast } from "@/components/ui/toast";
 import { supabase } from "@/lib/supabase/client";
 import { pauseMatch, resumeMatch } from "@jits/shared/api/mutations";
+import { getMatchDetails } from "@jits/shared/api/queries";
 import type { useSessionMatchSync } from "@jits/shared/hooks/use-session-match-sync";
 // From the protocol module, not the hook module: tests mock the hook module.
 import { settleWithin } from "@jits/shared/hooks/session-match-channel";
@@ -58,6 +59,19 @@ export function useLiveControls({ matchId, timer, sync, endedRef, onEnded }: Use
       setBusy("resume");
       const res = await resumeMatch(supabase, matchId);
       setBusy(null);
+      if (!res.ok && res.error.code === "MATCH_NOT_PAUSED") {
+        // The match is already running (a resume we missed, e.g. the
+        // opponent's broadcast was lost). Take the running state from the
+        // DB rather than leaving this timer paused behind an error toast.
+        const fresh = await getMatchDetails(supabase, matchId);
+        if (fresh && fresh.status === "in_progress" && !fresh.paused_at) {
+          timer.syncFromBroadcast({
+            type: "resumed",
+            totalPausedDuration: fresh.total_paused_duration,
+          });
+          return;
+        }
+      }
       if (!res.ok) {
         toast.error({ text1: "Couldn't resume", description: res.error.message });
         return;

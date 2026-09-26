@@ -96,13 +96,14 @@ jest.mock("@/lib/match-flow/use-haptics", () => ({
     timeWarning: () => Promise.resolve(),
   },
 }));
+const mockTimerSync = jest.fn();
 jest.mock("@jits/shared/hooks/use-session-match-timer", () => ({
   useSessionMatchTimer: () => ({
     formatted: "05:00",
     remaining: 300,
     paused: false,
     running: true,
-    syncFromBroadcast: jest.fn(),
+    syncFromBroadcast: (...a: unknown[]) => mockTimerSync(...a),
   }),
 }));
 
@@ -424,6 +425,19 @@ describe("cancel during the weight step (jits-bh2v, E3B)", () => {
     await flush();
     expect(mockRouterReplace).toHaveBeenCalledWith(EXIT);
     expect(mockRouterReplace).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("live pause re-sync is fed every snapshot", () => {
+  it("a lost zero-length resume is recovered by the next (identical) poll", async () => {
+    await mountAt("in_progress");
+    // The opponent pauses (broadcast arrives) and resumes 0.3 s later; that
+    // broadcast is lost and resume_match added 0 s, so every read is
+    // identical to the mount-time row: no prop ever changes.
+    act(() => handlerOf("onTimerPaused")("2026-09-25T12:01:00.000Z"));
+    mockTimerSync.mockClear();
+    await tick(10_000);
+    expect(mockTimerSync).toHaveBeenCalledWith({ type: "resumed", totalPausedDuration: 0 });
   });
 });
 

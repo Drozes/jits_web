@@ -89,10 +89,23 @@ export function useWizardSync({
     exitingRef.current = true;
   }, []);
 
+  const snapshotListenersRef = React.useRef(new Set<(m: MatchDetails) => void>());
+  const subscribeSnapshot = React.useCallback((listener: (m: MatchDetails) => void) => {
+    const listeners = snapshotListenersRef.current;
+    listeners.add(listener);
+    return () => {
+      listeners.delete(listener);
+    };
+  }, []);
+
   const onSnapshot = React.useCallback(
     ({ match: fresh, confirmedAthleteIds: ids }: ReconcileSnapshot) => {
       applyMatch(fresh);
       if (ids) setConfirmedAthleteIds(ids);
+      // Every snapshot, even one identical to the last (applyMatch keeps the
+      // old object then, so no prop changes): the live step's pause re-sync
+      // must be able to re-apply a read it deferred as possibly stale.
+      for (const listener of snapshotListenersRef.current) listener(fresh);
       const current = stepRef.current;
       const me = fresh.participants.find((p) => p.athlete_id === currentAthleteId);
       const opponent = fresh.participants.find((p) => p.athlete_id !== currentAthleteId);
@@ -144,8 +157,8 @@ export function useWizardSync({
   });
 
   const syncContext = React.useMemo(
-    () => ({ onChannelStatus, reconcileNow, markExiting }),
-    [onChannelStatus, reconcileNow, markExiting],
+    () => ({ onChannelStatus, reconcileNow, markExiting, subscribeSnapshot }),
+    [onChannelStatus, reconcileNow, markExiting, subscribeSnapshot],
   );
 
   return {

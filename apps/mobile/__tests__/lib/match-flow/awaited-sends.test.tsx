@@ -149,7 +149,7 @@ describe("useRecordResult awaits result_submitted before onRecorded", () => {
     const reconcileNow = jest.fn();
     const wrapper = ({ children }: { children: React.ReactNode }) => (
       <MatchSyncProvider
-        value={{ onChannelStatus: jest.fn(), reconcileNow, markExiting: jest.fn() }}
+        value={{ onChannelStatus: jest.fn(), reconcileNow, markExiting: jest.fn(), subscribeSnapshot: () => () => {} }}
       >
         {children}
       </MatchSyncProvider>
@@ -169,7 +169,7 @@ describe("useRecordResult awaits result_submitted before onRecorded", () => {
     const onChannelStatus = jest.fn();
     const wrapper = ({ children }: { children: React.ReactNode }) => (
       <MatchSyncProvider
-        value={{ onChannelStatus, reconcileNow: jest.fn(), markExiting: jest.fn() }}
+        value={{ onChannelStatus, reconcileNow: jest.fn(), markExiting: jest.fn(), subscribeSnapshot: () => () => {} }}
       >
         {children}
       </MatchSyncProvider>

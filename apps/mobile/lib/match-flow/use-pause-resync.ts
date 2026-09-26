@@ -3,15 +3,28 @@ import type {
   TimerSyncEvent,
   useSessionMatchTimer,
 } from "@jits/shared/hooks/use-session-match-timer";
+import type { MatchDetails } from "@jits/shared/api/queries";
+import { useMatchSyncContext } from "./match-sync-context";
 
 type Timer = ReturnType<typeof useSessionMatchTimer>;
+
+/**
+ * How long after a pause/resume applied here a same-total DB read that
+ * disagrees with it is treated as possibly in flight across that change. A
+ * reconciler fetch is tens to hundreds of milliseconds; the live poll is
+ * 10 s, so the first poll after the window is always a read that started
+ * after the change and is trusted.
+ */
+export const PAUSE_STALE_WINDOW_MS = 3_000;
 
 /** The pause state this device has already applied to its timer. */
 export interface KnownPauseState {
   pausedAt: string | null;
   totalPausedDuration: number;
-  /** `paused_at` values (epoch ms) this device has already seen resumed. */
+  /** `paused_at` instants (epoch ms) this device has already seen resumed. */
   resumed: readonly number[];
+  /** `Date.now()` when a pause/resume was last applied here; null before any. */
+  lastChangeAt: number | null;
 }
 
 /** The pause state a reconciler read of the `matches` row carries. */
@@ -20,55 +33,85 @@ export interface DbPauseState {
   totalPausedDuration: number;
 }
 
+/** Epoch ms of a timestamp, or null when it does not parse. */
+function instant(iso: string): number | null {
+  const t = Date.parse(iso);
+  return Number.isFinite(t) ? t : null;
+}
+
+/** True when the read says exactly what this device already shows. Row and
+ * RPC may format the same `paused_at` differently, so compare instants. */
+export function isSamePauseState(known: KnownPauseState, db: DbPauseState): boolean {
+  if (db.totalPausedDuration !== known.totalPausedDuration) return false;
+  if (db.pausedAt == null || known.pausedAt == null) return db.pausedAt == known.pausedAt;
+  const a = instant(db.pausedAt);
+  const b = instant(known.pausedAt);
+  return a != null && b != null ? a === b : db.pausedAt === known.pausedAt;
+}
+
 /**
  * True when a DB read must NOT replace the pause state in hand, because it
- * was read before a pause or resume this device already applied (its own
- * tap, or the opponent's broadcast). A reconciler fetch can straddle such a
- * change: without this, a read taken while paused that lands just after a
- * resume re-paused the timer (and one taken while running re-started a
- * paused one) until the next poll, up to 10 s later.
+ * may have been read before a pause or resume this device already applied
+ * (its own tap, or the opponent's broadcast). Without this, a read taken
+ * while paused that landed just after a resume re-paused the timer (and one
+ * taken while running re-started a paused one) until the next poll.
  *
- * `total_paused_duration` only grows (resume_match adds each pause to it),
- * so it orders reads against resumes. Same total means the same running
- * stretch: a paused read is stale only if that very pause was already seen
- * resumed (a resume under 0.5 s adds 0, since the RPC rounds to seconds), and
- * a running read is stale while this device is paused (it predates the
- * pause). Timestamps compare as instants: the row and the RPC may format
- * the same `paused_at` differently.
+ * `total_paused_duration` only grows (resume_match adds each pause), so a
+ * smaller total is always older. An equal total is ambiguous: a running read
+ * while paused here is either from before our pause or a real resume that
+ * added 0 s (the RPC rounds, so a pause under 0.5 s) whose broadcast was
+ * missed; a paused read of a pause already seen resumed is either stale or
+ * that resume was itself misread. Those are held back only within
+ * `PAUSE_STALE_WINDOW_MS` of the last applied change, so a genuine state is
+ * applied by the next poll and the timer can never stick.
  */
-export function isStalePauseRead(known: KnownPauseState, db: DbPauseState): boolean {
+export function isStalePauseRead(known: KnownPauseState, db: DbPauseState, now: number): boolean {
   if (db.totalPausedDuration < known.totalPausedDuration) return true;
   if (db.totalPausedDuration > known.totalPausedDuration) return false;
-  if (db.pausedAt) return known.resumed.includes(Date.parse(db.pausedAt));
+  const inWindow = known.lastChangeAt != null && now - known.lastChangeAt < PAUSE_STALE_WINDOW_MS;
+  if (!inWindow) return false;
+  if (db.pausedAt) {
+    const t = instant(db.pausedAt);
+    return t != null && known.resumed.includes(t);
+  }
   return known.pausedAt != null;
 }
 
 /**
- * The live step's timer, kept in step with the DB pause state the wizard
- * re-reads (foreground, channel rejoin, poll) after a pause/resume broadcast
- * was missed. Returns the timer with a `syncFromBroadcast` that records
- * every applied change, so a DB read older than one of them is ignored
- * (`isStalePauseRead`). Every pause/resume source (local tap, broadcast, DB)
- * must go through the returned timer for that record to be complete.
+ * The live step's timer, kept in step with the DB pause state after a
+ * pause/resume broadcast was missed. Returns the timer with a
+ * `syncFromBroadcast` that records every applied change; every pause/resume
+ * source (local tap, broadcast, DB) must go through it. The DB side listens
+ * to every reconciler snapshot (foreground, rejoin, poll), including one
+ * identical to the last, so a read held back as possibly stale is applied
+ * by a later poll even though no prop changed.
  */
 export function usePauseResync(
   timer: Timer,
   pausedAt: string | null,
   totalPausedDuration: number,
 ): Timer {
-  const knownRef = React.useRef<KnownPauseState>({ pausedAt, totalPausedDuration, resumed: [] });
+  const knownRef = React.useRef<KnownPauseState>({
+    pausedAt,
+    totalPausedDuration,
+    resumed: [],
+    lastChangeAt: null,
+  });
   const { syncFromBroadcast } = timer;
+  const { subscribeSnapshot } = useMatchSyncContext();
 
   const track = React.useCallback(
     (event: TimerSyncEvent) => {
       const k = knownRef.current;
       if (event.type === "paused") {
-        knownRef.current = { ...k, pausedAt: event.pausedAt };
+        knownRef.current = { ...k, pausedAt: event.pausedAt, lastChangeAt: Date.now() };
       } else if (event.type === "resumed") {
+        const was = k.pausedAt ? instant(k.pausedAt) : null;
         knownRef.current = {
           pausedAt: null,
           totalPausedDuration: event.totalPausedDuration,
-          resumed: k.pausedAt ? [...k.resumed, Date.parse(k.pausedAt)] : k.resumed,
+          resumed: was != null ? [...k.resumed, was] : k.resumed,
+          lastChangeAt: Date.now(),
         };
       }
       syncFromBroadcast(event);
@@ -76,20 +119,18 @@ export function usePauseResync(
     [syncFromBroadcast],
   );
 
-  // The timer only takes its pause state from props at mount, so apply a
-  // newer DB state when the wizard's re-read changes it, unless the read
-  // predates a change already applied here.
-  const mountedRef = React.useRef(false);
-  React.useEffect(() => {
-    if (!mountedRef.current) {
-      mountedRef.current = true;
-      return;
-    }
-    if (isStalePauseRead(knownRef.current, { pausedAt, totalPausedDuration })) return;
-    if (pausedAt) track({ type: "paused", pausedAt });
-    else track({ type: "resumed", totalPausedDuration });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- react only to DB changes
-  }, [pausedAt, totalPausedDuration]);
+  React.useEffect(
+    () =>
+      subscribeSnapshot((m: MatchDetails) => {
+        if (m.status !== "in_progress") return;
+        const db = { pausedAt: m.paused_at, totalPausedDuration: m.total_paused_duration };
+        const known = knownRef.current;
+        if (isSamePauseState(known, db) || isStalePauseRead(known, db, Date.now())) return;
+        if (db.pausedAt) track({ type: "paused", pausedAt: db.pausedAt });
+        else track({ type: "resumed", totalPausedDuration: db.totalPausedDuration });
+      }),
+    [subscribeSnapshot, track],
+  );
 
   return { ...timer, syncFromBroadcast: track };
 }
