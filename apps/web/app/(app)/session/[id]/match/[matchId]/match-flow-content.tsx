@@ -3,7 +3,9 @@ import { requireAthlete } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
 import { getMatchDetails, getSubmissionTypes } from "@jits/shared/api/queries";
 import { getFlag } from "@/lib/feature-flags";
+import { exitReasonFor } from "@/lib/match-flow/match-state";
 import { MatchFlowWizard } from "./match-flow-wizard";
+import { MatchExitRedirect } from "./match-exit-redirect";
 import type { MatchFlowStep } from "./match-flow-wizard";
 
 function computeInitialStep(
@@ -66,6 +68,11 @@ export async function MatchFlowContent({
 
   const opponent = match.participants.find((p) => p.athlete_id !== athlete.id);
   if (!opponent) redirect(exitHref);
+
+  // Cancelled / voided used to fall through to weight verify, restarting a
+  // dead match. Leave for the exit with a toast instead (mirrors mobile).
+  const exitReason = exitReasonFor(match.status);
+  if (exitReason) return <MatchExitRedirect exitHref={exitHref} reason={exitReason} />;
 
   const isTimekeeper = allowTimekeeper && match.timekeeper_id === athlete.id;
   const initialStep = computeInitialStep(

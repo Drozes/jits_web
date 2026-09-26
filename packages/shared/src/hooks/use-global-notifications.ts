@@ -49,8 +49,18 @@ export interface UseGlobalNotificationsParams {
   onUnreadRefresh?: () => void;
   /** Build the deep link for a conversation -- e.g. `/messages/{id}` on web, `/(app)/messages/{id}` on mobile. */
   buildMessageHref?: (conversationId: string) => string;
-  /** Build the deep link for an accepted challenge match lobby -- e.g. `/match/lobby/{challengeId}` on web. */
+  /**
+   * Optional deep link for an accepted challenge. When omitted the "accepted"
+   * toast carries no link (there is deliberately no fallback route).
+   */
   buildLobbyHref?: (challengeId: string) => string;
+  /**
+   * Toast when a challenge this athlete sent is accepted or declined. Defaults
+   * to true. Web passes false: the Arena handshake owns those moments (it
+   * drops both athletes into the match, and toasts a decline itself), so a
+   * second toast here duplicated it or linked out of the ready check.
+   */
+  challengeOutcomeToasts?: boolean;
 }
 
 /**
@@ -69,6 +79,7 @@ export function useGlobalNotifications({
   onUnreadRefresh,
   buildMessageHref,
   buildLobbyHref,
+  challengeOutcomeToasts = true,
 }: UseGlobalNotificationsParams): void {
   // Stash the latest callbacks in refs so the realtime subscription
   // doesn't have to re-subscribe when they change identity.
@@ -82,6 +93,8 @@ export function useGlobalNotifications({
   buildMessageHrefRef.current = buildMessageHref;
   const buildLobbyHrefRef = useRef(buildLobbyHref);
   buildLobbyHrefRef.current = buildLobbyHref;
+  const outcomeToastsRef = useRef(challengeOutcomeToasts);
+  outcomeToastsRef.current = challengeOutcomeToasts;
 
   const senderCache = useRef(new Map<string, SenderMeta>());
   const mountIdRef = useRef(0);
@@ -144,7 +157,7 @@ export function useGlobalNotifications({
             opponent_id: string;
           };
 
-          if (challenge.status === "accepted") {
+          if (challenge.status === "accepted" && outcomeToastsRef.current) {
             const opponent = await resolveSender(
               supabase,
               challenge.opponent_id,
@@ -154,14 +167,12 @@ export function useGlobalNotifications({
               type: "challenge",
               title: "Challenge Accepted!",
               body: `${opponent.name} accepted your challenge`,
-              href:
-                buildLobbyHrefRef.current?.(challenge.id) ??
-                `/match/lobby/${challenge.id}`,
+              href: buildLobbyHrefRef.current?.(challenge.id),
               avatarUrl: opponent.avatarUrl,
             });
           }
 
-          if (challenge.status === "declined") {
+          if (challenge.status === "declined" && outcomeToastsRef.current) {
             const opponent = await resolveSender(
               supabase,
               challenge.opponent_id,

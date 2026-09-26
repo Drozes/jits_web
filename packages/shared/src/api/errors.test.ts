@@ -55,7 +55,7 @@ describe("mapPostgrestError", () => {
     it("maps 'missing_fields' hint to INVALID_RESULT", () => {
       const result = mapPostgrestError(pgError("P0001", "err", "missing_fields"));
       expect(result.code).toBe("INVALID_RESULT");
-      expect(result.message).toBe("Missing required fields for submission.");
+      expect(result.message).toBe("A submission needs a winner, a submission type and a finish time.");
     });
 
     it("maps 'invalid_winner' hint to NOT_PARTICIPANT", () => {
@@ -73,7 +73,7 @@ describe("mapPostgrestError", () => {
     it("maps 'invalid_finish_time' hint to INVALID_RESULT", () => {
       const result = mapPostgrestError(pgError("P0001", "err", "invalid_finish_time"));
       expect(result.code).toBe("INVALID_RESULT");
-      expect(result.message).toBe("Finish time must be between 1 and match duration.");
+      expect(result.message).toBe("Finish time must be at least 0:01 and no later than the end of the match.");
     });
 
     it("maps 'not_accepted' hint to CHALLENGE_NOT_ACCEPTED", () => {

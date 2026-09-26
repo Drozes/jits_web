@@ -13,11 +13,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { SubmissionType } from "@jits/shared/types/submission-type";
+import {
+  finishSecondsFromFields,
+  formatMatchClock,
+  isFinishTimeValid,
+} from "@/lib/match-flow/match-state";
 
 interface SubmissionFieldsProps {
   submissionTypes: SubmissionType[];
   submissionCode: string;
   defaultElapsedSeconds?: number;
+  /** Match length: the finish time is required and must fall in 1..duration. */
+  durationSeconds: number;
   onSubmissionChange: (code: string) => void;
   onFinishTimeChange: (seconds: number | undefined) => void;
 }
@@ -26,6 +33,7 @@ export function SubmissionFields({
   submissionTypes,
   submissionCode,
   defaultElapsedSeconds,
+  durationSeconds,
   onSubmissionChange,
   onFinishTimeChange,
 }: SubmissionFieldsProps) {
@@ -41,12 +49,12 @@ export function SubmissionFields({
   function updateTime(mins: string, secs: string) {
     setMinutes(mins);
     setSeconds(secs);
-    if (mins || secs) {
-      onFinishTimeChange(parseInt(mins || "0") * 60 + parseInt(secs || "0"));
-    } else {
-      onFinishTimeChange(undefined);
-    }
+    onFinishTimeChange(finishSecondsFromFields(mins, secs));
   }
+
+  const entered = finishSecondsFromFields(minutes, seconds);
+  const invalid =
+    entered !== undefined && !isFinishTimeValid(entered, durationSeconds);
 
   return (
     <Card>
@@ -73,7 +81,7 @@ export function SubmissionFields({
         <div className="space-y-2">
           <Label className="flex items-center gap-1.5 text-muted-foreground">
             <Clock className="h-3.5 w-3.5" />
-            Finish Time (optional)
+            Finish Time
           </Label>
           <div className="flex items-center gap-2">
             <Input
@@ -96,6 +104,11 @@ export function SubmissionFields({
               className="w-20"
             />
           </div>
+          {invalid && (
+            <p className="text-xs text-destructive">
+              Enter a time between 0:01 and {formatMatchClock(durationSeconds)}.
+            </p>
+          )}
         </div>
       </CardContent>
     </Card>

@@ -65,7 +65,7 @@ const HINT_TO_CODE: Record<string, { code: DomainErrorCode; message: string }> =
     },
     missing_fields: {
       code: "INVALID_RESULT",
-      message: "Missing required fields for submission.",
+      message: "A submission needs a winner, a submission type and a finish time.",
     },
     invalid_winner: {
       code: "NOT_PARTICIPANT",
@@ -77,7 +77,7 @@ const HINT_TO_CODE: Record<string, { code: DomainErrorCode; message: string }> =
     },
     invalid_finish_time: {
       code: "INVALID_RESULT",
-      message: "Finish time must be between 1 and match duration.",
+      message: "Finish time must be at least 0:01 and no later than the end of the match.",
     },
     not_accepted: {
       code: "CHALLENGE_NOT_ACCEPTED",

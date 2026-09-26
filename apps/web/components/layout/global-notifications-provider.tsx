@@ -22,7 +22,10 @@ export function GlobalNotificationsProvider({
     getCurrentRoute: () => pathname,
     onUnreadRefresh: refreshUnreadCounts,
     buildMessageHref: (conversationId) => `/messages/${conversationId}`,
-    buildLobbyHref: (challengeId) => `/match/lobby/${challengeId}`,
+    // The Arena handshake owns accepted/declined (it enters the match and
+    // toasts a decline itself). /match/lobby is a hidden route that redirects
+    // to "/", which pulled the athlete out of the ready check.
+    challengeOutcomeToasts: false,
   });
   return null;
 }
