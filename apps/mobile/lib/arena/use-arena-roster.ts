@@ -43,8 +43,15 @@ export interface UseArenaRosterResult {
   isFetching: boolean;
   /** Pull-to-refresh: re-reads with the pull spinner. */
   refresh: () => void;
-  /** Re-reads with no spinner, for reads the athlete did not ask for. */
+  /**
+   * Re-reads with no spinner, for reads the athlete did not ask for. If one
+   * fails while a good roster is showing, that roster stays and no error is
+   * shown: a background read the athlete never saw must not replace a working
+   * list with an error plate.
+   */
   refreshQuietly: () => void;
+  /** Whether the most recent completed read succeeded. */
+  lastReadOk: boolean;
 }
 
 export function useArenaRoster(currentElo: number): UseArenaRosterResult {
@@ -57,7 +64,12 @@ export function useArenaRoster(currentElo: number): UseArenaRosterResult {
   const [hasError, setHasError] = React.useState(false);
   // Starts true: the mount read is in flight from the first render.
   const [isFetching, setIsFetching] = React.useState(true);
+  const [lastReadOk, setLastReadOk] = React.useState(true);
   const [tick, setTick] = React.useState(0);
+  /** The next read was asked for by `refreshQuietly`. */
+  const quietNext = React.useRef(false);
+  /** A successfully read roster is on screen (not the error plate). */
+  const hasGoodRoster = React.useRef(false);
 
   // Re-read after every match: the Arena stays mounted under the match
   // (jits-tlk3), and the match just changed both ELOs (so every eloDiff) and
@@ -66,16 +78,20 @@ export function useArenaRoster(currentElo: number): UseArenaRosterResult {
   const matchExits = useMatchExitCount();
 
   const refresh = React.useCallback(() => {
+    quietNext.current = false;
     setIsRefreshing(true);
     setTick((t) => t + 1);
   }, []);
 
   const refreshQuietly = React.useCallback(() => {
+    quietNext.current = true;
     setTick((t) => t + 1);
   }, []);
 
   React.useEffect(() => {
     let cancelled = false;
+    const quiet = quietNext.current;
+    quietNext.current = false;
     setIsFetching(true);
 
     async function load() {
@@ -94,9 +110,12 @@ export function useArenaRoster(currentElo: number): UseArenaRosterResult {
       setIsFetching(false);
 
       if (!arena || !Array.isArray(arena.looking_athletes)) {
+        setLastReadOk(false);
+        setIsRefreshing(false);
+        if (quiet && hasGoodRoster.current) return;
+        hasGoodRoster.current = false;
         setHasError(true);
         setIsLoading(false);
-        setIsRefreshing(false);
         return;
       }
 
@@ -113,6 +132,8 @@ export function useArenaRoster(currentElo: number): UseArenaRosterResult {
         })),
       );
       setChallengedIds(new Set(arena.challenged_opponent_ids ?? []));
+      hasGoodRoster.current = true;
+      setLastReadOk(true);
       setHasError(false);
       setIsLoading(false);
       setIsRefreshing(false);
@@ -141,5 +162,6 @@ export function useArenaRoster(currentElo: number): UseArenaRosterResult {
     isFetching,
     refresh,
     refreshQuietly,
+    lastReadOk,
   };
 }

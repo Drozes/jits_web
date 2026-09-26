@@ -21,6 +21,7 @@
 import * as React from "react";
 import { RefreshControl, Text, View } from "react-native";
 import { useRouter } from "expo-router";
+import { useIsFocused } from "@react-navigation/native";
 import { useRequireAthlete } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { AppHeader } from "@/components/layout/app-header";
@@ -65,6 +66,7 @@ export default function ArenaScreen() {
     isRefreshing,
     hasError,
     isFetching,
+    lastReadOk,
     refresh,
     refreshQuietly,
   } = useArenaRoster(athlete?.current_elo ?? 0);
@@ -73,6 +75,9 @@ export default function ArenaScreen() {
     () => competitors.map((c) => c.id),
     [competitors],
   );
+  // A pushed profile or another tab keeps this screen mounted: read nothing
+  // then, and catch up on return.
+  const isFocused = useIsFocused();
   useRosterLobbySync({
     rosterIds,
     lobbyIds,
@@ -80,6 +85,8 @@ export default function ArenaScreen() {
     isLive,
     isLoading,
     isFetching,
+    lastReadOk,
+    enabled: isFocused,
     refresh: refreshQuietly,
   });
 

@@ -166,6 +166,46 @@ describe("useArenaRoster", () => {
     expect(result.current.isFetching).toBe(false);
   });
 
+  it("keeps a good roster, with no error plate, when a quiet read fails", async () => {
+    const { result } = renderHook(() => useArenaRoster(1200));
+    await waitFor(() => expect(result.current.isFetching).toBe(false));
+    expect(result.current.lastReadOk).toBe(true);
+
+    mockGetArenaData.mockResolvedValueOnce(null);
+    act(() => {
+      result.current.refreshQuietly();
+    });
+    await waitFor(() => expect(result.current.isFetching).toBe(false));
+    expect(result.current.lastReadOk).toBe(false);
+    expect(result.current.hasError).toBe(false);
+    expect(result.current.competitors).toHaveLength(2);
+  });
+
+  it("still shows the error when a pull fails", async () => {
+    const { result } = renderHook(() => useArenaRoster(1200));
+    await waitFor(() => expect(result.current.isFetching).toBe(false));
+
+    mockGetArenaData.mockResolvedValueOnce(null);
+    act(() => {
+      result.current.refresh();
+    });
+    await waitFor(() => expect(result.current.hasError).toBe(true));
+    expect(result.current.isRefreshing).toBe(false);
+  });
+
+  it("does not hide the error when a quiet read fails with no good roster", async () => {
+    mockGetArenaData.mockResolvedValueOnce(null);
+    const { result } = renderHook(() => useArenaRoster(1200));
+    await waitFor(() => expect(result.current.hasError).toBe(true));
+
+    mockGetArenaData.mockResolvedValueOnce(null);
+    act(() => {
+      result.current.refreshQuietly();
+    });
+    await waitFor(() => expect(result.current.isFetching).toBe(false));
+    expect(result.current.hasError).toBe(true);
+  });
+
   it("clears the error once a retry succeeds", async () => {
     mockGetArenaData.mockResolvedValueOnce(null);
     const { result } = renderHook(() => useArenaRoster(1200));

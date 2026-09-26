@@ -118,6 +118,12 @@ jest.mock("expo-router", () => ({
   },
 }));
 
+let mockIsFocused = true;
+jest.mock("@react-navigation/native", () => ({
+  ...jest.requireActual("@react-navigation/native"),
+  useIsFocused: () => mockIsFocused,
+}));
+
 const mockImpact = jest.fn((..._a: unknown[]) => Promise.resolve());
 jest.mock("expo-haptics", () => ({
   impactAsync: (...a: unknown[]) => mockImpact(...a),
@@ -152,6 +158,7 @@ let mockRoster = {
   isRefreshing: false,
   hasError: false,
   isFetching: false,
+  lastReadOk: true,
   refresh: mockRefresh,
   refreshQuietly: mockRefreshQuietly,
 };
@@ -207,6 +214,7 @@ beforeEach(() => {
   mockParams = {};
   mockFocusCleanups.length = 0;
   mockLobbyIds = new Set();
+  mockIsFocused = true;
   mockIsLive = false;
   mockRoster = {
     competitors: [],
@@ -215,6 +223,7 @@ beforeEach(() => {
     isRefreshing: false,
     hasError: false,
     isFetching: false,
+    lastReadOk: true,
     refresh: mockRefresh,
     refreshQuietly: mockRefreshQuietly,
   };
@@ -673,6 +682,25 @@ describe("Arena screen: rematch handoff (jits-00fr)", () => {
     expect(mockRefreshQuietly).toHaveBeenCalledTimes(1);
     // No pull spinner for a read nobody asked for.
     expect(mockRefresh).not.toHaveBeenCalled();
+  });
+
+  it("holds the re-read while the Arena is not focused, then catches up", () => {
+    jest.useFakeTimers();
+    mockIsFocused = false;
+    mockRoster.competitors = [competitor({ id: "a-1" })];
+    mockLobbyIds = new Set(["a-1", "late-joiner"]);
+    const { rerender } = render(<ArenaScreen />);
+    act(() => {
+      jest.advanceTimersByTime(10_000);
+    });
+    expect(mockRefreshQuietly).not.toHaveBeenCalled();
+
+    mockIsFocused = true;
+    rerender(<ArenaScreen />);
+    act(() => {
+      jest.advanceTimersByTime(5_000);
+    });
+    expect(mockRefreshQuietly).toHaveBeenCalledTimes(1);
   });
 
   it("never re-reads the roster for the viewer's own lobby entry", () => {

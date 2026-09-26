@@ -18,13 +18,26 @@
  *     when a read comes back with a different roster, and an id is forgotten
  *     once it leaves the lobby, so a later return is tried again.
  * The viewer going live also re-reads once, through the same fence.
+ *
+ * A read this hook started that FAILS did not answer anything, so the ids it
+ * marked are tried again after the minimum gap, up to
+ * `ROSTER_SYNC_MAX_FAILED_RETRIES` failures in a row (then they wait for the
+ * roster to change, the athlete to leave and return, or a pull).
+ *
+ * While the Arena is not focused (a pushed profile, another tab) nothing is
+ * read; the bookkeeping carries on and the focus return runs the normal check.
  */
 import * as React from "react";
 
-/** Quiet period after the last lobby change before re-reading. */
+/**
+ * Fixed delay from the FIRST lobby change that makes a read due. Later changes
+ * inside it do not restart it; they coalesce into the same read.
+ */
 export const ROSTER_SYNC_DEBOUNCE_MS = 1_000;
 /** Minimum gap between the starts of two roster reads. */
 export const ROSTER_SYNC_MIN_INTERVAL_MS = 3_000;
+/** Failed reads in a row after which missing ids stop being retried. */
+export const ROSTER_SYNC_MAX_FAILED_RETRIES = 3;
 
 export interface RosterLobbySyncInput {
   /** Ids on the roster as last read. */
@@ -37,6 +50,10 @@ export interface RosterLobbySyncInput {
   isLoading: boolean;
   /** Any roster read in flight. */
   isFetching: boolean;
+  /** Whether the most recent completed read succeeded. */
+  lastReadOk: boolean;
+  /** False while the Arena is not focused: schedule nothing. */
+  enabled: boolean;
   /** A background re-read, no spinner. */
   refresh: () => void;
 }
@@ -48,6 +65,8 @@ export function useRosterLobbySync({
   isLive,
   isLoading,
   isFetching,
+  lastReadOk,
+  enabled,
   refresh,
 }: RosterLobbySyncInput): void {
   const tried = React.useRef(new Set<string>());
@@ -57,6 +76,11 @@ export function useRosterLobbySync({
   const lastStart = React.useRef(Number.NEGATIVE_INFINITY);
   const timer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const rosterKeyRef = React.useRef<string | null>(null);
+  /** Our timer fired a read that has not started yet. */
+  const firedOwn = React.useRef(false);
+  /** The read in flight is ours: what it marked, and whether it owed "live". */
+  const ownRead = React.useRef<{ ids: string[]; live: boolean } | null>(null);
+  const failedInARow = React.useRef(0);
 
   const rosterKey = React.useMemo(
     () => [...rosterIds].sort().join(","),
@@ -107,15 +131,32 @@ export function useRosterLobbySync({
       if (!wasFetching.current) {
         wasFetching.current = true;
         lastStart.current = Date.now();
-        for (const id of missing()) tried.current.add(id);
+        const marked = missing().filter((id) => !tried.current.has(id));
+        for (const id of marked) tried.current.add(id);
+        ownRead.current = firedOwn.current
+          ? { ids: marked, live: liveOwed.current }
+          : null;
+        firedOwn.current = false;
         liveOwed.current = false;
       }
       cancel();
       return;
     }
-    wasFetching.current = false;
+    if (wasFetching.current) {
+      // A read just ended.
+      wasFetching.current = false;
+      const own = ownRead.current;
+      ownRead.current = null;
+      if (lastReadOk) {
+        failedInARow.current = 0;
+      } else if (own && failedInARow.current < ROSTER_SYNC_MAX_FAILED_RETRIES) {
+        failedInARow.current += 1;
+        for (const id of own.ids) tried.current.delete(id);
+        if (own.live) liveOwed.current = true;
+      }
+    }
 
-    if (isLoading || !due.current()) {
+    if (!enabled || isLoading || !due.current()) {
       cancel();
       return;
     }
@@ -129,9 +170,19 @@ export function useRosterLobbySync({
       timer.current = null;
       if (!due.current()) return;
       lastStart.current = Date.now();
+      firedOwn.current = true;
       refreshRef.current();
     }, wait);
-  }, [rosterKey, lobbyIds, isLive, isLoading, isFetching, missing]);
+  }, [
+    rosterKey,
+    lobbyIds,
+    isLive,
+    isLoading,
+    isFetching,
+    lastReadOk,
+    enabled,
+    missing,
+  ]);
 
   React.useEffect(
     () => () => {
