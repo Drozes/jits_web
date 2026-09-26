@@ -32,8 +32,11 @@ interface HoldToEndButtonProps {
 /**
  * The one red CTA. Ending takes a deliberate 1.2 s hold so a bumped phone or
  * a stray tap never ends a match; releasing early cancels. Completion comes
- * from `Pressable`'s long press timer, never from the fill animation, which
- * is only a readout. Screen reader users get "End match" actions instead.
+ * from our own timer started on press in, never from the fill animation,
+ * which is only a readout. Pressable's long press is only a redundant
+ * trigger: RN cancels its timer once the finger drifts 10 px, while the
+ * press itself stays active, so a rolling thumb would fill the bar and never
+ * end. Screen reader users get "End match" actions instead.
  */
 export function HoldToEndButton({ disabled, ending, onEnd, onHoldChange }: HoldToEndButtonProps) {
   const progress = React.useRef(new Animated.Value(0)).current;
@@ -44,6 +47,7 @@ export function HoldToEndButton({ disabled, ending, onEnd, onHoldChange }: HoldT
   // even if the button is re-enabled before the finger comes up.
   const cancelledRef = React.useRef(false);
   const holdingRef = React.useRef(false);
+  const holdTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const disabledRef = React.useRef(disabled);
   disabledRef.current = disabled;
   const onHoldChangeRef = React.useRef(onHoldChange);
@@ -54,6 +58,12 @@ export function HoldToEndButton({ disabled, ending, onEnd, onHoldChange }: HoldT
     holdingRef.current = next;
     setHolding(next);
     onHoldChangeRef.current?.(next);
+  }, []);
+
+  const clearHoldTimer = React.useCallback(() => {
+    if (holdTimerRef.current == null) return;
+    clearTimeout(holdTimerRef.current);
+    holdTimerRef.current = null;
   }, []);
 
   const retract = React.useCallback(() => {
@@ -67,6 +77,7 @@ export function HoldToEndButton({ disabled, ending, onEnd, onHoldChange }: HoldT
   }, [progress]);
 
   const finish = React.useCallback(() => {
+    clearHoldTimer();
     if (completeRef.current || disabledRef.current) return;
     completeRef.current = true;
     setComplete(true);
@@ -74,7 +85,14 @@ export function HoldToEndButton({ disabled, ending, onEnd, onHoldChange }: HoldT
     progress.setValue(1);
     setHold(false);
     onEnd();
-  }, [onEnd, progress, setHold]);
+  }, [clearHoldTimer, onEnd, progress, setHold]);
+
+  const handleHoldComplete = React.useCallback(() => {
+    if (cancelledRef.current || !holdingRef.current) return;
+    finish();
+  }, [finish]);
+  const handleHoldCompleteRef = React.useRef(handleHoldComplete);
+  handleHoldCompleteRef.current = handleHoldComplete;
 
   const handlePressIn = React.useCallback(() => {
     if (disabledRef.current || completeRef.current) return;
@@ -86,18 +104,19 @@ export function HoldToEndButton({ disabled, ending, onEnd, onHoldChange }: HoldT
       easing: Easing.linear,
       useNativeDriver: false,
     }).start();
-  }, [progress, setHold]);
+    clearHoldTimer();
+    holdTimerRef.current = setTimeout(() => {
+      holdTimerRef.current = null;
+      handleHoldCompleteRef.current();
+    }, HOLD_TO_END_MS);
+  }, [clearHoldTimer, progress, setHold]);
 
   const handlePressOut = React.useCallback(() => {
+    clearHoldTimer();
     if (completeRef.current) return;
     if (holdingRef.current) retract();
     setHold(false);
-  }, [retract, setHold]);
-
-  const handleLongPress = React.useCallback(() => {
-    if (cancelledRef.current || !holdingRef.current) return;
-    finish();
-  }, [finish]);
+  }, [clearHoldTimer, retract, setHold]);
 
   const handleAccessibilityAction = React.useCallback(
     (e: AccessibilityActionEvent) => {
@@ -112,11 +131,18 @@ export function HoldToEndButton({ disabled, ending, onEnd, onHoldChange }: HoldT
   React.useEffect(() => {
     if (!disabled || !holdingRef.current || completeRef.current) return;
     cancelledRef.current = true;
+    clearHoldTimer();
     retract();
     setHold(false);
-  }, [disabled, retract, setHold]);
+  }, [clearHoldTimer, disabled, retract, setHold]);
 
-  React.useEffect(() => () => progress.stopAnimation(), [progress]);
+  React.useEffect(
+    () => () => {
+      clearHoldTimer();
+      progress.stopAnimation();
+    },
+    [clearHoldTimer, progress],
+  );
 
   const label = complete || ending ? "ENDING" : holding ? "KEEP HOLDING" : "HOLD TO END";
   const dimmed = disabled || complete;
@@ -135,7 +161,7 @@ export function HoldToEndButton({ disabled, ending, onEnd, onHoldChange }: HoldT
       delayLongPress={HOLD_TO_END_MS}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
-      onLongPress={handleLongPress}
+      onLongPress={handleHoldComplete}
       style={{
         flex: 1.4,
         minWidth: 0,

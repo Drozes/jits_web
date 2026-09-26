@@ -29,7 +29,7 @@ function renderButton(props: Partial<React.ComponentProps<typeof HoldToEndButton
 beforeEach(() => jest.useFakeTimers());
 afterEach(() => jest.useRealTimers());
 
-it("uses a 1200 ms long press as the completion trigger", () => {
+it("keeps a 1200 ms long press as a redundant completion trigger", () => {
   const s = renderButton();
   expect(HOLD_TO_END_MS).toBe(1200);
   expect(s.UNSAFE_getByProps({ testID: "live-end", delayLongPress: 1200 })).toBeTruthy();
@@ -53,6 +53,52 @@ it("ends once on a completed hold and reads KEEP HOLDING, then ENDING", () => {
   // A second completion (or action) cannot end it twice.
   fireEvent(s.button(), "accessibilityAction", { nativeEvent: { actionName: "activate" } });
   expect(s.onEnd).toHaveBeenCalledTimes(1);
+});
+
+it("ends from its own 1200 ms timer with no long press event (finger drifted past 10 px)", () => {
+  const s = renderButton();
+  fireEvent(s.button(), "pressIn");
+  // RN would cancel its long press timer on a 10 px drift; the component must not rely on it.
+  fireEvent(s.button(), "responderMove", { nativeEvent: { pageX: 40, pageY: 0 } });
+  act(() => {
+    jest.advanceTimersByTime(HOLD_TO_END_MS - 1);
+  });
+  expect(s.onEnd).not.toHaveBeenCalled();
+  act(() => {
+    jest.advanceTimersByTime(1);
+  });
+  expect(s.onEnd).toHaveBeenCalledTimes(1);
+  expect(s.button()).toHaveTextContent("ENDING");
+  // A late long press after the timer finished cannot end twice.
+  fireEvent(s.button(), "longPress");
+  act(() => {
+    jest.advanceTimersByTime(5_000);
+  });
+  expect(s.onEnd).toHaveBeenCalledTimes(1);
+});
+
+it("a timer hold that becomes disabled under the finger never ends", () => {
+  const s = renderButton();
+  fireEvent(s.button(), "pressIn");
+  act(() => {
+    jest.advanceTimersByTime(600);
+  });
+  s.rerenderWith({ disabled: true });
+  s.rerenderWith({ disabled: false });
+  act(() => {
+    jest.advanceTimersByTime(2_000);
+  });
+  expect(s.onEnd).not.toHaveBeenCalled();
+});
+
+it("unmounting mid hold does not end", () => {
+  const s = renderButton();
+  fireEvent(s.button(), "pressIn");
+  s.unmount();
+  act(() => {
+    jest.advanceTimersByTime(2_000);
+  });
+  expect(s.onEnd).not.toHaveBeenCalled();
 });
 
 it("releasing before 1200 ms does not end, and restores the idle label", () => {

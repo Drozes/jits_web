@@ -1,7 +1,8 @@
 /**
  * Drives the live screen's hold-to-end button through a completed hold:
- * finger down, the 1.2 s long press fires, finger up. The long press is what
- * ends the match; the fill animation is only a readout.
+ * finger down, the 1.2 s long press fires, finger up. The button's own hold
+ * timer is the primary trigger; the long press is a redundant one that lets
+ * tests complete a hold without advancing timers.
  */
 import { fireEvent } from "@testing-library/react-native";
 
