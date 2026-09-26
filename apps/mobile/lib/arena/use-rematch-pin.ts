@@ -25,6 +25,7 @@ export interface RematchPinInput {
   competitors: ArenaCompetitor[];
   lobbyIds: Set<string>;
   isLoading: boolean;
+  /** A background roster read (`refreshQuietly`): nobody pulled for it. */
   refresh: () => void;
   /** Opponent of the current outgoing challenge, if one was sent. */
   outgoingOpponentId: string | null;

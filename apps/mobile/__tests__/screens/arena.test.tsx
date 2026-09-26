@@ -172,6 +172,7 @@ const mockCancelOutgoing = jest.fn();
 const mockClearCap = jest.fn();
 const mockSetUnavailable = jest.fn();
 let mockIsLive = false;
+let mockInMatch = false;
 let mockChallenge = {
   incoming: null as unknown,
   outgoing: null as unknown,
@@ -181,6 +182,7 @@ let mockChallenge = {
 jest.mock("@/lib/arena/arena-store", () => ({
   useArenaState: () => ({ isLive: mockIsLive, isSaving: false, ...mockChallenge }),
   useIsArenaLive: () => mockIsLive,
+  useIsInArenaMatch: () => mockInMatch,
   arenaActions: {
     toggle: (...a: unknown[]) => mockToggle(...a),
     sendChallenge: (...a: unknown[]) => mockSendChallenge(...a),
@@ -216,6 +218,7 @@ beforeEach(() => {
   mockLobbyIds = new Set();
   mockIsFocused = true;
   mockIsLive = false;
+  mockInMatch = false;
   mockRoster = {
     competitors: [],
     challengedIds: new Set(),
@@ -509,9 +512,123 @@ describe("Arena screen", () => {
     // stale row has to be corrected by something.
     const { unmount } = render(<ArenaScreen />);
 
-    expect(mockSetUnavailable).toHaveBeenCalledWith(mockRefresh);
+    const handler = mockSetUnavailable.mock.calls[0][0] as (id: string) => void;
+    handler("a-1");
+    expect(mockRefresh).toHaveBeenCalledTimes(1);
+    expect(mockRefreshQuietly).not.toHaveBeenCalled();
     unmount();
     expect(mockSetUnavailable).toHaveBeenLastCalledWith(null);
+  });
+
+  it("re-reads quietly after the stale-challenge sweep (no spinner, no error plate)", () => {
+    // `notifyStaleChallengesCancelled` calls the handler with an empty id:
+    // a background sweep nobody tapped for.
+    render(<ArenaScreen />);
+
+    const handler = mockSetUnavailable.mock.calls[0][0] as (id: string) => void;
+    handler("");
+    expect(mockRefreshQuietly).toHaveBeenCalledTimes(1);
+    expect(mockRefresh).not.toHaveBeenCalled();
+  });
+});
+
+describe("Arena screen: a challenge ending without a match (Pending tag)", () => {
+  const OUT = { challengeId: "c-1", opponentId: "a-1", opponentName: "Alpha" };
+  const IN = {
+    challengeId: "c-2",
+    challengerId: "a-2",
+    challengerName: "Bravo",
+    challengerElo: 1250,
+    challengerWeight: 180,
+  };
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+    mockIsLive = true;
+    mockRoster.competitors = [competitor({ id: "a-1" })];
+    mockLobbyIds = new Set(["a-1"]);
+  });
+
+  it("quietly re-reads the roster when my outgoing challenge ends", () => {
+    mockChallenge.outgoing = OUT;
+    const { rerender } = render(<ArenaScreen />);
+
+    mockChallenge = { ...mockChallenge, outgoing: null };
+    rerender(<ArenaScreen />);
+    act(() => {
+      jest.advanceTimersByTime(1_000);
+    });
+
+    expect(mockRefreshQuietly).toHaveBeenCalledTimes(1);
+    expect(mockRefresh).not.toHaveBeenCalled();
+  });
+
+  it("quietly re-reads the roster when an incoming challenge ends", () => {
+    mockChallenge.incoming = IN;
+    const { rerender } = render(<ArenaScreen />);
+
+    mockChallenge = { ...mockChallenge, incoming: null };
+    rerender(<ArenaScreen />);
+    act(() => {
+      jest.advanceTimersByTime(1_000);
+    });
+
+    expect(mockRefreshQuietly).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not read when nothing ended (mount, a challenge going out)", () => {
+    const { rerender } = render(<ArenaScreen />);
+    mockChallenge = { ...mockChallenge, outgoing: OUT };
+    rerender(<ArenaScreen />);
+    act(() => {
+      jest.advanceTimersByTime(1_000);
+    });
+
+    expect(mockRefreshQuietly).not.toHaveBeenCalled();
+  });
+
+  it("skips the read when the challenge ended in a match already mounted", () => {
+    mockChallenge.outgoing = OUT;
+    const { rerender } = render(<ArenaScreen />);
+
+    mockInMatch = true;
+    mockChallenge = { ...mockChallenge, outgoing: null };
+    rerender(<ArenaScreen />);
+    act(() => {
+      jest.advanceTimersByTime(1_000);
+    });
+
+    expect(mockRefreshQuietly).not.toHaveBeenCalled();
+  });
+
+  it("skips the read when the match screen mounts just after the slot clears", () => {
+    // enterMatch clears the slot, then pushes the match screen.
+    mockChallenge.outgoing = OUT;
+    const { rerender } = render(<ArenaScreen />);
+
+    mockChallenge = { ...mockChallenge, outgoing: null };
+    rerender(<ArenaScreen />);
+    mockInMatch = true;
+    rerender(<ArenaScreen />);
+    act(() => {
+      jest.advanceTimersByTime(1_000);
+    });
+
+    expect(mockRefreshQuietly).not.toHaveBeenCalled();
+  });
+
+  it("reads once when both slots clear together", () => {
+    mockChallenge.outgoing = OUT;
+    mockChallenge.incoming = IN;
+    const { rerender } = render(<ArenaScreen />);
+
+    mockChallenge = { ...mockChallenge, outgoing: null, incoming: null };
+    rerender(<ArenaScreen />);
+    act(() => {
+      jest.advanceTimersByTime(1_000);
+    });
+
+    expect(mockRefreshQuietly).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -661,7 +778,9 @@ describe("Arena screen: rematch handoff (jits-00fr)", () => {
 
     const { rerender } = render(<ArenaScreen />);
     rerender(<ArenaScreen />);
-    expect(mockRefresh).toHaveBeenCalledTimes(1);
+    // A background read: no pull spinner, no error plate over a good roster.
+    expect(mockRefreshQuietly).toHaveBeenCalledTimes(1);
+    expect(mockRefresh).not.toHaveBeenCalled();
   });
 
   it("quietly re-reads the roster when someone goes live after it loaded (jits-hlm1.4)", () => {
@@ -721,6 +840,7 @@ describe("Arena screen: rematch handoff (jits-00fr)", () => {
 
     render(<ArenaScreen />);
     expect(mockRefresh).not.toHaveBeenCalled();
+    expect(mockRefreshQuietly).not.toHaveBeenCalled();
   });
 
   it("drops the pin when the tab loses focus", () => {
