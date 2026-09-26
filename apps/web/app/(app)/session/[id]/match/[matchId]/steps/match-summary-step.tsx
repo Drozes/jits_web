@@ -13,6 +13,11 @@ import { settleWithin } from "@jits/shared/hooks/session-match-channel";
 /** How often a confirmer who is waiting on the opponent re-reads the DB. */
 const WAITING_POLL_MS = 5_000;
 
+/** After this athlete has confirmed, how long before they may stop waiting
+ * on an opponent who never confirms (the result and ELO are already final
+ * at record time; the confirmation does not change them). Mirrors mobile. */
+export const LEAVE_AFTER_MS = 20_000;
+
 /**
  * Whether the confirm step is finished, from the DB. `completed` alone is
  * NOT enough: record_match_result sets it at RECORD time, before anyone has
@@ -52,7 +57,10 @@ export function MatchSummaryStep({ onNext, matchId, matchType, currentAthleteId,
   const [myConfirmed, setMyConfirmed] = useState(false);
   const [opponentConfirmed, setOpponentConfirmed] = useState(false);
   const [disputing, setDisputing] = useState(false);
+  const [canLeave, setCanLeave] = useState(false);
   const confirmedRef = useRef(false);
+  // The failed-confirm toast (with Retry); dismissed once this step is done.
+  const retryToastRef = useRef<string | number | null>(null);
   const onNextRaw = useRef(onNext);
   onNextRaw.current = onNext;
   // Several signals can finish this step (broadcasts, the row listener, the
@@ -61,8 +69,14 @@ export function MatchSummaryStep({ onNext, matchId, matchType, currentAthleteId,
   const onNextRef = useRef(() => {
     if (advancedRef.current) return;
     advancedRef.current = true;
+    dismissRetryToast();
     onNextRaw.current();
   });
+  function dismissRetryToast() {
+    if (retryToastRef.current !== null) toast.dismiss(retryToastRef.current);
+    retryToastRef.current = null;
+  }
+  useEffect(() => () => dismissRetryToast(), []);
 
   const supabase = useMemo(() => createClient(), []);
   const sync = useSessionMatchSync({
@@ -127,15 +141,37 @@ export function MatchSummaryStep({ onNext, matchId, matchType, currentAthleteId,
     return () => clearInterval(id);
   }, [myConfirmed, opponentConfirmed, checkDb]);
 
+  // An opponent who closes the app never confirms; do not hold this athlete
+  // on the confirm step forever for a formality.
+  useEffect(() => {
+    if (!myConfirmed || opponentConfirmed) return;
+    const t = setTimeout(() => setCanLeave(true), LEAVE_AFTER_MS);
+    return () => clearTimeout(t);
+  }, [myConfirmed, opponentConfirmed]);
+
   async function handleConfirm() {
-    if (confirmedRef.current) return;
+    if (advancedRef.current || confirmedRef.current) return;
+    dismissRetryToast();
     confirmedRef.current = true;
     setMyConfirmed(true);
     const res = await confirmMatchResult(supabase, matchId);
     if (!res.ok) {
+      // Most often the opponent disputed, or our confirmation landed and
+      // only the response was lost: let the DB decide before erroring.
+      // The UI stays in its confirmed state meanwhile (no flash back to
+      // Confirm/Dispute); checkDb sets the ref again if our row exists.
       confirmedRef.current = false;
+      await checkDb();
+      if (advancedRef.current) return;
+      if (confirmedRef.current) {
+        void sync.broadcastResultConfirmed(currentAthleteId);
+        return;
+      }
       setMyConfirmed(false);
-      toast.error("Failed to confirm result. Please try again.");
+      setCanLeave(false);
+      retryToastRef.current = toast.error("Failed to confirm result. Please try again.", {
+        action: { label: "Retry", onClick: () => void handleConfirm() },
+      });
       return;
     }
     sync.broadcastResultConfirmed(currentAthleteId);
@@ -167,6 +203,11 @@ export function MatchSummaryStep({ onNext, matchId, matchType, currentAthleteId,
       {myConfirmed && !opponentConfirmed && (
         <p className="text-sm text-muted-foreground">Waiting for opponent to confirm...</p>
       )}
+      {myConfirmed && !opponentConfirmed && canLeave && (
+        <button type="button" onClick={() => onNextRef.current()} className="text-xs text-muted-foreground underline hover:text-foreground">
+          Continue without waiting
+        </button>
+      )}
 
       {!myConfirmed && !disputing && (
         <button type="button" onClick={handleDispute} className="text-xs text-muted-foreground underline hover:text-foreground">
@@ -189,7 +230,7 @@ function ResultBanner({ resultData, currentAthleteId, matchType }: { resultData:
       {resultData?.result === "draw" && <p className="text-3xl font-bold text-amber-500">Draw</p>}
       {!resultData && <p className="text-xl font-semibold">Match Complete</p>}
       {matchType === "ranked" && (
-        <p className="text-xs text-muted-foreground">Ranked match. ELO will update on confirmation.</p>
+        <p className="text-xs text-muted-foreground">Ranked. ELO already applied. Disputes are reviewed by an admin.</p>
       )}
     </div>
   );

@@ -30,7 +30,15 @@ vi.mock("@/lib/supabase/client", () => ({
   }),
 }));
 
-vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
+const mockToastError = vi.fn<(...a: unknown[]) => string>(() => "toast-1");
+const mockToastDismiss = vi.fn();
+vi.mock("sonner", () => ({
+  toast: {
+    error: (...a: unknown[]) => mockToastError(...a),
+    dismiss: (...a: unknown[]) => mockToastDismiss(...a),
+    success: vi.fn(),
+  },
+}));
 
 const mockConfirm = vi.fn();
 const mockDispute = vi.fn();
@@ -48,18 +56,19 @@ vi.mock("@jits/shared/api/queries", () => ({
 
 type SyncParams = { onMatchDisputed?: (id: string) => void; onResultConfirmed?: (id: string) => void };
 let syncParams: SyncParams = {};
-const mockBroadcastDisputed = vi.fn(async (_id: string) => "ok");
+const mockBroadcastDisputed = vi.fn<(id: string) => Promise<string>>(async () => "ok");
+const mockBroadcastConfirmed = vi.fn<(id: string) => Promise<string>>(async () => "ok");
 vi.mock("@jits/shared/hooks/use-session-match-sync", () => ({
   useSessionMatchSync: (p: SyncParams) => {
     syncParams = p;
     return {
-      broadcastResultConfirmed: vi.fn(async () => "ok"),
+      broadcastResultConfirmed: mockBroadcastConfirmed,
       broadcastMatchDisputed: mockBroadcastDisputed,
     };
   },
 }));
 
-import { MatchSummaryStep, isConfirmStepDone } from "./match-summary-step";
+import { MatchSummaryStep, isConfirmStepDone, LEAVE_AFTER_MS } from "./match-summary-step";
 
 const ME = "me-1";
 const OPP = "opp-1";
@@ -195,5 +204,158 @@ describe("MatchSummaryStep (web confirm step)", () => {
     await flush();
     expect(mockBroadcastDisputed).toHaveBeenCalledWith(ME);
     expect(onNext).toHaveBeenCalledTimes(1);
+  });
+
+  it("offers 'Continue without waiting' only 20s after confirming, and it advances", async () => {
+    const { onNext, getByText, queryByText } = renderStep();
+    await flush();
+    await act(async () => {
+      fireEvent.click(getByText("Confirm Result"));
+    });
+    await flush();
+    expect(queryByText("Continue without waiting")).toBeNull();
+    await act(async () => {
+      vi.advanceTimersByTime(LEAVE_AFTER_MS - 1);
+    });
+    expect(queryByText("Continue without waiting")).toBeNull();
+    await act(async () => {
+      vi.advanceTimersByTime(1);
+    });
+    await act(async () => {
+      fireEvent.click(getByText("Continue without waiting"));
+    });
+    expect(onNext).toHaveBeenCalledTimes(1);
+  });
+
+  it("a failed confirm advances when the DB shows the match disputed, with no error", async () => {
+    const { onNext, getByText } = renderStep();
+    await flush();
+    mockConfirm.mockResolvedValue({ ok: false, error: { code: "UNKNOWN", message: "x" } });
+    mockDetails.mockResolvedValue({ id: "M1", status: "disputed" });
+    await act(async () => {
+      fireEvent.click(getByText("Confirm Result"));
+    });
+    await flush();
+    expect(onNext).toHaveBeenCalledTimes(1);
+    expect(mockToastError).not.toHaveBeenCalled();
+  });
+
+  it("a failed confirm whose row did land shows the waiting state, with no error", async () => {
+    const { onNext, getByText, queryByText } = renderStep();
+    await flush();
+    mockConfirm.mockResolvedValue({ ok: false, error: { code: "UNKNOWN", message: "x" } });
+    mockConfirmations.mockResolvedValue([ME]);
+    await act(async () => {
+      fireEvent.click(getByText("Confirm Result"));
+    });
+    await flush();
+    getByText("Waiting for opponent to confirm...");
+    expect(queryByText("Confirm Result")).toBeNull();
+    expect(queryByText("Dispute result")).toBeNull();
+    expect(mockToastError).not.toHaveBeenCalled();
+    expect(mockBroadcastConfirmed).toHaveBeenCalledWith(ME);
+    expect(onNext).not.toHaveBeenCalled();
+  });
+
+  it("a failed confirm the DB does not explain shows the error with a retry", async () => {
+    const { onNext, getByText } = renderStep();
+    await flush();
+    mockConfirm.mockResolvedValue({ ok: false, error: { code: "UNKNOWN", message: "x" } });
+    await act(async () => {
+      fireEvent.click(getByText("Confirm Result"));
+    });
+    await flush();
+    expect(onNext).not.toHaveBeenCalled();
+    getByText("Confirm Result");
+    expect(mockToastError).toHaveBeenCalledTimes(1);
+    const opts = mockToastError.mock.calls[0][1] as { action: { label: string; onClick: () => void } };
+    expect(opts.action.label).toBe("Retry");
+    mockConfirm.mockResolvedValue({ ok: true, data: {} });
+    await act(async () => {
+      opts.action.onClick();
+    });
+    await flush();
+    expect(mockConfirm).toHaveBeenCalledTimes(2);
+    expect(mockToastDismiss).toHaveBeenCalledWith("toast-1");
+    getByText("Waiting for opponent to confirm...");
+  });
+
+  it("the Confirm/Dispute buttons do not flash back while a failed confirm re-checks the DB", async () => {
+    const { getByText, queryByText } = renderStep();
+    await flush();
+    mockConfirm.mockResolvedValue({ ok: false, error: { code: "UNKNOWN", message: "x" } });
+    let resolveConfirmations: (v: string[]) => void = () => {};
+    mockConfirmations.mockReturnValue(new Promise<string[]>((r) => { resolveConfirmations = r; }));
+    await act(async () => {
+      fireEvent.click(getByText("Confirm Result"));
+    });
+    await flush();
+    expect(queryByText("Confirm Result")).toBeNull();
+    expect(queryByText("Dispute result")).toBeNull();
+    await act(async () => {
+      resolveConfirmations([]);
+    });
+    await flush();
+    getByText("Confirm Result");
+  });
+
+  it("a retried confirm restarts the 20s leave clock", async () => {
+    const { getByText, queryByText } = renderStep();
+    await flush();
+    let resolveConfirm: (v: unknown) => void = () => {};
+    mockConfirm.mockReturnValueOnce(new Promise((r) => { resolveConfirm = r; }));
+    await act(async () => {
+      fireEvent.click(getByText("Confirm Result"));
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(LEAVE_AFTER_MS);
+    });
+    getByText("Continue without waiting");
+    // The slow confirm finally fails and the DB does not explain it.
+    await act(async () => {
+      resolveConfirm({ ok: false, error: { code: "UNKNOWN", message: "x" } });
+    });
+    await flush();
+    expect(queryByText("Continue without waiting")).toBeNull();
+    await act(async () => {
+      fireEvent.click(getByText("Confirm Result"));
+    });
+    await flush();
+    await act(async () => {
+      vi.advanceTimersByTime(LEAVE_AFTER_MS - 1);
+    });
+    expect(queryByText("Continue without waiting")).toBeNull();
+    await act(async () => {
+      vi.advanceTimersByTime(1);
+    });
+    getByText("Continue without waiting");
+  });
+
+  it("the leave link disappears once the opponent's result_confirmed arrives", async () => {
+    const { getByText, queryByText } = renderStep();
+    await flush();
+    await act(async () => {
+      fireEvent.click(getByText("Confirm Result"));
+    });
+    await flush();
+    await act(async () => {
+      vi.advanceTimersByTime(LEAVE_AFTER_MS);
+    });
+    getByText("Continue without waiting");
+    act(() => syncParams.onResultConfirmed?.(OPP));
+    expect(queryByText("Continue without waiting")).toBeNull();
+  });
+
+  it("dismisses the Retry toast when the step advances", async () => {
+    const { getByText } = renderStep();
+    await flush();
+    mockConfirm.mockResolvedValue({ ok: false, error: { code: "UNKNOWN", message: "x" } });
+    await act(async () => {
+      fireEvent.click(getByText("Confirm Result"));
+    });
+    await flush();
+    expect(mockToastError).toHaveBeenCalledTimes(1);
+    act(() => rowListener.handler?.({ new: { status: "disputed" } }));
+    expect(mockToastDismiss).toHaveBeenCalledWith("toast-1");
   });
 });
