@@ -58,7 +58,7 @@ export const PRACTICE_TIPS: Record<PracticePhase, string | null> = {
   waiting: "Challenge sent. In a real match your opponent gets a prompt and taps Accept.",
   weight: "Check both weights are right. Big weight gaps are factored into real ratings.",
   ready: "Prop your phone so the whole mat is in frame. This practice clip never leaves your phone.",
-  live: "No need to actually roll. Either of you can pause. Tap End Match when someone taps.",
+  live: "No need to actually roll. Either of you can pause. Hold End when someone taps.",
   end: null,
   result:
     "Record how it ended: a submission and winner, or a draw. Real Arena matches are ranked; practice is not.",

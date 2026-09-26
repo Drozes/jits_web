@@ -1,11 +1,12 @@
 import * as React from "react";
-import { View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { useSessionMatchTimer } from "@jits/shared/hooks/use-session-match-timer";
-import { TimerDisplay } from "@/components/match-flow/steps/timer-display";
-import { LiveControls } from "@/components/match-flow/steps/live-controls";
+import { LiveBroadcast } from "@/components/match-flow/live/live-broadcast";
+import { HudTagButton } from "@/components/match-flow/live/hud-tag";
 import { useMatchRecorder } from "@/components/match-flow/match-recorder-context";
 import { matchHaptics } from "@/lib/match-flow/use-haptics";
 import { clampFinishSeconds } from "@/lib/match-flow/clamp-finish-seconds";
+import { toLiveAthlete, type LiveParticipant } from "@/lib/match-flow/live-view-state";
 import { AUTO_END_DELAY_MS } from "@/lib/video/recording-limits";
 import { PRACTICE_BOT_NAME, PRACTICE_DURATION_SECONDS } from "@/lib/practice/constants";
 
@@ -14,8 +15,19 @@ import { PRACTICE_BOT_NAME, PRACTICE_DURATION_SECONDS } from "@/lib/practice/con
  * locally instead of over the match channel. Recording starts on mount (if
  * the camera is allowed) and stops on End Match or when the clock runs out,
  * exactly like a real match. The clip is never uploaded.
+ *
+ * Same live screen as a real match (hold to end included, so this is where
+ * athletes learn it), tagged PRACTICE, with an EXIT pill in the HUD.
  */
-export function PracticeLive({ onEnd }: { onEnd: (finishSeconds: number) => void }) {
+export function PracticeLive({
+  athlete,
+  onEnd,
+  onExit,
+}: {
+  athlete: LiveParticipant;
+  onEnd: (finishSeconds: number) => void;
+  onExit: () => void;
+}) {
   const recorder = useMatchRecorder();
   const [startedAt] = React.useState(() => new Date().toISOString());
   const timer = useSessionMatchTimer({
@@ -27,6 +39,8 @@ export function PracticeLive({ onEnd }: { onEnd: (finishSeconds: number) => void
   const pausedAtRef = React.useRef<number | null>(null);
   const totalPausedRef = React.useRef(0);
   const endedRef = React.useRef(false);
+  // Drives the re-render that shows "ENDING" (the ref alone would not).
+  const [ended, setEnded] = React.useState(false);
   // The clock at the end, read through a ref (clamped on end, like the real live step).
   const elapsedRef = React.useRef(timer.elapsed);
   elapsedRef.current = timer.elapsed;
@@ -45,6 +59,7 @@ export function PracticeLive({ onEnd }: { onEnd: (finishSeconds: number) => void
   const end = React.useCallback(() => {
     if (endedRef.current) return;
     endedRef.current = true;
+    setEnded(true);
     void recorder.stop();
     void matchHaptics.matchEnd();
     onEnd(clampFinishSeconds(elapsedRef.current, PRACTICE_DURATION_SECONDS));
@@ -73,16 +88,30 @@ export function PracticeLive({ onEnd }: { onEnd: (finishSeconds: number) => void
   }, [autoEndDue]);
 
   return (
-    <View className="items-center gap-5 px-1 py-2">
-      <TimerDisplay
+    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+      <LiveBroadcast
+        kindLabel="PRACTICE"
+        practice
+        me={toLiveAthlete(athlete)}
+        opponent={{ name: PRACTICE_BOT_NAME, meta: "NO RATING" }}
+        durationSeconds={PRACTICE_DURATION_SECONDS}
         formatted={timer.formatted}
         remaining={timer.remaining}
         paused={timer.paused}
-        matchType="casual"
-        kindLabel="Practice"
-        opponentName={PRACTICE_BOT_NAME}
+        recorder={recorder}
+        controlsDisabled={ended}
+        endPending={ended}
+        onPauseResume={pauseResume}
+        onEnd={end}
+        hudExtra={
+          <HudTagButton
+            label="EXIT"
+            testID="practice-exit"
+            accessibilityLabel="Exit practice"
+            onPress={onExit}
+          />
+        }
       />
-      <LiveControls paused={timer.paused} disabled={false} onPauseResume={pauseResume} onEnd={end} />
     </View>
   );
 }

@@ -29,6 +29,11 @@ jest.mock("lucide-react-native", () => {
   );
 });
 
+jest.mock("react-native/Libraries/Utilities/useWindowDimensions", () => ({
+  __esModule: true,
+  default: () => ({ width: 390, height: 844, scale: 3, fontScale: 1 }),
+}));
+
 import { CameraOverlay } from "@/components/match-flow/camera-overlay";
 
 function renderOverlay(canAskAgain: boolean) {
@@ -74,5 +79,53 @@ describe("CameraOverlay without permission", () => {
       openSettings.mockRestore();
       openURL.mockRestore();
     }
+  });
+});
+
+describe("CameraOverlay fullscreen (live step)", () => {
+  function renderFull(granted: boolean, recording = true) {
+    return render(
+      <CameraOverlay
+        cameraRef={{ current: null }}
+        permissionGranted={granted}
+        permissionCanAskAgain
+        onRequestPermission={jest.fn()}
+        onCameraReady={jest.fn()}
+        recording={recording}
+        layout="fullscreen"
+      />,
+    );
+  }
+
+  it("draws the camera at the recorded 9:16 aspect, top-aligned, with no REC pill", () => {
+    const screen = renderFull(true);
+    const frame = screen.getByTestId("camera-frame");
+    expect(frame.props.style).toEqual(
+      expect.objectContaining({ position: "absolute", width: 390, left: 0, top: 0 }),
+    );
+    expect(frame.props.style.height).toBeCloseTo(693.33, 2);
+    // The live HUD owns the tally.
+    expect(screen.queryByText("REC")).toBeNull();
+  });
+
+  it("renders only the solid ground without permission (the live screen draws the plate)", () => {
+    const screen = renderFull(false);
+    screen.getByTestId("camera-no-feed-ground");
+    expect(screen.queryByText("Camera access needed")).toBeNull();
+    expect(screen.queryByText("Grant Access")).toBeNull();
+  });
+
+  it("keeps the REC pill in the card layout", () => {
+    const screen = render(
+      <CameraOverlay
+        cameraRef={{ current: null }}
+        permissionGranted
+        permissionCanAskAgain
+        onRequestPermission={jest.fn()}
+        onCameraReady={jest.fn()}
+        recording
+      />,
+    );
+    screen.getByText("REC");
   });
 });

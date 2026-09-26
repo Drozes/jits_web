@@ -65,11 +65,15 @@ export function useLiveControls({ matchId, timer, sync, endedRef, onEnded }: Use
       setBusy("resume");
       const res = await resumeMatch(supabase, matchId);
       setBusy(null);
+      // The match ended while the RPC was in flight (the opponent's
+      // match_ended): apply nothing, broadcast nothing, toast nothing.
+      if (endedRef.current) return;
       if (!res.ok && res.error.code === "MATCH_NOT_PAUSED") {
         // The match is already running (a resume we missed, e.g. the
         // opponent's broadcast was lost). Take the running state from the
         // DB rather than leaving this timer paused behind an error toast.
         const fresh = await getMatchDetails(supabase, matchId);
+        if (endedRef.current) return;
         if (fresh && fresh.status === "in_progress" && !fresh.paused_at) {
           timer.syncFromBroadcast({
             type: "resumed",
@@ -88,6 +92,7 @@ export function useLiveControls({ matchId, timer, sync, endedRef, onEnded }: Use
       setBusy("pause");
       const res = await pauseMatch(supabase, matchId);
       setBusy(null);
+      if (endedRef.current) return;
       if (!res.ok && res.error.code === "MATCH_NOT_IN_PROGRESS") {
         // pause_match maps "already paused" here (as well as a match that is
         // no longer running). Mirror of the resume recovery above: if the DB
@@ -95,6 +100,7 @@ export function useLiveControls({ matchId, timer, sync, endedRef, onEnded }: Use
         // apply it through the tracked timer instead of toasting. No
         // broadcast: the opponent paused it and already knows.
         const fresh = await getMatchDetails(supabase, matchId);
+        if (endedRef.current) return;
         if (fresh && fresh.status === "in_progress" && fresh.paused_at) {
           timer.syncFromBroadcast({ type: "paused", pausedAt: fresh.paused_at });
           return;

@@ -72,6 +72,13 @@ export default function PracticeScreen() {
   useArenaMatchScreen();
   useMatchKeepAwake(phase === "ready" || phase === "live");
 
+  // Live shrinks the content to the viewport with scrolling off. Reset any
+  // offset left from scrolling the ready step (see the match wizard).
+  const scrollRef = React.useRef<ScrollView>(null);
+  React.useEffect(() => {
+    if (phase === "live") scrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, [phase]);
+
   const mark = React.useCallback(
     (event: PracticeMatchEvent) => {
       void markPracticeMatch(supabase, event)
@@ -129,15 +136,25 @@ export default function PracticeScreen() {
 
   const step = stepFor(phase);
   const tip = PRACTICE_TIPS[phase];
+  // Live is full screen over the camera, like a real match. Hidden slots
+  // render null in place so the camera keeps its position in the tree and
+  // is never remounted; the exit moves into the live HUD.
+  const live = phase === "live";
 
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
-      <View className="flex-1 bg-surface">
-        <AppHeader title="Practice Match" back backFallback="/" liveSignal="static" />
+      <View className={live ? "flex-1 bg-black" : "flex-1 bg-surface"}>
+        {live ? null : (
+          <AppHeader title="Practice Match" back backFallback="/" liveSignal="static" />
+        )}
         <ScrollView
-          className="flex-1"
-          contentContainerStyle={{ padding: 16, paddingBottom: 32 + insets.bottom, gap: 16 }}
+          ref={scrollRef}
+          className={live ? "flex-1 bg-black" : "flex-1"}
+          scrollEnabled={!live}
+          contentContainerStyle={
+            live ? { flexGrow: 1 } : { padding: 16, paddingBottom: 32 + insets.bottom, gap: 16 }
+          }
           keyboardShouldPersistTaps="handled"
         >
           <MatchRecorderProvider
@@ -148,17 +165,19 @@ export default function PracticeScreen() {
             upload={false}
           >
             <PracticeClipCustodian />
-            <MetaTag accessibilityLabel="Practice match" testID="practice-tag">
-              Practice
-            </MetaTag>
-            {step ? (
+            {live ? null : (
+              <MetaTag accessibilityLabel="Practice match" testID="practice-tag">
+                Practice
+              </MetaTag>
+            )}
+            {step && !live ? (
               <WizardStepHeader
                 step={step}
                 currentIdx={MATCH_STEPS.indexOf(step)}
                 label={STEP_LABELS[step]}
               />
             ) : null}
-            {tip ? <PracticeTip text={tip} /> : null}
+            {tip && !live ? <PracticeTip text={tip} /> : null}
             <MatchRecorderCamera step={step ?? "wait"} />
             <PracticePhaseView
               state={state}
@@ -168,8 +187,9 @@ export default function PracticeScreen() {
               onArena={() => exitMatchTo(router, ARENA_HREF)}
               onDone={exit}
               onAgain={again}
+              onExit={exit}
             />
-            {phase === "summary" ? null : (
+            {phase === "summary" || live ? null : (
               <PracticeButton
                 testID="practice-exit"
                 label="Exit practice"
