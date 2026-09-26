@@ -56,7 +56,7 @@ const STARTED = "2026-09-26T10:00:00.000Z";
 
 function renderStep() {
   const onNext = vi.fn();
-  render(
+  const view = render(
     <ReadyCheckStep
       onNext={onNext}
       exitHref="/arena"
@@ -68,7 +68,7 @@ function renderStep() {
       isTimekeeper={false}
     />,
   );
-  return onNext;
+  return Object.assign(onNext, { unmount: view.unmount });
 }
 
 async function bothReady() {
@@ -135,6 +135,44 @@ describe("ReadyCheckStep", () => {
     api.getMatchDetails.mockResolvedValue({ status: "in_progress", started_at: STARTED });
     const onNext = renderStep();
     await waitFor(() => expect(onNext).toHaveBeenCalledWith({ startedAt: STARTED }));
+  });
+
+  it("does not poll while its own start call is in flight", async () => {
+    vi.useFakeTimers();
+    try {
+      const onNext = renderStep();
+      await act(async () => {});
+      let resolveStart: (v: unknown) => void = () => {};
+      api.startMatch.mockReturnValue(new Promise((r) => (resolveStart = r)));
+      await bothReady();
+      const polls = api.getMatchDetails.mock.calls.length;
+      api.getMatchDetails.mockResolvedValue({ status: "in_progress", started_at: STARTED });
+
+      await act(async () => {
+        vi.advanceTimersByTime(9_000);
+      });
+      expect(api.getMatchDetails.mock.calls.length).toBe(polls);
+      expect(onNext).not.toHaveBeenCalled();
+
+      // Our own start wins: timer_started goes out before we advance.
+      await act(async () => resolveStart({ ok: true, data: { started_at: STARTED } }));
+      expect(sync.broadcastTimerStarted).toHaveBeenCalledWith(STARTED);
+      expect(onNext).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does nothing after unmount when a late start answer lands", async () => {
+    const onNext = renderStep();
+    let resolveStart: (v: unknown) => void = () => {};
+    api.startMatch.mockReturnValue(new Promise((r) => (resolveStart = r)));
+    await bothReady();
+    onNext.unmount();
+    await act(async () => resolveStart({ ok: false, error: { message: "late" } }));
+    expect(toasts.error).not.toHaveBeenCalled();
+    expect(onNext).not.toHaveBeenCalled();
+    expect(api.getMatchDetails).toHaveBeenCalledTimes(1);
   });
 
   it("exits once on an opponent cancel broadcast", async () => {

@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { act, renderHook } from "@testing-library/react";
-import { CHALLENGE_CAP_MESSAGE, useArenaChallenge } from "./use-arena-challenge";
+import {
+  CHALLENGE_CAP_MESSAGE,
+  CHALLENGE_SEND_FAILED_MESSAGE,
+  opponentLeftMessage,
+  useArenaChallenge,
+} from "./use-arena-challenge";
 
 type Handler = (payload: unknown) => unknown;
 interface FakeChannel {
@@ -17,6 +22,11 @@ const rt = vi.hoisted(() => ({
   removed: [] as FakeChannel[],
   /** Overrides the challenger lookup, e.g. to hold it open. */
   lookup: null as null | (() => Promise<unknown>),
+  /** The opponent row read when an insert is refused. */
+  opponent: { data: { looking_for_ranked: true, status: "active" }, error: null } as {
+    data: null | { looking_for_ranked: boolean; status: string };
+    error: null | { message: string };
+  },
 }));
 
 vi.mock("@/lib/supabase/client", () => ({
@@ -48,6 +58,7 @@ vi.mock("@/lib/supabase/client", () => ({
         eq: () => q,
         single: () =>
           rt.lookup ? rt.lookup() : Promise.resolve({ data: { display_name: "Ana" } }),
+        maybeSingle: () => Promise.resolve(rt.opponent),
       };
       return q;
     },
@@ -104,6 +115,7 @@ beforeEach(() => {
   rt.channels = [];
   rt.removed = [];
   rt.lookup = null;
+  rt.opponent = { data: { looking_for_ranked: true, status: "active" }, error: null };
   vi.clearAllMocks();
   m.acceptChallenge.mockResolvedValue({ ok: true, data: null });
   m.declineChallenge.mockResolvedValue({ ok: true, data: null });
@@ -574,6 +586,31 @@ describe("useArenaChallenge", () => {
       expect(m.createChallenge).toHaveBeenCalledTimes(1);
       expect(toast.error).toHaveBeenCalledWith(CHALLENGE_CAP_MESSAGE);
       expect(result.current.outgoing).toBeNull();
+    });
+
+    it("says who left the Arena when the opponent is not live (not the cap)", async () => {
+      const { result } = mount(true);
+      await flush();
+      m.createChallenge.mockResolvedValue(CAPPED);
+      rt.opponent = { data: { looking_for_ranked: false, status: "active" }, error: null };
+
+      await act(() => result.current.sendChallenge("ana", "Ana"));
+
+      expect(toast.info).toHaveBeenCalledWith(opponentLeftMessage("Ana"));
+      expect(toast.error).not.toHaveBeenCalledWith(CHALLENGE_CAP_MESSAGE);
+      expect(result.current.outgoing).toBeNull();
+    });
+
+    it("does not assert the cap when the opponent row cannot be read", async () => {
+      const { result } = mount(true);
+      await flush();
+      m.createChallenge.mockResolvedValue(CAPPED);
+      rt.opponent = { data: null, error: { message: "rls" } };
+
+      await act(() => result.current.sendChallenge("ana", "Ana"));
+
+      expect(toast.error).toHaveBeenCalledWith(CHALLENGE_SEND_FAILED_MESSAGE);
+      expect(toast.error).not.toHaveBeenCalledWith(CHALLENGE_CAP_MESSAGE);
     });
 
     it("does not sweep for a failure that is not the cap", async () => {

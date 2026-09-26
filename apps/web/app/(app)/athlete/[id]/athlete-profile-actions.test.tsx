@@ -31,7 +31,7 @@ const stats = {
   weight: 170,
 };
 
-function renderActions(pendingChallengeId: string | null = null) {
+function renderActions(pendingChallengeId: string | null = null, competitorInArena = true) {
   return render(
     <AthleteProfileActions
       competitorId="op"
@@ -40,6 +40,7 @@ function renderActions(pendingChallengeId: string | null = null) {
       competitor={{ ...stats, displayName: "Opp" }}
       headToHead={[]}
       pendingChallengeId={pendingChallengeId}
+      competitorInArena={competitorInArena}
     />,
   );
 }
@@ -94,6 +95,22 @@ describe("AthleteProfileActions", () => {
         outgoing: { challengeId: "c1", opponentId: "someone", opponentName: "S" },
       }),
     );
+    expect(screen.getByRole("button", { name: /^challenge$/i })).toBeDisabled();
+  });
+
+  it("disables Send and says why when the opponent is not in the Arena", async () => {
+    renderActions(null, false);
+    fireEvent.click(screen.getByRole("button", { name: /^challenge$/i }));
+    expect(await screen.findByText("Opp isn't in the Arena right now.")).toBeInTheDocument();
+    const send = screen.getByRole("button", { name: /send challenge/i });
+    expect(send).toBeDisabled();
+    fireEvent.click(send);
+    expect(controller.sendChallenge).not.toHaveBeenCalled();
+  });
+
+  it("blocks challenging until the Arena owner has registered", () => {
+    act(() => publishArenaState(IDLE_ARENA_STATE));
+    renderActions();
     expect(screen.getByRole("button", { name: /^challenge$/i })).toBeDisabled();
   });
 

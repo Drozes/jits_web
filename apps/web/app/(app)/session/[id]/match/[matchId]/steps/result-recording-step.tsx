@@ -36,6 +36,10 @@ export function ResultRecordingStep({ onNext, matchId, currentAthleteId, duratio
   const [submissionCode, setSubmissionCode] = useState("");
   const [finishTime, setFinishTime] = useState<number | undefined>();
   const [loading, setLoading] = useState(false);
+  // SubmissionFields remounts empty when the result or winner changes (keyed
+  // by winner), so the time it reported earlier must not ride along with
+  // blank inputs.
+  useEffect(() => { setFinishTime(undefined); }, [result, winnerId]);
   const [remainingLock, setRemainingLock] = useState(isLocked ? 60 : 0);
 
   useEffect(() => {
@@ -127,7 +131,7 @@ export function ResultRecordingStep({ onNext, matchId, currentAthleteId, duratio
       <ResultToggle result={result} onSelect={setResult} />
       {result === "submission" && <WinnerPicker participants={participants} winnerId={winnerId} onSelect={setWinnerId} />}
       {result === "submission" && winnerId && (
-        <SubmissionFields submissionTypes={submissionTypes} submissionCode={submissionCode} durationSeconds={durationSeconds} onSubmissionChange={setSubmissionCode} onFinishTimeChange={setFinishTime} />
+        <SubmissionFields key={winnerId} submissionTypes={submissionTypes} submissionCode={submissionCode} durationSeconds={durationSeconds} onSubmissionChange={setSubmissionCode} onFinishTimeChange={setFinishTime} />
       )}
       {result === "draw" && (
         <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 text-center">

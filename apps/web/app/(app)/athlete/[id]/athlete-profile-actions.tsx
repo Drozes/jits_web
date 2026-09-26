@@ -27,6 +27,9 @@ interface AthleteProfileActionsProps {
   competitor: AthleteStats;
   headToHead: HeadToHeadMatch[];
   pendingChallengeId: string | null;
+  /** The competitor is live in the Arena (`looking_for_ranked`); the
+   * `challenges_insert` RLS refuses a challenge to anyone who is not. */
+  competitorInArena: boolean;
 }
 
 export function AthleteProfileActions({
@@ -36,6 +39,7 @@ export function AthleteProfileActions({
   competitor,
   headToHead,
   pendingChallengeId,
+  competitorInArena,
 }: AthleteProfileActionsProps) {
   const [compareOpen, setCompareOpen] = useState(false);
   const [challengeOpen, setChallengeOpen] = useState(false);
@@ -44,7 +48,9 @@ export function AthleteProfileActions({
   // one-at-a-time rule and shows its waiting state.
   const arena = useArenaState();
   const waitingOnThem = arena.outgoing?.opponentId === competitorId;
-  const challengeBlocked = arena.isBusy || !!arena.outgoing || !!arena.incoming;
+  // Before the Arena owner registers, sending would be a silent no-op.
+  const challengeBlocked =
+    !arena.ready || arena.isBusy || !!arena.outgoing || !!arena.incoming;
 
   return (
     <>
@@ -100,6 +106,7 @@ export function AthleteProfileActions({
           competitorWeight={competitor.weight}
           currentAthleteElo={currentAthlete.elo}
           currentAthleteWeight={currentAthlete.weight}
+          opponentInArena={competitorInArena}
           defaultMatchType={undefined}
           open={challengeOpen}
           onOpenChange={setChallengeOpen}

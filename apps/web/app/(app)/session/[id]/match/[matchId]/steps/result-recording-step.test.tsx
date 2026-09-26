@@ -81,6 +81,16 @@ describe("ResultRecordingStep", () => {
     expect(recordBtn()).toBeEnabled();
   });
 
+  it("drops a finish time entered for a different winner", () => {
+    renderStep();
+    fillSubmission();
+    fireEvent.click(screen.getByText("time-90"));
+    expect(recordBtn()).toBeEnabled();
+    // Switching the winner remounts the fields empty; the old 90 must go too.
+    fireEvent.click(screen.getByRole("button", { name: "Opp" }));
+    expect(recordBtn()).toBeDisabled();
+  });
+
   it("records a submission with its finish time", async () => {
     api.recordMatchResult.mockResolvedValue({ ok: true, data: {} });
     const onNext = renderStep();

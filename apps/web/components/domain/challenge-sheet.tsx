@@ -23,6 +23,8 @@ interface ChallengeSheetProps {
   competitorWeight: number | null;
   currentAthleteElo: number;
   currentAthleteWeight: number | null;
+  /** Opponent is `looking_for_ranked`; otherwise the insert is refused by RLS. */
+  opponentInArena: boolean;
   /** @deprecated All matches are now ranked. Ignored. */
   defaultMatchType?: MatchType;
   open: boolean;
@@ -44,6 +46,7 @@ export function ChallengeSheet({
   competitorWeight,
   currentAthleteElo,
   currentAthleteWeight,
+  opponentInArena,
   open,
   onOpenChange,
 }: ChallengeSheetProps) {
@@ -52,7 +55,10 @@ export function ChallengeSheet({
   const [stakes, setStakes] = useState<EloStakes | null>(null);
   const [canChallenge, setCanChallenge] = useState<boolean | null>(null);
   // One Arena challenge at a time: an open prompt or a sent one blocks this.
-  const arenaBlocked = arena.isBusy || !!arena.outgoing || !!arena.incoming;
+  // Before the owner registers, sending would be a silent no-op.
+  const arenaBlocked =
+    !arena.ready || arena.isBusy || !!arena.outgoing || !!arena.incoming;
+  const blocked = arenaBlocked || !opponentInArena;
 
   useEffect(() => {
     if (!open) {
@@ -91,7 +97,7 @@ export function ChallengeSheet({
   }
 
   function handleSubmit() {
-    if (arenaBlocked) return;
+    if (blocked) return;
     // The Arena owner toasts a failure itself; on success its waiting bar
     // (the app-wide overlay) takes over from this sheet.
     void arenaActions.sendChallenge(competitorId, competitorName);
@@ -159,15 +165,19 @@ export function ChallengeSheet({
               </Card>
             )}
 
-            {arenaBlocked && (
+            {!opponentInArena ? (
+              <p className="text-sm text-muted-foreground">
+                {competitorName} isn&apos;t in the Arena right now.
+              </p>
+            ) : arena.ready && arenaBlocked ? (
               <p className="text-sm text-muted-foreground">
                 Finish your current Arena challenge first.
               </p>
-            )}
+            ) : null}
 
             <Button
               onClick={handleSubmit}
-              disabled={arenaBlocked}
+              disabled={blocked}
               className="h-12 text-base mt-1"
             >
               Send Challenge

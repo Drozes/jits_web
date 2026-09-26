@@ -33,6 +33,12 @@ export const CHALLENGE_GONE_MESSAGE = "That challenge is no longer available.";
 export const CHALLENGE_CAP_MESSAGE =
   "You have 3 challenges out. Unanswered challenges clear automatically after 10 minutes, so try again shortly.";
 
+/** Shown when the insert was refused because the opponent is not in the Arena. */
+export const opponentLeftMessage = (name: string) => `${name} just left the Arena.`;
+
+/** Shown when a refused insert cannot be explained. */
+export const CHALLENGE_SEND_FAILED_MESSAGE = "Couldn't send that challenge. Try again.";
+
 /** Broadcast channel shared by both parties to a single Arena challenge. */
 const channelName = (challengeId: string) => `arena-challenge:${challengeId}`;
 
@@ -72,9 +78,11 @@ async function broadcast(
  *  - postgres_changes INSERT on `challenges` filtered to me as opponent, which
  *    raises the incoming prompt, but ONLY while `canReceive` (the athlete is
  *    live and not in a match). There is no column that marks a challenge as
- *    Arena-originated (the profile ChallengeSheet inserts an identical row),
- *    so live-ness is the gate: a non-live athlete's challenges are left for
- *    the regular challenge flow instead of hijacking them into the Arena.
+ *    Arena-originated, so live-ness is the gate: a non-live athlete's
+ *    challenges are left for the regular challenge flow instead of hijacking
+ *    them into the Arena. The profile ChallengeSheet sends through this hook
+ *    too (`arenaActions.sendChallenge`), so its challenger gets the same
+ *    waiting bar and match entry.
  *  - postgres_changes UPDATE on the same filter, which dismisses a prompt once
  *    its row stops being pending (cancelled, expired, answered elsewhere).
  *  - postgres_changes UPDATE filtered to me as challenger, which resolves my
@@ -336,6 +344,39 @@ export function useArenaChallenge({
     }
   }, []);
 
+  /**
+   * Work out what a refused insert means before saying anything (port of
+   * mobile's `explainRefusedInsert`). `mapPostgrestError` maps EVERY 42501 on
+   * this insert to MAX_PENDING_CHALLENGES, but `challenges_insert` also
+   * refuses when the opponent is not `looking_for_ranked`
+   * (`opponent_accepts_match_type`): they left the Arena after the roster
+   * loaded, or were challenged from their profile while not live. The
+   * opponent's row decides; when it cannot be read, the cap is NOT asserted.
+   */
+  const explainRefusedInsert = useCallback(
+    async (
+      supabase: ReturnType<typeof createClient>,
+      opponentId: string,
+      opponentName: string,
+    ) => {
+      const { data, error } = await supabase
+        .from("athletes")
+        .select("looking_for_ranked, status")
+        .eq("id", opponentId)
+        .maybeSingle();
+      if (error || !data) {
+        toast.error(CHALLENGE_SEND_FAILED_MESSAGE);
+        return;
+      }
+      if (data.looking_for_ranked !== true || data.status !== "active") {
+        toast.info(opponentLeftMessage(opponentName));
+        return;
+      }
+      toast.error(CHALLENGE_CAP_MESSAGE);
+    },
+    [],
+  );
+
   const sendChallenge = useCallback(
     (opponentId: string, opponentName: string) =>
       runExclusive(async () => {
@@ -357,16 +398,16 @@ export function useArenaChallenge({
           result = await create();
         }
         if (!result.ok) {
-          toast.error(
-            result.error.code === "MAX_PENDING_CHALLENGES"
-              ? CHALLENGE_CAP_MESSAGE
-              : result.error.message || "Couldn't send that challenge.",
-          );
+          if (result.error.code === "MAX_PENDING_CHALLENGES") {
+            await explainRefusedInsert(supabase, opponentId, opponentName);
+            return;
+          }
+          toast.error(result.error.message || "Couldn't send that challenge.");
           return;
         }
         setOutgoing({ challengeId: result.data.id, opponentId, opponentName });
       }),
-    [athleteWeight, runExclusive, setOutgoing, sweepStale],
+    [athleteWeight, runExclusive, setOutgoing, sweepStale, explainRefusedInsert],
   );
 
   const accept = useCallback(

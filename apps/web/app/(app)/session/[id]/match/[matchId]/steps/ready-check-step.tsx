@@ -35,11 +35,16 @@ export function ReadyCheckStep({ onNext, exitHref, matchId, currentAthleteId, op
    * opponent still moves us on while our own start call is in flight. */
   const advancedRef = useRef(false);
   const cancelledRef = useRef(false);
+  /** Our own start_match call is awaiting its answer. */
+  const startInFlightRef = useRef(false);
+  /** Set on unmount: late awaits must not toast, navigate or advance. */
+  const unmountedRef = useRef(false);
+  useEffect(() => () => { unmountedRef.current = true; }, []);
 
   const supabase = useMemo(() => createClient(), []);
 
   const advance = useCallback((startedAt: string) => {
-    if (advancedRef.current || cancelledRef.current) return;
+    if (advancedRef.current || cancelledRef.current || unmountedRef.current) return;
     advancedRef.current = true;
     startedRef.current = true;
     onNext({ startedAt });
@@ -47,7 +52,7 @@ export function ReadyCheckStep({ onNext, exitHref, matchId, currentAthleteId, op
 
   /** Leave for the exit once: opponent cancel broadcast, or the DB says so. */
   const exitWith = useCallback((message: string) => {
-    if (cancelledRef.current || advancedRef.current) return;
+    if (cancelledRef.current || advancedRef.current || unmountedRef.current) return;
     cancelledRef.current = true;
     toast.info(message);
     router.replace(exitHref);
@@ -74,7 +79,7 @@ export function ReadyCheckStep({ onNext, exitHref, matchId, currentAthleteId, op
    */
   const reconcile = useCallback(async (): Promise<boolean> => {
     const match = await getMatchDetails(supabase, matchId);
-    if (!match) return false;
+    if (unmountedRef.current || !match) return false;
     const reason = exitReasonFor(match.status);
     if (reason) {
       exitWith(MATCH_EXIT_COPY[reason]);
@@ -87,11 +92,20 @@ export function ReadyCheckStep({ onNext, exitHref, matchId, currentAthleteId, op
     return false;
   }, [supabase, matchId, exitWith, advance]);
 
+  // Through a ref so a parent re-render (a new onNext) does not restart the
+  // poll with an extra immediate read.
+  const reconcileRef = useRef(reconcile);
+  reconcileRef.current = reconcile;
   useEffect(() => {
-    void reconcile();
-    const id = setInterval(() => void reconcile(), MATCH_WAIT_POLL_MS);
+    // Skipped while our own start call is in flight: the poll could otherwise
+    // advance (and unmount this step) before our timer_started is broadcast.
+    const tick = () => {
+      if (!startInFlightRef.current) void reconcileRef.current();
+    };
+    tick();
+    const id = setInterval(tick, MATCH_WAIT_POLL_MS);
     return () => clearInterval(id);
-  }, [reconcile]);
+  }, []);
 
   async function handleBothReady() {
     if (startedRef.current || advancedRef.current) return;
@@ -102,8 +116,11 @@ export function ReadyCheckStep({ onNext, exitHref, matchId, currentAthleteId, op
     if (!shouldStart) return;
 
     startedRef.current = true;
+    startInFlightRef.current = true;
     setLoading(true);
     const result = await startMatch(supabase, matchId);
+    startInFlightRef.current = false;
+    if (unmountedRef.current) return;
     if (!result.ok) {
       // start_match only succeeds once (pending -> in_progress). Losing the
       // race is NOT an error: check the DB before surfacing one, or a missed
