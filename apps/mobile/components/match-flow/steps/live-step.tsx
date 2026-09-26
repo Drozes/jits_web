@@ -1,5 +1,5 @@
 import * as React from "react";
-import { View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { useStepMatchSync } from "@/lib/match-flow/match-sync-context";
 import { useSessionMatchTimer } from "@jits/shared/hooks/use-session-match-timer";
 import { useLiveControls } from "@/lib/match-flow/use-live-controls";
@@ -8,14 +8,30 @@ import { matchHaptics } from "@/lib/match-flow/use-haptics";
 import { clampFinishSeconds } from "@/lib/match-flow/clamp-finish-seconds";
 import type { UseVideoRecorderReturn } from "@/lib/video/use-video-recorder";
 import { AUTO_END_DELAY_MS } from "@/lib/video/recording-limits";
-import { TimerDisplay } from "./timer-display";
-import { LiveControls } from "./live-controls";
+import {
+  OPPONENT_ENDED_INTERSTITIAL_MS,
+  formatAthleteMeta,
+} from "@/lib/match-flow/live-view-state";
+import { LiveBroadcast, type LiveAthlete } from "../live/live-broadcast";
+
+/** The participant fields the live screen shows. */
+export interface LiveParticipant {
+  display_name: string;
+  current_elo: number | null;
+  current_weight: number | null;
+}
+
+function toLiveAthlete(p: LiveParticipant): LiveAthlete {
+  return { name: p.display_name, meta: formatAthleteMeta(p.current_elo, p.current_weight) };
+}
 
 interface LiveStepProps {
   matchId: string;
   matchType: "ranked" | "casual";
-  /** Named under the clock so the athletes know who they are rolling with. */
-  opponentName?: string | null;
+  /** This device's athlete (left on the athlete bar). */
+  me: LiveParticipant;
+  /** The opponent (right on the athlete bar, and named if they end it). */
+  opponent: LiveParticipant;
   durationSeconds: number;
   startedAt: string;
   pausedAt: string | null;
@@ -38,7 +54,7 @@ interface LiveStepProps {
 const TIME_WARNING_SECONDS = 10;
 
 /**
- * Step 4: live timer with pause / resume / end controls. Auto-starts the
+ * Step 4: live timer with pause / resume / hold-to-end controls. Auto-starts the
  * wizard's recorder on entry and stops it on end, and fires haptics on key
  * events (match start, time-warning, match end). The screen wake-lock is
  * held by the wizard across ready AND live, so it is not taken here.
@@ -49,17 +65,19 @@ const TIME_WARNING_SECONDS = 10;
  * this step (jits-2zpe, jits-od3).
  *
  * Recording is best-effort: if the user denies camera access, the match
- * runs as before and the wizard's camera slot explains the fallback.
+ * runs as before and the live screen says there is no video.
  *
- * ELO design system: timekeeper-view (D7 wireframe lines 1213-1238).
- * The camera viewfinder sits up top (wizard-level), then the hero mono
- * timer, then pause / end controls.
+ * Layout: the portrait broadcast lower-third (`LiveBroadcast`), drawn over
+ * the full-screen camera the wizard renders underneath. Ending takes a
+ * 1.2 s hold. When the opponent ends the match, their plate shows for
+ * OPPONENT_ENDED_INTERSTITIAL_MS before the END step.
  */
 export function LiveStep(props: LiveStepProps) {
   const {
     matchId,
     matchType,
-    opponentName,
+    me,
+    opponent,
     durationSeconds,
     startedAt,
     pausedAt,
@@ -71,6 +89,25 @@ export function LiveStep(props: LiveStepProps) {
   const startHapticFiredRef = React.useRef(false);
   const warnHapticFiredRef = React.useRef(false);
   const recordingStartedRef = React.useRef(false);
+  const endHapticFiredRef = React.useRef(false);
+  // `endedRef` is the one-shot guard; this state only makes the ended look
+  // (ENDING, dimmed buttons) render, since a ref change alone does not.
+  const [endedView, setEndedView] = React.useState(false);
+  const interstitialTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  // R-P8: set when the opponent's match_ended lands; the clock freezes on it.
+  const [opponentEnded, setOpponentEnded] = React.useState<{
+    name: string;
+    finalFormatted: string;
+  } | null>(null);
+
+  // The final whistle, at most once per mount: a completed hold fires it at
+  // completion, and the end that follows (after the broadcast settles) must
+  // not fire it a second time.
+  const fireEndHaptic = React.useCallback(() => {
+    if (endHapticFiredRef.current) return;
+    endHapticFiredRef.current = true;
+    void matchHaptics.matchEnd();
+  }, []);
 
   // Every pause/resume (tap, broadcast, DB re-read) goes through this timer,
   // which re-applies the DB pause state after a missed broadcast but ignores
@@ -84,26 +121,34 @@ export function LiveStep(props: LiveStepProps) {
   // (above 0, at most the duration: auto-end fires a beat after 00:00).
   const elapsedRef = React.useRef(timer.elapsed);
   elapsedRef.current = timer.elapsed;
+  const formattedRef = React.useRef(timer.formatted);
+  formattedRef.current = timer.formatted;
   const sync = useStepMatchSync({
     matchId,
     onTimerPaused: (p) => timer.syncFromBroadcast({ type: "paused", pausedAt: p }),
     onTimerResumed: (d) =>
       timer.syncFromBroadcast({ type: "resumed", totalPausedDuration: d }),
+    // The opponent ended it. Read the finish and stop the recorder NOW,
+    // then hold the "opponent ended" plate briefly before the END step.
     onMatchEnded: () => {
       if (endedRef.current) return;
       endedRef.current = true;
+      const finish = clampFinishSeconds(elapsedRef.current, durationSeconds);
       void recorder.stop();
-      onEnded(clampFinishSeconds(elapsedRef.current, durationSeconds));
+      fireEndHaptic();
+      setOpponentEnded({ name: opponent.display_name, finalFormatted: formattedRef.current });
+      interstitialTimerRef.current = setTimeout(() => onEnded(finish), OPPONENT_ENDED_INTERSTITIAL_MS);
     },
   });
 
   const wrappedOnEnded = React.useCallback(
     (elapsed: number) => {
       void recorder.stop();
-      void matchHaptics.matchEnd();
+      fireEndHaptic();
+      setEndedView(true);
       onEnded(clampFinishSeconds(elapsed, durationSeconds));
     },
-    [recorder, onEnded, durationSeconds],
+    [recorder, onEnded, durationSeconds, fireEndHaptic],
   );
 
   const { busy, handleEnd, handlePauseResume } = useLiveControls({
@@ -176,20 +221,39 @@ export function LiveStep(props: LiveStepProps) {
     return () => clearTimeout(t);
   }, [autoEndDue]);
 
+  React.useEffect(
+    () => () => {
+      if (interstitialTimerRef.current) clearTimeout(interstitialTimerRef.current);
+    },
+    [],
+  );
+
+  // Hold completed (or a screen reader "End match" action): the haptic
+  // lands at completion, then the same end path as before.
+  const onHoldEnd = React.useCallback(() => {
+    if (endedRef.current || busy !== null) return;
+    fireEndHaptic();
+    setEndedView(true);
+    handleEnd();
+  }, [busy, fireEndHaptic, handleEnd]);
+
+  const ended = endedRef.current || endedView;
   return (
-    <View className="items-center gap-5 px-1 py-2">
-      <TimerDisplay
+    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+      <LiveBroadcast
+        kindLabel={matchType === "ranked" ? "RANKED" : "CASUAL"}
+        me={toLiveAthlete(me)}
+        opponent={toLiveAthlete(opponent)}
+        durationSeconds={durationSeconds}
         formatted={timer.formatted}
         remaining={timer.remaining}
         paused={timer.paused}
-        matchType={matchType}
-        opponentName={opponentName}
-      />
-      <LiveControls
-        paused={timer.paused}
-        disabled={busy !== null || endedRef.current}
+        recorder={recorder}
+        controlsDisabled={busy !== null || ended}
+        endPending={busy === "end" || ended}
         onPauseResume={handlePauseResume}
-        onEnd={handleEnd}
+        onEnd={onHoldEnd}
+        opponentEnded={opponentEnded}
       />
     </View>
   );

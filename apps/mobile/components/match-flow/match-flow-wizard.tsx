@@ -205,15 +205,24 @@ export function MatchFlowWizard({
   const matchType = (match.match_type as "ranked" | "casual") ?? "casual";
   const stepIdx = MATCH_STEPS.indexOf(step);
   const ownOutcome = computeOwnOutcome(me.outcome, resultData, currentAthleteId);
+  // Live is a full-screen broadcast layout over the camera. The ScrollView
+  // and every slot stay in place (hidden slots render null) so the camera
+  // element keeps its position and the capture session is never remounted.
+  const live = step === "live";
 
   return (
     <ScrollView
-      className="flex-1 bg-surface"
-      contentContainerStyle={{
-        padding: 16,
-        paddingBottom: 32 + insets.bottom,
-        gap: 16,
-      }}
+      className={cn("flex-1", live ? "bg-black" : "bg-surface")}
+      scrollEnabled={!live}
+      contentContainerStyle={
+        live
+          ? { flexGrow: 1 }
+          : {
+              padding: 16,
+              paddingBottom: 32 + insets.bottom,
+              gap: 16,
+            }
+      }
       keyboardShouldPersistTaps="handled"
     >
       <MatchRecorderProvider
@@ -223,12 +232,16 @@ export function MatchFlowWizard({
       >
         <MatchSyncProvider value={syncContext}>
           <RecorderStopBridge stopRef={stopRecorderRef} />
-          <WizardStepHeader step={step} currentIdx={stepIdx} label={STEP_LABELS[step]} />
-          <QueueStatusBanner />
+          {live ? null : (
+            <WizardStepHeader step={step} currentIdx={stepIdx} label={STEP_LABELS[step]} />
+          )}
+          {live ? null : <QueueStatusBanner />}
           {/* Above the step, never inside one: the upload begins after the
               live step has already unmounted, so this is the only place its
-              outcome (success, stall or failure) can be seen. jits-od3. */}
-          <MatchRecorderStatus matchId={matchId} />
+              outcome (success, stall or failure) can be seen. jits-od3.
+              Hidden on live only: the live screen shows recorder trouble
+              itself, and the chip is back from the end step on. */}
+          {live ? null : <MatchRecorderStatus matchId={matchId} />}
           <MatchRecorderCamera step={step} />
           <MatchStepRenderer
             step={step}

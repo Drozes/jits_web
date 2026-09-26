@@ -16,6 +16,7 @@
  */
 import * as React from "react";
 import { render, act, fireEvent } from "@testing-library/react-native";
+import { completeHold } from "../../support/complete-hold";
 
 jest.mock("@/lib/supabase/client", () => ({ supabase: {} }));
 
@@ -53,13 +54,17 @@ jest.mock("@jits/shared/hooks/use-session-match-sync", () => ({
 }));
 
 const mockTimeWarning = jest.fn(() => Promise.resolve());
+const mockMatchEnd = jest.fn(() => Promise.resolve());
 jest.mock("@/lib/match-flow/use-keep-awake", () => ({ useMatchKeepAwake: () => {} }));
 jest.mock("@/lib/match-flow/use-haptics", () => ({
   matchHaptics: {
     matchStart: () => Promise.resolve(),
-    matchEnd: () => Promise.resolve(),
+    matchEnd: () => mockMatchEnd(),
     timeWarning: () => mockTimeWarning(),
   },
+}));
+jest.mock("react-native-safe-area-context", () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 jest.mock("@/components/ui/toast", () => ({
   toast: { success: jest.fn(), error: jest.fn(), info: jest.fn() },
@@ -91,6 +96,7 @@ jest.mock("@/components/ui/elo-system", () => {
 
 import { LiveStep } from "@/components/match-flow/steps/live-step";
 import { AUTO_END_DELAY_MS } from "@/lib/video/recording-limits";
+import { OPPONENT_ENDED_INTERSTITIAL_MS } from "@/lib/match-flow/live-view-state";
 import type { UseVideoRecorderReturn } from "@/lib/video/use-video-recorder";
 
 const NOW = new Date("2026-09-26T12:00:00.000Z").getTime();
@@ -98,7 +104,10 @@ const DURATION = 300;
 
 function makeRecorder(granted = false) {
   return {
-    permission: { granted },
+    state: "idle",
+    error: null,
+    requestPermission: jest.fn(() => Promise.resolve()),
+    permission: { granted, canAskAgain: true },
     start: jest.fn(() => Promise.resolve()),
     stop: jest.fn(() => Promise.resolve()),
   } as unknown as UseVideoRecorderReturn & { stop: jest.Mock };
@@ -119,6 +128,8 @@ function renderLive(remainingSeconds: number, pausedForSeconds?: number, granted
     <LiveStep
       matchId="M1"
       matchType="ranked"
+      me={{ display_name: "Kai Reyes", current_elo: 1512, current_weight: 77 }}
+      opponent={{ display_name: "Mina Park", current_elo: 1498, current_weight: 76 }}
       durationSeconds={DURATION}
       startedAt={startedAt}
       pausedAt={pausedAt}
@@ -147,6 +158,7 @@ beforeEach(() => {
   jest.useFakeTimers({ now: NOW });
   mockBroadcastMatchEnded.mockClear();
   mockTimeWarning.mockClear();
+  mockMatchEnd.mockClear();
   mockPauseMatch.mockReset();
   mockResumeMatch.mockReset();
   mockSyncParams.current = null;
@@ -192,16 +204,25 @@ describe("LiveStep auto-end at 00:00 (jits-2y8i)", () => {
     expect(mockBroadcastMatchEnded).not.toHaveBeenCalled();
   });
 
-  it("does not double-fire after a manual END MATCH at 00:00", async () => {
-    const { rerender, onEnded, getByText } = renderLive(0);
+  it("disables the hold at 00:00 (auto-end owns it) and still ends exactly once", async () => {
+    const { rerender, onEnded, getByTestId } = renderLive(0);
 
+    const end = getByTestId("live-end");
+    expect(end).toHaveTextContent("ENDING");
+    expect(end.props.accessibilityState).toEqual(expect.objectContaining({ disabled: true }));
     await act(async () => {
-      fireEvent.press(getByText(/end match/i));
+      completeHold(getByTestId("live-end"));
     });
+    expect(mockBroadcastMatchEnded).not.toHaveBeenCalled();
+    // Pause stays live at time up: it is how the timekeeper holds the end.
+    expect(getByTestId("live-pause-toggle").props.accessibilityState).toEqual(
+      expect.objectContaining({ disabled: false }),
+    );
     await advanceWithRerenders(AUTO_END_DELAY_MS + 5_000, rerender);
 
     expect(mockBroadcastMatchEnded).toHaveBeenCalledTimes(1);
     expect(onEnded).toHaveBeenCalledTimes(1);
+    expect(mockMatchEnd).toHaveBeenCalledTimes(1);
   });
 
   it("holds while paused at 00:00 and re-arms on resume", async () => {
@@ -243,8 +264,8 @@ describe("LiveStep mounted into a paused match", () => {
     const { rerender, onEnded, getByText, queryByText } = renderLive(3, 20);
 
     // Paused on mount: the toggle offers RESUME and the clock is frozen.
-    expect(getByText("Resume")).toBeTruthy();
-    expect(queryByText("Pause")).toBeNull();
+    expect(getByText("RESUME")).toBeTruthy();
+    expect(queryByText("PAUSE")).toBeNull();
     expect(getByText("00:03")).toBeTruthy();
     await advanceWithRerenders(AUTO_END_DELAY_MS + 5_000, rerender);
     expect(getByText("00:03")).toBeTruthy();
@@ -255,11 +276,11 @@ describe("LiveStep mounted into a paused match", () => {
     // Mount-time `now` + 6 s: resume_match adds this pause to the total.
     mockResumeMatch.mockResolvedValue({ ok: true, data: { total_paused_duration: 26 } });
     await act(async () => {
-      fireEvent.press(getByText("Resume"));
+      fireEvent.press(getByText("RESUME"));
     });
     expect(mockResumeMatch).toHaveBeenCalledTimes(1);
     expect(mockPauseMatch).not.toHaveBeenCalled();
-    expect(getByText("Pause")).toBeTruthy();
+    expect(getByText("PAUSE")).toBeTruthy();
 
     expect(mockTimeWarning).toHaveBeenCalledTimes(1);
     await advanceWithRerenders(1_000, rerender);
@@ -316,20 +337,20 @@ describe("LiveStep recorder auto-start", () => {
 });
 
 describe("LiveStep reports the finish time from the match clock", () => {
-  it("END MATCH tap passes the elapsed seconds at the tap", async () => {
+  it("a completed hold passes the elapsed seconds at hold completion", async () => {
     // 300 s bout with 120 s left: 180 s on the clock.
-    const { onEnded, getByText } = renderLive(120);
+    const { onEnded, getByTestId } = renderLive(120);
     await act(async () => {
-      fireEvent.press(getByText(/end match/i));
+      completeHold(getByTestId("live-end"));
     });
     expect(onEnded).toHaveBeenCalledWith(180);
   });
 
   it("is pause-aware: a paused clock reports the paused reading", async () => {
     // Paused 40 s ago with 100 s left: the 40 s of pause do not count.
-    const { onEnded, getByText } = renderLive(100, 40);
+    const { onEnded, getByTestId } = renderLive(100, 40);
     await act(async () => {
-      fireEvent.press(getByText(/end match/i));
+      completeHold(getByTestId("live-end"));
     });
     expect(onEnded).toHaveBeenCalledWith(200);
   });
@@ -347,14 +368,159 @@ describe("LiveStep reports the finish time from the match clock", () => {
     act(() => {
       mockSyncParams.current?.onMatchEnded?.();
     });
+    // The reading is taken at receipt, then the opponent-ended plate shows.
+    await advanceWithRerenders(OPPONENT_ENDED_INTERSTITIAL_MS, rerender);
     expect(onEnded).toHaveBeenCalledWith(55);
   });
 
   it("floors the reading at 1 s when ended right at the start", async () => {
-    const { onEnded, getByText } = renderLive(DURATION);
+    const { onEnded, getByTestId } = renderLive(DURATION);
     await act(async () => {
-      fireEvent.press(getByText(/end match/i));
+      completeHold(getByTestId("live-end"));
     });
     expect(onEnded).toHaveBeenCalledWith(1);
+  });
+});
+
+describe("LiveStep hold to end", () => {
+  it("ends once with one haptic at hold completion, then shows ENDING with both buttons dimmed", async () => {
+    const { onEnded, getByTestId } = renderLive(120);
+
+    await act(async () => {
+      fireEvent(getByTestId("live-end"), "pressIn");
+    });
+    expect(getByTestId("live-end")).toHaveTextContent("KEEP HOLDING");
+    expect(getByTestId("live-strip-hold")).toHaveTextContent(/RELEASE TO CANCEL/);
+    expect(mockMatchEnd).not.toHaveBeenCalled();
+
+    await act(async () => {
+      fireEvent(getByTestId("live-end"), "longPress");
+    });
+    // The haptic lands at completion, before the broadcast settles.
+    expect(mockMatchEnd).toHaveBeenCalledTimes(1);
+    expect(getByTestId("live-end")).toHaveTextContent("ENDING");
+    expect(getByTestId("live-end").props.accessibilityState).toEqual(
+      expect.objectContaining({ disabled: true }),
+    );
+    expect(getByTestId("live-pause-toggle").props.accessibilityState).toEqual(
+      expect.objectContaining({ disabled: true }),
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(mockBroadcastMatchEnded).toHaveBeenCalledTimes(1);
+    expect(onEnded).toHaveBeenCalledTimes(1);
+    expect(onEnded).toHaveBeenCalledWith(180);
+    // No second whistle once the end path runs.
+    expect(mockMatchEnd).toHaveBeenCalledTimes(1);
+  });
+
+  it("releasing early does not end and fires no haptic", async () => {
+    const { onEnded, getByTestId, queryByTestId, rerender } = renderLive(120);
+
+    await act(async () => {
+      fireEvent(getByTestId("live-end"), "pressIn");
+    });
+    await advanceWithRerenders(500, rerender);
+    await act(async () => {
+      fireEvent(getByTestId("live-end"), "pressOut");
+    });
+    await advanceWithRerenders(1_000, rerender);
+
+    expect(onEnded).not.toHaveBeenCalled();
+    expect(mockBroadcastMatchEnded).not.toHaveBeenCalled();
+    expect(mockMatchEnd).not.toHaveBeenCalled();
+    expect(getByTestId("live-end")).toHaveTextContent("HOLD TO END");
+    expect(queryByTestId("live-strip-hold")).toBeNull();
+  });
+
+  it("paused at 00:00, the hold is enabled and a completed hold ends once", async () => {
+    const { onEnded, getByTestId, rerender } = renderLive(0, 10);
+
+    expect(getByTestId("live-strip-paused")).toBeTruthy();
+    expect(getByTestId("live-end")).toHaveTextContent("HOLD TO END");
+    await act(async () => {
+      completeHold(getByTestId("live-end"));
+    });
+    await advanceWithRerenders(AUTO_END_DELAY_MS + 3_000, rerender);
+
+    expect(mockBroadcastMatchEnded).toHaveBeenCalledTimes(1);
+    expect(onEnded).toHaveBeenCalledTimes(1);
+    expect(onEnded).toHaveBeenCalledWith(DURATION);
+    expect(mockMatchEnd).toHaveBeenCalledTimes(1);
+  });
+
+  it("a screen reader 'End match' action ends through the same path", async () => {
+    const { onEnded, getByTestId } = renderLive(120);
+    await act(async () => {
+      fireEvent(getByTestId("live-end"), "accessibilityAction", {
+        nativeEvent: { actionName: "activate" },
+      });
+    });
+    expect(mockBroadcastMatchEnded).toHaveBeenCalledTimes(1);
+    expect(onEnded).toHaveBeenCalledWith(180);
+    expect(mockMatchEnd).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("LiveStep opponent-ended interstitial (R-P8)", () => {
+  it("stops, freezes and shows the plate, then advances after the interstitial with the receipt reading", async () => {
+    const { onEnded, recorder, getByTestId, queryByTestId, getByText, rerender } = renderLive(250, undefined, true);
+    await advanceWithRerenders(5_000, rerender);
+    act(() => {
+      mockSyncParams.current?.onMatchEnded?.();
+    });
+
+    expect(recorder.stop).toHaveBeenCalledTimes(1);
+    expect(mockMatchEnd).toHaveBeenCalledTimes(1);
+    const plate = getByTestId("live-opponent-ended");
+    expect(plate.props.accessibilityRole).toBe("alert");
+    expect(getByText("MATCH OVER")).toBeTruthy();
+    expect(getByText("MINA PARK ENDED THE MATCH")).toBeTruthy();
+    expect(getByText("FINAL CLOCK 04:05 OF 05:00")).toBeTruthy();
+    expect(getByTestId("live-slab-final")).toBeTruthy();
+    expect(getByTestId("live-dim-saving-dim")).toBeTruthy();
+    expect(queryByTestId("live-end")).toBeNull();
+    expect(queryByTestId("live-pause-toggle")).toBeNull();
+    // The recorder double never reached "recording", so nothing is saving.
+    expect(getByTestId("live-tally")).toHaveTextContent("NO VIDEO");
+
+    // The clock is frozen on the plate while real time passes.
+    await advanceWithRerenders(OPPONENT_ENDED_INTERSTITIAL_MS - 250, rerender);
+    expect(getByTestId("live-timer")).toHaveTextContent("04:05");
+    expect(onEnded).not.toHaveBeenCalled();
+
+    await advanceWithRerenders(250, rerender);
+    expect(onEnded).toHaveBeenCalledTimes(1);
+    expect(onEnded).toHaveBeenCalledWith(55);
+  });
+
+  it("ignores a second match_ended and auto-end during the interstitial", async () => {
+    const { onEnded, recorder, rerender } = renderLive(0);
+    act(() => {
+      mockSyncParams.current?.onMatchEnded?.();
+    });
+    act(() => {
+      mockSyncParams.current?.onMatchEnded?.();
+    });
+    await advanceWithRerenders(OPPONENT_ENDED_INTERSTITIAL_MS + AUTO_END_DELAY_MS + 2_000, rerender);
+
+    expect(onEnded).toHaveBeenCalledTimes(1);
+    expect(recorder.stop).toHaveBeenCalledTimes(1);
+    expect(mockBroadcastMatchEnded).not.toHaveBeenCalled();
+    expect(mockMatchEnd).toHaveBeenCalledTimes(1);
+  });
+
+  it("clears the interstitial timeout on unmount", async () => {
+    const { onEnded, unmount } = renderLive(200);
+    act(() => {
+      mockSyncParams.current?.onMatchEnded?.();
+    });
+    unmount();
+    await act(async () => {
+      jest.advanceTimersByTime(OPPONENT_ENDED_INTERSTITIAL_MS * 3);
+    });
+    expect(onEnded).not.toHaveBeenCalled();
   });
 });

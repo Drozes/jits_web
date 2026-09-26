@@ -18,14 +18,17 @@ export function PracticePhaseView({
   onArena,
   onDone,
   onAgain,
+  onExit,
 }: {
   state: PracticeState;
   dispatch: React.Dispatch<PracticeAction>;
-  athlete: Pick<AthleteGuardRow, "id" | "current_elo" | "current_weight">;
+  athlete: Pick<AthleteGuardRow, "id" | "display_name" | "current_elo" | "current_weight">;
   submissionTypes: SubmissionType[];
   onArena: () => void;
   onDone: () => void;
   onAgain: () => void;
+  /** Leave practice (the live screen's EXIT pill). */
+  onExit: () => void;
 }) {
   const { phase } = state;
   const onEnded = React.useCallback(() => dispatch({ type: "ENDED" }), [dispatch]);
@@ -62,7 +65,9 @@ export function PracticePhaseView({
     case "live":
       return (
         <PracticeLive
+          athlete={athlete}
           onEnd={(finishSeconds) => dispatch({ type: "END_MATCH", finishSeconds })}
+          onExit={onExit}
         />
       );
     case "end":

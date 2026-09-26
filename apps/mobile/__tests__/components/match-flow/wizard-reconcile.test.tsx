@@ -183,6 +183,7 @@ function handlerOf(name: string) {
 
 import { MatchFlowWizard } from "@/components/match-flow/match-flow-wizard";
 import { toast } from "@/components/ui/toast";
+import { OPPONENT_ENDED_INTERSTITIAL_MS } from "@/lib/match-flow/live-view-state";
 
 // ---- fixtures ----
 
@@ -276,7 +277,7 @@ async function mountAt(status: string, opts: { outcome?: "win" | "loss" | null }
 describe("foreground re-sync (jits-vh7m, E6)", () => {
   it("moves a backgrounded live athlete to confirm, stopping the recorder first", async () => {
     const screen = await mountAt("in_progress");
-    screen.getByTestId("match-step-live");
+    screen.getByTestId("live-broadcast");
 
     // Opponent ended + recorded while this athlete was away.
     mockGetMatchDetails.mockResolvedValue(row("completed", { outcome: "loss" }));
@@ -295,6 +296,7 @@ describe("missed result_submitted (jits-mzfu, C2)", () => {
   it("the result step's poll moves the athlete to confirm", async () => {
     const screen = await mountAt("in_progress");
     act(() => handlerOf("onMatchEnded")());
+    await tick(OPPONENT_ENDED_INTERSTITIAL_MS); // opponent-ended plate
     await tick(800); // EndStep beat
     screen.getByTestId("match-step-result");
 
@@ -517,7 +519,7 @@ describe("monotonic: a stale read never moves the wizard back", () => {
     const screen = await mountAt("in_progress");
     mockGetMatchDetails.mockResolvedValue(row("pending"));
     await tick(10_000);
-    screen.getByTestId("match-step-live");
+    screen.getByTestId("live-broadcast");
     expect(mockRecorder.stop).not.toHaveBeenCalled();
   });
 });
@@ -584,6 +586,7 @@ describe("a realtime matches UPDATE never skips confirmation", () => {
   it("the recorder's own 'completed' (record -> confirm) does not skip its confirm step", async () => {
     const screen = await mountAt("in_progress");
     act(() => handlerOf("onMatchEnded")());
+    await tick(OPPONENT_ENDED_INTERSTITIAL_MS); // opponent-ended plate
     await tick(800);
     screen.getByTestId("match-step-result");
     // This athlete records; the row flips to completed with no confirmations.
@@ -623,10 +626,11 @@ describe("screen wake-lock spans the camera steps", () => {
 
   it("holds through live and releases once the match has ended", async () => {
     const screen = await mountAt("in_progress");
-    screen.getByTestId("match-step-live");
+    screen.getByTestId("live-broadcast");
     expect(lastKeepAwake()).toBe(true);
 
     act(() => handlerOf("onMatchEnded")());
+    await tick(OPPONENT_ENDED_INTERSTITIAL_MS); // opponent-ended plate
     await tick(800);
     screen.getByTestId("match-step-result");
     expect(lastKeepAwake()).toBe(false);

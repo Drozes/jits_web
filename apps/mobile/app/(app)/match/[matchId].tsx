@@ -63,8 +63,11 @@ export default function ArenaMatchScreen() {
   return (
     <>
       <Stack.Screen options={{ headerShown: false, gestureEnabled: !guarded }} />
-      <View className="flex-1 bg-surface">
-        <AppHeader title="Match" liveSignal="static" />
+      {/* Live is full screen over the camera: no app header, black ground.
+          The header slot stays in place (null) so nothing below it moves in
+          the tree. */}
+      <View className={step === "live" ? "flex-1 bg-black" : "flex-1 bg-surface"}>
+        {step === "live" ? null : <AppHeader title="Match" liveSignal="static" />}
         {/* The wizard derives its own starting step from `matches.status`, so
             backgrounding and reopening mid-match resumes where it left off. */}
         <MatchFlowWizard

@@ -1,9 +1,13 @@
 import * as React from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { CameraView } from "expo-camera";
 import { Camera, CameraOff } from "lucide-react-native";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { cn } from "@/lib/cn";
+import { fitRecordedFrame } from "@/lib/video/recorded-frame";
+
+/** Solid ground behind the live screen when there is no camera feed. */
+const NO_FEED_GROUND = "#0D0F14";
 
 interface CameraOverlayProps {
   cameraRef: React.MutableRefObject<CameraView | null>;
@@ -14,6 +18,14 @@ interface CameraOverlayProps {
    * recordAsync before this throws "Camera is not ready yet". */
   onCameraReady: () => void;
   recording: boolean;
+  /**
+   * `card`: the 16:9 viewfinder card (ready step). `fullscreen`: the live
+   * step, full screen on black at the recorded 9:16 aspect, with the live
+   * chrome drawn over it by the step. The element nesting around
+   * `CameraView` is identical in both, so switching never remounts the
+   * native capture session.
+   */
+  layout?: "card" | "fullscreen";
 }
 
 /**
@@ -42,8 +54,21 @@ export function CameraOverlay({
   onRequestPermission,
   onCameraReady,
   recording,
+  layout = "card",
 }: CameraOverlayProps) {
   const tokens = useThemedTokens();
+  const window = useWindowDimensions();
+  const fullscreen = layout === "fullscreen";
+
+  if (!permissionGranted && fullscreen) {
+    // The live screen draws the no-video plate and the Allow Camera action.
+    return (
+      <View
+        testID="camera-no-feed-ground"
+        style={[StyleSheet.absoluteFill, { backgroundColor: NO_FEED_GROUND }]}
+      />
+    );
+  }
 
   if (!permissionGranted) {
     return (
@@ -78,9 +103,23 @@ export function CameraOverlay({
     );
   }
 
+  const frame = fullscreen ? fitRecordedFrame(window.width, window.height) : null;
   return (
-    <View className="w-full overflow-hidden rounded-md border border-hairline-strong bg-black">
-      <View className="aspect-video w-full">
+    <View
+      className={
+        fullscreen ? undefined : "w-full overflow-hidden rounded-md border border-hairline-strong bg-black"
+      }
+      style={fullscreen ? [StyleSheet.absoluteFill, { backgroundColor: "#000000", overflow: "hidden" }] : undefined}
+    >
+      <View
+        testID="camera-frame"
+        className={fullscreen ? undefined : "aspect-video w-full"}
+        style={
+          frame
+            ? { position: "absolute", width: frame.width, height: frame.height, left: frame.left, top: frame.top }
+            : undefined
+        }
+      >
         <CameraView
           ref={cameraRef}
           mode="video"
@@ -89,7 +128,7 @@ export function CameraOverlay({
           videoQuality="720p"
           onCameraReady={onCameraReady}
         />
-        {recording ? (
+        {recording && !fullscreen ? (
           <View className="absolute right-2 top-2 flex-row items-center gap-1.5 rounded-xs bg-black/60 px-2 py-1">
             <View className={cn("h-2 w-2 rounded-full bg-cta")} />
             <Text className="font-mono-bold text-[10px] uppercase tracking-caps-l text-white">

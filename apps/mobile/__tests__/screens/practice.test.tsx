@@ -7,6 +7,7 @@
  */
 import * as React from "react";
 import { act, fireEvent, render } from "@testing-library/react-native";
+import { completeHold } from "../support/complete-hold";
 
 // ---- mocks ----
 
@@ -132,6 +133,8 @@ const mockCamera = {
   recordAsync: jest.fn(),
   stopRecording: jest.fn(),
 };
+/** CameraView mounts and unmounts, to prove ready -> live keeps one session. */
+const mockCameraLife = { mounts: 0, unmounts: 0 };
 jest.mock("expo-camera", () => {
   const R = require("react");
   const RN = require("react-native");
@@ -144,7 +147,13 @@ jest.mock("expo-camera", () => {
             if (ref) ref.current = null;
           };
         }, []);
-        R.useEffect(() => props.onCameraReady?.(), []);
+        R.useEffect(() => {
+          mockCameraLife.mounts += 1;
+          props.onCameraReady?.();
+          return () => {
+            mockCameraLife.unmounts += 1;
+          };
+        }, []);
         return R.createElement(RN.View, { testID: "camera-view" });
       },
     ),
@@ -235,14 +244,14 @@ function toLive(s: Screen) {
   expect(s.getByTestId("match-step-ready")).toBeTruthy();
   fireEvent.press(s.getByTestId("ready-button"));
   advance(BOT_READY_MS);
-  expect(s.getByTestId("match-step-live")).toBeTruthy();
+  expect(s.getByTestId("live-broadcast")).toBeTruthy();
 }
 
-/** Live -> End Match -> end -> result. */
+/** Live -> hold to end -> end -> result. */
 async function toResult(s: Screen) {
   toLive(s);
   await flush();
-  fireEvent.press(s.getByTestId("live-end"));
+  completeHold(s.getByTestId("live-end"));
   await flush();
   expect(s.getByTestId("match-step-end")).toBeTruthy();
   advance(1000);
@@ -409,7 +418,7 @@ describe("PracticeScreen", () => {
     advance(6000); // paused time does not count
     fireEvent.press(s.getByTestId("live-pause-toggle"));
     advance(3000);
-    fireEvent.press(s.getByTestId("live-end"));
+    completeHold(s.getByTestId("live-end"));
     await flush();
     advance(1000);
     expect(s.getByTestId("match-step-result")).toBeTruthy();
@@ -516,16 +525,70 @@ describe("PracticeScreen", () => {
     const s = render(<PracticeScreen />);
     await flush();
     toLive(s);
-    expect(s.getByText("Practice · vs Practice Partner")).toBeTruthy();
-    expect(s.queryByText(/Casual/)).toBeNull();
+    expect(s.getByTestId("live-kind-tag")).toHaveTextContent("PRACTICE");
+    expect(s.getByTestId("live-opponent-name")).toHaveTextContent("PRACTICE PARTNER");
+    expect(s.getByTestId("live-opponent-meta")).toHaveTextContent("NO RATING");
+    expect(s.queryByText(/Casual|CASUAL|RANKED/)).toBeNull();
     await flush();
-    fireEvent.press(s.getByTestId("live-end"));
+    completeHold(s.getByTestId("live-end"));
     await flush();
     advance(1000);
     fireEvent.press(s.getByTestId("result-outcome-draw"));
     fireEvent.press(s.getByTestId("result-record"));
     expect(s.getByText("Practice result")).toBeTruthy();
     expect(s.queryByText("Match Recorded")).toBeNull();
+  });
+
+  it("goes full screen on live: no header, tag, step header or tip, and EXIT in the HUD", async () => {
+    const s = render(<PracticeScreen />);
+    await flush();
+    expect(s.getByText("Practice Match")).toBeTruthy();
+    toLive(s);
+    expect(s.queryByText("Practice Match")).toBeNull();
+    expect(s.queryByLabelText("Practice match")).toBeNull();
+    expect(s.queryByTestId("match-step-live")).toBeNull();
+    expect(s.queryByText(/Hold End when someone taps/)).toBeNull();
+    // The athlete bar: you on the left with your rating and weight.
+    expect(s.getByTestId("live-me-name")).toHaveTextContent("ME");
+    expect(s.getByTestId("live-me-meta")).toHaveTextContent("1000 · 170 KG");
+    const exitPill = s.getByTestId("practice-exit");
+    expect(exitPill).toHaveTextContent("EXIT");
+    expect(s.getByLabelText("Exit practice")).toBeTruthy();
+  });
+
+  it("ends practice only on a completed hold, like a real match", async () => {
+    const s = render(<PracticeScreen />);
+    await flush();
+    toLive(s);
+    await flush();
+    const end = s.getByTestId("live-end");
+    fireEvent.press(end);
+    fireEvent(end, "pressIn");
+    advance(600);
+    fireEvent(end, "pressOut");
+    await flush();
+    expect(s.getByTestId("live-broadcast")).toBeTruthy();
+    expect(s.queryByTestId("match-step-end")).toBeNull();
+    completeHold(s.getByTestId("live-end"));
+    await flush();
+    expect(s.getByTestId("match-step-end")).toBeTruthy();
+  });
+
+  it("keeps one camera from ready through live (no remount on the full-screen switch)", async () => {
+    mockCameraLife.mounts = 0;
+    mockCameraLife.unmounts = 0;
+    const s = render(<PracticeScreen />);
+    await flush();
+    toWeight(s);
+    fireEvent.press(s.getByTestId("weight-confirm"));
+    s.getByTestId("camera-view");
+    expect(mockCameraLife.mounts).toBe(1);
+    fireEvent.press(s.getByTestId("ready-button"));
+    advance(BOT_READY_MS);
+    s.getByTestId("live-broadcast");
+    s.getByTestId("camera-view");
+    expect(mockCameraLife.mounts).toBe(1);
+    expect(mockCameraLife.unmounts).toBe(0);
   });
 
   it("does not blame camera permission when it was granted but no clip came out", async () => {
@@ -555,7 +618,7 @@ describe("PracticeScreen", () => {
     end: async (s) => {
       toLive(s);
       await flush();
-      fireEvent.press(s.getByTestId("live-end"));
+      completeHold(s.getByTestId("live-end"));
       await flush();
     },
     result: toResult,

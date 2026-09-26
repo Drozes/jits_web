@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import type { MatchStep } from "@/lib/match-flow/step-router";
 import { useMatchUpload } from "@/lib/video/match-upload-store";
 import { deriveUploadBannerState } from "@/lib/video/upload-banner-state";
@@ -34,6 +34,10 @@ import { useMatchRecorder } from "./match-recorder-context";
 export function MatchRecorderCamera({ step }: { step: MatchStep }) {
   const recorder = useMatchRecorder();
   const warming = step === "ready";
+  // Live is full screen: the camera fills the screen at the recorded aspect
+  // and the live step draws its chrome over it. Same element either way, so
+  // the ready -> live handoff never remounts the capture session.
+  const fullscreen = step === "live";
   const granted = recorder.permission?.granted ?? false;
   // Held past the live step while an explicit stop is still in flight:
   // tearing the capture session down mid-stop is how a clip ends up
@@ -57,7 +61,10 @@ export function MatchRecorderCamera({ step }: { step: MatchStep }) {
   if (!mounted) return null;
 
   return (
-    <View className="w-full gap-2">
+    <View
+      className={fullscreen ? undefined : "w-full gap-2"}
+      style={fullscreen ? StyleSheet.absoluteFill : undefined}
+    >
       <CameraOverlay
         cameraRef={recorder.cameraRef}
         permissionGranted={granted}
@@ -65,6 +72,7 @@ export function MatchRecorderCamera({ step }: { step: MatchStep }) {
         onRequestPermission={() => void recorder.requestPermission()}
         onCameraReady={recorder.markCameraReady}
         recording={recorder.state === "recording"}
+        layout={fullscreen ? "fullscreen" : "card"}
       />
       {/* Only alongside an actual preview. Under the "camera access
           denied" card it would promise a recording that cannot happen. */}

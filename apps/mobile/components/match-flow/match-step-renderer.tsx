@@ -132,7 +132,8 @@ export function MatchStepRenderer({
       <LiveStep
         matchId={matchId}
         matchType={matchType}
-        opponentName={opponent.display_name}
+        me={me}
+        opponent={opponent}
         durationSeconds={durationSeconds}
         startedAt={startedAt}
         pausedAt={pausedAt}
