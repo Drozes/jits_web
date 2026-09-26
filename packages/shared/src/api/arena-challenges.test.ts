@@ -14,8 +14,10 @@ import {
   cancelChallenge,
   cancelStaleOutgoingChallenges,
   createChallenge,
+  declineOtherPendingChallenges,
   isStaleOutgoingChallenge,
 } from "./mutations";
+import { getChallengeStatus } from "./queries";
 import { ARENA_CHALLENGE_FRESH_MS } from "../constants";
 import type { PendingChallenge } from "../types/composites";
 
@@ -242,5 +244,133 @@ describe("createChallenge", () => {
       ok: true,
       data: { id: "c1", expiresAt: "2026-10-02T12:00:00Z" },
     });
+  });
+});
+
+describe("declineOtherPendingChallenges (three challengers, one target)", () => {
+  function incoming(id: string, challengerId: string): PendingChallenge {
+    return pending(id, 60_000, { challengerId, opponentId: ME });
+  }
+
+  it("declines every other incoming one, each guarded on pending and on me", async () => {
+    const { client, eqs, updates } = mockUpdateClient((id) => ({
+      data: [{ id }],
+      error: null,
+    }));
+    const result = await declineOtherPendingChallenges(client, ME, {
+      keepChallengeId: "entered",
+      now: NOW,
+      incoming: [
+        incoming("entered", "a"),
+        incoming("b1", "b"),
+        incoming("c1", "c"),
+      ],
+    });
+
+    expect(result.ok && result.data.declined.map((c) => c.challengeId)).toEqual([
+      "b1",
+      "c1",
+    ]);
+    expect(updates[0]).toMatchObject({ status: "declined" });
+    expect(eqs).toEqual([
+      [
+        ["id", "b1"],
+        ["opponent_id", ME],
+        ["status", "pending"],
+      ],
+      [
+        ["id", "c1"],
+        ["opponent_id", ME],
+        ["status", "pending"],
+      ],
+    ]);
+  });
+
+  it("hands back, untouched, the ones from the person I am matched with", async () => {
+    const { client, from } = mockUpdateClient((id) => ({ data: [{ id }], error: null }));
+    const result = await declineOtherPendingChallenges(client, ME, {
+      keepChallengeId: "entered",
+      now: NOW,
+      exceptChallengerId: "peer",
+      incoming: [incoming("cross", "peer")],
+    });
+    expect(result).toEqual({
+      ok: true,
+      data: { declined: [], skipped: [incoming("cross", "peer")] },
+    });
+    expect(from).not.toHaveBeenCalled();
+  });
+
+  it("keeps going when one row fails RLS (lapsed server-side) or already moved on", async () => {
+    const { client } = mockUpdateClient((id) =>
+      id === "lapsed"
+        ? { data: null, error: { code: "42501", message: "rls", details: "", hint: "" } }
+        : id === "moved"
+          ? { data: [], error: null }
+          : { data: [{ id }], error: null },
+    );
+    const result = await declineOtherPendingChallenges(client, ME, {
+      keepChallengeId: "entered",
+      now: NOW,
+      incoming: [incoming("lapsed", "x"), incoming("moved", "y"), incoming("ok", "z")],
+    });
+    expect(result.ok && result.data.declined.map((c) => c.challengeId)).toEqual(["ok"]);
+  });
+
+  it("leaves challenges older than the Arena freshness window alone", async () => {
+    const { client } = mockUpdateClient((id) => ({ data: [{ id }], error: null }));
+    const result = await declineOtherPendingChallenges(client, ME, {
+      keepChallengeId: "entered",
+      now: NOW,
+      incoming: [
+        pending("old", ARENA_CHALLENGE_FRESH_MS + 1, { challengerId: "x", opponentId: ME }),
+        pending("fresh", ARENA_CHALLENGE_FRESH_MS - 1, { challengerId: "y", opponentId: ME }),
+      ],
+    });
+    expect(result.ok && result.data.declined.map((c) => c.challengeId)).toEqual(["fresh"]);
+  });
+
+  it("never touches a challenge I SENT", async () => {
+    const { client, from } = mockUpdateClient((id) => ({ data: [{ id }], error: null }));
+    await declineOtherPendingChallenges(client, ME, {
+      keepChallengeId: "entered",
+      now: NOW,
+      incoming: [pending("mine", 60_000, { challengerId: ME, opponentId: "other" })],
+    });
+    expect(from).not.toHaveBeenCalled();
+  });
+});
+
+describe("getChallengeStatus", () => {
+  function selectClient(result: { data: unknown; error: unknown }) {
+    const eq = vi.fn(() => ({ maybeSingle: () => Promise.resolve(result) }));
+    const select = vi.fn(() => ({ eq }));
+    return { client: { from: vi.fn(() => ({ select })) } as never, select, eq };
+  }
+
+  it("returns the row's status", async () => {
+    const { client, eq } = selectClient({
+      data: { status: "started", expires_at: "2026-10-02T12:00:00Z" },
+      error: null,
+    });
+    const result = await getChallengeStatus(client, "c1");
+    expect(eq).toHaveBeenCalledWith("id", "c1");
+    expect(result).toEqual({
+      ok: true,
+      data: { status: "started", expiresAt: "2026-10-02T12:00:00Z" },
+    });
+  });
+
+  it("returns null for a row the caller cannot see", async () => {
+    const { client } = selectClient({ data: null, error: null });
+    expect(await getChallengeStatus(client, "c1")).toEqual({ ok: true, data: null });
+  });
+
+  it("maps a transport error to a failed Result", async () => {
+    const { client } = selectClient({
+      data: null,
+      error: { code: "XX000", message: "boom", details: "", hint: "" },
+    });
+    expect((await getChallengeStatus(client, "c1")).ok).toBe(false);
   });
 });

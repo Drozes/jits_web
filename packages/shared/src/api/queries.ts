@@ -542,6 +542,35 @@ export async function getPendingChallengeBetween(
   return data ? { id: data.id } : null;
 }
 
+/**
+ * One challenge's current status, read fresh.
+ *
+ * For a client that may have missed the realtime UPDATE (suspended app, a
+ * socket that dropped) and needs the truth before acting: the Arena waiting
+ * plate re-reads its challenge on foreground and on (re)subscribe. RLS
+ * (`challenges_select_own`) only shows rows the caller is a party to, so
+ * `data: null` means "not visible", never an error.
+ */
+export async function getChallengeStatus(
+  supabase: Client,
+  challengeId: string,
+): Promise<Result<{ status: string; expiresAt: string | null } | null>> {
+  const { data, error } = await supabase
+    .from("challenges")
+    .select("status, expires_at")
+    .eq("id", challengeId)
+    .maybeSingle();
+
+  if (error) {
+    return { ok: false, error: mapPostgrestError(error) };
+  }
+  if (!data) return { ok: true, data: null };
+  return {
+    ok: true,
+    data: { status: data.status, expiresAt: data.expires_at ?? null },
+  };
+}
+
 /** Get IDs of all athletes who have a pending challenge with this athlete (either direction) */
 export async function getPendingChallengeOpponentIds(
   supabase: Client,

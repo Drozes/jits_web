@@ -23,6 +23,7 @@ jest.mock("@/lib/supabase/client", () => ({ supabase: {} }));
 import {
   PENDING_PROMPT_MAX_AGE_MS,
   isFreshPending,
+  requestPendingChallengeResync,
   usePendingChallengeRecovery,
   type UsePendingChallengeRecoveryArgs,
 } from "@/lib/arena/use-pending-challenge-recovery";
@@ -82,7 +83,7 @@ function mount(over: Partial<UsePendingChallengeRecoveryArgs> = {}) {
 beforeEach(() => {
   jest.clearAllMocks();
   jest.spyOn(Date, "now").mockReturnValue(NOW);
-  mockOffer.mockResolvedValue(true);
+  mockOffer.mockResolvedValue("raised");
   mockSweep.mockResolvedValue({ ok: true, data: { cancelled: [] } });
   reply();
   appStateHandler = null;
@@ -391,20 +392,20 @@ describe("offers skipped by a match (jits-yiwx)", () => {
     reply([pending()]);
     // The offer is still reading the challenger when a match starts, and the
     // hook then skips it.
-    let finishOffer!: (raised: boolean) => void;
+    let finishOffer!: (outcome: string) => void;
     mockOffer.mockImplementationOnce(
-      () => new Promise<boolean>((resolve) => (finishOffer = resolve)),
+      () => new Promise<string>((resolve) => (finishOffer = resolve)),
     );
     const { rerender } = mount();
     await act(flush);
     expect(mockOffer).toHaveBeenCalledTimes(1);
     await act(async () => {
       rerender(baseArgs({ inMatch: true }));
-      finishOffer(false);
+      finishOffer("retry");
       await flush();
     });
 
-    mockOffer.mockResolvedValue(true);
+    mockOffer.mockResolvedValue("raised");
     await act(async () => {
       rerender(baseArgs({ inMatch: false }));
       await flush();
@@ -416,7 +417,7 @@ describe("offers skipped by a match (jits-yiwx)", () => {
 
   it("does not keep re-offering one the hook refused for good (already answered)", async () => {
     reply([pending()]);
-    mockOffer.mockResolvedValue(false);
+    mockOffer.mockResolvedValue("final");
     const { rerender } = mount();
     await act(flush);
 
@@ -466,6 +467,89 @@ describe("offers skipped by a match (jits-yiwx)", () => {
       await flush();
     });
 
+    expect(mockOffer).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("re-reading on request (a prompt cleared, a channel rebuilt)", () => {
+  it("offers the next challenger queued behind a declined prompt", async () => {
+    // Three challengers, one target: B's INSERT landed while A's prompt was
+    // up, so it was never shown. A is declined; the re-read offers B.
+    const lobby = new Set(["rival-a", "rival-b"]);
+    reply([pending({ challengeId: "ch-a", challengerId: "rival-a" })]);
+    const { rerender } = mount({ lobbyIds: lobby });
+    await act(flush);
+    expect(mockOffer).toHaveBeenCalledWith("ch-a", "rival-a");
+
+    // A's prompt is up, then declined.
+    await act(async () => {
+      rerender(baseArgs({ hasIncoming: true, lobbyIds: lobby }));
+      await flush();
+    });
+    reply([pending({ challengeId: "ch-b", challengerId: "rival-b" })]);
+    mockOffer.mockClear();
+    mockGetPending.mockClear();
+    await act(async () => {
+      rerender(baseArgs({ hasIncoming: false, lobbyIds: lobby }));
+      requestPendingChallengeResync();
+      await flush();
+    });
+
+    expect(mockGetPending).toHaveBeenCalledTimes(1);
+    expect(mockOffer).toHaveBeenCalledTimes(1);
+    expect(mockOffer).toHaveBeenCalledWith("ch-b", "rival-b");
+  });
+
+  it("is ignored mid-match (the match exit reads anyway)", async () => {
+    mount({ inMatch: true });
+    await act(flush);
+    mockGetPending.mockClear();
+
+    await act(async () => {
+      requestPendingChallengeResync();
+      await flush();
+    });
+    expect(mockGetPending).not.toHaveBeenCalled();
+  });
+
+  it("stops listening once unmounted", async () => {
+    const { unmount } = mount();
+    await act(flush);
+    unmount();
+    mockGetPending.mockClear();
+
+    requestPendingChallengeResync();
+    await flush();
+    expect(mockGetPending).not.toHaveBeenCalled();
+  });
+});
+
+describe("a retryable skip stays eligible (review item 3)", () => {
+  it("offers again on the next resync after a 'retry' (another prompt was up)", async () => {
+    reply([pending()]);
+    mockOffer.mockResolvedValueOnce("retry");
+    mount();
+    await act(flush);
+    expect(mockOffer).toHaveBeenCalledTimes(1);
+
+    mockOffer.mockResolvedValue("raised");
+    await act(async () => {
+      requestPendingChallengeResync();
+      await flush();
+    });
+    expect(mockOffer).toHaveBeenCalledTimes(2);
+    expect(mockOffer).toHaveBeenLastCalledWith("ch-1", "rival-1");
+  });
+
+  it("never offers again after 'final', even on a resync", async () => {
+    reply([pending()]);
+    mockOffer.mockResolvedValue("final");
+    mount();
+    await act(flush);
+    await act(async () => {
+      requestPendingChallengeResync();
+      await flush();
+    });
     expect(mockOffer).toHaveBeenCalledTimes(1);
   });
 });
