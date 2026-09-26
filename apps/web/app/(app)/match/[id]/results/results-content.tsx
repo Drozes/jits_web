@@ -28,9 +28,13 @@ export async function ResultsContent({
 
   const submissionTypes = await getSubmissionTypes(supabase);
 
-  // Compute elapsed match time from server started_at for auto-fill
+  // Compute elapsed match time from server started_at for auto-fill, capped
+  // at the match length (the BE refuses a finish time past it).
   const elapsedSeconds = match.started_at
-    ? Math.floor((Date.now() - new Date(match.started_at).getTime()) / 1000)
+    ? Math.min(
+        Math.floor((Date.now() - new Date(match.started_at).getTime()) / 1000),
+        match.duration_seconds,
+      )
     : undefined;
 
   return (
@@ -39,6 +43,7 @@ export async function ResultsContent({
       participants={match.participants}
       submissionTypes={submissionTypes}
       elapsedSeconds={elapsedSeconds}
+      durationSeconds={match.duration_seconds}
     />
   );
 }

@@ -1,10 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { createChallenge } from "@jits/shared/api/mutations";
 import { canCreateChallenge } from "@jits/shared/api/queries";
+import { arenaActions, useArenaState } from "@/lib/arena/arena-store";
 import {
   Sheet,
   SheetContent,
@@ -12,11 +11,8 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Swords, TrendingUp, TrendingDown, Minus, Check, AlertCircle, Loader2 } from "lucide-react";
+import { Swords, TrendingUp, TrendingDown, Minus, AlertCircle, Loader2 } from "lucide-react";
 import type { EloStakes } from "@jits/shared/types/composites";
 import { MATCH_TYPE, type MatchType } from "@jits/shared/constants";
 
@@ -27,12 +23,22 @@ interface ChallengeSheetProps {
   competitorWeight: number | null;
   currentAthleteElo: number;
   currentAthleteWeight: number | null;
+  /** Opponent is `looking_for_ranked`; otherwise the insert is refused by RLS. */
+  opponentInArena: boolean;
   /** @deprecated All matches are now ranked. Ignored. */
   defaultMatchType?: MatchType;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
+/**
+ * Challenge from an athlete profile. Sends through the app-wide Arena
+ * handshake (`arenaActions.sendChallenge`, owned by <ArenaBootstrap />), so the
+ * challenger gets the same waiting bar, accept subscription and match entry
+ * as a challenge sent from the Arena. Creating the row directly left a live
+ * opponent who accepted alone in the match. Weight is not entered here: the
+ * Arena sends the athlete's profile weight and the match wizard verifies it.
+ */
 export function ChallengeSheet({
   competitorId,
   competitorName,
@@ -40,18 +46,19 @@ export function ChallengeSheet({
   competitorWeight,
   currentAthleteElo,
   currentAthleteWeight,
+  opponentInArena,
   open,
   onOpenChange,
 }: ChallengeSheetProps) {
-  const router = useRouter();
   const matchType = MATCH_TYPE.RANKED;
-  const [weight, setWeight] = useState(currentAthleteWeight?.toString() ?? "");
+  const arena = useArenaState();
   const [stakes, setStakes] = useState<EloStakes | null>(null);
-  const [weightConfirmed, setWeightConfirmed] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
   const [canChallenge, setCanChallenge] = useState<boolean | null>(null);
+  // One Arena challenge at a time: an open prompt or a sent one blocks this.
+  // Before the owner registers, sending would be a silent no-op.
+  const arenaBlocked =
+    !arena.ready || arena.isBusy || !!arena.outgoing || !!arena.incoming;
+  const blocked = arenaBlocked || !opponentInArena;
 
   useEffect(() => {
     if (!open) {
@@ -85,44 +92,17 @@ export function ChallengeSheet({
   }, [matchType, open, currentAthleteElo, competitorElo, currentAthleteWeight, competitorWeight]);
 
   function resetState() {
-    setWeight(currentAthleteWeight?.toString() ?? "");
     setStakes(null);
-    setWeightConfirmed(false);
-    setError(null);
-    setSuccess(false);
     setCanChallenge(null);
   }
 
-  async function handleSubmit() {
-    const parsedWeight = weight ? parseFloat(weight) : NaN;
-    if (isNaN(parsedWeight) || parsedWeight <= 0 || parsedWeight > 500) {
-      setError("Please enter a valid weight");
-      return;
-    }
-
-    setSubmitting(true);
-    setError(null);
-
-    const supabase = createClient();
-    const result = await createChallenge(supabase, {
-      opponentId: competitorId,
-      matchType,
-      challengerWeight: parsedWeight ?? undefined,
-    });
-
-    setSubmitting(false);
-
-    if (!result.ok) {
-      setError(result.error.message);
-      return;
-    }
-
-    setSuccess(true);
-    setTimeout(() => {
-      onOpenChange(false);
-      resetState();
-      router.refresh();
-    }, 1500);
+  function handleSubmit() {
+    if (blocked) return;
+    // The Arena owner toasts a failure itself; on success its waiting bar
+    // (the app-wide overlay) takes over from this sheet.
+    void arenaActions.sendChallenge(competitorId, competitorName);
+    onOpenChange(false);
+    resetState();
   }
 
   return (
@@ -152,16 +132,6 @@ export function ChallengeSheet({
             <p className="font-semibold">Can&apos;t Challenge</p>
             <p className="text-sm text-muted-foreground text-center">
               You have too many pending challenges or this opponent is currently unavailable.
-            </p>
-          </div>
-        ) : success ? (
-          <div className="flex flex-col items-center gap-3 py-10">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
-              <Check className="h-6 w-6 text-green-600" />
-            </div>
-            <p className="font-semibold">Challenge Sent!</p>
-            <p className="text-sm text-muted-foreground">
-              Waiting for {competitorName} to respond
             </p>
           </div>
         ) : (
@@ -195,46 +165,22 @@ export function ChallengeSheet({
               </Card>
             )}
 
-            {/* Weight */}
-            <div className="flex flex-col gap-3">
-              <Label htmlFor="challenge-weight" className="text-sm font-medium">Your Weight (lbs)</Label>
-              <Input
-                id="challenge-weight"
-                type="number"
-                value={weight}
-                onChange={(e) => { setWeight(e.target.value); setWeightConfirmed(false); }}
-                placeholder="e.g. 155"
-                min={1}
-                max={500}
-                step="0.1"
-                className="h-11"
-              />
-            </div>
-
-            {/* Weight Confirmation */}
-            <div className="flex items-center gap-3">
-              <Checkbox
-                id="confirm-weight"
-                checked={weightConfirmed}
-                onCheckedChange={(checked) => setWeightConfirmed(checked === true)}
-              />
-              <Label htmlFor="confirm-weight" className="text-sm leading-tight">
-                I confirm my weight is accurate
-              </Label>
-            </div>
-
-            {error && (
-              <div className="rounded-lg bg-destructive/10 px-4 py-3">
-                <p className="text-sm text-destructive">{error}</p>
-              </div>
-            )}
+            {!opponentInArena ? (
+              <p className="text-sm text-muted-foreground">
+                {competitorName} isn&apos;t in the Arena right now.
+              </p>
+            ) : arena.ready && arenaBlocked ? (
+              <p className="text-sm text-muted-foreground">
+                Finish your current Arena challenge first.
+              </p>
+            ) : null}
 
             <Button
               onClick={handleSubmit}
-              disabled={submitting || !weight || !weightConfirmed}
+              disabled={blocked}
               className="h-12 text-base mt-1"
             >
-              {submitting ? "Sending..." : "Send Challenge"}
+              Send Challenge
             </Button>
           </div>
         )}

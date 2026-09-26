@@ -119,6 +119,7 @@ export async function AthleteProfileContent({
             }}
             headToHead={headToHeadCompact}
             pendingChallengeId={pendingChallenge?.id ?? null}
+            competitorInArena={competitor.looking_for_ranked === true}
           />
         </div>
 

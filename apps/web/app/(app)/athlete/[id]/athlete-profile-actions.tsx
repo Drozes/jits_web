@@ -8,6 +8,7 @@ import {
   type HeadToHeadMatch,
 } from "@/components/domain/compare-stats-modal";
 import { ChallengeSheet } from "@/components/domain/challenge-sheet";
+import { useArenaState } from "@/lib/arena/arena-store";
 
 interface AthleteStats {
   displayName: string;
@@ -26,6 +27,9 @@ interface AthleteProfileActionsProps {
   competitor: AthleteStats;
   headToHead: HeadToHeadMatch[];
   pendingChallengeId: string | null;
+  /** The competitor is live in the Arena (`looking_for_ranked`); the
+   * `challenges_insert` RLS refuses a challenge to anyone who is not. */
+  competitorInArena: boolean;
 }
 
 export function AthleteProfileActions({
@@ -35,35 +39,49 @@ export function AthleteProfileActions({
   competitor,
   headToHead,
   pendingChallengeId,
+  competitorInArena,
 }: AthleteProfileActionsProps) {
   const [compareOpen, setCompareOpen] = useState(false);
   const [challengeOpen, setChallengeOpen] = useState(false);
   const isSelf = currentAthleteId === competitorId;
+  // The profile challenge rides the Arena handshake, so it shares its
+  // one-at-a-time rule and shows its waiting state.
+  const arena = useArenaState();
+  const waitingOnThem = arena.outgoing?.opponentId === competitorId;
+  // Before the Arena owner registers, sending would be a silent no-op.
+  const challengeBlocked =
+    !arena.ready || arena.isBusy || !!arena.outgoing || !!arena.incoming;
 
   return (
     <>
       <div className="grid grid-cols-2 gap-2">
         {!isSelf ? (
-          pendingChallengeId ? (
+          pendingChallengeId && !waitingOnThem ? (
+            // /athlete/[id]/challenges is a hidden route (redirects to "/");
+            // pending challenges are answered in the Arena.
             <Link
-              href={`/athlete/${competitorId}/challenges`}
+              href="/arena"
               className="font-heading uppercase grid items-center justify-center"
               style={primaryBtnStyle}
             >
               <span className="inline-flex items-center gap-2">
                 <Swords className="h-4 w-4" />
-                View Challenge
+                Open Arena
               </span>
             </Link>
           ) : (
             <button
               type="button"
               onClick={() => setChallengeOpen(true)}
+              disabled={challengeBlocked}
               className="font-heading uppercase inline-flex items-center justify-center gap-2"
-              style={primaryBtnStyle}
+              style={{
+                ...primaryBtnStyle,
+                ...(challengeBlocked ? { opacity: 0.6, cursor: "default" } : null),
+              }}
             >
               <Swords className="h-4 w-4" />
-              Challenge
+              {waitingOnThem ? "Challenge Sent" : "Challenge"}
             </button>
           )
         ) : (
@@ -88,6 +106,7 @@ export function AthleteProfileActions({
           competitorWeight={competitor.weight}
           currentAthleteElo={currentAthlete.elo}
           currentAthleteWeight={currentAthlete.weight}
+          opponentInArena={competitorInArena}
           defaultMatchType={undefined}
           open={challengeOpen}
           onOpenChange={setChallengeOpen}

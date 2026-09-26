@@ -1,13 +1,15 @@
 "use client";
 
-import { useMemo, useState, useRef, useEffect } from "react";
+import { useCallback, useMemo, useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Check, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { cancelSessionMatch, startMatch } from "@jits/shared/api/mutations";
+import { getMatchDetails } from "@jits/shared/api/queries";
 import { useSessionMatchSync } from "@jits/shared/hooks/use-session-match-sync";
+import { MATCH_EXIT_COPY, MATCH_WAIT_POLL_MS, exitReasonFor } from "@/lib/match-flow/match-state";
 
 interface ReadyCheckStepProps {
   onNext: (data: { startedAt: string }) => void;
@@ -27,52 +29,119 @@ export function ReadyCheckStep({ onNext, exitHref, matchId, currentAthleteId, op
   const [opponentReady, setOpponentReady] = useState(false);
   const [loading, setLoading] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  /** A start_match call is in flight (or won). Guards a second call only. */
   const startedRef = useRef(false);
+  /** onNext has fired. Separate from startedRef so timer_started from the
+   * opponent still moves us on while our own start call is in flight. */
+  const advancedRef = useRef(false);
   const cancelledRef = useRef(false);
+  /** Our own start_match call is awaiting its answer. */
+  const startInFlightRef = useRef(false);
+  /** Set on unmount: late awaits must not toast, navigate or advance. Reset
+   * on mount too: Strict Mode (next dev) mounts, cleans up and mounts again,
+   * and a ref left true would make every path bail and hang the wizard. */
+  const unmountedRef = useRef(false);
+  useEffect(() => {
+    unmountedRef.current = false;
+    return () => {
+      unmountedRef.current = true;
+    };
+  }, []);
 
   const supabase = useMemo(() => createClient(), []);
+
+  const advance = useCallback((startedAt: string) => {
+    if (advancedRef.current || cancelledRef.current || unmountedRef.current) return;
+    advancedRef.current = true;
+    startedRef.current = true;
+    onNext({ startedAt });
+  }, [onNext]);
+
+  /** Leave for the exit once: opponent cancel broadcast, or the DB says so. */
+  const exitWith = useCallback((message: string) => {
+    if (cancelledRef.current || advancedRef.current || unmountedRef.current) return;
+    cancelledRef.current = true;
+    toast.info(message);
+    router.replace(exitHref);
+  }, [router, exitHref]);
+
   const sync = useSessionMatchSync({
     supabase,
     matchId,
     onReadySignal: (athleteId) => {
       if (athleteId === opponentId) setOpponentReady(true);
     },
-    onTimerStarted: (startedAt) => {
-      if (!startedRef.current) {
-        startedRef.current = true;
-        onNext({ startedAt });
-      }
-    },
+    onTimerStarted: (startedAt) => advance(startedAt),
     onMatchCancelled: () => {
       // Opponent cancelled: abort and return to the lobby.
-      if (cancelledRef.current || startedRef.current) return;
-      cancelledRef.current = true;
-      toast.info("Match cancelled. Your opponent left the ready check.");
-      router.replace(exitHref);
+      exitWith("Match cancelled. Your opponent left the ready check.");
     },
   });
 
+  /**
+   * The DB is the authority when a broadcast was missed: a cancel sent while
+   * this athlete was still on weight verify (before this step's channel
+   * joined), or a timer_started that never arrived. Mirrors mobile's
+   * reconciler. Resolves true when it moved the wizard.
+   */
+  const reconcile = useCallback(async (): Promise<boolean> => {
+    const match = await getMatchDetails(supabase, matchId);
+    if (unmountedRef.current || !match) return false;
+    const reason = exitReasonFor(match.status);
+    if (reason) {
+      exitWith(MATCH_EXIT_COPY[reason]);
+      return true;
+    }
+    if (match.status === "in_progress" && match.started_at) {
+      advance(match.started_at);
+      return true;
+    }
+    return false;
+  }, [supabase, matchId, exitWith, advance]);
+
+  // Through a ref so a parent re-render (a new onNext) does not restart the
+  // poll with an extra immediate read.
+  const reconcileRef = useRef(reconcile);
+  reconcileRef.current = reconcile;
+  useEffect(() => {
+    // Skipped while our own start call is in flight: the poll could otherwise
+    // advance (and unmount this step) before our timer_started is broadcast.
+    const tick = () => {
+      if (!startInFlightRef.current) void reconcileRef.current();
+    };
+    tick();
+    const id = setInterval(tick, MATCH_WAIT_POLL_MS);
+    return () => clearInterval(id);
+  }, []);
+
   async function handleBothReady() {
-    if (startedRef.current) return;
+    if (startedRef.current || advancedRef.current) return;
     // Only block if there's an actual assigned timekeeper and it's not us.
     // When the match has no timekeeper (session 2-fighter flow), either
-    // fighter can start; start_match is idempotent so the loser's call
-    // returns an error that we swallow, and onTimerStarted from broadcast
-    // moves them forward.
+    // fighter can start and both usually race to start_match.
     const shouldStart = timekeeperEnabled && hasTimekeeper ? isTimekeeper : true;
     if (!shouldStart) return;
 
     startedRef.current = true;
+    startInFlightRef.current = true;
     setLoading(true);
     const result = await startMatch(supabase, matchId);
+    startInFlightRef.current = false;
+    if (unmountedRef.current) return;
     if (!result.ok) {
+      // start_match only succeeds once (pending -> in_progress). Losing the
+      // race is NOT an error: check the DB before surfacing one, or a missed
+      // timer_started strands this side here while the match runs.
+      if (await reconcile()) return;
+      if (advancedRef.current || cancelledRef.current) return;
       startedRef.current = false;
       setLoading(false);
+      toast.error(result.error.message || "Couldn't start the match.");
       return;
     }
     const startedAt = result.data.started_at ?? new Date().toISOString();
     sync.broadcastTimerStarted(startedAt);
-    onNext({ startedAt });
+    advance(startedAt);
   }
 
   function handleReady() {
@@ -81,7 +150,7 @@ export function ReadyCheckStep({ onNext, exitHref, matchId, currentAthleteId, op
   }
 
   async function handleCancel() {
-    if (cancelling || loading || startedRef.current || cancelledRef.current) return;
+    if (cancelling || loading || startedRef.current || advancedRef.current || cancelledRef.current) return;
     if (!window.confirm("Cancel match? Your opponent will be returned to the lobby.")) return;
     cancelledRef.current = true;
     setCancelling(true);

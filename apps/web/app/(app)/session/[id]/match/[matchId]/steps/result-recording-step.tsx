@@ -1,21 +1,26 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useCallback, useMemo, useRef, useState, useEffect } from "react";
 import { Swords, Handshake, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { recordMatchResult } from "@jits/shared/api/mutations";
+import { getMatchDetails } from "@jits/shared/api/queries";
 import { useSessionMatchSync, type BroadcastResult } from "@jits/shared/hooks/use-session-match-sync";
 import { SubmissionFields } from "@/app/(app)/match/[id]/results/submission-fields";
 import { cn } from "@/lib/utils";
+import { canSubmitResult, hasRecordedResult, resultFromMatch } from "@/lib/match-flow/match-state";
 import { toast } from "sonner";
 import type { SubmissionType } from "@jits/shared/types/submission-type";
 
 interface Participant { id: string; displayName: string }
 
 interface ResultRecordingStepProps {
-  onNext: (data: { resultData: BroadcastResult }) => void;
+  onNext: (data: { resultData?: BroadcastResult }) => void;
   matchId: string;
+  currentAthleteId: string;
+  /** Match length; a submission's finish time must fall in 1..duration. */
+  durationSeconds: number;
   participants: Participant[];
   submissionTypes: SubmissionType[];
   timekeeperEnabled: boolean;
@@ -23,7 +28,7 @@ interface ResultRecordingStepProps {
   isTimekeeper: boolean;
 }
 
-export function ResultRecordingStep({ onNext, matchId, participants, submissionTypes, timekeeperEnabled, hasTimekeeper, isTimekeeper }: ResultRecordingStepProps) {
+export function ResultRecordingStep({ onNext, matchId, currentAthleteId, durationSeconds, participants, submissionTypes, timekeeperEnabled, hasTimekeeper, isTimekeeper }: ResultRecordingStepProps) {
   const isLocked = timekeeperEnabled && hasTimekeeper && !isTimekeeper;
   const [unlocked, setUnlocked] = useState(!isLocked);
   const [result, setResult] = useState<"submission" | "draw" | null>(null);
@@ -31,6 +36,10 @@ export function ResultRecordingStep({ onNext, matchId, participants, submissionT
   const [submissionCode, setSubmissionCode] = useState("");
   const [finishTime, setFinishTime] = useState<number | undefined>();
   const [loading, setLoading] = useState(false);
+  // SubmissionFields remounts empty when the result or winner changes (keyed
+  // by winner), so the time it reported earlier must not ride along with
+  // blank inputs.
+  useEffect(() => { setFinishTime(undefined); }, [result, winnerId]);
   const [remainingLock, setRemainingLock] = useState(isLocked ? 60 : 0);
 
   useEffect(() => {
@@ -48,13 +57,40 @@ export function ResultRecordingStep({ onNext, matchId, participants, submissionT
   }, [isLocked]);
 
   const supabase = useMemo(() => createClient(), []);
+  // Broadcast, own record and DB re-read can all land: advance once.
+  const advancedRef = useRef(false);
+  const advance = useCallback((resultData?: BroadcastResult) => {
+    if (advancedRef.current) return;
+    advancedRef.current = true;
+    onNext({ resultData });
+  }, [onNext]);
   const sync = useSessionMatchSync({
     supabase,
     matchId,
-    onResultSubmitted: (r) => onNext({ resultData: r }),
+    onResultSubmitted: (r) => advance(r),
   });
 
-  const canSubmit = result === "draw" || (result === "submission" && winnerId && submissionCode);
+  /**
+   * The DB is the authority when result_submitted was missed (the opponent
+   * recorded first, or this tab was in the background): move on to the
+   * summary instead of offering a form that cannot succeed. Mirrors mobile.
+   */
+  const reconcile = useCallback(async (): Promise<boolean> => {
+    const match = await getMatchDetails(supabase, matchId);
+    if (!match || !hasRecordedResult(match.status)) return false;
+    advance(resultFromMatch(match, currentAthleteId) ?? undefined);
+    return true;
+  }, [supabase, matchId, currentAthleteId, advance]);
+
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void reconcile();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [reconcile]);
+
+  const canSubmit = canSubmitResult({ result, winnerId, submissionCode, finishTime, durationSeconds });
 
   async function handleSubmit() {
     if (!result || !canSubmit) return;
@@ -65,10 +101,17 @@ export function ResultRecordingStep({ onNext, matchId, participants, submissionT
       submissionTypeCode: result === "submission" ? submissionCode : undefined,
       finishTimeSeconds: result === "submission" ? finishTime : undefined,
     });
-    if (!res.ok) { setLoading(false); toast.error("Failed to record result. Please try again."); return; }
-    const broadcast: BroadcastResult = { result, winnerId: winnerId || undefined, submissionCode: submissionCode || undefined, finishTimeSeconds: finishTime };
+    if (!res.ok) {
+      if (await reconcile()) return;
+      setLoading(false);
+      toast.error(res.error.message || "Failed to record result. Please try again.");
+      return;
+    }
+    const broadcast: BroadcastResult = result === "draw"
+      ? { result }
+      : { result, winnerId, submissionCode, finishTimeSeconds: finishTime };
     sync.broadcastResultSubmitted(broadcast);
-    onNext({ resultData: broadcast });
+    advance(broadcast);
   }
 
   if (!unlocked) {
@@ -88,7 +131,7 @@ export function ResultRecordingStep({ onNext, matchId, participants, submissionT
       <ResultToggle result={result} onSelect={setResult} />
       {result === "submission" && <WinnerPicker participants={participants} winnerId={winnerId} onSelect={setWinnerId} />}
       {result === "submission" && winnerId && (
-        <SubmissionFields submissionTypes={submissionTypes} submissionCode={submissionCode} onSubmissionChange={setSubmissionCode} onFinishTimeChange={setFinishTime} />
+        <SubmissionFields key={winnerId} submissionTypes={submissionTypes} submissionCode={submissionCode} durationSeconds={durationSeconds} onSubmissionChange={setSubmissionCode} onFinishTimeChange={setFinishTime} />
       )}
       {result === "draw" && (
         <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 text-center">

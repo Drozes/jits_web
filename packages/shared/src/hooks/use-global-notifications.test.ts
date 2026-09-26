@@ -321,6 +321,56 @@ describe("useGlobalNotifications", () => {
     });
   });
 
+  it("links nowhere on accepted when no buildLobbyHref is given", async () => {
+    renderHook(() => useGlobalNotifications(defaultProps()));
+
+    mockChannels.simulateChange("challenge-updates", "UPDATE", {
+      id: "ch-5",
+      status: "accepted",
+      opponent_id: "opponent-e",
+    });
+
+    await waitFor(() => {
+      expect(notify).toHaveBeenCalledWith(
+        expect.objectContaining({ title: "Challenge Accepted!", href: undefined }),
+      );
+    });
+  });
+
+  it("skips accepted and declined toasts when challengeOutcomeToasts is false", async () => {
+    renderHook(() =>
+      useGlobalNotifications({ ...defaultProps(), challengeOutcomeToasts: false }),
+    );
+
+    mockChannels.simulateChange("challenge-updates", "UPDATE", {
+      id: "ch-6",
+      status: "accepted",
+      opponent_id: "opponent-f",
+    });
+    mockChannels.simulateChange("challenge-updates", "UPDATE", {
+      id: "ch-7",
+      status: "declined",
+      opponent_id: "opponent-f",
+    });
+    // Expired still toasts, which also proves the handlers ran.
+    mockChannels.simulateChange("challenge-updates", "UPDATE", {
+      id: "ch-8",
+      status: "expired",
+      opponent_id: "opponent-f",
+    });
+
+    await waitFor(() => {
+      expect(notify).toHaveBeenCalledWith(
+        expect.objectContaining({ title: "Challenge Expired" }),
+      );
+    });
+    // The mock fires both UPDATE listeners (challenger and opponent filters),
+    // so expired may toast twice; accepted/declined must never appear.
+    const titles = notify.mock.calls.map(([p]) => p.title);
+    expect(titles.length).toBeGreaterThan(0);
+    expect(titles.every((t) => t === "Challenge Expired")).toBe(true);
+  });
+
   it("cleans up both channels on unmount", () => {
     const { unmount } = renderHook(() =>
       useGlobalNotifications(defaultProps()),

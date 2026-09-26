@@ -12,6 +12,7 @@ import { getProfilePhotoUrl, cn } from "@/lib/utils";
 import { getInitials } from "@jits/shared/utils";
 import type { MatchParticipant } from "@jits/shared/api/queries";
 import type { SubmissionType } from "@jits/shared/types/submission-type";
+import { canSubmitResult } from "@/lib/match-flow/match-state";
 import { SubmissionFields } from "./submission-fields";
 
 interface RecordResultFormProps {
@@ -19,6 +20,7 @@ interface RecordResultFormProps {
   participants: MatchParticipant[];
   submissionTypes: SubmissionType[];
   elapsedSeconds?: number;
+  durationSeconds: number;
 }
 
 export function RecordResultForm({
@@ -26,6 +28,7 @@ export function RecordResultForm({
   participants,
   submissionTypes,
   elapsedSeconds,
+  durationSeconds,
 }: RecordResultFormProps) {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
@@ -43,9 +46,15 @@ export function RecordResultForm({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const canSubmit =
-    result === "draw" ||
-    (result === "submission" && winnerId && submissionCode);
+  // Finish time is required for a submission (BE missing_fields /
+  // invalid_finish_time), so the button stays off until it is in range.
+  const canSubmit = canSubmitResult({
+    result,
+    winnerId,
+    submissionCode,
+    finishTime,
+    durationSeconds,
+  });
 
   async function handleSubmit() {
     if (!result || !canSubmit) return;
@@ -92,6 +101,7 @@ export function RecordResultForm({
             submissionTypes={submissionTypes}
             submissionCode={submissionCode}
             defaultElapsedSeconds={elapsedSeconds}
+            durationSeconds={durationSeconds}
             onSubmissionChange={setSubmissionCode}
             onFinishTimeChange={setFinishTime}
           />
