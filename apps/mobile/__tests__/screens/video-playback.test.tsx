@@ -3,18 +3,33 @@ import { act, fireEvent, render, waitFor } from "@testing-library/react-native";
 
 // ---- mocks ----
 
+const mockBack = jest.fn();
+const mockReplace = jest.fn();
+
 jest.mock("expo-router", () => ({
   useLocalSearchParams: () => ({ id: "vid-1" }),
+  useRouter: () => ({ back: mockBack, replace: mockReplace, canGoBack: () => true }),
 }));
+
+/**
+ * The fake player records the props of every mount so a test can fire the
+ * player's own callbacks (onError, onPlaybackStatusUpdate) and see the seek
+ * that follows a silent re-sign.
+ */
+const mockSetPosition = jest.fn(async () => undefined);
+const mockPlayers: Array<Record<string, any>> = [];
 
 jest.mock("expo-av", () => {
   const R = require("react");
   const RN = require("react-native");
-  return {
-    ResizeMode: { CONTAIN: "contain" },
-    Video: ({ source }: { source: { uri: string } }) =>
-      R.createElement(RN.Text, { testID: "video-player" }, source.uri),
-  };
+  const Video = R.forwardRef((props: Record<string, any>, ref: unknown) => {
+    R.useImperativeHandle(ref, () => ({ setPositionAsync: mockSetPosition }));
+    R.useEffect(() => {
+      mockPlayers.push(props);
+    }, []);
+    return R.createElement(RN.Text, { testID: "video-player" }, props.source.uri);
+  });
+  return { ResizeMode: { CONTAIN: "contain" }, Video };
 });
 
 jest.mock("@/lib/supabase/client", () => ({ supabase: {} }));
@@ -35,6 +50,7 @@ jest.mock("@/components/layout/app-header", () => {
 jest.mock("@jits/shared/api/queries", () => ({
   getMatchVideoSignedUrl: jest.fn(),
   getMatchVideoSignedUrlResult: jest.fn(),
+  getMatchVideoPlaybackResult: jest.fn(),
 }));
 
 import MatchVideoScreen from "@/app/(app)/video/[id]";
@@ -42,107 +58,184 @@ import MatchVideoScreen from "@/app/(app)/video/[id]";
 interface QueryMocks {
   getMatchVideoSignedUrl: jest.Mock;
   getMatchVideoSignedUrlResult: jest.Mock;
+  getMatchVideoPlaybackResult: jest.Mock;
 }
 
 function queries() {
   return require("@jits/shared/api/queries") as QueryMocks;
 }
 
+function playable(url: string, posterUrl: string | null = null) {
+  return {
+    ok: true,
+    data: { url, posterUrl, status: "ready", playability: "playable" },
+  };
+}
+
+function lastPlayer() {
+  return mockPlayers[mockPlayers.length - 1];
+}
+
+function stateLabel(utils: ReturnType<typeof render>) {
+  return utils.getByTestId("video-player-state").props.accessibilityLabel;
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
+  mockPlayers.length = 0;
 });
 
 /**
- * "The recording is not there" and "we could not find out" are different
- * statements, and this screen makes one of them to the athlete (jits-icei.5).
- *
- * getMatchVideoSignedUrl collapsed both into null, so a transient PostgREST
- * failure rendered "Video Unavailable" and told an athlete their match video
- * does not exist, with no way to retry. The Result variant separates them.
- *
  * Every failure below is a RESOLVED `{ ok: false }`, never a rejection:
  * supabase-js does not reject, so a mockRejectedValue here would exercise a
- * path production cannot produce.
+ * path production cannot produce (jits-icei.5).
  */
 describe("MatchVideoScreen", () => {
-  it("plays the video when a signed URL comes back", async () => {
-    queries().getMatchVideoSignedUrlResult.mockResolvedValue({
-      ok: true,
-      data: "https://signed.example/v.mp4",
-    });
-
-    const { getByTestId } = render(React.createElement(MatchVideoScreen));
-    await waitFor(() => {
-      expect(getByTestId("video-player")).toBeTruthy();
-    });
-  });
-
-  it("shows the empty state when the read worked and there is no recording", async () => {
-    queries().getMatchVideoSignedUrlResult.mockResolvedValue({
-      ok: true,
-      data: null,
-    });
-
-    const { getByTestId } = render(React.createElement(MatchVideoScreen));
-    await waitFor(() => {
-      expect(getByTestId("video-unavailable")).toBeTruthy();
-    });
-  });
-
-  it("shows a retryable failure, NOT the empty state, when the read fails", async () => {
-    queries().getMatchVideoSignedUrlResult.mockResolvedValue({
-      ok: false,
-      error: { code: "UNKNOWN", message: "connection failure" },
-    });
-
-    const { getByTestId, queryByTestId } = render(
-      React.createElement(MatchVideoScreen),
+  it("plays the signed URL and reports loaded once the player has it", async () => {
+    queries().getMatchVideoPlaybackResult.mockResolvedValue(
+      playable("https://signed.example/v.mp4"),
     );
-    await waitFor(() => {
-      expect(getByTestId("video-load-failed")).toBeTruthy();
+
+    const utils = render(React.createElement(MatchVideoScreen));
+    await waitFor(() => expect(utils.getByTestId("video-player")).toBeTruthy());
+    expect(stateLabel(utils)).toBe("Video state: loading");
+
+    act(() => {
+      lastPlayer().onPlaybackStatusUpdate({ isLoaded: true, positionMillis: 0 });
     });
-    // The distinction is the whole point: a failed read must never claim the
-    // recording does not exist.
-    expect(queryByTestId("video-unavailable")).toBeNull();
+    expect(stateLabel(utils)).toBe("Video state: loaded");
   });
 
-  it("reads through the Result query, not the null-collapsing one", async () => {
-    queries().getMatchVideoSignedUrlResult.mockResolvedValue({
-      ok: true,
-      data: "https://signed.example/v.mp4",
-    });
+  it("reads through the playback Result query, not the older wrappers", async () => {
+    queries().getMatchVideoPlaybackResult.mockResolvedValue(
+      playable("https://signed.example/v.mp4"),
+    );
 
     render(React.createElement(MatchVideoScreen));
     await waitFor(() => {
-      expect(queries().getMatchVideoSignedUrlResult).toHaveBeenCalled();
+      expect(queries().getMatchVideoPlaybackResult).toHaveBeenCalledWith({}, "vid-1");
     });
-    // Reverting to getMatchVideoSignedUrl would restore the bug while every
-    // happy-path assertion kept passing, so guard it explicitly.
     expect(queries().getMatchVideoSignedUrl).not.toHaveBeenCalled();
+    expect(queries().getMatchVideoSignedUrlResult).not.toHaveBeenCalled();
   });
 
-  it("retries the read when the athlete asks", async () => {
-    const mock = queries().getMatchVideoSignedUrlResult;
-    mock.mockResolvedValue({
+  it("passes the signed poster to the player", async () => {
+    queries().getMatchVideoPlaybackResult.mockResolvedValue(
+      playable("https://signed.example/v.mp4", "https://signed.example/p.jpg"),
+    );
+
+    render(React.createElement(MatchVideoScreen));
+    await waitFor(() => expect(mockPlayers.length).toBe(1));
+    expect(lastPlayer().posterSource).toEqual({ uri: "https://signed.example/p.jpg" });
+    expect(lastPlayer().usePoster).toBe(true);
+  });
+
+  it("shows the unavailable state when no row is visible", async () => {
+    queries().getMatchVideoPlaybackResult.mockResolvedValue({ ok: true, data: null });
+
+    const utils = render(React.createElement(MatchVideoScreen));
+    await waitFor(() => expect(utils.getByTestId("video-unavailable")).toBeTruthy());
+    expect(stateLabel(utils)).toBe("Video state: absent");
+    fireEvent.press(utils.getByLabelText("Back"));
+    expect(mockBack).toHaveBeenCalled();
+  });
+
+  it("does not mount the player while the recording is still uploading", async () => {
+    queries().getMatchVideoPlaybackResult.mockResolvedValue({
+      ok: true,
+      data: { url: "https://x/v.mp4", posterUrl: null, status: "uploading", playability: "processing" },
+    });
+
+    const utils = render(React.createElement(MatchVideoScreen));
+    await waitFor(() => expect(utils.getByTestId("video-processing")).toBeTruthy());
+    expect(utils.queryByTestId("video-player")).toBeNull();
+    expect(stateLabel(utils)).toBe("Video state: processing");
+  });
+
+  it("shows file-missing, not the retry panel, when storage has no object", async () => {
+    queries().getMatchVideoPlaybackResult.mockResolvedValue({
+      ok: false,
+      error: { code: "VIDEO_FILE_MISSING", message: "The video file was not found." },
+    });
+
+    const utils = render(React.createElement(MatchVideoScreen));
+    await waitFor(() => expect(utils.getByTestId("video-file-missing")).toBeTruthy());
+    expect(utils.queryByTestId("video-load-failed")).toBeNull();
+    expect(stateLabel(utils)).toBe("Video state: missing");
+  });
+
+  it("shows a retryable failure, NOT the empty state, when the read fails", async () => {
+    queries().getMatchVideoPlaybackResult.mockResolvedValue({
       ok: false,
       error: { code: "UNKNOWN", message: "connection failure" },
     });
 
-    const { getByTestId, getByLabelText } = render(
-      React.createElement(MatchVideoScreen),
-    );
-    await waitFor(() => {
-      expect(getByTestId("video-load-failed")).toBeTruthy();
-    });
+    const utils = render(React.createElement(MatchVideoScreen));
+    await waitFor(() => expect(utils.getByTestId("video-load-failed")).toBeTruthy());
+    expect(utils.queryByTestId("video-unavailable")).toBeNull();
+    expect(stateLabel(utils)).toBe("Video state: error");
+  });
 
-    mock.mockResolvedValue({ ok: true, data: "https://signed.example/v.mp4" });
+  it("retries the read when the athlete asks", async () => {
+    const mock = queries().getMatchVideoPlaybackResult;
+    mock.mockResolvedValue({ ok: false, error: { code: "UNKNOWN", message: "x" } });
+
+    const utils = render(React.createElement(MatchVideoScreen));
+    await waitFor(() => expect(utils.getByTestId("video-load-failed")).toBeTruthy());
+
+    mock.mockResolvedValue(playable("https://signed.example/v.mp4"));
     await act(async () => {
-      fireEvent.press(getByLabelText("Retry loading video"));
+      fireEvent.press(utils.getByLabelText("Retry loading video"));
+    });
+    await waitFor(() => expect(utils.getByTestId("video-player")).toBeTruthy());
+    expect(mock).toHaveBeenCalledTimes(2);
+  });
+
+  it("re-signs once silently on a player error and resumes where it was", async () => {
+    const mock = queries().getMatchVideoPlaybackResult;
+    mock.mockResolvedValueOnce(playable("https://signed.example/old.mp4"));
+    mock.mockResolvedValueOnce(playable("https://signed.example/new.mp4"));
+
+    const utils = render(React.createElement(MatchVideoScreen));
+    await waitFor(() => expect(mockPlayers.length).toBe(1));
+    act(() => {
+      lastPlayer().onPlaybackStatusUpdate({ isLoaded: true, positionMillis: 42_000 });
     });
 
-    await waitFor(() => {
-      expect(getByTestId("video-player")).toBeTruthy();
+    // The 1h URL expires mid-match.
+    await act(async () => {
+      lastPlayer().onError("expired");
     });
+    await waitFor(() => expect(utils.getByText("https://signed.example/new.mp4")).toBeTruthy());
+    expect(utils.queryByTestId("video-load-failed")).toBeNull();
+    expect(mock).toHaveBeenCalledTimes(2);
+
+    act(() => {
+      lastPlayer().onPlaybackStatusUpdate({ isLoaded: true, positionMillis: 0 });
+    });
+    expect(mockSetPosition).toHaveBeenCalledWith(42_000);
+    expect(stateLabel(utils)).toBe("Video state: loaded");
+  });
+
+  it("shows the retry panel on a second consecutive player error", async () => {
+    const mock = queries().getMatchVideoPlaybackResult;
+    mock.mockResolvedValue(playable("https://signed.example/v.mp4"));
+
+    const utils = render(React.createElement(MatchVideoScreen));
+    await waitFor(() => expect(mockPlayers.length).toBe(1));
+
+    await act(async () => {
+      lastPlayer().onError("bad");
+    });
+    await waitFor(() => expect(mockPlayers.length).toBe(2));
+    expect(stateLabel(utils)).toBe("Video state: loading");
+
+    await act(async () => {
+      lastPlayer().onError("bad again");
+    });
+    expect(utils.getByTestId("video-load-failed")).toBeTruthy();
+    expect(stateLabel(utils)).toBe("Video state: error");
+    // One initial sign plus exactly one silent re-sign.
     expect(mock).toHaveBeenCalledTimes(2);
   });
 });

@@ -30,6 +30,9 @@ export default function AppLayout() {
           both parties. Pushes over the tab bar like every other detail
           screen. */}
         <Stack.Screen name="match/[matchId]" />
+        {/* A past match opened from a history row: read-only, never the
+          live wizard, so it leaves live state alone. */}
+        <Stack.Screen name="match-detail/[matchId]" />
         <Stack.Screen name="video/[id]" />
         <Stack.Screen name="settings" />
       </Stack>

@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Mobile: match detail screen + player hardening (jits-5tj9.7)
+
+JS-only, OTA-eligible for runtime 0.3.0 (expo-av and expo-image are already in the build; no native dependency, `app.json` or config change).
+
+**Added**
+- `apps/mobile/app/(app)/match-detail/[matchId].tsx`: pushed "Match" screen for any past match (registered in `apps/mobile/app/(app)/_layout.tsx`). Result plate (WIN / LOSS / DRAW / NO RESULT, signed ELO delta in mono: green only for a gain, red for a loss, amber for a draw; `before → after`; "Casual, unrated" for casual), amber DISPUTED badge and muted VOIDED / CANCELLED chips, date + RANKED/CASUAL + length + how it ended, an opponent row that opens their profile, and one card per recording labelled by angle ("Your recording" / "<Name>'s recording") with poster or placeholder. Only the first watchable card gets the red Watch; processing videos show an amber UPLOADING / PROCESSING chip and a disabled button; failed-status videos keep Watch with a note. Loading skeleton, no-video plate, and not-a-participant / not-found / error-with-retry panels. Pull-to-refresh and a refetch on regaining focus keep the loaded match on screen. It is a plain pushed screen: it never calls `useArenaMatchScreen`, so opening it leaves live state alone. testIDs: `match-detail-screen` (label "Match detail vs <name>"), `match-video-card-<id>`, `match-detail-loading|no-video|not-participant|not-found|error`.
+- `apps/mobile/lib/match-detail/use-match-detail.ts` (`useMatchDetail`), `apps/mobile/lib/match-detail/use-video-playback.ts` (`useVideoPlayback`), `apps/mobile/components/match-detail/` (`match-result-header`, `match-status-badge`, `match-meta-row`, `opponent-link-row`, `match-video-section`, `match-video-card`, `match-video-status`, `match-detail-states`, `video-state-panel`).
+- Tests: `apps/mobile/__tests__/screens/match-detail.test.tsx`, `apps/mobile/__tests__/lib/match-detail/use-match-detail.test.tsx`.
+
+**Changed**
+- `apps/mobile/app/(app)/video/[id].tsx`: reads through `getMatchVideoPlaybackResult` (normalized MP4 preferred, signed poster passed to expo-av). Distinct panels for no row ("Video unavailable", Back), still uploading ("Still uploading", Try again, no player mounted), storage miss ("Video file not found", Back) and any other failure ("Couldn't play this video", Try again). A player error re-signs once silently, remounts on the new URL and seeks back to the last position; a second consecutive error shows the retry panel. New `video-player-state` wrapper with label "Video state: loading|loaded|error|absent|processing|missing" for the match-loop harness; new testIDs `video-processing`, `video-file-missing` (existing `video-load-failed`, `video-unavailable` kept). Tests: `apps/mobile/__tests__/screens/video-playback.test.tsx`.
+
 ### Shared: match detail + video playback data layer (jits-5tj9.6)
 
 **Added**
