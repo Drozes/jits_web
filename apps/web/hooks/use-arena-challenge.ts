@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import {
   acceptChallenge,
   cancelChallenge,
+  cancelStaleOutgoingChallenges,
   createChallenge,
   declineChallenge,
   startMatchFromChallenge,
@@ -27,6 +28,10 @@ export interface OutgoingChallenge {
 
 /** Shown when the challenge was cancelled or expired under the accepter. */
 export const CHALLENGE_GONE_MESSAGE = "That challenge is no longer available.";
+
+/** Shown when the pending cap still refuses after stale ones were withdrawn. */
+export const CHALLENGE_CAP_MESSAGE =
+  "You have 3 challenges out. Unanswered challenges clear automatically after 10 minutes, so try again shortly.";
 
 /** Broadcast channel shared by both parties to a single Arena challenge. */
 const channelName = (challengeId: string) => `arena-challenge:${challengeId}`;
@@ -122,6 +127,37 @@ export function useArenaChallenge({
   useEffect(() => {
     if (!canReceive) setIncoming(null);
   }, [canReceive, setIncoming]);
+
+  /**
+   * Withdraw my own outgoing challenges older than the Arena freshness window
+   * (jits-celf, mirrors mobile). Nobody answers them live, but each one holds
+   * a slot of the 3-pending cap until `expires_at`, 7 days out. The one on my
+   * waiting bar is kept. Resolves to how many were withdrawn.
+   */
+  const sweepStale = useCallback(async (): Promise<number> => {
+    if (!athleteId) return 0;
+    const swept = await cancelStaleOutgoingChallenges(createClient(), athleteId, {
+      keepChallengeId: outgoingRef.current?.challengeId ?? null,
+    });
+    if (!swept.ok || swept.data.cancelled.length === 0) return 0;
+    // The Arena roster marks already-challenged athletes from a server read.
+    router.refresh();
+    return swept.data.cancelled.length;
+  }, [athleteId, router]);
+
+  // On mount, on going live / leaving a match, and when the tab comes back.
+  const sweepRef = useRef(sweepStale);
+  sweepRef.current = sweepStale;
+  useEffect(() => {
+    void sweepRef.current();
+  }, [athleteId, canReceive]);
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void sweepRef.current();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, []);
 
   /** Navigate both parties into the shared wizard, once per challenge. */
   const enterMatch = useCallback(
@@ -300,18 +336,33 @@ export function useArenaChallenge({
     (opponentId: string, opponentName: string) =>
       runExclusive(async () => {
         const supabase = createClient();
-        const result = await createChallenge(supabase, {
-          opponentId,
-          matchType: "ranked", // ranked-only product
-          challengerWeight: athleteWeight ?? undefined,
-        });
+        const create = () =>
+          createChallenge(supabase, {
+            opponentId,
+            matchType: "ranked", // ranked-only product
+            challengerWeight: athleteWeight ?? undefined,
+          });
+        let result = await create();
+        // The cap may be held by my own stale challenges: withdraw them and
+        // try exactly once more (jits-celf).
+        if (
+          !result.ok &&
+          result.error.code === "MAX_PENDING_CHALLENGES" &&
+          (await sweepStale()) > 0
+        ) {
+          result = await create();
+        }
         if (!result.ok) {
-          toast.error(result.error.message || "Couldn't send that challenge.");
+          toast.error(
+            result.error.code === "MAX_PENDING_CHALLENGES"
+              ? CHALLENGE_CAP_MESSAGE
+              : result.error.message || "Couldn't send that challenge.",
+          );
           return;
         }
         setOutgoing({ challengeId: result.data.id, opponentId, opponentName });
       }),
-    [athleteWeight, runExclusive, setOutgoing],
+    [athleteWeight, runExclusive, setOutgoing, sweepStale],
   );
 
   const accept = useCallback(

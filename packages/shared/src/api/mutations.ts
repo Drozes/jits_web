@@ -4,12 +4,18 @@ import type {
   StartMatchResponse,
   StartMatchTimerResponse,
   RecordResultResponse,
+  PendingChallenge,
 } from "../types/composites";
+import { ARENA_CHALLENGE_FRESH_MS } from "../constants";
 import {
   type Result,
   mapPostgrestError,
 } from "./errors";
-import type { AdminCard, AdminCardStatus } from "./queries";
+import {
+  getPendingChallengesForAthlete,
+  type AdminCard,
+  type AdminCardStatus,
+} from "./queries";
 
 type Client = SupabaseClient<Database>;
 
@@ -28,7 +34,7 @@ interface CreateChallengeParams {
 export async function createChallenge(
   supabase: Client,
   params: CreateChallengeParams,
-): Promise<Result<{ id: string }>> {
+): Promise<Result<{ id: string; expiresAt: string | null }>> {
   const authResult = await supabase.rpc("auth_athlete_id");
   if (authResult.error || !authResult.data) {
     return { ok: false, error: { code: "UNKNOWN" as const, message: "Could not identify current athlete" } };
@@ -43,13 +49,13 @@ export async function createChallenge(
       challenger_weight: params.challengerWeight,
       proposed_gym_id: params.proposedGymId,
     })
-    .select("id")
+    .select("id, expires_at")
     .single();
 
   if (error) {
     return { ok: false, error: mapPostgrestError(error, "challenge_create") };
   }
-  return { ok: true, data: { id: data.id } };
+  return { ok: true, data: { id: data.id, expiresAt: data.expires_at ?? null } };
 }
 
 interface AcceptChallengeParams {
@@ -98,20 +104,120 @@ export async function declineChallenge(
   return { ok: true, data: undefined };
 }
 
-/** Cancel a pending or accepted challenge. Either party can call this. */
+interface CancelChallengeOptions {
+  /**
+   * Only cancel while the row is still `pending`. For background sweeps that
+   * read the row a moment ago: without it, an opponent accepting in between
+   * would have their `accepted` challenge cancelled out from under them
+   * (`challenges_update_cancel` allows cancelling `accepted` too).
+   */
+  onlyIfPending?: boolean;
+}
+
+/**
+ * Cancel a pending or accepted challenge. Either party can call this.
+ *
+ * `cancelled` says whether a row actually changed. The
+ * `challenges_update_cancel` policy's USING clause only matches `pending` /
+ * `accepted` rows, and a PostgREST update that matches no rows is NOT an
+ * error, so a challenge that already expired, was declined or has started
+ * comes back `{ ok: true, data: { cancelled: false } }` rather than failing.
+ * The Arena waiting plate reads that to tell "withdrawn" from "already over".
+ */
 export async function cancelChallenge(
   supabase: Client,
   challengeId: string,
-): Promise<Result<void>> {
-  const { error } = await supabase
+  options: CancelChallengeOptions = {},
+): Promise<Result<{ cancelled: boolean }>> {
+  let query = supabase
     .from("challenges")
     .update({ status: "cancelled" })
     .eq("id", challengeId);
+  if (options.onlyIfPending) query = query.eq("status", "pending");
+
+  const { data, error } = await query.select("id");
 
   if (error) {
     return { ok: false, error: mapPostgrestError(error) };
   }
-  return { ok: true, data: undefined };
+  return { ok: true, data: { cancelled: (data?.length ?? 0) > 0 } };
+}
+
+/**
+ * Whether an outgoing pending challenge has outlived the Arena freshness
+ * window (`ARENA_CHALLENGE_FRESH_MS`). An unparseable timestamp is NOT stale:
+ * a sweep must never withdraw a challenge it cannot date.
+ */
+export function isStaleOutgoingChallenge(
+  challenge: Pick<PendingChallenge, "createdAt">,
+  now: number,
+  maxAgeMs: number = ARENA_CHALLENGE_FRESH_MS,
+): boolean {
+  const created = Date.parse(challenge.createdAt);
+  if (Number.isNaN(created)) return false;
+  return now - created > maxAgeMs;
+}
+
+interface CancelStaleOutgoingOptions {
+  /** A challenge to leave alone (the one the athlete is looking at right now). */
+  keepChallengeId?: string | null;
+  /** Clock override, for tests. */
+  now?: number;
+  /**
+   * The athlete's outgoing pending challenges, when the caller has just read
+   * them (saves a second round trip). Omitted: they are read here.
+   */
+  outgoing?: PendingChallenge[];
+}
+
+/**
+ * Withdraw the athlete's OWN outgoing pending challenges that are older than
+ * the Arena freshness window.
+ *
+ * Why: `can_create_challenge()` counts every non-expired pending outgoing
+ * challenge toward the cap of 3, and `expires_at` defaults to 7 days, but an
+ * Arena challenge nobody answered within minutes will not be answered live
+ * (recovery only offers challenges younger than `ARENA_CHALLENGE_FRESH_MS`).
+ * Left alone they lock the challenger out of the Arena for a week. This is
+ * the frontend mitigation (jits-celf); a backend sweep or a shorter
+ * `expires_at` is tracked separately.
+ *
+ * Only the challenger's own rows, only rows still `pending` at write time
+ * (`onlyIfPending`), and never `keepChallengeId`. Returns the challenges that
+ * were actually withdrawn. A failed read is returned as a failure; an
+ * individual cancel that fails is simply left out of `cancelled`.
+ */
+export async function cancelStaleOutgoingChallenges(
+  supabase: Client,
+  athleteId: string,
+  options: CancelStaleOutgoingOptions = {},
+): Promise<Result<{ cancelled: PendingChallenge[] }>> {
+  let outgoing = options.outgoing;
+  if (!outgoing) {
+    const read = await getPendingChallengesForAthlete(supabase, athleteId);
+    if (!read.ok) return read;
+    outgoing = read.data.outgoing;
+  }
+
+  const now = options.now ?? Date.now();
+  const stale = outgoing.filter(
+    (c) =>
+      c.challengerId === athleteId &&
+      c.challengeId !== options.keepChallengeId &&
+      isStaleOutgoingChallenge(c, now),
+  );
+  if (stale.length === 0) return { ok: true, data: { cancelled: [] } };
+
+  const results = await Promise.all(
+    stale.map((c) =>
+      cancelChallenge(supabase, c.challengeId, { onlyIfPending: true }),
+    ),
+  );
+  const cancelled = stale.filter((_, i) => {
+    const r = results[i];
+    return r.ok && r.data.cancelled;
+  });
+  return { ok: true, data: { cancelled } };
 }
 
 // ---------------------------------------------------------------------------

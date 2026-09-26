@@ -73,7 +73,9 @@ const mockAcceptChallenge = jest.fn();
 const mockDeclineChallenge = jest.fn();
 const mockCancelChallenge = jest.fn();
 const mockStartMatch = jest.fn();
+const mockSweep = jest.fn();
 jest.mock("@jits/shared/api/mutations", () => ({
+  cancelStaleOutgoingChallenges: (...a: unknown[]) => mockSweep(...a),
   createChallenge: (...a: unknown[]) => mockCreateChallenge(...a),
   acceptChallenge: (...a: unknown[]) => mockAcceptChallenge(...a),
   declineChallenge: (...a: unknown[]) => mockDeclineChallenge(...a),
@@ -106,6 +108,8 @@ const ME = "me-1";
 const OPPONENT = "opp-1";
 const CHALLENGE = "ch-1";
 const MATCH = "match-1";
+/** A normal 7-day `expires_at`, well past anything a test waits for. */
+const FAR_EXPIRY = new Date(Date.now() + 7 * 86_400_000).toISOString();
 
 function findBinding(type: string, match: (f: Record<string, string>) => boolean) {
   const found = mockBindings.find((b) => b.type === type && match(b.filter));
@@ -180,10 +184,14 @@ beforeEach(() => {
           error: null,
         }),
   );
-  mockCreateChallenge.mockResolvedValue({ ok: true, data: { id: CHALLENGE } });
+  mockCreateChallenge.mockResolvedValue({
+    ok: true,
+    data: { id: CHALLENGE, expiresAt: FAR_EXPIRY },
+  });
   mockAcceptChallenge.mockResolvedValue({ ok: true, data: undefined });
   mockDeclineChallenge.mockResolvedValue({ ok: true, data: undefined });
-  mockCancelChallenge.mockResolvedValue({ ok: true, data: undefined });
+  mockCancelChallenge.mockResolvedValue({ ok: true, data: { cancelled: true } });
+  mockSweep.mockResolvedValue({ ok: true, data: { cancelled: [] } });
   mockStartMatch.mockResolvedValue({
     ok: true,
     data: { success: true, match_id: MATCH, challenge_id: CHALLENGE },
@@ -206,6 +214,7 @@ describe("sending a challenge", () => {
       challengeId: CHALLENGE,
       opponentId: OPPONENT,
       opponentName: "Rival",
+      expiresAt: FAR_EXPIRY,
     });
   });
 
@@ -946,5 +955,377 @@ describe("INSERT racing another prompt", () => {
     });
 
     expect(result.current.incoming).toMatchObject({ challengeId: CHALLENGE });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// jits-1o4l: an outgoing challenge that can no longer become a match
+// ---------------------------------------------------------------------------
+
+async function sendOne(result: { current: ReturnType<typeof useArenaChallenge> }) {
+  await act(async () => {
+    await result.current.sendChallenge(OPPONENT, "Rival");
+  });
+  expect(result.current.outgoing).not.toBeNull();
+}
+
+function challengerUpdate(status: string) {
+  return act(async () => {
+    await challengerUpdateBinding().handler({
+      new: { id: CHALLENGE, challenger_id: ME, opponent_id: OPPONENT, status },
+    });
+  });
+}
+
+describe("the waiting plate never gets stuck (jits-1o4l)", () => {
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.restoreAllMocks();
+  });
+
+  it("clears the plate and says so when the sweep expires the challenge", async () => {
+    const { result } = mount();
+    await sendOne(result);
+
+    await challengerUpdate("expired");
+
+    expect(result.current.outgoing).toBeNull();
+    expect(mockToastInfo).toHaveBeenCalledWith("Your challenge to Rival expired.");
+  });
+
+  it("treats any other terminal status as over, quietly", async () => {
+    const { result } = mount();
+    await sendOne(result);
+
+    await challengerUpdate("some_future_status");
+
+    expect(result.current.outgoing).toBeNull();
+    expect(mockToastInfo).not.toHaveBeenCalled();
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it("frees the cap when the challenge expires", async () => {
+    mockCreateChallenge
+      .mockResolvedValueOnce({
+        ok: false,
+        error: { code: "MAX_PENDING_CHALLENGES", message: "3 out" },
+      })
+      .mockResolvedValue({ ok: true, data: { id: CHALLENGE, expiresAt: FAR_EXPIRY } });
+    const { result } = mount();
+    await act(async () => {
+      await result.current.sendChallenge(OPPONENT, "Rival");
+    });
+    expect(result.current.capReached).toBe(true);
+    await sendOne(result);
+    await challengerUpdate("expired");
+
+    expect(result.current.capReached).toBe(false);
+  });
+
+  it("clears the plate on its own at expires_at, without any realtime event", async () => {
+    jest.useFakeTimers();
+    const soon = new Date(Date.now() + 5_000).toISOString();
+    mockCreateChallenge.mockResolvedValue({
+      ok: true,
+      data: { id: CHALLENGE, expiresAt: soon },
+    });
+    const { result } = mount();
+    await sendOne(result);
+
+    await act(async () => {
+      jest.advanceTimersByTime(4_000);
+    });
+    expect(result.current.outgoing).not.toBeNull();
+
+    await act(async () => {
+      jest.advanceTimersByTime(1_500);
+    });
+    expect(result.current.outgoing).toBeNull();
+    expect(mockToastInfo).toHaveBeenCalledWith("Your challenge to Rival expired.");
+  });
+
+  it("drops a restored challenge that is already past expires_at", async () => {
+    const { result } = mount();
+    await act(async () => {
+      result.current.restoreOutgoing({
+        challengeId: CHALLENGE,
+        opponentId: OPPONENT,
+        opponentName: "Rival",
+        expiresAt: new Date(Date.now() - 1_000).toISOString(),
+      });
+    });
+
+    expect(result.current.outgoing).toBeNull();
+  });
+
+  it("re-checks expiry when the app returns to the foreground", async () => {
+    // iOS does not run timers while the app is suspended.
+    let onAppState: ((s: string) => void) | null = null;
+    const { AppState } = jest.requireActual("react-native") as typeof import("react-native");
+    jest.spyOn(AppState, "addEventListener").mockImplementation(((
+      _e: string,
+      handler: (s: string) => void,
+    ) => {
+      onAppState = handler;
+      return { remove: jest.fn() };
+    }) as never);
+    const expiresAt = new Date(Date.now() + 60_000).toISOString();
+    mockCreateChallenge.mockResolvedValue({
+      ok: true,
+      data: { id: CHALLENGE, expiresAt },
+    });
+    const { result } = mount();
+    await sendOne(result);
+
+    const later = Date.parse(expiresAt) + 1;
+    jest.spyOn(Date, "now").mockReturnValue(later);
+    await act(async () => {
+      onAppState?.("active");
+    });
+
+    expect(result.current.outgoing).toBeNull();
+  });
+});
+
+describe("Cancel on the waiting plate always resolves (jits-1o4l)", () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it("clears the plate when the challenge was already over (no row changed)", async () => {
+    mockCancelChallenge.mockResolvedValue({ ok: true, data: { cancelled: false } });
+    mockStartMatch.mockResolvedValue({
+      ok: false,
+      error: { code: "CHALLENGE_NOT_ACCEPTED", message: "not accepted" },
+    });
+    const { result } = mount();
+    await sendOne(result);
+
+    await act(async () => {
+      await result.current.cancelOutgoing();
+    });
+
+    expect(result.current.outgoing).toBeNull();
+    expect(mockToastError).not.toHaveBeenCalled();
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it("joins the match instead when the opponent had just started it", async () => {
+    // Clearing here would leave the opponent alone in a match nobody joined.
+    mockCancelChallenge.mockResolvedValue({ ok: true, data: { cancelled: false } });
+    const { result } = mount();
+    await sendOne(result);
+
+    await act(async () => {
+      await result.current.cancelOutgoing();
+    });
+
+    expect(mockStartMatch).toHaveBeenCalledWith(expect.anything(), CHALLENGE);
+    expect(mockPush).toHaveBeenCalledWith(`/match/${MATCH}`);
+    expect(result.current.outgoing).toBeNull();
+  });
+
+  it("does not ask for a match after a real cancel", async () => {
+    const { result } = mount();
+    await sendOne(result);
+
+    await act(async () => {
+      await result.current.cancelOutgoing();
+    });
+
+    expect(mockStartMatch).not.toHaveBeenCalled();
+    expect(result.current.outgoing).toBeNull();
+  });
+
+  it("clears the plate when the database refuses the cancel as not cancellable", async () => {
+    mockCancelChallenge.mockResolvedValue({
+      ok: false,
+      error: { code: "RLS_VIOLATION", message: "denied" },
+    });
+    const { result } = mount();
+    await sendOne(result);
+
+    await act(async () => {
+      await result.current.cancelOutgoing();
+    });
+
+    expect(result.current.outgoing).toBeNull();
+    expect(mockToastError).not.toHaveBeenCalled();
+  });
+
+  it("clears the plate on a failed cancel once the challenge has expired locally", async () => {
+    const expiresAt = new Date(Date.now() + 60_000).toISOString();
+    mockCreateChallenge.mockResolvedValue({
+      ok: true,
+      data: { id: CHALLENGE, expiresAt },
+    });
+    mockCancelChallenge.mockResolvedValue({
+      ok: false,
+      error: { code: "UNKNOWN", message: "network" },
+    });
+    const { result } = mount();
+    await sendOne(result);
+
+    jest.spyOn(Date, "now").mockReturnValue(Date.parse(expiresAt) + 1);
+    await act(async () => {
+      await result.current.cancelOutgoing();
+    });
+
+    expect(result.current.outgoing).toBeNull();
+    expect(mockToastError).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// jits-celf: stale challenges must not hold the cap
+// ---------------------------------------------------------------------------
+
+describe("a capped insert withdraws my stale challenges and retries once (jits-celf)", () => {
+  const CAPPED = {
+    ok: false,
+    error: { code: "MAX_PENDING_CHALLENGES", message: "3 out" },
+  };
+
+  it("retries after withdrawing stale ones, and asks for a roster refresh", async () => {
+    mockCreateChallenge
+      .mockResolvedValueOnce(CAPPED)
+      .mockResolvedValue({ ok: true, data: { id: CHALLENGE, expiresAt: FAR_EXPIRY } });
+    mockSweep.mockResolvedValue({
+      ok: true,
+      data: { cancelled: [{ challengeId: "old-1" }] },
+    });
+    const onStaleCancelled = jest.fn();
+    const { result } = renderHook(() =>
+      useArenaChallenge({ athleteId: ME, athleteWeight: 180, onStaleCancelled }),
+    );
+
+    await act(async () => {
+      await result.current.sendChallenge(OPPONENT, "Rival");
+    });
+
+    expect(mockSweep).toHaveBeenCalledWith(expect.anything(), ME, {
+      keepChallengeId: null,
+    });
+    expect(mockCreateChallenge).toHaveBeenCalledTimes(2);
+    expect(onStaleCancelled).toHaveBeenCalledTimes(1);
+    expect(result.current.outgoing).toMatchObject({ challengeId: CHALLENGE });
+    expect(result.current.capReached).toBe(false);
+  });
+
+  it("does not retry when nothing was stale, and shows the cap", async () => {
+    mockCreateChallenge.mockResolvedValue(CAPPED);
+    const { result } = mount();
+
+    await act(async () => {
+      await result.current.sendChallenge(OPPONENT, "Rival");
+    });
+
+    expect(mockSweep).toHaveBeenCalledTimes(1);
+    expect(mockCreateChallenge).toHaveBeenCalledTimes(1);
+    expect(result.current.capReached).toBe(true);
+  });
+
+  it("retries exactly once, then shows the cap if still refused", async () => {
+    mockCreateChallenge.mockResolvedValue(CAPPED);
+    mockSweep.mockResolvedValue({
+      ok: true,
+      data: { cancelled: [{ challengeId: "old-1" }] },
+    });
+    const { result } = mount();
+
+    await act(async () => {
+      await result.current.sendChallenge(OPPONENT, "Rival");
+    });
+
+    expect(mockCreateChallenge).toHaveBeenCalledTimes(2);
+    expect(mockSweep).toHaveBeenCalledTimes(1);
+    expect(result.current.capReached).toBe(true);
+  });
+
+  it("still shows the cap when the sweep's read failed", async () => {
+    mockCreateChallenge.mockResolvedValue(CAPPED);
+    mockSweep.mockResolvedValue({
+      ok: false,
+      error: { code: "UNKNOWN", message: "down" },
+    });
+    const { result } = mount();
+
+    await act(async () => {
+      await result.current.sendChallenge(OPPONENT, "Rival");
+    });
+
+    expect(mockCreateChallenge).toHaveBeenCalledTimes(1);
+    expect(result.current.capReached).toBe(true);
+  });
+
+  it("does not sweep for a failure that is not the cap", async () => {
+    mockCreateChallenge.mockResolvedValue({
+      ok: false,
+      error: { code: "UNKNOWN", message: "network is down" },
+    });
+    const { result } = mount();
+
+    await act(async () => {
+      await result.current.sendChallenge(OPPONENT, "Rival");
+    });
+
+    expect(mockSweep).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// jits-yiwx: a match that starts by another route
+// ---------------------------------------------------------------------------
+
+describe("a match started by another route (jits-yiwx)", () => {
+  function mountWithMatch() {
+    return renderHook(
+      (props: { inMatch: boolean }) =>
+        useArenaChallenge({ athleteId: ME, athleteWeight: 180, inMatch: props.inMatch }),
+      { initialProps: { inMatch: false } },
+    );
+  }
+
+  it("drops the prompt instead of holding it over the match", async () => {
+    const { result, rerender } = mountWithMatch();
+    await raiseIncoming(result);
+
+    await act(async () => {
+      rerender({ inMatch: true });
+    });
+
+    expect(result.current.incoming).toBeNull();
+  });
+
+  it("leaves the dropped challenge re-offerable after the match", async () => {
+    const { result, rerender } = mountWithMatch();
+    await raiseIncoming(result);
+    await act(async () => {
+      rerender({ inMatch: true });
+    });
+    await act(async () => {
+      rerender({ inMatch: false });
+    });
+
+    let raised = false;
+    await act(async () => {
+      raised = await result.current.offerIncoming(CHALLENGE, OPPONENT);
+    });
+
+    expect(raised).toBe(true);
+    expect(result.current.incoming).toMatchObject({ challengeId: CHALLENGE });
+  });
+
+  it("offerIncoming reports a skip as false", async () => {
+    const { result } = renderHook(() =>
+      useArenaChallenge({ athleteId: ME, athleteWeight: 180, inMatch: true }),
+    );
+
+    let raised = true;
+    await act(async () => {
+      raised = await result.current.offerIncoming(CHALLENGE, OPPONENT);
+    });
+
+    expect(raised).toBe(false);
   });
 });

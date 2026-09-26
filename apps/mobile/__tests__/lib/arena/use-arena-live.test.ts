@@ -687,11 +687,18 @@ describe("launch resume", () => {
     const { result } = mount({ initialRanked: true });
     await act(flush);
 
-    expect(mockToggleMatchPreferences).not.toHaveBeenCalled();
     expect(mockJoinLobby).not.toHaveBeenCalled();
     expect(result.current.isLive).toBe(false);
+    // The stale `true` it arrived with is cleared rather than left
+    // advertising an athlete whose app is closed (jits-yiwx).
+    expect(mockToggleMatchPreferences).toHaveBeenCalledTimes(1);
+    expect(flagWrite(0)).toEqual({
+      lookingForCasual: false,
+      lookingForRanked: false,
+    });
 
     // The first time the athlete actually opens the app, they are live.
+    mockCalls.length = 0;
     await act(async () => {
       setAppState("active");
       appStateHandler?.("active");
@@ -710,6 +717,35 @@ describe("launch resume", () => {
       rerender({ ...ARGS, initialRanked: true, inMatch: false });
       await flush();
     });
+    expect(result.current.isLive).toBe(true);
+  });
+
+  it("clears a stale flag for the whole match when launched straight into one (jits-yiwx)", async () => {
+    // Seeded as uncommitted, the match's clear looked like a no-op and the
+    // flag stayed true all match, so web could still challenge the athlete.
+    mount({ initialRanked: true, inMatch: true });
+    await act(flush);
+
+    expect(mockCalls).toEqual(["leaveLobby", "flag:false"]);
+  });
+
+  it("writes nothing at launch when the athlete arrived offline", async () => {
+    mount({ initialRanked: false, inMatch: true });
+    await act(flush);
+    setAppState("background");
+    mount({ initialRanked: false });
+    await act(flush);
+
+    expect(mockToggleMatchPreferences).not.toHaveBeenCalled();
+  });
+
+  it("still runs a full go-live (flag AND lobby) for a flag it arrived with", async () => {
+    // The seed marks the flag committed; the foreground path must not let
+    // that skip the lobby join.
+    const { result } = mount({ initialRanked: true });
+    await act(flush);
+
+    expect(mockCalls).toEqual(["flag:true", "joinLobby"]);
     expect(result.current.isLive).toBe(true);
   });
 

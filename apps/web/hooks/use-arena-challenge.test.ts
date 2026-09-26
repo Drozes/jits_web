@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { act, renderHook } from "@testing-library/react";
-import { useArenaChallenge } from "./use-arena-challenge";
+import { CHALLENGE_CAP_MESSAGE, useArenaChallenge } from "./use-arena-challenge";
 
 type Handler = (payload: unknown) => unknown;
 interface FakeChannel {
@@ -52,12 +52,14 @@ vi.mock("@/lib/supabase/client", () => ({
 }));
 
 const push = vi.fn();
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
+const refresh = vi.fn();
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push, refresh }) }));
 const toast = vi.hoisted(() => ({ error: vi.fn(), info: vi.fn() }));
 vi.mock("sonner", () => ({ toast }));
 const m = vi.hoisted(() => ({
   acceptChallenge: vi.fn(),
   cancelChallenge: vi.fn(),
+  cancelStaleOutgoingChallenges: vi.fn(),
   createChallenge: vi.fn(),
   declineChallenge: vi.fn(),
   startMatchFromChallenge: vi.fn(),
@@ -104,6 +106,7 @@ beforeEach(() => {
   m.cancelChallenge.mockResolvedValue({ ok: true, data: null });
   m.createChallenge.mockResolvedValue({ ok: true, data: { id: "out1" } });
   m.startMatchFromChallenge.mockResolvedValue({ ok: true, data: { match_id: "m1" } });
+  m.cancelStaleOutgoingChallenges.mockResolvedValue({ ok: true, data: { cancelled: [] } });
 });
 
 function mount(canReceive = true) {
@@ -407,5 +410,119 @@ describe("useArenaChallenge", () => {
     expect(push).toHaveBeenCalledWith("/arena/match/m9");
     expect(m.cancelChallenge).not.toHaveBeenCalled();
     expect(result.current.outgoing).toBeNull();
+  });
+
+  describe("stale outgoing challenges must not hold the cap (jits-celf)", () => {
+    const CAPPED = {
+      ok: false,
+      error: { code: "MAX_PENDING_CHALLENGES", message: "3 pending" },
+    };
+    const flush = () => act(async () => {});
+
+    it("withdraws stale ones on mount and again on going live", async () => {
+      const { rerender } = mount(false);
+      await flush();
+      expect(m.cancelStaleOutgoingChallenges).toHaveBeenCalledTimes(1);
+      expect(m.cancelStaleOutgoingChallenges).toHaveBeenCalledWith(
+        expect.anything(),
+        "me",
+        { keepChallengeId: null },
+      );
+
+      rerender({ canReceive: true });
+      await flush();
+      expect(m.cancelStaleOutgoingChallenges).toHaveBeenCalledTimes(2);
+    });
+
+    it("withdraws stale ones when the tab becomes visible again", async () => {
+      mount(true);
+      await flush();
+      m.cancelStaleOutgoingChallenges.mockClear();
+
+      await act(async () => {
+        document.dispatchEvent(new Event("visibilitychange"));
+      });
+      expect(m.cancelStaleOutgoingChallenges).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps the challenge on my waiting bar", async () => {
+      const { result } = mount(true);
+      await act(() => result.current.sendChallenge("ana", "Ana"));
+      m.cancelStaleOutgoingChallenges.mockClear();
+
+      await act(async () => {
+        document.dispatchEvent(new Event("visibilitychange"));
+      });
+      expect(m.cancelStaleOutgoingChallenges).toHaveBeenCalledWith(
+        expect.anything(),
+        "me",
+        { keepChallengeId: "out1" },
+      );
+    });
+
+    it("refreshes the roster only when something was withdrawn", async () => {
+      mount(true);
+      await flush();
+      expect(refresh).not.toHaveBeenCalled();
+
+      m.cancelStaleOutgoingChallenges.mockResolvedValue({
+        ok: true,
+        data: { cancelled: [{ challengeId: "old" }] },
+      });
+      await act(async () => {
+        document.dispatchEvent(new Event("visibilitychange"));
+      });
+      expect(refresh).toHaveBeenCalledTimes(1);
+    });
+
+    it("a capped insert withdraws stale ones and retries exactly once", async () => {
+      const { result } = mount(true);
+      await flush();
+      m.cancelStaleOutgoingChallenges.mockResolvedValue({
+        ok: true,
+        data: { cancelled: [{ challengeId: "old" }] },
+      });
+      m.createChallenge
+        .mockResolvedValueOnce(CAPPED)
+        .mockResolvedValue({ ok: true, data: { id: "out1", expiresAt: null } });
+
+      await act(() => result.current.sendChallenge("ana", "Ana"));
+
+      expect(m.createChallenge).toHaveBeenCalledTimes(2);
+      expect(result.current.outgoing).toEqual({
+        challengeId: "out1",
+        opponentId: "ana",
+        opponentName: "Ana",
+      });
+      expect(toast.error).not.toHaveBeenCalled();
+    });
+
+    it("says plainly when the cap still refuses", async () => {
+      const { result } = mount(true);
+      await flush();
+      m.createChallenge.mockResolvedValue(CAPPED);
+
+      await act(() => result.current.sendChallenge("ana", "Ana"));
+
+      // Nothing stale to withdraw: no retry.
+      expect(m.createChallenge).toHaveBeenCalledTimes(1);
+      expect(toast.error).toHaveBeenCalledWith(CHALLENGE_CAP_MESSAGE);
+      expect(result.current.outgoing).toBeNull();
+    });
+
+    it("does not sweep for a failure that is not the cap", async () => {
+      const { result } = mount(true);
+      await flush();
+      m.cancelStaleOutgoingChallenges.mockClear();
+      m.createChallenge.mockResolvedValue({
+        ok: false,
+        error: { code: "UNKNOWN", message: "down" },
+      });
+
+      await act(() => result.current.sendChallenge("ana", "Ana"));
+
+      expect(m.cancelStaleOutgoingChallenges).not.toHaveBeenCalled();
+      expect(toast.error).toHaveBeenCalledWith("down");
+    });
   });
 });

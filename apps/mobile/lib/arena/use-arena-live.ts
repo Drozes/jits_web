@@ -107,8 +107,18 @@ export function useArenaLive({
 
   /** What we intend. Set synchronously by every caller, before any await. */
   const desiredRef = React.useRef(false);
-  /** What we have committed: flag written AND presence settled to match. */
-  const actualRef = React.useRef(false);
+  /**
+   * What we have committed: flag written AND presence settled to match.
+   *
+   * Seeded from the row, not from `false` (jits-yiwx): a `true` the athlete
+   * arrived with IS committed in the database, so a clear requested before
+   * any go-live (cold launch straight into a match, a silent-push background
+   * launch) must actually write `false`. Seeded `false`, that clear looked
+   * like a no-op and the stale flag stayed up for the whole match, leaving
+   * the athlete challengeable from web. The foreground arrival path resets
+   * it before going live, because presence is NOT yet joined.
+   */
+  const actualRef = React.useRef(initialRanked);
   /** Serializes transitions so their writes cannot reach the DB out of order. */
   const queueRef = React.useRef<Promise<unknown>>(Promise.resolve());
   /** UI-level double-tap guard; `isSaving` is still false across the await. */
@@ -262,21 +272,29 @@ export function useArenaLive({
   // mode) can cold-launch the JS with the app never shown, and going live
   // then would advertise an athlete whose app is closed. In that case the
   // intent is parked and the first "active" restores it. Same for a launch
-  // straight into a match: it waits for the match to end.
+  // straight into a match: it waits for the match to end. In both parked
+  // cases the stale `true` is CLEARED now (the flag is seeded as committed,
+  // see `actualRef`), so nobody can challenge an athlete who cannot answer.
   const reconciledRef = React.useRef(false);
   React.useEffect(() => {
     if (!athleteId || !initialRanked || reconciledRef.current) return;
     reconciledRef.current = true;
     if (inMatchRef.current) {
+      // The match effect below issues the clear as it records the resume.
       resumeAfterMatchRef.current = true;
       return;
     }
     if (AppState.currentState !== "active") {
       resumeLiveRef.current = true;
+      void requestOffline();
       return;
     }
+    // Only the flag is committed; presence has not been joined. Mark it
+    // uncommitted so the reconcile loop runs a full transition (flag AND
+    // lobby) instead of seeing desired === actual and doing nothing.
+    actualRef.current = false;
     void requestLive();
-  }, [athleteId, initialRanked, requestLive]);
+  }, [athleteId, initialRanked, requestLive, requestOffline]);
 
   // THE LIFECYCLE. Live belongs to the athlete, not to a screen:
   //  - Switching tabs or pushing a profile: still live. The header LIVE pill
@@ -284,7 +302,11 @@ export function useArenaLive({
   //    live athlete on Home or Rankings still gets their challenges.
   //  - Entering a match: offline for the match (nobody can answer a prompt
   //    mid-roll), and live again when the match screen is left, if they were
-  //    live going in.
+  //    live going in. KNOWN, by design (jits-yiwx): "the match screen" is any
+  //    mounted `match/[matchId]`, and that includes watching the match video
+  //    from the summary step, so an athlete replaying their roll stays
+  //    offline (no prompts, not in "Open to challenges") until they leave
+  //    the match screen.
   //  - Backgrounding: offline (below). The app can no longer answer a prompt.
   //  - Foregrounding: live again, wherever they land, if and only if the
   //    background is what took them down, and not while still in a match

@@ -8,7 +8,7 @@
  * dismiss a sheet it presented and that has not already closed itself.
  */
 import * as React from "react";
-import { act, render } from "@testing-library/react-native";
+import { act, fireEvent, render } from "@testing-library/react-native";
 
 const mockPresent = jest.fn();
 const mockDismiss = jest.fn();
@@ -107,5 +107,56 @@ describe("ChallengePromptSheet open/close", () => {
     render(<Harness challenge={null} />);
     expect(mockSheetProps.enableDynamicSizing).toBe(true);
     expect(mockSheetProps.snapPoints).toBeUndefined();
+  });
+});
+
+describe("ChallengePromptSheet accessibility (jits-ef2a)", () => {
+  it("turns off gorhom's accessible 'Bottom Sheet' container, which hid Accept/Decline", () => {
+    // gorhom defaults the content container to accessible=true with the
+    // label "Bottom Sheet"; an accessible element is a leaf to VoiceOver and
+    // idb, so nothing inside it could be reached.
+    render(<Harness challenge={RIVAL} />);
+    expect(mockSheetProps.accessible).toBe(false);
+  });
+
+  it("replaces the background that announced itself as an adjustable 'Bottom Sheet'", () => {
+    render(<Harness challenge={RIVAL} />);
+    const Background = mockSheetProps.backgroundComponent as React.ComponentType<{
+      style?: unknown;
+      pointerEvents?: string;
+    }>;
+    expect(Background).toBeDefined();
+
+    const { UNSAFE_root } = render(<Background style={{}} pointerEvents="none" />);
+    const view = UNSAFE_root.findByType(require("react-native").View);
+    expect(view.props.accessible).toBe(false);
+    expect(view.props.accessibilityLabel).toBeUndefined();
+    expect(view.props.accessibilityRole).toBeUndefined();
+  });
+
+  it("exposes Accept and Decline as labelled buttons", () => {
+    const onAccept = jest.fn();
+    const onDecline = jest.fn();
+    const { getByRole } = render(
+      <ChallengePromptSheet
+        challenge={RIVAL}
+        busy={false}
+        onAccept={onAccept}
+        onDecline={onDecline}
+      />,
+    );
+
+    fireEvent.press(getByRole("button", { name: "Accept challenge" }));
+    fireEvent.press(getByRole("button", { name: "Decline challenge" }));
+    expect(onAccept).toHaveBeenCalledTimes(1);
+    expect(onDecline).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the challenge-prompt testID, as a modal accessibility container", () => {
+    const { getByTestId } = render(<Harness challenge={RIVAL} />);
+    const prompt = getByTestId("challenge-prompt");
+    expect(prompt.props.accessibilityViewIsModal).toBe(true);
+    // A container, not a leaf: its buttons must stay individually reachable.
+    expect(prompt.props.accessible).not.toBe(true);
   });
 });

@@ -100,6 +100,12 @@ export function WaitingPlate({
  * challenges and it runs inside the `challenges_insert` RLS WITH CHECK, so the
  * fourth insert is refused by the database. That is a rule, not a hiccup, and
  * it gets a standing explanation rather than a toast that scrolls away.
+ *
+ * By the time it shows, the challenge hook has already withdrawn the
+ * athlete's own stale (over 10 minutes) challenges and retried once
+ * (jits-celf), so the three still counted are recent ones. The athlete can
+ * only see one of them, so the copy does not ask them to cancel one; it says
+ * when the slots come back.
  */
 export function CapPlate({ onDismiss }: { onDismiss: () => void }) {
   return (
@@ -111,8 +117,8 @@ export function CapPlate({ onDismiss }: { onDismiss: () => void }) {
         You have 3 challenges out
       </Text>
       <Text className="mt-1 font-body text-[13px] text-ink-2">
-        That is the limit. Cancel one, or wait for a reply, before sending
-        another.
+        That is the limit. Unanswered challenges clear automatically after 10
+        minutes, so try again shortly.
       </Text>
       <OutlineButton label="Got it" onPress={onDismiss} />
     </Plate>

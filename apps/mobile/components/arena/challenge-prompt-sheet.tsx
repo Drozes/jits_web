@@ -12,9 +12,31 @@
  */
 import * as React from "react";
 import { Pressable, Text, View } from "react-native";
-import { BottomSheetModal, BottomSheetView } from "@gorhom/bottom-sheet";
+import {
+  BottomSheetModal,
+  BottomSheetView,
+  type BottomSheetBackgroundProps,
+} from "@gorhom/bottom-sheet";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import type { IncomingChallenge } from "@/lib/arena/use-arena-challenge";
+
+/**
+ * The sheet's background, WITHOUT gorhom's default accessibility. The stock
+ * `BottomSheetBackground` is an `accessible` element labelled "Bottom Sheet"
+ * with role "adjustable": a meaningless stop for VoiceOver on a sheet that
+ * cannot be dragged. Purely visual here. The stock one also rounds to 15px;
+ * the brand cap for modals is 8px.
+ */
+function PromptBackground({ style, pointerEvents }: BottomSheetBackgroundProps) {
+  return (
+    <View
+      pointerEvents={pointerEvents}
+      accessible={false}
+      importantForAccessibility="no"
+      style={[style, { borderTopLeftRadius: 8, borderTopRightRadius: 8 }]}
+    />
+  );
+}
 
 interface ChallengePromptSheetProps {
   challenge: IncomingChallenge | null;
@@ -74,12 +96,25 @@ export function ChallengePromptSheet({
       enableDynamicSizing
       enablePanDownToClose={false}
       onChange={handleChange}
+      // ACCESSIBILITY (jits-ef2a). gorhom defaults the sheet's content
+      // container to `accessible` with the label "Bottom Sheet", and an
+      // accessible element is a LEAF to VoiceOver and to idb: everything
+      // inside it, including Accept and Decline, collapsed into one opaque
+      // "Bottom Sheet" stop. Turning that off exposes the real elements.
+      accessible={false}
+      backgroundComponent={PromptBackground}
       backgroundStyle={{ backgroundColor: tokens.bgSecondary }}
       handleIndicatorStyle={{ backgroundColor: tokens.textTertiary }}
     >
       <BottomSheetView>
         {challenge ? (
-          <View testID="challenge-prompt" className="px-4 pb-8 pt-2">
+          <View
+            testID="challenge-prompt"
+            className="px-4 pb-8 pt-2"
+            // The prompt demands an answer: keep VoiceOver focus inside it
+            // rather than wandering to the screen behind the sheet.
+            accessibilityViewIsModal
+          >
             <Text className="font-mono-bold text-[10px] text-ink-2 uppercase tracking-caps-xl">
               Incoming challenge
             </Text>

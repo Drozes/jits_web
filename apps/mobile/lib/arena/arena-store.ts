@@ -143,6 +143,15 @@ export function notifyOpponentUnavailable(opponentId: string): void {
   opponentUnavailableHandler?.(opponentId);
 }
 
+/**
+ * Stale outgoing challenges were withdrawn (jits-celf). The roster read its
+ * "Pending" rows at load, so the same registered `refresh` re-reads them;
+ * without it those athletes stay unchallengeable until the next pull.
+ */
+export function notifyStaleChallengesCancelled(): void {
+  opponentUnavailableHandler?.("");
+}
+
 // ---------------------------------------------------------------------------
 // In a match
 // ---------------------------------------------------------------------------

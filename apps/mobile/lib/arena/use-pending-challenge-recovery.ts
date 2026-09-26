@@ -23,16 +23,28 @@
  *
  * My own newest fresh OUTGOING challenge is put back too, so after a relaunch
  * the "Sent" plate returns and the accept broadcast still has a listener.
+ *
+ * And my own STALE outgoing challenges (older than the same window) are
+ * withdrawn on each of those triggers (jits-celf). Nobody will answer them
+ * live, but every pending row counts toward the 3-pending cap until
+ * `expires_at`, 7 days out, so left alone they lock me out of challenging.
+ * The one on my waiting plate right now is never touched: I can see it and
+ * cancel it myself, and the prompt for it may still be up on the other side.
  */
 import * as React from "react";
 import { AppState, type AppStateStatus } from "react-native";
+import { ARENA_CHALLENGE_FRESH_MS } from "@jits/shared/constants";
+import { cancelStaleOutgoingChallenges } from "@jits/shared/api/mutations";
 import { getPendingChallengesForAthlete } from "@jits/shared/api/queries";
 import type { PendingChallenge } from "@jits/shared/types/composites";
 import { supabase } from "../supabase/client";
 import type { OutgoingChallenge } from "./use-arena-challenge";
 
-/** How old a pending challenge can be and still be a LIVE prompt. */
-export const PENDING_PROMPT_MAX_AGE_MS = 10 * 60_000;
+/**
+ * How old a pending challenge can be and still be a LIVE prompt. The shared
+ * constant, so web and mobile agree on what "stale" means.
+ */
+export const PENDING_PROMPT_MAX_AGE_MS = ARENA_CHALLENGE_FRESH_MS;
 
 export interface UsePendingChallengeRecoveryArgs {
   athleteId: string;
@@ -43,8 +55,13 @@ export interface UsePendingChallengeRecoveryArgs {
   hasIncoming: boolean;
   /** Athlete ids present in `lobby:online`. */
   lobbyIds: Set<string>;
-  offerIncoming: (challengeId: string, challengerId: string) => Promise<void>;
+  /** Resolves true only when the prompt was actually raised. */
+  offerIncoming: (challengeId: string, challengerId: string) => Promise<boolean>;
   restoreOutgoing: (challenge: OutgoingChallenge) => void;
+  /** The challenge on my waiting plate right now; never swept as stale. */
+  outgoingChallengeId?: string | null;
+  /** Called after stale outgoing challenges were withdrawn (roster refresh). */
+  onStaleCancelled?: () => void;
 }
 
 /** Still answerable, and recent enough that the other side is still waiting. */
@@ -63,12 +80,23 @@ export function usePendingChallengeRecovery({
   lobbyIds,
   offerIncoming,
   restoreOutgoing,
+  outgoingChallengeId = null,
+  onStaleCancelled,
 }: UsePendingChallengeRecoveryArgs): void {
   const [candidates, setCandidates] = React.useState<PendingChallenge[]>([]);
+  /** Challenges whose prompt was actually raised by this instance. */
   const offeredRef = React.useRef<Set<string>>(new Set());
+  /** Offers still waiting on their challenger read; never doubled up. */
+  const offeringRef = React.useRef<Set<string>>(new Set());
 
   const restoreRef = React.useRef(restoreOutgoing);
   restoreRef.current = restoreOutgoing;
+  const outgoingIdRef = React.useRef(outgoingChallengeId);
+  outgoingIdRef.current = outgoingChallengeId;
+  const staleCancelledRef = React.useRef(onStaleCancelled);
+  staleCancelledRef.current = onStaleCancelled;
+  const inMatchRef = React.useRef(inMatch);
+  inMatchRef.current = inMatch;
 
   const fetchPending = React.useCallback(async () => {
     if (!athleteId) return;
@@ -85,7 +113,19 @@ export function usePendingChallengeRecovery({
         challengeId: mine.challengeId,
         opponentId: mine.opponentId,
         opponentName: mine.opponentName,
+        expiresAt: mine.expiresAt,
       });
+    }
+
+    // Free the cap from my own stale challenges. Reuses the read above; the
+    // cancel is guarded on `pending`, so one accepted a moment ago survives.
+    const swept = await cancelStaleOutgoingChallenges(supabase, athleteId, {
+      outgoing: result.data.outgoing,
+      keepChallengeId: outgoingIdRef.current,
+      now,
+    });
+    if (swept.ok && swept.data.cancelled.length > 0) {
+      staleCancelledRef.current?.();
     }
   }, [athleteId]);
 
@@ -99,6 +139,20 @@ export function usePendingChallengeRecovery({
   React.useEffect(() => {
     if (isLive) void fetchRef.current();
   }, [isLive]);
+
+  // Leaving a match. A prompt that was up when the match started (by a deep
+  // link, say) was dropped rather than held, so read again and let a still
+  // fresh one be offered again. The "already offered" memory is reset for
+  // the same reason; anything actually answered is remembered by the
+  // challenge hook (`settledRef`), not here.
+  const wasInMatchRef = React.useRef(inMatch);
+  React.useEffect(() => {
+    if (inMatch === wasInMatchRef.current) return;
+    wasInMatchRef.current = inMatch;
+    if (inMatch) return;
+    offeredRef.current.clear();
+    void fetchRef.current();
+  }, [inMatch]);
 
   // Back from the background. Tracked from "background" specifically, for
   // the same reason the live hook ignores "inactive": Control Center and the
@@ -129,11 +183,25 @@ export function usePendingChallengeRecovery({
     const pick = candidates.find(
       (c) =>
         !offeredRef.current.has(c.challengeId) &&
+        !offeringRef.current.has(c.challengeId) &&
         lobbyIds.has(c.challengerId) &&
         isFreshPending(c, now),
     );
     if (!pick) return;
-    offeredRef.current.add(pick.challengeId);
-    void offerIncoming(pick.challengeId, pick.challengerId);
+    // Marked offered once the prompt was really raised. An offer the
+    // challenge hook skipped because a match started during the challenger
+    // read stays eligible and is offered again after the match. Any other
+    // skip (already answered, another prompt up) is final, as before, so a
+    // settled challenge cannot sit at the head of the list blocking newer
+    // candidates.
+    const id = pick.challengeId;
+    offeringRef.current.add(id);
+    void offerIncoming(id, pick.challengerId)
+      .then((raised) => {
+        if (raised || !inMatchRef.current) offeredRef.current.add(id);
+      })
+      .finally(() => {
+        offeringRef.current.delete(id);
+      });
   }, [candidates, lobbyIds, isLive, inMatch, hasIncoming, offerIncoming]);
 }
