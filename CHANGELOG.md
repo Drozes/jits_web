@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Mobile: timed match auto-ends at 00:00 again (jits-2y8i)
+
+JS-only, OTA-eligible for runtime 0.3.0 (no native dependency, `app.json` or config change).
+
+**Fixed**
+- `apps/mobile/components/match-flow/steps/live-step.tsx`: a timed match never auto-ended at 00:00. The auto-end effect listed `handleEnd` in its deps, and `handleEnd` is a new function every render while the timer keeps re-rendering every second at zero, so the first tick inside `AUTO_END_DELAY_MS` cancelled the armed timeout and a one-shot guard stopped it re-arming: the match sat LIVE at 00:00 and `match_ended` was never sent. The effect now reads `handleEnd` through a ref and keys only on whether an auto-end is due (zero, running, not paused, no pause/resume in flight, not already ended). A pause at 00:00 holds the auto-end and resuming re-arms it; the opponent's `match_ended`, a manual END MATCH and unmount can never double-fire it. Test: `apps/mobile/__tests__/components/match-flow/live-step-auto-end.test.tsx` (real match timer under fake timers, forced re-renders inside the delay).
+
 ### Web: match detail page + inline video viewer (jits-5tj9.9, jits-8t0m)
 
 **Added**
