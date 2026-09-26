@@ -17,6 +17,7 @@ import {
   useArenaState,
   useIsArenaLive,
   useIsInArenaMatch,
+  useMatchExitCount,
   type ArenaController,
 } from "@/lib/arena/arena-store";
 
@@ -121,11 +122,31 @@ describe("in-match bit", () => {
     const b = renderHook(() => useArenaMatchScreen());
     expect(probe.result.current).toBe(true);
 
-    // A router.replace that mounts the next match before the old unmounts.
+    // A navigation that mounts the next match before the old unmounts.
     a.unmount();
     expect(probe.result.current).toBe(true);
     b.unmount();
     expect(probe.result.current).toBe(false);
+  });
+});
+
+describe("match-exit count (jits-tlk3)", () => {
+  it("bumps once per true-to-false transition of the in-match bit", () => {
+    const probe = renderHook(() => useMatchExitCount());
+    const start = probe.result.current;
+
+    const a = renderHook(() => useArenaMatchScreen());
+    expect(probe.result.current).toBe(start);
+    a.unmount();
+    expect(probe.result.current).toBe(start + 1);
+
+    // Two overlapping match screens are one match left, not two.
+    const b = renderHook(() => useArenaMatchScreen());
+    const c = renderHook(() => useArenaMatchScreen());
+    b.unmount();
+    expect(probe.result.current).toBe(start + 1);
+    c.unmount();
+    expect(probe.result.current).toBe(start + 2);
   });
 });
 

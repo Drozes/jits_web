@@ -7,6 +7,7 @@ import { useThemedTokens } from "@/lib/theme/use-theme";
 import { useProfileData } from "@/lib/profile/use-profile-data";
 import { useMyMatchVideos } from "@/lib/profile/use-my-match-videos";
 import { usePullToRefresh, useRefetchOnRefocus } from "@/lib/cache/use-refocus-refetch";
+import { useMatchExitCount } from "@/lib/arena/arena-store";
 import { matchDetailHref } from "@/lib/match-detail/href";
 import { ProfileHeader } from "@/components/profile/profile-header";
 import { ProfileQuickStats } from "@/components/profile/profile-quick-stats";
@@ -114,7 +115,7 @@ export default function ProfileScreen() {
     refetchVideos();
   }, [refetchProfile, refetchVideos]);
   const { refreshing, onRefresh } = usePullToRefresh(refetchAll, profileBusy || videos.isValidating);
-  useRefetchOnRefocus(refetchAll);
+  useRefetchOnRefocus(refetchAll, useMatchExitCount());
 
   // Serve recent matches from the single cached history payload fetched by
   // useProfileData; no separate round-trip.

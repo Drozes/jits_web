@@ -158,14 +158,22 @@ export function notifyStaleChallengesCancelled(): void {
 
 /**
  * How many match screens are mounted. A count, not a boolean, so a
- * `router.replace` that mounts the next match screen before the old one
- * unmounts cannot clear the bit early.
+ * navigation that mounts the next match screen before the old one unmounts
+ * (a match pushed from a match) cannot clear the bit early.
  *
  * Lives here rather than in the owner because the match screen can mount
  * BEFORE the owner (a launch straight into `/match/<id>`: the Stack's effects
  * run before its sibling's), and the owner must still see it.
  */
 let matchScreens = 0;
+/**
+ * How many times the athlete has left a match: the in-match bit going from
+ * true to false. Match exits pop back to tab screens that stayed mounted
+ * underneath (exitMatchTo's dismissTo, jits-tlk3), so nothing remounts and
+ * refetches on its own; screens whose data a match changes (the Arena roster,
+ * Home, Profile) key a refresh off this instead.
+ */
+let matchExits = 0;
 const matchListeners = new Set<() => void>();
 
 function subscribeMatch(callback: () => void): () => void {
@@ -184,18 +192,29 @@ export function useIsInArenaMatch(): boolean {
   return useSyncExternalStore(subscribeMatch, getInMatch, getInMatch);
 }
 
+function getMatchExits(): number {
+  return matchExits;
+}
+
+/** Bumps each time the last mounted match screen unmounts. */
+export function useMatchExitCount(): number {
+  return useSyncExternalStore(subscribeMatch, getMatchExits, getMatchExits);
+}
+
 /**
  * Mark a match screen as mounted for its lifetime. While any is mounted the
  * athlete is offline and no challenge prompt is raised; every exit path
- * (summary done, abort, back gesture, `router.replace`) unmounts the screen,
- * which is what restores live.
+ * (summary exits via `exitMatchTo`, abort, back gesture) removes the route and
+ * unmounts the screen, which is what restores live.
  */
 export function useArenaMatchScreen(): void {
   React.useEffect(() => {
     matchScreens += 1;
     for (const l of matchListeners) l();
     return () => {
+      const wasInMatch = matchScreens > 0;
       matchScreens = Math.max(0, matchScreens - 1);
+      if (wasInMatch && matchScreens === 0) matchExits += 1;
       for (const l of matchListeners) l();
     };
   }, []);

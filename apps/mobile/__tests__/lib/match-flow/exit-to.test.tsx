@@ -18,14 +18,32 @@
  *  - the Arena tab screen is NOT remounted, yet still receives `?rematch=`,
  *    and the real useRematchPin pins it and clears it off the route;
  *  - Done (`/`) lands on the Home tab, not the root redirect index;
- *  - with no `(tabs)` route beneath the match at all, the exit still lands.
+ *  - with no `(tabs)` route beneath the match at all, the exit still lands;
+ *  - a match entered on top of athlete/[id] pops that profile too;
+ *  - because nothing remounts, the screens that show match-changed data are
+ *    told: the real useArenaRoster re-reads, and the real
+ *    useRefetchOnRefocus refetches Home inside its 30 s throttle, both keyed
+ *    off the arena store's match-exit count (bumped by the real
+ *    useArenaMatchScreen on the match screen).
+ *
+ * Only the data layer under the roster is mocked.
  */
 import * as React from "react";
 import { Text } from "react-native";
 import { Redirect, Stack, Tabs, router, useLocalSearchParams } from "expo-router";
 import { renderRouter, act } from "expo-router/testing-library";
+
+const mockGetArenaData = jest.fn();
+jest.mock("@jits/shared/api/queries", () => ({
+  getArenaData: (...args: unknown[]) => mockGetArenaData(...args),
+}));
+jest.mock("@/lib/supabase/client", () => ({ supabase: {} }));
+
 import { exitMatchTo } from "@/lib/match-flow/exit-to";
 import { useRematchPin } from "@/lib/arena/use-rematch-pin";
+import { useArenaRoster } from "@/lib/arena/use-arena-roster";
+import { useArenaMatchScreen, useMatchExitCount } from "@/lib/arena/arena-store";
+import { useRefetchOnRefocus } from "@/lib/cache/use-refocus-refetch";
 import { ARENA_HREF } from "@/lib/arena/constants";
 
 // Same shape as summary-step's rematchHref (pinned in summary-step.test.tsx);
@@ -59,16 +77,17 @@ function useTrackMount(name: string) {
   }, [name]);
 }
 
-const NO_COMPETITORS: never[] = [];
 const NO_LOBBY = new Set<string>();
 const noop = () => {};
+const mockHomeRefetch = jest.fn();
 
 function ArenaIndex() {
   useTrackMount("arena");
+  const roster = useArenaRoster(1500);
   // The real hook, so the handoff is proven end to end: the param is read,
   // pinned, and cleared off this route with route-scoped setParams.
   const pin = useRematchPin({
-    competitors: NO_COMPETITORS,
+    competitors: roster.competitors,
     lobbyIds: NO_LOBBY,
     isLoading: false,
     refresh: noop,
@@ -79,13 +98,20 @@ function ArenaIndex() {
 
 function HomeIndex() {
   useTrackMount("home");
+  useRefetchOnRefocus(mockHomeRefetch, useMatchExitCount());
   return <Text testID="home">home</Text>;
 }
 
 function MatchScreen() {
   useTrackMount("match");
+  useArenaMatchScreen();
   const { matchId } = useLocalSearchParams<{ matchId: string }>();
   return <Text testID="match">{matchId}</Text>;
+}
+
+function AthleteScreen() {
+  useTrackMount("athlete");
+  return <Text testID="athlete">athlete</Text>;
 }
 
 function appTree({ anchorTabs = true } = {}) {
@@ -108,6 +134,7 @@ function appTree({ anchorTabs = true } = {}) {
     },
     "(app)/(tabs)/arena/index": ArenaIndex,
     "(app)/match/[matchId]": MatchScreen,
+    "(app)/athlete/[id]": AthleteScreen,
   };
 }
 
@@ -133,6 +160,11 @@ function focusedTab(state: unknown): string | undefined {
 }
 
 beforeEach(() => {
+  mockGetArenaData.mockReset();
+  // Pending forever by default, so routing-only tests never see a late
+  // roster state update; the refresh block below resolves it.
+  mockGetArenaData.mockReturnValue(new Promise(() => {}));
+  mockHomeRefetch.mockReset();
   for (const k of Object.keys(mounts)) delete mounts[k];
   for (const k of Object.keys(unmounts)) delete unmounts[k];
 });
@@ -265,5 +297,80 @@ describe("match exits on the real router", () => {
     expect(unmounts.match).toBe(1);
     expect(mounts.arena).toBe(1);
     expect(r.getByTestId("arena-pin")).toBeTruthy();
+  });
+
+  it("pops an athlete profile the match was entered from, and still delivers the param", () => {
+    const r = renderRouter(appTree(), { initialUrl: ARENA_HREF });
+    act(() => router.push("/athlete/A1"));
+    act(() => router.push("/match/M1"));
+    expect(appStackNames(r.getRouterState())).toEqual(["(tabs)", "athlete/[id]", "match/[matchId]"]);
+
+    act(() => exitMatchTo(router, rematchHref("opp-1")));
+
+    expect(appStackNames(r.getRouterState())).toEqual(["(tabs)"]);
+    expect(unmounts.athlete).toBe(1);
+    expect(unmounts.match).toBe(1);
+    expect(mounts.arena).toBe(1);
+    expect(r.getByTestId("arena-pin").props.children).toBe("opp-1");
+  });
+});
+
+describe("match exits refresh the screens that stayed mounted", () => {
+  beforeEach(() => {
+    mockGetArenaData.mockResolvedValue({ looking_athletes: [], challenged_opponent_ids: [] });
+  });
+  // Flush the roster's awaited read so its state lands inside act.
+  const settle = () => act(async () => {});
+
+  it("re-reads the Arena roster after every exit", async () => {
+    renderRouter(appTree(), { initialUrl: ARENA_HREF });
+    await settle();
+    expect(mockGetArenaData).toHaveBeenCalledTimes(1);
+
+    act(() => router.push("/match/M1"));
+    await settle();
+    expect(mockGetArenaData).toHaveBeenCalledTimes(1);
+
+    act(() => exitMatchTo(router, ARENA_HREF));
+    await settle();
+    expect(mockGetArenaData).toHaveBeenCalledTimes(2);
+    expect(mounts.arena).toBe(1);
+
+    act(() => router.push("/match/M2"));
+    act(() => exitMatchTo(router, rematchHref("opp-1")));
+    await settle();
+    expect(mockGetArenaData).toHaveBeenCalledTimes(3);
+  });
+
+  it("refetches Home on Done even inside the refocus throttle", async () => {
+    renderRouter(appTree(), { initialUrl: "/" });
+    await settle();
+    expect(mockHomeRefetch).not.toHaveBeenCalled();
+
+    // A plain push and back inside 30 s stays throttled...
+    act(() => router.push("/athlete/A1"));
+    act(() => router.back());
+    expect(mockHomeRefetch).not.toHaveBeenCalled();
+
+    // ...but leaving a match does not, and refetches exactly once.
+    act(() => router.push("/match/M1"));
+    act(() => exitMatchTo(router, "/"));
+    await settle();
+    expect(mockHomeRefetch).toHaveBeenCalledTimes(1);
+    expect(mounts.home).toBe(1);
+  });
+
+  it("refetches Home on its next focus after a match exited to the Arena", async () => {
+    renderRouter(appTree(), { initialUrl: "/" });
+    await settle();
+    act(() => router.navigate(ARENA_HREF));
+    act(() => router.push("/match/M1"));
+    act(() => exitMatchTo(router, ARENA_HREF));
+    await settle();
+    expect(mockHomeRefetch).not.toHaveBeenCalled();
+
+    act(() => router.navigate("/"));
+    await settle();
+    expect(mockHomeRefetch).toHaveBeenCalledTimes(1);
   });
 });

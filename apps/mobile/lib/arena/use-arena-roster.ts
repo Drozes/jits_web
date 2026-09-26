@@ -8,6 +8,7 @@ import * as React from "react";
 import { getArenaData } from "@jits/shared/api/queries";
 import type { ArenaData } from "@jits/shared/types/composites";
 import { supabase } from "../supabase/client";
+import { useMatchExitCount } from "./arena-store";
 import { ARENA_ROSTER_LIMIT } from "./constants";
 
 export interface ArenaCompetitor {
@@ -51,8 +52,11 @@ export function useArenaRoster(currentElo: number): UseArenaRosterResult {
   const [hasError, setHasError] = React.useState(false);
   const [tick, setTick] = React.useState(0);
 
-  const eloRef = React.useRef(currentElo);
-  eloRef.current = currentElo;
+  // Re-read after every match: the Arena stays mounted under the match
+  // (jits-tlk3), and the match just changed both ELOs (so every eloDiff) and
+  // consumed the challenge that marked the opponent "pending". A background
+  // read, so no pull spinner.
+  const matchExits = useMatchExitCount();
 
   const refresh = React.useCallback(() => {
     setIsRefreshing(true);
@@ -82,7 +86,6 @@ export function useArenaRoster(currentElo: number): UseArenaRosterResult {
         return;
       }
 
-      const mine = eloRef.current;
       setCompetitors(
         arena.looking_athletes.map((a) => ({
           id: a.id,
@@ -91,7 +94,7 @@ export function useArenaRoster(currentElo: number): UseArenaRosterResult {
           gymName: a.gym_name ?? undefined,
           weight: a.current_weight ?? undefined,
           profilePhotoUrl: a.profile_photo_url,
-          eloDiff: a.current_elo - mine,
+          eloDiff: 0,
           acceptsRanked: a.looking_for_ranked === true,
         })),
       );
@@ -105,10 +108,18 @@ export function useArenaRoster(currentElo: number): UseArenaRosterResult {
     return () => {
       cancelled = true;
     };
-  }, [tick]);
+  }, [tick, matchExits]);
+
+  // The gap is taken against the athlete's CURRENT rating at render, not the
+  // one at load: after a match both sides move, and the athlete's own row is
+  // re-read (ArenaBootstrap) independently of this roster read.
+  const withGap = React.useMemo(
+    () => competitors.map((c) => ({ ...c, eloDiff: c.currentElo - currentElo })),
+    [competitors, currentElo],
+  );
 
   return {
-    competitors,
+    competitors: withGap,
     challengedIds,
     isLoading,
     isRefreshing,
