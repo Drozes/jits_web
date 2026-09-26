@@ -6,6 +6,7 @@ import { Activity, Swords } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { MatchCard } from "@/components/domain/match-card";
 import { cn } from "@/lib/utils";
+import { matchRowLabel } from "@/lib/match-row-label";
 import { formatRelativeDate } from "@jits/shared/utils";
 import type { MatchOutcome } from "@jits/shared/constants";
 
@@ -83,7 +84,7 @@ export function RecentActivitySection({ myMatches, allActivity }: { myMatches: M
         hasContent ? (
           <div className="flex flex-col gap-2">
             {myMatches.map((m) => (
-              <MatchCard key={m.id} type="match" opponentName={m.opponentName} result={m.result} eloDelta={m.eloDelta} date={m.date} />
+              <MatchCard key={m.id} type="match" opponentName={m.opponentName} result={m.result} eloDelta={m.eloDelta} date={m.date} href={`/matches/${m.id}`} ariaLabel={matchRowLabel(m.opponentName, m.result, m.matchType, m.eloDelta)} />
             ))}
           </div>
         ) : (

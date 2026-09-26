@@ -17,6 +17,8 @@ interface MatchCardProps {
   eloDelta?: number;
   date: string;
   href?: string;
+  /** Accessible name for the link (only used with `href`). */
+  ariaLabel?: string;
 }
 
 const resultConfig = {
@@ -90,7 +92,7 @@ function CardInner({ type, opponentName, opponentPhotoUrl, result, status, direc
 export function MatchCard(props: MatchCardProps) {
   if (props.href) {
     return (
-      <Link href={props.href} prefetch={false}>
+      <Link href={props.href} prefetch={false} aria-label={props.ariaLabel}>
         <Card variant="interactive" className="active:scale-[0.98] active:opacity-90">
           <CardInner {...props} />
         </Card>

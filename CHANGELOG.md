@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Web: match detail page + inline video viewer (jits-5tj9.9, jits-8t0m)
+
+**Added**
+- `/matches/[id]` (`apps/web/app/(app)/matches/[id]/`): `page.tsx` (sync, Suspense + skeleton), `match-detail-content.tsx` (async server read via `getMatchDetailView`, `notFound()` on `MATCH_NOT_FOUND`, inline "You can't view this match" / "Couldn't load this match" panels, per-video server-side signing via `getMatchVideoPlaybackResult` for every non-processing video, per request and never cached across users), `match-result-header.tsx` (WIN / LOSS / DRAW / NO RESULT verdict, ranked ELO delta with before and after (hidden when the delta is unknown) or "Casual, unrated", amber DISPUTED or muted VOIDED / CANCELLED chip, opponent row with a circular avatar linking to `/athlete/<id>`, meta row with a mono date), `match-video-card.tsx` (client: poster or placeholder, angle label, Watch mounts an inline `<video controls playsInline preload="metadata">` and calls `play()` so iOS Safari needs no second tap; a playback error re-signs silently and resumes at the same position, the budget is refunded only after 2s of real progress past the resume point and capped at 2 silent re-signs per mount, otherwise "Couldn't play this video" with Try again; processing, file missing and unavailable states; only the first watchable card gets the Signal Red Watch), `match-video-card-parts.tsx` (poster, panels, actions), `match-video-state.ts` (phase rules shared by server and card), `match-detail-states.tsx`, `not-found.tsx` ("Match not found" / "It may have been cancelled or removed." / Back). Tests colocated (`*.test.ts(x)`).
+- `apps/web/e2e/smoke.spec.ts`: unauthenticated `/matches/<uuid>` redirects to `/login`.
+
+**Changed**
+- Match history rows link to `/matches/<id>`: Profile Recent Matches and athlete Head-to-Head (`app/(app)/profile/profile-history-list.tsx`), Stats history (`app/(app)/profile/stats/match-history-list.tsx`) and Home "Me" scope (`components/domain/recent-activity-section.tsx`). "All" scope rows stay unlinked. Each row's accessible name is "Open match vs <name>, <outcome>[, <signed delta> when ranked]" via `apps/web/lib/match-row-label.ts`; `MatchCard` takes an optional `ariaLabel`. Tests added for each.
+
+**Fixed**
+- `apps/web/components/domain/video-analysis-viewer.tsx` (jits-8t0m): signs through `getMatchVideoSignedUrlResult` (normalized_path ?? storage_path) instead of reading `match_videos.storage_path` directly, so a WebM upload plays its normalized MP4. Test: `components/domain/video-analysis-viewer.test.tsx`.
+
 ### Shared: match detail + video playback data layer (jits-5tj9.6)
 
 **Added**

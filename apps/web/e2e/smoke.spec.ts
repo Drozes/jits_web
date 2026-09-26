@@ -77,4 +77,12 @@ test.describe("Auth redirects", () => {
     await page.waitForURL(/\/login/);
     await expect(page.getByRole("button", { name: SIGN_IN_CTA })).toBeVisible();
   });
+
+  test("unauthenticated user is redirected from a match detail page to login", async ({
+    page,
+  }) => {
+    await page.goto("/matches/00000000-0000-4000-8000-000000000000");
+    await page.waitForURL(/\/login/);
+    await expect(page.getByRole("button", { name: SIGN_IN_CTA })).toBeVisible();
+  });
 });

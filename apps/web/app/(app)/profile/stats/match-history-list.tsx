@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { MatchCard } from "@/components/domain/match-card";
 import { cn } from "@/lib/utils";
+import { matchRowLabel } from "@/lib/match-row-label";
 import type { MatchOutcome } from "@jits/shared/constants";
 import { Swords } from "lucide-react";
 
@@ -89,6 +90,8 @@ export function MatchHistoryList({ matches }: MatchHistoryListProps) {
               matchType={m.match_type as "ranked" | "casual"}
               eloDelta={m.match_type === "ranked" ? m.elo_delta : undefined}
               date={m.completed_at}
+              href={`/matches/${m.match_id}`}
+              ariaLabel={matchRowLabel(m.opponent_display_name, m.athlete_outcome, m.match_type, m.elo_delta)}
             />
           ))}
         </div>
