@@ -588,9 +588,10 @@ describe("useLobbyPresence: server-closed channel recovery (jits-fa9x)", () => {
     const rebuilt = mockChannels[1];
     expect(rebuilt.config).toEqual({ config: { presence: { key: ME } } });
     expect(mockRegistry).toEqual([rebuilt]);
-    // Torn down locally, never "removed": a leave for this topic could
-    // unregister the replacement, since realtime-js removes by topic.
-    expect(channel.teardown).toHaveBeenCalled();
+    // Already CLOSED, so left alone: teardown() would clear the reply
+    // bindings a pending push needs to ever time out, and a removal would
+    // push a leave for this topic that could unregister the replacement.
+    expect(channel.teardown).not.toHaveBeenCalled();
     expect(mockRemoveChannel).not.toHaveBeenCalledWith(channel);
 
     await act(async () => {
@@ -617,19 +618,22 @@ describe("useLobbyPresence: server-closed channel recovery (jits-fa9x)", () => {
     await act(async () => {
       await leaveLobby();
     });
-    channel.state = "closed";
+    // Unregistered but not closed: this one does need a local teardown.
+    channel.state = "errored";
     mockRegistry.splice(mockRegistry.indexOf(channel), 1);
 
     await act(async () => {
       await joinLobby(PAYLOAD);
     });
     expect(channel.track).toHaveBeenCalledTimes(1);
+    expect(channel.teardown).not.toHaveBeenCalled();
     expect(warn).toHaveBeenCalledWith(
       expect.stringContaining("no longer registered"),
     );
 
     await advance(1_000);
     expect(mockChannels).toHaveLength(2);
+    expect(channel.teardown).toHaveBeenCalledTimes(1);
     await act(async () => {
       mockChannels[1].subscribeHandler?.("SUBSCRIBED");
     });
@@ -906,5 +910,167 @@ describe("useLobbyPresence: presence churn", () => {
     expect(channel.untrack).toHaveBeenCalledTimes(1);
 
     unmount();
+  });
+});
+
+/**
+ * A rate-limited track gets NO reply, and the server then closes the channel.
+ * With real realtime-js the push's timeout can end up with nothing to fire
+ * into, so the track promise never settles. The sync loop is module-level and
+ * serialized, and `use-arena-live` awaits `joinLobby()`, so a call that never
+ * settles used to freeze going live and going offline for the rest of the
+ * app process.
+ */
+describe("useLobbyPresence: presence calls that never settle", () => {
+  async function advance(ms: number) {
+    await act(async () => {
+      jest.advanceTimersByTime(ms);
+      await settle();
+    });
+  }
+
+  function never(): Promise<string> {
+    return new Promise<string>(() => {});
+  }
+
+  it("lets go of a hung track the moment the server closes the channel", async () => {
+    jest.useFakeTimers();
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    const hook = mount();
+    await settle();
+    const channel = mockChannels[0];
+    await act(async () => {
+      channel.subscribeHandler?.("SUBSCRIBED");
+    });
+    channel.track.mockImplementation(never);
+
+    let joined = false;
+    await act(async () => {
+      void joinLobby(PAYLOAD).then(() => {
+        joined = true;
+      });
+      await settle();
+    });
+    expect(channel.track).toHaveBeenCalledTimes(1);
+    expect(joined).toBe(false);
+
+    // Rate limited: no reply, then the server closes the channel.
+    await act(async () => {
+      mockClose(channel);
+      await settle();
+    });
+    expect(joined).toBe(true);
+
+    await advance(1_000);
+    expect(mockChannels).toHaveLength(2);
+    await act(async () => {
+      mockChannels[1].subscribeHandler?.("SUBSCRIBED");
+    });
+    expect(mockChannels[1].track).toHaveBeenCalledWith(PAYLOAD);
+
+    // And the loop is free: later calls resolve too.
+    await act(async () => {
+      await leaveLobby();
+    });
+    expect(mockChannels[1].untrack).toHaveBeenCalledTimes(1);
+
+    hook.unmount();
+    warn.mockRestore();
+  });
+
+  it("does not hold a match-entry leave behind a hung call on a lost channel", async () => {
+    jest.useFakeTimers();
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    const hook = mount();
+    await settle();
+    const channel = mockChannels[0];
+    await act(async () => {
+      channel.subscribeHandler?.("SUBSCRIBED");
+    });
+    channel.track.mockImplementation(never);
+
+    let left = false;
+    await act(async () => {
+      void joinLobby(PAYLOAD);
+      // Entering a match while the track hangs.
+      void leaveLobby().then(() => {
+        left = true;
+      });
+      await settle();
+    });
+    expect(left).toBe(false);
+
+    await act(async () => {
+      mockClose(channel);
+      await settle();
+    });
+    // Released at once, not after the 12s bound.
+    expect(left).toBe(true);
+
+    // The rebuilt channel does not put the athlete back in the lobby.
+    await advance(1_000);
+    await act(async () => {
+      mockChannels[1].subscribeHandler?.("SUBSCRIBED");
+    });
+    expect(mockChannels[1].track).not.toHaveBeenCalled();
+
+    hook.unmount();
+    warn.mockRestore();
+  });
+
+  it("bounds a call that never settles on a channel that stays up, then re-syncs once", async () => {
+    jest.useFakeTimers();
+    const hook = mount();
+    await settle();
+    const channel = mockChannels[0];
+    await act(async () => {
+      channel.subscribeHandler?.("SUBSCRIBED");
+    });
+    channel.track.mockImplementation(never);
+
+    let joined = false;
+    await act(async () => {
+      void joinLobby(PAYLOAD).then(() => {
+        joined = true;
+      });
+      await settle();
+    });
+
+    await advance(11_999);
+    expect(joined).toBe(false);
+    await advance(1);
+    expect(joined).toBe(true);
+
+    // Unconfirmed while still wanted: one follow-up track about 2s later.
+    channel.track.mockResolvedValue("ok");
+    await advance(1_999);
+    expect(channel.track).toHaveBeenCalledTimes(1);
+    await advance(1);
+    expect(channel.track).toHaveBeenCalledTimes(2);
+    expect(channel.track).toHaveBeenLastCalledWith(PAYLOAD);
+
+    hook.unmount();
+  });
+
+  it("re-syncs only once for a run of unconfirmed calls", async () => {
+    jest.useFakeTimers();
+    const hook = mount();
+    await settle();
+    const channel = mockChannels[0];
+    await act(async () => {
+      channel.subscribeHandler?.("SUBSCRIBED");
+    });
+    channel.track.mockResolvedValue("timed out");
+
+    await act(async () => {
+      await joinLobby(PAYLOAD);
+    });
+    await advance(2_000);
+    expect(channel.track).toHaveBeenCalledTimes(2);
+    // The follow-up was unconfirmed too: no more presence calls on a timer.
+    await advance(60_000);
+    expect(channel.track).toHaveBeenCalledTimes(2);
+
+    hook.unmount();
   });
 });

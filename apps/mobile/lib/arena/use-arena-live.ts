@@ -71,6 +71,32 @@ export interface UseArenaLiveResult {
   goOffline: () => Promise<boolean>;
 }
 
+/** Longest a transition waits on joining the lobby's presence. */
+const LOBBY_CALL_BOUND_MS = 12_000;
+
+/**
+ * Wait for `work`, but never longer than `ms`, and never reject: a presence
+ * failure is logged and survivable, a stuck or rejected transition is not.
+ */
+async function settleWithin(work: Promise<unknown>, ms: number): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      work.catch((error: unknown) => {
+        console.warn("[arena] joining the lobby failed:", error);
+      }),
+      new Promise<void>((resolve) => {
+        timer = setTimeout(() => {
+          console.warn("[arena] joining the lobby did not settle; moving on");
+          resolve();
+        }, ms);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /**
  * Write the flag, with one retry.
  *
@@ -149,13 +175,20 @@ export function useArenaLive({
       // presence row the next pass has to take straight back down, so leave
       // it to the loop, which clears both halves instead.
       if (!desiredRef.current) return true;
-      await joinLobby({
-        athlete_id: id,
-        display_name: name,
-        current_elo: elo,
-        looking_for_casual: false,
-        looking_for_ranked: true,
-      });
+      // Bounded (jits-fa9x). Presence is best-effort and the flag above is
+      // authoritative, so a presence call that never settles must not hold
+      // this serialized queue: behind it the toggle would spin forever and
+      // the go-offline on match entry would never write the flag.
+      await settleWithin(
+        joinLobby({
+          athlete_id: id,
+          display_name: name,
+          current_elo: elo,
+          looking_for_casual: false,
+          looking_for_ranked: true,
+        }),
+        LOBBY_CALL_BOUND_MS,
+      );
       return true;
     }
 

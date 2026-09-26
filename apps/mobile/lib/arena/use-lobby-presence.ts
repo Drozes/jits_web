@@ -116,6 +116,18 @@ const LOSS_STREAK_RESET_MS = 30_000;
  */
 const UNCONFIRMED = "\u0000unconfirmed";
 
+/**
+ * Hard upper bound on one track/untrack. phoenix normally answers a push that
+ * got no reply with 'timed out' after 10s, but not always: a server that
+ * rate-limits a call does not reply at all, and once the channel it went out
+ * on has been torn down, nothing is left to fire that timeout into, so the
+ * promise never settles. The serialized sync loop must never wait on that.
+ */
+const PRESENCE_CALL_TIMEOUT_MS = 12_000;
+
+/** Delay before the one follow-up sync after an unconfirmed call. */
+const UNCONFIRMED_RESYNC_MS = 2_000;
+
 // ---------------------------------------------------------------------------
 // External store
 // ---------------------------------------------------------------------------
@@ -200,6 +212,57 @@ function payloadKey(payload: LobbyPayload | null): string | null {
 }
 
 /**
+ * Per-channel "this channel is gone" signal, resolved when the module stops
+ * owning the channel (server loss or deliberate release). A presence call in
+ * flight on that channel is raced against it, so the sync loop lets go the
+ * moment the channel is lost instead of holding every later join or leave
+ * (including the untrack on entering a match) behind a call that may never
+ * settle.
+ */
+const channelGone = new WeakMap<
+  RealtimeChannel,
+  { promise: Promise<"lost">; resolve: () => void }
+>();
+
+function goneSignal(channel: RealtimeChannel) {
+  let signal = channelGone.get(channel);
+  if (!signal) {
+    let resolve!: () => void;
+    const promise = new Promise<"lost">((r) => {
+      resolve = () => r("lost");
+    });
+    signal = { promise, resolve };
+    channelGone.set(channel, signal);
+  }
+  return signal;
+}
+
+let resyncTimer: ReturnType<typeof setTimeout> | null = null;
+/** The one follow-up for the current run of unconfirmed calls is spent. */
+let resyncSpent = false;
+
+/**
+ * An unconfirmed call left us not knowing what the server holds. Sync once
+ * more a little later, but only once per run of unconfirmed calls: a server
+ * that keeps not answering is not helped by more presence calls, and the rate
+ * limit counts every one of them.
+ */
+function scheduleResync(): void {
+  if (resyncTimer || resyncSpent) return;
+  resyncSpent = true;
+  resyncTimer = setTimeout(() => {
+    resyncTimer = null;
+    void syncPresence();
+  }, UNCONFIRMED_RESYNC_MS);
+}
+
+function cancelResync(): void {
+  if (resyncTimer) clearTimeout(resyncTimer);
+  resyncTimer = null;
+  resyncSpent = false;
+}
+
+/**
  * The owned channel is gone for good (server close). Clear the refs and ask
  * the owner to build a new one, KEEPING `desiredPayload` so the new channel
  * re-tracks on SUBSCRIBED. The identity guard is what stops an intentional
@@ -220,6 +283,8 @@ function handleChannelLoss(channel: RealtimeChannel, reason: string): void {
   trackedKey = null;
   ownedSubscribedAt = null;
   lostChannel = channel;
+  goneSignal(channel).resolve();
+  cancelResync();
   // We no longer receive syncs, so the roster we hold is going stale.
   lobbyIds = new Set();
   emitChange();
@@ -249,16 +314,34 @@ async function syncOnce(): Promise<void> {
   const want = payloadKey(desiredPayload);
   if (want === trackedKey) return;
   trackedKey = want;
+  let timer: ReturnType<typeof setTimeout> | null = null;
   try {
-    const status = desiredPayload
-      ? await channel.track(desiredPayload)
-      : await channel.untrack();
-    if (status !== "ok" && channelRef === channel && trackedKey === want) {
-      trackedKey = UNCONFIRMED;
+    const call = desiredPayload
+      ? channel.track(desiredPayload)
+      : channel.untrack();
+    // Whichever loses the race must not surface as an unhandled rejection.
+    call.catch(() => {});
+    const status = await Promise.race([
+      call,
+      goneSignal(channel).promise,
+      new Promise<"timed out">((resolve) => {
+        timer = setTimeout(() => resolve("timed out"), PRESENCE_CALL_TIMEOUT_MS);
+      }),
+    ]);
+    if (channelRef !== channel || trackedKey !== want) return;
+    if (status === "ok") {
+      resyncSpent = false;
+      return;
     }
+    trackedKey = UNCONFIRMED;
+    scheduleResync();
   } catch (error: unknown) {
-    if (channelRef === channel && trackedKey === want) trackedKey = UNCONFIRMED;
     console.warn("[arena] lobby presence update failed:", error);
+    if (channelRef !== channel || trackedKey !== want) return;
+    trackedKey = UNCONFIRMED;
+    scheduleResync();
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }
 
@@ -324,9 +407,11 @@ async function releaseChannel(): Promise<void> {
   ownedSubscribedAt = null;
   // A deliberate release (athlete change, sign-out) starts a new story.
   consecutiveLosses = 0;
+  cancelResync();
   lobbyIds = new Set();
   emitChange();
   if (!channel) return;
+  goneSignal(channel).resolve();
   const status = await supabase.removeChannel(channel);
   if (status !== "ok") {
     console.warn("[arena] lobby channel did not confirm teardown:", status);
@@ -406,15 +491,18 @@ export function useLobbyPresence(athleteId: string): void {
     }
 
     async function ensure(attempt: number) {
-      // A channel the server closed is already out of the registry; tear it
-      // down (timers, buffered pushes, bindings) without sending anything.
-      // `removeChannel()` would push a leave for this topic, and realtime-js
-      // drops registry entries BY TOPIC on close, so any late close event
-      // from it could unregister the replacement built below.
+      // A channel the server CLOSED needs nothing more: phoenix's close has
+      // already reset its rejoin timer and dropped it from the socket.
+      // Tearing it down as well would clear its reply bindings, so a push
+      // still waiting on it could never time out and would hang forever.
+      // Only an instance lost some other way (unregistered, not closed) is
+      // torn down, locally: `removeChannel()` would push a leave for this
+      // topic, and realtime-js drops registry entries BY TOPIC on close, so
+      // a late close from it could unregister the replacement built below.
       if (lostChannel) {
         const dead = lostChannel;
         lostChannel = null;
-        dead.teardown();
+        if (dead.state !== "closed") dead.teardown();
       }
 
       if (!athleteId) {

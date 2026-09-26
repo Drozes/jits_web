@@ -189,7 +189,9 @@ describe("useOnlinePresence", () => {
 
     await advance(1_000);
     expect(mockChannels).toHaveLength(2);
-    expect(channel.teardown).toHaveBeenCalled();
+    // Already CLOSED: neither torn down (that would strand a pending push's
+    // timeout) nor removed (a leave for this topic could hit the new one).
+    expect(channel.teardown).not.toHaveBeenCalled();
     expect(mockRemoveChannel).not.toHaveBeenCalledWith(channel);
     await subscribed(mockChannels[1]);
     expect(mockChannels[1].track).toHaveBeenCalledWith({

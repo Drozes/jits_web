@@ -186,13 +186,16 @@ export function useOnlinePresence(
     }
 
     async function connect() {
-      // Tear the closed instance down locally. Not `removeChannel()`: that
-      // pushes a leave for this topic, and realtime-js unregisters BY TOPIC
-      // on close, so a late close could take the replacement with it.
+      // A CLOSED instance needs nothing more (phoenix already dropped it from
+      // the socket), and tearing it down would clear the reply bindings a
+      // pending push needs to ever time out. Anything else is torn down
+      // locally, not via `removeChannel()`: that pushes a leave for this
+      // topic, and realtime-js unregisters BY TOPIC on close, so a late close
+      // could take the replacement with it.
       if (deadChannel) {
         const dead = deadChannel;
         deadChannel = null;
-        dead.teardown();
+        if (dead.state !== "closed") dead.teardown();
       }
       if (pendingRemoval) await pendingRemoval;
       if (cancelled) return;
@@ -272,7 +275,7 @@ export function useOnlinePresence(
       sub.remove();
       if (retryTimer) clearTimeout(retryTimer);
       if (deadChannel) {
-        deadChannel.teardown();
+        if (deadChannel.state !== "closed") deadChannel.teardown();
         deadChannel = null;
       }
       const ch = channel;
