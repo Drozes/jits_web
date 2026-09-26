@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Mobile: release-review Arena fixes
+
+JS-only, OTA-eligible for runtime 0.3.0.
+
+**Fixed**
+- The Arena "Pending" tag no longer sticks after a challenge ends without a match: the Arena quietly re-reads the roster when an outgoing or incoming challenge clears, skipped when it became a match. `apps/mobile/app/(app)/(tabs)/arena/index.tsx`
+- Live resume runs once, at arrival: `useArenaLive` captures `looking_for_ranked` at mount, so the post-match athlete re-read no longer triggers an extra flag write and lobby track, or forces an athlete who tapped offline back live. `apps/mobile/lib/arena/use-arena-live.ts`
+- Background roster re-reads (rematch pin, stale-challenge sweep) are quiet (no pull spinner, no error plate over a good roster).
+
 ### Mobile: Arena concurrency follow-ups (jits-6ziw)
 
 JS-only, OTA-eligible for runtime 0.3.0.
