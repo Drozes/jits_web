@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Web: release-review cross-platform fixes
+
+**Fixed**
+- Arena: a challenger who reloads gets the waiting bar and accept listener back (own newest fresh pending outgoing restored on mount / go-live / leaving a match / tab visible), and a fresh "started" challenge of theirs is joined even when it is no longer on the bar (`apps/web/hooks/use-arena-challenge.ts`, new `apps/web/lib/arena/challenge-freshness.ts`).
+- Arena: entering a match declines the athlete's other fresh pending incoming challenges and tells each challenger; the matched peer's crossing challenge is withdrawn quietly (mobile parity).
+- Match wizard: the fighter live step re-reads the match on tab visible and every 10s, re-applying missed pause/resume, moving on once the result is recorded, and leaving a cancelled/voided match.
+- Match wizard: result recording reconciles with the DB once on mount; the confirm step says "<name> disputed the result. An admin will review it." and a failed dispute stays on the step with an error.
+- Athlete profile: only a challenge younger than the Arena freshness window counts as pending; `getPendingChallengeBetween` returns `createdAt`, newest first.
+
 ### Mobile: release-review match-flow fixes
 
 JS-only, OTA-eligible for runtime 0.3.0.
