@@ -17,9 +17,12 @@ import {
 import {
   getChallengeStatus,
   getPendingChallengesForAthlete,
+  getStartedChallengesToJoin,
 } from "@jits/shared/api/queries";
+import { ARENA_CHALLENGE_FRESH_MS } from "@jits/shared/constants";
 import type { PendingChallenge } from "@jits/shared/types/composites";
 import { isFreshChallenge } from "@/lib/arena/challenge-freshness";
+import { clearAccepted, readAccepted, writeAccepted } from "@/lib/arena/accepted-record";
 
 export interface IncomingChallenge {
   challengeId: string;
@@ -369,6 +372,7 @@ export function useArenaChallenge({
       entryPeerRef.current = peerId;
       enteredIdsRef.current.add(challengeId);
       acceptedNotEnteredRef.current.delete(challengeId);
+      clearAccepted(athleteIdRef.current);
       settledRef.current.add(challengeId);
       // My own challenge that did not become this match is over too. Settled
       // now, so recovery cannot put its bar back while it is withdrawn.
@@ -576,6 +580,62 @@ export function useArenaChallenge({
     },
     [enterMatch],
   );
+
+  /**
+   * Back into a match the challenger started without me (jits-itjn, mobile's
+   * `rejoinStartedMatch`). I accepted, then my tab reloaded (or lost the
+   * network) before my start or its broadcast went out; the challenger's
+   * `ACCEPTED_FALLBACK_MS` safety net started the match alone, and nothing in
+   * this fresh instance knows. So check the ONE challenge persisted on accept
+   * (`lib/arena/accepted-record.ts`) and never entered. It is joined only when:
+   *  - it is within the live window (`ARENA_CHALLENGE_FRESH_MS`) of my accept;
+   *  - the server says it is `started`, its match is still `pending`, and the
+   *    challenger (not I) started it, see `getStartedChallengesToJoin`;
+   *  - this instance never entered it, and no accept, prompt or match screen
+   *    is in the way.
+   * Entering any match clears the record, so a match left on purpose is never
+   * joined again. In a session lobby or join wizard `enterMatch` offers it as
+   * a Join toast rather than navigating (jits-zasq).
+   */
+  const rejoinStartedMatch = useCallback(async () => {
+    const me = athleteIdRef.current;
+    const blocked = () => busyRef.current || entryBlocked() || !!incomingRef.current;
+    if (!me || blocked()) return;
+    const stored = readAccepted(me);
+    if (!stored) return;
+    if (
+      Date.now() - stored.at > ARENA_CHALLENGE_FRESH_MS ||
+      enteredIdsRef.current.has(stored.challengeId)
+    ) {
+      clearAccepted(me);
+      return;
+    }
+    const since = new Date(Date.now() - ARENA_CHALLENGE_FRESH_MS).toISOString();
+    const read = await getStartedChallengesToJoin(createClient(), me, since);
+    if (!read.ok) return;
+    // Not there (yet): the challenger's fallback may still be counting down,
+    // so the record stays until it goes stale or a later check finds it.
+    const pick = read.data.find((c) => c.challengeId === stored.challengeId);
+    if (!pick || blocked()) return;
+    enterMatch(pick.challengeId, pick.matchId, pick.challengerId);
+  }, [entryBlocked, enterMatch]);
+  const rejoinRef = useRef(rejoinStartedMatch);
+  rejoinRef.current = rejoinStartedMatch;
+
+  // On mount, but only once the tab is actually visible (a tab restored in
+  // the background must not navigate), and on every return to the tab.
+  useEffect(() => {
+    if (!athleteId || document.visibilityState === "hidden") return;
+    void rejoinRef.current();
+  }, [athleteId]);
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      void rejoinRef.current();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, []);
 
   /**
    * Withdraw my own outgoing challenges older than the Arena freshness window
@@ -855,7 +915,15 @@ export function useArenaChallenge({
               void joinAccepted(row.id, row.challenger_id);
             } else if (row.status !== "accepted") {
               acceptedNotEnteredRef.current.delete(row.id);
+              clearAccepted(athleteId);
             }
+          } else if (
+            row.status === "started" &&
+            readAccepted(athleteId)?.challengeId === row.id
+          ) {
+            // The challenger's fallback started one I accepted before a
+            // reload: the same narrow rejoin check decides (jits-itjn).
+            void rejoinRef.current();
           }
           // My own accept flips the row to accepted before the match exists.
           if (acceptingIdRef.current === row.id) return;
@@ -1185,6 +1253,10 @@ export function useArenaChallenge({
           // challenger's fallback starts it and its `started` UPDATE brings
           // me in.
           acceptedNotEnteredRef.current.add(current.challengeId);
+          writeAccepted(athleteIdRef.current, {
+            challengeId: current.challengeId,
+            at: Date.now(),
+          });
 
           // acceptChallenge filters on status = 'pending' and a no-row update
           // is not an error, so a withdrawn challenge surfaces here as
@@ -1205,6 +1277,7 @@ export function useArenaChallenge({
             const withdrawn = await cancelChallenge(supabase, current.challengeId);
             if (withdrawn.ok && withdrawn.data.cancelled) {
               acceptedNotEnteredRef.current.delete(current.challengeId);
+              clearAccepted(athleteIdRef.current);
             }
             if (withdrawn.ok && !withdrawn.data.cancelled) {
               started = await startMatchFromChallenge(supabase, current.challengeId);

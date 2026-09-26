@@ -12,6 +12,7 @@ import {
   opponentLeftMessage,
   useArenaChallenge,
 } from "./use-arena-challenge";
+import { ACCEPTED_KEY_PREFIX } from "@/lib/arena/accepted-record";
 
 type Handler = (payload: unknown) => unknown;
 interface FakeChannel {
@@ -152,6 +153,7 @@ vi.mock("@jits/shared/api/mutations", () => m);
 const q = vi.hoisted(() => ({
   getPendingChallengesForAthlete: vi.fn(),
   getChallengeStatus: vi.fn(),
+  getStartedChallengesToJoin: vi.fn(),
 }));
 vi.mock("@jits/shared/api/queries", () => q);
 
@@ -242,6 +244,8 @@ beforeEach(() => {
     ok: true,
     data: { status: "pending", expiresAt: null },
   });
+  q.getStartedChallengesToJoin.mockResolvedValue({ ok: true, data: [] });
+  window.localStorage.clear();
 });
 
 type MountProps = { canReceive: boolean; inMatch?: boolean; lobbyIds?: Set<string> };
@@ -1764,5 +1768,180 @@ describe("a session lobby or join wizard never races an Arena push (jits-zasq)",
     });
     expect(push).not.toHaveBeenCalled();
     expect(joinToast()?.id).toBe("arena-join:lost");
+  });
+});
+
+describe("an accepter whose tab reloaded finds its way back in (jits-itjn)", () => {
+  const KEY = `${ACCEPTED_KEY_PREFIX}me`;
+  const record = (challengeId: string, ageMs = 5_000) =>
+    window.localStorage.setItem(KEY, JSON.stringify({ challengeId, at: Date.now() - ageMs }));
+  const stored = () => window.localStorage.getItem(KEY);
+  const started = (challengeId: string, matchId = "m-re") => ({
+    ok: true,
+    data: [{ challengeId, challengerId: "ana", matchId }],
+  });
+  function setVisibility(state: "visible" | "hidden") {
+    Object.defineProperty(document, "visibilityState", { configurable: true, get: () => state });
+  }
+  afterEach(() => {
+    setVisibility("visible");
+  });
+
+  it("writes the record on accept and clears it once the match is entered", async () => {
+    let seen: string | null = null;
+    m.startMatchFromChallenge.mockImplementation(async () => {
+      seen = stored();
+      return { ok: true, data: { match_id: "m1" } };
+    });
+    const { result } = mount(true);
+    await insertChallenge("c1");
+    await act(() => result.current.accept());
+    expect(JSON.parse(seen!)).toEqual({ challengeId: "c1", at: expect.any(Number) });
+    expect(push).toHaveBeenCalledWith("/arena/match/m1");
+    expect(stored()).toBeNull();
+  });
+
+  it("clears the record when my failed start was withdrawn", async () => {
+    m.startMatchFromChallenge.mockResolvedValue({ ok: false, error: { code: "UNKNOWN", message: "down" } });
+    const { result } = mount(true);
+    await insertChallenge("c1");
+    await act(() => result.current.accept());
+    expect(stored()).toBeNull();
+  });
+
+  it("keeps the record when both the start and its withdrawal were lost", async () => {
+    m.startMatchFromChallenge.mockResolvedValue({ ok: false, error: { code: "UNKNOWN", message: "down" } });
+    m.cancelChallenge.mockResolvedValue({ ok: false, error: { code: "UNKNOWN", message: "down" } });
+    const { result } = mount(true);
+    await insertChallenge("c1");
+    await act(() => result.current.accept());
+    expect(JSON.parse(stored()!).challengeId).toBe("c1");
+  });
+
+  it("on mount, joins the persisted challenge the challenger started", async () => {
+    record("c1");
+    q.getStartedChallengesToJoin.mockResolvedValue(started("c1"));
+    mount(true);
+    await flushAll();
+    expect(q.getStartedChallengesToJoin).toHaveBeenCalledWith(expect.anything(), "me", expect.any(String));
+    expect(push).toHaveBeenCalledTimes(1);
+    expect(push).toHaveBeenCalledWith("/arena/match/m-re");
+    expect(stored()).toBeNull();
+  });
+
+  it("never rejoins without a persisted accept, whatever the server returns", async () => {
+    q.getStartedChallengesToJoin.mockResolvedValue(started("c1"));
+    mount(true);
+    await flushAll();
+    expect(q.getStartedChallengesToJoin).not.toHaveBeenCalled();
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("joins only the persisted challenge, not another started one", async () => {
+    record("c1");
+    q.getStartedChallengesToJoin.mockResolvedValue(started("other"));
+    mount(true);
+    await flushAll();
+    expect(push).not.toHaveBeenCalled();
+    // Not there yet: the record stays for a later check.
+    expect(JSON.parse(stored()!).challengeId).toBe("c1");
+  });
+
+  it("drops a stale record without asking the server", async () => {
+    record("c1", 11 * 60_000);
+    mount(true);
+    await flushAll();
+    expect(q.getStartedChallengesToJoin).not.toHaveBeenCalled();
+    expect(stored()).toBeNull();
+  });
+
+  it("does nothing on a read that fails", async () => {
+    record("c1");
+    q.getStartedChallengesToJoin.mockResolvedValue({ ok: false, error: { code: "UNKNOWN", message: "x" } });
+    mount(true);
+    await flushAll();
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("does not rejoin while a match screen is up", async () => {
+    record("c1");
+    q.getStartedChallengesToJoin.mockResolvedValue(started("c1"));
+    mount(false, true);
+    await flushAll();
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("waits for the tab to be visible, then joins", async () => {
+    setVisibility("hidden");
+    record("c1");
+    q.getStartedChallengesToJoin.mockResolvedValue(started("c1"));
+    mount(true);
+    await flushAll();
+    expect(q.getStartedChallengesToJoin).not.toHaveBeenCalled();
+    setVisibility("visible");
+    await act(async () => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    await flushAll();
+    expect(push).toHaveBeenCalledWith("/arena/match/m-re");
+  });
+
+  it("joins when the challenger's fallback starts it after the reload (its UPDATE)", async () => {
+    record("c1");
+    mount(true);
+    await flushAll();
+    expect(push).not.toHaveBeenCalled();
+    q.getStartedChallengesToJoin.mockResolvedValue(started("c1"));
+    await act(async () => {
+      await fire(incomingChannel(), "postgres_changes", "UPDATE", {
+        new: { id: "c1", challenger_id: "ana", status: "started" },
+      });
+    });
+    await flushAll();
+    expect(push).toHaveBeenCalledTimes(1);
+    expect(push).toHaveBeenCalledWith("/arena/match/m-re");
+  });
+
+  it("ignores a 'started' UPDATE for a challenge that is not the persisted one", async () => {
+    record("c1");
+    mount(true);
+    await flushAll();
+    q.getStartedChallengesToJoin.mockClear();
+    await act(async () => {
+      await fire(incomingChannel(), "postgres_changes", "UPDATE", {
+        new: { id: "zz", challenger_id: "ana", status: "started" },
+      });
+    });
+    expect(q.getStartedChallengesToJoin).not.toHaveBeenCalled();
+  });
+
+  it("offers it as a Join toast in a session lobby or join wizard", async () => {
+    record("c1");
+    q.getStartedChallengesToJoin.mockResolvedValue(started("c1"));
+    renderHook(() =>
+      useArenaChallenge({ athleteId: "me", athleteWeight: 170, canReceive: false, inSessionFlow: true }),
+    );
+    await flushAll();
+    expect(push).not.toHaveBeenCalled();
+    expect(toast.info).toHaveBeenCalledWith(ARENA_MATCH_STARTED_MESSAGE, expect.anything());
+  });
+
+  it("survives storage that throws", async () => {
+    const spy = vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new Error("blocked");
+    });
+    const set = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("blocked");
+    });
+    try {
+      const { result } = mount(true);
+      await flushAll();
+      await insertChallenge("c1");
+      await act(() => result.current.accept());
+      expect(push).toHaveBeenCalledWith("/arena/match/m1");
+    } finally {
+      spy.mockRestore();
+      set.mockRestore();
+    }
   });
 });
