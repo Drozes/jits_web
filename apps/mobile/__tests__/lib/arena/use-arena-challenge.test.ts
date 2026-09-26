@@ -105,8 +105,10 @@ jest.mock("@jits/shared/api/mutations", () => ({
 }));
 
 const mockGetStatus = jest.fn();
+const mockGetStarted = jest.fn();
 jest.mock("@jits/shared/api/queries", () => ({
   getChallengeStatus: (...a: unknown[]) => mockGetStatus(...a),
+  getStartedChallengesToJoin: (...a: unknown[]) => mockGetStarted(...a),
 }));
 
 const mockResync = jest.fn();
@@ -204,6 +206,7 @@ beforeEach(() => {
   mockBuilt.length = 0;
   jest.clearAllMocks();
   mockDeclineOthers.mockResolvedValue({ ok: true, data: { declined: [], skipped: [] } });
+  mockGetStarted.mockResolvedValue({ ok: true, data: [] });
   mockGetStatus.mockResolvedValue({
     ok: true,
     data: { status: "pending", expiresAt: FAR_EXPIRY },
@@ -2600,5 +2603,387 @@ describe("restoreOutgoing is refused mid-accept or mid-entry (review item 7)", (
       });
     });
     expect(result.current.outgoing).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// jits-6ziw: concurrency follow-ups (F1, F2, F3, withdrawn toast)
+// ---------------------------------------------------------------------------
+
+function mockAppStateHandlers() {
+  const handlers: Array<(s: string) => void> = [];
+  const { AppState } = jest.requireActual("react-native") as typeof import("react-native");
+  jest.spyOn(AppState, "addEventListener").mockImplementation(((
+    _e: string,
+    handler: (s: string) => void,
+  ) => {
+    handlers.push(handler);
+    return { remove: jest.fn() };
+  }) as never);
+  return (s: string) => handlers.forEach((h) => h(s));
+}
+
+function mountWithMatch(inMatch: boolean) {
+  return renderHook(
+    ({ inMatch: m }: { inMatch: boolean }) =>
+      useArenaChallenge({ athleteId: ME, athleteWeight: 180, inMatch: m }),
+    { initialProps: { inMatch } },
+  );
+}
+
+const STARTED_ROW = { challengeId: CHALLENGE, challengerId: OPPONENT, matchId: MATCH };
+
+describe("an accepter whose start never landed finds its way back in (F1)", () => {
+  const networkError = { ok: false, error: { code: "UNKNOWN", message: "network" } };
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  /** Accept, with every start and the withdrawal lost to the network. */
+  async function acceptIntoTheVoid(result: { current: ReturnType<typeof useArenaChallenge> }) {
+    mockStartMatch.mockResolvedValue(networkError);
+    mockCancelChallenge.mockResolvedValue(networkError);
+    await raiseIncoming(result);
+    await act(async () => {
+      await result.current.accept();
+    });
+    expect(mockPush).not.toHaveBeenCalled();
+    mockStartMatch.mockResolvedValue({
+      ok: true,
+      data: { success: true, match_id: MATCH, challenge_id: CHALLENGE },
+    });
+    mockStartMatch.mockClear();
+  }
+
+  it("joins on the 'started' UPDATE the challenger's fallback produced", async () => {
+    const { result } = mount();
+    await acceptIntoTheVoid(result);
+
+    await act(async () => {
+      await opponentUpdateBinding().handler({
+        new: { id: CHALLENGE, challenger_id: OPPONENT, opponent_id: ME, status: "started" },
+      });
+      await flushAsync();
+    });
+
+    expect(mockStartMatch).toHaveBeenCalledWith(expect.anything(), CHALLENGE);
+    expect(mockPush).toHaveBeenCalledWith(`/match/${MATCH}`);
+  });
+
+  it("ignores a 'started' UPDATE for a challenge I never accepted", async () => {
+    mount();
+    await act(async () => {
+      await opponentUpdateBinding().handler({
+        new: { id: "ch-other", challenger_id: "opp-9", opponent_id: ME, status: "started" },
+      });
+      await flushAsync();
+    });
+    expect(mockStartMatch).not.toHaveBeenCalled();
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it("forgets an accepted challenge that ended without a match", async () => {
+    const { result } = mount();
+    await acceptIntoTheVoid(result);
+    await act(async () => {
+      await opponentUpdateBinding().handler({
+        new: { id: CHALLENGE, challenger_id: OPPONENT, opponent_id: ME, status: "cancelled" },
+      });
+      await opponentUpdateBinding().handler({
+        new: { id: CHALLENGE, challenger_id: OPPONENT, opponent_id: ME, status: "started" },
+      });
+      await flushAsync();
+    });
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it("on mount (a relaunch), joins a match the challenger started without me", async () => {
+    mockGetStarted.mockResolvedValue({ ok: true, data: [STARTED_ROW] });
+    const before = Date.now();
+    mount();
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith(`/match/${MATCH}`));
+
+    const [, athlete, since] = mockGetStarted.mock.calls[0];
+    expect(athlete).toBe(ME);
+    // The live window: ten minutes back, no further.
+    const sinceMs = Date.parse(since as string);
+    expect(before - sinceMs).toBeGreaterThanOrEqual(10 * 60_000 - 50);
+    expect(before - sinceMs).toBeLessThanOrEqual(10 * 60_000 + 1_000);
+  });
+
+  it("on return from the background, joins it", async () => {
+    const appState = mockAppStateHandlers();
+    mount();
+    await act(async () => {
+      await flushAsync();
+    });
+    expect(mockPush).not.toHaveBeenCalled();
+
+    mockGetStarted.mockResolvedValue({ ok: true, data: [STARTED_ROW] });
+    await act(async () => {
+      appState("background");
+      appState("active");
+      await flushAsync();
+    });
+    expect(mockPush).toHaveBeenCalledWith(`/match/${MATCH}`);
+  });
+
+  it("on a re-subscribe of the incoming channel, joins it", async () => {
+    mount();
+    const [ch] = mockBuilt.filter((c) => c.topic.startsWith(`arena-incoming:${ME}:`));
+    act(() => ch.statusCb?.("SUBSCRIBED"));
+    await act(async () => {
+      await flushAsync();
+    });
+    mockGetStarted.mockClear();
+
+    mockGetStarted.mockResolvedValue({ ok: true, data: [STARTED_ROW] });
+    await act(async () => {
+      ch.statusCb?.("CHANNEL_ERROR");
+      ch.statusCb?.("SUBSCRIBED");
+      await flushAsync();
+    });
+    expect(mockGetStarted).toHaveBeenCalledTimes(1);
+    expect(mockPush).toHaveBeenCalledWith(`/match/${MATCH}`);
+  });
+
+  it("does nothing on a read that fails", async () => {
+    mockGetStarted.mockResolvedValue({ ok: false, error: { code: "UNKNOWN", message: "x" } });
+    mount();
+    await act(async () => {
+      await flushAsync();
+    });
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it("does not rejoin while a match screen is up", async () => {
+    mockGetStarted.mockResolvedValue({ ok: true, data: [STARTED_ROW] });
+    mountWithMatch(true);
+    await act(async () => {
+      await flushAsync();
+    });
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it("never drags me back into a match this instance already entered and left", async () => {
+    const appState = mockAppStateHandlers();
+    const { result, rerender } = mountWithMatch(false);
+    await raiseIncoming(result);
+    await act(async () => {
+      await result.current.accept();
+    });
+    expect(mockPush).toHaveBeenCalledTimes(1);
+    // The match screen mounts, then is left.
+    rerender({ inMatch: true });
+    rerender({ inMatch: false });
+
+    mockGetStarted.mockClear();
+    mockGetStarted.mockResolvedValue({ ok: true, data: [STARTED_ROW] });
+    await act(async () => {
+      appState("background");
+      appState("active");
+      await flushAsync();
+    });
+    expect(mockGetStarted).toHaveBeenCalled();
+    expect(mockPush).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("a late challenge from the peer I am entering a match with (F2)", () => {
+  async function enterWithOpponent(
+    result: { current: ReturnType<typeof useArenaChallenge> },
+  ) {
+    await raiseIncoming(result);
+    await act(async () => {
+      await result.current.accept();
+    });
+    expect(mockPush).toHaveBeenCalledWith(`/match/${MATCH}`);
+    await act(async () => {
+      await flushAsync();
+    });
+    mockCancelChallenge.mockClear();
+    mockDeclineChallenge.mockClear();
+    mockCalls.length = 0;
+  }
+
+  async function peerInsert(id = "ch-cross", challengerId = OPPONENT) {
+    await act(async () => {
+      await incomingBinding().handler({
+        new: { id, challenger_id: challengerId, opponent_id: ME, status: "pending" },
+      });
+      await flushAsync();
+    });
+  }
+
+  it("is withdrawn quietly while entering, never declined", async () => {
+    const { result } = mount();
+    await enterWithOpponent(result);
+    await peerInsert();
+
+    expect(mockCancelChallenge).toHaveBeenCalledWith(expect.anything(), "ch-cross", {
+      onlyIfPending: true,
+    });
+    expect(mockDeclineChallenge).not.toHaveBeenCalled();
+    expect(mockCalls).not.toContain("send:declined");
+  });
+
+  it("is withdrawn quietly once the match screen is up too", async () => {
+    const { result, rerender } = mountWithMatch(false);
+    await enterWithOpponent(result);
+    rerender({ inMatch: true });
+    await peerInsert();
+
+    expect(mockCancelChallenge).toHaveBeenCalledWith(expect.anything(), "ch-cross", {
+      onlyIfPending: true,
+    });
+    expect(mockDeclineChallenge).not.toHaveBeenCalled();
+  });
+
+  it("still declines anyone else as busy", async () => {
+    const { result } = mount();
+    await enterWithOpponent(result);
+    await peerInsert("ch-late", "opp-late");
+
+    expect(mockDeclineChallenge).toHaveBeenCalledWith(expect.anything(), "ch-late");
+    expect(mockCancelChallenge).not.toHaveBeenCalled();
+  });
+
+  it("forgets the peer once I leave the match", async () => {
+    const { result, rerender } = mountWithMatch(false);
+    await enterWithOpponent(result);
+    rerender({ inMatch: true });
+    rerender({ inMatch: false });
+    rerender({ inMatch: true });
+    await peerInsert("ch-next");
+
+    expect(mockDeclineChallenge).toHaveBeenCalledWith(expect.anything(), "ch-next");
+    expect(mockCancelChallenge).not.toHaveBeenCalled();
+  });
+});
+
+describe("a failed fallback start re-reads once (F3)", () => {
+  const networkError = { ok: false, error: { code: "UNKNOWN", message: "network" } };
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+    mockAppStateHandlers();
+  });
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.restoreAllMocks();
+  });
+
+  async function stuckAtAccepted(result: { current: ReturnType<typeof useArenaChallenge> }) {
+    await sendOne(result);
+    await challengerUpdate("accepted");
+    mockGetStatus.mockResolvedValue({ ok: true, data: { status: "accepted", expiresAt: FAR_EXPIRY } });
+    mockStartMatch.mockResolvedValueOnce(networkError);
+    await act(async () => {
+      jest.advanceTimersByTime(12_000);
+      await flushAsync();
+    });
+    expect(mockStartMatch).toHaveBeenCalledTimes(1);
+    expect(mockPush).not.toHaveBeenCalled();
+  }
+
+  it("joins when the row turned 'started' meanwhile", async () => {
+    const { result } = mount();
+    await stuckAtAccepted(result);
+    mockGetStatus.mockResolvedValue({ ok: true, data: { status: "started", expiresAt: FAR_EXPIRY } });
+
+    await act(async () => {
+      jest.advanceTimersByTime(1_999);
+      await flushAsync();
+    });
+    expect(mockStartMatch).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      jest.advanceTimersByTime(1);
+      await flushAsync();
+    });
+    expect(mockStartMatch).toHaveBeenCalledTimes(2);
+    expect(mockPush).toHaveBeenCalledWith(`/match/${MATCH}`);
+  });
+
+  it("clears the plate when the accepter withdrew it meanwhile", async () => {
+    const { result } = mount();
+    await stuckAtAccepted(result);
+    mockGetStatus.mockResolvedValue({ ok: true, data: { status: "cancelled", expiresAt: FAR_EXPIRY } });
+    await act(async () => {
+      jest.advanceTimersByTime(2_000);
+      await flushAsync();
+    });
+    expect(result.current.outgoing).toBeNull();
+    expect(mockToastInfo).toHaveBeenCalledWith("Couldn't start the match with Rival.");
+  });
+
+  it("re-reads only once: a row still 'accepted' is left for the next foreground", async () => {
+    const { result } = mount();
+    await stuckAtAccepted(result);
+    const readsBefore = mockGetStatus.mock.calls.length;
+    await act(async () => {
+      jest.advanceTimersByTime(60_000);
+      await flushAsync();
+    });
+    expect(mockStartMatch).toHaveBeenCalledTimes(1);
+    expect(mockGetStatus.mock.calls.length - readsBefore).toBe(1);
+    expect(result.current.outgoing?.challengeId).toBe(CHALLENGE);
+  });
+
+  it("is cancelled on unmount", async () => {
+    const { result, unmount } = mount();
+    await stuckAtAccepted(result);
+    mockGetStatus.mockClear();
+    unmount();
+    await act(async () => {
+      jest.advanceTimersByTime(10_000);
+      await flushAsync();
+    });
+    expect(mockGetStatus).not.toHaveBeenCalled();
+  });
+});
+
+describe("the accepter withdrew after a failed start (accepted -> cancelled)", () => {
+  it("tells the challenger the match could not be started", async () => {
+    const { result } = mount();
+    await sendOne(result);
+    await challengerUpdate("accepted");
+    await challengerUpdate("cancelled");
+    expect(result.current.outgoing).toBeNull();
+    expect(mockToastInfo).toHaveBeenCalledWith("Couldn't start the match with Rival.");
+  });
+
+  it("stays quiet for a cancel that was never accepted", async () => {
+    const { result } = mount();
+    await sendOne(result);
+    await challengerUpdate("cancelled");
+    expect(result.current.outgoing).toBeNull();
+    expect(mockToastInfo).not.toHaveBeenCalled();
+  });
+
+  it("stays quiet for my own cancel, even when its UPDATE beats the reply", async () => {
+    let finishCancel!: () => void;
+    mockCancelChallenge.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finishCancel = () => resolve({ ok: true, data: { cancelled: true } });
+        }),
+    );
+    const { result } = mount();
+    await sendOne(result);
+    await challengerUpdate("accepted");
+
+    let cancelling!: Promise<void>;
+    act(() => {
+      cancelling = result.current.cancelOutgoing();
+    });
+    await challengerUpdate("cancelled");
+    await act(async () => {
+      finishCancel();
+      await cancelling;
+    });
+    expect(result.current.outgoing).toBeNull();
+    expect(mockToastInfo).not.toHaveBeenCalled();
   });
 });

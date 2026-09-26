@@ -555,6 +555,65 @@ export async function getChallengeStatus(
   };
 }
 
+/** A challenge I accepted whose match is still waiting for me. */
+export interface StartedChallengeToJoin {
+  challengeId: string;
+  challengerId: string;
+  matchId: string;
+}
+
+/**
+ * Challenges I accepted (I am the opponent) that turned `started` at or after
+ * `sinceIso` and whose match is still `pending` or `in_progress`, newest
+ * first.
+ *
+ * For an accepter whose app died or lost the network right after accepting:
+ * the challenger's fallback started the match alone, and this is how the
+ * accepter finds its way back in. Only `opponent_id = me` rows: a row reaches
+ * `started` only through `accepted`, which only the opponent can set, so these
+ * are challenges I actually accepted. Two reads rather than an embed, and a
+ * match I cannot see (RLS: participants only) is simply not returned.
+ */
+export async function getStartedChallengesToJoin(
+  supabase: Client,
+  athleteId: string,
+  sinceIso: string,
+): Promise<Result<StartedChallengeToJoin[]>> {
+  const { data: challenges, error } = await supabase
+    .from("challenges")
+    .select("id, challenger_id")
+    .eq("opponent_id", athleteId)
+    .eq("status", "started")
+    .gte("updated_at", sinceIso)
+    .order("updated_at", { ascending: false })
+    .limit(5);
+
+  if (error) return { ok: false, error: mapPostgrestError(error) };
+  if (!challenges || challenges.length === 0) return { ok: true, data: [] };
+
+  const { data: matches, error: matchError } = await supabase
+    .from("matches")
+    .select("id, challenge_id")
+    .in(
+      "challenge_id",
+      challenges.map((c) => c.id),
+    )
+    .in("status", ["pending", "in_progress"]);
+
+  if (matchError) return { ok: false, error: mapPostgrestError(matchError) };
+
+  const matchFor = new Map<string, string>();
+  for (const m of matches ?? []) {
+    if (m.challenge_id) matchFor.set(m.challenge_id, m.id);
+  }
+  const data: StartedChallengeToJoin[] = [];
+  for (const c of challenges) {
+    const matchId = matchFor.get(c.id);
+    if (matchId) data.push({ challengeId: c.id, challengerId: c.challenger_id, matchId });
+  }
+  return { ok: true, data };
+}
+
 /** Get IDs of all athletes who have a pending challenge with this athlete (either direction) */
 export async function getPendingChallengeOpponentIds(
   supabase: Client,
