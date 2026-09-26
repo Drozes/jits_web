@@ -14,6 +14,7 @@
  * mean a second flag writer and a second prompt for every challenge.
  * Observing the lobby is not joining it: an athlete is only tracked in
  * `lobby:online` while they are live.
+ * Rematch (jits-00fr): see `lib/arena/use-rematch-pin.ts`. Never auto-sends.
  */
 import * as React from "react";
 import { RefreshControl, Text, View } from "react-native";
@@ -25,6 +26,7 @@ import { PageContainer } from "@/components/layout/page-container";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { useLobbyIds } from "@/lib/arena/use-lobby-presence";
 import { useArenaRoster } from "@/lib/arena/use-arena-roster";
+import { pinFirst, useRematchPin } from "@/lib/arena/use-rematch-pin";
 import {
   arenaActions,
   setOpponentUnavailableHandler,
@@ -37,6 +39,7 @@ import {
   CapPlate,
   EmptyLobbyPlate,
   NobodyOnlineNote,
+  RematchHint,
   RosterErrorPlate,
   SectionLabel,
   WaitingPlate,
@@ -69,7 +72,18 @@ export default function ArenaScreen() {
     return () => setOpponentUnavailableHandler(null);
   }, [refresh]);
 
-  const online = competitors.filter((c) => lobbyIds.has(c.id));
+  const rematch = useRematchPin({
+    competitors,
+    lobbyIds,
+    isLoading,
+    refresh,
+    outgoingOpponentId: outgoing?.opponentId ?? null,
+  });
+
+  const online = pinFirst(
+    competitors.filter((c) => lobbyIds.has(c.id)),
+    rematch.isOnline ? rematch.pinnedId : null,
+  );
   const offline = competitors.filter((c) => !lobbyIds.has(c.id));
 
   // One challenge at a time: a second outgoing prompt while one is unanswered
@@ -99,6 +113,7 @@ export default function ArenaScreen() {
           inLobby={inLobby}
           action={actionFor(c.id, c.acceptsRanked, inLobby)}
           disabled={actionsLocked || isSaving}
+          pinned={inLobby && c.id === rematch.pinnedId}
           onChallenge={() => void sendChallenge(c.id, c.displayName)}
           onGoLive={() => void toggle()}
           onOpenProfile={() => router.push(`/athlete/${c.id}`)}
@@ -157,6 +172,10 @@ export default function ArenaScreen() {
 
             {hasError ? <RosterErrorPlate onRetry={refresh} /> : null}
 
+            {!hasError && rematch.pinnedId && !rematch.isOnline ? (
+              <RematchHint name={rematch.name} />
+            ) : null}
+
             {!hasError && competitors.length === 0 ? (
               <EmptyLobbyPlate isLive={isLive} />
             ) : null}
@@ -170,7 +189,7 @@ export default function ArenaScreen() {
                   {online.length > 0 ? (
                     online.map(renderRow(true))
                   ) : (
-                    <NobodyOnlineNote />
+                    <NobodyOnlineNote isLive={isLive} />
                   )}
                 </View>
 
@@ -181,8 +200,8 @@ export default function ArenaScreen() {
                       count={offline.length}
                     />
                     <Text className="font-body text-[12px] text-ink-3">
-                      Not in the app right now, so they cannot answer a live
-                      challenge.
+                      Not in the app right now. They can take a challenge once
+                      they open it and go live.
                     </Text>
                     {offline.map(renderRow(false))}
                   </View>

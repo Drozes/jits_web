@@ -8,7 +8,7 @@
  * dead end.
  */
 import * as React from "react";
-import { fireEvent, render } from "@testing-library/react-native";
+import { act, fireEvent, render } from "@testing-library/react-native";
 
 // ---- mocks ----
 
@@ -83,8 +83,45 @@ jest.mock("@/lib/auth/hooks", () => ({
 }));
 
 const mockPush = jest.fn();
+const mockSetParams = jest.fn();
+let mockParams: Record<string, string | undefined> = {};
+// Records each focus effect so a test can simulate the tab losing focus.
+const mockFocusCleanups: (() => void)[] = [];
+// Stable, like expo-router's own (useRouter returns the imperative singleton).
+const mockRouter = {
+  push: (...a: unknown[]) => mockPush(...a),
+  replace: jest.fn(),
+  back: jest.fn(),
+  // The rematch param must be cleared on THIS route, never through the
+  // global router, so this one must stay untouched.
+  setParams: jest.fn(),
+};
+// Route-scoped navigation. setParams really updates the params, as the route
+// would.
+const mockNavigation = {
+  setParams: (p: Record<string, string | undefined>) => {
+    mockSetParams(p);
+    mockParams = { ...mockParams, ...p };
+  },
+};
 jest.mock("expo-router", () => ({
-  useRouter: () => ({ push: mockPush, replace: jest.fn(), back: jest.fn() }),
+  useRouter: () => mockRouter,
+  useNavigation: () => mockNavigation,
+  useLocalSearchParams: () => mockParams,
+  useFocusEffect: (cb: () => (() => void) | void) => {
+    const R = require("react");
+    R.useEffect(() => {
+      const cleanup = cb();
+      if (cleanup) mockFocusCleanups.push(cleanup);
+      return cleanup;
+    }, [cb]);
+  },
+}));
+
+const mockImpact = jest.fn((..._a: unknown[]) => Promise.resolve());
+jest.mock("expo-haptics", () => ({
+  impactAsync: (...a: unknown[]) => mockImpact(...a),
+  ImpactFeedbackStyle: { Light: "light", Medium: "medium", Heavy: "heavy" },
 }));
 
 let mockLobbyIds = new Set<string>();
@@ -164,6 +201,8 @@ function competitor(over: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockParams = {};
+  mockFocusCleanups.length = 0;
   mockLobbyIds = new Set();
   mockIsLive = false;
   mockRoster = {
@@ -296,9 +335,79 @@ describe("Arena screen", () => {
     mockLobbyIds = new Set();
 
     const { getByText } = render(<ArenaScreen />);
-    expect(getByText(/Nobody has the app open right now/)).toBeTruthy();
+    expect(
+      getByText(
+        "Nobody is live right now. Go live and you'll be first in the lobby.",
+      ),
+    ).toBeTruthy();
     expect(getByText("Open to challenges")).toBeTruthy();
     expect(getByText("Alpha")).toBeTruthy();
+  });
+
+  it("never tells a live viewer that nobody is live", () => {
+    // The viewer is in the lobby themselves, so "nobody" has to mean "nobody
+    // else", and the offline rows must not be promised a challenge.
+    mockIsLive = true;
+    mockRoster.competitors = [competitor()];
+    mockLobbyIds = new Set();
+
+    const { getByText, queryByText } = render(<ArenaScreen />);
+    expect(
+      getByText(
+        "Nobody else is live right now. Stay live and anyone who goes live shows up here.",
+      ),
+    ).toBeTruthy();
+    expect(queryByText(/Nobody has the app open/)).toBeNull();
+    expect(queryByText(/will see it next time/)).toBeNull();
+    expect(
+      getByText(
+        "Not in the app right now. They can take a challenge once they open it and go live.",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("titles the plate as offline until the athlete is live", () => {
+    const offline = render(<ArenaScreen />);
+    expect(offline.getByText("You're offline")).toBeTruthy();
+    expect(offline.queryByText(/Looking for/)).toBeNull();
+    expect(offline.getByLabelText("Go live")).toBeTruthy();
+    offline.unmount();
+
+    mockIsLive = true;
+    const live = render(<ArenaScreen />);
+    expect(live.getByText("Looking for a match")).toBeTruthy();
+    expect(live.queryByText("You're offline")).toBeNull();
+    expect(live.getByLabelText("Go offline")).toBeTruthy();
+  });
+
+  it("gives a light haptic when a challenge is sent, and none when locked", () => {
+    mockIsLive = true;
+    mockRoster.competitors = [competitor()];
+    mockLobbyIds = new Set(["a-1"]);
+
+    const { getByLabelText, unmount } = render(<ArenaScreen />);
+    fireEvent.press(getByLabelText("Challenge Alpha"));
+    expect(mockImpact).toHaveBeenCalledTimes(1);
+    expect(mockImpact).toHaveBeenCalledWith("light");
+    unmount();
+
+    mockImpact.mockClear();
+    mockChallenge.isBusy = true;
+    const locked = render(<ArenaScreen />);
+    fireEvent.press(locked.getByLabelText("Challenge Alpha"));
+    expect(mockImpact).not.toHaveBeenCalled();
+    expect(mockSendChallenge).toHaveBeenCalledTimes(1);
+  });
+
+  it("still sends the challenge when the haptic engine fails", () => {
+    mockIsLive = true;
+    mockRoster.competitors = [competitor()];
+    mockLobbyIds = new Set(["a-1"]);
+    mockImpact.mockImplementationOnce(() => Promise.reject(new Error("no")));
+
+    const { getByLabelText } = render(<ArenaScreen />);
+    fireEvent.press(getByLabelText("Challenge Alpha"));
+    expect(mockSendChallenge).toHaveBeenCalledWith("a-1", "Alpha");
   });
 
   it("replaces the go-live plate with a cancellable waiting plate", () => {
@@ -385,5 +494,193 @@ describe("Arena screen", () => {
     expect(mockSetUnavailable).toHaveBeenCalledWith(mockRefresh);
     unmount();
     expect(mockSetUnavailable).toHaveBeenLastCalledWith(null);
+  });
+});
+
+describe("Arena screen: rematch handoff (jits-00fr)", () => {
+  function rematchRoster() {
+    mockIsLive = true;
+    mockRoster.competitors = [
+      competitor({ id: "a-1", displayName: "Alpha" }),
+      competitor({ id: "a-2", displayName: "Bravo" }),
+      competitor({ id: "a-3", displayName: "Charlie" }),
+    ];
+  }
+
+  function rowOrder(getAllByLabelText: (r: RegExp) => { props: { accessibilityLabel?: string } }[]) {
+    return getAllByLabelText(/, ELO \d+/).map((n) =>
+      String(n.props.accessibilityLabel).split(",")[0],
+    );
+  }
+
+  it("pins the rematch opponent to the top of Online now with a tag", () => {
+    rematchRoster();
+    mockLobbyIds = new Set(["a-1", "a-2", "a-3"]);
+    mockParams = { rematch: "a-3" };
+
+    const { getAllByLabelText, getByText, queryByTestId } = render(
+      <ArenaScreen />,
+    );
+
+    expect(rowOrder(getAllByLabelText)).toEqual(["Charlie", "Alpha", "Bravo"]);
+    expect(getByText("Rematch")).toBeTruthy();
+    expect(queryByTestId("arena-rematch-hint")).toBeNull();
+  });
+
+  it("never sends a challenge on its own; the row's Challenge does", () => {
+    rematchRoster();
+    mockLobbyIds = new Set(["a-3"]);
+    mockParams = { rematch: "a-3" };
+
+    const { getByLabelText, queryByText } = render(<ArenaScreen />);
+    expect(mockSendChallenge).not.toHaveBeenCalled();
+
+    fireEvent.press(getByLabelText("Challenge Charlie"));
+    expect(mockSendChallenge).toHaveBeenCalledWith("a-3", "Charlie");
+    expect(queryByText("Rematch")).toBeTruthy();
+  });
+
+  it("ends the pin only once the challenge to them actually went out", () => {
+    rematchRoster();
+    mockLobbyIds = new Set(["a-3"]);
+    mockParams = { rematch: "a-3" };
+
+    const { getByLabelText, getByText, queryByText, rerender } = render(
+      <ArenaScreen />,
+    );
+    fireEvent.press(getByLabelText("Challenge Charlie"));
+    // The tap alone is not success: the pin holds until the outgoing slot
+    // names them.
+    expect(getByText("Rematch")).toBeTruthy();
+
+    mockChallenge.outgoing = {
+      challengeId: "ch-1",
+      opponentId: "a-3",
+      opponentName: "Charlie",
+    };
+    rerender(<ArenaScreen />);
+    expect(queryByText("Rematch")).toBeNull();
+
+    // And it does not come back once the challenge resolves.
+    mockChallenge.outgoing = null;
+    rerender(<ArenaScreen />);
+    expect(queryByText("Rematch")).toBeNull();
+  });
+
+  it("keeps the pin and tag when the challenge send fails", () => {
+    rematchRoster();
+    mockLobbyIds = new Set(["a-3"]);
+    mockParams = { rematch: "a-3" };
+    // A refused or failed send leaves no outgoing challenge behind.
+    mockSendChallenge.mockResolvedValueOnce(undefined);
+
+    const { getByLabelText, getByText, rerender } = render(<ArenaScreen />);
+    fireEvent.press(getByLabelText("Challenge Charlie"));
+    rerender(<ArenaScreen />);
+
+    expect(getByText("Rematch")).toBeTruthy();
+    expect(getByLabelText("Challenge Charlie")).toBeTruthy();
+  });
+
+  it("does not end the pin for a challenge to someone else", () => {
+    rematchRoster();
+    mockLobbyIds = new Set(["a-1", "a-3"]);
+    mockParams = { rematch: "a-3" };
+
+    const { getByText, rerender } = render(<ArenaScreen />);
+    mockChallenge.outgoing = {
+      challengeId: "ch-2",
+      opponentId: "a-1",
+      opponentName: "Alpha",
+    };
+    rerender(<ArenaScreen />);
+    expect(getByText("Rematch")).toBeTruthy();
+  });
+
+  it("marks the pinned row's profile label, not the Challenge label", () => {
+    rematchRoster();
+    mockLobbyIds = new Set(["a-3"]);
+    mockParams = { rematch: "a-3" };
+
+    const { getByLabelText } = render(<ArenaScreen />);
+    expect(getByLabelText("Charlie, ELO 1300, rematch")).toBeTruthy();
+    expect(getByLabelText("Challenge Charlie")).toBeTruthy();
+  });
+
+  it("clears the route param as soon as it is read", () => {
+    rematchRoster();
+    mockParams = { rematch: "a-3" };
+
+    render(<ArenaScreen />);
+    expect(mockSetParams).toHaveBeenCalledWith({ rematch: undefined });
+    expect(mockRouter.setParams).not.toHaveBeenCalled();
+  });
+
+  it("names an opponent on the roster who is not live", () => {
+    rematchRoster();
+    mockLobbyIds = new Set(["a-1"]);
+    mockParams = { rematch: "a-2" };
+
+    const { getByTestId, getByText, queryByText } = render(<ArenaScreen />);
+    expect(getByTestId("arena-rematch-hint")).toBeTruthy();
+    expect(getByText("Bravo isn't back in the Arena yet. Their Challenge button appears here the moment they are.")).toBeTruthy();
+    // Not in the lobby, so not pinned and never challengeable.
+    expect(queryByText("Rematch")).toBeNull();
+  });
+
+  it("falls back to a neutral name when the opponent is not on the roster", () => {
+    rematchRoster();
+    mockParams = { rematch: "zz-9" };
+
+    const { getByText } = render(<ArenaScreen />);
+    expect(getByText("Your opponent isn't back in the Arena yet. Their Challenge button appears here the moment they are.")).toBeTruthy();
+  });
+
+  it("re-reads the roster once when the opponent is live but not listed yet", () => {
+    rematchRoster();
+    mockLobbyIds = new Set(["zz-9"]);
+    mockParams = { rematch: "zz-9" };
+
+    const { rerender } = render(<ArenaScreen />);
+    rerender(<ArenaScreen />);
+    expect(mockRefresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not re-read the roster for an opponent who is simply offline", () => {
+    rematchRoster();
+    mockParams = { rematch: "a-2" };
+
+    render(<ArenaScreen />);
+    expect(mockRefresh).not.toHaveBeenCalled();
+  });
+
+  it("drops the pin when the tab loses focus", () => {
+    rematchRoster();
+    mockLobbyIds = new Set(["a-1", "a-3"]);
+    mockParams = { rematch: "a-3" };
+
+    const { getByText, queryByText, rerender } = render(<ArenaScreen />);
+    expect(getByText("Rematch")).toBeTruthy();
+
+    // The param was cleared on read, so coming back cannot re-pin.
+    expect(mockParams.rematch).toBeUndefined();
+    act(() => {
+      mockFocusCleanups.forEach((c) => c());
+    });
+    rerender(<ArenaScreen />);
+    expect(queryByText("Rematch")).toBeNull();
+  });
+
+  it("is inert without the param", () => {
+    rematchRoster();
+    mockLobbyIds = new Set(["a-1", "a-3"]);
+
+    const { getAllByLabelText, queryByText, queryByTestId } = render(
+      <ArenaScreen />,
+    );
+    expect(rowOrder(getAllByLabelText)).toEqual(["Alpha", "Charlie", "Bravo"]);
+    expect(queryByText("Rematch")).toBeNull();
+    expect(queryByTestId("arena-rematch-hint")).toBeNull();
+    expect(mockSetParams).not.toHaveBeenCalled();
   });
 });
