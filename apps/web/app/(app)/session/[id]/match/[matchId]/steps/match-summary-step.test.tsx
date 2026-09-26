@@ -32,9 +32,11 @@ vi.mock("@/lib/supabase/client", () => ({
 
 const mockToastError = vi.fn<(...a: unknown[]) => string>(() => "toast-1");
 const mockToastDismiss = vi.fn();
+const mockToastInfo = vi.fn();
 vi.mock("sonner", () => ({
   toast: {
     error: (...a: unknown[]) => mockToastError(...a),
+    info: (...a: unknown[]) => mockToastInfo(...a),
     dismiss: (...a: unknown[]) => mockToastDismiss(...a),
     success: vi.fn(),
   },
@@ -68,7 +70,13 @@ vi.mock("@jits/shared/hooks/use-session-match-sync", () => ({
   },
 }));
 
-import { MatchSummaryStep, isConfirmStepDone, LEAVE_AFTER_MS } from "./match-summary-step";
+import {
+  DISPUTE_FAILED_MESSAGE,
+  LEAVE_AFTER_MS,
+  MatchSummaryStep,
+  isConfirmStepDone,
+  opponentDisputedMessage,
+} from "./match-summary-step";
 
 const ME = "me-1";
 const OPP = "opp-1";
@@ -174,6 +182,74 @@ describe("MatchSummaryStep (web confirm step)", () => {
     expect(onNext).not.toHaveBeenCalled();
     act(() => syncParams.onMatchDisputed?.(OPP));
     expect(onNext).toHaveBeenCalledTimes(1);
+  });
+
+  it("tells the athlete their opponent disputed, once", async () => {
+    renderStep();
+    await flush();
+    act(() => syncParams.onMatchDisputed?.(ME));
+    expect(mockToastInfo).not.toHaveBeenCalled();
+    act(() => syncParams.onMatchDisputed?.(OPP));
+    act(() => rowListener.handler?.({ new: { status: "disputed" } }));
+    expect(mockToastInfo).toHaveBeenCalledTimes(1);
+    expect(mockToastInfo).toHaveBeenCalledWith(opponentDisputedMessage("Opponent"));
+  });
+
+  it("also says so when only the 'disputed' row event arrives", async () => {
+    const { onNext } = renderStep();
+    await flush();
+    act(() => rowListener.handler?.({ new: { status: "disputed" } }));
+    expect(mockToastInfo).toHaveBeenCalledWith(
+      "Opponent disputed the result. An admin will review it.",
+    );
+    expect(onNext).toHaveBeenCalledTimes(1);
+  });
+
+  it("the disputer's own row event is not toasted as the opponent's", async () => {
+    let finish!: (v: unknown) => void;
+    mockDispute.mockReturnValue(new Promise((r) => (finish = r)));
+    const { onNext, getByText } = renderStep();
+    await flush();
+    await act(async () => {
+      fireEvent.click(getByText("Dispute result"));
+    });
+    act(() => rowListener.handler?.({ new: { status: "disputed" } }));
+    expect(mockToastInfo).not.toHaveBeenCalled();
+    expect(onNext).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      finish({ ok: true, data: {} });
+    });
+    await flush();
+    expect(onNext).toHaveBeenCalledTimes(1);
+  });
+
+  it("a failed dispute stays on the step, toasts, and lets the athlete choose again", async () => {
+    mockDispute.mockResolvedValue({ ok: false, error: { code: "UNKNOWN", message: "" } });
+    const { onNext, getByText } = renderStep();
+    await flush();
+    await act(async () => {
+      fireEvent.click(getByText("Dispute result"));
+    });
+    await flush();
+    expect(mockToastError).toHaveBeenCalledWith(DISPUTE_FAILED_MESSAGE);
+    expect(mockBroadcastDisputed).not.toHaveBeenCalled();
+    expect(onNext).not.toHaveBeenCalled();
+    getByText("Dispute result");
+    getByText("Confirm Result");
+  });
+
+  it("a failed dispute shows the mapped message when there is one", async () => {
+    mockDispute.mockResolvedValue({
+      ok: false,
+      error: { code: "RLS_VIOLATION", message: "You can't dispute this match." },
+    });
+    const { getByText } = renderStep();
+    await flush();
+    await act(async () => {
+      fireEvent.click(getByText("Dispute result"));
+    });
+    await flush();
+    expect(mockToastError).toHaveBeenCalledWith("You can't dispute this match.");
   });
 
   it("a waiting confirmer's poll catches a missed result_confirmed, once", async () => {

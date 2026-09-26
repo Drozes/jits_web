@@ -18,6 +18,13 @@ const WAITING_POLL_MS = 5_000;
  * at record time; the confirmation does not change them). Mirrors mobile. */
 export const LEAVE_AFTER_MS = 20_000;
 
+/** Shown to the athlete whose opponent disputed the recorded result. */
+export const opponentDisputedMessage = (name: string) =>
+  `${name} disputed the result. An admin will review it.`;
+
+/** Shown when filing a dispute failed without a mapped message. */
+export const DISPUTE_FAILED_MESSAGE = "Couldn't dispute the result. Please try again.";
+
 /**
  * Whether the confirm step is finished, from the DB. `completed` alone is
  * NOT enough: record_match_result sets it at RECORD time, before anyone has
@@ -59,6 +66,8 @@ export function MatchSummaryStep({ onNext, matchId, matchType, currentAthleteId,
   const [disputing, setDisputing] = useState(false);
   const [canLeave, setCanLeave] = useState(false);
   const confirmedRef = useRef(false);
+  // This athlete filed the dispute: its own row event is not news to toast.
+  const disputeInFlightRef = useRef(false);
   // The failed-confirm toast (with Retry); dismissed once this step is done.
   const retryToastRef = useRef<string | number | null>(null);
   const onNextRaw = useRef(onNext);
@@ -78,6 +87,13 @@ export function MatchSummaryStep({ onNext, matchId, matchType, currentAthleteId,
   }
   useEffect(() => () => dismissRetryToast(), []);
 
+  /** The opponent disputed: say so once, then move on. */
+  function opponentDisputed() {
+    if (advancedRef.current) return;
+    toast.info(opponentDisputedMessage(opponent.displayName));
+    onNextRef.current();
+  }
+
   const supabase = useMemo(() => createClient(), []);
   const sync = useSessionMatchSync({
     supabase,
@@ -85,10 +101,10 @@ export function MatchSummaryStep({ onNext, matchId, matchType, currentAthleteId,
     onResultConfirmed: (athleteId) => {
       if (athleteId === opponent.id) setOpponentConfirmed(true);
     },
-    // The opponent disputed: there is nothing left to confirm, so move on
-    // exactly like the disputer does (jits-wfpo).
+    // The opponent disputed: there is nothing left to confirm, so say so and
+    // move on exactly like the disputer does (jits-wfpo).
     onMatchDisputed: (athleteId) => {
-      if (athleteId !== currentAthleteId) onNextRef.current();
+      if (athleteId !== currentAthleteId) opponentDisputed();
     },
   });
 
@@ -125,8 +141,10 @@ export function MatchSummaryStep({ onNext, matchId, matchType, currentAthleteId,
       .channel(`match-complete:${matchId}`)
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "matches", filter: `id=eq.${matchId}` }, ({ new: row }) => {
         const r = row as { status?: string };
-        if (r.status === "disputed") onNextRef.current();
-        else void checkDb();
+        if (r.status === "disputed") {
+          if (disputeInFlightRef.current) onNextRef.current();
+          else opponentDisputed();
+        } else void checkDb();
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
@@ -178,10 +196,21 @@ export function MatchSummaryStep({ onNext, matchId, matchType, currentAthleteId,
   }
 
   async function handleDispute() {
+    if (advancedRef.current) return;
+    disputeInFlightRef.current = true;
     setDisputing(true);
     const res = await disputeMatchResult(supabase, matchId);
+    if (!res.ok) {
+      // Stay on the step: nothing was disputed, and Confirm / Dispute are
+      // both still the athlete's to choose.
+      disputeInFlightRef.current = false;
+      if (advancedRef.current) return;
+      setDisputing(false);
+      toast.error(res.error.message || DISPUTE_FAILED_MESSAGE);
+      return;
+    }
     // Tell the opponent (bounded) before this step and its channel go away.
-    if (res.ok) await settleWithin(sync.broadcastMatchDisputed(currentAthleteId), 1500);
+    await settleWithin(sync.broadcastMatchDisputed(currentAthleteId), 1500);
     onNextRef.current();
   }
 

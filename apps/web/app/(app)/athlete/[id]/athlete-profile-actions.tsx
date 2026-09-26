@@ -9,6 +9,7 @@ import {
 } from "@/components/domain/compare-stats-modal";
 import { ChallengeSheet } from "@/components/domain/challenge-sheet";
 import { useArenaState } from "@/lib/arena/arena-store";
+import { isFreshChallenge } from "@/lib/arena/challenge-freshness";
 
 interface AthleteStats {
   displayName: string;
@@ -27,6 +28,9 @@ interface AthleteProfileActionsProps {
   competitor: AthleteStats;
   headToHead: HeadToHeadMatch[];
   pendingChallengeId: string | null;
+  /** When that pending challenge was sent. Older than the Arena window, it
+   * is not answered live any more and does not block a new challenge. */
+  pendingChallengeCreatedAt: string | null;
   /** The competitor is live in the Arena (`looking_for_ranked`); the
    * `challenges_insert` RLS refuses a challenge to anyone who is not. */
   competitorInArena: boolean;
@@ -38,9 +42,17 @@ export function AthleteProfileActions({
   currentAthlete,
   competitor,
   headToHead,
-  pendingChallengeId,
+  pendingChallengeId: rawPendingChallengeId,
+  pendingChallengeCreatedAt,
   competitorInArena,
 }: AthleteProfileActionsProps) {
+  // Only a FRESH pending challenge counts: an older one is swept as stale
+  // (jits-celf) and never surfaced as a live prompt, so "Open Arena" would
+  // lead nowhere.
+  const pendingChallengeId =
+    rawPendingChallengeId && isFreshChallenge(pendingChallengeCreatedAt)
+      ? rawPendingChallengeId
+      : null;
   const [compareOpen, setCompareOpen] = useState(false);
   const [challengeOpen, setChallengeOpen] = useState(false);
   const isSelf = currentAthleteId === competitorId;

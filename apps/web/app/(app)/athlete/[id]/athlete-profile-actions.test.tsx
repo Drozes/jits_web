@@ -19,6 +19,7 @@ vi.mock("@/lib/supabase/client", () => ({
 vi.mock("@jits/shared/api/queries", () => ({ canCreateChallenge: db.canCreateChallenge }));
 vi.mock("@jits/shared/api/mutations", () => ({ createChallenge: db.createChallenge }));
 
+import { ARENA_CHALLENGE_FRESH_MS } from "@jits/shared/constants";
 import { AthleteProfileActions } from "./athlete-profile-actions";
 
 const stats = {
@@ -31,7 +32,11 @@ const stats = {
   weight: 170,
 };
 
-function renderActions(pendingChallengeId: string | null = null, competitorInArena = true) {
+function renderActions(
+  pendingChallengeId: string | null = null,
+  competitorInArena = true,
+  pendingChallengeCreatedAt: string | null = pendingChallengeId ? new Date().toISOString() : null,
+) {
   return render(
     <AthleteProfileActions
       competitorId="op"
@@ -40,6 +45,7 @@ function renderActions(pendingChallengeId: string | null = null, competitorInAre
       competitor={{ ...stats, displayName: "Opp" }}
       headToHead={[]}
       pendingChallengeId={pendingChallengeId}
+      pendingChallengeCreatedAt={pendingChallengeCreatedAt}
       competitorInArena={competitorInArena}
     />,
   );
@@ -119,5 +125,17 @@ describe("AthleteProfileActions", () => {
     const link = screen.getByRole("link", { name: /open arena/i });
     expect(link).toHaveAttribute("href", "/arena");
     expect(document.querySelector('a[href*="/challenges"]')).toBeNull();
+  });
+
+  it("treats a pending challenge older than the Arena window as not pending", () => {
+    const stale = new Date(Date.now() - ARENA_CHALLENGE_FRESH_MS - 60_000).toISOString();
+    renderActions("pending-old", true, stale);
+    expect(screen.queryByRole("link", { name: /open arena/i })).toBeNull();
+    expect(screen.getByRole("button", { name: /^challenge$/i })).toBeEnabled();
+  });
+
+  it("treats an undated pending challenge as not pending", () => {
+    renderActions("pending-x", true, null);
+    expect(screen.queryByRole("link", { name: /open arena/i })).toBeNull();
   });
 });
