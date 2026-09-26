@@ -113,7 +113,7 @@ describe("ResultBanner subtitle", () => {
 describe("ConfirmPanel states", () => {
   it("your-call: empty circle and 'Your call', no spinner", () => {
     const { getByText, UNSAFE_queryAllByType } = render(
-      <ConfirmPanel label="You" state="your-call" />,
+      <ConfirmPanel label="You" side="you" state="your-call" />,
     );
     getByText("Your call");
     expect(UNSAFE_queryAllByType(ActivityIndicator)).toHaveLength(0);
@@ -121,7 +121,7 @@ describe("ConfirmPanel states", () => {
 
   it("confirming: spinner and 'Confirming...'", () => {
     const { getByText, UNSAFE_queryAllByType } = render(
-      <ConfirmPanel label="Demo Red" state="confirming" />,
+      <ConfirmPanel label="Demo Red" side="opponent" state="confirming" />,
     );
     getByText("Confirming...");
     expect(UNSAFE_queryAllByType(ActivityIndicator)).toHaveLength(1);
@@ -129,7 +129,7 @@ describe("ConfirmPanel states", () => {
 
   it("confirmed: check, no spinner", () => {
     const { getByText, UNSAFE_queryAllByType } = render(
-      <ConfirmPanel label="You" state="confirmed" />,
+      <ConfirmPanel label="You" side="you" state="confirmed" />,
     );
     getByText("Confirmed");
     expect(UNSAFE_queryAllByType(ActivityIndicator)).toHaveLength(0);
@@ -139,8 +139,8 @@ describe("ConfirmPanel states", () => {
 describe("ConfirmStep", () => {
   it("before acting: 'Your call' for the viewer, 'Confirming...' for the opponent", () => {
     const { getByTestId } = renderStep();
-    getByTestId("confirm-panel-your-call");
-    getByTestId("confirm-panel-confirming");
+    getByTestId("confirm-panel-you-your-call");
+    getByTestId("confirm-panel-opponent-confirming");
     getByTestId("confirm-result");
     getByTestId("confirm-dispute");
   });
@@ -151,7 +151,8 @@ describe("ConfirmStep", () => {
       fireEvent.press(getByTestId("confirm-result"));
     });
     getByText("Waiting for Demo Red to confirm...");
-    getByTestId("confirm-panel-confirmed");
+    getByTestId("confirm-panel-you-confirmed");
+    getByTestId("confirm-panel-opponent-confirming");
     expect(mockImpact).toHaveBeenCalledWith("light");
     expect(mockHapticError).not.toHaveBeenCalled();
   });
@@ -165,6 +166,6 @@ describe("ConfirmStep", () => {
     expect(mockHapticError).toHaveBeenCalledTimes(1);
     expect(mockImpact).not.toHaveBeenCalled();
     // Back to the viewer's turn.
-    getByTestId("confirm-panel-your-call");
+    getByTestId("confirm-panel-you-your-call");
   });
 });

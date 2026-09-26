@@ -171,9 +171,10 @@ export function ConfirmStep(props: ConfirmStepProps) {
       />
 
       <View className="flex-row gap-3">
-        <ConfirmPanel label="You" state={myConfirmed ? "confirmed" : "your-call"} />
+        <ConfirmPanel label="You" side="you" state={myConfirmed ? "confirmed" : "your-call"} />
         <ConfirmPanel
           label={opponentDisplayName}
+          side="opponent"
           state={opponentConfirmed ? "confirmed" : "confirming"}
         />
       </View>

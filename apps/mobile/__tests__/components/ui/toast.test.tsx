@@ -6,6 +6,7 @@
  */
 import * as React from "react";
 import { render } from "@testing-library/react-native";
+import { AccessibilityInfo } from "react-native";
 
 let mockHostProps: Record<string, unknown> = {};
 const mockShow = jest.fn();
@@ -82,6 +83,17 @@ describe("BrandToast", () => {
     const { getByTestId, getByText } = render(<>{el}</>);
     getByTestId("toast-error");
     getByText("Couldn't confirm");
+  });
+});
+
+describe("toast announces to VoiceOver", () => {
+  it("announces title and description", () => {
+    const spy = jest.spyOn(AccessibilityInfo, "announceForAccessibility").mockImplementation(() => {});
+    toast.error({ text1: "Couldn't confirm", description: "nope" });
+    expect(spy).toHaveBeenCalledWith("Couldn't confirm. nope");
+    toast.info("Plain");
+    expect(spy).toHaveBeenLastCalledWith("Plain");
+    spy.mockRestore();
   });
 });
 

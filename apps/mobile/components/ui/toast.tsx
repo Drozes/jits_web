@@ -1,4 +1,4 @@
-import { Pressable, Text } from "react-native";
+import { AccessibilityInfo, Pressable, Text } from "react-native";
 import RNToast, {
   type ToastConfig,
   type ToastConfigParams,
@@ -23,15 +23,29 @@ function normalize(input: ToastInput): ToastShowParams {
   return { ...rest, text2: rest.text2 ?? description };
 }
 
+/**
+ * Shows the toast and reads it out to VoiceOver, which does not otherwise
+ * notice a toast appearing over the current screen.
+ */
+function showAndAnnounce(type: "success" | "error" | "info", input: ToastInput) {
+  const params = normalize(input);
+  RNToast.show({ type, ...params });
+  if (params.text1) {
+    AccessibilityInfo.announceForAccessibility(
+      params.text1 + (params.text2 ? ". " + params.text2 : ""),
+    );
+  }
+}
+
 export const toast = {
   success(input: ToastInput) {
-    RNToast.show({ type: "success", ...normalize(input) });
+    showAndAnnounce("success", input);
   },
   error(input: ToastInput) {
-    RNToast.show({ type: "error", ...normalize(input) });
+    showAndAnnounce("error", input);
   },
   info(input: ToastInput) {
-    RNToast.show({ type: "info", ...normalize(input) });
+    showAndAnnounce("info", input);
   },
   show(params: ToastShowParams) {
     RNToast.show(params);
@@ -102,6 +116,8 @@ function render(type: BrandToastType) {
   );
 }
 
+// Any type not listed here (e.g. a raw `toast.show({ type: "custom" })`)
+// falls back to the library's stock, unbranded card.
 export const toastConfig: ToastConfig = {
   success: render("success"),
   error: render("error"),

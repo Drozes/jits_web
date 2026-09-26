@@ -2,7 +2,8 @@ import * as React from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 import { AlertTriangle } from "lucide-react-native";
 import { toast } from "@/components/ui/toast";
-import { useResolvedColorScheme, useThemedTokens } from "@/lib/theme/use-theme";
+import { useThemedTokens } from "@/lib/theme/use-theme";
+import { useAmber } from "@/components/match-detail/use-amber";
 import { matchHaptics } from "@/lib/match-flow/use-haptics";
 import { supabase } from "@/lib/supabase/client";
 import { disputeMatchResult } from "@jits/shared/api/mutations";
@@ -28,8 +29,7 @@ interface DisputeFormProps {
  */
 export function DisputeForm({ matchId, onCancel, onSubmitted }: DisputeFormProps) {
   const tokens = useThemedTokens();
-  // Same amber shades as `useAmber` in components/match-detail.
-  const amberIcon = useResolvedColorScheme() === "dark" ? "#F59E0B" : "#D97706";
+  const amberIcon = useAmber().icon;
   const [reason, setReason] = React.useState("");
   const [submitting, setSubmitting] = React.useState(false);
 

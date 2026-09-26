@@ -18,9 +18,15 @@ const mockRecord = jest.fn();
 jest.mock("@jits/shared/api/mutations", () => ({
   recordMatchResult: (...a: unknown[]) => mockRecord(...a),
 }));
+let mockQueued = false;
 jest.mock("@/lib/network/mutation-queue", () => ({
   mutationQueue: { enqueue: (_k: string, fn: () => unknown) => fn() },
-  isQueuedResult: () => false,
+  isQueuedResult: () => mockQueued,
+}));
+const mockImpact = jest.fn((_s: unknown) => Promise.resolve());
+jest.mock("expo-haptics", () => ({
+  impactAsync: (s: unknown) => mockImpact(s),
+  ImpactFeedbackStyle: { Light: "light", Medium: "medium", Heavy: "heavy" },
 }));
 const mockReconcile = jest.fn();
 jest.mock("@/lib/match-flow/match-sync-context", () => ({
@@ -34,6 +40,7 @@ import { useRecordResult } from "@/lib/match-flow/use-record-result";
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockQueued = false;
 });
 
 it("buzzes resultRecorded once when the record succeeds", async () => {
@@ -60,4 +67,18 @@ it("buzzes the error haptic alongside the failure toast", async () => {
   expect(mockRecorded).not.toHaveBeenCalled();
   expect(onRecorded).not.toHaveBeenCalled();
   expect(mockReconcile).toHaveBeenCalledTimes(1);
+});
+
+it("a result queued offline gets a light impact, not the Success buzz", async () => {
+  mockQueued = true;
+  mockRecord.mockResolvedValue({ ok: true, data: { queued: true } });
+  const onRecorded = jest.fn();
+  const { result } = renderHook(() => useRecordResult({ matchId: "M1", onRecorded }));
+  await act(async () => {
+    await result.current.submit({ outcome: "draw" });
+  });
+  expect(onRecorded).toHaveBeenCalledTimes(1);
+  expect(mockRecorded).not.toHaveBeenCalled();
+  expect(mockImpact).toHaveBeenCalledWith("light");
+  expect(mockError).not.toHaveBeenCalled();
 });

@@ -83,16 +83,19 @@ const STATUS_COPY: Record<ConfirmPanelState, string> = {
  */
 export function ConfirmPanel({
   label,
+  side,
   state,
 }: {
   label: string;
+  /** Which athlete this panel is for; keeps the testIDs unique per side. */
+  side: "you" | "opponent";
   state: ConfirmPanelState;
 }) {
   const tokens = useThemedTokens();
   const confirmed = state === "confirmed";
   return (
     <View
-      testID={`confirm-panel-${state}`}
+      testID={`confirm-panel-${side}-${state}`}
       className={cn(
         "flex-1 items-center gap-2 rounded-md bg-surface-3 border px-3 py-4",
         confirmed ? "border-positive" : "border-hairline-strong",

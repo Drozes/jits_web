@@ -1,4 +1,5 @@
 import * as React from "react";
+import * as Haptics from "expo-haptics";
 import { toast } from "@/components/ui/toast";
 import { supabase } from "@/lib/supabase/client";
 import { recordMatchResult } from "@jits/shared/api/mutations";
@@ -75,7 +76,13 @@ export function useRecordResult({ matchId, onRecorded }: UseRecordResultParams) 
       }
       const queued = isQueuedResult(res.data);
       recordedRef.current = true;
-      void matchHaptics.resultRecorded();
+      // Success only once the server has it; a result queued offline is not
+      // recorded yet, so it gets a light acknowledgement instead.
+      if (queued) {
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
+      } else {
+        void matchHaptics.resultRecorded();
+      }
       const broadcast: BroadcastResult = {
         result: outcome,
         winnerId: outcome === "submission" ? winnerId : undefined,

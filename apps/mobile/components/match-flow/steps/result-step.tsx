@@ -2,7 +2,8 @@ import * as React from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { Handshake } from "lucide-react-native";
 import { Plate } from "@/components/ui/elo-system";
-import { useResolvedColorScheme, useThemedTokens } from "@/lib/theme/use-theme";
+import { useThemedTokens } from "@/lib/theme/use-theme";
+import { useAmber } from "@/components/match-detail/use-amber";
 import { useRecordResult } from "@/lib/match-flow/use-record-result";
 import { isFinishTimeValid } from "@/lib/match-flow/parse-finish-time";
 import type { BroadcastResult } from "@jits/shared/hooks/use-session-match-sync";
@@ -41,9 +42,8 @@ export function ResultStep({
   onRecorded,
 }: ResultStepProps) {
   const tokens = useThemedTokens();
-  // Amber for draws (Pressure Score). Same shades as `useAmber` in
-  // components/match-detail: amber-500 on dark, amber-600 on light.
-  const amberIcon = useResolvedColorScheme() === "dark" ? "#F59E0B" : "#D97706";
+  // Amber for draws (Pressure Score).
+  const amberIcon = useAmber().icon;
   const [outcome, setOutcome] = React.useState<"submission" | "draw" | null>(null);
   const [winnerId, setWinnerId] = React.useState("");
   const [submissionCode, setSubmissionCode] = React.useState("");
