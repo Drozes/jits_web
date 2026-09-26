@@ -5,7 +5,7 @@ import { ArrowUpRight } from "lucide-react-native";
 import { useRequireAthlete } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { useProfileData } from "@/lib/profile/use-profile-data";
-import { useMyMatchVideos } from "@/lib/profile/use-my-match-videos";
+import { useMyMatchVideos, useRefetchOnUploadSettled } from "@/lib/profile/use-my-match-videos";
 import { usePullToRefresh, useRefetchOnRefocus } from "@/lib/cache/use-refocus-refetch";
 import { useMatchExitCount } from "@/lib/arena/arena-store";
 import { matchDetailHref } from "@/lib/match-detail/href";
@@ -116,6 +116,9 @@ export default function ProfileScreen() {
   }, [refetchProfile, refetchVideos]);
   const { refreshing, onRefresh } = usePullToRefresh(refetchAll, profileBusy || videos.isValidating);
   useRefetchOnRefocus(refetchAll, useMatchExitCount());
+  // The video row lands when the upload settles, often after that refocus.
+  const historyMatchIds = React.useMemo(() => history.map((m) => m.match_id), [history]);
+  useRefetchOnUploadSettled(historyMatchIds, refetchVideos);
 
   // Serve recent matches from the single cached history payload fetched by
   // useProfileData; no separate round-trip.

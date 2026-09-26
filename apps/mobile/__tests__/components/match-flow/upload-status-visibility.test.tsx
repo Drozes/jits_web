@@ -361,12 +361,17 @@ describe("watching the match back from the summary (jits-p75q)", () => {
     expect(mockRouterPush).toHaveBeenCalledWith("/(app)/match-detail/M1");
   });
 
-  it("does not show the details link while a video is available or uploading", () => {
-    expect(
-      renderSummary({ status: "uploaded", videoId: "VID-1" }).queryByText("View match details"),
-    ).toBeNull();
+  it("still shows the details link while a video is available or uploading", () => {
+    // Watch plays only this device's clip; the detail screen lists both
+    // athletes' recordings, so the link is always offered below it.
+    const withVideo = renderSummary({ status: "uploaded", videoId: "VID-1" });
+    withVideo.getByText("Watch Match Video");
+    fireEvent.press(withVideo.getByText("View match details"));
+    expect(mockRouterPush).toHaveBeenCalledWith("/(app)/match-detail/M1");
     resetMatchUploadStore();
-    expect(renderSummary({ status: "uploading" }).queryByText("View match details")).toBeNull();
+    const uploading = renderSummary({ status: "uploading" });
+    uploading.getByText(/video uploading/i);
+    uploading.getByText("View match details");
   });
 });
 

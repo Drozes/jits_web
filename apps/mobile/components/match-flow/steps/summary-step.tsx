@@ -248,23 +248,23 @@ export function SummaryStep(props: SummaryStepProps) {
               Video Uploading...
             </Text>
           </View>
-        ) : (
-          // A reopened completed or disputed match has an empty in-memory
-          // upload store, so no video id: the detail screen lists every video
-          // on the match from the server (jits-p75q). A text link, never a
-          // second red CTA.
-          <Pressable
-            testID="summary-view-match-details"
-            accessibilityRole="button"
-            onPress={() => router.push(matchDetailHref(matchId))}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            className="items-center py-2 active:opacity-70"
-          >
-            <Text className="font-heading text-[12px] text-ink-2 uppercase tracking-caps">
-              View match details
-            </Text>
-          </Pressable>
-        )}
+        ) : null}
+        {/* Always offered, not only as the no-video fallback: the Watch
+            button plays only THIS device's clip, and the detail screen lists
+            every video on the match from the server (both athletes'
+            recordings, and a reopened match whose in-memory upload store is
+            empty, jits-p75q). A text link, never a second red CTA. */}
+        <Pressable
+          testID="summary-view-match-details"
+          accessibilityRole="button"
+          onPress={() => router.push(matchDetailHref(matchId))}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          className="items-center py-2 active:opacity-70"
+        >
+          <Text className="font-heading text-[12px] text-ink-2 uppercase tracking-caps">
+            View match details
+          </Text>
+        </Pressable>
         {outcome && !disputed ? (
           <Pressable
             accessibilityRole="button"

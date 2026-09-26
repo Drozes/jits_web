@@ -1,7 +1,9 @@
 /**
  * CameraOverlay permission states. Once iOS has recorded a denial it never
- * shows the prompt again, so the denied card has to offer the way back
- * (Settings); a "Grant Access" button there would do nothing.
+ * shows the prompt again, so a "Grant Access" button there would do nothing.
+ * It must not offer "Open Settings" either: iOS terminates the app when a
+ * camera or microphone privacy switch changes, and this card only renders
+ * inside the match wizard, so that round trip kills the app mid-match.
  */
 import * as React from "react";
 import { Linking } from "react-native";
@@ -53,17 +55,24 @@ describe("CameraOverlay without permission", () => {
     expect(screen.queryByText("Open Settings")).toBeNull();
   });
 
-  it("offers Open Settings once the OS will not prompt again", () => {
+  it("never sends the athlete to Settings mid-match once the OS will not prompt again", () => {
     const openSettings = jest.spyOn(Linking, "openSettings").mockResolvedValue(undefined);
+    const openURL = jest.spyOn(Linking, "openURL").mockResolvedValue(undefined);
     try {
       const screen = renderOverlay(false);
       screen.getByText("Camera access denied");
+      // The copy explains the match still runs and warns about the restart.
+      screen.getByText(/will not be recorded and runs as normal/);
+      screen.getByText(/Changing them restarts the app/);
       expect(screen.queryByText("Grant Access")).toBeNull();
-      fireEvent.press(screen.getByText("Open Settings"));
-      expect(openSettings).toHaveBeenCalledTimes(1);
+      expect(screen.queryByText("Open Settings")).toBeNull();
+      expect(screen.queryAllByRole("button")).toHaveLength(0);
+      expect(openSettings).not.toHaveBeenCalled();
+      expect(openURL).not.toHaveBeenCalled();
       expect(screen.onRequestPermission).not.toHaveBeenCalled();
     } finally {
       openSettings.mockRestore();
+      openURL.mockRestore();
     }
   });
 });

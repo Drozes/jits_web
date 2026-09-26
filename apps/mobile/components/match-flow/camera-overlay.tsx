@@ -1,7 +1,7 @@
 import * as React from "react";
-import { Linking, Pressable, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { CameraView } from "expo-camera";
-import { Camera, CameraOff, Settings } from "lucide-react-native";
+import { Camera, CameraOff } from "lucide-react-native";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { cn } from "@/lib/cn";
 
@@ -24,6 +24,13 @@ interface CameraOverlayProps {
  * When permission is missing we render a placeholder + grant CTA in
  * the same slot. The match flow continues regardless: recording is
  * best-effort.
+ *
+ * Deliberately NO "Open Settings" button once iOS has recorded a denial.
+ * iOS terminates the app when a camera or microphone privacy switch
+ * changes, and this card only ever renders inside the match wizard (ready
+ * and live steps), so a Settings round trip kills the app mid-match and
+ * strands the athlete. The denied card says so instead and points them at
+ * Settings for their NEXT match.
  *
  * ELO design system: tk-viewfinder style. The recording REC pill uses
  * the negative/CTA dot to match the wireframe.
@@ -50,7 +57,7 @@ export function CameraOverlay({
             <Text className="mt-1 font-body text-[12px] text-ink-2">
               {permissionCanAskAgain
                 ? "Grant access to record this match. The match will run regardless."
-                : "Enable camera access in Settings to record this match."}
+                : "This match will not be recorded and runs as normal. To record your next match, enable camera and microphone access in Settings after this one. Changing them restarts the app."}
             </Text>
           </View>
         </View>
@@ -66,23 +73,7 @@ export function CameraOverlay({
               Grant Access
             </Text>
           </Pressable>
-        ) : (
-          // iOS will not show the prompt again once denied, so the only way
-          // back is Settings. The recorder re-reads the permission when the
-          // app returns to the foreground, so the preview comes back on its
-          // own after the user flips the switch.
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => void Linking.openSettings().catch(() => undefined)}
-            hitSlop={10}
-            className="mt-3 self-start flex-row items-center gap-2 border border-hairline-strong rounded-xs bg-surface-3 px-3 py-2 active:bg-surface-4"
-          >
-            <Settings size={14} color={tokens.textPrimary} />
-            <Text className="font-heading text-[10px] text-ink uppercase tracking-caps">
-              Open Settings
-            </Text>
-          </Pressable>
-        )}
+        ) : null}
       </View>
     );
   }
