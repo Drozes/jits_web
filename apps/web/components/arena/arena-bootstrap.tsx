@@ -34,6 +34,10 @@ export function ArenaBootstrap({
   const pathname = usePathname();
   // Navigating away from an Arena match route is leaving it on purpose: Home's
   // Resume card does not offer it again (a closed tab is not leaving).
+  // This writes AFTER the route has committed, which is only safe because no
+  // match exit goes straight to "/": Home would render on the server before
+  // the cookie exists. If one ever does, write the cookie in that exit
+  // handler first (or router.refresh() after writing it here).
   const lastMatchIdRef = useRef<string | null>(null);
   useEffect(() => {
     const current = arenaMatchIdFromPath(pathname);

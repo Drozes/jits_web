@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import {
   LEFT_MATCHES_COOKIE,
   LEFT_MATCHES_MAX,
@@ -66,6 +66,26 @@ describe("rememberLeftMatch", () => {
     const ids = parseLeftMatches(cookieValue(), ME);
     expect(ids).toHaveLength(LEFT_MATCHES_MAX);
     expect(ids.at(-1)).toBe(uuid(LEFT_MATCHES_MAX + 4));
+  });
+
+  it("marks the cookie Secure on https only", () => {
+    const writes: string[] = [];
+    const setter = vi
+      .spyOn(document, "cookie", "set")
+      .mockImplementation((v: string) => void writes.push(v));
+    const loc = vi
+      .spyOn(window, "location", "get")
+      .mockReturnValue({ ...window.location, protocol: "https:" } as Location);
+    try {
+      rememberLeftMatch(ME, M1);
+      loc.mockReturnValue({ ...window.location, protocol: "http:" } as Location);
+      rememberLeftMatch(ME, M2);
+    } finally {
+      setter.mockRestore();
+      loc.mockRestore();
+    }
+    expect(writes[0]).toMatch(/; Secure$/);
+    expect(writes[1]).not.toMatch(/Secure/);
   });
 
   it("ignores an id that is not a UUID", () => {

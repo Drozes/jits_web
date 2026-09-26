@@ -46,7 +46,8 @@ export function rememberLeftMatch(athleteId: string, matchId: string): void {
     const ids = parseLeftMatches(current, athleteId).filter((id) => id !== matchId);
     ids.push(matchId);
     const value = encodeURIComponent(`${athleteId}:${ids.slice(-LEFT_MATCHES_MAX).join(",")}`);
-    document.cookie = `${LEFT_MATCHES_COOKIE}=${value}; path=/; SameSite=Lax`;
+    const secure = window.location.protocol === "https:" ? "; Secure" : "";
+    document.cookie = `${LEFT_MATCHES_COOKIE}=${value}; path=/; SameSite=Lax${secure}`;
   } catch {
     // Best effort: without it Resume may offer a match the athlete left.
   }
