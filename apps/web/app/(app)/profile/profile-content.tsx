@@ -57,6 +57,7 @@ export async function ProfileContent({
     outcome: (m.athlete_outcome ?? "draw") as "win" | "loss" | "draw",
     when: formatRelativeDate(m.completed_at),
     delta: m.elo_delta ?? 0,
+    matchType: m.match_type,
   }));
 
   const shareAthlete = {

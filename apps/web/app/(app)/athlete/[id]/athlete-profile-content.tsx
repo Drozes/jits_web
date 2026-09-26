@@ -70,6 +70,7 @@ export async function AthleteProfileContent({
     outcome: (m.athlete_outcome ?? "draw") as "win" | "loss" | "draw",
     when: formatRelativeDate(m.completed_at),
     delta: m.elo_delta ?? 0,
+    matchType: m.match_type,
   }));
 
   // Competitor's own win streak (computed only from H2H; best-effort)

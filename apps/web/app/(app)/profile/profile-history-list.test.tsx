@@ -7,13 +7,13 @@ describe("ProfileHistoryList", () => {
     render(
       <ProfileHistoryList
         rows={[
-          { matchId: "m-1", opponentName: "Demo Red", gymName: null, outcome: "win", when: "2d ago", delta: 12 },
-          { matchId: "m-2", opponentName: "Demo Blue", gymName: "Alpha", outcome: "loss", when: "3d ago", delta: -9 },
+          { matchId: "m-1", opponentName: "Demo Red", gymName: null, outcome: "win", when: "2d ago", delta: 12, matchType: "ranked" },
+          { matchId: "m-2", opponentName: "Demo Blue", gymName: "Alpha", outcome: "loss", when: "3d ago", delta: -9, matchType: "casual" },
         ]}
       />,
     );
-    expect(screen.getByRole("link", { name: "Open match vs Demo Red" })).toHaveAttribute("href", "/matches/m-1");
-    expect(screen.getByRole("link", { name: "Open match vs Demo Blue" })).toHaveAttribute("href", "/matches/m-2");
+    expect(screen.getByRole("link", { name: "Open match vs Demo Red, win, +12" })).toHaveAttribute("href", "/matches/m-1");
+    expect(screen.getByRole("link", { name: "Open match vs Demo Blue, loss" })).toHaveAttribute("href", "/matches/m-2");
   });
 
   it("empty state has no links", () => {

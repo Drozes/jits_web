@@ -9,7 +9,13 @@ vi.mock("@jits/shared/api/queries", () => ({
   getMatchVideoPlaybackResult: (...a: unknown[]) => mockPlayback(...a),
 }));
 
-import { MatchVideoCard } from "./match-video-card";
+import { MatchVideoCard, MAX_SILENT_RESIGNS } from "./match-video-card";
+
+function setTime(el: HTMLVideoElement, t: number) {
+  Object.defineProperty(el, "currentTime", { value: t, writable: true, configurable: true });
+}
+
+const playSpy = vi.fn(() => Promise.resolve());
 
 function makeVideo(over: Partial<MatchDetailVideo> = {}): MatchDetailVideo {
   return {
@@ -34,6 +40,8 @@ function ok(url: string) {
 
 beforeEach(() => {
   mockPlayback.mockReset();
+  playSpy.mockClear();
+  Object.defineProperty(HTMLMediaElement.prototype, "play", { value: playSpy, configurable: true, writable: true });
 });
 
 describe("MatchVideoCard", () => {
@@ -108,18 +116,49 @@ describe("MatchVideoCard", () => {
     expect(mockPlayback).toHaveBeenCalledTimes(2);
   });
 
-  it("successful playback resets the silent re-sign budget", async () => {
+  it("error, play, error at the same position ends on the panel (no loop)", async () => {
     mockPlayback.mockResolvedValue(ok("https://x/fresh.mp4"));
     const { container } = render(
       <MatchVideoCard video={makeVideo()} initialUrl="https://x/stale.mp4" initialError={null} primary />,
     );
     fireEvent.click(screen.getByRole("button", { name: /watch/i }));
-    fireEvent.error(container.querySelector("video")!);
-    await waitFor(() => expect(mockPlayback).toHaveBeenCalledTimes(1));
-    fireEvent.playing(container.querySelector("video")!);
-    fireEvent.error(container.querySelector("video")!);
-    await waitFor(() => expect(mockPlayback).toHaveBeenCalledTimes(2));
+    const el = () => container.querySelector("video")!;
+    setTime(el(), 42);
+    fireEvent.error(el());
+    await waitFor(() => expect(el()).toHaveAttribute("src", "https://x/fresh.mp4"));
+    // Plays again from the resume point, but makes no real progress.
+    fireEvent.playing(el());
+    setTime(el(), 43);
+    fireEvent.timeUpdate(el());
+    fireEvent.error(el());
+    expect(await screen.findByText("Couldn't play this video")).toBeInTheDocument();
+    expect(mockPlayback).toHaveBeenCalledTimes(1);
+  });
+
+  it("real progress refunds the budget, but silent re-signs cap at 2 per mount", async () => {
+    mockPlayback.mockResolvedValue(ok("https://x/fresh.mp4"));
+    const { container } = render(
+      <MatchVideoCard video={makeVideo()} initialUrl="https://x/stale.mp4" initialError={null} primary />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /watch/i }));
+    const el = () => container.querySelector("video")!;
+    for (const [at, calls] of [[10, 1], [100, 2]] as const) {
+      setTime(el(), at);
+      fireEvent.error(el());
+      await waitFor(() => expect(mockPlayback).toHaveBeenCalledTimes(calls));
+      setTime(el(), at + 30);
+      fireEvent.timeUpdate(el());
+    }
     expect(screen.queryByText("Couldn't play this video")).toBeNull();
+    fireEvent.error(el());
+    expect(await screen.findByText("Couldn't play this video")).toBeInTheDocument();
+    expect(mockPlayback).toHaveBeenCalledTimes(MAX_SILENT_RESIGNS);
+  });
+
+  it("calls play() after mounting the video so iOS needs no second tap", () => {
+    render(<MatchVideoCard video={makeVideo()} initialUrl="https://x/v.mp4" initialError={null} primary />);
+    fireEvent.click(screen.getByRole("button", { name: /watch/i }));
+    expect(playSpy).toHaveBeenCalled();
   });
 
   it("processing: amber chip and a disabled Processing button, no Watch", () => {

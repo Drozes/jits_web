@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { OutcomeTag } from "@/components/ui/elo-system";
+import { matchRowLabel } from "@/lib/match-row-label";
 
 interface HistoryRow {
   matchId: string;
@@ -8,6 +9,8 @@ interface HistoryRow {
   outcome: "win" | "loss" | "draw";
   when: string;
   delta: number;
+  /** Delta is only announced for ranked rows. */
+  matchType?: string;
 }
 
 interface ProfileHistoryListProps {
@@ -77,7 +80,7 @@ function Row({ row }: { row: HistoryRow }) {
     <Link
       href={`/matches/${row.matchId}`}
       prefetch={false}
-      aria-label={`Open match vs ${row.opponentName}`}
+      aria-label={matchRowLabel(row.opponentName, row.outcome, row.matchType, row.delta)}
       className="grid grid-cols-[auto_1fr_auto] items-center transition-colors hover:!bg-[var(--bg-elevated-hover)]"
       style={{
         background: "var(--bg-elevated)",

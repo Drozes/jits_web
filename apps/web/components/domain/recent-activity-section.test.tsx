@@ -16,6 +16,6 @@ describe("RecentActivitySection", () => {
     );
     expect(screen.getByText("Alpha").closest("a")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Me" }));
-    expect(screen.getByText("Demo Red").closest("a")).toHaveAttribute("href", "/matches/m-3");
+    expect(screen.getByRole("link", { name: "Open match vs Demo Red, win, +9" })).toHaveAttribute("href", "/matches/m-3");
   });
 });

@@ -121,4 +121,24 @@ describe("MatchResultHeader", () => {
     render(<MatchResultHeader view={makeView({ opponent: false })} />);
     expect(screen.queryByRole("link")).toBeNull();
   });
+
+  it("ranked with an unknown delta shows no ELO row (never a fake 0)", () => {
+    const v = makeView();
+    (v.me as { elo_delta: number | null }).elo_delta = null;
+    render(<MatchResultHeader view={v} />);
+    expect(screen.queryByTestId("match-elo-delta")).toBeNull();
+    expect(screen.queryByText("1198 → 1210")).toBeNull();
+  });
+
+  it("opponent avatar is circular with shared initials", () => {
+    render(<MatchResultHeader view={makeView()} />);
+    const initials = screen.getByText("DR");
+    expect(initials.closest('[data-slot="avatar"]')).toHaveClass("rounded-full");
+  });
+
+  it("meta row date is mono tabular", () => {
+    render(<MatchResultHeader view={makeView()} />);
+    const date = screen.getByTestId("match-date");
+    expect(date).toHaveClass("font-mono");
+  });
 });

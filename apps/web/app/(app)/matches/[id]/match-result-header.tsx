@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { Avatar32, MetaTag, Plate } from "@/components/ui/elo-system";
-import { cn } from "@/lib/utils";
+import { MetaTag, Plate } from "@/components/ui/elo-system";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { cn, getProfilePhotoUrl } from "@/lib/utils";
 import type { MatchDetailView, MatchParticipant } from "@jits/shared/api/queries";
-import { formatRelativeDate, formatVideoDuration } from "@jits/shared/utils";
+import { formatRelativeDate, formatVideoDuration, getInitials } from "@jits/shared/utils";
 
 const VERDICT: Record<string, { word: string; className: string }> = {
   win: { word: "WIN", className: "text-foreground" },
@@ -32,7 +33,8 @@ export function MatchResultHeader({ view }: { view: MatchDetailView }) {
           <StatusChip status={match.status} />
         </div>
         {match.match_type === "ranked" ? (
-          <EloChange me={me} />
+          // No ELO row at all when the delta is unknown: never a fake "0".
+          me.elo_delta != null && <EloChange me={me} />
         ) : (
           <p className="text-sm text-muted-foreground" style={{ marginTop: "var(--space-2)" }}>
             Casual, unrated
@@ -53,7 +55,7 @@ export function MatchResultHeader({ view }: { view: MatchDetailView }) {
 }
 
 function EloChange({ me }: { me: MatchParticipant }) {
-  const delta = me.elo_delta ?? 0;
+  const delta = me.elo_delta;
   // Draws always cost ELO (Pressure Score), so a draw reads amber, not red.
   const tone =
     me.outcome === "draw" ? "text-amber-500" : delta > 0 ? "text-success" : delta < 0 ? "text-[var(--state-negative)]" : "text-muted-foreground";
@@ -103,7 +105,17 @@ function OpponentRow({ opponent }: { opponent: MatchParticipant }) {
         borderRadius: "var(--radius-md)",
       }}
     >
-      <Avatar32 name={opponent.display_name} photoUrl={opponent.profile_photo_url} />
+      {/* Avatars stay circular (brand rule); Avatar32 is square by design. */}
+      <Avatar className="size-8 border border-[var(--border-hairline-strong)]">
+        {opponent.profile_photo_url && (
+          <AvatarImage
+            src={getProfilePhotoUrl(opponent.profile_photo_url)!}
+            alt={opponent.display_name}
+            className="object-cover"
+          />
+        )}
+        <AvatarFallback className="font-mono text-xs">{getInitials(opponent.display_name)}</AvatarFallback>
+      </Avatar>
       <span className="font-heading font-bold truncate" style={{ color: "var(--text-primary)" }}>
         {opponent.display_name}
       </span>
@@ -121,7 +133,7 @@ function MetaRow({ view }: { view: MatchDetailView }) {
   const resultLabel = match.result ? RESULT_LABEL[match.result] : undefined;
   return (
     <div className="flex flex-wrap items-center text-xs text-muted-foreground" style={{ gap: "var(--space-2)" }}>
-      {date && <span className="tabular-nums">{formatRelativeDate(date)}</span>}
+      {date && <span data-testid="match-date" className="font-mono tabular-nums">{formatRelativeDate(date)}</span>}
       <MetaTag>{match.match_type === "ranked" ? "Ranked" : "Casual"}</MetaTag>
       {duration && <span className="font-mono tabular-nums">{duration}</span>}
       {resultLabel && <span>{resultLabel}</span>}

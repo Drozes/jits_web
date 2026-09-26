@@ -20,6 +20,6 @@ describe("MatchHistoryList", () => {
         ]}
       />,
     );
-    expect(screen.getByText("Demo Red").closest("a")).toHaveAttribute("href", "/matches/m-7");
+    expect(screen.getByRole("link", { name: "Open match vs Demo Red, win, +11" })).toHaveAttribute("href", "/matches/m-7");
   });
 });

@@ -1,8 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
-import { Loader2, PlayCircle } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
   getMatchVideoPlaybackResult,
@@ -10,7 +8,8 @@ import {
 } from "@jits/shared/api/queries";
 import type { DomainErrorCode } from "@jits/shared/api/errors";
 import { formatVideoDuration } from "@jits/shared/utils";
-import { initialVideoPhase, watchLabel, type VideoCardPhase } from "./match-video-state";
+import { initialVideoPhase, type VideoCardPhase } from "./match-video-state";
+import { CARD_PANELS, CardAction, CardPanel, Poster } from "./match-video-card-parts";
 
 interface MatchVideoCardProps {
   video: MatchDetailVideo;
@@ -21,26 +20,12 @@ interface MatchVideoCardProps {
   primary: boolean;
 }
 
-const PANELS: Partial<Record<VideoCardPhase, { title: string; body: string; retry: boolean }>> = {
-  absent: {
-    title: "Video unavailable",
-    body: "This recording was removed or you don't have access to it.",
-    retry: false,
-  },
-  missing: {
-    title: "Video file not found",
-    body: "The upload didn't finish, so this recording can't be played.",
-    retry: false,
-  },
-  error: {
-    title: "Couldn't play this video",
-    body: "The link may have expired or your connection dropped.",
-    retry: true,
-  },
-};
-
 // MediaError.MEDIA_ERR_DECODE: the file itself is bad, a fresh URL won't help.
 const MEDIA_ERR_DECODE = 3;
+/** Hard cap on silent re-signs per mount, whatever playback does in between. */
+export const MAX_SILENT_RESIGNS = 2;
+/** Seconds past the resume point that count as real progress. */
+const PROGRESS_SECONDS = 2;
 
 export function MatchVideoCard({ video, initialUrl, initialError, primary }: MatchVideoCardProps) {
   const supabase = useMemo(() => createClient(), []);
@@ -49,9 +34,23 @@ export function MatchVideoCard({ video, initialUrl, initialError, primary }: Mat
   );
   const [url, setUrl] = useState<string | null>(initialUrl);
   const videoRef = useRef<HTMLVideoElement>(null);
-  // One silent re-sign per stretch without successful playback.
-  const resignedRef = useRef(false);
+  // A silent re-sign spends the budget; only real progress past the resume
+  // point refunds it, so a file that fails at the same spot cannot loop.
+  const budgetSpentRef = useRef(false);
+  const silentResignsRef = useRef(0);
+  const progressFloorRef = useRef(0);
   const resumeAtRef = useRef(0);
+
+  // iOS Safari ignores autoPlay on a freshly mounted element unless play() is
+  // called; the Watch tap is the user gesture that allows it.
+  useEffect(() => {
+    if (phase !== "playing") return;
+    try {
+      videoRef.current?.play()?.catch(() => {});
+    } catch {
+      // Environments without media playback (jsdom) throw synchronously.
+    }
+  }, [phase]);
 
   async function sign() {
     const res = await getMatchVideoPlaybackResult(supabase, video.id);
@@ -76,23 +75,35 @@ export function MatchVideoCard({ video, initialUrl, initialError, primary }: Mat
 
   function onVideoError() {
     const el = videoRef.current;
-    if (resignedRef.current || el?.error?.code === MEDIA_ERR_DECODE) {
+    if (
+      budgetSpentRef.current ||
+      silentResignsRef.current >= MAX_SILENT_RESIGNS ||
+      el?.error?.code === MEDIA_ERR_DECODE
+    ) {
       setPhase("error");
       return;
     }
-    // Most likely the 1h signed URL expired mid-session: re-sign once, keep
-    // the element mounted (fullscreen survives), and resume where it was.
-    resignedRef.current = true;
-    resumeAtRef.current = el?.currentTime ?? 0;
+    // Most likely the 1h signed URL expired mid-session: re-sign, keep the
+    // element mounted (fullscreen survives), and resume where it was.
+    budgetSpentRef.current = true;
+    silentResignsRef.current += 1;
+    progressFloorRef.current = el?.currentTime ?? 0;
+    resumeAtRef.current = progressFloorRef.current;
     void sign();
   }
 
+  function onTimeUpdate(e: React.SyntheticEvent<HTMLVideoElement>) {
+    if (e.currentTarget.currentTime > progressFloorRef.current + PROGRESS_SECONDS) {
+      budgetSpentRef.current = false;
+    }
+  }
+
   function onRetry() {
-    resignedRef.current = false;
+    budgetSpentRef.current = false;
     start();
   }
 
-  const panel = PANELS[phase];
+  const panel = CARD_PANELS[phase];
   const duration = formatVideoDuration(video.duration_seconds);
 
   return (
@@ -117,9 +128,7 @@ export function MatchVideoCard({ video, initialUrl, initialError, primary }: Mat
             poster={video.poster_url ?? undefined}
             className="h-full w-full"
             onError={onVideoError}
-            onPlaying={() => {
-              resignedRef.current = false;
-            }}
+            onTimeUpdate={onTimeUpdate}
             onLoadedMetadata={(e) => {
               if (resumeAtRef.current > 0) {
                 e.currentTarget.currentTime = resumeAtRef.current;
@@ -144,97 +153,5 @@ export function MatchVideoCard({ video, initialUrl, initialError, primary }: Mat
         <CardAction video={video} phase={phase} primary={primary} onWatch={start} />
       </div>
     </div>
-  );
-}
-
-function Poster({ url, signing }: { url: string | null; signing: boolean }) {
-  return (
-    <div className="absolute inset-0 grid place-items-center" style={{ background: "var(--bg-elevated-hover)" }}>
-      {url ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={url} alt="" data-testid="match-video-poster" className="absolute inset-0 h-full w-full object-cover" />
-      ) : (
-        <PlayCircle data-testid="match-video-placeholder" className="h-10 w-10 text-muted-foreground" aria-hidden />
-      )}
-      {signing && (
-        <div className="absolute inset-0 grid place-items-center bg-black/50" role="status" aria-label="Loading video">
-          <Loader2 className="h-6 w-6 animate-spin text-white" aria-hidden />
-        </div>
-      )}
-    </div>
-  );
-}
-
-function CardPanel({
-  title,
-  body,
-  retry,
-  primary,
-  onRetry,
-}: {
-  title: string;
-  body: string;
-  retry: boolean;
-  primary: boolean;
-  onRetry: () => void;
-}) {
-  return (
-    <div role="alert" className="absolute inset-0 flex flex-col items-center justify-center text-center px-6" style={{ background: "var(--bg-elevated-hover)" }}>
-      <p className="font-heading font-bold" style={{ color: "var(--text-primary)" }}>{title}</p>
-      <p className="mt-1 text-xs text-muted-foreground">{body}</p>
-      {retry && (
-        <Button size="sm" variant={primary ? "default" : "outline"} className="mt-3 shadow-none rounded-[var(--radius-sm)]" onClick={onRetry}>
-          Try again
-        </Button>
-      )}
-    </div>
-  );
-}
-
-function CardAction({
-  video,
-  phase,
-  primary,
-  onWatch,
-}: {
-  video: MatchDetailVideo;
-  phase: VideoCardPhase;
-  primary: boolean;
-  onWatch: () => void;
-}) {
-  if (phase === "processing") {
-    return (
-      <>
-        <div className="flex items-center" style={{ gap: "var(--space-2)" }}>
-          <span
-            className="font-mono uppercase text-xs border text-amber-500 border-amber-500"
-            style={{ padding: "var(--space-1) var(--space-2)", borderRadius: "var(--radius-xs)" }}
-          >
-            {video.status === "uploading" ? "Uploading" : "Processing"}
-          </span>
-          <span className="text-xs text-muted-foreground">Still uploading. Refresh the page to check again.</span>
-        </div>
-        <Button variant="outline" disabled className="shadow-none rounded-[var(--radius-sm)]">
-          Processing...
-        </Button>
-      </>
-    );
-  }
-  if (phase !== "idle" && phase !== "signing") return null;
-  return (
-    <>
-      {video.playability === "failed" && (
-        <p className="text-xs text-muted-foreground">Processing failed. The original recording may still play.</p>
-      )}
-      <Button
-        variant={primary ? "default" : "outline"}
-        className="shadow-none rounded-[var(--radius-sm)]"
-        aria-label={watchLabel(video)}
-        disabled={phase === "signing"}
-        onClick={onWatch}
-      >
-        Watch
-      </Button>
-    </>
   );
 }

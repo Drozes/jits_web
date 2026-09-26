@@ -16,19 +16,24 @@ const COPY = {
     title: "You can't view this match",
     body: "Only the two athletes in a match can see its details and video.",
   },
+  "not-found": {
+    title: "Match not found",
+    body: "It may have been cancelled or removed.",
+  },
   error: {
     title: "Couldn't load this match",
     body: "Check your connection and try again.",
   },
 } as const;
 
-/** Screen-level panels for spec 3.2 (not-found is the route's 404 page). */
+/** Screen-level panels for spec 3.2 (not-found renders from `not-found.tsx`). */
 export function MatchDetailErrorPanel({
   kind,
   retryHref,
 }: {
   kind: keyof typeof COPY;
-  retryHref: string;
+  /** Required for kind "error" (Try again reloads it). */
+  retryHref?: string;
 }) {
   const router = useRouter();
   const copy = COPY[kind];
