@@ -12,11 +12,18 @@ import { cn } from "@/lib/cn";
 interface LivePillProps {
   label?: string;
   className?: string;
+  /**
+   * Fixed #22C55E dot and text for dark chrome over video (the live
+   * broadcast clock slab), whatever the app theme.
+   */
+  onDark?: boolean;
 }
+
+const ON_DARK_GREEN = "#22C55E";
 
 const PULSE_DURATION_MS = 1400;
 
-export function LivePill({ label = "LIVE", className }: LivePillProps) {
+export function LivePill({ label = "LIVE", className, onDark = false }: LivePillProps) {
   const opacity = useSharedValue(1);
   const scale = useSharedValue(1);
 
@@ -43,10 +50,20 @@ export function LivePill({ label = "LIVE", className }: LivePillProps) {
       <Animated.View
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants"
-        className="bg-positive"
-        style={[{ width: 7, height: 7, borderRadius: 3.5 }, dotStyle]}
+        className={onDark ? undefined : "bg-positive"}
+        style={[
+          { width: 7, height: 7, borderRadius: 3.5 },
+          onDark ? { backgroundColor: ON_DARK_GREEN } : null,
+          dotStyle,
+        ]}
       />
-      <Text className="font-mono-bold text-[10px] text-positive uppercase tracking-caps-xl">
+      <Text
+        className={cn(
+          "font-mono-bold text-[10px] uppercase tracking-caps-xl",
+          onDark ? undefined : "text-positive",
+        )}
+        style={onDark ? { color: ON_DARK_GREEN } : undefined}
+      >
         {label}
       </Text>
     </View>

@@ -1,0 +1,50 @@
+/**
+ * Fixed colors and sizes for the live broadcast screen. The chrome sits over
+ * camera video in both app themes, so it does not follow the light / dark
+ * theme tokens.
+ */
+export const BROADCAST = {
+  black: "#000000",
+  ground: "#0D0F14",
+  ink: "#0D0F14",
+  inkDark: "#E8EDF2",
+  ink3: "#575C68",
+  cta: "#E63946",
+  ctaHover: "#F0556B",
+  ctaText: "#AC2B34",
+  live: "#22C55E",
+  amber: "#F59E0B",
+  amberSoft: "rgba(245,158,11,0.16)",
+  amberSpent: "rgba(245,158,11,0.22)",
+  amberRule: "rgba(245,158,11,0.5)",
+  slab: "rgba(13,15,20,0.92)",
+  plate: "rgba(232,235,240,0.96)",
+  plateBorder: "rgba(13,15,20,0.34)",
+  glassFill: "rgba(255,255,255,0.12)",
+  glassFillPressed: "rgba(255,255,255,0.20)",
+  glassBorder: "rgba(255,255,255,0.40)",
+  tagFill: "rgba(0,0,0,0.40)",
+  tagText: "rgba(255,255,255,0.85)",
+  tallyGlass: "rgba(13,15,20,0.72)",
+  white: "#FFFFFF",
+  white72: "rgba(255,255,255,0.72)",
+  dim62: "rgba(232,237,242,0.62)",
+  body72: "rgba(232,237,242,0.72)",
+  track: "rgba(13,15,20,0.25)",
+  startingDim: "rgba(0,0,0,0.35)",
+  savingDim: "rgba(0,0,0,0.55)",
+} as const;
+
+export const BROADCAST_RADIUS = { tag: 2, button: 3, plate: 4 } as const;
+
+export const BROADCAST_SIZE = {
+  strip: 32,
+  bar: 56,
+  slab: 104,
+  controls: 64,
+  tally: 28,
+  maxWidth: 480,
+} as const;
+
+/** Every number on the live screen uses tabular figures. */
+export const TABULAR = { fontVariant: ["tabular-nums" as const] };
