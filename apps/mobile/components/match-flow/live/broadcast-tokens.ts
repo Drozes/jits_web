@@ -44,5 +44,19 @@ export const BROADCAST_SIZE = {
   maxWidth: 480,
 } as const;
 
+/**
+ * The glass button look shared by Pause and Allow camera: 1 px white-40
+ * border, white-12 fill (white-20 pressed), a 0.98 press-in.
+ */
+export function glassButtonStyle(pressed: boolean) {
+  return {
+    borderRadius: BROADCAST_RADIUS.button,
+    borderWidth: 1,
+    borderColor: BROADCAST.glassBorder,
+    backgroundColor: pressed ? BROADCAST.glassFillPressed : BROADCAST.glassFill,
+    transform: [{ scale: pressed ? 0.98 : 1 }],
+  };
+}
+
 /** Every number on the live screen uses tabular figures. */
 export const TABULAR = { fontVariant: ["tabular-nums" as const] };

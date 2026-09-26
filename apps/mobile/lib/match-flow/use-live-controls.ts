@@ -65,6 +65,9 @@ export function useLiveControls({ matchId, timer, sync, endedRef, onEnded }: Use
       setBusy("resume");
       const res = await resumeMatch(supabase, matchId);
       setBusy(null);
+      // The match ended while the RPC was in flight (the opponent's
+      // match_ended): apply nothing, broadcast nothing, toast nothing.
+      if (endedRef.current) return;
       if (!res.ok && res.error.code === "MATCH_NOT_PAUSED") {
         // The match is already running (a resume we missed, e.g. the
         // opponent's broadcast was lost). Take the running state from the
@@ -88,6 +91,7 @@ export function useLiveControls({ matchId, timer, sync, endedRef, onEnded }: Use
       setBusy("pause");
       const res = await pauseMatch(supabase, matchId);
       setBusy(null);
+      if (endedRef.current) return;
       if (!res.ok && res.error.code === "MATCH_NOT_IN_PROGRESS") {
         // pause_match maps "already paused" here (as well as a match that is
         // no longer running). Mirror of the resume recovery above: if the DB

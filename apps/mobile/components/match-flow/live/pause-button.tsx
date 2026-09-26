@@ -1,6 +1,6 @@
 import { Pressable, Text, View } from "react-native";
 import { Pause, Play } from "lucide-react-native";
-import { BROADCAST, BROADCAST_RADIUS, BROADCAST_SIZE } from "./broadcast-tokens";
+import { BROADCAST, BROADCAST_SIZE, glassButtonStyle } from "./broadcast-tokens";
 
 /** Glass Pause button; while paused it is the amber Resume (the next action). */
 export function PauseButton({
@@ -28,16 +28,10 @@ export function PauseButton({
         alignItems: "center",
         justifyContent: "center",
         gap: 10,
-        borderRadius: BROADCAST_RADIUS.button,
-        borderWidth: 1,
-        borderColor: paused ? BROADCAST.amber : BROADCAST.glassBorder,
-        backgroundColor: paused
-          ? BROADCAST.amberSoft
-          : pressed
-            ? BROADCAST.glassFillPressed
-            : BROADCAST.glassFill,
+        ...glassButtonStyle(pressed && !disabled),
+        // Paused, it is the amber Resume.
+        ...(paused ? { borderColor: BROADCAST.amber, backgroundColor: BROADCAST.amberSoft } : null),
         opacity: disabled ? 0.5 : 1,
-        transform: [{ scale: pressed && !disabled ? 0.98 : 1 }],
       })}
     >
       <View pointerEvents="none">

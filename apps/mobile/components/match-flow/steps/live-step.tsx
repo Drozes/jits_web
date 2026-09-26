@@ -15,8 +15,6 @@ import {
 } from "@/lib/match-flow/live-view-state";
 import { LiveBroadcast } from "../live/live-broadcast";
 
-export type { LiveParticipant } from "@/lib/match-flow/live-view-state";
-
 interface LiveStepProps {
   matchId: string;
   matchType: "ranked" | "casual";
@@ -173,9 +171,12 @@ export function LiveStep(props: LiveStepProps) {
   // otherwise record the second or two before auto-end fires and upload it
   // as a success, spending the one (match_id, uploaded_by) video row and an
   // upload-cap slot on a clip of nothing.
+  //
+  // Nor once the match has ended: a permission grant landing during the
+  // opponent-ended interstitial must not start a clip after the stop.
   const expired = timer.remaining === 0;
   React.useEffect(() => {
-    if (recordingStartedRef.current) return;
+    if (recordingStartedRef.current || endedRef.current) return;
     if (!recorder.permission?.granted) return;
     if (expired) return;
     recordingStartedRef.current = true;
@@ -183,9 +184,10 @@ export function LiveStep(props: LiveStepProps) {
   }, [recorder.permission?.granted, recorder, expired]);
 
   // Time-warning haptic once at <= 10s remaining, on a ticking clock (not on
-  // mounting into a match already paused inside the last 10 s).
+  // mounting into a match already paused inside the last 10 s), and never
+  // after the end (the clock keeps ticking under the interstitial).
   React.useEffect(() => {
-    if (warnHapticFiredRef.current) return;
+    if (warnHapticFiredRef.current || endedRef.current) return;
     if (timer.running && !timer.paused && timer.remaining > 0 && timer.remaining <= TIME_WARNING_SECONDS) {
       warnHapticFiredRef.current = true;
       void matchHaptics.timeWarning();

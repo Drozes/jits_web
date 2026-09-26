@@ -29,6 +29,7 @@ jest.mock("@jits/shared/api/mutations", () => ({
 jest.mock("@jits/shared/api/queries", () => ({ getMatchDetails: jest.fn() }));
 
 const mockBroadcastMatchEnded = jest.fn();
+const mockBroadcastTimerPaused = jest.fn();
 interface CapturedSyncParams {
   onTimerPaused?: (pausedAt: string) => void;
   onTimerResumed?: (totalPausedDuration: number) => void;
@@ -47,7 +48,7 @@ jest.mock("@jits/shared/hooks/use-session-match-sync", () => ({
         mockBroadcastMatchEnded();
         return Promise.resolve("ok");
       },
-      broadcastTimerPaused: jest.fn(),
+      broadcastTimerPaused: (...a: unknown[]) => mockBroadcastTimerPaused(...a),
       broadcastTimerResumed: jest.fn(),
     };
   },
@@ -157,6 +158,7 @@ async function advanceWithRerenders(ms: number, rerender: () => void, slice = 25
 beforeEach(() => {
   jest.useFakeTimers({ now: NOW });
   mockBroadcastMatchEnded.mockClear();
+  mockBroadcastTimerPaused.mockClear();
   mockTimeWarning.mockClear();
   mockMatchEnd.mockClear();
   mockPauseMatch.mockReset();
@@ -508,6 +510,52 @@ describe("LiveStep opponent-ended interstitial (R-P8)", () => {
 
     expect(onEnded).toHaveBeenCalledTimes(1);
     expect(recorder.stop).toHaveBeenCalledTimes(1);
+    expect(mockBroadcastMatchEnded).not.toHaveBeenCalled();
+    expect(mockMatchEnd).toHaveBeenCalledTimes(1);
+  });
+
+  it("no control, auto-start, warning haptic or pause result acts during the interstitial", async () => {
+    // A pause RPC is in flight when the opponent's match_ended lands.
+    let resolvePause: (v: unknown) => void = () => {};
+    mockPauseMatch.mockReturnValue(new Promise((r) => (resolvePause = r)));
+    const { onEnded, recorder, getByTestId, queryByTestId, rerender } = renderLive(12);
+    await act(async () => {
+      fireEvent.press(getByTestId("live-pause-toggle"));
+    });
+    expect(mockPauseMatch).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      mockSyncParams.current?.onMatchEnded?.();
+    });
+    // No hold or pause to press while the plate shows.
+    expect(queryByTestId("live-end")).toBeNull();
+    expect(queryByTestId("live-pause-toggle")).toBeNull();
+
+    // The pause resolves after the end: no pause applied or broadcast, no toast.
+    await act(async () => {
+      resolvePause({ ok: true, data: { paused_at: new Date(NOW).toISOString() } });
+    });
+    const { toast } = jest.requireMock("@/components/ui/toast") as { toast: { error: jest.Mock } };
+    expect(mockBroadcastTimerPaused).not.toHaveBeenCalled();
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(queryByTestId("live-strip-paused")).toBeNull();
+
+    // Camera permission granted under the plate: recording does not start.
+    (recorder as unknown as { permission: { granted: boolean; canAskAgain: boolean } }).permission = {
+      granted: true,
+      canAskAgain: true,
+    };
+    // The clock ticks under the plate into the final 10 s and to 00:00.
+    await advanceWithRerenders(OPPONENT_ENDED_INTERSTITIAL_MS - 250, rerender);
+    expect(recorder.start).not.toHaveBeenCalled();
+    expect(mockTimeWarning).not.toHaveBeenCalled();
+    expect(onEnded).not.toHaveBeenCalled();
+
+    await advanceWithRerenders(250 + AUTO_END_DELAY_MS + 12_000, rerender);
+    expect(onEnded).toHaveBeenCalledTimes(1);
+    expect(recorder.stop).toHaveBeenCalledTimes(1);
+    expect(recorder.start).not.toHaveBeenCalled();
+    expect(mockTimeWarning).not.toHaveBeenCalled();
     expect(mockBroadcastMatchEnded).not.toHaveBeenCalled();
     expect(mockMatchEnd).toHaveBeenCalledTimes(1);
   });

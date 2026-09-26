@@ -23,10 +23,10 @@ export function RecTally({ variant, recordingSeconds }: { variant: TallyVariant;
     variant === "rec"
       ? `Recording, ${spokenDuration(recordingSeconds)}`
       : variant === "starting"
-        ? "Camera starting"
+        ? "Camera starting, not recording yet"
         : variant === "saving"
           ? "Saving video"
-          : "No video";
+          : "No video, camera unavailable";
   const textColor = rec ? BROADCAST.ink : BROADCAST.white;
   return (
     <View

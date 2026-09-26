@@ -100,6 +100,7 @@ it("R-P3 paused: amber strip, PAUSED slab, Resume variant, hold still enabled", 
   s.getByTestId("live-strip-paused");
   s.getByText("CAMERA STILL RECORDING");
   s.getByTestId("live-slab-paused");
+  expect(s.getByTestId("live-timer").props.accessibilityLabel).toBe("Paused, 4 minutes 12 seconds remaining");
   expect(s.getByTestId("live-pause-toggle")).toHaveTextContent("RESUME");
   expect(s.getByLabelText("Resume match clock")).toBeTruthy();
   expect(s.getByTestId("live-end").props.accessibilityState).toEqual(expect.objectContaining({ disabled: false }));
@@ -122,6 +123,7 @@ it("R-P5 time up: TIME strip and slab, hold disabled and ENDING, pause enabled",
   s.getByTestId("live-strip-timeup");
   s.getByTestId("timeup-drain");
   s.getByTestId("live-slab-time");
+  expect(s.getByTestId("live-timer").props.accessibilityLabel).toBe("Time up, 0 seconds remaining");
   expect(s.getByTestId("live-end")).toHaveTextContent("ENDING");
   expect(s.getByTestId("live-end").props.accessibilityState).toEqual(expect.objectContaining({ disabled: true }));
   expect(s.getByTestId("live-pause-toggle").props.accessibilityState).toEqual(
@@ -132,6 +134,7 @@ it("R-P5 time up: TIME strip and slab, hold disabled and ENDING, pause enabled",
 it("R-P6 camera starting: starting tally and strip, 35 percent dim, controls enabled", () => {
   const s = render(<LiveBroadcast {...props({ state: "idle", formatted: "09:56", remaining: 596 })} />);
   expect(s.getByTestId("live-tally")).toHaveTextContent("CAMERA STARTING");
+  expect(s.getByTestId("live-tally").props.accessibilityLabel).toBe("Camera starting, not recording yet");
   expect(s.queryByText(/^REC/)).toBeNull();
   s.getByTestId("live-strip-starting");
   s.getByText("CLOCK IS RUNNING");
@@ -150,6 +153,7 @@ describe("R-P7 camera unavailable", () => {
     s.getByTestId("live-ground");
     expect(s.queryByTestId("live-scrim-top")).toBeNull();
     expect(s.getByTestId("live-tally")).toHaveTextContent("NO VIDEO");
+    expect(s.getByTestId("live-tally").props.accessibilityLabel).toBe("No video, camera unavailable");
     s.getByText("NO VIDEO FOR THIS MATCH");
     s.getByText(/Camera access is off\. The clock runs as normal and your result still counts\./);
     expect(s.queryByText(/settings/i, { exact: false })).toBeTruthy(); // copy mentions Settings
@@ -201,7 +205,7 @@ it("R-P8 opponent ended: plate, 55 percent dim, SAVING VIDEO, FINAL slab with th
   expect(s.getByTestId("live-timer")).toHaveTextContent("06:18");
   expect(s.queryByTestId("live-end")).toBeNull();
   expect(s.queryByTestId("live-pause-toggle")).toBeNull();
-  expect(s.getByLabelText("6 minutes 18 seconds remaining")).toBeTruthy();
+  expect(s.getByLabelText("Final clock, 6 minutes 18 seconds remaining")).toBeTruthy();
   expect(announce).toHaveBeenCalledTimes(1);
   expect(announce).toHaveBeenCalledWith("M. Park ended the match. Final clock 06:18");
 });

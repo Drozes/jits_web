@@ -2,12 +2,33 @@
 
 ## [Unreleased]
 
+### Mobile: full-screen broadcast live step, finish-time prefill, submission picker
+
+JS-only, OTA-eligible (no native, `app.json` or dependency change).
+
+**Changed**
+- Live step, Arena match and practice: a full-screen portrait broadcast lower-third drawn over the camera frame. A HUD at the top (a REC tally that shows "REC mm:ss" only while the recorder is actually recording, otherwise CAMERA STARTING, SAVING VIDEO or NO VIDEO; the RANKED / CASUAL / PRACTICE tag; the practice EXIT pill), then a state strip (paused, final 10 seconds with one segment per second, time up with a drain bar, hold in progress, camera starting), the you-vs-opponent athlete bar with rating and weight, the clock slab (LIVE / PAUSED / TIME / FINAL) and Pause plus the red end button. Ending now takes a deliberate 1.2 s hold (releasing early cancels; screen readers get an "End match" action). When the opponent ends the match, a MATCH OVER plate with the frozen final clock shows for 1.5 s before the END step, and no control, recording start, warning haptic or late pause result acts during it. Screen readers hear the state before the clock ("Paused, 4 minutes 12 seconds remaining", "Time up, ...", "Final clock, ...") and a spelled-out tally ("Camera starting, not recording yet", "No video, camera unavailable").
+- Result step, Arena match and practice: the finish time is prefilled from the match clock at the end moment (pause-aware, clamped to 1 s to the match length; still editable and required, with a "From match clock" hint until edited). A cold start or re-entry into the result step has no reading and stays empty. `isFinishTimeValid` rejects 0, which `record_match_result` refuses.
+- Result step, Arena match and practice: the submission chip grid is replaced by one select field that opens the shared full-screen `SearchSelect` overlay. Search ignores case, punctuation, spacing and diacritics, matches codes and initials (for example "rnc"), keeps Other Submission offered under no match, and still submits the submission type code.
+- `SearchSelect` (`apps/mobile/components/ui/search-select.tsx`): optional testID-derived ids, a trigger accessible name of "<field>, <selection or placeholder>", a clear button, and configurable no-match copy and options. Existing callers are unchanged.
+
+**Added**
+- `apps/mobile/components/match-flow/live/`: `live-broadcast.tsx` (the shared screen), `athlete-bar.tsx`, `clock-slab.tsx`, `state-strip.tsx`, `rec-tally.tsx`, `hud-tag.tsx`, `pause-button.tsx`, `hold-to-end-button.tsx`, `no-video-plate.tsx`, `opponent-ended-plate.tsx`, `scrims.tsx`, `broadcast-tokens.ts` (fixed colors and sizes, theme-independent because they sit over video).
+- `apps/mobile/lib/match-flow/live-view-state.ts`: `deriveLiveView` (everything the live screen shows, derived from the clock, recorder and permission state), `HOLD_TO_END_MS`, `OPPONENT_ENDED_INTERSTITIAL_MS`, `spokenDuration`, `formatAthleteMeta`, `toLiveAthlete`.
+- `apps/mobile/lib/match-flow/use-recording-elapsed.ts`: the REC tally's elapsed seconds.
+- `apps/mobile/lib/video/recorded-frame.ts`: `fitRecordedFrame`, which sizes the camera preview to fit the screen at the 9:16 aspect the camera records, so what the athlete sees is exactly what is recorded (`camera-overlay.tsx`).
+- `LivePill` (`apps/mobile/components/ui/elo-system/live-pill.tsx`): the pulsing LIVE dot and label, with `onDark` for a fixed green on the dark broadcast chrome.
+- `apps/mobile/lib/match-flow/clamp-finish-seconds.ts`, `apps/mobile/lib/match-flow/use-finish-time-field.ts` (shared by match and practice), `apps/mobile/lib/match-flow/filter-submissions.ts`.
+
+**Removed**
+- `apps/mobile/components/match-flow/steps/timer-display.tsx` and `apps/mobile/components/match-flow/steps/live-controls.tsx` (replaced by the live broadcast components).
+
 ### Mobile: practice match onboarding (jits-82by, jr_be spec 014)
 
 JS-only, OTA-eligible, but ship only AFTER the jr_be `practice_match_onboarding` migration is live in prod: `ATHLETE_GUARD_SELECT` now reads two new athlete columns and every athlete load fails without them (web `requireAthlete()` shares the constant, so the next web deploy must follow the migration too).
 
 **Added**
-- `/practice` (`apps/mobile/app/(app)/practice.tsx`): a client-side walk through one Arena match (go live, challenge, accept, weights, ready, 30s clock, result, confirm, summary) against a scripted "Practice Partner" bot. Reuses the real presentational leaves (`GoLivePlate`, `CompetitorRow`, `WaitingPlate`, `WizardStepHeader`, `WeightTile`, `ReadyPanel`, `TimerDisplay`, `LiveControls`, `EndStep`, result fields, `ResultBanner`, `ConfirmPanel`) with a local reducer and bot timers (`apps/mobile/lib/practice/use-practice-match.ts`, `apps/mobile/lib/practice/constants.ts`, `apps/mobile/components/practice/`). A PRACTICE tag and a coach line on every phase; no rating numbers, share, rematch or dispute. Writes no challenge, match, result, confirmation or video; the only network write is `markPracticeMatch`. Mounts `useArenaMatchScreen()` so no real challenge prompt lands over it.
+- `/practice` (`apps/mobile/app/(app)/practice.tsx`): a client-side walk through one Arena match (go live, challenge, accept, weights, ready, 30s clock, result, confirm, summary) against a scripted "Practice Partner" bot. Reuses the real presentational leaves (`GoLivePlate`, `CompetitorRow`, `WaitingPlate`, `WizardStepHeader`, `WeightTile`, `ReadyPanel`, the live broadcast screen, `EndStep`, result fields, `ResultBanner`, `ConfirmPanel`) with a local reducer and bot timers (`apps/mobile/lib/practice/use-practice-match.ts`, `apps/mobile/lib/practice/constants.ts`, `apps/mobile/components/practice/`). A PRACTICE tag and a coach line on every phase; no rating numbers, share, rematch or dispute. Writes no challenge, match, result, confirmation or video; the only network write is `markPracticeMatch`. Mounts `useArenaMatchScreen()` so no real challenge prompt lands over it.
 - One recorded clip per run, played back locally (muted by default) on the summary and deleted when the athlete leaves or taps Practice again. Never uploaded.
 - Home: a one-time "Try a practice match" card (`apps/mobile/components/dashboard/practice-offer-card.tsx`) for an athlete who has not answered the offer, is not a bot, has no match in flight and no completed matches. It holds Home's red CTA while shown (the Arena card steps down). Not now marks the offer skipped.
 - Settings: a PRACTICE MATCH row, always visible, to replay it.

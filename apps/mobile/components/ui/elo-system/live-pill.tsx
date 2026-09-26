@@ -46,7 +46,8 @@ export function LivePill({ label = "LIVE", className, onDark = false }: LivePill
   }));
 
   return (
-    <View className={cn("flex-row items-center gap-2", className)}>
+    // 6 px on dark chrome, matching the broadcast slab's static labels.
+    <View className={cn("flex-row items-center", onDark ? undefined : "gap-2", className)} style={onDark ? { gap: 6 } : undefined}>
       <Animated.View
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants"

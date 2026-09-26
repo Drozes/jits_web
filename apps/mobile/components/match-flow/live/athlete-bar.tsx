@@ -59,7 +59,7 @@ export function AthleteBar({ me, opponent, flatTop }: { me: LiveAthlete; opponen
         importantForAccessibility="no-hide-descendants"
         style={{ width: 44, alignItems: "center", paddingTop: 7, gap: 3 }}
       >
-        <Text className="font-display" style={{ fontSize: 22, lineHeight: 22, letterSpacing: 0.4, color: BROADCAST.ctaText }}>
+        <Text className="font-display" style={{ fontSize: 22, lineHeight: 19, letterSpacing: 0.4, color: BROADCAST.ctaText }}>
           VS
         </Text>
         <View style={{ width: 1, flexGrow: 1, backgroundColor: BROADCAST.cta }} />

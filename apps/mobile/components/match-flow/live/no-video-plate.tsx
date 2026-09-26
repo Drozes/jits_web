@@ -1,7 +1,7 @@
 import { Pressable, Text, View } from "react-native";
 import { CameraOff } from "lucide-react-native";
 import type { UnavailableVariant } from "@/lib/match-flow/live-view-state";
-import { BROADCAST, BROADCAST_RADIUS } from "./broadcast-tokens";
+import { BROADCAST, glassButtonStyle } from "./broadcast-tokens";
 
 /**
  * The plate's words. Deliberately no Settings button: iOS restarts the app
@@ -64,11 +64,7 @@ export function NoVideoPlate({
             height: 48,
             alignItems: "center",
             justifyContent: "center",
-            borderRadius: BROADCAST_RADIUS.button,
-            borderWidth: 1,
-            borderColor: BROADCAST.glassBorder,
-            backgroundColor: pressed ? BROADCAST.glassFillPressed : BROADCAST.glassFill,
-            transform: [{ scale: pressed ? 0.98 : 1 }],
+            ...glassButtonStyle(pressed),
           })}
         >
           <Text className="font-heading" style={{ fontSize: 14, lineHeight: 16, letterSpacing: 1.12, color: BROADCAST.white }}>

@@ -18,8 +18,6 @@ import { HoldToEndButton } from "./hold-to-end-button";
 import { NoVideoPlate } from "./no-video-plate";
 import { OpponentEndedPlate } from "./opponent-ended-plate";
 
-export type { LiveAthlete } from "./athlete-bar";
-
 export interface LiveBroadcastProps {
   kindLabel: "RANKED" | "CASUAL" | "PRACTICE";
   me: LiveAthlete;

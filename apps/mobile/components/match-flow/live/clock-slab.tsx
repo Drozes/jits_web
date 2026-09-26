@@ -5,6 +5,14 @@ import { BROADCAST, BROADCAST_RADIUS, BROADCAST_SIZE, TABULAR } from "./broadcas
 
 const LABEL_TEXT = { fontSize: 10, lineHeight: 12, letterSpacing: 2.52 };
 
+/** What a screen reader hears before the time, so the state is not only visual. */
+const SPOKEN_PREFIX: Record<SlabLabel, string> = {
+  live: "",
+  paused: "Paused, ",
+  time: "Time up, ",
+  final: "Final clock, ",
+};
+
 function StaticLabel({ text, color, dot }: { text: string; color: string; dot: boolean }) {
   return (
     <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
@@ -64,7 +72,7 @@ export function ClockSlab({
       <Text
         testID="live-timer"
         accessibilityRole="timer"
-        accessibilityLabel={`${spokenDuration(seconds)} remaining`}
+        accessibilityLabel={`${SPOKEN_PREFIX[label]}${spokenDuration(seconds)} remaining`}
         className="font-mono-bold"
         style={[
           { fontSize: 88, lineHeight: 92, letterSpacing: -3.52, color: BROADCAST.inkDark, paddingTop: 10 },
