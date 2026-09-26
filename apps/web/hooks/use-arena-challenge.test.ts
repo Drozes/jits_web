@@ -15,6 +15,8 @@ interface FakeChannel {
 const rt = vi.hoisted(() => ({
   channels: [] as FakeChannel[],
   removed: [] as FakeChannel[],
+  /** Overrides the challenger lookup, e.g. to hold it open. */
+  lookup: null as null | (() => Promise<unknown>),
 }));
 
 vi.mock("@/lib/supabase/client", () => ({
@@ -44,7 +46,8 @@ vi.mock("@/lib/supabase/client", () => ({
       const q = {
         select: () => q,
         eq: () => q,
-        single: async () => ({ data: { display_name: "Ana" } }),
+        single: () =>
+          rt.lookup ? rt.lookup() : Promise.resolve({ data: { display_name: "Ana" } }),
       };
       return q;
     },
@@ -100,6 +103,7 @@ async function insertChallenge(id = "c1") {
 beforeEach(() => {
   rt.channels = [];
   rt.removed = [];
+  rt.lookup = null;
   vi.clearAllMocks();
   m.acceptChallenge.mockResolvedValue({ ok: true, data: null });
   m.declineChallenge.mockResolvedValue({ ok: true, data: null });
@@ -140,6 +144,24 @@ describe("useArenaChallenge", () => {
     rerender({ canReceive: false });
     expect(result.current.incoming).toBeNull();
     expect(m.declineChallenge).not.toHaveBeenCalled();
+  });
+
+  it("drops an INSERT when the athlete goes offline during the challenger lookup (jits-dwq1)", async () => {
+    let release!: (v: unknown) => void;
+    rt.lookup = () => new Promise((r) => (release = r));
+    const { result, rerender } = mount(true);
+    let pending!: Promise<unknown>;
+    act(() => {
+      pending = fire(incomingChannel(), "postgres_changes", "INSERT", {
+        new: { id: "c1", challenger_id: "ana", status: "pending" },
+      }) as Promise<unknown>;
+    });
+    rerender({ canReceive: false });
+    await act(async () => {
+      release({ data: { display_name: "Ana" } });
+      await pending;
+    });
+    expect(result.current.incoming).toBeNull();
   });
 
   it("clears the prompt when its row stops being pending", async () => {
