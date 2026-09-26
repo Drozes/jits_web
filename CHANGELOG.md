@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Mobile: Arena concurrency follow-ups (jits-6ziw)
+
+JS-only, OTA-eligible for runtime 0.3.0.
+
+**Fixed**
+- An accepter whose app died or lost the network right after accepting gets back into the match the challenger's 12s fallback started alone: via the `started` UPDATE, or on launch (once in the foreground), foreground or realtime re-subscribe for the one accepted challenge persisted on-device (AsyncStorage, within 10 minutes) when the new shared `getStartedChallengesToJoin` confirms it started, its match is still pending and the challenger started it. A match the athlete entered and left is never rejoined; no rejoin over an open prompt.
+- A late challenge from the athlete I am entering, or already in, a match with is withdrawn quietly instead of "declined".
+- A failed fallback start re-reads once after 2s and joins if started; if still accepted the 12s fallback is re-armed once.
+- The challenger sees "Couldn't start the match with {name}." when the accepter withdraws an accepted challenge.
+
 ### Mobile: Arena challenge concurrency for a full room (jits-njyd)
 
 JS-only, OTA-eligible for runtime 0.3.0.
