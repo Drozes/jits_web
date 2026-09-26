@@ -1,5 +1,6 @@
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
+import { exitMatchTo } from "@/lib/match-flow/exit-to";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 
 /**
@@ -50,7 +51,7 @@ export function WizardError({
       <Pressable
         testID="wizard-error-exit"
         accessibilityRole="button"
-        onPress={() => router.replace(exitHref)}
+        onPress={() => exitMatchTo(router, exitHref)}
         className="mt-2 bg-cta items-center justify-center py-3 px-5 rounded-sm active:bg-cta-hover"
       >
         <Text className="font-heading text-[13px] text-ink-on-cta uppercase tracking-caps">

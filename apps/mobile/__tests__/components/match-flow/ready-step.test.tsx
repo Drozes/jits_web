@@ -43,9 +43,9 @@ jest.mock("@/components/ui/toast", () => ({
   toast: { success: jest.fn(), error: jest.fn(), info: jest.fn() },
 }));
 
-const mockRouterReplace = jest.fn();
+const mockRouterDismissTo = jest.fn();
 jest.mock("expo-router", () => ({
-  useRouter: () => ({ replace: mockRouterReplace, push: jest.fn(), back: jest.fn() }),
+  useRouter: () => ({ dismissTo: mockRouterDismissTo, push: jest.fn(), back: jest.fn() }),
 }));
 
 jest.mock("@jits/shared/api/mutations", () => ({

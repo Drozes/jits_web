@@ -1,5 +1,6 @@
 import * as React from "react";
 import { useRouter } from "expo-router";
+import { exitMatchTo } from "./exit-to";
 import { toast } from "@/components/ui/toast";
 import type { MatchDetails } from "@jits/shared/api/queries";
 import type { BroadcastResult } from "@jits/shared/hooks/use-session-match-sync";
@@ -80,7 +81,7 @@ export function useWizardSync({
       if (exitingRef.current) return;
       exitingRef.current = true;
       toast.info({ text1: title, description });
-      router.replace(exitHref);
+      exitMatchTo(router, exitHref);
     },
     [router, exitHref],
   );
