@@ -127,7 +127,7 @@ function isLocalHost(host: string): boolean {
 export const EXPO_ENV_FILES = [".env", ".env.development", ".env.local", ".env.development.local"];
 
 /** Throws EnvError unless every target is the local stack. */
-export function assertSafe(cfg: Config): void {
+export function assertSafe(cfg: Config, mobileDir = join(REPO_ROOT, "apps/mobile")): void {
   const api = new URL(cfg.supabaseUrl);
   if (!isLocalHost(api.hostname) || api.port !== "54321" || api.search || api.username || api.password) {
     throw new EnvError(`REFUSING: Supabase URL ${cfg.supabaseUrl} is not the plain local API (127.0.0.1:54321)`);
@@ -141,7 +141,7 @@ export function assertSafe(cfg: Config): void {
 
   // The app under test must be pointed at the same local backend, in every
   // file Expo would load.
-  const mobile = join(REPO_ROOT, "apps/mobile");
+  const mobile = mobileDir;
   let seen = 0;
   for (const file of EXPO_ENV_FILES) {
     const path = join(mobile, file);

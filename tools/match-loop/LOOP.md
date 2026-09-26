@@ -24,8 +24,9 @@ Hard rules, every iteration (these run UNATTENDED, so they are absolute):
   unless a fix genuinely needs web parity, and then touch and stage ONLY the
   loop's own hunks.
 - Git hygiene, all mandatory:
-  - Before staging, `git diff --cached --quiet` must succeed (nothing
-    pre-staged). If anything is already staged, STOP and report: never
+  - Before staging, `git diff --cached --quiet -- . ':!.beads'` must succeed
+    (nothing pre-staged outside `.beads/`; see the `.beads` rule below). If
+    anything else is already staged, STOP and report: never
     commit pre-staged foreign changes. Prefer `git commit -- <paths>` with an
     explicit list of the loop's own files.
   - Never `git add -A`, `git add .`, `git add -u`, or a directory glob.
@@ -33,6 +34,16 @@ Hard rules, every iteration (these run UNATTENDED, so they are absolute):
   - Never `--no-verify`. If the pre-commit hook fails because of foreign
     uncommitted changes (another session's work), STOP and report; do not
     bypass it, stash it, or "fix" someone else's files.
+  - `git commit -- <paths>` commits the WHOLE working-tree content of each
+    path. Before committing, `git diff -- <path>` every file on the list: if
+    any file contains a hunk the loop did not write (another session's edit),
+    STOP and report. Never commit it, never try to split it out.
+  - Bead state: the loop commits bead state ONLY as `.beads/issues.jsonl`,
+    in its own separate `chore(bd): ...` commit, made when nothing else is
+    staged. `bd create` / `bd update` may re-stage `.beads/issues.jsonl` by
+    themselves; that is expected. Check "nothing pre-staged" for everything
+    EXCEPT `.beads/` (`git diff --cached --quiet -- . ':!.beads'`), and check
+    `.beads/` separately. Never unstage, restore or reset `.beads/*`.
   - To revert the loop's own change, apply the reverse patch of the loop's
     own diff (`git diff <paths> > loop.patch` beforehand, then
     `git apply -R loop.patch`). Never `git checkout <file>`, `git restore`,
@@ -78,7 +89,10 @@ Metro `packager-status:running`; Metro log readable (`METRO_LOG`, else the
 log oracle is skipped); simulator booted; app installed; camera + microphone
 revoked for core runs (auto-revokes, which relaunches the app); app in the
 foreground (auto-launches); alert sweep; simulator signed in as Demo Blue;
-the bot can sign in as Demo Red; Blue/Red/Green active; `submission_types`
+the bot can sign in as Demo Red AND sees Blue's app in `app:online` on the
+local realtime (runtime proof the simulator app is on the local stack; this
+same check also runs at the start of EVERY scenario, inside `prepare()`, and
+fails the scenario as `env_error`); Blue/Red/Green active; `submission_types`
 non-empty; `realtime-publication` (informational: whether `matches` is
 published, i.e. whether H1 still holds); `match-loop:typecheck`.
 
@@ -90,7 +104,10 @@ If preflight fails twice in a row, stop the loop and report.
 npm run match-loop -- --signin-blue --preflight-only
 ```
 
-This opens `elorated://settings`, reads the signed-in email, signs out
+It first re-runs the STATIC local-only config check (`assertSafe`: API,
+every Expo dotenv file, bot key, container name) and refuses before any
+password is typed if it fails; `loadConfig()` has already run it too. Then it
+opens `elorated://settings`, reads the signed-in email, signs out
 (Sign out -> confirm) and signs in through `login-email` / `login-password`
 / `login-submit`, dismissing the iOS "Save Password?" sheet. If the UI
 sign-out fails it falls back to terminate + `simctl keychain reset` +
@@ -164,7 +181,7 @@ socket's view of every broadcast on the match topic), `metro.slice.log`.
    match-loop:typecheck` and `cd apps/mobile && npx expo export --platform
    ios --no-bytecode --output-dir <outside the repo>` (delete it after).
 6. `CHANGELOG.md` entry under `## [Unreleased]`.
-7. `git diff --cached --quiet` first; then `git commit -- <the loop's own
+7. `git diff --cached --quiet -- . ':!.beads'` first (see the `.beads` rule); then `git commit -- <the loop's own
    files>` naming the bead (hook runs; no `--no-verify`); never push. Close
    the bead with the SHA.
 8. Two reviewer rejections on the same fingerprint: revert the loop's own
@@ -211,5 +228,7 @@ already appends a `{"type":"run",...}` line per run):
   what else is mounted; selectors match by label/testID, not type.
 - A dev-build LogBox toast can cover the tab bar; the harness closes it.
 - E13 (camera granted) is not implemented: the simulator has no camera.
+- A broadcast "ok" in the trace is not a delivery ack (channels use
+  `ack: false`); delivery is judged by the spy socket and receiver oracles.
 - Scenario E3B is an addition to the spec: Blue cancels while Red is still on
   the weight step (no channel mounted there).

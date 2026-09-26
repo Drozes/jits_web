@@ -4,6 +4,7 @@ import { basename } from "node:path";
 import { run } from "../lib/util";
 import { trackChild } from "../lib/cleanup";
 import { Transform } from "node:stream";
+import { StringDecoder } from "node:string_decoder";
 import { redact } from "../lib/redact";
 
 /** `xcrun simctl` wrapper for the one simulator under test. */
@@ -77,30 +78,38 @@ export class Simctl {
       { stdio: ["ignore", "pipe", "pipe"] },
     );
     trackChild(child);
-    // Redact line by line before anything reaches disk.
+    // Redact line by line before anything reaches disk. StringDecoder keeps a
+    // multi-byte character split across chunks intact.
     const redactor = () => {
+      const decoder = new StringDecoder("utf8");
       let carry = "";
       return new Transform({
-        transform(chunk, _enc, cb) {
-          const text = carry + chunk.toString("utf8");
+        transform(chunk: Buffer, _enc, cb) {
+          const text = carry + decoder.write(chunk);
           const cut = text.lastIndexOf("\n");
           carry = cut === -1 ? text : text.slice(cut + 1);
           cb(null, cut === -1 ? "" : redact(text.slice(0, cut + 1)));
         },
         flush(cb) {
-          cb(null, redact(carry));
+          cb(null, redact(carry + decoder.end()));
         },
       });
     };
-    child.stdout?.pipe(redactor()).pipe(out, { end: false });
-    child.stderr?.pipe(redactor()).pipe(out, { end: false });
-    // End the file only after both redactors have flushed.
+    // End the file only once BOTH redactors have flushed their last line.
     let open = 2;
     const done = () => {
       if (--open === 0) out.end();
     };
-    child.stdout?.once("end", () => setImmediate(done));
-    child.stderr?.once("end", () => setImmediate(done));
+    for (const src of [child.stdout, child.stderr]) {
+      if (!src) {
+        done();
+        continue;
+      }
+      const r = redactor();
+      r.on("end", done);
+      src.pipe(r);
+      r.on("data", (d: Buffer | string) => out.write(d));
+    }
     return () => {
       child.kill("SIGINT");
     };

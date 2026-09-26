@@ -226,7 +226,13 @@ export class MatchSide {
   /**
    * Send exactly like the app (fire and forget: the caller transitions
    * immediately, so "send then unmount" races are reproduced), and trace
-   * realtime-js's real status when it resolves. `close()` awaits the
+   * realtime-js's real status when it resolves.
+   *
+   * CAUTION: the status is NOT a delivery acknowledgement. The app's channels
+   * use the default `broadcast: { ack: false }`, so a websocket "ok" only
+   * means the push left this socket (the httpSend `{ success }` only means
+   * the REST endpoint accepted it). Whether the other side RECEIVED it is
+   * what the spy socket and the receiving side's oracles establish. `close()` awaits the
    * outstanding sends so the protocol oracle sees every status.
    */
   private send(event: string, payload: Record<string, unknown>): void {

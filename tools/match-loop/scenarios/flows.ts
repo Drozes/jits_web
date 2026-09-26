@@ -9,6 +9,7 @@ import type { MatchSide, ReadyOutcome } from "../bot/match-side";
 import { db } from "../oracle/db";
 import { parseDelta, waitLivePill } from "../oracle/ui";
 import { resetFixtures, type ResetOptions } from "../fixtures/reset";
+import { proveAppOnLocalStack } from "../bot/app-on-local";
 import { ExpectationTimeout, HarnessError, pollUntil } from "../lib/util";
 import type { ScenarioCtx } from "./context";
 
@@ -35,6 +36,9 @@ export async function prepare(ctx: ScenarioCtx, opts: PrepareOptions = {}): Prom
     ctx.trace.note("harness", "reset", out);
   });
   await ctx.step("normalise app", () => normaliseApp(ctx));
+  await ctx.step("app is on the local stack (app:online)", () =>
+    proveAppOnLocalStack(ctx.cfg, ctx.ids, ctx.password),
+  );
   await ctx.step(`Blue ${blueLive ? "live" : "offline"} on the Arena`, async () => {
     await ctx.ui.openArena();
     if (blueLive) await ctx.ui.ensureLive();

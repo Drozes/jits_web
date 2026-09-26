@@ -47,10 +47,18 @@ export async function runCleanup(): Promise<void> {
 export function installSignalHandlers(): void {
   if (installed) return;
   installed = true;
+  let cleaning = false;
   const handler = (sig: NodeJS.Signals) => {
+    // A second Ctrl-C while cleanup runs must not kill the process before
+    // the realtime container is unpaused: swallow it.
+    if (cleaning) {
+      process.stderr.write(`${sig} again: still cleaning up, please wait...\n`);
+      return;
+    }
+    cleaning = true;
     process.stderr.write(`\n${sig}: cleaning up (unpausing realtime, killing children)...\n`);
     void runCleanup().finally(() => process.exit(sig === "SIGINT" ? 130 : 143));
   };
-  process.once("SIGINT", handler);
-  process.once("SIGTERM", handler);
+  process.on("SIGINT", handler);
+  process.on("SIGTERM", handler);
 }

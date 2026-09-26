@@ -73,7 +73,7 @@ export class ScenarioCtx {
     readonly ui: Screens,
     readonly metro: MetroLog,
     opts: RunOptions,
-    private readonly password: string,
+    readonly password: string,
   ) {
     // Per-scenario copy: a scenario may switch itself to fast timing.
     this.opts = { ...opts };

@@ -16,7 +16,8 @@
     "db:types": "cd ../jr_be && supabase gen types typescript --local > ../jits_web/packages/shared/src/types/database.ts",
     "prepare": "husky",
     "match-loop": "tsx tools/match-loop/run.ts",
-    "match-loop:typecheck": "tsc -p tools/match-loop"
+    "match-loop:typecheck": "tsc -p tools/match-loop",
+    "match-loop:test": "tsx --test tools/match-loop/tests/guards.test.ts"
   },
   "overrides": {
     "react": "19.1.0",

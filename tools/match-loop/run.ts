@@ -221,7 +221,10 @@ async function runOne(env: Env, s: Scenario, dir: string, known: Map<string, str
   ) {
     status = "harness_error";
   } else {
-    if (error && !(error instanceof ExpectationTimeout) && !ctx.oracles.some((o) => !o.ok)) {
+    // Any thrown error that is not a recorded UI/DB wait gets its own oracle,
+    // EVEN when other oracles already failed, so a new crash can never hide
+    // behind an already-filed (known) fingerprint.
+    if (error && !(error instanceof ExpectationTimeout)) {
       ctx.oracle("error", false, "no error", errMsg);
     }
     protocolOracles(ctx, s);

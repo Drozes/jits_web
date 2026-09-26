@@ -6,11 +6,10 @@ import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { AthleteIds, Config } from "./config";
-import { REPO_ROOT } from "./config";
+import { REPO_ROOT, assertSafe } from "./config";
 import { psql, queryJson } from "./lib/psql";
 import { run, log } from "./lib/util";
-import { MobileOpponent } from "./bot/opponent";
-import { Trace } from "./bot/trace";
+import { proveAppOnLocalStack } from "./bot/app-on-local";
 import type { Idb } from "./sim/idb";
 import type { Simctl } from "./sim/simctl";
 import type { Screens } from "./sim/screens";
@@ -163,28 +162,7 @@ export async function preflight(d: PreflightDeps): Promise<CheckResult[]> {
     await idb.tapQ({ label: "Go back", type: "Button" }, 5_000).catch(() => undefined);
     return email;
   });
-  await check(r, "bot-signs-in-as-red + app-on-local-stack", async () => {
-    // Runtime proof that the SIMULATOR APP talks to this local stack (the
-    // dotenv check in config.ts is only static): the bot, connected to local
-    // realtime, must see Blue's app in the app-wide `app:online` presence.
-    const b = new MobileOpponent(cfg, { id: d.ids.red, email: cfg.emails.red, displayName: cfg.names.red, key: "red" }, new Trace(null), d.password);
-    try {
-      await b.signIn();
-      await b.ready();
-      const start = Date.now();
-      while (!b.appOnline.has(d.ids.blue)) {
-        if (Date.now() - start > 20_000) {
-          throw new Error(
-            "Blue's app never appeared in app:online on the LOCAL realtime: the simulator app is not talking to the local stack (or is not signed in / not foreground)",
-          );
-        }
-        await new Promise((res) => setTimeout(res, 500));
-      }
-      return "Blue present in local app:online";
-    } finally {
-      await b.close();
-    }
-  });
+  await check(r, "bot-signs-in-as-red + app-on-local-stack", () => proveAppOnLocalStack(cfg, d.ids, d.password));
   await check(r, "athletes-active", async () => {
     const rows = await queryJson<{ id: string; status: string }>(
       `select id, status from public.athletes where id in ('${d.ids.blue}','${d.ids.red}','${d.ids.green}')`,
@@ -215,6 +193,9 @@ export async function preflight(d: PreflightDeps): Promise<CheckResult[]> {
 /** LOOP.md step 3: sign the simulator in as Demo Blue through the UI. */
 export async function signInBlue(d: Pick<PreflightDeps, "cfg" | "ui" | "idb" | "simctl" | "password" | "ids">): Promise<void> {
   const { ui, idb, simctl, cfg } = d;
+  // Never type the password into an app that might be pointed elsewhere:
+  // re-run the static local-only guard right before sign-in.
+  assertSafe(cfg);
   const email = await ui.signedInEmail();
   if (email === cfg.emails.blue) {
     log(`simulator already signed in as ${email}`);

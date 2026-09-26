@@ -16,15 +16,27 @@ const scenario: Scenario = {
     await blueEnds(ctx, side);
     await blueRecordsDraw(ctx, side);
     const container = ctx.cfg.realtimeContainer;
-    const unpause = () =>
+    let pausing: Promise<unknown> = Promise.resolve();
+    const unpauseOnce = () =>
       run("docker", ["unpause", container]).then(
-        () => undefined,
-        (e) => log(`UNPAUSE FAILED: ${e instanceof Error ? e.message : e}`),
+        () => true,
+        () => false,
       );
+    // Wait out an in-flight `docker pause` (an interrupt can land mid-call),
+    // unpause, and unpause once more after a beat in case the pause landed
+    // after the first unpause.
+    const unpause = async () => {
+      await pausing.catch(() => undefined);
+      await unpauseOnce();
+      await pace(1_000);
+      await unpauseOnce();
+      const { stdout } = await run("docker", ["inspect", "-f", "{{.State.Paused}}", container]).catch(() => ({ stdout: "?" }));
+      if (stdout.trim() !== "false") log(`UNPAUSE FAILED: ${container} paused=${stdout.trim()}`);
+    };
     // Ctrl-C / SIGTERM mid-outage must still unpause (lib/cleanup.ts).
     const unregister = onInterrupt("e8-unpause-realtime", unpause);
     try {
-      await ctx.step("pause realtime", () => run("docker", ["pause", container]));
+      await ctx.step("pause realtime", () => (pausing = run("docker", ["pause", container])));
       await ctx.step("both confirm during the outage", async () => {
         await ctx.ui.confirmResult();
         await side.confirm();
