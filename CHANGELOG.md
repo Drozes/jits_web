@@ -14,6 +14,20 @@
 **Fixed**
 - `apps/web/components/domain/video-analysis-viewer.tsx` (jits-8t0m): signs through `getMatchVideoSignedUrlResult` (normalized_path ?? storage_path) instead of reading `match_videos.storage_path` directly, so a WebM upload plays its normalized MP4. Test: `components/domain/video-analysis-viewer.test.tsx`.
 
+### Tooling: match-loop scenario E17, match video history (jits-5tj9.10)
+
+LOCAL stack only; no app code, no service role.
+
+**Added**
+- `tools/match-loop/scenarios/extended/e17-match-video-history.ts` (registered in `scenarios/index.ts`, extended tier): a C1-style decisive match, then one seeded recording per athlete; the match detail is opened from Home ("Me" scope), Profile Recent Matches, Demo Red's head-to-head, Stats history and Past Match Videos, each checked to be THIS match (marker "Match detail vs Demo Red" plus both seeded `match-video-watch-<videoId>` buttons, labelled "Watch your recording" / "Watch Demo Red's recording"); Watch on Red's recording must reach "Video state: loaded" with no player error panel; Blue stays live throughout. Oracles `db:video-rows`, `db:video-objects`, `ui:detail-from-{home,profile,athlete,stats,past-videos}`, `ui:video-cards-labelled`, `ui:player-loaded`, `ui:no-error-panel`, `db:blue-still-live-after-history`, `ui:live-pill-after-history`, `harness:seeded-videos-removed`. Home and Profile are pulled to refresh first (tab refocus refetch is throttled to 30 s).
+- `tools/match-loop/lib/video-seed.ts`: `seedMatchVideo` signs in as the uploader with the publishable key (bot key guard + local-API check), uploads the fixture to `<matchId>/<athleteId>/<unix_ms>.mp4` via `buildMatchVideoStoragePath` and writes the row with `upsertMatchVideo`; `removeSeededVideo` deletes the row and the object as the same uploader and signs out with LOCAL scope (a global sign-out as Blue would kill the simulator's session).
+- `tools/match-loop/sim/match-detail.ts`: page objects for the history entry points, the detail marker, Watch buttons and the player state marker.
+- `tools/match-loop/fixtures/video/sample-3s.mp4`: 3 s, 34 KB, H.264 Constrained Baseline + AAC, faststart (ffmpeg command in `lib/video-seed.ts`).
+- `tools/match-loop/tests/video-seed.test.ts` (added to `npm run match-loop:test`).
+
+**Changed**
+- `tools/match-loop/config.ts`: `assertBotKey` is exported (unchanged logic) so the seed client applies the same key guard.
+
 ### Mobile: match detail screen + player hardening (jits-5tj9.7)
 
 JS-only, OTA-eligible for runtime 0.3.0 (expo-av and expo-image are already in the build; no native dependency, `app.json` or config change).

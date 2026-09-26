@@ -166,7 +166,7 @@ export function assertSafe(cfg: Config, mobileDir = join(REPO_ROOT, "apps/mobile
   }
 }
 
-function assertBotKey(key: string): void {
+export function assertBotKey(key: string): void {
   if (key.startsWith("sb_secret_")) {
     throw new EnvError("REFUSING: the bot key is an sb_secret_ key; the bot must use a publishable key");
   }

@@ -26,10 +26,11 @@ import e12 from "./extended/e12-weight-gap";
 import e14 from "./extended/e14-recovery-prompt";
 import e15 from "./extended/e15-cap-plate";
 import e16 from "./extended/e16-challenge-mid-match";
+import e17 from "./extended/e17-match-video-history";
 
 export const SCENARIOS: Scenario[] = [
   c1, c2, c3, c4, c5, c6, c6b,
-  e1, e2, e3, e3b, e4, e5, e6, e7, e8, e9, e10, e11, e12, e14, e15, e16,
+  e1, e2, e3, e3b, e4, e5, e6, e7, e8, e9, e10, e11, e12, e14, e15, e16, e17,
 ];
 
 /** Extended scenarios that are specified but not implemented, with why. */
