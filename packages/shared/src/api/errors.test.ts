@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { PostgrestError } from "@supabase/supabase-js";
-import { mapPostgrestError, mapRpcError } from "./errors";
+import { domainErrorFromHint, mapPostgrestError, mapRpcError } from "./errors";
 
 /** Helper to build a minimal PostgrestError for testing */
 function pgError(
@@ -327,5 +327,75 @@ describe("mapRpcError", () => {
       expect(result.code).toBe("UNKNOWN");
       expect(result.message).toBe("Unknown error");
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Highlight reels (jr_be spec 014 section 9.5 table)
+// ---------------------------------------------------------------------------
+
+const HIGHLIGHT_HINTS: [string, string, string][] = [
+  ["highlight_no_athlete", "ATHLETE_NOT_FOUND", "Sign in to see your highlight."],
+  ["highlight_not_participant", "NOT_PARTICIPANT", "You are not in this match."],
+  ["highlight_clips_disabled", "HIGHLIGHTS_DISABLED", "Highlight reels are paused right now."],
+  ["highlight_not_found", "HIGHLIGHT_NOT_FOUND", "That highlight no longer exists."],
+  ["highlight_not_ready", "HIGHLIGHT_NOT_READY", "Your highlight isn't ready yet."],
+  ["highlight_source_not_ready", "HIGHLIGHT_NOT_READY", "Your highlight isn't ready yet."],
+  [
+    "highlight_render_in_progress",
+    "HIGHLIGHT_RENDER_IN_PROGRESS",
+    "A new version is already being made.",
+  ],
+  ["highlight_render_limit", "HIGHLIGHT_RENDER_LIMIT", "You've used all versions for this reel."],
+  ["highlight_regen_unavailable", "HIGHLIGHT_REGEN_UNAVAILABLE", "This reel can't be regenerated."],
+  [
+    "highlight_regen_ai_failed",
+    "HIGHLIGHT_REGEN_FAILED",
+    "We couldn't work out a better cut. Try different feedback.",
+  ],
+  ["highlight_not_retryable", "HIGHLIGHT_NOT_RETRYABLE", "This reel doesn't need a retry."],
+  ["highlight_bad_feedback", "HIGHLIGHT_FEEDBACK_INVALID", "We couldn't save that feedback."],
+  ["highlight_feedback_limit", "HIGHLIGHT_FEEDBACK_INVALID", "We couldn't save that feedback."],
+  ["highlight_bad_segments", "HIGHLIGHT_BAD_SEGMENTS", "Those moments can't make a reel."],
+  ["highlight_too_long", "HIGHLIGHT_BAD_SEGMENTS", "Those moments can't make a reel."],
+  ["highlight_too_short", "HIGHLIGHT_BAD_SEGMENTS", "Those moments can't make a reel."],
+  ["highlight_segment_out_of_range", "HIGHLIGHT_BAD_SEGMENTS", "Those moments can't make a reel."],
+];
+
+describe("highlight hints", () => {
+  it.each(HIGHLIGHT_HINTS)("P0001 hint %s maps to %s", (hint, code, message) => {
+    const result = mapPostgrestError(pgError("P0001", "raw db text", hint));
+    expect(result.code).toBe(code);
+    expect(result.message).toBe(message);
+    expect(result.raw).toBeDefined();
+  });
+
+  it.each(HIGHLIGHT_HINTS)("domainErrorFromHint(%s) maps to %s", (hint, code, message) => {
+    expect(domainErrorFromHint(hint, "server text")).toEqual({ code, message });
+  });
+});
+
+describe("domainErrorFromHint", () => {
+  it("keeps the given message for an unknown hint", () => {
+    expect(domainErrorFromHint("brand_new_hint", "Server said no")).toEqual({
+      code: "UNKNOWN",
+      message: "Server said no",
+    });
+  });
+
+  it("falls back to a generic message with no hint and no message", () => {
+    expect(domainErrorFromHint(null)).toEqual({
+      code: "UNKNOWN",
+      message: "Something went wrong.",
+    });
+  });
+
+  it("does not resolve prototype keys as hints", () => {
+    expect(domainErrorFromHint("constructor", "x").code).toBe("UNKNOWN");
+    expect(mapPostgrestError(pgError("P0001", "x", "toString")).code).toBe("UNKNOWN");
+  });
+
+  it("maps an existing non-highlight hint too (one table)", () => {
+    expect(domainErrorFromHint("session_full").code).toBe("SESSION_FULL");
   });
 });

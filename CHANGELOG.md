@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### Shared: Highlight Reels Alpha client layer (jits-s6mi.9)
+
+Coded against jr_be spec 014 section 9; the backend (B1 `jr_be-15c.11`) lands in parallel.
+
+**Added**
+- `@jits/shared/api/highlights` (new `packages/shared/src/api/highlights.ts`): `getHighlightProgress`, `signHighlightPlayback` (live render + poster in `match-videos`, 3600 s, poster best effort, 404 -> `VIDEO_FILE_MISSING`), `submitHighlightFeedback`, `regenerateHighlight` (edge function `highlight-regenerate` via `supabase.functions.invoke`, error bodies mapped by hint, non-JSON -> `UNKNOWN`), `retryHighlightRender`, `toHighlightProgress`, and the `HighlightPhase` / `HighlightProgress` / `HighlightPlaybackUrls` types. All return `Result<T>`.
+- `useHighlightProgress(supabase, matchVideoId)` (new `packages/shared/src/hooks/use-highlight-progress.ts`): one realtime channel on `video_highlights` + `match_videos`, 200 ms debounced refetch, 15 s polling only while the reel is still moving, version-gated responses.
+- `HIGHLIGHT_FEEDBACK_CHIPS` and `HIGHLIGHT_FREE_TEXT_MAX` (new `packages/shared/src/constants/highlights.ts`, also `@jits/shared/constants`).
+- `domainErrorFromHint(hint, message)` and the highlight `DomainErrorCode`s / hint rows in `packages/shared/src/api/errors.ts` (one table for RPC and edge-function errors; hint lookup is now own-property only).
+- Hand-written RPC wire types isolated in new `packages/shared/src/api/highlight-rpc.ts` until `npm run db:types` is run with B1 applied (TODO in the file).
+
+**Changed**
+- `packages/shared/src/api/queries.ts`: `MATCH_VIDEO_BUCKET`, `signPosterKey` and the new `isStorageObjectMissing` are exported for reuse; `getMatchVideoPlaybackResult` uses the latter (same behaviour).
+
 ### Docs
 **Changed**
 - `CLAUDE.md`: corrected the `match_participants` RLS note (own rows readable), added the presence rate-limit / channel-rebuild rules, mobile match exits (`exitMatchTo`, `useMatchExitCount`), Arena concurrency rules, Resume/rejoin scope, the narrowed web pending-challenge gap, and the `tools/match-loop` harness.

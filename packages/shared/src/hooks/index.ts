@@ -5,3 +5,4 @@ export * from "./use-lobby-sync";
 export * from "./use-pending-challenges";
 export * from "./use-global-notifications";
 export * from "./use-video-progress";
+export * from "./use-highlight-progress";

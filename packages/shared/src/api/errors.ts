@@ -33,6 +33,16 @@ export type DomainErrorCode =
   | "GYM_NOT_FOUND"
   | "MATCH_NOT_FOUND"
   | "VIDEO_FILE_MISSING"
+  | "HIGHLIGHTS_DISABLED"
+  | "HIGHLIGHT_NOT_FOUND"
+  | "HIGHLIGHT_NOT_READY"
+  | "HIGHLIGHT_RENDER_IN_PROGRESS"
+  | "HIGHLIGHT_RENDER_LIMIT"
+  | "HIGHLIGHT_REGEN_UNAVAILABLE"
+  | "HIGHLIGHT_REGEN_FAILED"
+  | "HIGHLIGHT_NOT_RETRYABLE"
+  | "HIGHLIGHT_FEEDBACK_INVALID"
+  | "HIGHLIGHT_BAD_SEGMENTS"
   | "RLS_VIOLATION"
   | "UNKNOWN";
 
@@ -151,7 +161,103 @@ const HINT_TO_CODE: Record<string, { code: DomainErrorCode; message: string }> =
       code: "NOT_ADMIN",
       message: "You need admin access to do that.",
     },
+    // Highlight reels (jr_be spec 014 section 9.5). The same table serves the
+    // RPCs (P0001 HINT) and the highlight-regenerate edge function's
+    // {ok:false,error:{hint}} body, via domainErrorFromHint.
+    highlight_no_athlete: {
+      code: "ATHLETE_NOT_FOUND",
+      message: "Sign in to see your highlight.",
+    },
+    highlight_not_participant: {
+      code: "NOT_PARTICIPANT",
+      message: "You are not in this match.",
+    },
+    highlight_clips_disabled: {
+      code: "HIGHLIGHTS_DISABLED",
+      message: "Highlight reels are paused right now.",
+    },
+    highlight_not_found: {
+      code: "HIGHLIGHT_NOT_FOUND",
+      message: "That highlight no longer exists.",
+    },
+    highlight_not_ready: {
+      code: "HIGHLIGHT_NOT_READY",
+      message: "Your highlight isn't ready yet.",
+    },
+    highlight_source_not_ready: {
+      code: "HIGHLIGHT_NOT_READY",
+      message: "Your highlight isn't ready yet.",
+    },
+    highlight_render_in_progress: {
+      code: "HIGHLIGHT_RENDER_IN_PROGRESS",
+      message: "A new version is already being made.",
+    },
+    highlight_render_limit: {
+      code: "HIGHLIGHT_RENDER_LIMIT",
+      message: "You've used all versions for this reel.",
+    },
+    highlight_regen_unavailable: {
+      code: "HIGHLIGHT_REGEN_UNAVAILABLE",
+      message: "This reel can't be regenerated.",
+    },
+    highlight_regen_ai_failed: {
+      code: "HIGHLIGHT_REGEN_FAILED",
+      message: "We couldn't work out a better cut. Try different feedback.",
+    },
+    highlight_not_retryable: {
+      code: "HIGHLIGHT_NOT_RETRYABLE",
+      message: "This reel doesn't need a retry.",
+    },
+    highlight_bad_feedback: {
+      code: "HIGHLIGHT_FEEDBACK_INVALID",
+      message: "We couldn't save that feedback.",
+    },
+    highlight_feedback_limit: {
+      code: "HIGHLIGHT_FEEDBACK_INVALID",
+      message: "We couldn't save that feedback.",
+    },
+    highlight_bad_segments: {
+      code: "HIGHLIGHT_BAD_SEGMENTS",
+      message: "Those moments can't make a reel.",
+    },
+    highlight_too_long: {
+      code: "HIGHLIGHT_BAD_SEGMENTS",
+      message: "Those moments can't make a reel.",
+    },
+    highlight_too_short: {
+      code: "HIGHLIGHT_BAD_SEGMENTS",
+      message: "Those moments can't make a reel.",
+    },
+    highlight_segment_out_of_range: {
+      code: "HIGHLIGHT_BAD_SEGMENTS",
+      message: "Those moments can't make a reel.",
+    },
   };
+
+/** Own-property lookup, so a hint like "constructor" never hits the prototype. */
+function lookupHint(
+  hint: string | null | undefined,
+): { code: DomainErrorCode; message: string } | undefined {
+  if (!hint || !Object.prototype.hasOwnProperty.call(HINT_TO_CODE, hint)) {
+    return undefined;
+  }
+  return HINT_TO_CODE[hint];
+}
+
+/**
+ * Map a backend HINT code to a domain error. Known hints get the table's
+ * user-safe message; an unknown or missing hint is UNKNOWN carrying `message`
+ * (or a generic fallback). Used for RPC errors (via mapPostgrestError) and for
+ * edge-function error bodies that carry a hint, so there is one table.
+ */
+export function domainErrorFromHint(
+  hint: string | null | undefined,
+  message?: string | null,
+): DomainError {
+  const mapped = lookupHint(hint);
+  if (mapped) return { ...mapped };
+  return { code: "UNKNOWN", message: message || "Something went wrong." };
+}
 
 /** Map a PostgrestError to a domain error */
 export function mapPostgrestError(
@@ -160,7 +266,7 @@ export function mapPostgrestError(
 ): DomainError {
   // P0001 = business logic RAISE EXCEPTION — use hint for mapping
   if (error.code === "P0001" && error.hint) {
-    const mapped = HINT_TO_CODE[error.hint];
+    const mapped = lookupHint(error.hint);
     if (mapped) return { ...mapped, raw: error };
   }
 

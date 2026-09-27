@@ -2408,7 +2408,7 @@ export async function getAllGyms(supabase: Client): Promise<GymOption[]> {
 // ---------------------------------------------------------------------------
 
 /** Private storage bucket holding match recordings (BE contract §1.2). */
-const MATCH_VIDEO_BUCKET = "match-videos";
+export const MATCH_VIDEO_BUCKET = "match-videos";
 
 /** One entry of the `get_athlete_videos` RPC payload. */
 export interface AthleteVideoRow {
@@ -2576,7 +2576,7 @@ function unexpectedError(context: string, err: unknown): DomainError {
  * KEY in the private bucket (jits-fjzy), not a URL; a legacy `http...` value
  * passes through. Best effort: any failure yields null, never an error.
  */
-async function signPosterKey(
+export async function signPosterKey(
   supabase: Client,
   key: string | null | undefined,
   expiresInSeconds: number,
@@ -2592,6 +2592,19 @@ async function signPosterKey(
   } catch {
     return null;
   }
+}
+
+/**
+ * Storage answers "Object not found" (404) when a row outlived its file.
+ * "Bucket not found" is a config failure, not a missing file.
+ */
+export function isStorageObjectMissing(signError: { message: string }): boolean {
+  const statusCode = (signError as { statusCode?: unknown }).statusCode;
+  return (
+    /not.?found/i.test(signError.message) &&
+    !/bucket/i.test(signError.message) &&
+    (statusCode == null || String(statusCode) === "404")
+  );
 }
 
 /** One entry of `get_match_details().videos` (deleted rows never present). */
@@ -2772,12 +2785,7 @@ export async function getMatchVideoPlaybackResult(
       console.error("getMatchVideoPlaybackResult sign:", signError);
       // Storage answers "Object not found" (404) when the row outlived its
       // file. "Bucket not found" is a config failure, not a missing file.
-      const statusCode = (signError as { statusCode?: unknown }).statusCode;
-      if (
-        /not.?found/i.test(signError.message) &&
-        !/bucket/i.test(signError.message) &&
-        (statusCode == null || String(statusCode) === "404")
-      ) {
+      if (isStorageObjectMissing(signError)) {
         return {
           ok: false,
           error: {

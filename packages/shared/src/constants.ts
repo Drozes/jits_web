@@ -267,3 +267,5 @@ export const SPLASH_GLOW_STATEMENT = {
    *  brand minimal-motion rule). */
   EASING_EXPAND: [0.2, 1, 0.3, 1] as const,
 } as const;
+
+export * from "./constants/highlights";
