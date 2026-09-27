@@ -412,6 +412,7 @@ describe("regenerateHighlight", () => {
     [409, "highlight_not_ready", "HIGHLIGHT_NOT_READY"],
     [409, "highlight_clips_disabled", "HIGHLIGHTS_DISABLED"],
     [422, "highlight_regen_ai_failed", "HIGHLIGHT_REGEN_FAILED"],
+    [409, "highlight_regen_expired", "HIGHLIGHT_REGEN_EXPIRED"],
   ])("maps HTTP %i hint %s to %s", async (status, hint, code) => {
     const body = JSON.stringify({ ok: false, error: { hint, message: "user-safe" } });
     const { client } = fnClient({ data: null, error: httpError(status, body) });

@@ -357,6 +357,7 @@ const HIGHLIGHT_HINTS: [string, string, string][] = [
     "HIGHLIGHT_REGEN_FAILED",
     "We couldn't work out a better cut. Try different feedback.",
   ],
+  ["highlight_regen_expired", "HIGHLIGHT_REGEN_EXPIRED", "That took too long. Try again."],
   ["highlight_not_retryable", "HIGHLIGHT_NOT_RETRYABLE", "This reel doesn't need a retry."],
   ["highlight_bad_feedback", "HIGHLIGHT_FEEDBACK_INVALID", "We couldn't save that feedback."],
   [

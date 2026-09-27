@@ -563,6 +563,7 @@ describe("Feedback sheet", () => {
     ["HIGHLIGHT_RENDER_LIMIT", "You've used all versions for this reel."],
     ["HIGHLIGHT_REGEN_UNAVAILABLE", "This reel can't be regenerated."],
     ["HIGHLIGHT_REGEN_FAILED", "We couldn't work out a better cut. Try different feedback."],
+    ["HIGHLIGHT_REGEN_EXPIRED", "That took too long. Try again."],
     ["HIGHLIGHT_NOT_RETRYABLE", "This reel doesn't need a retry."],
     ["HIGHLIGHT_FEEDBACK_INVALID", "We couldn't save that feedback."],
     ["HIGHLIGHT_FEEDBACK_LIMIT", "You've sent a lot of feedback on this reel. Try again later."],
@@ -580,6 +581,20 @@ describe("Feedback sheet", () => {
     expect(utils.getByTestId("sheet")).toBeTruthy();
     expect(utils.getByTestId("highlight-feedback-error")).toHaveTextContent(copy);
     expect(utils.queryByText("raw server text")).toBeNull();
+  });
+
+  it("a thumbs-down sheet whose regenerate expired shows the copy and does not write -1 on close", async () => {
+    mockRegenerate.mockResolvedValue({ ok: false, error: { code: "HIGHLIGHT_REGEN_EXPIRED", message: "x" } });
+    const utils = await renderCard(progress("ready"));
+    fireEvent.press(utils.getByTestId("highlight-thumb-down"));
+    await act(async () => {
+      fireEvent.press(utils.getByTestId("highlight-regenerate"));
+    });
+    expect(utils.getByTestId("highlight-feedback-error")).toHaveTextContent("That took too long. Try again.");
+    await act(async () => {
+      fireEvent.press(utils.getByTestId("sheet-swipe-close"));
+    });
+    expect(mockSubmit).not.toHaveBeenCalled();
   });
 
   it("a thumbs-down sheet whose regenerate the AI failed does not write -1 again on close", async () => {

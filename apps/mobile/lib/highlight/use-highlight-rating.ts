@@ -140,8 +140,12 @@ export function useHighlightRating(
       if (session) session.inFlight = false;
       if (!mountedRef.current) return;
       setBusy(null);
-      // A regenerate the AI could not satisfy still stored the feedback row.
-      const stored = result.ok || result.error.code === "HIGHLIGHT_REGEN_FAILED";
+      // A regenerate the AI could not satisfy (or answered too late) still
+      // stored the feedback row.
+      const stored =
+        result.ok ||
+        result.error.code === "HIGHLIGHT_REGEN_FAILED" ||
+        result.error.code === "HIGHLIGHT_REGEN_EXPIRED";
       if (stored) {
         if (session) session.stored = true;
         if (payload.rating !== null) setRating(payload.rating);

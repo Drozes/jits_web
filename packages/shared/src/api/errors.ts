@@ -42,6 +42,7 @@ export type DomainErrorCode =
   | "HIGHLIGHT_REGEN_UNAVAILABLE"
   | "HIGHLIGHT_REGEN_FAILED"
   | "HIGHLIGHT_REGEN_TIMEOUT"
+  | "HIGHLIGHT_REGEN_EXPIRED"
   | "HIGHLIGHT_NOT_RETRYABLE"
   | "HIGHLIGHT_FEEDBACK_INVALID"
   | "HIGHLIGHT_FEEDBACK_LIMIT"
@@ -208,6 +209,12 @@ const HINT_TO_CODE: Record<string, { code: DomainErrorCode; message: string }> =
     highlight_regen_ai_failed: {
       code: "HIGHLIGHT_REGEN_FAILED",
       message: "We couldn't work out a better cut. Try different feedback.",
+    },
+    // 409 from highlight-regenerate: the AI answer came back after its 150 s
+    // window, nothing was rendered; the feedback row is stored.
+    highlight_regen_expired: {
+      code: "HIGHLIGHT_REGEN_EXPIRED",
+      message: "That took too long. Try again.",
     },
     highlight_not_retryable: {
       code: "HIGHLIGHT_NOT_RETRYABLE",
