@@ -61,10 +61,16 @@ export function AppHeader({
   return (
     <View
       className={cn(
-        "bg-surface-2 border-b border-hairline flex-row items-center px-4",
+        "bg-surface-2 border-b border-hairline flex-row items-center",
         className,
       )}
-      style={{ paddingTop: insets.top, height: 56 + insets.top }}
+      style={{
+        paddingTop: insets.top,
+        height: 56 + insets.top,
+        // 16 in portrait; clears the notch and corners on the landscape ready check.
+        paddingLeft: Math.max(16, insets.left),
+        paddingRight: Math.max(16, insets.right),
+      }}
     >
       <View style={{ flex: 1, flexBasis: 0, height: 32 }}>
         {back ? (

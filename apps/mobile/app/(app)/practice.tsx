@@ -21,6 +21,10 @@ import { MetaTag } from "@/components/ui/elo-system";
 import { STEP_LABELS, WizardStepHeader } from "@/components/match-flow/match-flow-wizard";
 import { MatchRecorderProvider, useMatchRecorder } from "@/components/match-flow/match-recorder-context";
 import { MatchRecorderCamera } from "@/components/match-flow/match-recorder-surface";
+import {
+  MatchOrientationController,
+  orientationModeFor,
+} from "@/components/match-flow/match-orientation-controller";
 import { PracticeButton, PracticeTip } from "@/components/practice/practice-steps";
 import { PracticePhaseView } from "@/components/practice/practice-phase";
 import { usePracticeMatch } from "@/lib/practice/use-practice-match";
@@ -153,7 +157,15 @@ export default function PracticeScreen() {
           className={live ? "flex-1 bg-black" : "flex-1"}
           scrollEnabled={!live}
           contentContainerStyle={
-            live ? { flexGrow: 1 } : { padding: 16, paddingBottom: 32 + insets.bottom, gap: 16 }
+            live
+              ? { flexGrow: 1 }
+              : {
+                  padding: 16,
+                  paddingLeft: Math.max(16, insets.left),
+                  paddingRight: Math.max(16, insets.right),
+                  paddingBottom: 32 + insets.bottom,
+                  gap: 16,
+                }
           }
           keyboardShouldPersistTaps="handled"
         >
@@ -165,6 +177,8 @@ export default function PracticeScreen() {
             upload={false}
           >
             <PracticeClipCustodian />
+            {/* Before the phase view so the live lock lands before recording starts. */}
+            <MatchOrientationController mode={orientationModeFor(phase)} />
             {live ? null : (
               <MetaTag accessibilityLabel="Practice match" testID="practice-tag">
                 Practice

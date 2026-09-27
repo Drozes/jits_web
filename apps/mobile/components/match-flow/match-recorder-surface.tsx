@@ -81,6 +81,13 @@ export function MatchRecorderCamera({ step }: { step: MatchStep }) {
           Preview only. Recording starts with the match.
         </Text>
       ) : null}
+      {/* Rotation is the control: the ready check follows the phone and
+          going live locks it (MatchOrientationController). */}
+      {warming && granted ? (
+        <Text testID="ready-rotate-hint" className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">
+          Turn your phone sideways for a wide shot. It locks when the match starts.
+        </Text>
+      ) : null}
     </View>
   );
 }

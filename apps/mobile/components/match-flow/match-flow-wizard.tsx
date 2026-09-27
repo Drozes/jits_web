@@ -12,6 +12,7 @@ import { QueueStatusBanner } from "./queue-status-banner";
 import { MatchStepRenderer } from "./match-step-renderer";
 import { MatchRecorderProvider, useMatchRecorder } from "./match-recorder-context";
 import { MatchRecorderCamera, MatchRecorderStatus } from "./match-recorder-surface";
+import { MatchOrientationController, orientationModeFor } from "./match-orientation-controller";
 import { cn } from "@/lib/cn";
 import { ARENA_EXIT_LABEL } from "@/lib/arena/constants";
 
@@ -229,6 +230,9 @@ export function MatchFlowWizard({
           ? { flexGrow: 1 }
           : {
               padding: 16,
+              // Landscape ready check: clear the sensor housing and corners.
+              paddingLeft: Math.max(16, insets.left),
+              paddingRight: Math.max(16, insets.right),
               paddingBottom: 32 + insets.bottom,
               gap: 16,
             }
@@ -242,6 +246,8 @@ export function MatchFlowWizard({
       >
         <MatchSyncProvider value={syncContext}>
           <RecorderStopBridge stopRef={stopRecorderRef} />
+          {/* Before the step renderer so the live lock lands before recording starts. */}
+          <MatchOrientationController mode={orientationModeFor(step)} />
           {live ? null : (
             <WizardStepHeader step={step} currentIdx={stepIdx} label={STEP_LABELS[step]} />
           )}

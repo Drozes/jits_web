@@ -127,6 +127,21 @@ jest.mock("expo-av", () => {
   };
 });
 
+// Orientation calls share one ordered log with recordAsync (see below).
+const mockCallLog: string[] = [];
+jest.mock("@/lib/orientation", () => ({
+  allowRotation: jest.fn(async () => {
+    mockCallLog.push("allowRotation");
+  }),
+  lockToCurrent: jest.fn(async () => {
+    mockCallLog.push("lockToCurrent");
+    return "landscape";
+  }),
+  lockPortrait: jest.fn(async () => {
+    mockCallLog.push("lockPortrait");
+  }),
+}));
+
 // A camera that records until stopped, then settles with a local file.
 const mockPermission = { granted: true };
 const mockCamera = {
@@ -205,6 +220,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   jest.useFakeTimers();
   mockPermission.granted = true;
+  mockCallLog.length = 0;
   markPracticeMatch.mockResolvedValue({
     ok: true,
     data: { practice_match_offered_at: "t", practice_match_completed_at: null },
@@ -213,9 +229,10 @@ beforeEach(() => {
     { code: "armbar", display_name: "Armbar" },
   ]);
   let resolveRecord: ((v: { uri: string }) => void) | null = null;
-  mockCamera.recordAsync.mockImplementation(
-    () => new Promise((res) => (resolveRecord = res)),
-  );
+  mockCamera.recordAsync.mockImplementation(() => {
+    mockCallLog.push("recordAsync");
+    return new Promise((res) => (resolveRecord = res));
+  });
   mockCamera.stopRecording.mockImplementation(() => resolveRecord?.({ uri: CLIP }));
   jest.spyOn(console, "log").mockImplementation(() => undefined);
   jest.spyOn(console, "warn").mockImplementation(() => undefined);
@@ -661,5 +678,50 @@ describe("PracticeScreen", () => {
     await flush();
     expect(startMatchVideoUpload).not.toHaveBeenCalled();
     expect(markPracticeMatch).not.toHaveBeenCalledWith({}, "completed");
+  });
+
+  describe("orientation parity with the real match", () => {
+    it("portrait until ready, rotates on ready with the hint, locks at live before recording", async () => {
+      const s = render(<PracticeScreen />);
+      await flush();
+      expect(mockCallLog).toEqual(["lockPortrait"]);
+      toWeight(s);
+      fireEvent.press(s.getByTestId("weight-confirm"));
+      expect(mockCallLog).toEqual(["lockPortrait", "allowRotation"]);
+      s.getByText("Turn your phone sideways for a wide shot. It locks when the match starts.");
+      fireEvent.press(s.getByTestId("ready-button"));
+      advance(BOT_READY_MS);
+      await flush();
+      expect(mockCallLog.indexOf("lockToCurrent")).toBeGreaterThan(-1);
+      expect(mockCallLog.indexOf("lockToCurrent")).toBeLessThan(mockCallLog.indexOf("recordAsync"));
+    });
+
+    it("no hint under the permission card", async () => {
+      mockPermission.granted = false;
+      const s = render(<PracticeScreen />);
+      await flush();
+      toWeight(s);
+      fireEvent.press(s.getByTestId("weight-confirm"));
+      expect(s.queryByTestId("ready-rotate-hint")).toBeNull();
+    });
+
+    it("EXIT from live leaves and restores portrait", async () => {
+      const s = render(<PracticeScreen />);
+      await flush();
+      toLive(s);
+      await flush();
+      mockCallLog.length = 0;
+      fireEvent.press(s.getByTestId("practice-exit"));
+      expect(mockRouter.back).toHaveBeenCalled();
+      s.unmount();
+      expect(mockCallLog).toContain("lockPortrait");
+    });
+
+    it("portrait again once the practice clip has stopped", async () => {
+      const s = render(<PracticeScreen />);
+      await flush();
+      await toResult(s);
+      expect(mockCallLog[mockCallLog.length - 1]).toBe("lockPortrait");
+    });
   });
 });
