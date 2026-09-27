@@ -18,7 +18,8 @@ import { MatchRecorderCamera } from "./match-recorder-surface";
 import { MatchOrientationController, orientationModeFor } from "./match-orientation-controller";
 import { FaceoffProvider } from "./faceoff/faceoff-context";
 import { FaceoffTop } from "./faceoff/faceoff-top";
-import { FIGHT } from "./fight/fight-tokens";
+import { usePalette } from "@/lib/theme/palette";
+import { BROADCAST } from "./live/broadcast-tokens";
 import { ARENA_EXIT_LABEL } from "@/lib/arena/constants";
 import { cn } from "@/lib/cn";
 
@@ -101,6 +102,7 @@ export function MatchFlowWizard({
   // here rather than defended against three times further down.
   const exitLabel = rawExitLabel?.trim() || ARENA_EXIT_LABEL;
   const insets = useSafeAreaInsets();
+  const palette = usePalette();
   const recording = useRecordingOptIn();
   const { match, submissionTypes, isLoading, error, refresh, applyMatch } =
     useMatchDetails(matchId);
@@ -250,7 +252,7 @@ export function MatchFlowWizard({
   return (
     <ScrollView
       ref={scrollRef}
-      style={{ flex: 1, backgroundColor: live ? FIGHT.black : FIGHT.bg }}
+      style={{ flex: 1, backgroundColor: live ? BROADCAST.black : palette.bg }}
       scrollEnabled={!live}
       contentContainerStyle={
         fullBleed

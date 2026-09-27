@@ -37,6 +37,7 @@ jest.mock("@react-navigation/native", () => ({
 }));
 
 jest.mock("@/lib/theme/use-theme", () => ({
+  useResolvedColorScheme: () => "light",
   useThemedTokens: () => ({ textSecondary: "#9AA3AD" }),
 }));
 

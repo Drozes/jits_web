@@ -12,7 +12,8 @@ import { mutationQueue, isQueuedResult } from "@/lib/network/mutation-queue";
 import { matchHaptics } from "@/lib/match-flow/use-haptics";
 import { formatElapsed } from "@/lib/match-flow/format-elapsed";
 import { disputeLockNote, isDisputeWindowClosed } from "@/lib/match-flow/match-extras";
-import { FIGHT, FIGHT_RADIUS } from "../fight/fight-tokens";
+import { usePalette } from "@/lib/theme/palette";
+import { FIGHT_RADIUS } from "../fight/fight-tokens";
 import { FightButton, InitialsBlock, Mono, RatingBlock, shortName } from "../fight/fight-ui";
 import { DisputeForm } from "./dispute-form";
 
@@ -62,6 +63,7 @@ export function confirmVerdict(resultData: BroadcastResult | null, meId: string)
  * wizard to the verdict once both rows exist or the match is disputed.
  */
 export function ConfirmStep(props: ConfirmStepProps) {
+  const p = usePalette();
   const { matchId, matchType, me, opponent, resultData, confirmedAthleteIds, submissionName, finishTimeSeconds, disputeLocksAt, onCompleted } = props;
   const [myConfirmedLocal, setMyConfirmed] = React.useState(false);
   const [opponentConfirmedLocal, setOpponentConfirmed] = React.useState(false);
@@ -160,39 +162,39 @@ export function ConfirmStep(props: ConfirmStepProps) {
     <View style={{ gap: 20 }}>
       <View style={{ gap: 10 }}>
         <Mono>{opponentConfirmed ? `RESULT RECORDED BY ${oppShort.toUpperCase()}` : "RESULT RECORDED"}</Mono>
-        <Text accessibilityRole="header" className="font-heading uppercase" style={{ fontSize: 30, letterSpacing: 0.6, color: FIGHT.text }}>
+        <Text accessibilityRole="header" className="font-heading uppercase" style={{ fontSize: 30, letterSpacing: 0.6, color: p.text }}>
           Confirm result
         </Text>
       </View>
 
-      <View style={{ backgroundColor: FIGHT.plate, borderWidth: 1, borderColor: FIGHT.hairline, borderRadius: FIGHT_RADIUS.plate }}>
+      <View style={{ backgroundColor: p.plate, borderWidth: 1, borderColor: p.hairline, borderRadius: FIGHT_RADIUS.plate }}>
         <View style={{ paddingVertical: 20, paddingHorizontal: 16, gap: 12 }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
             {winner ? <InitialsBlock name={winner.display_name} size={40} fontSize={14} /> : null}
             <View style={{ flex: 1 }}>
-              <Mono color={FIGHT.text3}>{isDraw ? "RESULT" : "WINNER"}</Mono>
+              <Mono color={p.text3}>{isDraw ? "RESULT" : "WINNER"}</Mono>
             </View>
-            <Text testID="confirm-verdict" className="font-mono-bold" style={{ fontSize: 11, letterSpacing: 1.68, color: FIGHT.text2 }}>
+            <Text testID="confirm-verdict" className="font-mono-bold" style={{ fontSize: 11, letterSpacing: 1.68, color: p.text2 }}>
               {confirmVerdict(resultData, me.athlete_id)}
             </Text>
           </View>
-          <Text className="font-display" style={{ fontSize: 60, lineHeight: 56, color: FIGHT.text }}>
+          <Text className="font-display" style={{ fontSize: 60, lineHeight: 56, color: p.text }}>
             {isDraw ? "Draw" : winner ? `${shortName(winner.display_name)} won` : "Result in"}
           </Text>
           {how ? (
-            <Text className="font-body" style={{ fontSize: 16, color: FIGHT.text2 }}>
+            <Text className="font-body" style={{ fontSize: 16, color: p.text2 }}>
               {how}
             </Text>
           ) : null}
         </View>
         {matchType === "ranked" && me.elo_after != null ? (
-          <View style={{ borderTopWidth: 1, borderColor: FIGHT.hairline, padding: 12 }}>
+          <View style={{ borderTopWidth: 1, borderColor: p.hairline, padding: 12 }}>
             <RatingBlock label="YOUR RATING" before={me.elo_before ?? null} after={me.elo_after} delta={me.elo_delta ?? null} />
           </View>
         ) : null}
       </View>
 
-      <View style={{ backgroundColor: FIGHT.plate, borderWidth: 1, borderColor: FIGHT.hairline, borderRadius: FIGHT_RADIUS.plate }}>
+      <View style={{ backgroundColor: p.plate, borderWidth: 1, borderColor: p.hairline, borderRadius: FIGHT_RADIUS.plate }}>
         <StatusRow
           testID={`confirm-panel-opponent-${opponentConfirmed ? "confirmed" : "confirming"}`}
           name={oppShort}
@@ -221,7 +223,7 @@ export function ConfirmStep(props: ConfirmStepProps) {
             />
           )}
           {lockNote ? (
-            <Text className="font-mono" style={{ textAlign: "center", fontSize: 11, letterSpacing: 0.4, color: FIGHT.text2 }}>
+            <Text className="font-mono" style={{ textAlign: "center", fontSize: 11, letterSpacing: 0.4, color: p.text2 }}>
               {lockNote}
             </Text>
           ) : null}
@@ -239,15 +241,16 @@ export function ConfirmStep(props: ConfirmStepProps) {
 }
 
 function StatusRow({ name, status, done, divider = false, testID }: { name: string; status: string; done: boolean; divider?: boolean; testID?: string }) {
+  const p = usePalette();
   return (
     <View
       testID={testID}
-      style={{ height: 48, paddingHorizontal: 14, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderBottomWidth: divider ? 1 : 0, borderColor: FIGHT.hairline }}
+      style={{ height: 48, paddingHorizontal: 14, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderBottomWidth: divider ? 1 : 0, borderColor: p.hairline }}
     >
-      <Text numberOfLines={1} className="font-heading uppercase" style={{ flex: 1, fontSize: 13, letterSpacing: 0.52, color: FIGHT.text }}>
+      <Text numberOfLines={1} className="font-heading uppercase" style={{ flex: 1, fontSize: 13, letterSpacing: 0.52, color: p.text }}>
         {name}
       </Text>
-      <Mono bold size={11} spacing={1.68} color={done ? FIGHT.win : FIGHT.amber}>
+      <Mono bold size={11} spacing={1.68} color={done ? p.win : p.amber}>
         {status}
       </Mono>
     </View>

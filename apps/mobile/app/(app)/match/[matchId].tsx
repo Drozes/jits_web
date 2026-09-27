@@ -17,7 +17,8 @@ import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { usePreventRemove } from "@react-navigation/native";
 import { useRequireAthlete } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
-import { ForceDarkTheme } from "@/lib/theme/force-dark-theme";
+import { ThemedStatusBar } from "@/lib/theme/themed-status-bar";
+import { BROADCAST } from "@/components/match-flow/live/broadcast-tokens";
 import { exitMatchTo } from "@/lib/match-flow/exit-to";
 import { MatchFlowWizard } from "@/components/match-flow/match-flow-wizard";
 import type { MatchStep } from "@/lib/match-flow/step-router";
@@ -81,12 +82,14 @@ export default function ArenaMatchScreen() {
   return (
     <>
       <Stack.Screen options={{ headerShown: false, gestureEnabled: swipeable }} />
-      {/* The match flow is fight-night dark end to end, whatever the app
-          theme. Once a step is up the steps carry their own chrome (the
+      {/* The match flow follows the app theme; only the camera screens
+          (countdown, live) are dark and turn the status bar light while they
+          are up. Once a step is up the steps carry their own chrome (the
           face-off's Leave, the verdict's exits), so the app header shows only
           while the match loads. Its slot stays in place (null) so nothing
           below it moves in the tree. */}
-      <ForceDarkTheme style={{ backgroundColor: step === "live" ? "#000000" : "#0D0F14" }}>
+      <ThemedStatusBar />
+      <View className="flex-1 bg-surface" style={step === "live" ? { backgroundColor: BROADCAST.black } : undefined}>
         {step == null ? <AppHeader title="Match" liveSignal="static" /> : null}
         {/* The wizard derives its own starting step from `matches.status`, so
             backgrounding and reopening mid-match resumes where it left off. */}
@@ -98,7 +101,7 @@ export default function ArenaMatchScreen() {
           onStepChange={setStep}
           onLeaveMatch={onLeaveMatch}
         />
-      </ForceDarkTheme>
+      </View>
     </>
   );
 }

@@ -15,9 +15,10 @@ jest.mock("lucide-react-native", () => {
   const stub = () => R.createElement(RN.View, { testID: "icon" });
   return new Proxy({}, { get: (_t: Record<string, unknown>, prop: string) => (prop === "__esModule" ? true : stub) });
 });
+let mockScheme: "dark" | "light" = "dark";
 jest.mock("@/lib/theme/use-theme", () => ({
   useThemedTokens: () => ({ textPrimary: "#E8EDF2", textSecondary: "#9AA3AD", stateNegative: "#EC6A74" }),
-  useResolvedColorScheme: () => "dark",
+  useResolvedColorScheme: () => mockScheme,
 }));
 jest.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) }));
 jest.mock("expo-image", () => {
@@ -116,8 +117,29 @@ describe("verdict copy and the harness contract", () => {
     await flush();
     expect(s.getByTestId("summary-verdict")).toHaveTextContent("YOU LOST");
     expect(s.getByTestId("summary-elo-delta")).toHaveTextContent("▼ −9");
-    expect(color(s.getByTestId("summary-elo-delta"))).toBe("#F0556B");
+    // The dark theme's red text token.
+    expect(color(s.getByTestId("summary-elo-delta"))).toBe("#EC6A74");
     expect(s.queryByTestId("verdict-confetti", { includeHiddenElements: true })).toBeNull();
+  });
+
+  it("follows the app theme: the light scheme uses the light text tokens (AA on the light plates)", async () => {
+    mockScheme = "light";
+    try {
+      const loss = renderVerdict({ outcome: "loss", me: { athlete_id: "me", display_name: "Kai Reyes", elo_before: 1498, elo_after: 1489, elo_delta: -9 } });
+      await flush();
+      expect(color(loss.getByTestId("summary-verdict"))).toBe("#0D0F14");
+      expect(color(loss.getByTestId("summary-elo-delta"))).toBe("#AC2B34");
+      loss.unmount();
+      const win = renderVerdict({ outcome: "win", me: { athlete_id: "me", display_name: "Kai Reyes", elo_before: 1498, elo_after: 1512, elo_delta: 14 } });
+      await flush();
+      expect(color(win.getByTestId("summary-elo-delta"))).toBe("#116A33");
+      win.unmount();
+      const draw = renderVerdict({ outcome: "draw", me: { athlete_id: "me", display_name: "Kai Reyes", elo_before: 1500, elo_after: 1498, elo_delta: -2 } });
+      await flush();
+      expect(color(draw.getByTestId("summary-verdict"))).toBe("#92400E");
+    } finally {
+      mockScheme = "dark";
+    }
   });
 
   it("a draw: amber, never Signal Red", async () => {

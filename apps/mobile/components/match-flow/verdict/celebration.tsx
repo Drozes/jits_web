@@ -2,24 +2,25 @@ import * as React from "react";
 import { StyleSheet, Text, View, useWindowDimensions, type StyleProp, type TextStyle } from "react-native";
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withDelay, withTiming } from "react-native-reanimated";
 import { useReduceMotion } from "@/lib/match-flow/use-reduce-motion";
-import { FIGHT, FIGHT_EASING } from "../fight/fight-tokens";
+import { usePalette } from "@/lib/theme/palette";
+import { FIGHT_EASING } from "../fight/fight-tokens";
 
 const EASE = Easing.bezier(...FIGHT_EASING);
 /** The brand rating tick. */
 export const RATING_TICK_MS = 480;
 
-/** Sharp rectangles, brand colors only; x is a fraction of the width. */
+/** Sharp rectangles, brand colors only (palette keys); x is a fraction of the width. */
 const PIECES = [
-  { x: 0.09, w: 6, h: 14, c: FIGHT.cta, d: 0 },
-  { x: 0.18, w: 8, h: 8, c: FIGHT.text, d: 180 },
-  { x: 0.28, w: 5, h: 16, c: FIGHT.red, d: 90 },
-  { x: 0.38, w: 10, h: 5, c: FIGHT.text, d: 320 },
-  { x: 0.48, w: 6, h: 12, c: FIGHT.cta, d: 40 },
-  { x: 0.58, w: 7, h: 7, c: FIGHT.text, d: 260 },
-  { x: 0.67, w: 5, h: 14, c: FIGHT.cta, d: 140 },
-  { x: 0.76, w: 9, h: 5, c: FIGHT.red, d: 380 },
-  { x: 0.85, w: 6, h: 10, c: FIGHT.text, d: 60 },
-  { x: 0.93, w: 5, h: 13, c: FIGHT.cta, d: 220 },
+  { x: 0.09, w: 6, h: 14, c: "cta" as const, d: 0 },
+  { x: 0.18, w: 8, h: 8, c: "text" as const, d: 180 },
+  { x: 0.28, w: 5, h: 16, c: "red" as const, d: 90 },
+  { x: 0.38, w: 10, h: 5, c: "text" as const, d: 320 },
+  { x: 0.48, w: 6, h: 12, c: "cta" as const, d: 40 },
+  { x: 0.58, w: 7, h: 7, c: "text" as const, d: 260 },
+  { x: 0.67, w: 5, h: 14, c: "cta" as const, d: 140 },
+  { x: 0.76, w: 9, h: 5, c: "red" as const, d: 380 },
+  { x: 0.85, w: 6, h: 10, c: "text" as const, d: 60 },
+  { x: 0.93, w: 5, h: 13, c: "cta" as const, d: 220 },
 ];
 
 /**
@@ -29,11 +30,12 @@ const PIECES = [
 export function Confetti({ height = 600 }: { height?: number }) {
   const reduceMotion = useReduceMotion();
   const { width } = useWindowDimensions();
+  const palette = usePalette();
   if (reduceMotion) return null;
   return (
     <View testID="verdict-confetti" pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[StyleSheet.absoluteFill, { height }]}>
       {PIECES.map((p, i) => (
-        <Piece key={i} left={p.x * width} w={p.w} h={p.h} color={p.c} delay={p.d} fall={height} />
+        <Piece key={i} left={p.x * width} w={p.w} h={p.h} color={palette[p.c]} delay={p.d} fall={height} />
       ))}
     </View>
   );
@@ -124,11 +126,12 @@ export function useRatingTick(before: number | null, after: number | null): numb
  * its own, so the 60 fps tick re-renders this Text only, never the verdict.
  */
 export function TickingRating({ before, after }: { before: number | null; after: number | null }) {
+  const p = usePalette();
   const ticking = useRatingTick(before, after);
   const shown = ticking ?? after;
   const text = before != null && shown != null && before !== after ? `${before} \u2192 ${shown}` : shown != null ? `${shown}` : "";
   return (
-    <Text testID="verdict-rating" className="font-mono-bold" style={{ fontSize: 22, color: "#E8EDF2", fontVariant: ["tabular-nums"] }}>
+    <Text testID="verdict-rating" className="font-mono-bold" style={{ fontSize: 22, color: p.text, fontVariant: ["tabular-nums"] }}>
       {text}
     </Text>
   );

@@ -20,7 +20,8 @@ import {
 import * as Haptics from "expo-haptics";
 import type { IncomingChallenge } from "@/lib/arena/use-arena-challenge";
 import { useViewerStakes } from "@/lib/match-flow/use-viewer-stakes";
-import { FIGHT, FIGHT_RADIUS } from "@/components/match-flow/fight/fight-tokens";
+import { FIGHT_RADIUS } from "@/components/match-flow/fight/fight-tokens";
+import { usePalette } from "@/lib/theme/palette";
 import { InitialsBlock, KindTag, Mono, StakesStrip, shortName } from "@/components/match-flow/fight/fight-ui";
 
 /**
@@ -61,6 +62,7 @@ export function ChallengePromptSheet({
   viewer,
 }: ChallengePromptSheetProps) {
   const ref = React.useRef<BottomSheetModal | null>(null);
+  const p = usePalette();
   // One calculate_elo_stakes read per challenge, viewer as "challenger"
   // (see useViewerStakes). Fails quietly: no strip.
   const stakes = useViewerStakes(
@@ -130,9 +132,9 @@ export function ChallengePromptSheet({
       // "Bottom Sheet" stop. Turning that off exposes the real elements.
       accessible={false}
       backgroundComponent={PromptBackground}
-      // Fight-night dark whatever the app theme, like the match it leads to.
-      backgroundStyle={{ backgroundColor: FIGHT.plate, borderTopWidth: 1, borderColor: FIGHT.strong }}
-      handleIndicatorStyle={{ backgroundColor: "rgba(255,255,255,0.24)", width: 40 }}
+      // Follows the app theme, like every other sheet.
+      backgroundStyle={{ backgroundColor: p.plate, borderTopWidth: 1, borderColor: p.strong }}
+      handleIndicatorStyle={{ backgroundColor: p.strong, width: 40 }}
     >
       <BottomSheetView>
         {challenge ? (
@@ -145,8 +147,8 @@ export function ChallengePromptSheet({
           >
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 7 }}>
-                <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: FIGHT.win }} />
-                <Mono bold color={FIGHT.win}>
+                <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: p.win }} />
+                <Mono bold color={p.win}>
                   INCOMING CHALLENGE
                 </Mono>
               </View>
@@ -156,15 +158,15 @@ export function ChallengePromptSheet({
             <View style={{ flexDirection: "row", alignItems: "center", gap: 16 }}>
               <InitialsBlock name={challenge.challengerName} size={88} fontSize={30} />
               <View style={{ flex: 1, gap: 8, minWidth: 0 }}>
-                <Text numberOfLines={1} className="font-display" style={{ fontSize: 44, lineHeight: 42, color: FIGHT.text }}>
+                <Text numberOfLines={1} className="font-display" style={{ fontSize: 44, lineHeight: 42, color: p.text }}>
                   {shortName(challenge.challengerName)}
                 </Text>
                 {meta ? (
-                  <Text className="font-mono" style={{ fontSize: 13, color: FIGHT.text2, fontVariant: ["tabular-nums"] }}>
+                  <Text className="font-mono" style={{ fontSize: 13, color: p.text2, fontVariant: ["tabular-nums"] }}>
                     {meta}
                   </Text>
                 ) : null}
-                <Text className="font-body" style={{ fontSize: 13, color: FIGHT.text2 }}>
+                <Text className="font-body" style={{ fontSize: 13, color: p.text2 }}>
                   {`${shortName(challenge.challengerName)} is live in the Arena`}
                 </Text>
               </View>
@@ -172,18 +174,18 @@ export function ChallengePromptSheet({
 
             {stakes ? (
               <View style={{ gap: 8 }}>
-                <Mono color={FIGHT.text3}>{`YOUR STAKES${viewer?.elo != null ? ` \u00b7 ${viewer.elo}` : ""}`}</Mono>
+                <Mono color={p.text3}>{`YOUR STAKES${viewer?.elo != null ? ` \u00b7 ${viewer.elo}` : ""}`}</Mono>
                 <StakesStrip
                   testID="challenge-prompt-stakes"
                   win={stakes.challenger_win}
                   draw={stakes.challenger_draw}
                   loss={stakes.challenger_loss}
                   height={64}
-                  background={FIGHT.bg}
+                  background={p.bg}
                 />
               </View>
             ) : (
-              <Text className="font-body" style={{ fontSize: 13, color: FIGHT.text2 }}>
+              <Text className="font-body" style={{ fontSize: 13, color: p.text2 }}>
                 Accept and you both drop straight into the match.
               </Text>
             )}
@@ -202,12 +204,12 @@ export function ChallengePromptSheet({
                   justifyContent: "center",
                   borderRadius: FIGHT_RADIUS.button,
                   borderWidth: 1,
-                  borderColor: FIGHT.strong,
-                  backgroundColor: pressed ? FIGHT.secondaryBgPressed : FIGHT.secondaryBg,
+                  borderColor: p.strong,
+                  backgroundColor: pressed ? p.secondaryBgPressed : p.secondaryBg,
                   opacity: busy ? 0.6 : 1,
                 })}
               >
-                <Text className="font-heading uppercase" style={{ fontSize: 14, letterSpacing: 1.12, color: FIGHT.white }}>
+                <Text className="font-heading uppercase" style={{ fontSize: 14, letterSpacing: 1.12, color: p.text }}>
                   Decline
                 </Text>
               </Pressable>
@@ -223,11 +225,11 @@ export function ChallengePromptSheet({
                   alignItems: "center",
                   justifyContent: "center",
                   borderRadius: FIGHT_RADIUS.button,
-                  backgroundColor: pressed ? FIGHT.ctaPressed : FIGHT.cta,
+                  backgroundColor: pressed ? p.ctaPressed : p.cta,
                   opacity: busy ? 0.6 : 1,
                 })}
               >
-                <Text className="font-heading uppercase" style={{ fontSize: 14, letterSpacing: 1.12, color: FIGHT.onCta }}>
+                <Text className="font-heading uppercase" style={{ fontSize: 14, letterSpacing: 1.12, color: p.onCta }}>
                   Accept challenge
                 </Text>
               </Pressable>

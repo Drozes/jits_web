@@ -5,7 +5,8 @@ import { SearchSelect, type SearchSelectOption } from "@/components/ui/search-se
 import { OTHER_SUBMISSION_CODE, filterSubmissionTypes } from "@/lib/match-flow/filter-submissions";
 import { formatElapsed } from "@/lib/match-flow/format-elapsed";
 import type { SubmissionType } from "@jits/shared/types/submission-type";
-import { FIGHT, FIGHT_RADIUS, TABULAR } from "../fight/fight-tokens";
+import { ON_MEDIA, usePalette } from "@/lib/theme/palette";
+import { FIGHT_RADIUS, TABULAR } from "../fight/fight-tokens";
 import { InitialsBlock, Mono, initialsOf, shortName } from "../fight/fight-ui";
 
 export interface ResultAthlete {
@@ -59,6 +60,7 @@ export function WinnerTiles({
   opponent: ResultAthlete;
   onPick: (id: string) => void;
 }) {
+  const p = usePalette();
   return (
     <View style={{ flexDirection: "row", gap: 12 }}>
       {[me, opponent].map((a) => (
@@ -76,15 +78,15 @@ export function WinnerTiles({
             alignItems: "center",
             justifyContent: "center",
             gap: 16,
-            backgroundColor: pressed ? FIGHT.panel : FIGHT.plate,
+            backgroundColor: pressed ? p.panel : p.plate,
             borderWidth: 1,
-            borderColor: pressed ? FIGHT.cta : FIGHT.hairline,
+            borderColor: pressed ? p.cta : p.hairline,
             borderRadius: FIGHT_RADIUS.plate,
           })}
         >
           <InitialsBlock name={a.displayName} size={112} fontSize={36} />
           <View style={{ alignItems: "center", gap: 8 }}>
-            <Text numberOfLines={1} className="font-heading uppercase" style={{ fontSize: 18, letterSpacing: 0.72, color: FIGHT.text }}>
+            <Text numberOfLines={1} className="font-heading uppercase" style={{ fontSize: 18, letterSpacing: 0.72, color: p.text }}>
               {shortName(a.displayName)}
             </Text>
             {meta(a) ? (
@@ -92,7 +94,7 @@ export function WinnerTiles({
                 {meta(a)}
               </Mono>
             ) : null}
-            <Mono color={a.id === me.id ? FIGHT.red : FIGHT.text3}>{a.id === me.id ? "YOU" : "OPPONENT"}</Mono>
+            <Mono color={a.id === me.id ? p.red : p.text3}>{a.id === me.id ? "YOU" : "OPPONENT"}</Mono>
           </View>
         </Pressable>
       ))}
@@ -100,32 +102,34 @@ export function WinnerTiles({
   );
 }
 
-/** The chosen winner on the light chip, with Change. */
+/** The chosen winner on the light chip (fixed light in both themes), with Change. */
 export function WinnerChip({ winner, onChange }: { winner: ResultAthlete; onChange: () => void }) {
   return (
     <View
-      style={{ height: 56, paddingLeft: 10, paddingRight: 6, flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: FIGHT.chip, borderRadius: FIGHT_RADIUS.button }}
+      style={{ height: 56, paddingLeft: 10, paddingRight: 6, flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: ON_MEDIA.chip, borderWidth: 1, borderColor: ON_MEDIA.chipBorder, borderRadius: FIGHT_RADIUS.button }}
     >
-      <View style={{ width: 36, height: 36, alignItems: "center", justifyContent: "center", backgroundColor: FIGHT.ink, borderRadius: FIGHT_RADIUS.tag }}>
-        <Text className="font-heading" style={{ fontSize: 13, color: FIGHT.text }}>
+      <View style={{ width: 36, height: 36, alignItems: "center", justifyContent: "center", backgroundColor: ON_MEDIA.ink, borderRadius: FIGHT_RADIUS.tag }}>
+        <Text className="font-heading" style={{ fontSize: 13, color: ON_MEDIA.text }}>
           {initialsOf(winner.displayName)}
         </Text>
       </View>
       <View style={{ flex: 1, gap: 4 }}>
-        <Mono color={FIGHT.ink3}>WINNER</Mono>
-        <Text numberOfLines={1} className="font-heading uppercase" style={{ fontSize: 16, letterSpacing: 0.64, color: FIGHT.ink }}>
+        <Mono color={ON_MEDIA.ink3}>WINNER</Mono>
+        <Text numberOfLines={1} className="font-heading uppercase" style={{ fontSize: 16, letterSpacing: 0.64, color: ON_MEDIA.ink }}>
           {shortName(winner.displayName)}
         </Text>
       </View>
-      <ChangeButton onPress={onChange} />
+      <ChangeButton onPress={onChange} color={ON_MEDIA.inkRed} />
     </View>
   );
 }
 
-export function ChangeButton({ onPress, testID = "result-change" }: { onPress: () => void; testID?: string }) {
+/** "Change": red text, themed unless `color` pins it (on the light chip). */
+export function ChangeButton({ onPress, testID = "result-change", color }: { onPress: () => void; testID?: string; color?: string }) {
+  const p = usePalette();
   return (
     <Pressable testID={testID} accessibilityRole="button" accessibilityLabel="Change" onPress={onPress} style={{ height: 44, paddingHorizontal: 12, justifyContent: "center" }}>
-      <Text className="font-heading uppercase" style={{ fontSize: 13, letterSpacing: 0.8, color: FIGHT.inkRed }}>
+      <Text className="font-heading uppercase" style={{ fontSize: 13, letterSpacing: 0.8, color: color ?? p.red }}>
         Change
       </Text>
     </Pressable>
@@ -142,6 +146,7 @@ export function SubmissionGrid({
   value: string;
   onChange: (code: string) => void;
 }) {
+  const p = usePalette();
   const common = React.useMemo(() => commonSubmissions(submissionTypes), [submissionTypes]);
   const toOption = (t: SubmissionType): SearchSelectOption => ({ label: t.display_name, value: t.code });
   const getOptions = React.useCallback((q: string) => filterSubmissionTypes(submissionTypes, q).map(toOption), [submissionTypes]);
@@ -170,16 +175,16 @@ export function SubmissionGrid({
                 flexDirection: "row",
                 alignItems: "center",
                 justifyContent: "space-between",
-                backgroundColor: selected ? FIGHT.selectedBg : FIGHT.plate,
+                backgroundColor: selected ? p.selectedBg : p.plate,
                 borderWidth: 1,
-                borderColor: selected ? FIGHT.cta : FIGHT.hairline,
+                borderColor: selected ? p.cta : p.hairline,
                 borderRadius: FIGHT_RADIUS.button,
               }}
             >
-              <Text numberOfLines={2} className="font-heading" style={{ flex: 1, fontSize: 14, color: FIGHT.text }}>
+              <Text numberOfLines={2} className="font-heading" style={{ flex: 1, fontSize: 14, color: p.text }}>
                 {t.display_name}
               </Text>
-              {selected ? <Check size={16} color={FIGHT.red} /> : null}
+              {selected ? <Check size={16} color={p.red} /> : null}
             </Pressable>
           );
         })}
@@ -216,6 +221,7 @@ export function FinishTimeField({
   invalid: boolean;
   durationSeconds: number;
 }) {
+  const p = usePalette();
   const inputRef = React.useRef<TextInput>(null);
   return (
     <View style={{ gap: 8 }}>
@@ -223,26 +229,26 @@ export function FinishTimeField({
         FINISH TIME
       </Mono>
       <View
-        style={{ height: 64, paddingLeft: 14, paddingRight: 6, flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: FIGHT.plate, borderWidth: 1, borderColor: invalid ? FIGHT.red : FIGHT.hairline, borderRadius: FIGHT_RADIUS.button }}
+        style={{ height: 64, paddingLeft: 14, paddingRight: 6, flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: p.plate, borderWidth: 1, borderColor: invalid ? p.red : p.hairline, borderRadius: FIGHT_RADIUS.button }}
       >
         <TextInput
           ref={inputRef}
           testID="result-finish-time"
           accessibilityLabel="Finish time"
           placeholder="mm:ss"
-          placeholderTextColor={FIGHT.text3}
+          placeholderTextColor={p.text3}
           value={value}
           onChangeText={onChange}
           keyboardType="numeric"
           maxLength={5}
           className="font-mono-bold"
-          style={[{ minWidth: 104, fontSize: 30, letterSpacing: -0.6, color: FIGHT.text, padding: 0 }, TABULAR]}
+          style={[{ minWidth: 104, fontSize: 30, letterSpacing: -0.6, color: p.text, padding: 0 }, TABULAR]}
         />
         <View style={{ flex: 1 }}>
           {invalid ? (
-            <Mono color={FIGHT.red}>{`WITHIN ${formatElapsed(durationSeconds)}`}</Mono>
+            <Mono color={p.red}>{`WITHIN ${formatElapsed(durationSeconds)}`}</Mono>
           ) : fromClock ? (
-            <Mono testID="result-finish-time-hint" color={FIGHT.text3}>
+            <Mono testID="result-finish-time-hint" color={p.text3}>
               FROM MATCH CLOCK
             </Mono>
           ) : null}
@@ -253,7 +259,7 @@ export function FinishTimeField({
           onPress={() => inputRef.current?.focus()}
           style={{ width: 44, height: 44, alignItems: "center", justifyContent: "center" }}
         >
-          <Pencil size={16} color={FIGHT.text2} />
+          <Pencil size={16} color={p.text2} />
         </Pressable>
       </View>
     </View>
@@ -262,18 +268,19 @@ export function FinishTimeField({
 
 /** The draw confirmation plate. */
 export function DrawPlate({ matchType, onChange }: { matchType: "ranked" | "casual"; onChange: () => void }) {
+  const p = usePalette();
   return (
     <View
-      style={{ padding: 16, gap: 10, backgroundColor: FIGHT.plate, borderWidth: 1, borderColor: FIGHT.hairline, borderRadius: FIGHT_RADIUS.plate }}
+      style={{ padding: 16, gap: 10, backgroundColor: p.plate, borderWidth: 1, borderColor: p.hairline, borderRadius: FIGHT_RADIUS.plate }}
     >
       <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-        <Handshake size={22} color={FIGHT.amber} />
-        <Text className="font-heading uppercase" style={{ flex: 1, fontSize: 15, letterSpacing: 1, color: FIGHT.text }}>
+        <Handshake size={22} color={p.amber} />
+        <Text className="font-heading uppercase" style={{ flex: 1, fontSize: 15, letterSpacing: 1, color: p.text }}>
           Match ends in a draw
         </Text>
         <ChangeButton onPress={onChange} testID="result-change-draw" />
       </View>
-      <Text className="font-body" style={{ fontSize: 13, color: FIGHT.text2 }}>
+      <Text className="font-body" style={{ fontSize: 13, color: p.text2 }}>
         {matchType === "ranked" ? "Draws cost both athletes rating." : "Casual match: no rating change."}
       </Text>
     </View>

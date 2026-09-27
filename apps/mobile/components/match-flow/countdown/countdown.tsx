@@ -1,10 +1,12 @@
 import * as React from "react";
 import { StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { matchHaptics } from "@/lib/match-flow/use-haptics";
 import { useReduceMotion } from "@/lib/match-flow/use-reduce-motion";
-import { FIGHT, FIGHT_EASING, FIGHT_RADIUS } from "../fight/fight-tokens";
+import { ON_MEDIA } from "@/lib/theme/palette";
+import { FIGHT_EASING, FIGHT_RADIUS } from "../fight/fight-tokens";
 import { KindTag, Mono } from "../fight/fight-ui";
 import { FaceoffChip, type FaceoffAthlete } from "../faceoff/faceoff-top";
 
@@ -41,7 +43,7 @@ export function numeralSize(windowHeight: number): number {
  * phones time it from the server's `started_at`, so they reach GO together;
  * the recorder (when opted in) arms at GO, when the live step mounts.
  * One heavy haptic per numeral. Reduce Motion shows the numerals without
- * the scale-in.
+ * the scale-in. Over the camera it is dark in both app themes (ON_MEDIA).
  */
 export function Countdown({ goAt, matchType, recording, me, opponent, myWeight, opponentWeight }: CountdownProps) {
   const insets = useSafeAreaInsets();
@@ -93,13 +95,14 @@ export function Countdown({ goAt, matchType, recording, me, opponent, myWeight, 
 
   return (
     <View testID="match-countdown" style={StyleSheet.absoluteFill}>
-      <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: FIGHT.scrim }]} />
+      <StatusBar style="light" />
+      <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: ON_MEDIA.scrim }]} />
       <View style={{ position: "absolute", left: Math.max(16, insets.left), right: Math.max(16, insets.right), top: insets.top + 12, height: 28, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
         <View
-          style={{ height: 28, paddingHorizontal: 10, flexDirection: "row", alignItems: "center", gap: 7, borderWidth: 1, borderColor: recording ? FIGHT.cta : FIGHT.strong, borderRadius: FIGHT_RADIUS.tag, backgroundColor: FIGHT.glass }}
+          style={{ height: 28, paddingHorizontal: 10, flexDirection: "row", alignItems: "center", gap: 7, borderWidth: 1, borderColor: recording ? ON_MEDIA.cta : ON_MEDIA.strong, borderRadius: FIGHT_RADIUS.tag, backgroundColor: ON_MEDIA.tag }}
         >
-          <View style={{ width: 8, height: 8, borderRadius: 4, borderWidth: 1.5, borderColor: recording ? FIGHT.red : FIGHT.text3 }} />
-          <Mono bold spacing={1.68} color={recording ? FIGHT.red : FIGHT.text2}>
+          <View style={{ width: 8, height: 8, borderRadius: 4, borderWidth: 1.5, borderColor: recording ? ON_MEDIA.red : ON_MEDIA.text3 }} />
+          <Mono bold spacing={1.68} color={recording ? ON_MEDIA.red : ON_MEDIA.text2}>
             {recording ? "REC ARMS AT GO" : "NOT RECORDING"}
           </Mono>
         </View>
@@ -112,7 +115,7 @@ export function Countdown({ goAt, matchType, recording, me, opponent, myWeight, 
         style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
       >
         <Animated.View style={numeralStyle}>
-          <Text testID="countdown-numeral" className="font-display" style={{ fontSize: size, lineHeight: size, color: FIGHT.white }}>
+          <Text testID="countdown-numeral" className="font-display" style={{ fontSize: size, lineHeight: size, color: ON_MEDIA.white }}>
             {numeral > 0 ? String(numeral) : ""}
           </Text>
         </Animated.View>
@@ -127,12 +130,12 @@ export function Countdown({ goAt, matchType, recording, me, opponent, myWeight, 
           gap: 12,
         }}
       >
-        <View style={{ width: "100%", height: 3, backgroundColor: "rgba(255,255,255,0.18)" }}>
-          <Animated.View testID="countdown-progress" style={[{ height: 3, backgroundColor: FIGHT.cta }, barStyle]} />
+        <View style={{ width: "100%", height: 3, backgroundColor: ON_MEDIA.track }}>
+          <Animated.View testID="countdown-progress" style={[{ height: 3, backgroundColor: ON_MEDIA.cta }, barStyle]} />
         </View>
         {/* Landscape has no room under the numeral for the caption or the
             athlete chip; the numeral and the bar carry it there. */}
-        {landscape ? null : <Mono color={FIGHT.text2}>SYNCED TO SERVER CLOCK {"·"} BOTH PHONES</Mono>}
+        {landscape ? null : <Mono color={ON_MEDIA.text2}>SYNCED TO SERVER CLOCK {"·"} BOTH PHONES</Mono>}
       </View>
       {landscape ? null : (
         <View testID="countdown-chip" style={{ position: "absolute", left: 16, right: 16, bottom: Math.max(insets.bottom, 16) + 26 }}>
@@ -161,7 +164,7 @@ export function GoFlash() {
           testID="countdown-go"
           accessibilityLiveRegion="assertive"
           className="font-display"
-          style={{ fontSize: 116, letterSpacing: 2, color: FIGHT.red }}
+          style={{ fontSize: 116, letterSpacing: 2, color: ON_MEDIA.red }}
         >
           GRAPPLE
         </Text>

@@ -8,7 +8,7 @@ import { useFinishTimeField } from "@/lib/match-flow/use-finish-time-field";
 import { formatElapsed } from "@/lib/match-flow/format-elapsed";
 import type { BroadcastResult } from "@jits/shared/hooks/use-session-match-sync";
 import type { SubmissionType } from "@jits/shared/types/submission-type";
-import { FIGHT } from "../fight/fight-tokens";
+import { usePalette } from "@/lib/theme/palette";
 import { FightButton, KindTag, Mono, shortName } from "../fight/fight-ui";
 import {
   DrawPlate,
@@ -45,6 +45,7 @@ interface ResultStepProps {
  * full catalogue search, and the finish time prefilled from the clock.
  */
 export function ResultStep(props: ResultStepProps) {
+  const p = usePalette();
   const { matchId, matchType, durationSeconds, initialFinishSeconds, me, opponent, submissionTypes, onRecorded, onLeave } = props;
   const [outcome, setOutcome] = React.useState<"submission" | "draw" | null>(null);
   const [winnerId, setWinnerId] = React.useState("");
@@ -115,7 +116,7 @@ export function ResultStep(props: ResultStepProps) {
         </View>
         {/* A plain text element on purpose: the match-loop harness taps the
             StaticText "Record result" to drop the numeric keyboard. */}
-        <Text className="font-heading uppercase" style={{ fontSize: 30, letterSpacing: 0.6, color: FIGHT.text }}>
+        <Text className="font-heading uppercase" style={{ fontSize: 30, letterSpacing: 0.6, color: p.text }}>
           Record result
         </Text>
       </View>
@@ -156,7 +157,7 @@ export function ResultStep(props: ResultStepProps) {
 
       {claim.state === "mine" ? (
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 }}>
-          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: FIGHT.win }} />
+          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: p.win }} />
           <Mono size={11} spacing={0.4}>
             {`You're recording for both of you. ${shortName(opponent.displayName)} sees this live.`}
           </Mono>

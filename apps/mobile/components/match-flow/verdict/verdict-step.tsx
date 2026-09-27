@@ -13,7 +13,8 @@ import { rankStripText, useRankChange, useVerdictVideos } from "@/lib/match-flow
 import type { UploadBannerState } from "@/lib/video/upload-banner-state";
 import { buildShareText, buildShareUrl } from "@jits/shared/utils";
 import { UploadProgressBanner } from "../upload-progress-banner";
-import { FIGHT, FIGHT_RADIUS, TABULAR } from "../fight/fight-tokens";
+import { usePalette } from "@/lib/theme/palette";
+import { FIGHT_RADIUS, TABULAR } from "../fight/fight-tokens";
 import { FightButton, Mono, RatingBlock, deltaColor, formatSignedDelta, shortName } from "../fight/fight-ui";
 import { Confetti, RiseIn, SlamIn, TickingRating } from "./celebration";
 import { VerdictHero } from "./verdict-hero";
@@ -76,6 +77,7 @@ interface VerdictStepProps {
  * into the calm DISPUTED verdict (no celebration, no rank strip).
  */
 export function VerdictStep(props: VerdictStepProps) {
+  const p = usePalette();
   const { matchId, exitHref, exitLabel, matchType, matchStatus, outcome, me, opponent, submissionName, finishTimeSeconds, upload, uploadedVideoId, confirmedAthleteIds = [] } = props;
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -127,7 +129,7 @@ export function VerdictStep(props: VerdictStepProps) {
   const gap = ranked ? (me.weight_division_gap ?? 0) : 0;
 
   const verdict = disputed ? "DISPUTED" : win ? "YOU WON" : loss ? "YOU LOST" : outcome === "draw" ? "DRAW" : "MATCH RECORDED";
-  const verdictColor = disputed ? FIGHT.text : outcome === "draw" ? FIGHT.amber : win ? FIGHT.white : FIGHT.text;
+  const verdictColor = outcome === "draw" && !disputed ? p.amber : p.text;
   const how = [submissionName ? `by ${submissionName}` : null, finishTimeSeconds != null ? formatElapsed(finishTimeSeconds) : null]
     .filter(Boolean)
     .join(" \u00b7 ");
@@ -187,7 +189,7 @@ export function VerdictStep(props: VerdictStepProps) {
       disabled={uploadBusy}
       onPress={watch}
       icon={(c) => <Film size={16} color={c} />}
-      trailing={uploadBusy && !primary ? <Mono color={FIGHT.amber}>PROCESSING</Mono> : undefined}
+      trailing={uploadBusy && !primary ? <Mono color={p.amber}>PROCESSING</Mono> : undefined}
     />
   );
 
@@ -212,13 +214,13 @@ export function VerdictStep(props: VerdictStepProps) {
             </Text>
           </SlamIn>
           {how ? (
-            <Text className="font-body-medium" style={{ fontSize: 16, color: win ? FIGHT.text : FIGHT.text2 }}>
+            <Text className="font-body-medium" style={{ fontSize: 16, color: win ? p.text : p.text2 }}>
               {loss ? `${how} · vs ${oppShort}` : how}
             </Text>
           ) : null}
           {loss && how ? null : <Mono size={11} spacing={1.68}>{`VS ${oppShort.toUpperCase()}`}</Mono>}
           {disputed ? (
-            <Text testID="summary-disputed-note" className="font-body" style={{ fontSize: 14, color: FIGHT.text2 }}>
+            <Text testID="summary-disputed-note" className="font-body" style={{ fontSize: 14, color: p.text2 }}>
               An admin will review it. Your rating change stands until they do.
             </Text>
           ) : null}
@@ -232,7 +234,7 @@ export function VerdictStep(props: VerdictStepProps) {
             ratingNode={<TickingRating before={disputed ? null : eloBefore} after={eloAfter} />}
             deltaNode={
               eloDelta != null && eloDelta !== 0 ? (
-                <Text testID="summary-elo-delta" className="font-mono-bold" style={[{ fontSize: 26, color: outcome === "draw" ? FIGHT.amber : deltaColor(eloDelta) }, TABULAR]}>
+                <Text testID="summary-elo-delta" className="font-mono-bold" style={[{ fontSize: 26, color: outcome === "draw" ? p.amber : deltaColor(eloDelta, p) }, TABULAR]}>
                   {formatSignedDelta(eloDelta)}
                 </Text>
               ) : null
@@ -244,10 +246,10 @@ export function VerdictStep(props: VerdictStepProps) {
           <RiseIn>
             <View
               testID="verdict-rank-strip"
-              style={{ height: 40, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 10, borderWidth: 1, borderColor: "rgba(34,197,94,0.45)", borderRadius: FIGHT_RADIUS.plate }}
+              style={{ height: 40, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 10, borderWidth: 1, borderColor: p.winRule, borderRadius: FIGHT_RADIUS.plate }}
             >
-              <TrendingUp size={16} color={FIGHT.win} />
-              <Mono size={11} spacing={1.68} color={FIGHT.text}>
+              <TrendingUp size={16} color={p.win} />
+              <Mono size={11} spacing={1.68} color={p.text}>
                 {rankText}
               </Mono>
             </View>
@@ -261,7 +263,7 @@ export function VerdictStep(props: VerdictStepProps) {
         {upload.kind !== "hidden" ? <UploadProgressBanner {...upload} /> : null}
 
         {loss ? (
-          <Text className="font-body" style={{ fontSize: 15, color: FIGHT.text }}>
+          <Text className="font-body" style={{ fontSize: 15, color: p.text }}>
             Run it back?
           </Text>
         ) : null}

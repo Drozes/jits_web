@@ -110,11 +110,18 @@ describe("ResultStep draw", () => {
     screen.getByText("Casual match: no rating change.");
   });
 
-  it("keeps the fight-night amber whatever the app theme (the match flow is always dark)", () => {
+  it("follows the app theme: amber-500 on dark, the AA amber-800 on light", () => {
+    mockScheme = "dark";
+    const dark = renderResult();
+    fireEvent.press(dark.getByText("Draw"));
+    expect(dark.getAllByTestId("icon-Handshake").at(-1)!.props.color).toBe("#F59E0B");
+    dark.unmount();
+
     mockScheme = "light";
-    const screen = renderResult();
-    fireEvent.press(screen.getByText("Draw"));
-    expect(screen.getAllByTestId("icon-Handshake").at(-1)!.props.color).toBe("#F59E0B");
+    const light = renderResult();
+    fireEvent.press(light.getByText("Draw"));
+    expect(light.getAllByTestId("icon-Handshake").at(-1)!.props.color).toBe("#92400E");
+    mockScheme = "dark";
   });
 });
 

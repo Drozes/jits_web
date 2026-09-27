@@ -42,6 +42,7 @@ jest.mock("expo-haptics", () => ({
 }));
 
 jest.mock("@/lib/theme/use-theme", () => ({
+  useResolvedColorScheme: () => "light",
   useThemedTokens: () => ({ bgSecondary: "#13151B", textTertiary: "#8D929D" }),
 }));
 

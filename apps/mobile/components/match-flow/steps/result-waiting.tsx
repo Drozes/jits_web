@@ -1,6 +1,7 @@
 import { Text, View } from "react-native";
 import { formatElapsed } from "@/lib/match-flow/format-elapsed";
-import { FIGHT, FIGHT_RADIUS, TABULAR } from "../fight/fight-tokens";
+import { usePalette } from "@/lib/theme/palette";
+import { FIGHT_RADIUS, TABULAR } from "../fight/fight-tokens";
 import { FightButton, InitialsBlock, Mono, shortName } from "../fight/fight-ui";
 import type { ResultAthlete } from "./result-form";
 
@@ -29,6 +30,7 @@ export function ResultWaiting({
   /** Offered once the claim has gone a minute without a result. */
   onTakeOver?: () => void;
 }) {
+  const p = usePalette();
   const name = shortName(claimer.displayName);
   const cells = [
     { label: "ENDED AT", value: endedAtSeconds != null ? formatElapsed(endedAtSeconds) : "--:--" },
@@ -40,27 +42,27 @@ export function ResultWaiting({
       <Mono>MATCH OVER</Mono>
       <View accessibilityRole="summary" accessibilityLiveRegion="polite" style={{ alignItems: "center", gap: 24, paddingVertical: 24 }}>
         <InitialsBlock name={claimer.displayName} size={96} fontSize={32} />
-        <Text className="font-display" style={{ maxWidth: 320, textAlign: "center", fontSize: 48, lineHeight: 46, color: FIGHT.text }}>
+        <Text className="font-display" style={{ maxWidth: 320, textAlign: "center", fontSize: 48, lineHeight: 46, color: p.text }}>
           {`${name} is recording the result`}
         </Text>
         <Dots />
-        <Text className="font-body" style={{ fontSize: 15, color: FIGHT.text2, textAlign: "center" }}>
+        <Text className="font-body" style={{ fontSize: 15, color: p.text2, textAlign: "center" }}>
           You{"’"}ll confirm it in a moment.
         </Text>
       </View>
-      <View style={{ backgroundColor: FIGHT.plate, borderWidth: 1, borderColor: FIGHT.hairline, borderRadius: FIGHT_RADIUS.plate, overflow: "hidden" }}>
+      <View style={{ backgroundColor: p.plate, borderWidth: 1, borderColor: p.hairline, borderRadius: FIGHT_RADIUS.plate, overflow: "hidden" }}>
         <View style={{ flexDirection: "row" }}>
           {cells.map((c, i) => (
-            <View key={c.label} style={{ flex: 1, paddingVertical: 14, paddingHorizontal: 12, gap: 8, borderLeftWidth: i ? 1 : 0, borderColor: FIGHT.hairline }}>
-              <Mono color={FIGHT.text3}>{c.label}</Mono>
-              <Text className="font-mono-bold" style={[{ fontSize: 18, color: FIGHT.text }, TABULAR]}>
+            <View key={c.label} style={{ flex: 1, paddingVertical: 14, paddingHorizontal: 12, gap: 8, borderLeftWidth: i ? 1 : 0, borderColor: p.hairline }}>
+              <Mono color={p.text3}>{c.label}</Mono>
+              <Text className="font-mono-bold" style={[{ fontSize: 18, color: p.text }, TABULAR]}>
                 {c.value}
               </Text>
             </View>
           ))}
         </View>
-        <View style={{ padding: 12, flexDirection: "row", justifyContent: "space-between", borderTopWidth: 1, borderColor: FIGHT.hairline }}>
-          <Text numberOfLines={1} className="font-heading uppercase" style={{ flex: 1, fontSize: 13, letterSpacing: 0.52, color: FIGHT.text }}>
+        <View style={{ padding: 12, flexDirection: "row", justifyContent: "space-between", borderTopWidth: 1, borderColor: p.hairline }}>
+          <Text numberOfLines={1} className="font-heading uppercase" style={{ flex: 1, fontSize: 13, letterSpacing: 0.52, color: p.text }}>
             {`${shortName(me.displayName)} vs ${shortName(opponent.displayName)}`}
           </Text>
           <Mono size={11} spacing={0}>
@@ -70,7 +72,7 @@ export function ResultWaiting({
       </View>
       {onTakeOver ? (
         <View style={{ gap: 8 }}>
-          <Text className="font-body" style={{ fontSize: 13, color: FIGHT.text2, textAlign: "center" }}>
+          <Text className="font-body" style={{ fontSize: 13, color: p.text2, textAlign: "center" }}>
             {`Still no result from ${name}.`}
           </Text>
           <FightButton testID="result-take-over" variant="secondary" label="Record it myself" onPress={onTakeOver} />
@@ -85,10 +87,11 @@ export function ResultWaiting({
 
 /** Static: only the countdown and the verdict celebration may auto-animate. */
 function Dots() {
+  const p = usePalette();
   return (
     <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={{ flexDirection: "row", gap: 8, height: 12, alignItems: "center" }}>
       {[1, 0.6, 0.3].map((o) => (
-        <View key={o} style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: FIGHT.text, opacity: o }} />
+        <View key={o} style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: p.text, opacity: o }} />
       ))}
     </View>
   );

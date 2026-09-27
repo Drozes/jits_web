@@ -1,11 +1,12 @@
 import * as React from "react";
 import { ActivityIndicator, Pressable, Text, View, type StyleProp, type ViewStyle } from "react-native";
-import { FIGHT, FIGHT_RADIUS, TABULAR } from "./fight-tokens";
+import { ON_MEDIA, usePalette, type Palette } from "@/lib/theme/palette";
+import { FIGHT_RADIUS, TABULAR } from "./fight-tokens";
 
 /**
- * Small building blocks shared by the fight-night match-flow screens. Kept
- * deliberately plain: fixed dark colors (FIGHT), brand fonts via NativeWind
- * classes, no shadows, radius 2-4.
+ * Small building blocks shared by the match-flow screens. Kept deliberately
+ * plain: colors from the app theme (`usePalette()`, so light and dark both
+ * work), brand fonts via NativeWind classes, no shadows, radius 2-4.
  */
 
 /** "▲ +14" / "▼ −9" / "0". The minus is U+2212, as in the approved mockups. */
@@ -15,8 +16,8 @@ export function formatSignedDelta(delta: number): string {
   return "0";
 }
 
-export function deltaColor(delta: number): string {
-  return delta > 0 ? FIGHT.win : delta < 0 ? FIGHT.loss : FIGHT.text;
+export function deltaColor(delta: number, p: Palette): string {
+  return delta > 0 ? p.win : delta < 0 ? p.loss : p.text;
 }
 
 /** First letters of the first and last word: "Mina Park" -> "MP". */
@@ -49,22 +50,24 @@ interface MonoProps {
 }
 
 /** JetBrains Mono caps label. */
-export function Mono({ children, color = FIGHT.text2, size = 10, bold = false, spacing = 2.52, testID, numberOfLines, accessibilityLabel }: MonoProps) {
+export function Mono({ children, color, size = 10, bold = false, spacing = 2.52, testID, numberOfLines, accessibilityLabel }: MonoProps) {
+  const p = usePalette();
   return (
     <Text
       testID={testID}
       accessibilityLabel={accessibilityLabel}
       numberOfLines={numberOfLines}
       className={bold ? "font-mono-bold" : "font-mono-medium"}
-      style={[{ fontSize: size, letterSpacing: spacing, color }, TABULAR]}
+      style={[{ fontSize: size, letterSpacing: spacing, color: color ?? p.text2 }, TABULAR]}
     >
       {children}
     </Text>
   );
 }
 
-/** The bordered RANKED / CASUAL tag. */
+/** The bordered RANKED / CASUAL tag; `onScrim` over camera or a photo. */
 export function KindTag({ kind, onScrim = false }: { kind: "ranked" | "casual"; onScrim?: boolean }) {
+  const p = usePalette();
   return (
     <View
       style={{
@@ -72,12 +75,12 @@ export function KindTag({ kind, onScrim = false }: { kind: "ranked" | "casual"; 
         paddingHorizontal: 8,
         justifyContent: "center",
         borderWidth: 1,
-        borderColor: FIGHT.strong,
+        borderColor: onScrim ? ON_MEDIA.strong : p.strong,
         borderRadius: FIGHT_RADIUS.tag,
-        backgroundColor: onScrim ? FIGHT.glass : undefined,
+        backgroundColor: onScrim ? ON_MEDIA.tag : undefined,
       }}
     >
-      <Mono color={FIGHT.tagText}>{kind === "ranked" ? "RANKED" : "CASUAL"}</Mono>
+      <Mono color={onScrim ? ON_MEDIA.tagText : p.text2}>{kind === "ranked" ? "RANKED" : "CASUAL"}</Mono>
     </View>
   );
 }
@@ -100,9 +103,9 @@ interface FightButtonProps {
 }
 
 /**
- * The one button shape of the match flow: primary is Signal Red with dark
- * text (one per screen), secondary is the white-8 glass with a 40% border,
- * ghost is text only.
+ * The one button shape of the match flow: primary is Signal Red with the
+ * on-accent label (one per screen), secondary is a faint fill with the strong
+ * hairline, ghost is text only.
  */
 export function FightButton({
   label,
@@ -117,7 +120,8 @@ export function FightButton({
   trailing,
   style,
 }: FightButtonProps) {
-  const fg = variant === "primary" ? FIGHT.onCta : variant === "secondary" ? FIGHT.white : FIGHT.text;
+  const p = usePalette();
+  const fg = variant === "primary" ? p.onCta : p.text;
   const inert = disabled || busy;
   return (
     <Pressable
@@ -138,11 +142,11 @@ export function FightButton({
           borderRadius: FIGHT_RADIUS.button,
           opacity: disabled ? 0.5 : 1,
         },
-        variant === "primary" && { backgroundColor: pressed ? FIGHT.ctaPressed : FIGHT.cta },
+        variant === "primary" && { backgroundColor: pressed ? p.ctaPressed : p.cta },
         variant === "secondary" && {
-          backgroundColor: pressed ? FIGHT.secondaryBgPressed : FIGHT.secondaryBg,
+          backgroundColor: pressed ? p.secondaryBgPressed : p.secondaryBg,
           borderWidth: 1,
-          borderColor: FIGHT.strong,
+          borderColor: p.strong,
         },
         variant === "ghost" && { opacity: pressed ? 0.7 : disabled ? 0.5 : 1 },
         style,
@@ -180,6 +184,7 @@ export function InitialsBlock({
   accent?: string;
   style?: StyleProp<ViewStyle>;
 }) {
+  const p = usePalette();
   return (
     <View
       accessibilityElementsHidden
@@ -188,9 +193,9 @@ export function InitialsBlock({
         {
           alignItems: "center",
           justifyContent: "center",
-          backgroundColor: size === "fill" ? FIGHT.plate : FIGHT.panel,
+          backgroundColor: size === "fill" ? p.plate : p.panel,
           borderWidth: 1,
-          borderColor: FIGHT.strong,
+          borderColor: p.strong,
           borderRadius: FIGHT_RADIUS.tag,
         },
         size === "fill" ? { width: "100%" } : { width: size, height: size },
@@ -200,7 +205,7 @@ export function InitialsBlock({
     >
       <Text
         className={display ? "font-display" : "font-heading"}
-        style={{ fontSize, letterSpacing: 1, color: FIGHT.text }}
+        style={{ fontSize, letterSpacing: 1, color: p.text }}
       >
         {initialsOf(name)}
       </Text>
@@ -214,16 +219,18 @@ export function StakesStrip({
   draw,
   loss,
   height = 56,
-  background = FIGHT.plate,
+  background,
   testID,
 }: {
   win: number;
   draw: number;
   loss: number;
   height?: number;
+  /** Defaults to the plate. */
   background?: string;
   testID?: string;
 }) {
+  const p = usePalette();
   const cells = [
     { key: "win", label: "WIN", value: win },
     { key: "draw", label: "DRAW", value: draw },
@@ -235,9 +242,9 @@ export function StakesStrip({
       style={{
         height,
         flexDirection: "row",
-        backgroundColor: background,
+        backgroundColor: background ?? p.plate,
         borderWidth: 1,
-        borderColor: FIGHT.hairline,
+        borderColor: p.hairline,
         borderRadius: FIGHT_RADIUS.button,
       }}
     >
@@ -252,14 +259,14 @@ export function StakesStrip({
             justifyContent: "center",
             gap: 5,
             borderLeftWidth: i === 0 ? 0 : 1,
-            borderColor: FIGHT.hairline,
+            borderColor: p.hairline,
           }}
         >
-          <Mono color={FIGHT.text3}>{c.label}</Mono>
+          <Mono color={p.text3}>{c.label}</Mono>
           <Text
             testID={testID ? `${testID}-${c.key}` : undefined}
             className="font-mono-bold"
-            style={[{ fontSize: 16, color: c.key === "draw" ? (c.value < 0 ? FIGHT.amber : FIGHT.text) : deltaColor(c.value) }, TABULAR]}
+            style={[{ fontSize: 16, color: c.key === "draw" ? (c.value < 0 ? p.amber : p.text) : deltaColor(c.value, p) }, TABULAR]}
           >
             {formatSignedDelta(c.value)}
           </Text>
@@ -276,16 +283,15 @@ export function StatusPlate({
   align = "left",
   testID,
   accessibilityLabel,
-  pendingColor = FIGHT.amber,
 }: {
   label: string;
   done: boolean;
   align?: "left" | "right";
   testID?: string;
   accessibilityLabel?: string;
-  pendingColor?: string;
 }) {
-  const color = done ? FIGHT.win : pendingColor;
+  const p = usePalette();
+  const color = done ? p.win : p.amber;
   return (
     <View
       testID={testID}
@@ -301,7 +307,7 @@ export function StatusPlate({
         gap: 8,
         borderWidth: 1,
         borderStyle: done ? "solid" : "dashed",
-        borderColor: done ? FIGHT.winRule : pendingColor,
+        borderColor: done ? p.winRule : p.amber,
         borderRadius: FIGHT_RADIUS.button,
       }}
     >
@@ -339,6 +345,7 @@ export function RatingBlock({
   /** Replaces the rating text (the verdict ticks it in its own leaf). */
   ratingNode?: React.ReactNode;
 }) {
+  const p = usePalette();
   const ratingText =
     before != null && after != null && before !== after ? `${before} → ${after}` : after != null ? `${after}` : "";
   return (
@@ -349,23 +356,23 @@ export function RatingBlock({
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "space-between",
-        backgroundColor: FIGHT.plate,
+        backgroundColor: p.plate,
         borderWidth: 1,
-        borderColor: FIGHT.hairline,
+        borderColor: p.hairline,
         borderRadius: FIGHT_RADIUS.plate,
       }}
     >
       <View style={{ gap: 6 }}>
-        <Mono color={FIGHT.text3}>{label}</Mono>
+        <Mono color={p.text3}>{label}</Mono>
         {ratingNode ?? (
-          <Text className="font-mono-bold" style={[{ fontSize: 22, color: FIGHT.text }, TABULAR]}>
+          <Text className="font-mono-bold" style={[{ fontSize: 22, color: p.text }, TABULAR]}>
             {ratingText}
           </Text>
         )}
       </View>
       {deltaNode ??
         (delta != null && delta !== 0 ? (
-          <Text testID={deltaTestID} className="font-mono-bold" style={[{ fontSize: 26, color: deltaColor(delta) }, TABULAR]}>
+          <Text testID={deltaTestID} className="font-mono-bold" style={[{ fontSize: 26, color: deltaColor(delta, p) }, TABULAR]}>
             {formatSignedDelta(delta)}
           </Text>
         ) : null)}
