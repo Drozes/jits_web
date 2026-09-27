@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Mobile: "Your highlight" card, player and feedback sheet (jits-s6mi.10, Highlight Reels Alpha)
+
+JS-only, OTA-eligible for runtime 0.3.0 (expo-video is already embedded; no dependency, `app.json`, plugin, metro, babel or `eas.json` change). Needs jr_be B1 + B6 deployed to show anything: until `get_highlight_progress` answers, the card renders nothing.
+
+**Added**
+- Match detail shows the athlete's OWN highlight reel for each match video, after the video section (`apps/mobile/components/match-detail/highlight/`: `highlight-section.tsx`, `highlight-card.tsx`, `highlight-states.tsx`, `highlight-progress-steps.tsx`, `highlight-reel.tsx`, `highlight-reel-notes.tsx`, `highlight-player.tsx`, `highlight-frame.ts`, `highlight-feedback-row.tsx`, `highlight-thumbs.tsx`, `highlight-feedback-sheet.tsx`, `highlight-feedback-form.tsx`, `highlight-feedback-text.tsx`, `highlight-form-actions.tsx`, `highlight-regenerate-button.tsx`). Every phase from jr_be spec 014 section 10: waiting, generating (two honest steps), ready (9:16 expo-video player, muted, looping, tap to play, poster until the first frame, native fullscreen, AirPlay and PiP off), regenerating (the current version keeps playing), failed (one red "Try again" while renders remain), none, invalidated; disabled / unavailable render nothing. No share, save or export affordance anywhere.
+- Feedback: thumbs up stores a rating at once (optimistic, reverted on error); thumbs down opens "Improve your reel" preset to -1 and stores the -1 alone if the sheet is closed without submitting. The sheet has the six chips, 280-character free text with a mono counter, the one red "Regenerate (n left)" (disabled with helper at 0 left, hidden with helper when regeneration is unavailable) and "Just send feedback".
+- Orchestration hooks in `apps/mobile/lib/highlight/`: `use-my-highlight.ts` (shared progress hook + signing of the live render, one re-sign per version on a player error, refresh on return from background), `use-highlight-player.ts`, `use-highlight-rating.ts`, `use-highlight-feedback-form.ts`, `use-highlight-retry.ts`, `regenerate-mode.ts`, and all copy in `highlight-copy.ts`.
+- `apps/mobile/jest.setup.js`: a global `expo-video` stand-in (its JS entry cannot load under Jest).
+
 ### Shared: Highlight Reels Alpha client layer (jits-s6mi.9)
 
 Coded against jr_be spec 014 section 9; the backend (B1 `jr_be-15c.11`) lands in parallel.

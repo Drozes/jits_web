@@ -5,6 +5,7 @@ import { AppHeader } from "@/components/layout/app-header";
 import { MatchResultHeader } from "@/components/match-detail/match-result-header";
 import { OpponentLinkRow } from "@/components/match-detail/opponent-link-row";
 import { MatchVideoSection } from "@/components/match-detail/match-video-section";
+import { HighlightSection } from "@/components/match-detail/highlight/highlight-section";
 import {
   MatchDetailError,
   MatchDetailSkeleton,
@@ -63,6 +64,7 @@ export default function MatchDetailScreen() {
             videos={data.videos}
             onWatch={(videoId) => router.push(`/(app)/video/${videoId}`)}
           />
+          <HighlightSection videos={data.videos} />
         </ScrollView>
       ) : state === "error" ? (
         <MatchDetailError code={error?.code ?? "UNKNOWN"} onBack={goBack} onRetry={refetch} />

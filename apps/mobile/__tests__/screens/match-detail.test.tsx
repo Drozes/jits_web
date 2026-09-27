@@ -79,6 +79,20 @@ jest.mock("@jits/shared/api/queries", () => ({
   getMatchDetailView: (...a: unknown[]) => mockGetMatchDetailView(...a),
 }));
 
+// The highlight card's shared progress hook (realtime + RPC). `null` data is
+// "not loaded / read failed", which renders no card, so the suites above
+// this block see the screen exactly as before.
+let mockHighlightByVideo: Record<string, unknown> = {};
+const mockUseHighlightProgress = jest.fn((_client: unknown, id: string | null) => ({
+  data: (id && mockHighlightByVideo[id]) ?? null,
+  loading: false,
+  error: null,
+  refresh: jest.fn(),
+}));
+jest.mock("@jits/shared/hooks/use-highlight-progress", () => ({
+  useHighlightProgress: (...a: [unknown, string | null]) => mockUseHighlightProgress(...a),
+}));
+
 import MatchDetailScreen from "@/app/(app)/match-detail/[matchId]";
 
 // ---- fixtures ----
@@ -170,6 +184,7 @@ async function renderLoaded(result: unknown) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockHighlightByVideo = {};
   mockMatchId = "11111111-1111-4111-8111-111111111111";
   mockScheme = "light";
 });
@@ -382,5 +397,81 @@ describe("MatchDetailScreen", () => {
     );
     expect(src).not.toMatch(/from "@\/lib\/arena\//);
     expect(src).not.toMatch(/components\/match-flow/);
+  });
+
+  describe("Your highlight", () => {
+    function highlight(videoId: string, phase: string) {
+      return {
+        matchVideoId: videoId,
+        athleteId: "me-1",
+        enabled: phase !== "disabled",
+        phase,
+        highlightId: "h-1",
+        status: null,
+        planStatus: "planning",
+        renderTotal: 0,
+        renderMax: 10,
+        rendersRemaining: 10,
+        canRegenerate: false,
+        lastAttemptFailed: false,
+        playback: null,
+        errorMessage: null,
+        identityDisputed: false,
+        lastChangeSummary: null,
+        updatedAt: null,
+      };
+    }
+
+    it("reads the viewer's own reel for each video of the match", async () => {
+      await renderLoaded(view({ videos: [video(), video(OPP_VIDEO)] }));
+      const ids = mockUseHighlightProgress.mock.calls.map((c) => c[1]);
+      expect(ids).toEqual(expect.arrayContaining(["v-mine", "v-opp"]));
+    });
+
+    it("renders no card until progress loads, or when disabled / unavailable", async () => {
+      const utils = await renderLoaded(view());
+      expect(utils.queryByText("Your highlight")).toBeNull();
+      mockHighlightByVideo = { "v-mine": highlight("v-mine", "disabled") };
+      const again = await renderLoaded(view());
+      expect(again.queryByText("Your highlight")).toBeNull();
+      mockHighlightByVideo = { "v-mine": highlight("v-mine", "unavailable") };
+      const third = await renderLoaded(view());
+      expect(third.queryByText("Your highlight")).toBeNull();
+    });
+
+    it("renders the card after the match video section, without a red CTA while generating", async () => {
+      mockHighlightByVideo = { "v-mine": highlight("v-mine", "planning") };
+      const utils = await renderLoaded(view());
+      expect(utils.getByTestId("highlight-card-v-mine")).toBeTruthy();
+      expect(utils.getByText("Your highlight")).toBeTruthy();
+      expect(utils.getByText("GENERATING")).toBeTruthy();
+      const order: string[] = [];
+      const walk = (node: unknown): void => {
+        if (!node || typeof node !== "object") return;
+        if (Array.isArray(node)) return node.forEach(walk);
+        const n = node as { props?: { testID?: string }; children?: unknown };
+        if (n.props?.testID) order.push(n.props.testID);
+        walk(n.children);
+      };
+      walk(utils.toJSON());
+      expect(order.indexOf("match-video-card-v-mine")).toBeGreaterThanOrEqual(0);
+      expect(order.indexOf("match-video-card-v-mine")).toBeLessThan(
+        order.indexOf("highlight-card-v-mine"),
+      );
+      // Watch stays the screen's one Signal Red CTA.
+      expect(utils.queryByTestId("highlight-retry")).toBeNull();
+    });
+
+    it("labels each card with the recording when the match has two", async () => {
+      mockHighlightByVideo = {
+        "v-mine": highlight("v-mine", "none"),
+        "v-opp": highlight("v-opp", "waiting_for_analysis"),
+      };
+      const utils = await renderLoaded(view({ videos: [video(), video(OPP_VIDEO)] }));
+      expect(within(utils.getByTestId("highlight-card-v-mine")).getByText("Your recording")).toBeTruthy();
+      expect(
+        within(utils.getByTestId("highlight-card-v-opp")).getByText("Demo Red's recording"),
+      ).toBeTruthy();
+    });
   });
 });
