@@ -100,9 +100,19 @@ jest.mock("@jits/shared/api/mutations", () => ({
 jest.mock("@jits/shared/api/queries", () => ({
   getMatchDetails: jest.fn(),
   getMatchConfirmations: jest.fn(() => Promise.resolve([])),
-  // The ranked weight step's "At stake" preview; null hides the row.
+  // The ranked face-off's stakes strip; null hides it.
   getEloStakes: jest.fn(() => Promise.resolve(null)),
+  // The verdict's opening still.
+  getMatchDetailView: jest.fn(() => Promise.resolve({ ok: true, data: { videos: [] } })),
 }));
+jest.mock("@jits/shared/api/match-rank-change", () => ({
+  getMatchRankChange: jest.fn(() => Promise.resolve({ ok: false, error: { code: "UNKNOWN", message: "n/a" } })),
+}));
+jest.mock("expo-image", () => {
+  const R = require("react");
+  const RN = require("react-native");
+  return { Image: () => R.createElement(RN.View, { testID: "still-image" }) };
+});
 
 interface CapturedSyncParams {
   onReadySignal?: (athleteId: string) => void;
@@ -117,6 +127,8 @@ jest.mock("@jits/shared/hooks/use-session-match-sync", () => ({
       broadcastTimerStarted: jest.fn(),
       broadcastReady: jest.fn(),
       broadcastMatchCancelled: jest.fn(),
+      broadcastWeighedIn: jest.fn(),
+      broadcastRecordingOptIn: jest.fn(),
     };
   },
 }));
@@ -127,7 +139,6 @@ jest.mock("@/lib/match-flow/use-match-details", () => ({
 }));
 
 import { MatchFlowWizard } from "@/components/match-flow/match-flow-wizard";
-import { ReadyStep } from "@/components/match-flow/steps/ready-step";
 import { cancelSessionMatch } from "@jits/shared/api/mutations";
 import { ARENA_EXIT_LABEL, ARENA_HREF } from "@/lib/arena/constants";
 
@@ -376,7 +387,7 @@ describe("MatchFlowWizard exit navigation", () => {
     expect(mockRouterDismissTo).toHaveBeenCalledWith(ARENA_EXIT);
   });
 
-  it("offers a Rematch of the opponent that dismisses the match to the Arena (jits-00fr)", () => {
+  it("offers a Rematch of the opponent that dismisses the match to the Arena (jits-00fr)", async () => {
     mockUseMatchDetails.mockReturnValue(completedMatchResult());
 
     const { getByTestId, getByText } = render(
@@ -385,11 +396,11 @@ describe("MatchFlowWizard exit navigation", () => {
 
     const rematch = getByTestId("summary-rematch");
     expect(rematch.props.accessibilityLabel).toBe("Rematch Opponent");
-    fireEvent.press(rematch);
-    expect(mockRouterDismissTo).toHaveBeenCalledWith(`${ARENA_HREF}?rematch=opp-1`);
-    // Done and the exit cta are still there.
-    getByText("Done");
     getByText(ARENA_LABEL);
+    await act(async () => {
+      fireEvent.press(rematch);
+    });
+    await waitFor(() => expect(mockRouterDismissTo).toHaveBeenCalledWith(`${ARENA_HREF}?rematch=opp-1`));
   });
 
   it("keeps a caller label that merely has surrounding whitespace", () => {
@@ -409,55 +420,41 @@ describe("MatchFlowWizard exit navigation", () => {
   });
 });
 
-describe("ReadyStep exit navigation", () => {
-  function renderReady(exitHref: string, onCancelledRemotely: jest.Mock = jest.fn()) {
-    return render(
-      <ReadyStep
-        exitHref={exitHref}
-        onCancelledRemotely={onCancelledRemotely}
-        matchId="M1"
-        currentAthleteId="me-1"
-        opponentId="opp-1"
-        onStarted={jest.fn()}
-      />,
+describe("face-off exit navigation", () => {
+  function pendingMatch() {
+    return {
+      ...completedMatchResult(),
+      match: { ...completedMatchResult().match, status: "pending", started_at: null },
+    };
+  }
+
+  function renderOnReady(exitHref: string) {
+    mockUseMatchDetails.mockReturnValue(pendingMatch());
+    const screen = render(
+      <MatchFlowWizard exitHref={exitHref} exitLabel="Back" matchId="M1" currentAthleteId="me-1" />,
     );
+    fireEvent.press(screen.getByTestId("weight-confirm"));
+    screen.getByTestId("match-step-ready");
+    return screen;
   }
 
   it("leaves through the wizard's exit (once) when the opponent cancels", () => {
-    // The wizard's exitCancelled does the toast + navigation to exitHref and
-    // marks the wizard exiting, so the reconciler cannot exit a second time.
-    // The step itself must not navigate or toast on its own.
-    const onCancelledRemotely = jest.fn();
-    renderReady(ARENA_EXIT, onCancelledRemotely);
-
+    renderOnReady(ARENA_EXIT);
     act(() => {
       mockSyncParams?.onMatchCancelled?.();
       mockSyncParams?.onMatchCancelled?.();
     });
-
-    expect(onCancelledRemotely).toHaveBeenCalledTimes(1);
-    expect(onCancelledRemotely).toHaveBeenCalledWith("Your opponent left the ready check.");
-    expect(mockRouterDismissTo).not.toHaveBeenCalled();
+    expect(mockRouterDismissTo).toHaveBeenCalledTimes(1);
   });
 
   it.each([
     ["Arena", ARENA_EXIT],
     ["non-Arena", OTHER_EXIT],
   ])("returns to the %s exitHref when the opponent cancels", (_name, exitHref) => {
-    mockUseMatchDetails.mockReturnValue({
-      ...completedMatchResult(),
-      match: { ...completedMatchResult().match, status: "pending", started_at: null },
-    });
-    const { getByTestId } = render(
-      <MatchFlowWizard exitHref={exitHref} exitLabel="Back" matchId="M1" currentAthleteId="me-1" />,
-    );
-    fireEvent.press(getByTestId("weight-confirm"));
-    getByTestId("match-step-ready");
-
+    renderOnReady(exitHref);
     act(() => {
       mockSyncParams?.onMatchCancelled?.();
     });
-
     expect(mockRouterDismissTo).toHaveBeenCalledTimes(1);
     expect(mockRouterDismissTo).toHaveBeenCalledWith(exitHref);
   });
@@ -465,7 +462,7 @@ describe("ReadyStep exit navigation", () => {
   it.each([
     ["Arena", ARENA_EXIT],
     ["non-Arena", OTHER_EXIT],
-  ])("returns to the %s exitHref when this athlete cancels", async (_name, exitHref) => {
+  ])("Leave (the harness's 'Cancel match') returns to the %s exitHref", async (_name, exitHref) => {
     mockCancelSessionMatch.mockResolvedValue({ ok: true, data: {} });
     const alertSpy = jest
       .spyOn(Alert, "alert")
@@ -474,10 +471,25 @@ describe("ReadyStep exit navigation", () => {
         buttons?.[1]?.onPress?.();
       });
 
-    const { getByLabelText } = renderReady(exitHref);
+    const { getByLabelText } = renderOnReady(exitHref);
     fireEvent.press(getByLabelText("Cancel match"));
 
     await waitFor(() => expect(mockRouterDismissTo).toHaveBeenCalledWith(exitHref));
+    expect(alertSpy.mock.calls[0][0]).toBe("Cancel match?");
+    alertSpy.mockRestore();
+  });
+
+  it("Leave is on the weigh-in too, which used to have no way out but back (jits-bh2v)", async () => {
+    mockCancelSessionMatch.mockResolvedValue({ ok: true, data: {} });
+    const alertSpy = jest.spyOn(Alert, "alert").mockImplementation((_t, _m, buttons) => buttons?.[1]?.onPress?.());
+    mockUseMatchDetails.mockReturnValue(pendingMatch());
+    const { getByLabelText, getByTestId } = render(
+      <MatchFlowWizard exitHref={ARENA_EXIT} exitLabel="Back" matchId="M1" currentAthleteId="me-1" />,
+    );
+    getByTestId("match-step-weight");
+    fireEvent.press(getByLabelText("Cancel match"));
+    await waitFor(() => expect(mockCancelSessionMatch).toHaveBeenCalledWith(expect.anything(), "M1"));
+    await waitFor(() => expect(mockRouterDismissTo).toHaveBeenCalledWith(ARENA_EXIT));
     alertSpy.mockRestore();
   });
 });
@@ -590,7 +602,7 @@ describe("no session-lobby URL can be rebuilt in the match-flow tree", () => {
       />,
     );
     fireEvent.press(getByText(ARENA_LABEL));
-    fireEvent.press(getByText("Done"));
+    fireEvent.press(getByText("Match details"));
 
     expect(mockRouterDismissTo.mock.calls.length).toBeGreaterThan(0);
     for (const [href] of mockRouterDismissTo.mock.calls) {

@@ -10,9 +10,23 @@ import { parseFinishTime } from "./parse-finish-time";
 import { matchHaptics } from "./use-haptics";
 import { SEND_GRACE_MS, useMatchSyncContext, useStepMatchSync } from "./match-sync-context";
 
+export interface RecordedMeta {
+  /**
+   * The server confirmed the recorder's side with the result (jr_be B2), so
+   * this athlete skips the confirm step. False when the opponent's result
+   * arrived instead, when the write was queued offline, or on an older
+   * backend that does not auto-confirm.
+   */
+  recorderConfirmed: boolean;
+}
+
 interface UseRecordResultParams {
   matchId: string;
-  onRecorded: (result: BroadcastResult) => void;
+  onRecorded: (result: BroadcastResult, meta: RecordedMeta) => void;
+  /** This athlete; announced as confirmed when the server auto-confirmed. */
+  currentAthleteId?: string;
+  /** The opponent claimed the result form (claim-first entry). */
+  onResultClaimed?: (athleteId: string, claimedAt: number) => void;
 }
 
 interface SubmitParams {
@@ -32,7 +46,7 @@ interface SubmitParams {
  * key and the wizard advances optimistically; the queue auto-flushes on
  * reconnect (see `lib/network/mutation-queue.ts`).
  */
-export function useRecordResult({ matchId, onRecorded }: UseRecordResultParams) {
+export function useRecordResult({ matchId, onRecorded, currentAthleteId, onResultClaimed }: UseRecordResultParams) {
   const [loading, setLoading] = React.useState(false);
   const recordedRef = React.useRef(false);
 
@@ -42,8 +56,9 @@ export function useRecordResult({ matchId, onRecorded }: UseRecordResultParams) 
     onResultSubmitted: (r) => {
       if (recordedRef.current) return;
       recordedRef.current = true;
-      onRecorded(r);
+      onRecorded(r, { recorderConfirmed: false });
     },
+    onResultClaimed: (athleteId, claimedAt) => onResultClaimed?.(athleteId, claimedAt),
   });
 
   const submit = React.useCallback(
@@ -95,18 +110,23 @@ export function useRecordResult({ matchId, onRecorded }: UseRecordResultParams) 
       // server's ack, bounded. Offline there is nothing to wait for: the
       // opponent's wizard picks the result up from the DB (reconciler) once
       // the queued write lands.
+      const recorderConfirmed = !queued && (res.data as { recorder_confirmed?: boolean }).recorder_confirmed === true;
       const sent = sync.broadcastResultSubmitted(broadcast);
-      if (!queued) await settleWithin(sent, SEND_GRACE_MS);
+      // The server confirmed this side too: tell the opponent's confirm step
+      // now, so it shows this athlete confirmed without waiting on a poll.
+      const confirmedSent =
+        recorderConfirmed && currentAthleteId ? sync.broadcastResultConfirmed(currentAthleteId) : undefined;
+      if (!queued) await settleWithin(confirmedSent ? Promise.all([sent, confirmedSent]) : sent, SEND_GRACE_MS);
       if (queued) {
         toast.success({
           text1: "Saved locally",
           description: "Result will sync when you're back online.",
         });
       }
-      onRecorded(broadcast);
+      onRecorded(broadcast, { recorderConfirmed });
     },
-    [matchId, onRecorded, sync, reconcileNow],
+    [matchId, onRecorded, sync, reconcileNow, currentAthleteId],
   );
 
-  return { loading, submit };
+  return { loading, submit, broadcastResultClaimed: sync.broadcastResultClaimed };
 }

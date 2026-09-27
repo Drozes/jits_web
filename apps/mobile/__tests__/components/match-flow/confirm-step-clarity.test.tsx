@@ -40,9 +40,10 @@ jest.mock("@/lib/match-flow/use-haptics", () => ({
 }));
 
 const mockConfirm = jest.fn();
+const mockDispute = jest.fn();
 jest.mock("@jits/shared/api/mutations", () => ({
   confirmMatchResult: (...a: unknown[]) => mockConfirm(...a),
-  disputeMatchResult: jest.fn(),
+  disputeMatchResult: (...a: unknown[]) => mockDispute(...a),
 }));
 jest.mock("@/lib/network/mutation-queue", () => ({
   mutationQueue: { enqueue: (_k: string, fn: () => unknown) => fn() },
@@ -60,17 +61,22 @@ jest.mock("@/lib/match-flow/match-sync-context", () => ({
 import { ConfirmStep } from "@/components/match-flow/steps/confirm-step";
 import { ConfirmPanel, ResultBanner } from "@/components/match-flow/steps/confirm-step-panels";
 
-function renderStep(matchType: "ranked" | "casual" = "ranked") {
+type StepProps = React.ComponentProps<typeof ConfirmStep>;
+
+function renderStep(matchType: "ranked" | "casual" = "ranked", overrides: Partial<StepProps> = {}) {
   return render(
     <ConfirmStep
       matchId="M1"
       matchType={matchType}
-      currentAthleteId="me-1"
-      opponentId="opp-1"
-      opponentDisplayName="Demo Red"
+      me={{ athlete_id: "me-1", display_name: "Mina Park", elo_before: 1498, elo_after: 1489, elo_delta: -9 }}
+      opponent={{ athlete_id: "opp-1", display_name: "Demo Red" }}
       resultData={{ result: "submission", winnerId: "me-1" }}
       confirmedAthleteIds={[]}
+      submissionName={null}
+      finishTimeSeconds={null}
+      disputeLocksAt={null}
       onCompleted={jest.fn()}
+      {...overrides}
     />,
   );
 }
@@ -149,7 +155,56 @@ describe("ConfirmPanel states", () => {
   });
 });
 
-describe("ConfirmStep", () => {
+describe("ConfirmStep (opponent view, match-flow redesign)", () => {
+  it("shows who won, how, and the viewer's rating move; keeps the harness verdict", () => {
+    const s = renderStep("ranked", {
+      resultData: { result: "submission", winnerId: "opp-1" },
+      submissionName: "Rear-naked choke",
+      finishTimeSeconds: 377,
+    });
+    s.getByText("D. Red won");
+    s.getByText("by Rear-naked choke \u00b7 06:17");
+    expect(s.getByTestId("confirm-verdict")).toHaveTextContent("YOU LOST");
+    s.getByText("1498 \u2192 1489");
+    s.getByText("\u25bc \u22129");
+    // The heading and the red CTA both say it.
+    expect(s.getAllByText("Confirm result")).toHaveLength(2);
+  });
+
+  it("the recorder is shown already confirmed (auto-confirmed server-side)", () => {
+    const s = renderStep("ranked", { confirmedAthleteIds: ["opp-1"] });
+    s.getByText("RESULT RECORDED BY D. RED");
+    s.getByTestId("confirm-panel-opponent-confirmed");
+    s.getByText("D. RED CONFIRMED \u2713");
+    s.getByText("WAITING ON YOU");
+  });
+
+  it("dispute is a full-size secondary button with the 24 h lock note", () => {
+    const locks = new Date(Date.now() + 23.5 * 3_600_000).toISOString();
+    const s = renderStep("ranked", { disputeLocksAt: locks });
+    expect(s.getByTestId("confirm-dispute")).toBeTruthy();
+    s.getByText("Dispute result");
+    s.getByText("Locks automatically in 23 h if nobody disputes.");
+  });
+
+  it("hides dispute once the window has closed", () => {
+    const s = renderStep("ranked", { disputeLocksAt: new Date(Date.now() - 1000).toISOString() });
+    expect(s.queryByTestId("confirm-dispute")).toBeNull();
+    s.getByText("The dispute window has closed.");
+  });
+
+  it("a dispute refused with dispute_window_closed closes the form and hides dispute", async () => {
+    mockDispute.mockResolvedValue({ ok: false, error: { code: "DISPUTE_WINDOW_CLOSED", message: "Results lock 24 hours after the match." } });
+    const s = renderStep();
+    fireEvent.press(s.getByTestId("confirm-dispute"));
+    await act(async () => {
+      fireEvent.press(s.getByTestId("dispute-submit"));
+    });
+    expect(s.queryByTestId("dispute-submit")).toBeNull();
+    expect(s.queryByTestId("confirm-dispute")).toBeNull();
+    s.getByTestId("confirm-result");
+  });
+
   it("before acting: 'Your call' for the viewer, 'Confirming...' for the opponent", () => {
     const { getByTestId } = renderStep();
     getByTestId("confirm-panel-you-your-call");

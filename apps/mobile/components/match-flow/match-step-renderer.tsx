@@ -1,18 +1,20 @@
 import type { MatchStep } from "@/lib/match-flow/step-router";
 import type { BroadcastResult } from "@jits/shared/hooks/use-session-match-sync";
 import type { SubmissionType } from "@jits/shared/types/submission-type";
-import { WeightStep } from "./steps/weight-step";
-import { ReadyStep } from "./steps/ready-step";
-import { LiveStep } from "./steps/live-step";
+import type { MatchExtras } from "@/lib/match-flow/match-extras";
+import type { RecordedMeta } from "@/lib/match-flow/use-record-result";
 import { EndStep } from "./steps/end-step";
 import { ResultStep } from "./steps/result-step";
 import { ConfirmStep } from "./steps/confirm-step";
-import { SummaryStep } from "./steps/summary-step";
 import { WaitStep } from "./steps/wait-step";
+import { FaceoffBody } from "./faceoff/faceoff-body";
+import { LiveStage } from "./countdown/live-stage";
+import { VerdictStep } from "./verdict/verdict-step";
 import { useMatchUpload } from "@/lib/video/match-upload-store";
+import { deriveUploadBannerState } from "@/lib/video/upload-banner-state";
 import { useMatchRecorder } from "./match-recorder-context";
 
-interface MatchParticipant {
+export interface MatchParticipant {
   athlete_id: string;
   display_name: string;
   current_elo: number | null;
@@ -29,12 +31,13 @@ interface MatchStepRendererProps {
   step: MatchStep;
   /** Where the steps that leave the wizard navigate to. */
   exitHref: string;
-  /** Copy on the summary step's exit cta. */
+  /** Copy on the verdict's exit cta. */
   exitLabel: string;
   matchId: string;
   matchType: "ranked" | "casual";
   matchStatus: string;
   durationSeconds: number;
+  /** The server's `started_at` (the countdown and clock shift it to GO). */
   startedAt: string;
   pausedAt: string | null;
   totalPausedDuration: number;
@@ -45,8 +48,11 @@ interface MatchStepRendererProps {
   ownOutcome: "win" | "loss" | "draw" | null;
   /** Athletes with a confirmation row in the DB (from the reconciler). */
   confirmedAthleteIds: string[];
+  /** B3/B4 fields read from the match in hand (null on an older backend). */
+  extras: MatchExtras;
+  /** "Record from my phone" (decision 5). */
+  recording: boolean;
   setStep: (step: MatchStep) => void;
-  setStartedAt: (s: string) => void;
   setResultData: (r: BroadcastResult) => void;
   advanceToResult: () => void;
   /** Match clock at End Match, seeds the result step's finish time. */
@@ -54,82 +60,58 @@ interface MatchStepRendererProps {
   /** Records the match clock reading taken when the live step ended. */
   setFinishSeconds: (seconds: number) => void;
   refresh: () => void;
-  /** The opponent cancelled before the match went live (weight or ready step). */
-  onCancelledRemotely: (description?: string) => void;
+  /** Leave a guarded step on purpose ("Leave and confirm later"). */
+  onLeaveMatch?: () => void;
 }
 
-export function MatchStepRenderer({
-  step,
-  exitHref,
-  exitLabel,
-  matchId,
-  matchType,
-  matchStatus,
-  durationSeconds,
-  startedAt,
-  pausedAt,
-  totalPausedDuration,
-  me,
-  opponent,
-  submissionTypes,
-  resultData,
-  ownOutcome,
-  confirmedAthleteIds,
-  setStep,
-  setStartedAt,
-  setResultData,
-  advanceToResult,
-  initialFinishSeconds,
-  setFinishSeconds,
-  refresh,
-  onCancelledRemotely,
-}: MatchStepRendererProps) {
+/**
+ * One step at a time. The face-off header and the camera are rendered by the
+ * wizard above this (they span steps); weight and ready render the face-off
+ * body here, live renders the countdown then the frozen live screen.
+ */
+export function MatchStepRenderer(props: MatchStepRendererProps) {
+  const {
+    step,
+    exitHref,
+    exitLabel,
+    matchId,
+    matchType,
+    matchStatus,
+    durationSeconds,
+    startedAt,
+    pausedAt,
+    totalPausedDuration,
+    me,
+    opponent,
+    submissionTypes,
+    resultData,
+    ownOutcome,
+    confirmedAthleteIds,
+    extras,
+    recording,
+    setStep,
+    setResultData,
+    advanceToResult,
+    initialFinishSeconds,
+    setFinishSeconds,
+    refresh,
+    onLeaveMatch,
+  } = props;
   // One recorder for the whole wizard, owned by MatchRecorderProvider above
-  // this component; the live step drives it. The summary step's playback
-  // affordance reads the match-keyed upload store instead, because the id
-  // has to survive this subtree remounting (which the wizard does on every
-  // match) and an upload that lands after the recorder that started it.
+  // this component. The verdict reads the match-keyed upload store, which
+  // survives this subtree remounting and a late-finishing upload.
   const recorder = useMatchRecorder();
   const upload = useMatchUpload(matchId);
 
   if (step === "wait") {
     return <WaitStep message="Waiting for opponent..." allowSkip onSkip={() => setStep("weight")} />;
   }
-  if (step === "weight") {
-    return (
-      <WeightStep
-        matchId={matchId}
-        onCancelledRemotely={onCancelledRemotely}
-        currentDisplayName={me.display_name}
-        currentWeight={me.current_weight}
-        opponentDisplayName={opponent.display_name}
-        opponentWeight={opponent.current_weight}
-        currentElo={me.current_elo}
-        opponentElo={opponent.current_elo}
-        matchType={matchType}
-        onConfirm={() => setStep("ready")}
-      />
-    );
-  }
-  if (step === "ready") {
-    return (
-      <ReadyStep
-        exitHref={exitHref}
-        onCancelledRemotely={onCancelledRemotely}
-        matchId={matchId}
-        currentAthleteId={me.athlete_id}
-        opponentId={opponent.athlete_id}
-        opponentName={opponent.display_name}
-        onStarted={(s) => {
-          setStartedAt(s);
-          setStep("live");
-        }}
-      />
-    );
+  if (step === "weight" || step === "ready") {
+    return <FaceoffBody phase={step} matchType={matchType} me={me} opponent={opponent} />;
   }
   if (step === "live") {
     return (
-      <LiveStep
+      <LiveStage
         matchId={matchId}
         matchType={matchType}
         me={me}
@@ -139,6 +121,7 @@ export function MatchStepRenderer({
         pausedAt={pausedAt}
         totalPausedDuration={totalPausedDuration}
         recorder={recorder}
+        recording={recording}
         onEnded={(seconds) => {
           setFinishSeconds(seconds);
           setStep("end");
@@ -150,34 +133,53 @@ export function MatchStepRenderer({
     return <EndStep onAdvance={advanceToResult} />;
   }
   if (step === "result") {
+    const athlete = (p: MatchParticipant) => ({
+      id: p.athlete_id,
+      displayName: p.display_name,
+      elo: p.current_elo,
+      weight: p.current_weight,
+    });
     return (
       <ResultStep
         matchId={matchId}
         matchType={matchType}
         durationSeconds={durationSeconds}
         initialFinishSeconds={initialFinishSeconds}
-        participants={[
-          { id: me.athlete_id, displayName: me.display_name },
-          { id: opponent.athlete_id, displayName: opponent.display_name },
-        ]}
+        me={athlete(me)}
+        opponent={athlete(opponent)}
         submissionTypes={submissionTypes}
-        onRecorded={(r) => {
+        onLeave={onLeaveMatch}
+        onRecorded={(r: BroadcastResult, meta: RecordedMeta) => {
           setResultData(r);
-          setStep("confirm");
+          if (meta.recorderConfirmed) {
+            // Auto-confirmed server-side (B2): straight to the verdict, on
+            // the same refresh path the confirm step's completion takes.
+            refresh();
+            setStep("summary");
+          } else {
+            setStep("confirm");
+          }
         }}
       />
     );
   }
   if (step === "confirm") {
+    const submissionName =
+      extras.submissionName ??
+      (resultData?.submissionCode
+        ? (submissionTypes.find((t) => t.code === resultData.submissionCode)?.display_name ?? null)
+        : null);
     return (
       <ConfirmStep
         matchId={matchId}
         matchType={matchType}
-        currentAthleteId={me.athlete_id}
-        opponentId={opponent.athlete_id}
-        opponentDisplayName={opponent.display_name}
+        me={me}
+        opponent={opponent}
         resultData={resultData}
         confirmedAthleteIds={confirmedAthleteIds}
+        submissionName={submissionName}
+        finishTimeSeconds={extras.finishTimeSeconds ?? resultData?.finishTimeSeconds ?? null}
+        disputeLocksAt={extras.disputeLocksAt}
         onCompleted={() => {
           refresh();
           setStep("summary");
@@ -186,33 +188,25 @@ export function MatchStepRenderer({
     );
   }
   if (step === "summary") {
-    // For ranked matches the BE stamps authoritative elo_before / elo_after on
-    // the participant when the result is recorded; `current_elo` is already the
-    // post-match rating after refresh(), so we use the stamped fields directly
-    // rather than re-deriving them (which would double-count the delta).
-    const isRanked = matchType === "ranked";
-    const eloBefore = isRanked ? me.elo_before : null;
-    const eloAfter = isRanked ? me.elo_after : null;
-    const eloDelta = isRanked ? me.elo_delta ?? null : null;
-    // BE-stamped IBJJF division gap (same value for both athletes). Surfaced
-    // only for ranked matches where it actually adjusts the phantom ELO.
-    const weightDivisionGap = isRanked ? me.weight_division_gap ?? null : null;
+    const submissionName =
+      extras.submissionName ??
+      (resultData?.submissionCode
+        ? (submissionTypes.find((t) => t.code === resultData.submissionCode)?.display_name ?? null)
+        : null);
     return (
-      <SummaryStep
+      <VerdictStep
         matchId={matchId}
         exitHref={exitHref}
         exitLabel={exitLabel}
         matchType={matchType}
         matchStatus={matchStatus}
         outcome={ownOutcome}
-        eloDelta={eloDelta}
-        eloBefore={eloBefore}
-        eloAfter={eloAfter ?? me.current_elo}
-        weightDivisionGap={weightDivisionGap}
-        videoId={upload?.videoId ?? null}
-        videoPending={upload?.status === "uploading" || recorder.state === "stopping"}
-        opponentId={opponent.athlete_id}
-        opponentName={opponent.display_name}
+        me={me}
+        opponent={opponent}
+        submissionName={submissionName}
+        finishTimeSeconds={extras.finishTimeSeconds ?? resultData?.finishTimeSeconds ?? null}
+        upload={deriveUploadBannerState(recorder.state, recorder.error, upload)}
+        uploadedVideoId={upload?.status === "uploaded" ? (upload.videoId ?? null) : null}
       />
     );
   }

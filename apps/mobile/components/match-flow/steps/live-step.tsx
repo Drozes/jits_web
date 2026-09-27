@@ -39,6 +39,12 @@ interface LiveStepProps {
    * match clock at that moment (pause-aware, clamped to 1..duration) so the
    * result step can prefill the finish time. */
   onEnded: (finishSeconds: number) => void;
+  /**
+   * Record from this phone (the face-off opt-in, decision 5). Default true.
+   * False never arms the recorder and shows the no-video plate's "recording
+   * off" state instead of the camera.
+   */
+  recordingEnabled?: boolean;
 }
 
 const TIME_WARNING_SECONDS = 10;
@@ -74,6 +80,7 @@ export function LiveStep(props: LiveStepProps) {
     totalPausedDuration,
     recorder,
     onEnded,
+    recordingEnabled = true,
   } = props;
   const endedRef = React.useRef(false);
   const startHapticFiredRef = React.useRef(false);
@@ -176,12 +183,13 @@ export function LiveStep(props: LiveStepProps) {
   // opponent-ended interstitial must not start a clip after the stop.
   const expired = timer.remaining === 0;
   React.useEffect(() => {
+    if (!recordingEnabled) return;
     if (recordingStartedRef.current || endedRef.current) return;
     if (!recorder.permission?.granted) return;
     if (expired) return;
     recordingStartedRef.current = true;
     void recorder.start();
-  }, [recorder.permission?.granted, recorder, expired]);
+  }, [recorder.permission?.granted, recorder, expired, recordingEnabled]);
 
   // Time-warning haptic once at <= 10s remaining, on a ticking clock (not on
   // mounting into a match already paused inside the last 10 s), and never
@@ -255,6 +263,7 @@ export function LiveStep(props: LiveStepProps) {
         onPauseResume={handlePauseResume}
         onEnd={onHoldEnd}
         opponentEnded={opponentEnded}
+        recordingOff={!recordingEnabled}
       />
     </View>
   );

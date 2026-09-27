@@ -11,7 +11,7 @@ export type StripVariant = "hold" | "paused" | "timeup" | "final10" | "starting"
 export type TallyVariant = "rec" | "starting" | "noVideo" | "saving";
 export type SlabLabel = "live" | "paused" | "time" | "final";
 export type CameraTreatment = "live" | "starting-dim" | "saving-dim" | "unavailable";
-export type UnavailableVariant = "canAsk" | "denied" | "error";
+export type UnavailableVariant = "canAsk" | "denied" | "error" | "off";
 
 export interface LiveViewInput {
   remaining: number;
@@ -26,6 +26,8 @@ export interface LiveViewInput {
    * duration cap), not that the camera is still starting.
    */
   hasRecorded: boolean;
+  /** The athlete opted out of recording from this phone: no camera at all. */
+  recordingOff?: boolean;
 }
 
 export interface LiveView {
@@ -48,12 +50,14 @@ const SAVING_STATES: ReadonlySet<RecordingState> = new Set<RecordingState>([
 
 /** Everything the live broadcast screen shows, derived from the live state. */
 export function deriveLiveView(input: LiveViewInput): LiveView {
-  const { remaining, paused, holding, recorderState, permission, opponentEnded, hasRecorded } = input;
-  const granted = permission?.granted ?? false;
+  const { remaining, paused, holding, recorderState, permission, opponentEnded, hasRecorded, recordingOff = false } = input;
+  // Opted out reads as a camera that is not there, whatever the permission.
+  const granted = !recordingOff && (permission?.granted ?? false);
   const autoEndPending = remaining === 0 && !paused && !opponentEnded;
 
   let unavailable: UnavailableVariant | null = null;
-  if (!granted) unavailable = permission?.canAskAgain === false ? "denied" : "canAsk";
+  if (recordingOff) unavailable = "off";
+  else if (!granted) unavailable = permission?.canAskAgain === false ? "denied" : "canAsk";
   else if (recorderState === "error") unavailable = "error";
 
   // Only before the first recording: the live step never restarts one.
