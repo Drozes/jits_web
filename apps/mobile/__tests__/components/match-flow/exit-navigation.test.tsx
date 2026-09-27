@@ -388,6 +388,14 @@ describe("MatchFlowWizard exit navigation", () => {
     expect(mockRouterDismissTo).toHaveBeenCalledWith(ARENA_EXIT);
   });
 
+  it("resets the scroll to the top on entering the verdict, so its hero and status bar start at y 0", () => {
+    mockUseMatchDetails.mockReturnValue(completedMatchResult());
+    const scrollTo = (require("react-native").ScrollView.prototype as { scrollTo: jest.Mock }).scrollTo;
+    scrollTo.mockClear();
+    render(<MatchFlowWizard exitHref={ARENA_EXIT} exitLabel={ARENA_LABEL} matchId="M1" currentAthleteId="me-1" />);
+    expect(scrollTo).toHaveBeenCalledWith({ y: 0, animated: false });
+  });
+
   it("offers a Rematch of the opponent that dismisses the match to the Arena (jits-00fr)", async () => {
     mockUseMatchDetails.mockReturnValue(completedMatchResult());
 

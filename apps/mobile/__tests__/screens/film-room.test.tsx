@@ -87,7 +87,10 @@ function library() {
 async function renderLoaded(result: unknown = page(library())) {
   mockGetMyMatchLibrary.mockResolvedValue(result);
   const utils = render(<FilmRoomScreen />);
-  await waitFor(() => expect(utils.queryByTestId("film-room-loading")).toBeNull());
+  // The first page resolves on a microtask, but the whole grid mounts before
+  // the skeleton goes: under a full parallel run that can pass the 1 s
+  // waitFor default, so give it room.
+  await waitFor(() => expect(utils.queryByTestId("film-room-loading")).toBeNull(), { timeout: 5000 });
   return utils;
 }
 

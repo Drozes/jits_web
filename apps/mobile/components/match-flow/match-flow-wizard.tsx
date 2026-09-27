@@ -164,7 +164,10 @@ export function MatchFlowWizard({
   // tree as is, so the camera is not remounted.
   const scrollRef = React.useRef<ScrollView>(null);
   React.useEffect(() => {
-    if (step === "live") scrollRef.current?.scrollTo({ y: 0, animated: false });
+    // The verdict too: its hero, and its status bar over it, start at y 0
+    // (VerdictStep's pastHero starts false), never at the offset the
+    // confirm or result step left behind.
+    if (step === "live" || step === "summary") scrollRef.current?.scrollTo({ y: 0, animated: false });
   }, [step]);
 
   const advanceToResult = React.useCallback(() => setStep("result"), [setStep]);

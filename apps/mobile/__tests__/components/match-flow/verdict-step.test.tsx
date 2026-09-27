@@ -391,6 +391,7 @@ describe("status bar over the opening still", () => {
       </Harness>,
     );
     await waitFor(() => expect(s.getByTestId("verdict-still")).toBeTruthy());
+    // Mounts at y 0 (the wizard resets the scroll on summary): pastHero is false.
     expect(mockStatusBar).toHaveBeenLastCalledWith("light");
     // HERO_HEIGHT 360 - 75 - top inset 0: where the bottom scrim is solid.
     scrollTo(ref.current!, 200);
