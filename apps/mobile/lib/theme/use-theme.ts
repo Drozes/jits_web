@@ -29,8 +29,8 @@ const THEME_STORAGE_KEY = "elo-rated-theme-preference";
  */
 export function useResolvedColorScheme(): ColorScheme {
   const { colorScheme } = useColorScheme();
-  // A subtree pinned to one scheme (the match flow's fight-night dark,
-  // `ForceDarkTheme`) wins over the system / user preference.
+  // A subtree pinned to one scheme (`ForceDarkTheme`, over full-screen
+  // video) wins over the system / user preference.
   const forced = React.useContext(ForcedSchemeContext);
   if (forced) return forced;
   return colorScheme === "dark" ? "dark" : "light";

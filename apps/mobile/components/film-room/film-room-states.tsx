@@ -1,19 +1,20 @@
 import * as React from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { SkeletonBlock, SkeletonProvider } from "@/components/ui/skeleton";
-import { FILM } from "@/lib/film-room/film-palette";
+import { usePalette } from "@/lib/theme/palette";
 import { matchCountLabel } from "@/lib/film-room/format";
 
 /** "SEPTEMBER 2026 ──────── 6 MATCHES"; count null when the month may be incomplete. */
 export function MonthHeader({ label, count }: { label: string; count: number | null }) {
+  const p = usePalette();
   return (
     <View className="flex-row items-center" style={{ gap: 10, marginTop: 22, marginBottom: 12 }}>
-      <Text accessibilityRole="header" className="font-mono-bold" style={{ fontSize: 10, letterSpacing: 2.52, color: FILM.text2 }}>
+      <Text accessibilityRole="header" className="font-mono-bold" style={{ fontSize: 10, letterSpacing: 2.52, color: p.text2 }}>
         {label}
       </Text>
-      <View style={{ flex: 1, height: 1, backgroundColor: FILM.hairline }} />
+      <View style={{ flex: 1, height: 1, backgroundColor: p.hairline }} />
       {count != null ? (
-        <Text className="font-mono-medium" style={{ fontSize: 10, letterSpacing: 1.68, color: FILM.text3 }}>
+        <Text className="font-mono-medium" style={{ fontSize: 10, letterSpacing: 1.68, color: p.text3 }}>
           {matchCountLabel(count)}
         </Text>
       ) : null}
@@ -39,17 +40,18 @@ export function FilmRoomSkeleton() {
 }
 
 function Panel({ testID, title, body, action }: { testID: string; title: string; body: string; action?: { label: string; onPress: () => void } }) {
+  const p = usePalette();
   return (
     <View testID={testID} className="items-center" style={{ marginTop: 48, paddingHorizontal: 24, gap: 8 }}>
-      <Text className="font-mono-bold text-center" style={{ fontSize: 11, letterSpacing: 1.68, color: FILM.text }}>
+      <Text className="font-mono-bold text-center" style={{ fontSize: 11, letterSpacing: 1.68, color: p.text }}>
         {title}
       </Text>
-      <Text className="font-body text-center" style={{ fontSize: 13, lineHeight: 19, color: FILM.text2 }}>
+      <Text className="font-body text-center" style={{ fontSize: 13, lineHeight: 19, color: p.text2 }}>
         {body}
       </Text>
       {action ? (
         <Pressable accessibilityRole="button" accessibilityLabel={action.label} onPress={action.onPress} hitSlop={{ top: 14, bottom: 14, left: 8, right: 8 }} className="active:opacity-70" style={{ marginTop: 8 }}>
-          <Text className="font-mono-bold uppercase" style={{ fontSize: 10, letterSpacing: 1.68, color: FILM.redText }}>
+          <Text className="font-mono-bold uppercase" style={{ fontSize: 10, letterSpacing: 1.68, color: p.red }}>
             {action.label}
           </Text>
         </Pressable>
@@ -85,17 +87,18 @@ export function FilmRoomError({ onRetry }: { onRetry: () => void }) {
 
 /** Below the grid: a spinner while paging, a retry after a failed page. */
 export function ListFooter({ loadingMore, moreError, onRetry }: { loadingMore: boolean; moreError: boolean; onRetry: () => void }) {
+  const p = usePalette();
   if (loadingMore) {
     return (
       <View testID="film-room-loading-more" style={{ paddingVertical: 24 }}>
-        <ActivityIndicator color={FILM.text2} />
+        <ActivityIndicator color={p.text2} />
       </View>
     );
   }
   if (moreError) {
     return (
       <Pressable testID="film-room-more-retry" accessibilityRole="button" onPress={onRetry} className="items-center active:opacity-70" style={{ paddingVertical: 24 }}>
-        <Text className="font-mono-bold" style={{ fontSize: 10, letterSpacing: 1.68, color: FILM.text2 }}>
+        <Text className="font-mono-bold" style={{ fontSize: 10, letterSpacing: 1.68, color: p.text2 }}>
           COULDN'T LOAD MORE. TAP TO RETRY
         </Text>
       </Pressable>

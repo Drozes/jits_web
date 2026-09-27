@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Pressable, ScrollView, Text } from "react-native";
-import { FILM } from "@/lib/film-room/film-palette";
+import { usePalette } from "@/lib/theme/palette";
 import type { LibraryFilter, OutcomeFilter } from "@/lib/film-room/rows";
 
 const OUTCOMES: { id: OutcomeFilter; label: string }[] = [
@@ -11,6 +11,7 @@ const OUTCOMES: { id: OutcomeFilter; label: string }[] = [
 ];
 
 function Chip({ label, on, onPress, testID, a11y, role = "tab" }: { label: string; on: boolean; onPress: () => void; testID: string; a11y?: string; role?: "tab" | "button" }) {
+  const p = usePalette();
   return (
     <Pressable
       testID={testID}
@@ -26,11 +27,11 @@ function Chip({ label, on, onPress, testID, a11y, role = "tab" }: { label: strin
         borderRadius: 2,
         justifyContent: "center",
         borderWidth: 1,
-        borderColor: on ? FILM.text : FILM.strong,
-        backgroundColor: on ? FILM.text : FILM.glass,
+        borderColor: on ? p.text : p.strong,
+        backgroundColor: on ? p.text : p.secondaryBg,
       }}
     >
-      <Text className="font-mono-bold uppercase" style={{ fontSize: 11, letterSpacing: 1.68, color: on ? FILM.ink : FILM.text }}>
+      <Text className="font-mono-bold uppercase" style={{ fontSize: 11, letterSpacing: 1.68, color: on ? p.bg : p.text }}>
         {label}
       </Text>
     </Pressable>

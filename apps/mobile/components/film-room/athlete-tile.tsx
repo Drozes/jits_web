@@ -3,7 +3,7 @@ import { Text, View } from "react-native";
 import { Image } from "expo-image";
 import { getInitials } from "@jits/shared/utils";
 import { athletePhotoSource } from "@/lib/athlete-photo";
-import { FILM } from "@/lib/film-room/film-palette";
+import { usePalette } from "@/lib/theme/palette";
 
 interface AthleteTileProps {
   name: string;
@@ -16,6 +16,7 @@ interface AthleteTileProps {
  * one, else initials in DM Sans on the panel color, 1 px strong border.
  */
 export function AthleteTile({ name, photoUrl, size }: AthleteTileProps) {
+  const p = usePalette();
   const src = athletePhotoSource(photoUrl);
   return (
     <View
@@ -25,8 +26,8 @@ export function AthleteTile({ name, photoUrl, size }: AthleteTileProps) {
         height: size,
         borderRadius: 2,
         borderWidth: 1,
-        borderColor: FILM.strong,
-        backgroundColor: FILM.panel,
+        borderColor: p.strong,
+        backgroundColor: p.panel,
         alignItems: "center",
         justifyContent: "center",
         overflow: "hidden",

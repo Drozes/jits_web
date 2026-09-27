@@ -1,15 +1,17 @@
 import * as React from "react";
 import { Pressable, Text, View } from "react-native";
 import type { MatchLibraryItem } from "@jits/shared/api/film-room";
-import { FILM, TABULAR } from "@/lib/film-room/film-palette";
+import { ON_MEDIA, TABULAR, usePalette } from "@/lib/theme/palette";
 import { cardLine, outcomeLetter, outcomeWord, shortDate, shortName } from "@/lib/film-room/format";
 import { statusBadgeLabel, uploadingLabel, type CardStatus } from "@/lib/film-room/card-status";
 import { OpeningStill, type StillAthlete } from "./opening-still";
 import { FilmScrim } from "./film-scrim";
 import { FilmBadge, toneFor } from "./status-badge";
 
-const OUTCOME_COLOR = { W: FILM.win, L: FILM.redText, D: FILM.text } as const;
-const TAG_BORDER = { W: FILM.win, L: "rgba(240,85,107,0.7)", D: FILM.strong } as const;
+// The W/L/D tag and the bottom lines sit on the poster's black scrim, so they
+// keep the on-film colors in both themes.
+const OUTCOME_COLOR = { W: ON_MEDIA.win, L: ON_MEDIA.red, D: ON_MEDIA.text } as const;
+const TAG_BORDER = { W: ON_MEDIA.win, L: ON_MEDIA.redRule, D: ON_MEDIA.strong } as const;
 
 interface PosterCardProps {
   item: MatchLibraryItem;
@@ -54,6 +56,7 @@ function fallbackLabel(item: MatchLibraryItem, status: CardStatus): string {
  * badges share a row even on a narrow card.
  */
 export const PosterCard = React.memo(function PosterCard({ item, status, viewer, onPress, testID, accessibilityLabel, variant = "grid" }: PosterCardProps) {
+  const p = usePalette();
   const compact = variant === "compact";
   const letter = outcomeLetter(item.outcome);
   const poster = item.videos.find((v) => v.poster_url) ?? null;
@@ -75,7 +78,7 @@ export const PosterCard = React.memo(function PosterCard({ item, status, viewer,
         .join(", ")}
       onPress={onPress}
       className="flex-1 overflow-hidden active:opacity-80"
-      style={{ aspectRatio: 3 / 4, borderRadius: 3, borderWidth: 1, borderColor: FILM.hairline, backgroundColor: FILM.plate }}
+      style={{ aspectRatio: 3 / 4, borderRadius: 3, borderWidth: 1, borderColor: p.hairline, backgroundColor: p.plate }}
     >
       <OpeningStill
         posterUrl={poster?.poster_url ?? null}
@@ -98,14 +101,14 @@ export const PosterCard = React.memo(function PosterCard({ item, status, viewer,
       ) : null}
       {uploading && poster ? (
         <View testID="film-card-uploading" style={{ position: "absolute", left: 10, right: 10, top: "38%", alignItems: "center", gap: 6 }}>
-          <Text className="font-mono-bold" style={{ fontSize: 10, letterSpacing: 2.2, color: FILM.amber }}>
+          <Text className="font-mono-bold" style={{ fontSize: 10, letterSpacing: 2.2, color: p.amber }}>
             {uploadingLabel(progress)}
           </Text>
         </View>
       ) : null}
       {uploading && progress != null ? (
-        <View style={{ position: "absolute", left: 0, right: 0, top: 0, height: 3, backgroundColor: FILM.track }}>
-          <View testID="film-card-progress" style={{ width: `${Math.round(progress * 100)}%`, height: 3, backgroundColor: FILM.amber }} />
+        <View style={{ position: "absolute", left: 0, right: 0, top: 0, height: 3, backgroundColor: p.track }}>
+          <View testID="film-card-progress" style={{ width: `${Math.round(progress * 100)}%`, height: 3, backgroundColor: p.amber }} />
         </View>
       ) : null}
 
@@ -113,22 +116,22 @@ export const PosterCard = React.memo(function PosterCard({ item, status, viewer,
         <View className="flex-row items-center" style={{ gap: 7, minWidth: 0 }}>
           {letter ? (
             <View
-              style={{ height: 20, minWidth: 20, paddingHorizontal: 5, borderRadius: 2, borderWidth: 1, borderColor: TAG_BORDER[letter], backgroundColor: FILM.tag, alignItems: "center", justifyContent: "center" }}
+              style={{ height: 20, minWidth: 20, paddingHorizontal: 5, borderRadius: 2, borderWidth: 1, borderColor: TAG_BORDER[letter], backgroundColor: ON_MEDIA.tag, alignItems: "center", justifyContent: "center" }}
             >
               <Text className="font-mono-bold" style={{ fontSize: 11, color: OUTCOME_COLOR[letter] }}>
                 {letter}
               </Text>
             </View>
           ) : null}
-          <Text numberOfLines={1} className="flex-1 font-heading uppercase" style={{ fontSize: 13, letterSpacing: 0.52, color: FILM.white }}>
+          <Text numberOfLines={1} className="flex-1 font-heading uppercase" style={{ fontSize: 13, letterSpacing: 0.52, color: ON_MEDIA.white }}>
             {opp}
           </Text>
         </View>
         <View className="flex-row items-center justify-between" style={{ gap: 6 }}>
-          <Text numberOfLines={1} className="font-mono-bold" style={[{ fontSize: 11, letterSpacing: 0.4, color: letter ? OUTCOME_COLOR[letter] : FILM.text }, TABULAR]}>
+          <Text numberOfLines={1} className="font-mono-bold" style={[{ fontSize: 11, letterSpacing: 0.4, color: letter ? OUTCOME_COLOR[letter] : ON_MEDIA.text }, TABULAR]}>
             {line}
           </Text>
-          <Text className="font-mono-medium" style={[{ fontSize: 10, letterSpacing: 1.2, color: FILM.text2 }, TABULAR]}>
+          <Text className="font-mono-medium" style={[{ fontSize: 10, letterSpacing: 1.2, color: ON_MEDIA.text2 }, TABULAR]}>
             {date}
           </Text>
         </View>

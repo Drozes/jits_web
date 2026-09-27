@@ -3,7 +3,7 @@ import { Pressable, Text, View } from "react-native";
 import { PlayCircle } from "lucide-react-native";
 import { formatVideoDuration } from "@jits/shared/utils";
 import type { MatchDetailVideo } from "@jits/shared/api/queries";
-import { FILM, TABULAR } from "@/lib/film-room/film-palette";
+import { usePalette, TABULAR, type Palette } from "@/lib/theme/palette";
 import { angleName } from "@/components/film-room/angle-switcher";
 
 /** "Your recording" reads "Watch your recording"; a name keeps its case. */
@@ -13,12 +13,12 @@ export function watchLabel(angleLabel: string): string {
 
 const PIPELINE = new Set(["processing", "slicing", "analyzing", "merging"]);
 
-function statusOf(v: MatchDetailVideo): { text: string; color: string } {
-  if (v.playability === "processing") return { text: v.status === "uploading" ? "UPLOADING" : "PROCESSING", color: FILM.amber };
-  if (v.playability === "failed") return { text: "ANALYSIS FAILED · MAY STILL PLAY", color: FILM.redText };
-  if (v.has_analysis) return { text: "BREAKDOWN READY", color: FILM.text2 };
-  if (PIPELINE.has(v.status)) return { text: "ANALYZING", color: FILM.amber };
-  return { text: "READY TO WATCH", color: FILM.text2 };
+function statusOf(v: MatchDetailVideo, p: Palette): { text: string; color: string } {
+  if (v.playability === "processing") return { text: v.status === "uploading" ? "UPLOADING" : "PROCESSING", color: p.amber };
+  if (v.playability === "failed") return { text: "ANALYSIS FAILED · MAY STILL PLAY", color: p.red };
+  if (v.has_analysis) return { text: "BREAKDOWN READY", color: p.text2 };
+  if (PIPELINE.has(v.status)) return { text: "ANALYZING", color: p.amber };
+  return { text: "READY TO WATCH", color: p.text2 };
 }
 
 interface FilmAnglesProps {
@@ -34,15 +34,16 @@ interface FilmAnglesProps {
  * recording", and a disabled "Processing" while the clip is still uploading.
  */
 export function FilmAngles({ videos, opponentName, onWatch }: FilmAnglesProps) {
+  const p = usePalette();
   return (
     <View testID="film-angles" style={{ gap: 10 }}>
-      <Text accessibilityRole="header" className="font-mono-bold" style={{ fontSize: 10, letterSpacing: 2.52, color: FILM.text }}>
+      <Text accessibilityRole="header" className="font-mono-bold" style={{ fontSize: 10, letterSpacing: 2.52, color: p.text }}>
         {videos.length > 1 ? "FILM · 2 ANGLES" : "FILM"}
       </Text>
-      <View style={{ borderTopWidth: 1, borderTopColor: FILM.hairline }}>
+      <View style={{ borderTopWidth: 1, borderTopColor: p.hairline }}>
         {videos.map((v) => {
           const processing = v.playability === "processing";
-          const status = statusOf(v);
+          const status = statusOf(v, p);
           const duration = formatVideoDuration(v.duration_seconds);
           return (
             <Pressable
@@ -54,10 +55,10 @@ export function FilmAngles({ videos, opponentName, onWatch }: FilmAnglesProps) {
               disabled={processing}
               onPress={() => onWatch(v.id)}
               className="flex-row items-center active:opacity-70"
-              style={{ minHeight: 60, gap: 12, borderBottomWidth: 1, borderBottomColor: FILM.hairline, opacity: processing ? 0.7 : 1 }}
+              style={{ minHeight: 60, gap: 12, borderBottomWidth: 1, borderBottomColor: p.hairline, opacity: processing ? 0.7 : 1 }}
             >
               <View className="flex-1 min-w-0" style={{ gap: 5 }}>
-                <Text numberOfLines={1} className="font-heading" style={{ fontSize: 14, letterSpacing: 0.4, color: FILM.text }}>
+                <Text numberOfLines={1} className="font-heading" style={{ fontSize: 14, letterSpacing: 0.4, color: p.text }}>
                   {angleName(v, opponentName)}
                 </Text>
                 <Text numberOfLines={1} className="font-mono-bold" style={{ fontSize: 9, letterSpacing: 1.6, color: status.color }}>
@@ -65,11 +66,11 @@ export function FilmAngles({ videos, opponentName, onWatch }: FilmAnglesProps) {
                 </Text>
               </View>
               {duration ? (
-                <Text className="font-mono-medium" style={[{ fontSize: 12, color: FILM.text2 }, TABULAR]}>
+                <Text className="font-mono-medium" style={[{ fontSize: 12, color: p.text2 }, TABULAR]}>
                   {duration}
                 </Text>
               ) : null}
-              {processing ? null : <PlayCircle size={22} color={FILM.text} />}
+              {processing ? null : <PlayCircle size={22} color={p.text} />}
             </Pressable>
           );
         })}

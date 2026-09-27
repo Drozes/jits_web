@@ -1,7 +1,7 @@
 import * as React from "react";
 import { Text, View } from "react-native";
 import { Image } from "expo-image";
-import { FILM } from "@/lib/film-room/film-palette";
+import { usePalette } from "@/lib/theme/palette";
 import { AthleteTile } from "./athlete-tile";
 
 export interface StillAthlete {
@@ -42,6 +42,7 @@ export function OpeningStill({
   dim = false,
   testID = "opening-still",
 }: OpeningStillProps) {
+  const p = usePalette();
   if (posterUrl) {
     return (
       <Image
@@ -57,12 +58,12 @@ export function OpeningStill({
   return (
     <View
       testID={`${testID}-fallback`}
-      style={{ position: "absolute", left: 0, top: 0, right: 0, bottom: 0, backgroundColor: FILM.plate }}
+      style={{ position: "absolute", left: 0, top: 0, right: 0, bottom: 0, backgroundColor: p.plate }}
       className="items-center justify-center"
     >
       <View className="flex-row items-center" style={{ gap: Math.round(tileSize * 0.2) }}>
         <AthleteTile name={me.name} photoUrl={me.photoUrl} size={tileSize} />
-        <Text className="font-display" style={{ color: FILM.redText, fontSize: Math.round(tileSize * 0.3) }}>
+        <Text className="font-display" style={{ color: p.red, fontSize: Math.round(tileSize * 0.3) }}>
           VS
         </Text>
         <AthleteTile name={opponent?.name ?? "Opponent"} photoUrl={opponent?.photoUrl} size={tileSize} />
@@ -70,7 +71,7 @@ export function OpeningStill({
       <Text
         numberOfLines={2}
         className="font-mono-medium text-center"
-        style={{ marginTop: 12, paddingHorizontal: 12, fontSize: 9, letterSpacing: 2, color: FILM.text2 }}
+        style={{ marginTop: 12, paddingHorizontal: 12, fontSize: 9, letterSpacing: 2, color: p.text2 }}
       >
         {fallbackLabel}
       </Text>

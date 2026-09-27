@@ -65,10 +65,8 @@ export function buildVars(t: typeof lightTokens) {
 
 const lightVarsStyle = buildVars(lightTokens);
 /**
- * The dark token set as a vars() style. Exported for surfaces that are dark
- * in both app themes: the Film Room (a View carrying it re-points every
- * semantic class below it, `bg-surface`, `text-ink`, ..., at the dark values)
- * and `ForceDarkTheme` (lib/theme/force-dark-theme.tsx) for the match flow.
+ * The dark token set as a vars() style. Exported for `ForceDarkTheme`
+ * (lib/theme/force-dark-theme.tsx), which pins full-screen video dark.
  */
 export const darkVarsStyle = buildVars(darkTokens);
 

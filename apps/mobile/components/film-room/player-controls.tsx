@@ -2,7 +2,7 @@ import * as React from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { Pause, Play, RotateCcw, RotateCw } from "lucide-react-native";
 import { formatClock, type KeyMoment } from "@jits/shared/utils";
-import { FILM, TABULAR } from "@/lib/film-room/film-palette";
+import { ON_MEDIA, TABULAR } from "@/lib/theme/palette";
 
 /** Playback speeds the speed button cycles through (slow motion for study). */
 export const SPEEDS = [1, 0.5, 0.25, 2] as const;
@@ -23,8 +23,8 @@ function SkipButton({ dir, onPress }: { dir: "back" | "forward"; onPress: () => 
       className="items-center justify-center active:opacity-70"
       style={{ width: 56, height: 56 }}
     >
-      <Icon size={28} color={FILM.white} strokeWidth={2} />
-      <Text className="font-mono-bold" style={{ position: "absolute", fontSize: 8, color: FILM.white, top: 23 }}>
+      <Icon size={28} color={ON_MEDIA.white} strokeWidth={2} />
+      <Text className="font-mono-bold" style={{ position: "absolute", fontSize: 8, color: ON_MEDIA.white, top: 23 }}>
         10
       </Text>
     </Pressable>
@@ -50,13 +50,13 @@ export function Transport({ playing, speed, onToggle, onSkip, onSpeed }: Transpo
         accessibilityLabel={playing ? "Pause" : "Play"}
         onPress={onToggle}
         className="items-center justify-center active:opacity-80"
-        style={{ width: 72, height: 72, borderRadius: 36, borderWidth: 1, borderColor: FILM.strong, backgroundColor: FILM.glassStrong }}
+        style={{ width: 72, height: 72, borderRadius: 36, borderWidth: 1, borderColor: ON_MEDIA.strong, backgroundColor: ON_MEDIA.glassStrong }}
       >
         {playing ? (
-          <Pause size={28} color={FILM.white} fill={FILM.white} />
+          <Pause size={28} color={ON_MEDIA.white} fill={ON_MEDIA.white} />
         ) : (
           <View style={{ marginLeft: 4 }}>
-            <Play size={28} color={FILM.white} fill={FILM.white} />
+            <Play size={28} color={ON_MEDIA.white} fill={ON_MEDIA.white} />
           </View>
         )}
       </Pressable>
@@ -67,9 +67,9 @@ export function Transport({ playing, speed, onToggle, onSkip, onSpeed }: Transpo
         accessibilityLabel={`Playback speed, ${speed}x`}
         onPress={onSpeed}
         className="items-center justify-center active:opacity-70"
-        style={{ height: 44, minWidth: 56, paddingHorizontal: 12, borderRadius: 3, borderWidth: 1, borderColor: FILM.strong, backgroundColor: FILM.glass }}
+        style={{ height: 44, minWidth: 56, paddingHorizontal: 12, borderRadius: 3, borderWidth: 1, borderColor: ON_MEDIA.strong, backgroundColor: ON_MEDIA.glass }}
       >
-        <Text className="font-mono-bold" style={[{ fontSize: 13, color: FILM.white }, TABULAR]}>
+        <Text className="font-mono-bold" style={[{ fontSize: 13, color: ON_MEDIA.white }, TABULAR]}>
           {`${speed}x`}
         </Text>
       </Pressable>
@@ -99,9 +99,9 @@ export function MomentChips({ moments, currentT, onJump }: { moments: KeyMoment[
             accessibilityLabel={`Jump to ${formatClock(m.t)}, ${m.label}`}
             accessibilityState={{ selected: on }}
             onPress={() => onJump(m.t)}
-            style={{ height: 44, paddingHorizontal: 12, borderRadius: 2, borderWidth: 1, justifyContent: "center", borderColor: on ? FILM.text : FILM.strong, backgroundColor: on ? FILM.text : FILM.tag }}
+            style={{ height: 44, paddingHorizontal: 12, borderRadius: 2, borderWidth: 1, justifyContent: "center", borderColor: on ? ON_MEDIA.text : ON_MEDIA.strong, backgroundColor: on ? ON_MEDIA.text : ON_MEDIA.tag }}
           >
-            <Text className="font-mono-bold" style={[{ fontSize: 11, letterSpacing: 1.2, color: on ? FILM.ink : FILM.white }, TABULAR]}>
+            <Text className="font-mono-bold" style={[{ fontSize: 11, letterSpacing: 1.2, color: on ? ON_MEDIA.ink : ON_MEDIA.white }, TABULAR]}>
               {label}
             </Text>
           </Pressable>
@@ -114,12 +114,12 @@ export function MomentChips({ moments, currentT, onJump }: { moments: KeyMoment[
 /** The light caption chip: "03:12 | Guard pass: knee cut to side control". */
 export function MomentCaption({ t, text }: { t: number; text: string }) {
   return (
-    <View testID="player-caption" className="flex-row items-center self-start" style={{ gap: 8, paddingVertical: 8, paddingHorizontal: 10, borderRadius: 2, backgroundColor: FILM.lightChip, maxWidth: "100%" }}>
-      <Text className="font-mono-bold" style={[{ fontSize: 11, color: FILM.ink }, TABULAR]}>
+    <View testID="player-caption" className="flex-row items-center self-start" style={{ gap: 8, paddingVertical: 8, paddingHorizontal: 10, borderRadius: 2, backgroundColor: ON_MEDIA.chip, maxWidth: "100%" }}>
+      <Text className="font-mono-bold" style={[{ fontSize: 11, color: ON_MEDIA.ink }, TABULAR]}>
         {formatClock(t)}
       </Text>
-      <View style={{ width: 1, height: 12, backgroundColor: "rgba(13,15,20,0.34)" }} />
-      <Text numberOfLines={2} className="font-body-medium flex-shrink" style={{ fontSize: 13, lineHeight: 16, color: FILM.ink }}>
+      <View style={{ width: 1, height: 12, backgroundColor: ON_MEDIA.chipBorder }} />
+      <Text numberOfLines={2} className="font-body-medium flex-shrink" style={{ fontSize: 13, lineHeight: 16, color: ON_MEDIA.ink }}>
         {text}
       </Text>
     </View>

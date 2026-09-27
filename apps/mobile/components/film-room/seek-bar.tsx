@@ -1,7 +1,7 @@
 import * as React from "react";
 import { PanResponder, View, type LayoutChangeEvent } from "react-native";
 import type { KeyMoment } from "@jits/shared/utils";
-import { FILM } from "@/lib/film-room/film-palette";
+import { ON_MEDIA } from "@/lib/theme/palette";
 
 interface SeekBarProps {
   positionS: number;
@@ -76,18 +76,18 @@ export function SeekBar({ positionS, durationS, moments, onSeek }: SeekBarProps)
       {...pan.panHandlers}
     >
       <View pointerEvents="none" style={{ position: "absolute", left: 0, right: 0, top: 20, height: 3, backgroundColor: "rgba(255,255,255,0.25)" }} />
-      <View pointerEvents="none" style={{ position: "absolute", left: 0, top: 20, height: 3, width: `${frac * 100}%`, backgroundColor: FILM.white }} />
+      <View pointerEvents="none" style={{ position: "absolute", left: 0, top: 20, height: 3, width: `${frac * 100}%`, backgroundColor: ON_MEDIA.white }} />
       {moments.map((m, i) => (
         <View
           key={`${m.t}-${i}`}
           pointerEvents="none"
           testID={`seek-marker-${i}`}
-          style={{ position: "absolute", left: pct(m.t), top: 18, width: 7, height: 7, marginLeft: -3.5, borderRadius: 3.5, backgroundColor: m.kind === "finish" ? FILM.win : FILM.amber }}
+          style={{ position: "absolute", left: pct(m.t), top: 18, width: 7, height: 7, marginLeft: -3.5, borderRadius: 3.5, backgroundColor: m.kind === "finish" ? ON_MEDIA.win : ON_MEDIA.amber }}
         />
       ))}
       <View
         pointerEvents="none"
-        style={{ position: "absolute", left: `${frac * 100}%`, top: 14, width: 16, height: 16, marginLeft: -8, borderRadius: 8, borderWidth: 3, borderColor: FILM.amber, backgroundColor: FILM.white }}
+        style={{ position: "absolute", left: `${frac * 100}%`, top: 14, width: 16, height: 16, marginLeft: -8, borderRadius: 8, borderWidth: 3, borderColor: ON_MEDIA.amber, backgroundColor: ON_MEDIA.white }}
       />
     </View>
   );

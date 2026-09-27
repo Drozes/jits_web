@@ -234,7 +234,8 @@ describe("MatchDetailScreen (Film Room match page)", () => {
     expect(utils.getByTestId("match-verdict")).toHaveTextContent("YOU WON");
     const delta = utils.getByTestId("match-elo-delta");
     expect(delta).toHaveTextContent("▲ +16");
-    expect(colorOf(delta)).toBe("#22C55E");
+    // The light theme's gain green (the page follows the app theme).
+    expect(colorOf(delta)).toBe("#116A33");
     expect(utils.getByText("1200 → 1216")).toBeTruthy();
     expect(utils.getByTestId("match-verdict-line")).toHaveTextContent(
       "by Rear-naked choke · 03:57 · vs D. Red · Ranked · Sep 20",
@@ -247,7 +248,7 @@ describe("MatchDetailScreen (Film Room match page)", () => {
     const loss = await renderLoaded(view({ me: { outcome: "loss", elo_delta: -12 } }));
     expect(loss.getByTestId("match-verdict")).toHaveTextContent("YOU LOST");
     expect(loss.getByTestId("match-elo-delta")).toHaveTextContent("▼ −12");
-    expect(colorOf(loss.getByTestId("match-elo-delta"))).toBe("#F0556B");
+    expect(colorOf(loss.getByTestId("match-elo-delta"))).toBe("#AC2B34");
     loss.unmount();
 
     const draw = await renderLoaded(view({ me: { outcome: "draw", elo_delta: -4 }, match: { result: "draw" } }));

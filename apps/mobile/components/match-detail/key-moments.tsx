@@ -2,26 +2,27 @@ import * as React from "react";
 import { Pressable, Text, View } from "react-native";
 import { PlayCircle } from "lucide-react-native";
 import { formatClock, type KeyMoment } from "@jits/shared/utils";
-import { FILM, TABULAR } from "@/lib/film-room/film-palette";
+import { usePalette, TABULAR } from "@/lib/theme/palette";
 
 /** Dots along a hairline, placed by time over the clip (the finish in green). */
 export function MomentTimeline({ moments, durationS }: { moments: KeyMoment[]; durationS: number }) {
+  const p = usePalette();
   const pct = (t: number) => `${Math.min(100, Math.max(0, (t / durationS) * 100))}%` as const;
   const finish = moments.find((m) => m.kind === "finish");
   return (
     <View testID="moment-timeline" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={{ height: 18 }}>
-      <View style={{ position: "absolute", left: 0, right: 0, top: 8, height: 2, backgroundColor: FILM.track }} />
-      {finish ? <View style={{ position: "absolute", left: 0, top: 8, height: 2, width: pct(finish.t), backgroundColor: "rgba(232,237,242,0.6)" }} /> : null}
+      <View style={{ position: "absolute", left: 0, right: 0, top: 8, height: 2, backgroundColor: p.track }} />
+      {finish ? <View style={{ position: "absolute", left: 0, top: 8, height: 2, width: pct(finish.t), backgroundColor: p.text2 }} /> : null}
       {moments.map((m, i) => {
         const size = m.kind === "finish" ? 14 : 10;
         return (
           <View
             key={`${m.t}-${i}`}
-            style={{ position: "absolute", left: pct(m.t), top: 9 - size / 2, width: size, height: size, marginLeft: -size / 2, borderRadius: size / 2, backgroundColor: m.kind === "finish" ? FILM.win : FILM.text }}
+            style={{ position: "absolute", left: pct(m.t), top: 9 - size / 2, width: size, height: size, marginLeft: -size / 2, borderRadius: size / 2, backgroundColor: m.kind === "finish" ? p.win : p.text }}
           />
         );
       })}
-      <View style={{ position: "absolute", right: 0, top: 3, width: 2, height: 12, backgroundColor: FILM.strong }} />
+      <View style={{ position: "absolute", right: 0, top: 3, width: 2, height: 12, backgroundColor: p.strong }} />
     </View>
   );
 }
@@ -35,22 +36,23 @@ interface KeyMomentsProps {
 
 /** KEY MOMENTS: timeline, one tappable row per moment, technique tags. */
 export function KeyMoments({ moments, durationS, tags, onJump }: KeyMomentsProps) {
+  const p = usePalette();
   if (moments.length === 0 && tags.length === 0) return null;
   const span = durationS && durationS > 0 ? durationS : Math.max(...moments.map((m) => m.t), 1) * 1.05;
   return (
     <View testID="key-moments" style={{ gap: 10 }}>
       <View className="flex-row items-center justify-between">
-        <Text accessibilityRole="header" className="font-mono-bold" style={{ fontSize: 10, letterSpacing: 2.52, color: FILM.text }}>
+        <Text accessibilityRole="header" className="font-mono-bold" style={{ fontSize: 10, letterSpacing: 2.52, color: p.text }}>
           KEY MOMENTS
         </Text>
         {moments.length > 0 ? (
-          <Text className="font-mono-medium" style={{ fontSize: 10, letterSpacing: 1.68, color: FILM.text3 }}>
+          <Text className="font-mono-medium" style={{ fontSize: 10, letterSpacing: 1.68, color: p.text3 }}>
             TAP TO JUMP
           </Text>
         ) : null}
       </View>
       {moments.length > 0 ? <MomentTimeline moments={moments} durationS={span} /> : null}
-      <View style={{ borderTopWidth: moments.length ? 1 : 0, borderTopColor: FILM.hairline }}>
+      <View style={{ borderTopWidth: moments.length ? 1 : 0, borderTopColor: p.hairline }}>
         {moments.map((m, i) => (
           <Pressable
             key={`${m.t}-${i}`}
@@ -59,30 +61,30 @@ export function KeyMoments({ moments, durationS, tags, onJump }: KeyMomentsProps
             accessibilityLabel={`Play from ${formatClock(m.t)}, ${m.label}`}
             onPress={() => onJump(m.t)}
             className="flex-row items-center active:opacity-70"
-            style={{ height: 52, gap: 14, borderBottomWidth: 1, borderBottomColor: FILM.hairline }}
+            style={{ height: 52, gap: 14, borderBottomWidth: 1, borderBottomColor: p.hairline }}
           >
-            <Text className="font-mono-bold" style={[{ width: 44, fontSize: 13, color: FILM.text }, TABULAR]}>
+            <Text className="font-mono-bold" style={[{ width: 44, fontSize: 13, color: p.text }, TABULAR]}>
               {formatClock(m.t)}
             </Text>
-            <Text numberOfLines={1} className="flex-1 font-heading uppercase" style={{ fontSize: 14, letterSpacing: 0.4, color: FILM.text }}>
+            <Text numberOfLines={1} className="flex-1 font-heading uppercase" style={{ fontSize: 14, letterSpacing: 0.4, color: p.text }}>
               {m.label}
             </Text>
             {m.kind === "finish" ? (
-              <View style={{ height: 18, paddingHorizontal: 6, borderRadius: 2, borderWidth: 1, borderColor: FILM.win, justifyContent: "center" }}>
-                <Text className="font-mono-bold" style={{ fontSize: 9, letterSpacing: 1.6, color: FILM.win }}>
+              <View style={{ height: 18, paddingHorizontal: 6, borderRadius: 2, borderWidth: 1, borderColor: p.win, justifyContent: "center" }}>
+                <Text className="font-mono-bold" style={{ fontSize: 9, letterSpacing: 1.6, color: p.win }}>
                   FINISH
                 </Text>
               </View>
             ) : null}
-            <PlayCircle size={20} color={FILM.text2} />
+            <PlayCircle size={20} color={p.text2} />
           </Pressable>
         ))}
       </View>
       {tags.length > 0 ? (
         <View testID="technique-tags" className="flex-row flex-wrap" style={{ gap: 6 }}>
           {tags.map((t) => (
-            <View key={t} style={{ height: 26, paddingHorizontal: 9, borderRadius: 2, borderWidth: 1, borderColor: FILM.hairline, backgroundColor: FILM.glass, justifyContent: "center" }}>
-              <Text className="font-mono-medium uppercase" style={{ fontSize: 10, letterSpacing: 1.2, color: "rgba(232,237,242,0.86)" }}>
+            <View key={t} style={{ height: 26, paddingHorizontal: 9, borderRadius: 2, borderWidth: 1, borderColor: p.hairline, backgroundColor: p.secondaryBg, justifyContent: "center" }}>
+              <Text className="font-mono-medium uppercase" style={{ fontSize: 10, letterSpacing: 1.2, color: p.text }}>
                 {t}
               </Text>
             </View>

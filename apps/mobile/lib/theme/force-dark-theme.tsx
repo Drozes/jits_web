@@ -7,8 +7,9 @@ import { ForcedSchemeContext } from "./forced-scheme-context";
  * Pins its subtree to the dark token set, whatever the system or user theme:
  * semantic classes (`bg-surface`, `text-ink`, ...) resolve through the dark
  * CSS variables, and `useThemedTokens()` / `useResolvedColorScheme()` report
- * dark. The match flow is "fight night" dark end to end, next to the live
- * screen that has always been dark over the camera.
+ * dark. Only for full-bleed video where themed components draw over the
+ * picture (the Film Room player's state panel); every other screen follows
+ * the app theme.
  */
 export function ForceDarkTheme({
   children,

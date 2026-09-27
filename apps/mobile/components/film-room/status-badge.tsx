@@ -1,15 +1,19 @@
 import * as React from "react";
 import { Text, View, type StyleProp, type ViewStyle } from "react-native";
-import { FILM } from "@/lib/film-room/film-palette";
+import { ON_MEDIA } from "@/lib/theme/palette";
 import type { CardStatus } from "@/lib/film-room/card-status";
 
 type Tone = "light" | "amber" | "outline" | "red";
 
-const TONES: Record<Tone, { bg: string; fg: string; border?: string }> = {
-  light: { bg: FILM.text, fg: FILM.ink },
-  amber: { bg: FILM.badge, fg: FILM.amber, border: FILM.amberRule },
-  outline: { bg: FILM.badge, fg: FILM.text, border: FILM.strong },
-  red: { bg: FILM.badge, fg: FILM.redText, border: "rgba(240,85,107,0.7)" },
+/**
+ * Badges sit over the poster (a photo, or the themed plate when there is no
+ * still), so each carries its own fixed backing and reads on both themes.
+ */
+const TONES: Record<Tone, { bg: string; fg: string; border: string }> = {
+  light: { bg: ON_MEDIA.chip, fg: ON_MEDIA.ink, border: ON_MEDIA.chipBorder },
+  amber: { bg: ON_MEDIA.badge, fg: ON_MEDIA.amber, border: ON_MEDIA.amberRule },
+  outline: { bg: ON_MEDIA.badge, fg: ON_MEDIA.text, border: ON_MEDIA.strong },
+  red: { bg: ON_MEDIA.badge, fg: ON_MEDIA.red, border: ON_MEDIA.redRule },
 };
 
 export function toneFor(status: CardStatus): Tone {
@@ -42,7 +46,7 @@ export function FilmBadge({
           borderRadius: 2,
           justifyContent: "center",
           backgroundColor: t.bg,
-          borderWidth: t.border ? 1 : 0,
+          borderWidth: 1,
           borderColor: t.border,
         },
         style,

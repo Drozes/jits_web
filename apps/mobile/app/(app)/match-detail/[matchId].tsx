@@ -5,19 +5,19 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { OpponentLinkRow } from "@/components/match-detail/opponent-link-row";
 import { MatchDetailError, MatchDetailSkeleton, MatchNoVideo } from "@/components/match-detail/match-detail-states";
 import { HarnessMarker } from "@/components/match-detail/harness-marker";
-import { MatchHero } from "@/components/match-detail/match-hero";
+import { HERO_HEIGHT, MatchHero } from "@/components/match-detail/match-hero";
 import { MatchVerdict } from "@/components/match-detail/match-verdict";
 import { AiBreakdown } from "@/components/match-detail/ai-breakdown";
 import { KeyMoments } from "@/components/match-detail/key-moments";
 import { FilmAngles } from "@/components/match-detail/film-angles";
-import { FilmSurface } from "@/components/film-room/film-surface";
 import { FilmBackButton } from "@/components/film-room/film-back-button";
 import { AngleSwitcher } from "@/components/film-room/angle-switcher";
 import { useMatchDetail } from "@/lib/match-detail/use-match-detail";
 import { useMatchFilm } from "@/lib/match-detail/use-match-film";
 import { markMatchSeen } from "@/lib/film-room/seen-store";
 import { videoHref } from "@/lib/film-room/href";
-import { FILM } from "@/lib/film-room/film-palette";
+import { usePalette } from "@/lib/theme/palette";
+import { ThemedStatusBar } from "@/lib/theme/themed-status-bar";
 
 /**
  * One past match, the Film Room's match page: the opening still with play,
@@ -33,6 +33,9 @@ export default function MatchDetailScreen() {
   const { matchId } = useLocalSearchParams<{ matchId: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const p = usePalette();
+  // The hero's top scrim is dark: light status bar until it scrolls away.
+  const [pastHero, setPastHero] = React.useState(false);
   const { state, data, error, refreshing, refetch } = useMatchDetail(matchId);
   const film = useMatchFilm(state === "ready" ? data : null, matchId ?? "");
 
@@ -54,11 +57,17 @@ export default function MatchDetailScreen() {
   const active = film.active;
 
   return (
-    <FilmSurface>
+    <View className="flex-1 bg-surface">
+      <ThemedStatusBar overMedia={state === "ready" && !!data && !pastHero} />
       {state === "ready" && data ? (
         <ScrollView
+          scrollEventThrottle={32}
+          onScroll={(e) => {
+            const past = e.nativeEvent.contentOffset.y > HERO_HEIGHT;
+            if (past !== pastHero) setPastHero(past);
+          }}
           contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refetch} tintColor={FILM.text2} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refetch} tintColor={p.text2} />}
         >
           <MatchHero
             posterUrl={active?.poster_url ?? null}
@@ -105,7 +114,7 @@ export default function MatchDetailScreen() {
       ) : (
         <View style={{ flex: 1, paddingTop: insets.top }}>
           <View style={{ paddingHorizontal: 4, height: 48, justifyContent: "center" }}>
-            <FilmBackButton label="Go back" fallback="/" color={FILM.text} />
+            <FilmBackButton label="Go back" fallback="/" color={p.text} />
           </View>
           {state === "error" ? (
             <MatchDetailError code={error?.code ?? "UNKNOWN"} onBack={goBack} onRetry={refetch} />
@@ -115,6 +124,6 @@ export default function MatchDetailScreen() {
         </View>
       )}
       <HarnessMarker testID="match-detail-screen" label={label} />
-    </FilmSurface>
+    </View>
   );
 }

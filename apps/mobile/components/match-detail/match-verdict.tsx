@@ -2,7 +2,7 @@ import * as React from "react";
 import { Text, View } from "react-native";
 import { formatClock } from "@jits/shared/utils";
 import type { MatchDetailView } from "@jits/shared/api/queries";
-import { FILM, TABULAR } from "@/lib/film-room/film-palette";
+import { usePalette, TABULAR, type Palette } from "@/lib/theme/palette";
 import { deltaLabel, shortName, titleDate } from "@/lib/film-room/format";
 import { humanizeAnalysisLabel } from "@jits/shared/utils";
 
@@ -27,10 +27,10 @@ export function verdictLine(view: MatchDetailView): string {
   return parts.join(" · ");
 }
 
-function deltaColor(delta: number): string {
-  if (delta > 0) return FILM.win;
-  if (delta < 0) return FILM.redText;
-  return FILM.text2;
+function deltaColor(delta: number, p: Palette): string {
+  if (delta > 0) return p.win;
+  if (delta < 0) return p.red;
+  return p.text2;
 }
 
 /**
@@ -39,6 +39,7 @@ function deltaColor(delta: number): string {
  * result says so in amber; casual matches read "Casual, unrated".
  */
 export function MatchVerdict({ view }: { view: MatchDetailView }) {
+  const p = usePalette();
   const { match, me } = view;
   const muted = MUTED[match.status];
   const ranked = match.match_type === "ranked";
@@ -46,43 +47,43 @@ export function MatchVerdict({ view }: { view: MatchDetailView }) {
   return (
     <View testID="match-result-header" style={{ gap: 8 }}>
       <View className="flex-row items-end justify-between" style={{ gap: 12 }}>
-        <Text testID="match-verdict" className="font-display" style={{ fontSize: 52, lineHeight: 52, letterSpacing: 0.8, color: FILM.text }}>
+        <Text testID="match-verdict" className="font-display" style={{ fontSize: 52, lineHeight: 52, letterSpacing: 0.8, color: p.text }}>
           {verdict}
         </Text>
         {muted ? (
-          <Text className="font-body" style={{ fontSize: 12, color: FILM.text2, paddingBottom: 6 }}>
+          <Text className="font-body" style={{ fontSize: 12, color: p.text2, paddingBottom: 6 }}>
             Rating unchanged
           </Text>
         ) : ranked ? (
           <View className="items-end" style={{ gap: 5, paddingBottom: 3 }}>
-            <Text testID="match-elo-delta" className="font-mono-bold" style={[{ fontSize: 18, color: deltaColor(me.elo_delta) }, TABULAR]}>
+            <Text testID="match-elo-delta" className="font-mono-bold" style={[{ fontSize: 18, color: deltaColor(me.elo_delta, p) }, TABULAR]}>
               {deltaLabel(me.elo_delta)}
             </Text>
             {me.elo_before != null && me.elo_after != null ? (
-              <Text className="font-mono-medium" style={[{ fontSize: 11, letterSpacing: 0.56, color: FILM.text2 }, TABULAR]}>
+              <Text className="font-mono-medium" style={[{ fontSize: 11, letterSpacing: 0.56, color: p.text2 }, TABULAR]}>
                 {me.elo_before} {"→"} {me.elo_after}
               </Text>
             ) : null}
           </View>
         ) : (
-          <Text className="font-body" style={{ fontSize: 12, color: FILM.text2, paddingBottom: 6 }}>
+          <Text className="font-body" style={{ fontSize: 12, color: p.text2, paddingBottom: 6 }}>
             Casual, unrated
           </Text>
         )}
       </View>
-      <Text testID="match-verdict-line" className="font-mono-medium uppercase" style={{ fontSize: 11, lineHeight: 16, letterSpacing: 0.8, color: FILM.text2 }}>
+      <Text testID="match-verdict-line" className="font-mono-medium uppercase" style={{ fontSize: 11, lineHeight: 16, letterSpacing: 0.8, color: p.text2 }}>
         {verdictLine(view)}
       </Text>
       {muted ? (
-        <View testID="match-muted-badge" className="self-start" style={{ borderWidth: 1, borderColor: FILM.strong, borderRadius: 2, paddingHorizontal: 8, paddingVertical: 4 }}>
-          <Text className="font-mono-bold" style={{ fontSize: 10, letterSpacing: 1.68, color: FILM.text2 }}>
+        <View testID="match-muted-badge" className="self-start" style={{ borderWidth: 1, borderColor: p.strong, borderRadius: 2, paddingHorizontal: 8, paddingVertical: 4 }}>
+          <Text className="font-mono-bold" style={{ fontSize: 10, letterSpacing: 1.68, color: p.text2 }}>
             {muted}
           </Text>
         </View>
       ) : null}
       {match.status === "disputed" ? (
-        <View testID="match-disputed-badge" className="self-start" style={{ borderWidth: 1, borderColor: FILM.amberRule, borderRadius: 2, paddingHorizontal: 8, paddingVertical: 4 }}>
-          <Text className="font-mono-bold" style={{ fontSize: 10, letterSpacing: 1.68, color: FILM.amber }}>
+        <View testID="match-disputed-badge" className="self-start" style={{ borderWidth: 1, borderColor: p.amberRule, borderRadius: 2, paddingHorizontal: 8, paddingVertical: 4 }}>
+          <Text className="font-mono-bold" style={{ fontSize: 10, letterSpacing: 1.68, color: p.amber }}>
             DISPUTED · UNDER REVIEW
           </Text>
         </View>

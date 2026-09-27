@@ -12,8 +12,8 @@ import { useMatchLibrary } from "@/lib/film-room/use-match-library";
 import { useSeenMatches } from "@/lib/film-room/seen-store";
 import { applyFilter, buildRows, NO_FILTER, opponentsOf, recordOf, type LibraryFilter, type LibraryRow } from "@/lib/film-room/rows";
 import { recordStrip } from "@/lib/film-room/format";
-import { FILM, TABULAR } from "@/lib/film-room/film-palette";
-import { FilmSurface } from "@/components/film-room/film-surface";
+import { TABULAR, usePalette } from "@/lib/theme/palette";
+import { ThemedStatusBar } from "@/lib/theme/themed-status-bar";
 import { FilmBackButton } from "@/components/film-room/film-back-button";
 import { FilterChips } from "@/components/film-room/filter-chips";
 import { OpponentPicker } from "@/components/film-room/opponent-picker";
@@ -31,6 +31,7 @@ export default function FilmRoomScreen() {
   const { athlete } = useRequireAthlete();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const p = usePalette();
   const library = useMatchLibrary(athlete?.id);
   const { history } = useProfileData(athlete?.id, athlete?.primary_gym_id);
   const seen = useSeenMatches();
@@ -79,13 +80,13 @@ export default function FilmRoomScreen() {
     <View>
       <View className="flex-row items-center" style={{ gap: 8, height: 44 }}>
         <View style={{ marginLeft: -12 }}>
-          <FilmBackButton label="Go back" fallback="/(app)/(tabs)/profile" color={FILM.text} />
+          <FilmBackButton label="Go back" fallback="/(app)/(tabs)/profile" color={p.text} />
         </View>
         <Text accessibilityRole="header" className="font-display text-ink" style={{ fontSize: 40, lineHeight: 44, letterSpacing: 0.8, paddingTop: 4 }}>
           FILM ROOM
         </Text>
       </View>
-      <Text testID="film-room-record" className="font-mono-medium" style={[{ marginTop: 6, marginBottom: 18, fontSize: 11, letterSpacing: 1.68, color: FILM.text2 }, TABULAR]}>
+      <Text testID="film-room-record" className="font-mono-medium" style={[{ marginTop: 6, marginBottom: 18, fontSize: 11, letterSpacing: 1.68, color: p.text2 }, TABULAR]}>
         {recordStrip(recordOf(history), athlete?.current_elo)}
       </Text>
       <FilterChips
@@ -109,7 +110,8 @@ export default function FilmRoomScreen() {
   );
 
   return (
-    <FilmSurface testID="film-room-screen">
+    <View testID="film-room-screen" className="flex-1 bg-surface">
+      <ThemedStatusBar />
       <FlatList
         data={rows}
         keyExtractor={(r) => r.key}
@@ -123,7 +125,7 @@ export default function FilmRoomScreen() {
         onEndReachedThreshold={0.6}
         contentContainerStyle={{ paddingTop: insets.top + 8, paddingHorizontal: 16, paddingBottom: insets.bottom + 16 }}
         refreshControl={
-          <RefreshControl refreshing={library.isValidating && !library.isLoading} onRefresh={library.refresh} tintColor={FILM.text2} />
+          <RefreshControl refreshing={library.isValidating && !library.isLoading} onRefresh={library.refresh} tintColor={p.text2} />
         }
       />
       <OpponentPicker
@@ -136,6 +138,6 @@ export default function FilmRoomScreen() {
         }}
         onClose={() => setPickerOpen(false)}
       />
-    </FilmSurface>
+    </View>
   );
 }

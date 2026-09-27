@@ -1,17 +1,18 @@
 import * as React from "react";
 import { Pressable, Text, View } from "react-native";
-import { FILM } from "@/lib/film-room/film-palette";
+import { usePalette } from "@/lib/theme/palette";
 import type { BreakdownPhase } from "@/lib/match-detail/use-match-film";
 
 function Heading({ tier }: { tier: string | null }) {
+  const p = usePalette();
   return (
     <View className="flex-row items-center justify-between">
-      <Text accessibilityRole="header" className="font-mono-bold" style={{ fontSize: 10, letterSpacing: 2.52, color: FILM.text }}>
+      <Text accessibilityRole="header" className="font-mono-bold" style={{ fontSize: 10, letterSpacing: 2.52, color: p.text }}>
         AI BREAKDOWN
       </Text>
       {tier ? (
-        <View style={{ height: 18, paddingHorizontal: 6, borderRadius: 2, borderWidth: 1, borderColor: tier === "premium" ? FILM.amberRule : FILM.strong, justifyContent: "center" }}>
-          <Text className="font-mono-bold" style={{ fontSize: 9, letterSpacing: 1.6, color: tier === "premium" ? FILM.amber : FILM.text2 }}>
+        <View style={{ height: 18, paddingHorizontal: 6, borderRadius: 2, borderWidth: 1, borderColor: tier === "premium" ? p.amberRule : p.strong, justifyContent: "center" }}>
+          <Text className="font-mono-bold" style={{ fontSize: 9, letterSpacing: 1.6, color: tier === "premium" ? p.amber : p.text2 }}>
             {tier.toUpperCase()}
           </Text>
         </View>
@@ -21,8 +22,9 @@ function Heading({ tier }: { tier: string | null }) {
 }
 
 function Body({ children, tone = "text" }: { children: React.ReactNode; tone?: "text" | "muted" }) {
+  const p = usePalette();
   return (
-    <Text className="font-body" style={{ fontSize: 14, lineHeight: 21, color: tone === "text" ? "rgba(232,237,242,0.86)" : FILM.text2 }}>
+    <Text className="font-body" style={{ fontSize: 14, lineHeight: 21, color: tone === "text" ? p.text : p.text2 }}>
       {children}
     </Text>
   );
@@ -33,6 +35,7 @@ function Body({ children, tone = "text" }: { children: React.ReactNode; tone?: "
  * uploading, analyzing (live chunk count), failed, or not analyzed.
  */
 export function AiBreakdown({ phase, onRetry }: { phase: BreakdownPhase; onRetry: () => void }) {
+  const p = usePalette();
   let tier: string | null = null;
   let body: React.ReactNode;
   if (phase.kind === "uploading") {
@@ -40,7 +43,7 @@ export function AiBreakdown({ phase, onRetry }: { phase: BreakdownPhase; onRetry
   } else if (phase.kind === "analyzing") {
     body = (
       <View style={{ gap: 6 }}>
-        <Text testID="breakdown-analyzing" className="font-mono-bold" style={{ fontSize: 10, letterSpacing: 2.2, color: FILM.amber }}>
+        <Text testID="breakdown-analyzing" className="font-mono-bold" style={{ fontSize: 10, letterSpacing: 2.2, color: p.amber }}>
           {phase.total ? `ANALYZING ${phase.done ?? 0}/${phase.total}` : "ANALYZING"}
         </Text>
         <Body tone="muted">The breakdown and key moments land here when the analysis finishes.</Body>
@@ -56,7 +59,7 @@ export function AiBreakdown({ phase, onRetry }: { phase: BreakdownPhase; onRetry
       <View style={{ gap: 8 }}>
         <Body tone="muted">Couldn't load the breakdown.</Body>
         <Pressable accessibilityRole="button" accessibilityLabel="Retry breakdown" onPress={onRetry} className="self-start active:opacity-70" hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}>
-          <Text className="font-mono-bold" style={{ fontSize: 10, letterSpacing: 1.68, color: FILM.redText }}>
+          <Text className="font-mono-bold" style={{ fontSize: 10, letterSpacing: 1.68, color: p.red }}>
             TRY AGAIN
           </Text>
         </Pressable>
@@ -71,7 +74,7 @@ export function AiBreakdown({ phase, onRetry }: { phase: BreakdownPhase; onRetry
     <View
       testID="ai-breakdown"
       accessibilityLabel="AI breakdown"
-      style={{ backgroundColor: FILM.plate, borderWidth: 1, borderColor: FILM.hairline, borderRadius: 3, padding: 14, gap: 10 }}
+      style={{ backgroundColor: p.plate, borderWidth: 1, borderColor: p.hairline, borderRadius: 3, padding: 14, gap: 10 }}
     >
       <Heading tier={tier} />
       {body}

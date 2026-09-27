@@ -2,13 +2,14 @@ import * as React from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { StatusBar } from "expo-status-bar";
 import { Audio, ResizeMode, Video, type AVPlaybackStatus } from "expo-av";
 import { buildKeyMoments, captionAt, formatClock, translateAngleTime } from "@jits/shared/utils";
 import { getVideoSyncOffsets } from "@jits/shared/api/film-room";
 import { supabase } from "@/lib/supabase/client";
 import { HarnessMarker } from "@/components/match-detail/harness-marker";
 import { VideoStatePanel } from "@/components/match-detail/video-state-panel";
-import { FilmSurface } from "@/components/film-room/film-surface";
+import { ForceDarkTheme } from "@/lib/theme/force-dark-theme";
 import { FilmScrim } from "@/components/film-room/film-scrim";
 import { FilmBackButton } from "@/components/film-room/film-back-button";
 import { AngleSwitcher } from "@/components/film-room/angle-switcher";
@@ -18,7 +19,7 @@ import { useVideoPlayback } from "@/lib/match-detail/use-video-playback";
 import { useMatchDetail } from "@/lib/match-detail/use-match-detail";
 import { useVideoAnalysis } from "@/lib/film-room/use-video-analysis";
 import { shortName } from "@/lib/film-room/format";
-import { FILM, TABULAR } from "@/lib/film-room/film-palette";
+import { ON_MEDIA, TABULAR } from "@/lib/theme/palette";
 
 /** A moment stays "current" (chip lit) this long after its time. */
 const CURRENT_HOLD_S = 10;
@@ -130,13 +131,13 @@ function PlayerBody({ id, start, approximate }: { id: string | undefined; start:
 
   const topBar = (
     <View className="flex-row items-center" style={{ position: "absolute", left: 4, right: 16, top: insets.top + 8, height: 44, gap: 6 }}>
-      <FilmBackButton label="Go back" icon="close" fallback="/" color={FILM.white} />
-      <Text numberOfLines={1} className="flex-1 font-heading uppercase" style={{ fontSize: 14, letterSpacing: 1.12, color: FILM.white }}>
+      <FilmBackButton label="Go back" icon="close" fallback="/" color={ON_MEDIA.white} />
+      <Text numberOfLines={1} className="flex-1 font-heading uppercase" style={{ fontSize: 14, letterSpacing: 1.12, color: ON_MEDIA.white }}>
         {title}
       </Text>
       {view ? (
-        <View style={{ height: 24, paddingHorizontal: 8, borderRadius: 2, borderWidth: 1, borderColor: FILM.strong, backgroundColor: "rgba(0,0,0,0.40)", justifyContent: "center" }}>
-          <Text className="font-mono-medium" style={{ fontSize: 10, letterSpacing: 2.52, color: "rgba(255,255,255,0.85)" }}>
+        <View style={{ height: 24, paddingHorizontal: 8, borderRadius: 2, borderWidth: 1, borderColor: ON_MEDIA.strong, backgroundColor: "rgba(0,0,0,0.40)", justifyContent: "center" }}>
+          <Text className="font-mono-medium" style={{ fontSize: 10, letterSpacing: 2.52, color: ON_MEDIA.tagText }}>
             {view.match.match_type === "ranked" ? "RANKED" : "CASUAL"}
           </Text>
         </View>
@@ -145,7 +146,10 @@ function PlayerBody({ id, start, approximate }: { id: string | undefined; start:
   );
 
   return (
-    <FilmSurface style={{ backgroundColor: "#000" }}>
+    // Full-screen video: dark in both app themes. ForceDarkTheme pins the
+    // themed pieces drawn over it (VideoStatePanel) to the dark tokens.
+    <ForceDarkTheme style={{ backgroundColor: "#000000" }}>
+      <StatusBar style="light" />
       {phase === "ready" && source ? (
         <>
           <Video
@@ -193,7 +197,7 @@ function PlayerBody({ id, start, approximate }: { id: string | undefined; start:
               pointerEvents="none"
               style={{ position: "absolute", left: 16, right: 16, top: insets.top + 110, alignItems: "center" }}
             >
-              <Text className="font-mono-medium" style={{ fontSize: 10, letterSpacing: 1.2, color: FILM.text2, backgroundColor: FILM.badge, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 2 }}>
+              <Text className="font-mono-medium" style={{ fontSize: 10, letterSpacing: 1.2, color: ON_MEDIA.text2, backgroundColor: ON_MEDIA.badge, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 2 }}>
                 Angles aren't synced; position is approximate
               </Text>
             </View>
@@ -203,11 +207,11 @@ function PlayerBody({ id, start, approximate }: { id: string | undefined; start:
             <View style={{ gap: 6 }}>
               <SeekBar positionS={positionS} durationS={duration} moments={moments} onSeek={seek} />
               <View className="flex-row justify-between">
-                <Text testID="player-time" className="font-mono-bold" style={[{ fontSize: 12, color: FILM.white }, TABULAR]}>
+                <Text testID="player-time" className="font-mono-bold" style={[{ fontSize: 12, color: ON_MEDIA.white }, TABULAR]}>
                   {`${formatClock(positionS)} / ${formatClock(duration)}`}
                 </Text>
                 {moments.length > 0 ? (
-                  <Text className="font-mono-medium" style={{ fontSize: 10, letterSpacing: 1.68, color: FILM.text2 }}>
+                  <Text className="font-mono-medium" style={{ fontSize: 10, letterSpacing: 1.68, color: ON_MEDIA.text2 }}>
                     {`${moments.length} KEY MOMENT${moments.length === 1 ? "" : "S"}`}
                   </Text>
                 ) : null}
@@ -219,7 +223,7 @@ function PlayerBody({ id, start, approximate }: { id: string | undefined; start:
         </>
       ) : phase === "loading" || phase === "ready" ? (
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator color={FILM.text2} />
+          <ActivityIndicator color={ON_MEDIA.text2} />
           {topBar}
         </View>
       ) : (
@@ -229,6 +233,6 @@ function PlayerBody({ id, start, approximate }: { id: string | undefined; start:
         </View>
       )}
       <HarnessMarker testID="video-player-state" label={`Video state: ${stateLabel}`} />
-    </FilmSurface>
+    </ForceDarkTheme>
   );
 }

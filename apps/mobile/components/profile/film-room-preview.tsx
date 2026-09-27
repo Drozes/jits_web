@@ -4,7 +4,6 @@ import { useRouter } from "expo-router";
 import { ChevronRight } from "lucide-react-native";
 import type { MatchLibraryItem } from "@jits/shared/api/film-room";
 import { useThemedTokens } from "@/lib/theme/use-theme";
-import { darkVarsStyle } from "@/lib/theme/theme-provider";
 import { matchDetailHref } from "@/lib/match-detail/href";
 import { FILM_ROOM_HREF } from "@/lib/film-room/href";
 import { useMatchUploads } from "@/lib/film-room/use-match-uploads";
@@ -75,7 +74,7 @@ export function FilmRoomPreview({ items, error, onRetry, viewer }: FilmRoomPrevi
           showsHorizontalScrollIndicator={false}
           testID="film-room-preview"
           contentContainerStyle={{ gap: 12, paddingHorizontal: 16 }}
-          style={[{ marginHorizontal: -16 }, darkVarsStyle]}
+          style={{ marginHorizontal: -16 }}
         >
           {preview.map((item) => {
             const name = item.opponent?.display_name ?? "Opponent";

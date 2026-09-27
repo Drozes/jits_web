@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Pressable, Text, View } from "react-native";
-import { FILM } from "@/lib/film-room/film-palette";
+import { ON_MEDIA, usePalette } from "@/lib/theme/palette";
 import { shortName } from "@/lib/film-room/format";
 
 export interface AngleOption {
@@ -29,7 +29,14 @@ interface AngleSwitcherProps {
  * nothing with fewer than two angles.
  */
 export function AngleSwitcher({ angles, activeId, opponentName, onSelect, variant = "plate" }: AngleSwitcherProps) {
+  const p = usePalette();
   if (angles.length < 2) return null;
+  // Over video the segments keep the on-film colors; on the page they follow
+  // the theme. The active segment inverts (ink fill, page-colored label).
+  const c =
+    variant === "film"
+      ? { on: ON_MEDIA.text, onLabel: ON_MEDIA.ink, border: ON_MEDIA.strong, fill: ON_MEDIA.tag, label: ON_MEDIA.white }
+      : { on: p.text, onLabel: p.bg, border: p.strong, fill: p.secondaryBg, label: p.text };
   return (
     <View
       testID="angle-switcher"
@@ -54,11 +61,11 @@ export function AngleSwitcher({ angles, activeId, opponentName, onSelect, varian
               height: 44,
               borderRadius: 2,
               borderWidth: 1,
-              borderColor: on ? FILM.text : FILM.strong,
-              backgroundColor: on ? FILM.text : variant === "film" ? FILM.tag : FILM.glass,
+              borderColor: on ? c.on : c.border,
+              backgroundColor: on ? c.on : c.fill,
             }}
           >
-            <Text numberOfLines={1} className="font-mono-bold" style={{ fontSize: 11, letterSpacing: 1.2, color: on ? FILM.ink : FILM.white }}>
+            <Text numberOfLines={1} className="font-mono-bold" style={{ fontSize: 11, letterSpacing: 1.2, color: on ? c.onLabel : c.label }}>
               {label}
             </Text>
           </Pressable>

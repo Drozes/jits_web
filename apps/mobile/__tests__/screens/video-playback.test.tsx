@@ -71,6 +71,7 @@ jest.mock("expo-av", () => {
 jest.mock("@/lib/supabase/client", () => ({ supabase: {} }));
 
 jest.mock("@/lib/theme/use-theme", () => ({
+  useResolvedColorScheme: () => "light",
   useThemedTokens: () => ({ accentCta: "#E63946" }),
 }));
 
