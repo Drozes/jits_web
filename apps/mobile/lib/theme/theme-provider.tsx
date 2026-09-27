@@ -64,7 +64,12 @@ function buildVars(t: typeof lightTokens) {
 }
 
 const lightVarsStyle = buildVars(lightTokens);
-const darkVarsStyle = buildVars(darkTokens);
+/**
+ * The dark token set as a vars() style. Exported for surfaces that are dark
+ * in both app themes (the Film Room): a View carrying it re-points every
+ * semantic class below it (`bg-surface`, `text-ink`, ...) at the dark values.
+ */
+export const darkVarsStyle = buildVars(darkTokens);
 
 export interface ThemeProviderProps {
   children: React.ReactNode;

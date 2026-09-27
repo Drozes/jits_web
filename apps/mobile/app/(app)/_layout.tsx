@@ -34,6 +34,8 @@ export default function AppLayout() {
           live wizard, so it leaves live state alone. */}
         <Stack.Screen name="match-detail/[matchId]" />
         <Stack.Screen name="video/[id]" />
+        {/* The Film Room: every past match as a poster grid, from Profile. */}
+        <Stack.Screen name="film-room" />
         <Stack.Screen name="settings" />
         {/* The practice match: a local walk through one Arena match against
           a scripted bot. Writes no match data. */}
