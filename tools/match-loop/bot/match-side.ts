@@ -117,6 +117,10 @@ const HANDLER_EVENT: Record<string, string> = {
   onResultSubmitted: E.RESULT_SUBMITTED,
   onResultConfirmed: E.RESULT_CONFIRMED,
   onMatchCancelled: E.MATCH_CANCELLED,
+  // Match-flow redesign (face-off and claim-first result entry).
+  onWeighedIn: E.WEIGHED_IN,
+  onRecordingOptIn: E.RECORDING_OPTIN,
+  onResultClaimed: E.RESULT_CLAIMED,
   onMatchDisputed: E.MATCH_DISPUTED,
 };
 

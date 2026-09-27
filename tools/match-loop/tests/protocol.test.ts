@@ -41,7 +41,9 @@ test("APP_TIMING matches the app sources", () => {
   assert.equal(APP_TIMING.SEND_GRACE_MS, appConst("apps/mobile/lib/match-flow/match-sync-context.tsx", "SEND_GRACE_MS"));
   assert.equal(
     APP_TIMING.READY_REPEAT_MS,
-    appConst("apps/mobile/components/match-flow/steps/ready-step.tsx", "READY_REPEAT_MS"),
+    // The ready check moved into the face-off (match-flow redesign), which
+    // repeats ready_signal (and its weigh-in / recording state) on this beat.
+    appConst("apps/mobile/lib/match-flow/use-faceoff.ts", "FACEOFF_REPEAT_MS"),
   );
   const confirm = src("apps/mobile/components/match-flow/steps/confirm-step.tsx");
   const m = confirm.match(/setTimeout\(advance,\s*([\d_]+)\)/);
