@@ -355,7 +355,11 @@ const HIGHLIGHT_HINTS: [string, string, string][] = [
   ],
   ["highlight_not_retryable", "HIGHLIGHT_NOT_RETRYABLE", "This reel doesn't need a retry."],
   ["highlight_bad_feedback", "HIGHLIGHT_FEEDBACK_INVALID", "We couldn't save that feedback."],
-  ["highlight_feedback_limit", "HIGHLIGHT_FEEDBACK_INVALID", "We couldn't save that feedback."],
+  [
+    "highlight_feedback_limit",
+    "HIGHLIGHT_FEEDBACK_LIMIT",
+    "You've sent a lot of feedback on this reel. Try again later.",
+  ],
   ["highlight_bad_segments", "HIGHLIGHT_BAD_SEGMENTS", "Those moments can't make a reel."],
   ["highlight_too_long", "HIGHLIGHT_BAD_SEGMENTS", "Those moments can't make a reel."],
   ["highlight_too_short", "HIGHLIGHT_BAD_SEGMENTS", "Those moments can't make a reel."],

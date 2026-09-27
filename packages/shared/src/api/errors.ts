@@ -42,6 +42,7 @@ export type DomainErrorCode =
   | "HIGHLIGHT_REGEN_FAILED"
   | "HIGHLIGHT_NOT_RETRYABLE"
   | "HIGHLIGHT_FEEDBACK_INVALID"
+  | "HIGHLIGHT_FEEDBACK_LIMIT"
   | "HIGHLIGHT_BAD_SEGMENTS"
   | "RLS_VIOLATION"
   | "UNKNOWN";
@@ -212,9 +213,11 @@ const HINT_TO_CODE: Record<string, { code: DomainErrorCode; message: string }> =
       code: "HIGHLIGHT_FEEDBACK_INVALID",
       message: "We couldn't save that feedback.",
     },
+    // Split out of HIGHLIGHT_FEEDBACK_INVALID (spec 9.5 lumps them) at the
+    // B6 implementer's request: it is a 409 rate cap, not a bad payload.
     highlight_feedback_limit: {
-      code: "HIGHLIGHT_FEEDBACK_INVALID",
-      message: "We couldn't save that feedback.",
+      code: "HIGHLIGHT_FEEDBACK_LIMIT",
+      message: "You've sent a lot of feedback on this reel. Try again later.",
     },
     highlight_bad_segments: {
       code: "HIGHLIGHT_BAD_SEGMENTS",

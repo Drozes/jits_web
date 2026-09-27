@@ -279,7 +279,7 @@ describe("submitHighlightFeedback", () => {
 
   it.each([
     ["highlight_bad_feedback", "HIGHLIGHT_FEEDBACK_INVALID"],
-    ["highlight_feedback_limit", "HIGHLIGHT_FEEDBACK_INVALID"],
+    ["highlight_feedback_limit", "HIGHLIGHT_FEEDBACK_LIMIT"],
     ["highlight_not_ready", "HIGHLIGHT_NOT_READY"],
     ["highlight_not_found", "HIGHLIGHT_NOT_FOUND"],
   ])("maps %s to %s", async (hint, code) => {
@@ -400,6 +400,25 @@ describe("regenerateHighlight", () => {
     const { client } = fnClient({ data: null, error: httpError(502, "<html>Bad gateway</html>") });
     const result = await regenerateHighlight(client, PARAMS);
     expect(!result.ok && result.error.code).toBe("UNKNOWN");
+  });
+
+  it("maps a non-JSON gateway 401 to ATHLETE_NOT_FOUND (signed out), not UNKNOWN", async () => {
+    const { client } = fnClient({ data: null, error: httpError(401, "Unauthorized") });
+    const result = await regenerateHighlight(client, PARAMS);
+    expect(!result.ok && result.error.code).toBe("ATHLETE_NOT_FOUND");
+  });
+
+  it("maps HTTP 409 highlight_feedback_limit to HIGHLIGHT_FEEDBACK_LIMIT", async () => {
+    const body = JSON.stringify({ ok: false, error: { hint: "highlight_feedback_limit", message: "x" } });
+    const { client } = fnClient({ data: null, error: httpError(409, body) });
+    const result = await regenerateHighlight(client, PARAMS);
+    expect(!result.ok && result.error.code).toBe("HIGHLIGHT_FEEDBACK_LIMIT");
+  });
+
+  it("never sends more than 280 characters of free text (the function rejects, not truncates)", async () => {
+    const { client, invoke } = fnClient({ data: { ok: true }, error: null });
+    await regenerateHighlight(client, { ...PARAMS, freeText: "z".repeat(400) });
+    expect(invoke.mock.calls[0][1].body.free_text).toHaveLength(HIGHLIGHT_FREE_TEXT_MAX);
   });
 
   it("maps a gateway 401 without a hint (invalid JWT) to ATHLETE_NOT_FOUND", async () => {

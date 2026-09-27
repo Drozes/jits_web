@@ -295,8 +295,10 @@ function hintForStatus(status: number | undefined): string | null {
 /**
  * Read a functions-js error. A FunctionsHttpError carries the Response in
  * `context`; its JSON body is `{ ok: false, error: { hint, message } }`
- * (spec 9.3). A non-JSON body, a relay or a fetch error is UNKNOWN (except a
- * bare 401, which is the gateway rejecting the JWT).
+ * (spec 9.3). With `verify_jwt = true` the Supabase gateway rejects a
+ * missing/expired JWT with ITS OWN 401 body (no envelope), so any 401 without
+ * a hint means signed out (ATHLETE_NOT_FOUND). Any other non-envelope body,
+ * a relay or a fetch error is UNKNOWN.
  */
 async function domainErrorFromFunctionsError(error: unknown): Promise<DomainError> {
   const e = error as { message?: string; context?: unknown } | null;
@@ -307,7 +309,9 @@ async function domainErrorFromFunctionsError(error: unknown): Promise<DomainErro
   try {
     body = await ctx.json();
   } catch {
-    return { code: "UNKNOWN", message: fallback };
+    // Not our envelope. A 401 is still the gateway refusing the JWT
+    // (verify_jwt = true answers with its own body), i.e. signed out.
+    return domainErrorFromHint(hintForStatus(ctx.status), fallback);
   }
   const bodyError = (body as { error?: { hint?: unknown; message?: unknown } } | null)?.error;
   const hint = typeof bodyError?.hint === "string" ? bodyError.hint : hintForStatus(ctx.status);
