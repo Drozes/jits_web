@@ -119,6 +119,21 @@ export function useRatingTick(before: number | null, after: number | null): numb
   return value;
 }
 
+/**
+ * "1512 -> 1526" with the after value ticking up in RATING_TICK_MS. A leaf of
+ * its own, so the 60 fps tick re-renders this Text only, never the verdict.
+ */
+export function TickingRating({ before, after }: { before: number | null; after: number | null }) {
+  const ticking = useRatingTick(before, after);
+  const shown = ticking ?? after;
+  const text = before != null && shown != null && before !== after ? `${before} \u2192 ${shown}` : shown != null ? `${shown}` : "";
+  return (
+    <Text testID="verdict-rating" className="font-mono-bold" style={{ fontSize: 22, color: "#E8EDF2", fontVariant: ["tabular-nums"] }}>
+      {text}
+    </Text>
+  );
+}
+
 /** Plain text helper so the verdict file stays short. */
 export function DisplayText({ children, style, testID }: { children: React.ReactNode; style?: StyleProp<TextStyle>; testID?: string }) {
   return (

@@ -6,25 +6,33 @@ import { Film, RotateCcw, Share2, TrendingUp } from "lucide-react-native";
 import { toast } from "@/components/ui/toast";
 import { exitMatchTo } from "@/lib/match-flow/exit-to";
 import { matchDetailHref } from "@/lib/match-detail/href";
-import { arenaActions } from "@/lib/arena/arena-store";
 import { ARENA_HREF } from "@/lib/arena/constants";
 import { formatElapsed } from "@/lib/match-flow/format-elapsed";
+import { useMatchSyncContext, useStepMatchSync } from "@/lib/match-flow/match-sync-context";
 import { rankStripText, useRankChange, useVerdictVideos } from "@/lib/match-flow/use-verdict-data";
 import type { UploadBannerState } from "@/lib/video/upload-banner-state";
 import { buildShareText, buildShareUrl } from "@jits/shared/utils";
 import { UploadProgressBanner } from "../upload-progress-banner";
 import { FIGHT, FIGHT_RADIUS, TABULAR } from "../fight/fight-tokens";
 import { FightButton, Mono, RatingBlock, deltaColor, formatSignedDelta, shortName } from "../fight/fight-ui";
-import { Confetti, RiseIn, SlamIn, useRatingTick } from "./celebration";
+import { Confetti, RiseIn, SlamIn, TickingRating } from "./celebration";
 import { VerdictHero } from "./verdict-hero";
 
 /**
  * The Arena with the opponent to run it back against (jits-00fr). Navigated
- * with exitMatchTo, never a push: the match screen must unmount.
+ * with exitMatchTo, never a push: the match screen must unmount. `send`
+ * asks the Arena to send the challenge itself once the opponent is back in
+ * the lobby (see `useRematchAutoSend`): sending from here, while they are
+ * still on their own verdict, gets it declined as busy by their app.
  */
-export function rematchHref(opponentId: string): string {
-  return `${ARENA_HREF}?rematch=${encodeURIComponent(opponentId)}`;
+export function rematchHref(opponentId: string, opts: { send?: boolean } = {}): string {
+  return `${ARENA_HREF}?rematch=${encodeURIComponent(opponentId)}${opts.send ? "&send=1" : ""}`;
 }
+
+/** While the opponent's confirmation is missing, re-read the match this often. */
+export const VERDICT_DISPUTE_POLL_MS = 15_000;
+/** ...this many times (10 minutes); the row listener and foreground cover the rest. */
+export const VERDICT_DISPUTE_POLL_LIMIT = 40;
 
 export interface VerdictAthlete {
   athlete_id: string;
@@ -51,6 +59,8 @@ interface VerdictStepProps {
   upload: UploadBannerState;
   /** This phone's clip landed; re-reads the match's videos for the still. */
   uploadedVideoId: string | null;
+  /** Athletes with a confirmation row (from the wizard's reconciler). */
+  confirmedAthleteIds?: string[];
 }
 
 /**
@@ -58,32 +68,68 @@ interface VerdictStepProps {
  * rating ticks, the rank strip rises); a loss is calm and makes the rematch
  * the red CTA. Two primary actions plus a small row; the opening still (or
  * the athletes, until it exists) as the hero; this phone's upload as a card.
+ *
+ * A recorder reaches this before the opponent has confirmed (auto-confirm,
+ * B2), and the opponent may still dispute. So the verdict listens for
+ * match_disputed and, while the opponent's confirmation is missing on a
+ * completed match, re-reads the match on a bounded poll; a dispute turns it
+ * into the calm DISPUTED verdict (no celebration, no rank strip).
  */
 export function VerdictStep(props: VerdictStepProps) {
-  const { matchId, exitHref, exitLabel, matchType, matchStatus, outcome, me, opponent, submissionName, finishTimeSeconds, upload, uploadedVideoId } = props;
+  const { matchId, exitHref, exitLabel, matchType, matchStatus, outcome, me, opponent, submissionName, finishTimeSeconds, upload, uploadedVideoId, confirmedAthleteIds = [] } = props;
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [rematching, setRematching] = React.useState(false);
-  const disputed = matchStatus === "disputed";
+  const [disputedHere, setDisputedHere] = React.useState(false);
+  const { reconcileNow } = useMatchSyncContext();
+
+  const opponentConfirmed = confirmedAthleteIds.includes(opponent.athlete_id);
+  const disputed = matchStatus === "disputed" || disputedHere;
+  const awaitingOpponent = !disputed && matchStatus === "completed" && !opponentConfirmed;
+
+  useStepMatchSync({
+    matchId,
+    enabled: !disputed,
+    onMatchDisputed: (athleteId) => {
+      if (athleteId === me.athlete_id) return;
+      setDisputedHere(true);
+      toast.info({ text1: "Result disputed", description: `${opponent.display_name} disputed the result. An admin will review it.` });
+      reconcileNow();
+    },
+  });
+
+  // Bounded poll while the opponent could still dispute (a missed broadcast).
+  const pollsRef = React.useRef(0);
+  React.useEffect(() => {
+    if (!awaitingOpponent) return;
+    const id = setInterval(() => {
+      if (pollsRef.current >= VERDICT_DISPUTE_POLL_LIMIT) return;
+      pollsRef.current += 1;
+      reconcileNow();
+    }, VERDICT_DISPUTE_POLL_MS);
+    return () => clearInterval(id);
+  }, [awaitingOpponent, reconcileNow]);
+
   const ranked = matchType === "ranked";
   const win = !disputed && outcome === "win";
   const loss = !disputed && outcome === "loss";
 
   const videos = useVerdictVideos(matchId, me.athlete_id, uploadedVideoId);
   const rank = useRankChange(matchId, ranked && win);
-  const rankText = rankStripText(rank, shortName);
+  const rankText = win ? rankStripText(rank, shortName) : null;
 
   const eloBefore = ranked ? (me.elo_before ?? null) : null;
-  const eloAfter = ranked ? (me.elo_after ?? me.current_elo ?? null) : null;
+  // The stamped post-match rating only: before the refresh lands,
+  // current_elo is still the PRE-match rating and would read as no change.
+  const eloAfter = ranked ? (me.elo_after ?? null) : null;
   const eloDelta = ranked ? (me.elo_delta ?? null) : null;
-  const ticking = useRatingTick(eloBefore, eloAfter);
   const gap = ranked ? (me.weight_division_gap ?? 0) : 0;
 
   const verdict = disputed ? "DISPUTED" : win ? "YOU WON" : loss ? "YOU LOST" : outcome === "draw" ? "DRAW" : "MATCH RECORDED";
-  const verdictColor = disputed ? FIGHT.red : outcome === "draw" ? FIGHT.amber : win ? FIGHT.white : FIGHT.text;
+  const verdictColor = disputed ? FIGHT.text : outcome === "draw" ? FIGHT.amber : win ? FIGHT.white : FIGHT.text;
   const how = [submissionName ? `by ${submissionName}` : null, finishTimeSeconds != null ? formatElapsed(finishTimeSeconds) : null]
     .filter(Boolean)
-    .join(" · ");
+    .join(" \u00b7 ");
   const oppShort = shortName(opponent.display_name);
 
   const uploadBusy = upload.kind === "uploading" || upload.kind === "stopping";
@@ -92,21 +138,27 @@ export function VerdictStep(props: VerdictStepProps) {
   const watch = () => router.push(matchDetailHref(matchId));
   const back = () => exitMatchTo(router, exitHref);
 
-  async function rematch() {
+  function rematch() {
     if (rematching) return;
     setRematching(true);
-    // Sends the challenge (the Arena's own send path, ranked), then lands in
-    // the Arena where the waiting plate shows it.
-    await arenaActions.sendChallenge(opponent.athlete_id, opponent.display_name);
-    exitMatchTo(router, rematchHref(opponent.athlete_id));
+    // The Arena sends it once the opponent is back in the lobby (and takes
+    // this athlete live if they are not), then says so.
+    exitMatchTo(router, rematchHref(opponent.athlete_id, { send: true }));
   }
 
   async function share() {
     if (!outcome) return;
     const url = buildShareUrl("match", matchId);
-    const text = buildShareText({ type: "match-result", data: { outcome, elo: eloAfter, eloDelta } });
+    // The rating line only once the stamped rating is in (never the
+    // pre-match current_elo).
+    const text = buildShareText({
+      type: "match-result",
+      data: { outcome, elo: eloAfter, eloDelta: eloAfter != null ? eloDelta : null },
+    });
     try {
-      await Share.share({ title: "ELO RATED match", message: `${text}\n${url}`, url });
+      // The link once, in the message: iOS appends a separate `url` to the
+      // message, which showed it twice.
+      await Share.share({ title: "ELO RATED match", message: `${text}\n${url}` });
     } catch {
       toast.error("Could not share this match");
     }
@@ -120,7 +172,7 @@ export function VerdictStep(props: VerdictStepProps) {
         accessibilityLabel={`Rematch ${opponent.display_name}`}
         label={`Rematch ${oppShort}`}
         busy={rematching}
-        onPress={() => void rematch()}
+        onPress={rematch}
         height={primary ? 56 : 44}
         icon={(c) => <RotateCcw size={16} color={c} />}
         style={primary ? undefined : { flex: 1, paddingHorizontal: 4 }}
@@ -174,8 +226,9 @@ export function VerdictStep(props: VerdictStepProps) {
         {ranked && eloAfter != null ? (
           <RatingBlock
             before={eloBefore}
-            after={ticking ?? eloAfter}
+            after={eloAfter}
             delta={eloDelta}
+            ratingNode={<TickingRating before={disputed ? null : eloBefore} after={eloAfter} />}
             deltaNode={
               eloDelta != null && eloDelta !== 0 ? (
                 <Text testID="summary-elo-delta" className="font-mono-bold" style={[{ fontSize: 26, color: outcome === "draw" ? FIGHT.amber : deltaColor(eloDelta) }, TABULAR]}>

@@ -327,14 +327,17 @@ export function RatingBlock({
   delta,
   deltaTestID,
   deltaNode,
+  ratingNode,
 }: {
   label?: string;
   before: number | null;
   after: number | null;
   delta: number | null;
   deltaTestID?: string;
-  /** Replaces the plain delta text (the verdict animates it). */
+  /** Replaces the plain delta text. */
   deltaNode?: React.ReactNode;
+  /** Replaces the rating text (the verdict ticks it in its own leaf). */
+  ratingNode?: React.ReactNode;
 }) {
   const ratingText =
     before != null && after != null && before !== after ? `${before} → ${after}` : after != null ? `${after}` : "";
@@ -354,9 +357,11 @@ export function RatingBlock({
     >
       <View style={{ gap: 6 }}>
         <Mono color={FIGHT.text3}>{label}</Mono>
-        <Text className="font-mono-bold" style={[{ fontSize: 22, color: FIGHT.text }, TABULAR]}>
-          {ratingText}
-        </Text>
+        {ratingNode ?? (
+          <Text className="font-mono-bold" style={[{ fontSize: 22, color: FIGHT.text }, TABULAR]}>
+            {ratingText}
+          </Text>
+        )}
       </View>
       {deltaNode ??
         (delta != null && delta !== 0 ? (

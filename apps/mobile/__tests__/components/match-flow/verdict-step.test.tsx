@@ -25,7 +25,6 @@ jest.mock("expo-image", () => {
   const RN = require("react-native");
   return { Image: (p: { source?: { uri?: string } }) => R.createElement(RN.View, { testID: "still-image", uri: p.source?.uri }) };
 });
-jest.mock("@/components/ui/toast", () => ({ toast: { success: jest.fn(), error: jest.fn(), info: jest.fn() } }));
 jest.mock("@/lib/supabase/client", () => ({ supabase: { tag: "client" } }));
 
 const mockDismissTo = jest.fn();
@@ -34,10 +33,17 @@ jest.mock("expo-router", () => ({
   useRouter: () => ({ dismissTo: mockDismissTo, push: mockPush, back: jest.fn() }),
 }));
 
-const mockSendChallenge = jest.fn((_id: string, _name: string) => Promise.resolve());
-jest.mock("@/lib/arena/arena-store", () => ({
-  arenaActions: { sendChallenge: (id: string, name: string) => mockSendChallenge(id, name) },
+type SyncParams = { onMatchDisputed?: (id: string) => void; enabled?: boolean };
+let mockSyncParams: SyncParams = {};
+const mockReconcileNow = jest.fn();
+jest.mock("@/lib/match-flow/match-sync-context", () => ({
+  useMatchSyncContext: () => ({ reconcileNow: mockReconcileNow }),
+  useStepMatchSync: (p: SyncParams) => {
+    mockSyncParams = p;
+    return {};
+  },
 }));
+jest.mock("@/components/ui/toast", () => ({ toast: { success: jest.fn(), error: jest.fn(), info: jest.fn() } }));
 
 const mockDetailView = jest.fn();
 jest.mock("@jits/shared/api/queries", () => ({
@@ -78,6 +84,7 @@ const color = (el: { props: { style?: unknown } }) => (StyleSheet.flatten(el.pro
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockSyncParams = {};
   mockDetailView.mockResolvedValue({ ok: true, data: { videos: [] } });
   mockRankChange.mockResolvedValue({ ok: false, error: { code: "UNKNOWN", message: "missing" } });
 });
@@ -151,30 +158,44 @@ describe("actions", () => {
     expect(s.getByText(ARENA_EXIT_LABEL)).toBeTruthy();
   });
 
-  it("loss: Rematch is the red CTA and sends the challenge before landing in the Arena", async () => {
+  it("loss: Rematch is the red CTA and hands the send to the Arena (send=1)", async () => {
     const s = renderVerdict({ outcome: "loss", me: { athlete_id: "me", display_name: "Kai Reyes", elo_delta: -9, elo_before: 1498, elo_after: 1489 } });
     await flush();
     expect(s.getByText("Run it back?")).toBeTruthy();
-    await act(async () => {
-      fireEvent.press(s.getByTestId("summary-rematch"));
-    });
-    expect(mockSendChallenge).toHaveBeenCalledWith("opp", "Mina Park");
-    expect(mockDismissTo).toHaveBeenCalledWith("/arena?rematch=opp");
+    fireEvent.press(s.getByTestId("summary-rematch"));
+    // Not sent from here: the opponent is likely still on their verdict,
+    // where their app declines every challenge as busy.
+    expect(mockDismissTo).toHaveBeenCalledWith("/arena?rematch=opp&send=1");
     expect(mockPush).not.toHaveBeenCalled();
   });
 
   it("encodes the rematch href", () => {
     expect(rematchHref("a b&c")).toBe(`${ARENA_HREF}?rematch=a%20b%26c`);
+    expect(rematchHref("x", { send: true })).toBe(`${ARENA_HREF}?rematch=x&send=1`);
   });
 
-  it("shares a link to the web match page", async () => {
+  it("shares the live web match page once, with the stamped rating", async () => {
     const spy = jest.spyOn(Share, "share").mockResolvedValue({ action: "sharedAction" } as never);
     const s = renderVerdict();
     await flush();
     await act(async () => {
       fireEvent.press(s.getByTestId("summary-share"));
     });
-    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ url: "https://elorated.com/matches/M1" }));
+    const arg = spy.mock.calls[0][0] as { message: string; url?: string };
+    expect(arg.url).toBeUndefined();
+    expect(arg.message).toBe("I just won a match on ELO RATED! New rating: 1526 (+14)\nhttps://jitsweb.vercel.app/matches/M1");
+    expect(arg.message.match(/https:/g)).toHaveLength(1);
+    spy.mockRestore();
+  });
+
+  it("leaves the rating out of the share until the stamped rating is in", async () => {
+    const spy = jest.spyOn(Share, "share").mockResolvedValue({ action: "sharedAction" } as never);
+    const s = renderVerdict({ me: { athlete_id: "me", display_name: "Kai Reyes", current_elo: 1512, elo_after: null, elo_delta: null } });
+    await flush();
+    await act(async () => {
+      fireEvent.press(s.getByTestId("summary-share"));
+    });
+    expect((spy.mock.calls[0][0] as { message: string }).message).toBe("I just won a match on ELO RATED!\nhttps://jitsweb.vercel.app/matches/M1");
     spy.mockRestore();
   });
 
@@ -204,7 +225,7 @@ describe("rank strip (B6)", () => {
   it("shows the climb and who was passed", async () => {
     mockRankChange.mockResolvedValue({
       ok: true,
-      data: { rank_before: 23, rank_after: 19, passed: [{ athlete_id: "x", display_name: "Joao Silva" }] },
+      data: { rank_before: 23, rank_after: 19, direction: "up", passed: [{ athlete_id: "x", display_name: "Joao Silva" }], passed_total: 1 },
     });
     const s = renderVerdict();
     await waitFor(() => expect(s.getByTestId("verdict-rank-strip")).toBeTruthy());
@@ -238,5 +259,51 @@ describe("opening still", () => {
     const s = renderVerdict();
     await waitFor(() => expect(s.getByText("STILL ARRIVES AFTER UPLOAD")).toBeTruthy());
     expect(s.getByTestId("verdict-still-fallback")).toBeTruthy();
+  });
+});
+
+describe("the recorder learns of a dispute (S1)", () => {
+  it("a match_disputed from the opponent turns the win into the calm DISPUTED verdict", async () => {
+    const s = renderVerdict({ confirmedAthleteIds: ["me"] });
+    await flush();
+    expect(s.getByTestId("summary-verdict")).toHaveTextContent("YOU WON");
+    act(() => mockSyncParams.onMatchDisputed?.("opp"));
+    expect(s.getByTestId("summary-verdict")).toHaveTextContent("DISPUTED");
+    s.getByTestId("summary-disputed-note");
+    expect(s.queryByTestId("verdict-confetti", { includeHiddenElements: true })).toBeNull();
+    expect(s.queryByTestId("summary-rematch")).toBeNull();
+    expect(mockReconcileNow).toHaveBeenCalled();
+  });
+
+  it("ignores its own match_disputed echo", async () => {
+    const s = renderVerdict();
+    await flush();
+    act(() => mockSyncParams.onMatchDisputed?.("me"));
+    expect(s.getByTestId("summary-verdict")).toHaveTextContent("YOU WON");
+  });
+
+  it("re-reads the match every 15 s while the opponent has not confirmed, bounded", () => {
+    jest.useFakeTimers();
+    renderVerdict({ confirmedAthleteIds: ["me"] });
+    act(() => {
+      jest.advanceTimersByTime(15_000 * 3);
+    });
+    expect(mockReconcileNow).toHaveBeenCalledTimes(3);
+    act(() => {
+      jest.advanceTimersByTime(15_000 * 60);
+    });
+    expect(mockReconcileNow).toHaveBeenCalledTimes(40);
+    jest.useRealTimers();
+  });
+
+  it("does not poll once both have confirmed, nor on a match already disputed", () => {
+    jest.useFakeTimers();
+    renderVerdict({ confirmedAthleteIds: ["me", "opp"] });
+    renderVerdict({ matchStatus: "disputed" });
+    act(() => {
+      jest.advanceTimersByTime(60_000);
+    });
+    expect(mockReconcileNow).not.toHaveBeenCalled();
+    jest.useRealTimers();
   });
 });

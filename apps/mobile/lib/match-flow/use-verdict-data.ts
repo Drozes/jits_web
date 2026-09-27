@@ -92,11 +92,13 @@ export function useRankChange(matchId: string, enabled: boolean): MatchRankChang
  * strip (unranked on either side, or no improvement).
  */
 export function rankStripText(change: MatchRankChange | null, short: (name: string) => string): string | null {
-  if (!change || change.rank_before == null || change.rank_after == null) return null;
-  if (change.rank_after >= change.rank_before) return null;
-  const base = `#${change.rank_before} → #${change.rank_after}`;
-  const names = change.passed.map((p) => short(p.display_name).toUpperCase());
-  if (names.length === 0) return base;
-  const more = names.length > 1 ? ` +${names.length - 1}` : "";
-  return `${base} · PASSED ${names[0]}${more}`;
+  if (!change || change.direction !== "up") return null;
+  if (change.rank_before == null || change.rank_after == null || change.rank_after >= change.rank_before) return null;
+  const base = `#${change.rank_before} \u2192 #${change.rank_after}`;
+  const first = change.passed[0];
+  if (!first) return base;
+  // The uncapped count: "passed" itself holds at most three.
+  const others = Math.max(change.passed_total, change.passed.length) - 1;
+  const more = others > 0 ? ` +${others}` : "";
+  return `${base} \u00b7 PASSED ${short(first.display_name).toUpperCase()}${more}`;
 }

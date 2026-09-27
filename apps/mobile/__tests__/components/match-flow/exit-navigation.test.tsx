@@ -400,7 +400,7 @@ describe("MatchFlowWizard exit navigation", () => {
     await act(async () => {
       fireEvent.press(rematch);
     });
-    await waitFor(() => expect(mockRouterDismissTo).toHaveBeenCalledWith(`${ARENA_HREF}?rematch=opp-1`));
+    await waitFor(() => expect(mockRouterDismissTo).toHaveBeenCalledWith(`${ARENA_HREF}?rematch=opp-1&send=1`));
   });
 
   it("keeps a caller label that merely has surrounding whitespace", () => {
