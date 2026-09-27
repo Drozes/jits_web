@@ -23,7 +23,10 @@ jest.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: () => ({
 jest.mock("expo-image", () => {
   const R = require("react");
   const RN = require("react-native");
-  return { Image: (p: { source?: { uri?: string } }) => R.createElement(RN.View, { testID: "still-image", uri: p.source?.uri }) };
+  return {
+    Image: (p: { source?: { uri?: string; cacheKey?: string } }) =>
+      R.createElement(RN.View, { testID: "still-image", uri: p.source?.uri, cacheKey: p.source?.cacheKey }),
+  };
 });
 jest.mock("@/lib/supabase/client", () => ({ supabase: { tag: "client" } }));
 
@@ -252,6 +255,18 @@ describe("opening still", () => {
     await waitFor(() => expect(s.getByTestId("verdict-still")).toBeTruthy());
     expect(s.getByTestId("still-image").props.uri).toBe("https://signed/poster.jpg");
     expect(s.getByText("Watch film")).toBeTruthy();
+  });
+
+  it("caches the still under the poster's storage key in the Film Room's film-still- namespace", async () => {
+    mockDetailView.mockResolvedValue({
+      ok: true,
+      data: {
+        videos: [{ id: "v1", poster_url: "https://signed/poster.jpg?token=a", thumbnail_key: "matches/M1/v1/poster.jpg" }],
+      },
+    });
+    const s = renderVerdict();
+    await waitFor(() => expect(s.getByTestId("verdict-still")).toBeTruthy());
+    expect(s.getByTestId("still-image").props.cacheKey).toBe("film-still-matches/M1/v1/poster.jpg");
   });
 
   it("falls back to the athletes with STILL ARRIVES AFTER UPLOAD while a video has no poster", async () => {

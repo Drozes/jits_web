@@ -16,7 +16,10 @@ export interface VerdictVideos {
   /**
    * Stable image cache key: the poster's storage key (thumbnail key), the same
    * key the Film Room's OpeningStill caches under, so the match page reuses
-   * the verdict's still. Falls back to the video id.
+   * the verdict's still. The video-id fallback is effectively unreachable:
+   * getMatchDetailView only signs a poster_url from a non-null thumbnail_url,
+   * which is also what thumbnail_key carries. It stays as a type-level guard
+   * (thumbnail_key is optional in the type) and for hand-built fixtures.
    */
   posterKey: string | null;
 }
