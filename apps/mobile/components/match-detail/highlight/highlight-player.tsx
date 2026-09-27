@@ -28,7 +28,7 @@ interface HighlightPlayerProps {
 export function HighlightPlayer({ source, onError }: HighlightPlayerProps) {
   const viewRef = React.useRef<VideoView>(null);
   const [firstFrame, setFirstFrame] = React.useState(false);
-  const player = useHighlightPlayer(source, onError);
+  const { player, readyVersion } = useHighlightPlayer(source, onError);
   // The poster covers a NEW version until it renders; a re-sign keeps the frame.
   React.useEffect(() => setFirstFrame(false), [source.version]);
 
@@ -57,7 +57,7 @@ export function HighlightPlayer({ source, onError }: HighlightPlayerProps) {
           allowsPictureInPicture={false}
           onFirstFrameRender={() => setFirstFrame(true)}
         />
-        {source.posterUrl && !firstFrame ? (
+        {source.posterUrl && !firstFrame && readyVersion !== source.version ? (
           <Image
             testID="highlight-poster"
             source={posterSource(source)}

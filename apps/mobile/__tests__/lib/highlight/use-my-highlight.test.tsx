@@ -389,6 +389,84 @@ describe("HighlightPlayer", () => {
     expect(onError).toHaveBeenCalledTimes(1);
   });
 
+  /** Make the next replaceAsync calls resolve/reject by hand. */
+  function deferSwaps(player: { replaceAsync: jest.Mock; source: string }) {
+    const pending: { url: string; resolve: () => void; reject: (e: Error) => void }[] = [];
+    player.replaceAsync.mockImplementation(
+      (url: string) =>
+        new Promise<void>((resolve, reject) => {
+          pending.push({
+            url,
+            resolve: () => {
+              player.source = url; // the native item is whichever finished last
+              resolve();
+            },
+            reject,
+          });
+        }),
+    );
+    return pending;
+  }
+
+  it("ignores a superseded swap and re-issues the latest URL when the stale one finishes last", async () => {
+    const onError = jest.fn();
+    const utils = render(<HighlightPlayer source={SOURCE} onError={onError} />);
+    const player = utils.getByTestId("expo-video-view").props.player;
+    const pending = deferSwaps(player);
+    player.play();
+    player.currentTime = 8;
+    utils.rerender(<HighlightPlayer source={{ ...SOURCE, url: "https://a", generation: 1 }} onError={onError} />);
+    utils.rerender(<HighlightPlayer source={{ ...SOURCE, url: "https://b", generation: 2 }} onError={onError} />);
+    expect(pending.map((p) => p.url)).toEqual(["https://a", "https://b"]);
+    // Latest finishes first and applies its restore...
+    await act(async () => pending[1].resolve());
+    expect(player.play).toHaveBeenCalledTimes(2);
+    // ...then the stale one finishes last: its restore is ignored and the
+    // latest URL is loaded again so the item is not left on the stale URL.
+    player.currentTime = 3;
+    await act(async () => pending[0].resolve());
+    expect(player.currentTime).toBe(3);
+    expect(pending.map((p) => p.url)).toEqual(["https://a", "https://b", "https://b"]);
+    await act(async () => pending[2].resolve());
+    expect(player.source).toBe("https://b");
+    expect(onError).not.toHaveBeenCalled();
+  });
+
+  it("ignores a stale swap that fails, and anything settling after unmount", async () => {
+    const onError = jest.fn();
+    const utils = render(<HighlightPlayer source={SOURCE} onError={onError} />);
+    const player = utils.getByTestId("expo-video-view").props.player;
+    const pending = deferSwaps(player);
+    utils.rerender(<HighlightPlayer source={{ ...SOURCE, url: "https://a", generation: 1 }} onError={onError} />);
+    utils.rerender(<HighlightPlayer source={{ ...SOURCE, url: "https://b", generation: 2 }} onError={onError} />);
+    await act(async () => pending[0].reject(new Error("stale failed")));
+    expect(onError).not.toHaveBeenCalled();
+    utils.unmount();
+    await act(async () => pending[1].reject(new Error("late")));
+    expect(onError).not.toHaveBeenCalled();
+    expect(pending).toHaveLength(2);
+  });
+
+  it("hides the poster on readyToPlay for the current version even without onFirstFrameRender", async () => {
+    const utils = render(<HighlightPlayer source={SOURCE} onError={jest.fn()} />);
+    const player = utils.getByTestId("expo-video-view").props.player;
+    expect(utils.getByTestId("highlight-poster")).toBeTruthy();
+    act(() => player.emitStatus({ status: "readyToPlay" }));
+    expect(utils.queryByTestId("highlight-poster")).toBeNull();
+    // A new version shows its poster again until IT is ready.
+    const pending = deferSwaps(player);
+    utils.rerender(
+      <HighlightPlayer source={{ ...SOURCE, url: "https://v2", version: 2, generation: 1 }} onError={jest.fn()} />,
+    );
+    expect(utils.getByTestId("highlight-poster")).toBeTruthy();
+    // readyToPlay while the swap is still pending is about the OLD item.
+    act(() => player.emitStatus({ status: "readyToPlay" }));
+    expect(utils.getByTestId("highlight-poster")).toBeTruthy();
+    await act(async () => pending[0].resolve());
+    act(() => player.emitStatus({ status: "readyToPlay" }));
+    expect(utils.queryByTestId("highlight-poster")).toBeNull();
+  });
+
   it("offers native fullscreen", () => {
     const utils = render(<HighlightPlayer source={SOURCE} onError={jest.fn()} />);
     expect(utils.getByLabelText("Watch full screen")).toBeTruthy();

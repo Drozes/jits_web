@@ -371,15 +371,21 @@ function hintForStatus(status: number | undefined): string | null {
  * a hint means signed out (ATHLETE_NOT_FOUND). Any other non-envelope body,
  * a relay or a fetch error is UNKNOWN.
  */
-/** functions-js wraps the aborted fetch in a FunctionsFetchError whose context is the abort. */
-function isAbortOrTimeout(error: unknown): boolean {
+/**
+ * No response was received, so the outcome is unknown (the server may have
+ * armed the render): our 90 s abort, or ANY fetch failure functions-js wraps
+ * in a FunctionsFetchError (e.g. iOS's native ~60 s "Network request failed").
+ * An HTTP error response is a FunctionsHttpError and is mapped by its body.
+ */
+function isNoResponse(error: unknown): boolean {
   const e = error as { name?: string; context?: { name?: string } } | null;
+  if (e?.name === "FunctionsFetchError") return true;
   const inner = e?.context?.name ?? e?.name;
   return inner === "AbortError" || inner === "TimeoutError";
 }
 
 async function domainErrorFromFunctionsError(error: unknown): Promise<DomainError> {
-  if (isAbortOrTimeout(error)) {
+  if (isNoResponse(error)) {
     return { code: "HIGHLIGHT_REGEN_TIMEOUT", message: "Still working on it. Check back in a minute." };
   }
   const e = error as { message?: string; context?: unknown } | null;

@@ -474,14 +474,33 @@ describe("regenerateHighlight", () => {
     },
   );
 
-  it("treats a relay/fetch error (no Response context) as UNKNOWN", async () => {
-    const err = Object.assign(new Error("Failed to send a request"), { name: "FunctionsFetchError" });
+  it("maps ANY FunctionsFetchError (no response, e.g. iOS 'Network request failed') to HIGHLIGHT_REGEN_TIMEOUT", async () => {
+    const err = Object.assign(new Error("Failed to send a request to the Edge Function"), {
+      name: "FunctionsFetchError",
+      context: new TypeError("Network request failed"),
+    });
+    const { client } = fnClient({ data: null, error: err });
+    const result = await regenerateHighlight(client, PARAMS);
+    expect(!result.ok && result.error.code).toBe("HIGHLIGHT_REGEN_TIMEOUT");
+  });
+
+  it("keeps a relay error (a Response without our envelope) as UNKNOWN", async () => {
+    const err = Object.assign(new Error("Relay Error invoking the Edge Function"), {
+      name: "FunctionsRelayError",
+      context: new Response("relay down", { status: 502 }),
+    });
     const { client } = fnClient({ data: null, error: err });
     const result = await regenerateHighlight(client, PARAMS);
     expect(result).toEqual({
       ok: false,
-      error: { code: "UNKNOWN", message: "Failed to send a request" },
+      error: { code: "UNKNOWN", message: "Relay Error invoking the Edge Function" },
     });
+  });
+
+  it("keeps a thrown non-functions error as UNKNOWN", async () => {
+    const client = { functions: { invoke: vi.fn().mockRejectedValue(new Error("boom")) } } as never;
+    const result = await regenerateHighlight(client, PARAMS);
+    expect(result).toEqual({ ok: false, error: { code: "UNKNOWN", message: "boom" } });
   });
 
   it("treats a 200 without a feedback_id as UNKNOWN", async () => {
