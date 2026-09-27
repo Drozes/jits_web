@@ -70,6 +70,7 @@ const ERROR_COPY: Partial<Record<DomainErrorCode, string>> = {
   HIGHLIGHTS_DISABLED: "Highlight reels are paused right now.",
   HIGHLIGHT_NOT_FOUND: "That highlight no longer exists.",
   HIGHLIGHT_NOT_READY: "Your highlight isn't ready yet.",
+  HIGHLIGHT_SOURCE_NOT_READY: "Your match video isn't available for a highlight right now.",
   HIGHLIGHT_RENDER_IN_PROGRESS: "A new version is already being made.",
   HIGHLIGHT_RENDER_LIMIT: "You've used all versions for this reel.",
   HIGHLIGHT_REGEN_UNAVAILABLE: "This reel can't be regenerated.",

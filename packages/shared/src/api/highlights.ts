@@ -10,7 +10,6 @@ import {
   type DomainError,
   type Result,
 } from "./errors";
-import { highlightRpc, type RawHighlightProgress } from "./highlight-rpc";
 import {
   isStorageObjectMissing,
   MATCH_VIDEO_BUCKET,
@@ -47,6 +46,42 @@ export interface HighlightSegment {
 
 export type HighlightStatus = "pending" | "rendering" | "ready" | "failed" | "invalidated";
 export type HighlightPlanStatus = "pending" | "planning" | "planned" | "failed" | "invalidated";
+/** Which athlete the latest applied regeneration built the reel from. */
+export type HighlightIdentitySide = "own" | "swapped" | "mixed";
+
+/**
+ * `get_highlight_progress(p_match_video_id)` JSONB (jr_be spec 014 section
+ * 9.1), snake_case. Generated types give it as `Json`; `toHighlightProgress`
+ * narrows every text column to its union at this boundary.
+ */
+export interface RawHighlightProgress {
+  match_video_id: string;
+  athlete_id: string;
+  enabled: boolean;
+  phase: string;
+  highlight_id: string | null;
+  status: string | null;
+  plan_status: string | null;
+  render_total: number;
+  render_max: number;
+  renders_remaining: number;
+  can_regenerate: boolean;
+  last_attempt_failed: boolean;
+  playback: {
+    storage_path: string;
+    poster_path: string | null;
+    duration_s: number | string;
+    version: number;
+    segments: unknown;
+    ready_at: string;
+  } | null;
+  error_message: string | null;
+  identity_disputed: boolean;
+  /** Additive key from B1 (not in the spec 9.1 list); may be absent. */
+  identity_side?: string | null;
+  last_change_summary: string | null;
+  updated_at: string | null;
+}
 
 export interface HighlightPlayback {
   storagePath: string;
@@ -73,6 +108,7 @@ export interface HighlightProgress {
   playback: HighlightPlayback | null;
   errorMessage: string | null;
   identityDisputed: boolean;
+  identitySide: HighlightIdentitySide | null;
   lastChangeSummary: string | null;
   updatedAt: string | null;
 }
@@ -97,6 +133,27 @@ export interface HighlightRegenerateResult {
   renderTotal: number;
   rendersRemaining: number;
   changeSummary: string | null;
+}
+
+const STATUSES: ReadonlySet<string> = new Set<HighlightStatus>([
+  "pending",
+  "rendering",
+  "ready",
+  "failed",
+  "invalidated",
+]);
+const PLAN_STATUSES: ReadonlySet<string> = new Set<HighlightPlanStatus>([
+  "pending",
+  "planning",
+  "planned",
+  "failed",
+  "invalidated",
+]);
+const IDENTITY_SIDES: ReadonlySet<string> = new Set<HighlightIdentitySide>(["own", "swapped", "mixed"]);
+
+/** `value` when it is one of `allowed`, else null. */
+function oneOf<T extends string>(allowed: ReadonlySet<string>, value: unknown): T | null {
+  return typeof value === "string" && allowed.has(value) ? (value as T) : null;
 }
 
 const PHASES: ReadonlySet<string> = new Set<HighlightPhase>([
@@ -151,8 +208,8 @@ export function toHighlightProgress(raw: RawHighlightProgress): HighlightProgres
     enabled: raw.enabled === true,
     phase: PHASES.has(raw.phase) ? (raw.phase as HighlightPhase) : "unavailable",
     highlightId: raw.highlight_id ?? null,
-    status: (raw.status ?? null) as HighlightStatus | null,
-    planStatus: (raw.plan_status ?? null) as HighlightPlanStatus | null,
+    status: oneOf<HighlightStatus>(STATUSES, raw.status),
+    planStatus: oneOf<HighlightPlanStatus>(PLAN_STATUSES, raw.plan_status),
     renderTotal: num(raw.render_total),
     renderMax: num(raw.render_max),
     rendersRemaining: Math.max(num(raw.renders_remaining), 0),
@@ -170,6 +227,7 @@ export function toHighlightProgress(raw: RawHighlightProgress): HighlightProgres
       : null,
     errorMessage: raw.error_message ?? null,
     identityDisputed: raw.identity_disputed === true,
+    identitySide: oneOf<HighlightIdentitySide>(IDENTITY_SIDES, raw.identity_side),
     lastChangeSummary: raw.last_change_summary ?? null,
     updatedAt: raw.updated_at ?? null,
   };
@@ -195,14 +253,14 @@ export async function getHighlightProgress(
   matchVideoId: string,
 ): Promise<Result<HighlightProgress>> {
   try {
-    const { data, error } = await highlightRpc(supabase, "get_highlight_progress", {
+    const { data, error } = await supabase.rpc("get_highlight_progress", {
       p_match_video_id: matchVideoId,
     });
     if (error) return { ok: false, error: mapPostgrestError(error, "highlight_progress") };
-    if (!data || typeof data !== "object") {
+    if (!data || typeof data !== "object" || Array.isArray(data)) {
       return { ok: false, error: { code: "UNKNOWN", message: "No highlight progress returned." } };
     }
-    return { ok: true, data: toHighlightProgress(data) };
+    return { ok: true, data: toHighlightProgress(data as unknown as RawHighlightProgress) };
   } catch (err) {
     return { ok: false, error: unexpected("getHighlightProgress", err) };
   }
@@ -257,11 +315,14 @@ export async function submitHighlightFeedback(
   params: HighlightFeedbackParams,
 ): Promise<Result<{ feedbackId: string }>> {
   try {
-    const { data, error } = await highlightRpc(supabase, "submit_highlight_feedback", {
+    // Nulls are omitted: the SQL defaults (NULL rating, '{}' chips, NULL
+    // text) apply, and the generated Args type has no `null` for them.
+    const freeText = normalizeFreeText(params.freeText);
+    const { data, error } = await supabase.rpc("submit_highlight_feedback", {
       p_highlight_id: params.highlightId,
-      p_rating: params.rating,
       p_chips: [...params.chips],
-      p_free_text: normalizeFreeText(params.freeText),
+      ...(params.rating !== null ? { p_rating: params.rating } : {}),
+      ...(freeText !== null ? { p_free_text: freeText } : {}),
     });
     if (error) return { ok: false, error: mapPostgrestError(error, "highlight_feedback") };
     if (typeof data !== "string" || !data) {
@@ -279,7 +340,7 @@ export async function retryHighlightRender(
   highlightId: string,
 ): Promise<Result<{ highlightId: string }>> {
   try {
-    const { data, error } = await highlightRpc(supabase, "retry_highlight_render", {
+    const { data, error } = await supabase.rpc("retry_highlight_render", {
       p_highlight_id: highlightId,
     });
     if (error) return { ok: false, error: mapPostgrestError(error, "highlight_retry") };

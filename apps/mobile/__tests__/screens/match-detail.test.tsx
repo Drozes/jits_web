@@ -418,6 +418,7 @@ describe("MatchDetailScreen", () => {
         playback: null,
         errorMessage: null,
         identityDisputed: false,
+        identitySide: null,
         lastChangeSummary: null,
         updatedAt: null,
       };

@@ -36,6 +36,7 @@ export type DomainErrorCode =
   | "HIGHLIGHTS_DISABLED"
   | "HIGHLIGHT_NOT_FOUND"
   | "HIGHLIGHT_NOT_READY"
+  | "HIGHLIGHT_SOURCE_NOT_READY"
   | "HIGHLIGHT_RENDER_IN_PROGRESS"
   | "HIGHLIGHT_RENDER_LIMIT"
   | "HIGHLIGHT_REGEN_UNAVAILABLE"
@@ -185,9 +186,11 @@ const HINT_TO_CODE: Record<string, { code: DomainErrorCode; message: string }> =
       code: "HIGHLIGHT_NOT_READY",
       message: "Your highlight isn't ready yet.",
     },
+    // The SOURCE video is gone or not analysed (retry_highlight_render,
+    // request_highlight_clip): about the match video, not the reel.
     highlight_source_not_ready: {
-      code: "HIGHLIGHT_NOT_READY",
-      message: "Your highlight isn't ready yet.",
+      code: "HIGHLIGHT_SOURCE_NOT_READY",
+      message: "Your match video isn't available for a highlight right now.",
     },
     highlight_render_in_progress: {
       code: "HIGHLIGHT_RENDER_IN_PROGRESS",

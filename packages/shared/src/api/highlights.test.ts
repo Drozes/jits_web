@@ -7,8 +7,8 @@ import {
   submitHighlightFeedback,
   toHighlightProgress,
   type HighlightPhase,
+  type RawHighlightProgress,
 } from "./highlights";
-import type { RawHighlightProgress } from "./highlight-rpc";
 import { HIGHLIGHT_FEEDBACK_CHIPS, HIGHLIGHT_FREE_TEXT_MAX } from "../constants/highlights";
 
 // ---------------------------------------------------------------------------
@@ -96,6 +96,7 @@ describe("getHighlightProgress", () => {
         },
         errorMessage: null,
         identityDisputed: false,
+        identitySide: null,
         lastChangeSummary: null,
         updatedAt: "2026-09-27T10:00:00Z",
       },
@@ -142,6 +143,21 @@ describe("getHighlightProgress", () => {
       raw({ playback: { ...raw().playback!, storage_path: undefined as unknown as string } }),
     );
     expect(q.playback).toBeNull();
+  });
+
+  it("narrows identity_side, status and plan_status to their unions", () => {
+    expect(toHighlightProgress(raw({ identity_side: "swapped" })).identitySide).toBe("swapped");
+    expect(toHighlightProgress(raw({ identity_side: "sideways" })).identitySide).toBeNull();
+    expect(toHighlightProgress(raw({ identity_side: undefined })).identitySide).toBeNull();
+    const odd = toHighlightProgress(raw({ status: "exploded", plan_status: "weird" }));
+    expect(odd.status).toBeNull();
+    expect(odd.planStatus).toBeNull();
+  });
+
+  it("treats a non-object payload (array) as UNKNOWN", async () => {
+    const { client } = rpcClient({ data: [], error: null });
+    const result = await getHighlightProgress(client, VIDEO);
+    expect(!result.ok && result.error.code).toBe("UNKNOWN");
   });
 
   it("degrades an unknown phase to unavailable", () => {
@@ -280,10 +296,13 @@ describe("submitHighlightFeedback", () => {
     expect(result).toEqual({ ok: true, data: { feedbackId: "fb-1" } });
   });
 
-  it("sends blank text as null", async () => {
+  it("omits a null rating and blank text so the SQL defaults apply", async () => {
     const { client, rpc } = rpcClient({ data: "fb-1", error: null });
-    await submitHighlightFeedback(client, { highlightId: HL, rating: 1, chips: [], freeText: "   " });
-    expect(rpc.mock.calls[0][1].p_free_text).toBeNull();
+    await submitHighlightFeedback(client, { highlightId: HL, rating: null, chips: ["too_long"], freeText: "   " });
+    expect(rpc).toHaveBeenCalledWith("submit_highlight_feedback", {
+      p_highlight_id: HL,
+      p_chips: ["too_long"],
+    });
   });
 
   it.each([
@@ -316,6 +335,7 @@ describe("retryHighlightRender", () => {
     ["highlight_render_limit", "HIGHLIGHT_RENDER_LIMIT"],
     ["highlight_clips_disabled", "HIGHLIGHTS_DISABLED"],
     ["highlight_not_found", "HIGHLIGHT_NOT_FOUND"],
+    ["highlight_source_not_ready", "HIGHLIGHT_SOURCE_NOT_READY"],
   ])("maps %s to %s", async (hint, code) => {
     const { client } = rpcClient({ data: null, error: pgErr(hint) });
     const result = await retryHighlightRender(client, HL);

@@ -340,7 +340,11 @@ const HIGHLIGHT_HINTS: [string, string, string][] = [
   ["highlight_clips_disabled", "HIGHLIGHTS_DISABLED", "Highlight reels are paused right now."],
   ["highlight_not_found", "HIGHLIGHT_NOT_FOUND", "That highlight no longer exists."],
   ["highlight_not_ready", "HIGHLIGHT_NOT_READY", "Your highlight isn't ready yet."],
-  ["highlight_source_not_ready", "HIGHLIGHT_NOT_READY", "Your highlight isn't ready yet."],
+  [
+    "highlight_source_not_ready",
+    "HIGHLIGHT_SOURCE_NOT_READY",
+    "Your match video isn't available for a highlight right now.",
+  ],
   [
     "highlight_render_in_progress",
     "HIGHLIGHT_RENDER_IN_PROGRESS",
