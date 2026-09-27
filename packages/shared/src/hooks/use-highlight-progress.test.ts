@@ -251,9 +251,11 @@ describe("useHighlightProgress", () => {
     await flush();
     rerender({ id: "v2" });
     expect(m.channels[0].removed).toBe(true);
-    expect(m.channels[1].name).toMatch(/^highlight_progress:v2:/);
+    // v2's channel opens only once v2's own snapshot has landed.
+    expect(m.channels).toHaveLength(1);
     await flush();
     expect(result.current.data?.matchVideoId).toBe("v2");
+    expect(m.channels[1].name).toMatch(/^highlight_progress:v2:/);
   });
 
   it("ignores a stale response for a previous id", async () => {
@@ -378,5 +380,17 @@ describe("useHighlightProgress", () => {
     renderHook(() => useHighlightProgress(m.client as never, "v1"));
     await flush();
     expect(m.channels).toHaveLength(0);
+  });
+
+  it("ignores a snapshot for a different video id when deciding to subscribe", async () => {
+    const m = createClient();
+    m.rpc.mockResolvedValueOnce({ data: progress("planning", { match_video_id: "other" }), error: null });
+    renderHook(() => useHighlightProgress(m.client as never, "v1"));
+    await flush();
+    expect(m.channels).toHaveLength(0);
+    await act(async () => {
+      vi.advanceTimersByTime(HIGHLIGHT_POLL_MS * 2);
+    });
+    expect(m.rpc).toHaveBeenCalledTimes(1);
   });
 });

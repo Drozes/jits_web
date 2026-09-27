@@ -56,7 +56,9 @@ export interface UseHighlightRatingResult {
  * its outcome survives the sheet closing: success toasts, refreshes and
  * closes; an error shows inline while that sheet is open, else as a toast.
  * A close while a submit is in flight never writes the -1 (the submit carries
- * the rating); a close after a submit that stored nothing still does.
+ * the rating); a close after a submit that stored nothing still does. A
+ * client timeout on Regenerate is not an error: the render may be armed, so
+ * it closes, says "still working" and re-reads progress.
  */
 export function useHighlightRating(
   highlightId: string | null,
@@ -145,6 +147,15 @@ export function useHighlightRating(
         if (payload.rating !== null) setRating(payload.rating);
       }
       const stillOpen = session !== null && sessionRef.current === session;
+      if (!result.ok && result.error.code === "HIGHLIGHT_REGEN_TIMEOUT") {
+        // Outcome unknown: the server may have stored the feedback and armed
+        // the render. Close softly and re-read instead of an error.
+        if (session) session.stored = true;
+        toast.info(highlightErrorCopy(result.error));
+        if (stillOpen) setSheetOpen(false);
+        onChanged();
+        return;
+      }
       if (result.ok) {
         toast.success(kind === "regenerated" ? HIGHLIGHT_COPY.regenerateToast : HIGHLIGHT_COPY.feedbackSentToast);
         if (stillOpen) setSheetOpen(false);

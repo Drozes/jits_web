@@ -132,7 +132,7 @@ describe("useMyHighlight", () => {
     expect(result.current.source?.posterPath).toBe("m/u/highlights/1.jpg");
   });
 
-  it("renews the signature before the 1 h URL expires", async () => {
+  it("never re-signs on a timer (a renewal must not interrupt playback)", async () => {
     jest.useFakeTimers();
     try {
       mockProgress = progress(1);
@@ -140,16 +140,43 @@ describe("useMyHighlight", () => {
       await flush();
       expect(mockSign).toHaveBeenCalledTimes(1);
       await act(async () => {
-        jest.advanceTimersByTime(HIGHLIGHT_RESIGN_AFTER_MS - 1);
-      });
-      expect(mockSign).toHaveBeenCalledTimes(1);
-      await act(async () => {
-        jest.advanceTimersByTime(1);
+        jest.advanceTimersByTime(HIGHLIGHT_RESIGN_AFTER_MS * 3);
       });
       await flush();
-      expect(mockSign).toHaveBeenCalledTimes(2);
+      expect(mockSign).toHaveBeenCalledTimes(1);
     } finally {
       jest.useRealTimers();
+    }
+  });
+
+  it("re-signs on return from background only when the signature is stale", async () => {
+    const handlers: ((s: string) => void)[] = [];
+    const original = AppState.addEventListener;
+    AppState.addEventListener = ((_e: unknown, h: (s: string) => void) => {
+      handlers.push(h);
+      return { remove: jest.fn() };
+    }) as never;
+    const now = jest.spyOn(Date, "now");
+    try {
+      now.mockReturnValue(5_000_000);
+      mockProgress = progress(1);
+      renderHook(() => useMyHighlight("v1"));
+      await flush();
+      const cycle = async () => {
+        await act(async () => {
+          handlers.forEach((h) => h("background"));
+          handlers.forEach((h) => h("active"));
+        });
+        await flush();
+      };
+      await cycle();
+      expect(mockSign).toHaveBeenCalledTimes(1);
+      now.mockReturnValue(5_000_000 + HIGHLIGHT_RESIGN_AFTER_MS);
+      await cycle();
+      expect(mockSign).toHaveBeenCalledTimes(2);
+    } finally {
+      now.mockRestore();
+      AppState.addEventListener = original;
     }
   });
 
@@ -303,6 +330,63 @@ describe("HighlightPlayer", () => {
     player.play();
     mockFocusCleanup?.();
     expect(player.pause).toHaveBeenCalled();
+  });
+
+  it("swaps a re-signed URL into the SAME player and view, keeping position and play state", async () => {
+    const utils = render(<HighlightPlayer source={SOURCE} onError={jest.fn()} />);
+    const view = utils.getByTestId("expo-video-view");
+    const player = view.props.player;
+    act(() => view.props.onFirstFrameRender());
+    player.play();
+    player.currentTime = 12.5;
+    utils.rerender(
+      <HighlightPlayer source={{ ...SOURCE, url: "https://signed/1-renewed", generation: 1 }} onError={jest.fn()} />,
+    );
+    await flush();
+    expect(player.replaceAsync).toHaveBeenCalledWith("https://signed/1-renewed");
+    expect(utils.getByTestId("expo-video-view")).toBe(view);
+    expect(utils.getByTestId("expo-video-view").props.player).toBe(player);
+    expect(player.currentTime).toBe(12.5);
+    expect(player.playing).toBe(true);
+    // Same version: no poster flash over the frame.
+    expect(utils.queryByTestId("highlight-poster")).toBeNull();
+  });
+
+  it("reloads an identical URL in place when the generation changes (re-sign after an error)", async () => {
+    const utils = render(<HighlightPlayer source={SOURCE} onError={jest.fn()} />);
+    const player = utils.getByTestId("expo-video-view").props.player;
+    utils.rerender(<HighlightPlayer source={{ ...SOURCE, generation: 1 }} onError={jest.fn()} />);
+    await flush();
+    expect(player.replaceAsync).toHaveBeenCalledWith(SOURCE.url);
+  });
+
+  it("a new version swaps in place from the top and shows its poster until it renders", async () => {
+    const utils = render(<HighlightPlayer source={SOURCE} onError={jest.fn()} />);
+    const view = utils.getByTestId("expo-video-view");
+    const player = view.props.player;
+    act(() => view.props.onFirstFrameRender());
+    player.currentTime = 20;
+    utils.rerender(
+      <HighlightPlayer
+        source={{ ...SOURCE, url: "https://signed/2", posterUrl: "https://p2", version: 2, generation: 1 }}
+        onError={jest.fn()}
+      />,
+    );
+    await flush();
+    expect(player.replaceAsync).toHaveBeenCalledWith("https://signed/2");
+    expect(player.currentTime).toBe(0);
+    expect(utils.getByTestId("expo-video-view")).toBe(view);
+    expect(utils.getByTestId("highlight-poster")).toBeTruthy();
+  });
+
+  it("reports a failed in-place swap as a player error", async () => {
+    const onError = jest.fn();
+    const utils = render(<HighlightPlayer source={SOURCE} onError={onError} />);
+    const player = utils.getByTestId("expo-video-view").props.player;
+    player.replaceAsync.mockRejectedValueOnce(new Error("load failed"));
+    utils.rerender(<HighlightPlayer source={{ ...SOURCE, url: "https://x", generation: 1 }} onError={onError} />);
+    await flush();
+    expect(onError).toHaveBeenCalledTimes(1);
   });
 
   it("offers native fullscreen", () => {

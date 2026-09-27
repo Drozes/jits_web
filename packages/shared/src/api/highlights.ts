@@ -350,6 +350,13 @@ export async function retryHighlightRender(
   }
 }
 
+/**
+ * Client-side cap on the regenerate call. The function's own AI budget is
+ * ~30 s plus a repair retry; past this the outcome is unknown (the server may
+ * already have armed the render), which is reported as HIGHLIGHT_REGEN_TIMEOUT.
+ */
+export const HIGHLIGHT_REGENERATE_TIMEOUT_MS = 90_000;
+
 /** HTTP status fallback when an edge-function error body carries no hint. */
 function hintForStatus(status: number | undefined): string | null {
   if (status === 401) return "highlight_no_athlete";
@@ -364,7 +371,17 @@ function hintForStatus(status: number | undefined): string | null {
  * a hint means signed out (ATHLETE_NOT_FOUND). Any other non-envelope body,
  * a relay or a fetch error is UNKNOWN.
  */
+/** functions-js wraps the aborted fetch in a FunctionsFetchError whose context is the abort. */
+function isAbortOrTimeout(error: unknown): boolean {
+  const e = error as { name?: string; context?: { name?: string } } | null;
+  const inner = e?.context?.name ?? e?.name;
+  return inner === "AbortError" || inner === "TimeoutError";
+}
+
 async function domainErrorFromFunctionsError(error: unknown): Promise<DomainError> {
+  if (isAbortOrTimeout(error)) {
+    return { code: "HIGHLIGHT_REGEN_TIMEOUT", message: "Still working on it. Check back in a minute." };
+  }
   const e = error as { message?: string; context?: unknown } | null;
   const ctx = e?.context as { status?: number; json?: () => Promise<unknown> } | undefined;
   const fallback = e?.message || "Something went wrong.";
@@ -411,6 +428,7 @@ export async function regenerateHighlight(
           chips: [...params.chips],
           free_text: normalizeFreeText(params.freeText),
         },
+        timeout: HIGHLIGHT_REGENERATE_TIMEOUT_MS,
       },
     );
     if (error) return { ok: false, error: await domainErrorFromFunctionsError(error) };

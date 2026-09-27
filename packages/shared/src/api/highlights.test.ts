@@ -388,6 +388,7 @@ describe("regenerateHighlight", () => {
         chips: ["not_me", "slow_start"],
         free_text: "add the sweep near the end",
       },
+      timeout: 90_000,
     });
     expect(result).toEqual({
       ok: true,
@@ -455,6 +456,23 @@ describe("regenerateHighlight", () => {
     const result = await regenerateHighlight(client, PARAMS);
     expect(!result.ok && result.error.code).toBe("ATHLETE_NOT_FOUND");
   });
+
+  it.each(["AbortError", "TimeoutError"])(
+    "maps a client %s (the 90 s timeout) to HIGHLIGHT_REGEN_TIMEOUT",
+    async (name) => {
+      const abort = Object.assign(new Error("The operation was aborted."), { name });
+      const err = Object.assign(new Error("Failed to send a request to the Edge Function"), {
+        name: "FunctionsFetchError",
+        context: abort,
+      });
+      const { client } = fnClient({ data: null, error: err });
+      const result = await regenerateHighlight(client, PARAMS);
+      expect(result).toEqual({
+        ok: false,
+        error: { code: "HIGHLIGHT_REGEN_TIMEOUT", message: "Still working on it. Check back in a minute." },
+      });
+    },
+  );
 
   it("treats a relay/fetch error (no Response context) as UNKNOWN", async () => {
     const err = Object.assign(new Error("Failed to send a request"), { name: "FunctionsFetchError" });

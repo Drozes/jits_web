@@ -116,7 +116,10 @@ export function useHighlightProgress(
 
   // Realtime only once a successful read says there is something to watch:
   // no socket traffic for the (common) disabled / unavailable reel.
-  const phase = data?.phase ?? null;
+  // Only a snapshot of THIS id counts (the reset to null on an id change
+  // lands in the same commit, but never trust it across ids).
+  const current = data && data.matchVideoId === matchVideoId ? data : null;
+  const phase = current?.phase ?? null;
   const live = phase !== null && !HIGHLIGHT_QUIET_PHASES.has(phase);
 
   useEffect(() => {

@@ -28,8 +28,9 @@ interface HighlightPlayerProps {
 export function HighlightPlayer({ source, onError }: HighlightPlayerProps) {
   const viewRef = React.useRef<VideoView>(null);
   const [firstFrame, setFirstFrame] = React.useState(false);
-  const player = useHighlightPlayer(source.url, onError);
-  React.useEffect(() => setFirstFrame(false), [player]);
+  const player = useHighlightPlayer(source, onError);
+  // The poster covers a NEW version until it renders; a re-sign keeps the frame.
+  React.useEffect(() => setFirstFrame(false), [source.version]);
 
   const toggle = React.useCallback(() => {
     if (player.playing) player.pause();
@@ -47,7 +48,6 @@ export function HighlightPlayer({ source, onError }: HighlightPlayerProps) {
         style={{ flex: 1 }}
       >
         <VideoView
-          key={source.generation}
           ref={viewRef}
           player={player}
           style={{ flex: 1 }}

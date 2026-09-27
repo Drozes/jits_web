@@ -684,4 +684,21 @@ describe("Feedback sheet", () => {
     });
     expect(mockSubmit).toHaveBeenCalledWith({}, { highlightId: "h1", rating: -1, chips: [], freeText: null });
   });
+
+  it("a regenerate timeout closes softly, says still working and refreshes (no error, no -1)", async () => {
+    mockRegenerate.mockResolvedValue({
+      ok: false,
+      error: { code: "HIGHLIGHT_REGEN_TIMEOUT", message: "x" },
+    });
+    const utils = await renderCard(progress("ready"));
+    fireEvent.press(utils.getByTestId("highlight-thumb-down"));
+    await act(async () => {
+      fireEvent.press(utils.getByTestId("highlight-regenerate"));
+    });
+    expect(mockToast.info).toHaveBeenCalledWith("Still working on it. Check back in a minute.");
+    expect(mockToast.error).not.toHaveBeenCalled();
+    expect(mockRefresh).toHaveBeenCalled();
+    expect(utils.queryByTestId("sheet")).toBeNull();
+    expect(mockSubmit).not.toHaveBeenCalled();
+  });
 });

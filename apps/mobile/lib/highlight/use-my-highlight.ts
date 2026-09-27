@@ -7,7 +7,7 @@ import {
   type HighlightProgress,
 } from "@jits/shared/api/highlights";
 
-/** Signed URLs live 1 h; re-sign well before that. */
+/** Signed URLs live 1 h; one older than this is renewed on demand. */
 export const HIGHLIGHT_RESIGN_AFTER_MS = 50 * 60_000;
 
 export interface HighlightSource {
@@ -17,7 +17,7 @@ export interface HighlightSource {
   posterPath: string | null;
   version: number;
   durationS: number;
-  /** Bumped on every sign so the player remounts even on an identical URL. */
+  /** Bumped on every sign, so the player reloads even an identical URL (in place). */
   generation: number;
 }
 
@@ -40,10 +40,12 @@ export interface UseMyHighlightResult {
  *
  * Signing is keyed on the live version + key, NOT on the progress object, so
  * a refetch while regenerating keeps the same URL and the player keeps
- * playing. A signature is renewed before it expires (timer at 50 min, and on
- * `reload` if older). A player error re-signs, unless the URL was already
- * re-signed for that error and is still fresh, in which case playback is
- * reported failed. `reload` (pull-to-refresh via `reloadToken`, return from
+ * playing. A signature is renewed ON DEMAND, never on a timer (a renewal must
+ * not interrupt a watching athlete): on a player error, and on `reload`
+ * (pull-to-refresh, return from background) when it is older than 50 min or
+ * playback failed. The player swaps the new URL in place. A player error
+ * re-signs, unless the URL was already re-signed for an error and is still
+ * fresh, in which case playback is reported failed. `reload` (pull-to-refresh via `reloadToken`, return from
  * background) also clears a failure. Sign results are dropped when the key
  * moved on or the card unmounted (`cancelled`).
  */
@@ -70,7 +72,6 @@ export function useMyHighlight(matchVideoId: string | null, reloadToken = 0): Us
       return;
     }
     let cancelled = false;
-    let renew: ReturnType<typeof setTimeout> | undefined;
     (async () => {
       const result = await signHighlightPlayback(supabase, current);
       if (cancelled) return;
@@ -81,11 +82,9 @@ export function useMyHighlight(matchVideoId: string | null, reloadToken = 0): Us
       signedAtRef.current = Date.now();
       setSource({ ...result.data, posterPath: current.posterPath, generation: signTick });
       setPlaybackFailed(false);
-      renew = setTimeout(() => setSignTick((n) => n + 1), HIGHLIGHT_RESIGN_AFTER_MS);
     })();
     return () => {
       cancelled = true;
-      if (renew) clearTimeout(renew);
     };
   }, [key, signTick]);
 

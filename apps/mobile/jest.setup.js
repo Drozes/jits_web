@@ -32,6 +32,7 @@ jest.mock("expo-video", () => {
     const listeners = [];
     const player = {
       source,
+      initialSource: source,
       muted: false,
       loop: false,
       playing: false,
@@ -41,6 +42,14 @@ jest.mock("expo-video", () => {
       }),
       pause: jest.fn(() => {
         player.playing = false;
+      }),
+      currentTime: 0,
+      // Like native: a new source starts at 0, paused.
+      replaceAsync: jest.fn((next) => {
+        player.source = next;
+        player.currentTime = 0;
+        player.playing = false;
+        return Promise.resolve();
       }),
       addListener: jest.fn((event, fn) => {
         const entry = { event, fn };
@@ -54,7 +63,8 @@ jest.mock("expo-video", () => {
   }
   function useVideoPlayer(source, setup) {
     const ref = R.useRef(null);
-    if (!ref.current || ref.current.source !== source) {
+    // Like the real hook: a changed source creates a NEW player.
+    if (!ref.current || ref.current.initialSource !== source) {
       ref.current = createPlayer(source);
       if (setup) setup(ref.current);
     }

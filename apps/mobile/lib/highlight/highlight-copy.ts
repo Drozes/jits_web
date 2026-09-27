@@ -75,6 +75,7 @@ const ERROR_COPY: Partial<Record<DomainErrorCode, string>> = {
   HIGHLIGHT_RENDER_LIMIT: "You've used all versions for this reel.",
   HIGHLIGHT_REGEN_UNAVAILABLE: "This reel can't be regenerated.",
   HIGHLIGHT_REGEN_FAILED: "We couldn't work out a better cut. Try different feedback.",
+  HIGHLIGHT_REGEN_TIMEOUT: "Still working on it. Check back in a minute.",
   HIGHLIGHT_NOT_RETRYABLE: "This reel doesn't need a retry.",
   HIGHLIGHT_FEEDBACK_INVALID: "We couldn't save that feedback.",
   HIGHLIGHT_FEEDBACK_LIMIT: "You've sent a lot of feedback on this reel. Try again later.",
