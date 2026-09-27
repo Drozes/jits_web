@@ -2,12 +2,25 @@
 
 ## [Unreleased]
 
+### Mobile: the match-flow redesign follows the app theme
+
+JS-only, OTA-eligible (no native, `app.json` or dependency change; `expo-status-bar` is already in the build). Layouts, copy, motion, testIDs and accessibility labels are unchanged.
+
+**Changed**
+- The accept sheet, face-off (weigh-in and ready panels), result form and waiting screen, confirm and dispute, verdict (page, rating block, actions, the no-still fallback plate), the Film Room library, the Profile Film Room preview and the match page now follow the user's light or dark theme instead of forcing a dark palette. Colors passed as props come from `usePalette()` (`apps/mobile/lib/theme/palette.ts`), which maps the active scheme's semantic tokens (page `bgPrimary`, plate `bgElevated`, panel `bgElevatedHover`, ink tiers, AA red text, gain green) plus per-scheme amber and translucent fills.
+- Stays dark on purpose: the countdown over the camera, the live screen (untouched), the video player and its controls. Chrome drawn over camera, video or a photo scrim (the verdict's and match page's opening-still chips, the poster card's scrim text and badges, the light athlete chip) uses the fixed `ON_MEDIA` colors in both themes. The opening-still scrims fade into the themed page, solid under the verdict text that overlaps the photo.
+- Status bar: `ThemedStatusBar` (`apps/mobile/lib/theme/themed-status-bar.tsx`) follows the app scheme (not the system one) on the match and Film Room screens; the countdown, the video player, the verdict's still and the match page's hero (until it scrolls away) turn it light.
+- Contrast on the light theme: amber text is amber-800 `#92400E` (5.4:1 on the `#DEE2E9` plate; amber-600 was 2.4:1); red and green text use the light tokens `#AC2B34` / `#116A33`. The CTA label stays `textOnAccent` on Signal Red, as elsewhere.
+
+**Removed**
+- `FIGHT` (fixed match-flow colors in `fight-tokens.ts`), `lib/film-room/film-palette.ts` (`FILM`) and `components/film-room/film-surface.tsx` (`FilmSurface`). `ForceDarkTheme` is kept only for the video player, where the themed state panel draws over the video; the match route no longer wraps the wizard in it.
+
 ### Mobile + shared: Film Room (match flow redesign, slice F2)
 
 JS-only, OTA-eligible: no native dependency, `app.json` or config change (expo-av, expo-image, react-native-svg and PanResponder are all already in the build). Needs the jr_be `feat/match-flow-redesign` migrations for the full experience (`get_my_match_library`, the additive `get_match_details` fields); against an older backend the library falls back to `get_match_history` plus the `match_videos` read (completed matches only) and the new detail fields read as null.
 
 **Added**
-- Film Room library screen `apps/mobile/app/(app)/film-room.tsx`, reached from Profile: FILM ROOM header, record strip (matches, W/L/D, rating), All / Wins / Losses / Draws chips and an opponent picker sheet, month groups, a 2-column 3:4 poster grid (opening still or both-athletes plate, W/L/D tag, opponent, rating change and finish time, date), status badges (UPLOADING n% from this phone's upload store, ANALYZING n/m, NEW, BREAKDOWN READY, FAILED) and a 2 ANGLES badge, pagination through `next_before`, skeleton, empty, filtered-empty and error states. Dark fight-night palette in both app themes (`components/film-room/film-surface.tsx`, `lib/film-room/film-palette.ts`).
+- Film Room library screen `apps/mobile/app/(app)/film-room.tsx`, reached from Profile: FILM ROOM header, record strip (matches, W/L/D, rating), All / Wins / Losses / Draws chips and an opponent picker sheet, month groups, a 2-column 3:4 poster grid (opening still or both-athletes plate, W/L/D tag, opponent, rating change and finish time, date), status badges (UPLOADING n% from this phone's upload store, ANALYZING n/m, NEW, BREAKDOWN READY, FAILED) and a 2 ANGLES badge, pagination through `next_before`, skeleton, empty, filtered-empty and error states. Follows the app theme (see "the match-flow redesign follows the app theme").
 - Components under `apps/mobile/components/film-room/` (poster card, opening still + fallback plate, athlete tile, scrim, status badge, filter chips, opponent picker, states, angle switcher, seek bar, player controls, back button) and logic under `apps/mobile/lib/film-room/` (library paging hook, upload tracking, card status, rows/filters, formatting, per-device "seen" store for NEW, video analysis hook, hrefs).
 - Shared: `getMyMatchLibrary` and `getVideoAnalysis` (`packages/shared/src/api/film-room.ts`, export `@jits/shared/api/film-room`), batch poster signing `signPosterKeys` (one `createSignedUrls` call per page, `packages/shared/src/api/poster-signing.ts`), key moment helpers `buildKeyMoments` / `captionAt` / `formatClock` (`packages/shared/src/utils/key-moments.ts`), and database types for `get_my_match_library` and `match_videos.thumbnail_width/height`.
 
@@ -27,7 +40,7 @@ JS-only, OTA-eligible: no native dependency, `app.json` or config change (expo-a
 
 ### Mobile: match-flow redesign, iteration 1 (face-off, countdown, claim-first result, confirm, verdict)
 
-JS-only, OTA-eligible (no native, `app.json` or dependency change; `expo-image`, `react-native-reanimated` and `react-native-svg` are already in the build). Pairs with jr_be `feat/match-flow-redesign` (B2 recorder auto-confirm, B3 24 h dispute window, B4 `get_match_details` fields, B6 `get_match_rank_change`); every one of those degrades gracefully on an older backend. The whole match flow is "fight night" dark whatever the app theme (`apps/mobile/lib/theme/force-dark-theme.tsx`, fixed colors in `apps/mobile/components/match-flow/fight/fight-tokens.ts`, shared pieces in `fight/fight-ui.tsx`). The live screen is unchanged apart from wiring.
+JS-only, OTA-eligible (no native, `app.json` or dependency change; `expo-image`, `react-native-reanimated` and `react-native-svg` are already in the build). Pairs with jr_be `feat/match-flow-redesign` (B2 recorder auto-confirm, B3 24 h dispute window, B4 `get_match_details` fields, B6 `get_match_rank_change`); every one of those degrades gracefully on an older backend. The match flow follows the app theme apart from the camera screens (shared pieces in `apps/mobile/components/match-flow/fight/fight-ui.tsx`; see "the match-flow redesign follows the app theme"). The live screen is unchanged apart from wiring.
 
 **Added**
 - Face-off, the first match step (weight + ready merged, two phases on one match channel): top bar with Leave (accessibility label "Cancel match"; confirms, then cancels for both, also on Android back), the phase and the RANKED / CASUAL tag; the fight card (initials, VS, ELO and this match's weights), the weight gap and division line, the stakes strip. Weights, gap and stakes come from the CHALLENGE's stamped weights (`getMatchChallengeWeights`, `apps/mobile/lib/match-flow/use-match-weights.ts`), which is what `record_match_result` rates on; the pencil edits the PROFILE weight for future matches only (`updateAthleteWeight`), says so, and changes neither this match's stakes nor its weigh-in; per-athlete status (weighed in, ready) over new broadcasts; on the ready phase the compressed athlete chip, the camera framing panel and "Record from my phone" with the opponent's choice and a "No one is recording this match" warning. `apps/mobile/components/match-flow/faceoff/`, `apps/mobile/lib/match-flow/use-faceoff.ts`.
@@ -55,7 +68,6 @@ JS-only, OTA-eligible (no native, `app.json` or dependency change; `expo-image`,
 
 **Integration with the Film Room (F2)**
 - The verdict's opening still is cached under the poster's storage key (`thumbnail_key`) in the Film Room's `film-still-` namespace, so "Watch film" opens the match page with the still already cached.
-- `FilmSurface` also provides the forced dark scheme context (as `ForceDarkTheme` does), so `useThemedTokens()` / `useResolvedColorScheme()` inside the Film Room report dark in both app themes.
 
 ### Mobile: landscape live screen (Widescreen Sideline), rotate at ready, lock at live
 
