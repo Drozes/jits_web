@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+### Mobile + shared: Film Room (match flow redesign, slice F2)
+
+JS-only, OTA-eligible: no native dependency, `app.json` or config change (expo-av, expo-image, react-native-svg and PanResponder are all already in the build). Needs the jr_be `feat/match-flow-redesign` migrations for the full experience (`get_my_match_library`, the additive `get_match_details` fields); against an older backend the library falls back to `get_match_history` plus the `match_videos` read (completed matches only) and the new detail fields read as null.
+
+**Added**
+- Film Room library screen `apps/mobile/app/(app)/film-room.tsx`, reached from Profile: FILM ROOM header, record strip (matches, W/L/D, rating), All / Wins / Losses / Draws chips and an opponent picker sheet, month groups, a 2-column 3:4 poster grid (opening still or both-athletes plate, W/L/D tag, opponent, rating change and finish time, date), status badges (UPLOADING n% from this phone's upload store, ANALYZING n/m, NEW, BREAKDOWN READY, FAILED) and a 2 ANGLES badge, pagination through `next_before`, skeleton, empty, filtered-empty and error states. Dark fight-night palette in both app themes (`components/film-room/film-surface.tsx`, `lib/film-room/film-palette.ts`).
+- Components under `apps/mobile/components/film-room/` (poster card, opening still + fallback plate, athlete tile, scrim, status badge, filter chips, opponent picker, states, angle switcher, seek bar, player controls, back button) and logic under `apps/mobile/lib/film-room/` (library paging hook, upload tracking, card status, rows/filters, formatting, per-device "seen" store for NEW, video analysis hook, hrefs).
+- Shared: `getMyMatchLibrary` and `getVideoAnalysis` (`packages/shared/src/api/film-room.ts`, export `@jits/shared/api/film-room`), batch poster signing `signPosterKeys` (one `createSignedUrls` call per page, `packages/shared/src/api/poster-signing.ts`), key moment helpers `buildKeyMoments` / `captionAt` / `formatClock` (`packages/shared/src/utils/key-moments.ts`), and database types for `get_my_match_library` and `match_videos.thumbnail_width/height`.
+
+**Changed**
+- Profile: "Past Match Videos" is replaced by a Film Room entry row plus a row of the newest filmed matches (`components/profile/film-room-preview.tsx`). The preview tiles keep the harness contract (`past-video-row-<matchId>`, "Open match video vs <name>").
+- Match page (`app/(app)/match-detail/[matchId].tsx`): hero opening still with play, RANKED tag and clock (fallback plate with upload progress), YOU WON / YOU LOST / DRAW with the ▲/▼ rating change, how it ended, AI BREAKDOWN of the selected angle (live ANALYZING n/m while chunks run, re-read as soon as the merge lands), KEY MOMENTS timeline and rows (tap opens the player at that second), technique tags, an angle switcher when both athletes recorded, and a FILM row per recording that keeps `match-video-watch-<id>` and the "Watch ..." labels.
+- Player (`app/(app)/video/[id].tsx`): custom controls replace the native ones: seek bar with a marker per key moment, moment chips, caption for the current moment, ±10 s, play/pause, speed (1x, 0.5x, 0.25x, 2x), `?t=<seconds>` start, and an in-place angle switcher that carries the current time. The `video-player-state` marker and error panels are unchanged.
+- `getMatchDetailView` returns the B4 fields (`winner_id`, `submission_type_code`, `submission_name`, `finish_time_seconds`, `dispute_locks_at`, `confirmations`, and per video `normalized_path`, `error_message`, `title`, `thumbnail_width/height`, `requested_tier`, `analysis_tier`), null-normalized, and signs posters in one batch call. `getMatchVideoPlaybackResult` also returns `matchId` and `durationSeconds`.
+
+**Removed**
+- `components/profile/past-match-videos.tsx`, `useMyMatchVideos`, and the old match detail cards (`match-result-header`, `match-meta-row`, `match-status-badge`, `match-video-card`, `match-video-section`, `match-video-status`, `watch-button`).
+
 ### Mobile: landscape live screen (Widescreen Sideline), rotate at ready, lock at live
 
 Requires a TestFlight build; NOT OTA-eligible. Ships in `expo.version` 0.4.0 (runtime 0.4.0). Native changes: `app.json` `expo.orientation` `"portrait"` to `"default"`, and the new `expo-screen-orientation` dependency (~9.0.9) with its config plugin (`initialOrientation: "PORTRAIT_UP"`). No OTA of this change may target the `0.3.0` runtime (installed 0.3.0 binaries lack the module; the wrapper degrades them to portrait-only without crashing). No backend, upload metadata or recorder option change: orientation lives in the clip itself (1280 x 720 landscape or 720 x 1280 portrait).
