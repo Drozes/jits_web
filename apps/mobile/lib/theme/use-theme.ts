@@ -11,7 +11,9 @@
  * `BottomSheet.backgroundStyle`, `TextInput.placeholderTextColor`,
  * `ActivityIndicator.color`).
  */
+import * as React from "react";
 import { useColorScheme } from "nativewind";
+import { ForcedSchemeContext } from "./forced-scheme-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { darkTokens, lightTokens, type ColorTokens } from "../tokens";
 
@@ -27,6 +29,10 @@ const THEME_STORAGE_KEY = "elo-rated-theme-preference";
  */
 export function useResolvedColorScheme(): ColorScheme {
   const { colorScheme } = useColorScheme();
+  // A subtree pinned to one scheme (the match flow's fight-night dark,
+  // `ForceDarkTheme`) wins over the system / user preference.
+  const forced = React.useContext(ForcedSchemeContext);
+  if (forced) return forced;
   return colorScheme === "dark" ? "dark" : "light";
 }
 

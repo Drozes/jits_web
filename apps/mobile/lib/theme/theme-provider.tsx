@@ -15,7 +15,7 @@ import { vars } from "nativewind";
 import { useResolvedColorScheme, useRestoreThemePreference } from "./use-theme";
 import { darkTokens, lightTokens } from "../tokens";
 
-function buildVars(t: typeof lightTokens) {
+export function buildVars(t: typeof lightTokens) {
   return vars({
     // Legacy shadcn-style tokens
     "--background": t.background,
@@ -64,7 +64,8 @@ function buildVars(t: typeof lightTokens) {
 }
 
 const lightVarsStyle = buildVars(lightTokens);
-const darkVarsStyle = buildVars(darkTokens);
+/** Exported for `ForceDarkTheme` (lib/theme/forced-scheme.tsx). */
+export const darkVarsStyle = buildVars(darkTokens);
 
 export interface ThemeProviderProps {
   children: React.ReactNode;
