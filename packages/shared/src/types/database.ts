@@ -2032,7 +2032,7 @@ export type Database = {
       }
       get_match_videos: { Args: { p_match_id: string }; Returns: Json }
       get_my_match_library: {
-        Args: { p_before?: string; p_limit?: number }
+        Args: { p_before?: string; p_before_id?: string; p_limit?: number }
         Returns: Json
       }
       get_recent_activity: {

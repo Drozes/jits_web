@@ -16,8 +16,11 @@ import { libItem } from "../../support/film-fixtures";
 let seq = 0;
 const nextId = () => `lib-ath-${++seq}`;
 
-function page(ids: string[], next: string | null) {
-  return { ok: true, data: { items: ids.map((match_id) => libItem({ match_id })), next_before: next, source: "rpc" } };
+function page(ids: string[], next: string | null, nextId: string | null = next ? `${next}-id` : null) {
+  return {
+    ok: true,
+    data: { items: ids.map((match_id) => libItem({ match_id })), next_before: next, next_before_id: nextId, source: "rpc" },
+  };
 }
 
 beforeEach(() => mockGetMyMatchLibrary.mockReset());
@@ -36,7 +39,12 @@ describe("useMatchLibrary", () => {
     act(() => result.current.loadMore());
     expect(result.current.loadingMore).toBe(true);
     await waitFor(() => expect(result.current.loadingMore).toBe(false));
-    expect(mockGetMyMatchLibrary).toHaveBeenLastCalledWith({ tag: "client" }, id, { limit: 20, before: "cursor-1" });
+    // Both cursor halves, verbatim.
+    expect(mockGetMyMatchLibrary).toHaveBeenLastCalledWith({ tag: "client" }, id, {
+      limit: 20,
+      before: "cursor-1",
+      beforeId: "cursor-1-id",
+    });
     expect(result.current.items.map((i) => i.match_id)).toEqual(["a", "b", "c"]);
     expect(result.current.hasMore).toBe(false);
 
@@ -82,6 +90,46 @@ describe("useMatchLibrary", () => {
     act(() => result.current.refresh());
     await waitFor(() => expect(result.current.items.map((i) => i.match_id)).toEqual(["new", "a"]));
     expect(result.current.hasMore).toBe(true);
+  });
+});
+
+describe("useMatchLibrary revalidate", () => {
+  it("keeps later pages when the first page's boundary is unchanged", async () => {
+    const id = nextId();
+    mockGetMyMatchLibrary
+      .mockResolvedValueOnce(page(["a", "b"], "c1"))
+      .mockResolvedValueOnce(page(["c"], null))
+      .mockResolvedValueOnce(page(["a", "b"], "c1"));
+    const { result } = renderHook(() => useMatchLibrary(id));
+    await waitFor(() => expect(result.current.items).toHaveLength(2));
+    act(() => result.current.loadMore());
+    await waitFor(() => expect(result.current.items).toHaveLength(3));
+    act(() => result.current.revalidate());
+    await waitFor(() => expect(mockGetMyMatchLibrary).toHaveBeenCalledTimes(3));
+    await waitFor(() => expect(result.current.isValidating).toBe(false));
+    expect(result.current.items.map((i) => i.match_id)).toEqual(["a", "b", "c"]);
+  });
+
+  it("drops later pages when a revalidate moves the boundary, so nothing is skipped", async () => {
+    const id = nextId();
+    mockGetMyMatchLibrary
+      .mockResolvedValueOnce(page(["a", "b"], "c1", "b"))
+      .mockResolvedValueOnce(page(["c", "d"], "c2", "d"))
+      // A new match arrived: page 1 now ends at "a", so "b" moved onto page 2.
+      .mockResolvedValueOnce(page(["new", "a"], "c0", "a"))
+      .mockResolvedValueOnce(page(["b", "c"], "c1b", "c"));
+    const { result } = renderHook(() => useMatchLibrary(id));
+    await waitFor(() => expect(result.current.items).toHaveLength(2));
+    act(() => result.current.loadMore());
+    await waitFor(() => expect(result.current.items).toHaveLength(4));
+
+    act(() => result.current.revalidate());
+    await waitFor(() => expect(result.current.items.map((i) => i.match_id)).toEqual(["new", "a"]));
+    expect(result.current.hasMore).toBe(true);
+
+    act(() => result.current.loadMore());
+    await waitFor(() => expect(result.current.items.map((i) => i.match_id)).toEqual(["new", "a", "b", "c"]));
+    expect(mockGetMyMatchLibrary).toHaveBeenLastCalledWith({ tag: "client" }, id, { limit: 20, before: "c0", beforeId: "a" });
   });
 });
 

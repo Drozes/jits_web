@@ -174,6 +174,13 @@ describe("getMyMatchLibrary (rpc)", () => {
       p_limit: 50,
       p_before: "2026-09-01T00:00:00Z",
     });
+    // Both halves of the keyset cursor go back verbatim.
+    await getMyMatchLibrary(m.client, ME, { before: "2026-09-01 00:00:00.123456+00", beforeId: "m9" });
+    expect(m.rpc).toHaveBeenLastCalledWith("get_my_match_library", {
+      p_limit: 20,
+      p_before: "2026-09-01 00:00:00.123456+00",
+      p_before_id: "m9",
+    });
     await getMyMatchLibrary(m.client, ME, { limit: 0 });
     expect(m.rpc).toHaveBeenLastCalledWith("get_my_match_library", { p_limit: 1 });
   });
@@ -192,6 +199,7 @@ describe("getMyMatchLibrary (rpc)", () => {
             libItem({ match_id: "m2", outcome: "loss", elo_delta: -9, videos: [libVideo({ video_id: "v-2", thumbnail_key: null, status: "uploading", has_analysis: false })] }),
           ],
           next_before: "2026-09-20T00:00:00Z",
+          next_before_id: "m2",
         },
         error: null,
       }),
@@ -201,6 +209,7 @@ describe("getMyMatchLibrary (rpc)", () => {
     if (!r.ok) return;
     expect(r.data.source).toBe("rpc");
     expect(r.data.next_before).toBe("2026-09-20T00:00:00Z");
+    expect(r.data.next_before_id).toBe("m2");
     expect(m.createSignedUrls).toHaveBeenCalledTimes(1);
     expect(m.createSignedUrls).toHaveBeenCalledWith(["m1/me/poster.jpg", "m1/opp/p.jpg"], 3600);
 
@@ -244,7 +253,7 @@ describe("getMyMatchLibrary (rpc)", () => {
 
     const empty = mockClient({ rpc: () => ({ data: null, error: null }) });
     const r2 = await getMyMatchLibrary(empty.client, ME);
-    expect(r2).toEqual({ ok: true, data: { items: [], next_before: null, source: "rpc" } });
+    expect(r2).toEqual({ ok: true, data: { items: [], next_before: null, next_before_id: null, source: "rpc" } });
   });
 
   it("maps a real RPC error to a Result error (no fallback)", async () => {
@@ -309,6 +318,7 @@ describe("getMyMatchLibrary (fallback when the RPC is missing)", () => {
     expect(r.data.source).toBe("fallback");
     expect(r.data.items.map((i) => i.match_id)).toEqual(["h0", "h1"]);
     expect(r.data.next_before).toBe("2026-09-27T10:00:00Z");
+    expect(r.data.next_before_id).toBe("h1");
     expect(m.rpc).toHaveBeenCalledWith("get_match_history", { p_athlete_id: ME });
     expect(m.inFn).toHaveBeenCalledWith("match_id", ["h0", "h1"]);
     expect(m.neq).toHaveBeenCalledWith("status", "deleted");
@@ -327,9 +337,50 @@ describe("getMyMatchLibrary (fallback when the RPC is missing)", () => {
     });
     expect(r.data.items[1].videos).toEqual([]);
 
-    const next = await getMyMatchLibrary(m.client, ME, { limit: 2, before: r.data.next_before });
+    const next = await getMyMatchLibrary(m.client, ME, {
+      limit: 2,
+      before: r.data.next_before,
+      beforeId: r.data.next_before_id,
+    });
     expect(next.ok && next.data.items.map((i) => i.match_id)).toEqual(["h2"]);
     expect(next.ok && next.data.next_before).toBeNull();
+  });
+
+  it("never loses a match that shares completed_at with the page boundary", async () => {
+    const same = "2026-09-20T10:00:00Z";
+    const rows = ["t-a", "t-b", "t-c", "t-d"].map((match_id, i) => ({
+      match_id,
+      completed_at: i === 3 ? "2026-09-19T10:00:00Z" : same,
+      match_type: "ranked",
+      athlete_outcome: "win",
+      result: "points",
+      submission_type_display_name: null,
+      finish_time_seconds: null,
+      elo_before: 1500,
+      elo_after: 1510,
+      elo_delta: 10,
+      opponent_id: OPP,
+      opponent_display_name: "Mina Park",
+    }));
+    const m = mockClient({
+      rpc: (name) =>
+        name === "get_my_match_library"
+          ? { data: null, error: pgError("PGRST202") }
+          : { data: rows, error: null },
+    });
+    const seen: string[] = [];
+    let before: string | null = null;
+    let beforeId: string | null = null;
+    for (let i = 0; i < 5; i++) {
+      const r = await getMyMatchLibrary(m.client, ME, { limit: 2, before, beforeId });
+      if (!r.ok) throw new Error("page failed");
+      seen.push(...r.data.items.map((it) => it.match_id));
+      if (!r.data.next_before) break;
+      before = r.data.next_before;
+      beforeId = r.data.next_before_id;
+    }
+    // completed_at desc, match_id desc on ties; every match exactly once.
+    expect(seen).toEqual(["t-c", "t-b", "t-a", "t-d"]);
   });
 
   it("surfaces a failed history read instead of an empty library", async () => {
@@ -352,7 +403,7 @@ describe("getMyMatchLibrary (fallback when the RPC is missing)", () => {
   it("returns an empty last page without reading videos when there is no history", async () => {
     const m = fallbackClient(0);
     const r = await getMyMatchLibrary(m.client, ME);
-    expect(r).toEqual({ ok: true, data: { items: [], next_before: null, source: "fallback" } });
+    expect(r).toEqual({ ok: true, data: { items: [], next_before: null, next_before_id: null, source: "fallback" } });
     expect(m.from).not.toHaveBeenCalled();
   });
 });

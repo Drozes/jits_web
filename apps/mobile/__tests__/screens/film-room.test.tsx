@@ -68,7 +68,7 @@ const NOW = new Date();
 const daysAgo = (n: number) => new Date(NOW.getTime() - n * 86_400_000).toISOString();
 
 function page(items: ReturnType<typeof libItem>[], next: string | null = null) {
-  return { ok: true, data: { items, next_before: next, source: "rpc" } };
+  return { ok: true, data: { items, next_before: next, next_before_id: next ? "id-" + next : null, source: "rpc" } };
 }
 
 const PARK = { id: "opp-1", display_name: "Mina Park", profile_photo_url: null };
@@ -211,7 +211,7 @@ describe("FilmRoomScreen", () => {
       list.props.onEndReached();
     });
     await waitFor(() => expect(utils.getByTestId("film-card-p2")).toBeTruthy());
-    expect(mockGetMyMatchLibrary).toHaveBeenLastCalledWith({}, mockAthleteId(), { limit: 20, before: "cursor-1" });
+    expect(mockGetMyMatchLibrary).toHaveBeenLastCalledWith({}, mockAthleteId(), { limit: 20, before: "cursor-1", beforeId: "id-cursor-1" });
   });
 
   it("shows the empty state for an athlete with no matches", async () => {

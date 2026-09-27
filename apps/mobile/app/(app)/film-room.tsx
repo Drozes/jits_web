@@ -25,7 +25,7 @@ import { FilmRoomEmpty, FilmRoomError, FilmRoomSkeleton, ListFooter, MonthHeader
 /**
  * The Film Room: every match the athlete has fought, newest first, as a
  * poster grid grouped by month, with result and opponent filters. Reached
- * from Profile. Pages through `get_my_match_library` via `next_before`.
+ * from Profile. Pages through `get_my_match_library` via its (next_before, next_before_id) cursor.
  *
  * A plain pushed screen: like match detail it never touches live state.
  */

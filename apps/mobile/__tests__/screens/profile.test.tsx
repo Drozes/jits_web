@@ -75,7 +75,7 @@ jest.mock("@/lib/profile/use-my-match-videos", () => ({
 // "videos" reload this suite tracks.
 jest.mock("@/lib/film-room/use-match-library", () => ({
   useMatchLibraryFirstPage: () => ({
-    data: { items: [], next_before: null, source: "rpc" },
+    data: { items: [], next_before: null, next_before_id: null, source: "rpc" },
     isLoading: false,
     isValidating: false,
     error: null,

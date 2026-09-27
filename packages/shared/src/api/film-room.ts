@@ -73,8 +73,14 @@ export interface MatchLibraryItem {
 
 export interface MatchLibraryPage {
   items: MatchLibraryItem[];
-  /** Pass as `before` for the next page; null when this is the last page. */
+  /**
+   * Keyset cursor for the next page, (completed_at, match_id) of this page's
+   * last item. Pass BOTH back verbatim as `before` / `beforeId`; null when
+   * this is the last page. The id breaks ties between matches that share a
+   * completed_at, which a time-only cursor would skip forever.
+   */
   next_before: string | null;
+  next_before_id: string | null;
   /**
    * "rpc" is `get_my_match_library`. "fallback" means the backend predates
    * it and the page was composed from `get_match_history` plus the
@@ -87,8 +93,10 @@ export interface MatchLibraryPage {
 export interface MatchLibraryOptions {
   /** Page size, clamped 1..50 (the RPC clamps too). Default 20. */
   limit?: number;
-  /** `next_before` of the previous page. */
+  /** `next_before` of the previous page (verbatim). */
   before?: string | null;
+  /** `next_before_id` of the previous page (verbatim); sent together with `before`. */
+  beforeId?: string | null;
   /** Poster URL lifetime. Default 3600. */
   expiresInSeconds?: number;
 }
@@ -191,6 +199,27 @@ async function withPosters(
   }));
 }
 
+/** Instant of an ISO timestamp, so "+00:00" and "Z" spellings compare equal. */
+function instant(iso: string): number {
+  const t = Date.parse(iso);
+  return Number.isNaN(t) ? 0 : t;
+}
+
+/** Order two (completed_at, match_id) keys newest first, id desc on ties. */
+function compareKeysDesc(aAt: string, aId: string, bAt: string, bId: string): number {
+  const d = instant(bAt) - instant(aAt);
+  if (d !== 0) return d;
+  return aId < bId ? 1 : aId > bId ? -1 : 0;
+}
+
+/** Strictly after the cursor in keyset order (older, or same time and lower id). */
+function isBeforeCursor(at: string, id: string, before: string | null, beforeId: string | null): boolean {
+  if (!before) return true;
+  const d = instant(at) - instant(before);
+  if (d !== 0) return d < 0;
+  return beforeId ? id < beforeId : false;
+}
+
 /**
  * Fallback for a backend without `get_my_match_library`: completed matches
  * from `get_match_history`, recordings from the RLS-scoped `match_videos`
@@ -202,7 +231,8 @@ async function composeFallbackPage(
   viewerId: string,
   limit: number,
   before: string | null,
-): Promise<Result<{ rows: RawRecord[]; next_before: string | null }>> {
+  beforeId: string | null,
+): Promise<Result<{ rows: RawRecord[]; next_before: string | null; next_before_id: string | null }>> {
   // Read directly rather than through getMatchHistory, which turns a failed
   // read into an empty list: here that would render as "no matches yet".
   const { data: historyData, error: historyError } = await supabase.rpc(
@@ -214,11 +244,16 @@ async function composeFallbackPage(
     return { ok: false, error: mapPostgrestError(historyError, "match_library") };
   }
   const history = ((historyData ?? []) as MatchHistoryRow[])
-    .filter((h) => !!h.completed_at && (!before || h.completed_at < before))
-    .sort((a, b) => (a.completed_at < b.completed_at ? 1 : -1));
+    .filter((h) => !!h.completed_at && isBeforeCursor(h.completed_at, h.match_id, before, beforeId))
+    // Same keyset order as the RPC: completed_at desc, then match_id desc.
+    .sort((a, b) => compareKeysDesc(a.completed_at, a.match_id, b.completed_at, b.match_id));
   const page = history.slice(0, limit);
-  const next_before = history.length > limit ? page[page.length - 1].completed_at : null;
-  if (page.length === 0) return { ok: true, data: { rows: [], next_before: null } };
+  const last = history.length > limit ? page[page.length - 1] : null;
+  const next_before = last ? last.completed_at : null;
+  const next_before_id = last ? last.match_id : null;
+  if (page.length === 0) {
+    return { ok: true, data: { rows: [], next_before: null, next_before_id: null } };
+  }
 
   const { data: rows, error } = await supabase
     .from("match_videos")
@@ -268,7 +303,7 @@ async function composeFallbackPage(
     videos: byMatch.get(h.match_id) ?? [],
     highlight_count: 0,
   }));
-  return { ok: true, data: { rows: rowsOut, next_before } };
+  return { ok: true, data: { rows: rowsOut, next_before, next_before_id } };
 }
 
 /**
@@ -287,14 +322,20 @@ export async function getMyMatchLibrary(
 ): Promise<Result<MatchLibraryPage>> {
   const limit = clampLimit(opts?.limit);
   const before = opts?.before ?? null;
+  const beforeId = opts?.beforeId ?? null;
   const expires = opts?.expiresInSeconds ?? 3600;
   try {
-    const args: { p_limit: number; p_before?: string } = { p_limit: limit };
+    // Both cursor halves go back verbatim (B5 keyset on completed_at, match_id).
+    const args: { p_limit: number; p_before?: string; p_before_id?: string } = { p_limit: limit };
     if (before) args.p_before = before;
+    if (before && beforeId) args.p_before_id = beforeId;
     const { data, error } = await supabase.rpc("get_my_match_library", args);
 
+    // N6: p_before_id ships in the same migration as get_my_match_library, so
+    // "function missing" (including a signature mismatch on p_before_id)
+    // means an older backend: compose the page from the older reads instead.
     if (error && isMissingRpcError(error)) {
-      const fallback = await composeFallbackPage(supabase, viewerId, limit, before);
+      const fallback = await composeFallbackPage(supabase, viewerId, limit, before, beforeId);
       if (!fallback.ok) return fallback;
       const items = await withPosters(
         supabase,
@@ -303,7 +344,12 @@ export async function getMyMatchLibrary(
       );
       return {
         ok: true,
-        data: { items, next_before: fallback.data.next_before, source: "fallback" },
+        data: {
+          items,
+          next_before: fallback.data.next_before,
+          next_before_id: fallback.data.next_before_id,
+          source: "fallback",
+        },
       };
     }
     if (error) {
@@ -311,7 +357,7 @@ export async function getMyMatchLibrary(
       return { ok: false, error: mapPostgrestError(error, "match_library") };
     }
 
-    const payload = (data ?? {}) as { items?: unknown; next_before?: unknown };
+    const payload = (data ?? {}) as { items?: unknown; next_before?: unknown; next_before_id?: unknown };
     const rawItems = Array.isArray(payload.items) ? payload.items : [];
     const items = await withPosters(
       supabase,
@@ -320,7 +366,12 @@ export async function getMyMatchLibrary(
     );
     return {
       ok: true,
-      data: { items, next_before: str(payload.next_before), source: "rpc" },
+      data: {
+        items,
+        next_before: str(payload.next_before),
+        next_before_id: str(payload.next_before_id),
+        source: "rpc",
+      },
     };
   } catch (err) {
     console.error("getMyMatchLibrary:", err);
