@@ -16,3 +16,56 @@
 jest.mock("@react-native-async-storage/async-storage", () =>
   require("@react-native-async-storage/async-storage/jest/async-storage-mock"),
 );
+
+/**
+ * expo-video's JS entry extends a native SharedObject class at module load,
+ * which does not exist under Jest ("Cannot read properties of undefined
+ * (reading 'prototype')"). The highlight card on match detail imports it, so
+ * every suite that renders that screen needs a stand-in. The fake player
+ * records play/pause and status listeners; `emitStatus` lets a suite fire
+ * a statusChange. A suite that needs more declares its own `jest.mock`.
+ */
+jest.mock("expo-video", () => {
+  const R = require("react");
+  const RN = require("react-native");
+  function createPlayer(source) {
+    const listeners = [];
+    const player = {
+      source,
+      muted: false,
+      loop: false,
+      playing: false,
+      allowsExternalPlayback: true,
+      play: jest.fn(() => {
+        player.playing = true;
+      }),
+      pause: jest.fn(() => {
+        player.playing = false;
+      }),
+      addListener: jest.fn((event, fn) => {
+        const entry = { event, fn };
+        listeners.push(entry);
+        return { remove: () => listeners.splice(listeners.indexOf(entry), 1) };
+      }),
+      emitStatus: (payload) =>
+        listeners.filter((l) => l.event === "statusChange").forEach((l) => l.fn(payload)),
+    };
+    return player;
+  }
+  function useVideoPlayer(source, setup) {
+    const ref = R.useRef(null);
+    if (!ref.current || ref.current.source !== source) {
+      ref.current = createPlayer(source);
+      if (setup) setup(ref.current);
+    }
+    return ref.current;
+  }
+  const VideoView = R.forwardRef(function VideoView(props, ref) {
+    R.useImperativeHandle(ref, () => ({
+      enterFullscreen: jest.fn(() => Promise.resolve()),
+      exitFullscreen: jest.fn(() => Promise.resolve()),
+    }));
+    return R.createElement(RN.View, { testID: "expo-video-view", ...props });
+  });
+  return { useVideoPlayer, VideoView, createVideoPlayer: createPlayer };
+});
