@@ -7,6 +7,8 @@ import { deltaLabel, shortName, titleDate } from "@/lib/film-room/format";
 import { humanizeAnalysisLabel } from "@jits/shared/utils";
 
 const VERDICT: Record<string, string> = { win: "YOU WON", loss: "YOU LOST", draw: "DRAW" };
+/** Statuses whose result stands for nothing: muted chip, no rating change. */
+const MUTED: Record<string, string> = { voided: "VOIDED", cancelled: "CANCELLED" };
 
 /** "by Rear-naked choke · 06:17 · vs M. Park · Ranked · Sep 27" */
 export function verdictLine(view: MatchDetailView): string {
@@ -38,15 +40,20 @@ function deltaColor(delta: number): string {
  */
 export function MatchVerdict({ view }: { view: MatchDetailView }) {
   const { match, me } = view;
+  const muted = MUTED[match.status];
   const ranked = match.match_type === "ranked";
-  const verdict = (me.outcome && VERDICT[me.outcome]) || "NO RESULT";
+  const verdict = (!muted && me.outcome && VERDICT[me.outcome]) || "NO RESULT";
   return (
     <View testID="match-result-header" style={{ gap: 8 }}>
       <View className="flex-row items-end justify-between" style={{ gap: 12 }}>
         <Text testID="match-verdict" className="font-display" style={{ fontSize: 52, lineHeight: 52, letterSpacing: 0.8, color: FILM.text }}>
           {verdict}
         </Text>
-        {ranked ? (
+        {muted ? (
+          <Text className="font-body" style={{ fontSize: 12, color: FILM.text2, paddingBottom: 6 }}>
+            Rating unchanged
+          </Text>
+        ) : ranked ? (
           <View className="items-end" style={{ gap: 5, paddingBottom: 3 }}>
             <Text testID="match-elo-delta" className="font-mono-bold" style={[{ fontSize: 18, color: deltaColor(me.elo_delta) }, TABULAR]}>
               {deltaLabel(me.elo_delta)}
@@ -66,6 +73,13 @@ export function MatchVerdict({ view }: { view: MatchDetailView }) {
       <Text testID="match-verdict-line" className="font-mono-medium uppercase" style={{ fontSize: 11, lineHeight: 16, letterSpacing: 0.8, color: FILM.text2 }}>
         {verdictLine(view)}
       </Text>
+      {muted ? (
+        <View testID="match-muted-badge" className="self-start" style={{ borderWidth: 1, borderColor: FILM.strong, borderRadius: 2, paddingHorizontal: 8, paddingVertical: 4 }}>
+          <Text className="font-mono-bold" style={{ fontSize: 10, letterSpacing: 1.68, color: FILM.text2 }}>
+            {muted}
+          </Text>
+        </View>
+      ) : null}
       {match.status === "disputed" ? (
         <View testID="match-disputed-badge" className="self-start" style={{ borderWidth: 1, borderColor: FILM.amberRule, borderRadius: 2, paddingHorizontal: 8, paddingVertical: 4 }}>
           <Text className="font-mono-bold" style={{ fontSize: 10, letterSpacing: 1.68, color: FILM.amber }}>

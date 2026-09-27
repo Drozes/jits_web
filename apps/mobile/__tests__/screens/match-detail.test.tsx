@@ -267,6 +267,17 @@ describe("MatchDetailScreen (Film Room match page)", () => {
     expect(utils.getByTestId("match-video-watch-v-mine")).toBeTruthy();
   });
 
+  it("shows a muted VOIDED or CANCELLED chip and no rating change", async () => {
+    for (const [status, label] of [["voided", "VOIDED"], ["cancelled", "CANCELLED"]]) {
+      const utils = await renderLoaded(view({ match: { status } }));
+      expect(utils.getByTestId("match-muted-badge")).toHaveTextContent(label);
+      expect(utils.queryByTestId("match-elo-delta")).toBeNull();
+      expect(utils.getByText("Rating unchanged")).toBeTruthy();
+      expect(utils.getByTestId("match-verdict")).toHaveTextContent("NO RESULT");
+      utils.unmount();
+    }
+  });
+
   it("opens the opponent profile from the opponent row", async () => {
     const utils = await renderLoaded(view());
     fireEvent.press(utils.getByLabelText("View Demo Red's profile"));

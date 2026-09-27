@@ -99,7 +99,7 @@ export function MomentChips({ moments, currentT, onJump }: { moments: KeyMoment[
             accessibilityLabel={`Jump to ${formatClock(m.t)}, ${m.label}`}
             accessibilityState={{ selected: on }}
             onPress={() => onJump(m.t)}
-            style={{ height: 40, paddingHorizontal: 12, borderRadius: 2, borderWidth: 1, justifyContent: "center", borderColor: on ? FILM.text : FILM.strong, backgroundColor: on ? FILM.text : FILM.tag }}
+            style={{ height: 44, paddingHorizontal: 12, borderRadius: 2, borderWidth: 1, justifyContent: "center", borderColor: on ? FILM.text : FILM.strong, backgroundColor: on ? FILM.text : FILM.tag }}
           >
             <Text className="font-mono-bold" style={[{ fontSize: 11, letterSpacing: 1.2, color: on ? FILM.ink : FILM.white }, TABULAR]}>
               {label}

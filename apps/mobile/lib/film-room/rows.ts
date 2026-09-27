@@ -36,7 +36,7 @@ export function opponentsOf(items: MatchLibraryItem[]): { id: string; name: stri
 }
 
 export type LibraryRow =
-  | { type: "month"; key: string; label: string; count: number }
+  | { type: "month"; key: string; label: string; count: number; last: boolean }
   | { type: "pair"; key: string; items: [MatchLibraryItem] | [MatchLibraryItem, MatchLibraryItem] };
 
 /**
@@ -51,7 +51,7 @@ export function buildRows(items: MatchLibraryItem[]): LibraryRow[] {
     const month = monthOf(items[i].completed_at);
     let j = i;
     while (j < items.length && monthOf(items[j].completed_at).key === month.key) j += 1;
-    rows.push({ type: "month", key: `m:${month.key}:${i}`, label: month.label, count: j - i });
+    rows.push({ type: "month", key: `m:${month.key}:${i}`, label: month.label, count: j - i, last: j >= items.length });
     for (let k = i; k < j; k += 2) {
       const pair = (k + 1 < j ? [items[k], items[k + 1]] : [items[k]]) as
         | [MatchLibraryItem]

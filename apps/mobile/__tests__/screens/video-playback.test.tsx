@@ -517,6 +517,15 @@ describe("MatchVideoScreen Film Room controls", () => {
     expect(mockLatestProps.current!.useNativeControls).toBeFalsy();
   });
 
+  it("gives the seek bar, moment chips and angle segments 44 pt targets", async () => {
+    const utils = await renderLoadedPlayer();
+    await waitFor(() => expect(utils.getByTestId("moment-chip-0")).toBeTruthy());
+    const h = (el: { props: { style: unknown } }) => Object.assign({}, ...([] as unknown[]).concat(el.props.style).flat(3)).height;
+    expect(h(utils.getByTestId("player-seek"))).toBe(44);
+    expect(h(utils.getByTestId("moment-chip-0"))).toBe(44);
+    expect(h(utils.getByLabelText("YOUR ANGLE"))).toBe(44);
+  });
+
   it("switches angle in place, carrying the current time", async () => {
     const utils = await renderLoadedPlayer();
     statusAt(42.6);

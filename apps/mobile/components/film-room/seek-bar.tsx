@@ -71,22 +71,23 @@ export function SeekBar({ positionS, durationS, moments, onSeek }: SeekBarProps)
       accessibilityActions={[{ name: "increment" }, { name: "decrement" }]}
       onAccessibilityAction={(e) => onSeek(Math.min(durationS, Math.max(0, positionS + (e.nativeEvent.actionName === "increment" ? 10 : -10))))}
       onLayout={(e: LayoutChangeEvent) => setWidth(e.nativeEvent.layout.width)}
-      style={{ height: 32, justifyContent: "center" }}
+      // 44 pt touch target around a 3 pt track.
+      style={{ height: 44, justifyContent: "center" }}
       {...pan.panHandlers}
     >
-      <View pointerEvents="none" style={{ position: "absolute", left: 0, right: 0, top: 14, height: 3, backgroundColor: "rgba(255,255,255,0.25)" }} />
-      <View pointerEvents="none" style={{ position: "absolute", left: 0, top: 14, height: 3, width: `${frac * 100}%`, backgroundColor: FILM.white }} />
+      <View pointerEvents="none" style={{ position: "absolute", left: 0, right: 0, top: 20, height: 3, backgroundColor: "rgba(255,255,255,0.25)" }} />
+      <View pointerEvents="none" style={{ position: "absolute", left: 0, top: 20, height: 3, width: `${frac * 100}%`, backgroundColor: FILM.white }} />
       {moments.map((m, i) => (
         <View
           key={`${m.t}-${i}`}
           pointerEvents="none"
           testID={`seek-marker-${i}`}
-          style={{ position: "absolute", left: pct(m.t), top: 12, width: 7, height: 7, marginLeft: -3.5, borderRadius: 3.5, backgroundColor: m.kind === "finish" ? FILM.win : FILM.amber }}
+          style={{ position: "absolute", left: pct(m.t), top: 18, width: 7, height: 7, marginLeft: -3.5, borderRadius: 3.5, backgroundColor: m.kind === "finish" ? FILM.win : FILM.amber }}
         />
       ))}
       <View
         pointerEvents="none"
-        style={{ position: "absolute", left: `${frac * 100}%`, top: 8, width: 16, height: 16, marginLeft: -8, borderRadius: 8, borderWidth: 3, borderColor: FILM.amber, backgroundColor: FILM.white }}
+        style={{ position: "absolute", left: `${frac * 100}%`, top: 14, width: 16, height: 16, marginLeft: -8, borderRadius: 8, borderWidth: 3, borderColor: FILM.amber, backgroundColor: FILM.white }}
       />
     </View>
   );

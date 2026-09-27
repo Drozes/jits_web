@@ -37,6 +37,7 @@ export default function FilmRoomScreen() {
   const [filter, setFilter] = React.useState<LibraryFilter>(NO_FILTER);
   const [pickerOpen, setPickerOpen] = React.useState(false);
 
+  const hasMore = library.hasMore;
   const ids = React.useMemo(() => library.items.map((i) => i.match_id), [library.items]);
   useRefetchOnUploadSettled(ids, library.revalidate);
   useRefetchOnRefocus(library.revalidate, useMatchExitCount());
@@ -54,7 +55,8 @@ export default function FilmRoomScreen() {
 
   const renderRow = React.useCallback(
     ({ item: row }: { item: LibraryRow }) => {
-      if (row.type === "month") return <MonthHeader label={row.label} count={row.count} />;
+      // The oldest loaded month may continue on the next page: no count yet.
+      if (row.type === "month") return <MonthHeader label={row.label} count={row.last && hasMore ? null : row.count} />;
       return (
         <View className="flex-row" style={{ gap: 16, marginBottom: 16 }}>
           {row.items.map((m) => (
@@ -70,7 +72,7 @@ export default function FilmRoomScreen() {
         </View>
       );
     },
-    [viewer, seen, open],
+    [viewer, seen, open, hasMore],
   );
 
   const header = (

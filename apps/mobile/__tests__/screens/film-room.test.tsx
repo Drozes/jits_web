@@ -217,6 +217,16 @@ describe("FilmRoomScreen", () => {
     expect(utils.getByTestId("film-card-m-new")).toBeTruthy();
   });
 
+  it("exposes the result chips as selectable tabs with 44 pt targets", async () => {
+    const utils = await renderLoaded();
+    const wins = utils.getByTestId("film-filter-win");
+    expect(wins.props.accessibilityRole).toBe("tab");
+    expect(utils.getByTestId("film-filter-all").props.accessibilityState).toMatchObject({ selected: true });
+    const flat = Object.assign({}, ...[].concat(wins.props.style));
+    expect(flat.height + wins.props.hitSlop.top + wins.props.hitSlop.bottom).toBeGreaterThanOrEqual(44);
+    expect(utils.getByTestId("film-filter-opponent").props.accessibilityRole).toBe("button");
+  });
+
   it("offers to clear a filter with no matches", async () => {
     const utils = await renderLoaded(page([libItem({ match_id: "only-win" })]));
     fireEvent.press(utils.getByTestId("film-filter-loss"));
@@ -237,6 +247,14 @@ describe("FilmRoomScreen", () => {
     });
     await waitFor(() => expect(utils.getByTestId("film-card-p2")).toBeTruthy());
     expect(mockGetMyMatchLibrary).toHaveBeenLastCalledWith({}, mockAthleteId(), { limit: 20, before: "cursor-1", beforeId: "id-cursor-1" });
+  });
+
+  it("omits the count on the oldest loaded month while more pages exist", async () => {
+    const utils = await renderLoaded(page([libItem({ match_id: "p1", completed_at: daysAgo(0) })], "cursor-1"));
+    expect(utils.getByTestId("film-card-p1")).toBeTruthy();
+    expect(utils.queryByText("1 MATCH")).toBeNull();
+    const done = await renderLoaded(page([libItem({ match_id: "p2", completed_at: daysAgo(0) })]));
+    expect(done.getByText("1 MATCH")).toBeTruthy();
   });
 
   it("shows the empty state for an athlete with no matches", async () => {

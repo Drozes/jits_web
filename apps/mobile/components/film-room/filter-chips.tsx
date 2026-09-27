@@ -10,14 +10,15 @@ const OUTCOMES: { id: OutcomeFilter; label: string }[] = [
   { id: "draw", label: "Draws" },
 ];
 
-function Chip({ label, on, onPress, testID, a11y }: { label: string; on: boolean; onPress: () => void; testID: string; a11y?: string }) {
+function Chip({ label, on, onPress, testID, a11y, role = "tab" }: { label: string; on: boolean; onPress: () => void; testID: string; a11y?: string; role?: "tab" | "button" }) {
   return (
     <Pressable
       testID={testID}
-      accessibilityRole="button"
+      accessibilityRole={role}
       accessibilityLabel={a11y ?? label}
       accessibilityState={{ selected: on }}
       onPress={onPress}
+      // 36 pt chip + 4 pt slop above and below = a 44 pt target.
       hitSlop={{ top: 4, bottom: 4 }}
       style={{
         height: 36,
@@ -63,6 +64,8 @@ export function FilterChips({ filter, opponentName, onOutcome, onOpenOpponents }
         label={opponentName ? `vs ${opponentName} ▾` : "Opponent ▾"}
         a11y={opponentName ? `Opponent filter, ${opponentName}` : "Filter by opponent"}
         on={!!filter.opponentId}
+        // Opens a picker rather than selecting a tab.
+        role="button"
         onPress={onOpenOpponents}
       />
     </ScrollView>

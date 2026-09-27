@@ -51,7 +51,7 @@ export function AngleSwitcher({ angles, activeId, opponentName, onSelect, varian
             onPress={() => onSelect(a.id)}
             className="flex-1 items-center justify-center"
             style={{
-              height: 40,
+              height: 44,
               borderRadius: 2,
               borderWidth: 1,
               borderColor: on ? FILM.text : FILM.strong,

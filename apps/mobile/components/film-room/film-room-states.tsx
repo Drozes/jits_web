@@ -4,17 +4,19 @@ import { SkeletonBlock, SkeletonProvider } from "@/components/ui/skeleton";
 import { FILM } from "@/lib/film-room/film-palette";
 import { matchCountLabel } from "@/lib/film-room/format";
 
-/** "SEPTEMBER 2026 ──────── 6 MATCHES" */
-export function MonthHeader({ label, count }: { label: string; count: number }) {
+/** "SEPTEMBER 2026 ──────── 6 MATCHES"; count null when the month may be incomplete. */
+export function MonthHeader({ label, count }: { label: string; count: number | null }) {
   return (
     <View className="flex-row items-center" style={{ gap: 10, marginTop: 22, marginBottom: 12 }}>
       <Text accessibilityRole="header" className="font-mono-bold" style={{ fontSize: 10, letterSpacing: 2.52, color: FILM.text2 }}>
         {label}
       </Text>
       <View style={{ flex: 1, height: 1, backgroundColor: FILM.hairline }} />
-      <Text className="font-mono-medium" style={{ fontSize: 10, letterSpacing: 1.68, color: FILM.text3 }}>
-        {matchCountLabel(count)}
-      </Text>
+      {count != null ? (
+        <Text className="font-mono-medium" style={{ fontSize: 10, letterSpacing: 1.68, color: FILM.text3 }}>
+          {matchCountLabel(count)}
+        </Text>
+      ) : null}
     </View>
   );
 }

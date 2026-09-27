@@ -17,6 +17,11 @@ JS-only, OTA-eligible: no native dependency, `app.json` or config change (expo-a
 - Player (`app/(app)/video/[id].tsx`): custom controls replace the native ones: seek bar with a marker per key moment, moment chips, caption for the current moment, ±10 s, play/pause, speed (1x, 0.5x, 0.25x, 2x), `?t=<seconds>` start, and an in-place angle switcher that carries the current time. The `video-player-state` marker and error panels are unchanged.
 - `getMatchDetailView` returns the B4 fields (`winner_id`, `submission_type_code`, `submission_name`, `finish_time_seconds`, `dispute_locks_at`, `confirmations`, and per video `normalized_path`, `error_message`, `title`, `thumbnail_width/height`, `requested_tier`, `analysis_tier`), null-normalized, and signs posters in one batch call. `getMatchVideoPlaybackResult` also returns `matchId` and `durationSeconds`.
 
+**Review round 1**
+- Library paging uses the backend's keyset cursor (`next_before` plus `next_before_id`, both passed back verbatim as `p_before` / `p_before_id`); the fallback pages on the same (completed_at, match_id) key, so matches sharing a completed_at are never skipped. A revalidate that moves the first page's boundary drops the later pages instead of leaving a gap.
+- Key moments stay on the video clock: the finish is the analysed moment or technique tag naming the submission (else the last scoring moment), never `finish_time_seconds` (match clock). Angle switches translate time by `sync_offset_ms` when both recordings have one, else show "Angles aren't synced; position is approximate".
+- Upload progress re-renders only the uploading poster; badges stack in one column (short labels on the Profile tiles); DISPUTED badge on posters; posters cached by storage key; muted VOIDED / CANCELLED chip and no rating change on the match page; 44 pt targets on the seek bar, moment chips, angle segments and filter chips (result chips are tabs); the oldest loaded month omits its count while more pages exist.
+
 **Removed**
 - `components/profile/past-match-videos.tsx`, `useMyMatchVideos`, and the old match detail cards (`match-result-header`, `match-meta-row`, `match-status-badge`, `match-video-card`, `match-video-section`, `match-video-status`, `watch-button`).
 
