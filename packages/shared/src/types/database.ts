@@ -1717,6 +1717,7 @@ export type Database = {
           segments_snapshot: Json | null
           updated_at: string
           version: number | null
+          version_identity_side: string | null
         }
         Insert: {
           ai_latency_ms?: number | null
@@ -1741,6 +1742,7 @@ export type Database = {
           segments_snapshot?: Json | null
           updated_at?: string
           version?: number | null
+          version_identity_side?: string | null
         }
         Update: {
           ai_latency_ms?: number | null
@@ -1765,6 +1767,7 @@ export type Database = {
           segments_snapshot?: Json | null
           updated_at?: string
           version?: number | null
+          version_identity_side?: string | null
         }
         Relationships: [
           {
@@ -1790,6 +1793,38 @@ export type Database = {
           },
         ]
       }
+      video_highlight_identity: {
+        Row: {
+          highlight_id: string
+          identity_disputed_at: string | null
+          identity_side: string
+          live_identity_side: string | null
+          updated_at: string
+        }
+        Insert: {
+          highlight_id: string
+          identity_disputed_at?: string | null
+          identity_side?: string
+          live_identity_side?: string | null
+          updated_at?: string
+        }
+        Update: {
+          highlight_id?: string
+          identity_disputed_at?: string | null
+          identity_side?: string
+          live_identity_side?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_highlight_identity_highlight_id_fkey"
+            columns: ["highlight_id"]
+            isOneToOne: true
+            referencedRelation: "video_highlights"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       video_highlight_plans: {
         Row: {
           claimed_at: string | null
@@ -1800,9 +1835,12 @@ export type Database = {
           latency_ms: number | null
           match_video_id: string
           model: string | null
+          pending_since: string | null
           plan_attempts: number
           plan_total: number
           prompt_version: string | null
+          redispatch_count: number
+          redispatched_at: string | null
           result: Json | null
           selection: Json | null
           source_duration_s: number | null
@@ -1820,9 +1858,12 @@ export type Database = {
           latency_ms?: number | null
           match_video_id: string
           model?: string | null
+          pending_since?: string | null
           plan_attempts?: number
           plan_total?: number
           prompt_version?: string | null
+          redispatch_count?: number
+          redispatched_at?: string | null
           result?: Json | null
           selection?: Json | null
           source_duration_s?: number | null
@@ -1840,9 +1881,12 @@ export type Database = {
           latency_ms?: number | null
           match_video_id?: string
           model?: string | null
+          pending_since?: string | null
           plan_attempts?: number
           plan_total?: number
           prompt_version?: string | null
+          redispatch_count?: number
+          redispatched_at?: string | null
           result?: Json | null
           selection?: Json | null
           source_duration_s?: number | null
@@ -1869,8 +1913,6 @@ export type Database = {
           duration_s: number | null
           error_message: string | null
           id: string
-          identity_disputed_at: string | null
-          identity_side: string
           live_duration_s: number | null
           live_poster_path: string | null
           live_ready_at: string | null
@@ -1879,7 +1921,10 @@ export type Database = {
           live_storage_path: string | null
           match_video_id: string
           origin: string
+          pending_since: string | null
           poster_path: string | null
+          redispatch_count: number
+          redispatched_at: string | null
           render_attempts: number
           render_total: number
           segments: Json
@@ -1894,8 +1939,6 @@ export type Database = {
           duration_s?: number | null
           error_message?: string | null
           id?: string
-          identity_disputed_at?: string | null
-          identity_side?: string
           live_duration_s?: number | null
           live_poster_path?: string | null
           live_ready_at?: string | null
@@ -1904,7 +1947,10 @@ export type Database = {
           live_storage_path?: string | null
           match_video_id: string
           origin?: string
+          pending_since?: string | null
           poster_path?: string | null
+          redispatch_count?: number
+          redispatched_at?: string | null
           render_attempts?: number
           render_total?: number
           segments: Json
@@ -1919,8 +1965,6 @@ export type Database = {
           duration_s?: number | null
           error_message?: string | null
           id?: string
-          identity_disputed_at?: string | null
-          identity_side?: string
           live_duration_s?: number | null
           live_poster_path?: string | null
           live_ready_at?: string | null
@@ -1929,7 +1973,10 @@ export type Database = {
           live_storage_path?: string | null
           match_video_id?: string
           origin?: string
+          pending_since?: string | null
           poster_path?: string | null
+          redispatch_count?: number
+          redispatched_at?: string | null
           render_attempts?: number
           render_total?: number
           segments?: Json
@@ -2113,10 +2160,43 @@ export type Database = {
         }
         Returns: string
       }
+      _fail_stale_pending_highlight: {
+        Args: { p_expected_pending_since: string; p_highlight_id: string }
+        Returns: boolean
+      }
+      _fail_stale_pending_highlight_plan: {
+        Args: { p_expected_pending_since: string; p_plan_id: string }
+        Returns: boolean
+      }
       _gym_range_cutoff: { Args: { p_range: string }; Returns: string }
+      _highlight_flag_changed_at: { Args: never; Returns: string }
       _highlight_max_seconds: { Args: never; Returns: number }
       _highlight_plan_max: { Args: never; Returns: number }
       _highlight_render_max: { Args: never; Returns: number }
+      _reap_stale_highlight_claim: {
+        Args: { p_expected_claimed_at: string; p_highlight_id: string }
+        Returns: string
+      }
+      _reap_stale_highlight_plan_claim: {
+        Args: { p_expected_claimed_at: string; p_plan_id: string }
+        Returns: string
+      }
+      _redispatch_pending_highlight: {
+        Args: {
+          p_expected_pending_since: string
+          p_expected_redispatched_at: string
+          p_highlight_id: string
+        }
+        Returns: boolean
+      }
+      _redispatch_pending_highlight_plan: {
+        Args: {
+          p_expected_pending_since: string
+          p_expected_redispatched_at: string
+          p_plan_id: string
+        }
+        Returns: boolean
+      }
       _scrub_highlight_message: {
         Args: { p_max?: number; p_text: string }
         Returns: string
@@ -2461,6 +2541,8 @@ export type Database = {
       get_video_analysis: { Args: { p_video_id: string }; Returns: Json }
       get_video_progress: { Args: { p_video_id: string }; Returns: Json }
       get_weight_division: { Args: { p_weight: number }; Returns: number }
+      highlight_plan_deadline_seconds: { Args: never; Returns: number }
+      highlight_render_deadline_seconds: { Args: never; Returns: number }
       increment_chunks_completed: {
         Args: { p_video_id: string }
         Returns: boolean
@@ -2509,6 +2591,7 @@ export type Database = {
       }
       random_match: { Args: { p_session_id: string }; Returns: Json }
       reap_stuck_analyzing_chunks: { Args: never; Returns: number }
+      reap_stuck_highlights: { Args: never; Returns: number }
       reap_stuck_slicing_videos: { Args: never; Returns: number }
       record_match_result: {
         Args: {
