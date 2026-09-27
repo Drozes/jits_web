@@ -2,6 +2,30 @@
 
 ## [Unreleased]
 
+### Mobile: match-flow redesign, iteration 1 (face-off, countdown, claim-first result, confirm, verdict)
+
+JS-only, OTA-eligible (no native, `app.json` or dependency change; `expo-image`, `react-native-reanimated` and `react-native-svg` are already in the build). Pairs with jr_be `feat/match-flow-redesign` (B2 recorder auto-confirm, B3 24 h dispute window, B4 `get_match_details` fields, B6 `get_match_rank_change`); every one of those degrades gracefully on an older backend. The whole match flow is "fight night" dark whatever the app theme (`apps/mobile/lib/theme/force-dark-theme.tsx`, fixed colors in `apps/mobile/components/match-flow/fight/fight-tokens.ts`, shared pieces in `fight/fight-ui.tsx`). The live screen is unchanged apart from wiring.
+
+**Added**
+- Face-off, the first match step (weight + ready merged, two phases on one match channel): top bar with Leave (accessibility label "Cancel match"; confirms, then cancels for both, also on Android back), the phase and the RANKED / CASUAL tag; the fight card (initials, VS, ELO, weights with an in-place edit of your own, `updateAthleteWeight`), the weight gap and division line, the stakes strip; per-athlete status (weighed in, ready) over new broadcasts; on the ready phase the compressed athlete chip, the camera framing panel and "Record from my phone" with the opponent's choice and a "No one is recording this match" warning. `apps/mobile/components/match-flow/faceoff/`, `apps/mobile/lib/match-flow/use-faceoff.ts`.
+- Recording opt-in per athlete (decision 5): OFF on first use, remembered per device (AsyncStorage), `apps/mobile/lib/match-flow/recording-optin.ts`. Off means no capture session on ready or live and the live screen's no-video plate in a new "NOT RECORDING" state.
+- 3-2-1-GRAPPLE countdown over the camera, timed from the server `started_at` so both phones reach GO together (never longer than 3 s on one phone); one heavy haptic per numeral; the live step, and so the recorder, mounts at GO and the match clock starts at GO (`started_at` + 3 s). Reduce Motion shows the numerals without motion. `apps/mobile/components/match-flow/countdown/`.
+- Claim-first result entry: the first tap on a winner tile or Draw claims the form (`result_claimed`, repeated every 5 s); the other phone shows "<name> is recording the result" with "Leave and confirm later"; a claim silent for 20 s unlocks the form; a simultaneous claim resolves to the earlier one on both phones. Winner = two big tiles plus Draw, eight one-tap finishes plus "Search all submissions", finish time prefilled from the clock. `apps/mobile/components/match-flow/steps/result-form.tsx`, `result-waiting.tsx`, `apps/mobile/lib/match-flow/use-result-claim.ts`.
+- Verdict (replaces the summary): win celebration (confetti once, the verdict slams in, the rating ticks, the rank strip "#23 -> #19 · PASSED J. SILVA" from B6), calm loss with Rematch as the red CTA; Watch film (the match page) and Back to Arena, plus Rematch and Share; the opening still (slicer poster) as the hero with a "STILL ARRIVES AFTER UPLOAD" fallback; this phone's upload as a card. `apps/mobile/components/match-flow/verdict/`, `apps/mobile/lib/match-flow/use-verdict-data.ts`.
+- Accept sheet: RANKED tag, "<name> is live in the Arena", and the viewer's Win / Draw / Loss stakes (`calculate_elo_stakes`).
+- `@jits/shared`: `getMatchRankChange` (`packages/shared/src/api/match-rank-change.ts`), `updateAthleteWeight` (`packages/shared/src/api/athlete-weight.ts`), the `dispute_window_closed` / `not_authorized` hints, `RecordResultResponse.recorder_confirmed`, a `match` share type (`/matches/<id>`), broadcast events `weighed_in` `{athlete_id, weight}`, `recording_optin` `{athlete_id, recording}`, `result_claimed` `{athlete_id, claimed_at}`, and an `enabled` flag on `useSessionMatchSync`.
+
+**Changed**
+- The recorder skips confirm when the server auto-confirmed it (B2) and broadcasts `result_confirmed` for itself; an older backend still sends it to confirm.
+- Confirm (the opponent's view): who won and how, your rating move, both athletes' status, Dispute as a full-size secondary button, "Locks automatically in N h" from `dispute_locks_at`, and a dispute refused with `dispute_window_closed` closes the form.
+- Upload status is a card on the verdict instead of a banner over every post-live step.
+- The visible "STEP N / 8" header is gone; a 1 px marker keeps the harness's `match-step-<step>` / "Step N of 8, <Label>" (now on live too). The app header shows only while the match loads; weight and ready no longer swipe back.
+- Rematch on the verdict sends the challenge (the Arena's own send path) before landing in the Arena.
+- Match-loop harness: result entry without the Submission toggle, the recorder landing on the verdict, `▼ −9` deltas, validators for the new events, the ready repeat drift guard pointed at the face-off.
+
+**Removed**
+- `ReadyStep`, `WeightStep` (the practice match keeps `WeightTile`), `SummaryStep` and the wizard-level `MatchRecorderStatus`.
+
 ### Mobile: landscape live screen (Widescreen Sideline), rotate at ready, lock at live
 
 Requires a TestFlight build; NOT OTA-eligible. Ships in `expo.version` 0.4.0 (runtime 0.4.0). Native changes: `app.json` `expo.orientation` `"portrait"` to `"default"`, and the new `expo-screen-orientation` dependency (~9.0.9) with its config plugin (`initialOrientation: "PORTRAIT_UP"`). No OTA of this change may target the `0.3.0` runtime (installed 0.3.0 binaries lack the module; the wrapper degrades them to portrait-only without crashing). No backend, upload metadata or recorder option change: orientation lives in the clip itself (1280 x 720 landscape or 720 x 1280 portrait).
