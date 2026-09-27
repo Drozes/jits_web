@@ -12,7 +12,10 @@ export interface StillAthlete {
 interface OpeningStillProps {
   /** Signed poster (slicer thumbnail); null shows the fallback plate. */
   posterUrl: string | null;
-  /** Stable cache key so a re-signed URL does not flash (the video id). */
+  /**
+   * Stable cache key so a re-signed URL does not flash: the poster's storage
+   * path (thumbnail key), so a regenerated poster gets a new key.
+   */
   cacheKey?: string;
   me: StillAthlete;
   opponent: StillAthlete | null;

@@ -2641,6 +2641,8 @@ export interface MatchDetailVideo {
   // type only so hand-built fixtures and older callers stay valid.
   /** "standard" | "premium" once analyzed, else null. */
   analysis_tier?: string | null;
+  /** Poster storage key (match_videos.thumbnail_url, unsigned): a stable image cache key. */
+  thumbnail_key?: string | null;
   /** H.264/AAC copy the slicer wrote for webm uploads (playback prefers it). */
   normalized_path?: string | null;
   /** Why processing failed, when the pipeline recorded a reason. */
@@ -2755,6 +2757,7 @@ export async function getMatchDetailView(
         ),
         poster_url: posters[i],
         analysis_tier: v.analysis_tier ?? null,
+        thumbnail_key: v.thumbnail_url ?? null,
         normalized_path: v.normalized_path ?? null,
         error_message: v.error_message ?? null,
         title: v.title ?? null,

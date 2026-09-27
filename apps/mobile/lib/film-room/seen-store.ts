@@ -71,11 +71,13 @@ const getVersion = () => version;
  * instead of flashing them on every card.
  */
 export function useSeenMatches(): { ready: boolean; isSeen: (id: string) => boolean } {
-  React.useSyncExternalStore(subscribe, getVersion, getVersion);
+  const v = React.useSyncExternalStore(subscribe, getVersion, getVersion);
   React.useEffect(() => {
     void loadSeenMatches();
   }, []);
-  return { ready: loaded, isSeen: isMatchSeen };
+  // Stable between changes to the seen set, so memoized cards can skip.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  return React.useMemo(() => ({ ready: loaded, isSeen: isMatchSeen }), [v]);
 }
 
 /** Test-only reset. */

@@ -9,9 +9,7 @@ import { useRefetchOnRefocus } from "@/lib/cache/use-refocus-refetch";
 import { useMatchExitCount } from "@/lib/arena/arena-store";
 import { matchDetailHref } from "@/lib/match-detail/href";
 import { useMatchLibrary } from "@/lib/film-room/use-match-library";
-import { useMatchUploads } from "@/lib/film-room/use-match-uploads";
 import { useSeenMatches } from "@/lib/film-room/seen-store";
-import { deriveCardStatus } from "@/lib/film-room/card-status";
 import { applyFilter, buildRows, NO_FILTER, opponentsOf, recordOf, type LibraryFilter, type LibraryRow } from "@/lib/film-room/rows";
 import { recordStrip } from "@/lib/film-room/format";
 import { FILM, TABULAR } from "@/lib/film-room/film-palette";
@@ -19,7 +17,7 @@ import { FilmSurface } from "@/components/film-room/film-surface";
 import { FilmBackButton } from "@/components/film-room/film-back-button";
 import { FilterChips } from "@/components/film-room/filter-chips";
 import { OpponentPicker } from "@/components/film-room/opponent-picker";
-import { PosterCard } from "@/components/film-room/poster-card";
+import { LibraryPoster } from "@/components/film-room/library-poster";
 import { FilmRoomEmpty, FilmRoomError, FilmRoomSkeleton, ListFooter, MonthHeader } from "@/components/film-room/film-room-states";
 
 /**
@@ -40,7 +38,6 @@ export default function FilmRoomScreen() {
   const [pickerOpen, setPickerOpen] = React.useState(false);
 
   const ids = React.useMemo(() => library.items.map((i) => i.match_id), [library.items]);
-  const uploads = useMatchUploads(ids);
   useRefetchOnUploadSettled(ids, library.revalidate);
   useRefetchOnRefocus(library.revalidate, useMatchExitCount());
 
@@ -49,7 +46,11 @@ export default function FilmRoomScreen() {
   const rows = React.useMemo(() => buildRows(visible), [visible]);
   const filtered = filter.outcome !== "all" || !!filter.opponentId;
   const opponentName = opponents.find((o) => o.id === filter.opponentId)?.name ?? null;
-  const viewer = { name: athlete?.display_name ?? "You", photoUrl: athlete?.profile_photo_url ?? null };
+  const viewerName = athlete?.display_name ?? "You";
+  const viewerPhoto = athlete?.profile_photo_url ?? null;
+  // Stable props so memoized posters skip unrelated re-renders.
+  const viewer = React.useMemo(() => ({ name: viewerName, photoUrl: viewerPhoto }), [viewerName, viewerPhoto]);
+  const open = React.useCallback((matchId: string) => router.push(matchDetailHref(matchId)), [router]);
 
   const renderRow = React.useCallback(
     ({ item: row }: { item: LibraryRow }) => {
@@ -57,19 +58,19 @@ export default function FilmRoomScreen() {
       return (
         <View className="flex-row" style={{ gap: 16, marginBottom: 16 }}>
           {row.items.map((m) => (
-            <PosterCard
+            <LibraryPoster
               key={m.match_id}
               item={m}
               viewer={viewer}
-              status={deriveCardStatus(m, uploads.get(m.match_id) ?? null, !seen.ready || seen.isSeen(m.match_id))}
-              onPress={() => router.push(matchDetailHref(m.match_id))}
+              seen={!seen.ready || seen.isSeen(m.match_id)}
+              onOpen={open}
             />
           ))}
           {row.items.length === 1 ? <View className="flex-1" /> : null}
         </View>
       );
     },
-    [viewer.name, viewer.photoUrl, uploads, seen, router],
+    [viewer, seen, open],
   );
 
   const header = (

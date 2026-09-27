@@ -56,6 +56,21 @@ describe("FilmRoomPreview", () => {
     expect(mockPush).toHaveBeenCalledWith("/(app)/match-detail/m-0");
   });
 
+  it("keeps badges short on the narrow tiles", () => {
+    const utils = render(
+      <FilmRoomPreview
+        items={[libItem({ match_id: "two", completed_at: new Date().toISOString(), videos: [libItem().videos[0], { ...libItem().videos[0], video_id: "v-2" }] })]}
+        error={false}
+        onRetry={jest.fn()}
+        viewer={viewer}
+      />,
+    );
+    // Seen set is empty and the match is fresh: NEW, plus the angle count.
+    expect(utils.getByText("NEW")).toBeTruthy();
+    expect(utils.getByText("2×")).toBeTruthy();
+    expect(utils.queryByText("2 ANGLES")).toBeNull();
+  });
+
   it("includes a match whose film is still uploading from this phone", () => {
     act(() => {
       setMatchUpload("fresh", { status: "uploading", progress: 0.4 });

@@ -152,10 +152,35 @@ describe("FilmRoomScreen", () => {
     expect(within(utils.getByTestId("film-card-m-up")).getByText("UPLOADING 90%")).toBeTruthy();
   });
 
+  it("re-renders only the uploading poster on a progress tick", async () => {
+    act(() => {
+      setMatchUpload("m-up", { status: "uploading", progress: 0.1 });
+    });
+    const utils = await renderLoaded();
+    await waitFor(() => expect(within(utils.getByTestId("film-card-m-up")).getByText("UPLOADING 10%")).toBeTruthy());
+    const cardStatus = require("@/lib/film-room/card-status");
+    const spy = jest.spyOn(cardStatus, "deriveCardStatus");
+    act(() => {
+      setMatchUpload("m-up", { progress: 0.5 });
+    });
+    expect(within(utils.getByTestId("film-card-m-up")).getByText("UPLOADING 50%")).toBeTruthy();
+    expect(spy.mock.calls.map((c) => (c[0] as { match_id: string }).match_id)).toEqual(["m-up"]);
+    spy.mockClear();
+    act(() => {
+      setMatchUpload("some-other-match", { status: "uploading", progress: 0.5 });
+    });
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it("marks a disputed match on its poster", async () => {
+    const utils = await renderLoaded(page([libItem({ match_id: "m-d", status: "disputed" })]));
+    expect(within(utils.getByTestId("film-card-m-d")).getByTestId("film-card-disputed")).toBeTruthy();
+  });
+
   it("uses the signed still when there is one and the avatar plate otherwise", async () => {
     const utils = await renderLoaded();
     const still = within(utils.getByTestId("film-card-m-new")).getByTestId("opening-still");
-    expect(still.props.source).toEqual({ uri: "https://signed/k.jpg", cacheKey: "film-still-v-1" });
+    expect(still.props.source).toEqual({ uri: "https://signed/k.jpg", cacheKey: "film-still-k.jpg" });
     const failed = utils.getByTestId("film-card-m-failed");
     expect(within(failed).getByTestId("opening-still-fallback")).toBeTruthy();
     expect(within(failed).getByText("FILM FAILED TO PROCESS")).toBeTruthy();

@@ -62,7 +62,7 @@ export default function MatchDetailScreen() {
         >
           <MatchHero
             posterUrl={active?.poster_url ?? null}
-            posterKey={active?.id}
+            posterKey={active?.thumbnail_key ?? undefined}
             me={{ name: data.me.display_name, photoUrl: data.me.profile_photo_url }}
             opponent={data.opponent ? { name: data.opponent.display_name, photoUrl: data.opponent.profile_photo_url } : null}
             fallbackLabel={film.fallbackLabel}

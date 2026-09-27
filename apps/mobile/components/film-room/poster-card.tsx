@@ -20,6 +20,24 @@ interface PosterCardProps {
   testID?: string;
   /** Overrides the composed label (the Profile preview keeps the harness copy). */
   accessibilityLabel?: string;
+  /** "compact" (the 120 pt Profile preview) uses short badge labels. */
+  variant?: "grid" | "compact";
+}
+
+/** Short badge copy for the narrow Profile preview tiles. */
+export function compactBadgeLabel(status: CardStatus): string | null {
+  switch (status.kind) {
+    case "failed":
+      return "FAILED";
+    case "analyzing":
+      return status.total ? `${status.done ?? 0}/${status.total}` : "ANALYZING";
+    case "new":
+      return "NEW";
+    case "ready":
+      return "READY";
+    default:
+      return null;
+  }
 }
 
 function fallbackLabel(item: MatchLibraryItem, status: CardStatus): string {
@@ -32,13 +50,17 @@ function fallbackLabel(item: MatchLibraryItem, status: CardStatus): string {
 /**
  * One match in the Film Room grid (3:4): opening still or avatar plate,
  * bottom scrim, W/L/D tag, opponent, rating change and finish time, date,
- * the status badge top right and "2 ANGLES" top left.
+ * and a top-right badge column (status, DISPUTED, angles) stacked so no two
+ * badges share a row even on a narrow card.
  */
-export function PosterCard({ item, status, viewer, onPress, testID, accessibilityLabel }: PosterCardProps) {
+export const PosterCard = React.memo(function PosterCard({ item, status, viewer, onPress, testID, accessibilityLabel, variant = "grid" }: PosterCardProps) {
+  const compact = variant === "compact";
   const letter = outcomeLetter(item.outcome);
   const poster = item.videos.find((v) => v.poster_url) ?? null;
   const uploading = status.kind === "uploading";
-  const badge = statusBadgeLabel(status);
+  const badge = compact ? compactBadgeLabel(status) : statusBadgeLabel(status);
+  const disputed = item.status === "disputed";
+  const angles = item.videos.length > 1 ? (compact ? `${item.videos.length}×` : `${item.videos.length} ANGLES`) : null;
   const opp = shortName(item.opponent?.display_name);
   const line = cardLine(item);
   const date = shortDate(item.completed_at);
@@ -48,7 +70,7 @@ export function PosterCard({ item, status, viewer, onPress, testID, accessibilit
     <Pressable
       testID={testID ?? `film-card-${item.match_id}`}
       accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel ?? [`${outcomeWord(item.outcome)} vs ${opp}`, date, line, badge ?? (uploading ? uploadingLabel(progress) : null)]
+      accessibilityLabel={accessibilityLabel ?? [`${outcomeWord(item.outcome)} vs ${opp}`, date, line, statusBadgeLabel(status) ?? (uploading ? uploadingLabel(progress) : null), disputed ? "disputed" : null]
         .filter(Boolean)
         .join(", ")}
       onPress={onPress}
@@ -57,7 +79,8 @@ export function PosterCard({ item, status, viewer, onPress, testID, accessibilit
     >
       <OpeningStill
         posterUrl={poster?.poster_url ?? null}
-        cacheKey={poster?.video_id}
+        // The storage path, not the video id: a new poster gets a new key.
+        cacheKey={poster?.thumbnail_key ?? undefined}
         me={viewer}
         opponent={item.opponent ? { name: item.opponent.display_name, photoUrl: item.opponent.profile_photo_url } : null}
         fallbackLabel={fallbackLabel(item, status)}
@@ -66,11 +89,12 @@ export function PosterCard({ item, status, viewer, onPress, testID, accessibilit
       />
       <FilmScrim stops={[[0, 0], [1, 0.88]]} style={{ left: 0, right: 0, bottom: 0, height: "58%" }} />
 
-      {item.videos.length > 1 ? (
-        <FilmBadge testID="film-card-angles" label={`${item.videos.length} ANGLES`} tone="outline" style={{ position: "absolute", top: 8, left: 8 }} />
-      ) : null}
-      {badge ? (
-        <FilmBadge testID="film-card-badge" label={badge} tone={toneFor(status)} style={{ position: "absolute", top: 8, right: 8 }} />
+      {badge || disputed || angles ? (
+        <View testID="film-card-badges" style={{ position: "absolute", top: 8, right: 8, left: 8, alignItems: "flex-end", gap: 4 }}>
+          {badge ? <FilmBadge testID="film-card-badge" label={badge} tone={toneFor(status)} /> : null}
+          {disputed ? <FilmBadge testID="film-card-disputed" label="DISPUTED" tone="amber" /> : null}
+          {angles ? <FilmBadge testID="film-card-angles" label={angles} tone="outline" /> : null}
+        </View>
       ) : null}
       {uploading && poster ? (
         <View testID="film-card-uploading" style={{ position: "absolute", left: 10, right: 10, top: "38%", alignItems: "center", gap: 6 }}>
@@ -111,4 +135,4 @@ export function PosterCard({ item, status, viewer, onPress, testID, accessibilit
       </View>
     </Pressable>
   );
-}
+});

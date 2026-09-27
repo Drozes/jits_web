@@ -7,11 +7,10 @@ import { useThemedTokens } from "@/lib/theme/use-theme";
 import { darkVarsStyle } from "@/lib/theme/theme-provider";
 import { matchDetailHref } from "@/lib/match-detail/href";
 import { FILM_ROOM_HREF } from "@/lib/film-room/href";
-import { deriveCardStatus } from "@/lib/film-room/card-status";
 import { useMatchUploads } from "@/lib/film-room/use-match-uploads";
 import { useSeenMatches } from "@/lib/film-room/seen-store";
 import { MetaTag } from "@/components/ui/elo-system";
-import { PosterCard } from "@/components/film-room/poster-card";
+import { LibraryPoster } from "@/components/film-room/library-poster";
 import type { StillAthlete } from "@/components/film-room/opening-still";
 
 /** Posters in the preview row. */
@@ -36,6 +35,10 @@ interface FilmRoomPreviewProps {
 export function FilmRoomPreview({ items, error, onRetry, viewer }: FilmRoomPreviewProps) {
   const router = useRouter();
   const tokens = useThemedTokens();
+  // Stable props so the memoized posters only re-render when their own
+  // match changes (an upload tick re-renders just that poster).
+  const tile = React.useMemo(() => ({ name: viewer.name, photoUrl: viewer.photoUrl }), [viewer.name, viewer.photoUrl]);
+  const open = React.useCallback((matchId: string) => router.push(matchDetailHref(matchId)), [router]);
   const seen = useSeenMatches();
   const filmed = React.useMemo(() => (items ?? []).slice(0, 20), [items]);
   const uploads = useMatchUploads(React.useMemo(() => filmed.map((i) => i.match_id), [filmed]));
@@ -78,13 +81,14 @@ export function FilmRoomPreview({ items, error, onRetry, viewer }: FilmRoomPrevi
             const name = item.opponent?.display_name ?? "Opponent";
             return (
               <View key={item.match_id} style={{ width: TILE_WIDTH }}>
-                <PosterCard
+                <LibraryPoster
                   item={item}
-                  viewer={viewer}
-                  status={deriveCardStatus(item, uploads.get(item.match_id) ?? null, !seen.ready || seen.isSeen(item.match_id))}
+                  viewer={tile}
+                  variant="compact"
+                  seen={!seen.ready || seen.isSeen(item.match_id)}
                   testID={`past-video-row-${item.match_id}`}
                   accessibilityLabel={`Open match video vs ${name}`}
-                  onPress={() => router.push(matchDetailHref(item.match_id))}
+                  onOpen={open}
                 />
               </View>
             );

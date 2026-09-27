@@ -301,10 +301,13 @@ describe("MatchDetailScreen (Film Room match page)", () => {
     expect(utils.queryByLabelText("Play match film")).toBeNull();
   });
 
-  it("uses the signed opening still as the hero, cached by video id, and plays from it", async () => {
-    const utils = await renderLoaded(view({ videos: [video({ poster_url: "https://signed/p.jpg" })] }));
+  it("uses the signed opening still as the hero, cached by its storage key, and plays from it", async () => {
+    const utils = await renderLoaded(
+      view({ videos: [video({ poster_url: "https://signed/p.jpg", thumbnail_key: "m1/me/poster.jpg" })] }),
+    );
     const still = utils.getByTestId("match-hero-still");
-    expect(still.props.source).toEqual({ uri: "https://signed/p.jpg", cacheKey: "film-still-v-mine" });
+    // Keyed by the poster's storage path: a regenerated poster is a new key.
+    expect(still.props.source).toEqual({ uri: "https://signed/p.jpg", cacheKey: "film-still-m1/me/poster.jpg" });
     expect(utils.getByText("OPENING STILL")).toBeTruthy();
     expect(utils.getByText("05:00")).toBeTruthy();
     fireEvent.press(utils.getByLabelText("Play match film"));
