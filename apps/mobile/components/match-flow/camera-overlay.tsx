@@ -4,7 +4,7 @@ import { CameraView } from "expo-camera";
 import { Camera, CameraOff } from "lucide-react-native";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { cn } from "@/lib/cn";
-import { fitRecordedFrame } from "@/lib/video/recorded-frame";
+import { fitRecordedFrame, readyPreviewWidth } from "@/lib/video/recorded-frame";
 import { BROADCAST } from "./live/broadcast-tokens";
 
 interface CameraOverlayProps {
@@ -18,7 +18,8 @@ interface CameraOverlayProps {
   recording: boolean;
   /**
    * `card`: the 16:9 viewfinder card (ready step). `fullscreen`: the live
-   * step, full screen on black at the recorded 9:16 aspect, with the live
+   * step, full screen on black at the recorded aspect (9:16 portrait, 16:9
+   * landscape), with the live
    * chrome drawn over it by the step. The element nesting around
    * `CameraView` is identical in both, so switching never remounts the
    * native capture session.
@@ -102,12 +103,24 @@ export function CameraOverlay({
   }
 
   const frame = fullscreen ? fitRecordedFrame(window.width, window.height) : null;
+  // Landscape ready check: a narrower centered 16:9 card (the recorded frame)
+  // so the Ready controls stay in reach. Same nesting, so no remount.
+  const cardWidth = fullscreen ? null : readyPreviewWidth(window.width, window.height);
   return (
     <View
+      testID="camera-card"
       className={
-        fullscreen ? undefined : "w-full overflow-hidden rounded-md border border-hairline-strong bg-black"
+        fullscreen
+          ? undefined
+          : cn(cardWidth == null && "w-full", "overflow-hidden rounded-md border border-hairline-strong bg-black")
       }
-      style={fullscreen ? [StyleSheet.absoluteFill, { backgroundColor: BROADCAST.black, overflow: "hidden" }] : undefined}
+      style={
+        fullscreen
+          ? [StyleSheet.absoluteFill, { backgroundColor: BROADCAST.black, overflow: "hidden" }]
+          : cardWidth != null
+            ? { width: cardWidth, maxWidth: "100%", alignSelf: "center" }
+            : undefined
+      }
     >
       <View
         testID="camera-frame"

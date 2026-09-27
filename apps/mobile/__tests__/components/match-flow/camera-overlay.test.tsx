@@ -29,10 +29,16 @@ jest.mock("lucide-react-native", () => {
   );
 });
 
+const mockWindow = { width: 390, height: 844 };
 jest.mock("react-native/Libraries/Utilities/useWindowDimensions", () => ({
   __esModule: true,
-  default: () => ({ width: 390, height: 844, scale: 3, fontScale: 1 }),
+  default: () => ({ ...mockWindow, scale: 3, fontScale: 1 }),
 }));
+
+beforeEach(() => {
+  mockWindow.width = 390;
+  mockWindow.height = 844;
+});
 
 import { CameraOverlay } from "@/components/match-flow/camera-overlay";
 
@@ -128,4 +134,41 @@ describe("CameraOverlay fullscreen (live step)", () => {
     );
     screen.getByText("REC");
   });
+});
+
+describe("CameraOverlay in landscape", () => {
+  function renderGranted(layout: "card" | "fullscreen") {
+    return render(
+      <CameraOverlay
+        cameraRef={{ current: null }}
+        permissionGranted
+        permissionCanAskAgain
+        onRequestPermission={jest.fn()}
+        onCameraReady={jest.fn()}
+        recording={false}
+        layout={layout}
+      />,
+    );
+  }
+
+  it("live: draws the camera at 16:9, full height, horizontally centered", () => {
+    mockWindow.width = 844;
+    mockWindow.height = 390;
+    const frame = renderGranted("fullscreen").getByTestId("camera-frame").props.style;
+    expect(frame).toEqual(expect.objectContaining({ position: "absolute", height: 390, top: 0 }));
+    expect(frame.width).toBeCloseTo(693.33, 2);
+    expect(frame.left).toBeCloseTo(75.33, 2);
+  });
+
+  it("ready: a centered 16:9 card at 0.6 x height x 16 / 9, capped at the content width", () => {
+    mockWindow.width = 844;
+    mockWindow.height = 390;
+    const card = renderGranted("card").getByTestId("camera-card").props.style;
+    expect(card).toEqual({ width: 416, maxWidth: "100%", alignSelf: "center" });
+  });
+
+  it("ready in portrait: the card stays full width", () => {
+    expect(renderGranted("card").getByTestId("camera-card").props.style).toBeUndefined();
+  });
+
 });
