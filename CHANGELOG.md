@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### Mobile: landscape live screen (Widescreen Sideline), rotate at ready, lock at live
+
+Requires a TestFlight build; NOT OTA-eligible. Native changes: `app.json` `expo.orientation` `"portrait"` to `"default"`, and the new `expo-screen-orientation` dependency (~9.0.9) with its config plugin (`initialOrientation: "PORTRAIT_UP"`). The release owner must bump `expo.version` for the build that carries this, and no OTA of this change may target the current `0.3.0` runtime (installed 0.3.0 binaries lack the module; the wrapper degrades them to portrait-only without crashing). No backend, upload metadata or recorder option change: orientation lives in the clip itself (1280 x 720 landscape or 720 x 1280 portrait).
+
+**Added**
+- Orientation policy for the Arena match wizard and practice: the ready check follows the phone (portrait, landscape left, landscape right); going live locks the interface to whatever orientation it is in, so the clip records in it; the lock holds through the whole live step and while the clip is still stopping; every other step, every other screen and unmount are portrait. `apps/mobile/components/match-flow/match-orientation-controller.tsx` (rendered before the step renderer so the lock lands before recording starts).
+- `apps/mobile/lib/orientation.ts`: the crash-safe `expo-screen-orientation` wrapper (`allowRotation`, `lockToCurrent`, `lockPortrait`), a no-op without the native module; a rejected lock is logged once and never thrown.
+- Landscape live layout, same components reflowed (`apps/mobile/components/match-flow/live/live-landscape-layout.tsx`): HUD top-left, lower-third docked bottom-left at 320 wide (96 high slab, 80 px digits), Pause (112 x 112) and Hold to end (112 x 180, fill grows bottom to top) as tiles in a right rail, left and right scrims. Every live state (recording, paused, final 10 s, hold, time up, camera starting, no video, opponent ended) has a landscape rendering; the no-video plate sits in the free region between the lower-third and the rail. Practice gets the same screen with the PRACTICE tag and EXIT pill in the HUD row.
+- Ready check hint under the preview: "Turn your phone sideways for a wide shot. It locks when the match starts." (only with a granted preview).
+
+**Changed**
+- `fitRecordedFrame` is orientation-aware: 16:9, full height and centered in a landscape window; portrait output unchanged. New `readyPreviewWidth`: the landscape ready preview card is 16:9 at `min(content width, 0.6 x window height x 16 / 9)`, centered.
+- Landscape safe area: the wizard and practice scroll content and `AppHeader` use `max(16, inset)` side padding (unchanged in portrait).
+
 ### Mobile: full-screen broadcast live step, finish-time prefill, submission picker
 
 JS-only, OTA-eligible (no native, `app.json` or dependency change).
