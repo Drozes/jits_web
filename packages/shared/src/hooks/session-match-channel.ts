@@ -47,6 +47,9 @@ export const SESSION_MATCH_EVENTS = {
    * `{ athlete_id, claimed_at }` (epoch ms). Repeated as a heartbeat while
    * the claimer is on the form; a claim that goes quiet unlocks the other
    * side. Advisory only: `record_match_result` still accepts one result.
+   * A waiting athlete may take over a claim that has not produced a result
+   * for a minute: the takeover carries `supersedes` (the claim it replaces,
+   * by its `claimed_at`), and the replaced claimer yields to it.
    */
   RESULT_CLAIMED: "result_claimed",
 } as const;
@@ -78,8 +81,9 @@ export interface SessionMatchHandlers {
   /** Face-off: `weight` is lbs, or null when the athlete has none on file. */
   onWeighedIn?: (athleteId: string, weight: number | null) => void;
   onRecordingOptIn?: (athleteId: string, recording: boolean) => void;
-  /** `claimedAt` is the claimer's epoch ms, used only to break a tie. */
-  onResultClaimed?: (athleteId: string, claimedAt: number) => void;
+  /** `claimedAt` is the claimer's epoch ms, used only to break a tie;
+   * `supersedes` is the `claimed_at` of the claim a takeover replaces. */
+  onResultClaimed?: (athleteId: string, claimedAt: number, supersedes: number | null) => void;
 }
 
 export interface SessionMatchChannel {
@@ -167,7 +171,12 @@ export function createSessionMatchChannel(
     })
     .on("broadcast", { event: E.RESULT_CLAIMED }, ({ payload }) => {
       const at = payload.claimed_at;
-      h().onResultClaimed?.(payload.athlete_id as string, typeof at === "number" && Number.isFinite(at) ? at : 0);
+      const sup = payload.supersedes;
+      h().onResultClaimed?.(
+        payload.athlete_id as string,
+        typeof at === "number" && Number.isFinite(at) ? at : 0,
+        typeof sup === "number" && Number.isFinite(sup) ? sup : null,
+      );
     })
     .subscribe((status, err) => {
       subscribed = status === "SUBSCRIBED";

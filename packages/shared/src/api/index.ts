@@ -5,3 +5,4 @@ export * from "./chat-queries";
 export * from "./chat-mutations";
 export * from "./match-rank-change";
 export * from "./athlete-weight";
+export * from "./match-weights";

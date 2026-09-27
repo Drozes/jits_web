@@ -7,6 +7,8 @@ import { describe, it, expect, vi } from "vitest";
 import { getMatchRankChange, parseMatchRankChange } from "./match-rank-change";
 import { updateAthleteWeight, isValidAthleteWeight } from "./athlete-weight";
 import { mapPostgrestError } from "./errors";
+import { getMatchChallengeWeights, weightsFor } from "./match-weights";
+import { buildShareUrl } from "../utils/share";
 
 function rpcClient(result: { data?: unknown; error?: unknown } | Error) {
   const rpc = vi.fn(() =>
@@ -21,6 +23,8 @@ describe("getMatchRankChange", () => {
       data: {
         rank_before: 23,
         rank_after: 19,
+        direction: "up",
+        passed_total: 7,
         passed: [
           { athlete_id: "a1", display_name: "J. Silva" },
           { athlete_id: "a2", display_name: "  " },
@@ -37,20 +41,24 @@ describe("getMatchRankChange", () => {
       data: {
         rank_before: 23,
         rank_after: 19,
+        direction: "up",
         passed: [
           { athlete_id: "a1", display_name: "J. Silva" },
           { athlete_id: "a2", display_name: "An athlete" },
           { athlete_id: "a3", display_name: "C" },
         ],
+        passed_total: 7,
       },
     });
   });
 
   it("keeps null ranks for an unranked athlete", () => {
-    expect(parseMatchRankChange({ rank_before: null, rank_after: 0, passed: null })).toEqual({
+    expect(parseMatchRankChange({ rank_before: null, rank_after: 0, passed: null, direction: "sideways" })).toEqual({
       rank_before: null,
       rank_after: null,
+      direction: "none",
       passed: [],
+      passed_total: 0,
     });
   });
 
@@ -105,5 +113,37 @@ describe("dispute window hint", () => {
   it("maps dispute_window_closed to its own code", () => {
     const e = mapPostgrestError({ code: "P0001", message: "x", details: "", hint: "dispute_window_closed" } as never);
     expect(e.code).toBe("DISPUTE_WINDOW_CLOSED");
+  });
+});
+
+describe("match challenge weights", () => {
+  function client(result: { data?: unknown; error?: unknown }) {
+    const maybeSingle = vi.fn(() => Promise.resolve({ data: result.data ?? null, error: result.error ?? null }));
+    const eq = vi.fn(() => ({ maybeSingle }));
+    const select = vi.fn(() => ({ eq }));
+    const from = vi.fn(() => ({ select }));
+    return { client: { from } as never, from, select, eq };
+  }
+
+  it("reads the challenge's stamped weights", async () => {
+    const m = client({ data: { challenger_id: "a", opponent_id: "b", challenger_weight: 170, opponent_weight: null } });
+    const w = await getMatchChallengeWeights(m.client, "c1");
+    expect(m.from).toHaveBeenCalledWith("challenges");
+    expect(m.eq).toHaveBeenCalledWith("id", "c1");
+    expect(w).toEqual({ challengerId: "a", opponentId: "b", challengerWeight: 170, opponentWeight: null });
+    expect(weightsFor(w, "a")).toEqual({ mine: 170, theirs: null });
+    expect(weightsFor(w, "b")).toEqual({ mine: null, theirs: 170 });
+    expect(weightsFor(w, "zz")).toBeNull();
+  });
+
+  it("is null on an error", async () => {
+    expect(await getMatchChallengeWeights(client({ error: { message: "x" } }).client, "c1")).toBeNull();
+  });
+});
+
+describe("match share URL", () => {
+  it("links the live web app's match page (elorated.com is not live, jits-x1t2)", () => {
+    expect(buildShareUrl("match", "M1")).toBe("https://jitsweb.vercel.app/matches/M1");
+    expect(buildShareUrl("athlete", "A1")).toBe("https://elorated.com/athlete/A1");
   });
 });

@@ -103,6 +103,7 @@ describe("createSessionMatchChannel", () => {
     m.fire("weighed_in", { athlete_id: "d", weight: 171.5 });
     m.fire("recording_optin", { athlete_id: "e", recording: true });
     m.fire("result_claimed", { athlete_id: "f", claimed_at: 42 });
+    m.fire("result_claimed", { athlete_id: "g", claimed_at: 43, supersedes: 42 });
     expect(h.onTimerStarted).toHaveBeenCalledWith("t0");
     expect(h.onTimerPaused).toHaveBeenCalledWith("t1");
     expect(h.onTimerResumed).toHaveBeenCalledWith(7);
@@ -114,7 +115,8 @@ describe("createSessionMatchChannel", () => {
     expect(h.onMatchDisputed).toHaveBeenCalledWith("c");
     expect(h.onWeighedIn).toHaveBeenCalledWith("d", 171.5);
     expect(h.onRecordingOptIn).toHaveBeenCalledWith("e", true);
-    expect(h.onResultClaimed).toHaveBeenCalledWith("f", 42);
+    expect(h.onResultClaimed).toHaveBeenCalledWith("f", 42, null);
+    expect(h.onResultClaimed).toHaveBeenCalledWith("g", 43, 42);
   });
 
   it("normalises malformed face-off and claim payloads", () => {
@@ -130,7 +132,7 @@ describe("createSessionMatchChannel", () => {
     m.fire("result_claimed", { athlete_id: "f" });
     expect(h.onWeighedIn).toHaveBeenCalledWith("d", null);
     expect(h.onRecordingOptIn).toHaveBeenCalledWith("e", false);
-    expect(h.onResultClaimed).toHaveBeenCalledWith("f", 0);
+    expect(h.onResultClaimed).toHaveBeenCalledWith("f", 0, null);
   });
 
   it("exposes match_disputed as a protocol event (jits-wfpo)", () => {

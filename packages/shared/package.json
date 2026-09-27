@@ -14,6 +14,7 @@
     "./api/chat-mutations": "./src/api/chat-mutations.ts",
     "./api/match-rank-change": "./src/api/match-rank-change.ts",
     "./api/athlete-weight": "./src/api/athlete-weight.ts",
+    "./api/match-weights": "./src/api/match-weights.ts",
     "./constants": "./src/constants.ts",
     "./geo": "./src/geo/index.ts",
     "./hooks": "./src/hooks/index.ts",

@@ -101,7 +101,12 @@ export function useSessionMatchSync(params: UseSessionMatchSyncParams) {
       [send],
     ),
     broadcastResultClaimed: useCallback(
-      (athleteId: string, claimedAt: number) => send(E.RESULT_CLAIMED, { athlete_id: athleteId, claimed_at: claimedAt }),
+      (athleteId: string, claimedAt: number, supersedes?: number | null) =>
+        send(E.RESULT_CLAIMED, {
+          athlete_id: athleteId,
+          claimed_at: claimedAt,
+          ...(supersedes != null ? { supersedes } : {}),
+        }),
       [send],
     ),
   };

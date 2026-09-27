@@ -20,7 +20,12 @@ export interface RankPassedAthlete {
 export interface MatchRankChange {
   rank_before: number | null;
   rank_after: number | null;
+  /** Which way the viewer moved; "none" when unranked or unchanged. */
+  direction: "up" | "down" | "none";
+  /** At most three, nearest first. */
   passed: RankPassedAthlete[];
+  /** Uncapped count behind `passed` (falls back to its length). */
+  passed_total: number;
 }
 
 function toRank(v: unknown): number | null {
@@ -40,7 +45,19 @@ export function parseMatchRankChange(raw: unknown): MatchRankChange | null {
         return [{ athlete_id: row.athlete_id, display_name: name || "An athlete" }];
       })
     : [];
-  return { rank_before: toRank(r.rank_before), rank_after: toRank(r.rank_after), passed: passed.slice(0, 3) };
+  const direction = r.direction === "up" || r.direction === "down" ? r.direction : "none";
+  const capped = passed.slice(0, 3);
+  const total =
+    typeof r.passed_total === "number" && Number.isFinite(r.passed_total) && r.passed_total >= capped.length
+      ? Math.round(r.passed_total)
+      : capped.length;
+  return {
+    rank_before: toRank(r.rank_before),
+    rank_after: toRank(r.rank_after),
+    direction,
+    passed: capped,
+    passed_total: total,
+  };
 }
 
 /**
