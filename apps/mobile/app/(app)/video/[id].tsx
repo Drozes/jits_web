@@ -1,39 +1,60 @@
 import * as React from "react";
-import { ActivityIndicator, View } from "react-native";
+import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Audio, ResizeMode, Video } from "expo-av";
-import { AppHeader } from "@/components/layout/app-header";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Audio, ResizeMode, Video, type AVPlaybackStatus } from "expo-av";
+import { buildKeyMoments, captionAt, formatClock } from "@jits/shared/utils";
 import { HarnessMarker } from "@/components/match-detail/harness-marker";
 import { VideoStatePanel } from "@/components/match-detail/video-state-panel";
+import { FilmSurface } from "@/components/film-room/film-surface";
+import { FilmScrim } from "@/components/film-room/film-scrim";
+import { FilmBackButton } from "@/components/film-room/film-back-button";
+import { AngleSwitcher } from "@/components/film-room/angle-switcher";
+import { SeekBar } from "@/components/film-room/seek-bar";
+import { MomentCaption, MomentChips, Transport, nextSpeed } from "@/components/film-room/player-controls";
 import { useVideoPlayback } from "@/lib/match-detail/use-video-playback";
-import { useThemedTokens } from "@/lib/theme/use-theme";
+import { useMatchDetail } from "@/lib/match-detail/use-match-detail";
+import { useVideoAnalysis } from "@/lib/film-room/use-video-analysis";
+import { shortName } from "@/lib/film-room/format";
+import { FILM, TABULAR } from "@/lib/film-room/film-palette";
+
+/** A moment stays "current" (chip lit) this long after its time. */
+const CURRENT_HOLD_S = 10;
 
 /**
- * Full-screen playback of one match video. `useVideoPlayback` signs a 1-hour
- * URL against the private match-videos bucket (participant-gated RLS on both
- * the row read and the sign), prefers the normalized MP4, and re-signs once
- * silently when the player errors (an expired URL mid-match), resuming at the
- * last position. Playback streams progressively; nothing is downloaded.
+ * Full-screen playback of one match video with the Film Room controls: seek
+ * bar with a marker per key moment, moment chips, a caption for the current
+ * moment, ±10 s, speed, and the angle switcher when both athletes recorded.
+ * `?t=<seconds>` starts playback there (key moments link in with it).
  *
- * Player is expo-av's Video because that module is already embedded in the
- * field build, so this screen can ship over OTA. The expo-video swap is
- * planned with the Phase 2 TestFlight build (jits-kaf.2.6): an OTA must
- * never reference a native module the installed binary does not carry.
+ * `useVideoPlayback` signs a 1-hour URL (normalized MP4 preferred), re-signs
+ * silently once when the player errors and resumes where it was. The player is
+ * expo-av's Video because that module is embedded in the field build, so this
+ * screen ships over OTA (no new native module).
  *
- * The `video-player-state` marker exposes the phase to the match-loop
- * harness as "Video state: <state>"; `loaded` means the player reported
- * `isLoaded` at least once for the current URL.
+ * The `video-player-state` marker exposes the phase to the match-loop harness
+ * as "Video state: <state>".
  */
 export default function MatchVideoScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const router = useRouter();
-  const tokens = useThemedTokens();
-  const { phase, source, stateLabel, videoRef, retry, onPlayerError, onPlayerStatus } =
-    useVideoPlayback(id);
+  const { id, t } = useLocalSearchParams<{ id: string; t?: string }>();
+  const start = t != null && Number.isFinite(Number(t)) ? Number(t) : null;
+  // Keyed by id: switching angles remounts the player on the other recording.
+  return <PlayerBody key={id ?? "none"} id={id} start={start} />;
+}
 
-  // iOS routes audio through the ringer switch by default, so with the
-  // silent switch on a match video played with no sound at all. Play
-  // through it while this screen is up, then hand the session back.
+function PlayerBody({ id, start }: { id: string | undefined; start: number | null }) {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { phase, source, stateLabel, videoRef, retry, onPlayerError, onPlayerStatus } = useVideoPlayback(id, start);
+  const details = useMatchDetail(source?.matchId ?? undefined);
+  const { analysis } = useVideoAnalysis(id ?? null);
+  const [positionS, setPositionS] = React.useState(start ?? 0);
+  const [durationS, setDurationS] = React.useState(0);
+  const [playing, setPlaying] = React.useState(true);
+  const [speed, setSpeed] = React.useState(1);
+
+  // iOS routes audio through the ringer switch by default; play through it
+  // while this screen is up, then hand the session back.
   React.useEffect(() => {
     void Audio.setAudioModeAsync({ playsInSilentModeIOS: true }).catch(() => undefined);
     return () => {
@@ -41,40 +62,123 @@ export default function MatchVideoScreen() {
     };
   }, []);
 
-  const goBack = React.useCallback(() => {
-    if (router.canGoBack()) router.back();
-    else router.replace("/");
-  }, [router]);
+  const onStatus = React.useCallback(
+    (status: AVPlaybackStatus) => {
+      onPlayerStatus(status);
+      if (!status.isLoaded) return;
+      setPositionS(status.positionMillis / 1000);
+      if (status.durationMillis) setDurationS(status.durationMillis / 1000);
+      if (status.didJustFinish) setPlaying(false);
+    },
+    [onPlayerStatus],
+  );
+
+  const duration = durationS || source?.durationSeconds || 0;
+  const view = details.state === "ready" ? details.data : null;
+  const moments = React.useMemo(
+    () => (analysis ? buildKeyMoments(analysis, view?.match ?? null, duration || null) : []),
+    [analysis, view?.match, duration],
+  );
+  const caption = captionAt(moments, analysis?.positions, positionS);
+  const current = [...moments].reverse().find((m) => m.t <= positionS + 0.25 && positionS - m.t < CURRENT_HOLD_S);
+
+  const seek = (seconds: number) => {
+    const clamped = Math.max(0, duration > 0 ? Math.min(duration, seconds) : seconds);
+    setPositionS(clamped);
+    videoRef.current?.setPositionAsync(clamped * 1000).catch(() => undefined);
+  };
+  const toggle = () => {
+    if (!playing && duration > 0 && positionS >= duration - 0.5) seek(0);
+    setPlaying((p) => !p);
+  };
+  const title = view
+    ? `${shortName(view.me.display_name)} vs ${shortName(view.opponent?.display_name)}`
+    : "Match film";
+
+  const topBar = (
+    <View className="flex-row items-center" style={{ position: "absolute", left: 4, right: 16, top: insets.top + 8, height: 44, gap: 6 }}>
+      <FilmBackButton label="Go back" icon="close" fallback="/" color={FILM.white} />
+      <Text numberOfLines={1} className="flex-1 font-heading uppercase" style={{ fontSize: 14, letterSpacing: 1.12, color: FILM.white }}>
+        {title}
+      </Text>
+      {view ? (
+        <View style={{ height: 24, paddingHorizontal: 8, borderRadius: 2, borderWidth: 1, borderColor: FILM.strong, backgroundColor: "rgba(0,0,0,0.40)", justifyContent: "center" }}>
+          <Text className="font-mono-medium" style={{ fontSize: 10, letterSpacing: 2.52, color: "rgba(255,255,255,0.85)" }}>
+            {view.match.match_type === "ranked" ? "RANKED" : "CASUAL"}
+          </Text>
+        </View>
+      ) : null}
+    </View>
+  );
 
   return (
-    <View className="flex-1 bg-surface">
-      <AppHeader title="Match Video" back />
-      <View className="flex-1">
-        {phase === "ready" && source ? (
+    <FilmSurface style={{ backgroundColor: "#000" }}>
+      {phase === "ready" && source ? (
+        <>
           <Video
             key={`${source.generation}:${source.url}`}
             ref={videoRef}
             source={{ uri: source.url }}
             posterSource={source.posterUrl ? { uri: source.posterUrl } : undefined}
             usePoster={!!source.posterUrl}
-            style={{ flex: 1, backgroundColor: "#000" }}
-            useNativeControls
+            style={StyleSheet.absoluteFill}
             resizeMode={ResizeMode.CONTAIN}
-            shouldPlay
-            onPlaybackStatusUpdate={onPlayerStatus}
+            shouldPlay={playing}
+            rate={speed}
+            shouldCorrectPitch
+            progressUpdateIntervalMillis={250}
+            onPlaybackStatusUpdate={onStatus}
             // The row read and the sign both succeeded, so the recording
             // exists: an error here is an expired URL or the network.
             onError={onPlayerError}
           />
-        ) : phase === "loading" || phase === "ready" ? (
-          <View className="flex-1 items-center justify-center">
-            <ActivityIndicator color={tokens.accentCta} />
+          <FilmScrim stops={[[0, 0.75], [1, 0]]} style={{ left: 0, right: 0, top: 0, height: insets.top + 150 }} />
+          <FilmScrim stops={[[0, 0], [1, 0.9]]} style={{ left: 0, right: 0, bottom: 0, height: "45%" }} />
+          {topBar}
+          {view && view.videos.length > 1 && id ? (
+            <View style={{ position: "absolute", left: 16, right: 16, top: insets.top + 60 }}>
+              <AngleSwitcher
+                variant="film"
+                angles={view.videos}
+                activeId={id}
+                opponentName={view.opponent?.display_name}
+                onSelect={(other) => {
+                  if (other !== id) router.setParams({ id: other, t: String(Math.floor(positionS)) });
+                }}
+              />
+            </View>
+          ) : null}
+          <View style={{ position: "absolute", left: 16, right: 16, bottom: insets.bottom + 24, gap: 14 }}>
+            {caption ? <MomentCaption t={caption.t} text={caption.text} /> : null}
+            <View style={{ gap: 6 }}>
+              <SeekBar positionS={positionS} durationS={duration} moments={moments} onSeek={seek} />
+              <View className="flex-row justify-between">
+                <Text testID="player-time" className="font-mono-bold" style={[{ fontSize: 12, color: FILM.white }, TABULAR]}>
+                  {`${formatClock(positionS)} / ${formatClock(duration)}`}
+                </Text>
+                {moments.length > 0 ? (
+                  <Text className="font-mono-medium" style={{ fontSize: 10, letterSpacing: 1.68, color: FILM.text2 }}>
+                    {`${moments.length} KEY MOMENT${moments.length === 1 ? "" : "S"}`}
+                  </Text>
+                ) : null}
+              </View>
+            </View>
+            <Transport playing={playing} speed={speed} onToggle={toggle} onSkip={(d) => seek(positionS + d)} onSpeed={() => setSpeed(nextSpeed)} />
+            <MomentChips moments={moments} currentT={current?.t ?? null} onJump={(tt) => { seek(tt); setPlaying(true); }} />
           </View>
-        ) : (
-          <VideoStatePanel kind={phase} onRetry={retry} onBack={goBack} />
-        )}
-      </View>
+        </>
+      ) : phase === "loading" || phase === "ready" ? (
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator color={FILM.text2} />
+          {topBar}
+        </View>
+      ) : (
+        <View style={{ flex: 1 }}>
+          <VideoStatePanel kind={phase} onRetry={retry} onBack={() => (router.canGoBack() ? router.back() : router.replace("/"))} />
+          {topBar}
+        </View>
+      )}
       <HarnessMarker testID="video-player-state" label={`Video state: ${stateLabel}`} />
-    </View>
+    </FilmSurface>
   );
 }
