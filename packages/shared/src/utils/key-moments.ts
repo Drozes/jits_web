@@ -211,13 +211,23 @@ export function formatClock(seconds: number | null | undefined): string {
 /**
  * Carry a playback position from one angle of a match to the other.
  *
- * ASSUMPTION (documented, unverified on real footage): `match_videos.
- * sync_offset_ms` is how much later a recording started than the match's
- * reference (primary) angle, so reference time = video time + offset. The
- * same instant on the target is then `t + (fromOffset - toOffset) / 1000`.
- * Only when BOTH offsets are known is the result `synced`; otherwise `t`
- * carries over unchanged and the caller should say it is approximate
- * (the two phones started recording at different moments).
+ * BACKEND FACTS (jr_be, checked 2026-09-27): `match_videos.sync_offset_ms`
+ * exists (migration 20260313000000_video_tables.sql, comment "millisecond
+ * offset relative to primary video for sync") but NOTHING writes it: no RPC,
+ * trigger, edge function, slicer worker or frontend sets it, the chunked
+ * pipeline spec marks it "v1: ignored", and no sign convention is defined.
+ * The research note puts it on the SECONDARY video only (the primary angle,
+ * `primary_video_id` NULL, has no offset). So today both offsets are null
+ * and every switch takes the unsynced path: `t` carries over and the caller
+ * shows "Angles aren't synced; position is approximate".
+ *
+ * If a writer ever lands, this ASSUMES the offset is how much later that
+ * recording started than the reference, so reference time = video time +
+ * offset and the same instant on the target is
+ * `t + (fromOffset - toOffset) / 1000`. It only reports `synced` when BOTH
+ * offsets are numbers, so a writer that leaves the primary NULL must also
+ * store 0 on it (or this must learn `primary_video_id`) before angles sync.
+ * Re-check the sign against the writer when it exists.
  */
 export function translateAngleTime(
   t: number,

@@ -177,8 +177,9 @@ function PlayerBody({ id, start, approximate }: { id: string | undefined; start:
                 opponentName={view.opponent?.display_name}
                 onSelect={(other) => {
                   if (other === id) return;
-                  // Synced only when both recordings carry sync_offset_ms;
-                  // otherwise carry the second over and say it is approximate.
+                  // Synced only when both recordings carry sync_offset_ms. Nothing
+                  // in the backend writes it yet (see translateAngleTime), so in
+                  // practice this carries the second and says it is approximate.
                   const moved = translateAngleTime(positionS, offsets[id], offsets[other]);
                   router.setParams({ id: other, t: String(Math.floor(moved.t)), approx: moved.synced ? "0" : "1" });
                 }}

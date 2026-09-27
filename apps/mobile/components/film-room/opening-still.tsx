@@ -22,7 +22,7 @@ interface OpeningStillProps {
   /** Fallback caption, e.g. "STILL ARRIVES AFTER UPLOAD" or "UPLOADING 64%". */
   fallbackLabel: string;
   tileSize: number;
-  /** Dim + desaturate the poster (an upload in progress over an older still). */
+  /** Dim the poster (opacity only) while an upload is in progress. */
   dim?: boolean;
   testID?: string;
 }
