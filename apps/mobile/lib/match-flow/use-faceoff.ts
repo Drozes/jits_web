@@ -164,7 +164,14 @@ export function useFaceoff(p: FaceoffParams): Faceoff {
     startedRef.current = true;
     setStarting(true);
     const result = await startMatch(supabase, pRef.current.matchId);
-    if (cancelledRef.current) return;
+    // Left while start_match was in flight: the cancel owns the exit now.
+    // Reset the spinner so a failed cancel (which re-arms Leave) is not left
+    // stuck on "Starting match...".
+    if (cancelledRef.current) {
+      startedRef.current = false;
+      setStarting(false);
+      return;
+    }
     if (!result.ok) {
       // Both devices race start_match; losing the race is not an error.
       const match = await getMatchDetails(supabase, pRef.current.matchId);

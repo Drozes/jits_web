@@ -124,7 +124,7 @@ export default function ArenaScreen() {
     blocked: isBusy || !!incoming,
     capReached,
     outgoingOpponentId: outgoing?.opponentId ?? null,
-    goLive: () => void toggle(),
+    goLive: () => void arenaActions.goLive(),
     send: sendChallenge,
   });
 

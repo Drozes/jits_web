@@ -120,9 +120,9 @@ export function useRematchPin({
   };
 }
 
-/** Grace before taking a rematcher live: leaving the match restores a live
- * athlete on its own (use-arena-live), and a toggle racing that restore
- * would take them OFFLINE instead. */
+/** Grace before asking to go live: leaving the match restores a live
+ * athlete on its own (use-arena-live). The ask itself is idempotent
+ * (`goLive`, never a toggle), so a restore still in flight is harmless. */
 export const REMATCH_GO_LIVE_GRACE_MS = 1_500;
 
 export interface RematchAutoSendInput {
@@ -133,6 +133,7 @@ export interface RematchAutoSendInput {
   blocked: boolean;
   capReached: boolean;
   outgoingOpponentId: string | null;
+  /** Idempotent go-live (`arenaActions.goLive`), never a toggle. */
   goLive: () => void;
   send: (opponentId: string, opponentName: string) => Promise<void>;
 }
@@ -173,6 +174,17 @@ export function useRematchAutoSend({
   goLiveRef.current = goLive;
 
   const wanted = pin.autoSend ? pin.pinnedId : null;
+
+  // Each arrival from a verdict is its own rematch: once the pin ends (sent,
+  // cleared, tab left), forget the last one so a second rematch of the same
+  // opponent on this still-mounted screen sends again.
+  React.useEffect(() => {
+    if (wanted) return;
+    if (sentForRef.current && outgoingOpponentId === sentForRef.current && toastedForRef.current !== sentForRef.current) return;
+    sentForRef.current = null;
+    sentNameRef.current = null;
+    toastedForRef.current = null;
+  }, [wanted, outgoingOpponentId]);
 
   // Go live once per rematch if the match exit did not restore it.
   React.useEffect(() => {

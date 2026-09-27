@@ -129,6 +129,7 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
     const unregister = registerArenaController({
       toggle: () => liveRef.current.toggle(),
       goOffline: () => liveRef.current.goOffline(),
+      goLive: () => liveRef.current.goLive(),
       sendChallenge: (id, name) => challengeRef.current.sendChallenge(id, name),
       cancelOutgoing: () => challengeRef.current.cancelOutgoing(),
       clearCap: () => challengeRef.current.clearCap(),

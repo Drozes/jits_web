@@ -102,10 +102,11 @@ export function VerdictStep(props: VerdictStepProps) {
   const pollsRef = React.useRef(0);
   React.useEffect(() => {
     if (!awaitingOpponent) return;
+    if (pollsRef.current >= VERDICT_DISPUTE_POLL_LIMIT) return;
     const id = setInterval(() => {
-      if (pollsRef.current >= VERDICT_DISPUTE_POLL_LIMIT) return;
       pollsRef.current += 1;
       reconcileNow();
+      if (pollsRef.current >= VERDICT_DISPUTE_POLL_LIMIT) clearInterval(id);
     }, VERDICT_DISPUTE_POLL_MS);
     return () => clearInterval(id);
   }, [awaitingOpponent, reconcileNow]);
