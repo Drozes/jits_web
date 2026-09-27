@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { Square } from "lucide-react-native";
 import { HOLD_TO_END_MS } from "@/lib/match-flow/live-view-state";
-import { BROADCAST, BROADCAST_RADIUS, BROADCAST_SIZE } from "./broadcast-tokens";
+import { BROADCAST, BROADCAST_LANDSCAPE, BROADCAST_RADIUS, BROADCAST_SIZE } from "./broadcast-tokens";
 
 const RETRACT_MS = 240;
 
@@ -27,6 +27,8 @@ interface HoldToEndButtonProps {
   onEnd: () => void;
   /** Reports the finger going down / up so the strip can say "RELEASE TO CANCEL". */
   onHoldChange?: (holding: boolean) => void;
+  /** The landscape rail's 112 x 180 tile: fill grows bottom to top, two-line label. */
+  tile?: boolean;
 }
 
 /**
@@ -38,7 +40,7 @@ interface HoldToEndButtonProps {
  * press itself stays active, so a rolling thumb would fill the bar and never
  * end. Screen reader users get "End match" actions instead.
  */
-export function HoldToEndButton({ disabled, ending, onEnd, onHoldChange }: HoldToEndButtonProps) {
+export function HoldToEndButton({ disabled, ending, onEnd, onHoldChange, tile = false }: HoldToEndButtonProps) {
   const progress = React.useRef(new Animated.Value(0)).current;
   const [holding, setHolding] = React.useState(false);
   const [complete, setComplete] = React.useState(false);
@@ -147,6 +149,10 @@ export function HoldToEndButton({ disabled, ending, onEnd, onHoldChange }: HoldT
   const label = complete || ending ? "ENDING" : holding ? "KEEP HOLDING" : "HOLD TO END";
   const dimmed = disabled || complete;
   const fillWidth = progress.interpolate({ inputRange: [0, 1], outputRange: ["0%", "100%"] });
+  // The tile's fill carries the vertical reading; the bottom rule stays horizontal.
+  const fillStyle = tile
+    ? { left: 0, right: 0, bottom: 0, height: fillWidth }
+    : { left: 0, top: 0, bottom: 0, width: fillWidth };
 
   return (
     <Pressable
@@ -163,9 +169,9 @@ export function HoldToEndButton({ disabled, ending, onEnd, onHoldChange }: HoldT
       onPressOut={handlePressOut}
       onLongPress={handleHoldComplete}
       style={{
-        flex: 1.4,
-        minWidth: 0,
-        height: BROADCAST_SIZE.controls,
+        ...(tile
+          ? { width: BROADCAST_LANDSCAPE.rail, height: BROADCAST_LANDSCAPE.holdTile }
+          : { flex: 1.4, minWidth: 0, height: BROADCAST_SIZE.controls }),
         borderRadius: BROADCAST_RADIUS.button,
         backgroundColor: BROADCAST.cta,
         overflow: "hidden",
@@ -180,21 +186,24 @@ export function HoldToEndButton({ disabled, ending, onEnd, onHoldChange }: HoldT
         pointerEvents="none"
         style={{
           position: "absolute",
-          left: 0,
-          top: 0,
-          bottom: 0,
-          width: fillWidth,
+          ...fillStyle,
           backgroundColor: BROADCAST.ctaHover,
         }}
       />
-      <View pointerEvents="none" style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+      <View
+        pointerEvents="none"
+        style={{ flexDirection: tile ? "column" : "row", alignItems: "center", gap: tile ? 12 : 10 }}
+      >
         <Square size={20} color={BROADCAST.ink} strokeWidth={2} />
         <Text
           className="font-heading"
-          numberOfLines={1}
-          style={{ fontSize: 14, lineHeight: 16, letterSpacing: 1.12, color: BROADCAST.ink }}
+          numberOfLines={tile ? 2 : 1}
+          style={[
+            { fontSize: 14, lineHeight: 16, letterSpacing: 1.12, color: BROADCAST.ink },
+            tile ? { lineHeight: 15.4, textAlign: "center" } : null,
+          ]}
         >
-          {label}
+          {tile ? label.replace(" ", "\n") : label}
         </Text>
       </View>
       <View

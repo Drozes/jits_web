@@ -29,27 +29,50 @@ export function noVideoCopy(variant: UnavailableVariant, practice: boolean): { h
   }
 }
 
+/**
+ * `regionWidth` (landscape): the free width between the lower-third and the
+ * rail. The plate fits inside it (capped at 300), drops the icon and uses
+ * smaller type.
+ */
 export function NoVideoPlate({
   variant,
   practice,
   onAllowCamera,
+  regionWidth,
 }: {
   variant: UnavailableVariant;
   practice: boolean;
   onAllowCamera: () => void;
+  regionWidth?: number;
 }) {
   const copy = noVideoCopy(variant, practice);
+  const compact = regionWidth != null;
+  const maxWidth = compact ? Math.min(300, regionWidth) : 300;
   return (
-    <View testID={`live-no-video-${variant}`} style={{ maxWidth: 300, alignItems: "center", gap: 12 }}>
-      <CameraOff size={40} color={BROADCAST.dim62} strokeWidth={1.5} />
+    <View testID={`live-no-video-${variant}`} style={{ maxWidth, alignItems: "center", gap: 12 }}>
+      {compact ? null : <CameraOff size={40} color={BROADCAST.dim62} strokeWidth={1.5} />}
       <Text
         accessibilityRole="header"
         className="font-display"
-        style={{ fontSize: 36, lineHeight: 34, letterSpacing: -0.18, color: BROADCAST.inkDark, textAlign: "center" }}
+        style={{
+          fontSize: compact ? 28 : 36,
+          lineHeight: compact ? 27 : 34,
+          letterSpacing: -0.18,
+          color: BROADCAST.inkDark,
+          textAlign: "center",
+        }}
       >
         {copy.heading}
       </Text>
-      <Text className="font-body" style={{ fontSize: 14, lineHeight: 21, color: BROADCAST.body72, textAlign: "center" }}>
+      <Text
+        className="font-body"
+        style={{
+          fontSize: compact ? 13 : 14,
+          lineHeight: compact ? 18.2 : 21,
+          color: BROADCAST.body72,
+          textAlign: "center",
+        }}
+      >
         {copy.body}
       </Text>
       {variant === "canAsk" ? (
@@ -60,7 +83,7 @@ export function NoVideoPlate({
           onPress={onAllowCamera}
           hitSlop={10}
           style={({ pressed }) => ({
-            width: 180,
+            width: Math.min(180, maxWidth),
             height: 48,
             alignItems: "center",
             justifyContent: "center",

@@ -1,9 +1,11 @@
 import { Text, View } from "react-native";
 import { LivePill } from "@/components/ui/elo-system";
 import { spokenDuration, type SlabLabel } from "@/lib/match-flow/live-view-state";
-import { BROADCAST, BROADCAST_RADIUS, BROADCAST_SIZE, TABULAR } from "./broadcast-tokens";
+import { BROADCAST, BROADCAST_LANDSCAPE, BROADCAST_RADIUS, BROADCAST_SIZE, TABULAR } from "./broadcast-tokens";
 
 const LABEL_TEXT = { fontSize: 10, lineHeight: 12, letterSpacing: 2.52 };
+const DIGITS = { fontSize: 88, lineHeight: 92, letterSpacing: -3.52 };
+const DIGITS_LANDSCAPE = { fontSize: 80, lineHeight: 84, letterSpacing: -3.2 };
 
 /** What a screen reader hears before the time, so the state is not only visual. */
 const SPOKEN_PREFIX: Record<SlabLabel, string> = {
@@ -26,25 +28,28 @@ function StaticLabel({ text, color, dot }: { text: string; color: string; dot: b
 
 /**
  * The clock: remaining time in big mono digits that never change color, the
- * state label top-left and the bout length top-right.
+ * state label top-left and the bout length top-right. Landscape is a
+ * slightly shorter slab (96) with 80 px digits.
  */
 export function ClockSlab({
   label,
   formatted,
   seconds,
   durationFormatted,
+  landscape = false,
 }: {
   label: SlabLabel;
   formatted: string;
   /** The same remaining time as `formatted`, in seconds, for the spoken label. */
   seconds: number;
   durationFormatted: string;
+  landscape?: boolean;
 }) {
   return (
     <View
       testID="live-clock-slab"
       style={{
-        height: BROADCAST_SIZE.slab,
+        height: landscape ? BROADCAST_LANDSCAPE.slab : BROADCAST_SIZE.slab,
         alignItems: "center",
         justifyContent: "center",
         backgroundColor: BROADCAST.slab,
@@ -75,7 +80,7 @@ export function ClockSlab({
         accessibilityLabel={`${SPOKEN_PREFIX[label]}${spokenDuration(seconds)} remaining`}
         className="font-mono-bold"
         style={[
-          { fontSize: 88, lineHeight: 92, letterSpacing: -3.52, color: BROADCAST.inkDark, paddingTop: 10 },
+          { ...(landscape ? DIGITS_LANDSCAPE : DIGITS), color: BROADCAST.inkDark, paddingTop: 10 },
           TABULAR,
         ]}
       >

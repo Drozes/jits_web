@@ -44,6 +44,20 @@ export const BROADCAST_SIZE = {
   maxWidth: 480,
 } as const;
 
+/** Widescreen Sideline (landscape) deltas; everything else is as portrait. */
+export const BROADCAST_LANDSCAPE = {
+  lowerThird: 320,
+  rail: 112,
+  pauseTile: 112,
+  holdTile: 180,
+  slab: 96,
+  top: 16,
+  /** Added to the side safe inset (at least 16): 59 + 12 = 71 on a notched iPhone. */
+  edge: 12,
+  /** The lower-third and rail bottom: 21 clears the landscape home indicator. */
+  bottom: 21,
+} as const;
+
 /**
  * The glass button look shared by Pause and Allow camera: 1 px white-40
  * border, white-12 fill (white-20 pressed), a 0.98 press-in.

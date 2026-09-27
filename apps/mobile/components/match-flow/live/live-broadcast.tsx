@@ -1,5 +1,5 @@
 import * as React from "react";
-import { AccessibilityInfo, Platform, StyleSheet, View } from "react-native";
+import { AccessibilityInfo, Platform, StyleSheet, View, useWindowDimensions } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { UseVideoRecorderReturn } from "@/lib/video/use-video-recorder";
@@ -17,6 +17,7 @@ import { PauseButton } from "./pause-button";
 import { HoldToEndButton } from "./hold-to-end-button";
 import { NoVideoPlate } from "./no-video-plate";
 import { OpponentEndedPlate } from "./opponent-ended-plate";
+import { LiveLandscapeLayout } from "./live-landscape-layout";
 
 export interface LiveBroadcastProps {
   kindLabel: "RANKED" | "CASUAL" | "PRACTICE";
@@ -48,6 +49,10 @@ export interface LiveBroadcastProps {
  * camera frame (drawn underneath by the wizard) with a broadcast-style HUD
  * and lower-third over it. Pure presentation; the steps own the clock, the
  * recorder and the end.
+ *
+ * A landscape window (the phone was sideways when the match went live and
+ * the interface is locked there) gets the Widescreen Sideline arrangement
+ * of the same pieces; the derived live state is orientation-independent.
  */
 export function LiveBroadcast(props: LiveBroadcastProps) {
   const {
@@ -68,6 +73,8 @@ export function LiveBroadcast(props: LiveBroadcastProps) {
     practice = false,
   } = props;
   const insets = useSafeAreaInsets();
+  const window = useWindowDimensions();
+  const landscape = window.width > window.height;
   const [holding, setHolding] = React.useState(false);
   const recordingSeconds = useRecordingElapsed(recorder.state);
   // Set on render (not in an effect) so the frame after a recording ends
@@ -110,13 +117,63 @@ export function LiveBroadcast(props: LiveBroadcastProps) {
   }, [opponentEndedName, opponentEndedFinal]);
   const holdDisabled = controlsDisabled || endPending || view.autoEndPending;
 
+  const tally = <RecTally variant={view.tally} recordingSeconds={recordingSeconds} />;
+  const tags = (
+    <>
+      <HudTag label={kindLabel} testID="live-kind-tag" />
+      {hudExtra}
+    </>
+  );
+  const renderNoVideo = (regionWidth?: number) =>
+    view.unavailable ? (
+      <NoVideoPlate
+        variant={view.unavailable}
+        practice={practice}
+        onAllowCamera={() => void recorder.requestPermission()}
+        regionWidth={regionWidth}
+      />
+    ) : null;
+  const endedPlate = opponentEnded ? (
+    <OpponentEndedPlate
+      name={opponentEnded.name}
+      finalFormatted={opponentEnded.finalFormatted}
+      durationFormatted={durationFormatted}
+      headlineLines={landscape ? 2 : undefined}
+    />
+  ) : null;
+  const plates = (
+    <View>
+      {view.strip ? <StateStrip key={view.strip} variant={view.strip} remaining={remaining} /> : null}
+      <AthleteBar me={me} opponent={opponent} flatTop={!!view.strip} />
+      <ClockSlab
+        label={view.slab}
+        formatted={opponentEnded ? opponentEnded.finalFormatted : formatted}
+        seconds={opponentEnded ? opponentEnded.finalRemaining : remaining}
+        durationFormatted={durationFormatted}
+        landscape={landscape}
+      />
+    </View>
+  );
+  const controls = opponentEnded ? null : (
+    <>
+      <PauseButton paused={paused} disabled={controlsDisabled || endPending} onPress={onPauseResume} tile={landscape} />
+      <HoldToEndButton
+        disabled={holdDisabled}
+        ending={endPending || view.autoEndPending}
+        onEnd={onEnd}
+        onHoldChange={setHolding}
+        tile={landscape}
+      />
+    </>
+  );
+
   return (
     <View testID="live-broadcast" pointerEvents="box-none" style={StyleSheet.absoluteFill}>
       <StatusBar style="light" />
       {view.camera === "unavailable" ? (
         <View testID="live-ground" pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: BROADCAST.ground }]} />
       ) : (
-        <Scrims />
+        <Scrims landscape={landscape} />
       )}
       {view.camera === "starting-dim" || view.camera === "saving-dim" ? (
         <View
@@ -128,70 +185,59 @@ export function LiveBroadcast(props: LiveBroadcastProps) {
           ]}
         />
       ) : null}
-      <View
-        pointerEvents="box-none"
-        style={[
-          StyleSheet.absoluteFill,
-          {
-            paddingTop: insets.top + 12,
-            paddingBottom: Math.max(insets.bottom, 16) + 8,
-            paddingHorizontal: 16,
-          },
-        ]}
-      >
+      {landscape ? (
+        <LiveLandscapeLayout
+          hud={
+            <>
+              {tally}
+              {tags}
+            </>
+          }
+          lowerThird={
+            <>
+              {endedPlate}
+              {plates}
+            </>
+          }
+          rail={controls}
+          renderNoVideo={renderNoVideo}
+        />
+      ) : (
         <View
           pointerEvents="box-none"
-          style={{ height: BROADCAST_SIZE.tally, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}
+          style={[
+            StyleSheet.absoluteFill,
+            {
+              paddingTop: insets.top + 12,
+              paddingBottom: Math.max(insets.bottom, 16) + 8,
+              paddingHorizontal: 16,
+            },
+          ]}
         >
-          <RecTally variant={view.tally} recordingSeconds={recordingSeconds} />
-          <View pointerEvents="box-none" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-            <HudTag label={kindLabel} testID="live-kind-tag" />
-            {hudExtra}
-          </View>
-        </View>
-        <View pointerEvents="box-none" style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-          {view.unavailable ? (
-            <NoVideoPlate
-              variant={view.unavailable}
-              practice={practice}
-              onAllowCamera={() => void recorder.requestPermission()}
-            />
-          ) : null}
-        </View>
-        <View
-          pointerEvents="box-none"
-          style={{ width: "100%", maxWidth: BROADCAST_SIZE.maxWidth, alignSelf: "center", gap: 12 }}
-        >
-          {opponentEnded ? (
-            <OpponentEndedPlate
-              name={opponentEnded.name}
-              finalFormatted={opponentEnded.finalFormatted}
-              durationFormatted={durationFormatted}
-            />
-          ) : null}
-          <View>
-            {view.strip ? <StateStrip key={view.strip} variant={view.strip} remaining={remaining} /> : null}
-            <AthleteBar me={me} opponent={opponent} flatTop={!!view.strip} />
-            <ClockSlab
-              label={view.slab}
-              formatted={opponentEnded ? opponentEnded.finalFormatted : formatted}
-              seconds={opponentEnded ? opponentEnded.finalRemaining : remaining}
-              durationFormatted={durationFormatted}
-            />
-          </View>
-          {opponentEnded ? null : (
-            <View style={{ height: BROADCAST_SIZE.controls, flexDirection: "row", gap: 12 }}>
-              <PauseButton paused={paused} disabled={controlsDisabled || endPending} onPress={onPauseResume} />
-              <HoldToEndButton
-                disabled={holdDisabled}
-                ending={endPending || view.autoEndPending}
-                onEnd={onEnd}
-                onHoldChange={setHolding}
-              />
+          <View
+            pointerEvents="box-none"
+            style={{ height: BROADCAST_SIZE.tally, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}
+          >
+            {tally}
+            <View pointerEvents="box-none" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              {tags}
             </View>
-          )}
+          </View>
+          <View pointerEvents="box-none" style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+            {renderNoVideo()}
+          </View>
+          <View
+            pointerEvents="box-none"
+            style={{ width: "100%", maxWidth: BROADCAST_SIZE.maxWidth, alignSelf: "center", gap: 12 }}
+          >
+            {endedPlate}
+            {plates}
+            {controls ? (
+              <View style={{ height: BROADCAST_SIZE.controls, flexDirection: "row", gap: 12 }}>{controls}</View>
+            ) : null}
+          </View>
         </View>
-      </View>
+      )}
     </View>
   );
 }
