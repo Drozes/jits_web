@@ -56,25 +56,37 @@ function createClient() {
         error: null,
       }) as Promise<{ data: unknown; error: unknown }>,
   );
+  // Mirrors realtime-js: channel(topic) returns the EXISTING channel while
+  // one with that topic is registered, and .on() after subscribe() throws.
+  const registry = new Map<string, unknown>();
   const client = {
     rpc,
     channel(name: string) {
+      const existing = registry.get(name);
+      if (existing) return existing;
       const ch: FakeChannel = { name, subs: [], removed: false };
+      let subscribed = false;
       channels.push(ch);
       const api = {
         on(_type: string, opts: { table: string; filter: string }, handler: () => void) {
+          if (subscribed) {
+            throw new Error("cannot add `postgres_changes` callbacks after `subscribe()`.");
+          }
           ch.subs.push({ table: opts.table, filter: opts.filter, handler });
           return api;
         },
         subscribe() {
+          subscribed = true;
           return api;
         },
         __ch: ch,
       };
+      registry.set(name, api);
       return api;
     },
     removeChannel: vi.fn((api: { __ch: FakeChannel }) => {
       api.__ch.removed = true;
+      registry.delete(api.__ch.name);
       return Promise.resolve("ok");
     }),
   };
@@ -122,7 +134,7 @@ describe("useHighlightProgress", () => {
     expect(result.current.data?.phase).toBe("planning");
     expect(m.rpc).toHaveBeenCalledWith("get_highlight_progress", { p_match_video_id: "v1" });
     expect(m.channels).toHaveLength(1);
-    expect(m.channels[0].name).toBe("highlight_progress:v1");
+    expect(m.channels[0].name).toMatch(/^highlight_progress:v1:[a-z0-9]+$/);
     expect(m.channels[0].subs.map(({ table, filter }) => ({ table, filter }))).toEqual([
       { table: "video_highlights", filter: "match_video_id=eq.v1" },
       { table: "match_videos", filter: "id=eq.v1" },
@@ -239,7 +251,7 @@ describe("useHighlightProgress", () => {
     await flush();
     rerender({ id: "v2" });
     expect(m.channels[0].removed).toBe(true);
-    expect(m.channels[1].name).toBe("highlight_progress:v2");
+    expect(m.channels[1].name).toMatch(/^highlight_progress:v2:/);
     await flush();
     expect(result.current.data?.matchVideoId).toBe("v2");
   });
@@ -299,5 +311,72 @@ describe("useHighlightProgress", () => {
     });
     await flush();
     expect(m.rpc).toHaveBeenCalledTimes(2);
+  });
+
+  it("two instances for the same id both subscribe; unmounting one keeps the other's channel", async () => {
+    const m = createClient();
+    m.setPhase("ready");
+    const first = renderHook(() => useHighlightProgress(m.client as never, "v1"));
+    await flush();
+    const second = renderHook(() => useHighlightProgress(m.client as never, "v1"));
+    await flush();
+    expect(m.channels).toHaveLength(2);
+    expect(m.channels[0].name).not.toBe(m.channels[1].name);
+    expect(m.channels.every((c) => c.subs.length === 2)).toBe(true);
+    second.unmount();
+    expect(m.channels[1].removed).toBe(true);
+    expect(m.channels[0].removed).toBe(false);
+    // The survivor still reacts to realtime.
+    const calls = m.rpc.mock.calls.length;
+    act(() => m.channels[0].subs[0].handler());
+    await act(async () => {
+      vi.advanceTimersByTime(HIGHLIGHT_REFRESH_DEBOUNCE_MS);
+    });
+    await flush();
+    expect(m.rpc).toHaveBeenCalledTimes(calls + 1);
+    first.unmount();
+  });
+
+  it("a slower OLDER response for the same id never overwrites a newer one", async () => {
+    const m = createClient();
+    m.setPhase("rendering");
+    const { result } = renderHook(() => useHighlightProgress(m.client as never, "v1"));
+    await flush();
+    let resolveOld: (v: { data: unknown; error: unknown }) => void = () => undefined;
+    m.rpc.mockImplementationOnce(() => new Promise((r) => (resolveOld = r)));
+    await act(async () => {
+      result.current.refresh(); // older, slow
+    });
+    m.setPhase("ready");
+    await act(async () => {
+      result.current.refresh(); // newer, fast
+    });
+    await flush();
+    expect(result.current.data?.phase).toBe("ready");
+    await act(async () => {
+      resolveOld({ data: progress("rendering"), error: null });
+    });
+    await flush();
+    expect(result.current.data?.phase).toBe("ready");
+  });
+
+  it.each(["disabled", "unavailable"])("opens no realtime channel when the first read says %s", async (phase) => {
+    const m = createClient();
+    m.setPhase(phase);
+    const { result } = renderHook(() => useHighlightProgress(m.client as never, "v1"));
+    await flush();
+    expect(result.current.data?.phase).toBe(phase);
+    expect(m.channels).toHaveLength(0);
+  });
+
+  it("opens no realtime channel when the first read fails", async () => {
+    const m = createClient();
+    m.rpc.mockResolvedValueOnce({
+      data: null,
+      error: { code: "PGRST202", message: "function not found", details: "", hint: "" },
+    });
+    renderHook(() => useHighlightProgress(m.client as never, "v1"));
+    await flush();
+    expect(m.channels).toHaveLength(0);
   });
 });

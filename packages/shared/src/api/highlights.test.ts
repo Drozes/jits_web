@@ -135,6 +135,15 @@ describe("getHighlightProgress", () => {
     expect(result.data.lastChangeSummary).toBe("Shorter.");
   });
 
+  it("treats a playback object without a storage_path as no playback", () => {
+    const p = toHighlightProgress(raw({ playback: { ...raw().playback!, storage_path: "" } }));
+    expect(p.playback).toBeNull();
+    const q = toHighlightProgress(
+      raw({ playback: { ...raw().playback!, storage_path: undefined as unknown as string } }),
+    );
+    expect(q.playback).toBeNull();
+  });
+
   it("degrades an unknown phase to unavailable", () => {
     expect(toHighlightProgress(raw({ phase: "something_new" })).phase).toBe("unavailable");
   });
@@ -416,7 +425,7 @@ describe("regenerateHighlight", () => {
   });
 
   it("never sends more than 280 characters of free text (the function rejects, not truncates)", async () => {
-    const { client, invoke } = fnClient({ data: { ok: true }, error: null });
+    const { client, invoke } = fnClient({ data: { ok: true, feedback_id: "fb" }, error: null });
     await regenerateHighlight(client, { ...PARAMS, freeText: "z".repeat(400) });
     expect(invoke.mock.calls[0][1].body.free_text).toHaveLength(HIGHLIGHT_FREE_TEXT_MAX);
   });
@@ -435,6 +444,12 @@ describe("regenerateHighlight", () => {
       ok: false,
       error: { code: "UNKNOWN", message: "Failed to send a request" },
     });
+  });
+
+  it("treats a 200 without a feedback_id as UNKNOWN", async () => {
+    const { client } = fnClient({ data: { ok: true, highlight_id: HL, render_total: 2 }, error: null });
+    const result = await regenerateHighlight(client, PARAMS);
+    expect(result).toEqual({ ok: false, error: { code: "UNKNOWN", message: "No feedback id returned." } });
   });
 
   it("maps a 2xx body with ok:false through the hint table", async () => {

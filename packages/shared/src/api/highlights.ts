@@ -141,7 +141,10 @@ function segmentsFrom(value: unknown): HighlightSegment[] {
  * backend) degrades to "unavailable", which the UI renders as nothing.
  */
 export function toHighlightProgress(raw: RawHighlightProgress): HighlightProgress {
-  const p = raw.playback;
+  // A playback object without a key cannot be signed: treat as no live version.
+  const p = raw.playback && typeof raw.playback.storage_path === "string" && raw.playback.storage_path
+    ? raw.playback
+    : null;
   return {
     matchVideoId: raw.match_video_id,
     athleteId: raw.athlete_id,
@@ -355,11 +358,14 @@ export async function regenerateHighlight(
       const message = typeof data?.error?.message === "string" ? data.error.message : null;
       return { ok: false, error: domainErrorFromHint(hint, message) };
     }
+    if (typeof data.feedback_id !== "string" || !data.feedback_id) {
+      return { ok: false, error: { code: "UNKNOWN", message: "No feedback id returned." } };
+    }
     return {
       ok: true,
       data: {
-        feedbackId: String(data.feedback_id ?? ""),
-        highlightId: String(data.highlight_id ?? params.highlightId),
+        feedbackId: data.feedback_id,
+        highlightId: typeof data.highlight_id === "string" && data.highlight_id ? data.highlight_id : params.highlightId,
         renderTotal: num(data.render_total),
         rendersRemaining: Math.max(num(data.renders_remaining), 0),
         changeSummary: typeof data.change_summary === "string" ? data.change_summary : null,

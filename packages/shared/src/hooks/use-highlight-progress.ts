@@ -16,6 +16,9 @@ export const HIGHLIGHT_REFRESH_DEBOUNCE_MS = 200;
  */
 export const HIGHLIGHT_POLL_MS = 15_000;
 
+/** Phases with nothing to watch: no realtime subscription. */
+const HIGHLIGHT_QUIET_PHASES: ReadonlySet<string> = new Set(["disabled", "unavailable"]);
+
 type TimerRef = { current: ReturnType<typeof setTimeout> | null };
 
 function clearTimer(ref: TimerRef): void {
@@ -40,7 +43,8 @@ export interface UseHighlightProgressResult {
  * Live state of the caller's own highlight reel for one match video
  * (jr_be spec 014 section 9.2).
  *
- * One channel `highlight_progress:{id}` with postgres_changes on
+ * One channel `highlight_progress:{id}:{mount}` (opened only after a read
+ * returns a phase other than disabled / unavailable) with postgres_changes on
  * `video_highlights` (match_video_id) and `match_videos` (id), each event a
  * debounced refetch of `get_highlight_progress`; plus a 15 s poll only in
  * `waiting_for_analysis` / `planning` / `rendering` / `regenerating`.
@@ -58,13 +62,22 @@ export function useHighlightProgress(
   const [loading, setLoading] = useState<boolean>(!!matchVideoId);
   const [error, setError] = useState<DomainError | null>(null);
 
+  // Which id the state belongs to: a response for a previous id (or after
+  // unmount) never lands.
   const versionRef = useRef(0);
+  // Per-request sequence: a slower OLDER response for the same id never
+  // overwrites a newer one that already landed.
+  const seqRef = useRef(0);
+  const appliedSeqRef = useRef(0);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchSnapshot = useCallback(
     async (id: string, myVersion: number) => {
+      const mySeq = ++seqRef.current;
       const result = await getHighlightProgress(supabase, id);
       if (myVersion !== versionRef.current) return;
+      if (mySeq < appliedSeqRef.current) return;
+      appliedSeqRef.current = mySeq;
       if (result.ok) {
         setData(result.data);
         setError(null);
@@ -82,6 +95,7 @@ export function useHighlightProgress(
     void fetchSnapshot(matchVideoId, versionRef.current);
   }, [matchVideoId, fetchSnapshot]);
 
+  // Initial read per id.
   useEffect(() => {
     versionRef.current += 1;
     const myVersion = versionRef.current;
@@ -93,7 +107,21 @@ export function useHighlightProgress(
     }
     setLoading(true);
     void fetchSnapshot(matchVideoId, myVersion);
+    return () => {
+      // Bump so an in-flight read for this id is ignored after teardown.
+      versionRef.current += 1;
+      clearTimer(debounceRef);
+    };
+  }, [matchVideoId, fetchSnapshot]);
 
+  // Realtime only once a successful read says there is something to watch:
+  // no socket traffic for the (common) disabled / unavailable reel.
+  const phase = data?.phase ?? null;
+  const live = phase !== null && !HIGHLIGHT_QUIET_PHASES.has(phase);
+
+  useEffect(() => {
+    if (!live || !matchVideoId) return;
+    const myVersion = versionRef.current;
     const schedule = () => {
       clearTimer(debounceRef);
       debounceRef.current = setTimeout(() => {
@@ -102,8 +130,15 @@ export function useHighlightProgress(
       }, HIGHLIGHT_REFRESH_DEBOUNCE_MS);
     };
 
+    // The topic must be unique per hook INSTANCE: `supabase.channel(topic)`
+    // returns the EXISTING channel while one with that topic is registered,
+    // and `.on()` after subscribe() throws. Two cards for the same video
+    // (match detail pushed twice via the opponent profile) would crash, and
+    // the second unmount's removeChannel would kill the first's realtime.
+    // Same defence as use-pending-challenges.ts.
+    const mountId = Math.random().toString(36).slice(2, 10);
     const channel: RealtimeChannel = supabase
-      .channel(`highlight_progress:${matchVideoId}`)
+      .channel(`highlight_progress:${matchVideoId}:${mountId}`)
       .on(
         "postgres_changes",
         {
@@ -122,16 +157,11 @@ export function useHighlightProgress(
       .subscribe();
 
     return () => {
-      // Bump so an in-flight read for this id is ignored after teardown.
-      versionRef.current += 1;
       clearTimer(debounceRef);
       void supabase.removeChannel(channel);
     };
-    // fetchSnapshot only changes with supabase, already a dependency.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [supabase, matchVideoId]);
+  }, [live, supabase, matchVideoId, fetchSnapshot]);
 
-  const phase = data?.phase ?? null;
   const polling = phase !== null && HIGHLIGHT_ACTIVE_PHASES.has(phase);
 
   useEffect(() => {
