@@ -12,6 +12,7 @@
     "./api/errors": "./src/api/errors.ts",
     "./api/chat-queries": "./src/api/chat-queries.ts",
     "./api/chat-mutations": "./src/api/chat-mutations.ts",
+    "./api/film-room": "./src/api/film-room.ts",
     "./constants": "./src/constants.ts",
     "./geo": "./src/geo/index.ts",
     "./hooks": "./src/hooks/index.ts",

@@ -5,3 +5,4 @@ export * from "./milestones";
 export * from "./backoff";
 export * from "./upload-retry";
 export * from "./match-video";
+export * from "./key-moments";

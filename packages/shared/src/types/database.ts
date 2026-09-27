@@ -795,7 +795,9 @@ export type Database = {
           status: string
           storage_path: string | null
           sync_offset_ms: number | null
+          thumbnail_height: number | null
           thumbnail_url: string | null
+          thumbnail_width: number | null
           title: string | null
           updated_at: string
           uploaded_by: string
@@ -828,7 +830,9 @@ export type Database = {
           status?: string
           storage_path?: string | null
           sync_offset_ms?: number | null
+          thumbnail_height?: number | null
           thumbnail_url?: string | null
+          thumbnail_width?: number | null
           title?: string | null
           updated_at?: string
           uploaded_by: string
@@ -861,7 +865,9 @@ export type Database = {
           status?: string
           storage_path?: string | null
           sync_offset_ms?: number | null
+          thumbnail_height?: number | null
           thumbnail_url?: string | null
+          thumbnail_width?: number | null
           title?: string | null
           updated_at?: string
           uploaded_by?: string
@@ -2025,6 +2031,10 @@ export type Database = {
         }[]
       }
       get_match_videos: { Args: { p_match_id: string }; Returns: Json }
+      get_my_match_library: {
+        Args: { p_before?: string; p_limit?: number }
+        Returns: Json
+      }
       get_recent_activity: {
         Args: { p_limit?: number }
         Returns: {
