@@ -1,14 +1,19 @@
 import { useResolvedColorScheme } from "@/lib/theme/use-theme";
+import { paletteFor } from "@/lib/theme/palette";
 
 /**
- * Amber for draws, the disputed badge and processing chips. The palette has
- * no warning token and amber-500 is too light on the light surfaces for small
- * text, so light mode steps down to amber-600 (dark keeps amber-500).
- * `icon` is the same shade as a hex, for components that take a `color`
- * prop instead of a className (lucide icons).
+ * Amber for draws, the disputed badge and processing chips: the palette's
+ * amber (`paletteFor(scheme).amber`), so the whole app has one per theme.
+ * The palette has no warning token; amber-500 reads on the dark surfaces,
+ * and on the light ones only amber-800 reaches 4.5:1 for small text.
+ * `text` / `border` are the matching Tailwind classes (static, so NativeWind
+ * compiles them); `icon` is the hex, for components that take a `color`
+ * prop (lucide icons).
  */
 export function useAmber(): { text: string; border: string; icon: string } {
-  return useResolvedColorScheme() === "dark"
-    ? { text: "text-amber-500", border: "border-amber-500", icon: "#F59E0B" }
-    : { text: "text-amber-600", border: "border-amber-600", icon: "#D97706" };
+  const scheme = useResolvedColorScheme();
+  const icon = paletteFor(scheme).amber;
+  return scheme === "dark"
+    ? { text: "text-amber-500", border: "border-amber-500", icon }
+    : { text: "text-amber-800", border: "border-amber-800", icon };
 }

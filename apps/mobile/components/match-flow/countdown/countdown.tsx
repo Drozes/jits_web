@@ -139,7 +139,7 @@ export function Countdown({ goAt, matchType, recording, me, opponent, myWeight, 
       </View>
       {landscape ? null : (
         <View testID="countdown-chip" style={{ position: "absolute", left: 16, right: 16, bottom: Math.max(insets.bottom, 16) + 26 }}>
-          <FaceoffChip me={me} opponent={opponent} myWeight={myWeight} opponentWeight={opponentWeight} height={56} />
+          <FaceoffChip me={me} opponent={opponent} myWeight={myWeight} opponentWeight={opponentWeight} height={56} onMedia />
         </View>
       )}
     </View>

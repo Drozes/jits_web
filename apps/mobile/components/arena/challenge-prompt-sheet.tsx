@@ -132,7 +132,8 @@ export function ChallengePromptSheet({
       // "Bottom Sheet" stop. Turning that off exposes the real elements.
       accessible={false}
       backgroundComponent={PromptBackground}
-      // Follows the app theme, like every other sheet.
+      // Follows the app theme: the theme's plate (the same light value as the
+      // shared Sheet's card token), with the plates inside on the page color.
       backgroundStyle={{ backgroundColor: p.plate, borderTopWidth: 1, borderColor: p.strong }}
       handleIndicatorStyle={{ backgroundColor: p.strong, width: 40 }}
     >

@@ -108,11 +108,15 @@ export const ON_MEDIA = {
   track: "rgba(255,255,255,0.18)",
   glass: "rgba(255,255,255,0.08)",
   glassStrong: "rgba(255,255,255,0.12)",
-  /** Tag / badge fills over film. */
+  /** Tag fill over film (on a scrim). */
   tag: "rgba(0,0,0,0.45)",
-  badge: "rgba(0,0,0,0.6)",
+  /**
+   * Badge fill: dense enough that every on-media ink (red included) holds
+   * 4.5:1 over a white frame or the light theme's plate.
+   */
+  badge: "rgba(0,0,0,0.88)",
   scrim: "rgba(0,0,0,0.55)",
-  /** The light athlete chip and caption plate (as on the live athlete bar). */
+  /** The light chip over the camera (countdown) and the player's caption plate. */
   chip: "rgba(232,235,240,0.96)",
   chipBorder: "rgba(13,15,20,0.34)",
   ink: "#0D0F14",

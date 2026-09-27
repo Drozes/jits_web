@@ -71,7 +71,7 @@ export function OpeningStill({
       <Text
         numberOfLines={2}
         className="font-mono-medium text-center"
-        style={{ marginTop: 12, paddingHorizontal: 12, fontSize: 9, letterSpacing: 2, color: p.text2 }}
+        style={{ marginTop: 12, paddingHorizontal: 12, fontSize: 10, letterSpacing: 2, color: p.text2 }}
       >
         {fallbackLabel}
       </Text>

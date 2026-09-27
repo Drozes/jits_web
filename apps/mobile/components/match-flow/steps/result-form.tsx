@@ -5,7 +5,7 @@ import { SearchSelect, type SearchSelectOption } from "@/components/ui/search-se
 import { OTHER_SUBMISSION_CODE, filterSubmissionTypes } from "@/lib/match-flow/filter-submissions";
 import { formatElapsed } from "@/lib/match-flow/format-elapsed";
 import type { SubmissionType } from "@jits/shared/types/submission-type";
-import { ON_MEDIA, usePalette } from "@/lib/theme/palette";
+import { usePalette } from "@/lib/theme/palette";
 import { FIGHT_RADIUS, TABULAR } from "../fight/fight-tokens";
 import { InitialsBlock, Mono, initialsOf, shortName } from "../fight/fight-ui";
 
@@ -102,34 +102,35 @@ export function WinnerTiles({
   );
 }
 
-/** The chosen winner on the light chip (fixed light in both themes), with Change. */
+/** The chosen winner on a themed plate, with Change. */
 export function WinnerChip({ winner, onChange }: { winner: ResultAthlete; onChange: () => void }) {
+  const p = usePalette();
   return (
     <View
-      style={{ height: 56, paddingLeft: 10, paddingRight: 6, flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: ON_MEDIA.chip, borderWidth: 1, borderColor: ON_MEDIA.chipBorder, borderRadius: FIGHT_RADIUS.button }}
+      testID="result-winner-chip"
+      style={{ height: 56, paddingLeft: 10, paddingRight: 6, flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: p.plate, borderWidth: 1, borderColor: p.strong, borderRadius: FIGHT_RADIUS.button }}
     >
-      <View style={{ width: 36, height: 36, alignItems: "center", justifyContent: "center", backgroundColor: ON_MEDIA.ink, borderRadius: FIGHT_RADIUS.tag }}>
-        <Text className="font-heading" style={{ fontSize: 13, color: ON_MEDIA.text }}>
+      <View style={{ width: 36, height: 36, alignItems: "center", justifyContent: "center", backgroundColor: p.panel, borderWidth: 1, borderColor: p.strong, borderRadius: FIGHT_RADIUS.tag }}>
+        <Text className="font-heading" style={{ fontSize: 13, color: p.text }}>
           {initialsOf(winner.displayName)}
         </Text>
       </View>
       <View style={{ flex: 1, gap: 4 }}>
-        <Mono color={ON_MEDIA.ink3}>WINNER</Mono>
-        <Text numberOfLines={1} className="font-heading uppercase" style={{ fontSize: 16, letterSpacing: 0.64, color: ON_MEDIA.ink }}>
+        <Mono color={p.text3}>WINNER</Mono>
+        <Text numberOfLines={1} className="font-heading uppercase" style={{ fontSize: 16, letterSpacing: 0.64, color: p.text }}>
           {shortName(winner.displayName)}
         </Text>
       </View>
-      <ChangeButton onPress={onChange} color={ON_MEDIA.inkRed} />
+      <ChangeButton onPress={onChange} />
     </View>
   );
 }
 
-/** "Change": red text, themed unless `color` pins it (on the light chip). */
-export function ChangeButton({ onPress, testID = "result-change", color }: { onPress: () => void; testID?: string; color?: string }) {
+export function ChangeButton({ onPress, testID = "result-change" }: { onPress: () => void; testID?: string }) {
   const p = usePalette();
   return (
     <Pressable testID={testID} accessibilityRole="button" accessibilityLabel="Change" onPress={onPress} style={{ height: 44, paddingHorizontal: 12, justifyContent: "center" }}>
-      <Text className="font-heading uppercase" style={{ fontSize: 13, letterSpacing: 0.8, color: color ?? p.red }}>
+      <Text className="font-heading uppercase" style={{ fontSize: 13, letterSpacing: 0.8, color: p.red }}>
         Change
       </Text>
     </Pressable>

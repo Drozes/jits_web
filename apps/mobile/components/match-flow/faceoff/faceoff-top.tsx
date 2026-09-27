@@ -223,9 +223,9 @@ function MyWeight() {
 }
 
 /**
- * The compressed light athlete chip on the ready phase (and over the camera
- * on the countdown). Fixed light, as the live athlete bar, in both themes;
- * the hairline border separates it from a light page.
+ * The compressed athlete chip on the ready phase and, with `onMedia`, over
+ * the camera on the countdown. On the page it is a themed plate; over the
+ * camera it is the fixed light chip of the live athlete bar.
  */
 export function FaceoffChip({
   me,
@@ -233,42 +233,50 @@ export function FaceoffChip({
   myWeight,
   opponentWeight,
   height = 64,
+  onMedia = false,
 }: {
   me: FaceoffAthlete;
   opponent: FaceoffAthlete;
   myWeight: number | null;
   opponentWeight: number | null;
   height?: number;
+  /** Over the camera (the countdown): the fixed light chip. */
+  onMedia?: boolean;
 }) {
+  const p = usePalette();
+  const c = onMedia
+    ? { bg: ON_MEDIA.chip, border: ON_MEDIA.chipBorder, ink: ON_MEDIA.ink, ink3: ON_MEDIA.ink3, vs: ON_MEDIA.inkRed, dot: ON_MEDIA.cta }
+    : { bg: p.plate, border: p.strong, ink: p.text, ink3: p.text3, vs: p.red, dot: p.cta };
   const meta = (a: FaceoffAthlete, w: number | null) =>
     [a.current_elo != null ? String(a.current_elo) : null, w != null ? `${Number(w.toFixed(1))} LBS` : null]
       .filter(Boolean)
       .join(" · ");
   return (
     <View
-      style={{ height, flexDirection: "row", backgroundColor: ON_MEDIA.chip, borderWidth: 1, borderColor: ON_MEDIA.chipBorder, borderRadius: FIGHT_RADIUS.button }}
+      testID="faceoff-chip"
+      style={{ height, flexDirection: "row", backgroundColor: c.bg, borderWidth: 1, borderColor: c.border, borderRadius: FIGHT_RADIUS.button }}
     >
       <View style={{ flex: 1, paddingLeft: 12, justifyContent: "center", gap: 5, minWidth: 0 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 7 }}>
-          <View style={{ width: 4, height: 4, backgroundColor: ON_MEDIA.cta }} />
-          <Text numberOfLines={1} className="font-heading uppercase" style={{ fontSize: 15, letterSpacing: 0.6, color: ON_MEDIA.ink }}>
+          <View style={{ width: 4, height: 4, backgroundColor: c.dot }} />
+          <Text numberOfLines={1} className="font-heading uppercase" style={{ fontSize: 15, letterSpacing: 0.6, color: c.ink }}>
             {shortName(me.display_name)}
           </Text>
         </View>
-        <Text className="font-mono" style={[{ paddingLeft: 11, fontSize: 11, color: ON_MEDIA.ink3 }, TABULAR]}>
+        <Text className="font-mono" style={[{ paddingLeft: 11, fontSize: 11, color: c.ink3 }, TABULAR]}>
           {meta(me, myWeight)}
         </Text>
       </View>
       <View style={{ width: 44, alignItems: "center", justifyContent: "center" }}>
-        <Text className="font-display" style={{ fontSize: 22, color: ON_MEDIA.inkRed }}>
+        <Text className="font-display" style={{ fontSize: 22, color: c.vs }}>
           VS
         </Text>
       </View>
       <View style={{ flex: 1, paddingRight: 12, justifyContent: "center", alignItems: "flex-end", gap: 5, minWidth: 0 }}>
-        <Text numberOfLines={1} className="font-heading uppercase" style={{ fontSize: 15, letterSpacing: 0.6, color: ON_MEDIA.ink }}>
+        <Text numberOfLines={1} className="font-heading uppercase" style={{ fontSize: 15, letterSpacing: 0.6, color: c.ink }}>
           {shortName(opponent.display_name)}
         </Text>
-        <Text className="font-mono" style={[{ fontSize: 11, color: ON_MEDIA.ink3 }, TABULAR]}>
+        <Text className="font-mono" style={[{ fontSize: 11, color: c.ink3 }, TABULAR]}>
           {meta(opponent, opponentWeight)}
         </Text>
       </View>

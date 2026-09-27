@@ -208,7 +208,7 @@ describe("after tile tone (jits-9cgj)", () => {
   it.each([
     ["positive", "border-positive"],
     ["negative", "border-negative"],
-    ["amber", "border-amber-600"],
+    ["amber", "border-amber-800"],
   ] as const)("%s tone borders the after tile with %s, never Signal Red", async (tone, cls) => {
     const utils = render(<EloTile label="ELO Rating" before={1000} after={1016} tone={tone} />);
     await flushReduceMotion();
