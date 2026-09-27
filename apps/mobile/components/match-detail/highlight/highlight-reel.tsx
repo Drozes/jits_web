@@ -1,11 +1,9 @@
 import * as React from "react";
 import { Text, View } from "react-native";
-import { toast } from "@/components/ui/toast";
 import type { HighlightProgress } from "@jits/shared/api/highlights";
 import { HIGHLIGHT_COPY } from "@/lib/highlight/highlight-copy";
 import type { UseMyHighlightResult } from "@/lib/highlight/use-my-highlight";
 import { useHighlightRating } from "@/lib/highlight/use-highlight-rating";
-import type { FeedbackSubmitKind } from "@/lib/highlight/use-highlight-feedback-form";
 import { HighlightPlayer } from "./highlight-player";
 import { HIGHLIGHT_FRAME_STYLE } from "./highlight-frame";
 import { HighlightNote } from "./highlight-states";
@@ -26,24 +24,14 @@ type Props = Pick<UseMyHighlightResult, "source" | "playbackFailed" | "onPlayerE
 export function HighlightReel({ progress, source, playbackFailed, onPlayerError, refresh }: Props) {
   const playback = progress.playback;
   const regenerating = progress.phase === "regenerating";
-  const fb = useHighlightRating(progress.highlightId, playback?.version ?? null);
-  const { closeSheet } = fb;
-  const onDone = React.useCallback(
-    (kind: FeedbackSubmitKind) => {
-      closeSheet();
-      if (kind === "regenerated") toast.success(HIGHLIGHT_COPY.regenerateToast);
-      else toast.success(HIGHLIGHT_COPY.feedbackSentToast);
-      refresh();
-    },
-    [closeSheet, refresh],
-  );
+  const fb = useHighlightRating(progress.highlightId, playback?.version ?? null, refresh);
 
   return (
     <View className="gap-3">
-      {source ? (
-        <HighlightPlayer source={source} onError={onPlayerError} />
-      ) : playbackFailed ? (
+      {playbackFailed ? (
         <HighlightNote testID="highlight-cannot-play">{HIGHLIGHT_COPY.cannotPlay}</HighlightNote>
+      ) : source ? (
+        <HighlightPlayer source={source} onError={onPlayerError} />
       ) : (
         <View testID="highlight-player-loading" className="bg-surface-4 rounded-md" style={HIGHLIGHT_FRAME_STYLE} />
       )}
@@ -56,15 +44,16 @@ export function HighlightReel({ progress, source, playbackFailed, onPlayerError,
         onImprove={fb.openImprove}
       />
       {progress.highlightId ? (
-        <HighlightFeedbackSheet open={fb.sheetOpen} onClosed={fb.onSheetClosed}>
+        <HighlightFeedbackSheet open={fb.sheetOpen} busy={fb.busy !== null} onClosed={fb.onSheetClosed}>
           {fb.sheet ? (
             <HighlightFeedbackForm
               key={fb.sheet.id}
-              highlightId={progress.highlightId}
               preset={fb.sheet.preset}
+              storedRating={fb.rating}
+              busy={fb.busy}
+              error={fb.sheetError}
               progress={progress}
-              onStored={fb.markSubmitted}
-              onDone={onDone}
+              onSubmit={fb.submit}
             />
           ) : null}
         </HighlightFeedbackSheet>

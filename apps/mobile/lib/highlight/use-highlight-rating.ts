@@ -1,18 +1,30 @@
 import * as React from "react";
 import { supabase } from "@/lib/supabase/client";
 import { toast } from "@/components/ui/toast";
-import { submitHighlightFeedback } from "@jits/shared/api/highlights";
-import { HIGHLIGHT_COPY } from "./highlight-copy";
+import {
+  regenerateHighlight,
+  submitHighlightFeedback,
+  type HighlightFeedbackParams,
+} from "@jits/shared/api/highlights";
+import { HIGHLIGHT_COPY, highlightErrorCopy } from "./highlight-copy";
 
 export type HighlightRating = -1 | 1;
+export type FeedbackSubmitKind = "regenerated" | "sent";
+export type FeedbackPayload = Omit<HighlightFeedbackParams, "highlightId">;
 
 export interface FeedbackSheetSession {
   /** Distinct per opening, so the form's state starts fresh each time. */
   id: number;
   /** Rating the sheet opens with. */
   preset: HighlightRating | null;
-  /** Opened by thumbs down: closing without a submit still stores the -1. */
+  /** Opened by thumbs down: closing without a stored submit still stores the -1. */
   fromThumbsDown: boolean;
+}
+
+interface SessionState {
+  fromThumbsDown: boolean;
+  inFlight: boolean;
+  stored: boolean;
 }
 
 export interface UseHighlightRatingResult {
@@ -20,38 +32,45 @@ export interface UseHighlightRatingResult {
   rating: HighlightRating | null;
   /** The session the sheet shows; kept until it has finished closing. */
   sheet: FeedbackSheetSession | null;
-  /** Whether the sheet should be presented. */
   sheetOpen: boolean;
+  /** A sheet submit is running (the sheet cannot be swiped away meanwhile). */
+  busy: FeedbackSubmitKind | null;
+  /** Inline error copy for the open sheet. */
+  sheetError: string | null;
   thumbsUp: () => void;
   thumbsDown: () => void;
   openImprove: () => void;
-  /** The sheet stored feedback (send or regenerate): no extra write on close. */
-  markSubmitted: (rating: HighlightRating | null) => void;
-  /** The sheet finished closing (swipe, backdrop or after a submit). */
+  submit: (kind: FeedbackSubmitKind, payload: FeedbackPayload) => void;
+  /** The sheet finished closing (swipe, backdrop, or after a submit). */
   onSheetClosed: () => void;
-  /** Ask the sheet to close (after a successful submit). */
-  closeSheet: () => void;
 }
 
 /**
- * Card-level feedback (jr_be spec 014 section 10, "Thumbs").
+ * All of the card's feedback writes (jr_be spec 014 section 10).
  *
- * Thumbs up writes `{rating: 1}` at once, optimistic, reverted with a toast
- * on error. Thumbs down writes nothing yet: it opens the sheet preset to -1,
- * and only if the athlete then closes the sheet without submitting is the -1
- * stored alone. `sessionRef` makes that close handling run once per sheet,
- * whichever path (gorhom onChange or a programmatic close) reports it.
- * A new reel version (`versionKey`) clears the toggle.
+ * Thumbs up writes `{rating: 1}` at once, optimistic, reverted with a toast on
+ * error. Thumbs down opens the sheet preset to -1 and writes nothing yet; if
+ * the sheet then closes without a stored submit, the -1 is written alone.
+ *
+ * The sheet's submit (Regenerate / Just send) runs HERE, not in the sheet, so
+ * its outcome survives the sheet closing: success toasts, refreshes and
+ * closes; an error shows inline while that sheet is open, else as a toast.
+ * A close while a submit is in flight never writes the -1 (the submit carries
+ * the rating); a close after a submit that stored nothing still does.
  */
 export function useHighlightRating(
   highlightId: string | null,
   versionKey: string | number | null,
+  onChanged: () => void,
 ): UseHighlightRatingResult {
   const [rating, setRating] = React.useState<HighlightRating | null>(null);
   const [sheet, setSheet] = React.useState<FeedbackSheetSession | null>(null);
   const [sheetOpen, setSheetOpen] = React.useState(false);
+  const [busy, setBusy] = React.useState<FeedbackSubmitKind | null>(null);
+  const [sheetError, setSheetError] = React.useState<string | null>(null);
   const sessionIdRef = React.useRef(0);
-  const sessionRef = React.useRef<{ fromThumbsDown: boolean; submitted: boolean } | null>(null);
+  const sessionRef = React.useRef<SessionState | null>(null);
+  const busyRef = React.useRef(false);
   const mountedRef = React.useRef(true);
 
   React.useEffect(() => {
@@ -89,35 +108,80 @@ export function useHighlightRating(
   }, [rating, writeRating]);
 
   const open = React.useCallback((session: Omit<FeedbackSheetSession, "id">) => {
-    sessionRef.current = { fromThumbsDown: session.fromThumbsDown, submitted: false };
+    sessionRef.current = { fromThumbsDown: session.fromThumbsDown, inFlight: false, stored: false };
     sessionIdRef.current += 1;
     setSheet({ ...session, id: sessionIdRef.current });
+    setSheetError(null);
     setSheetOpen(true);
   }, []);
 
-  const thumbsDown = React.useCallback(
-    () => open({ preset: -1, fromThumbsDown: true }),
-    [open],
-  );
+  const thumbsDown = React.useCallback(() => open({ preset: -1, fromThumbsDown: true }), [open]);
   const openImprove = React.useCallback(
     () => open({ preset: rating, fromThumbsDown: false }),
     [open, rating],
   );
 
-  const markSubmitted = React.useCallback((value: HighlightRating | null) => {
-    if (sessionRef.current) sessionRef.current.submitted = true;
-    if (value !== null) setRating(value);
-  }, []);
+  const submit = React.useCallback(
+    async (kind: FeedbackSubmitKind, payload: FeedbackPayload) => {
+      if (!highlightId || busyRef.current) return;
+      const session = sessionRef.current;
+      busyRef.current = true;
+      if (session) session.inFlight = true;
+      setBusy(kind);
+      setSheetError(null);
+      const params = { highlightId, ...payload };
+      const result =
+        kind === "regenerated"
+          ? await regenerateHighlight(supabase, params)
+          : await submitHighlightFeedback(supabase, params);
+      busyRef.current = false;
+      if (session) session.inFlight = false;
+      if (!mountedRef.current) return;
+      setBusy(null);
+      // A regenerate the AI could not satisfy still stored the feedback row.
+      const stored = result.ok || result.error.code === "HIGHLIGHT_REGEN_FAILED";
+      if (stored) {
+        if (session) session.stored = true;
+        if (payload.rating !== null) setRating(payload.rating);
+      }
+      const stillOpen = session !== null && sessionRef.current === session;
+      if (result.ok) {
+        toast.success(kind === "regenerated" ? HIGHLIGHT_COPY.regenerateToast : HIGHLIGHT_COPY.feedbackSentToast);
+        if (stillOpen) setSheetOpen(false);
+        onChanged();
+        return;
+      }
+      const copy = highlightErrorCopy(result.error);
+      if (stillOpen) setSheetError(copy);
+      else toast.error(copy);
+    },
+    [highlightId, onChanged],
+  );
+
+  const submitAndForget = React.useCallback(
+    (kind: FeedbackSubmitKind, payload: FeedbackPayload) => void submit(kind, payload),
+    [submit],
+  );
 
   const onSheetClosed = React.useCallback(() => {
     const session = sessionRef.current;
     sessionRef.current = null;
     setSheetOpen(false);
     setSheet(null);
-    if (session?.fromThumbsDown && !session.submitted) void writeRating(-1, rating);
+    setSheetError(null);
+    if (session?.fromThumbsDown && !session.stored && !session.inFlight) void writeRating(-1, rating);
   }, [rating, writeRating]);
 
-  const closeSheet = React.useCallback(() => setSheetOpen(false), []);
-
-  return { rating, sheet, sheetOpen, thumbsUp, thumbsDown, openImprove, markSubmitted, onSheetClosed, closeSheet };
+  return {
+    rating,
+    sheet,
+    sheetOpen,
+    busy,
+    sheetError,
+    thumbsUp,
+    thumbsDown,
+    openImprove,
+    submit: submitAndForget,
+    onSheetClosed,
+  };
 }

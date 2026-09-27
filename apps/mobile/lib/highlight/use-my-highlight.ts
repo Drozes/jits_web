@@ -7,9 +7,14 @@ import {
   type HighlightProgress,
 } from "@jits/shared/api/highlights";
 
+/** Signed URLs live 1 h; re-sign well before that. */
+export const HIGHLIGHT_RESIGN_AFTER_MS = 50 * 60_000;
+
 export interface HighlightSource {
   url: string;
   posterUrl: string | null;
+  /** Storage key of the poster: a stable, render-unique image cache key. */
+  posterPath: string | null;
   version: number;
   durationS: number;
   /** Bumped on every sign so the player remounts even on an identical URL. */
@@ -20,10 +25,13 @@ export interface UseMyHighlightResult {
   progress: HighlightProgress | null;
   /** Signed live render; kept while a new version is being made. */
   source: HighlightSource | null;
-  /** The live render could not be signed or played after one re-sign. */
+  /** The live render could not be signed, or played after a fresh re-sign. */
   playbackFailed: boolean;
   onPlayerError: () => void;
+  /** Re-read progress only (after a mutation). */
   refresh: () => void;
+  /** Re-read progress and re-sign when playback failed or the URL is old. */
+  reload: () => void;
 }
 
 /**
@@ -32,13 +40,14 @@ export interface UseMyHighlightResult {
  *
  * Signing is keyed on the live version + key, NOT on the progress object, so
  * a refetch while regenerating keeps the same URL and the player keeps
- * playing. A new version signs once; a player error re-signs once per
- * version (the usual cause is the 1 h URL expiring), then gives up. Sign
- * results are dropped when the key moved on or the card unmounted
- * (`cancelled`). Foregrounding the app refreshes progress, since the shared
- * hook is platform-agnostic.
+ * playing. A signature is renewed before it expires (timer at 50 min, and on
+ * `reload` if older). A player error re-signs, unless the URL was already
+ * re-signed for that error and is still fresh, in which case playback is
+ * reported failed. `reload` (pull-to-refresh via `reloadToken`, return from
+ * background) also clears a failure. Sign results are dropped when the key
+ * moved on or the card unmounted (`cancelled`).
  */
-export function useMyHighlight(matchVideoId: string | null): UseMyHighlightResult {
+export function useMyHighlight(matchVideoId: string | null, reloadToken = 0): UseMyHighlightResult {
   const { data, refresh } = useHighlightProgress(supabase, matchVideoId);
   const playback = data?.playback ?? null;
   const key = playback ? `${playback.version}:${playback.storagePath}` : null;
@@ -51,7 +60,8 @@ export function useMyHighlight(matchVideoId: string | null): UseMyHighlightResul
   const [source, setSource] = React.useState<HighlightSource | null>(null);
   const [playbackFailed, setPlaybackFailed] = React.useState(false);
   const [signTick, setSignTick] = React.useState(0);
-  const resignedForRef = React.useRef<string | null>(null);
+  const signedAtRef = React.useRef(0);
+  const resignedForErrorRef = React.useRef(false);
 
   React.useEffect(() => {
     const current = playbackRef.current;
@@ -60,30 +70,67 @@ export function useMyHighlight(matchVideoId: string | null): UseMyHighlightResul
       return;
     }
     let cancelled = false;
+    let renew: ReturnType<typeof setTimeout> | undefined;
     (async () => {
       const result = await signHighlightPlayback(supabase, current);
       if (cancelled) return;
-      if (result.ok) {
-        setSource({ ...result.data, generation: signTick });
-        setPlaybackFailed(false);
-      } else {
+      if (!result.ok) {
         setPlaybackFailed(true);
+        return;
       }
+      signedAtRef.current = Date.now();
+      setSource({ ...result.data, posterPath: current.posterPath, generation: signTick });
+      setPlaybackFailed(false);
+      renew = setTimeout(() => setSignTick((n) => n + 1), HIGHLIGHT_RESIGN_AFTER_MS);
     })();
     return () => {
       cancelled = true;
+      if (renew) clearTimeout(renew);
     };
   }, [key, signTick]);
 
+  // A new version starts with a clean error budget.
+  React.useEffect(() => {
+    resignedForErrorRef.current = false;
+  }, [key]);
+
+  const resign = React.useCallback(() => setSignTick((n) => n + 1), []);
+
   const onPlayerError = React.useCallback(() => {
     if (!key) return;
-    if (resignedForRef.current === key) {
+    const fresh = Date.now() - signedAtRef.current < HIGHLIGHT_RESIGN_AFTER_MS;
+    if (resignedForErrorRef.current && fresh) {
       setPlaybackFailed(true);
       return;
     }
-    resignedForRef.current = key;
-    setSignTick((n) => n + 1);
-  }, [key]);
+    resignedForErrorRef.current = true;
+    resign();
+  }, [key, resign]);
+
+  const failedRef = React.useRef(playbackFailed);
+  React.useEffect(() => {
+    failedRef.current = playbackFailed;
+  }, [playbackFailed]);
+
+  const reload = React.useCallback(() => {
+    refresh();
+    const stale = Date.now() - signedAtRef.current >= HIGHLIGHT_RESIGN_AFTER_MS;
+    if (playbackRef.current && (failedRef.current || stale)) {
+      resignedForErrorRef.current = false;
+      resign();
+    }
+  }, [refresh, resign]);
+
+  const firstToken = React.useRef(true);
+  React.useEffect(() => {
+    if (firstToken.current) {
+      firstToken.current = false;
+      return;
+    }
+    reload();
+    // Only a new token (a pull-to-refresh) reloads.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reloadToken]);
 
   React.useEffect(() => {
     // Only a real return from background; iOS "inactive" (notification
@@ -93,11 +140,11 @@ export function useMyHighlight(matchVideoId: string | null): UseMyHighlightResul
       if (next === "background") wasBackground = true;
       else if (next === "active" && wasBackground) {
         wasBackground = false;
-        refresh();
+        reload();
       }
     });
     return () => sub.remove();
-  }, [refresh]);
+  }, [reload]);
 
-  return { progress: data, source, playbackFailed, onPlayerError, refresh };
+  return { progress: data, source, playbackFailed, onPlayerError, refresh, reload };
 }

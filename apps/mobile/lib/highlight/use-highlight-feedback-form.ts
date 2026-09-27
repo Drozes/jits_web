@@ -1,41 +1,42 @@
 import * as React from "react";
-import { supabase } from "@/lib/supabase/client";
-import {
-  regenerateHighlight,
-  submitHighlightFeedback,
-  type HighlightFeedbackChip,
-} from "@jits/shared/api/highlights";
+import type { HighlightFeedbackChip } from "@jits/shared/api/highlights";
 import {
   HIGHLIGHT_FEEDBACK_CHIPS,
   HIGHLIGHT_FREE_TEXT_MAX,
 } from "@jits/shared/constants/highlights";
-import { highlightErrorCopy } from "./highlight-copy";
-import type { HighlightRating } from "./use-highlight-rating";
-
-export type FeedbackSubmitKind = "regenerated" | "sent";
+import type {
+  FeedbackPayload,
+  FeedbackSubmitKind,
+  HighlightRating,
+} from "./use-highlight-rating";
 
 export interface UseHighlightFeedbackFormResult {
   rating: HighlightRating | null;
-  setRating: (value: HighlightRating) => void;
+  /** Tapping the selected thumb again clears it. */
+  toggleRating: (value: HighlightRating) => void;
   chips: HighlightFeedbackChip[];
   toggleChip: (code: HighlightFeedbackChip) => void;
   text: string;
   setText: (value: string) => void;
   busy: FeedbackSubmitKind | null;
-  /** Inline error copy (never a raw server message). */
   error: string | null;
-  /** Something is selected or typed: "Just send feedback" is enabled. */
+  /**
+   * Something new would be stored: a chip, text, or a rating that differs from
+   * the one the card already stored. Gates "Just send feedback" so a
+   * rating-only duplicate row is never written.
+   */
   hasFeedback: boolean;
   regenerate: () => void;
   send: () => void;
 }
 
 interface Options {
-  highlightId: string;
   preset: HighlightRating | null;
-  /** Feedback was stored server-side (send, regenerate, or a regenerate the AI failed). */
-  onStored: (rating: HighlightRating | null) => void;
-  onDone: (kind: FeedbackSubmitKind) => void;
+  /** The rating the card already stored this visit (null when none). */
+  storedRating: HighlightRating | null;
+  busy: FeedbackSubmitKind | null;
+  error: string | null;
+  onSubmit: (kind: FeedbackSubmitKind, payload: FeedbackPayload) => void;
 }
 
 /** Chip codes in canonical (render) order, so payloads are deterministic. */
@@ -44,31 +45,24 @@ function ordered(selected: HighlightFeedbackChip[]): HighlightFeedbackChip[] {
 }
 
 /**
- * The "Improve your reel" sheet's form (jr_be spec 014 section 10).
- * `regenerate` goes through the edge function (can take ~30 s), `send` stores
- * feedback only. Both stay on the sheet with inline error copy on failure.
- * A regenerate the AI could not satisfy has still stored the feedback row
- * (outcome ai_failed), so it reports `onStored` to stop a duplicate -1 write
- * when the athlete then closes the sheet.
+ * The "Improve your reel" sheet's field state. The network call and its
+ * outcome live in `useHighlightRating` (they must survive the sheet closing);
+ * this hook only builds the payload: rating, ordered chip codes, trimmed text
+ * capped at 280 (the edge function rejects longer text rather than truncating).
  */
 export function useHighlightFeedbackForm({
-  highlightId,
   preset,
-  onStored,
-  onDone,
+  storedRating,
+  busy,
+  error,
+  onSubmit,
 }: Options): UseHighlightFeedbackFormResult {
-  const [rating, setRatingState] = React.useState<HighlightRating | null>(preset);
+  const [rating, setRating] = React.useState<HighlightRating | null>(preset);
   const [chips, setChips] = React.useState<HighlightFeedbackChip[]>([]);
   const [text, setTextState] = React.useState("");
-  const [busy, setBusy] = React.useState<FeedbackSubmitKind | null>(null);
-  const [error, setError] = React.useState<string | null>(null);
-  const mountedRef = React.useRef(true);
 
-  React.useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-    };
+  const toggleRating = React.useCallback((value: HighlightRating) => {
+    setRating((prev) => (prev === value ? null : value));
   }, []);
 
   const toggleChip = React.useCallback((code: HighlightFeedbackChip) => {
@@ -79,43 +73,21 @@ export function useHighlightFeedbackForm({
     setTextState(value.slice(0, HIGHLIGHT_FREE_TEXT_MAX));
   }, []);
 
-  const setRating = React.useCallback((value: HighlightRating) => setRatingState(value), []);
-
   const trimmed = text.trim();
-  const hasFeedback = rating !== null || chips.length > 0 || trimmed.length > 0;
+  const hasFeedback =
+    chips.length > 0 || trimmed.length > 0 || (rating !== null && rating !== storedRating);
 
-  const submit = React.useCallback(
-    async (kind: FeedbackSubmitKind) => {
-      if (busy) return;
-      setBusy(kind);
-      setError(null);
-      const params = {
-        highlightId,
-        rating,
-        chips: ordered(chips),
-        freeText: trimmed ? trimmed : null,
-      };
-      const result =
-        kind === "regenerated"
-          ? await regenerateHighlight(supabase, params)
-          : await submitHighlightFeedback(supabase, params);
-      if (!mountedRef.current) return;
-      setBusy(null);
-      if (result.ok) {
-        onStored(rating);
-        onDone(kind);
-        return;
-      }
-      if (result.error.code === "HIGHLIGHT_REGEN_FAILED") onStored(rating);
-      setError(highlightErrorCopy(result.error));
-    },
-    [busy, highlightId, rating, chips, trimmed, onStored, onDone],
+  const payload = React.useCallback(
+    (): FeedbackPayload => ({ rating, chips: ordered(chips), freeText: trimmed ? trimmed : null }),
+    [rating, chips, trimmed],
   );
 
-  const regenerate = React.useCallback(() => void submit("regenerated"), [submit]);
+  const regenerate = React.useCallback(() => {
+    if (!busy) onSubmit("regenerated", payload());
+  }, [busy, onSubmit, payload]);
   const send = React.useCallback(() => {
-    if (hasFeedback) void submit("sent");
-  }, [hasFeedback, submit]);
+    if (!busy && hasFeedback) onSubmit("sent", payload());
+  }, [busy, hasFeedback, onSubmit, payload]);
 
-  return { rating, setRating, chips, toggleChip, text, setText, busy, error, hasFeedback, regenerate, send };
+  return { rating, toggleRating, chips, toggleChip, text, setText, busy, error, hasFeedback, regenerate, send };
 }

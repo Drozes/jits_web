@@ -9,12 +9,24 @@ import { HighlightCard } from "./highlight-card";
  * spaced ScrollView: when every card is disabled/unavailable nothing renders.
  * The opponent's reel is never shown (spec 014 non-goal).
  */
-export function HighlightSection({ videos }: { videos: MatchDetailVideo[] }) {
+export function HighlightSection({
+  videos,
+  reloadToken,
+}: {
+  videos: MatchDetailVideo[];
+  /** Bumped by the screen's pull-to-refresh. */
+  reloadToken: number;
+}) {
   const labelled = videos.length > 1;
   return (
     <>
       {videos.map((v) => (
-        <HighlightCard key={v.id} matchVideoId={v.id} angleLabel={labelled ? v.angle_label : null} />
+        <HighlightCard
+          key={v.id}
+          matchVideoId={v.id}
+          angleLabel={labelled ? v.angle_label : null}
+          reloadToken={reloadToken}
+        />
       ))}
     </>
   );

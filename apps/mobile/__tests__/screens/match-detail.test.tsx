@@ -83,11 +83,12 @@ jest.mock("@jits/shared/api/queries", () => ({
 // "not loaded / read failed", which renders no card, so the suites above
 // this block see the screen exactly as before.
 let mockHighlightByVideo: Record<string, unknown> = {};
+const mockHighlightRefresh = jest.fn();
 const mockUseHighlightProgress = jest.fn((_client: unknown, id: string | null) => ({
   data: (id && mockHighlightByVideo[id]) ?? null,
   loading: false,
   error: null,
-  refresh: jest.fn(),
+  refresh: mockHighlightRefresh,
 }));
 jest.mock("@jits/shared/hooks/use-highlight-progress", () => ({
   useHighlightProgress: (...a: [unknown, string | null]) => mockUseHighlightProgress(...a),
@@ -472,6 +473,18 @@ describe("MatchDetailScreen", () => {
       expect(
         within(utils.getByTestId("highlight-card-v-opp")).getByText("Demo Red's recording"),
       ).toBeTruthy();
+    });
+
+    it("pull-to-refresh re-reads the match AND the highlight cards", async () => {
+      mockHighlightByVideo = { "v-mine": highlight("v-mine", "planning") };
+      const utils = await renderLoaded(view());
+      const calls = mockGetMatchDetailView.mock.calls.length;
+      const scroll = utils.UNSAFE_getByType(require("react-native").ScrollView);
+      await act(async () => {
+        scroll.props.refreshControl.props.onRefresh();
+      });
+      expect(mockGetMatchDetailView.mock.calls.length).toBeGreaterThan(calls);
+      expect(mockHighlightRefresh).toHaveBeenCalled();
     });
   });
 });

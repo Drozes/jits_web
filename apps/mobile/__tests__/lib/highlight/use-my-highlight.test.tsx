@@ -45,7 +45,7 @@ jest.mock("@jits/shared/api/highlights", () => ({
   signHighlightPlayback: (...a: unknown[]) => mockSign(...a),
 }));
 
-import { useMyHighlight } from "@/lib/highlight/use-my-highlight";
+import { HIGHLIGHT_RESIGN_AFTER_MS, useMyHighlight } from "@/lib/highlight/use-my-highlight";
 import { HighlightPlayer } from "@/components/match-detail/highlight/highlight-player";
 
 function progress(version: number | null, phase = "ready") {
@@ -122,6 +122,84 @@ describe("useMyHighlight", () => {
     expect(result.current.source).toMatchObject({ url: "https://signed/2", version: 2 });
   });
 
+  it("carries the poster storage key on the source (image cache key)", async () => {
+    mockProgress = {
+      ...progress(1),
+      playback: { ...progress(1).playback!, posterPath: "m/u/highlights/1.jpg" },
+    };
+    const { result } = renderHook(() => useMyHighlight("v1"));
+    await flush();
+    expect(result.current.source?.posterPath).toBe("m/u/highlights/1.jpg");
+  });
+
+  it("renews the signature before the 1 h URL expires", async () => {
+    jest.useFakeTimers();
+    try {
+      mockProgress = progress(1);
+      renderHook(() => useMyHighlight("v1"));
+      await flush();
+      expect(mockSign).toHaveBeenCalledTimes(1);
+      await act(async () => {
+        jest.advanceTimersByTime(HIGHLIGHT_RESIGN_AFTER_MS - 1);
+      });
+      expect(mockSign).toHaveBeenCalledTimes(1);
+      await act(async () => {
+        jest.advanceTimersByTime(1);
+      });
+      await flush();
+      expect(mockSign).toHaveBeenCalledTimes(2);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("a player error on an old signature re-signs even after an earlier re-sign", async () => {
+    const now = jest.spyOn(Date, "now");
+    try {
+      now.mockReturnValue(1_000_000);
+      mockProgress = progress(1);
+      const { result } = renderHook(() => useMyHighlight("v1"));
+      await flush();
+      act(() => result.current.onPlayerError());
+      await flush();
+      expect(mockSign).toHaveBeenCalledTimes(2);
+      now.mockReturnValue(1_000_000 + HIGHLIGHT_RESIGN_AFTER_MS + 1);
+      act(() => result.current.onPlayerError());
+      await flush();
+      expect(mockSign).toHaveBeenCalledTimes(3);
+      expect(result.current.playbackFailed).toBe(false);
+    } finally {
+      now.mockRestore();
+    }
+  });
+
+  it("a new reloadToken (pull-to-refresh) refreshes and re-signs a failed playback", async () => {
+    mockSign.mockResolvedValueOnce({ ok: false, error: { code: "UNKNOWN", message: "x" } });
+    mockProgress = progress(1);
+    const { result, rerender } = renderHook(({ token }: { token: number }) => useMyHighlight("v1", token), {
+      initialProps: { token: 0 },
+    });
+    await flush();
+    expect(result.current.playbackFailed).toBe(true);
+    expect(mockRefresh).not.toHaveBeenCalled();
+    rerender({ token: 1 });
+    await flush();
+    expect(mockRefresh).toHaveBeenCalledTimes(1);
+    expect(mockSign).toHaveBeenCalledTimes(2);
+    expect(result.current.playbackFailed).toBe(false);
+    expect(result.current.source?.url).toBe("https://signed/1");
+  });
+
+  it("reload with a fresh, working signature only refreshes progress", async () => {
+    mockProgress = progress(1);
+    const { result } = renderHook(() => useMyHighlight("v1"));
+    await flush();
+    act(() => result.current.reload());
+    await flush();
+    expect(mockRefresh).toHaveBeenCalledTimes(1);
+    expect(mockSign).toHaveBeenCalledTimes(1);
+  });
+
   it("re-signs ONCE on a player error, then reports playback failed", async () => {
     mockProgress = progress(1);
     const { result } = renderHook(() => useMyHighlight("v1"));
@@ -182,7 +260,7 @@ describe("useMyHighlight", () => {
 });
 
 describe("HighlightPlayer", () => {
-  const SOURCE = { url: "https://signed/1", posterUrl: "https://p", version: 1, durationS: 30, generation: 0 };
+  const SOURCE = { url: "https://signed/1", posterUrl: "https://p", posterPath: "m/u/highlights/1.jpg", version: 1, durationS: 30, generation: 0 };
 
   it("sets up a muted, looping player with external playback off, no PiP, no native controls", () => {
     const utils = render(<HighlightPlayer source={SOURCE} onError={jest.fn()} />);

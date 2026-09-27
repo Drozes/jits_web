@@ -16,6 +16,7 @@ export const HIGHLIGHT_COPY = {
   failed: "We couldn't make your highlight reel.",
   tryAgain: "Try again",
   noRetries: "No retries left for this reel.",
+  planFailed: "We couldn't find highlights in this video.",
   none: "We couldn't find a clear highlight of you in this video.",
   invalidated: "Your match video was replaced. A new reel will be made once it's analysed.",
   cannotPlay: "We couldn't play this reel right now. Pull down to refresh.",

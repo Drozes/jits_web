@@ -4,21 +4,23 @@ import { Chip } from "@/components/ui/elo-system/chip";
 import { HIGHLIGHT_FEEDBACK_CHIPS } from "@jits/shared/constants/highlights";
 import type { HighlightProgress } from "@jits/shared/api/highlights";
 import { HIGHLIGHT_COPY } from "@/lib/highlight/highlight-copy";
-import {
-  useHighlightFeedbackForm,
-  type FeedbackSubmitKind,
-} from "@/lib/highlight/use-highlight-feedback-form";
-import type { HighlightRating } from "@/lib/highlight/use-highlight-rating";
+import { useHighlightFeedbackForm } from "@/lib/highlight/use-highlight-feedback-form";
+import type {
+  FeedbackPayload,
+  FeedbackSubmitKind,
+  HighlightRating,
+} from "@/lib/highlight/use-highlight-rating";
 import { HighlightThumb } from "./highlight-thumbs";
 import { HighlightFormActions } from "./highlight-form-actions";
 import { HighlightFeedbackText } from "./highlight-feedback-text";
 
 export interface HighlightFeedbackFormProps {
-  highlightId: string;
   preset: HighlightRating | null;
+  storedRating: HighlightRating | null;
+  busy: FeedbackSubmitKind | null;
+  error: string | null;
   progress: Pick<HighlightProgress, "phase" | "canRegenerate" | "rendersRemaining" | "renderMax">;
-  onStored: (rating: HighlightRating | null) => void;
-  onDone: (kind: FeedbackSubmitKind) => void;
+  onSubmit: (kind: FeedbackSubmitKind, payload: FeedbackPayload) => void;
 }
 
 function Label({ children }: { children: string }) {
@@ -38,8 +40,8 @@ export function HighlightFeedbackForm(props: HighlightFeedbackFormProps) {
       <View className="gap-2">
         <Label>{HIGHLIGHT_COPY.howWasIt}</Label>
         <View className="flex-row gap-2">
-          <HighlightThumb kind="up" testIDPrefix="highlight-sheet-thumb" selected={form.rating === 1} onPress={() => form.setRating(1)} />
-          <HighlightThumb kind="down" testIDPrefix="highlight-sheet-thumb" selected={form.rating === -1} onPress={() => form.setRating(-1)} />
+          <HighlightThumb kind="up" testIDPrefix="highlight-sheet-thumb" selected={form.rating === 1} onPress={() => form.toggleRating(1)} />
+          <HighlightThumb kind="down" testIDPrefix="highlight-sheet-thumb" selected={form.rating === -1} onPress={() => form.toggleRating(-1)} />
         </View>
       </View>
       <View className="gap-2">

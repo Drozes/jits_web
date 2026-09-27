@@ -2,14 +2,18 @@ import * as React from "react";
 import { Pressable, View } from "react-native";
 import { Image } from "expo-image";
 import { VideoView } from "expo-video";
-import { Maximize2 } from "lucide-react-native";
-import { useThemedTokens } from "@/lib/theme/use-theme";
-import { HIGHLIGHT_COPY, playerLabel } from "@/lib/highlight/highlight-copy";
+import { playerLabel } from "@/lib/highlight/highlight-copy";
 import { useHighlightPlayer } from "@/lib/highlight/use-highlight-player";
 import type { HighlightSource } from "@/lib/highlight/use-my-highlight";
 import { HIGHLIGHT_FRAME_STYLE } from "./highlight-frame";
+import { HighlightFullscreenButton } from "./highlight-fullscreen-button";
 
 const FILL = { position: "absolute", top: 0, left: 0, right: 0, bottom: 0 } as const;
+
+/** Cached by the render-unique storage key: re-signs reuse it, matches never share it. */
+function posterSource({ posterUrl, posterPath }: HighlightSource) {
+  return { uri: posterUrl ?? undefined, cacheKey: posterPath ? `highlight-poster:${posterPath}` : undefined };
+}
 
 interface HighlightPlayerProps {
   source: HighlightSource;
@@ -22,7 +26,6 @@ interface HighlightPlayerProps {
  * there is deliberately NO share / save / export affordance.
  */
 export function HighlightPlayer({ source, onError }: HighlightPlayerProps) {
-  const tokens = useThemedTokens();
   const viewRef = React.useRef<VideoView>(null);
   const [firstFrame, setFirstFrame] = React.useState(false);
   const player = useHighlightPlayer(source.url, onError);
@@ -57,23 +60,14 @@ export function HighlightPlayer({ source, onError }: HighlightPlayerProps) {
         {source.posterUrl && !firstFrame ? (
           <Image
             testID="highlight-poster"
-            source={{ uri: source.posterUrl, cacheKey: `highlight-poster-${source.version}` }}
+            source={posterSource(source)}
             style={FILL}
             contentFit="contain"
             pointerEvents="none"
           />
         ) : null}
       </Pressable>
-      <Pressable
-        testID="highlight-fullscreen"
-        accessibilityRole="button"
-        accessibilityLabel={HIGHLIGHT_COPY.fullscreen}
-        hitSlop={10}
-        onPress={() => void viewRef.current?.enterFullscreen().catch(() => undefined)}
-        className="absolute right-2 bottom-2 p-2 bg-surface-3 border border-hairline rounded-xs"
-      >
-        <Maximize2 size={16} color={tokens.textPrimary} />
-      </Pressable>
+      <HighlightFullscreenButton onPress={() => void viewRef.current?.enterFullscreen().catch(() => undefined)} />
     </View>
   );
 }

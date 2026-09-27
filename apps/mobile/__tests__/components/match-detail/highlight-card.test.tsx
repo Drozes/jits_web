@@ -45,6 +45,7 @@ jest.mock("@/components/ui/toast", () => ({
   },
 }));
 
+let mockSheetProps: Record<string, unknown> = {};
 // A stateful gorhom stand-in: children render only while presented, and
 // dismiss() reports index -1 like the real modal once it has closed.
 jest.mock("@gorhom/bottom-sheet", () => {
@@ -52,6 +53,7 @@ jest.mock("@gorhom/bottom-sheet", () => {
   const RN = require("react-native");
   const BottomSheetModal = R.forwardRef(
     (props: { children: React.ReactNode; onChange?: (i: number) => void }, ref: unknown) => {
+      mockSheetProps = props as Record<string, unknown>;
       const [shown, setShown] = R.useState(false);
       const onChange = R.useRef(props.onChange);
       onChange.current = props.onChange;
@@ -81,7 +83,7 @@ jest.mock("@gorhom/bottom-sheet", () => {
   return {
     BottomSheetModal,
     BottomSheetView: (p: { children: React.ReactNode }) => R.createElement(RN.View, {}, p.children),
-    BottomSheetBackdrop: () => null,
+    BottomSheetBackdrop: (p: Record<string, unknown>) => R.createElement(RN.View, { testID: "backdrop", ...p }),
     BottomSheetTextInput: (p: Record<string, unknown>) => R.createElement(RN.TextInput, p),
   };
 });
@@ -281,6 +283,37 @@ describe("HighlightCard phases", () => {
     const utils = await renderCard(progress("failed", { status: "failed", playback: null }));
     expect(utils.queryByTestId("highlight-error-reason")).toBeNull();
     expect(utils.queryByText("null")).toBeNull();
+  });
+
+  it("failed with no highlight row (plan failed): no-highlights copy and no action", async () => {
+    const utils = await renderCard(
+      progress("failed", { status: null, highlightId: null, playback: null, planStatus: "failed", errorMessage: "planner timeout" }),
+    );
+    expect(utils.getByTestId("highlight-plan-failed")).toHaveTextContent(
+      "We couldn't find highlights in this video.",
+    );
+    expect(utils.queryByText("No retries left for this reel.")).toBeNull();
+    expect(utils.queryByText("Try again")).toBeNull();
+    expect(redCtas(utils)).toHaveLength(0);
+  });
+
+  it("ready but the live render cannot be signed: cannot-play note, no dead player", async () => {
+    mockSign.mockResolvedValue({ ok: false, error: { code: "VIDEO_FILE_MISSING", message: "x" } });
+    const utils = await renderCard(progress("ready"));
+    await waitFor(() => expect(utils.getByTestId("highlight-cannot-play")).toBeTruthy());
+    expect(utils.getByTestId("highlight-cannot-play")).toHaveTextContent(
+      "We couldn't play this reel right now. Pull down to refresh.",
+    );
+    expect(utils.queryByTestId("expo-video-view")).toBeNull();
+  });
+
+  it("caches the poster by its storage key, not by version", async () => {
+    const utils = await renderCard(progress("ready"));
+    await waitFor(() => expect(utils.getByTestId("highlight-poster")).toBeTruthy());
+    expect(utils.getByTestId("highlight-poster").props.source).toEqual({
+      uri: "https://signed/v1.jpg",
+      cacheKey: "highlight-poster:m/u/highlights/1.jpg",
+    });
   });
 
   it("failed with no renders left: no CTA, no-retries note", async () => {
@@ -558,5 +591,95 @@ describe("Feedback sheet", () => {
       fireEvent.press(utils.getByTestId("sheet-swipe-close"));
     });
     expect(mockSubmit).not.toHaveBeenCalled();
+  });
+
+  it("clears the sheet thumbs on a second tap; nothing selected disables Just send", async () => {
+    const utils = await renderCard(progress("ready"));
+    fireEvent.press(utils.getByTestId("highlight-thumb-down"));
+    expect(utils.getByTestId("highlight-send-feedback").props.accessibilityState.disabled).toBe(false);
+    fireEvent.press(utils.getByTestId("highlight-sheet-thumb-down"));
+    expect(utils.getByTestId("highlight-sheet-thumb-down").props.accessibilityState.selected).toBe(false);
+    expect(utils.getByTestId("highlight-send-feedback").props.accessibilityState.disabled).toBe(true);
+  });
+
+  it("never stores a rating-only duplicate: after thumbs up, Improve's Just send waits for a change", async () => {
+    const utils = await renderCard(progress("ready"));
+    await act(async () => {
+      fireEvent.press(utils.getByTestId("highlight-thumb-up"));
+    });
+    expect(mockSubmit).toHaveBeenCalledTimes(1);
+    fireEvent.press(utils.getByTestId("highlight-improve"));
+    expect(utils.getByTestId("highlight-sheet-thumb-up").props.accessibilityState.selected).toBe(true);
+    expect(utils.getByTestId("highlight-send-feedback").props.accessibilityState.disabled).toBe(true);
+    fireEvent.press(utils.getByTestId("highlight-send-feedback"));
+    expect(mockSubmit).toHaveBeenCalledTimes(1);
+    fireEvent.press(utils.getByTestId("highlight-sheet-thumb-down"));
+    expect(utils.getByTestId("highlight-send-feedback").props.accessibilityState.disabled).toBe(false);
+  });
+
+  it("locks swipe and backdrop close while a submit runs", async () => {
+    let resolve: (v: unknown) => void = () => undefined;
+    mockRegenerate.mockReturnValue(new Promise((r) => (resolve = r)));
+    const utils = await openSheet(progress("ready"));
+    const backdrop = () =>
+      (mockSheetProps.backdropComponent as (p: object) => React.ReactElement<{ pressBehavior: string }>)({});
+    expect(mockSheetProps.enablePanDownToClose).toBe(true);
+    expect(backdrop().props.pressBehavior).toBe("close");
+    fireEvent.press(utils.getByTestId("highlight-regenerate"));
+    expect(mockSheetProps.enablePanDownToClose).toBe(false);
+    expect(backdrop().props.pressBehavior).toBe("none");
+    await act(async () => resolve({ ok: false, error: { code: "HIGHLIGHT_RENDER_LIMIT", message: "x" } }));
+    expect(mockSheetProps.enablePanDownToClose).toBe(true);
+  });
+
+  it("a sheet closed mid-regenerate writes no -1, and the result still toasts and refreshes", async () => {
+    let resolve: (v: unknown) => void = () => undefined;
+    mockRegenerate.mockReturnValue(new Promise((r) => (resolve = r)));
+    const utils = await renderCard(progress("ready"));
+    fireEvent.press(utils.getByTestId("highlight-thumb-down"));
+    fireEvent.press(utils.getByTestId("highlight-regenerate"));
+    await act(async () => {
+      fireEvent.press(utils.getByTestId("sheet-swipe-close"));
+    });
+    expect(mockSubmit).not.toHaveBeenCalled();
+    await act(async () =>
+      resolve({
+        ok: true,
+        data: { feedbackId: "fb", highlightId: "h1", renderTotal: 2, rendersRemaining: 8, changeSummary: null },
+      }),
+    );
+    expect(mockToast.success).toHaveBeenCalledWith("Making a new version.");
+    expect(mockRefresh).toHaveBeenCalled();
+    expect(mockSubmit).not.toHaveBeenCalled();
+    expect(utils.getByTestId("highlight-thumb-down").props.accessibilityState.selected).toBe(true);
+  });
+
+  it("a sheet closed mid-regenerate surfaces a later error (e.g. 422) as a toast", async () => {
+    let resolve: (v: unknown) => void = () => undefined;
+    mockRegenerate.mockReturnValue(new Promise((r) => (resolve = r)));
+    const utils = await openSheet(progress("ready"));
+    fireEvent.press(utils.getByTestId("highlight-chip-too_long"));
+    fireEvent.press(utils.getByTestId("highlight-regenerate"));
+    await act(async () => {
+      fireEvent.press(utils.getByTestId("sheet-swipe-close"));
+    });
+    await act(async () => resolve({ ok: false, error: { code: "HIGHLIGHT_REGEN_FAILED", message: "x" } }));
+    expect(mockToast.error).toHaveBeenCalledWith(
+      "We couldn't work out a better cut. Try different feedback.",
+    );
+  });
+
+  it("a thumbs-down sheet closed after a submit that stored nothing still writes the -1", async () => {
+    mockRegenerate.mockResolvedValue({ ok: false, error: { code: "UNKNOWN", message: "offline" } });
+    const utils = await renderCard(progress("ready"));
+    fireEvent.press(utils.getByTestId("highlight-thumb-down"));
+    await act(async () => {
+      fireEvent.press(utils.getByTestId("highlight-regenerate"));
+    });
+    expect(utils.getByTestId("highlight-feedback-error")).toHaveTextContent(HIGHLIGHT_ERROR_FALLBACK);
+    await act(async () => {
+      fireEvent.press(utils.getByTestId("sheet-swipe-close"));
+    });
+    expect(mockSubmit).toHaveBeenCalledWith({}, { highlightId: "h1", rating: -1, chips: [], freeText: null });
   });
 });

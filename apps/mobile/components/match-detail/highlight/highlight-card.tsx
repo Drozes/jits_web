@@ -15,6 +15,8 @@ interface HighlightCardProps {
   matchVideoId: string;
   /** Shown under the title only when the match has more than one recording. */
   angleLabel: string | null;
+  /** Bumped by the screen's pull-to-refresh. */
+  reloadToken?: number;
 }
 
 /**
@@ -23,8 +25,8 @@ interface HighlightCardProps {
  * the backend is not deployed yet) and for `disabled` / `unavailable`, so a
  * card never flashes in or shows a raw error.
  */
-export function HighlightCard({ matchVideoId, angleLabel }: HighlightCardProps) {
-  const my = useMyHighlight(matchVideoId);
+export function HighlightCard({ matchVideoId, angleLabel, reloadToken = 0 }: HighlightCardProps) {
+  const my = useMyHighlight(matchVideoId, reloadToken);
   const progress = my.progress;
   const retry = useHighlightRetry(progress?.highlightId ?? null, my.refresh);
   if (!progress || HIDDEN.has(progress.phase)) return null;
@@ -51,10 +53,13 @@ export function HighlightCard({ matchVideoId, angleLabel }: HighlightCardProps) 
             onPlayerError={my.onPlayerError}
             refresh={my.refresh}
           />
+        ) : phase === "failed" && !progress.highlightId ? (
+          // The plan failed: there is no reel to retry.
+          <HighlightNote testID="highlight-plan-failed">{HIGHLIGHT_COPY.planFailed}</HighlightNote>
         ) : phase === "failed" ? (
           <HighlightFailed
             errorMessage={progress.errorMessage}
-            canRetry={progress.rendersRemaining > 0 && !!progress.highlightId}
+            canRetry={progress.rendersRemaining > 0}
             busy={retry.busy}
             onRetry={() => void retry.retry()}
           />

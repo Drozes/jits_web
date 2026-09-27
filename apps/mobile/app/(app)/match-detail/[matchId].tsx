@@ -28,6 +28,12 @@ export default function MatchDetailScreen() {
   const router = useRouter();
   const tokens = useThemedTokens();
   const { state, data, error, refreshing, refetch } = useMatchDetail(matchId);
+  // Pull-to-refresh also re-reads (and if needed re-signs) the highlight cards.
+  const [highlightReload, setHighlightReload] = React.useState(0);
+  const onRefresh = React.useCallback(() => {
+    refetch();
+    setHighlightReload((n) => n + 1);
+  }, [refetch]);
 
   const goBack = React.useCallback(() => {
     if (router.canGoBack()) router.back();
@@ -48,7 +54,7 @@ export default function MatchDetailScreen() {
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
-              onRefresh={refetch}
+              onRefresh={onRefresh}
               tintColor={tokens.accentCta}
             />
           }
@@ -64,7 +70,7 @@ export default function MatchDetailScreen() {
             videos={data.videos}
             onWatch={(videoId) => router.push(`/(app)/video/${videoId}`)}
           />
-          <HighlightSection videos={data.videos} />
+          <HighlightSection videos={data.videos} reloadToken={highlightReload} />
         </ScrollView>
       ) : state === "error" ? (
         <MatchDetailError code={error?.code ?? "UNKNOWN"} onBack={goBack} onRetry={refetch} />
