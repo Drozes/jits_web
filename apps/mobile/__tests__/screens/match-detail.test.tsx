@@ -345,9 +345,11 @@ describe("MatchDetailScreen (Film Room match page)", () => {
     expect(utils.getByText("KEY MOMENTS")).toBeTruthy();
     // Decorative: hidden from assistive tech, the rows carry the actions.
     expect(utils.getByTestId("moment-timeline", { includeHiddenElements: true })).toBeTruthy();
-    // Engage, takedown, back take, and the recorded finish at 03:57.
+    // Engage, takedown, and the last scoring moment promoted to the finish
+    // (video time 03:20). The match clock's 03:57 is never placed on it.
     expect(utils.getByLabelText("Play from 00:09, Engage")).toBeTruthy();
-    expect(utils.getByLabelText("Play from 03:57, Rear-naked choke")).toBeTruthy();
+    expect(utils.getByLabelText("Play from 03:20, Rear-naked choke")).toBeTruthy();
+    expect(utils.queryByLabelText(/^Play from 03:57/)).toBeNull();
     expect(utils.getByText("FINISH")).toBeTruthy();
     fireEvent.press(utils.getByLabelText("Play from 00:27, Takedown"));
     expect(mockPush).toHaveBeenCalledWith("/(app)/video/v-mine?t=27");

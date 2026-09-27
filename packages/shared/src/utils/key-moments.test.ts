@@ -3,6 +3,7 @@ import {
   buildKeyMoments,
   captionAt,
   formatClock,
+  translateAngleTime,
   humanizeAnalysisLabel,
 } from "./key-moments";
 
@@ -35,16 +36,13 @@ describe("buildKeyMoments", () => {
     scoring_moments: [
       { type: "guard_pass", timestamp_s: 192, description: "Knee cut to side control" },
       { type: "takedown", timestamp_s: 27 },
-      { type: "submission", timestamp_s: 375 },
+      { type: "submission", timestamp_s: 375, description: "Rear naked choke from the back" },
     ],
   };
+  const rnc = { result: "submission", submission_name: "Rear-naked choke" };
 
-  it("orders engage, scores and the finish; promotes the nearby scoring moment to the finish", () => {
-    const moments = buildKeyMoments(
-      analysis,
-      { result: "submission", submission_name: "Rear-naked choke", finish_time_seconds: 377 },
-      600,
-    );
+  it("orders engage and scores, and promotes the scoring moment that is the submission", () => {
+    const moments = buildKeyMoments(analysis, rnc, 600);
     expect(moments.map((m) => [m.t, m.label, m.kind])).toEqual([
       [9, "Engage", "engage"],
       [27, "Takedown", "score"],
@@ -55,25 +53,41 @@ describe("buildKeyMoments", () => {
     expect(moments[1].description).toBeNull();
   });
 
-  it("adds a separate finish when no scoring moment is near it", () => {
+  it("uses a technique tag naming the submission when no scoring moment does, in video time", () => {
     const moments = buildKeyMoments(
-      { scoring_moments: [{ type: "takedown", timestamp_s: 27 }] },
-      { result: "submission", submission_name: null, finish_time_seconds: 300 },
+      {
+        scoring_moments: [{ type: "takedown", timestamp_s: 27 }, { type: "back_take", timestamp_s: 300 }],
+        technique_tags: [
+          { technique_name: "Single leg", timestamp_start: 27 },
+          { technique_name: "Rear naked choke", timestamp_start: 318 },
+        ],
+      },
+      rnc,
       null,
     );
     expect(moments.map((m) => [m.t, m.label, m.kind])).toEqual([
       [27, "Takedown", "score"],
-      [300, "Finish", "finish"],
+      [300, "Back take", "score"],
+      [318, "Rear-naked choke", "finish"],
     ]);
   });
 
-  it("adds no finish for points, draws or an unknown finish time", () => {
-    expect(
-      buildKeyMoments(null, { result: "points", finish_time_seconds: 300 }).some((m) => m.kind === "finish"),
-    ).toBe(false);
-    expect(
-      buildKeyMoments(null, { result: "submission", finish_time_seconds: null }),
-    ).toEqual([]);
+  it("falls back to the last scoring moment, and adds no finish without any", () => {
+    const last = buildKeyMoments(
+      { scoring_moments: [{ type: "back_take", timestamp_s: 200 }, { type: "takedown", timestamp_s: 27 }] },
+      rnc,
+    );
+    expect(last.map((m) => [m.t, m.label, m.kind])).toEqual([
+      [27, "Takedown", "score"],
+      [200, "Rear-naked choke", "finish"],
+    ]);
+    expect(buildKeyMoments({ positions: [{ position: "standing", timestamp_s: 5 }] }, rnc).some((m) => m.kind === "finish")).toBe(false);
+    expect(buildKeyMoments(null, rnc)).toEqual([]);
+  });
+
+  it("marks no finish for points or draws", () => {
+    expect(buildKeyMoments(analysis, { result: "points" }).some((m) => m.kind === "finish")).toBe(false);
+    expect(buildKeyMoments(analysis, null).some((m) => m.kind === "finish")).toBe(false);
   });
 
   it("drops invalid and past-the-end times, and collapses duplicates", () => {
@@ -125,5 +139,18 @@ describe("captionAt", () => {
   it("returns null before anything happens", () => {
     expect(captionAt(moments, positions, 2)).toBeNull();
     expect(captionAt([], null, 100)).toBeNull();
+  });
+});
+
+describe("translateAngleTime", () => {
+  it("shifts by the offset difference when both angles are synced", () => {
+    // Target started 2.5 s later than the source: the same instant is earlier on it.
+    expect(translateAngleTime(42, 0, 2500)).toEqual({ t: 39.5, synced: true });
+    expect(translateAngleTime(1, 0, 2500)).toEqual({ t: 0, synced: true });
+  });
+
+  it("carries t unchanged and unsynced when either offset is unknown", () => {
+    expect(translateAngleTime(42, null, 2500)).toEqual({ t: 42, synced: false });
+    expect(translateAngleTime(42, 0, undefined)).toEqual({ t: 42, synced: false });
   });
 });

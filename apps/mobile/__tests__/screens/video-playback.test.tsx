@@ -9,9 +9,10 @@ const mockReplace = jest.fn();
 const mockSetParams = jest.fn();
 let mockId: string | undefined = "vid-1";
 let mockT: string | undefined;
+let mockApprox: string | undefined;
 
 jest.mock("expo-router", () => ({
-  useLocalSearchParams: () => ({ id: mockId, t: mockT }),
+  useLocalSearchParams: () => ({ id: mockId, t: mockT, approx: mockApprox }),
   useRouter: () => ({ back: mockBack, replace: mockReplace, setParams: mockSetParams, canGoBack: () => true }),
 }));
 
@@ -32,8 +33,10 @@ jest.mock("@/lib/match-detail/use-match-detail", () => ({
   useMatchDetail: (id: string | undefined) => mockUseMatchDetail(id),
 }));
 const mockGetVideoAnalysis = jest.fn();
+const mockGetVideoSyncOffsets = jest.fn();
 jest.mock("@jits/shared/api/film-room", () => ({
   getVideoAnalysis: (...a: unknown[]) => mockGetVideoAnalysis(...a),
+  getVideoSyncOffsets: (...a: unknown[]) => mockGetVideoSyncOffsets(...a),
 }));
 
 /**
@@ -141,6 +144,8 @@ beforeEach(() => {
   mockLatestProps.current = null;
   mockId = "vid-1";
   mockT = undefined;
+  mockApprox = undefined;
+  mockGetVideoSyncOffsets.mockResolvedValue({});
   mockUseMatchDetail.mockReturnValue({ state: "loading", data: null, error: null, refreshing: false, refetch: jest.fn() });
   mockGetVideoAnalysis.mockResolvedValue({ ok: true, data: null });
 });
@@ -420,7 +425,7 @@ const ANALYSIS = {
       { type: "takedown", timestamp_s: 27, description: "Single leg to the mat" },
       { type: "guard_pass", timestamp_s: 192 },
     ],
-    technique_tags: [],
+    technique_tags: [{ id: "t1", technique_name: "Rear naked choke", category: null, athlete_id: null, timestamp_start: 375, timestamp_end: null, submission_type_name: null }],
     completed_at: null,
   },
 };
@@ -468,10 +473,11 @@ describe("MatchVideoScreen Film Room controls", () => {
   it("marks every key moment on the seek bar and jumps from a chip", async () => {
     const utils = await renderLoadedPlayer();
     await waitFor(() => expect(utils.getByTestId("moment-chip-0")).toBeTruthy());
-    // Engage, takedown, guard pass, and the finish at 06:17.
-    expect(utils.getAllByTestId(/^seek-marker-/)).toHaveLength(4);
+    // Engage, takedown, guard pass, and the finish from the analysis's own
+    // technique tag at 06:15 video time (never the 06:17 match clock).
+    expect(utils.getAllByTestId(/^seek-marker-/, { includeHiddenElements: true })).toHaveLength(4);
     expect(utils.getByText("4 KEY MOMENTS")).toBeTruthy();
-    expect(utils.getByText("06:17 REAR-NAKED CHOKE · FINISH")).toBeTruthy();
+    expect(utils.getByText("06:15 REAR-NAKED CHOKE · FINISH")).toBeTruthy();
     fireEvent.press(utils.getByLabelText("Jump to 00:27, Takedown"));
     expect(mockSetPosition).toHaveBeenLastCalledWith(27_000);
   });
@@ -516,7 +522,48 @@ describe("MatchVideoScreen Film Room controls", () => {
     statusAt(42.6);
     expect(utils.getByLabelText("YOUR ANGLE").props.accessibilityState).toMatchObject({ selected: true });
     fireEvent.press(utils.getByLabelText("M. PARK'S ANGLE"));
-    expect(mockSetParams).toHaveBeenCalledWith({ id: "vid-2", t: "42" });
+    // No sync offsets: carry the second, flagged approximate.
+    expect(mockSetParams).toHaveBeenCalledWith({ id: "vid-2", t: "42", approx: "1" });
+  });
+
+  it("translates the time by the sync offsets when both angles have one", async () => {
+    mockGetVideoSyncOffsets.mockResolvedValue({ "vid-1": 0, "vid-2": 2500 });
+    const utils = await renderLoadedPlayer();
+    await waitFor(() => expect(mockGetVideoSyncOffsets).toHaveBeenCalledWith({}, ["vid-1", "vid-2"]));
+    statusAt(42.6);
+    await act(async () => undefined);
+    fireEvent.press(utils.getByLabelText("M. PARK'S ANGLE"));
+    expect(mockSetParams).toHaveBeenCalledWith({ id: "vid-2", t: "40", approx: "0" });
+  });
+
+  it("shows the approximate-position note after an unsynced switch, then hides it", async () => {
+    jest.useFakeTimers();
+    try {
+      mockApprox = "1";
+      queries().getMatchVideoPlaybackResult.mockResolvedValue(playableInMatch());
+      const utils = render(React.createElement(MatchVideoScreen));
+      await waitFor(() => expect(mockPlayers.length).toBe(1));
+      expect(utils.getByText("Angles aren't synced; position is approximate")).toBeTruthy();
+      act(() => {
+        jest.advanceTimersByTime(5000);
+      });
+      expect(utils.queryByTestId("player-approx-note")).toBeNull();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("does not flash 00:00 before a ?t= seek lands", async () => {
+    mockT = "27";
+    queries().getMatchVideoPlaybackResult.mockResolvedValue(playableInMatch());
+    const utils = render(React.createElement(MatchVideoScreen));
+    await waitFor(() => expect(mockPlayers.length).toBe(1));
+    act(() => {
+      lastPlayer().onPlaybackStatusUpdate({ isLoaded: true, positionMillis: 0, durationMillis: 400_000 });
+    });
+    expect(utils.getByTestId("player-time")).toHaveTextContent("00:27 / 06:40");
+    statusAt(27.4);
+    expect(utils.getByTestId("player-time")).toHaveTextContent("00:27 / 06:40");
   });
 
   it("shows no angle switcher, chips or caption for one angle with no breakdown", async () => {

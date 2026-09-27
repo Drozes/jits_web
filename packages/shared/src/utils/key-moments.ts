@@ -32,15 +32,20 @@ export interface KeyMoment {
   description: string | null;
 }
 
-/** The match facts that place the finish on the timeline. */
+/** The match facts that decide which analysed moment is the finish. */
 export interface KeyMomentMatchFacts {
   result?: string | null;
   submission_name?: string | null;
-  finish_time_seconds?: number | null;
 }
 
-/** A scoring moment this close to the recorded finish IS the finish. */
-const FINISH_MATCH_WINDOW_S = 5;
+/** A technique tag, as far as finding the finish needs it. */
+export interface AnalysisTechniqueTag {
+  technique_name?: string | null;
+  submission_type_name?: string | null;
+  category?: string | null;
+  timestamp_start?: number | null;
+}
+
 /** A caption stays up this long after its moment. */
 const CAPTION_HOLD_S = 10;
 
@@ -57,14 +62,30 @@ export function humanizeAnalysisLabel(raw: string | null | undefined): string | 
   return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
 }
 
+function norm(text: string | null | undefined): string {
+  return (text ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+/** Loose match against the recorded submission ("rear naked choke" ~ "Rear-naked choke"). */
+function namesSubmission(text: string | null | undefined, submission: string): boolean {
+  const t = norm(text);
+  return !!t && !!submission && (t.includes(submission) || submission.includes(t));
+}
+
 /**
  * Build the key moments for one video, oldest first:
  *
  *   - the first recorded position becomes "Engage";
  *   - every scoring moment becomes a "score" moment;
- *   - a submission result adds the finish at `finish_time_seconds`, unless a
- *     scoring moment already sits within 5 s of it, in which case that moment
- *     is promoted to the finish (labelled with the submission name).
+ *   - for a submission result, ONE analysed moment is marked the finish.
+ *
+ * CLOCKS. Every time here is VIDEO time (seconds into the recording), the
+ * analysis's own clock. `matches.finish_time_seconds` is MATCH clock time
+ * and drifts from video time by the recording's start offset and any pauses,
+ * so it is deliberately never used to place anything on this timeline.
+ * Instead the finish is the latest scoring moment or technique tag that
+ * names the recorded submission (or is typed a submission); failing that,
+ * the last scoring moment; with no scoring moments, there is no finish.
  *
  * Moments with a missing, negative or past-the-end time are dropped; exact
  * duplicates (same second, same label) collapse to one.
@@ -73,6 +94,7 @@ export function buildKeyMoments(
   input: {
     positions?: AnalysisPosition[] | null;
     scoring_moments?: AnalysisScoringMoment[] | null;
+    technique_tags?: AnalysisTechniqueTag[] | null;
   } | null,
   match: KeyMomentMatchFacts | null,
   durationS?: number | null,
@@ -91,32 +113,47 @@ export function buildKeyMoments(
     });
   }
 
+  const scores: { moment: KeyMoment; raw: AnalysisScoringMoment }[] = [];
   for (const s of input?.scoring_moments ?? []) {
     if (!s || !validTime(s.timestamp_s, durationS)) continue;
-    moments.push({
+    const moment: KeyMoment = {
       t: s.timestamp_s,
       label: humanizeAnalysisLabel(s.type) ?? "Score",
       kind: "score",
       description: s.description?.trim() || null,
-    });
+    };
+    moments.push(moment);
+    scores.push({ moment, raw: s });
   }
 
-  const finishAt = match?.finish_time_seconds;
-  if (match?.result === "submission" && validTime(finishAt, durationS)) {
-    const label = match.submission_name?.trim() || "Finish";
-    let nearest: KeyMoment | null = null;
-    for (const m of moments) {
-      if (m.kind !== "score") continue;
-      const gap = Math.abs(m.t - finishAt);
-      if (gap <= FINISH_MATCH_WINDOW_S && (!nearest || gap < Math.abs(nearest.t - finishAt))) {
-        nearest = m;
+  if (match?.result === "submission") {
+    const name = match.submission_name?.trim() || null;
+    const sub = norm(name);
+    const isFinishText = (text: string | null | undefined) =>
+      norm(text).includes("submission") || (sub ? namesSubmission(text, sub) : false);
+
+    let best: { t: number; moment: KeyMoment | null } | null = null;
+    for (const { moment, raw } of scores) {
+      if ((isFinishText(raw.type) || isFinishText(raw.description)) && (!best || moment.t >= best.t)) {
+        best = { t: moment.t, moment };
       }
     }
-    if (nearest) {
-      nearest.kind = "finish";
-      nearest.label = label;
-    } else {
-      moments.push({ t: finishAt, label, kind: "finish", description: null });
+    for (const tag of input?.technique_tags ?? []) {
+      if (!tag || !validTime(tag.timestamp_start, durationS)) continue;
+      const hit =
+        tag.category === "submission" ||
+        (sub ? namesSubmission(tag.technique_name, sub) || namesSubmission(tag.submission_type_name, sub) : false);
+      if (hit && (!best || tag.timestamp_start > best.t)) best = { t: tag.timestamp_start, moment: null };
+    }
+    if (!best && scores.length > 0) {
+      const last = scores.reduce((a, b) => (b.moment.t >= a.moment.t ? b : a));
+      best = { t: last.moment.t, moment: last.moment };
+    }
+    if (best?.moment) {
+      best.moment.kind = "finish";
+      if (name) best.moment.label = name;
+    } else if (best) {
+      moments.push({ t: best.t, label: name ?? "Finish", kind: "finish", description: null });
     }
   }
 
@@ -169,4 +206,32 @@ export function formatClock(seconds: number | null | undefined): string {
   const m = Math.floor(total / 60);
   const s = total % 60;
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
+/**
+ * Carry a playback position from one angle of a match to the other.
+ *
+ * ASSUMPTION (documented, unverified on real footage): `match_videos.
+ * sync_offset_ms` is how much later a recording started than the match's
+ * reference (primary) angle, so reference time = video time + offset. The
+ * same instant on the target is then `t + (fromOffset - toOffset) / 1000`.
+ * Only when BOTH offsets are known is the result `synced`; otherwise `t`
+ * carries over unchanged and the caller should say it is approximate
+ * (the two phones started recording at different moments).
+ */
+export function translateAngleTime(
+  t: number,
+  fromOffsetMs: number | null | undefined,
+  toOffsetMs: number | null | undefined,
+): { t: number; synced: boolean } {
+  const safeT = Number.isFinite(t) && t > 0 ? t : 0;
+  if (
+    typeof fromOffsetMs !== "number" ||
+    typeof toOffsetMs !== "number" ||
+    !Number.isFinite(fromOffsetMs) ||
+    !Number.isFinite(toOffsetMs)
+  ) {
+    return { t: safeT, synced: false };
+  }
+  return { t: Math.max(0, safeT + (fromOffsetMs - toOffsetMs) / 1000), synced: true };
 }
