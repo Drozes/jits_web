@@ -362,7 +362,7 @@ describe("MatchDetailScreen (Film Room match page)", () => {
     // Engage, takedown, and the last scoring moment promoted to the finish
     // (video time 03:20). The match clock's 03:57 is never placed on it.
     expect(utils.getByLabelText("Play from 00:09, Engage")).toBeTruthy();
-    expect(utils.getByLabelText("Play from 03:20, Rear-naked choke")).toBeTruthy();
+    expect(utils.getByLabelText("Play from 03:20, Back take")).toBeTruthy();
     expect(utils.queryByLabelText(/^Play from 03:57/)).toBeNull();
     expect(utils.getByText("FINISH")).toBeTruthy();
     fireEvent.press(utils.getByLabelText("Play from 00:27, Takedown"));

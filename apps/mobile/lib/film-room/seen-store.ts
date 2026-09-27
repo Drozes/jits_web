@@ -76,6 +76,7 @@ export function useSeenMatches(): { ready: boolean; isSeen: (id: string) => bool
     void loadSeenMatches();
   }, []);
   // Stable between changes to the seen set, so memoized cards can skip.
+  // `v` bumps on every seen-set change; `loaded`/`isMatchSeen` are module state it covers.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   return React.useMemo(() => ({ ready: loaded, isSeen: isMatchSeen }), [v]);
 }

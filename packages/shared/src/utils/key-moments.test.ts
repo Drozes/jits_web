@@ -79,7 +79,8 @@ describe("buildKeyMoments", () => {
     );
     expect(last.map((m) => [m.t, m.label, m.kind])).toEqual([
       [27, "Takedown", "score"],
-      [200, "Rear-naked choke", "finish"],
+      // Marked the finish, but keeps its own analysed label.
+      [200, "Back take", "finish"],
     ]);
     expect(buildKeyMoments({ positions: [{ position: "standing", timestamp_s: 5 }] }, rnc).some((m) => m.kind === "finish")).toBe(false);
     expect(buildKeyMoments(null, rnc)).toEqual([]);

@@ -77,7 +77,8 @@ function namesSubmission(text: string | null | undefined, submission: string): b
  *
  *   - the first recorded position becomes "Engage";
  *   - every scoring moment becomes a "score" moment;
- *   - for a submission result, ONE analysed moment is marked the finish.
+ *   - for a submission result, ONE analysed moment is marked the finish
+ *     (relabelled with the submission name only when it names it).
  *
  * CLOCKS. Every time here is VIDEO time (seconds into the recording), the
  * analysis's own clock. `matches.finish_time_seconds` is MATCH clock time
@@ -132,10 +133,12 @@ export function buildKeyMoments(
     const isFinishText = (text: string | null | undefined) =>
       norm(text).includes("submission") || (sub ? namesSubmission(text, sub) : false);
 
-    let best: { t: number; moment: KeyMoment | null } | null = null;
+    // `named`: the moment itself names the submission, so it may take the
+    // recorded name; the last-scoring-moment fallback keeps its own label.
+    let best: { t: number; moment: KeyMoment | null; named: boolean } | null = null;
     for (const { moment, raw } of scores) {
       if ((isFinishText(raw.type) || isFinishText(raw.description)) && (!best || moment.t >= best.t)) {
-        best = { t: moment.t, moment };
+        best = { t: moment.t, moment, named: true };
       }
     }
     for (const tag of input?.technique_tags ?? []) {
@@ -143,15 +146,15 @@ export function buildKeyMoments(
       const hit =
         tag.category === "submission" ||
         (sub ? namesSubmission(tag.technique_name, sub) || namesSubmission(tag.submission_type_name, sub) : false);
-      if (hit && (!best || tag.timestamp_start > best.t)) best = { t: tag.timestamp_start, moment: null };
+      if (hit && (!best || tag.timestamp_start > best.t)) best = { t: tag.timestamp_start, moment: null, named: true };
     }
     if (!best && scores.length > 0) {
       const last = scores.reduce((a, b) => (b.moment.t >= a.moment.t ? b : a));
-      best = { t: last.moment.t, moment: last.moment };
+      best = { t: last.moment.t, moment: last.moment, named: false };
     }
     if (best?.moment) {
       best.moment.kind = "finish";
-      if (name) best.moment.label = name;
+      if (name && best.named) best.moment.label = name;
     } else if (best) {
       moments.push({ t: best.t, label: name ?? "Finish", kind: "finish", description: null });
     }
