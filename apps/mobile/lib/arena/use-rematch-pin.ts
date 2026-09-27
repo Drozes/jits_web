@@ -20,6 +20,7 @@ import * as React from "react";
 import { useFocusEffect, useLocalSearchParams, useNavigation } from "expo-router";
 import type { NavigationProp } from "@react-navigation/native";
 import type { ArenaCompetitor } from "./use-arena-roster";
+import { toast } from "@/components/ui/toast";
 
 export interface RematchPinInput {
   competitors: ArenaCompetitor[];
@@ -33,6 +34,12 @@ export interface RematchPinInput {
 
 export interface RematchPin {
   pinnedId: string | null;
+  /**
+   * Arrived from the verdict's Rematch (`&send=1`): the Arena sends the
+   * challenge itself once the opponent is back in the lobby
+   * (`useRematchAutoSend`).
+   */
+  autoSend: boolean;
   /** Display name, known only while the opponent is on the roster. */
   name: string | null;
   /** In the lobby AND on the roster, so their row can be pinned. */
@@ -47,12 +54,14 @@ export function useRematchPin({
   outgoingOpponentId,
 }: RematchPinInput): RematchPin {
   const navigation =
-    useNavigation<NavigationProp<{ arena: { rematch?: string } }>>();
-  const params = useLocalSearchParams<{ rematch?: string | string[] }>();
+    useNavigation<NavigationProp<{ arena: { rematch?: string; send?: string } }>>();
+  const params = useLocalSearchParams<{ rematch?: string | string[]; send?: string | string[] }>();
   const param = Array.isArray(params.rematch)
     ? params.rematch[0]
     : params.rematch;
+  const sendParam = Array.isArray(params.send) ? params.send[0] : params.send;
   const [pinnedId, setPinnedId] = React.useState<string | null>(null);
+  const [autoSend, setAutoSend] = React.useState(false);
   const refreshedFor = React.useRef<string | null>(null);
 
   const paramRef = React.useRef(param);
@@ -61,11 +70,15 @@ export function useRematchPin({
   React.useEffect(() => {
     if (!param) return;
     setPinnedId(param);
+    setAutoSend(sendParam === "1");
     refreshedFor.current = null;
-    navigation.setParams({ rematch: undefined });
-  }, [param, navigation]);
+    navigation.setParams({ rematch: undefined, send: undefined });
+  }, [param, sendParam, navigation]);
 
-  const clear = React.useCallback(() => setPinnedId(null), []);
+  const clear = React.useCallback(() => {
+    setPinnedId(null);
+    setAutoSend(false);
+  }, []);
   // Leaving the tab also drops the param itself. When the match exits into an
   // Arena that is already mounted (exitMatchTo's dismissTo, jits-tlk3), the
   // navigator applies the incoming params in an update scheduled AFTER this
@@ -77,7 +90,7 @@ export function useRematchPin({
     React.useCallback(
       () => () => {
         clear();
-        if (paramRef.current) navigation.setParams({ rematch: undefined });
+        if (paramRef.current) navigation.setParams({ rematch: undefined, send: undefined });
       },
       [clear, navigation],
     ),
@@ -101,9 +114,90 @@ export function useRematchPin({
 
   return {
     pinnedId,
+    autoSend: !!pinnedId && autoSend,
     name: pinned?.displayName ?? null,
     isOnline: inLobby && !!pinned,
   };
+}
+
+/** Grace before taking a rematcher live: leaving the match restores a live
+ * athlete on its own (use-arena-live), and a toggle racing that restore
+ * would take them OFFLINE instead. */
+export const REMATCH_GO_LIVE_GRACE_MS = 1_500;
+
+export interface RematchAutoSendInput {
+  pin: RematchPin;
+  isLive: boolean;
+  isSaving: boolean;
+  /** Something else is in flight or on screen: never send over it. */
+  blocked: boolean;
+  capReached: boolean;
+  outgoingOpponentId: string | null;
+  goLive: () => void;
+  send: (opponentId: string, opponentName: string) => Promise<void>;
+}
+
+/**
+ * The verdict's Rematch, finished in the Arena (match-flow redesign).
+ *
+ * Sending from the verdict itself fails quietly: the opponent is usually
+ * still on THEIR verdict, and an app that is in a match declines every
+ * incoming challenge as busy (`settleBusyInsert` in use-arena-challenge.ts),
+ * so the rematcher just saw "<name> declined." Instead the verdict lands
+ * here with `send=1` and this hook:
+ *  - takes the rematcher live if leaving the match did not (only live
+ *    athletes can challenge, and the opponent's recovery only offers a
+ *    challenge whose challenger is in the lobby);
+ *  - sends the challenge once, the moment the opponent is back in the lobby
+ *    (so out of their match) and nothing else is in flight;
+ *  - says "Rematch sent to <name>" once the outgoing challenge exists.
+ *    Refusals (cap, opponent gone) are toasted by `sendChallenge` itself,
+ *    and while the opponent is away the Rematch hint says it will send.
+ */
+export function useRematchAutoSend({
+  pin,
+  isLive,
+  isSaving,
+  blocked,
+  capReached,
+  outgoingOpponentId,
+  goLive,
+  send,
+}: RematchAutoSendInput): void {
+  const sentForRef = React.useRef<string | null>(null);
+  const sentNameRef = React.useRef<string | null>(null);
+  const toastedForRef = React.useRef<string | null>(null);
+  const liveRef = React.useRef({ isLive, isSaving });
+  liveRef.current = { isLive, isSaving };
+  const goLiveRef = React.useRef(goLive);
+  goLiveRef.current = goLive;
+
+  const wanted = pin.autoSend ? pin.pinnedId : null;
+
+  // Go live once per rematch if the match exit did not restore it.
+  React.useEffect(() => {
+    if (!wanted) return;
+    const t = setTimeout(() => {
+      const { isLive: live, isSaving: saving } = liveRef.current;
+      if (!live && !saving) goLiveRef.current();
+    }, REMATCH_GO_LIVE_GRACE_MS);
+    return () => clearTimeout(t);
+  }, [wanted]);
+
+  React.useEffect(() => {
+    if (!wanted || !pin.isOnline || !isLive || blocked || capReached) return;
+    if (outgoingOpponentId || sentForRef.current === wanted) return;
+    sentForRef.current = wanted;
+    sentNameRef.current = pin.name;
+    void send(wanted, pin.name ?? "your opponent");
+  }, [wanted, pin.isOnline, pin.name, isLive, blocked, capReached, outgoingOpponentId, send]);
+
+  React.useEffect(() => {
+    const id = sentForRef.current;
+    if (!id || outgoingOpponentId !== id || toastedForRef.current === id) return;
+    toastedForRef.current = id;
+    toast.success({ text1: `Rematch sent to ${sentNameRef.current ?? "your opponent"}` });
+  }, [outgoingOpponentId]);
 }
 
 /** Moves the row with `id` to the front; everyone else keeps roster order. */

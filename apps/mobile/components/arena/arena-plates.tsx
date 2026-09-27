@@ -178,13 +178,16 @@ export function NobodyOnlineNote({ isLive }: { isLive: boolean }) {
  * moment they are; this line says so. The name is
  * known only when they are on the roster, so it falls back to a neutral one.
  */
-export function RematchHint({ name }: { name: string | null }) {
+export function RematchHint({ name, autoSend = false }: { name: string | null; autoSend?: boolean }) {
+  const who = name ?? "Your opponent";
   return (
     <Text
       testID="arena-rematch-hint"
       className="font-body text-[12px] text-ink-3"
     >
-      {`${name ?? "Your opponent"} isn't back in the Arena yet. Their Challenge button appears here the moment they are.`}
+      {autoSend
+        ? `${who} isn't back in the Arena yet. Your rematch goes to them the moment they are.`
+        : `${who} isn't back in the Arena yet. Their Challenge button appears here the moment they are.`}
     </Text>
   );
 }
