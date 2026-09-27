@@ -20,6 +20,13 @@ jest.mock("@/lib/theme/use-theme", () => ({
   useThemedTokens: () => ({ textPrimary: "#E8EDF2", textSecondary: "#9AA3AD", stateNegative: "#EC6A74" }),
   useResolvedColorScheme: () => mockScheme,
 }));
+const mockStatusBar = jest.fn();
+jest.mock("expo-status-bar", () => ({
+  StatusBar: (p: { style: string }) => {
+    mockStatusBar(p.style);
+    return null;
+  },
+}));
 jest.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) }));
 jest.mock("expo-image", () => {
   const R = require("react");
@@ -60,6 +67,7 @@ jest.mock("@jits/shared/api/match-rank-change", () => ({
 
 import { Share } from "react-native";
 import { VerdictStep, rematchHref } from "@/components/match-flow/verdict/verdict-step";
+import { WizardScrollContext, useWizardScrollSource } from "@/components/match-flow/wizard-scroll";
 import { ARENA_EXIT_LABEL, ARENA_HREF } from "@/lib/arena/constants";
 
 type Props = React.ComponentProps<typeof VerdictStep>;
@@ -342,5 +350,62 @@ describe("the recorder learns of a dispute (S1)", () => {
     });
     expect(mockReconcileNow).not.toHaveBeenCalled();
     jest.useRealTimers();
+  });
+});
+
+describe("status bar over the opening still", () => {
+  type Source = ReturnType<typeof useWizardScrollSource>;
+  function Harness({ children, sourceRef }: { children: React.ReactNode; sourceRef: { current: Source | null } }) {
+    const source = useWizardScrollSource();
+    sourceRef.current = source;
+    return <WizardScrollContext.Provider value={source.value}>{children}</WizardScrollContext.Provider>;
+  }
+  const scrollTo = (source: Source, y: number) =>
+    act(() => source.onScroll({ nativeEvent: { contentOffset: { x: 0, y } } } as never));
+  const props = (): React.ComponentProps<typeof VerdictStep> => ({
+    matchId: "M1",
+    exitHref: ARENA_HREF,
+    exitLabel: ARENA_EXIT_LABEL,
+    matchType: "ranked",
+    matchStatus: "completed",
+    outcome: "win",
+    me: { athlete_id: "me", display_name: "Kai Reyes", elo_before: 1512, elo_after: 1526, elo_delta: 14 },
+    opponent: { athlete_id: "opp", display_name: "Mina Park" },
+    submissionName: null,
+    finishTimeSeconds: null,
+    upload: HIDDEN,
+    uploadedVideoId: null,
+  });
+
+  afterEach(() => {
+    mockScheme = "dark";
+  });
+
+  it("light over the still's dark scrim, then the app theme once the hero scrolls away (light theme)", async () => {
+    mockScheme = "light";
+    mockDetailView.mockResolvedValue({ ok: true, data: { videos: [{ id: "v1", poster_url: "https://signed/poster.jpg" }] } });
+    const ref: { current: Source | null } = { current: null };
+    const s = render(
+      <Harness sourceRef={ref}>
+        <VerdictStep {...props()} />
+      </Harness>,
+    );
+    await waitFor(() => expect(s.getByTestId("verdict-still")).toBeTruthy());
+    expect(mockStatusBar).toHaveBeenLastCalledWith("light");
+    // HERO_HEIGHT 360 - 75 - top inset 0: where the bottom scrim is solid.
+    scrollTo(ref.current!, 200);
+    expect(mockStatusBar).toHaveBeenLastCalledWith("light");
+    scrollTo(ref.current!, 300);
+    expect(mockStatusBar).toHaveBeenLastCalledWith("dark");
+    scrollTo(ref.current!, 0);
+    expect(mockStatusBar).toHaveBeenLastCalledWith("light");
+  });
+
+  it("follows the app theme with no still (the themed fallback plate)", async () => {
+    mockScheme = "light";
+    const s = renderVerdict();
+    await flush();
+    expect(s.getByTestId("verdict-still-fallback")).toBeTruthy();
+    expect(mockStatusBar).toHaveBeenLastCalledWith("dark");
   });
 });

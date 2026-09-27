@@ -17,7 +17,9 @@ import { usePalette } from "@/lib/theme/palette";
 import { FIGHT_RADIUS, TABULAR } from "../fight/fight-tokens";
 import { FightButton, Mono, RatingBlock, deltaColor, formatSignedDelta, shortName } from "../fight/fight-ui";
 import { Confetti, RiseIn, SlamIn, TickingRating } from "./celebration";
-import { VerdictHero } from "./verdict-hero";
+import { HERO_HEIGHT, VerdictHero } from "./verdict-hero";
+import { ThemedStatusBar } from "@/lib/theme/themed-status-bar";
+import { useScrolledPast } from "../wizard-scroll";
 
 /**
  * The Arena with the opponent to run it back against (jits-00fr). Navigated
@@ -84,6 +86,9 @@ export function VerdictStep(props: VerdictStepProps) {
   const [rematching, setRematching] = React.useState(false);
   const [disputedHere, setDisputedHere] = React.useState(false);
   const { reconcileNow } = useMatchSyncContext();
+  // Light status bar over the still's dark top scrim until the page scrolls
+  // to where the bottom scrim is solid; then it follows the app theme.
+  const pastHero = useScrolledPast(HERO_HEIGHT - 75 - insets.top);
 
   const opponentConfirmed = confirmedAthleteIds.includes(opponent.athlete_id);
   const disputed = matchStatus === "disputed" || disputedHere;
@@ -195,6 +200,7 @@ export function VerdictStep(props: VerdictStepProps) {
 
   return (
     <View style={{ paddingBottom: Math.max(insets.bottom, 16) + 16 }}>
+      <ThemedStatusBar overMedia={!!videos.posterUrl && !pastHero} />
       <VerdictHero
         matchType={matchType}
         posterUrl={videos.posterUrl}

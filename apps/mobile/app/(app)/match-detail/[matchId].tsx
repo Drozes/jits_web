@@ -34,7 +34,8 @@ export default function MatchDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const p = usePalette();
-  // The hero's top scrim is dark: light status bar until it scrolls away.
+  // The hero's top scrim is dark: light status bar until the hero has
+  // mostly scrolled away (its last 50 pt fade into the page).
   const [pastHero, setPastHero] = React.useState(false);
   const { state, data, error, refreshing, refetch } = useMatchDetail(matchId);
   const film = useMatchFilm(state === "ready" ? data : null, matchId ?? "");
@@ -63,7 +64,7 @@ export default function MatchDetailScreen() {
         <ScrollView
           scrollEventThrottle={32}
           onScroll={(e) => {
-            const past = e.nativeEvent.contentOffset.y > HERO_HEIGHT;
+            const past = e.nativeEvent.contentOffset.y > HERO_HEIGHT - 50;
             if (past !== pastHero) setPastHero(past);
           }}
           contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}

@@ -20,6 +20,7 @@ import { FaceoffProvider } from "./faceoff/faceoff-context";
 import { FaceoffTop } from "./faceoff/faceoff-top";
 import { usePalette } from "@/lib/theme/palette";
 import { BROADCAST } from "./live/broadcast-tokens";
+import { WizardScrollContext, useWizardScrollSource } from "./wizard-scroll";
 import { ARENA_EXIT_LABEL } from "@/lib/arena/constants";
 import { cn } from "@/lib/cn";
 
@@ -103,6 +104,8 @@ export function MatchFlowWizard({
   const exitLabel = rawExitLabel?.trim() || ARENA_EXIT_LABEL;
   const insets = useSafeAreaInsets();
   const palette = usePalette();
+  // The verdict turns its status bar back to the theme once its hero scrolls away.
+  const wizardScroll = useWizardScrollSource();
   const recording = useRecordingOptIn();
   const { match, submissionTypes, isLoading, error, refresh, applyMatch } =
     useMatchDetails(matchId);
@@ -250,89 +253,93 @@ export function MatchFlowWizard({
   const faceoff = step === "weight" || step === "ready";
 
   return (
-    <ScrollView
-      ref={scrollRef}
-      style={{ flex: 1, backgroundColor: live ? BROADCAST.black : palette.bg }}
-      scrollEnabled={!live}
-      contentContainerStyle={
-        fullBleed
-          ? { flexGrow: 1 }
-          : {
-              padding: 16,
-              paddingTop: insets.top + 8,
-              // Landscape ready check: clear the sensor housing and corners.
-              paddingLeft: Math.max(16, insets.left),
-              paddingRight: Math.max(16, insets.right),
-              paddingBottom: 32 + insets.bottom,
-              gap: 16,
-            }
-      }
-      keyboardShouldPersistTaps="handled"
-    >
-      <MatchRecorderProvider
-        matchId={matchId}
-        uploaderAthleteId={me.athlete_id}
-        matchDurationSeconds={match.duration_seconds}
+    <WizardScrollContext.Provider value={wizardScroll.value}>
+      <ScrollView
+        ref={scrollRef}
+        onScroll={step === "summary" ? wizardScroll.onScroll : undefined}
+        scrollEventThrottle={32}
+        style={{ flex: 1, backgroundColor: live ? BROADCAST.black : palette.bg }}
+        scrollEnabled={!live}
+        contentContainerStyle={
+          fullBleed
+            ? { flexGrow: 1 }
+            : {
+                padding: 16,
+                paddingTop: insets.top + 8,
+                // Landscape ready check: clear the sensor housing and corners.
+                paddingLeft: Math.max(16, insets.left),
+                paddingRight: Math.max(16, insets.right),
+                paddingBottom: 32 + insets.bottom,
+                gap: 16,
+              }
+        }
+        keyboardShouldPersistTaps="handled"
       >
-        <MatchSyncProvider value={syncContext}>
-          <FaceoffProvider
-            active={faceoff}
-            phase={faceoff ? step : null}
-            matchId={matchId}
-            exitHref={exitHref}
-            meId={me.athlete_id}
-            opponentId={opponent.athlete_id}
-            myWeight={weights.mine}
-            opponentWeight={weights.theirs}
-            weightsRated={weights.rated}
-            onWeighedIn={() => setStep("ready")}
-            onStarted={(s) => {
-              setStartedAt(s);
-              setStep("live");
-            }}
-            onCancelledRemotely={exitCancelled}
-          >
-            <RecorderStopBridge stopRef={stopRecorderRef} />
-            {/* Before the step renderer so the live lock lands before recording starts. */}
-            <MatchOrientationController mode={orientationModeFor(step)} />
-            <StepMarker step={step} />
-            {live ? null : <QueueStatusBanner />}
-            {faceoff ? (
-              <FaceoffTop phase={step} matchType={matchType} me={me} opponent={opponent} />
-            ) : null}
-            <MatchRecorderCamera step={step} optedIn={recording} />
-            <MatchStepRenderer
-              step={step}
-              exitHref={exitHref}
-              exitLabel={exitLabel}
+        <MatchRecorderProvider
+          matchId={matchId}
+          uploaderAthleteId={me.athlete_id}
+          matchDurationSeconds={match.duration_seconds}
+        >
+          <MatchSyncProvider value={syncContext}>
+            <FaceoffProvider
+              active={faceoff}
+              phase={faceoff ? step : null}
               matchId={matchId}
-              matchType={matchType}
-              matchStatus={match.status}
-              durationSeconds={match.duration_seconds}
-              startedAt={startedAt ?? match.started_at ?? new Date().toISOString()}
-              pausedAt={match.paused_at}
-              totalPausedDuration={match.total_paused_duration}
-              me={me}
-              opponent={opponent}
-              submissionTypes={submissionTypes}
-              resultData={resultData}
-              ownOutcome={ownOutcome}
-              confirmedAthleteIds={confirmedAthleteIds}
-              extras={extras}
-              recording={recording}
-              matchWeights={weights}
-              setStep={setStep}
-              setResultData={setResultData}
-              advanceToResult={advanceToResult}
-              initialFinishSeconds={initialFinishSeconds}
-              setFinishSeconds={setFinishSeconds}
-              refresh={refresh}
-              onLeaveMatch={onLeaveMatch}
-            />
-          </FaceoffProvider>
-        </MatchSyncProvider>
-      </MatchRecorderProvider>
-    </ScrollView>
+              exitHref={exitHref}
+              meId={me.athlete_id}
+              opponentId={opponent.athlete_id}
+              myWeight={weights.mine}
+              opponentWeight={weights.theirs}
+              weightsRated={weights.rated}
+              onWeighedIn={() => setStep("ready")}
+              onStarted={(s) => {
+                setStartedAt(s);
+                setStep("live");
+              }}
+              onCancelledRemotely={exitCancelled}
+            >
+              <RecorderStopBridge stopRef={stopRecorderRef} />
+              {/* Before the step renderer so the live lock lands before recording starts. */}
+              <MatchOrientationController mode={orientationModeFor(step)} />
+              <StepMarker step={step} />
+              {live ? null : <QueueStatusBanner />}
+              {faceoff ? (
+                <FaceoffTop phase={step} matchType={matchType} me={me} opponent={opponent} />
+              ) : null}
+              <MatchRecorderCamera step={step} optedIn={recording} />
+              <MatchStepRenderer
+                step={step}
+                exitHref={exitHref}
+                exitLabel={exitLabel}
+                matchId={matchId}
+                matchType={matchType}
+                matchStatus={match.status}
+                durationSeconds={match.duration_seconds}
+                startedAt={startedAt ?? match.started_at ?? new Date().toISOString()}
+                pausedAt={match.paused_at}
+                totalPausedDuration={match.total_paused_duration}
+                me={me}
+                opponent={opponent}
+                submissionTypes={submissionTypes}
+                resultData={resultData}
+                ownOutcome={ownOutcome}
+                confirmedAthleteIds={confirmedAthleteIds}
+                extras={extras}
+                recording={recording}
+                matchWeights={weights}
+                setStep={setStep}
+                setResultData={setResultData}
+                advanceToResult={advanceToResult}
+                initialFinishSeconds={initialFinishSeconds}
+                setFinishSeconds={setFinishSeconds}
+                refresh={refresh}
+                onLeaveMatch={onLeaveMatch}
+              />
+            </FaceoffProvider>
+          </MatchSyncProvider>
+        </MatchRecorderProvider>
+      </ScrollView>
+    </WizardScrollContext.Provider>
   );
 }
 

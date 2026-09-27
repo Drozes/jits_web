@@ -1,6 +1,5 @@
 import { StyleSheet, Text, View } from "react-native";
 import { Image } from "expo-image";
-import { StatusBar } from "expo-status-bar";
 import { StillScrims } from "./scrim";
 import type { UploadBannerState } from "@/lib/video/upload-banner-state";
 import { ON_MEDIA, usePalette } from "@/lib/theme/palette";
@@ -47,8 +46,6 @@ export function VerdictHero({ matchType, posterUrl, posterKey, left, right, uplo
           contentFit="cover"
         />
         <StillScrims height={HERO_HEIGHT} ground={p.bg} />
-        {/* Light status bar over the photo's dark top scrim. */}
-        <StatusBar style="light" />
         <View style={{ position: "absolute", left: 16, right: 16, top: topInset + 12, flexDirection: "row", justifyContent: "space-between" }}>
           <View style={{ height: 28, paddingHorizontal: 10, justifyContent: "center", borderWidth: 1, borderColor: ON_MEDIA.strong, borderRadius: FIGHT_RADIUS.tag, backgroundColor: ON_MEDIA.tag }}>
             <Mono color={ON_MEDIA.tagText}>OPENING STILL</Mono>
