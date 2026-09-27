@@ -32,6 +32,7 @@ import { PushRegistrationBootstrap } from "@/lib/notifications/push-registration
 import { SentryUserBootstrap } from "@/lib/error-tracking/sentry-user-bootstrap";
 import { OnlinePresenceBootstrap } from "@/lib/presence/online-presence-bootstrap";
 import { VideoUploadBootstrap } from "@/lib/video/video-upload-bootstrap";
+import { OrientationBootstrap } from "@/lib/orientation-bootstrap";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { OfflineBanner } from "@/components/offline-banner";
 import { SplashReveal } from "@/components/ui/elo-system/splash-reveal";
@@ -116,6 +117,7 @@ function RootLayout() {
   return (
     <ErrorBoundary>
       <GestureHandlerRootView style={{ flex: 1 }}>
+        <OrientationBootstrap />
         <ThemeProvider>
           <SafeAreaProvider>
             {/*

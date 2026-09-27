@@ -130,6 +130,14 @@ describe("frame", () => {
     expect(style(s, "live-rail")).toEqual(expect.objectContaining({ right: 28, bottom: 21 }));
   });
 
+  it("clears a visible landscape status bar (iPad) with insets.top", () => {
+    Object.assign(mockInsets, { top: 24, bottom: 20, left: 0, right: 0 });
+    mockWindow.width = 1194;
+    mockWindow.height = 834;
+    const s = render(<LiveBroadcast {...props()} />);
+    expect(style(s, "live-hud").top).toBe(40);
+  });
+
   it("a portrait window keeps the shipped portrait layout", () => {
     mockWindow.width = 390;
     mockWindow.height = 844;

@@ -73,6 +73,20 @@ describe("with the native module", () => {
     expect(so.lockAsync).toHaveBeenCalledWith(lock);
   });
 
+  it("a lockPortrait issued while go-live reads the side wins (no stale landscape lock)", async () => {
+    const { so, lib } = setup(true);
+    let resolve!: (o: number) => void;
+    so.getOrientationAsync.mockImplementationOnce(
+      () => new Promise<number>((r) => (resolve = r)),
+    );
+    const live = lib.lockToCurrent();
+    await lib.lockPortrait();
+    resolve(Orientation.LANDSCAPE_LEFT);
+    await live;
+    expect(so.lockAsync).toHaveBeenLastCalledWith(OrientationLock.PORTRAIT_UP);
+    expect(so.lockAsync).not.toHaveBeenCalledWith(OrientationLock.LANDSCAPE_LEFT);
+  });
+
   it("a rejected lock is swallowed and logged once", async () => {
     const { so, lib } = setup(true);
     so.lockAsync.mockRejectedValue(new Error("nope"));

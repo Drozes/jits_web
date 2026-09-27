@@ -34,10 +34,15 @@ function warnOnce(error: unknown) {
   console.warn(`[orientation] lock failed: ${error instanceof Error ? error.message : String(error)}`);
 }
 
+// Every call bumps this, so a lockToCurrent whose native round trip is
+// overtaken by a later call (portrait, unmount) drops its stale lock.
+let generation = 0;
+
 export type InterfaceOrientation = "portrait" | "landscape";
 
 /** Ready check: follow the phone (on iPhone, never upside down). */
 export async function allowRotation(): Promise<void> {
+  generation++;
   const so = load();
   if (!so) return;
   try {
@@ -47,8 +52,13 @@ export async function allowRotation(): Promise<void> {
   }
 }
 
-/** Everywhere outside the ready check and the live step. */
+/**
+ * Everywhere outside the ready check and the live step. The root layout
+ * calls it once at launch: on Android the plugin's portrait launch mask does
+ * not apply, so without it non-match screens would rotate freely.
+ */
 export async function lockPortrait(): Promise<void> {
+  generation++;
   const so = load();
   if (!so) return;
   try {
@@ -62,13 +72,16 @@ export async function lockPortrait(): Promise<void> {
  * Go live: lock to the specific side the interface is in right now, never
  * the generic landscape lock (a 180 degree flip mid-recording would turn
  * the UI upside down relative to the clip). Upside down or unknown is
- * portrait up.
+ * portrait up. If another call lands while the current side is being read,
+ * this one steps aside (no lock) so the stale landscape lock cannot win.
  */
 export async function lockToCurrent(): Promise<InterfaceOrientation> {
+  const mine = ++generation;
   const so = load();
   if (!so) return "portrait";
   try {
     const current = await so.getOrientationAsync();
+    if (mine !== generation) return "portrait";
     const lock =
       current === so.Orientation.LANDSCAPE_LEFT
         ? so.OrientationLock.LANDSCAPE_LEFT

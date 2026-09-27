@@ -27,6 +27,8 @@ export function LiveLandscapeLayout({ hud, lowerThird, rail, renderNoVideo }: Li
   const left = Math.max(insets.left, 16) + L.edge;
   const right = Math.max(insets.right, 16) + L.edge;
   const bottom = Math.max(insets.bottom, L.bottom);
+  // 0 on a landscape iPhone (status bar hidden); on iPad it stays visible.
+  const top = insets.top + L.top;
   // The free region between the lower-third and the rail, 16 clear of each.
   const regionLeft = left + L.lowerThird + 16;
   const regionRight = right + L.rail + 16;
@@ -40,7 +42,7 @@ export function LiveLandscapeLayout({ hud, lowerThird, rail, renderNoVideo }: Li
         style={{
           position: "absolute",
           left,
-          top: L.top,
+          top,
           height: BROADCAST_SIZE.tally,
           flexDirection: "row",
           alignItems: "center",
@@ -57,7 +59,7 @@ export function LiveLandscapeLayout({ hud, lowerThird, rail, renderNoVideo }: Li
             position: "absolute",
             left: regionLeft,
             right: regionRight,
-            top: L.top + BROADCAST_SIZE.tally + 12,
+            top: top + BROADCAST_SIZE.tally + 12,
             bottom: 0,
             alignItems: "center",
             justifyContent: "center",
