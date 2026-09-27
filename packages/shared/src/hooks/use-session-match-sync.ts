@@ -32,6 +32,12 @@ interface UseSessionMatchSyncParams extends SessionMatchHandlers {
    * when broadcasts may have been missed.
    */
   onStatus?: (status: string, err?: Error) => void;
+  /**
+   * Default true. False keeps the channel closed (and removes an open one),
+   * for a component that stays mounted across steps but only needs the
+   * channel during some of them. Every `broadcast*` is then a no-op.
+   */
+  enabled?: boolean;
 }
 
 /**
@@ -50,16 +56,19 @@ export function useSessionMatchSync(params: UseSessionMatchSyncParams) {
   cbRefs.current = params;
 
   const { supabase, matchId } = params;
+  const enabled = params.enabled !== false;
 
   useEffect(() => {
+    if (!enabled) return;
     const handle = createSessionMatchChannel(supabase, matchId, () => cbRefs.current, {
       onStatus: (status, err) => cbRefs.current.onStatus?.(status, err),
     });
     handleRef.current = handle;
     return () => {
+      if (handleRef.current === handle) handleRef.current = null;
       handle.remove();
     };
-  }, [supabase, matchId]);
+  }, [supabase, matchId, enabled]);
 
   const send = useCallback((event: string, payload: Record<string, unknown>): Promise<unknown> => {
     const handle = handleRef.current;
@@ -83,5 +92,17 @@ export function useSessionMatchSync(params: UseSessionMatchSyncParams) {
     broadcastResultConfirmed: useCallback((athleteId: string) => send(E.RESULT_CONFIRMED, { athlete_id: athleteId }), [send]),
     broadcastMatchCancelled: useCallback(() => send(E.MATCH_CANCELLED, {}), [send]),
     broadcastMatchDisputed: useCallback((athleteId: string) => send(E.MATCH_DISPUTED, { athlete_id: athleteId }), [send]),
+    broadcastWeighedIn: useCallback(
+      (athleteId: string, weight: number | null) => send(E.WEIGHED_IN, { athlete_id: athleteId, weight }),
+      [send],
+    ),
+    broadcastRecordingOptIn: useCallback(
+      (athleteId: string, recording: boolean) => send(E.RECORDING_OPTIN, { athlete_id: athleteId, recording }),
+      [send],
+    ),
+    broadcastResultClaimed: useCallback(
+      (athleteId: string, claimedAt: number) => send(E.RESULT_CLAIMED, { athlete_id: athleteId, claimed_at: claimedAt }),
+      [send],
+    ),
   };
 }

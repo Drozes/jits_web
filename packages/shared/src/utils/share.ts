@@ -1,12 +1,14 @@
 const BASE_URL = "https://elorated.com";
 
-type ShareContentType = "athlete" | "session" | "gym" | "match-result";
+type ShareContentType = "athlete" | "session" | "gym" | "match-result" | "match";
 
 const PATH_MAP: Record<ShareContentType, string> = {
   athlete: "athlete",
   session: "session",
   gym: "gyms",
   "match-result": "athlete",
+  // The web match page, `/matches/<id>`.
+  match: "matches",
 };
 
 /** Build a shareable URL for a given content type and ID. */

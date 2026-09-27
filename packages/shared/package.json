@@ -12,6 +12,8 @@
     "./api/errors": "./src/api/errors.ts",
     "./api/chat-queries": "./src/api/chat-queries.ts",
     "./api/chat-mutations": "./src/api/chat-mutations.ts",
+    "./api/match-rank-change": "./src/api/match-rank-change.ts",
+    "./api/athlete-weight": "./src/api/athlete-weight.ts",
     "./constants": "./src/constants.ts",
     "./geo": "./src/geo/index.ts",
     "./hooks": "./src/hooks/index.ts",

@@ -28,6 +28,27 @@ export const SESSION_MATCH_EVENTS = {
    * ignores it, and the mobile reconciler covers a missed one from the DB.
    */
   MATCH_DISPUTED: "match_disputed",
+  /**
+   * Face-off (mobile match-flow redesign): this athlete confirmed their
+   * scale weight. Payload `{ athlete_id, weight }` (lbs, may be null). Purely
+   * presentational: nothing in the DB depends on it, and it is repeated until
+   * the match starts because a broadcast sent before the other side joined
+   * is simply gone.
+   */
+  WEIGHED_IN: "weighed_in",
+  /**
+   * Face-off: whether this athlete will record the match from their phone.
+   * Payload `{ athlete_id, recording }`. Repeated like `weighed_in`.
+   */
+  RECORDING_OPTIN: "recording_optin",
+  /**
+   * Result step: this athlete started entering the result, so the other side
+   * shows a waiting view instead of a second form. Payload
+   * `{ athlete_id, claimed_at }` (epoch ms). Repeated as a heartbeat while
+   * the claimer is on the form; a claim that goes quiet unlocks the other
+   * side. Advisory only: `record_match_result` still accepts one result.
+   */
+  RESULT_CLAIMED: "result_claimed",
 } as const;
 
 export type SessionMatchEvent =
@@ -54,6 +75,11 @@ export interface SessionMatchHandlers {
   onMatchCancelled?: () => void;
   /** `athleteId` is the athlete who raised the dispute. */
   onMatchDisputed?: (athleteId: string) => void;
+  /** Face-off: `weight` is lbs, or null when the athlete has none on file. */
+  onWeighedIn?: (athleteId: string, weight: number | null) => void;
+  onRecordingOptIn?: (athleteId: string, recording: boolean) => void;
+  /** `claimedAt` is the claimer's epoch ms, used only to break a tie. */
+  onResultClaimed?: (athleteId: string, claimedAt: number) => void;
 }
 
 export interface SessionMatchChannel {
@@ -131,6 +157,17 @@ export function createSessionMatchChannel(
     })
     .on("broadcast", { event: E.MATCH_DISPUTED }, ({ payload }) => {
       h().onMatchDisputed?.(payload.athlete_id as string);
+    })
+    .on("broadcast", { event: E.WEIGHED_IN }, ({ payload }) => {
+      const w = payload.weight;
+      h().onWeighedIn?.(payload.athlete_id as string, typeof w === "number" && Number.isFinite(w) ? w : null);
+    })
+    .on("broadcast", { event: E.RECORDING_OPTIN }, ({ payload }) => {
+      h().onRecordingOptIn?.(payload.athlete_id as string, payload.recording === true);
+    })
+    .on("broadcast", { event: E.RESULT_CLAIMED }, ({ payload }) => {
+      const at = payload.claimed_at;
+      h().onResultClaimed?.(payload.athlete_id as string, typeof at === "number" && Number.isFinite(at) ? at : 0);
     })
     .subscribe((status, err) => {
       subscribed = status === "SUBSCRIBED";

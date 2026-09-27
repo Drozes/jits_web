@@ -86,6 +86,9 @@ describe("createSessionMatchChannel", () => {
       onResultConfirmed: vi.fn(),
       onMatchCancelled: vi.fn(),
       onMatchDisputed: vi.fn(),
+      onWeighedIn: vi.fn(),
+      onRecordingOptIn: vi.fn(),
+      onResultClaimed: vi.fn(),
     };
     createSessionMatchChannel(m.supabase as never, "m-1", h);
     m.fire("timer_started", { started_at: "t0" });
@@ -97,6 +100,9 @@ describe("createSessionMatchChannel", () => {
     m.fire("result_confirmed", { athlete_id: "b" });
     m.fire("match_cancelled");
     m.fire("match_disputed", { athlete_id: "c" });
+    m.fire("weighed_in", { athlete_id: "d", weight: 171.5 });
+    m.fire("recording_optin", { athlete_id: "e", recording: true });
+    m.fire("result_claimed", { athlete_id: "f", claimed_at: 42 });
     expect(h.onTimerStarted).toHaveBeenCalledWith("t0");
     expect(h.onTimerPaused).toHaveBeenCalledWith("t1");
     expect(h.onTimerResumed).toHaveBeenCalledWith(7);
@@ -106,6 +112,25 @@ describe("createSessionMatchChannel", () => {
     expect(h.onResultConfirmed).toHaveBeenCalledWith("b");
     expect(h.onMatchCancelled).toHaveBeenCalledOnce();
     expect(h.onMatchDisputed).toHaveBeenCalledWith("c");
+    expect(h.onWeighedIn).toHaveBeenCalledWith("d", 171.5);
+    expect(h.onRecordingOptIn).toHaveBeenCalledWith("e", true);
+    expect(h.onResultClaimed).toHaveBeenCalledWith("f", 42);
+  });
+
+  it("normalises malformed face-off and claim payloads", () => {
+    const m = createMockSupabase();
+    const h: SessionMatchHandlers = {
+      onWeighedIn: vi.fn(),
+      onRecordingOptIn: vi.fn(),
+      onResultClaimed: vi.fn(),
+    };
+    createSessionMatchChannel(m.supabase as never, "m-1", h);
+    m.fire("weighed_in", { athlete_id: "d", weight: "heavy" });
+    m.fire("recording_optin", { athlete_id: "e", recording: "yes" });
+    m.fire("result_claimed", { athlete_id: "f" });
+    expect(h.onWeighedIn).toHaveBeenCalledWith("d", null);
+    expect(h.onRecordingOptIn).toHaveBeenCalledWith("e", false);
+    expect(h.onResultClaimed).toHaveBeenCalledWith("f", 0);
   });
 
   it("exposes match_disputed as a protocol event (jits-wfpo)", () => {
