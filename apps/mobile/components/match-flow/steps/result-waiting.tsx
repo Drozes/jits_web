@@ -17,6 +17,7 @@ export function ResultWaiting({
   durationSeconds,
   endedAtSeconds,
   onLeave,
+  onTakeOver,
 }: {
   claimer: ResultAthlete;
   me: ResultAthlete;
@@ -25,6 +26,8 @@ export function ResultWaiting({
   durationSeconds: number;
   endedAtSeconds?: number;
   onLeave?: () => void;
+  /** Offered once the claim has gone a minute without a result. */
+  onTakeOver?: () => void;
 }) {
   const name = shortName(claimer.displayName);
   const cells = [
@@ -65,6 +68,14 @@ export function ResultWaiting({
           </Mono>
         </View>
       </View>
+      {onTakeOver ? (
+        <View style={{ gap: 8 }}>
+          <Text className="font-body" style={{ fontSize: 13, color: FIGHT.text2, textAlign: "center" }}>
+            {`Still no result from ${name}.`}
+          </Text>
+          <FightButton testID="result-take-over" variant="secondary" label="Record it myself" onPress={onTakeOver} />
+        </View>
+      ) : null}
       {onLeave ? (
         <FightButton testID="result-leave-later" variant="secondary" label="Leave and confirm later" onPress={onLeave} />
       ) : null}

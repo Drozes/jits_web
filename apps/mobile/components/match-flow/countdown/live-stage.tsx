@@ -31,6 +31,9 @@ interface LiveStageProps {
   recorder: UseVideoRecorderReturn;
   /** Record from this phone (decision 5). */
   recording: boolean;
+  /** The match's rated weights (challenge), for the countdown's chip. */
+  myWeight: number | null;
+  opponentWeight: number | null;
   onEnded: (finishSeconds: number) => void;
 }
 
@@ -45,7 +48,7 @@ interface LiveStageProps {
  * not sit on "3" for longer than the countdown lasts.
  */
 export function LiveStage(props: LiveStageProps) {
-  const { startedAt, recording, matchType, me, opponent } = props;
+  const { startedAt, recording, matchType, me, opponent, myWeight, opponentWeight, ...liveProps } = props;
   const [mountedAt] = React.useState(() => Date.now());
   const serverGo = Date.parse(startedAt) + COUNTDOWN_MS;
   const goAt = Number.isFinite(serverGo) ? Math.min(serverGo, mountedAt + COUNTDOWN_MS) : mountedAt;
@@ -68,11 +71,28 @@ export function LiveStage(props: LiveStageProps) {
   }, [flash]);
 
   if (phase === "countdown") {
-    return <Countdown goAt={goAt} matchType={matchType} recording={recording} me={me} opponent={opponent} />;
+    return (
+      <Countdown
+        goAt={goAt}
+        matchType={matchType}
+        recording={recording}
+        me={me}
+        opponent={opponent}
+        myWeight={myWeight}
+        opponentWeight={opponentWeight}
+      />
+    );
   }
   return (
     <>
-      <LiveStep {...props} startedAt={clockStartFor(startedAt)} recordingEnabled={recording} />
+      <LiveStep
+        {...liveProps}
+        matchType={matchType}
+        me={me}
+        opponent={opponent}
+        startedAt={clockStartFor(startedAt)}
+        recordingEnabled={recording}
+      />
       {flash ? <GoFlash /> : null}
     </>
   );

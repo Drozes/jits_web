@@ -72,8 +72,9 @@ const STAKES = {
   draw_score: 0.25,
 };
 
-function Harness({ phase, onWeighedIn = jest.fn(), onStarted = jest.fn(), onCancelledRemotely = jest.fn(), matchType = "ranked" as "ranked" | "casual" }: {
+function Harness({ phase, onWeighedIn = jest.fn(), onStarted = jest.fn(), onCancelledRemotely = jest.fn(), matchType = "ranked" as "ranked" | "casual", weightsRated = true }: {
   phase: "weight" | "ready";
+  weightsRated?: boolean;
   onWeighedIn?: () => void;
   onStarted?: (s: string) => void;
   onCancelledRemotely?: (d?: string) => void;
@@ -89,6 +90,7 @@ function Harness({ phase, onWeighedIn = jest.fn(), onStarted = jest.fn(), onCanc
       opponentId="opp-1"
       myWeight={170}
       opponentWeight={167}
+      weightsRated={weightsRated}
       onWeighedIn={onWeighedIn}
       onStarted={onStarted}
       onCancelledRemotely={onCancelledRemotely}
@@ -150,27 +152,57 @@ describe("weigh-in", () => {
     expect(mockSend.broadcastWeighedIn).toHaveBeenCalledWith("me-1", 170);
   });
 
-  it("the opponent weighing in shows on their status, with their new weight", async () => {
+  it("the opponent weighing in shows on their status; the match weight stays the rated one", async () => {
     const s = render(<Harness phase="weight" />);
     s.getByText("M. PARK WEIGHING IN");
     act(() => mockHandlers.onWeighedIn?.("opp-1", 171));
     s.getByText("WEIGHED IN");
-    expect(s.getByTestId("faceoff-opponent-weight")).toHaveTextContent("171 LBS");
+    expect(s.getByTestId("faceoff-opponent-weight")).toHaveTextContent("167 LBS");
   });
 
-  it("edits the viewer's weight through updateAthleteWeight", async () => {
+  it("the pencil edits the PROFILE weight: this match's weight, stakes and weigh-in stay", async () => {
     mockUpdateWeight.mockResolvedValue({ ok: true, data: { weight: 172.5 } });
     const s = render(<Harness phase="weight" />);
+    await flush();
+    const stakesCalls = mockGetEloStakes.mock.calls.length;
     fireEvent.press(s.getByTestId("faceoff-edit-weight"));
+    s.getByText("Updates your profile weight for future matches. This match keeps its weigh-in.");
+    // Confirm waits while the editor is open.
+    expect(s.getByTestId("weight-confirm").props.accessibilityState.disabled).toBe(true);
     fireEvent.changeText(s.getByTestId("faceoff-weight-input"), "12");
-    expect(s.getByTestId("faceoff-weight-save").props.accessibilityState?.disabled ?? s.getByTestId("faceoff-weight-save").props.disabled).toBeTruthy();
+    expect(s.getByTestId("faceoff-weight-save").props.accessibilityState.disabled).toBe(true);
     fireEvent.changeText(s.getByTestId("faceoff-weight-input"), "172.5");
     await act(async () => {
       fireEvent.press(s.getByTestId("faceoff-weight-save"));
     });
     expect(mockUpdateWeight).toHaveBeenCalledWith(expect.anything(), "me-1", 172.5);
-    expect(s.getByTestId("faceoff-my-weight")).toHaveTextContent("172.5 LBS");
-    s.getByText("Confirm 172.5 lbs");
+    expect(s.getByTestId("faceoff-my-weight")).toHaveTextContent("170 LBS");
+    s.getByText("Profile weight saved: 172.5 lbs, for future matches.");
+    s.getByText("Confirm 170 lbs");
+    await flush();
+    expect(mockGetEloStakes.mock.calls.length).toBe(stakesCalls);
+    expect(s.getByTestId("weight-confirm").props.accessibilityState.disabled).toBe(false);
+    await act(async () => {
+      fireEvent.press(s.getByTestId("weight-confirm"));
+    });
+    expect(mockSend.broadcastWeighedIn).toHaveBeenLastCalledWith("me-1", 170);
+  });
+
+  it("Save is a 44 pt target and Cancel closes the editor", () => {
+    const s = render(<Harness phase="weight" />);
+    fireEvent.press(s.getByTestId("faceoff-edit-weight"));
+    const style = s.getByTestId("faceoff-weight-save").props.style;
+    const flat = Array.isArray(style) ? Object.assign({}, ...style) : style;
+    expect(flat.height).toBeGreaterThanOrEqual(44);
+    expect(flat.minWidth).toBeGreaterThanOrEqual(44);
+    fireEvent.press(s.getByTestId("faceoff-weight-cancel"));
+    expect(s.queryByTestId("faceoff-weight-input")).toBeNull();
+  });
+
+  it("prices nothing until the match's rated (challenge) weights are read", async () => {
+    render(<Harness phase="weight" weightsRated={false} />);
+    await flush();
+    expect(mockGetEloStakes).not.toHaveBeenCalled();
   });
 });
 
@@ -249,6 +281,18 @@ describe("Leave", () => {
     await waitFor(() => expect(mockDismissTo).toHaveBeenCalledWith("/arena"));
     expect(mockCancel).toHaveBeenCalledWith(expect.anything(), "M1");
     expect(mockSend.broadcastMatchCancelled).toHaveBeenCalled();
+    alert.mockRestore();
+  });
+
+  it("never starts a match this athlete is leaving (both ready while the cancel is in flight)", async () => {
+    mockCancel.mockReturnValue(new Promise(() => {}));
+    const alert = jest.spyOn(Alert, "alert").mockImplementation((_t, _m, buttons) => buttons?.[1]?.onPress?.());
+    const s = render(<Harness phase="ready" />);
+    fireEvent.press(s.getByTestId("ready-button"));
+    fireEvent.press(s.getByLabelText("Cancel match"));
+    act(() => mockHandlers.onReadySignal?.("opp-1"));
+    await flush();
+    expect(mockStart).not.toHaveBeenCalled();
     alert.mockRestore();
   });
 

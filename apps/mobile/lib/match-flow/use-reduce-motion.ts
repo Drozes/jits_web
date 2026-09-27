@@ -1,25 +1,52 @@
-import * as React from "react";
+import { useSyncExternalStore } from "react";
 import { AccessibilityInfo } from "react-native";
 
 /**
- * The OS "Reduce Motion" setting. The countdown and verdict celebration (the
- * two approved animation exceptions) show their end state without motion
- * when it is on. False until the first read lands.
+ * The OS "Reduce Motion" setting, read once per app run and cached at module
+ * level, so the countdown and verdict celebration (the two approved
+ * animation exceptions) know it on their FIRST frame instead of animating
+ * for one frame before the async read lands. Kept current by one listener.
  */
-export function useReduceMotion(): boolean {
-  const [reduce, setReduce] = React.useState(false);
-  React.useEffect(() => {
-    let alive = true;
+let reduceMotion = false;
+let started = false;
+const listeners = new Set<() => void>();
+
+function set(next: boolean) {
+  if (next === reduceMotion) return;
+  reduceMotion = next;
+  for (const l of listeners) l();
+}
+
+/** Seed the cache; called at import and safe to call again. */
+export function primeReduceMotion(): void {
+  if (started) return;
+  started = true;
+  try {
     AccessibilityInfo.isReduceMotionEnabled?.()
-      .then((v) => {
-        if (alive) setReduce(v === true);
-      })
+      .then((v) => set(v === true))
       .catch(() => undefined);
-    const sub = AccessibilityInfo.addEventListener?.("reduceMotionChanged", (v: boolean) => setReduce(v === true));
-    return () => {
-      alive = false;
-      sub?.remove?.();
-    };
-  }, []);
-  return reduce;
+    AccessibilityInfo.addEventListener?.("reduceMotionChanged", (v: boolean) => set(v === true));
+  } catch {
+    // No accessibility module (tests, web): motion stays allowed.
+  }
+}
+
+primeReduceMotion();
+
+function subscribe(cb: () => void) {
+  listeners.add(cb);
+  return () => {
+    listeners.delete(cb);
+  };
+}
+
+const snapshot = () => reduceMotion;
+
+export function useReduceMotion(): boolean {
+  return useSyncExternalStore(subscribe, snapshot, snapshot);
+}
+
+/** Tests only. */
+export function __setReduceMotionForTests(next: boolean): void {
+  set(next);
 }

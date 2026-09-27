@@ -273,6 +273,7 @@ describe("the face-off repeats ready_signal until the match starts", () => {
         opponentId: "opp-1",
         myWeight: 170,
         opponentWeight: 168,
+        weightsRated: true,
         onWeighedIn: jest.fn(),
         onStarted: jest.fn(),
         onCancelledRemotely: jest.fn(),

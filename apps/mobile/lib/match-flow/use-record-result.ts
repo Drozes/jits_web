@@ -26,7 +26,7 @@ interface UseRecordResultParams {
   /** This athlete; announced as confirmed when the server auto-confirmed. */
   currentAthleteId?: string;
   /** The opponent claimed the result form (claim-first entry). */
-  onResultClaimed?: (athleteId: string, claimedAt: number) => void;
+  onResultClaimed?: (athleteId: string, claimedAt: number, supersedes: number | null) => void;
 }
 
 interface SubmitParams {
@@ -58,7 +58,7 @@ export function useRecordResult({ matchId, onRecorded, currentAthleteId, onResul
       recordedRef.current = true;
       onRecorded(r, { recorderConfirmed: false });
     },
-    onResultClaimed: (athleteId, claimedAt) => onResultClaimed?.(athleteId, claimedAt),
+    onResultClaimed: (athleteId, claimedAt, supersedes) => onResultClaimed?.(athleteId, claimedAt, supersedes),
   });
 
   const submit = React.useCallback(

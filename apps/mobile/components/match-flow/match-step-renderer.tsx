@@ -52,6 +52,8 @@ interface MatchStepRendererProps {
   extras: MatchExtras;
   /** "Record from my phone" (decision 5). */
   recording: boolean;
+  /** The match's rated weights (see useMatchWeights). */
+  matchWeights?: { mine: number | null; theirs: number | null };
   setStep: (step: MatchStep) => void;
   setResultData: (r: BroadcastResult) => void;
   advanceToResult: () => void;
@@ -89,6 +91,7 @@ export function MatchStepRenderer(props: MatchStepRendererProps) {
     confirmedAthleteIds,
     extras,
     recording,
+    matchWeights,
     setStep,
     setResultData,
     advanceToResult,
@@ -122,6 +125,8 @@ export function MatchStepRenderer(props: MatchStepRendererProps) {
         totalPausedDuration={totalPausedDuration}
         recorder={recorder}
         recording={recording}
+        myWeight={matchWeights?.mine ?? me.current_weight}
+        opponentWeight={matchWeights?.theirs ?? opponent.current_weight}
         onEnded={(seconds) => {
           setFinishSeconds(seconds);
           setStep("end");
@@ -207,6 +212,7 @@ export function MatchStepRenderer(props: MatchStepRendererProps) {
         finishTimeSeconds={extras.finishTimeSeconds ?? resultData?.finishTimeSeconds ?? null}
         upload={deriveUploadBannerState(recorder.state, recorder.error, upload)}
         uploadedVideoId={upload?.status === "uploaded" ? (upload.videoId ?? null) : null}
+        confirmedAthleteIds={confirmedAthleteIds}
       />
     );
   }

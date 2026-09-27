@@ -26,9 +26,9 @@ jest.mock("lucide-react-native", () => {
 
 const mockSubmit = jest.fn();
 const mockClaimBroadcast = jest.fn();
-let mockOnResultClaimed: ((id: string, at: number) => void) | undefined;
+let mockOnResultClaimed: ((id: string, at: number, supersedes?: number | null) => void) | undefined;
 jest.mock("@/lib/match-flow/use-record-result", () => ({
-  useRecordResult: (p: { onResultClaimed?: (id: string, at: number) => void }) => {
+  useRecordResult: (p: { onResultClaimed?: (id: string, at: number, supersedes?: number | null) => void }) => {
     mockOnResultClaimed = p.onResultClaimed;
     return { loading: false, submit: mockSubmit, broadcastResultClaimed: mockClaimBroadcast };
   },
@@ -36,7 +36,7 @@ jest.mock("@/lib/match-flow/use-record-result", () => ({
 
 import { ResultStep } from "@/components/match-flow/steps/result-step";
 import { commonSubmissions } from "@/components/match-flow/steps/result-form";
-import { CLAIM_STALE_MS } from "@/lib/match-flow/use-result-claim";
+import { CLAIM_STALE_MS, CLAIM_TAKEOVER_MS } from "@/lib/match-flow/use-result-claim";
 
 const type = (code: string, display_name: string, sort_order: number): SubmissionType =>
   ({ code, display_name, category: "x", id: code, sort_order, status: "active" }) as SubmissionType;
@@ -128,7 +128,7 @@ describe("claim-first", () => {
       jest.advanceTimersByTime(10_500);
     });
     expect(mockClaimBroadcast).toHaveBeenCalledTimes(3);
-    expect(mockClaimBroadcast).toHaveBeenLastCalledWith("me-1", at);
+    expect(mockClaimBroadcast).toHaveBeenLastCalledWith("me-1", at, null);
   });
 
   it("a simultaneous claim: the earlier one stands on both phones", () => {
@@ -141,6 +141,38 @@ describe("claim-first", () => {
     expect(mockClaimBroadcast).toHaveBeenCalledTimes(2);
     // Theirs is earlier: this phone yields.
     act(() => mockOnResultClaimed?.("opp-1", mine - 50));
+    s.getByTestId("result-waiting");
+  });
+
+  it("after a minute of a live claim with no result, the waiting athlete may take over", () => {
+    jest.useFakeTimers();
+    const s = renderStep();
+    act(() => mockOnResultClaimed?.("opp-1", 1000));
+    expect(s.queryByTestId("result-take-over")).toBeNull();
+    // Their heartbeats keep the claim alive the whole time.
+    for (let t = 0; t < CLAIM_TAKEOVER_MS; t += 5_000) {
+      act(() => {
+        jest.advanceTimersByTime(5_000);
+      });
+      act(() => mockOnResultClaimed?.("opp-1", 1000));
+    }
+    act(() => {
+      jest.advanceTimersByTime(1_000);
+    });
+    fireEvent.press(s.getByTestId("result-take-over"));
+    // The takeover names the claim it replaces.
+    expect(mockClaimBroadcast).toHaveBeenLastCalledWith("me-1", expect.any(Number), 1000);
+    s.getByTestId("result-winner-me-1");
+    // A late heartbeat of the replaced claim does not take it back.
+    act(() => mockOnResultClaimed?.("opp-1", 1000));
+    expect(s.queryByTestId("result-waiting")).toBeNull();
+  });
+
+  it("the claimer yields to a takeover of its claim", () => {
+    const s = renderStep();
+    fireEvent.press(s.getByTestId("result-winner-me-1"));
+    const mine = mockClaimBroadcast.mock.calls[0][1] as number;
+    act(() => mockOnResultClaimed?.("opp-1", mine + 60_000, mine));
     s.getByTestId("result-waiting");
   });
 

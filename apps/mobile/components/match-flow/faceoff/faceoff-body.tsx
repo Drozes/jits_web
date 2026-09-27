@@ -27,7 +27,9 @@ export function FaceoffBody(props: FaceoffBodyProps) {
 function WeighIn({ matchType, me, opponent }: FaceoffBodyProps) {
   const f = useFaceoffContext();
   const ranked = matchType === "ranked";
-  const stakes = useViewerStakes(ranked, me.current_elo, opponent.current_elo, f.myWeight, f.opponentWeight);
+  // Priced on the challenge's rated weights, exactly as record_match_result
+  // will rate it (a missing one means no gap), and only once they are read.
+  const stakes = useViewerStakes(ranked && f.weightsRated, me.current_elo, opponent.current_elo, f.myWeight, f.opponentWeight);
   const gap = stakes?.weight_division_gap ?? 0;
   const both = f.myWeight != null && f.opponentWeight != null;
   const diff = both ? Math.round(Math.abs(f.myWeight! - f.opponentWeight!) * 10) / 10 : null;
@@ -63,7 +65,13 @@ function WeighIn({ matchType, me, opponent }: FaceoffBodyProps) {
           accessibilityLabel={`${oppName}, ${f.opponentWeighed ? "weighed in" : "not weighed in yet"}`}
         />
       </View>
-      <FightButton testID="weight-confirm" label={cta} height={64} onPress={() => void f.confirmWeight()} disabled={f.savingWeight} />
+      <FightButton
+        testID="weight-confirm"
+        label={cta}
+        height={64}
+        onPress={() => void f.confirmWeight()}
+        disabled={f.savingWeight || f.weightEditorOpen}
+      />
     </View>
   );
 }

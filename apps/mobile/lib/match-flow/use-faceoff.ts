@@ -24,8 +24,11 @@ export interface FaceoffParams {
   exitHref: string;
   meId: string;
   opponentId: string;
+  /** This match's weights (the challenge's, see useMatchWeights). */
   myWeight: number | null;
   opponentWeight: number | null;
+  /** True once those are the challenge's rated weights. */
+  weightsRated: boolean;
   /** Move the wizard to the ready step (weights confirmed). */
   onWeighedIn: () => void;
   /** start_match completed here, or the opponent's timer_started arrived. */
@@ -35,8 +38,15 @@ export interface FaceoffParams {
 }
 
 export interface Faceoff {
+  /** This match's weights; a profile edit never changes them. */
   myWeight: number | null;
   opponentWeight: number | null;
+  weightsRated: boolean;
+  /** The profile weight just saved from the pencil (future matches). */
+  profileWeightSaved: number | null;
+  /** The pencil's editor is open (Confirm waits for it). */
+  weightEditorOpen: boolean;
+  setWeightEditorOpen: (open: boolean) => void;
   myWeighed: boolean;
   opponentWeighed: boolean;
   myReady: boolean;
@@ -50,7 +60,7 @@ export interface Faceoff {
   /** Leave is offered until the match starts. */
   canLeave: boolean;
   confirmWeight: () => Promise<void>;
-  /** Save a new scale weight; resolves false when it was refused. */
+  /** Save a new PROFILE weight (future matches); false when refused. */
   editWeight: (lbs: number) => Promise<boolean>;
   tapReady: () => void;
   /** The Leave control: confirm, then cancel the match for both. */
@@ -71,8 +81,8 @@ export function useFaceoff(p: FaceoffParams): Faceoff {
   const router = useRouter();
   const { markExiting } = useMatchSyncContext();
   const recording = useRecordingOptIn();
-  const [myWeightEdit, setMyWeightEdit] = React.useState<number | null>(null);
-  const [opponentWeightLive, setOpponentWeightLive] = React.useState<number | null>(null);
+  const [profileWeightSaved, setProfileWeightSaved] = React.useState<number | null>(null);
+  const [weightEditorOpen, setWeightEditorOpen] = React.useState(false);
   const [myWeighed, setMyWeighed] = React.useState(p.phase === "ready");
   const [opponentWeighed, setOpponentWeighed] = React.useState(false);
   const [myReady, setMyReady] = React.useState(false);
@@ -83,25 +93,24 @@ export function useFaceoff(p: FaceoffParams): Faceoff {
   const [savingWeight, setSavingWeight] = React.useState(false);
   const startedRef = React.useRef(false);
   const cancelledRef = React.useRef(false);
-  const myWeight = myWeightEdit ?? p.myWeight;
-  const opponentWeight = opponentWeightLive ?? p.opponentWeight;
+  const myWeight = p.myWeight;
+  const opponentWeight = p.opponentWeight;
 
+  const weightEditorOpenRef = React.useRef(weightEditorOpen);
+  weightEditorOpenRef.current = weightEditorOpen;
   const pRef = React.useRef(p);
   pRef.current = p;
   const stateRef = React.useRef({ myWeighed, myReady, myWeight, recording });
   stateRef.current = { myWeighed, myReady, myWeight, recording };
 
-  const markOpponentWeighed = React.useCallback((weight: number | null) => {
-    setOpponentWeighed(true);
-    if (weight != null) setOpponentWeightLive(weight);
-  }, []);
 
   const sync = useStepMatchSync({
     matchId: p.matchId,
     enabled: p.active,
-    onWeighedIn: (athleteId, weight) => {
-      if (athleteId !== pRef.current.opponentId) return;
-      markOpponentWeighed(weight);
+    // The weight in the payload is informational: both sides read the
+    // rated weights from the challenge.
+    onWeighedIn: (athleteId) => {
+      if (athleteId === pRef.current.opponentId) setOpponentWeighed(true);
     },
     onRecordingOptIn: (athleteId, on) => {
       if (athleteId === pRef.current.opponentId) setOpponentRecording(on);
@@ -150,10 +159,12 @@ export function useFaceoff(p: FaceoffParams): Faceoff {
   }, [p.active, announce]);
 
   const handleStart = React.useCallback(async () => {
-    if (startedRef.current) return;
+    // Never start a match this athlete is cancelling (Leave in flight).
+    if (startedRef.current || cancelledRef.current) return;
     startedRef.current = true;
     setStarting(true);
     const result = await startMatch(supabase, pRef.current.matchId);
+    if (cancelledRef.current) return;
     if (!result.ok) {
       // Both devices race start_match; losing the race is not an error.
       const match = await getMatchDetails(supabase, pRef.current.matchId);
@@ -184,11 +195,12 @@ export function useFaceoff(p: FaceoffParams): Faceoff {
       toast.error({ text1: "Couldn't update weight", description: res.error.message });
       return false;
     }
-    setMyWeightEdit(res.data.weight);
+    setProfileWeightSaved(res.data.weight);
     return true;
   }, []);
 
   const confirmWeight = React.useCallback(async () => {
+    if (weightEditorOpenRef.current) return;
     setMyWeighed(true);
     pRef.current.onWeighedIn();
   }, []);
@@ -225,6 +237,10 @@ export function useFaceoff(p: FaceoffParams): Faceoff {
   return {
     myWeight,
     opponentWeight,
+    weightsRated: p.weightsRated,
+    profileWeightSaved,
+    weightEditorOpen,
+    setWeightEditorOpen,
     myWeighed,
     opponentWeighed,
     myReady,

@@ -9,6 +9,7 @@ import { MatchSyncProvider } from "@/lib/match-flow/match-sync-context";
 import type { BroadcastResult } from "@jits/shared/hooks/use-session-match-sync";
 import { readMatchExtras } from "@/lib/match-flow/match-extras";
 import { useRecordingOptIn } from "@/lib/match-flow/recording-optin";
+import { useMatchWeights } from "@/lib/match-flow/use-match-weights";
 import { WizardError, WizardLoading } from "./wizard-status";
 import { QueueStatusBanner } from "./queue-status-banner";
 import { MatchStepRenderer } from "./match-step-renderer";
@@ -133,6 +134,15 @@ export function MatchFlowWizard({
   React.useEffect(() => {
     onStepChange?.(step);
   }, [step, onStepChange]);
+
+  // The weights this match is rated on (the challenge's), for the face-off
+  // and the countdown. Read here, above the early returns, for hook order.
+  const weights = useMatchWeights(
+    match?.challenge_id,
+    currentAthleteId,
+    match?.participants.find((p) => p.athlete_id === currentAthleteId)?.current_weight ?? null,
+    match?.participants.find((p) => p.athlete_id !== currentAthleteId)?.current_weight ?? null,
+  );
 
   // Screen wake-lock for every step the recorder camera is up, not just
   // live. The ready check shows the preview and the phone is typically
@@ -270,8 +280,9 @@ export function MatchFlowWizard({
             exitHref={exitHref}
             meId={me.athlete_id}
             opponentId={opponent.athlete_id}
-            myWeight={me.current_weight}
-            opponentWeight={opponent.current_weight}
+            myWeight={weights.mine}
+            opponentWeight={weights.theirs}
+            weightsRated={weights.rated}
             onWeighedIn={() => setStep("ready")}
             onStarted={(s) => {
               setStartedAt(s);
@@ -307,6 +318,7 @@ export function MatchFlowWizard({
               confirmedAthleteIds={confirmedAthleteIds}
               extras={extras}
               recording={recording}
+              matchWeights={weights}
               setStep={setStep}
               setResultData={setResultData}
               advanceToResult={advanceToResult}
@@ -323,18 +335,26 @@ export function MatchFlowWizard({
 }
 
 /**
- * The wizard's step, for the match-loop harness and screen readers. The
- * visible "STEP N / 8" header is gone (the redesign has no step progress),
- * but the harness reads the step from this label ("Step N of 8, <Label>")
- * and the `match-step-<step>` testID, so it stays as a 1 px element.
+ * The wizard's step, for the match-loop harness. The visible "STEP N / 8"
+ * header is gone (the redesign has no step progress), but the harness reads
+ * the step from this element: PRIMARILY by its accessibility label ("Step N
+ * of 8, <Label>"), because idb does not reliably surface a testID
+ * (`tools/match-loop/sim/screens.ts` currentStep), with `match-step-<step>`
+ * as the fallback. So it cannot simply be hidden from the accessibility tree.
+ *
+ * The harness drives a Metro dev build, so the marker is an accessibility
+ * element only in `__DEV__`; release builds hide it (and its label) from
+ * VoiceOver / TalkBack, where it would be a stray, invisible stop.
  */
-export function StepMarker({ step }: { step: MatchStep }) {
+export function StepMarker({ step, exposed = __DEV__ }: { step: MatchStep; exposed?: boolean }) {
   const idx = MATCH_STEPS.indexOf(step);
   return (
     <View
       testID={`match-step-${step}`}
-      accessible
-      accessibilityLabel={`Step ${idx + 1} of ${MATCH_STEPS.length}, ${STEP_LABELS[step]}`}
+      accessible={exposed}
+      accessibilityLabel={exposed ? `Step ${idx + 1} of ${MATCH_STEPS.length}, ${STEP_LABELS[step]}` : undefined}
+      accessibilityElementsHidden={!exposed}
+      importantForAccessibility={exposed ? "yes" : "no-hide-descendants"}
       pointerEvents="none"
       style={{ position: "absolute", top: 0, left: 0, width: 1, height: 1 }}
     />

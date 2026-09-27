@@ -22,7 +22,14 @@ jest.mock("@/components/match-flow/steps/live-step", () => ({
   },
 }));
 
-import { COUNTDOWN_MS, countdownNumeral } from "@/components/match-flow/countdown/countdown";
+const mockWindow: { current: { width: number; height: number } } = { current: { width: 390, height: 844 } };
+jest.mock("react-native/Libraries/Utilities/useWindowDimensions", () => ({
+  __esModule: true,
+  default: () => ({ ...mockWindow.current, scale: 3, fontScale: 1 }),
+}));
+
+import { StyleSheet } from "react-native";
+import { COUNTDOWN_MS, countdownNumeral, numeralSize } from "@/components/match-flow/countdown/countdown";
 import { LiveStage, clockStartFor } from "@/components/match-flow/countdown/live-stage";
 
 const NOW = Date.parse("2026-09-27T12:00:00.000Z");
@@ -41,12 +48,15 @@ function renderStage(startedAtMs: number, recording = true) {
       totalPausedDuration={0}
       recorder={{} as never}
       recording={recording}
+      myWeight={170}
+      opponentWeight={168}
       onEnded={jest.fn()}
     />,
   );
 }
 
 beforeEach(() => {
+  mockWindow.current = { width: 390, height: 844 };
   jest.useFakeTimers();
   jest.setSystemTime(NOW);
   jest.clearAllMocks();
@@ -134,5 +144,34 @@ describe("LiveStage", () => {
       jest.advanceTimersByTime(COUNTDOWN_MS);
     });
     expect(mockLiveProps.mock.calls.at(-1)?.[0].recordingEnabled).toBe(false);
+  });
+});
+
+describe("orientation", () => {
+  const fontSize = (el: { props: { style?: unknown } }) =>
+    (StyleSheet.flatten(el.props.style as never) as { fontSize?: number }).fontSize;
+
+  it("portrait: the 240 numeral, the caption and the athlete chip", () => {
+    const s = renderStage(NOW);
+    expect(fontSize(s.getByTestId("countdown-numeral"))).toBe(240);
+    s.getByText("SYNCED TO SERVER CLOCK \u00b7 BOTH PHONES");
+    s.getByTestId("countdown-chip");
+    s.getByTestId("countdown-progress");
+  });
+
+  it("landscape: the numeral fits the height, no caption or chip to overlap it", () => {
+    mockWindow.current = { width: 844, height: 390 };
+    const s = renderStage(NOW);
+    const size = fontSize(s.getByTestId("countdown-numeral"))!;
+    expect(size).toBe(numeralSize(390));
+    expect(size).toBeLessThan(390 * 0.6);
+    expect(s.queryByText("SYNCED TO SERVER CLOCK \u00b7 BOTH PHONES")).toBeNull();
+    expect(s.queryByTestId("countdown-chip")).toBeNull();
+    s.getByTestId("countdown-progress");
+  });
+
+  it("numeral size is capped and floored", () => {
+    expect(numeralSize(2000)).toBe(240);
+    expect(numeralSize(100)).toBe(96);
   });
 });

@@ -116,74 +116,104 @@ function FightCard({ me, opponent }: { me: FaceoffAthlete; opponent: FaceoffAthl
   );
 }
 
-/** The viewer's weight with the pencil; tapping it edits in place. */
+/**
+ * The viewer's weight for THIS match (the challenge's rated weight) with a
+ * pencil. The pencil edits the PROFILE weight, for future matches: this
+ * match is rated on the weights stamped on its challenge, so its stakes and
+ * weigh-in never change from here, and the editor says so.
+ */
 function MyWeight() {
   const f = useFaceoffContext();
-  const [editing, setEditing] = React.useState(false);
   const [text, setText] = React.useState("");
+  const editing = f.weightEditorOpen;
   const value = Number(text.replace(",", "."));
   const valid = text.trim() !== "" && isValidAthleteWeight(value);
 
   if (!editing) {
     return (
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-        <Text testID="faceoff-my-weight" className="font-display" style={[{ fontSize: 36, color: FIGHT.text }, TABULAR]}>
-          {weightText(f.myWeight)}
-        </Text>
-        {f.myWeighed ? null : (
-          <Pressable
-            testID="faceoff-edit-weight"
-            accessibilityRole="button"
-            accessibilityLabel="Edit your weight"
-            onPress={() => {
-              setText(f.myWeight != null ? String(f.myWeight) : "");
-              setEditing(true);
-            }}
-            style={{ width: 44, height: 44, alignItems: "center", justifyContent: "center" }}
-          >
-            <Pencil size={16} color={FIGHT.text2} />
-          </Pressable>
-        )}
+      <View style={{ gap: 4 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+          <Text testID="faceoff-my-weight" className="font-display" style={[{ fontSize: 36, color: FIGHT.text }, TABULAR]}>
+            {weightText(f.myWeight)}
+          </Text>
+          {f.myWeighed ? null : (
+            <Pressable
+              testID="faceoff-edit-weight"
+              accessibilityRole="button"
+              accessibilityLabel="Edit your profile weight"
+              accessibilityHint="Updates your profile weight for future matches. This match keeps its weigh-in."
+              onPress={() => {
+                setText(f.profileWeightSaved != null ? String(f.profileWeightSaved) : f.myWeight != null ? String(f.myWeight) : "");
+                f.setWeightEditorOpen(true);
+              }}
+              style={{ width: 44, height: 44, alignItems: "center", justifyContent: "center" }}
+            >
+              <Pencil size={16} color={FIGHT.text2} />
+            </Pressable>
+          )}
+        </View>
+        {f.profileWeightSaved != null ? (
+          <Text testID="faceoff-profile-weight-saved" className="font-body" style={{ fontSize: 12, color: FIGHT.text2 }}>
+            {`Profile weight saved: ${Number(f.profileWeightSaved.toFixed(1))} lbs, for future matches.`}
+          </Text>
+        ) : null}
       </View>
     );
   }
   return (
-    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-      <TextInput
-        testID="faceoff-weight-input"
-        accessibilityLabel="Your weight in pounds"
-        value={text}
-        onChangeText={setText}
-        keyboardType="decimal-pad"
-        maxLength={5}
-        autoFocus
-        className="font-mono-bold"
-        style={{
-          width: 84,
-          height: 44,
-          paddingHorizontal: 8,
-          fontSize: 18,
-          color: FIGHT.text,
-          backgroundColor: FIGHT.plate,
-          borderWidth: 1,
-          borderColor: valid ? FIGHT.strong : FIGHT.red,
-          borderRadius: FIGHT_RADIUS.button,
-        }}
-      />
-      <Pressable
-        testID="faceoff-weight-save"
-        accessibilityRole="button"
-        accessibilityLabel="Save weight"
-        disabled={!valid || f.savingWeight}
-        onPress={async () => {
-          if (await f.editWeight(value)) setEditing(false);
-        }}
-        style={{ height: 44, justifyContent: "center", opacity: valid && !f.savingWeight ? 1 : 0.5 }}
-      >
-        <Text className="font-heading uppercase" style={{ fontSize: 13, letterSpacing: 0.8, color: FIGHT.text }}>
-          {f.savingWeight ? "Saving" : "Save"}
-        </Text>
-      </Pressable>
+    <View style={{ gap: 6 }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+        <TextInput
+          testID="faceoff-weight-input"
+          accessibilityLabel="Your profile weight in pounds"
+          value={text}
+          onChangeText={setText}
+          keyboardType="decimal-pad"
+          maxLength={5}
+          autoFocus
+          className="font-mono-bold"
+          style={{
+            width: 84,
+            height: 44,
+            paddingHorizontal: 8,
+            fontSize: 18,
+            color: FIGHT.text,
+            backgroundColor: FIGHT.plate,
+            borderWidth: 1,
+            borderColor: valid ? FIGHT.strong : FIGHT.red,
+            borderRadius: FIGHT_RADIUS.button,
+          }}
+        />
+        <Pressable
+          testID="faceoff-weight-save"
+          accessibilityRole="button"
+          accessibilityLabel="Save profile weight"
+          accessibilityState={{ disabled: !valid || f.savingWeight }}
+          disabled={!valid || f.savingWeight}
+          onPress={async () => {
+            if (await f.editWeight(value)) f.setWeightEditorOpen(false);
+          }}
+          style={{ minWidth: 64, height: 44, paddingHorizontal: 10, alignItems: "center", justifyContent: "center", opacity: valid && !f.savingWeight ? 1 : 0.5 }}
+        >
+          <Text className="font-heading uppercase" style={{ fontSize: 13, letterSpacing: 0.8, color: FIGHT.text }}>
+            {f.savingWeight ? "Saving" : "Save"}
+          </Text>
+        </Pressable>
+        <Pressable
+          testID="faceoff-weight-cancel"
+          accessibilityRole="button"
+          accessibilityLabel="Cancel weight edit"
+          onPress={() => f.setWeightEditorOpen(false)}
+          style={{ minWidth: 44, height: 44, alignItems: "center", justifyContent: "center" }}
+        >
+          <Text className="font-heading uppercase" style={{ fontSize: 13, letterSpacing: 0.8, color: FIGHT.text2 }}>
+            Cancel
+          </Text>
+        </Pressable>
+      </View>
+      <Text testID="faceoff-weight-edit-note" className="font-body" style={{ fontSize: 12, color: FIGHT.text2 }}>
+        Updates your profile weight for future matches. This match keeps its weigh-in.
+      </Text>
     </View>
   );
 }

@@ -1,5 +1,5 @@
 import * as React from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { matchHaptics } from "@/lib/match-flow/use-haptics";
@@ -23,8 +23,16 @@ interface CountdownProps {
   goAt: number;
   matchType: "ranked" | "casual";
   recording: boolean;
-  me: FaceoffAthlete & { current_weight: number | null };
-  opponent: FaceoffAthlete & { current_weight: number | null };
+  me: FaceoffAthlete;
+  opponent: FaceoffAthlete;
+  /** The match's rated weights (from the challenge), lbs. */
+  myWeight: number | null;
+  opponentWeight: number | null;
+}
+
+/** Numeral size: 240 in portrait, scaled to the window height when short. */
+export function numeralSize(windowHeight: number): number {
+  return Math.max(96, Math.min(240, Math.round(windowHeight * 0.55)));
 }
 
 /**
@@ -35,17 +43,32 @@ interface CountdownProps {
  * One heavy haptic per numeral. Reduce Motion shows the numerals without
  * the scale-in.
  */
-export function Countdown({ goAt, matchType, recording, me, opponent }: CountdownProps) {
+export function Countdown({ goAt, matchType, recording, me, opponent, myWeight, opponentWeight }: CountdownProps) {
   const insets = useSafeAreaInsets();
+  const window = useWindowDimensions();
+  const landscape = window.width > window.height;
   const reduceMotion = useReduceMotion();
-  const [now, setNow] = React.useState(() => Date.now());
-  const msLeft = Math.max(0, goAt - now);
-  const numeral = countdownNumeral(msLeft);
-
+  // Re-render only when the numeral changes (a timer to the next second
+  // boundary), not on a fast interval; the bar animates on the UI thread.
+  const [numeral, setNumeral] = React.useState(() => countdownNumeral(goAt - Date.now()));
   React.useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 100);
-    return () => clearInterval(id);
-  }, []);
+    const left = goAt - Date.now();
+    const next = countdownNumeral(left);
+    if (next !== numeral) {
+      setNumeral(next);
+      return;
+    }
+    if (next === 0) return;
+    const t = setTimeout(() => setNumeral(countdownNumeral(goAt - Date.now())), Math.max(1, left - (next - 1) * 1000));
+    return () => clearTimeout(t);
+  }, [goAt, numeral]);
+
+  const progress = useSharedValue(Math.max(0, Math.min(1, 1 - (goAt - Date.now()) / COUNTDOWN_MS)));
+  React.useEffect(() => {
+    const left = Math.max(0, goAt - Date.now());
+    progress.value = withTiming(1, { duration: left, easing: Easing.linear });
+  }, [goAt, progress]);
+  const barStyle = useAnimatedStyle(() => ({ width: `${Math.round(progress.value * 100)}%` }));
 
   const scale = useSharedValue(1);
   const opacity = useSharedValue(1);
@@ -66,12 +89,12 @@ export function Countdown({ goAt, matchType, recording, me, opponent }: Countdow
   }, [numeral, reduceMotion, scale, opacity]);
 
   const numeralStyle = useAnimatedStyle(() => ({ opacity: opacity.value, transform: [{ scale: scale.value }] }));
-  const progress = 1 - msLeft / COUNTDOWN_MS;
+  const size = numeralSize(window.height);
 
   return (
     <View testID="match-countdown" style={StyleSheet.absoluteFill}>
       <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: FIGHT.scrim }]} />
-      <View style={{ position: "absolute", left: 16, right: 16, top: insets.top + 12, height: 28, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+      <View style={{ position: "absolute", left: Math.max(16, insets.left), right: Math.max(16, insets.right), top: insets.top + 12, height: 28, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
         <View
           style={{ height: 28, paddingHorizontal: 10, flexDirection: "row", alignItems: "center", gap: 7, borderWidth: 1, borderColor: recording ? FIGHT.cta : FIGHT.strong, borderRadius: FIGHT_RADIUS.tag, backgroundColor: FIGHT.glass }}
         >
@@ -89,20 +112,33 @@ export function Countdown({ goAt, matchType, recording, me, opponent }: Countdow
         style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
       >
         <Animated.View style={numeralStyle}>
-          <Text testID="countdown-numeral" className="font-display" style={{ fontSize: 240, lineHeight: 240, color: FIGHT.white }}>
+          <Text testID="countdown-numeral" className="font-display" style={{ fontSize: size, lineHeight: size, color: FIGHT.white }}>
             {numeral > 0 ? String(numeral) : ""}
           </Text>
         </Animated.View>
       </View>
-      <View style={{ position: "absolute", left: 48, right: 48, bottom: insets.bottom + 132, alignItems: "center", gap: 12 }}>
+      <View
+        style={{
+          position: "absolute",
+          left: Math.max(48, insets.left + 16),
+          right: Math.max(48, insets.right + 16),
+          bottom: landscape ? Math.max(insets.bottom, 16) + 12 : insets.bottom + 132,
+          alignItems: "center",
+          gap: 12,
+        }}
+      >
         <View style={{ width: "100%", height: 3, backgroundColor: "rgba(255,255,255,0.18)" }}>
-          <View style={{ height: 3, width: `${Math.round(Math.max(0, Math.min(1, progress)) * 100)}%`, backgroundColor: FIGHT.cta }} />
+          <Animated.View testID="countdown-progress" style={[{ height: 3, backgroundColor: FIGHT.cta }, barStyle]} />
         </View>
-        <Mono color={FIGHT.text2}>SYNCED TO SERVER CLOCK {"·"} BOTH PHONES</Mono>
+        {/* Landscape has no room under the numeral for the caption or the
+            athlete chip; the numeral and the bar carry it there. */}
+        {landscape ? null : <Mono color={FIGHT.text2}>SYNCED TO SERVER CLOCK {"·"} BOTH PHONES</Mono>}
       </View>
-      <View style={{ position: "absolute", left: 16, right: 16, bottom: Math.max(insets.bottom, 16) + 26 }}>
-        <FaceoffChip me={me} opponent={opponent} myWeight={me.current_weight} opponentWeight={opponent.current_weight} height={56} />
-      </View>
+      {landscape ? null : (
+        <View testID="countdown-chip" style={{ position: "absolute", left: 16, right: 16, bottom: Math.max(insets.bottom, 16) + 26 }}>
+          <FaceoffChip me={me} opponent={opponent} myWeight={myWeight} opponentWeight={opponentWeight} height={56} />
+        </View>
+      )}
     </View>
   );
 }

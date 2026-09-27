@@ -51,12 +51,12 @@ export function ResultStep(props: ResultStepProps) {
   const [submissionCode, setSubmissionCode] = React.useState("");
   const finish = useFinishTimeField(initialFinishSeconds);
 
-  const remoteClaimRef = React.useRef<((athleteId: string, at: number) => void) | null>(null);
+  const remoteClaimRef = React.useRef<((athleteId: string, at: number, supersedes: number | null) => void) | null>(null);
   const { loading, submit, broadcastResultClaimed } = useRecordResult({
     matchId,
     onRecorded,
     currentAthleteId: me.id,
-    onResultClaimed: (athleteId, at) => remoteClaimRef.current?.(athleteId, at),
+    onResultClaimed: (athleteId, at, supersedes) => remoteClaimRef.current?.(athleteId, at, supersedes),
   });
   const claim = useResultClaim({ meId: me.id, broadcast: broadcastResultClaimed });
   remoteClaimRef.current = claim.onRemoteClaim;
@@ -79,6 +79,7 @@ export function ResultStep(props: ResultStepProps) {
         durationSeconds={durationSeconds}
         endedAtSeconds={initialFinishSeconds}
         onLeave={onLeave}
+        onTakeOver={claim.canTakeOver ? claim.takeOver : undefined}
       />
     );
   }

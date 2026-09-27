@@ -92,18 +92,30 @@ describe("dispute window", () => {
 });
 
 describe("rankStripText", () => {
-  it("a climb with who was passed", () => {
-    expect(
-      rankStripText(
-        { rank_before: 23, rank_after: 19, passed: [{ athlete_id: "x", display_name: "Joao Silva" }, { athlete_id: "y", display_name: "B C" }] },
-        shortName,
-      ),
-    ).toBe("#23 → #19 · PASSED J. SILVA +1");
+  const up = (over: Record<string, unknown> = {}) =>
+    ({
+      rank_before: 23,
+      rank_after: 19,
+      direction: "up",
+      passed: [
+        { athlete_id: "x", display_name: "Joao Silva" },
+        { athlete_id: "y", display_name: "B C" },
+        { athlete_id: "z", display_name: "D E" },
+      ],
+      passed_total: 5,
+      ...over,
+    }) as Parameters<typeof rankStripText>[0];
+  it("a climb with who was passed, counting everyone (passed_total, not the 3 capped)", () => {
+    expect(rankStripText(up(), shortName)).toBe("#23 \u2192 #19 \u00b7 PASSED J. SILVA +4");
+    expect(rankStripText(up({ passed: [{ athlete_id: "x", display_name: "Joao Silva" }], passed_total: 1 }), shortName)).toBe(
+      "#23 \u2192 #19 \u00b7 PASSED J. SILVA",
+    );
+    expect(rankStripText(up({ passed: [], passed_total: 0 }), shortName)).toBe("#23 \u2192 #19");
   });
-  it("nothing for no climb, a drop, or an unranked side", () => {
-    expect(rankStripText({ rank_before: 19, rank_after: 19, passed: [] }, shortName)).toBeNull();
-    expect(rankStripText({ rank_before: 19, rank_after: 23, passed: [] }, shortName)).toBeNull();
-    expect(rankStripText({ rank_before: null, rank_after: 40, passed: [] }, shortName)).toBeNull();
+  it("only for direction 'up'", () => {
+    expect(rankStripText(up({ direction: "none" }), shortName)).toBeNull();
+    expect(rankStripText(up({ direction: "down", rank_before: 19, rank_after: 23 }), shortName)).toBeNull();
+    expect(rankStripText(up({ rank_before: null }), shortName)).toBeNull();
     expect(rankStripText(null, shortName)).toBeNull();
   });
 });
@@ -144,5 +156,35 @@ describe("fight-night formatting", () => {
     expect(shortName("Cher")).toBe("Cher");
     expect(shortName(" ")).toBe("Opponent");
     expect(initialsOf("Kai de la Reyes")).toBe("KR");
+  });
+});
+
+describe("useMatchWeights", () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { renderHook, waitFor } = require("@testing-library/react-native");
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const weightsApi = require("@jits/shared/api/match-weights");
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { useMatchWeights } = require("@/lib/match-flow/use-match-weights");
+
+  it("shows the profile weights until the challenge's rated ones are read, then those", async () => {
+    const spy = jest.spyOn(weightsApi, "getMatchChallengeWeights").mockResolvedValue({
+      challengerId: "opp",
+      opponentId: "me",
+      challengerWeight: 181,
+      opponentWeight: 169,
+    });
+    const { result } = renderHook(() => useMatchWeights("c1", "me", 175, 180));
+    expect(result.current).toEqual({ mine: 175, theirs: 180, rated: false });
+    await waitFor(() => expect(result.current).toEqual({ mine: 169, theirs: 181, rated: true }));
+    spy.mockRestore();
+  });
+
+  it("stays on the profile weights (unrated) when the challenge cannot be read", async () => {
+    const spy = jest.spyOn(weightsApi, "getMatchChallengeWeights").mockResolvedValue(null);
+    const { result } = renderHook(() => useMatchWeights("c1", "me", 175, 180));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(result.current).toEqual({ mine: 175, theirs: 180, rated: false });
+    spy.mockRestore();
   });
 });
