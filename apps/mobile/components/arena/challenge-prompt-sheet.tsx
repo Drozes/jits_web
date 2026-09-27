@@ -18,8 +18,10 @@ import {
   type BottomSheetBackgroundProps,
 } from "@gorhom/bottom-sheet";
 import * as Haptics from "expo-haptics";
-import { useThemedTokens } from "@/lib/theme/use-theme";
 import type { IncomingChallenge } from "@/lib/arena/use-arena-challenge";
+import { useViewerStakes } from "@/lib/match-flow/use-viewer-stakes";
+import { FIGHT, FIGHT_RADIUS } from "@/components/match-flow/fight/fight-tokens";
+import { InitialsBlock, KindTag, Mono, StakesStrip, shortName } from "@/components/match-flow/fight/fight-ui";
 
 /**
  * The sheet's background, WITHOUT gorhom's default accessibility. The stock
@@ -44,6 +46,11 @@ interface ChallengePromptSheetProps {
   busy: boolean;
   onAccept: () => void;
   onDecline: () => void;
+  /**
+   * The viewer's own rating and weight, for the stakes strip. Omitted (or a
+   * missing rating): no strip. Arena challenges are ranked-only.
+   */
+  viewer?: { elo: number | null; weight: number | null };
 }
 
 export function ChallengePromptSheet({
@@ -51,9 +58,18 @@ export function ChallengePromptSheet({
   busy,
   onAccept,
   onDecline,
+  viewer,
 }: ChallengePromptSheetProps) {
   const ref = React.useRef<BottomSheetModal | null>(null);
-  const tokens = useThemedTokens();
+  // One calculate_elo_stakes read per challenge, viewer as "challenger"
+  // (see useViewerStakes). Fails quietly: no strip.
+  const stakes = useViewerStakes(
+    !!challenge && viewer?.elo != null,
+    viewer?.elo,
+    challenge?.challengerElo,
+    viewer?.weight,
+    challenge?.challengerWeight,
+  );
 
   // Only dismiss a sheet this component presented and that has not closed
   // itself. dismiss() on a gorhom modal that was never presented (this
@@ -90,7 +106,7 @@ export function ChallengePromptSheet({
     ? [
         challenge.challengerElo != null ? `ELO ${challenge.challengerElo}` : null,
         challenge.challengerWeight != null
-          ? `${challenge.challengerWeight} lbs`
+          ? `${challenge.challengerWeight} LBS`
           : null,
       ]
         .filter(Boolean)
@@ -114,47 +130,84 @@ export function ChallengePromptSheet({
       // "Bottom Sheet" stop. Turning that off exposes the real elements.
       accessible={false}
       backgroundComponent={PromptBackground}
-      backgroundStyle={{ backgroundColor: tokens.bgSecondary }}
-      handleIndicatorStyle={{ backgroundColor: tokens.textTertiary }}
+      // Fight-night dark whatever the app theme, like the match it leads to.
+      backgroundStyle={{ backgroundColor: FIGHT.plate, borderTopWidth: 1, borderColor: FIGHT.strong }}
+      handleIndicatorStyle={{ backgroundColor: "rgba(255,255,255,0.24)", width: 40 }}
     >
       <BottomSheetView>
         {challenge ? (
           <View
             testID="challenge-prompt"
-            className="px-4 pb-8 pt-2"
+            style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 34, gap: 20 }}
             // The prompt demands an answer: keep VoiceOver focus inside it
             // rather than wandering to the screen behind the sheet.
             accessibilityViewIsModal
           >
-            <Text className="font-mono-bold text-[10px] text-ink-2 uppercase tracking-caps-xl">
-              Incoming challenge
-            </Text>
-            <Text className="mt-2 font-heading text-[20px] text-ink">
-              {challenge.challengerName} wants to roll
-            </Text>
-            {meta ? (
-              <Text
-                className="mt-1 font-mono text-[12px] text-ink-2"
-                style={{ fontVariant: ["tabular-nums"] }}
-              >
-                {meta}
-              </Text>
-            ) : null}
-            <Text className="mt-2 font-body text-[13px] text-ink-2">
-              Accept and you both drop straight into the match.
-            </Text>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 7 }}>
+                <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: FIGHT.win }} />
+                <Mono bold color={FIGHT.win}>
+                  INCOMING CHALLENGE
+                </Mono>
+              </View>
+              <KindTag kind="ranked" />
+            </View>
 
-            <View className="mt-5 flex-row gap-2">
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 16 }}>
+              <InitialsBlock name={challenge.challengerName} size={88} fontSize={30} />
+              <View style={{ flex: 1, gap: 8, minWidth: 0 }}>
+                <Text numberOfLines={1} className="font-display" style={{ fontSize: 44, lineHeight: 42, color: FIGHT.text }}>
+                  {shortName(challenge.challengerName)}
+                </Text>
+                {meta ? (
+                  <Text className="font-mono" style={{ fontSize: 13, color: FIGHT.text2, fontVariant: ["tabular-nums"] }}>
+                    {meta}
+                  </Text>
+                ) : null}
+                <Text className="font-body" style={{ fontSize: 13, color: FIGHT.text2 }}>
+                  {`${shortName(challenge.challengerName)} is live in the Arena`}
+                </Text>
+              </View>
+            </View>
+
+            {stakes ? (
+              <View style={{ gap: 8 }}>
+                <Mono color={FIGHT.text3}>{`YOUR STAKES${viewer?.elo != null ? ` \u00b7 ${viewer.elo}` : ""}`}</Mono>
+                <StakesStrip
+                  testID="challenge-prompt-stakes"
+                  win={stakes.challenger_win}
+                  draw={stakes.challenger_draw}
+                  loss={stakes.challenger_loss}
+                  height={64}
+                  background={FIGHT.bg}
+                />
+              </View>
+            ) : (
+              <Text className="font-body" style={{ fontSize: 13, color: FIGHT.text2 }}>
+                Accept and you both drop straight into the match.
+              </Text>
+            )}
+
+            <View style={{ flexDirection: "row", gap: 12 }}>
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Decline challenge"
                 accessibilityState={{ disabled: busy }}
                 onPress={onDecline}
                 disabled={busy}
-                className="min-h-[44px] flex-1 items-center justify-center rounded-sm border border-hairline-strong active:bg-surface-4"
-                style={busy ? { opacity: 0.6 } : undefined}
+                style={({ pressed }) => ({
+                  flex: 1,
+                  height: 56,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: FIGHT_RADIUS.button,
+                  borderWidth: 1,
+                  borderColor: FIGHT.strong,
+                  backgroundColor: pressed ? FIGHT.secondaryBgPressed : FIGHT.secondaryBg,
+                  opacity: busy ? 0.6 : 1,
+                })}
               >
-                <Text className="font-heading text-[12px] text-ink-2 uppercase tracking-caps">
+                <Text className="font-heading uppercase" style={{ fontSize: 14, letterSpacing: 1.12, color: FIGHT.white }}>
                   Decline
                 </Text>
               </Pressable>
@@ -164,11 +217,18 @@ export function ChallengePromptSheet({
                 accessibilityState={{ disabled: busy }}
                 onPress={onAccept}
                 disabled={busy}
-                className="min-h-[44px] flex-1 items-center justify-center rounded-sm bg-cta active:bg-cta-hover"
-                style={busy ? { opacity: 0.6 } : undefined}
+                style={({ pressed }) => ({
+                  flex: 1.6,
+                  height: 56,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: FIGHT_RADIUS.button,
+                  backgroundColor: pressed ? FIGHT.ctaPressed : FIGHT.cta,
+                  opacity: busy ? 0.6 : 1,
+                })}
               >
-                <Text className="font-heading text-[12px] text-ink-on-cta uppercase tracking-caps">
-                  Accept
+                <Text className="font-heading uppercase" style={{ fontSize: 14, letterSpacing: 1.12, color: FIGHT.onCta }}>
+                  Accept challenge
                 </Text>
               </Pressable>
             </View>

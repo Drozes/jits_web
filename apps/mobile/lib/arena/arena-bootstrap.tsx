@@ -150,6 +150,7 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
       busy={isBusy}
       onAccept={() => void challenge.accept()}
       onDecline={() => void challenge.decline()}
+      viewer={{ elo: athlete.current_elo ?? null, weight: athlete.current_weight ?? null }}
     />
   );
 }

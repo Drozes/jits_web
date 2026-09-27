@@ -459,7 +459,7 @@ describe("Arena screen", () => {
     };
     const { queryByText, queryByLabelText } = render(<ArenaScreen />);
 
-    expect(queryByText("Rival wants to roll")).toBeNull();
+    expect(queryByText("Rival is live in the Arena")).toBeNull();
     expect(queryByLabelText("Accept challenge")).toBeNull();
   });
 
