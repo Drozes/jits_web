@@ -1,10 +1,7 @@
 import * as React from "react";
 import { StyleSheet, Text, View } from "react-native";
 import type { MatchStep } from "@/lib/match-flow/step-router";
-import { useMatchUpload } from "@/lib/video/match-upload-store";
-import { deriveUploadBannerState } from "@/lib/video/upload-banner-state";
 import { CameraOverlay } from "./camera-overlay";
-import { UploadProgressBanner } from "./upload-progress-banner";
 import { useMatchRecorder } from "./match-recorder-context";
 
 /**
@@ -31,7 +28,18 @@ import { useMatchRecorder } from "./match-recorder-context";
  * mid-match to the ready check, which is where a denial is still
  * recoverable.
  */
-export function MatchRecorderCamera({ step }: { step: MatchStep }) {
+export function MatchRecorderCamera({
+  step,
+  optedIn = true,
+}: {
+  step: MatchStep;
+  /**
+   * "Record from my phone" (the match face-off, decision 5). Default true
+   * (practice). Off: no capture session at all on ready or live; the live
+   * screen shows its no-video plate instead.
+   */
+  optedIn?: boolean;
+}) {
   const recorder = useMatchRecorder();
   const warming = step === "ready";
   // Live is full screen: the camera fills the screen at the recorded aspect
@@ -44,7 +52,7 @@ export function MatchRecorderCamera({ step }: { step: MatchStep }) {
   // finalized with no file. `stopping` is bounded by the recorder's stop
   // watchdog, so a stop the hardware drops cannot pin the viewfinder (and
   // the mic indicator) open over the result and summary steps.
-  const mounted = warming || step === "live" || recorder.state === "stopping";
+  const mounted = (optedIn && (warming || step === "live")) || recorder.state === "stopping";
 
   // The recorder outlives this view now, so readiness and the pending
   // deferred-start backstop have to be torn down when the camera goes
@@ -90,25 +98,4 @@ export function MatchRecorderCamera({ step }: { step: MatchStep }) {
       ) : null}
     </View>
   );
-}
-
-/**
- * The persistent recording / upload status chip (jits-od3).
- *
- * Rendered once by the wizard, above the step, so it is on screen for
- * every step from live through summary. Its whole reason to exist is that
- * the upload starts after the live step has already unmounted, so a banner
- * scoped to that step can never report the upload's outcome, least of all
- * a failure.
- */
-export function MatchRecorderStatus({ matchId }: { matchId: string }) {
-  const recorder = useMatchRecorder();
-  // The upload's outcome comes from the match-keyed store, not from the
-  // recorder: the recorder is idle again after any remount, and an upload
-  // that finishes late writes to the store long after the instance that
-  // started it is gone. Reading the recorder here is what made the failure
-  // silent in the first place.
-  const upload = useMatchUpload(matchId);
-  const banner = deriveUploadBannerState(recorder.state, recorder.error, upload);
-  return <UploadProgressBanner {...banner} />;
 }

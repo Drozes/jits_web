@@ -69,6 +69,12 @@ export interface UseArenaLiveResult {
    * For sign-out, which has to clear the flag while the session still exists.
    */
   goOffline: () => Promise<boolean>;
+  /**
+   * Go live, idempotently: sets the intent to live (never reverses it the
+   * way `toggle` does) and resolves true once it landed. For flows that want
+   * the athlete live whatever the current intent (the verdict's rematch).
+   */
+  goLive: () => Promise<boolean>;
 }
 
 /** Longest a transition waits on joining the lobby's presence. */
@@ -417,5 +423,5 @@ export function useArenaLive({
     };
   }, []);
 
-  return { isLive, isSaving, toggle, goOffline: requestOffline };
+  return { isLive, isSaving, toggle, goOffline: requestOffline, goLive: requestLive };
 }

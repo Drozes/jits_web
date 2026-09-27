@@ -13,6 +13,8 @@ interface DisputeFormProps {
   matchId: string;
   onCancel: () => void;
   onSubmitted: () => void;
+  /** The 24 h dispute window had already closed (hint dispute_window_closed). */
+  onWindowClosed?: () => void;
 }
 
 /**
@@ -27,7 +29,7 @@ interface DisputeFormProps {
  * pressure, not a loss) + textarea with hairline border + Signal Red
  * primary cta and underlined back.
  */
-export function DisputeForm({ matchId, onCancel, onSubmitted }: DisputeFormProps) {
+export function DisputeForm({ matchId, onCancel, onSubmitted, onWindowClosed }: DisputeFormProps) {
   const tokens = useThemedTokens();
   const amberIcon = useAmber().icon;
   const [reason, setReason] = React.useState("");
@@ -40,6 +42,11 @@ export function DisputeForm({ matchId, onCancel, onSubmitted }: DisputeFormProps
     if (!res.ok) {
       setSubmitting(false);
       void matchHaptics.error();
+      if (res.error.code === "DISPUTE_WINDOW_CLOSED") {
+        toast.error({ text1: "Dispute window closed", description: res.error.message });
+        onWindowClosed?.();
+        return;
+      }
       toast.error({ text1: "Couldn't dispute", description: res.error.message });
       return;
     }

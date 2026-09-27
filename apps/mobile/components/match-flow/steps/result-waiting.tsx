@@ -1,0 +1,95 @@
+import { Text, View } from "react-native";
+import { formatElapsed } from "@/lib/match-flow/format-elapsed";
+import { FIGHT, FIGHT_RADIUS, TABULAR } from "../fight/fight-tokens";
+import { FightButton, InitialsBlock, Mono, shortName } from "../fight/fight-ui";
+import type { ResultAthlete } from "./result-form";
+
+/**
+ * The other phone while one athlete records the result. Nothing to do here
+ * but wait (the result arrives by broadcast or the reconciler and moves this
+ * phone to confirm) or leave and confirm later from Home's resume card.
+ */
+export function ResultWaiting({
+  claimer,
+  me,
+  opponent,
+  matchType,
+  durationSeconds,
+  endedAtSeconds,
+  onLeave,
+  onTakeOver,
+}: {
+  claimer: ResultAthlete;
+  me: ResultAthlete;
+  opponent: ResultAthlete;
+  matchType: "ranked" | "casual";
+  durationSeconds: number;
+  endedAtSeconds?: number;
+  onLeave?: () => void;
+  /** Offered once the claim has gone a minute without a result. */
+  onTakeOver?: () => void;
+}) {
+  const name = shortName(claimer.displayName);
+  const cells = [
+    { label: "ENDED AT", value: endedAtSeconds != null ? formatElapsed(endedAtSeconds) : "--:--" },
+    { label: "TYPE", value: matchType === "ranked" ? "RANKED" : "CASUAL" },
+    { label: "CLOCK", value: formatElapsed(durationSeconds) },
+  ];
+  return (
+    <View testID="result-waiting" style={{ gap: 20 }}>
+      <Mono>MATCH OVER</Mono>
+      <View accessibilityRole="summary" accessibilityLiveRegion="polite" style={{ alignItems: "center", gap: 24, paddingVertical: 24 }}>
+        <InitialsBlock name={claimer.displayName} size={96} fontSize={32} />
+        <Text className="font-display" style={{ maxWidth: 320, textAlign: "center", fontSize: 48, lineHeight: 46, color: FIGHT.text }}>
+          {`${name} is recording the result`}
+        </Text>
+        <Dots />
+        <Text className="font-body" style={{ fontSize: 15, color: FIGHT.text2, textAlign: "center" }}>
+          You{"’"}ll confirm it in a moment.
+        </Text>
+      </View>
+      <View style={{ backgroundColor: FIGHT.plate, borderWidth: 1, borderColor: FIGHT.hairline, borderRadius: FIGHT_RADIUS.plate, overflow: "hidden" }}>
+        <View style={{ flexDirection: "row" }}>
+          {cells.map((c, i) => (
+            <View key={c.label} style={{ flex: 1, paddingVertical: 14, paddingHorizontal: 12, gap: 8, borderLeftWidth: i ? 1 : 0, borderColor: FIGHT.hairline }}>
+              <Mono color={FIGHT.text3}>{c.label}</Mono>
+              <Text className="font-mono-bold" style={[{ fontSize: 18, color: FIGHT.text }, TABULAR]}>
+                {c.value}
+              </Text>
+            </View>
+          ))}
+        </View>
+        <View style={{ padding: 12, flexDirection: "row", justifyContent: "space-between", borderTopWidth: 1, borderColor: FIGHT.hairline }}>
+          <Text numberOfLines={1} className="font-heading uppercase" style={{ flex: 1, fontSize: 13, letterSpacing: 0.52, color: FIGHT.text }}>
+            {`${shortName(me.displayName)} vs ${shortName(opponent.displayName)}`}
+          </Text>
+          <Mono size={11} spacing={0}>
+            {[me.elo, opponent.elo].map((e) => (e != null ? String(e) : "--")).join(" · ")}
+          </Mono>
+        </View>
+      </View>
+      {onTakeOver ? (
+        <View style={{ gap: 8 }}>
+          <Text className="font-body" style={{ fontSize: 13, color: FIGHT.text2, textAlign: "center" }}>
+            {`Still no result from ${name}.`}
+          </Text>
+          <FightButton testID="result-take-over" variant="secondary" label="Record it myself" onPress={onTakeOver} />
+        </View>
+      ) : null}
+      {onLeave ? (
+        <FightButton testID="result-leave-later" variant="secondary" label="Leave and confirm later" onPress={onLeave} />
+      ) : null}
+    </View>
+  );
+}
+
+/** Static: only the countdown and the verdict celebration may auto-animate. */
+function Dots() {
+  return (
+    <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={{ flexDirection: "row", gap: 8, height: 12, alignItems: "center" }}>
+      {[1, 0.6, 0.3].map((o) => (
+        <View key={o} style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: FIGHT.text, opacity: o }} />
+      ))}
+    </View>
+  );
+}

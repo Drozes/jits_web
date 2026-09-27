@@ -50,7 +50,7 @@ jest.mock("@jits/shared/api/mutations", () => ({
   disputeMatchResult: (...a: unknown[]) => mockDispute(...a),
 }));
 jest.mock("@/lib/match-flow/use-record-result", () => ({
-  useRecordResult: () => ({ loading: false, submit: jest.fn() }),
+  useRecordResult: () => ({ loading: false, submit: jest.fn(), broadcastResultClaimed: jest.fn() }),
 }));
 
 import { ResultStep } from "@/components/match-flow/steps/result-step";
@@ -75,20 +75,19 @@ describe("ResultStep draw", () => {
         matchId="M1"
         matchType={matchType}
         durationSeconds={300}
-        participants={[
-          { id: "me-1", displayName: "Me" },
-          { id: "opp-1", displayName: "Demo Red" },
-        ]}
+        me={{ id: "me-1", displayName: "Me", elo: null, weight: null }}
+        opponent={{ id: "opp-1", displayName: "Demo Red", elo: null, weight: null }}
         submissionTypes={[]}
         onRecorded={jest.fn()}
       />,
     );
   }
 
-  it("keeps the harness heading and record testID", () => {
+  it("keeps the harness heading, draw and record testIDs", () => {
     const { getAllByText, getByTestId } = renderResult();
-    // The heading (the harness reads it) and the CTA label both match.
+    // The heading is what the harness reads (and taps to drop the keyboard).
     expect(getAllByText(/^record result$/i).length).toBeGreaterThanOrEqual(1);
+    fireEvent.press(getByTestId("result-outcome-draw"));
     getByTestId("result-record");
   });
 
@@ -97,11 +96,10 @@ describe("ResultStep draw", () => {
     fireEvent.press(screen.getByText("Draw"));
     screen.getByText("Match ends in a draw");
     screen.getByText("Draws cost both athletes rating.");
-    // The Draw chip in the toggle has its own handshake; the plate's is last.
+    // The draw plate's handshake is amber (pressure), never Signal Red.
     const icon = screen.getAllByTestId("icon-Handshake").at(-1)!;
     expect(icon.props.color).toBe("#F59E0B");
     expect(icon.props.color).not.toBe(TOKENS.stateNegative);
-    expect(plateClass(icon)).not.toMatch(/border-l-negative/);
   });
 
   it("does not claim a casual draw costs rating", () => {
@@ -112,11 +110,11 @@ describe("ResultStep draw", () => {
     screen.getByText("Casual match: no rating change.");
   });
 
-  it("uses the darker amber on light surfaces", () => {
+  it("keeps the fight-night amber whatever the app theme (the match flow is always dark)", () => {
     mockScheme = "light";
     const screen = renderResult();
     fireEvent.press(screen.getByText("Draw"));
-    expect(screen.getAllByTestId("icon-Handshake").at(-1)!.props.color).toBe("#D97706");
+    expect(screen.getAllByTestId("icon-Handshake").at(-1)!.props.color).toBe("#F59E0B");
   });
 });
 

@@ -22,6 +22,8 @@ export const matchHaptics = {
   resultRecorded: () => safe(Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)),
   /** Mutation / network error. */
   error: () => safe(Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error)),
+  /** One beat of the 3-2-1 countdown before the match clock starts. */
+  countdownTick: () => safe(Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy)),
   /** Timer has crossed the low-time-remaining threshold (e.g. 10s). */
   timeWarning: () => safe(Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)),
 };

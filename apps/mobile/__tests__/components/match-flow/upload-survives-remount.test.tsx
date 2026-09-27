@@ -190,14 +190,23 @@ jest.mock("@jits/shared/api/queries", () => ({
   getMatchDetails: (...a: unknown[]) => mockGetMatchDetails(...a),
   getSubmissionTypes: (...a: unknown[]) => mockGetSubmissionTypes(...a),
   getMatchConfirmations: (...a: unknown[]) => mockGetMatchConfirmations(...a),
+  getEloStakes: async () => null,
+  // The verdict's opening still; no server videos here.
+  getMatchDetailView: async () => ({ ok: true, data: { videos: [] } }),
 }));
+jest.mock("@jits/shared/api/match-rank-change", () => ({
+  getMatchRankChange: async () => ({ ok: false, error: { code: "UNKNOWN", message: "n/a" } }),
+}));
+jest.mock("expo-image", () => ({ Image: () => null }));
 
 // The result step's RPC. Stubbed so a draw submits in two taps; the step,
 // the confirm step, the wizard and useMatchDetails are all real.
 jest.mock("@/lib/match-flow/use-record-result", () => ({
-  useRecordResult: ({ onRecorded }: { onRecorded: (r: unknown) => void }) => ({
+  useRecordResult: ({ onRecorded }: { onRecorded: (r: unknown, m: unknown) => void }) => ({
     loading: false,
-    submit: () => onRecorded({ result: "draw", winnerId: null }),
+    // The opponent's view of it: this side still confirms.
+    submit: () => onRecorded({ result: "draw", winnerId: null }, { recorderConfirmed: false }),
+    broadcastResultClaimed: jest.fn(),
   }),
 }));
 
@@ -222,6 +231,11 @@ jest.mock("@jits/shared/hooks/use-session-match-sync", () => ({
     broadcastTimerPaused: jest.fn(),
     broadcastTimerResumed: jest.fn(),
     broadcastResult: jest.fn(),
+    broadcastWeighedIn: jest.fn(),
+    broadcastRecordingOptIn: jest.fn(),
+    broadcastResultClaimed: jest.fn(),
+    broadcastResultConfirmed: jest.fn(),
+    broadcastMatchDisputed: jest.fn(),
   }),
 }));
 
@@ -320,6 +334,7 @@ jest.mock("@/components/ui/elo-system", () => {
 
 import { MatchFlowWizard } from "@/components/match-flow/match-flow-wizard";
 import { resetMatchUploadStore } from "@/lib/video/match-upload-store";
+import { __resetRecordingOptInForTests } from "@/lib/match-flow/recording-optin";
 
 // ---- fixtures ----
 
@@ -390,6 +405,8 @@ beforeEach(() => {
   mockGetMatchDetails.mockResolvedValue(matchRow("in_progress"));
   // Nobody has confirmed until completeMatch() says so.
   mockGetMatchConfirmations.mockResolvedValue([]);
+  // "Record from my phone" is ON for these (it is OFF on first use).
+  __resetRecordingOptInForTests(true);
 });
 
 afterEach(() => {
@@ -415,7 +432,7 @@ async function advanceToConfirm(screen: ReturnType<typeof render>) {
     fireEvent.press(screen.getByText("Draw"));
   });
   await act(async () => {
-    fireEvent.press(screen.getByText("Record Result"));
+    fireEvent.press(screen.getByTestId("result-record"));
   });
 }
 
@@ -469,11 +486,11 @@ describe("the confirm-to-summary refresh cannot erase the upload", () => {
 
     const screen = renderWizard();
     await advanceToConfirm(screen);
-    await waitFor(() => expect(screen.getByText(/saving the record failed/i)).toBeTruthy());
+    await waitFor(() => expect(mockUpsertMatchVideo).toHaveBeenCalled());
 
     await completeMatch();
 
-    // Summary step, and the failure is still on screen. Before the store,
+    // The verdict, and the failure is on its upload card. Before the store,
     // refresh() rebuilt the recorder idle here and the chip vanished.
     await waitFor(() => expect(screen.getByText("Back to Arena")).toBeTruthy());
     screen.getByTestId("upload-status-banner");
@@ -481,29 +498,31 @@ describe("the confirm-to-summary refresh cannot erase the upload", () => {
     screen.getByText(/row-level security/i);
   });
 
-  it("still offers Watch Match Video on the summary after the row completes", async () => {
+  it("still offers Watch film on the verdict after the row completes", async () => {
     const screen = renderWizard();
     await advanceToConfirm(screen);
-    await waitFor(() => expect(screen.getByText(/match video uploaded/i)).toBeTruthy());
+    await waitFor(() => expect(mockUpsertMatchVideo).toHaveBeenCalled());
 
     await completeMatch();
 
     await waitFor(() => expect(screen.getByText("Back to Arena")).toBeTruthy());
     // videoId lived only on the recorder before, so the remount lost it and
-    // the summary offered no playback for a video that exists in storage.
-    screen.getByText("Watch Match Video");
-    screen.getByText(/match video uploaded/i);
+    // the verdict offered no film for a video that exists in storage.
+    await waitFor(() => expect(screen.getByText(/match video uploaded/i)).toBeTruthy());
+    screen.getByText("Watch film");
+    expect(screen.getByTestId("summary-watch-film").props.accessibilityState.disabled).toBe(false);
   });
 
   it("survives a DISPUTED completion too, which takes the same refresh path", async () => {
     const screen = renderWizard();
     await advanceToConfirm(screen);
-    await waitFor(() => expect(screen.getByText(/match video uploaded/i)).toBeTruthy());
+    await waitFor(() => expect(mockUpsertMatchVideo).toHaveBeenCalled());
 
     await completeMatch("disputed");
 
     await waitFor(() => expect(screen.getByText("Back to Arena")).toBeTruthy());
-    screen.getByText("Watch Match Video");
+    await waitFor(() => expect(screen.getByText(/match video uploaded/i)).toBeTruthy());
+    screen.getByText("Watch film");
   });
 });
 
@@ -544,17 +563,15 @@ describe("an upload that finishes LATE still reaches the summary", () => {
 
     const screen = renderWizard();
     await advanceToConfirm(screen);
-
     // Upload in flight, not finished.
-    await waitFor(() => expect(screen.getByText(/uploading match video/i)).toBeTruthy());
+    await waitFor(() => expect(mockUpsertMatchVideo).toHaveBeenCalled());
 
     // The match completes and the wizard refreshes while it is still going.
     await completeMatch();
     await waitFor(() => expect(screen.getByText("Back to Arena")).toBeTruthy());
     screen.getByText(/uploading match video/i);
-    // Pending, not a dead link: the id does not exist yet.
-    screen.getByText(/video uploading/i);
-    expect(screen.queryByText("Watch Match Video")).toBeNull();
+    // Pending, not a dead link: Watch film waits for the id.
+    expect(screen.getByTestId("summary-watch-film").props.accessibilityState.disabled).toBe(true);
 
     // NOW the upload lands, long after the recorder that started it.
     await act(async () => {
@@ -562,7 +579,7 @@ describe("an upload that finishes LATE still reaches the summary", () => {
     });
 
     await waitFor(() => expect(screen.getByText(/match video uploaded/i)).toBeTruthy());
-    screen.getByText("Watch Match Video");
+    expect(screen.getByTestId("summary-watch-film").props.accessibilityState.disabled).toBe(false);
   });
 
   it("delivers a late FAILURE the same way", async () => {
@@ -570,10 +587,11 @@ describe("an upload that finishes LATE still reaches the summary", () => {
 
     const screen = renderWizard();
     await advanceToConfirm(screen);
-    await waitFor(() => expect(screen.getByText(/uploading match video/i)).toBeTruthy());
+    await waitFor(() => expect(mockUpsertMatchVideo).toHaveBeenCalled());
 
     await completeMatch();
     await waitFor(() => expect(screen.getByText("Back to Arena")).toBeTruthy());
+    screen.getByText(/uploading match video/i);
 
     await act(async () => {
       held.release();
@@ -676,13 +694,12 @@ describe("a recorder-only failure survives the confirm-to-summary refresh", () =
 
     const screen = renderWizard();
     await advanceToConfirm(screen);
-    await waitFor(() => expect(screen.getByText(/stop failed/i)).toBeTruthy());
 
     await completeMatch();
     await waitFor(() => expect(screen.getByText("Back to Arena")).toBeTruthy());
 
+    await waitFor(() => expect(screen.getByText(/stop failed/i)).toBeTruthy());
     screen.getByTestId("upload-status-banner");
-    screen.getByText(/stop failed/i);
     expect(mockUpsertMatchVideo).not.toHaveBeenCalled();
   });
 });

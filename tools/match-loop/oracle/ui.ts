@@ -31,7 +31,8 @@ export async function stepOrNull(ui: Screens, step: string, timeoutMs: number): 
 /** Normalise a rendered ELO delta ("▲ +16" / "▼ 8") to a signed number. */
 export function parseDelta(label: string | null): number | null {
   if (!label) return null;
-  const m = label.match(/([▲▼])\s*\+?(\d+)/);
+  // "▲ +14" / "▼ −9" (U+2212, the redesigned verdict) / "▼ 9" (older builds).
+  const m = label.match(/([▲▼])\s*[+\u2212-]?(\d+)/);
   if (!m) return null;
   return m[1] === "▲" ? Number(m[2]) : -Number(m[2]);
 }

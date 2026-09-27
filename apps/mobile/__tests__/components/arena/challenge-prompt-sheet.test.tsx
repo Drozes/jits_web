@@ -45,6 +45,13 @@ jest.mock("@/lib/theme/use-theme", () => ({
   useThemedTokens: () => ({ bgSecondary: "#13151B", textTertiary: "#8D929D" }),
 }));
 
+jest.mock("@/lib/supabase/client", () => ({ supabase: { tag: "client" } }));
+
+const mockGetEloStakes = jest.fn();
+jest.mock("@jits/shared/api/queries", () => ({
+  getEloStakes: (...args: unknown[]) => mockGetEloStakes(...args),
+}));
+
 import { ChallengePromptSheet } from "@/components/arena/challenge-prompt-sheet";
 import type { IncomingChallenge } from "@/lib/arena/use-arena-challenge";
 
@@ -68,6 +75,8 @@ function Harness({ challenge }: { challenge: IncomingChallenge | null }) {
 }
 
 beforeEach(() => {
+  mockGetEloStakes.mockReset();
+  mockGetEloStakes.mockResolvedValue(null);
   mockPresent.mockClear();
   mockDismiss.mockClear();
   mockNotify.mockClear();
@@ -197,5 +206,53 @@ describe("ChallengePromptSheet haptic (jits-4zp.7)", () => {
       await Promise.resolve();
     });
     expect(mockPresent).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("ChallengePromptSheet face-off preview (match-flow redesign)", () => {
+  const STAKES = {
+    challenger_win: 14,
+    challenger_loss: -9,
+    challenger_draw: -2,
+    opponent_win: 9,
+    opponent_loss: -14,
+    opponent_draw: 2,
+    challenger_expected: 0.5,
+    opponent_expected: 0.5,
+    weight_division_gap: 0,
+    draw_score: 0.25,
+  };
+
+  it("shows the viewer's stakes, read once with the viewer as challenger", async () => {
+    mockGetEloStakes.mockResolvedValue(STAKES);
+    const screen = render(
+      <ChallengePromptSheet
+        challenge={RIVAL}
+        busy={false}
+        onAccept={jest.fn()}
+        onDecline={jest.fn()}
+        viewer={{ elo: 1512, weight: 170 }}
+      />,
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(mockGetEloStakes).toHaveBeenCalledWith(expect.anything(), 1512, 1350, 170, 190);
+    expect(screen.getByTestId("challenge-prompt-stakes-win")).toHaveTextContent("\u25b2 +14");
+    expect(screen.getByTestId("challenge-prompt-stakes-loss")).toHaveTextContent("\u25bc \u22129");
+    expect(screen.getByText("YOUR STAKES \u00b7 1512")).toBeTruthy();
+    expect(screen.getByText("RANKED")).toBeTruthy();
+    expect(screen.getByText("Rival is live in the Arena")).toBeTruthy();
+  });
+
+  it("shows no strip (and never a spinner) without the viewer or when stakes fail", async () => {
+    mockGetEloStakes.mockRejectedValue(new Error("offline"));
+    const screen = render(<Harness challenge={RIVAL} />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(mockGetEloStakes).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("challenge-prompt-stakes")).toBeNull();
+    expect(screen.getByText("Accept and you both drop straight into the match.")).toBeTruthy();
   });
 });

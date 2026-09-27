@@ -13,10 +13,12 @@
  */
 import * as React from "react";
 import { ActivityIndicator, View } from "react-native";
-import { Stack, useLocalSearchParams } from "expo-router";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { usePreventRemove } from "@react-navigation/native";
 import { useRequireAthlete } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
+import { ForceDarkTheme } from "@/lib/theme/force-dark-theme";
+import { exitMatchTo } from "@/lib/match-flow/exit-to";
 import { MatchFlowWizard } from "@/components/match-flow/match-flow-wizard";
 import type { MatchStep } from "@/lib/match-flow/step-router";
 import { AppHeader } from "@/components/layout/app-header";
@@ -34,8 +36,17 @@ const GUARDED_STEPS: ReadonlySet<MatchStep> = new Set<MatchStep>([
   "confirm",
 ]);
 
+/**
+ * The face-off: no swipe back either (leaving there without cancelling left
+ * the match pending with nobody in it, jits-bh2v). Not a preventRemove
+ * guard, so the face-off's own exits (Leave, a remote cancel) still
+ * navigate; its Leave control and Android back both confirm and cancel.
+ */
+const NO_SWIPE_STEPS: ReadonlySet<MatchStep> = new Set<MatchStep>(["weight", "ready"]);
+
 export default function ArenaMatchScreen() {
   const tokens = useThemedTokens();
+  const router = useRouter();
   const { matchId } = useLocalSearchParams<{ matchId: string }>();
   const { athlete, isLoading: authLoading } = useRequireAthlete();
   const [step, setStep] = React.useState<MatchStep | null>(null);
@@ -43,8 +54,15 @@ export default function ArenaMatchScreen() {
   // the way out (every exit path unmounts this screen). See arena-store.ts.
   useArenaMatchScreen(matchId);
 
-  const guarded = step != null && GUARDED_STEPS.has(step);
+  // "Leave and confirm later": lift the guard, then exit once it is off.
+  const [leaving, setLeaving] = React.useState(false);
+  const guarded = step != null && GUARDED_STEPS.has(step) && !leaving;
   usePreventRemove(guarded, () => {});
+  React.useEffect(() => {
+    if (leaving) exitMatchTo(router, ARENA_HREF);
+  }, [leaving, router]);
+  const onLeaveMatch = React.useCallback(() => setLeaving(true), []);
+  const swipeable = !guarded && !(step != null && NO_SWIPE_STEPS.has(step));
 
   if (authLoading || !athlete) {
     return (
@@ -62,12 +80,14 @@ export default function ArenaMatchScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ headerShown: false, gestureEnabled: !guarded }} />
-      {/* Live is full screen over the camera: no app header, black ground.
-          The header slot stays in place (null) so nothing below it moves in
-          the tree. */}
-      <View className={step === "live" ? "flex-1 bg-black" : "flex-1 bg-surface"}>
-        {step === "live" ? null : <AppHeader title="Match" liveSignal="static" />}
+      <Stack.Screen options={{ headerShown: false, gestureEnabled: swipeable }} />
+      {/* The match flow is fight-night dark end to end, whatever the app
+          theme. Once a step is up the steps carry their own chrome (the
+          face-off's Leave, the verdict's exits), so the app header shows only
+          while the match loads. Its slot stays in place (null) so nothing
+          below it moves in the tree. */}
+      <ForceDarkTheme style={{ backgroundColor: step === "live" ? "#000000" : "#0D0F14" }}>
+        {step == null ? <AppHeader title="Match" liveSignal="static" /> : null}
         {/* The wizard derives its own starting step from `matches.status`, so
             backgrounding and reopening mid-match resumes where it left off. */}
         <MatchFlowWizard
@@ -76,8 +96,9 @@ export default function ArenaMatchScreen() {
           matchId={matchId}
           currentAthleteId={athlete.id}
           onStepChange={setStep}
+          onLeaveMatch={onLeaveMatch}
         />
-      </View>
+      </ForceDarkTheme>
     </>
   );
 }

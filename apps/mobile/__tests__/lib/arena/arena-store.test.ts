@@ -26,6 +26,7 @@ function controller(over: Partial<ArenaController> = {}): ArenaController {
   return {
     toggle: jest.fn().mockResolvedValue(undefined),
     goOffline: jest.fn().mockResolvedValue(true),
+    goLive: jest.fn().mockResolvedValue(true),
     sendChallenge: jest.fn().mockResolvedValue(undefined),
     cancelOutgoing: jest.fn().mockResolvedValue(undefined),
     clearCap: jest.fn(),
@@ -74,7 +75,18 @@ describe("actions", () => {
   it("are harmless no-ops when no owner is mounted", async () => {
     await expect(arenaActions.toggle()).resolves.toBeUndefined();
     await expect(arenaActions.goOffline()).resolves.toBe(true);
+    // No owner, so nobody went live.
+    await expect(arenaActions.goLive()).resolves.toBe(false);
     expect(() => arenaActions.clearCap()).not.toThrow();
+  });
+
+  it("goLive delegates to the controller's idempotent go-live", async () => {
+    const c = controller();
+    const off = registerArenaController(c);
+    await expect(arenaActions.goLive()).resolves.toBe(true);
+    expect(c.goLive).toHaveBeenCalledTimes(1);
+    expect(c.toggle).not.toHaveBeenCalled();
+    off();
   });
 
   it("delegate to the registered controller", async () => {

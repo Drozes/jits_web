@@ -1,7 +1,7 @@
 import type { Scenario } from "../context";
 import { db } from "../../oracle/db";
 import { pollUntil } from "../../lib/util";
-import { blueEnds, blueRecordsDraw, bothConfirm, exitToArena, openToLive, prepare, T } from "../flows";
+import { blueEnds, botRecordsDraw, bothConfirm, exitToArena, openToLive, prepare, T } from "../flows";
 
 const scenario: Scenario = {
   id: "E7",
@@ -24,7 +24,9 @@ const scenario: Scenario = {
       return "live";
     });
     await blueEnds(ctx, side);
-    await blueRecordsDraw(ctx, side);
+    // Red records, so Blue has a confirm step to be killed on (the recorder
+    // is auto-confirmed and skips it, B2).
+    await botRecordsDraw(ctx, side);
     await ctx.step("kill and relaunch Blue during confirm", async () => {
       await ctx.simctl.terminate();
       await ctx.simctl.launch();

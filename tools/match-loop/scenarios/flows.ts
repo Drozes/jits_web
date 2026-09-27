@@ -384,11 +384,22 @@ export async function blueEnds(ctx: ScenarioCtx, side: MatchSide): Promise<void>
   ]);
 }
 
+/**
+ * Where the recorder lands after recording. With jr_be B2 the server
+ * confirms the recorder's side with the result, so the app skips confirm
+ * and goes to the verdict ("summary"); an older backend still sends it to
+ * confirm. Either is accepted here; the step reached is traced.
+ */
+async function blueAfterRecording(ctx: ScenarioCtx): Promise<void> {
+  const step = await ctx.ui.waitStepIn(["summary", "confirm"], T.step);
+  ctx.trace.note("harness", "blue_after_record", step);
+}
+
 export async function blueRecordsSubmission(ctx: ScenarioCtx, side: MatchSide, winnerId: string, code = "armbar", finish = "90"): Promise<void> {
   const botWait = side.waitForResult(T.handshake);
   await ctx.step("Blue records a submission", () => ctx.ui.recordSubmission(winnerId, code, finish));
   await Promise.all([
-    ctx.step("Blue reaches the confirm step", () => ctx.ui.waitStep("confirm", T.step)),
+    ctx.step("Blue reaches the verdict (auto-confirmed) or confirm", () => blueAfterRecording(ctx)),
     ctx.step("bot receives result_submitted", () => botWait),
   ]);
 }
@@ -397,9 +408,20 @@ export async function blueRecordsDraw(ctx: ScenarioCtx, side: MatchSide): Promis
   const botWait = side.waitForResult(T.handshake);
   await ctx.step("Blue records a draw", () => ctx.ui.recordDraw());
   await Promise.all([
-    ctx.step("Blue reaches the confirm step", () => ctx.ui.waitStep("confirm", T.step)),
+    ctx.step("Blue reaches the verdict (auto-confirmed) or confirm", () => blueAfterRecording(ctx)),
     ctx.step("bot receives result_submitted", () => botWait),
   ]);
+}
+
+/**
+ * Red (the bot) records a draw, so Blue is the athlete who confirms: the
+ * recorder is auto-confirmed (B2) and never sees the confirm step. For the
+ * scenarios that are about Blue's confirm step (E7, E8).
+ */
+export async function botRecordsDraw(ctx: ScenarioCtx, side: MatchSide): Promise<void> {
+  const rec = await ctx.step("Red records a draw", () => side.record({ result: "draw" }));
+  ctx.eq("bot:record-ok", { ok: true }, rec);
+  await ctx.step("Blue is moved to the confirm step", () => ctx.ui.waitStep("confirm", T.step));
 }
 
 /**
@@ -419,7 +441,12 @@ export async function bothConfirm(
     return side.waitConfirmDone(T.handshake);
   })();
   botRun.catch(() => undefined); // awaited below; never an unhandled rejection
-  await ctx.step("Blue confirms", () => ctx.ui.confirmResult());
+  // A recorder the server auto-confirmed (B2) is already on the verdict and
+  // has nothing to tap; it still broadcast result_confirmed (checked below).
+  const blueStep = await ctx.ui.currentStep();
+  const blueAutoConfirmed = blueStep === "summary";
+  if (blueAutoConfirmed) ctx.trace.note("harness", "blue_auto_confirmed", true);
+  else await ctx.step("Blue confirms", () => ctx.ui.confirmResult());
   const [outcome] = await Promise.all([
     ctx.step("bot sees Blue's confirmation", () => botRun),
     ctx.step("Blue reaches the summary", () => ctx.ui.waitStep("summary", T.handshake)),
@@ -438,7 +465,12 @@ export async function bothConfirm(
     return true;
   });
   const received = side.confirmReceivedOnChannel();
-  if (channelCheck === "hard") ctx.eq("bot:confirm-channel-received-blue-result_confirmed", true, received);
+  // An auto-confirmed recorder sends result_confirmed right behind
+  // result_submitted, often before the opponent's confirm channel has joined
+  // (the app's confirm step then takes it from the DB), so it is only
+  // informational there.
+  if (channelCheck === "hard" && !blueAutoConfirmed) ctx.eq("bot:confirm-channel-received-blue-result_confirmed", true, received);
+  else if (blueAutoConfirmed) ctx.oracle("bot:confirm-channel-received-blue-result_confirmed", true, "informational", received, "Blue was auto-confirmed at record (B2)");
   else ctx.oracle("bot:confirm-channel-received-blue-result_confirmed", true, "informational", received, `bot finished confirm via ${outcome.via}`);
 }
 

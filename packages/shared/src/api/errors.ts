@@ -33,6 +33,8 @@ export type DomainErrorCode =
   | "GYM_NOT_FOUND"
   | "MATCH_NOT_FOUND"
   | "VIDEO_FILE_MISSING"
+  | "DISPUTE_WINDOW_CLOSED"
+  | "NOT_AUTHORIZED"
   | "RLS_VIOLATION"
   | "UNKNOWN";
 
@@ -114,6 +116,14 @@ const HINT_TO_CODE: Record<string, { code: DomainErrorCode; message: string }> =
     already_confirmed: {
       code: "ALREADY_CONFIRMED",
       message: "You have already confirmed this result.",
+    },
+    dispute_window_closed: {
+      code: "DISPUTE_WINDOW_CLOSED",
+      message: "Results lock 24 hours after the match. This one can no longer be disputed.",
+    },
+    not_authorized: {
+      code: "NOT_AUTHORIZED",
+      message: "Only the athletes in this match can control it.",
     },
     already_disputed: {
       code: "ALREADY_DISPUTED",

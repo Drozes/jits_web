@@ -31,7 +31,7 @@ jest.mock("lucide-react-native", () => {
 });
 const mockSubmit = jest.fn();
 jest.mock("@/lib/match-flow/use-record-result", () => ({
-  useRecordResult: () => ({ loading: false, submit: mockSubmit }),
+  useRecordResult: () => ({ loading: false, submit: mockSubmit, broadcastResultClaimed: jest.fn() }),
 }));
 
 import { ResultStep } from "@/components/match-flow/steps/result-step";
@@ -47,10 +47,8 @@ function renderResult(initialFinishSeconds?: number) {
       matchType="ranked"
       durationSeconds={300}
       initialFinishSeconds={initialFinishSeconds}
-      participants={[
-        { id: "me-1", displayName: "Me" },
-        { id: "opp-1", displayName: "Opp" },
-      ]}
+      me={{ id: "me-1", displayName: "Me", elo: 1500, weight: 170 }}
+      opponent={{ id: "opp-1", displayName: "Opp", elo: 1490, weight: 168 }}
       submissionTypes={TYPES}
       onRecorded={jest.fn()}
     />,
@@ -59,10 +57,9 @@ function renderResult(initialFinishSeconds?: number) {
 }
 
 function toSubmissionFields(s: ReturnType<typeof render>) {
-  fireEvent.press(s.getByTestId("result-outcome-submission"));
+  // Winner first (a tile), then a one-tap finish from the grid.
   fireEvent.press(s.getByTestId("result-winner-me-1"));
-  fireEvent.press(s.getByTestId("result-submission"));
-  fireEvent.press(s.getByTestId("result-submission-option-armbar"));
+  fireEvent.press(s.getByTestId("result-submission-armbar"));
 }
 
 beforeEach(() => mockSubmit.mockClear());
@@ -72,7 +69,7 @@ describe("ResultStep finish time prefill", () => {
     const s = renderResult(270);
     toSubmissionFields(s);
     expect(s.getByTestId("result-finish-time").props.value).toBe("04:30");
-    expect(s.getByTestId("result-finish-time-hint")).toHaveTextContent("From match clock");
+    expect(s.getByTestId("result-finish-time-hint")).toHaveTextContent("FROM MATCH CLOCK");
     expect(s.getByTestId("result-record")).not.toBeDisabled();
     fireEvent.press(s.getByTestId("result-record"));
     expect(mockSubmit).toHaveBeenCalledWith(
