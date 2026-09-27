@@ -414,6 +414,17 @@ export async function blueRecordsDraw(ctx: ScenarioCtx, side: MatchSide): Promis
 }
 
 /**
+ * Red (the bot) records a draw, so Blue is the athlete who confirms: the
+ * recorder is auto-confirmed (B2) and never sees the confirm step. For the
+ * scenarios that are about Blue's confirm step (E7, E8).
+ */
+export async function botRecordsDraw(ctx: ScenarioCtx, side: MatchSide): Promise<void> {
+  const rec = await ctx.step("Red records a draw", () => side.record({ result: "draw" }));
+  ctx.eq("bot:record-ok", { ok: true }, rec);
+  await ctx.step("Blue is moved to the confirm step", () => ctx.ui.waitStep("confirm", T.step));
+}
+
+/**
  * Both confirm; Blue must reach the summary and the bot's confirm step must
  * finish as the app's would (Blue's result_confirmed, or the DB showing both
  * confirmations; never a bare `completed` row).
@@ -433,7 +444,8 @@ export async function bothConfirm(
   // A recorder the server auto-confirmed (B2) is already on the verdict and
   // has nothing to tap; it still broadcast result_confirmed (checked below).
   const blueStep = await ctx.ui.currentStep();
-  if (blueStep === "summary") ctx.trace.note("harness", "blue_auto_confirmed", true);
+  const blueAutoConfirmed = blueStep === "summary";
+  if (blueAutoConfirmed) ctx.trace.note("harness", "blue_auto_confirmed", true);
   else await ctx.step("Blue confirms", () => ctx.ui.confirmResult());
   const [outcome] = await Promise.all([
     ctx.step("bot sees Blue's confirmation", () => botRun),
@@ -453,7 +465,12 @@ export async function bothConfirm(
     return true;
   });
   const received = side.confirmReceivedOnChannel();
-  if (channelCheck === "hard") ctx.eq("bot:confirm-channel-received-blue-result_confirmed", true, received);
+  // An auto-confirmed recorder sends result_confirmed right behind
+  // result_submitted, often before the opponent's confirm channel has joined
+  // (the app's confirm step then takes it from the DB), so it is only
+  // informational there.
+  if (channelCheck === "hard" && !blueAutoConfirmed) ctx.eq("bot:confirm-channel-received-blue-result_confirmed", true, received);
+  else if (blueAutoConfirmed) ctx.oracle("bot:confirm-channel-received-blue-result_confirmed", true, "informational", received, "Blue was auto-confirmed at record (B2)");
   else ctx.oracle("bot:confirm-channel-received-blue-result_confirmed", true, "informational", received, `bot finished confirm via ${outcome.via}`);
 }
 

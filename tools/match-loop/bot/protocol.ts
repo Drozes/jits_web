@@ -92,7 +92,13 @@ export const PAYLOAD_VALIDATORS: Record<string, Validator> = {
   [SESSION_MATCH_EVENTS.RECORDING_OPTIN]: (p) =>
     !isStr(p.athlete_id) ? "athlete_id missing" : typeof p.recording === "boolean" ? null : "recording not a boolean",
   [SESSION_MATCH_EVENTS.RESULT_CLAIMED]: (p) =>
-    !isStr(p.athlete_id) ? "athlete_id missing" : isNum(p.claimed_at) ? null : "claimed_at not a number",
+    !isStr(p.athlete_id)
+      ? "athlete_id missing"
+      : !isNum(p.claimed_at)
+        ? "claimed_at not a number"
+        : p.supersedes === undefined || isNum(p.supersedes)
+          ? null
+          : "supersedes not a number",
   [CHALLENGE_EVENTS.MATCH_STARTED]: (p) => (isStr(p.matchId) ? null : "matchId missing"),
   [CHALLENGE_EVENTS.DECLINED]: () => null,
 };

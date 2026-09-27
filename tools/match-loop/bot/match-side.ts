@@ -647,6 +647,16 @@ export class MatchSide {
     );
     if (!r.ok) return { ok: false, error: r.error.message };
     await this.sendAwaited(E.RESULT_SUBMITTED, result as unknown as Record<string, unknown>);
+    // jr_be B2: the server confirmed the recorder with the result. The app
+    // then tells the opponent (result_confirmed) and needs no confirm tap;
+    // mirror the signal. The bot still passes through its confirm step so a
+    // later confirm() (already_confirmed, harmless) and waitConfirmDone work.
+    const autoConfirmed = (r.data as { recorder_confirmed?: boolean } | null)?.recorder_confirmed === true;
+    if (autoConfirmed) {
+      this.myConfirmed = true;
+      this.trace.note(this.actor, "recorder_auto_confirmed", true);
+      await this.sendAwaited(E.RESULT_CONFIRMED, { athlete_id: this.meId });
+    }
     this.enter("confirm");
     return { ok: true };
   }
