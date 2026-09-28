@@ -36,7 +36,7 @@ export const APP_TIMING = {
   /** `SEND_GRACE_MS` (apps/mobile/lib/match-flow/match-sync-context.tsx): how
    * long a step waits for an awaited send before it unmounts the channel. */
   SEND_GRACE_MS: 1_500,
-  /** `READY_REPEAT_MS` (apps/mobile/components/match-flow/steps/ready-step.tsx):
+  /** `FACEOFF_REPEAT_MS` (apps/mobile/lib/match-flow/use-faceoff.ts, the ready check):
    * a ready athlete repeats ready_signal until the opponent's arrives. */
   READY_REPEAT_MS: 3_000,
   /** ConfirmStep's delay between "both confirmed" and the summary
@@ -86,6 +86,19 @@ export const PAYLOAD_VALIDATORS: Record<string, Validator> = {
   [SESSION_MATCH_EVENTS.RESULT_CONFIRMED]: (p) => (isStr(p.athlete_id) ? null : "athlete_id missing"),
   [SESSION_MATCH_EVENTS.MATCH_CANCELLED]: () => null,
   [SESSION_MATCH_EVENTS.MATCH_DISPUTED]: (p) => (isStr(p.athlete_id) ? null : "athlete_id missing"),
+  // Match-flow redesign. Presentational and repeated; weight may be null.
+  [SESSION_MATCH_EVENTS.WEIGHED_IN]: (p) =>
+    !isStr(p.athlete_id) ? "athlete_id missing" : p.weight === null || isNum(p.weight) ? null : "weight not a number",
+  [SESSION_MATCH_EVENTS.RECORDING_OPTIN]: (p) =>
+    !isStr(p.athlete_id) ? "athlete_id missing" : typeof p.recording === "boolean" ? null : "recording not a boolean",
+  [SESSION_MATCH_EVENTS.RESULT_CLAIMED]: (p) =>
+    !isStr(p.athlete_id)
+      ? "athlete_id missing"
+      : !isNum(p.claimed_at)
+        ? "claimed_at not a number"
+        : p.supersedes === undefined || isNum(p.supersedes)
+          ? null
+          : "supersedes not a number",
   [CHALLENGE_EVENTS.MATCH_STARTED]: (p) => (isStr(p.matchId) ? null : "matchId missing"),
   [CHALLENGE_EVENTS.DECLINED]: () => null,
 };

@@ -5,14 +5,15 @@ import { ArrowUpRight } from "lucide-react-native";
 import { useRequireAthlete } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { useProfileData } from "@/lib/profile/use-profile-data";
-import { useMyMatchVideos, useRefetchOnUploadSettled } from "@/lib/profile/use-my-match-videos";
+import { useRefetchOnUploadSettled } from "@/lib/profile/use-my-match-videos";
+import { useMatchLibraryFirstPage } from "@/lib/film-room/use-match-library";
 import { usePullToRefresh, useRefetchOnRefocus } from "@/lib/cache/use-refocus-refetch";
 import { useMatchExitCount } from "@/lib/arena/arena-store";
 import { matchDetailHref } from "@/lib/match-detail/href";
 import { ProfileHeader } from "@/components/profile/profile-header";
 import { ProfileQuickStats } from "@/components/profile/profile-quick-stats";
 import { AccountSection } from "@/components/profile/account-section";
-import { PastMatchVideos } from "@/components/profile/past-match-videos";
+import { FilmRoomPreview } from "@/components/profile/film-room-preview";
 import { HighlightsRow } from "@/components/profile/highlights-row";
 import { useMyHighlights } from "@/lib/highlight/use-my-highlights";
 import { ShareProfileSheet } from "@/components/share-profile-sheet";
@@ -107,20 +108,20 @@ export default function ProfileScreen() {
   const tokens = useThemedTokens();
   const { stats, gymName, eloThisMonth, history, isLoading, refreshing: profileBusy, onRefresh: refetchProfile } =
     useProfileData(athlete?.id, athlete?.primary_gym_id);
-  const videos = useMyMatchVideos(athlete?.id);
-  const refetchVideos = videos.refetch;
+  const library = useMatchLibraryFirstPage(athlete?.id);
+  const refetchVideos = library.refetch;
   const highlights = useMyHighlights(athlete?.id);
   const refetchHighlights = highlights.refetch;
 
-  // Pull-to-refresh and returning to the tab both reload the profile AND the
-  // videos list and the highlights row, so a video uploaded from the match
-  // wizard (and the reel made from it) shows up here.
+  // Pull-to-refresh and returning to the tab both reload the profile, the
+  // Film Room preview and the highlights row, so a video uploaded from the
+  // match wizard (and the reel made from it) shows up here.
   const refetchAll = React.useCallback(() => {
     refetchProfile();
     refetchVideos();
     refetchHighlights();
   }, [refetchProfile, refetchVideos, refetchHighlights]);
-  const { refreshing, onRefresh } = usePullToRefresh(refetchAll, profileBusy || videos.isValidating);
+  const { refreshing, onRefresh } = usePullToRefresh(refetchAll, profileBusy || library.isValidating);
   useRefetchOnRefocus(refetchAll, useMatchExitCount());
   // The video row lands when the upload settles, often after that refocus.
   const historyMatchIds = React.useMemo(() => history.map((m) => m.match_id), [history]);
@@ -209,7 +210,12 @@ export default function ProfileScreen() {
               onOpen={highlights.markSeenLocally}
             />
 
-            <PastMatchVideos videos={videos} />
+            <FilmRoomPreview
+              items={library.data?.items}
+              error={!!library.error}
+              onRetry={refetchVideos}
+              viewer={{ name: athlete.display_name ?? "You", photoUrl: athlete.profile_photo_url }}
+            />
 
             <View className="gap-2">
               <Pressable

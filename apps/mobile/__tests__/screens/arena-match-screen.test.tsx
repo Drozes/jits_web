@@ -15,11 +15,19 @@ import { ARENA_EXIT_LABEL, ARENA_HREF } from "@/lib/arena/constants";
 
 // ---- mocks ----
 
+const mockDismissTo = jest.fn();
+const mockScreenOptions = jest.fn();
 jest.mock("expo-router", () => {
   const R = require("react");
   return {
-    Stack: { Screen: () => R.createElement(R.Fragment, null) },
+    Stack: {
+      Screen: (props: { options?: unknown }) => {
+        mockScreenOptions(props.options);
+        return R.createElement(R.Fragment, null);
+      },
+    },
     useLocalSearchParams: () => ({ matchId: "99999999-9999-4999-8999-999999999999" }),
+    useRouter: () => ({ dismissTo: mockDismissTo, replace: jest.fn(), push: jest.fn() }),
   };
 });
 
@@ -29,6 +37,7 @@ jest.mock("@react-navigation/native", () => ({
 }));
 
 jest.mock("@/lib/theme/use-theme", () => ({
+  useResolvedColorScheme: () => "light",
   useThemedTokens: () => ({ textSecondary: "#9AA3AD" }),
 }));
 
@@ -129,6 +138,43 @@ describe("ArenaMatchScreen", () => {
     expect(getLeftMatchIds().has("99999999-9999-4999-8999-999999999999")).toBe(false);
     screen.unmount();
     expect(getLeftMatchIds().has("99999999-9999-4999-8999-999999999999")).toBe(true);
+  });
+
+  it("lets the face-off neither swipe back nor block its own exits (jits-bh2v)", async () => {
+    render(<ArenaMatchScreen />);
+    await waitFor(() => expect(mockOnStepChange).toBeDefined());
+    mockUsePreventRemove.mockClear();
+    mockScreenOptions.mockClear();
+    act(() => {
+      mockOnStepChange?.("weight");
+    });
+    // No preventRemove guard: Leave and a remote cancel must still navigate.
+    expect(mockUsePreventRemove.mock.calls.every((c) => c[0] === false)).toBe(true);
+    // But no swipe back, which used to orphan a pending match.
+    expect(mockScreenOptions).toHaveBeenLastCalledWith(expect.objectContaining({ gestureEnabled: false }));
+  });
+
+  it("'Leave and confirm later' lifts the guard, then exits to the Arena", async () => {
+    render(<ArenaMatchScreen />);
+    await waitFor(() => expect(mockOnStepChange).toBeDefined());
+    act(() => {
+      mockOnStepChange?.("result");
+    });
+    expect(mockUsePreventRemove.mock.calls.at(-1)?.[0]).toBe(true);
+    const onLeave = mockWizardProps.mock.calls.at(-1)?.[0].onLeaveMatch as () => void;
+    act(() => onLeave());
+    expect(mockUsePreventRemove.mock.calls.at(-1)?.[0]).toBe(false);
+    await waitFor(() => expect(mockDismissTo).toHaveBeenCalledWith(ARENA_HREF));
+  });
+
+  it("drops the app header once a step is up (the steps carry their own chrome)", async () => {
+    const screen = render(<ArenaMatchScreen />);
+    expect(screen.queryByTestId("app-header")).toBeTruthy();
+    await waitFor(() => expect(mockOnStepChange).toBeDefined());
+    act(() => {
+      mockOnStepChange?.("weight");
+    });
+    expect(screen.queryByTestId("app-header")).toBeNull();
   });
 
   it("shows the LIVE signal as static, so tapping it cannot pop the match", () => {

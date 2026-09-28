@@ -70,8 +70,12 @@ jest.mock("@/lib/profile/use-my-match-videos", () => ({
   // The real upload-settled refetch, driven by the real upload store below.
   useRefetchOnUploadSettled: jest.requireActual("@/lib/profile/use-my-match-videos")
     .useRefetchOnUploadSettled,
-  useMyMatchVideos: () => ({
-    items: [],
+}));
+// The Film Room preview reads the first library page; its refetch is the
+// "videos" reload this suite tracks.
+jest.mock("@/lib/film-room/use-match-library", () => ({
+  useMatchLibraryFirstPage: () => ({
+    data: { items: [], next_before: null, next_before_id: null, source: "rpc" },
     isLoading: false,
     isValidating: false,
     error: null,
@@ -86,7 +90,7 @@ function mockStub(testID: string) {
 jest.mock("@/components/profile/profile-header", () => ({ ProfileHeader: mockStub("profile-header") }));
 jest.mock("@/components/profile/profile-quick-stats", () => ({ ProfileQuickStats: mockStub("quick-stats") }));
 jest.mock("@/components/profile/account-section", () => ({ AccountSection: mockStub("account") }));
-jest.mock("@/components/profile/past-match-videos", () => ({ PastMatchVideos: mockStub("videos") }));
+jest.mock("@/components/profile/film-room-preview", () => ({ FilmRoomPreview: mockStub("film-room-preview") }));
 const mockHighlightsRefetch = jest.fn();
 const mockMarkSeenLocally = jest.fn();
 const mockHighlightsRow = jest.fn();
@@ -185,14 +189,14 @@ describe("Profile recent matches and refresh", () => {
     expect(mockHighlightsRefetch).toHaveBeenCalledTimes(1);
   });
 
-  it("renders the Highlights row between Recent Matches and Past Match Videos", () => {
+  it("renders the Highlights row between Recent Matches and the Film Room preview", () => {
     const utils = render(<ProfileScreen />);
     const ids = utils.UNSAFE_root.findAll(
       (n: HostNode) => typeof n.type === "string" && typeof n.props.testID === "string",
     ).map((n: HostNode) => n.props.testID as string);
     expect(utils.getByText("Recent Matches")).toBeTruthy();
     expect(ids.indexOf("highlights-row")).toBeGreaterThan(-1);
-    expect(ids.indexOf("highlights-row")).toBeLessThan(ids.indexOf("videos"));
+    expect(ids.indexOf("highlights-row")).toBeLessThan(ids.indexOf("film-room-preview"));
     expect(ids.indexOf("quick-stats")).toBeLessThan(ids.indexOf("highlights-row"));
     expect(mockHighlightsRow).toHaveBeenLastCalledWith({
       items: [{ highlightId: "h1" }],
@@ -202,7 +206,7 @@ describe("Profile recent matches and refresh", () => {
   });
 });
 
-describe("Past Match Videos after an upload lands", () => {
+describe("Film Room preview after an upload lands", () => {
   it("refetches the videos once when a history match's upload settles after the refocus", () => {
     resetMatchUploadStore();
     mockHistory.push({
@@ -249,6 +253,12 @@ describe("Profile tab", () => {
     ).map((n: HostNode) => n.props.testID as string);
     expect(ids.indexOf("live-header-signal")).toBeGreaterThan(-1);
     expect(ids.indexOf("live-header-signal")).toBeLessThan(ids.indexOf("notification-bell"));
+  });
+
+  it("shows the Film Room preview in place of Past Match Videos", () => {
+    const { getByTestId, queryByText } = render(<ProfileScreen />);
+    expect(getByTestId("film-room-preview")).toBeTruthy();
+    expect(queryByText("Past Match Videos")).toBeNull();
   });
 
   it("offers Share profile in the body, wired to the same share sheet", () => {

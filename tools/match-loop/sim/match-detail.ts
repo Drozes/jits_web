@@ -10,8 +10,9 @@
  *     "Video state: loading|loaded|error|absent|processing|missing";
  *   - `match-video-watch-<videoId>`: each Watch button, label
  *     "Watch your recording" / "Watch <Name>'s recording";
- *   - history rows labelled "Open match vs <name>" (Pressables), Past Match
- *     Videos rows `past-video-row-<matchId>` ("Open match video vs <name>").
+ *   - history rows labelled "Open match vs <name>" (Pressables), and the
+ *     Profile Film Room preview posters `past-video-row-<matchId>` ("Open
+ *     match video vs <name>"; they replaced the Past Match Videos rows).
  * Selectors take the testID OR the label, never a container testID.
  */
 import type { AXElement, Idb, Query } from "./idb";

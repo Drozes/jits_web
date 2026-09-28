@@ -1,17 +1,24 @@
+import { WEB_APP_URL } from "../constants";
+
 const BASE_URL = "https://elorated.com";
 
-type ShareContentType = "athlete" | "session" | "gym" | "match-result";
+type ShareContentType = "athlete" | "session" | "gym" | "match-result" | "match";
 
 const PATH_MAP: Record<ShareContentType, string> = {
   athlete: "athlete",
   session: "session",
   gym: "gyms",
   "match-result": "athlete",
+  // The web match page, `/matches/<id>`.
+  match: "matches",
 };
 
 /** Build a shareable URL for a given content type and ID. */
 export function buildShareUrl(type: ShareContentType, id: string): string {
-  return `${BASE_URL}/${PATH_MAP[type]}/${id}`;
+  // A match links to the live web app (participant-gated `/matches/<id>`);
+  // the other types keep their elorated.com universal-link paths.
+  const base = type === "match" ? WEB_APP_URL : BASE_URL;
+  return `${base}/${PATH_MAP[type]}/${id}`;
 }
 
 interface MatchResultData {

@@ -1,77 +1,78 @@
 import * as React from "react";
-import { Pressable, Text, View } from "react-native";
-import { Check } from "lucide-react-native";
+import { Text, View } from "react-native";
+import { Check, Flag } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
 import { toast } from "@/components/ui/toast";
-import { useThemedTokens } from "@/lib/theme/use-theme";
 import { supabase } from "@/lib/supabase/client";
 import { confirmMatchResult } from "@jits/shared/api/mutations";
 import type { BroadcastResult } from "@jits/shared/hooks/use-session-match-sync";
 import { settleWithin } from "@jits/shared/hooks/session-match-channel";
-import {
-  SEND_GRACE_MS,
-  useMatchSyncContext,
-  useStepMatchSync,
-} from "@/lib/match-flow/match-sync-context";
+import { SEND_GRACE_MS, useMatchSyncContext, useStepMatchSync } from "@/lib/match-flow/match-sync-context";
 import { mutationQueue, isQueuedResult } from "@/lib/network/mutation-queue";
 import { matchHaptics } from "@/lib/match-flow/use-haptics";
-import { ConfirmPanel, ResultBanner } from "./confirm-step-panels";
+import { formatElapsed } from "@/lib/match-flow/format-elapsed";
+import { disputeLockNote, isDisputeWindowClosed } from "@/lib/match-flow/match-extras";
+import { usePalette } from "@/lib/theme/palette";
+import { FIGHT_RADIUS } from "../fight/fight-tokens";
+import { FightButton, InitialsBlock, Mono, RatingBlock, shortName } from "../fight/fight-ui";
 import { DisputeForm } from "./dispute-form";
-import { cn } from "@/lib/cn";
+
+export interface ConfirmAthlete {
+  athlete_id: string;
+  display_name: string;
+  elo_before?: number | null;
+  elo_after?: number | null;
+  elo_delta?: number | null;
+}
 
 interface ConfirmStepProps {
   matchId: string;
   matchType: "ranked" | "casual";
-  currentAthleteId: string;
-  opponentId: string;
-  opponentDisplayName: string;
+  me: ConfirmAthlete;
+  opponent: ConfirmAthlete;
   resultData: BroadcastResult | null;
-  /** Athletes the DB has a confirmation for (from the wizard's reconciler),
-   * so a missed result_confirmed, or a remount, cannot hide one. */
+  /** Athletes the DB has a confirmation for (from the wizard's reconciler). */
   confirmedAthleteIds: string[];
+  /** Display name of the finish (B4 `submission_name`, else the catalogue). */
+  submissionName: string | null;
+  finishTimeSeconds: number | null;
+  /** B3: completed_at + 24 h; null on an older backend. */
+  disputeLocksAt: string | null;
   onCompleted: () => void;
 }
 
 /** After this athlete has confirmed, how long before they may stop waiting
- * on an opponent who never confirms (the result and ELO are already final
- * at record time; the confirmation does not change them). */
+ * on an opponent who never confirms. */
 const LEAVE_AFTER_MS = 20_000;
 
+/** "YOU WON" / "YOU LOST" / "DRAW" / "MATCH COMPLETE" (the harness reads it). */
+export function confirmVerdict(resultData: BroadcastResult | null, meId: string): string {
+  if (resultData?.result === "draw") return "DRAW";
+  if (resultData?.result === "submission") return resultData.winnerId === meId ? "YOU WON" : "YOU LOST";
+  return "MATCH COMPLETE";
+}
+
 /**
- * Step 7: both athletes confirm the recorded result. Either side can
- * dispute (which surfaces a reason input). Advances to the summary when
- * both have confirmed or either has disputed.
+ * Step 7, the opponent's side: confirm the recorded result with one tap or
+ * dispute it. The recorder never lands here on a current backend: the server
+ * confirms their side with the result (B2) and they go straight to the
+ * verdict. A dispute is only possible for 24 h after the match (B3).
  *
- * Signals, fastest first: the result_confirmed / match_disputed broadcasts;
- * then the wizard's reconciler (it polls this step and re-reads the match on
- * foreground and on every channel rejoin), which feeds `confirmedAthleteIds`
- * and moves the wizard to the summary itself once both rows exist or the
- * match is disputed. `completed` alone is NOT a signal here:
- * record_match_result sets it at record time, before anyone confirmed.
- *
- * ELO design system: hero ResultBanner verdict, two ConfirmPanels, a
- * Signal Red confirm cta, and an underlined dispute escape. Mirrors D9
- * wireframe (lines 1275-1323).
+ * Signals, fastest first: result_confirmed / match_disputed broadcasts, then
+ * the wizard's reconciler (confirmations from the DB), which also moves the
+ * wizard to the verdict once both rows exist or the match is disputed.
  */
 export function ConfirmStep(props: ConfirmStepProps) {
-  const tokens = useThemedTokens();
-  const {
-    matchId,
-    matchType,
-    currentAthleteId,
-    opponentId,
-    opponentDisplayName,
-    resultData,
-    confirmedAthleteIds,
-    onCompleted,
-  } = props;
+  const p = usePalette();
+  const { matchId, matchType, me, opponent, resultData, confirmedAthleteIds, submissionName, finishTimeSeconds, disputeLocksAt, onCompleted } = props;
   const [myConfirmedLocal, setMyConfirmed] = React.useState(false);
   const [opponentConfirmedLocal, setOpponentConfirmed] = React.useState(false);
   const [showDispute, setShowDispute] = React.useState(false);
+  const [windowClosed, setWindowClosed] = React.useState(() => isDisputeWindowClosed(disputeLocksAt));
   const [canLeave, setCanLeave] = React.useState(false);
   const { reconcileNow } = useMatchSyncContext();
-  const myConfirmed = myConfirmedLocal || confirmedAthleteIds.includes(currentAthleteId);
-  const opponentConfirmed = opponentConfirmedLocal || confirmedAthleteIds.includes(opponentId);
+  const myConfirmed = myConfirmedLocal || confirmedAthleteIds.includes(me.athlete_id);
+  const opponentConfirmed = opponentConfirmedLocal || confirmedAthleteIds.includes(opponent.athlete_id);
 
   const advancedRef = React.useRef(false);
   const onCompletedRef = React.useRef(onCompleted);
@@ -85,71 +86,53 @@ export function ConfirmStep(props: ConfirmStepProps) {
   const sync = useStepMatchSync({
     matchId,
     onResultConfirmed: (athleteId) => {
-      if (athleteId === opponentId) setOpponentConfirmed(true);
+      if (athleteId === opponent.athlete_id) setOpponentConfirmed(true);
     },
     onMatchDisputed: (athleteId) => {
-      // The opponent disputed: nothing left to confirm (jits-wfpo).
-      if (athleteId === currentAthleteId) return;
-      toast.info({
-        text1: "Result disputed",
-        description: `${opponentDisplayName} disputed the result. An admin will review it.`,
-      });
+      if (athleteId === me.athlete_id) return;
+      toast.info({ text1: "Result disputed", description: `${opponent.display_name} disputed the result. An admin will review it.` });
       advance();
     },
   });
 
-  // Auto-advance when both sides have confirmed.
   React.useEffect(() => {
-    if (myConfirmed && opponentConfirmed) {
-      const t = setTimeout(advance, 1500);
-      return () => clearTimeout(t);
-    }
+    if (!myConfirmed || !opponentConfirmed) return;
+    const t = setTimeout(advance, 1500);
+    return () => clearTimeout(t);
   }, [myConfirmed, opponentConfirmed, advance]);
 
-  // An opponent who closes the app never confirms; do not hold this athlete
-  // on the confirm step forever for a formality.
   React.useEffect(() => {
     if (!myConfirmed || opponentConfirmed) return;
     const t = setTimeout(() => setCanLeave(true), LEAVE_AFTER_MS);
     return () => clearTimeout(t);
   }, [myConfirmed, opponentConfirmed]);
 
-  // The practice match (components/practice/practice-steps.tsx) mirrors this step's layout.
+  React.useEffect(() => {
+    if (isDisputeWindowClosed(disputeLocksAt)) setWindowClosed(true);
+  }, [disputeLocksAt]);
+
   async function handleConfirm() {
     if (myConfirmed) return;
     setMyConfirmed(true);
-    // Route through the offline-tolerant queue. Online runs immediately;
-    // offline queues under a stable per-athlete key and the queue auto-
-    // flushes on reconnect. Last write wins for the same key.
-    const res = await mutationQueue.enqueue(
-      `confirm-result:${matchId}:${currentAthleteId}`,
-      () => confirmMatchResult(supabase, matchId),
+    const res = await mutationQueue.enqueue(`confirm-result:${matchId}:${me.athlete_id}`, () =>
+      confirmMatchResult(supabase, matchId),
     );
     if (!res.ok) {
       setMyConfirmed(false);
       void matchHaptics.error();
       toast.error({ text1: "Couldn't confirm", description: res.error.message });
-      // Most often the opponent disputed and that signal was missed.
       reconcileNow();
       return;
     }
-    // A light tick, not the Success buzz: the result was already recorded.
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
     if (isQueuedResult(res.data)) {
-      toast.success({
-        text1: "Saved locally",
-        description: "Confirmation will sync when you're back online.",
-      });
+      toast.success({ text1: "Saved locally", description: "Confirmation will sync when you're back online." });
     }
-    // Broadcast is a no-op offline; the opponent's reconciler reads the
-    // confirmation from the DB once our queued write lands.
-    void sync.broadcastResultConfirmed(currentAthleteId);
+    void sync.broadcastResultConfirmed(me.athlete_id);
   }
 
   async function handleDisputed() {
-    // Tell the opponent before this step (and its channel) goes away; they
-    // would otherwise wait on a confirmation that can never come.
-    await settleWithin(sync.broadcastMatchDisputed(currentAthleteId), SEND_GRACE_MS);
+    await settleWithin(sync.broadcastMatchDisputed(me.athlete_id), SEND_GRACE_MS);
     advance();
   }
 
@@ -159,77 +142,117 @@ export function ConfirmStep(props: ConfirmStepProps) {
         matchId={matchId}
         onCancel={() => setShowDispute(false)}
         onSubmitted={() => void handleDisputed()}
+        onWindowClosed={() => {
+          setWindowClosed(true);
+          setShowDispute(false);
+        }}
       />
     );
   }
 
-  return (
-    <View className="gap-5 px-1 py-4">
-      <ResultBanner
-        resultData={resultData}
-        currentAthleteId={currentAthleteId}
-        matchType={matchType}
-      />
+  const isDraw = resultData?.result === "draw";
+  const winner = resultData?.winnerId === me.athlete_id ? me : resultData?.winnerId === opponent.athlete_id ? opponent : null;
+  const how = [submissionName ? `by ${submissionName}` : null, finishTimeSeconds != null ? formatElapsed(finishTimeSeconds) : null]
+    .filter(Boolean)
+    .join(" · ");
+  const oppShort = shortName(opponent.display_name);
+  const lockNote = windowClosed ? "The dispute window has closed." : disputeLockNote(disputeLocksAt);
 
-      <View className="flex-row gap-3">
-        <ConfirmPanel label="You" side="you" state={myConfirmed ? "confirmed" : "your-call"} />
-        <ConfirmPanel
-          label={opponentDisplayName}
-          side="opponent"
-          state={opponentConfirmed ? "confirmed" : "confirming"}
+  return (
+    <View style={{ gap: 20 }}>
+      <View style={{ gap: 10 }}>
+        <Mono>{opponentConfirmed ? `RESULT RECORDED BY ${oppShort.toUpperCase()}` : "RESULT RECORDED"}</Mono>
+        <Text accessibilityRole="header" className="font-heading uppercase" style={{ fontSize: 30, letterSpacing: 0.6, color: p.text }}>
+          Confirm result
+        </Text>
+      </View>
+
+      <View style={{ backgroundColor: p.plate, borderWidth: 1, borderColor: p.hairline, borderRadius: FIGHT_RADIUS.plate }}>
+        <View style={{ paddingVertical: 20, paddingHorizontal: 16, gap: 12 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+            {winner ? <InitialsBlock name={winner.display_name} size={40} fontSize={14} /> : null}
+            <View style={{ flex: 1 }}>
+              <Mono color={p.text3}>{isDraw ? "RESULT" : "WINNER"}</Mono>
+            </View>
+            <Text testID="confirm-verdict" className="font-mono-bold" style={{ fontSize: 11, letterSpacing: 1.68, color: p.text2 }}>
+              {confirmVerdict(resultData, me.athlete_id)}
+            </Text>
+          </View>
+          <Text className="font-display" style={{ fontSize: 60, lineHeight: 56, color: p.text }}>
+            {isDraw ? "Draw" : winner ? `${shortName(winner.display_name)} won` : "Result in"}
+          </Text>
+          {how ? (
+            <Text className="font-body" style={{ fontSize: 16, color: p.text2 }}>
+              {how}
+            </Text>
+          ) : null}
+        </View>
+        {matchType === "ranked" && me.elo_after != null ? (
+          <View style={{ borderTopWidth: 1, borderColor: p.hairline, padding: 12 }}>
+            <RatingBlock label="YOUR RATING" before={me.elo_before ?? null} after={me.elo_after} delta={me.elo_delta ?? null} />
+          </View>
+        ) : null}
+      </View>
+
+      <View style={{ backgroundColor: p.plate, borderWidth: 1, borderColor: p.hairline, borderRadius: FIGHT_RADIUS.plate }}>
+        <StatusRow
+          testID={`confirm-panel-opponent-${opponentConfirmed ? "confirmed" : "confirming"}`}
+          name={oppShort}
+          status={opponentConfirmed ? `${oppShort.toUpperCase()} CONFIRMED ✓` : "WAITING"}
+          done={opponentConfirmed}
+          divider
+        />
+        <StatusRow
+          testID={`confirm-panel-you-${myConfirmed ? "confirmed" : "your-call"}`}
+          name={`${shortName(me.display_name)} (you)`}
+          status={myConfirmed ? "CONFIRMED ✓" : "WAITING ON YOU"}
+          done={myConfirmed}
         />
       </View>
 
       {!myConfirmed ? (
-        <Pressable
-          testID="confirm-result"
-          accessibilityRole="button"
-          onPress={handleConfirm}
-          className="bg-cta items-center justify-center py-3 rounded-sm active:bg-cta-hover flex-row gap-2"
-        >
-          <Check size={16} color={tokens.textOnAccent} />
-          <Text className="font-heading text-[13px] text-ink-on-cta uppercase tracking-caps">
-            Confirm Result
-          </Text>
-        </Pressable>
+        <View style={{ gap: 12 }}>
+          <FightButton testID="confirm-result" label="Confirm result" onPress={() => void handleConfirm()} icon={(c) => <Check size={16} color={c} />} />
+          {windowClosed ? null : (
+            <FightButton
+              testID="confirm-dispute"
+              variant="secondary"
+              label="Dispute result"
+              onPress={() => setShowDispute(true)}
+              icon={(c) => <Flag size={16} color={c} />}
+            />
+          )}
+          {lockNote ? (
+            <Text className="font-mono" style={{ textAlign: "center", fontSize: 11, letterSpacing: 0.4, color: p.text2 }}>
+              {lockNote}
+            </Text>
+          ) : null}
+        </View>
       ) : !opponentConfirmed ? (
-        <Text className="text-center font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">
-          {`Waiting for ${opponentDisplayName} to confirm...`}
-        </Text>
+        <View style={{ gap: 12, alignItems: "center" }}>
+          <Mono>{`Waiting for ${opponent.display_name} to confirm...`}</Mono>
+          {canLeave ? (
+            <FightButton testID="confirm-leave" variant="ghost" label="Continue without waiting" onPress={advance} height={44} />
+          ) : null}
+        </View>
       ) : null}
+    </View>
+  );
+}
 
-      {myConfirmed && !opponentConfirmed && canLeave ? (
-        <Pressable
-          testID="confirm-leave"
-          accessibilityRole="button"
-          onPress={advance}
-          className="items-center py-2 active:opacity-70"
-          hitSlop={8}
-        >
-          <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l underline">
-            Continue without waiting
-          </Text>
-        </Pressable>
-      ) : null}
-
-      {!myConfirmed ? (
-        <Pressable
-          testID="confirm-dispute"
-          accessibilityRole="button"
-          onPress={() => setShowDispute(true)}
-          className="items-center py-2 active:opacity-70"
-          hitSlop={8}
-        >
-          <Text
-            className={cn(
-              "font-mono text-[10px] text-ink-3 uppercase tracking-caps-l",
-              "underline",
-            )}
-          >
-            Dispute result
-          </Text>
-        </Pressable>
-      ) : null}
+function StatusRow({ name, status, done, divider = false, testID }: { name: string; status: string; done: boolean; divider?: boolean; testID?: string }) {
+  const p = usePalette();
+  return (
+    <View
+      testID={testID}
+      style={{ height: 48, paddingHorizontal: 14, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderBottomWidth: divider ? 1 : 0, borderColor: p.hairline }}
+    >
+      <Text numberOfLines={1} className="font-heading uppercase" style={{ flex: 1, fontSize: 13, letterSpacing: 0.52, color: p.text }}>
+        {name}
+      </Text>
+      <Mono bold size={11} spacing={1.68} color={done ? p.win : p.amber}>
+        {status}
+      </Mono>
     </View>
   );
 }

@@ -222,6 +222,20 @@ export class Screens {
     }
   }
 
+  /** Wait until the wizard is on any of `steps`; resolves which one. */
+  async waitStepIn(steps: WizardStep[], timeoutMs = 15_000): Promise<WizardStep> {
+    const start = Date.now();
+    for (;;) {
+      const els = await this.idb.describe();
+      const cur = await this.currentStep(els);
+      if (cur && steps.includes(cur)) return cur;
+      if (Date.now() - start > timeoutMs) {
+        throw new ExpectationTimeout(`wizard step in [${steps.join(", ")}]`, timeoutMs, { currentStep: cur, screen: summarise(els) });
+      }
+      await new Promise((r) => setTimeout(r, 350));
+    }
+  }
+
   async confirmWeights(): Promise<void> {
     await this.idb.tapQ({ id: "weight-confirm" }, 10_000);
   }
@@ -261,7 +275,7 @@ export class Screens {
 
   /** Fill the submission form without tapping Record (for E10). */
   async fillSubmission(winnerId: string, code: string, finishTime: string): Promise<AXElement> {
-    await this.idb.tapQ({ id: "result-outcome-submission" });
+    await this.tapOutcomeSubmissionIfPresent();
     await this.idb.tapQ({ id: `result-winner-${winnerId}` });
     const chip = await this.idb.scrollTo({ id: `result-submission-${code}` });
     await this.idb.tap(chip);
@@ -274,8 +288,19 @@ export class Screens {
     await this.idb.tapQ({ id: "live-end" });
   }
 
+  /**
+   * The redesigned result step (match-flow redesign) has no Submission /
+   * Draw toggle: tapping a winner tile IS the submission choice. Older
+   * builds still show the toggle, so tap it only when it is there.
+   */
+  private async tapOutcomeSubmissionIfPresent(): Promise<void> {
+    await this.idb.waitAny([{ id: "result-outcome-submission" }, { id: "result-outcome-draw" }], 10_000);
+    const toggle = await this.idb.find({ id: "result-outcome-submission" });
+    if (toggle) await this.idb.tap(toggle);
+  }
+
   async recordSubmission(winnerId: string, code: string, finishTime: string): Promise<void> {
-    await this.idb.tapQ({ id: "result-outcome-submission" });
+    await this.tapOutcomeSubmissionIfPresent();
     await this.idb.tapQ({ id: `result-winner-${winnerId}` });
     const chip = await this.idb.scrollTo({ id: `result-submission-${code}` });
     await this.idb.tap(chip);

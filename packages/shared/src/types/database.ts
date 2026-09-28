@@ -796,7 +796,9 @@ export type Database = {
           status: string
           storage_path: string | null
           sync_offset_ms: number | null
+          thumbnail_height: number | null
           thumbnail_url: string | null
+          thumbnail_width: number | null
           title: string | null
           updated_at: string
           uploaded_by: string
@@ -830,7 +832,9 @@ export type Database = {
           status?: string
           storage_path?: string | null
           sync_offset_ms?: number | null
+          thumbnail_height?: number | null
           thumbnail_url?: string | null
+          thumbnail_width?: number | null
           title?: string | null
           updated_at?: string
           uploaded_by: string
@@ -864,7 +868,9 @@ export type Database = {
           status?: string
           storage_path?: string | null
           sync_offset_ms?: number | null
+          thumbnail_height?: number | null
           thumbnail_url?: string | null
+          thumbnail_width?: number | null
           title?: string | null
           updated_at?: string
           uploaded_by?: string
@@ -2396,6 +2402,14 @@ export type Database = {
         }
         Returns: Json
       }
+      can_control_match: {
+        Args: {
+          p_caller_id: string
+          p_match_id: string
+          p_timekeeper_id: string
+        }
+        Returns: boolean
+      }
       can_create_challenge:
         | { Args: never; Returns: boolean }
         | { Args: { p_opponent_id?: string }; Returns: boolean }
@@ -2629,9 +2643,14 @@ export type Database = {
           submission_type_display_name: string
         }[]
       }
+      get_match_rank_change: { Args: { p_match_id: string }; Returns: Json }
       get_match_videos: { Args: { p_match_id: string }; Returns: Json }
       get_my_highlights: {
         Args: { p_before?: string; p_limit?: number; p_unseen_only?: boolean }
+        Returns: Json
+      }
+      get_my_match_library: {
+        Args: { p_before?: string; p_before_id?: string; p_limit?: number }
         Returns: Json
       }
       get_recent_activity: {
@@ -2697,7 +2716,7 @@ export type Database = {
       mark_practice_match: {
         Args: { p_event: string }
         Returns: {
-          practice_match_completed_at: string
+          practice_match_completed_at: string | null
           practice_match_offered_at: string
         }[]
       }
@@ -2824,8 +2843,11 @@ export type Database = {
       }
       set_match_video_thumbnail_url: {
         Args: {
+          p_duration_seconds?: number
           p_expected_storage_path?: string
+          p_thumbnail_height?: number
           p_thumbnail_url: string
+          p_thumbnail_width?: number
           p_video_id: string
         }
         Returns: undefined

@@ -1,10 +1,13 @@
 /**
  * The match step renderer hands the live step's clock reading up to the
  * wizard (setFinishSeconds) as it advances to "end", and passes the stored
- * reading down to the result step as initialFinishSeconds.
+ * reading down to the result step as initialFinishSeconds. A result the
+ * server auto-confirmed for the recorder (B2) skips the confirm step.
  */
 import * as React from "react";
 import { fireEvent, render } from "@testing-library/react-native";
+
+jest.mock("@/lib/supabase/client", () => ({ supabase: {} }));
 
 const mockResultProps: { current: Record<string, unknown> | null } = { current: null };
 jest.mock("@/components/match-flow/steps/live-step", () => ({
@@ -28,11 +31,10 @@ jest.mock("@/components/match-flow/match-recorder-context", () => ({
   useMatchRecorder: () => ({ state: "idle" }),
 }));
 jest.mock("@/lib/video/match-upload-store", () => ({ useMatchUpload: () => null }));
-jest.mock("@/components/match-flow/steps/weight-step", () => ({}));
-jest.mock("@/components/match-flow/steps/ready-step", () => ({}));
+jest.mock("@/components/match-flow/faceoff/faceoff-body", () => ({}));
 jest.mock("@/components/match-flow/steps/end-step", () => ({}));
 jest.mock("@/components/match-flow/steps/confirm-step", () => ({}));
-jest.mock("@/components/match-flow/steps/summary-step", () => ({}));
+jest.mock("@/components/match-flow/verdict/verdict-step", () => ({}));
 jest.mock("@/components/match-flow/steps/wait-step", () => ({}));
 
 import { MatchStepRenderer } from "@/components/match-flow/match-step-renderer";
@@ -55,6 +57,7 @@ function renderStep(
 ) {
   const setStep = jest.fn();
   const setFinishSeconds = jest.fn();
+  const refresh = jest.fn();
   const s = render(
     <MatchStepRenderer
       step={step}
@@ -64,7 +67,8 @@ function renderStep(
       matchType="ranked"
       matchStatus="in_progress"
       durationSeconds={300}
-      startedAt={new Date().toISOString()}
+      // Past the 3 s countdown, so the live step itself is up.
+      startedAt={new Date(Date.now() - 10_000).toISOString()}
       pausedAt={null}
       totalPausedDuration={0}
       me={participant("me")}
@@ -73,17 +77,17 @@ function renderStep(
       resultData={null}
       ownOutcome={null}
       confirmedAthleteIds={[]}
+      extras={{ winnerId: null, submissionName: null, finishTimeSeconds: null, disputeLocksAt: null }}
+      recording
       setStep={setStep}
-      setStartedAt={jest.fn()}
       setResultData={jest.fn()}
       advanceToResult={jest.fn()}
       setFinishSeconds={setFinishSeconds}
-      refresh={jest.fn()}
-      onCancelledRemotely={jest.fn()}
+      refresh={refresh}
       {...extra}
     />,
   );
-  return { ...s, setStep, setFinishSeconds };
+  return { ...s, setStep, setFinishSeconds, refresh };
 }
 
 describe("MatchStepRenderer finish seconds", () => {
@@ -102,5 +106,24 @@ describe("MatchStepRenderer finish seconds", () => {
   it("passes nothing when there is no reading (cold start into result)", () => {
     renderStep("result");
     expect(mockResultProps.current?.initialFinishSeconds).toBeUndefined();
+  });
+});
+
+describe("MatchStepRenderer after a result", () => {
+  it("an auto-confirmed recorder goes straight to the verdict, refreshing the stamped ELO", () => {
+    const { setStep, refresh } = renderStep("result");
+    const onRecorded = mockResultProps.current?.onRecorded as (r: unknown, m: unknown) => void;
+    onRecorded({ result: "draw" }, { recorderConfirmed: true });
+    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(setStep).toHaveBeenCalledWith("summary");
+    expect(setStep).not.toHaveBeenCalledWith("confirm");
+  });
+
+  it("otherwise (the opponent recorded, queued offline, older backend) it confirms", () => {
+    const { setStep, refresh } = renderStep("result");
+    const onRecorded = mockResultProps.current?.onRecorded as (r: unknown, m: unknown) => void;
+    onRecorded({ result: "draw" }, { recorderConfirmed: false });
+    expect(refresh).not.toHaveBeenCalled();
+    expect(setStep).toHaveBeenCalledWith("confirm");
   });
 });

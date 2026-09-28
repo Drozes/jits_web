@@ -45,6 +45,7 @@ import {
   sortMatchVideosForViewer,
   type VideoPlayability,
 } from "../utils/match-video";
+import { MATCH_VIDEO_BUCKET, signPosterKeys } from "./poster-signing";
 
 type Client = SupabaseClient<Database>;
 
@@ -2409,8 +2410,11 @@ export async function getAllGyms(supabase: Client): Promise<GymOption[]> {
 // Match videos (athlete gallery + playback)
 // ---------------------------------------------------------------------------
 
-/** Private storage bucket holding match recordings (BE contract §1.2). */
-export const MATCH_VIDEO_BUCKET = "match-videos";
+/**
+ * Private storage bucket holding match recordings (BE contract §1.2). Defined
+ * once in `./poster-signing`; re-exported here for the highlight wrappers.
+ */
+export { MATCH_VIDEO_BUCKET };
 
 /** One entry of the `get_athlete_videos` RPC payload. */
 export interface AthleteVideoRow {
@@ -2621,6 +2625,13 @@ interface MatchDetailsVideoRow {
   angle_quality: number | null;
   has_analysis: boolean | null;
   analysis_tier: string | null;
+  // Additive (BE B4, match flow redesign); absent on an older backend.
+  normalized_path?: string | null;
+  error_message?: string | null;
+  title?: string | null;
+  thumbnail_width?: number | null;
+  thumbnail_height?: number | null;
+  requested_tier?: string | null;
 }
 
 export interface MatchDetailVideo {
@@ -2641,16 +2652,53 @@ export interface MatchDetailVideo {
   angle_label: string;
   /** Signed thumbnail key (1h), http passthrough, or null. */
   poster_url: string | null;
+  // Additive fields (match flow redesign, BE B4). getMatchDetailView always
+  // sets them (null when the backend predates them); they are optional in the
+  // type only so hand-built fixtures and older callers stay valid.
+  /** "standard" | "premium" once analyzed, else null. */
+  analysis_tier?: string | null;
+  /** Poster storage key (match_videos.thumbnail_url, unsigned): a stable image cache key. */
+  thumbnail_key?: string | null;
+  /** H.264/AAC copy the slicer wrote for webm uploads (playback prefers it). */
+  normalized_path?: string | null;
+  /** Why processing failed, when the pipeline recorded a reason. */
+  error_message?: string | null;
+  title?: string | null;
+  thumbnail_width?: number | null;
+  thumbnail_height?: number | null;
+  /** "standard" | "premium" as requested at upload. */
+  requested_tier?: string | null;
+}
+
+/**
+ * `get_match_details().match` plus the B4 additions. getMatchDetailView always
+ * sets them (null on an older backend); optional in the type for fixtures.
+ */
+export type MatchDetailViewMatch = Omit<MatchDetails, "participants"> & {
+  winner_id?: string | null;
+  submission_type_code?: string | null;
+  submission_name?: string | null;
+  finish_time_seconds?: number | null;
+  /** completed_at + 24 h; disputes are refused after it. Null until completed. */
+  dispute_locks_at?: string | null;
+};
+
+/** One positive confirmation of the recorded result (B4). */
+export interface MatchConfirmation {
+  athlete_id: string;
+  confirmed_at: string;
 }
 
 export interface MatchDetailView {
-  match: Omit<MatchDetails, "participants">;
+  match: MatchDetailViewMatch;
   /** The viewer's participant row. */
   me: MatchParticipant;
   /** The other participant (null only on corrupt data). */
   opponent: MatchParticipant | null;
   /** Viewer's own first; deleted rows are never present, failed ones are. */
   videos: MatchDetailVideo[];
+  /** Who has confirmed the result; [] on an older backend (always set by getMatchDetailView). */
+  confirmations?: MatchConfirmation[];
 }
 
 /**
@@ -2679,9 +2727,10 @@ export async function getMatchDetailView(
     if (!data) return { ok: false, error: MATCH_NOT_FOUND_ERROR };
 
     const payload = data as unknown as {
-      match: Omit<MatchDetails, "participants">;
+      match: MatchDetailViewMatch;
       participants: MatchParticipant[] | null;
       videos?: MatchDetailsVideoRow[] | null;
+      confirmations?: MatchConfirmation[] | null;
     };
     const participants = payload.participants ?? [];
     const me = participants.find((p) => p.athlete_id === viewerAthleteId);
@@ -2699,8 +2748,11 @@ export async function getMatchDetailView(
       participants.find((p) => p.athlete_id !== viewerAthleteId) ?? null;
 
     const rows = sortMatchVideosForViewer(payload.videos ?? [], viewerAthleteId);
-    const posters = await Promise.all(
-      rows.map((v) => signPosterKey(supabase, v.thumbnail_url, 3600)),
+    // One storage round trip for every poster, however many angles.
+    const posters = await signPosterKeys(
+      supabase,
+      rows.map((v) => v.thumbnail_url),
+      3600,
     );
     const videos: MatchDetailVideo[] = rows.map((v, i) => {
       const isMine = v.uploaded_by === viewerAthleteId;
@@ -2720,10 +2772,34 @@ export async function getMatchDetailView(
           v.uploaded_by_name ?? (isMine ? null : opponent?.display_name ?? null),
         ),
         poster_url: posters[i],
+        analysis_tier: v.analysis_tier ?? null,
+        thumbnail_key: v.thumbnail_url ?? null,
+        normalized_path: v.normalized_path ?? null,
+        error_message: v.error_message ?? null,
+        title: v.title ?? null,
+        thumbnail_width: v.thumbnail_width ?? null,
+        thumbnail_height: v.thumbnail_height ?? null,
+        requested_tier: v.requested_tier ?? null,
       };
     });
 
-    return { ok: true, data: { match: payload.match, me, opponent, videos } };
+    const m = payload.match;
+    const match: MatchDetailViewMatch = {
+      ...m,
+      winner_id: m.winner_id ?? null,
+      submission_type_code: m.submission_type_code ?? null,
+      submission_name: m.submission_name ?? null,
+      finish_time_seconds: m.finish_time_seconds ?? null,
+      dispute_locks_at: m.dispute_locks_at ?? null,
+    };
+    const confirmations = Array.isArray(payload.confirmations)
+      ? payload.confirmations
+      : [];
+
+    return {
+      ok: true,
+      data: { match, me, opponent, videos, confirmations },
+    };
   } catch (err) {
     return { ok: false, error: unexpectedError("getMatchDetailView", err) };
   }
@@ -2737,6 +2813,10 @@ export interface MatchVideoPlayback {
   /** match_videos.status at read time. */
   status: string;
   playability: VideoPlayability;
+  /** The match this recording belongs to (the player loads its siblings). */
+  matchId: string | null;
+  /** Recorded length in seconds, when known. */
+  durationSeconds: number | null;
 }
 
 /**
@@ -2759,7 +2839,7 @@ export async function getMatchVideoPlaybackResult(
   try {
     const { data, error } = await supabase
       .from("match_videos")
-      .select("storage_path, normalized_path, thumbnail_url, status")
+      .select("storage_path, normalized_path, thumbnail_url, status, match_id, duration_seconds")
       .eq("id", videoId)
       .maybeSingle();
     if (error) {
@@ -2811,6 +2891,8 @@ export async function getMatchVideoPlaybackResult(
         posterUrl,
         status: data.status,
         playability: videoPlayability(data.status),
+        matchId: data.match_id ?? null,
+        durationSeconds: data.duration_seconds ?? null,
       },
     };
   } catch (err) {

@@ -35,6 +35,9 @@ export type PlayerStateLabel =
 export interface PlaybackSource {
   url: string;
   posterUrl: string | null;
+  /** The match the recording belongs to (the player loads the other angle from it). */
+  matchId: string | null;
+  durationSeconds: number | null;
   /** Bumped on every sign, so the player remounts even on an identical URL. */
   generation: number;
 }
@@ -67,14 +70,17 @@ function phaseFor(result: Result<MatchVideoPlayback | null>): PlaybackPhase {
  * ignored (the player being replaced can still report). `retry` always
  * re-signs and resets both limits.
  */
-export function useVideoPlayback(id: string | undefined) {
+export function useVideoPlayback(id: string | undefined, startSeconds?: number | null) {
   const [phase, setPhase] = React.useState<PlaybackPhase>("loading");
   const [source, setSource] = React.useState<PlaybackSource | null>(null);
   const [loaded, setLoaded] = React.useState(false);
   const [attempt, setAttempt] = React.useState(0);
   const videoRef = React.useRef<Video>(null);
   const epochRef = React.useRef(0);
-  const positionRef = React.useRef(0);
+  // A `?t=` start is just a resume point the first load seeks to.
+  const positionRef = React.useRef(
+    startSeconds != null && Number.isFinite(startSeconds) && startSeconds > 0 ? startSeconds * 1000 : 0,
+  );
   const resumeAtRef = React.useRef<number | null>(null);
   const progressBaseRef = React.useRef(0);
   const loadedRef = React.useRef(false);
@@ -103,7 +109,13 @@ export function useVideoPlayback(id: string | undefined) {
         progressBaseRef.current = resumeAt ?? 0;
         loadedRef.current = false;
         setLoaded(false);
-        setSource({ url: result.data.url, posterUrl: result.data.posterUrl, generation: epoch });
+        setSource({
+          url: result.data.url,
+          posterUrl: result.data.posterUrl,
+          matchId: result.data.matchId ?? null,
+          durationSeconds: result.data.durationSeconds ?? null,
+          generation: epoch,
+        });
       }
       setPhase(next);
     },

@@ -6,7 +6,7 @@ import { blueEnds, bothConfirm, exitToArena, openToLive, prepare, T } from "../f
 const scenario: Scenario = {
   id: "E10",
   tier: "extended",
-  title: "Both record at the same moment: one result wins and neither side is stranded (H4)",
+  title: "Both record at the same moment: one result wins and neither side is stranded (H4); the winner of the race skips confirm",
   async run(ctx) {
     ctx.opts.timing = "fast";
     await prepare(ctx);
@@ -23,9 +23,11 @@ const scenario: Scenario = {
     ]);
     ctx.trace.note("harness", "bot_record", botRes);
     ctx.eq("db:one-submission-row", 1, (await db.submission(h.matchId)) ? 1 : 0);
-    await ctx.expect("ui:blue-reaches-confirm", true, async () => {
-      await ctx.ui.waitStep("confirm", T.step);
-      return true;
+    // Whoever won the race is the recorder and is auto-confirmed (B2): Blue
+    // winning lands on the verdict, Red winning puts Blue on confirm.
+    const expected = botRes.ok ? "confirm" : "summary";
+    await ctx.expect("ui:blue-reaches-step-for-race-outcome", expected, async () => {
+      return ctx.ui.waitStepIn([expected], T.step);
     });
     if (!botRes.ok) {
       await ctx.expect("bot:loser-of-race-moved-to-confirm", true, async () => {

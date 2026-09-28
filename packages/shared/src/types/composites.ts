@@ -93,6 +93,12 @@ export interface RecordResultResponse {
     | ({ winner: EloChange; loser: EloChange; weight_division_gap?: number } & { player_a?: never; player_b?: never })
     | ({ player_a: EloChange; player_b: EloChange; weight_division_gap?: number } & { winner?: never; loser?: never })
     | null;
+  /**
+   * jr_be B2: the recorder's own `match_confirmations` row was written with
+   * the result, so the recorder has nothing left to confirm. Absent on an
+   * older backend, which means the recorder still has to confirm.
+   */
+  recorder_confirmed?: boolean;
   error?: string;
 }
 

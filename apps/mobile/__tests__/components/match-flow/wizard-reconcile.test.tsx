@@ -137,13 +137,20 @@ jest.mock("@jits/shared/api/queries", () => ({
   getMatchDetails: (...a: unknown[]) => mockGetMatchDetails(...a),
   getMatchConfirmations: (...a: unknown[]) => mockGetMatchConfirmations(...a),
   getSubmissionTypes: async () => [],
+  getEloStakes: async () => null,
+  getMatchDetailView: async () => ({ ok: true, data: { videos: [] } }),
 }));
+jest.mock("@jits/shared/api/match-rank-change", () => ({
+  getMatchRankChange: async () => ({ ok: false, error: { code: "UNKNOWN", message: "n/a" } }),
+}));
+jest.mock("expo-image", () => ({ Image: () => null }));
 
 const mockDispute = jest.fn();
+const mockRecord = jest.fn();
 jest.mock("@jits/shared/api/mutations", () => ({
   confirmMatchResult: async () => ({ ok: true, data: {} }),
   disputeMatchResult: (...a: unknown[]) => mockDispute(...a),
-  recordMatchResult: async () => ({ ok: true, data: {} }),
+  recordMatchResult: (...a: unknown[]) => mockRecord(...a),
   startMatch: jest.fn(),
   cancelSessionMatch: jest.fn(),
   pauseMatch: jest.fn(),
@@ -164,6 +171,9 @@ const mockBroadcast = {
   broadcastResultSubmitted: jest.fn(() => Promise.resolve("ok")),
   broadcastResultConfirmed: jest.fn(() => Promise.resolve("ok")),
   broadcastMatchDisputed: jest.fn((_id: string): Promise<unknown> => Promise.resolve("ok")),
+  broadcastWeighedIn: jest.fn(() => Promise.resolve("ok")),
+  broadcastRecordingOptIn: jest.fn(() => Promise.resolve("ok")),
+  broadcastResultClaimed: jest.fn(() => Promise.resolve("ok")),
 };
 jest.mock("@jits/shared/hooks/use-session-match-sync", () => ({
   useSessionMatchSync: (params: Handlers) => {
@@ -259,6 +269,8 @@ beforeEach(() => {
   jest.spyOn(console, "warn").mockImplementation(() => undefined);
   mockGetMatchConfirmations.mockResolvedValue([]);
   mockDispute.mockResolvedValue({ ok: true, data: {} });
+  // An older backend: no recorder_confirmed, so the recorder still confirms.
+  mockRecord.mockResolvedValue({ ok: true, data: {} });
 });
 
 afterEach(() => {
@@ -603,6 +615,32 @@ describe("a realtime matches UPDATE never skips confirmation", () => {
     await tick(5_000);
     screen.getByTestId("match-step-confirm");
     screen.getByTestId("confirm-result");
+  });
+
+  it("a recorder the server auto-confirmed (B2) goes to the verdict and stays there", async () => {
+    mockRecord.mockResolvedValue({ ok: true, data: { success: true, recorder_confirmed: true } });
+    const screen = await mountAt("in_progress");
+    act(() => handlerOf("onMatchEnded")());
+    await tick(OPPONENT_ENDED_INTERSTITIAL_MS);
+    await tick(800);
+    mockGetMatchDetails.mockResolvedValue(row("completed", { outcome: "win" }));
+    // Only this athlete's (auto) confirmation is in the DB.
+    mockGetMatchConfirmations.mockResolvedValue(["me-1"]);
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("result-outcome-draw"));
+    });
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("result-record"));
+    });
+    await flush();
+    screen.getByTestId("match-step-summary");
+    // It told the opponent it is confirmed.
+    expect(mockBroadcast.broadcastResultConfirmed).toHaveBeenCalledWith("me-1");
+    await act(async () => mockRow.handler?.({ new: { status: "completed" } }));
+    await flush();
+    await tick(10_000);
+    screen.getByTestId("match-step-summary");
+    expect(screen.queryByTestId("confirm-result")).toBeNull();
   });
 });
 

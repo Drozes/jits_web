@@ -166,7 +166,10 @@ jest.mock("@/lib/arena/use-arena-roster", () => ({
   useArenaRoster: () => mockRoster,
 }));
 
+jest.mock("@/components/ui/toast", () => ({ toast: { success: jest.fn(), error: jest.fn(), info: jest.fn() } }));
+
 const mockToggle = jest.fn();
+const mockGoLive = jest.fn(() => Promise.resolve(true));
 const mockSendChallenge = jest.fn();
 const mockCancelOutgoing = jest.fn();
 const mockClearCap = jest.fn();
@@ -189,6 +192,7 @@ jest.mock("@/lib/arena/arena-store", () => ({
     cancelOutgoing: (...a: unknown[]) => mockCancelOutgoing(...a),
     clearCap: (...a: unknown[]) => mockClearCap(...a),
     goOffline: jest.fn(),
+    goLive: () => mockGoLive(),
   },
   setOpponentUnavailableHandler: (...a: unknown[]) => mockSetUnavailable(...a),
 }));
@@ -459,7 +463,7 @@ describe("Arena screen", () => {
     };
     const { queryByText, queryByLabelText } = render(<ArenaScreen />);
 
-    expect(queryByText("Rival wants to roll")).toBeNull();
+    expect(queryByText("Rival is live in the Arena")).toBeNull();
     expect(queryByLabelText("Accept challenge")).toBeNull();
   });
 
@@ -747,8 +751,120 @@ describe("Arena screen: rematch handoff (jits-00fr)", () => {
     mockParams = { rematch: "a-3" };
 
     render(<ArenaScreen />);
-    expect(mockSetParams).toHaveBeenCalledWith({ rematch: undefined });
+    expect(mockSetParams).toHaveBeenCalledWith({ rematch: undefined, send: undefined });
     expect(mockRouter.setParams).not.toHaveBeenCalled();
+  });
+
+  describe("from the verdict's Rematch (send=1)", () => {
+    it("sends once the opponent is back in the lobby, never before, and says so", () => {
+      const { toast } = jest.requireMock("@/components/ui/toast") as { toast: { success: jest.Mock } };
+      rematchRoster();
+      mockLobbyIds = new Set(["a-1"]);
+      mockParams = { rematch: "a-3", send: "1" };
+      const { rerender, getByText } = render(<ArenaScreen />);
+      // Still on their own verdict: their app would decline it as busy.
+      expect(mockSendChallenge).not.toHaveBeenCalled();
+      getByText("Charlie isn't back in the Arena yet. Your rematch goes to them the moment they are.");
+
+      mockLobbyIds = new Set(["a-1", "a-3"]);
+      rerender(<ArenaScreen />);
+      expect(mockSendChallenge).toHaveBeenCalledTimes(1);
+      expect(mockSendChallenge).toHaveBeenCalledWith("a-3", "Charlie");
+      rerender(<ArenaScreen />);
+      expect(mockSendChallenge).toHaveBeenCalledTimes(1);
+
+      mockChallenge.outgoing = { challengeId: "ch-9", opponentId: "a-3", opponentName: "Charlie" };
+      rerender(<ArenaScreen />);
+      expect(toast.success).toHaveBeenCalledWith({ text1: "Rematch sent to Charlie" });
+    });
+
+    it("never sends over a prompt, a busy challenge, or the cap", () => {
+      rematchRoster();
+      mockLobbyIds = new Set(["a-3"]);
+      mockParams = { rematch: "a-3", send: "1" };
+      mockChallenge.capReached = true;
+      render(<ArenaScreen />);
+      expect(mockSendChallenge).not.toHaveBeenCalled();
+    });
+
+    it("takes a rematcher who is not live, live, idempotently (never a toggle)", () => {
+      jest.useFakeTimers();
+      rematchRoster();
+      mockIsLive = false;
+      mockParams = { rematch: "a-3", send: "1" };
+      render(<ArenaScreen />);
+      expect(mockGoLive).not.toHaveBeenCalled();
+      act(() => {
+        jest.advanceTimersByTime(1_600);
+      });
+      expect(mockGoLive).toHaveBeenCalledTimes(1);
+      expect(mockToggle).not.toHaveBeenCalled();
+      jest.useRealTimers();
+    });
+
+    it("a match-exit restore still in flight at 1.5 s: asks for live again, never toggles offline", () => {
+      // restoreLive has set the intent to live but isLive has not flipped
+      // and isSaving is never set for it: a toggle here would read the live
+      // intent and take the athlete OFFLINE.
+      jest.useFakeTimers();
+      rematchRoster();
+      mockIsLive = false;
+      mockParams = { rematch: "a-3", send: "1" };
+      const { rerender } = render(<ArenaScreen />);
+      act(() => {
+        jest.advanceTimersByTime(1_600);
+      });
+      expect(mockToggle).not.toHaveBeenCalled();
+      expect(mockGoLive).toHaveBeenCalledTimes(1);
+      // The restore lands: live, and the rematch goes out.
+      mockIsLive = true;
+      mockLobbyIds = new Set(["a-3"]);
+      rerender(<ArenaScreen />);
+      expect(mockSendChallenge).toHaveBeenCalledWith("a-3", "Charlie");
+      jest.useRealTimers();
+    });
+
+    it("does not ask for live when the match exit already took them live", () => {
+      jest.useFakeTimers();
+      rematchRoster();
+      mockParams = { rematch: "a-3", send: "1" };
+      render(<ArenaScreen />);
+      act(() => {
+        jest.advanceTimersByTime(2_000);
+      });
+      expect(mockGoLive).not.toHaveBeenCalled();
+      expect(mockToggle).not.toHaveBeenCalled();
+      jest.useRealTimers();
+    });
+
+    it("a second rematch of the same opponent on the still-mounted Arena sends again", () => {
+      const { toast } = jest.requireMock("@/components/ui/toast") as { toast: { success: jest.Mock } };
+      rematchRoster();
+      mockLobbyIds = new Set(["a-3"]);
+      mockParams = { rematch: "a-3", send: "1" };
+      const { rerender } = render(<ArenaScreen />);
+      expect(mockSendChallenge).toHaveBeenCalledTimes(1);
+      mockChallenge.outgoing = { challengeId: "ch-1", opponentId: "a-3", opponentName: "Charlie" };
+      rerender(<ArenaScreen />);
+      expect(toast.success).toHaveBeenCalledTimes(1);
+      // They played it; the challenge resolved; back to the verdict and Rematch again.
+      mockChallenge.outgoing = null;
+      rerender(<ArenaScreen />);
+      mockParams = { rematch: "a-3", send: "1" };
+      rerender(<ArenaScreen />);
+      expect(mockSendChallenge).toHaveBeenCalledTimes(2);
+      mockChallenge.outgoing = { challengeId: "ch-2", opponentId: "a-3", opponentName: "Charlie" };
+      rerender(<ArenaScreen />);
+      expect(toast.success).toHaveBeenCalledTimes(2);
+    });
+
+    it("a plain rematch param (no send) still never sends", () => {
+      rematchRoster();
+      mockLobbyIds = new Set(["a-3"]);
+      mockParams = { rematch: "a-3" };
+      render(<ArenaScreen />);
+      expect(mockSendChallenge).not.toHaveBeenCalled();
+    });
   });
 
   it("names an opponent on the roster who is not live", () => {
@@ -874,7 +990,7 @@ describe("Arena screen: rematch handoff (jits-00fr)", () => {
     act(() => {
       mockFocusCleanups.forEach((c) => c());
     });
-    expect(mockSetParams).toHaveBeenCalledWith({ rematch: undefined });
+    expect(mockSetParams).toHaveBeenCalledWith({ rematch: undefined, send: undefined });
     expect(mockParams.rematch).toBeUndefined();
     expect(mockRouter.setParams).not.toHaveBeenCalled();
   });

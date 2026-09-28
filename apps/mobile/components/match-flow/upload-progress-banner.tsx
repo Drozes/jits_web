@@ -21,13 +21,13 @@ function truncationCopy(truncation: RecordingTruncation): string {
 }
 
 /**
- * Persistent recording / upload status chip for the match wizard.
+ * Recording / upload status card for the match flow.
  *
- * Rendered ONCE at the wizard level, not inside a step: the upload only
- * starts after the live step has unmounted, so a step-scoped banner could
- * never report its outcome (jits-od3). It stays on screen through end,
- * result, confirm and summary, so a stuck or failed upload is visible
- * instead of silent.
+ * Shown on the verdict (the match-flow redesign moved it off every
+ * post-live step). It reads the match-keyed upload store plus the live
+ * recorder, never step state: the upload only starts after the live step
+ * has unmounted, so a step-scoped surface could never report its outcome
+ * (jits-od3). A stuck or failed upload is visible there, not silent.
  *
  * Shows a real percentage. The upload is a resumable tus transfer whose
  * PATCH responses carry a server-confirmed byte offset, so `progress` is

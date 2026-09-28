@@ -30,7 +30,7 @@ import { NotificationBell } from "@/components/notifications/notification-bell";
 import { useLobbyIds } from "@/lib/arena/use-lobby-presence";
 import { useArenaRoster } from "@/lib/arena/use-arena-roster";
 import { useRosterLobbySync } from "@/lib/arena/use-roster-lobby-sync";
-import { pinFirst, useRematchPin } from "@/lib/arena/use-rematch-pin";
+import { pinFirst, useRematchAutoSend, useRematchPin } from "@/lib/arena/use-rematch-pin";
 import {
   arenaActions,
   setOpponentUnavailableHandler,
@@ -114,6 +114,18 @@ export default function ArenaScreen() {
     isLoading,
     refresh: refreshQuietly,
     outgoingOpponentId: outgoing?.opponentId ?? null,
+  });
+
+  // The verdict's Rematch: send once the opponent is back (see the hook).
+  useRematchAutoSend({
+    pin: rematch,
+    isLive,
+    isSaving,
+    blocked: isBusy || !!incoming,
+    capReached,
+    outgoingOpponentId: outgoing?.opponentId ?? null,
+    goLive: () => void arenaActions.goLive(),
+    send: sendChallenge,
   });
 
   const online = pinFirst(
@@ -209,7 +221,7 @@ export default function ArenaScreen() {
             {hasError ? <RosterErrorPlate onRetry={refresh} /> : null}
 
             {!hasError && rematch.pinnedId && !rematch.isOnline ? (
-              <RematchHint name={rematch.name} />
+              <RematchHint name={rematch.name} autoSend={rematch.autoSend} />
             ) : null}
 
             {!hasError && competitors.length === 0 ? (

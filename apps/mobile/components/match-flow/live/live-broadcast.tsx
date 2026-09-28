@@ -42,6 +42,8 @@ export interface LiveBroadcastProps {
   hudExtra?: React.ReactNode;
   /** Practice copy on the no-video plate. */
   practice?: boolean;
+  /** This athlete chose not to record from this phone (face-off opt-in). */
+  recordingOff?: boolean;
 }
 
 /**
@@ -71,6 +73,7 @@ export function LiveBroadcast(props: LiveBroadcastProps) {
     opponentEnded,
     hudExtra,
     practice = false,
+    recordingOff = false,
   } = props;
   const insets = useSafeAreaInsets();
   const window = useWindowDimensions();
@@ -89,6 +92,7 @@ export function LiveBroadcast(props: LiveBroadcastProps) {
     permission: recorder.permission,
     opponentEnded: !!opponentEnded,
     hasRecorded: hasRecordedRef.current,
+    recordingOff,
   });
 
   // One announcement per strip change on iOS; Android reads the strip's

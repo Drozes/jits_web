@@ -255,6 +255,17 @@ beforeEach(() => {
 
 // ---- states ----
 
+describe("viewer theme", () => {
+  it("pins the dark scheme for everything inside and keeps the status bar light (in both app themes)", async () => {
+    const { StatusBar } = require("expo-status-bar");
+    const { ForceDarkTheme } = require("@/lib/theme/force-dark-theme");
+    const utils = await renderViewer();
+    expect(utils.UNSAFE_getByType(StatusBar).props.style).toBe("light");
+    // The whole screen sits under ForceDarkTheme, like the match video player.
+    expect(utils.UNSAFE_getByType(ForceDarkTheme).findByProps({ testID: "highlight-viewer" })).toBeTruthy();
+  });
+});
+
 describe("viewer states", () => {
   it("loading: the empty poster frame, no actions, header + close", async () => {
     mockGetDetail.mockReturnValue(new Promise(() => undefined));

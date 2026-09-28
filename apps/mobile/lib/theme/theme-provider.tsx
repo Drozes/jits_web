@@ -15,7 +15,7 @@ import { vars } from "nativewind";
 import { useResolvedColorScheme, useRestoreThemePreference } from "./use-theme";
 import { darkTokens, lightTokens } from "../tokens";
 
-function buildVars(t: typeof lightTokens) {
+export function buildVars(t: typeof lightTokens) {
   return vars({
     // Legacy shadcn-style tokens
     "--background": t.background,
@@ -64,7 +64,11 @@ function buildVars(t: typeof lightTokens) {
 }
 
 const lightVarsStyle = buildVars(lightTokens);
-/** Dark token vars, for surfaces that stay dark in both themes (the highlight viewer). */
+/**
+ * The dark token set as a vars() style. Exported for `ForceDarkTheme`
+ * (lib/theme/force-dark-theme.tsx), which pins full-screen video dark
+ * (Film Room, the highlight viewer).
+ */
 export const darkVarsStyle = buildVars(darkTokens);
 
 export interface ThemeProviderProps {

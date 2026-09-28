@@ -117,6 +117,10 @@ const HANDLER_EVENT: Record<string, string> = {
   onResultSubmitted: E.RESULT_SUBMITTED,
   onResultConfirmed: E.RESULT_CONFIRMED,
   onMatchCancelled: E.MATCH_CANCELLED,
+  // Match-flow redesign (face-off and claim-first result entry).
+  onWeighedIn: E.WEIGHED_IN,
+  onRecordingOptIn: E.RECORDING_OPTIN,
+  onResultClaimed: E.RESULT_CLAIMED,
   onMatchDisputed: E.MATCH_DISPUTED,
 };
 
@@ -643,6 +647,16 @@ export class MatchSide {
     );
     if (!r.ok) return { ok: false, error: r.error.message };
     await this.sendAwaited(E.RESULT_SUBMITTED, result as unknown as Record<string, unknown>);
+    // jr_be B2: the server confirmed the recorder with the result. The app
+    // then tells the opponent (result_confirmed) and needs no confirm tap;
+    // mirror the signal. The bot still passes through its confirm step so a
+    // later confirm() (already_confirmed, harmless) and waitConfirmDone work.
+    const autoConfirmed = (r.data as { recorder_confirmed?: boolean } | null)?.recorder_confirmed === true;
+    if (autoConfirmed) {
+      this.myConfirmed = true;
+      this.trace.note(this.actor, "recorder_auto_confirmed", true);
+      await this.sendAwaited(E.RESULT_CONFIRMED, { athlete_id: this.meId });
+    }
     this.enter("confirm");
     return { ok: true };
   }

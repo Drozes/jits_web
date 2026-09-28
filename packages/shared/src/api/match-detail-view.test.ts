@@ -33,7 +33,21 @@ function mockClient(opts: MockOpts) {
   const createSignedUrl = vi.fn(async (path: string) =>
     opts.sign ? opts.sign(path) : { data: { signedUrl: `https://signed/${path}` }, error: null },
   );
-  const storageFrom = vi.fn().mockReturnValue({ createSignedUrl });
+  // Batch signing (one call per page): the same per-path outcome as `sign`,
+  // in the storage-js shape { path, signedUrl, error }.
+  const createSignedUrls = vi.fn(async (paths: string[]) => ({
+    data: await Promise.all(
+      paths.map(async (path) => {
+        const r = opts.sign
+          ? await opts.sign(path)
+          : { data: { signedUrl: `https://signed/${path}` }, error: null };
+        const signedUrl = (r.data as { signedUrl?: string } | null)?.signedUrl ?? "";
+        return { path, signedUrl, error: r.error ? String((r.error as { message?: string }).message) : null };
+      }),
+    ),
+    error: null,
+  }));
+  const storageFrom = vi.fn().mockReturnValue({ createSignedUrl, createSignedUrls });
   return {
     client: { rpc, from, storage: { from: storageFrom } } as never,
     rpc,
@@ -44,6 +58,7 @@ function mockClient(opts: MockOpts) {
     order,
     limit,
     createSignedUrl,
+    createSignedUrls,
     storageFrom,
   };
 }
@@ -285,8 +300,93 @@ describe("getMatchDetailView", () => {
       null,
     ]);
     expect(m.storageFrom).toHaveBeenCalledWith("match-videos");
-    expect(m.createSignedUrl).toHaveBeenCalledWith("m/a/poster/1.jpg", 3600);
-    expect(m.createSignedUrl).toHaveBeenCalledTimes(3);
+    // One batch call for every storage key; http passes through unsigned.
+    expect(m.createSignedUrls).toHaveBeenCalledTimes(1);
+    expect(m.createSignedUrls).toHaveBeenCalledWith(
+      ["m/a/poster/1.jpg", "m/a/poster/broken.jpg", "m/a/poster/nourl.jpg"],
+      3600,
+    );
+    expect(m.createSignedUrl).not.toHaveBeenCalled();
+  });
+
+  it("normalizes the B4 match, video and confirmation fields to null / [] on an older backend", async () => {
+    const m = mockClient({ rpc: () => ({ data: detailsPayload([videoRow()]), error: null }) });
+    const r = await getMatchDetailView(m.client, MATCH_ID, ME);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.data.match).toMatchObject({
+      winner_id: null,
+      submission_type_code: null,
+      submission_name: null,
+      finish_time_seconds: null,
+      dispute_locks_at: null,
+    });
+    expect(r.data.confirmations).toEqual([]);
+    expect(r.data.videos[0]).toMatchObject({
+      normalized_path: null,
+      error_message: null,
+      title: null,
+      thumbnail_width: null,
+      thumbnail_height: null,
+      requested_tier: null,
+      analysis_tier: null,
+    });
+  });
+
+  it("passes the B4 fields through when the backend sends them", async () => {
+    const payload = {
+      ...detailsPayload([
+        videoRow({
+          normalized_path: "m/a/1.norm.mp4",
+          error_message: "slice failed",
+          title: "Round 1",
+          thumbnail_width: 720,
+          thumbnail_height: 1280,
+          requested_tier: "premium",
+          analysis_tier: "premium",
+        }),
+      ]),
+      confirmations: [{ athlete_id: ME, confirmed_at: "2026-09-20T10:06:01Z" }],
+    };
+    payload.match = {
+      ...payload.match,
+      winner_id: ME,
+      submission_type_code: "rnc",
+      submission_name: "Rear-naked choke",
+      finish_time_seconds: 377,
+      dispute_locks_at: "2026-09-21T10:06:00Z",
+    } as typeof payload.match;
+    const m = mockClient({ rpc: () => ({ data: payload, error: null }) });
+    const r = await getMatchDetailView(m.client, MATCH_ID, ME);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.data.match).toMatchObject({
+      winner_id: ME,
+      submission_type_code: "rnc",
+      submission_name: "Rear-naked choke",
+      finish_time_seconds: 377,
+      dispute_locks_at: "2026-09-21T10:06:00Z",
+    });
+    expect(r.data.confirmations).toEqual([{ athlete_id: ME, confirmed_at: "2026-09-20T10:06:01Z" }]);
+    expect(r.data.videos[0]).toMatchObject({
+      normalized_path: "m/a/1.norm.mp4",
+      error_message: "slice failed",
+      title: "Round 1",
+      thumbnail_width: 720,
+      thumbnail_height: 1280,
+      requested_tier: "premium",
+      analysis_tier: "premium",
+    });
+  });
+
+  it("a failed batch sign leaves every poster null without failing", async () => {
+    const m = mockClient({
+      rpc: () => ({ data: detailsPayload([videoRow({ thumbnail_url: "k.jpg" })]), error: null }),
+    });
+    m.createSignedUrls.mockResolvedValueOnce({ data: null, error: { message: "down" } } as never);
+    const r = await getMatchDetailView(m.client, MATCH_ID, ME);
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.data.videos[0].poster_url).toBeNull();
   });
 
   it("a throwing poster signer is still non-fatal", async () => {
@@ -316,8 +416,28 @@ describe("getMatchVideoPlaybackResult", () => {
     });
     await getMatchVideoPlaybackResult(m.client, VID);
     expect(m.from).toHaveBeenCalledWith("match_videos");
-    expect(m.select).toHaveBeenCalledWith("storage_path, normalized_path, thumbnail_url, status");
+    expect(m.select).toHaveBeenCalledWith(
+      "storage_path, normalized_path, thumbnail_url, status, match_id, duration_seconds",
+    );
     expect(m.eq).toHaveBeenCalledWith("id", VID);
+  });
+
+  it("returns the match id and duration so the player can find the other angle", async () => {
+    const m = mockClient({
+      maybeSingle: {
+        data: {
+          storage_path: "m/a/1.mp4",
+          normalized_path: null,
+          thumbnail_url: null,
+          status: "analyzed",
+          match_id: MATCH_ID,
+          duration_seconds: 377,
+        },
+        error: null,
+      },
+    });
+    const r = await getMatchVideoPlaybackResult(m.client, VID);
+    expect(r.ok && r.data).toMatchObject({ matchId: MATCH_ID, durationSeconds: 377 });
   });
 
   it("prefers normalized_path over storage_path", async () => {
@@ -331,7 +451,7 @@ describe("getMatchVideoPlaybackResult", () => {
     expect(m.createSignedUrl).toHaveBeenCalledWith("m/a/1.norm.mp4", 600);
     expect(r).toEqual({
       ok: true,
-      data: { url: "https://signed/m/a/1.norm.mp4", posterUrl: null, status: "analyzed", playability: "playable" },
+      data: { url: "https://signed/m/a/1.norm.mp4", posterUrl: null, status: "analyzed", playability: "playable", matchId: null, durationSeconds: null },
     });
   });
 
@@ -501,7 +621,7 @@ describe("getMatchVideoPlaybackResult", () => {
     const r3 = await getMatchVideoPlaybackResult(failing.client, VID);
     expect(r3).toEqual({
       ok: true,
-      data: { url: "https://signed/m/a/1.mp4", posterUrl: null, status: "ready", playability: "playable" },
+      data: { url: "https://signed/m/a/1.mp4", posterUrl: null, status: "ready", playability: "playable", matchId: null, durationSeconds: null },
     });
   });
 

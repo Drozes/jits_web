@@ -26,6 +26,11 @@ export function noVideoCopy(variant: UnavailableVariant, practice: boolean): { h
         heading: "NO VIDEO FOR THIS MATCH",
         body: `The camera could not start. The clock runs as normal${counts}.`,
       };
+    case "off":
+      return {
+        heading: "NOT RECORDING",
+        body: `Recording is off on this phone. The clock runs as normal${counts}.`,
+      };
   }
 }
 

@@ -82,6 +82,7 @@ jest.mock("react-native-safe-area-context", () => ({
 }));
 
 jest.mock("@/lib/theme/use-theme", () => ({
+  useResolvedColorScheme: () => "light",
   useThemedTokens: () => ({
     textPrimary: "#E8EDF2",
     textSecondary: "#9AA3AD",
@@ -133,7 +134,13 @@ jest.mock("@jits/shared/api/mutations", () => ({
 jest.mock("@jits/shared/api/queries", () => ({
   getMatchDetails: jest.fn(),
   getMatchConfirmations: jest.fn(() => Promise.resolve([])),
+  // The verdict's opening still: no server videos unless a test says so.
+  getMatchDetailView: jest.fn(() => Promise.resolve({ ok: true, data: { videos: [] } })),
 }));
+jest.mock("@jits/shared/api/match-rank-change", () => ({
+  getMatchRankChange: jest.fn(() => Promise.resolve({ ok: false, error: { code: "UNKNOWN", message: "n/a" } })),
+}));
+jest.mock("expo-image", () => ({ Image: () => null }));
 
 jest.mock("@jits/shared/hooks/use-session-match-sync", () => ({
   useSessionMatchSync: () => ({
@@ -257,7 +264,9 @@ describe("upload status survives the step that started it", () => {
     });
 
     getByTestId("upload-status-banner");
-    getByText(/finishing recording/i);
+    // The card, and the hero where the still will be.
+    getByText(/finishing recording\.\.\./i);
+    getByText("FINISHING RECORDING");
   });
 
   it("shows success on the summary step", () => {
@@ -310,68 +319,39 @@ describe("upload status survives the step that started it", () => {
   });
 });
 
-describe("watching the match back from the summary (jits-p75q)", () => {
-  it("offers playback once the video has an id, and routes to the player", () => {
-    const { getByText } = renderSummary({ status: "uploaded", videoId: "VID-1" });
-
-    fireEvent.press(getByText("Watch Match Video"));
-    expect(mockRouterPush).toHaveBeenCalledWith("/(app)/video/VID-1");
+describe("watching the match back from the verdict (jits-p75q)", () => {
+  // The verdict's Watch film opens the match page, which lists (and plays)
+  // every angle from the server: both athletes' recordings, a reopened
+  // match with an empty upload store, and a disputed match alike.
+  it("offers Watch film once this phone's clip has landed", async () => {
+    const { getByTestId, getByText } = renderSummary({ status: "uploaded", videoId: "VID-1" });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    getByText("Watch film");
+    fireEvent.press(getByTestId("summary-watch-film"));
+    expect(mockRouterPush).toHaveBeenCalledWith("/(app)/match-detail/M1");
   });
 
-  it("shows a pending affordance while the upload is still running", () => {
-    // Never a link to an id that does not exist yet: that route would 404.
-    const { getByText, queryByText } = renderSummary({ status: "uploading" });
-
-    getByText(/video uploading/i);
-    expect(queryByText("Watch Match Video")).toBeNull();
+  it("holds Watch film while the upload is still running (never a 404)", () => {
+    const { getByTestId } = renderSummary({ status: "uploading" });
+    const watch = getByTestId("summary-watch-film");
+    expect(watch.props.accessibilityState.disabled).toBe(true);
+    fireEvent.press(watch);
     expect(mockRouterPush).not.toHaveBeenCalled();
   });
 
-  it("offers playback on a DISPUTED match, which Past Match Videos cannot reach", () => {
-    // The profile list filters on matches.status = 'completed', so this
-    // summary is the only way to a disputed match's video.
-    const { getByText } = renderSummary(
-      { status: "uploaded", videoId: "VID-9" },
-      { status: "disputed" },
-    );
-
-    fireEvent.press(getByText("Watch Match Video"));
-    expect(mockRouterPush).toHaveBeenCalledWith("/(app)/video/VID-9");
-  });
-
-  it("offers no playback when there is no video and none is coming", () => {
-    const { queryByText } = renderSummary(null);
-    expect(queryByText("Watch Match Video")).toBeNull();
-    expect(queryByText(/video uploading/i)).toBeNull();
-  });
-
-  it("links a reopened match with no video id to the match detail screen", () => {
-    // Reopening a completed match starts with an empty upload store, so the
-    // detail screen (which reads every video from the server) is the way in.
-    const { getByText } = renderSummary(null);
-
-    fireEvent.press(getByText("View match details"));
+  it("offers it on a DISPUTED match, which Past Match Videos cannot reach", () => {
+    const { getByTestId } = renderSummary({ status: "uploaded", videoId: "VID-9" }, { status: "disputed" });
+    fireEvent.press(getByTestId("summary-watch-film"));
     expect(mockRouterPush).toHaveBeenCalledWith("/(app)/match-detail/M1");
   });
 
-  it("links a reopened DISPUTED match to the match detail screen too", () => {
-    const { getByText } = renderSummary(null, { status: "disputed" });
-
-    fireEvent.press(getByText("View match details"));
+  it("with no video and none coming it is Match details, still to the match page", () => {
+    const { getByText, queryByText } = renderSummary(null);
+    expect(queryByText("Watch film")).toBeNull();
+    fireEvent.press(getByText("Match details"));
     expect(mockRouterPush).toHaveBeenCalledWith("/(app)/match-detail/M1");
-  });
-
-  it("still shows the details link while a video is available or uploading", () => {
-    // Watch plays only this device's clip; the detail screen lists both
-    // athletes' recordings, so the link is always offered below it.
-    const withVideo = renderSummary({ status: "uploaded", videoId: "VID-1" });
-    withVideo.getByText("Watch Match Video");
-    fireEvent.press(withVideo.getByText("View match details"));
-    expect(mockRouterPush).toHaveBeenCalledWith("/(app)/match-detail/M1");
-    resetMatchUploadStore();
-    const uploading = renderSummary({ status: "uploading" });
-    uploading.getByText(/video uploading/i);
-    uploading.getByText("View match details");
   });
 });
 
@@ -429,6 +409,10 @@ describe("recorder ownership is structural, not by convention", () => {
     "match-recorder-surface.tsx",
     "match-flow-wizard.tsx",
     "upload-progress-banner.tsx",
+    // The match-flow redesign moved the upload card onto the verdict, the
+    // terminal step: it is never unmounted by a later step, and it reads the
+    // match-keyed store (via the renderer), never a step-scoped recorder.
+    "verdict/verdict-step.tsx",
   ];
 
   function sourceFiles(dir: string): string[] {
@@ -487,7 +471,7 @@ describe("recorder ownership is structural, not by convention", () => {
     expect(files).toContain("queue-status-banner.tsx");
   });
 
-  it("only the four owning files name the recorder or the banner", () => {
+  it("only the owning files name the recorder or the banner", () => {
     const offenders = sourceFiles(MATCH_FLOW_DIR)
       .filter((file) => claimsRecorderOwnership(fs.readFileSync(file, "utf8")))
       .map((file) => path.relative(MATCH_FLOW_DIR, file))

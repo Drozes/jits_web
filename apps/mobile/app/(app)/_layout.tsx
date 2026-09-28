@@ -37,6 +37,8 @@ export default function AppLayout() {
         {/* One of the athlete's own highlight reels, full screen (push, bell,
           Home, Profile, match detail). Header hidden: a dark video surface. */}
         <Stack.Screen name="highlight/[id]" options={{ headerShown: false }} />
+        {/* The Film Room: every past match as a poster grid, from Profile. */}
+        <Stack.Screen name="film-room" />
         <Stack.Screen name="settings" />
         {/* The practice match: a local walk through one Arena match against
           a scripted bot. Writes no match data. */}

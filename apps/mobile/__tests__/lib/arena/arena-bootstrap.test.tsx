@@ -25,8 +25,12 @@ jest.mock("@gorhom/bottom-sheet", () => {
 });
 
 jest.mock("@/lib/theme/use-theme", () => ({
+  useResolvedColorScheme: () => "light",
   useThemedTokens: () => ({ bgSecondary: "#13151B", textTertiary: "#8D929D" }),
 }));
+
+// The prompt's stakes strip reads calculate_elo_stakes; not under test here.
+jest.mock("@/lib/match-flow/use-viewer-stakes", () => ({ useViewerStakes: () => null }));
 
 let mockAthlete: Record<string, unknown> | null = null;
 const mockRefreshAthleteSoft = jest.fn(() => Promise.resolve());
@@ -185,8 +189,8 @@ describe("ArenaBootstrap", () => {
     mockIncoming = RIVAL;
     const { getByText, getByLabelText } = render(<ArenaBootstrap />);
 
-    expect(getByText("Rival wants to roll")).toBeTruthy();
-    expect(getByText("ELO 1350 · 190 lbs")).toBeTruthy();
+    expect(getByText("Rival is live in the Arena")).toBeTruthy();
+    expect(getByText("ELO 1350 · 190 LBS")).toBeTruthy();
 
     fireEvent.press(getByLabelText("Accept challenge"));
     expect(mockAccept).toHaveBeenCalled();
@@ -246,7 +250,7 @@ describe("ArenaBootstrap", () => {
   it("passes the in-match bit to every hook and holds the prompt back mid-match", () => {
     mockIncoming = RIVAL;
     const { queryByText, getByText } = render(<ArenaBootstrap />);
-    expect(getByText("Rival wants to roll")).toBeTruthy();
+    expect(getByText("Rival is live in the Arena")).toBeTruthy();
 
     const match = renderHook(() => useArenaMatchScreen());
 
@@ -259,11 +263,11 @@ describe("ArenaBootstrap", () => {
     expect(mockRecovery).toHaveBeenLastCalledWith(
       expect.objectContaining({ inMatch: true }),
     );
-    expect(queryByText("Rival wants to roll")).toBeNull();
+    expect(queryByText("Rival is live in the Arena")).toBeNull();
 
     // Still pending after the match: it comes back.
     match.unmount();
-    expect(getByText("Rival wants to roll")).toBeTruthy();
+    expect(getByText("Rival is live in the Arena")).toBeTruthy();
   });
 
   it("hands roster corrections through the store", () => {

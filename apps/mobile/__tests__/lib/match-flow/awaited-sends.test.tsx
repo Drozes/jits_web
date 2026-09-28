@@ -4,7 +4,8 @@
  * chance to leave the device first:
  *  - result_submitted before onRecorded (use-record-result.ts),
  *  - match_ended before onEnded (use-live-controls.ts),
- *  - ready_signal repeats until the opponent's arrives (ready-step.tsx).
+ *  - ready_signal repeats until the opponent's arrives (the face-off,
+ *    lib/match-flow/use-faceoff.ts).
  * And a failed record re-syncs from the DB right away.
  */
 import * as React from "react";
@@ -48,6 +49,10 @@ type Handlers = Record<string, unknown>;
 let mockLastParams: Handlers | null = null;
 const mockSend = {
   broadcastResultSubmitted: jest.fn(),
+  broadcastResultConfirmed: jest.fn(),
+  broadcastResultClaimed: jest.fn(),
+  broadcastWeighedIn: jest.fn(),
+  broadcastRecordingOptIn: jest.fn(),
   broadcastMatchEnded: jest.fn(),
   broadcastReady: jest.fn(),
   broadcastTimerStarted: jest.fn(),
@@ -63,7 +68,7 @@ jest.mock("@jits/shared/hooks/use-session-match-sync", () => ({
 import { useRecordResult } from "@/lib/match-flow/use-record-result";
 import { useLiveControls } from "@/lib/match-flow/use-live-controls";
 import { MatchSyncProvider, SEND_GRACE_MS } from "@/lib/match-flow/match-sync-context";
-import { ReadyStep } from "@/components/match-flow/steps/ready-step";
+import { useFaceoff } from "@/lib/match-flow/use-faceoff";
 import { startMatch } from "@jits/shared/api/mutations";
 
 function deferred() {
@@ -109,7 +114,34 @@ describe("useRecordResult awaits result_submitted before onRecorded", () => {
 
     await act(async () => d.resolve("ok"));
     await flush();
-    expect(onRecorded).toHaveBeenCalledWith(expect.objectContaining({ result: "draw" }));
+    expect(onRecorded).toHaveBeenCalledWith(expect.objectContaining({ result: "draw" }), { recorderConfirmed: false });
+  });
+
+  it("a server auto-confirm (B2) announces this side confirmed and skips confirm", async () => {
+    mockRecord.mockResolvedValue({ ok: true, data: { success: true, recorder_confirmed: true } });
+    mockSend.broadcastResultSubmitted.mockResolvedValue("ok");
+    mockSend.broadcastResultConfirmed.mockResolvedValue("ok");
+    const onRecorded = jest.fn();
+    const { result } = renderHook(() => useRecordResult({ matchId: "M1", onRecorded, currentAthleteId: "me-1" }));
+    await act(async () => {
+      void result.current.submit({ outcome: "draw" });
+    });
+    await flush();
+    expect(mockSend.broadcastResultConfirmed).toHaveBeenCalledWith("me-1");
+    expect(onRecorded).toHaveBeenCalledWith(expect.objectContaining({ result: "draw" }), { recorderConfirmed: true });
+  });
+
+  it("an older backend without recorder_confirmed still sends the recorder to confirm", async () => {
+    mockRecord.mockResolvedValue({ ok: true, data: { success: true } });
+    mockSend.broadcastResultSubmitted.mockResolvedValue("ok");
+    const onRecorded = jest.fn();
+    const { result } = renderHook(() => useRecordResult({ matchId: "M1", onRecorded, currentAthleteId: "me-1" }));
+    await act(async () => {
+      void result.current.submit({ outcome: "draw" });
+    });
+    await flush();
+    expect(mockSend.broadcastResultConfirmed).not.toHaveBeenCalled();
+    expect(onRecorded).toHaveBeenCalledWith(expect.anything(), { recorderConfirmed: false });
   });
 
   it("advances anyway once the grace period runs out (a dead socket never blocks)", async () => {
@@ -226,22 +258,28 @@ describe("useLiveControls awaits match_ended before onEnded", () => {
   });
 });
 
-describe("ReadyStep repeats ready_signal until the opponent's arrives", () => {
-  it("re-sends while waiting and stops once the opponent is ready", async () => {
+describe("the face-off repeats ready_signal until the match starts", () => {
+  it("re-sends while waiting and stops once the opponent is ready and the start begins", async () => {
     mockSend.broadcastReady.mockResolvedValue("ok");
     // The start race that follows both-ready is not under test: hold it.
     (startMatch as jest.Mock).mockReturnValue(new Promise(() => {}));
-    const screen = render(
-      <ReadyStep
-        exitHref="/(app)/(tabs)/arena"
-        onCancelledRemotely={jest.fn()}
-        matchId="M1"
-        currentAthleteId="me-1"
-        opponentId="opp-1"
-        onStarted={jest.fn()}
-      />,
+    const { result, unmount } = renderHook(() =>
+      useFaceoff({
+        active: true,
+        phase: "ready",
+        matchId: "M1",
+        exitHref: "/(app)/(tabs)/arena",
+        meId: "me-1",
+        opponentId: "opp-1",
+        myWeight: 170,
+        opponentWeight: 168,
+        weightsRated: true,
+        onWeighedIn: jest.fn(),
+        onStarted: jest.fn(),
+        onCancelledRemotely: jest.fn(),
+      }),
     );
-    fireEvent.press(screen.getByText("Ready"));
+    act(() => result.current.tapReady());
     expect(mockSend.broadcastReady).toHaveBeenCalledTimes(1);
 
     act(() => {
@@ -250,13 +288,15 @@ describe("ReadyStep repeats ready_signal until the opponent's arrives", () => {
     expect(mockSend.broadcastReady).toHaveBeenCalledTimes(3);
     expect(mockSend.broadcastReady).toHaveBeenLastCalledWith("me-1");
 
-    // The opponent's ready lands: repeating stops (the start race begins).
+    // The opponent's ready lands: the start race begins and repeating stops.
     act(() => (mockLastParams?.onReadySignal as (id: string) => void)("opp-1"));
+    await flush();
+    expect(startMatch).toHaveBeenCalledTimes(1);
     const before = mockSend.broadcastReady.mock.calls.length;
     act(() => {
       jest.advanceTimersByTime(9_000);
     });
     expect(mockSend.broadcastReady.mock.calls.length).toBe(before);
-    screen.unmount();
+    unmount();
   });
 });

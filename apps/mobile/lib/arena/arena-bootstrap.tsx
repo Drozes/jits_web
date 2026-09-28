@@ -129,6 +129,7 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
     const unregister = registerArenaController({
       toggle: () => liveRef.current.toggle(),
       goOffline: () => liveRef.current.goOffline(),
+      goLive: () => liveRef.current.goLive(),
       sendChallenge: (id, name) => challengeRef.current.sendChallenge(id, name),
       cancelOutgoing: () => challengeRef.current.cancelOutgoing(),
       clearCap: () => challengeRef.current.clearCap(),
@@ -150,6 +151,7 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
       busy={isBusy}
       onAccept={() => void challenge.accept()}
       onDecline={() => void challenge.decline()}
+      viewer={{ elo: athlete.current_elo ?? null, weight: athlete.current_weight ?? null }}
     />
   );
 }

@@ -39,6 +39,8 @@ export interface ArenaController {
   toggle: () => Promise<void>;
   /** Take the athlete offline; resolves true once the flag clear landed. */
   goOffline: () => Promise<boolean>;
+  /** Go live without reversing a live intent (unlike toggle). */
+  goLive: () => Promise<boolean>;
   sendChallenge: (opponentId: string, opponentName: string) => Promise<void>;
   cancelOutgoing: () => Promise<void>;
   clearCap: () => void;
@@ -117,6 +119,7 @@ export function registerArenaController(next: ArenaController): () => void {
 export const arenaActions: ArenaController = Object.freeze({
   toggle: () => controller?.toggle() ?? Promise.resolve(),
   goOffline: () => controller?.goOffline() ?? Promise.resolve(true),
+  goLive: () => controller?.goLive() ?? Promise.resolve(false),
   sendChallenge: (opponentId: string, opponentName: string) =>
     controller?.sendChallenge(opponentId, opponentName) ?? Promise.resolve(),
   cancelOutgoing: () => controller?.cancelOutgoing() ?? Promise.resolve(),

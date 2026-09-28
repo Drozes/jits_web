@@ -1,10 +1,11 @@
 import * as React from "react";
 import { View } from "react-native";
 import { useRouter } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { HighlightShareSourceTag } from "@jits/shared/api/highlight-share";
 import { darkTokens } from "@/lib/tokens";
-import { darkVarsStyle } from "@/lib/theme/theme-provider";
+import { ForceDarkTheme } from "@/lib/theme/force-dark-theme";
 import { HIGHLIGHT_ERROR_FALLBACK, highlightErrorCopy } from "@/lib/highlight/highlight-copy";
 import { useHighlightDetail } from "@/lib/highlight/use-highlight-detail";
 import { ViewerHeader } from "./viewer-header";
@@ -19,7 +20,8 @@ const NOOP = () => undefined;
 /**
  * The full-screen 9:16 viewer for one of the athlete's own reels
  * (spec 015 section 16.6.2). A video surface: the dark "void" tokens in both
- * themes. Loading shows the empty poster frame; a missing / foreign reel says
+ * themes (`ForceDarkTheme`, like the match video player, so themed pieces
+ * inside read dark too) and a light status bar. Loading shows the empty poster frame; a missing / foreign reel says
  * so with "Back"; a reel without a live version (video replaced) says a new
  * one is coming; anything else offers "Try again".
  */
@@ -61,13 +63,16 @@ export function ViewerScreen({ id, source }: { id: string | undefined; source: H
   }
 
   return (
-    <View
-      testID="highlight-viewer"
-      className="flex-1"
-      style={[darkVarsStyle, { backgroundColor: darkTokens.bgPrimary, paddingTop: insets.top, paddingBottom: insets.bottom + 8 }]}
-    >
-      <ViewerHeader onClose={close} />
-      {body}
-    </View>
+    <ForceDarkTheme style={{ backgroundColor: darkTokens.bgPrimary }}>
+      <StatusBar style="light" />
+      <View
+        testID="highlight-viewer"
+        className="flex-1"
+        style={{ paddingTop: insets.top, paddingBottom: insets.bottom + 8 }}
+      >
+        <ViewerHeader onClose={close} />
+        {body}
+      </View>
+    </ForceDarkTheme>
   );
 }

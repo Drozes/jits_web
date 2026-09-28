@@ -1,7 +1,7 @@
 import type { Scenario } from "../context";
 import { run, pace, log } from "../../lib/util";
 import { onInterrupt } from "../../lib/cleanup";
-import { blueEnds, blueRecordsDraw, exitToArena, openToLive, prepare, T } from "../flows";
+import { blueEnds, botRecordsDraw, exitToArena, openToLive, prepare, T } from "../flows";
 
 const scenario: Scenario = {
   id: "E8",
@@ -14,7 +14,9 @@ const scenario: Scenario = {
     await red.goLive();
     const { side } = await openToLive(ctx, red);
     await blueEnds(ctx, side);
-    await blueRecordsDraw(ctx, side);
+    // Red records, so Blue is on the confirm step (a recorder is auto-
+    // confirmed and skips it, B2).
+    await botRecordsDraw(ctx, side);
     const container = ctx.cfg.realtimeContainer;
     let pausing: Promise<unknown> = Promise.resolve();
     const unpauseOnce = () =>
@@ -39,6 +41,8 @@ const scenario: Scenario = {
       await ctx.step("pause realtime", () => (pausing = run("docker", ["pause", container])));
       await ctx.step("both confirm during the outage", async () => {
         await ctx.ui.confirmResult();
+        // Red was auto-confirmed at record; a second confirm is harmless
+        // (already_confirmed) and keeps the bot's own confirm path exercised.
         await side.confirm();
       });
       await pace(15_000);
