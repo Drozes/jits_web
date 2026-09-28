@@ -369,6 +369,10 @@ const HIGHLIGHT_HINTS: [string, string, string][] = [
   ["highlight_too_long", "HIGHLIGHT_BAD_SEGMENTS", "Those moments can't make a reel."],
   ["highlight_too_short", "HIGHLIGHT_BAD_SEGMENTS", "Those moments can't make a reel."],
   ["highlight_segment_out_of_range", "HIGHLIGHT_BAD_SEGMENTS", "Those moments can't make a reel."],
+  // Share funnel (spec 16.3.5)
+  ["highlight_share_disabled", "HIGHLIGHT_SHARE_DISABLED", "Sharing is turned off right now."],
+  ["highlight_bad_event", "HIGHLIGHT_EVENT_REJECTED", "That event was rejected."],
+  ["highlight_event_limit", "HIGHLIGHT_EVENT_REJECTED", "That event was rejected."],
 ];
 
 describe("highlight hints", () => {

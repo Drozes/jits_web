@@ -13,6 +13,7 @@
     "./api/chat-queries": "./src/api/chat-queries.ts",
     "./api/chat-mutations": "./src/api/chat-mutations.ts",
     "./api/highlights": "./src/api/highlights.ts",
+    "./api/highlight-share": "./src/api/highlight-share.ts",
     "./constants": "./src/constants.ts",
     "./constants/highlights": "./src/constants/highlights.ts",
     "./geo": "./src/geo/index.ts",

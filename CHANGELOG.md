@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### Shared: Highlight Reels phase 2 share-funnel layer (jits-s6mi.12)
+
+Coded against jr_be spec 014 section 16.3 / 16.5; the backend (B9 `jr_be-15c.15`) lands in parallel, so the six new RPCs are hand-typed until `db:types` is re-run.
+
+**Added**
+- `@jits/shared/api/highlight-share` (new `packages/shared/src/api/highlight-share.ts`, also in the `./api` barrel): `getHighlightFlags`, `getMyHighlights`, `getHighlightDetail`, `markHighlightSeen`, `prepareHighlightShare` (the server-side kill-switch check), `signHighlightDownload` (`match-videos`, 300 s, 404 -> `VIDEO_FILE_MISSING`) and `logHighlightShareEvent` (fire-and-forget, never rejects), with the `HighlightFlags` / `MyHighlightItem` / `MyHighlights` / `HighlightCaptionContext` / `HighlightDetail` / `HighlightShareSource` types. All return `Result<T>`; `getHighlightFlags` fails closed.
+- `packages/shared/src/api/highlight-share-rpc.ts`: the ONLY hand-written RPC types (raw JSONB shapes, argument names, a loosely typed `rpc` call). TODO: delete once `database.ts` is regenerated with B9.
+- `buildHighlightCaption` / `buildCollabTip` (new `packages/shared/src/utils/highlight-caption.ts`): the spec 16.5 caption template (display names only, no handles or URLs, <= 400 characters).
+- `HIGHLIGHT_SHARE_STEPS`, `HIGHLIGHT_SHARE_SOURCES`, `HIGHLIGHT_DOWNLOAD_URL_TTL_S` and the event-detail key documentation in `packages/shared/src/constants/highlights.ts`.
+- Error codes `HIGHLIGHT_SHARE_DISABLED` ("Sharing is turned off right now.") and `HIGHLIGHT_EVENT_REJECTED` (never shown) for hints `highlight_share_disabled`, `highlight_bad_event`, `highlight_event_limit`.
+
 ### Mobile: "Your highlight" card, player and feedback sheet (jits-s6mi.10, Highlight Reels Alpha)
 
 JS-only, OTA-eligible for runtime 0.3.0 (expo-video is already embedded; no dependency, `app.json`, plugin, metro, babel or `eas.json` change). Needs jr_be B1 + B6 deployed to show anything: until `get_highlight_progress` answers, the card renders nothing.
