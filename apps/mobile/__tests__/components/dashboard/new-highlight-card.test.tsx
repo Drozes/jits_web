@@ -51,6 +51,7 @@ function highlight(over: Partial<NewHighlight["item"]> = {}, posterUrl: string |
       playedAt: "2026-09-27T09:00:00Z",
       notifiedAt: "2026-09-27T10:00:01Z",
       unseen: true,
+      origin: null,
       ...over,
     },
   };

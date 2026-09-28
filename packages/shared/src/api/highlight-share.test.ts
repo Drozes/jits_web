@@ -50,7 +50,7 @@ describe("getHighlightFlags", () => {
       ok: true,
       data: { clipsEnabled: true, shareEnabled: false },
     });
-    expect(rpc).toHaveBeenCalledWith("get_highlight_flags", {});
+    expect(rpc).toHaveBeenCalledWith("get_highlight_flags");
   });
 
   it("returns ok:false on an RPC error (callers treat both as false)", async () => {
@@ -86,6 +86,7 @@ const ITEM = {
   played_at: "2026-09-27T09:00:00Z",
   notified_at: "2026-09-27T10:00:01Z",
   unseen: true,
+  origin: "regen",
 };
 
 describe("getMyHighlights", () => {
@@ -120,6 +121,7 @@ describe("getMyHighlights", () => {
             playedAt: "2026-09-27T09:00:00Z",
             notifiedAt: "2026-09-27T10:00:01Z",
             unseen: true,
+            origin: "regen",
           },
         ],
       },
@@ -156,6 +158,23 @@ describe("getMyHighlights", () => {
       notifiedAt: null,
       unseen: false,
     });
+  });
+
+  it.each([
+    ["auto", "auto"],
+    ["regen", "regen"],
+    ["retry", "retry"],
+    ["manual", null],
+    [null, null],
+    [undefined, null],
+    [7, null],
+  ])("maps origin %p -> %p (additive key; unknown or missing -> null)", async (origin, expected) => {
+    const item: Record<string, unknown> = { ...ITEM, origin };
+    if (origin === undefined) delete item.origin;
+    const { client } = rpcClient({ data: { clips_enabled: true, share_enabled: true, items: [item] }, error: null });
+    const result = await getMyHighlights(client);
+    if (!result.ok) throw new Error("expected ok");
+    expect(result.data.items[0].origin).toBe(expected);
   });
 
   it("returns an empty list when items is missing, and skips malformed items", async () => {

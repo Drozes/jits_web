@@ -8,14 +8,6 @@ import {
 } from "../constants/highlights";
 import { mapPostgrestError, type DomainError, type Result } from "./errors";
 import { isStorageObjectMissing, MATCH_VIDEO_BUCKET } from "./queries";
-import {
-  callHighlightShareRpc,
-  type RawHighlightDetail,
-  type RawHighlightFlags,
-  type RawHighlightShareSource,
-  type RawMyHighlightItem,
-  type RawMyHighlights,
-} from "./highlight-share-rpc";
 
 /**
  * Highlight reels phase 2: discovery and the share funnel (jr_be spec 014
@@ -29,6 +21,72 @@ import {
 
 type Client = SupabaseClient<Database>;
 
+/*
+ * JSONB narrowing shapes. The RPCs are in the generated `database.ts`
+ * (their Returns is `Json`); these describe what that Json holds.
+ */
+
+/** `get_highlight_flags()` */
+export interface RawHighlightFlags {
+  clips_enabled: boolean;
+  share_enabled: boolean;
+}
+
+/** One item of `get_my_highlights(...)`.items (spec 16.3.3). */
+export interface RawMyHighlightItem {
+  highlight_id: string;
+  match_id: string;
+  match_video_id: string;
+  version: number;
+  duration_s: number | string;
+  poster_path: string | null;
+  ready_at: string;
+  opponent_name: string | null;
+  match_type: string;
+  outcome: string | null;
+  played_at: string;
+  notified_at: string | null;
+  unseen: boolean;
+  /** Additive: origin of the ledger row for the live version (`auto` | `regen` | `retry`), else null. */
+  origin?: string | null;
+}
+
+/** `get_my_highlights(p_limit, p_before, p_unseen_only)` */
+export interface RawMyHighlights {
+  clips_enabled: boolean;
+  share_enabled: boolean;
+  items: RawMyHighlightItem[];
+}
+
+/** `get_highlight_detail(p_highlight_id)` */
+export interface RawHighlightDetail {
+  highlight_id: string;
+  match_video_id: string;
+  match_id: string;
+  version: number | null;
+  clips_enabled: boolean;
+  share_enabled: boolean;
+  caption: {
+    athlete_name: string;
+    opponent_name: string | null;
+    match_type: string;
+    outcome: string | null;
+    elo_after: number | null;
+    elo_delta: number | null;
+    technique: string | null;
+    played_at: string;
+  };
+}
+
+/** `prepare_highlight_share(p_highlight_id)` */
+export interface RawHighlightShareSource {
+  highlight_id: string;
+  version: number;
+  storage_path: string;
+  duration_s: number | string;
+  file_name: string;
+}
+
 export type { HighlightShareStep, HighlightShareSourceTag } from "../constants/highlights";
 
 export interface HighlightFlags {
@@ -38,6 +96,16 @@ export interface HighlightFlags {
 
 export type HighlightMatchType = "ranked" | "casual";
 export type HighlightOutcome = "win" | "loss" | "draw";
+
+/** Origin of a ready notification (`video_highlight_ready_notifications.origin`). */
+export type HighlightReadyOrigin = "auto" | "regen" | "retry";
+
+const READY_ORIGINS: ReadonlySet<string> = new Set<HighlightReadyOrigin>(["auto", "regen", "retry"]);
+
+/** Unknown / missing -> null (the key is additive; older backends omit it). */
+export function readyOriginOf(raw: unknown): HighlightReadyOrigin | null {
+  return typeof raw === "string" && READY_ORIGINS.has(raw) ? (raw as HighlightReadyOrigin) : null;
+}
 
 export interface MyHighlightItem {
   highlightId: string;
@@ -53,6 +121,8 @@ export interface MyHighlightItem {
   playedAt: string;
   notifiedAt: string | null;
   unseen: boolean;
+  /** Why the live version exists (ledger row): `regen` is a regeneration; null when unknown. */
+  origin: HighlightReadyOrigin | null;
 }
 
 export interface MyHighlights {
@@ -149,6 +219,7 @@ export function toMyHighlightItem(raw: RawMyHighlightItem): MyHighlightItem {
     playedAt: raw.played_at,
     notifiedAt: strOrNull(raw.notified_at),
     unseen: raw.unseen === true,
+    origin: readyOriginOf(raw.origin),
   };
 }
 
@@ -180,7 +251,7 @@ export function toHighlightDetail(raw: RawHighlightDetail): HighlightDetail {
  */
 export async function getHighlightFlags(supabase: Client): Promise<Result<HighlightFlags>> {
   try {
-    const { data, error } = await callHighlightShareRpc(supabase, "get_highlight_flags", {});
+    const { data, error } = await supabase.rpc("get_highlight_flags");
     if (error) return { ok: false, error: mapPostgrestError(error, "highlight_flags") };
     if (!isObject(data)) return { ok: false, error: MALFORMED };
     const raw = data as Partial<RawHighlightFlags>;
@@ -202,7 +273,7 @@ export async function getMyHighlights(
   opts: GetMyHighlightsOptions = {},
 ): Promise<Result<MyHighlights>> {
   try {
-    const { data, error } = await callHighlightShareRpc(supabase, "get_my_highlights", {
+    const { data, error } = await supabase.rpc("get_my_highlights", {
       ...(opts.limit !== undefined ? { p_limit: opts.limit } : {}),
       ...(opts.before !== undefined ? { p_before: opts.before } : {}),
       ...(opts.unseenOnly !== undefined ? { p_unseen_only: opts.unseenOnly } : {}),
@@ -234,7 +305,7 @@ export async function getHighlightDetail(
   highlightId: string,
 ): Promise<Result<HighlightDetail>> {
   try {
-    const { data, error } = await callHighlightShareRpc(supabase, "get_highlight_detail", {
+    const { data, error } = await supabase.rpc("get_highlight_detail", {
       p_highlight_id: highlightId,
     });
     if (error) return { ok: false, error: mapPostgrestError(error, "highlight_detail") };
@@ -254,7 +325,7 @@ export async function markHighlightSeen(
   version: number,
 ): Promise<Result<null>> {
   try {
-    const { error } = await callHighlightShareRpc(supabase, "mark_highlight_seen", {
+    const { error } = await supabase.rpc("mark_highlight_seen", {
       p_highlight_id: highlightId,
       p_version: version,
     });
@@ -275,7 +346,7 @@ export async function prepareHighlightShare(
   highlightId: string,
 ): Promise<Result<HighlightShareSource>> {
   try {
-    const { data, error } = await callHighlightShareRpc(supabase, "prepare_highlight_share", {
+    const { data, error } = await supabase.rpc("prepare_highlight_share", {
       p_highlight_id: highlightId,
     });
     if (error) return { ok: false, error: mapPostgrestError(error, "highlight_prepare_share") };
@@ -343,7 +414,7 @@ export async function logHighlightShareEvent(
   detail?: HighlightShareEventDetail,
 ): Promise<void> {
   try {
-    await callHighlightShareRpc(supabase, "log_highlight_share_event", {
+    await supabase.rpc("log_highlight_share_event", {
       p_highlight_id: highlightId,
       p_step: step,
       p_detail: detail ?? {},

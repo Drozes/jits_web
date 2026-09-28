@@ -32,7 +32,7 @@ export function toHighlightNotificationItems(items: MyHighlightItem[]): Highligh
           {
             type: "highlight_ready" as const,
             id: `highlight-${h.highlightId}-v${h.version}`,
-            title: bellTitle(h.version),
+            title: bellTitle(h.origin),
             body: bellBody(h.opponentName),
             route: highlightHref(h.highlightId, "bell"),
             createdAt: h.notifiedAt,

@@ -1,4 +1,4 @@
-import type { HighlightShareSourceTag } from "@jits/shared/api/highlight-share";
+import type { HighlightReadyOrigin, HighlightShareSourceTag } from "@jits/shared/api/highlight-share";
 
 /**
  * Discovery-surface copy and routing for Highlight Reels phase 2 (jr_be spec
@@ -23,6 +23,21 @@ export function highlightHref(highlightId: string, source: HighlightShareSourceT
   return `/highlight/${encodeURIComponent(highlightId)}?source=${source}`;
 }
 
+const SOURCES: ReadonlySet<string> = new Set<HighlightShareSourceTag>([
+  "push",
+  "bell",
+  "home",
+  "profile",
+  "match_detail",
+  "summary",
+]);
+
+/** `?source=` as the viewer route reads it: unknown or missing -> `match_detail` (spec 16.6.2). */
+export function parseHighlightSource(raw: string | string[] | undefined): HighlightShareSourceTag {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  return value && SOURCES.has(value) ? (value as HighlightShareSourceTag) : "match_detail";
+}
+
 /** Bell item body: "Your reel vs {opponent} is ready to watch." */
 export function bellBody(opponentName: string | null): string {
   const name = opponentName?.trim();
@@ -30,9 +45,11 @@ export function bellBody(opponentName: string | null): string {
 }
 
 /**
- * Bell item title. A version above 1 is a regeneration landing (the push
- * function's "regen" copy); version 1 is the first reel.
+ * Bell item title, by the ledger row's `origin` for the live version (the
+ * push function's copy split): only a regeneration (`regen`) reads "Your new
+ * version is ready"; `auto`, `retry` (a retry that landed the first reel)
+ * and unknown read "Your highlight is ready".
  */
-export function bellTitle(version: number): string {
-  return version > 1 ? DISCOVERY_COPY.bellTitleRegen : DISCOVERY_COPY.bellTitle;
+export function bellTitle(origin: HighlightReadyOrigin | null): string {
+  return origin === "regen" ? DISCOVERY_COPY.bellTitleRegen : DISCOVERY_COPY.bellTitle;
 }

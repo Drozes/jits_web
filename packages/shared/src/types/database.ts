@@ -1905,6 +1905,106 @@ export type Database = {
           },
         ]
       }
+      video_highlight_ready_notifications: {
+        Row: {
+          athlete_id: string
+          created_at: string
+          highlight_id: string
+          id: string
+          match_id: string
+          origin: string
+          seen_at: string | null
+          version: number
+        }
+        Insert: {
+          athlete_id: string
+          created_at?: string
+          highlight_id: string
+          id?: string
+          match_id: string
+          origin: string
+          seen_at?: string | null
+          version: number
+        }
+        Update: {
+          athlete_id?: string
+          created_at?: string
+          highlight_id?: string
+          id?: string
+          match_id?: string
+          origin?: string
+          seen_at?: string | null
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_highlight_ready_notifications_athlete_id_fkey"
+            columns: ["athlete_id"]
+            isOneToOne: false
+            referencedRelation: "athletes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_highlight_ready_notifications_highlight_id_fkey"
+            columns: ["highlight_id"]
+            isOneToOne: false
+            referencedRelation: "video_highlights"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_highlight_ready_notifications_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      video_highlight_share_events: {
+        Row: {
+          athlete_id: string
+          created_at: string
+          detail: Json
+          highlight_id: string
+          id: number
+          step: string
+          version: number | null
+        }
+        Insert: {
+          athlete_id: string
+          created_at?: string
+          detail?: Json
+          highlight_id: string
+          id?: never
+          step: string
+          version?: number | null
+        }
+        Update: {
+          athlete_id?: string
+          created_at?: string
+          detail?: Json
+          highlight_id?: string
+          id?: never
+          step?: string
+          version?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_highlight_share_events_athlete_id_fkey"
+            columns: ["athlete_id"]
+            isOneToOne: false
+            referencedRelation: "athletes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_highlight_share_events_highlight_id_fkey"
+            columns: ["highlight_id"]
+            isOneToOne: false
+            referencedRelation: "video_highlights"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       video_highlights: {
         Row: {
           athlete_id: string
@@ -2170,6 +2270,11 @@ export type Database = {
       }
       _gym_range_cutoff: { Args: { p_range: string }; Returns: string }
       _highlight_flag_changed_at: { Args: never; Returns: string }
+      _highlight_list_item: { Args: { p_highlight_id: string }; Returns: Json }
+      _highlight_match_facts: {
+        Args: { p_highlight_id: string; p_side: string }
+        Returns: Json
+      }
       _highlight_max_seconds: { Args: never; Returns: number }
       _highlight_plan_max: { Args: never; Returns: number }
       _highlight_render_max: { Args: never; Returns: number }
@@ -2488,6 +2593,8 @@ export type Database = {
         Args: { p_gym_id: string; p_range?: string }
         Returns: Json
       }
+      get_highlight_detail: { Args: { p_highlight_id: string }; Returns: Json }
+      get_highlight_flags: { Args: never; Returns: Json }
       get_highlight_progress: {
         Args: { p_match_video_id: string }
         Returns: Json
@@ -2517,6 +2624,10 @@ export type Database = {
         }[]
       }
       get_match_videos: { Args: { p_match_id: string }; Returns: Json }
+      get_my_highlights: {
+        Args: { p_before?: string; p_limit?: number; p_unseen_only?: boolean }
+        Returns: Json
+      }
       get_recent_activity: {
         Args: { p_limit?: number }
         Returns: {
@@ -2555,6 +2666,7 @@ export type Database = {
       is_founder: { Args: never; Returns: boolean }
       is_gym_manager: { Args: { p_gym_id: string }; Returns: boolean }
       is_highlight_rendering_enabled: { Args: never; Returns: boolean }
+      is_highlight_share_enabled: { Args: never; Returns: boolean }
       is_match_video_participant: {
         Args: { p_video_id: string }
         Returns: boolean
@@ -2564,9 +2676,17 @@ export type Database = {
         Returns: boolean
       }
       is_video_visible: { Args: { p_video_id: string }; Returns: boolean }
+      log_highlight_share_event: {
+        Args: { p_detail?: Json; p_highlight_id: string; p_step: string }
+        Returns: undefined
+      }
       mark_conversation_read: {
         Args: { p_conversation_id: string }
         Returns: Json
+      }
+      mark_highlight_seen: {
+        Args: { p_highlight_id: string; p_version: number }
+        Returns: undefined
       }
       merge_finalize: {
         Args: { p_analysis: Json; p_technique_tags: Json; p_video_id: string }
@@ -2587,6 +2707,10 @@ export type Database = {
       pause_match: { Args: { p_match_id: string }; Returns: Json }
       persist_video_chunks_and_finalize_slice: {
         Args: { p_chunks: Json; p_video_id: string }
+        Returns: Json
+      }
+      prepare_highlight_share: {
+        Args: { p_highlight_id: string }
         Returns: Json
       }
       random_match: { Args: { p_session_id: string }; Returns: Json }

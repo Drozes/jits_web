@@ -52,6 +52,7 @@ function hl(over: Record<string, unknown> = {}) {
     playedAt: "2026-09-27T09:00:00Z",
     notifiedAt: "2026-09-27T10:00:00Z",
     unseen: true,
+    origin: null as "auto" | "regen" | "retry" | null,
     ...over,
   };
 }
@@ -111,11 +112,28 @@ describe("toHighlightNotificationItems", () => {
     ]);
   });
 
-  it("uses the regeneration title for a later version and a fallback without an opponent", () => {
-    const [row] = toHighlightNotificationItems([hl({ version: 2, opponentName: null })]);
+  it("uses the regeneration title for origin regen and a fallback without an opponent", () => {
+    const [row] = toHighlightNotificationItems([hl({ version: 2, origin: "regen", opponentName: null })]);
     expect(row.title).toBe("Your new version is ready");
     expect(row.body).toBe("Your match reel is ready to watch.");
     expect(row.id).toBe("highlight-h1-v2");
+  });
+
+  it.each([
+    ["auto", 1],
+    ["retry", 1],
+    [null, 1],
+    ["auto", 3],
+    ["retry", 2],
+    [null, 4],
+  ] as const)("origin %p (version %i) reads Your highlight is ready (no version guess)", (origin, version) => {
+    const [row] = toHighlightNotificationItems([hl({ version, origin })]);
+    expect(row.title).toBe("Your highlight is ready");
+  });
+
+  it("origin regen reads Your new version is ready even on version 1", () => {
+    const [row] = toHighlightNotificationItems([hl({ version: 1, origin: "regen" })]);
+    expect(row.title).toBe("Your new version is ready");
   });
 
   it("skips reels the athlete was never notified about", () => {
