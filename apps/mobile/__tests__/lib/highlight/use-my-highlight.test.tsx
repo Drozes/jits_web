@@ -447,24 +447,127 @@ describe("HighlightPlayer", () => {
     expect(pending).toHaveLength(2);
   });
 
-  it("hides the poster on readyToPlay for the current version even without onFirstFrameRender", async () => {
+  /** Fire the fake player's playingChange listeners (the setup mock only has emitStatus). */
+  function emitPlaying(player: { addListener: jest.Mock }, isPlaying: boolean) {
+    for (const [event, fn] of player.addListener.mock.calls) {
+      if (event === "playingChange") (fn as (p: { isPlaying: boolean }) => void)({ isPlaying });
+    }
+  }
+
+  it("readyToPlay alone keeps the poster (a paused, never-played item renders black)", () => {
     const utils = render(<HighlightPlayer source={SOURCE} onError={jest.fn()} />);
     const player = utils.getByTestId("expo-video-view").props.player;
-    expect(utils.getByTestId("highlight-poster")).toBeTruthy();
     act(() => player.emitStatus({ status: "readyToPlay" }));
+    expect(utils.getByTestId("highlight-poster")).toBeTruthy();
+  });
+
+  it("readyToPlay hides the poster only once playback has started for that version (no onFirstFrameRender)", async () => {
+    const utils = render(<HighlightPlayer source={SOURCE} onError={jest.fn()} />);
+    const player = utils.getByTestId("expo-video-view").props.player;
+    act(() => player.emitStatus({ status: "readyToPlay" }));
+    act(() => emitPlaying(player, true));
     expect(utils.queryByTestId("highlight-poster")).toBeNull();
-    // A new version shows its poster again until IT is ready.
+    // A new version shows its poster again until IT has rendered.
     const pending = deferSwaps(player);
     utils.rerender(
       <HighlightPlayer source={{ ...SOURCE, url: "https://v2", version: 2, generation: 1 }} onError={jest.fn()} />,
     );
     expect(utils.getByTestId("highlight-poster")).toBeTruthy();
-    // readyToPlay while the swap is still pending is about the OLD item.
+    // Events while the swap is still pending are about the OLD item.
     act(() => player.emitStatus({ status: "readyToPlay" }));
+    act(() => emitPlaying(player, true));
     expect(utils.getByTestId("highlight-poster")).toBeTruthy();
     await act(async () => pending[0].resolve());
     act(() => player.emitStatus({ status: "readyToPlay" }));
+    expect(utils.getByTestId("highlight-poster")).toBeTruthy(); // ready, but not played yet
+    act(() => emitPlaying(player, true));
     expect(utils.queryByTestId("highlight-poster")).toBeNull();
+  });
+
+  it("a first-frame event while a new version's swap is pending does not hide its poster", async () => {
+    const utils = render(<HighlightPlayer source={SOURCE} onError={jest.fn()} />);
+    const view = utils.getByTestId("expo-video-view");
+    const player = view.props.player;
+    const pending = deferSwaps(player);
+    utils.rerender(
+      <HighlightPlayer source={{ ...SOURCE, url: "https://v2", version: 2, generation: 1 }} onError={jest.fn()} />,
+    );
+    act(() => utils.getByTestId("expo-video-view").props.onFirstFrameRender()); // the old item
+    expect(utils.getByTestId("highlight-poster")).toBeTruthy();
+    await act(async () => pending[0].resolve());
+    act(() => utils.getByTestId("expo-video-view").props.onFirstFrameRender());
+    expect(utils.queryByTestId("highlight-poster")).toBeNull();
+  });
+
+  describe("fullscreen always has native controls (simulator B1)", () => {
+    const mockVideoHandle = {
+      set current(h: { enterFullscreen: () => Promise<void> } | null) {
+        (globalThis as { __expoVideoHandle?: unknown }).__expoVideoHandle = h;
+      },
+    };
+    let raf: jest.SpyInstance;
+    beforeEach(() => {
+      raf = jest.spyOn(global, "requestAnimationFrame").mockImplementation((cb: FrameRequestCallback) => {
+        cb(0);
+        return 1;
+      });
+    });
+    afterEach(() => {
+      raf.mockRestore();
+      mockVideoHandle.current = null;
+    });
+
+    function enterSpy(utils: ReturnType<typeof render>) {
+      // The fake VideoView's imperative handle is created per render; grab it via the ref'd instance.
+      return utils.getByTestId("expo-video-view");
+    }
+
+    it("turns nativeControls on BEFORE calling enterFullscreen, and off again on exit", async () => {
+      const utils = render(<HighlightPlayer source={SOURCE} onError={jest.fn()} />);
+      expect(enterSpy(utils).props.nativeControls).toBe(false);
+      const calls: boolean[] = [];
+      const handle = { enterFullscreen: jest.fn(() => {
+        calls.push(utils.getByTestId("expo-video-view").props.nativeControls);
+        return Promise.resolve();
+      }) };
+      mockVideoHandle.current = handle;
+      await act(async () => {
+        fireEvent.press(utils.getByLabelText("Watch full screen"));
+      });
+      expect(handle.enterFullscreen).toHaveBeenCalledTimes(1);
+      expect(calls).toEqual([true]); // controls were already committed when fullscreen was entered
+      act(() => utils.getByTestId("expo-video-view").props.onFullscreenEnter());
+      expect(utils.getByTestId("expo-video-view").props.nativeControls).toBe(true);
+      act(() => utils.getByTestId("expo-video-view").props.onFullscreenExit());
+      expect(utils.getByTestId("expo-video-view").props.nativeControls).toBe(false);
+    });
+
+    it("any other way into fullscreen also turns the controls on", () => {
+      const utils = render(<HighlightPlayer source={SOURCE} onError={jest.fn()} />);
+      act(() => utils.getByTestId("expo-video-view").props.onFullscreenEnter());
+      expect(utils.getByTestId("expo-video-view").props.nativeControls).toBe(true);
+    });
+
+    it("a failed enterFullscreen turns the controls back off", async () => {
+      const utils = render(<HighlightPlayer source={SOURCE} onError={jest.fn()} />);
+      mockVideoHandle.current = { enterFullscreen: jest.fn(() => Promise.reject(new Error("no"))) };
+      await act(async () => {
+        fireEvent.press(utils.getByLabelText("Watch full screen"));
+      });
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(utils.getByTestId("expo-video-view").props.nativeControls).toBe(false);
+    });
+
+    it("fullscreen is enabled on the card and disabled where the button is hidden (the viewer)", () => {
+      const card = render(<HighlightPlayer source={SOURCE} onError={jest.fn()} />);
+      expect(card.getByTestId("expo-video-view").props.fullscreenOptions).toEqual({ enable: true });
+      card.unmount();
+      const viewer = render(<HighlightPlayer source={SOURCE} onError={jest.fn()} showFullscreenButton={false} />);
+      expect(viewer.getByTestId("expo-video-view").props.fullscreenOptions).toEqual({ enable: false });
+      expect(viewer.queryByLabelText("Watch full screen")).toBeNull();
+    });
   });
 
   it("offers native fullscreen", () => {

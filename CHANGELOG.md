@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Highlight Reels: simulator fixes on the player (iOS 26.3 run)
+
+JS-only, OTA-eligible (no native change: the fixes drive existing expo-video 3.0.16 props and events).
+
+**Fixed**
+- Fullscreen trap (blocker): the inline player runs with `nativeControls={false}`, and expo-video 3.0.16 maps that straight onto the AVPlayerViewController that goes fullscreen (`showsPlaybackControls`), so fullscreen had no Done button and no way out. New `apps/mobile/lib/highlight/use-fullscreen-controls.ts`: the fullscreen button turns `nativeControls` on, waits for that commit (one animation frame), then calls `enterFullscreen()`; `onFullscreenEnter` also forces the controls on (any other path into fullscreen) and `onFullscreenExit` / a failed enter turns them off again. The viewer, which has no fullscreen button, passes `fullscreenOptions.enable = false`.
+- Black frame at rest: a paused, never-played AVPlayer reaches `readyToPlay` without rendering a frame, and the poster was removed on `readyToPlay`. The poster now hides on `onFirstFrameRender` for the settled current version, or on `readyToPlay` only once playback of that version has started (`playingChange`). The poster moved to `components/match-detail/highlight/highlight-poster.tsx`.
+- The failed card's "Try again" is a secondary (outline) button, so match detail keeps one Signal Red CTA (the match video's Watch).
+- Numbers inside labels ("Regenerate (N left)", "Making version N…", "all N versions") render in mono tabular-nums spans (`components/match-detail/highlight/mono-numbers.tsx`).
+
 ### Highlight Reels phase 2: integration review fixes (jits-s6mi.3/.4/.12/.13/.14)
 
 JS-only, still tier-1 OTA-eligible (no dependency, `app.json`, plugin, metro, babel or `eas.json` change; the synchronous `getLastNotificationResponse` is in the installed expo-notifications 0.32.17).

@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, Text } from "react-native";
 import { cn } from "@/lib/cn";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { HIGHLIGHT_COPY, regenerateLabel } from "@/lib/highlight/highlight-copy";
+import { MonoNumbers } from "./mono-numbers";
 
 interface Props {
   rendersRemaining: number;
@@ -30,7 +31,7 @@ export function HighlightRegenerateButton({ rendersRemaining, disabled, working,
     >
       {working ? <ActivityIndicator size="small" color={tokens.textOnAccent} /> : null}
       <Text className="font-heading text-[12px] uppercase tracking-caps text-ink-on-cta">
-        {working ? HIGHLIGHT_COPY.working : label}
+        {working ? HIGHLIGHT_COPY.working : <MonoNumbers text={label} />}
       </Text>
     </Pressable>
   );

@@ -277,13 +277,17 @@ describe("HighlightCard phases", () => {
     expect(utils.getByTestId("highlight-improve").props.accessibilityState).toEqual({ disabled: true });
   });
 
-  it("failed with renders left: reason, ONE red Try again that retries", async () => {
+  it("failed with renders left: reason, a SECONDARY (outline) Try again that retries", async () => {
     const utils = await renderCard(
       progress("failed", { status: "failed", playback: null, errorMessage: "The render timed out." }),
     );
     expect(utils.getByText("We couldn't make your highlight reel.")).toBeTruthy();
     expect(utils.getByTestId("highlight-error-reason")).toHaveTextContent("The render timed out.");
-    expect(redCtas(utils)).toHaveLength(1);
+    // Match detail keeps ONE Signal Red CTA: the match video's Watch.
+    expect(redCtas(utils)).toHaveLength(0);
+    const retry = utils.getByTestId("highlight-retry");
+    expect(retry.props.className).toContain("border");
+    expect(retry.props.className).not.toMatch(/(^|\s)bg-cta(\s|$)/);
     await act(async () => {
       fireEvent.press(utils.getByText("Try again"));
     });
@@ -785,5 +789,37 @@ describe("HighlightCard phase 2 tie-in", () => {
     });
     expect(mockMarkSeen).toHaveBeenCalledTimes(2);
     expect(mockMarkSeen).toHaveBeenLastCalledWith({}, "h1", 2);
+  });
+});
+
+describe("numbers inside labels are mono tabular-nums", () => {
+  function monoSpans(root: ReturnType<typeof render>["root"]) {
+    return root
+      .findAll((n: ReturnType<typeof render>["root"]) => n.props.testID === "mono-number" && typeof n.type === "string")
+      .map((n: ReturnType<typeof render>["root"]) => ({
+        text: n.props.children,
+        className: n.props.className,
+        style: n.props.style,
+      }));
+  }
+
+  it("Regenerate (N left)", async () => {
+    const utils = await openSheet(progress("ready"));
+    const button = utils.getByTestId("highlight-regenerate");
+    expect(button).toHaveTextContent("Regenerate (9 left)");
+    expect(monoSpans(button)).toEqual([{ text: "9", className: "font-mono", style: { fontVariant: ["tabular-nums"] } }]);
+  });
+
+  it("the regenerating banner's version number", async () => {
+    const utils = await renderCard(progress("regenerating", { status: "pending", renderTotal: 2, canRegenerate: false }));
+    const banner = utils.getByTestId("highlight-regenerating");
+    expect(monoSpans(banner).map((s: { text: unknown }) => s.text)).toEqual(["2"]);
+  });
+
+  it("the exhausted helper's version count", async () => {
+    const utils = await openSheet(progress("ready", { rendersRemaining: 0, renderTotal: 10, canRegenerate: false }));
+    const helper = utils.getByTestId("highlight-regenerate-helper");
+    expect(helper).toHaveTextContent("You've used all 10 versions of this reel.");
+    expect(monoSpans(helper).map((s: { text: unknown }) => s.text)).toEqual(["10"]);
   });
 });

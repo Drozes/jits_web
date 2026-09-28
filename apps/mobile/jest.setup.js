@@ -71,8 +71,12 @@ jest.mock("expo-video", () => {
     return ref.current;
   }
   const VideoView = R.forwardRef(function VideoView(props, ref) {
+    // A suite can observe fullscreen calls through globalThis.__expoVideoHandle.
     R.useImperativeHandle(ref, () => ({
-      enterFullscreen: jest.fn(() => Promise.resolve()),
+      enterFullscreen: jest.fn(() => {
+        const h = globalThis.__expoVideoHandle;
+        return h && h.enterFullscreen ? h.enterFullscreen() : Promise.resolve();
+      }),
       exitFullscreen: jest.fn(() => Promise.resolve()),
     }));
     return R.createElement(RN.View, { testID: "expo-video-view", ...props });

@@ -5,8 +5,16 @@ import type { HighlightSource } from "./use-my-highlight";
 
 export interface HighlightPlayerState {
   player: VideoPlayer;
-  /** Version whose item reached readyToPlay (poster fallback when iOS skips onFirstFrameRender). */
-  readyVersion: number | null;
+  /**
+   * Version whose item reached readyToPlay AND has actually played, i.e. a
+   * frame is on screen: the poster fallback when iOS skips
+   * onFirstFrameRender. A paused, never-played AVPlayer reaches readyToPlay
+   * without rendering anything, so readyToPlay alone must never hide the
+   * poster (it left a black frame at rest).
+   */
+  renderedVersion: number | null;
+  /** The version of the item on screen, or null while a swap is still pending. */
+  settledVersion: () => number | null;
 }
 
 /**
@@ -34,6 +42,7 @@ export function useHighlightPlayer(source: HighlightSource, onError: () => void)
     p.allowsExternalPlayback = false;
   });
   const [readyVersion, setReadyVersion] = React.useState<number | null>(null);
+  const [playedVersion, setPlayedVersion] = React.useState<number | null>(null);
   const loadedRef = React.useRef({ url: source.url, version: source.version, generation: source.generation });
   const swap = React.useRef({ seq: 0, doneSeq: 0, mounted: true });
   const onErrorRef = React.useRef(onError);
@@ -66,6 +75,8 @@ export function useHighlightPlayer(source: HighlightSource, onError: () => void)
         if (player.status === "readyToPlay") setReadyVersion(loadedRef.current.version);
         if (restore && restore.at > 0) player.currentTime = restore.at;
         if (restore?.play) player.play();
+        // Resumed playback may not re-emit playingChange (it never stopped).
+        if (restore?.play || player.playing) setPlayedVersion(loadedRef.current.version);
       };
       player.replaceAsync(url).then(
         () => settle(true),
@@ -97,7 +108,14 @@ export function useHighlightPlayer(source: HighlightSource, onError: () => void)
         setReadyVersion(loadedRef.current.version);
       }
     });
-    return () => sub.remove();
+    // Playback of the current item started: from now on a ready item has a frame.
+    const playing = player.addListener("playingChange", ({ isPlaying }) => {
+      if (isPlaying && swap.current.doneSeq === swap.current.seq) setPlayedVersion(loadedRef.current.version);
+    });
+    return () => {
+      sub.remove();
+      playing.remove();
+    };
   }, [player]);
 
   useFocusEffect(
@@ -112,5 +130,10 @@ export function useHighlightPlayer(source: HighlightSource, onError: () => void)
     }, [player]),
   );
 
-  return { player, readyVersion };
+  const renderedVersion = readyVersion !== null && readyVersion === playedVersion ? readyVersion : null;
+  const settledVersion = React.useCallback(
+    () => (swap.current.doneSeq === swap.current.seq ? loadedRef.current.version : null),
+    [],
+  );
+  return { player, renderedVersion, settledVersion };
 }

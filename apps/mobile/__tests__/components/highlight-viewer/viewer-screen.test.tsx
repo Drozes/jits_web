@@ -318,6 +318,10 @@ describe("viewer states", () => {
     expect(utils.queryByTestId("highlight-fullscreen")).toBeNull();
     const meta = utils.getByTestId("viewer-meta");
     expect(meta).toHaveTextContent("31s · Version 2");
+    // The viewer's player: fullscreen disabled (no button), inline controls off.
+    const video = utils.getByTestId("expo-video-view");
+    expect(video.props.fullscreenOptions).toEqual({ enable: false });
+    expect(video.props.nativeControls).toBe(false);
     expect(meta.props.className).toContain("font-mono");
     expect(meta.props.style).toEqual({ fontVariant: ["tabular-nums"] });
     expect(utils.getByText("Share to Instagram")).toBeTruthy();
@@ -350,6 +354,11 @@ describe("viewer states", () => {
     expect(utils.getByTestId("viewer-regenerating")).toHaveTextContent(
       "Making version 3… You can keep watching this one.",
     );
+    const mono = utils.getByTestId("viewer-regenerating").findAll(
+      (n: HostNode) => typeof n.type === "string" && n.props.testID === "mono-number",
+    );
+    expect(mono.map((n: HostNode) => n.props.children)).toEqual(["3"]);
+    expect(mono[0].props.style).toEqual({ fontVariant: ["tabular-nums"] });
     expect(utils.getByTestId("viewer-improve").props.accessibilityState).toEqual({ disabled: true, busy: false });
     expect(utils.getByTestId("viewer-meta")).toHaveTextContent("31s · Version 2");
   });

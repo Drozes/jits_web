@@ -8,6 +8,7 @@ import {
   whatChanged,
 } from "@/lib/highlight/highlight-copy";
 import { HighlightNote } from "./highlight-states";
+import { MonoNumbers } from "./mono-numbers";
 
 /** Under the player: regenerating banner, mono meta, what changed, failed-attempt note. */
 export function HighlightReelNotes({ progress }: { progress: HighlightProgress }) {
@@ -16,7 +17,9 @@ export function HighlightReelNotes({ progress }: { progress: HighlightProgress }
     <>
       {progress.phase === "regenerating" ? (
         <View testID="highlight-regenerating" className="bg-surface-4 rounded-md px-3 py-2">
-          <Text className="font-body text-[12px] text-ink">{regeneratingBanner(progress.renderTotal)}</Text>
+          <Text className="font-body text-[12px] text-ink">
+            <MonoNumbers text={regeneratingBanner(progress.renderTotal)} />
+          </Text>
         </View>
       ) : null}
       {playback ? (

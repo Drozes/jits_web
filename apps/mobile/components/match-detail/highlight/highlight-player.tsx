@@ -1,19 +1,14 @@
 import * as React from "react";
 import { Pressable, View, type ViewStyle } from "react-native";
-import { Image } from "expo-image";
 import { VideoView } from "expo-video";
 import { playerLabel } from "@/lib/highlight/highlight-copy";
 import { useHighlightPlayer } from "@/lib/highlight/use-highlight-player";
+import { useFullscreenControls } from "@/lib/highlight/use-fullscreen-controls";
 import type { HighlightSource } from "@/lib/highlight/use-my-highlight";
 import { HIGHLIGHT_FRAME_STYLE } from "./highlight-frame";
 import { HighlightFullscreenButton } from "./highlight-fullscreen-button";
+import { HighlightPoster } from "./highlight-poster";
 
-const FILL = { position: "absolute", top: 0, left: 0, right: 0, bottom: 0 } as const;
-
-/** Cached by the render-unique storage key: re-signs reuse it, matches never share it. */
-function posterSource({ posterUrl, posterPath }: HighlightSource) {
-  return { uri: posterUrl ?? undefined, cacheKey: posterPath ? `highlight-poster:${posterPath}` : undefined };
-}
 
 interface HighlightPlayerProps {
   source: HighlightSource;
@@ -25,16 +20,21 @@ interface HighlightPlayerProps {
 }
 
 /**
- * The reel, in-app only: tap toggles play/pause, the poster covers the frame
- * until the first frame renders, native fullscreen is allowed. PiP is off and
- * there is deliberately NO share / save / export affordance.
+ * The reel, in-app only: tap toggles play/pause; the poster covers the frame
+ * until a frame of THIS version is on screen (onFirstFrameRender, or
+ * readyToPlay once playback has started: a paused, never-played item is
+ * black). Native fullscreen always presents WITH native controls
+ * (`useFullscreenControls`); the viewer, which hides the button, disables
+ * fullscreen outright. PiP is off and there is NO share / save / export.
  */
 export function HighlightPlayer({ source, onError, frameStyle, showFullscreenButton = true }: HighlightPlayerProps) {
   const viewRef = React.useRef<VideoView>(null);
-  const [firstFrame, setFirstFrame] = React.useState(false);
-  const { player, readyVersion } = useHighlightPlayer(source, onError);
-  // The poster covers a NEW version until it renders; a re-sign keeps the frame.
-  React.useEffect(() => setFirstFrame(false), [source.version]);
+  const [firstFrameVersion, setFirstFrameVersion] = React.useState<number | null>(null);
+  const { player, renderedVersion, settledVersion } = useHighlightPlayer(source, onError);
+  const fullscreen = useFullscreenControls(viewRef);
+  // A first frame counts only for the item whose swap has settled (never the old one).
+  const onFirstFrame = React.useCallback(() => setFirstFrameVersion(settledVersion()), [settledVersion]);
+  const covered = firstFrameVersion !== source.version && renderedVersion !== source.version;
 
   const toggle = React.useCallback(() => {
     if (player.playing) player.pause();
@@ -56,23 +56,19 @@ export function HighlightPlayer({ source, onError, frameStyle, showFullscreenBut
           player={player}
           style={{ flex: 1 }}
           contentFit="contain"
-          nativeControls={false}
-          fullscreenOptions={{ enable: true }}
+          nativeControls={fullscreen.nativeControls}
+          fullscreenOptions={{ enable: showFullscreenButton }}
+          onFullscreenEnter={fullscreen.onFullscreenEnter}
+          onFullscreenExit={fullscreen.onFullscreenExit}
           allowsPictureInPicture={false}
-          onFirstFrameRender={() => setFirstFrame(true)}
+          onFirstFrameRender={onFirstFrame}
         />
-        {source.posterUrl && !firstFrame && readyVersion !== source.version ? (
-          <Image
-            testID="highlight-poster"
-            source={posterSource(source)}
-            style={FILL}
-            contentFit="contain"
-            pointerEvents="none"
-          />
+        {source.posterUrl && covered ? (
+          <HighlightPoster source={source} />
         ) : null}
       </Pressable>
       {showFullscreenButton ? (
-        <HighlightFullscreenButton onPress={() => void viewRef.current?.enterFullscreen().catch(() => undefined)} />
+        <HighlightFullscreenButton onPress={fullscreen.enterFullscreen} />
       ) : null}
     </View>
   );

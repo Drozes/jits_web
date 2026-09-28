@@ -2,6 +2,7 @@ import * as React from "react";
 import { Text, View } from "react-native";
 import type { HighlightProgress } from "@jits/shared/api/highlights";
 import { metaLine, regeneratingBanner } from "@/lib/highlight/highlight-copy";
+import { MonoNumbers } from "@/components/match-detail/highlight/mono-numbers";
 
 /** The phase-1 regenerating banner, then "{duration}s · Version {n}" in mono. */
 export function ViewerMeta({ progress }: { progress: HighlightProgress | null }) {
@@ -10,7 +11,9 @@ export function ViewerMeta({ progress }: { progress: HighlightProgress | null })
     <>
       {progress?.phase === "regenerating" ? (
         <View testID="viewer-regenerating" className="bg-surface-4 rounded-md px-3 py-2">
-          <Text className="font-body text-[12px] text-ink">{regeneratingBanner(progress.renderTotal)}</Text>
+          <Text className="font-body text-[12px] text-ink">
+            <MonoNumbers text={regeneratingBanner(progress.renderTotal)} />
+          </Text>
         </View>
       ) : null}
       {playback ? (

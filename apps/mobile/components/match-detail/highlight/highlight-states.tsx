@@ -20,8 +20,9 @@ interface FailedProps {
 }
 
 /**
- * No playable version and the last render failed. "Try again" is the card's
- * one Signal Red CTA; a NULL reason renders nothing (never an error string).
+ * No playable version and the last render failed. "Try again" is a
+ * SECONDARY (outline) button: match detail's one Signal Red CTA is the match
+ * video's Watch. A NULL reason renders nothing (never an error string).
  */
 export function HighlightFailed({ errorMessage, canRetry, busy, onRetry }: FailedProps) {
   return (
@@ -37,11 +38,11 @@ export function HighlightFailed({ errorMessage, canRetry, busy, onRetry }: Faile
           disabled={busy}
           onPress={onRetry}
           className={cn(
-            "items-center justify-center rounded-sm px-5 py-3 bg-cta active:opacity-70",
+            "items-center justify-center rounded-sm px-5 py-3 border border-hairline-strong active:bg-surface-4",
             busy && "opacity-60",
           )}
         >
-          <Text className="font-heading text-[12px] uppercase tracking-caps text-ink-on-cta">
+          <Text className="font-heading text-[12px] uppercase tracking-caps text-ink">
             {HIGHLIGHT_COPY.tryAgain}
           </Text>
         </Pressable>

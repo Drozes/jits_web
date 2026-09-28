@@ -6,6 +6,7 @@ import { HIGHLIGHT_COPY } from "@/lib/highlight/highlight-copy";
 import { regenerateHelper, regenerateMode } from "@/lib/highlight/regenerate-mode";
 import type { UseHighlightFeedbackFormResult } from "@/lib/highlight/use-highlight-feedback-form";
 import { HighlightRegenerateButton } from "./highlight-regenerate-button";
+import { MonoNumbers } from "./mono-numbers";
 
 interface Props {
   form: UseHighlightFeedbackFormResult;
@@ -35,7 +36,7 @@ export function HighlightFormActions({ form, progress }: Props) {
       ) : null}
       {helper ? (
         <Text testID="highlight-regenerate-helper" className="font-body text-[12px] text-ink-3">
-          {helper}
+          <MonoNumbers text={helper} />
         </Text>
       ) : null}
       <Pressable
