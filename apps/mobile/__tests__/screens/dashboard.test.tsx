@@ -206,6 +206,7 @@ jest.mock("expo-image", () => {
 
 import DashboardScreen from "@/app/(app)/(tabs)/(home)/index";
 import { ARENA_HREF } from "@/lib/arena/constants";
+import { resetHighlightStore } from "@/lib/highlight/highlight-store";
 
 interface QueryMocks {
   getDashboardSummary: jest.Mock;
@@ -225,6 +226,7 @@ interface QueryMocks {
 let athleteSeq = 0;
 
 beforeEach(() => {
+  resetHighlightStore();
   jest.clearAllMocks();
   // Re-wire the resolved value each test since clearAllMocks resets mockResolvedValue
   const queries = require("@jits/shared/api/queries") as QueryMocks;

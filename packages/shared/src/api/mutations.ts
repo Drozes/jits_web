@@ -1007,6 +1007,22 @@ export async function removePushDevice(
   return { ok: true, data: undefined };
 }
 
+/**
+ * Remove this device's push registration by its token (sign-out). RLS
+ * (`push_subscriptions_delete_own`) limits the delete to the caller's own
+ * rows, so it must run while the session is still valid.
+ */
+export async function removePushDeviceByToken(
+  supabase: Client,
+  token: string,
+): Promise<Result<void>> {
+  const { error } = await supabase.from("push_subscriptions").delete().eq("token", token);
+  if (error) {
+    return { ok: false, error: mapPostgrestError(error) };
+  }
+  return { ok: true, data: undefined };
+}
+
 // ---------------------------------------------------------------------------
 // Gym mutations
 // ---------------------------------------------------------------------------

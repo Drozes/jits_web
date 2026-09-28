@@ -14,6 +14,9 @@ import { setCachedElo } from "../splash/elo-cache";
 import { needsAthleteLoad } from "./athlete-load";
 import { takeArenaOfflineBeforeSignOut } from "../arena/arena-store";
 import { clearShareCache } from "../highlight-share";
+import { resetNotificationRouterReady } from "../notifications/handlers";
+import { unregisterPushDeviceOnSignOut } from "../notifications/register-push";
+import { resetHighlightStore } from "../highlight/highlight-store";
 
 type AuthError = { message: string };
 
@@ -298,6 +301,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Clear `looking_for_ranked` while the session can still write it; once
     // signed out, RLS refuses the write and the athlete stays advertised.
     await takeArenaOfflineBeforeSignOut();
+    // Same reason: this device's push row can only be deleted while signed in.
+    await unregisterPushDeviceOnSignOut(supabase);
+    // Taps held for (or routed by) this account must not reach the next one.
+    resetNotificationRouterReady();
     let signOutError: unknown = null;
     try {
       ({ error: signOutError } = await supabase.auth.signOut());
@@ -318,6 +325,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Downloaded highlight reels are the athlete's footage: never leave them
     // in the cache for the next account on this device. Fire and forget.
     void clearShareCache().catch(() => undefined);
+    resetHighlightStore(); // cached reel lists belong to the old account
     loadedAthleteForUserId.current = null;
     setSession(null);
     setUser(null);

@@ -1,9 +1,7 @@
 import * as React from "react";
-import { AppState, type AppStateStatus } from "react-native";
 import { useFocusEffect } from "expo-router";
 import { supabase } from "@/lib/supabase/client";
 import { getNotificationHistory } from "@jits/shared/api/queries";
-import { getMyHighlights } from "@jits/shared/api/highlight-share";
 import type { NotificationItem } from "@jits/shared/types/notification";
 import {
   mergeBellItems,
@@ -11,6 +9,13 @@ import {
   type BellItem,
   type HighlightNotificationItem,
 } from "@/lib/notifications/notification-items";
+import {
+  readMyHighlights,
+  useBellRefreshCount,
+  useForegroundEffect,
+  useHighlightsChangedCount,
+  useOnCountChange,
+} from "@/lib/highlight/highlight-store";
 
 /** Bell feed size for ready reels (jr_be spec 014 section 16.6.4). */
 const HIGHLIGHT_LIMIT = 10;
@@ -23,8 +28,11 @@ const HIGHLIGHT_LIMIT = 10;
  *
  * The full feed is read on mount and on `refresh()` (the panel opening). The
  * highlight half, which also drives the badge, is re-read cheaply on focus
- * and on return to the foreground, so a reel watched elsewhere stops counting
- * as unread. A failed highlight read keeps the previous highlight rows.
+ * and on a real return to the foreground, so a reel watched elsewhere stops
+ * counting as unread; those reads go through the shared, deduped
+ * `readMyHighlights` (four bells + Home cost one RPC). A reel marked seen or
+ * dismissed anywhere re-reads it at once (forced), and Home's pull-to-refresh
+ * re-reads the whole feed. A failed highlight read keeps the previous rows.
  */
 export function useNotificationHistory(athleteId: string | undefined) {
   const [base, setBase] = React.useState<NotificationItem[]>([]);
@@ -38,10 +46,10 @@ export function useNotificationHistory(athleteId: string | undefined) {
     [],
   );
 
-  const fetchHighlights = React.useCallback(async () => {
+  const fetchHighlights = React.useCallback(async (force = false) => {
     if (!athleteId) return;
     try {
-      const res = await getMyHighlights(supabase, { limit: HIGHLIGHT_LIMIT });
+      const res = await readMyHighlights({ limit: HIGHLIGHT_LIMIT }, { force });
       if (!alive.current || !res.ok) return;
       setHighlights(res.data.clipsEnabled ? toHighlightNotificationItems(res.data.items) : []);
     } catch {
@@ -49,13 +57,14 @@ export function useNotificationHistory(athleteId: string | undefined) {
     }
   }, [athleteId]);
 
-  const fetch = React.useCallback(async () => {
+  /** The full feed; `force` skips the shared highlight read's dedupe (panel open, pull). */
+  const fetch = React.useCallback(async (force = false) => {
     if (!athleteId) return;
     setIsLoading(true);
     try {
       const [result] = await Promise.all([
         getNotificationHistory(supabase, athleteId, 30),
-        fetchHighlights(),
+        fetchHighlights(force),
       ]);
       if (alive.current) setBase(result);
     } finally {
@@ -79,12 +88,9 @@ export function useNotificationHistory(athleteId: string | undefined) {
     }, [fetchHighlights]),
   );
 
-  React.useEffect(() => {
-    const sub = AppState.addEventListener("change", (s: AppStateStatus) => {
-      if (s === "active") void fetchHighlights();
-    });
-    return () => sub.remove();
-  }, [fetchHighlights]);
+  useForegroundEffect(() => void fetchHighlights());
+  useOnCountChange(useHighlightsChangedCount(), () => void fetchHighlights(true));
+  useOnCountChange(useBellRefreshCount(), () => void fetch(true));
 
   const items: BellItem[] = React.useMemo(() => mergeBellItems(base, highlights), [base, highlights]);
   const unseenHighlights = React.useMemo(
@@ -92,5 +98,6 @@ export function useNotificationHistory(athleteId: string | undefined) {
     [highlights],
   );
 
-  return { items, unseenHighlights, isLoading, refresh: fetch };
+  const refresh = React.useCallback(() => fetch(true), [fetch]);
+  return { items, unseenHighlights, isLoading, refresh };
 }

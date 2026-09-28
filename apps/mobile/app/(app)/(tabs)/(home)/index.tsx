@@ -27,6 +27,7 @@ import { ResumeMatchCard } from "@/components/dashboard/resume-match-card";
 import { useMyActiveMatch } from "@/lib/match-flow/use-my-active-match";
 import { NewHighlightCard } from "@/components/dashboard/new-highlight-card";
 import { useNewHighlight } from "@/lib/highlight/use-new-highlight";
+import { requestBellRefresh } from "@/lib/highlight/highlight-store";
 import { markNotificationRouterReady } from "@/lib/notifications/handlers";
 
 interface DashboardData {
@@ -75,7 +76,9 @@ export default function DashboardScreen() {
   const refreshAll = React.useCallback(() => {
     refresh();
     refreshActiveMatch();
-    refreshNewHighlight();
+    refreshNewHighlight(true);
+    // The bell sits in this screen's header: a pull refreshes it too.
+    requestBellRefresh();
   }, [refresh, refreshActiveMatch, refreshNewHighlight]);
   const { refreshing, onRefresh } = usePullToRefresh(refreshAll, isValidating);
   useRefetchOnRefocus(refresh, useMatchExitCount());

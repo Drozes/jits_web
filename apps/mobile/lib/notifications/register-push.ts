@@ -17,7 +17,43 @@ import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
 import Constants from "expo-constants";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { registerPushDevice } from "@jits/shared/api/mutations";
+import { registerPushDevice, removePushDeviceByToken } from "@jits/shared/api/mutations";
+
+/** The token this process registered for the signed-in athlete (for sign-out). */
+let registeredToken: string | null = null;
+
+/** Sign-out waits at most this long for the unregister write. */
+export const UNREGISTER_PUSH_TIMEOUT_MS = 2_000;
+
+/**
+ * Sign-out: delete this device's push registration while the session can
+ * still write it, so the previous athlete's pushes never reach the next
+ * account on a shared device. Bounded (never blocks sign-out for long) and
+ * never throws; a no-op when nothing was registered in this process.
+ */
+export async function unregisterPushDeviceOnSignOut(supabase: SupabaseClient): Promise<void> {
+  const token = registeredToken;
+  registeredToken = null;
+  if (!token) return;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      removePushDeviceByToken(supabase, token),
+      new Promise((resolve) => {
+        timer = setTimeout(resolve, UNREGISTER_PUSH_TIMEOUT_MS);
+      }),
+    ]);
+  } catch {
+    // Best effort: the row is left behind, as before this change.
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+/** Test-only. */
+export function __setRegisteredPushTokenForTests(token: string | null): void {
+  registeredToken = token;
+}
 
 export type RegisterPushResult =
   | { ok: true; token: string }
@@ -107,5 +143,6 @@ export async function registerForPushNotifications(
     };
   }
 
+  registeredToken = token;
   return { ok: true, token };
 }

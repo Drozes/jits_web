@@ -52,6 +52,9 @@ export function ViewerScreen({ id, source }: { id: string | undefined; source: H
         action={{ testID: "viewer-retry", label: SHARE_COPY.tryAgain, variant: "primary", onPress: reload }}
       />
     );
+  } else if (!detail.clipsEnabled) {
+    // Clips are off: a calm paused state, no playback, nothing marked seen.
+    body = <ViewerMessage testID="viewer-paused" message={VIEWER_COPY.paused} />;
   } else if (detail.version == null) {
     body = <ViewerMessage testID="viewer-invalidated" message={HIGHLIGHT_COPY.invalidated} />;
   } else {

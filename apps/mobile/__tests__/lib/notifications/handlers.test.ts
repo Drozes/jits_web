@@ -17,8 +17,22 @@ let mockListener: ResponseListener | null = null;
 const mockGetLast = jest.fn();
 const mockClearLast = jest.fn();
 
+const mockSetHandler = jest.fn();
+// The sync cold-start API (expo-notifications >= 0.32): off by default so the
+// async suites keep covering the fallback; one describe turns it on.
+// eslint-disable-next-line no-var
+var mockSync: { on: boolean } = { on: false };
+const mockGetLastSync = jest.fn();
+const mockClearLastSync = jest.fn();
+
 jest.mock("expo-notifications", () => ({
-  setNotificationHandler: jest.fn(),
+  setNotificationHandler: (...a: unknown[]) => mockSetHandler(...a),
+  get getLastNotificationResponse() {
+    return mockSync.on ? mockGetLastSync : undefined;
+  },
+  get clearLastNotificationResponse() {
+    return mockSync.on ? mockClearLastSync : undefined;
+  },
   addNotificationResponseReceivedListener: (fn: ResponseListener) => {
     mockListener = fn;
     return { remove: jest.fn() };
@@ -30,13 +44,16 @@ jest.mock("expo-notifications", () => ({
 const mockPush = jest.fn();
 jest.mock("expo-router", () => ({ router: { push: (...a: unknown[]) => mockPush(...a) } }));
 
+import { renderHook } from "@testing-library/react-native";
 import {
   markNotificationRouterReady,
   notificationTarget,
+  resetNotificationRouterReady,
   resetNotificationRoutingForTests,
   setupNotificationHandlers,
   teardownNotificationHandlers,
 } from "@/lib/notifications/handlers";
+import { __resetArenaStoreForTests, useArenaMatchScreen } from "@/lib/arena/arena-store";
 import { resolveSystemPath } from "@/lib/deep-links/system-path";
 
 let seq = 0;
@@ -59,7 +76,18 @@ const HIGHLIGHT_PUSH = {
   route: "/highlight/h-1?source=push",
 };
 
+/** Mount a match screen (the in-match bit) until the returned unmount runs. */
+function enterMatch(): () => void {
+  const { unmount } = renderHook(() => useArenaMatchScreen());
+  return unmount;
+}
+
 beforeEach(() => {
+  __resetArenaStoreForTests();
+  mockSync.on = false;
+  mockGetLastSync.mockReset().mockReturnValue(null);
+  mockClearLastSync.mockReset();
+  mockSetHandler.mockClear();
   mockPush.mockClear();
   mockGetLast.mockReset().mockResolvedValue(null);
   mockClearLast.mockReset().mockResolvedValue(undefined);
@@ -191,5 +219,145 @@ describe("highlight route", () => {
     expect(resolveSystemPath("/highlight/x")).toBe("/highlight/x");
     expect(resolveSystemPath("/highlight/x?source=push")).toBe("/highlight/x?source=push");
     expect(notificationTarget({ route: "/highlight/x?source=push" })).toBe("/highlight/x?source=push");
+  });
+});
+
+
+describe("highlight taps during a match (discovery M1)", () => {
+  beforeEach(async () => {
+    markNotificationRouterReady();
+    await flush();
+  });
+
+  it("holds a highlight tap while a match screen is mounted and routes it on exit, once", () => {
+    const leave = enterMatch();
+    tap(HIGHLIGHT_PUSH, "hl-a");
+    expect(mockPush).not.toHaveBeenCalled();
+    tap(HIGHLIGHT_PUSH, "hl-a"); // the same tap again: still held once
+    leave();
+    expect(mockPush).toHaveBeenCalledTimes(1);
+    expect(mockPush).toHaveBeenCalledWith("/highlight/h-1?source=push");
+  });
+
+  it("keeps only the latest held highlight tap", () => {
+    const leave = enterMatch();
+    tap({ type: "highlight_ready", id: "h-old" }, "a");
+    tap({ type: "highlight_ready", id: "h-new" }, "b");
+    leave();
+    expect(mockPush.mock.calls).toEqual([["/highlight/h-new?source=push"]]);
+  });
+
+  it("a highlight route without the type is held too", () => {
+    const leave = enterMatch();
+    tap({ route: "/highlight/h-9?source=push" });
+    expect(mockPush).not.toHaveBeenCalled();
+    leave();
+    expect(mockPush).toHaveBeenCalledWith("/highlight/h-9?source=push");
+  });
+
+  it("does not hold other taps during a match", () => {
+    const leave = enterMatch();
+    tap({ route: "/athlete/a-1" });
+    expect(mockPush).toHaveBeenCalledWith("/athlete/a-1");
+    leave();
+  });
+
+  it("a nested match (the next match mounts before the old one unmounts) keeps holding", () => {
+    const leaveA = enterMatch();
+    tap(HIGHLIGHT_PUSH);
+    const leaveB = enterMatch();
+    leaveA();
+    expect(mockPush).not.toHaveBeenCalled();
+    leaveB();
+    expect(mockPush).toHaveBeenCalledTimes(1);
+  });
+
+  it("suppresses the foreground banner for highlight_ready only while in a match", async () => {
+    const handler = mockSetHandler.mock.calls[0][0].handleNotification as (n: unknown) => Promise<Record<string, boolean>>;
+    const note = (data: unknown) => ({ request: { content: { data } } });
+    expect((await handler(note(HIGHLIGHT_PUSH))).shouldShowBanner).toBe(true);
+    const leave = enterMatch();
+    const inMatch = await handler(note(HIGHLIGHT_PUSH));
+    expect(inMatch.shouldShowBanner).toBe(false);
+    expect(inMatch.shouldShowList).toBe(true);
+    expect((await handler(note({ route: "/athlete/a-1" }))).shouldShowBanner).toBe(true);
+    leave();
+    expect((await handler(note(HIGHLIGHT_PUSH))).shouldShowBanner).toBe(true);
+  });
+});
+
+describe("cold start during a match (rejoinStartedMatch ordering)", () => {
+  it("the accepter rejoin mounted the match first: the launching highlight tap waits for the exit", async () => {
+    mockGetLast.mockResolvedValue(response(HIGHLIGHT_PUSH, "cold-1"));
+    const leave = enterMatch(); // rejoinStartedMatch put the athlete into the match
+    markNotificationRouterReady();
+    await flush();
+    expect(mockPush).not.toHaveBeenCalled();
+    leave();
+    expect(mockPush).toHaveBeenCalledTimes(1);
+    expect(mockPush).toHaveBeenCalledWith("/highlight/h-1?source=push");
+  });
+
+  it("the highlight tap routed first: a later rejoin simply pushes the match on top (no re-route)", async () => {
+    mockGetLast.mockResolvedValue(response(HIGHLIGHT_PUSH, "cold-2"));
+    markNotificationRouterReady();
+    await flush();
+    expect(mockPush).toHaveBeenCalledTimes(1);
+    const leave = enterMatch();
+    leave();
+    expect(mockPush).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("sign-out (discovery M2)", () => {
+  it("resetNotificationRouterReady holds taps again until the next sign-in marks ready", async () => {
+    markNotificationRouterReady();
+    await flush();
+    resetNotificationRouterReady();
+    tap({ route: "/athlete/a-1" }, "after-signout");
+    expect(mockPush).not.toHaveBeenCalled();
+    markNotificationRouterReady();
+    expect(mockPush).toHaveBeenCalledWith("/athlete/a-1");
+  });
+
+  it("drops a tap held before sign-out (the previous account's)", async () => {
+    tap({ route: "/athlete/prev" }, "prev-tap");
+    resetNotificationRouterReady();
+    markNotificationRouterReady();
+    await flush();
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it("drops a highlight tap held during a match across sign-out", async () => {
+    markNotificationRouterReady();
+    await flush();
+    const leave = enterMatch();
+    tap(HIGHLIGHT_PUSH, "held-hl");
+    resetNotificationRouterReady();
+    leave();
+    markNotificationRouterReady();
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it("does not re-read the cold-start response after a sign-out / sign-in", async () => {
+    mockGetLast.mockResolvedValue(response({ route: "/arena" }, "cold-x"));
+    markNotificationRouterReady();
+    await flush();
+    resetNotificationRouterReady();
+    markNotificationRouterReady();
+    await flush();
+    expect(mockGetLast).toHaveBeenCalledTimes(1);
+    expect(mockPush).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("sync cold-start API (NIT)", () => {
+  it("uses getLastNotificationResponse / clearLastNotificationResponse when available", () => {
+    mockSync.on = true;
+    mockGetLastSync.mockReturnValue(response(HIGHLIGHT_PUSH, "sync-1"));
+    markNotificationRouterReady();
+    expect(mockPush).toHaveBeenCalledWith("/highlight/h-1?source=push");
+    expect(mockClearLastSync).toHaveBeenCalledTimes(1);
+    expect(mockGetLast).not.toHaveBeenCalled();
   });
 });

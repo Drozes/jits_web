@@ -8,7 +8,7 @@
 export const VIEWER_COPY = {
   close: "Close",
   back: "Back",
-  paused: "Highlight reels are paused right now.",
+  paused: "Highlights are paused right now.",
   cannotPlay: "We couldn't play this reel right now.",
 } as const;
 

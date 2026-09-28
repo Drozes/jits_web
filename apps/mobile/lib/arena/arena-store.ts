@@ -188,6 +188,16 @@ function getInMatch(): boolean {
   return matchScreens > 0;
 }
 
+/** Non-hook read of the in-match bit (notification routing, outside React). */
+export function isInArenaMatch(): boolean {
+  return getInMatch();
+}
+
+/** Non-hook subscription to the in-match bit and the exit count. */
+export function subscribeArenaMatch(callback: () => void): () => void {
+  return subscribeMatch(callback);
+}
+
 /** True while any match screen is mounted. */
 export function useIsInArenaMatch(): boolean {
   return useSyncExternalStore(subscribeMatch, getInMatch, getInMatch);

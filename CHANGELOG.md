@@ -2,6 +2,27 @@
 
 ## [Unreleased]
 
+### Highlight Reels phase 2: integration review fixes (jits-s6mi.3/.4/.12/.13/.14)
+
+JS-only, still tier-1 OTA-eligible (no dependency, `app.json`, plugin, metro, babel or `eas.json` change; the synchronous `getLastNotificationResponse` is in the installed expo-notifications 0.32.17).
+
+**Fixed (share path)**
+- `apps/mobile/__tests__/modules/highlight-share-guard.test.ts`: the guard now catches share-package specifiers in any quote or form (static, `require`, `import()`, subpaths such as `expo-media-library/next`), spaced `shareAsync (` calls, the `instagram://`, `instagram-reels://`, `instagram-stories://` schemes and direct native-module names (`ExpoSharing`, `ExpoMediaLibrary`, `ExpoClipboard`, `InstagramReels`) outside `lib/highlight-share/`; the viewer files may not re-export the share module and only the route may import `components/highlight-viewer/` (the screen). Negative fixtures prove each bypass is caught.
+- `useHighlightShare` exposes `activePath`, the effective path (`share_sheet` after a duration reroute, a Reels fall-through or the athlete's fallback; a server duration of 0 counts as unknown). The viewer derives the Share / Open Instagram labels and the iOS caption rule from it, and shows the caption once the flow is done, so the caption is no longer lost on a fallback.
+- `handoff()` and `saveToPhotos()` re-ask `prepare_highlight_share` before using a cached file (the kill switch holds on every action) and fetch a newer live version first. `highlight_not_ready` / `highlight_not_found` are non-retryable with accurate copy (`SHARE_COPY.notReady` / `notFound`; `SaveOutcome` `not_ready`).
+- `lib/highlight-share/download.ts`: progress-aware timeout (30 s without new bytes, 180 s cap) instead of a flat 60 s; the abandoned download promise is caught after a cancel; a cached file older than 23 h is re-downloaded (the sweep deletes at 24 h); a caller that joined an in-flight download is marked `joined`.
+- Telemetry: a joined download does not re-log `download_ok` / `download_failed`; `share_tapped` carries `retry: true` on a Try again in the same sheet session; the press-and-hold `caption_copied` is logged at most once per session. Home card, dismiss and Profile tile events carry the device keys through `apps/mobile/lib/highlight/highlight-event.ts` (shared with the share module's `track`).
+- `packages/shared/src/utils/highlight-caption.ts` (`sanitiseCaptionText`): names and technique lose leading `@` / `#`, URL-like tokens, control, bidi and zero-width characters; whitespace is collapsed; the ellipsis cut never splits a surrogate pair.
+- The match-detail "Open reel" link and its seen marking follow `useHighlightFlags().clipsEnabled` (fail closed when the phase-2 RPCs are missing).
+- iOS Reels: `handing_off` falls back to `done` after 8 s if the app never left the foreground; the "already back" branch is tested. The download progress bar is an accessible `progressbar`.
+
+**Fixed (discovery)**
+- A highlight push tapped during a live match is held while any match screen is mounted and routed when the athlete leaves (`isInArenaMatch` / `subscribeArenaMatch` in `lib/arena/arena-store.ts`); the foreground banner for `highlight_ready` is suppressed while in a match. Cold start with the accepter rejoin already in the match waits for the exit too.
+- Sign-out resets notification routing (`resetNotificationRouterReady`, dropping any held tap) and deletes this device's push registration while the session can still write it (`removePushDeviceByToken` in `@jits/shared/api/mutations`, `unregisterPushDeviceOnSignOut`, bounded to 2 s), so the previous athlete's pushes no longer reach the next account on a shared device.
+- `apps/mobile/lib/highlight/highlight-store.ts`: the four bells and the Home card share one deduped, 2 s-throttled `get_my_highlights` read per query; a reel marked seen (viewer, match detail) or dismissed re-reads the bell and the Home card at once; Home's pull-to-refresh refreshes the bell; foreground refetches ignore iOS `inactive` -> `active`. The Home card re-signs a poster older than 50 minutes.
+- The viewer shows a calm "Highlights are paused right now." with no playback when `detail.clipsEnabled` is false.
+- The cold-start read uses the synchronous `getLastNotificationResponse` / `clearLastNotificationResponse` when available.
+
 ### Mobile: highlight share module + replacement guard (jits-s6mi.3, Highlight Reels phase 2 F5)
 
 JS-only, OTA-eligible (tier 1): uses only native modules already in builds 22/23 (InstagramReels, ExpoSharing, ExpoMediaLibrary, legacy expo-file-system). No dependency, `app.json`, plugin, metro, babel or `eas.json` change; `expo-clipboard` is NOT added (its native module is probed directly, so the same JS lights up the Copy button on the tier-2 build).

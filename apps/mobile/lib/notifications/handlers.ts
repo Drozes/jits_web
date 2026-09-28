@@ -17,7 +17,16 @@
  *   point through the listener is held, not pushed, for the same reason.
  *   Every response is routed at most once, keyed by its notification
  *   identifier, so a tap seen by both the listener and the cold-start read
- *   never navigates twice.
+ *   never navigates twice. The cold-start read uses the synchronous
+ *   `getLastNotificationResponse()` / `clearLastNotificationResponse()` when
+ *   the installed expo-notifications has them, else the async pair.
+ * - During a match: a highlight tap (a reel is never urgent) is HELD while any
+ *   match screen is mounted and routed when the athlete leaves the match, so
+ *   it never pushes the viewer over a live match; the foreground banner for a
+ *   `highlight_ready` push is suppressed while in a match (it still lands in
+ *   the notification list).
+ * - Sign-out: `resetNotificationRouterReady()` forgets readiness and drops
+ *   every held tap, so the next account never gets the previous one's tap.
  *
  * Call `setupNotificationHandlers()` ONCE at app startup. The function is
  * idempotent so multiple invocations are harmless.
@@ -25,6 +34,7 @@
 import * as Notifications from "expo-notifications";
 import { router } from "expo-router";
 import { HOME_HREF, isRetiredRoute } from "@/lib/deep-links/retired-routes";
+import { isInArenaMatch, subscribeArenaMatch } from "@/lib/arena/arena-store";
 
 let configured = false;
 let responseSubscription: Notifications.EventSubscription | null = null;
@@ -37,6 +47,9 @@ let coldStartChecked = false;
 let pendingResponse: Notifications.NotificationResponse | null = null;
 /** Identifiers already routed (or deliberately dropped), never routed again. */
 const handledIds = new Set<string>();
+/** A highlight tap received during a match; routed when the match screen unmounts. */
+let heldHighlight: Notifications.NotificationResponse | null = null;
+let matchUnsubscribe: (() => void) | null = null;
 
 interface NotificationData {
   route?: unknown;
@@ -57,6 +70,14 @@ export function notificationTarget(data: unknown): string | null {
   }
   if (!route) return null;
   return isRetiredRoute(route) ? HOME_HREF : route;
+}
+
+/** A notification that opens a highlight reel (never urgent enough to interrupt a match). */
+export function isHighlightNotification(data: unknown): boolean {
+  const d = (data ?? {}) as NotificationData;
+  if (d.type === HIGHLIGHT_READY_PUSH_TYPE) return true;
+  const target = notificationTarget(data);
+  return target !== null && target.startsWith("/highlight/");
 }
 
 function responseId(response: Notifications.NotificationResponse): string | null {
@@ -88,8 +109,30 @@ function handleResponse(response: Notifications.NotificationResponse | null): vo
     pendingResponse = response;
     return;
   }
+  if (isInArenaMatch() && isHighlightNotification(response?.notification?.request?.content?.data)) {
+    holdUntilMatchExit(response);
+    return;
+  }
   if (id) handledIds.add(id);
   navigate(response);
+}
+
+function stopWatchingMatch(): void {
+  if (matchUnsubscribe) matchUnsubscribe();
+  matchUnsubscribe = null;
+}
+
+/** Keep the (latest) highlight tap until no match screen is mounted. */
+function holdUntilMatchExit(response: Notifications.NotificationResponse): void {
+  heldHighlight = response;
+  if (matchUnsubscribe) return;
+  matchUnsubscribe = subscribeArenaMatch(() => {
+    if (isInArenaMatch()) return;
+    stopWatchingMatch();
+    const held = heldHighlight;
+    heldHighlight = null;
+    handleResponse(held);
+  });
 }
 
 export function setupNotificationHandlers(): void {
@@ -97,12 +140,17 @@ export function setupNotificationHandlers(): void {
   configured = true;
 
   Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldPlaySound: false,
-      shouldSetBadge: true,
-      shouldShowBanner: true,
-      shouldShowList: true,
-    }),
+    handleNotification: async (notification) => {
+      // A reel is never worth a banner over a live match; it stays in the list.
+      const quiet =
+        isInArenaMatch() && isHighlightNotification(notification?.request?.content?.data);
+      return {
+        shouldPlaySound: false,
+        shouldSetBadge: true,
+        shouldShowBanner: !quiet,
+        shouldShowList: true,
+      };
+    },
   });
 
   responseSubscription = Notifications.addNotificationResponseReceivedListener(handleResponse);
@@ -121,16 +169,43 @@ export function markNotificationRouterReady(): void {
   handleResponse(held);
   if (coldStartChecked) return;
   coldStartChecked = true;
+  const api = Notifications as unknown as {
+    getLastNotificationResponse?: () => Notifications.NotificationResponse | null;
+    clearLastNotificationResponse?: () => void;
+  };
+  if (typeof api.getLastNotificationResponse === "function") {
+    try {
+      const last = api.getLastNotificationResponse();
+      handleResponse(last);
+      // A JS reload in the same native process would otherwise read it again.
+      if (last) api.clearLastNotificationResponse?.();
+    } catch (err) {
+      console.warn("[notifications] cold-start read failed", err);
+    }
+    return;
+  }
   void (async () => {
     try {
       const last = await Notifications.getLastNotificationResponseAsync();
       handleResponse(last);
-      // A JS reload in the same native process would otherwise read it again.
       if (last) await Notifications.clearLastNotificationResponseAsync?.();
     } catch (err) {
       console.warn("[notifications] cold-start read failed", err);
     }
   })();
+}
+
+/**
+ * Sign-out: the router is no longer on a signed-in screen and any held tap
+ * belongs to the account that just left, so forget readiness and drop every
+ * held tap. The next sign-in's Home marks the router ready again. The
+ * cold-start read stays done (it is once per process).
+ */
+export function resetNotificationRouterReady(): void {
+  routerReady = false;
+  pendingResponse = null;
+  heldHighlight = null;
+  stopWatchingMatch();
 }
 
 export function teardownNotificationHandlers(): void {
@@ -146,5 +221,7 @@ export function resetNotificationRoutingForTests(): void {
   routerReady = false;
   coldStartChecked = false;
   pendingResponse = null;
+  heldHighlight = null;
+  stopWatchingMatch();
   handledIds.clear();
 }

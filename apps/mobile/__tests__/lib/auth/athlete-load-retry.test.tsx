@@ -48,6 +48,18 @@ jest.mock("@/lib/highlight-share", () => ({
   clearShareCache: () => mockClearShareCache(),
 }));
 
+const mockOrder: string[] = [];
+const mockResetRouter = jest.fn(() => mockOrder.push("reset-router"));
+const mockUnregisterPush = jest.fn(async () => {
+  mockOrder.push("unregister-push");
+});
+jest.mock("@/lib/notifications/handlers", () => ({
+  resetNotificationRouterReady: () => mockResetRouter(),
+}));
+jest.mock("@/lib/notifications/register-push", () => ({
+  unregisterPushDeviceOnSignOut: (...a: unknown[]) => mockUnregisterPush(...(a as [])),
+}));
+
 jest.mock("expo-router", () => ({
   Redirect: ({ href }: { href: string }) => {
     const R = require("react");
@@ -224,6 +236,23 @@ describe("cold-start athlete load", () => {
     });
     expect(mockClearShareCache).toHaveBeenCalledTimes(1);
     expect(r.getByTestId("redirect").props.children).toBe("/login");
+  });
+
+  it("unregisters this device's push row and resets notification routing BEFORE the session drops", async () => {
+    mockRead.mockResolvedValue(OK(ACTIVE));
+    mockOrder.length = 0;
+    mockSignOut.mockImplementation(async () => {
+      mockOrder.push("auth-signout");
+      return { error: null };
+    });
+    render(<App />);
+    await flush();
+    await act(async () => {
+      await signOut!();
+    });
+    expect(mockUnregisterPush).toHaveBeenCalledTimes(1);
+    expect(mockResetRouter).toHaveBeenCalledTimes(1);
+    expect(mockOrder).toEqual(["unregister-push", "reset-router", "auth-signout"]);
   });
 });
 

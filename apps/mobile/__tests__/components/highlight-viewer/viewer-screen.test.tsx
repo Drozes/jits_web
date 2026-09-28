@@ -295,7 +295,19 @@ describe("viewer states", () => {
   it("clips paused while open (no playback): paused copy", async () => {
     mockProgress = progress("disabled", { playback: null });
     const utils = await renderViewer();
-    expect(utils.getByTestId("viewer-paused")).toHaveTextContent("Highlight reels are paused right now.");
+    expect(utils.getByTestId("viewer-paused")).toHaveTextContent("Highlights are paused right now.");
+  });
+
+  it("clips off at open (detail.clipsEnabled false): paused, no playback, no share, never marked seen", async () => {
+    mockGetDetail.mockResolvedValue({ ok: true, data: detail({ clipsEnabled: false }) });
+    const utils = await renderViewer();
+    expect(utils.getByTestId("viewer-paused")).toHaveTextContent("Highlights are paused right now.");
+    expect(utils.queryByTestId("highlight-player")).toBeNull();
+    expect(mockSign).not.toHaveBeenCalled();
+    expect(utils.queryByTestId("viewer-share")).toBeNull();
+    expect(mockMarkSeen).not.toHaveBeenCalled();
+    expect(mockTrack).not.toHaveBeenCalled();
+    expect(redCtas(utils)).toHaveLength(0);
   });
 
   it("ready: plays the signed LIVE version, mono meta, Share / Save / Improve", async () => {

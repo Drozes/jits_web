@@ -37,6 +37,7 @@ import type { NewHighlight } from "@/lib/highlight/use-new-highlight";
 function highlight(over: Partial<NewHighlight["item"]> = {}, posterUrl: string | null = "https://p.jpg"): NewHighlight {
   return {
     posterUrl,
+    signedAt: 0,
     item: {
       highlightId: "h1",
       matchId: "m1",

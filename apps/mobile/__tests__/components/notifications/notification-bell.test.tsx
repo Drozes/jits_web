@@ -58,6 +58,7 @@ jest.mock("@/hooks/use-notification-history", () => ({
 }));
 
 import { NotificationBell } from "@/components/notifications/notification-bell";
+import { resetHighlightStore } from "@/lib/highlight/highlight-store";
 
 const HIGHLIGHT_ROW = {
   type: "highlight_ready",
@@ -88,6 +89,7 @@ async function renderBell() {
 }
 
 beforeEach(() => {
+  resetHighlightStore();
   mockPush.mockClear();
   mockPresent.mockClear();
   mockDismiss.mockClear();

@@ -38,6 +38,12 @@ jest.mock("@jits/shared/api/highlight-share", () => ({
 }));
 
 import { useNewHighlight } from "@/lib/highlight/use-new-highlight";
+import {
+  __setHighlightReadThrottleForTests,
+  notifyHighlightsChanged,
+  resetHighlightStore,
+} from "@/lib/highlight/highlight-store";
+import { POSTER_RESIGN_AFTER_MS } from "@/lib/highlight/use-new-highlight";
 
 function item(over: Record<string, unknown> = {}) {
   return {
@@ -71,6 +77,8 @@ async function settle() {
 let appStateListener: ((s: string) => void) | null = null;
 
 beforeEach(() => {
+  resetHighlightStore();
+  __setHighlightReadThrottleForTests(0); // these suites test refresh wiring, not the dedupe
   jest.clearAllMocks();
   mockFocus.length = 0;
   mockExits = 0;
@@ -153,6 +161,26 @@ describe("useNewHighlight", () => {
       expect(mockGetMy).toHaveBeenCalledTimes(2);
     });
 
+    it("ignores iOS inactive -> active (not a real foreground)", async () => {
+      renderHook(() => useNewHighlight("a1"));
+      await settle();
+      act(() => appStateListener?.("inactive"));
+      act(() => appStateListener?.("active"));
+      await settle();
+      expect(mockGetMy).toHaveBeenCalledTimes(1);
+    });
+
+    it("re-reads (forced) when a reel is marked seen or dismissed elsewhere", async () => {
+      const { result } = renderHook(() => useNewHighlight("a1"));
+      await settle();
+      expect(result.current.highlight).not.toBeNull();
+      mockGetMy.mockResolvedValue(ok([]));
+      act(() => notifyHighlightsChanged());
+      await settle();
+      expect(mockGetMy).toHaveBeenCalledTimes(2);
+      expect(result.current.highlight).toBeNull();
+    });
+
     it("re-reads on return to the foreground, not on background", async () => {
       renderHook(() => useNewHighlight("a1"));
       await settle();
@@ -186,7 +214,8 @@ describe("useNewHighlight", () => {
     mockGetMy.mockReturnValueOnce(new Promise((r) => (resolveFirst = r)));
     mockGetMy.mockResolvedValueOnce(ok([]));
     const { result } = renderHook(() => useNewHighlight("a1"));
-    act(() => result.current.refresh());
+    // A forced read (pull to refresh) supersedes the mount read still in flight.
+    act(() => result.current.refresh(true));
     await settle();
     await act(async () => resolveFirst(ok([item()])));
     await settle();
@@ -206,6 +235,52 @@ describe("useNewHighlight", () => {
     act(() => result.current.refresh());
     await settle();
     expect(result.current.highlight).toBeNull();
+  });
+
+  it("dismiss tells the bell once the seen mark lands", async () => {
+    const store = require("@/lib/highlight/highlight-store");
+    const { result: counter } = renderHook(() => store.useHighlightsChangedCount());
+    const before = counter.current;
+    const { result } = renderHook(() => useNewHighlight("a1"));
+    await settle();
+    act(() => result.current.dismiss());
+    await settle();
+    expect(counter.current).toBe(before + 1);
+  });
+
+  it("does not bump the change signal when the seen mark fails", async () => {
+    mockMarkSeen.mockResolvedValue({ ok: false, error: { code: "UNKNOWN", message: "x" } });
+    const store = require("@/lib/highlight/highlight-store");
+    const { result: counter } = renderHook(() => store.useHighlightsChangedCount());
+    const before = counter.current;
+    const { result } = renderHook(() => useNewHighlight("a1"));
+    await settle();
+    act(() => result.current.dismiss());
+    await settle();
+    expect(counter.current).toBe(before);
+  });
+
+  it("re-signs a kept poster once it is older than 50 minutes", async () => {
+    const now = jest.spyOn(Date, "now");
+    let t = 1_000_000;
+    now.mockImplementation(() => t);
+    try {
+      const { result } = renderHook(() => useNewHighlight("a1"));
+      await settle();
+      expect(mockSignPoster).toHaveBeenCalledTimes(1);
+      t += POSTER_RESIGN_AFTER_MS - 1;
+      act(() => result.current.refresh(true));
+      await settle();
+      expect(mockSignPoster).toHaveBeenCalledTimes(1);
+      t += 2;
+      mockSignPoster.mockResolvedValue("https://signed/poster-2.jpg");
+      act(() => result.current.refresh(true));
+      await settle();
+      expect(mockSignPoster).toHaveBeenCalledTimes(2);
+      expect(result.current.highlight?.posterUrl).toBe("https://signed/poster-2.jpg");
+    } finally {
+      now.mockRestore();
+    }
   });
 
   it("a newer version after a dismiss shows again", async () => {

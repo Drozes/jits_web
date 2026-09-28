@@ -36,6 +36,12 @@ import {
   mergeBellItems,
   toHighlightNotificationItems,
 } from "@/lib/notifications/notification-items";
+import {
+  __setHighlightReadThrottleForTests,
+  notifyHighlightsChanged,
+  requestBellRefresh,
+  resetHighlightStore,
+} from "@/lib/highlight/highlight-store";
 
 function hl(over: Record<string, unknown> = {}) {
   return {
@@ -82,6 +88,8 @@ async function settle() {
 let appStateListener: ((s: string) => void) | null = null;
 
 beforeEach(() => {
+  resetHighlightStore();
+  __setHighlightReadThrottleForTests(0); // these suites test refresh wiring, not the dedupe
   jest.clearAllMocks();
   mockFocus.length = 0;
   mockHistory.mockResolvedValue([CHALLENGE, RESULT]);
@@ -193,10 +201,38 @@ describe("useNotificationHistory", () => {
     expect(mockHistory).toHaveBeenCalledTimes(1);
     expect(result.current.unseenHighlights).toBe(0);
 
+    // iOS inactive -> active (notification shade, app switcher) is not a foreground.
+    act(() => appStateListener?.("inactive"));
+    act(() => appStateListener?.("active"));
+    await settle();
+    expect(mockGetMy).toHaveBeenCalledTimes(2);
+
+    act(() => appStateListener?.("background"));
     act(() => appStateListener?.("active"));
     await settle();
     expect(mockGetMy).toHaveBeenCalledTimes(3);
     expect(mockHistory).toHaveBeenCalledTimes(1);
+  });
+
+  it("re-reads the highlight half (forced) when a reel is marked seen elsewhere", async () => {
+    const { result } = renderHook(() => useNotificationHistory("a1"));
+    await settle();
+    expect(result.current.unseenHighlights).toBe(1);
+    mockGetMy.mockResolvedValue({ ok: true, data: { clipsEnabled: true, shareEnabled: true, items: [hl({ unseen: false })] } });
+    act(() => notifyHighlightsChanged());
+    await settle();
+    expect(mockGetMy).toHaveBeenCalledTimes(2);
+    expect(mockHistory).toHaveBeenCalledTimes(1);
+    expect(result.current.unseenHighlights).toBe(0);
+  });
+
+  it("Home's pull-to-refresh re-reads the whole bell feed", async () => {
+    renderHook(() => useNotificationHistory("a1"));
+    await settle();
+    act(() => requestBellRefresh());
+    await settle();
+    expect(mockHistory).toHaveBeenCalledTimes(2);
+    expect(mockGetMy).toHaveBeenCalledTimes(2);
   });
 
   it("refresh() re-reads both halves", async () => {
