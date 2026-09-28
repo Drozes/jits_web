@@ -86,3 +86,19 @@ test.describe("Auth redirects", () => {
     await expect(page.getByRole("button", { name: SIGN_IN_CTA })).toBeVisible();
   });
 });
+
+// jits-s6mi.7: store reviewers and Meta's Live-mode check load these signed
+// out, so they must render (not redirect to /login).
+test.describe("Public legal pages", () => {
+  for (const [path, title] of [
+    ["/terms", /terms of service/i],
+    ["/privacy", /privacy policy/i],
+  ] as const) {
+    test(`${path} renders signed out`, async ({ page }) => {
+      const res = await page.goto(path);
+      expect(res?.status()).toBe(200);
+      expect(new URL(page.url()).pathname).toBe(path);
+      await expect(page.getByRole("heading", { level: 1, name: title })).toBeVisible();
+    });
+  }
+});

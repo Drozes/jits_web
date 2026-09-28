@@ -14,6 +14,14 @@ JS-only, OTA-eligible (no dependency, `app.json`, plugin, metro, babel or `eas.j
 - Match-detail ready card: an "Open reel" text link to the viewer (`source=match_detail`) and `markHighlightSeen` once per live version (`apps/mobile/components/match-detail/highlight/highlight-open-reel-link.tsx`, `apps/mobile/lib/highlight/use-mark-highlight-seen.ts`).
 - Discovery copy and the viewer href in `apps/mobile/lib/highlight/discovery.ts`; tests prove `/highlight/<id>` passes `resolveSystemPath` unchanged.
 
+### Web: public Terms and Privacy pages (jits-s6mi.7, phase 2 F10)
+
+**Added**
+- `/terms` and `/privacy` (`apps/web/app/(legal)/`), static server pages rendering the repo-root `TERMS.md` and `PRIVACY_POLICY.md`, both public (signed-out visitors, store reviewers, Meta's Live-mode check). The Markdown is bundled into `apps/web/lib/legal/documents.generated.ts` by `apps/web/scripts/sync-legal-docs.mjs` (a test fails while it is stale) and rendered by a small reader (`apps/web/lib/legal/markdown.ts`, `apps/web/components/legal/legal-document.tsx`). The four owner placeholders stay visibly marked as amber "TBD"; nothing was filled in, so Meta Live mode should not be requested until the owner supplies them.
+
+**Changed**
+- The proxy's public-path list moved to `apps/web/lib/supabase/public-paths.ts` (with tests) and gained `/terms` and `/privacy`.
+
 ### Mobile: "Your highlight" card, player and feedback sheet (jits-s6mi.10, Highlight Reels Alpha)
 
 JS-only, OTA-eligible for runtime 0.3.0 (expo-video is already embedded; no dependency, `app.json`, plugin, metro, babel or `eas.json` change). Needs jr_be B1 + B6 deployed to show anything: until `get_highlight_progress` answers, the card renders nothing.
