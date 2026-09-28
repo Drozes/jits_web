@@ -1,7 +1,7 @@
 import * as React from "react";
 import { supabase } from "@/lib/supabase/client";
 import { useVideoProgress } from "@jits/shared/hooks/use-video-progress";
-import { buildKeyMoments, type KeyMoment } from "@jits/shared/utils";
+import { buildKeyMoments, isNoMatch, type KeyMoment } from "@jits/shared/utils";
 import type { MatchDetailView, MatchDetailVideo } from "@jits/shared/api/queries";
 import { useMatchUpload } from "@/lib/video/match-upload-store";
 import type { VideoAnalysis } from "@jits/shared/api/film-room";
@@ -56,13 +56,18 @@ export function useMatchFilm(view: MatchDetailView | null, matchId: string): Mat
   const upload = useMatchUpload(matchId);
   const uploading = upload?.status === "uploading" || upload?.status === "pending";
 
+  // No match in the video: no key moments and no tags. The shared parser
+  // already empties that data for a no-match analysis; this keeps the page
+  // honest even if a stray entry ever slipped through.
+  const noMatch = isNoMatch(analysis);
   const moments = React.useMemo(
-    () => (analysis ? buildKeyMoments(analysis, view?.match ?? null, active?.duration_seconds) : []),
-    [analysis, view?.match, active?.duration_seconds],
+    () => (analysis && !noMatch ? buildKeyMoments(analysis, view?.match ?? null, active?.duration_seconds) : []),
+    [analysis, noMatch, view?.match, active?.duration_seconds],
   );
   const tags = React.useMemo(
-    () => [...new Set((analysis?.technique_tags ?? []).map((t) => t.technique_name))].slice(0, MAX_TAGS),
-    [analysis],
+    () =>
+      noMatch ? [] : [...new Set((analysis?.technique_tags ?? []).map((t) => t.technique_name))].slice(0, MAX_TAGS),
+    [analysis, noMatch],
   );
 
   let phase: BreakdownPhase | null = null;

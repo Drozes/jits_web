@@ -316,6 +316,7 @@ describe("viewer states", () => {
     ["rendering", "viewer-making", "Your reel is being made. It will play here as soon as it's ready."],
     ["failed", "viewer-failed", "We couldn't make your highlight reel."],
     ["none", "viewer-none", "We couldn't find a clear highlight of you in this video."],
+    ["no_match", "viewer-no-match", "No match was detected in this video, so there's no highlight reel."],
   ])("no live version, %s: a calm state, no share, never marked seen", async (phase, testID, copy) => {
     mockGetDetail.mockResolvedValue({ ok: true, data: detail({ version: null }) });
     mockProgress = progress(phase, { playback: null });

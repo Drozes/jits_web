@@ -452,6 +452,81 @@ describe("getVideoAnalysis", () => {
     expect(r.data.technique_tags.map((t) => t.technique_name)).toEqual(["Single leg"]);
   });
 
+  describe("match_detected (jr_be-0qf)", () => {
+    function analysisClient(analysis: Record<string, unknown>, tags: unknown[] = []) {
+      return mockClient({ rpc: () => ({ data: { analysis, technique_tags: tags }, error: null }) });
+    }
+
+    it("maps an explicit no-match with its reason and camera tips, and never any match data", async () => {
+      const m = analysisClient(
+        {
+          summary: "The video shows an empty office.",
+          analysis_tier: "standard",
+          // Contract says these are [] for a no-match; a stray entry is dropped.
+          positions: [{ position: "standing", timestamp_s: 0 }],
+          scoring_moments: [{ type: "takedown", timestamp_s: 5 }],
+          recommendations: [
+            { athlete_id: "a1", suggestion: "Frame both athletes from mat level." },
+            { athlete_id: null, text: "  Turn on more light.  " },
+            { athlete_id: "a1", suggestion: "   " },
+            "junk",
+          ],
+          match_detected: false,
+          no_match_reason: "  An empty office; nobody is grappling.  ",
+        },
+        [{ id: "t1", technique_name: "Single leg", timestamp_start: 3 }],
+      );
+      const r = await getVideoAnalysis(m.client, VID);
+      if (!r.ok || !r.data) throw new Error("expected analysis");
+      expect(r.data.match_detected).toBe(false);
+      expect(r.data.no_match_reason).toBe("An empty office; nobody is grappling.");
+      expect(r.data.positions).toEqual([]);
+      expect(r.data.scoring_moments).toEqual([]);
+      expect(r.data.technique_tags).toEqual([]);
+      expect(r.data.recommendations).toEqual([
+        { athlete_id: "a1", text: "Frame both athletes from mat level." },
+        { athlete_id: null, text: "Turn on more light." },
+      ]);
+    });
+
+    it("keeps a detected match's data and drops any reason", async () => {
+      const m = analysisClient(
+        {
+          positions: [{ position: "standing", timestamp_s: 0 }],
+          scoring_moments: [{ type: "takedown", timestamp_s: 5 }],
+          match_detected: true,
+          no_match_reason: "should not be here",
+        },
+        [{ id: "t1", technique_name: "Single leg", timestamp_start: 3 }],
+      );
+      const r = await getVideoAnalysis(m.client, VID);
+      if (!r.ok || !r.data) throw new Error("expected analysis");
+      expect(r.data.match_detected).toBe(true);
+      expect(r.data.no_match_reason).toBeNull();
+      expect(r.data.positions).toHaveLength(1);
+      expect(r.data.scoring_moments).toHaveLength(1);
+      expect(r.data.technique_tags).toHaveLength(1);
+    });
+
+    it.each([
+      ["null (legacy analysis)", null],
+      ["absent (older backend)", undefined],
+      ["a string", "false"],
+    ])("treats match_detected %s as unknown and keeps the data", async (_label, value) => {
+      const m = analysisClient({
+        positions: [{ position: "standing", timestamp_s: 0 }],
+        match_detected: value,
+        no_match_reason: "stray",
+      });
+      const r = await getVideoAnalysis(m.client, VID);
+      if (!r.ok || !r.data) throw new Error("expected analysis");
+      expect(r.data.match_detected).toBeNull();
+      expect(r.data.no_match_reason).toBeNull();
+      expect(r.data.positions).toHaveLength(1);
+      expect(r.data.recommendations).toEqual([]);
+    });
+  });
+
   it("maps errors (not_participant) and never throws", async () => {
     const denied = mockClient({
       rpc: () => ({ data: null, error: { ...pgError("P0001", "no"), hint: "not_participant" } }),

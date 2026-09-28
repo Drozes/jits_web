@@ -18,6 +18,7 @@ import type {
   AnalysisScoringMoment,
 } from "../utils/key-moments";
 import { isUuid } from "../utils/shared";
+import { toMatchDetected, toNoMatchReason } from "../utils/match-detection";
 
 type Client = SupabaseClient<Database>;
 
@@ -397,6 +398,12 @@ export interface VideoTechniqueTag {
   submission_type_name: string | null;
 }
 
+/** One `video_analyses.recommendations` entry, as plain text. */
+export interface VideoRecommendation {
+  athlete_id: string | null;
+  text: string;
+}
+
 export interface VideoAnalysis {
   summary: string | null;
   /** "standard" | "premium" */
@@ -404,7 +411,30 @@ export interface VideoAnalysis {
   positions: AnalysisPosition[];
   scoring_moments: AnalysisScoringMoment[];
   technique_tags: VideoTechniqueTag[];
+  /**
+   * Coaching advice; on a no-match analysis only camera / recording-setup
+   * tips. The merged analysis writes `suggestion`, older rows `text`.
+   */
+  recommendations: VideoRecommendation[];
   completed_at: string | null;
+  /**
+   * jr_be-0qf: true = a match was found, false = the video shows no
+   * jiu-jitsu (positions, scoring moments and tags are then always empty),
+   * null = unknown (legacy analysis or an older backend).
+   */
+  match_detected: boolean | null;
+  /** Model-written plain text, only when `match_detected` is false. */
+  no_match_reason: string | null;
+}
+
+function toRecommendations(value: unknown): VideoRecommendation[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((raw) => {
+    if (!raw || typeof raw !== "object") return [];
+    const r = raw as RawRecord;
+    const text = (str(r.suggestion) ?? str(r.text))?.trim();
+    return text ? [{ athlete_id: str(r.athlete_id), text }] : [];
+  });
 }
 
 /**
@@ -443,17 +473,24 @@ export async function getVideoAnalysis(
         submission_type_name: str(t.submission_type_name),
       }))
       .filter((t) => t.technique_name.length > 0);
+    const matchDetected = toMatchDetected(a.match_detected);
+    // A no-match analysis carries no match data by contract; enforce it here
+    // so no widget can ever render a stray position, moment or tag for it.
+    const noMatch = matchDetected === false;
     return {
       ok: true,
       data: {
         summary: str(a.summary),
         analysis_tier: str(a.analysis_tier),
-        positions: Array.isArray(a.positions) ? (a.positions as AnalysisPosition[]) : [],
-        scoring_moments: Array.isArray(a.scoring_moments)
+        positions: !noMatch && Array.isArray(a.positions) ? (a.positions as AnalysisPosition[]) : [],
+        scoring_moments: !noMatch && Array.isArray(a.scoring_moments)
           ? (a.scoring_moments as AnalysisScoringMoment[])
           : [],
-        technique_tags: tags,
+        technique_tags: noMatch ? [] : tags,
+        recommendations: toRecommendations(a.recommendations),
         completed_at: str(a.completed_at),
+        match_detected: matchDetected,
+        no_match_reason: toNoMatchReason(matchDetected, a.no_match_reason),
       },
     };
   } catch (err) {

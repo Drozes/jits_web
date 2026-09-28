@@ -2,6 +2,29 @@
 
 ## [Unreleased]
 
+### Video analysis: "no match detected" outcome (jr_be-0qf)
+
+JS-only, OTA-eligible. Needs jr_be migration `20260929012000_no_match_detected.sql` (and the matching edge functions) on the target backend to produce `match_detected = false`; against an older backend every new key reads as unknown (`null`) and nothing changes on screen.
+
+**Added**
+- `packages/shared/src/utils/match-detection.ts`: `toMatchDetected` (only a JSON boolean counts; anything else is `null` = unknown), `toNoMatchReason` (trimmed, capped at 500, only for an explicit `false`), `isNoMatch`, and the shared `NO_MATCH_COPY` used by web and mobile.
+- Highlight progress: `HighlightPhase` gains `no_match` (previously an unknown phase that degraded to `unavailable`); `HighlightProgress` gains `matchDetected` and `noMatchReason`. `packages/shared/src/api/highlights.ts`.
+- Error hint `highlight_no_match` maps to `HIGHLIGHT_NO_MATCH` ("No match was detected in this video, so there's no highlight reel."), including in the mobile highlight error copy. The UI never offers clip or regenerate for a no-match video; this is the safety net. `packages/shared/src/api/errors.ts`, `apps/mobile/lib/highlight/highlight-copy.ts`.
+- `getVideoAnalysis` returns `match_detected`, `no_match_reason` and `recommendations` (plain text, from `suggestion` or `text`). For an explicit no-match it always returns empty positions, scoring moments and technique tags. `packages/shared/src/api/film-room.ts`.
+- `useVideoProgress` data carries `match_detected` and `no_match_reason` (the table fallback, used only against a backend without the RPC, reports `null`). `packages/shared/src/hooks/use-video-progress.ts`.
+- Mobile "Your highlight" card: a neutral `no_match` note ("No match was detected in this video, so there's no highlight reel.") with no buttons, shown even while the kill switch is off. `disabled` and `unavailable` still render nothing, and nothing is signed or marked seen. The highlight viewer shows the same copy for `no_match`. `apps/mobile/components/match-detail/highlight/highlight-card.tsx`, `apps/mobile/components/highlight-viewer/viewer-progress-state.tsx`.
+- Film Room match page: when the analysis says no match, AI BREAKDOWN shows "We didn't see a match in this video" with the model's reason (plain text, with a fallback sentence when there is none) and any filming tips, in place of the summary and tier. Key moments and technique tags are hidden. Neutral colours in both themes and no retry. New `apps/mobile/components/match-detail/no-match-breakdown.tsx`; `apps/mobile/components/match-detail/ai-breakdown.tsx`, `apps/mobile/lib/match-detail/use-match-film.ts`.
+- Player (`apps/mobile/app/(app)/video/[id].tsx`): for a no-match video a "No match detected in this video" note replaces the moment caption, and there are no key-moment markers or chips (the film still plays).
+- Web `VideoAnalysisViewer` (session match recorded step): the same no-match state replaces the Summary, Timeline, Techniques and Tips tabs. The Tips tab now also reads the merged analysis's `suggestion` field (it only read `text` before, so merged tips rendered blank). `apps/web/components/domain/video-analysis-viewer.tsx`.
+- Admin > No-match videos (mobile, read-only): recent videos whose analysis found no match, with the attached match's type, status and result, the uploader, each competitor's outcome and ELO change, and the reason. It is a review aid for spotting fabricated results and changes nothing. Shared `adminListNoMatchVideos` in `packages/shared/src/api/queries.ts`; new `apps/mobile/app/(app)/settings/admin/no-match.tsx`, `apps/mobile/components/admin/no-match-video-row.tsx`, `apps/mobile/lib/admin/use-admin-no-match-videos.ts`; link in `apps/mobile/app/(app)/settings/admin.tsx`.
+
+**Changed**
+- `packages/shared/src/types/database.ts` regenerated from a local stack with every jr_be migration through `20260929012000` (adds `match_videos.match_detected`, `video_analyses` / `video_chunk_analyses` `match_detected` + `no_match_reason`, `admin_list_no_match_videos`, and the orphan-sweep and `app_setting` objects that had not been picked up yet). The `mark_practice_match` hand fix (`practice_match_completed_at: string | null`) is kept.
+
+**Unchanged (by design)**
+- The post-match "Your highlight is being made" note (`SummaryHighlightNote`) is shown before the video is analysed, so the verdict is not known yet. A no-match video then shows the `no_match` note on its card.
+- The Film Room library grid: `get_my_match_library` does not carry the verdict, so posters show no no-match badge.
+
 ### Mobile: match-flow buttons lost their fill and border on device
 
 JS-only, OTA-eligible.

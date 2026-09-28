@@ -17,6 +17,7 @@ const PHASE_STATE: Record<Exclude<HighlightPhase, "ready" | "regenerating">, { t
   rendering: { testID: "viewer-making", message: VIEWER_COPY.making },
   failed: { testID: "viewer-failed", message: HIGHLIGHT_COPY.failed },
   none: { testID: "viewer-none", message: HIGHLIGHT_COPY.none },
+  no_match: { testID: "viewer-no-match", message: HIGHLIGHT_COPY.noMatch },
 };
 
 /**

@@ -2264,6 +2264,117 @@ export async function getAdminMetrics(
   return { ok: true, data: data as unknown as AdminMetrics };
 }
 
+/** One competitor of a no-match video's match, with the rating change it recorded. */
+export interface NoMatchVideoParticipant {
+  athlete_id: string;
+  display_name: string | null;
+  /** "win" | "loss" | "draw" | null */
+  outcome: string | null;
+  elo_before: number | null;
+  elo_after: number | null;
+  elo_delta: number | null;
+}
+
+/** One row of `admin_list_no_match_videos` (jr_be-0qf). */
+export interface NoMatchVideoRow {
+  video_id: string;
+  match_id: string;
+  uploaded_by: string;
+  uploader_name: string | null;
+  video_status: string | null;
+  video_created_at: string | null;
+  analyzed_at: string | null;
+  no_match_reason: string | null;
+  /** "ranked" | "casual" */
+  match_type: string | null;
+  match_status: string | null;
+  /** "submission" | "draw" | null */
+  match_result: string | null;
+  match_completed_at: string | null;
+  participants: NoMatchVideoParticipant[];
+}
+
+function optStr(value: unknown): string | null {
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+function optNum(value: unknown): number | null {
+  const n = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
+  return Number.isFinite(n) ? n : null;
+}
+
+function toNoMatchParticipants(value: unknown): NoMatchVideoParticipant[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((raw) => {
+    if (!raw || typeof raw !== "object") return [];
+    const p = raw as Record<string, unknown>;
+    const athleteId = optStr(p.athlete_id);
+    if (!athleteId) return [];
+    return [
+      {
+        athlete_id: athleteId,
+        display_name: optStr(p.display_name),
+        outcome: optStr(p.outcome),
+        elo_before: optNum(p.elo_before),
+        elo_after: optNum(p.elo_after),
+        elo_delta: optNum(p.elo_delta),
+      },
+    ];
+  });
+}
+
+/**
+ * Admin-only, read-only: match videos whose analysis found NO jiu-jitsu,
+ * newest first, with the attached match's type, result and rating changes.
+ * A review aid for spotting fabricated results; nothing is changed by it.
+ * `since` null = the backend's default (last 30 days); `limit` 1..500.
+ */
+export async function adminListNoMatchVideos(
+  supabase: Client,
+  opts?: { since?: string | null; limit?: number },
+): Promise<Result<NoMatchVideoRow[]>> {
+  try {
+    const args: { p_since?: string; p_limit?: number } = {};
+    if (opts?.since) args.p_since = opts.since;
+    if (opts?.limit != null) args.p_limit = opts.limit;
+    const { data, error } = await supabase.rpc("admin_list_no_match_videos", args);
+    if (error) return { ok: false, error: mapPostgrestError(error) };
+    const rows = (Array.isArray(data) ? data : []) as unknown as Record<string, unknown>[];
+    return {
+      ok: true,
+      data: rows.flatMap((r) => {
+        const videoId = optStr(r.video_id);
+        const matchId = optStr(r.match_id);
+        const uploadedBy = optStr(r.uploaded_by);
+        if (!videoId || !matchId || !uploadedBy) return [];
+        return [
+          {
+            video_id: videoId,
+            match_id: matchId,
+            uploaded_by: uploadedBy,
+            uploader_name: optStr(r.uploader_name),
+            video_status: optStr(r.video_status),
+            video_created_at: optStr(r.video_created_at),
+            analyzed_at: optStr(r.analyzed_at),
+            no_match_reason: optStr(r.no_match_reason),
+            match_type: optStr(r.match_type),
+            match_status: optStr(r.match_status),
+            match_result: optStr(r.match_result),
+            match_completed_at: optStr(r.match_completed_at),
+            participants: toNoMatchParticipants(r.participants),
+          },
+        ];
+      }),
+    };
+  } catch (err) {
+    console.error("adminListNoMatchVideos:", err);
+    return {
+      ok: false,
+      error: { code: "UNKNOWN", message: err instanceof Error ? err.message : "Something went wrong." },
+    };
+  }
+}
+
 /** A feature flag row as surfaced to the admin flags screen. */
 export interface FeatureFlagRow {
   key: string;

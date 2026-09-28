@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import type { RealtimeChannel, SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "../types/database";
+import { toMatchDetected, toNoMatchReason } from "../utils/match-detection";
 
 // ---------------------------------------------------------------------------
 // Public types — wire-compatible with BE contract
@@ -48,6 +49,23 @@ export interface VideoProgress {
   merge_completed_at: string | null;
   latest_error_message: string | null;
   chunks: VideoProgressChunk[];
+  /**
+   * jr_be-0qf: true | false | null (null = unknown, not analysed yet, or a
+   * backend without the verdict). Only the RPC carries it.
+   */
+  match_detected: boolean | null;
+  /** Model-written plain text, only when `match_detected` is false. */
+  no_match_reason: string | null;
+}
+
+/** Normalise the RPC payload's additive no-match keys (absent on older backends). */
+function withMatchDetection(raw: VideoProgress): VideoProgress {
+  const matchDetected = toMatchDetected((raw as { match_detected?: unknown }).match_detected);
+  return {
+    ...raw,
+    match_detected: matchDetected,
+    no_match_reason: toNoMatchReason(matchDetected, (raw as { no_match_reason?: unknown }).no_match_reason),
+  };
 }
 
 export interface UseVideoProgressResult {
@@ -173,6 +191,10 @@ async function fetchVideoProgressViaTables(
     merge_completed_at: video.merge_completed_at,
     latest_error_message: latestErrorMessage,
     chunks,
+    // The table fallback only runs against a backend without the RPC, which
+    // predates the verdict column: unknown.
+    match_detected: null,
+    no_match_reason: null,
   };
 }
 
@@ -229,7 +251,7 @@ export function useVideoProgress(
         );
         if (myVersion !== versionRef.current) return;
         if (!rpcErr && rpcData) {
-          setData(rpcData as unknown as VideoProgress);
+          setData(withMatchDetection(rpcData as unknown as VideoProgress));
           setError(null);
           setLoading(false);
           return;

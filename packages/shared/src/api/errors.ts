@@ -37,6 +37,7 @@ export type DomainErrorCode =
   | "HIGHLIGHT_NOT_FOUND"
   | "HIGHLIGHT_NOT_READY"
   | "HIGHLIGHT_SOURCE_NOT_READY"
+  | "HIGHLIGHT_NO_MATCH"
   | "HIGHLIGHT_RENDER_IN_PROGRESS"
   | "HIGHLIGHT_RENDER_LIMIT"
   | "HIGHLIGHT_REGEN_UNAVAILABLE"
@@ -205,6 +206,13 @@ const HINT_TO_CODE: Record<string, { code: DomainErrorCode; message: string }> =
     highlight_source_not_ready: {
       code: "HIGHLIGHT_SOURCE_NOT_READY",
       message: "Your match video isn't available for a highlight right now.",
+    },
+    // jr_be-0qf: the video's analysis found no match, so no reel can be
+    // made (manual clip / regenerate). The UI never offers those actions for
+    // a no_match video; this is the safety net.
+    highlight_no_match: {
+      code: "HIGHLIGHT_NO_MATCH",
+      message: "No match was detected in this video, so there's no highlight reel.",
     },
     highlight_render_in_progress: {
       code: "HIGHLIGHT_RENDER_IN_PROGRESS",

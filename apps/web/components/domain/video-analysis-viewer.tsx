@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { useVideoProgress, type VideoProgress } from "@jits/shared/hooks/use-video-progress";
 import { cn } from "@/lib/utils";
 import { getMatchVideoSignedUrlResult } from "@jits/shared/api/queries";
+import { NO_MATCH_COPY, isNoMatch, toNoMatchReason } from "@jits/shared/utils";
 
 // ---------------------------------------------------------------------------
 // Types (mirror BE `get_video_analysis` return shape — see jr_be
@@ -30,8 +31,14 @@ interface ScoringMoment {
 
 interface Recommendation {
   athlete_id?: string;
+  /** The merged analysis writes `suggestion`; older rows `text`. */
+  suggestion?: string;
   text?: string;
   category?: string;
+}
+
+function recommendationText(r: Recommendation): string {
+  return (r.suggestion ?? r.text ?? "").trim();
 }
 
 interface TechniqueTag {
@@ -62,6 +69,10 @@ interface VideoAnalysisPayload {
     merge_strategy?: string | null;
     source_chunk_count?: number | null;
     dedup_dropped_count?: number | null;
+    /** jr_be-0qf: true | false | null (null = unknown / legacy). */
+    match_detected?: boolean | null;
+    /** Model-written plain text, only when match_detected is false. */
+    no_match_reason?: string | null;
   } | null;
   technique_tags: TechniqueTag[];
 }
@@ -305,6 +316,15 @@ function AnalysisTabs({
     return <p className="text-sm text-muted-foreground">No analysis available yet.</p>;
   }
 
+  if (isNoMatch(analysis)) {
+    return (
+      <NoMatchState
+        reason={toNoMatchReason(false, analysis.no_match_reason)}
+        tips={(analysis.recommendations ?? []).map(recommendationText).filter(Boolean)}
+      />
+    );
+  }
+
   const positions = analysis.positions ?? [];
   const moments = analysis.scoring_moments ?? [];
   const recs = analysis.recommendations ?? [];
@@ -390,12 +410,41 @@ function AnalysisTabs({
           recs.map((r, i) => (
             <div key={i} className="rounded border border-border bg-muted/40 p-2 text-sm">
               {r.category && <Badge className="mb-1" variant="outline">{r.category}</Badge>}
-              <p>{r.text}</p>
+              <p>{recommendationText(r)}</p>
             </div>
           ))
         )}
       </TabsContent>
     </Tabs>
+  );
+}
+
+/**
+ * The video shows no jiu-jitsu (jr_be-0qf): say so plainly, with the model's
+ * reason as plain text and any camera / setup tips, instead of empty
+ * timeline, technique and scoring tabs. Neutral, not an error.
+ */
+function NoMatchState({ reason, tips }: { reason: string | null; tips: string[] }) {
+  return (
+    <div data-testid="analysis-no-match" className="space-y-2 rounded-md border border-border bg-muted/40 p-4">
+      <p className="font-heading text-sm font-semibold">{NO_MATCH_COPY.title}</p>
+      <p data-testid="analysis-no-match-reason" className="text-sm text-muted-foreground">
+        {reason ?? NO_MATCH_COPY.fallbackReason}
+      </p>
+      <p className="text-xs text-muted-foreground">{NO_MATCH_COPY.explainer}</p>
+      {tips.length > 0 && (
+        <div data-testid="analysis-no-match-tips" className="space-y-1 pt-1">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            {NO_MATCH_COPY.tipsHeading}
+          </p>
+          <ul className="list-disc space-y-1 pl-5 text-sm">
+            {tips.map((tip, i) => (
+              <li key={i}>{tip}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
   );
 }
 

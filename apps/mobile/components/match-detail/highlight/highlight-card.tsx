@@ -26,7 +26,9 @@ interface HighlightCardProps {
  * "Your highlight" for one match video: the caller's OWN reel. Renders
  * nothing until the first progress read lands, when the read fails (e.g.
  * the backend is not deployed yet) and for `disabled` / `unavailable`, so a
- * card never flashes in or shows a raw error.
+ * card never flashes in or shows a raw error. `no_match` (the video shows no
+ * jiu-jitsu) is a neutral note with no actions, shown even while the kill
+ * switch is off because it explains why there will never be a reel.
  */
 export function HighlightCard({ matchVideoId, angleLabel, reloadToken = 0 }: HighlightCardProps) {
   const my = useMyHighlight(matchVideoId, reloadToken);
@@ -79,6 +81,9 @@ export function HighlightCard({ matchVideoId, angleLabel, reloadToken = 0 }: Hig
           />
         ) : phase === "none" ? (
           <HighlightNote testID="highlight-none">{HIGHLIGHT_COPY.none}</HighlightNote>
+        ) : phase === "no_match" ? (
+          // Not a failure (jr_be-0qf): a calm note, no retry or regenerate.
+          <HighlightNote testID="highlight-no-match">{HIGHLIGHT_COPY.noMatch}</HighlightNote>
         ) : (
           <HighlightNote testID="highlight-invalidated">{HIGHLIGHT_COPY.invalidated}</HighlightNote>
         )}

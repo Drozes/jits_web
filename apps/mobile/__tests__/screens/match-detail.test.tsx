@@ -53,8 +53,9 @@ jest.mock("@/lib/auth/hooks", () => ({
   useAuth: () => ({ athlete: { id: "me-1" }, user: { id: "u" }, isLoading: false }),
 }));
 
+let mockScheme: "light" | "dark" = "light";
 jest.mock("@/lib/theme/use-theme", () => ({
-  useResolvedColorScheme: () => "light",
+  useResolvedColorScheme: () => mockScheme,
   useThemedTokens: () => ({
     accentCta: "#E63946",
     textSecondary: "#4B5563",
@@ -101,6 +102,7 @@ jest.mock("@jits/shared/hooks/use-video-progress", () => ({
 import MatchDetailScreen from "@/app/(app)/match-detail/[matchId]";
 import { __resetSeenMatches, isMatchSeen } from "@/lib/film-room/seen-store";
 import { resetMatchUploadStore, setMatchUpload } from "@/lib/video/match-upload-store";
+import { paletteFor } from "@/lib/theme/palette";
 
 // ---- fixtures ----
 
@@ -212,6 +214,7 @@ async function renderLoaded(result: unknown) {
 beforeEach(() => {
   jest.clearAllMocks();
   mockHighlightByVideo = {};
+  mockScheme = "light";
   mockMatchId = "11111111-1111-4111-8111-111111111111";
   mockGetVideoAnalysis.mockResolvedValue({ ok: true, data: null });
   mockUseVideoProgress.mockReturnValue({ data: null, loading: false, error: null, rpcMissing: false, refresh: jest.fn() });
@@ -388,6 +391,102 @@ describe("MatchDetailScreen (Film Room match page)", () => {
     expect(within(utils.getByTestId("technique-tags")).getByText("RNC")).toBeTruthy();
   });
 
+  describe("no match detected (jr_be-0qf)", () => {
+    const NO_MATCH = {
+      ok: true,
+      data: {
+        summary: "The video shows an empty office, not a jiu-jitsu match.",
+        analysis_tier: "standard",
+        positions: [],
+        scoring_moments: [],
+        technique_tags: [],
+        recommendations: [
+          { athlete_id: "me-1", text: "Frame both athletes from mat level." },
+          { athlete_id: null, text: "Turn on more light." },
+        ],
+        completed_at: null,
+        match_detected: false,
+        no_match_reason: "An empty office; nobody is grappling.",
+      },
+    };
+    const analysed = () => view({ videos: [video({ has_analysis: true, status: "analyzed" })] });
+
+    it("says so plainly with the reason and filming tips, and no summary, tier, moments or tags", async () => {
+      mockGetVideoAnalysis.mockResolvedValue(NO_MATCH);
+      const utils = await renderLoaded(analysed());
+      await waitFor(() => expect(utils.getByTestId("breakdown-no-match")).toBeTruthy());
+      expect(utils.getByText("We didn't see a match in this video")).toBeTruthy();
+      expect(utils.getByTestId("breakdown-no-match-reason")).toHaveTextContent("An empty office; nobody is grappling.");
+      const tips = utils.getByTestId("breakdown-no-match-tips");
+      expect(within(tips).getByText("Filming tips")).toBeTruthy();
+      expect(within(tips).getByText("Frame both athletes from mat level.")).toBeTruthy();
+      expect(within(tips).getByText("Turn on more light.")).toBeTruthy();
+      expect(utils.queryByText(NO_MATCH.data.summary)).toBeNull();
+      expect(utils.queryByText("STANDARD")).toBeNull();
+      expect(utils.queryByTestId("key-moments")).toBeNull();
+      expect(utils.queryByTestId("technique-tags")).toBeNull();
+      expect(utils.queryByText("FINISH")).toBeNull();
+      // Neutral, not an error: no retry offered.
+      expect(utils.queryByLabelText("Retry breakdown")).toBeNull();
+      // The film itself stays watchable.
+      expect(utils.getAllByLabelText(/^Watch/).length).toBeGreaterThan(0);
+    });
+
+    it("never shows moments or tags even if a stray one arrives with the no-match verdict", async () => {
+      mockGetVideoAnalysis.mockResolvedValue({
+        ok: true,
+        data: { ...NO_MATCH.data, scoring_moments: ANALYSIS.data.scoring_moments, technique_tags: ANALYSIS.data.technique_tags },
+      });
+      const utils = await renderLoaded(analysed());
+      await waitFor(() => expect(utils.getByTestId("breakdown-no-match")).toBeTruthy());
+      expect(utils.queryByTestId("key-moments")).toBeNull();
+      expect(utils.queryByTestId("technique-tags")).toBeNull();
+    });
+
+    it("falls back to a plain sentence with no reason and hides tips when there are none", async () => {
+      mockGetVideoAnalysis.mockResolvedValue({
+        ok: true,
+        data: { ...NO_MATCH.data, no_match_reason: null, recommendations: [] },
+      });
+      const utils = await renderLoaded(analysed());
+      await waitFor(() => expect(utils.getByTestId("breakdown-no-match")).toBeTruthy());
+      expect(utils.getByTestId("breakdown-no-match-reason")).toHaveTextContent(
+        "The analysis found no jiu-jitsu in this recording.",
+      );
+      expect(utils.queryByTestId("breakdown-no-match-tips")).toBeNull();
+    });
+
+    it.each([
+      ["true", true],
+      ["null (legacy / unknown)", null],
+    ])("match_detected %s renders the normal breakdown", async (_label, matchDetected) => {
+      mockGetVideoAnalysis.mockResolvedValue({
+        ok: true,
+        data: { ...ANALYSIS.data, recommendations: [], match_detected: matchDetected, no_match_reason: null },
+      });
+      const utils = await renderLoaded(analysed());
+      await waitFor(() => expect(utils.getByText(ANALYSIS.data.summary)).toBeTruthy());
+      expect(utils.queryByTestId("breakdown-no-match")).toBeNull();
+      expect(utils.getByText("KEY MOMENTS")).toBeTruthy();
+      expect(utils.getByTestId("technique-tags")).toBeTruthy();
+    });
+
+    it.each(["light", "dark"] as const)("uses the %s theme's ink, never red", async (scheme) => {
+      mockScheme = scheme;
+      const p = paletteFor(scheme);
+      mockGetVideoAnalysis.mockResolvedValue(NO_MATCH);
+      const utils = await renderLoaded(analysed());
+      await waitFor(() => expect(utils.getByTestId("breakdown-no-match")).toBeTruthy());
+      expect(colorOf(utils.getByText("We didn't see a match in this video"))).toBe(p.text);
+      expect(colorOf(utils.getByTestId("breakdown-no-match-reason"))).toBe(p.text2);
+      const colors = within(utils.getByTestId("breakdown-no-match"))
+        .UNSAFE_queryAllByType(require("react-native").Text)
+        .map((t: { props: { style?: unknown } }) => colorOf(t));
+      expect(colors).not.toContain(p.red);
+      expect(colors).not.toContain(p.cta);
+    });
+  });
+
   it("shows live analysis progress while the chunks run", async () => {
     mockUseVideoProgress.mockImplementation((id: string | null) => ({
       data: id ? { status: "analyzing", chunk_count: 7, chunks_completed: 3 } : null,
@@ -526,6 +625,18 @@ describe("MatchDetailScreen (Film Room match page)", () => {
       mockHighlightByVideo = { "v-mine": highlight("v-mine", "unavailable") };
       const third = await renderLoaded(view());
       expect(third.queryByText("Your highlight")).toBeNull();
+    });
+
+    it("shows the neutral no-match note on the card, with no actions", async () => {
+      mockHighlightByVideo = {
+        "v-mine": { ...highlight("v-mine", "no_match"), enabled: false, highlightId: null, planStatus: null, matchDetected: false, noMatchReason: "Empty room." },
+      };
+      const utils = await renderLoaded(view());
+      expect(utils.getByTestId("highlight-no-match")).toHaveTextContent(
+        "No match was detected in this video, so there's no highlight reel.",
+      );
+      const card = utils.getByTestId("highlight-card-v-mine");
+      expect(within(card).queryAllByRole("button")).toHaveLength(0);
     });
 
     it("renders the card under the film angles, without a red CTA while generating", async () => {

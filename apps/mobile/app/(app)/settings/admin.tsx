@@ -8,7 +8,7 @@ import { useAuth, useIsAdmin } from "@/lib/auth/hooks";
 
 /**
  * Admin hub. Lists the platform-admin sub-screens (roles, metrics, feature
- * flags). Self-guards: any non-admin (or signed-out) athlete is bounced to the
+ * flags, no-match videos). Self-guards: any non-admin (or signed-out) athlete is bounced to the
  * root redirector, mirroring the <Redirect> approach in app/index.tsx. Section
  * visibility in settings/index.tsx already hides the entry point, this guard is
  * the defense-in-depth for a deep link straight to /settings/admin.
@@ -17,12 +17,14 @@ import { useAuth, useIsAdmin } from "@/lib/auth/hooks";
 type AdminRoute =
   | "/settings/admin/members"
   | "/settings/admin/metrics"
-  | "/settings/admin/flags";
+  | "/settings/admin/flags"
+  | "/settings/admin/no-match";
 
 const ADMIN_LINKS: { href: AdminRoute; label: string }[] = [
   { href: "/settings/admin/members", label: "MEMBERS" },
   { href: "/settings/admin/metrics", label: "METRICS" },
   { href: "/settings/admin/flags", label: "FEATURE FLAGS" },
+  { href: "/settings/admin/no-match", label: "NO-MATCH VIDEOS" },
 ];
 
 export default function AdminScreen() {

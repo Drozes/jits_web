@@ -346,6 +346,11 @@ const HIGHLIGHT_HINTS: [string, string, string][] = [
     "Your match video isn't available for a highlight right now.",
   ],
   [
+    "highlight_no_match",
+    "HIGHLIGHT_NO_MATCH",
+    "No match was detected in this video, so there's no highlight reel.",
+  ],
+  [
     "highlight_render_in_progress",
     "HIGHLIGHT_RENDER_IN_PROGRESS",
     "A new version is already being made.",

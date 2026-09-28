@@ -10,6 +10,7 @@ import {
   type DomainError,
   type Result,
 } from "./errors";
+import { toMatchDetected, toNoMatchReason } from "../utils/match-detection";
 import {
   isStorageObjectMissing,
   MATCH_VIDEO_BUCKET,
@@ -36,7 +37,12 @@ export type HighlightPhase =
   | "regenerating"
   | "failed"
   | "invalidated"
-  | "none";
+  | "none"
+  /**
+   * The analysis found no jiu-jitsu in the video (jr_be-0qf), so no reel
+   * will be made. Not a failure: no error, no actions.
+   */
+  | "no_match";
 
 export interface HighlightSegment {
   start_s: number;
@@ -81,6 +87,10 @@ export interface RawHighlightProgress {
   identity_side?: string | null;
   last_change_summary: string | null;
   updated_at: string | null;
+  /** jr_be-0qf (additive): true | false | null; absent on an older backend. */
+  match_detected?: boolean | null;
+  /** Model-written plain text, only when match_detected is false. */
+  no_match_reason?: string | null;
 }
 
 export interface HighlightPlayback {
@@ -111,6 +121,13 @@ export interface HighlightProgress {
   identitySide: HighlightIdentitySide | null;
   lastChangeSummary: string | null;
   updatedAt: string | null;
+  /**
+   * Did the video's analysis find a match? true / false, or null when
+   * unknown (legacy analysis, not analysed yet, or an older backend).
+   */
+  matchDetected: boolean | null;
+  /** Plain text (never markup), set only when `matchDetected` is false. */
+  noMatchReason: string | null;
 }
 
 export interface HighlightPlaybackUrls {
@@ -167,6 +184,7 @@ const PHASES: ReadonlySet<string> = new Set<HighlightPhase>([
   "failed",
   "invalidated",
   "none",
+  "no_match",
 ]);
 
 /** Phases in which the reel is still moving without realtime to tell us. */
@@ -202,6 +220,7 @@ export function toHighlightProgress(raw: RawHighlightProgress): HighlightProgres
   const p = raw.playback && typeof raw.playback.storage_path === "string" && raw.playback.storage_path
     ? raw.playback
     : null;
+  const matchDetected = toMatchDetected(raw.match_detected);
   return {
     matchVideoId: raw.match_video_id,
     athleteId: raw.athlete_id,
@@ -230,6 +249,8 @@ export function toHighlightProgress(raw: RawHighlightProgress): HighlightProgres
     identitySide: oneOf<HighlightIdentitySide>(IDENTITY_SIDES, raw.identity_side),
     lastChangeSummary: raw.last_change_summary ?? null,
     updatedAt: raw.updated_at ?? null,
+    matchDetected,
+    noMatchReason: toNoMatchReason(matchDetected, raw.no_match_reason),
   };
 }
 

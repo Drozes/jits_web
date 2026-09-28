@@ -363,8 +363,56 @@ describe("HighlightCard phases", () => {
     );
   });
 
+  describe("no_match (jr_be-0qf)", () => {
+    const NO_MATCH = {
+      enabled: false,
+      highlightId: null,
+      status: null,
+      planStatus: null,
+      playback: null,
+      canRegenerate: false,
+      rendersRemaining: 0,
+      errorMessage: null,
+      matchDetected: false,
+      noMatchReason: "An empty office; nobody is grappling.",
+    };
+
+    it("is a calm, neutral note with no buttons, even with the kill switch off", async () => {
+      const utils = await renderCard(progress("no_match", NO_MATCH));
+      expect(utils.getByText("Your highlight")).toBeTruthy();
+      expect(utils.getByTestId("highlight-no-match")).toHaveTextContent(
+        "No match was detected in this video, so there's no highlight reel.",
+      );
+      expect(utils.root.findAll((n: HostNode) => n.props.accessibilityRole === "button")).toHaveLength(0);
+      expect(utils.queryByTestId("highlight-retry")).toBeNull();
+      expect(utils.queryByTestId("highlight-failed")).toBeNull();
+      expect(utils.queryByText(/regenerate|improve|try again/i)).toBeNull();
+      expect(redCtas(utils)).toHaveLength(0);
+      expect(mockSign).not.toHaveBeenCalled();
+      expect(mockMarkSeen).not.toHaveBeenCalled();
+    });
+
+    it("does not render the model's reason on the card (the breakdown shows it)", async () => {
+      const utils = await renderCard(progress("no_match", NO_MATCH));
+      expect(utils.queryByText(NO_MATCH.noMatchReason)).toBeNull();
+    });
+
+    it.each([true, null])("matchDetected %s leaves the other phases unchanged", async (matchDetected) => {
+      const utils = await renderCard(
+        progress("none", { playback: null, highlightId: null, matchDetected, noMatchReason: null }),
+      );
+      expect(utils.getByTestId("highlight-none")).toBeTruthy();
+      expect(utils.queryByTestId("highlight-no-match")).toBeNull();
+    });
+
+    it.each(["disabled", "unavailable"])("still renders nothing for %s (fail closed)", async (phase) => {
+      const utils = await renderCard(progress(phase, { playback: null, matchDetected: false }));
+      expect(utils.toJSON()).toBeNull();
+    });
+  });
+
   it("offers no share, save or export affordance in any phase", async () => {
-    for (const phase of ["planning", "ready", "regenerating", "failed", "none"]) {
+    for (const phase of ["planning", "ready", "regenerating", "failed", "none", "no_match"]) {
       const utils = await renderCard(progress(phase));
       for (const word of [/share/i, /save/i, /export/i, /download/i, /instagram/i]) {
         expect(utils.queryByText(word)).toBeNull();
@@ -574,6 +622,7 @@ describe("Feedback sheet", () => {
     ["HIGHLIGHT_NOT_FOUND", "That highlight no longer exists."],
     ["HIGHLIGHT_NOT_READY", "Your highlight isn't ready yet."],
     ["HIGHLIGHT_SOURCE_NOT_READY", "Your match video isn't available for a highlight right now."],
+    ["HIGHLIGHT_NO_MATCH", "No match was detected in this video, so there's no highlight reel."],
     ["HIGHLIGHT_RENDER_IN_PROGRESS", "A new version is already being made."],
     ["HIGHLIGHT_RENDER_LIMIT", "You've used all versions for this reel."],
     ["HIGHLIGHT_REGEN_UNAVAILABLE", "This reel can't be regenerated."],

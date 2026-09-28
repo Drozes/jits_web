@@ -778,6 +778,7 @@ export type Database = {
           error_message: string | null
           file_size_bytes: number | null
           id: string
+          match_detected: boolean | null
           match_id: string
           merge_completed_at: string | null
           merge_started_at: string | null
@@ -814,6 +815,7 @@ export type Database = {
           error_message?: string | null
           file_size_bytes?: number | null
           id?: string
+          match_detected?: boolean | null
           match_id: string
           merge_completed_at?: string | null
           merge_started_at?: string | null
@@ -850,6 +852,7 @@ export type Database = {
           error_message?: string | null
           file_size_bytes?: number | null
           id?: string
+          match_detected?: boolean | null
           match_id?: string
           merge_completed_at?: string | null
           merge_started_at?: string | null
@@ -1338,6 +1341,36 @@ export type Database = {
           },
         ]
       }
+      storage_orphan_sweep_runs: {
+        Row: {
+          bucket_id: string
+          candidates: number
+          claimed_at: string
+          error: string | null
+          finished_at: string | null
+          id: number
+          removed: number | null
+        }
+        Insert: {
+          bucket_id: string
+          candidates: number
+          claimed_at?: string
+          error?: string | null
+          finished_at?: string | null
+          id?: never
+          removed?: number | null
+        }
+        Update: {
+          bucket_id?: string
+          candidates?: number
+          claimed_at?: string
+          error?: string | null
+          finished_at?: string | null
+          id?: never
+          removed?: number | null
+        }
+        Relationships: []
+      }
       submission_types: {
         Row: {
           category: string
@@ -1511,8 +1544,10 @@ export type Database = {
           created_at: string
           dedup_dropped_count: number | null
           id: string
+          match_detected: boolean | null
           merge_strategy: string | null
           model_used: string
+          no_match_reason: string | null
           positions: Json | null
           recommendations: Json | null
           scoring_moments: Json | null
@@ -1531,8 +1566,10 @@ export type Database = {
           created_at?: string
           dedup_dropped_count?: number | null
           id?: string
+          match_detected?: boolean | null
           merge_strategy?: string | null
           model_used: string
+          no_match_reason?: string | null
           positions?: Json | null
           recommendations?: Json | null
           scoring_moments?: Json | null
@@ -1551,8 +1588,10 @@ export type Database = {
           created_at?: string
           dedup_dropped_count?: number | null
           id?: string
+          match_detected?: boolean | null
           merge_strategy?: string | null
           model_used?: string
+          no_match_reason?: string | null
           positions?: Json | null
           recommendations?: Json | null
           scoring_moments?: Json | null
@@ -1584,7 +1623,9 @@ export type Database = {
           error_message: string | null
           id: string
           key_frames: Json | null
+          match_detected: boolean | null
           model_used: string
+          no_match_reason: string | null
           positions: Json | null
           recommendations: Json | null
           scoring_moments: Json | null
@@ -1605,7 +1646,9 @@ export type Database = {
           error_message?: string | null
           id?: string
           key_frames?: Json | null
+          match_detected?: boolean | null
           model_used: string
+          no_match_reason?: string | null
           positions?: Json | null
           recommendations?: Json | null
           scoring_moments?: Json | null
@@ -1626,7 +1669,9 @@ export type Database = {
           error_message?: string | null
           id?: string
           key_frames?: Json | null
+          match_detected?: boolean | null
           model_used?: string
+          no_match_reason?: string | null
           positions?: Json | null
           recommendations?: Json | null
           scoring_moments?: Json | null
@@ -2345,6 +2390,25 @@ export type Database = {
           gym_name: string
         }[]
       }
+      admin_list_no_match_videos: {
+        Args: { p_limit?: number; p_since?: string }
+        Returns: {
+          analysis_id: string
+          analyzed_at: string
+          match_completed_at: string
+          match_id: string
+          match_result: string
+          match_status: string
+          match_type: string
+          no_match_reason: string
+          participants: Json
+          uploaded_by: string
+          uploader_name: string
+          video_created_at: string
+          video_id: string
+          video_status: string
+        }[]
+      }
       admin_remove_gym_manager: {
         Args: { p_athlete_id: string; p_gym_id: string }
         Returns: undefined
@@ -2368,6 +2432,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      app_setting: { Args: { p_name: string }; Returns: string }
       apply_highlight_regeneration: {
         Args: {
           p_ai_latency_ms: number
@@ -2381,6 +2446,7 @@ export type Database = {
         }
         Returns: Json
       }
+      assert_orphaned_object_sweep_healthy: { Args: never; Returns: string }
       auth_athlete_id: { Args: never; Returns: string }
       begin_highlight_regeneration: {
         Args: {
@@ -2445,6 +2511,10 @@ export type Database = {
           source_storage_path: string
         }[]
       }
+      claim_orphaned_storage_objects: {
+        Args: { p_limit?: number }
+        Returns: Json
+      }
       claim_video_for_merging: {
         Args: { p_stale_minutes?: number; p_video_id: string }
         Returns: {
@@ -2507,6 +2577,10 @@ export type Database = {
         Returns: undefined
       }
       finalize_pending_merges: { Args: never; Returns: number }
+      finish_orphaned_storage_sweep: {
+        Args: { p_error?: string; p_removed: number; p_run_id: number }
+        Returns: boolean
+      }
       get_admin_metrics: { Args: never; Returns: Json }
       get_arena_data: { Args: { p_limit?: number }; Returns: Json }
       get_athlete_avatars: { Args: { p_athlete_id: string }; Returns: Json }
@@ -2735,6 +2809,13 @@ export type Database = {
           p_opponent_id: string
         }
         Returns: boolean
+      }
+      orphan_sweep_function_url: { Args: never; Returns: string }
+      orphaned_storage_object_candidates: {
+        Args: { p_claimable?: boolean; p_limit?: number }
+        Returns: {
+          name: string
+        }[]
       }
       pause_match: { Args: { p_match_id: string }; Returns: Json }
       persist_video_chunks_and_finalize_slice: {

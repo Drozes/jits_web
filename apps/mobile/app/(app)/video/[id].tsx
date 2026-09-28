@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { Audio, ResizeMode, Video, type AVPlaybackStatus } from "expo-av";
-import { buildKeyMoments, captionAt, formatClock, translateAngleTime } from "@jits/shared/utils";
+import { NO_MATCH_COPY, buildKeyMoments, captionAt, formatClock, isNoMatch, translateAngleTime } from "@jits/shared/utils";
 import { getVideoSyncOffsets } from "@jits/shared/api/film-room";
 import { supabase } from "@/lib/supabase/client";
 import { HarnessMarker } from "@/components/match-detail/harness-marker";
@@ -109,9 +109,11 @@ function PlayerBody({ id, start, approximate }: { id: string | undefined; start:
       cancelled = true;
     };
   }, [angleIds]);
+  // A video with no match in it has no moments to mark (jr_be-0qf).
+  const noMatch = isNoMatch(analysis);
   const moments = React.useMemo(
-    () => (analysis ? buildKeyMoments(analysis, view?.match ?? null, duration || null) : []),
-    [analysis, view?.match, duration],
+    () => (analysis && !noMatch ? buildKeyMoments(analysis, view?.match ?? null, duration || null) : []),
+    [analysis, noMatch, view?.match, duration],
   );
   const caption = captionAt(moments, analysis?.positions, positionS);
   const current = [...moments].reverse().find((m) => m.t <= positionS + 0.25 && positionS - m.t < CURRENT_HOLD_S);
@@ -203,7 +205,15 @@ function PlayerBody({ id, start, approximate }: { id: string | undefined; start:
             </View>
           ) : null}
           <View style={{ position: "absolute", left: 16, right: 16, bottom: insets.bottom + 24, gap: 14 }}>
-            {caption ? <MomentCaption t={caption.t} text={caption.text} /> : null}
+            {noMatch ? (
+              <View testID="player-no-match" className="self-start" style={{ paddingVertical: 8, paddingHorizontal: 10, borderRadius: 2, backgroundColor: ON_MEDIA.badge, maxWidth: "100%" }}>
+                <Text className="font-body-medium" style={{ fontSize: 13, lineHeight: 16, color: ON_MEDIA.text }}>
+                  {NO_MATCH_COPY.short}
+                </Text>
+              </View>
+            ) : caption ? (
+              <MomentCaption t={caption.t} text={caption.text} />
+            ) : null}
             <View style={{ gap: 6 }}>
               <SeekBar positionS={positionS} durationS={duration} moments={moments} onSeek={seek} />
               <View className="flex-row justify-between">

@@ -2,6 +2,8 @@ import * as React from "react";
 import { Pressable, Text, View } from "react-native";
 import { usePalette } from "@/lib/theme/palette";
 import type { BreakdownPhase } from "@/lib/match-detail/use-match-film";
+import { isNoMatch } from "@jits/shared/utils";
+import { NoMatchBreakdown } from "./no-match-breakdown";
 
 function Heading({ tier }: { tier: string | null }) {
   const p = usePalette();
@@ -32,7 +34,8 @@ function Body({ children, tone = "text" }: { children: React.ReactNode; tone?: "
 
 /**
  * The analysis summary for the selected angle, or why there is none yet:
- * uploading, analyzing (live chunk count), failed, or not analyzed.
+ * uploading, analyzing (live chunk count), failed, or not analyzed. When the
+ * analysis found no match in the video it says so instead of a summary.
  */
 export function AiBreakdown({ phase, onRetry }: { phase: BreakdownPhase; onRetry: () => void }) {
   const p = usePalette();
@@ -51,6 +54,8 @@ export function AiBreakdown({ phase, onRetry }: { phase: BreakdownPhase; onRetry
     );
   } else if (phase.kind === "failed") {
     body = <Body tone="muted">The analysis failed for this recording. The film may still play.</Body>;
+  } else if (phase.state === "ready" && phase.analysis && isNoMatch(phase.analysis)) {
+    body = <NoMatchBreakdown reason={phase.analysis.no_match_reason} tips={phase.analysis.recommendations} />;
   } else if (phase.state === "ready" && phase.analysis) {
     tier = phase.analysis.analysis_tier;
     body = <Body>{phase.analysis.summary ?? "The breakdown has key moments but no summary."}</Body>;

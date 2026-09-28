@@ -99,6 +99,8 @@ describe("getHighlightProgress", () => {
         identitySide: null,
         lastChangeSummary: null,
         updatedAt: "2026-09-27T10:00:00Z",
+        matchDetected: null,
+        noMatchReason: null,
       },
     });
   });
@@ -114,6 +116,19 @@ describe("getHighlightProgress", () => {
     ["failed", { status: "failed", playback: null, error_message: "Render timed out" }],
     ["invalidated", { status: "invalidated", playback: null, plan_status: "invalidated" }],
     ["none", { highlight_id: null, status: null, playback: null }],
+    [
+      "no_match",
+      {
+        enabled: false,
+        highlight_id: null,
+        status: null,
+        plan_status: null,
+        playback: null,
+        can_regenerate: false,
+        match_detected: false,
+        no_match_reason: "The camera shows an empty room.",
+      },
+    ],
   ];
 
   it.each(PHASE_FIXTURES)("maps phase %s", async (phase, over) => {
@@ -162,6 +177,53 @@ describe("getHighlightProgress", () => {
 
   it("degrades an unknown phase to unavailable", () => {
     expect(toHighlightProgress(raw({ phase: "something_new" })).phase).toBe("unavailable");
+  });
+
+  describe("no match detected (jr_be-0qf)", () => {
+    const NO_MATCH = {
+      phase: "no_match",
+      enabled: false,
+      highlight_id: null,
+      status: null,
+      plan_status: null,
+      playback: null,
+      can_regenerate: false,
+      error_message: null,
+      match_detected: false,
+      no_match_reason: "  Two people talking at a desk; no grappling.  ",
+    } satisfies Partial<RawHighlightProgress>;
+
+    it("maps phase no_match (even with the kill switch off) with its trimmed reason and no actions", () => {
+      const p = toHighlightProgress(raw(NO_MATCH));
+      expect(p.phase).toBe("no_match");
+      expect(p.enabled).toBe(false);
+      expect(p.matchDetected).toBe(false);
+      expect(p.noMatchReason).toBe("Two people talking at a desk; no grappling.");
+      expect(p.canRegenerate).toBe(false);
+      expect(p.errorMessage).toBeNull();
+      expect(p.planStatus).toBeNull();
+      expect(p.playback).toBeNull();
+    });
+
+    it("keeps match_detected true with no reason", () => {
+      const p = toHighlightProgress(raw({ match_detected: true, no_match_reason: "ignored" }));
+      expect(p.matchDetected).toBe(true);
+      expect(p.noMatchReason).toBeNull();
+    });
+
+    it.each([
+      ["null", null],
+      ["absent (older backend)", undefined],
+      ["a non-boolean", "false" as unknown as boolean],
+    ])("treats match_detected %s as unknown (null) and drops any reason", (_label, value) => {
+      const p = toHighlightProgress(raw({ match_detected: value, no_match_reason: "stray" }));
+      expect(p.matchDetected).toBeNull();
+      expect(p.noMatchReason).toBeNull();
+    });
+
+    it("maps a blank reason to null", () => {
+      expect(toHighlightProgress(raw({ ...NO_MATCH, no_match_reason: "   " })).noMatchReason).toBeNull();
+    });
   });
 
   it("drops malformed segments and clamps renders_remaining at 0", () => {
@@ -336,6 +398,7 @@ describe("retryHighlightRender", () => {
     ["highlight_clips_disabled", "HIGHLIGHTS_DISABLED"],
     ["highlight_not_found", "HIGHLIGHT_NOT_FOUND"],
     ["highlight_source_not_ready", "HIGHLIGHT_SOURCE_NOT_READY"],
+    ["highlight_no_match", "HIGHLIGHT_NO_MATCH"],
   ])("maps %s to %s", async (hint, code) => {
     const { client } = rpcClient({ data: null, error: pgErr(hint) });
     const result = await retryHighlightRender(client, HL);
@@ -413,6 +476,7 @@ describe("regenerateHighlight", () => {
     [409, "highlight_clips_disabled", "HIGHLIGHTS_DISABLED"],
     [422, "highlight_regen_ai_failed", "HIGHLIGHT_REGEN_FAILED"],
     [409, "highlight_regen_expired", "HIGHLIGHT_REGEN_EXPIRED"],
+    [409, "highlight_no_match", "HIGHLIGHT_NO_MATCH"],
   ])("maps HTTP %i hint %s to %s", async (status, hint, code) => {
     const body = JSON.stringify({ ok: false, error: { hint, message: "user-safe" } });
     const { client } = fnClient({ data: null, error: httpError(status, body) });

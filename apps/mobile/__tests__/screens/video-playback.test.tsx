@@ -576,6 +576,29 @@ describe("MatchVideoScreen Film Room controls", () => {
     expect(utils.getByTestId("player-time")).toHaveTextContent("00:27 / 06:40");
   });
 
+  it("says no match was detected instead of moments, even if a stray tag would place a finish", async () => {
+    const utils = await renderLoadedPlayer({
+      videos: 1,
+      analysis: { ok: true, data: { ...ANALYSIS.data, match_detected: false, no_match_reason: "Empty room.", recommendations: [] } },
+    });
+    await waitFor(() => expect(utils.getByTestId("player-no-match")).toHaveTextContent("No match detected in this video"));
+    statusAt(30);
+    expect(utils.queryByTestId("moment-chip-0")).toBeNull();
+    expect(utils.queryAllByTestId(/^seek-marker-/, { includeHiddenElements: true })).toHaveLength(0);
+    expect(utils.queryByText(/KEY MOMENT/)).toBeNull();
+    expect(utils.queryByTestId("player-caption")).toBeNull();
+    // The film still plays with its seek bar.
+    expect(utils.getByTestId("player-seek")).toBeTruthy();
+  });
+
+  it.each([true, null])("match_detected %s keeps the key moments and no note", async (matchDetected) => {
+    const utils = await renderLoadedPlayer({
+      analysis: { ok: true, data: { ...ANALYSIS.data, match_detected: matchDetected, no_match_reason: null, recommendations: [] } },
+    });
+    await waitFor(() => expect(utils.getByText("4 KEY MOMENTS")).toBeTruthy());
+    expect(utils.queryByTestId("player-no-match")).toBeNull();
+  });
+
   it("shows no angle switcher, chips or caption for one angle with no breakdown", async () => {
     const utils = await renderLoadedPlayer({ videos: 1, analysis: { ok: true, data: null } });
     expect(utils.queryByTestId("angle-switcher")).toBeNull();
