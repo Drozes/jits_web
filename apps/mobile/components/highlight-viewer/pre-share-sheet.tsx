@@ -2,6 +2,7 @@ import * as React from "react";
 import { BottomSheetBackdrop, BottomSheetModal, BottomSheetView, type BottomSheetBackdropProps } from "@gorhom/bottom-sheet";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useThemedTokens } from "@/lib/theme/use-theme";
+import { useSheetSchemeScope } from "@/lib/theme/use-sheet-scheme-scope";
 import { SheetBackground } from "@/components/match-detail/highlight/highlight-sheet-background";
 
 interface PreShareSheetProps {
@@ -19,7 +20,10 @@ interface PreShareSheetProps {
 export function PreShareSheet({ open, onClosed, children }: PreShareSheetProps) {
   const ref = React.useRef<BottomSheetModal | null>(null);
   const presentedRef = React.useRef(false);
+  // Background and handle come from the opener's scheme (forced dark in the
+  // viewer); the portalled content re-enters that same scheme.
   const tokens = useThemedTokens();
+  const scope = useSheetSchemeScope();
   const insets = useSafeAreaInsets();
 
   React.useEffect(() => {
@@ -58,7 +62,7 @@ export function PreShareSheet({ open, onClosed, children }: PreShareSheetProps) 
       handleIndicatorStyle={{ backgroundColor: tokens.textTertiary }}
     >
       <BottomSheetView style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: insets.bottom + 16 }}>
-        {children}
+        {scope(children)}
       </BottomSheetView>
     </BottomSheetModal>
   );

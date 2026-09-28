@@ -22,7 +22,11 @@
  *   the installed expo-notifications has them, else the async pair.
  * - During a match: a highlight tap (a reel is never urgent) is HELD while any
  *   match screen is mounted and routed when the athlete leaves the match, so
- *   it never pushes the viewer over a live match; the foreground banner for a
+ *   it never pushes the viewer over a live match. When that exit went to the
+ *   Arena to finish a Rematch auto-send (`?rematch=<id>&send=1`), the held
+ *   tap is dropped instead: pushing the viewer would blur the Arena, whose
+ *   blur clears the rematch pin and silently cancels the send. The reel
+ *   stays reachable from the bell and the Home card. The foreground banner for a
  *   `highlight_ready` push is suppressed while in a match (it still lands in
  *   the notification list).
  * - Sign-out: `resetNotificationRouterReady()` forgets readiness and drops
@@ -35,6 +39,7 @@ import * as Notifications from "expo-notifications";
 import { router } from "expo-router";
 import { HOME_HREF, isRetiredRoute } from "@/lib/deep-links/retired-routes";
 import { isInArenaMatch, subscribeArenaMatch } from "@/lib/arena/arena-store";
+import { takeRecentMatchExitHref } from "@/lib/match-flow/exit-to";
 
 let configured = false;
 let responseSubscription: Notifications.EventSubscription | null = null;
@@ -117,6 +122,17 @@ function handleResponse(response: Notifications.NotificationResponse | null): vo
   navigate(response);
 }
 
+/** How recent an exitMatchTo must be to count as the exit that released a held tap. */
+export const MATCH_EXIT_RECORD_MAX_AGE_MS = 5_000;
+
+/** The verdict's Rematch exit: the Arena will send the challenge itself (`send=1`). */
+export function exitStartsRematchSend(href: string | null): boolean {
+  if (!href) return false;
+  const query = href.split("?")[1] ?? "";
+  const params = new URLSearchParams(query);
+  return !!params.get("rematch") && params.get("send") === "1";
+}
+
 function stopWatchingMatch(): void {
   if (matchUnsubscribe) matchUnsubscribe();
   matchUnsubscribe = null;
@@ -134,6 +150,9 @@ function holdUntilMatchExit(response: Notifications.NotificationResponse): void 
     setTimeout(() => {
       const held = heldHighlight;
       heldHighlight = null;
+      // Still (or again) in a match: handleResponse re-holds it, and the
+      // exit record stays for that match's own exit.
+      if (!isInArenaMatch() && exitStartsRematchSend(takeRecentMatchExitHref(MATCH_EXIT_RECORD_MAX_AGE_MS))) return;
       handleResponse(held);
     }, 0);
   });

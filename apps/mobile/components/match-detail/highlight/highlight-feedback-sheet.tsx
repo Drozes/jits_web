@@ -6,6 +6,7 @@ import {
   type BottomSheetBackdropProps,
 } from "@gorhom/bottom-sheet";
 import { useThemedTokens } from "@/lib/theme/use-theme";
+import { useSheetSchemeScope } from "@/lib/theme/use-sheet-scheme-scope";
 import { SheetBackground } from "./highlight-sheet-background";
 
 interface HighlightFeedbackSheetProps {
@@ -25,7 +26,10 @@ interface HighlightFeedbackSheetProps {
 export function HighlightFeedbackSheet({ open, busy, onClosed, children }: HighlightFeedbackSheetProps) {
   const ref = React.useRef<BottomSheetModal | null>(null);
   const presentedRef = React.useRef(false);
+  // Background and handle come from the opener's scheme (forced dark in the
+  // viewer); the portalled content re-enters that same scheme.
   const tokens = useThemedTokens();
+  const scope = useSheetSchemeScope();
 
   React.useEffect(() => {
     if (open) {
@@ -64,7 +68,7 @@ export function HighlightFeedbackSheet({ open, busy, onClosed, children }: Highl
       backgroundStyle={{ backgroundColor: tokens.bgSecondary }}
       handleIndicatorStyle={{ backgroundColor: tokens.textTertiary }}
     >
-      <BottomSheetView>{children}</BottomSheetView>
+      <BottomSheetView>{scope(children)}</BottomSheetView>
     </BottomSheetModal>
   );
 }

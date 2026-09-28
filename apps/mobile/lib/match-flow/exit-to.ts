@@ -17,6 +17,24 @@
  */
 import type { Href, Router } from "expo-router";
 
+/** The latest exit's target, for notification routing (see below). */
+let lastExit: { href: string; at: number } | null = null;
+
 export function exitMatchTo(router: Pick<Router, "dismissTo">, href: Href): void {
+  lastExit = typeof href === "string" ? { href, at: Date.now() } : null;
   router.dismissTo(href);
+}
+
+/**
+ * The href of an exit taken within the last `maxAgeMs`, consumed (read once).
+ * A highlight tap held during the match is released right after the exit
+ * (lib/notifications/handlers.ts) and must know where the exit went: pushing
+ * the viewer over an Arena that is finishing a Rematch auto-send blurs it,
+ * and the blur clears the rematch pin. Time-bounded so an exit that took
+ * another path (a back gesture) never reads a stale target.
+ */
+export function takeRecentMatchExitHref(maxAgeMs: number, now = Date.now()): string | null {
+  const exit = lastExit;
+  lastExit = null;
+  return exit && now - exit.at <= maxAgeMs ? exit.href : null;
 }

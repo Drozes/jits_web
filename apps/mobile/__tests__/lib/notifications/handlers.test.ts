@@ -55,6 +55,9 @@ import {
 } from "@/lib/notifications/handlers";
 import { __resetArenaStoreForTests, useArenaMatchScreen } from "@/lib/arena/arena-store";
 import { resolveSystemPath } from "@/lib/deep-links/system-path";
+import { exitMatchTo, takeRecentMatchExitHref } from "@/lib/match-flow/exit-to";
+import { exitStartsRematchSend, MATCH_EXIT_RECORD_MAX_AGE_MS } from "@/lib/notifications/handlers";
+import { ARENA_HREF } from "@/lib/arena/constants";
 
 let seq = 0;
 function response(data: unknown, identifier = `n-${++seq}`) {
@@ -305,6 +308,64 @@ describe("highlight taps during a match (discovery M1)", () => {
     leave();
     await tick();
     expect((await handler(note(HIGHLIGHT_PUSH))).shouldShowBanner).toBe(true);
+  });
+});
+
+describe("a held highlight tap vs the verdict's Rematch auto-send", () => {
+  const REMATCH_SEND = `${ARENA_HREF}?rematch=opp-1&send=1`;
+  const dismissTo = jest.fn();
+
+  beforeEach(async () => {
+    takeRecentMatchExitHref(0); // no exit record from an earlier test
+    markNotificationRouterReady();
+    await flush();
+  });
+
+  it("drops the held tap when the match exits to a Rematch auto-send (the Arena must not blur)", async () => {
+    const leave = enterMatch();
+    tap(HIGHLIGHT_PUSH, "hl-rematch");
+    exitMatchTo({ dismissTo }, REMATCH_SEND);
+    leave();
+    await tick();
+    expect(dismissTo).toHaveBeenCalledWith(REMATCH_SEND);
+    expect(mockPush).not.toHaveBeenCalled();
+    // Not claimed: tapping it again from the notification list opens the reel.
+    tap(HIGHLIGHT_PUSH, "hl-rematch");
+    expect(mockPush).toHaveBeenCalledWith("/highlight/h-1?source=push");
+  });
+
+  it("still routes the held tap after a plain exit, or a rematch without auto-send", async () => {
+    for (const href of [ARENA_HREF, `${ARENA_HREF}?rematch=opp-1`]) {
+      mockPush.mockClear();
+      const leave = enterMatch();
+      tap(HIGHLIGHT_PUSH);
+      exitMatchTo({ dismissTo }, href);
+      leave();
+      await tick();
+      expect(mockPush).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it("ignores a stale rematch exit record (a later exit took another path)", async () => {
+    const now = jest.spyOn(Date, "now");
+    now.mockReturnValue(1_000);
+    exitMatchTo({ dismissTo }, REMATCH_SEND);
+    now.mockReturnValue(1_000 + MATCH_EXIT_RECORD_MAX_AGE_MS + 1);
+    const leave = enterMatch();
+    tap(HIGHLIGHT_PUSH);
+    leave(); // e.g. a back gesture, no exitMatchTo
+    await tick();
+    now.mockRestore();
+    expect(mockPush).toHaveBeenCalledTimes(1);
+  });
+
+  it("recognises only the auto-send rematch href", () => {
+    expect(exitStartsRematchSend(REMATCH_SEND)).toBe(true);
+    expect(exitStartsRematchSend(`${ARENA_HREF}?send=1&rematch=a%20b`)).toBe(true);
+    expect(exitStartsRematchSend(`${ARENA_HREF}?rematch=opp-1`)).toBe(false);
+    expect(exitStartsRematchSend(`${ARENA_HREF}?rematch=&send=1`)).toBe(false);
+    expect(exitStartsRematchSend(ARENA_HREF)).toBe(false);
+    expect(exitStartsRematchSend(null)).toBe(false);
   });
 });
 

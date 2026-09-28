@@ -11,6 +11,10 @@ JS-only, OTA-eligible.
 - Match page: the "Your highlight" cards now sit inside the Film Room match page, under the film angles (Watch rows) and above the opponent row; pull-to-refresh still re-reads the match and the highlight cards.
 - Profile: the Highlights row sits between Recent Matches and the Film Room preview (which replaced Past Match Videos); pull-to-refresh and refocus reload the profile, the Film Room preview and the highlights.
 - The highlight viewer pins itself dark with `ForceDarkTheme` (as the match video player does) and sets a light status bar, so it stays correct in the light app theme.
+- The viewer's two sheets (pre-share `components/highlight-viewer/pre-share-sheet.tsx`, Improve `components/match-detail/highlight/highlight-feedback-sheet.tsx`) re-enter the scheme they were opened under: gorhom portals sheet content to the root provider, outside the viewer's `ForceDarkTheme`, so the content fell back to the light theme on a forced-dark sheet background. New `apps/mobile/lib/theme/use-sheet-scheme-scope.tsx` wraps the portalled content in `ForceDarkTheme` (new `fill={false}`, content-sized) only when the opener is forced dark; on match detail the sheet still follows the app theme.
+
+**Fixed**
+- A highlight push tap held during a match is dropped (not pushed) when the match exits to the verdict's Rematch auto-send (`?rematch=<id>&send=1`): pushing the viewer blurred the Arena, whose blur cleared the rematch pin and silently cancelled the send. The reel stays reachable from the bell, the Home card and the notification list. `exitMatchTo` now records its target (`takeRecentMatchExitHref`, read once, 5 s window) for `lib/notifications/handlers.ts`.
 - `packages/shared/src/types/database.ts` regenerated from a local stack with every jr_be migration through `20260929000000` (the match-flow `20260927*` set and the highlight `20260928*` / `20260929*` set); `mark_practice_match`'s nullable `practice_match_completed_at` hand correction is kept.
 - `MATCH_VIDEO_BUCKET` is defined once in `packages/shared/src/api/poster-signing.ts` and re-exported from `queries.ts`.
 
