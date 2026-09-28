@@ -226,6 +226,24 @@ describe("useNotificationHistory", () => {
     expect(result.current.unseenHighlights).toBe(0);
   });
 
+  it("only the newest highlight read writes (a slow focus read never overwrites a forced one)", async () => {
+    const { result } = renderHook(() => useNotificationHistory("a1"));
+    await settle();
+    expect(result.current.unseenHighlights).toBe(1);
+    let resolveSlow: (v: unknown) => void = () => undefined;
+    mockGetMy.mockReturnValueOnce(new Promise((r) => (resolveSlow = r)));
+    act(() => mockFocus.forEach((cb) => cb())); // slow read, still reports unseen
+    mockGetMy.mockResolvedValueOnce({ ok: true, data: { clipsEnabled: true, shareEnabled: true, items: [hl({ unseen: false })] } });
+    act(() => notifyHighlightsChanged()); // forced read after a seen mark
+    await settle();
+    expect(result.current.unseenHighlights).toBe(0);
+    await act(async () =>
+      resolveSlow({ ok: true, data: { clipsEnabled: true, shareEnabled: true, items: [hl()] } }),
+    );
+    await settle();
+    expect(result.current.unseenHighlights).toBe(0);
+  });
+
   it("Home's pull-to-refresh re-reads the whole bell feed", async () => {
     renderHook(() => useNotificationHistory("a1"));
     await settle();

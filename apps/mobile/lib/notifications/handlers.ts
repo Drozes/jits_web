@@ -129,9 +129,13 @@ function holdUntilMatchExit(response: Notifications.NotificationResponse): void 
   matchUnsubscribe = subscribeArenaMatch(() => {
     if (isInArenaMatch()) return;
     stopWatchingMatch();
-    const held = heldHighlight;
-    heldHighlight = null;
-    handleResponse(held);
+    // Next tick: the exit's own navigation (dismissTo) settles first, and a
+    // match that mounts right after this one (nested) can still re-hold it.
+    setTimeout(() => {
+      const held = heldHighlight;
+      heldHighlight = null;
+      handleResponse(held);
+    }, 0);
   });
 }
 

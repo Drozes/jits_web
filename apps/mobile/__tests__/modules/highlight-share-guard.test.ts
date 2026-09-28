@@ -89,6 +89,8 @@ const FORBIDDEN_PATTERNS: ReadonlyArray<[string, RegExp]> = [
   ["share sheet call", /shareAsync\s*\(/],
   ["camera roll call", /saveToLibraryAsync|createAssetAsync/],
   ["Instagram URL scheme", /instagram(-reels|-stories)?:\/\//],
+  ["iOS action-sheet share", /showShareActionSheetWithOptions/],
+  ["Android storage access", /StorageAccessFramework/],
 ];
 
 /** The names of every forbidden pattern `source` matches. */
@@ -211,6 +213,8 @@ describe("2. lib/highlight-share/ is the single importer of the share packages",
     ["NativeModules access", "NativeModules.InstagramReels.share(x);"],
     ["media library native", 'requireNativeModule("ExpoMediaLibrary")'],
     ["clipboard native", 'requireOptionalNativeModule("ExpoClipboard")'],
+    ["ActionSheetIOS share", "ActionSheetIOS.showShareActionSheetWithOptions({ url: fileUri }, onErr, onOk);"],
+    ["Storage Access Framework", "await FileSystem.StorageAccessFramework.createFileAsync(dir, name, mime);"],
   ])("catches a %s bypass", (_label, fixture) => {
     expect(forbiddenHits(fixture).length).toBeGreaterThan(0);
   });
@@ -354,6 +358,34 @@ describe("4. the share module re-exports no native package", () => {
   });
 });
 
+/**
+ * Problems with the RN `Share` API in `source`: every `Share.share` url must
+ * come from a known share-URL builder (`buildShareUrl(...)` inline or a
+ * variable assigned from it in the same file), and `share` may not be pulled
+ * off `Share` (destructured, indexed or aliased), which would dodge the scan.
+ */
+function shareApiProblems(source: string): string[] {
+  const problems: string[] = [];
+  if (/\{[^{}]*\bshare\b[^{}]*\}\s*=\s*Share\b/.test(source)) problems.push("destructures share from Share");
+  if (/\bShare\s*\[\s*["'`]share["'`]\s*\]/.test(source)) problems.push("indexes Share['share']");
+  if (/\bShare\.share\b(?!\s*\()/.test(source)) problems.push("aliases Share.share");
+  const builtVars = new Set(
+    [...source.matchAll(/\b(?:const|let|var)\s+(\w+)\s*=\s*buildShareUrl\s*\(/g)].map((m) => m[1]),
+  );
+  for (const args of shareCallArguments(source)) {
+    const explicit = args.match(/\burl\s*:\s*([^,}\n]+)/);
+    const shorthand = /(?:^|[{,\s])url\s*(?:,|\}|$)/m.test(args);
+    if (explicit) {
+      const expr = explicit[1].trim();
+      const ok = /^buildShareUrl\s*\(/.test(expr) || builtVars.has(expr);
+      if (!ok) problems.push(`url from ${expr}`);
+    } else if (shorthand && !builtVars.has("url")) {
+      problems.push("url shorthand not from buildShareUrl");
+    }
+  }
+  return problems;
+}
+
 describe("5. Share.share stays as it is", () => {
   it("has exactly three calls and none hands over a local file", () => {
     const calls = appSourceFiles().flatMap((file) =>
@@ -367,5 +399,33 @@ describe("5. Share.share stays as it is", () => {
       )
       .map(([file]) => file);
     expect(offenders).toEqual([]);
+  });
+
+  it("every Share.share url comes from buildShareUrl, and share is never pulled off Share", () => {
+    const offenders = appSourceFiles().flatMap((file) =>
+      shareApiProblems(fs.readFileSync(file, "utf8")).map((problem) => `${relative(file)}: ${problem}`),
+    );
+    expect(offenders).toEqual([]);
+  });
+
+  it.each([
+    ["a file uri as url", "await Share.share({ message: 'x', url: fileUri });"],
+    ["a non-builder variable", "const u = localPath; await Share.share({ url: u });"],
+    ["shorthand url not from the builder", "const url = reel.uri; await Share.share({ url });"],
+    ["destructured share", "const { share } = Share; await share({ url: x });"],
+    ["destructured with alias", "const { share: s } = Share;"],
+    ["indexed share", 'await Share["share"]({ url: x });'],
+    ["aliased share", "const s = Share.share; await s({ url: x });"],
+  ])("flags %s", (_label, fixture) => {
+    expect(shareApiProblems(fixture).length).toBeGreaterThan(0);
+  });
+
+  it.each([
+    ["inline builder", 'await Share.share({ message: "m", url: buildShareUrl("athlete", id) });'],
+    ["builder variable", 'const url = buildShareUrl("athlete", id);\nawait Share.share({ title: "t", url });'],
+    ["named builder variable", 'const link = buildShareUrl("athlete", id);\nawait Share.share({ url: link });'],
+    ["no url at all", 'await Share.share({ message: "hi" });'],
+  ])("accepts %s", (_label, fixture) => {
+    expect(shareApiProblems(fixture)).toEqual([]);
   });
 });

@@ -4,17 +4,27 @@
  * `removePushDeviceByToken` (own rows only under RLS), bounded by a timeout,
  * never throwing, and a no-op when nothing was registered.
  */
-jest.mock("expo-notifications", () => ({}));
-jest.mock("expo-device", () => ({ isDevice: true }));
+const mockGetToken = jest.fn();
+jest.mock("expo-notifications", () => ({
+  getPermissionsAsync: () => Promise.resolve({ status: "granted" }),
+  requestPermissionsAsync: () => Promise.resolve({ status: "granted" }),
+  getExpoPushTokenAsync: (...a: unknown[]) => mockGetToken(...a),
+  setNotificationChannelAsync: jest.fn(),
+  AndroidImportance: { HIGH: 4 },
+}));
+jest.mock("expo-device", () => ({ isDevice: true, osName: "iOS", modelName: "iPhone" }));
 const mockRemove = jest.fn();
+const mockRegister = jest.fn();
 jest.mock("@jits/shared/api/mutations", () => ({
-  registerPushDevice: jest.fn(),
+  registerPushDevice: (...a: unknown[]) => mockRegister(...a),
   removePushDeviceByToken: (...a: unknown[]) => mockRemove(...a),
 }));
 
 import {
   UNREGISTER_PUSH_TIMEOUT_MS,
+  __getRegisteredPushTokenForTests,
   __setRegisteredPushTokenForTests,
+  registerForPushNotifications,
   unregisterPushDeviceOnSignOut,
 } from "@/lib/notifications/register-push";
 
@@ -63,5 +73,31 @@ describe("unregisterPushDeviceOnSignOut", () => {
     jest.advanceTimersByTime(UNREGISTER_PUSH_TIMEOUT_MS);
     await p;
     expect(done).toBe(true);
+  });
+});
+
+
+describe("sign-out generation (a registration racing a sign-out)", () => {
+  it("a registration that finishes normally stores its token", async () => {
+    mockGetToken.mockResolvedValue({ data: "tok-1" });
+    mockRegister.mockResolvedValue({ ok: true, data: undefined });
+    const res = await registerForPushNotifications(SB, "a1");
+    expect(res).toEqual({ ok: true, token: "tok-1" });
+    expect(__getRegisteredPushTokenForTests()).toBe("tok-1");
+  });
+
+  it("a registration that started before a sign-out does not store its token after it", async () => {
+    let finish: (v: unknown) => void = () => undefined;
+    mockGetToken.mockResolvedValue({ data: "tok-late" });
+    mockRegister.mockReturnValue(new Promise((r) => (finish = r)));
+    const pending = registerForPushNotifications(SB, "a1");
+    await new Promise((r) => setTimeout(r, 0));
+    await unregisterPushDeviceOnSignOut(SB); // nothing stored yet: a no-op delete
+    finish({ ok: true, data: undefined });
+    await pending;
+    expect(__getRegisteredPushTokenForTests()).toBeNull();
+    // So the NEXT account's sign-out never deletes the previous account's row.
+    await unregisterPushDeviceOnSignOut(SB);
+    expect(mockRemove).not.toHaveBeenCalled();
   });
 });

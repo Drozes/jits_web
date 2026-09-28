@@ -302,10 +302,6 @@ export function useHighlightShare(params: UseHighlightShareParams): UseHighlight
   }, [shareEnabled, resetState]);
 
   /**
-   * prepare (kill switch) -> sign 300 s -> download. `onDownloading` fires
-   * once the download itself begins. Logs download_ok / download_failed.
-   */
-  /**
    * The server-side gate, asked before EVERY action (start, handoff, save),
    * so the kill switch holds even for a file already in the cache.
    */
@@ -315,6 +311,11 @@ export function useHighlightShare(params: UseHighlightShareParams): UseHighlight
     return { ok: false, error: prepareRefusal(prepared.error.code) ?? DOWNLOAD_ERROR };
   }, []);
 
+  /**
+   * prepare (kill switch) -> sign 300 s -> download. `onDownloading` fires
+   * once the download itself begins. Logs download_ok / download_failed once
+   * per acquisition (not for a caller that joined an in-flight download).
+   */
   const acquire = React.useCallback(
     async (onDownloading?: () => void, onProgress?: (fraction: number | null) => void): Promise<Acquired> => {
       const prepared = await prepareHighlightShare(supabase, paramsRef.current.highlightId);

@@ -141,6 +141,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         loadedAthleteForUserId.current = null;
         setAthlete(null);
         setIsLoading(false);
+        // Involuntary sign-outs too (expired refresh token, another device):
+        // no held tap or cached reel list may carry over to the next account.
+        // Both are synchronous module resets, safe inside the auth lock.
+        resetNotificationRouterReady();
+        resetHighlightStore();
       } else if (needsAthleteLoad(nextUser.id, loadedAthleteForUserId.current)) {
         // Freshly signed-in user whose athlete row we have NOT loaded yet. Hold
         // the gate on "Loading..." (synchronously, in the same render that sets
@@ -300,9 +305,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = React.useCallback(async () => {
     // Clear `looking_for_ranked` while the session can still write it; once
     // signed out, RLS refuses the write and the athlete stays advertised.
-    await takeArenaOfflineBeforeSignOut();
-    // Same reason: this device's push row can only be deleted while signed in.
-    await unregisterPushDeviceOnSignOut(supabase);
+    // Both only work while the session can still write (the push row can only
+    // be deleted while signed in); independent, so run them side by side.
+    await Promise.all([takeArenaOfflineBeforeSignOut(), unregisterPushDeviceOnSignOut(supabase)]);
     // Taps held for (or routed by) this account must not reach the next one.
     resetNotificationRouterReady();
     let signOutError: unknown = null;

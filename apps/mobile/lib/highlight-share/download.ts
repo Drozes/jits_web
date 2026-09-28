@@ -11,8 +11,10 @@ import type { HighlightShareSource } from "@jits/shared/api/highlight-share";
  * - The bytes land in `<name>.part` and are moved into place only on a 2xx,
  *   so an existing, non-empty target is always a COMPLETE earlier download
  *   and is reused.
- * - Progress-aware timeout: the download fails only after 30 s with no new
- *   bytes, or after a 180 s overall cap, so a large reel on a slow but
+ * - Progress-aware timeout: once bytes are arriving, the download fails
+ *   only after 30 s with no new bytes; before the first progress callback
+ *   (some servers / platforms never report one) only the 180 s overall cap
+ *   applies, so a large reel on a slow but
  *   working connection is not cut off at a flat deadline. A timeout, a
  *   non-2xx or a throw deletes the partial file and returns a typed failure;
  *   the abandoned native promise is caught so a late rejection after the
@@ -142,7 +144,7 @@ async function runDownload(
       fireTimeout = () => resolve("timeout");
       capTimer = setTimeout(() => resolve("timeout"), timeouts.maxMs);
     });
-    armStall();
+    // The stall timer is armed by the first progress callback, never before.
     const download = resumable.downloadAsync();
     // After a timeout the cancel may reject this later: never unhandled.
     download.catch(() => undefined);

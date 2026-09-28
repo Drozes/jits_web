@@ -16,8 +16,33 @@ const TRACKED = "Tracked on ELO RATED.";
 const CONTROLS = /[\u0000-\u001F\u007F-\u009F]/g;
 /** Bidi embeddings/overrides/isolates/marks, zero-width characters and the BOM: removed outright. */
 const INVISIBLE = /[\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u2069\uFEFF]/g;
-/** A token that reads as a link: a scheme, `www.`, or a bare domain with a common TLD. */
-const URL_LIKE = /^(?:[a-z][a-z0-9+.-]*:\/\/\S*|www\.\S*|\S+\.(?:com|net|org|io|co|me|app|ly|gg|tv|link|info|biz|xyz)(?:[/?#]\S*)?)$/i;
+/** A token core that reads as a link: a scheme, `www.`, or anything ending in a 2+ letter TLD (plus a path). */
+const URL_LIKE = /^(?:[a-z][a-z0-9+.-]*:\/\/\S*|www\.\S*|\S+\.[a-z]{2,}(?:[/?#]\S*)?)$/i;
+/** Full-width / ideographic dots, read as "." for the link check ("evil。com"). */
+const WIDE_DOTS = /[\u3002\uFF0E\uFF61]/g;
+/** Punctuation around a token (quotes, brackets, sentence marks), not part of it. */
+const LEADING_PUNCT = /^["'\u201C\u201D\u2018\u2019([{<\u00AB\u00A1\u00BF]+/;
+const TRAILING_PUNCT = /["'\u201C\u201D\u2018\u2019)\]}>\u00BB,.;:!?\u2026\u3002\uFF0E\uFF61]+$/;
+const HANDLE_MARKS = /^[@#\uFF20\uFF03]+/;
+
+/**
+ * One token, or null to drop it. Surrounding punctuation is split off first,
+ * so "(evil.com)", "evil.com." and "\"@handle\"" are judged by their core:
+ * a link core drops the whole token; a leading @ / # is removed from the core
+ * (no handles or hashtags injected through a name). The punctuation is kept
+ * around a surviving core, so "J." stays "J." (a single letter is no TLD).
+ */
+function cleanToken(token: string): string | null {
+  const lead = token.match(LEADING_PUNCT)?.[0] ?? "";
+  const rest = token.slice(lead.length);
+  const trail = rest.match(TRAILING_PUNCT)?.[0] ?? "";
+  const core = rest.slice(0, rest.length - trail.length);
+  if (!core) return null;
+  const unmarked = core.replace(HANDLE_MARKS, "");
+  if (!unmarked) return null;
+  if (URL_LIKE.test(unmarked.replace(WIDE_DOTS, "."))) return null;
+  return `${lead}${unmarked}${trail}`;
+}
 
 /**
  * Free text from the database made safe for a caption: invisible and
@@ -30,9 +55,9 @@ export function sanitiseCaptionText(text: string | null | undefined): string | n
     .replace(CONTROLS, " ")
     .replace(INVISIBLE, "")
     .split(/\s+/)
-    .filter((word) => word && !URL_LIKE.test(word))
-    .map((word) => word.replace(/^[@#＠＃]+/, ""))
-    .filter(Boolean);
+    .filter(Boolean)
+    .map(cleanToken)
+    .filter((word): word is string => !!word);
   const cleaned = words.join(" ").trim();
   return cleaned ? cleaned : null;
 }

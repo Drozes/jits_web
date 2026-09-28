@@ -46,11 +46,15 @@ export function useNotificationHistory(athleteId: string | undefined) {
     [],
   );
 
+  // Only the newest highlight read may write (a slow focus read must not
+  // overwrite a forced one that landed after a seen mark).
+  const highlightSeq = React.useRef(0);
   const fetchHighlights = React.useCallback(async (force = false) => {
     if (!athleteId) return;
+    const id = ++highlightSeq.current;
     try {
       const res = await readMyHighlights({ limit: HIGHLIGHT_LIMIT }, { force });
-      if (!alive.current || !res.ok) return;
+      if (!alive.current || id !== highlightSeq.current || !res.ok) return;
       setHighlights(res.data.clipsEnabled ? toHighlightNotificationItems(res.data.items) : []);
     } catch {
       // Best effort: the bell never fails because of highlights.

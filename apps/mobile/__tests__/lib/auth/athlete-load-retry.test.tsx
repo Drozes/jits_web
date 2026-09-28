@@ -20,11 +20,14 @@ jest.mock("@jits/shared/api/queries", () => ({
 }));
 
 const mockSignOut = jest.fn<Promise<{ error: unknown }>, []>();
+// eslint-disable-next-line no-var
+var mockAuthCallback: ((event: string, session: unknown) => void) | null = null;
 jest.mock("@/lib/supabase/client", () => ({
   supabase: {
     auth: {
       storageKey: "sb-test-auth-token",
       onAuthStateChange: (cb: (event: string, session: unknown) => void) => {
+        mockAuthCallback = cb;
         cb("INITIAL_SESSION", { user: { id: "u-1" } });
         return { data: { subscription: { unsubscribe: jest.fn() } } };
       },
@@ -39,8 +42,14 @@ jest.mock("@/lib/supabase/secure-storage", () => ({
 }));
 
 jest.mock("@/lib/splash/elo-cache", () => ({ setCachedElo: jest.fn(() => Promise.resolve()) }));
+// eslint-disable-next-line no-var
+var mockArenaOffline = jest.fn(() => Promise.resolve());
 jest.mock("@/lib/arena/arena-store", () => ({
-  takeArenaOfflineBeforeSignOut: jest.fn(() => Promise.resolve()),
+  takeArenaOfflineBeforeSignOut: () => mockArenaOffline(),
+}));
+const mockResetHighlights = jest.fn();
+jest.mock("@/lib/highlight/highlight-store", () => ({
+  resetHighlightStore: () => mockResetHighlights(),
 }));
 
 const mockClearShareCache = jest.fn(() => Promise.resolve());
@@ -236,6 +245,41 @@ describe("cold-start athlete load", () => {
     });
     expect(mockClearShareCache).toHaveBeenCalledTimes(1);
     expect(r.getByTestId("redirect").props.children).toBe("/login");
+  });
+
+  it("takes arena offline and unregisters push side by side (neither waits for the other)", async () => {
+    mockRead.mockResolvedValue(OK(ACTIVE));
+    let finishArena: () => void = () => undefined;
+    mockArenaOffline.mockImplementationOnce(() => new Promise<void>((r) => (finishArena = r)));
+    render(<App />);
+    await flush();
+    let done = false;
+    await act(async () => {
+      void signOut!().then(() => {
+        done = true;
+      });
+      await Promise.resolve();
+    });
+    // The arena write is still pending, yet the push unregister already started.
+    expect(mockUnregisterPush).toHaveBeenCalledTimes(1);
+    expect(mockSignOut).not.toHaveBeenCalled();
+    expect(done).toBe(false);
+    await act(async () => finishArena());
+    await flush();
+    expect(mockSignOut).toHaveBeenCalledTimes(1);
+  });
+
+  it("an involuntary sign-out (SIGNED_OUT from auth) resets routing and the highlight store", async () => {
+    mockRead.mockResolvedValue(OK(ACTIVE));
+    render(<App />);
+    await flush();
+    mockResetRouter.mockClear();
+    mockResetHighlights.mockClear();
+    await act(async () => {
+      mockAuthCallback?.("SIGNED_OUT", null);
+    });
+    expect(mockResetRouter).toHaveBeenCalledTimes(1);
+    expect(mockResetHighlights).toHaveBeenCalledTimes(1);
   });
 
   it("unregisters this device's push row and resets notification routing BEFORE the session drops", async () => {

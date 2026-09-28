@@ -65,6 +65,11 @@ function tap(data: unknown, identifier?: string) {
   mockListener?.(response(data, identifier));
 }
 
+/** The held-tap flush runs on the next tick after a match exit. */
+function tick() {
+  return new Promise((r) => setTimeout(r, 0));
+}
+
 /** Let the cold-start read (a resolved promise chain) settle. */
 async function flush() {
   for (let i = 0; i < 5; i++) await Promise.resolve();
@@ -229,46 +234,62 @@ describe("highlight taps during a match (discovery M1)", () => {
     await flush();
   });
 
-  it("holds a highlight tap while a match screen is mounted and routes it on exit, once", () => {
+  it("holds a highlight tap while a match screen is mounted and routes it on exit, once", async () => {
     const leave = enterMatch();
     tap(HIGHLIGHT_PUSH, "hl-a");
     expect(mockPush).not.toHaveBeenCalled();
     tap(HIGHLIGHT_PUSH, "hl-a"); // the same tap again: still held once
     leave();
+    await tick();
     expect(mockPush).toHaveBeenCalledTimes(1);
     expect(mockPush).toHaveBeenCalledWith("/highlight/h-1?source=push");
   });
 
-  it("keeps only the latest held highlight tap", () => {
+  it("keeps only the latest held highlight tap", async () => {
     const leave = enterMatch();
     tap({ type: "highlight_ready", id: "h-old" }, "a");
     tap({ type: "highlight_ready", id: "h-new" }, "b");
     leave();
+    await tick();
     expect(mockPush.mock.calls).toEqual([["/highlight/h-new?source=push"]]);
   });
 
-  it("a highlight route without the type is held too", () => {
+  it("a highlight route without the type is held too", async () => {
     const leave = enterMatch();
     tap({ route: "/highlight/h-9?source=push" });
     expect(mockPush).not.toHaveBeenCalled();
     leave();
+    await tick();
     expect(mockPush).toHaveBeenCalledWith("/highlight/h-9?source=push");
   });
 
-  it("does not hold other taps during a match", () => {
+  it("a match that mounts in the same tick as the exit re-holds the tap", async () => {
+    const leaveA = enterMatch();
+    tap(HIGHLIGHT_PUSH, "same-tick");
+    leaveA();
+    const leaveB = enterMatch(); // e.g. the next match pushed from the summary
+    await tick();
+    expect(mockPush).not.toHaveBeenCalled();
+    leaveB();
+    await tick();
+    expect(mockPush).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not hold other taps during a match", async () => {
     const leave = enterMatch();
     tap({ route: "/athlete/a-1" });
     expect(mockPush).toHaveBeenCalledWith("/athlete/a-1");
     leave();
   });
 
-  it("a nested match (the next match mounts before the old one unmounts) keeps holding", () => {
+  it("a nested match (the next match mounts before the old one unmounts) keeps holding", async () => {
     const leaveA = enterMatch();
     tap(HIGHLIGHT_PUSH);
     const leaveB = enterMatch();
     leaveA();
     expect(mockPush).not.toHaveBeenCalled();
     leaveB();
+    await tick();
     expect(mockPush).toHaveBeenCalledTimes(1);
   });
 
@@ -282,6 +303,7 @@ describe("highlight taps during a match (discovery M1)", () => {
     expect(inMatch.shouldShowList).toBe(true);
     expect((await handler(note({ route: "/athlete/a-1" }))).shouldShowBanner).toBe(true);
     leave();
+    await tick();
     expect((await handler(note(HIGHLIGHT_PUSH))).shouldShowBanner).toBe(true);
   });
 });
@@ -294,6 +316,7 @@ describe("cold start during a match (rejoinStartedMatch ordering)", () => {
     await flush();
     expect(mockPush).not.toHaveBeenCalled();
     leave();
+    await tick();
     expect(mockPush).toHaveBeenCalledTimes(1);
     expect(mockPush).toHaveBeenCalledWith("/highlight/h-1?source=push");
   });
@@ -305,6 +328,7 @@ describe("cold start during a match (rejoinStartedMatch ordering)", () => {
     expect(mockPush).toHaveBeenCalledTimes(1);
     const leave = enterMatch();
     leave();
+    await tick();
     expect(mockPush).toHaveBeenCalledTimes(1);
   });
 });
@@ -336,6 +360,7 @@ describe("sign-out (discovery M2)", () => {
     resetNotificationRouterReady();
     leave();
     markNotificationRouterReady();
+    await tick();
     expect(mockPush).not.toHaveBeenCalled();
   });
 

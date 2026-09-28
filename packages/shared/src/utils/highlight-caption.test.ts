@@ -128,11 +128,29 @@ describe("sanitiseCaptionText (names and technique)", () => {
     ["Ana\u0000\u0007 Souza\n\tJr", "Ana Souza Jr"],
     ["  Ana    Souza  ", "Ana Souza"],
     ["St. Pierre", "St. Pierre"],
+    ["Ana evil.com.", "Ana"],
+    ["Ana (evil.com)", "Ana"],
+    ["Ana onlyfans.com, Souza", "Ana Souza"],
+    ['"@handle"', '"handle"'],
+    ["Ana evil.dev", "Ana"],
+    ["Ana grab.ai/x", "Ana"],
+    ["Ana evil。com", "Ana"],
+    ["Ana EVIL.COM", "Ana"],
+    ["Ana evil．io", "Ana"],
+    ["Arm triangle", "Arm triangle"],
+    ["J. Reyes", "J. Reyes"],
+    ["Rear-naked choke!", "Rear-naked choke!"],
+    ["(Ana)", "(Ana)"],
     ["@@@", null],
     ["https://only.link", null],
     [null, null],
   ])("%j -> %j", (input, expected) => {
     expect(sanitiseCaptionText(input as string | null)).toBe(expected);
+  });
+
+  it("keeps normal technique names and names with an initial in the caption", () => {
+    const caption = buildHighlightCaption(ctx({ opponentName: "J. Reyes", technique: "Arm triangle" }));
+    expect(caption.split("\n")[0]).toBe("Got the Arm triangle against J. Reyes.");
   });
 
   it("applies to the caption's names, technique and the collab tip", () => {

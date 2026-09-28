@@ -21,6 +21,12 @@ import { registerPushDevice, removePushDeviceByToken } from "@jits/shared/api/mu
 
 /** The token this process registered for the signed-in athlete (for sign-out). */
 let registeredToken: string | null = null;
+/**
+ * Bumped by every sign-out. A registration that started before a sign-out
+ * and finishes after it must not store its token: the next sign-out would
+ * then try to delete a row that belongs to the previous account.
+ */
+let signOutGeneration = 0;
 
 /** Sign-out waits at most this long for the unregister write. */
 export const UNREGISTER_PUSH_TIMEOUT_MS = 2_000;
@@ -32,6 +38,7 @@ export const UNREGISTER_PUSH_TIMEOUT_MS = 2_000;
  * never throws; a no-op when nothing was registered in this process.
  */
 export async function unregisterPushDeviceOnSignOut(supabase: SupabaseClient): Promise<void> {
+  signOutGeneration += 1;
   const token = registeredToken;
   registeredToken = null;
   if (!token) return;
@@ -53,6 +60,11 @@ export async function unregisterPushDeviceOnSignOut(supabase: SupabaseClient): P
 /** Test-only. */
 export function __setRegisteredPushTokenForTests(token: string | null): void {
   registeredToken = token;
+}
+
+/** Test-only. */
+export function __getRegisteredPushTokenForTests(): string | null {
+  return registeredToken;
 }
 
 export type RegisterPushResult =
@@ -103,6 +115,7 @@ export async function registerForPushNotifications(
   supabase: SupabaseClient,
   athleteId: string,
 ): Promise<RegisterPushResult> {
+  const generation = signOutGeneration;
   if (!Device.isDevice) {
     return { ok: false, reason: "not_a_device" };
   }
@@ -143,6 +156,7 @@ export async function registerForPushNotifications(
     };
   }
 
-  registeredToken = token;
+  // Signed out while this was in flight: the token is not this session's.
+  if (generation === signOutGeneration) registeredToken = token;
   return { ok: true, token };
 }

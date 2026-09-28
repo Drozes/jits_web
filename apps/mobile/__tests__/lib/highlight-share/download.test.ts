@@ -138,9 +138,10 @@ describe("downloadReel", () => {
     expect(mockFiles.size).toBe(0);
   });
 
-  it("a timeout cancels, deletes the partial file and fails download_timeout", async () => {
-    mockDownloadBehaviour.current = async (_u, uri) => {
+  it("a stall (bytes stopped arriving) cancels, deletes the partial file and fails download_timeout", async () => {
+    mockDownloadBehaviour.current = async (_u, uri, progress) => {
       mockFiles.set(uri, { size: 10, mtimeS: 1 });
+      progress({ totalBytesWritten: 10, totalBytesExpectedToWrite: 1000 });
       return new Promise(() => undefined); // never settles
     };
     const result = await downloadReel({ fileName: NAME }, "https://signed", undefined, { stallMs: 20, maxMs: 1000 });
@@ -175,12 +176,27 @@ describe("downloadReel", () => {
     expect(result).toMatchObject({ ok: false, failure: "download_timeout" });
   });
 
+  it("without any progress callback the stall timer never applies, only the overall cap", async () => {
+    mockDownloadBehaviour.current = async (_u, uri) => {
+      await new Promise((r) => setTimeout(r, 80)); // silent for 4x the stall window
+      mockFiles.set(uri, { size: 700, mtimeS: Date.now() / 1000 });
+      return { status: 200, uri };
+    };
+    const ok = await downloadReel({ fileName: NAME }, "https://signed", undefined, { stallMs: 20, maxMs: 1000 });
+    expect(ok).toMatchObject({ ok: true, byteCount: 700 });
+
+    mockFiles.clear();
+    mockDownloadBehaviour.current = () => new Promise(() => undefined);
+    const capped = await downloadReel({ fileName: NAME }, "https://signed", undefined, { stallMs: 20, maxMs: 60 });
+    expect(capped).toMatchObject({ ok: false, failure: "download_timeout" });
+  });
+
   it("a late rejection of the abandoned download after a timeout is caught", async () => {
     let reject: (e: Error) => void = () => undefined;
     mockDownloadBehaviour.current = () => new Promise((_res, rej) => (reject = rej));
     const unhandled = jest.fn();
     process.on("unhandledRejection", unhandled);
-    const result = await downloadReel({ fileName: NAME }, "https://signed", undefined, { stallMs: 10, maxMs: 1000 });
+    const result = await downloadReel({ fileName: NAME }, "https://signed", undefined, { stallMs: 10, maxMs: 30 });
     expect(result).toMatchObject({ ok: false, failure: "download_timeout" });
     reject(new Error("cancelled"));
     await new Promise((r) => setTimeout(r, 10));
