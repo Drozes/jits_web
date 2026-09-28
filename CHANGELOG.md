@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Mobile: Facebook App ID plumbing (jits-r71z, Highlight Reels phase 2 F9)
+
+Config only, OTA-eligible: `extra` is carried in the update manifest; no plugin, dependency or native change.
+
+**Added**
+- `EXPO_PUBLIC_FACEBOOK_APP_ID` -> `apps/mobile/app.config.js` `extra.FACEBOOK_APP_ID` -> `env.facebookAppId: string | null` in `apps/mobile/lib/env.ts` (extra first, then `process.env`, trimmed, blank is null). Optional: NOT in `REQUIRED_ENV`, so a build without it neither throws nor warns; without it the Reels path is not offered and sharing uses the system share sheet. Documented in `apps/mobile/.env.example` (pointer to `docs/meta-app-setup.md`). Tests in `apps/mobile/__tests__/lib/env.test.ts` (extra, env fallback, absent/blank, `app.config.js` with the variable unset and on an EAS build).
+
 ### Shared: Highlight Reels phase 2 share-funnel layer (jits-s6mi.12)
 
 Coded against jr_be spec 014 section 16.3 / 16.5; the backend (B9 `jr_be-15c.15`) lands in parallel, so the six new RPCs are hand-typed until `db:types` is re-run.
