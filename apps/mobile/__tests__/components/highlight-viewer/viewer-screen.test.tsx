@@ -105,9 +105,13 @@ type Share = Record<string, unknown>;
 let mockShare: Share;
 const mockUseShare = jest.fn((_p: unknown) => mockShare);
 const mockSweep = jest.fn(() => Promise.resolve());
+const mockTrack = jest.fn();
+// The real copy and constants; only the hook, telemetry and the cache sweep are faked.
 jest.mock("@/lib/highlight-share", () => ({
+  ...jest.requireActual("@/lib/highlight-share"),
   useHighlightShare: (p: unknown) => mockUseShare(p),
   sweepShareCache: () => mockSweep(),
+  track: (...a: unknown[]) => mockTrack(...a),
 }));
 
 import { ViewerScreen } from "@/components/highlight-viewer/viewer-screen";
@@ -179,8 +183,8 @@ function makeShare(over: Share = {}): Share {
     caption: "Got the Armbar against Bea.",
     collabTip: "Tag Bea as a collaborator: in Instagram tap Tag people, then Invite collaborator. One post shows on both profiles.",
     start: jest.fn(),
-    handoff: jest.fn(() => Promise.resolve()),
-    saveToPhotos: jest.fn(() => Promise.resolve()),
+    handoff: jest.fn((path: string) => Promise.resolve({ ok: true, path, oversize: false })),
+    saveToPhotos: jest.fn(() => Promise.resolve({ ok: true })),
     copyCaption: jest.fn(() => Promise.resolve(true)),
     reset: jest.fn(),
     ...over,
@@ -219,7 +223,7 @@ async function renderViewer(source: "push" | "bell" | "home" | "profile" | "matc
 }
 
 function stepsLogged(): string[] {
-  return mockLog.mock.calls.map((c: unknown[]) => c[2] as string);
+  return mockTrack.mock.calls.map((c: unknown[]) => c[1] as string);
 }
 
 beforeEach(() => {
@@ -255,7 +259,7 @@ describe("viewer states", () => {
     expect(mockRouter.back).toHaveBeenCalledTimes(1);
     expect(redCtas(utils)).toHaveLength(0);
     expect(mockMarkSeen).not.toHaveBeenCalled();
-    expect(mockLog).not.toHaveBeenCalled();
+    expect(mockTrack).not.toHaveBeenCalled();
   });
 
   it("another error: fallback copy, Try again (the one red CTA) re-reads", async () => {
@@ -395,7 +399,7 @@ describe("seen and telemetry", () => {
     const utils = await renderViewer("home");
     expect(mockMarkSeen).toHaveBeenCalledTimes(1);
     expect(mockMarkSeen).toHaveBeenCalledWith({}, "h1", 2);
-    expect(mockLog).toHaveBeenCalledWith({}, "h1", "viewer_opened", expect.objectContaining({ source: "home" }));
+    expect(mockTrack).toHaveBeenCalledWith("h1", "viewer_opened", expect.objectContaining({ source: "home" }));
     expect(stepsLogged().filter((s) => s === "viewer_opened")).toHaveLength(1);
     expect(stepsLogged()).not.toContain("notification_opened");
     expect(mockSweep).toHaveBeenCalledTimes(1);
@@ -417,7 +421,7 @@ describe("seen and telemetry", () => {
   it("source=push also logs notification_opened once", async () => {
     await renderViewer("push");
     expect(stepsLogged().filter((s) => s === "notification_opened")).toHaveLength(1);
-    expect(mockLog).toHaveBeenCalledWith({}, "h1", "viewer_opened", expect.objectContaining({ source: "push" }));
+    expect(mockTrack).toHaveBeenCalledWith("h1", "viewer_opened", expect.objectContaining({ source: "push" }));
   });
 });
 
@@ -428,7 +432,7 @@ describe("actions", () => {
     const utils = await renderViewer("profile");
     fireEvent.press(utils.getByTestId("viewer-improve"));
     await flush();
-    expect(mockLog).toHaveBeenCalledWith({}, "h1", "improve_tapped", expect.objectContaining({ source: "profile" }));
+    expect(mockTrack).toHaveBeenCalledWith("h1", "improve_tapped", expect.objectContaining({ source: "profile" }));
     expect(utils.getByText("Improve your reel")).toBeTruthy();
   });
 
@@ -447,9 +451,9 @@ describe("actions", () => {
     expect(mockRouter.back).not.toHaveBeenCalled();
   });
 
-  it("Save to Photos: spinner + Saving… while running, then back", async () => {
-    let finish: () => void = () => undefined;
-    mockShare = makeShare({ saveToPhotos: jest.fn(() => new Promise<void>((r) => (finish = r))) });
+  it("Save to Photos: spinner + Saving… while running, then back with the success toast", async () => {
+    let finish: (v: unknown) => void = () => undefined;
+    mockShare = makeShare({ saveToPhotos: jest.fn(() => new Promise((r) => (finish = r))) });
     const utils = await renderViewer();
     fireEvent.press(utils.getByTestId("viewer-save"));
     await flush();
@@ -458,15 +462,43 @@ describe("actions", () => {
     expect(utils.getByTestId("viewer-save-spinner")).toBeTruthy();
     fireEvent.press(utils.getByTestId("viewer-save"));
     expect(mockShare.saveToPhotos).toHaveBeenCalledTimes(1);
-    await act(async () => finish());
+    await act(async () => finish({ ok: true }));
     await flush();
     expect(utils.getByText("Save to Photos")).toBeTruthy();
+    expect(mockToast.success).toHaveBeenCalledWith("Saved to Photos");
+  });
+
+  it.each([
+    ["failed", "We couldn't save your reel. Try again."],
+    ["download", "We couldn't save your reel. Try again."],
+    ["disabled", "Sharing is turned off right now."],
+  ])("save outcome %s: error toast", async (kind, copy) => {
+    mockShare = makeShare({ saveToPhotos: jest.fn(() => Promise.resolve({ ok: false, kind })) });
+    const utils = await renderViewer();
+    fireEvent.press(utils.getByTestId("viewer-save"));
+    await flush();
+    expect(mockToast.error).toHaveBeenCalledWith(copy);
+    expect(mockToast.success).not.toHaveBeenCalled();
+    expect(utils.queryByTestId("viewer-save-permission")).toBeNull();
+  });
+
+  it("save outcome unavailable: silent", async () => {
+    mockShare = makeShare({ saveToPhotos: jest.fn(() => Promise.resolve({ ok: false, kind: "unavailable" })) });
+    const utils = await renderViewer();
+    fireEvent.press(utils.getByTestId("viewer-save"));
+    await flush();
+    expect(mockToast.error).not.toHaveBeenCalled();
+    expect(mockToast.success).not.toHaveBeenCalled();
   });
 
   it("save permission denied: inline Settings copy + Open Settings", async () => {
     const spy = jest.spyOn(Linking, "openSettings").mockResolvedValue(undefined);
-    mockShare = makeShare({ error: { kind: "permission", message: "x", canFallBack: false } });
+    mockShare = makeShare({ saveToPhotos: jest.fn(() => Promise.resolve({ ok: false, kind: "permission" })) });
     const utils = await renderViewer();
+    expect(utils.queryByTestId("viewer-save-permission")).toBeNull();
+    fireEvent.press(utils.getByTestId("viewer-save"));
+    await flush();
+    expect(mockToast.error).not.toHaveBeenCalled();
     expect(utils.getByTestId("viewer-save-permission")).toHaveTextContent(
       "Allow ELO RATED to add to Photos in Settings to save your reel.Open Settings",
     );
@@ -485,12 +517,13 @@ async function openSheet(utils: Utils) {
 }
 
 describe("pre-share sheet", () => {
-  it("opening logs share_tapped with the source and calls start()", async () => {
+  it("opening calls start() and leaves share_tapped to the hook (the viewer logs no share step)", async () => {
     const utils = await renderViewer("match_detail");
     await openSheet(utils);
     expect(mockShare.start).toHaveBeenCalledTimes(1);
-    expect(mockLog).toHaveBeenCalledWith({}, "h1", "share_tapped", expect.objectContaining({ source: "match_detail" }));
     expect(utils.getByText("Share your highlight")).toBeTruthy();
+    expect(stepsLogged()).toEqual(["viewer_opened"]);
+    expect(mockLog).not.toHaveBeenCalled();
   });
 
   it("downloading: progress copy with a mono percent, CTA disabled, iOS Reels note instead of the caption", async () => {
@@ -535,6 +568,38 @@ describe("pre-share sheet", () => {
     fireEvent.press(utils.getByText("Share"));
     expect(mockShare.handoff).toHaveBeenCalledWith("share_sheet");
     expect(redCtas(utils, sheet)).toHaveLength(1);
+  });
+
+  it("no clipboard: a long press on the caption calls copyCaption (press-and-hold), no toast", async () => {
+    mockShare = makeShare({ stage: "ready", primaryPath: "share_sheet", copyCaption: jest.fn(() => Promise.resolve(false)) });
+    const utils = await renderViewer();
+    await openSheet(utils);
+    fireEvent(utils.getByTestId("share-caption-text"), "longPress");
+    await flush();
+    expect(mockShare.copyCaption).toHaveBeenCalledTimes(1);
+    expect(mockToast.success).not.toHaveBeenCalled();
+  });
+
+  it("a Reels handoff that reports oversize shows the advisory info toast", async () => {
+    mockShare = makeShare({
+      stage: "ready",
+      handoff: jest.fn(() => Promise.resolve({ ok: true, path: "reels", oversize: true })),
+    });
+    const utils = await renderViewer();
+    await openSheet(utils);
+    fireEvent.press(utils.getByTestId("share-handoff"));
+    await flush();
+    const { REELS_OVERSIZE_WARNING } = jest.requireActual("@/lib/highlight-share");
+    expect(mockToast.info).toHaveBeenCalledWith(REELS_OVERSIZE_WARNING);
+  });
+
+  it("a handoff without oversize (or a failed one) shows no toast", async () => {
+    mockShare = makeShare({ stage: "ready", handoff: jest.fn(() => Promise.resolve({ ok: false, error: null })) });
+    const utils = await renderViewer();
+    await openSheet(utils);
+    fireEvent.press(utils.getByTestId("share-handoff"));
+    await flush();
+    expect(mockToast.info).not.toHaveBeenCalled();
   });
 
   it("clipboard present: outline Copy caption toasts Caption copied", async () => {
@@ -594,7 +659,7 @@ describe("pre-share sheet", () => {
   it("failed (kill switch hit mid-flow): the disabled copy and no retry", async () => {
     mockShare = makeShare({
       stage: "failed",
-      error: { kind: "disabled", message: "Sharing is turned off right now.", canFallBack: false },
+      error: { kind: "disabled", code: "disabled", message: "Sharing is turned off right now.", canFallBack: false, retryable: false },
     });
     const utils = await renderViewer();
     const sheet = await openSheet(utils);
@@ -606,7 +671,7 @@ describe("pre-share sheet", () => {
   it("failed download: Try again restarts the flow", async () => {
     mockShare = makeShare({
       stage: "failed",
-      error: { kind: "download", message: "We couldn't download your reel. Check your connection and try again.", canFallBack: false },
+      error: { kind: "download", code: "download-failed", message: "We couldn't download your reel. Check your connection and try again.", canFallBack: false, retryable: true },
     });
     const utils = await renderViewer();
     const sheet = await openSheet(utils);
@@ -615,8 +680,8 @@ describe("pre-share sheet", () => {
     expect(mockShare.start).toHaveBeenCalledTimes(2);
   });
 
-  it("failed Reels handoff: Try again (reels) and Use the share sheet", async () => {
-    mockShare = makeShare({ stage: "failed", error: { kind: "reels", message: "Instagram failed.", canFallBack: true } });
+  it("failed Reels handoff (retryable): Try again (reels) and Use the share sheet", async () => {
+    mockShare = makeShare({ stage: "failed", error: { kind: "reels", code: "handoff-failed", message: "Instagram failed.", canFallBack: true, retryable: true } });
     const utils = await renderViewer();
     const sheet = await openSheet(utils);
     expect(redCtas(utils, sheet)).toHaveLength(1);
@@ -626,8 +691,19 @@ describe("pre-share sheet", () => {
     expect(mockShare.handoff).toHaveBeenLastCalledWith("share_sheet");
   });
 
+  it("failed Reels handoff (not retryable, e.g. Instagram missing): only Use the share sheet, no red", async () => {
+    mockShare = makeShare({ stage: "failed", error: { kind: "reels", code: "instagram-unavailable", message: "Instagram isn't installed.", canFallBack: true, retryable: false } });
+    const utils = await renderViewer();
+    const sheet = await openSheet(utils);
+    expect(utils.getByTestId("share-error")).toHaveTextContent("Instagram isn't installed.");
+    expect(utils.queryByTestId("share-retry")).toBeNull();
+    expect(redCtas(utils, sheet)).toHaveLength(0);
+    fireEvent.press(utils.getByText("Use the share sheet"));
+    expect(mockShare.handoff).toHaveBeenLastCalledWith("share_sheet");
+  });
+
   it("failed share sheet: Try again retries the share sheet", async () => {
-    mockShare = makeShare({ stage: "failed", error: { kind: "share_sheet", message: "x", canFallBack: false } });
+    mockShare = makeShare({ stage: "failed", error: { kind: "share_sheet", code: "share-sheet-failed", message: "x", canFallBack: false, retryable: true } });
     const utils = await renderViewer();
     await openSheet(utils);
     expect(utils.queryByText("Use the share sheet")).toBeNull();

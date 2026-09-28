@@ -3,6 +3,7 @@ import { View, type LayoutChangeEvent, type ViewStyle } from "react-native";
 import { HighlightPlayer } from "@/components/match-detail/highlight/highlight-player";
 import type { HighlightSource } from "@/lib/highlight/use-my-highlight";
 import { VIEWER_COPY } from "./viewer-copy";
+import { SHARE_COPY } from "@/lib/highlight-share";
 import { ViewerMessage, ViewerSkeleton } from "./viewer-states";
 
 const GUTTER = 16;
@@ -40,7 +41,7 @@ export function ViewerFrame({ source, playbackFailed, onPlayerError, onRetry }: 
         <ViewerMessage
           testID="viewer-cannot-play"
           message={VIEWER_COPY.cannotPlay}
-          action={{ testID: "viewer-play-retry", label: VIEWER_COPY.tryAgain, variant: "outline", onPress: onRetry }}
+          action={{ testID: "viewer-play-retry", label: SHARE_COPY.tryAgain, variant: "outline", onPress: onRetry }}
         />
       ) : !frame ? null : source ? (
         <HighlightPlayer source={source} onError={onPlayerError} frameStyle={frame} showFullscreenButton={false} />

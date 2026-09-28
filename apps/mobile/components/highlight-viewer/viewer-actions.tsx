@@ -1,8 +1,7 @@
 import * as React from "react";
 import { Linking, Text, View } from "react-native";
-import type { SharePath } from "@/lib/highlight-share";
 import { HIGHLIGHT_COPY } from "@/lib/highlight/highlight-copy";
-import { VIEWER_COPY } from "./viewer-copy";
+import { SHARE_COPY, type SharePath } from "@/lib/highlight-share";
 import { ViewerButton } from "./viewer-button";
 
 export interface ViewerActionsProps {
@@ -34,7 +33,7 @@ export function ViewerActions(props: ViewerActionsProps) {
       {showShare ? (
         <ViewerButton
           testID="viewer-share"
-          label={primaryPath === "reels" ? VIEWER_COPY.shareInstagram : VIEWER_COPY.shareReel}
+          label={primaryPath === "reels" ? SHARE_COPY.shareToInstagram : SHARE_COPY.shareReel}
           variant="primary"
           onPress={props.onShare}
         />
@@ -42,7 +41,7 @@ export function ViewerActions(props: ViewerActionsProps) {
       {showSave ? (
         <ViewerButton
           testID="viewer-save"
-          label={saving ? VIEWER_COPY.saving : VIEWER_COPY.saveToPhotos}
+          label={saving ? SHARE_COPY.saving : SHARE_COPY.saveToPhotos}
           variant="outline"
           busy={saving}
           disabled={saving}
@@ -51,10 +50,10 @@ export function ViewerActions(props: ViewerActionsProps) {
       ) : null}
       {showSave && savePermissionDenied ? (
         <View testID="viewer-save-permission" className="gap-2 py-1">
-          <Text className="font-body text-[12px] text-ink-2">{VIEWER_COPY.savePermission}</Text>
+          <Text className="font-body text-[12px] text-ink-2">{SHARE_COPY.savePermissionDenied}</Text>
           <ViewerButton
             testID="viewer-open-settings"
-            label={VIEWER_COPY.openSettings}
+            label={SHARE_COPY.openSettings}
             variant="text"
             onPress={() => void Linking.openSettings().catch(() => undefined)}
           />

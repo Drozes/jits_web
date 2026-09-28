@@ -34,7 +34,7 @@ jest.mock("@/components/highlight-viewer/viewer-screen", () => ({
 
 import AppLayout from "@/app/(app)/_layout";
 import HighlightViewerRoute from "@/app/(app)/highlight/[id]";
-import { highlightHref, parseHighlightSource } from "@/lib/highlight/highlight-href";
+import { highlightHref, parseHighlightSource } from "@/lib/highlight/discovery";
 
 const APP_DIR = path.join(__dirname, "..", "..", "app", "(app)");
 

@@ -1,7 +1,7 @@
 import * as React from "react";
 import { useLocalSearchParams } from "expo-router";
 import { ViewerScreen } from "@/components/highlight-viewer/viewer-screen";
-import { parseHighlightSource } from "@/lib/highlight/highlight-href";
+import { parseHighlightSource } from "@/lib/highlight/discovery";
 
 /**
  * Full-screen viewer for one of the athlete's own highlight reels

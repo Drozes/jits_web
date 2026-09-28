@@ -3,6 +3,7 @@ import { Pressable, Text, View } from "react-native";
 import { X } from "lucide-react-native";
 import { darkTokens } from "@/lib/tokens";
 import { VIEWER_COPY } from "./viewer-copy";
+import { SHARE_COPY } from "@/lib/highlight-share";
 
 /** Close (top left) and the a11y header "Your highlight". */
 export function ViewerHeader({ onClose }: { onClose: () => void }) {
@@ -19,7 +20,7 @@ export function ViewerHeader({ onClose }: { onClose: () => void }) {
         <X size={22} color={darkTokens.textPrimary} />
       </Pressable>
       <Text accessibilityRole="header" className="font-heading text-[14px] text-ink uppercase tracking-caps">
-        {VIEWER_COPY.title}
+        {SHARE_COPY.viewerTitle}
       </Text>
     </View>
   );

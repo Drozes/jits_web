@@ -1,6 +1,7 @@
 import * as React from "react";
 import { Text, View } from "react-native";
-import { PREPARING_PREFIX, progressPercent } from "./viewer-copy";
+import { SHARE_COPY } from "@/lib/highlight-share";
+import { progressPercent } from "./viewer-copy";
 
 /**
  * "Preparing your reel… {pct}%" with a determinate bar (the only motion the
@@ -14,7 +15,7 @@ export function ShareProgress({ progress }: { progress: number | null }) {
         accessibilityLiveRegion="polite"
         className="font-body text-[12px] text-ink-2"
       >
-        {PREPARING_PREFIX}
+        {`${SHARE_COPY.downloadProgressPrefix} `}
         <Text testID="share-progress-pct" className="font-mono text-ink" style={{ fontVariant: ["tabular-nums"] }}>
           {pct}%
         </Text>

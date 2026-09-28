@@ -1,34 +1,35 @@
 import * as React from "react";
-import { supabase } from "@/lib/supabase/client";
-import { markHighlightSeen, type HighlightShareSourceTag } from "@jits/shared/api/highlight-share";
-import { sweepShareCache } from "@/lib/highlight-share";
-import { logHighlightEvent } from "@/lib/highlight/log-highlight-event";
+import type { HighlightShareSourceTag } from "@jits/shared/api/highlight-share";
+import { sweepShareCache, track } from "@/lib/highlight-share";
+import { useMarkHighlightSeen } from "@/lib/highlight/use-mark-highlight-seen";
 
 /**
  * Side effects of opening the viewer on a playable reel: once per VERSION it
- * marks the reel seen (clears the Home card, bell dot and NEW tag) and logs
- * `viewer_opened` with the entry `source`; once per mount it logs
- * `notification_opened` for a push entry and sweeps the share cache of files
- * older than 24 h. Never on a reel without a live version.
+ * marks the reel seen (clears the Home card, bell dot and NEW tag, through the
+ * same hook as the match-detail card) and logs `viewer_opened` with the entry
+ * `source`; once per mount it logs `notification_opened` for a push entry and
+ * sweeps the share cache of files older than 24 h. Never on a reel without a
+ * live version. These are the only funnel steps the viewer logs itself: the
+ * share hook logs every share-flow step.
  */
 export function useViewerOpened(
   highlightId: string,
   version: number | null,
   source: HighlightShareSourceTag,
 ): void {
-  const seenKey = React.useRef<string | null>(null);
+  useMarkHighlightSeen(version == null ? null : highlightId, version);
+  const openedKey = React.useRef<string | null>(null);
   const mountedOnce = React.useRef(false);
 
   React.useEffect(() => {
     if (version == null) return;
     const key = `${highlightId}:${version}`;
-    if (seenKey.current === key) return;
-    seenKey.current = key;
-    void markHighlightSeen(supabase, highlightId, version);
-    logHighlightEvent(highlightId, "viewer_opened", { source });
+    if (openedKey.current === key) return;
+    openedKey.current = key;
+    track(highlightId, "viewer_opened", { source });
     if (mountedOnce.current) return;
     mountedOnce.current = true;
-    if (source === "push") logHighlightEvent(highlightId, "notification_opened", { source });
+    if (source === "push") track(highlightId, "notification_opened", { source });
     void sweepShareCache().catch(() => undefined);
   }, [highlightId, version, source]);
 }

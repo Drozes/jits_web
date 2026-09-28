@@ -40,6 +40,7 @@ function item(id: string, over: Partial<ProfileHighlight> = {}): ProfileHighligh
     playedAt: "2026-09-27T09:00:00Z",
     notifiedAt: null,
     unseen: false,
+    origin: null,
     ...over,
   };
 }

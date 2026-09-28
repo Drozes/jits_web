@@ -4,7 +4,7 @@ import type { HighlightDetail, HighlightShareSourceTag } from "@jits/shared/api/
 import { HIGHLIGHT_COPY } from "@/lib/highlight/highlight-copy";
 import { useMyHighlight } from "@/lib/highlight/use-my-highlight";
 import { useHighlightRating } from "@/lib/highlight/use-highlight-rating";
-import { logHighlightEvent } from "@/lib/highlight/log-highlight-event";
+import { track } from "@/lib/highlight-share";
 import { useViewerOpened } from "./use-viewer-opened";
 import { useViewerShare } from "./use-viewer-share";
 import { ViewerFrame } from "./viewer-frame";
@@ -31,7 +31,7 @@ export function ViewerReady({ detail, source }: { detail: HighlightDetail; sourc
   const fb = useHighlightRating(detail.highlightId, version, my.refresh);
   const { openImprove } = fb;
   const improve = React.useCallback(() => {
-    logHighlightEvent(detail.highlightId, "improve_tapped", { source });
+    track(detail.highlightId, "improve_tapped", { source });
     openImprove();
   }, [detail.highlightId, openImprove, source]);
 
@@ -54,7 +54,7 @@ export function ViewerReady({ detail, source }: { detail: HighlightDetail; sourc
           primaryPath={vs.share.primaryPath}
           canSaveToPhotos={vs.share.capabilities?.saveToPhotos ?? false}
           saving={vs.saving}
-          savePermissionDenied={vs.share.error?.kind === "permission"}
+          savePermissionDenied={vs.savePermissionDenied}
           improveDisabled={!progress || progress.phase === "regenerating"}
           onShare={vs.openSheet}
           onSave={vs.save}
@@ -63,7 +63,7 @@ export function ViewerReady({ detail, source }: { detail: HighlightDetail; sourc
       </View>
       {detail.shareEnabled ? (
         <PreShareSheet open={vs.sheetOpen} onClosed={vs.onSheetClosed}>
-          <ShareSheetBody share={vs.share} iosReels={vs.iosReels} onCopy={vs.copy} onDone={vs.closeSheet} />
+          <ShareSheetBody share={vs.share} onHandoff={vs.handoff} iosReels={vs.iosReels} onCopy={vs.copy} onDone={vs.closeSheet} />
         </PreShareSheet>
       ) : null}
       {progress ? <ViewerImproveSheet fb={fb} progress={progress} /> : null}

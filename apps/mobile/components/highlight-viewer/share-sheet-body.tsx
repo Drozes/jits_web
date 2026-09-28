@@ -1,7 +1,6 @@
 import * as React from "react";
 import { Text, View } from "react-native";
-import type { ShareStage, UseHighlightShareResult } from "@/lib/highlight-share";
-import { VIEWER_COPY } from "./viewer-copy";
+import { SHARE_COPY, type SharePath, type ShareStage, type UseHighlightShareResult } from "@/lib/highlight-share";
 import { ViewerButton } from "./viewer-button";
 import { CaptionCard } from "./caption-card";
 import { CollabTip } from "./collab-tip";
@@ -14,6 +13,8 @@ const CAN_HAND_OFF: ReadonlySet<ShareStage> = new Set<ShareStage>(["ready", "don
 
 interface ShareSheetBodyProps {
   share: UseHighlightShareResult;
+  /** The viewer's handoff (toasts the oversize advisory). */
+  onHandoff: (path: SharePath) => void;
   /** iOS + Reels: the handoff replaces the pasteboard, so no caption copy before it. */
   iosReels: boolean;
   onCopy: () => void;
@@ -26,7 +27,7 @@ interface ShareSheetBodyProps {
  * the download is ready), "Try again" when failed, "Copy caption" when back
  * from Instagram.
  */
-export function ShareSheetBody({ share, iosReels, onCopy, onDone }: ShareSheetBodyProps) {
+export function ShareSheetBody({ share, onHandoff, iosReels, onCopy, onDone }: ShareSheetBodyProps) {
   const { stage, error, capabilities, primaryPath } = share;
   const clipboard = capabilities?.clipboard ?? false;
   if (stage === "returned") {
@@ -35,21 +36,21 @@ export function ShareSheetBody({ share, iosReels, onCopy, onDone }: ShareSheetBo
   return (
     <View testID={`share-stage-${stage}`} className="gap-4">
       <Text accessibilityRole="header" className="font-heading text-[16px] text-ink">
-        {VIEWER_COPY.sheetTitle}
+        {SHARE_COPY.sheetTitle}
       </Text>
       {stage === "failed" && error ? (
         <ShareFailed
           error={error}
-          onRetry={() => (error.kind === "download" ? share.start() : void share.handoff(error.kind === "reels" ? "reels" : "share_sheet"))}
-          onFallback={() => void share.handoff("share_sheet")}
+          onRetry={() => (error.kind === "download" ? share.start() : onHandoff(error.kind === "reels" ? "reels" : "share_sheet"))}
+          onFallback={() => onHandoff("share_sheet")}
         />
       ) : (
         <>
           {DOWNLOADING.has(stage) ? <ShareProgress progress={share.progress} /> : null}
           {iosReels ? (
             <View testID="share-ios-reels-note" className="gap-1">
-              <Text className="font-body text-[13px] text-ink">{VIEWER_COPY.iosReelsNote}</Text>
-              <Text className="font-body text-[12px] text-ink-2">{VIEWER_COPY.iosReelsCaptionNote}</Text>
+              <Text className="font-body text-[13px] text-ink">{SHARE_COPY.iosReelsNote[0]}</Text>
+              <Text className="font-body text-[12px] text-ink-2">{SHARE_COPY.iosReelsNote[1]}</Text>
             </View>
           ) : (
             <CaptionCard caption={share.caption} clipboard={clipboard} showCopyButton onCopy={onCopy} />
@@ -58,11 +59,11 @@ export function ShareSheetBody({ share, iosReels, onCopy, onDone }: ShareSheetBo
           {primaryPath ? (
             <ViewerButton
               testID="share-handoff"
-              label={primaryPath === "reels" ? VIEWER_COPY.openInstagram : VIEWER_COPY.share}
+              label={primaryPath === "reels" ? SHARE_COPY.openInstagram : SHARE_COPY.share}
               variant="primary"
               disabled={!CAN_HAND_OFF.has(stage)}
               busy={stage === "handing_off"}
-              onPress={() => void share.handoff(primaryPath)}
+              onPress={() => onHandoff(primaryPath)}
             />
           ) : null}
         </>

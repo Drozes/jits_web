@@ -12,6 +12,7 @@ import { ViewerFrame } from "./viewer-frame";
 import { ViewerMessage } from "./viewer-states";
 import { ViewerReady } from "./viewer-ready";
 import { VIEWER_COPY } from "./viewer-copy";
+import { SHARE_COPY } from "@/lib/highlight-share";
 
 const NOOP = () => undefined;
 
@@ -48,7 +49,7 @@ export function ViewerScreen({ id, source }: { id: string | undefined; source: H
       <ViewerMessage
         testID="viewer-error"
         message={HIGHLIGHT_ERROR_FALLBACK}
-        action={{ testID: "viewer-retry", label: VIEWER_COPY.tryAgain, variant: "primary", onPress: reload }}
+        action={{ testID: "viewer-retry", label: SHARE_COPY.tryAgain, variant: "primary", onPress: reload }}
       />
     );
   } else if (detail.version == null) {

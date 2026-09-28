@@ -23,4 +23,4 @@ export {
 export { getShareCapabilities, type ShareCapabilities } from "./capabilities";
 export { sweepShareCache, clearShareCache } from "./download";
 export { track } from "./telemetry";
-export { SHARE_COPY, INSTAGRAM_APP_URL, downloadProgressLabel } from "./share-copy";
+export { SHARE_COPY, INSTAGRAM_APP_URL, REELS_OVERSIZE_WARNING, downloadProgressLabel } from "./share-copy";

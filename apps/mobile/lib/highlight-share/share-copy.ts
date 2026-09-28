@@ -2,8 +2,12 @@
  * Every share-funnel string (jr_be spec 014 section 16.6.3), in one place so
  * the viewer, the pre-share sheet and the hook cannot drift. The Reels
  * failure messages come from `REELS_FAILURE_MESSAGES` in the Reels module and
- * the oversize advisory from `REELS_OVERSIZE_WARNING`; neither is copied here.
+ * the oversize advisory from `REELS_OVERSIZE_WARNING`; neither is copied here
+ * (the advisory is re-exported so the viewer can toast it without importing
+ * the native module outside this directory).
  */
+export { REELS_OVERSIZE_WARNING } from "@/modules/instagram-reels";
+
 export const SHARE_COPY = {
   viewerTitle: "Your highlight",
   shareToInstagram: "Share to Instagram",
