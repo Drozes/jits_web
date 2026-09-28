@@ -22,6 +22,20 @@ function ParticipantLine({ p }: { p: NoMatchVideoParticipant }) {
 }
 
 /**
+ * The video's verdict NOW, shown when it may differ from this (no-match)
+ * verdict: after a re-upload, or when the current value is not `false`.
+ * Only for a history-backed row whose video still exists (a deleted video
+ * already says so, and an older backend sends none of these fields).
+ */
+export function nowLine(row: NoMatchVideoRow): string | null {
+  if (row.verdict_id == null || !row.video_id) return null;
+  if (!row.superseded && row.current_match_detected === false) return null;
+  const state =
+    row.current_match_detected === true ? "match found" : row.current_match_detected === false ? "no match" : "unknown";
+  return `now: ${state}`;
+}
+
+/**
  * Verdict-history facts (history-backed backend only; each renders only when
  * present): the video was re-uploaded or deleted since this verdict, and how
  * many verdicts it has had in total and how many said no match.
@@ -32,7 +46,8 @@ function VerdictHistory({ row }: { row: NoMatchVideoRow }) {
     row.verdict_count != null
       ? `${row.no_match_count ?? 0} of ${row.verdict_count} verdict${row.verdict_count === 1 ? "" : "s"}: no match`
       : null;
-  if (!row.superseded && !counts) return null;
+  const now = nowLine(row);
+  if (!row.superseded && !counts && !now) return null;
   return (
     <View className="flex-row flex-wrap items-center gap-2">
       {row.superseded ? (
@@ -41,6 +56,11 @@ function VerdictHistory({ row }: { row: NoMatchVideoRow }) {
             {row.video_id ? "Re-uploaded since" : "Video deleted since"}
           </Text>
         </View>
+      ) : null}
+      {now ? (
+        <Text testID="no-match-now" className="font-mono text-[11px] text-ink-2">
+          {now}
+        </Text>
       ) : null}
       {counts ? (
         <Text testID="no-match-counts" className="font-mono tabular-nums text-[11px] text-ink-2">

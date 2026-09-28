@@ -49,6 +49,7 @@ async function renderScreen() {
 const ROW = {
   key: "vid-1",
   verdict_id: null,
+  verdict_storage_path: null,
   superseded: null,
   current_match_detected: null,
   verdict_count: null,
@@ -127,35 +128,67 @@ describe("AdminNoMatchVideosScreen", () => {
     it("shows re-uploaded-since and the verdict counts when present", async () => {
       mockList.mockResolvedValue({
         ok: true,
-        data: [{ ...ROW, key: "ver-1", verdict_id: "ver-1", superseded: true, current_match_detected: true, verdict_count: 3, no_match_count: 2 }],
+        data: [{ ...ROW, key: "verdict-1", verdict_id: 1, superseded: true, current_match_detected: true, verdict_count: 3, no_match_count: 2 }],
       });
       const r = await renderScreen();
-      const row = await waitFor(() => r.getByTestId("no-match-row-ver-1"));
+      const row = await waitFor(() => r.getByTestId("no-match-row-verdict-1"));
       expect(within(row).getByTestId("no-match-superseded")).toHaveTextContent("Re-uploaded since");
       expect(within(row).getByTestId("no-match-counts")).toHaveTextContent("2 of 3 verdicts: no match");
+      expect(within(row).getByTestId("no-match-now")).toHaveTextContent("now: match found");
+    });
+
+    it.each([
+      ["re-uploaded, new file not analysed yet", { superseded: true, current_match_detected: null }, "now: unknown"],
+      ["re-uploaded, new file also no match", { superseded: true, current_match_detected: false }, "now: no match"],
+      ["same file, verdict since changed to a match", { superseded: false, current_match_detected: true }, "now: match found"],
+      ["same file, verdict since cleared", { superseded: false, current_match_detected: null }, "now: unknown"],
+    ])("shows the current verdict: %s", async (_label, over, text) => {
+      mockList.mockResolvedValue({
+        ok: true,
+        data: [{ ...ROW, key: "verdict-5", verdict_id: 5, verdict_count: 2, no_match_count: 1, ...over }],
+      });
+      const r = await renderScreen();
+      const row = await waitFor(() => r.getByTestId("no-match-row-verdict-5"));
+      expect(within(row).getByTestId("no-match-now")).toHaveTextContent(text);
+    });
+
+    it("hides the now line when this verdict is still current (same file, still no match)", async () => {
+      mockList.mockResolvedValue({
+        ok: true,
+        data: [{ ...ROW, key: "verdict-6", verdict_id: 6, superseded: false, current_match_detected: false, verdict_count: 1, no_match_count: 1 }],
+      });
+      const r = await renderScreen();
+      const row = await waitFor(() => r.getByTestId("no-match-row-verdict-6"));
+      expect(within(row).queryByTestId("no-match-now")).toBeNull();
+      expect(within(row).queryByTestId("no-match-superseded")).toBeNull();
+      expect(within(row).getByTestId("no-match-counts")).toHaveTextContent("1 of 1 verdict: no match");
     });
 
     it("says the video was deleted when the verdict outlived its row", async () => {
       mockList.mockResolvedValue({
         ok: true,
-        data: [{ ...ROW, key: "ver-2", video_id: null, verdict_id: "ver-2", superseded: true, verdict_count: 1, no_match_count: 1 }],
+        data: [{ ...ROW, key: "verdict-2", video_id: null, uploaded_by: null, uploader_name: null, verdict_id: 2, superseded: true, current_match_detected: null, verdict_count: 1, no_match_count: 1 }],
       });
       const r = await renderScreen();
-      const row = await waitFor(() => r.getByTestId("no-match-row-ver-2"));
+      const row = await waitFor(() => r.getByTestId("no-match-row-verdict-2"));
       expect(within(row).getByTestId("no-match-superseded")).toHaveTextContent("Video deleted since");
       expect(within(row).getByTestId("no-match-counts")).toHaveTextContent("1 of 1 verdict: no match");
       expect(within(row).getByText(/video deleted · match m-1/)).toBeTruthy();
+      expect(within(row).getByText("Uploaded by unknown")).toBeTruthy();
+      // The deleted chip already says it; no "now: unknown" on top.
+      expect(within(row).queryByTestId("no-match-now")).toBeNull();
     });
 
     it("renders neither without the history fields (older backend) or when not superseded", async () => {
       mockList.mockResolvedValue({
         ok: true,
-        data: [ROW, { ...ROW, key: "ver-3", verdict_id: "ver-3", superseded: false, verdict_count: null, no_match_count: null }],
+        data: [ROW, { ...ROW, key: "verdict-3", verdict_id: 3, superseded: false, current_match_detected: false, verdict_count: null, no_match_count: null }],
       });
       const r = await renderScreen();
       await waitFor(() => expect(r.getByTestId("no-match-row-vid-1")).toBeTruthy());
       expect(r.queryByTestId("no-match-superseded")).toBeNull();
       expect(r.queryByTestId("no-match-counts")).toBeNull();
+      expect(r.queryByTestId("no-match-now")).toBeNull();
     });
   });
 

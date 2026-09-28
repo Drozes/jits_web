@@ -766,6 +766,53 @@ export type Database = {
           },
         ]
       }
+      match_video_match_verdicts: {
+        Row: {
+          analysis_id: string | null
+          id: number
+          match_detected: boolean | null
+          match_id: string
+          match_video_id: string | null
+          no_match_reason: string | null
+          recorded_at: string
+          source: string
+          storage_path: string | null
+          uploaded_by: string | null
+        }
+        Insert: {
+          analysis_id?: string | null
+          id?: never
+          match_detected?: boolean | null
+          match_id: string
+          match_video_id?: string | null
+          no_match_reason?: string | null
+          recorded_at?: string
+          source: string
+          storage_path?: string | null
+          uploaded_by?: string | null
+        }
+        Update: {
+          analysis_id?: string | null
+          id?: never
+          match_detected?: boolean | null
+          match_id?: string
+          match_video_id?: string | null
+          no_match_reason?: string | null
+          recorded_at?: string
+          source?: string
+          storage_path?: string | null
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "match_video_match_verdicts_match_video_id_fkey"
+            columns: ["match_video_id"]
+            isOneToOne: false
+            referencedRelation: "match_videos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       match_videos: {
         Row: {
           angle_quality: number | null
@@ -2395,15 +2442,21 @@ export type Database = {
         Returns: {
           analysis_id: string
           analyzed_at: string
+          current_match_detected: boolean
           match_completed_at: string
           match_id: string
           match_result: string
           match_status: string
           match_type: string
+          no_match_count: number
           no_match_reason: string
           participants: Json
+          superseded: boolean
           uploaded_by: string
           uploader_name: string
+          verdict_count: number
+          verdict_id: number
+          verdict_storage_path: string
           video_created_at: string
           video_id: string
           video_status: string

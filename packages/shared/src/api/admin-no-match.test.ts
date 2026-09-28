@@ -49,6 +49,7 @@ describe("adminListNoMatchVideos (jr_be-0qf)", () => {
     expect(r.data[0]).toMatchObject({
       key: "v1",
       verdict_id: null,
+      verdict_storage_path: null,
       superseded: null,
       current_match_detected: null,
       verdict_count: null,
@@ -56,20 +57,49 @@ describe("adminListNoMatchVideos (jr_be-0qf)", () => {
     });
   });
 
-  it("maps the verdict-history fields and keeps a row whose video was deleted", async () => {
+  it("maps the verdict-history fields (bigint verdict_id) and keeps deleted-video / unknown-uploader rows", async () => {
     const { client } = rpcClient({
       data: [
-        { ...ROW, verdict_id: "ver-1", superseded: true, current_match_detected: true, verdict_count: 3, no_match_count: "2" },
-        { ...ROW, video_id: null, verdict_id: "ver-2", superseded: true, verdict_count: 1, no_match_count: 1 },
+        {
+          ...ROW,
+          verdict_id: 41,
+          verdict_storage_path: "m1/a1/1.mp4",
+          superseded: true,
+          current_match_detected: true,
+          verdict_count: 3,
+          no_match_count: 2,
+        },
+        { ...ROW, video_id: null, uploaded_by: null, uploader_name: null, verdict_id: 7, superseded: true, verdict_count: 1, no_match_count: 1 },
+        // Neither a verdict id nor a video id: no stable key, dropped.
         { ...ROW, video_id: null, verdict_id: null },
       ],
       error: null,
     });
     const r = await adminListNoMatchVideos(client);
     if (!r.ok) throw new Error("expected ok");
-    expect(r.data.map((x) => x.key)).toEqual(["ver-1", "ver-2"]);
-    expect(r.data[0]).toMatchObject({ superseded: true, current_match_detected: true, verdict_count: 3, no_match_count: 2 });
-    expect(r.data[1]).toMatchObject({ video_id: null, superseded: true, verdict_count: 1, no_match_count: 1 });
+    expect(r.data.map((x) => x.key)).toEqual(["verdict-41", "verdict-7"]);
+    expect(r.data[0]).toMatchObject({
+      verdict_id: 41,
+      verdict_storage_path: "m1/a1/1.mp4",
+      superseded: true,
+      current_match_detected: true,
+      verdict_count: 3,
+      no_match_count: 2,
+    });
+    expect(r.data[1]).toMatchObject({ video_id: null, uploaded_by: null, verdict_id: 7, superseded: true });
+  });
+
+  it("reads a history-backed current_match_detected false and null as themselves", async () => {
+    const { client } = rpcClient({
+      data: [
+        { ...ROW, verdict_id: 1, superseded: false, current_match_detected: false, verdict_count: 1, no_match_count: 1 },
+        { ...ROW, video_id: "v2", verdict_id: 2, superseded: true, current_match_detected: null, verdict_count: 2, no_match_count: 1 },
+      ],
+      error: null,
+    });
+    const r = await adminListNoMatchVideos(client);
+    if (!r.ok) throw new Error("expected ok");
+    expect(r.data.map((x) => x.current_match_detected)).toEqual([false, null]);
   });
 
   it.each(["PGRST202", "42883"])("maps a missing RPC (%s) to RPC_MISSING, not PostgREST's text", async (code) => {

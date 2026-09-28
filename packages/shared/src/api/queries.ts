@@ -2282,7 +2282,8 @@ export interface NoMatchVideoRow {
   /** Null when the match_videos row has since been deleted (history-backed backend). */
   video_id: string | null;
   match_id: string;
-  uploaded_by: string;
+  /** Copied into the verdict history without an FK, so it may be null. */
+  uploaded_by: string | null;
   uploader_name: string | null;
   video_status: string | null;
   video_created_at: string | null;
@@ -2296,16 +2297,22 @@ export interface NoMatchVideoRow {
   match_completed_at: string | null;
   participants: NoMatchVideoParticipant[];
   /**
-   * Verdict-history fields (optional; null on a backend without the history
-   * table). `superseded`: the video was re-uploaded (or deleted) since this
-   * verdict. Counts are every verdict ever recorded for the video.
+   * Verdict-history fields (null on a backend without the history table).
+   * `verdict_id` is the history row's BIGINT id; `verdict_storage_path` the
+   * file that was judged. `superseded`: the video was re-uploaded (or
+   * deleted) since this verdict. `current_match_detected`: the video's
+   * verdict NOW (true | false | null). Counts cover every verdict ever
+   * recorded for the video. `analyzed_at` is the verdict's recorded_at.
    */
-  verdict_id: string | null;
+  verdict_id: number | null;
+  verdict_storage_path: string | null;
   superseded: boolean | null;
   current_match_detected: boolean | null;
   verdict_count: number | null;
   no_match_count: number | null;
 }
+
+type NoMatchRpcRow = Database["public"]["Functions"]["admin_list_no_match_videos"]["Returns"][number];
 
 function optBool(value: unknown): boolean | null {
   return typeof value === "boolean" ? value : null;
@@ -2362,22 +2369,23 @@ export async function adminListNoMatchVideos(
       }
       return { ok: false, error: mapPostgrestError(error) };
     }
-    const rows = (Array.isArray(data) ? data : []) as unknown as Record<string, unknown>[];
+    // Keyed by the GENERATED Returns columns, so a backend rename fails the
+    // typecheck instead of silently reading null. Values stay `unknown`.
+    const rows = (Array.isArray(data) ? data : []) as unknown as Partial<Record<keyof NoMatchRpcRow, unknown>>[];
     return {
       ok: true,
       data: rows.flatMap((r) => {
         const videoId = optStr(r.video_id);
-        const verdictId = optStr(r.verdict_id);
+        const verdictId = optNum(r.verdict_id);
         const matchId = optStr(r.match_id);
-        const uploadedBy = optStr(r.uploaded_by);
-        const key = verdictId ?? videoId;
-        if (!key || !matchId || !uploadedBy) return [];
+        const key = verdictId != null ? `verdict-${verdictId}` : videoId;
+        if (!key || !matchId) return [];
         return [
           {
             key,
             video_id: videoId,
             match_id: matchId,
-            uploaded_by: uploadedBy,
+            uploaded_by: optStr(r.uploaded_by),
             uploader_name: optStr(r.uploader_name),
             video_status: optStr(r.video_status),
             video_created_at: optStr(r.video_created_at),
@@ -2389,6 +2397,7 @@ export async function adminListNoMatchVideos(
             match_completed_at: optStr(r.match_completed_at),
             participants: toNoMatchParticipants(r.participants),
             verdict_id: verdictId,
+            verdict_storage_path: optStr(r.verdict_storage_path),
             superseded: optBool(r.superseded),
             current_match_detected: optBool(r.current_match_detected),
             verdict_count: optNum(r.verdict_count),
