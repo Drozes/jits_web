@@ -43,7 +43,13 @@ function toastSave(outcome: SaveOutcome): void {
  * flip); closing it resets the flow. With sharing off nothing here is
  * reachable (no Share or Save is rendered) and the hook no-ops as well.
  */
-export function useViewerShare(detail: HighlightDetail, durationS: number | null, source: HighlightShareSourceTag): ViewerShare {
+export function useViewerShare(
+  detail: HighlightDetail,
+  durationS: number | null,
+  source: HighlightShareSourceTag,
+  /** The live version on screen (null: none). A change closes and resets the share flow. */
+  liveVersion: number | null,
+): ViewerShare {
   const share = useHighlightShare({
     highlightId: detail.highlightId,
     shareEnabled: detail.shareEnabled,
@@ -63,6 +69,17 @@ export function useViewerShare(detail: HighlightDetail, durationS: number | null
   }, [detail.shareEnabled, start]);
 
   const closeSheet = React.useCallback(() => setSheetOpen(false), []);
+
+  // The live version went away or changed (invalidated, a regeneration
+  // landed): close the sheet and drop the flow, so it neither pops back open
+  // later nor hands off the old file; the next Share starts for the new one.
+  const lastVersion = React.useRef(liveVersion);
+  React.useEffect(() => {
+    if (lastVersion.current === liveVersion) return;
+    lastVersion.current = liveVersion;
+    setSheetOpen(false);
+    reset();
+  }, [liveVersion, reset]);
   const onSheetClosed = React.useCallback(() => {
     setSheetOpen(false);
     reset();

@@ -9,7 +9,9 @@ import { useFocusEffect } from "expo-router";
 export function useViewerRefresh(reload: () => void): void {
   const first = React.useRef(true);
   const reloadRef = React.useRef(reload);
-  reloadRef.current = reload;
+  React.useEffect(() => {
+    reloadRef.current = reload;
+  });
   useFocusEffect(
     React.useCallback(() => {
       if (first.current) {

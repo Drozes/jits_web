@@ -6,6 +6,7 @@ import {
   signHighlightPlayback,
   type HighlightProgress,
 } from "@jits/shared/api/highlights";
+import type { DomainError } from "@jits/shared/api/errors";
 
 /** Signed URLs live 1 h; one older than this is renewed on demand. */
 export const HIGHLIGHT_RESIGN_AFTER_MS = 50 * 60_000;
@@ -23,6 +24,8 @@ export interface HighlightSource {
 
 export interface UseMyHighlightResult {
   progress: HighlightProgress | null;
+  /** The last progress read's error (cleared by the next success). */
+  progressError: DomainError | null;
   /** Signed live render; kept while a new version is being made. */
   source: HighlightSource | null;
   /** The live render could not be signed, or played after a fresh re-sign. */
@@ -50,7 +53,7 @@ export interface UseMyHighlightResult {
  * moved on or the card unmounted (`cancelled`).
  */
 export function useMyHighlight(matchVideoId: string | null, reloadToken = 0): UseMyHighlightResult {
-  const { data, refresh } = useHighlightProgress(supabase, matchVideoId);
+  const { data, error: progressError, refresh } = useHighlightProgress(supabase, matchVideoId);
   const playback = data?.playback ?? null;
   const key = playback ? `${playback.version}:${playback.storagePath}` : null;
   const playbackRef = React.useRef(playback);
@@ -145,5 +148,5 @@ export function useMyHighlight(matchVideoId: string | null, reloadToken = 0): Us
     return () => sub.remove();
   }, [reload]);
 
-  return { progress: data, source, playbackFailed, onPlayerError, refresh, reload };
+  return { progress: data, progressError, source, playbackFailed, onPlayerError, refresh, reload };
 }

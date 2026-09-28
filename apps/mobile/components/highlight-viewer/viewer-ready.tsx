@@ -9,7 +9,7 @@ import { useViewerShare } from "./use-viewer-share";
 import { ViewerFrame } from "./viewer-frame";
 import { ViewerMeta } from "./viewer-meta";
 import { ViewerActions } from "./viewer-actions";
-import { ViewerProgressState } from "./viewer-progress-state";
+import { ViewerNoPlayback } from "./viewer-progress-state";
 import { useViewerRefresh } from "./use-viewer-refresh";
 import { ViewerImproveSheet } from "./viewer-improve-sheet";
 import { PreShareSheet } from "./pre-share-sheet";
@@ -31,7 +31,7 @@ export function ViewerReady({ detail, source }: { detail: HighlightDetail; sourc
   const version = playback?.version ?? detail.version;
   // Seen / viewer_opened only for a version actually on screen (not a stale detail read).
   useViewerOpened(detail.highlightId, playback?.version ?? null, source);
-  const vs = useViewerShare(detail, playback?.durationS ?? null, source);
+  const vs = useViewerShare(detail, playback?.durationS ?? null, source, playback?.version ?? null);
   const fb = useHighlightRating(detail.highlightId, version, my.refresh);
   const { openImprove } = fb;
   const improve = React.useCallback(() => {
@@ -39,9 +39,8 @@ export function ViewerReady({ detail, source }: { detail: HighlightDetail; sourc
     openImprove();
   }, [detail.highlightId, openImprove, source]);
 
-  if (progress && !playback) return <ViewerProgressState phase={progress.phase} />;
-  if (!progress) {
-    return <ViewerFrame source={null} playbackFailed={false} onPlayerError={my.onPlayerError} onRetry={my.reload} />;
+  if (!progress || !playback) {
+    return <ViewerNoPlayback progress={progress} error={my.progressError} onRetry={my.reload} />;
   }
   return (
     <View className="flex-1 gap-3">
@@ -54,7 +53,7 @@ export function ViewerReady({ detail, source }: { detail: HighlightDetail; sourc
           canSaveToPhotos={vs.share.capabilities?.saveToPhotos ?? false}
           saving={vs.saving}
           savePermissionDenied={vs.savePermissionDenied}
-          improveDisabled={!progress || progress.phase === "regenerating"}
+          improveDisabled={progress.phase === "regenerating"}
           onShare={vs.openSheet}
           onSave={vs.save}
           onImprove={improve}

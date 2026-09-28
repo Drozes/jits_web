@@ -91,9 +91,10 @@ jest.mock("@gorhom/bottom-sheet", () => {
 });
 
 let mockProgress: Record<string, unknown> | null = null;
+let mockProgressError: Record<string, unknown> | null = null;
 const mockRefresh = jest.fn();
 jest.mock("@jits/shared/hooks/use-highlight-progress", () => ({
-  useHighlightProgress: () => ({ data: mockProgress, loading: false, error: null, refresh: mockRefresh }),
+  useHighlightProgress: () => ({ data: mockProgress, loading: false, error: mockProgressError, refresh: mockRefresh }),
 }));
 const mockSign = jest.fn();
 jest.mock("@jits/shared/api/highlights", () => ({
@@ -243,6 +244,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockRouter.canGoBack.mockReturnValue(true);
   mockProgress = progress("ready");
+  mockProgressError = null;
   mockShare = makeShare();
   mockGetDetail.mockResolvedValue({ ok: true, data: detail() });
   mockSign.mockResolvedValue({
@@ -356,6 +358,40 @@ describe("viewer states", () => {
     const before = mockRefresh.mock.calls.length;
     act(() => mockFocus.forEach((cb) => cb()));
     expect(mockRefresh.mock.calls.length).toBeGreaterThan(before);
+  });
+
+  it("unavailable: a neutral no-highlight state, not the replaced copy", async () => {
+    mockProgress = progress("unavailable", { playback: null, highlightId: null });
+    const utils = await renderViewer();
+    expect(utils.getByTestId("viewer-unavailable")).toHaveTextContent("No highlight for this video.");
+    expect(utils.queryByText(/was replaced/)).toBeNull();
+    expect(utils.queryByTestId("viewer-share")).toBeNull();
+  });
+
+  it("the first progress read failed: can't-play + Try again (refresh), never an endless skeleton", async () => {
+    mockProgress = null;
+    mockProgressError = { code: "UNKNOWN", message: "network" };
+    const utils = await renderViewer();
+    expect(utils.queryByTestId("viewer-skeleton")).toBeNull();
+    expect(utils.getByTestId("viewer-progress-error")).toHaveTextContent("We couldn't play this reel right now.Try again");
+    expect(redCtas(utils)).toHaveLength(0);
+    const before = mockRefresh.mock.calls.length;
+    fireEvent.press(utils.getByTestId("viewer-progress-retry"));
+    expect(mockRefresh.mock.calls.length).toBe(before + 1);
+    expect(utils.queryByText("network")).toBeNull();
+  });
+
+  it("a progress error with a snapshot keeps playing the snapshot", async () => {
+    mockProgressError = { code: "UNKNOWN", message: "network" };
+    const utils = await renderViewer();
+    await waitFor(() => expect(utils.getByTestId("highlight-player")).toBeTruthy());
+    expect(utils.queryByTestId("viewer-progress-error")).toBeNull();
+  });
+
+  it("while the first read runs (no data, no error): the poster-frame skeleton", async () => {
+    mockProgress = null;
+    const utils = await renderViewer();
+    expect(utils.getByTestId("viewer-skeleton")).toBeTruthy();
   });
 
   it("progress lost its playback (invalidated): the replaced copy", async () => {
@@ -853,5 +889,65 @@ describe("pre-share sheet", () => {
     expect(mockShare.reset).toHaveBeenCalledTimes(1);
     await openSheet(utils);
     expect(mockShare.start).toHaveBeenCalledTimes(2);
+  });
+});
+
+
+describe("the share flow follows the live version (minor 3)", () => {
+  it("a new live version closes the open sheet and resets the flow; it does not reopen", async () => {
+    const utils = await renderViewer();
+    fireEvent.press(utils.getByTestId("viewer-share"));
+    await flush();
+    expect(utils.getByTestId("sheet")).toBeTruthy();
+    mockSign.mockResolvedValue({
+      ok: true,
+      data: { url: "https://signed/v3.mp4", posterUrl: "https://signed/v3.jpg", version: 3, durationS: 31.2 },
+    });
+    mockProgress = progress("ready", {
+      renderTotal: 3,
+      playback: { ...(progress("ready").playback as object), version: 3, storagePath: "m/u/highlights/3.mp4" },
+    });
+    utils.rerender(<ViewerScreen id="h1" source="home" />);
+    await flush();
+    expect(utils.queryByTestId("sheet")).toBeNull();
+    expect(mockShare.reset).toHaveBeenCalled();
+    utils.rerender(<ViewerScreen id="h1" source="home" />);
+    await flush();
+    expect(utils.queryByTestId("sheet")).toBeNull();
+    // The next Share starts cleanly for the new version.
+    fireEvent.press(utils.getByTestId("viewer-share"));
+    await flush();
+    expect(mockShare.start).toHaveBeenCalledTimes(2);
+  });
+
+  it("playback going away closes the sheet and resets; it does not pop back open when a version returns", async () => {
+    const utils = await renderViewer();
+    fireEvent.press(utils.getByTestId("viewer-share"));
+    await flush();
+    expect(utils.getByTestId("sheet")).toBeTruthy();
+    (mockShare.reset as jest.Mock).mockClear();
+    mockProgress = progress("invalidated", { playback: null });
+    utils.rerender(<ViewerScreen id="h1" source="home" />);
+    await flush();
+    expect(utils.getByTestId("viewer-invalidated")).toBeTruthy();
+    expect(mockShare.reset).toHaveBeenCalledTimes(1);
+    mockProgress = progress("ready");
+    utils.rerender(<ViewerScreen id="h1" source="home" />);
+    await flush();
+    fireEvent(utils.getByTestId("viewer-frame"), "layout", { nativeEvent: { layout: { width: 390, height: 700 } } });
+    await flush();
+    expect(utils.getByTestId("viewer-share")).toBeTruthy();
+    expect(utils.queryByTestId("sheet")).toBeNull();
+  });
+
+  it("an unchanged version (a re-render or re-sign) leaves an open sheet alone", async () => {
+    const utils = await renderViewer();
+    fireEvent.press(utils.getByTestId("viewer-share"));
+    await flush();
+    (mockShare.reset as jest.Mock).mockClear();
+    utils.rerender(<ViewerScreen id="h1" source="home" />);
+    await flush();
+    expect(utils.getByTestId("sheet")).toBeTruthy();
+    expect(mockShare.reset).not.toHaveBeenCalled();
   });
 });
