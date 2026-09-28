@@ -52,8 +52,11 @@ demo/output/
 # supabase
 supabase/.temp/
 
-# claude
-.claude/
+# claude: share the project slash commands and workflows; keep local
+# settings, permissions and agent worktrees out of the repo
+.claude/*
+!.claude/commands/
+!.claude/workflows/
 
 # external assets (Figma exports, design references)
 /outside_assets/
