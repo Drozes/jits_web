@@ -271,8 +271,9 @@ export function VerdictStep(props: VerdictStepProps) {
 
         {/* A reel is on its way when THIS phone's clip landed or is still
             uploading (spec 015 section 16.6.4; the pre-redesign summary's
-            videoId || videoPending). */}
-        <SummaryHighlightNote hasVideo={uploadedVideoId != null || uploadBusy} />
+            videoId || videoPending). Not on a disputed result: the match is
+            under admin review, so no reel is promised. */}
+        <SummaryHighlightNote hasVideo={(uploadedVideoId != null || uploadBusy) && !disputed} />
 
         {loss ? (
           <Text className="font-body" style={{ fontSize: 15, color: p.text }}>

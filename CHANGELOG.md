@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Mobile: no highlight note on a disputed verdict
+
+JS-only, OTA-eligible.
+
+**Changed**
+- The verdict step no longer shows the post-match "Your highlight is being made" note when the result is disputed, whether the match was already disputed on arrival or the opponent disputes while the verdict is on screen. It reuses the step's existing `disputed` value (`matchStatus === "disputed"` or a live `match_disputed` from the opponent); no new fetching or state. `apps/mobile/components/match-flow/verdict/verdict-step.tsx`.
+
 ### Mobile: in-app OTA update control (jits-5i2w)
 
 JS-only, OTA-eligible for runtime 0.4.0 (build 23 and later; OTAs from `main` now target 0.4.0 only).

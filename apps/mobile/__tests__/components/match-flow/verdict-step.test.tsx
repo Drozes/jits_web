@@ -447,6 +447,58 @@ describe("highlight note (spec 015 section 16.6.4)", () => {
     }
   });
 
+  it("is hidden on a disputed result, even with clips on and a video landed", async () => {
+    mockGetFlags.mockResolvedValue(ON);
+    const s = renderVerdict({ matchStatus: "disputed", uploadedVideoId: "v1" });
+    await flush();
+    expect(s.getByTestId("summary-verdict")).toHaveTextContent("DISPUTED");
+    expect(s.queryByTestId("summary-highlight-note")).toBeNull();
+    expect(s.queryByText(NOTE)).toBeNull();
+  });
+
+  it("is hidden on a disputed result while the clip is still uploading", async () => {
+    mockGetFlags.mockResolvedValue(ON);
+    const s = renderVerdict({ matchStatus: "disputed", upload: UPLOADING });
+    await flush();
+    expect(s.queryByTestId("summary-highlight-note")).toBeNull();
+  });
+
+  it("disappears when the opponent disputes while the verdict is on screen", async () => {
+    mockGetFlags.mockResolvedValue(ON);
+    const s = renderVerdict({ uploadedVideoId: "v1", confirmedAthleteIds: ["me"] });
+    await flush();
+    expect(s.getByTestId("summary-highlight-note")).toBeTruthy();
+    act(() => mockSyncParams.onMatchDisputed?.("opp"));
+    expect(s.getByTestId("summary-verdict")).toHaveTextContent("DISPUTED");
+    expect(s.queryByTestId("summary-highlight-note")).toBeNull();
+  });
+
+  it("disappears when a re-read flips the match status to disputed", async () => {
+    mockGetFlags.mockResolvedValue(ON);
+    const s = renderVerdict({ uploadedVideoId: "v1", confirmedAthleteIds: ["me"] });
+    await flush();
+    expect(s.getByTestId("summary-highlight-note")).toBeTruthy();
+    s.rerender(
+      <VerdictStep
+        matchId="M1"
+        exitHref={ARENA_HREF}
+        exitLabel={ARENA_EXIT_LABEL}
+        matchType="ranked"
+        matchStatus="disputed"
+        outcome="win"
+        me={{ athlete_id: "me", display_name: "Kai Reyes", elo_before: 1512, elo_after: 1526, elo_delta: 14, weight_division_gap: 0 }}
+        opponent={{ athlete_id: "opp", display_name: "Mina Park" }}
+        submissionName="Rear-naked choke"
+        finishTimeSeconds={377}
+        upload={HIDDEN}
+        uploadedVideoId="v1"
+        confirmedAthleteIds={["me"]}
+      />,
+    );
+    await flush();
+    expect(s.queryByTestId("summary-highlight-note")).toBeNull();
+  });
+
   it("does not read the flags when there is no recording", async () => {
     mockGetFlags.mockResolvedValue(ON);
     renderVerdict();
