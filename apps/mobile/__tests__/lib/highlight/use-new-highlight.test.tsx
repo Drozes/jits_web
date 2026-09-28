@@ -200,7 +200,7 @@ describe("useNewHighlight", () => {
     act(() => result.current.dismiss());
     expect(result.current.highlight).toBeNull();
     expect(mockMarkSeen).toHaveBeenCalledWith({}, "h1", 3);
-    expect(mockLog).toHaveBeenCalledWith({}, "h1", "home_card_dismissed", { source: "home" });
+    expect(mockLog).toHaveBeenCalledWith({}, "h1", "home_card_dismissed", expect.objectContaining({ source: "home", platform: expect.any(String), app_version: null, runtime_version: expect.anything() }));
 
     // A read that still reports it unseen (the mark not landed yet) keeps it hidden.
     act(() => result.current.refresh());

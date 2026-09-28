@@ -174,7 +174,9 @@ function progress(phase: string, over: Record<string, unknown> = {}) {
 }
 
 function makeShare(over: Share = {}): Share {
+  const primaryPath = "primaryPath" in over ? over.primaryPath : "reels";
   return {
+    activePath: primaryPath,
     capabilities: { reels: true, shareSheet: true, saveToPhotos: true, clipboard: false, facebookAppIdConfigured: true },
     primaryPath: "reels",
     stage: "idle",
@@ -472,6 +474,7 @@ describe("actions", () => {
     ["failed", "We couldn't save your reel. Try again."],
     ["download", "We couldn't save your reel. Try again."],
     ["disabled", "Sharing is turned off right now."],
+    ["not_ready", "This reel can't be shared right now. A new version may be on the way."],
   ])("save outcome %s: error toast", async (kind, copy) => {
     mockShare = makeShare({ saveToPhotos: jest.fn(() => Promise.resolve({ ok: false, kind })) });
     const utils = await renderViewer();
@@ -615,6 +618,43 @@ describe("pre-share sheet", () => {
     expect(mockShare.copyCaption).toHaveBeenCalledTimes(1);
     expect(mockToast.success).toHaveBeenCalledWith("Caption copied");
     expect(redCtas(utils, sheet)).toHaveLength(1);
+  });
+
+  it("rerouted to the share sheet (activePath) on iOS: caption shown, CTA Share, handoff on the share sheet", async () => {
+    mockShare = makeShare({ stage: "ready", primaryPath: "reels", activePath: "share_sheet" });
+    const utils = await renderViewer();
+    const sheet = await openSheet(utils);
+    expect(utils.queryByTestId("share-ios-reels-note")).toBeNull();
+    expect(utils.getByTestId("share-caption")).toBeTruthy();
+    expect(utils.getByTestId("share-handoff")).toHaveTextContent("Share");
+    fireEvent.press(utils.getByTestId("share-handoff"));
+    expect(mockShare.handoff).toHaveBeenCalledWith("share_sheet");
+    expect(redCtas(utils, sheet)).toHaveLength(1);
+  });
+
+  it("the viewer's Share label follows the effective path too", async () => {
+    mockShare = makeShare({ primaryPath: "reels", activePath: "share_sheet" });
+    const utils = await renderViewer();
+    expect(utils.getByText("Share reel")).toBeTruthy();
+    expect(utils.queryByText("Share to Instagram")).toBeNull();
+  });
+
+  it("iOS Reels done (Instagram never came up): the caption is offered", async () => {
+    mockShare = makeShare({ stage: "done" });
+    const utils = await renderViewer();
+    await openSheet(utils);
+    expect(utils.queryByTestId("share-ios-reels-note")).toBeNull();
+    expect(utils.getByTestId("share-caption")).toBeTruthy();
+  });
+
+  it("download progress is exposed to accessibility as a progress bar", async () => {
+    mockShare = makeShare({ stage: "downloading", progress: 0.42 });
+    const utils = await renderViewer();
+    await openSheet(utils);
+    const track = utils.getByTestId("share-progress-track");
+    expect(track.props.accessibilityRole).toBe("progressbar");
+    expect(track.props.accessibilityValue).toEqual({ min: 0, max: 100, now: 42 });
+    expect(track.props.accessibilityLabel).toBe("Preparing your reel… 42%");
   });
 
   it("handing_off: CTA disabled with a spinner", async () => {

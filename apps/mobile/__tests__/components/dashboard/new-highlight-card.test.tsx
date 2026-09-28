@@ -109,7 +109,7 @@ describe("NewHighlightCard", () => {
       const u = render(<NewHighlightCard highlight={highlight()} onDismiss={jest.fn()} />);
       fireEvent.press(u.getByTestId(testID));
       expect(mockPush).toHaveBeenCalledWith("/highlight/h1?source=home");
-      expect(mockLog).toHaveBeenCalledWith({}, "h1", "home_card_tapped", { source: "home" });
+      expect(mockLog).toHaveBeenCalledWith({}, "h1", "home_card_tapped", expect.objectContaining({ source: "home", platform: expect.any(String), app_version: null, runtime_version: expect.anything() }));
     },
   );
 

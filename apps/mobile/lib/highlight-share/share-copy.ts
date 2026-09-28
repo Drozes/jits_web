@@ -24,6 +24,10 @@ export const SHARE_COPY = {
   downloadProgressPrefix: "Preparing your reel…",
   downloadFailed: "We couldn't download your reel. Check your connection and try again.",
   tryAgain: "Try again",
+  /** prepare_highlight_share: highlight_not_ready (no live version any more, e.g. the video was replaced). */
+  notReady: "This reel can't be shared right now. A new version may be on the way.",
+  /** prepare_highlight_share: highlight_not_found. */
+  notFound: "That highlight no longer exists.",
   shareDisabled: "Sharing is turned off right now.",
   /** Not in the spec table: the share sheet itself failed to open. */
   shareSheetFailed: "We couldn't open the share sheet. Try again.",

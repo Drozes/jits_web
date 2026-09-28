@@ -12,16 +12,51 @@ export const HIGHLIGHT_CAPTION_MAX = 400;
 const HASHTAGS = "#bjj #jiujitsu #brazilianjiujitsu #elorated";
 const TRACKED = "Tracked on ELO RATED.";
 
-function cleanName(name: string | null | undefined): string | null {
-  const trimmed = (name ?? "").trim();
-  return trimmed ? trimmed : null;
+/** C0/C1 controls (tabs, newlines included): read as a word break. */
+const CONTROLS = /[\u0000-\u001F\u007F-\u009F]/g;
+/** Bidi embeddings/overrides/isolates/marks, zero-width characters and the BOM: removed outright. */
+const INVISIBLE = /[\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u2069\uFEFF]/g;
+/** A token that reads as a link: a scheme, `www.`, or a bare domain with a common TLD. */
+const URL_LIKE = /^(?:[a-z][a-z0-9+.-]*:\/\/\S*|www\.\S*|\S+\.(?:com|net|org|io|co|me|app|ly|gg|tv|link|info|biz|xyz)(?:[/?#]\S*)?)$/i;
+
+/**
+ * Free text from the database made safe for a caption: invisible and
+ * direction-changing characters removed, URL-like tokens dropped, leading
+ * `@` / `#` stripped from every word (no handles, no hashtags injected
+ * through a name), whitespace collapsed. Null when nothing is left.
+ */
+export function sanitiseCaptionText(text: string | null | undefined): string | null {
+  const words = (text ?? "")
+    .replace(CONTROLS, " ")
+    .replace(INVISIBLE, "")
+    .split(/\s+/)
+    .filter((word) => word && !URL_LIKE.test(word))
+    .map((word) => word.replace(/^[@#＠＃]+/, ""))
+    .filter(Boolean);
+  const cleaned = words.join(" ").trim();
+  return cleaned ? cleaned : null;
 }
 
-/** Trimmed, whitespace-collapsed, lower-cased except for its first letter. */
+function cleanName(name: string | null | undefined): string | null {
+  return sanitiseCaptionText(name);
+}
+
+/** Sanitised, lower-cased except for its first letter. */
 function cleanTechnique(technique: string | null | undefined): string | null {
-  const collapsed = (technique ?? "").trim().replace(/\s+/g, " ");
-  if (!collapsed) return null;
-  return collapsed.charAt(0) + collapsed.slice(1).toLowerCase();
+  const cleaned = sanitiseCaptionText(technique);
+  if (!cleaned) return null;
+  const [first, ...rest] = [...cleaned];
+  return first + rest.join("").toLowerCase();
+}
+
+/** Cut `text` to at most `max` UTF-16 units plus "…", never inside a surrogate pair. */
+function cutWithEllipsis(text: string, max: number): string {
+  let out = "";
+  for (const ch of [...text]) {
+    if (out.length + ch.length > max - 1) break;
+    out += ch;
+  }
+  return `${out.trimEnd()}…`;
 }
 
 function firstLine(ctx: HighlightCaptionContext): string {
@@ -66,7 +101,7 @@ export function buildHighlightCaption(ctx: HighlightCaptionContext): string {
   const tail = [secondLine(ctx), TRACKED, HASHTAGS].join("\n");
   const budget = HIGHLIGHT_CAPTION_MAX - tail.length - 1;
   let line1 = firstLine(ctx);
-  if (line1.length > budget) line1 = `${line1.slice(0, budget - 1).trimEnd()}…`;
+  if (line1.length > budget) line1 = cutWithEllipsis(line1, budget);
   return `${line1}\n${tail}`;
 }
 

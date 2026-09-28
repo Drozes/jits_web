@@ -731,12 +731,12 @@ describe("DashboardScreen new-highlight card (spec 014 section 16.6.4)", () => {
 
     fireEvent.press(utils.getByText("Watch"));
     expect(mockPush).toHaveBeenCalledWith("/highlight/h1?source=home");
-    expect(mockLogEvent).toHaveBeenCalledWith({}, "h1", "home_card_tapped", { source: "home" });
+    expect(mockLogEvent).toHaveBeenCalledWith({}, "h1", "home_card_tapped", expect.objectContaining({ source: "home", platform: expect.any(String), app_version: null, runtime_version: expect.anything() }));
 
     fireEvent.press(utils.getByLabelText("Dismiss"));
     expect(utils.queryByTestId("new-highlight-card")).toBeNull();
     expect(mockMarkSeen).toHaveBeenCalledWith({}, "h1", 2);
-    expect(mockLogEvent).toHaveBeenCalledWith({}, "h1", "home_card_dismissed", { source: "home" });
+    expect(mockLogEvent).toHaveBeenCalledWith({}, "h1", "home_card_dismissed", expect.objectContaining({ source: "home", platform: expect.any(String), app_version: null, runtime_version: expect.anything() }));
   });
 
   it("pull to refresh re-reads the reel", async () => {

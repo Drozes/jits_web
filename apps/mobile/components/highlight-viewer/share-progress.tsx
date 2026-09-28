@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Text, View } from "react-native";
-import { SHARE_COPY } from "@/lib/highlight-share";
+import { SHARE_COPY, downloadProgressLabel } from "@/lib/highlight-share";
 import { progressPercent } from "./viewer-copy";
 
 /**
@@ -20,7 +20,13 @@ export function ShareProgress({ progress }: { progress: number | null }) {
           {pct}%
         </Text>
       </Text>
-      <View className="h-1 bg-surface-4 rounded-xs overflow-hidden">
+      <View
+        testID="share-progress-track"
+        accessibilityRole="progressbar"
+        accessibilityLabel={downloadProgressLabel(pct / 100)}
+        accessibilityValue={{ min: 0, max: 100, now: pct }}
+        className="h-1 bg-surface-4 rounded-xs overflow-hidden"
+      >
         <View testID="share-progress-bar" className="h-1 bg-ink-3" style={{ width: `${pct}%` }} />
       </View>
     </View>

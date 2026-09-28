@@ -31,6 +31,7 @@ function toastSave(outcome: SaveOutcome): void {
   if (outcome.ok) toast.success(SHARE_COPY.saveSuccess);
   else if (outcome.kind === "failed" || outcome.kind === "download") toast.error(SHARE_COPY.saveFailed);
   else if (outcome.kind === "disabled") toast.error(SHARE_COPY.shareDisabled);
+  else if (outcome.kind === "not_ready") toast.error(SHARE_COPY.notReady);
 }
 
 /**
@@ -93,6 +94,8 @@ export function useViewerShare(detail: HighlightDetail, durationS: number | null
     });
   }, [copyCaption]);
 
-  const iosReels = Platform.OS === "ios" && share.primaryPath === "reels";
+  // From the EFFECTIVE path: once the flow is rerouted to the share sheet the
+  // caption is copyable before the handoff again.
+  const iosReels = Platform.OS === "ios" && share.activePath === "reels";
   return { share, sheetOpen, iosReels, saving, savePermissionDenied, openSheet, closeSheet, onSheetClosed, handoff, save, copy };
 }

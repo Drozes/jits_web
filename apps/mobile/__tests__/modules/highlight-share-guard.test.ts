@@ -74,8 +74,27 @@ function isInside(file: string, root: string): boolean {
   return rel === "" || (!rel.startsWith("..") && !path.isAbsolute(rel));
 }
 
-const FORBIDDEN =
-  /instagram-reels|InstagramReels|shareToReels|from "expo-sharing"|from "expo-media-library"|from "expo-clipboard"|require\("expo-(sharing|media-library|clipboard)"\)|saveToLibraryAsync|createAssetAsync|shareAsync\(/;
+/**
+ * Every way code can reach the share packages or hand footage to Instagram,
+ * outside `lib/highlight-share/`. Specifiers are matched as ANY string literal
+ * (single, double or template quotes; static import, export-from, require,
+ * dynamic import(); subpaths such as `expo-media-library/next`), plus the
+ * native module names (direct `requireNativeModule` / `NativeModules` access),
+ * the share-sheet / camera-roll calls and the Instagram URL schemes.
+ */
+const FORBIDDEN_PATTERNS: ReadonlyArray<[string, RegExp]> = [
+  ["share package specifier", /["'`]expo-(sharing|media-library|clipboard)(\/[^"'`]*)?["'`]/],
+  ["Reels module", /instagram-reels|shareToReels/],
+  ["native module name", /\b(ExpoSharing|ExpoMediaLibrary|ExpoClipboard|InstagramReels)\b/],
+  ["share sheet call", /shareAsync\s*\(/],
+  ["camera roll call", /saveToLibraryAsync|createAssetAsync/],
+  ["Instagram URL scheme", /instagram(-reels|-stories)?:\/\//],
+];
+
+/** The names of every forbidden pattern `source` matches. */
+function forbiddenHits(source: string): string[] {
+  return FORBIDDEN_PATTERNS.filter(([, re]) => re.test(source)).map(([name]) => name);
+}
 
 interface ImportRef {
   specifier: string;
@@ -172,16 +191,39 @@ describe("2. lib/highlight-share/ is the single importer of the share packages",
   it("no app file outside it touches the Reels module, expo-sharing, expo-media-library or expo-clipboard", () => {
     const offenders = appSourceFiles()
       .filter((file) => !isInside(file, SHARE_ROOT))
-      .filter((file) => FORBIDDEN.test(fs.readFileSync(file, "utf8")))
-      .map(relative);
+      .map((file) => [relative(file), forbiddenHits(fs.readFileSync(file, "utf8"))] as const)
+      .filter(([, hits]) => hits.length > 0)
+      .map(([file, hits]) => `${file}: ${hits.join(", ")}`);
     expect(offenders).toEqual([]);
+  });
+
+  it.each([
+    ["single quotes", "import * as Sharing from 'expo-sharing';"],
+    ["subpath", 'import { saveAsync } from "expo-media-library/next";'],
+    ["dynamic import", 'const Sharing = await import("expo-sharing");'],
+    ["single-quoted require", "const Clip = require('expo-clipboard');"],
+    ["template-literal require", "const Media = require(`expo-media-library`);"],
+    ["spaced call", "await Sharing.shareAsync (uri);"],
+    ["Instagram app URL", 'Linking.openURL("instagram://library?AssetPath=x");'],
+    ["Reels URL", "Linking.openURL('instagram-reels://share');"],
+    ["Stories URL", 'Linking.openURL("instagram-stories://share");'],
+    ["direct native module", 'const m = requireOptionalNativeModule("ExpoSharing");'],
+    ["NativeModules access", "NativeModules.InstagramReels.share(x);"],
+    ["media library native", 'requireNativeModule("ExpoMediaLibrary")'],
+    ["clipboard native", 'requireOptionalNativeModule("ExpoClipboard")'],
+  ])("catches a %s bypass", (_label, fixture) => {
+    expect(forbiddenHits(fixture).length).toBeGreaterThan(0);
+  });
+
+  it("does not flag ordinary code", () => {
+    expect(forbiddenHits('import { Share } from "react-native"; const x = "instagram";')).toEqual([]);
   });
 
   it("inside it, the patterns really occur (the scan can see them)", () => {
     const inside = sourceFilesUnder(SHARE_ROOT).map((file) => fs.readFileSync(file, "utf8"));
     expect(inside.some((src) => /from "@\/modules\/instagram-reels"/.test(src))).toBe(true);
     expect(inside.some((src) => /require\("expo-sharing"\)/.test(src))).toBe(true);
-    expect(inside.some((src) => FORBIDDEN.test(src))).toBe(true);
+    expect(inside.some((src) => forbiddenHits(src).length > 0)).toBe(true);
   });
 });
 
@@ -232,6 +274,70 @@ describe("3. who may import the share module", () => {
     expect(refs('import { track } from "@/lib/highlight-share/telemetry";')[0].names).toEqual(["track"]);
     expect(refs('const m = require("../highlight-share/download");')[0].names).toEqual(["*"]);
     expect(refs('import { x } from "@/lib/highlight";')).toEqual([]);
+  });
+});
+
+const VIEWER_ROOT = path.join(MOBILE_ROOT, "components", "highlight-viewer");
+const VIEWER_ROUTE = "app/(app)/highlight/[id].tsx";
+
+/** Re-exports of the share module in `source` (export * / export {..} from it). */
+function shareReExports(file: string, source: string): string[] {
+  const hits: string[] = [];
+  for (const m of source.matchAll(/export\s+(?:type\s+)?(\*|\{[\s\S]*?\})\s*(?:as\s+\w+\s*)?from\s+["'`]([^"'`]+)["'`]/g)) {
+    const target = resolveSpecifier(file, m[2]);
+    if (target !== null && isInside(target, SHARE_ROOT)) hits.push(m[0].replace(/\s+/g, " "));
+  }
+  if (/export\s*\{[^}]*\buseHighlightShare\b[^}]*\}\s*;?/.test(source.replace(/export\s*\{[^}]*\}\s*from[^;]*;?/g, ""))) {
+    hits.push("re-exports useHighlightShare");
+  }
+  return hits;
+}
+
+describe("3b. the allowed importers do not launder the share module", () => {
+  it("the route and components/highlight-viewer/** never re-export it", () => {
+    const files = [...sourceFilesUnder(VIEWER_ROOT), path.join(MOBILE_ROOT, VIEWER_ROUTE)];
+    expect(files.length).toBeGreaterThan(5);
+    const offenders = files.flatMap((file) =>
+      shareReExports(file, fs.readFileSync(file, "utf8")).map((hit) => `${mobileRelative(file)}: ${hit}`),
+    );
+    expect(offenders).toEqual([]);
+  });
+
+  it("components/highlight-viewer/ has no export * at all", () => {
+    const offenders = sourceFilesUnder(VIEWER_ROOT)
+      .filter((file) => /export\s*\*/.test(fs.readFileSync(file, "utf8")))
+      .map(mobileRelative);
+    expect(offenders).toEqual([]);
+  });
+
+  it("only the viewer route imports components/highlight-viewer/, and only the screen", () => {
+    const offenders: string[] = [];
+    for (const file of appSourceFiles()) {
+      if (isInside(file, VIEWER_ROOT)) continue;
+      for (const ref of importsOf(fs.readFileSync(file, "utf8"))) {
+        const target = resolveSpecifier(file, ref.specifier);
+        if (target === null || !isInside(target, VIEWER_ROOT)) continue;
+        const rel = mobileRelative(file);
+        const ok = rel === VIEWER_ROUTE && path.basename(target) === "viewer-screen";
+        if (!ok) offenders.push(`${rel}: imports ${ref.specifier}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it.each([
+    ['export * from "@/lib/highlight-share";'],
+    ["export { useHighlightShare } from '../../lib/highlight-share';"],
+    ['export { track as t } from "@/lib/highlight-share/telemetry";'],
+    ['import { useHighlightShare } from "@/lib/highlight-share";\nexport { useHighlightShare };'],
+  ])("catches the re-export %s", (fixture) => {
+    const file = path.join(VIEWER_ROOT, "x.ts");
+    expect(shareReExports(file, fixture).length).toBeGreaterThan(0);
+  });
+
+  it("does not flag a normal import", () => {
+    const file = path.join(VIEWER_ROOT, "x.ts");
+    expect(shareReExports(file, 'import { SHARE_COPY } from "@/lib/highlight-share";\nexport function A() {}')).toEqual([]);
   });
 });
 

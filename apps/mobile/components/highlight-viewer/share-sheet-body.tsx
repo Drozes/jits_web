@@ -28,7 +28,10 @@ interface ShareSheetBodyProps {
  * from Instagram.
  */
 export function ShareSheetBody({ share, onHandoff, iosReels, onCopy, onDone }: ShareSheetBodyProps) {
-  const { stage, error, capabilities, primaryPath } = share;
+  const { stage, error, capabilities, activePath } = share;
+  // The caption is shown whenever it can travel: off the iOS Reels path, or
+  // once the flow is done (e.g. Instagram never came up).
+  const showCaption = !iosReels || stage === "done";
   const clipboard = capabilities?.clipboard ?? false;
   if (stage === "returned") {
     return <ShareReturned caption={share.caption} clipboard={clipboard} onCopy={onCopy} onDone={onDone} />;
@@ -47,7 +50,7 @@ export function ShareSheetBody({ share, onHandoff, iosReels, onCopy, onDone }: S
       ) : (
         <>
           {DOWNLOADING.has(stage) ? <ShareProgress progress={share.progress} /> : null}
-          {iosReels ? (
+          {!showCaption ? (
             <View testID="share-ios-reels-note" className="gap-1">
               <Text className="font-body text-[13px] text-ink">{SHARE_COPY.iosReelsNote[0]}</Text>
               <Text className="font-body text-[12px] text-ink-2">{SHARE_COPY.iosReelsNote[1]}</Text>
@@ -56,14 +59,14 @@ export function ShareSheetBody({ share, onHandoff, iosReels, onCopy, onDone }: S
             <CaptionCard caption={share.caption} clipboard={clipboard} showCopyButton onCopy={onCopy} />
           )}
           <CollabTip tip={share.collabTip} />
-          {primaryPath ? (
+          {activePath ? (
             <ViewerButton
               testID="share-handoff"
-              label={primaryPath === "reels" ? SHARE_COPY.openInstagram : SHARE_COPY.share}
+              label={activePath === "reels" ? SHARE_COPY.openInstagram : SHARE_COPY.share}
               variant="primary"
               disabled={!CAN_HAND_OFF.has(stage)}
               busy={stage === "handing_off"}
-              onPress={() => onHandoff(primaryPath)}
+              onPress={() => onHandoff(activePath)}
             />
           ) : null}
         </>

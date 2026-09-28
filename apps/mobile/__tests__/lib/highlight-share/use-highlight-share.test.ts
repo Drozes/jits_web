@@ -531,7 +531,7 @@ describe("Reels path", () => {
         await result.current.handoff();
       });
       expect(mockDeleteCached).toHaveBeenCalledWith(FILE);
-      expect(mockPrepare).toHaveBeenCalledTimes(2);
+      expect(mockPrepare).toHaveBeenCalledTimes(3) // start, the handoff gate, the re-download;
       expect(mockDownload).toHaveBeenCalledTimes(2);
       expect(mockShareToReels).toHaveBeenCalledTimes(2);
       expect(result.current.error).toBeNull();
@@ -663,5 +663,252 @@ describe("reset()", () => {
     act(() => result.current.start());
     await waitFor(() => expect(result.current.stage).toBe("ready"));
     expect(mockPrepare).toHaveBeenCalledTimes(2);
+  });
+});
+
+// ---- review fixes (integration review, 2026-09-28) --------------------------
+
+describe("activePath (the effective path, M2)", () => {
+  it("starts as the primary path and stays reels on a Reels handoff", async () => {
+    const { result } = await renderReady();
+    expect(result.current.primaryPath).toBe("reels");
+    expect(result.current.activePath).toBe("reels");
+    await act(async () => {
+      await result.current.handoff();
+    });
+    expect(result.current.activePath).toBe("reels");
+  });
+
+  it("becomes share_sheet when the downloaded file is outside the Reels window (duration reroute)", async () => {
+    mockPrepare.mockResolvedValue({ ok: true, data: { ...SOURCE, durationS: 75 } });
+    const { result } = await renderReady();
+    expect(result.current.primaryPath).toBe("reels");
+    expect(result.current.activePath).toBe("share_sheet");
+    await act(async () => {
+      expect(await result.current.handoff()).toEqual({ ok: true, path: "share_sheet", oversize: false });
+    });
+    expect(mockShareToReels).not.toHaveBeenCalled();
+  });
+
+  it("a server duration coerced to 0 is unknown, not too short: stays on Reels", async () => {
+    mockPrepare.mockResolvedValue({ ok: true, data: { ...SOURCE, durationS: 0 } });
+    const { result } = await renderReady();
+    expect(result.current.activePath).toBe("reels");
+    await act(async () => {
+      await result.current.handoff();
+    });
+    expect(mockShareToReels).toHaveBeenCalledTimes(1);
+  });
+
+  it("becomes share_sheet when a Reels failure falls through", async () => {
+    mockShareToReels.mockResolvedValue({ ok: false, failure: "missing-app-id", message: "x" });
+    const { result } = await renderReady();
+    await act(async () => {
+      await result.current.handoff();
+    });
+    expect(mockShareAsync).toHaveBeenCalledTimes(1);
+    expect(result.current.activePath).toBe("share_sheet");
+  });
+
+  it("becomes share_sheet when the athlete takes the share-sheet fallback", async () => {
+    mockShareToReels.mockResolvedValue({ ok: false, failure: "instagram-unavailable", message: "x" });
+    const { result } = await renderReady();
+    await act(async () => {
+      await result.current.handoff();
+    });
+    expect(result.current.activePath).toBe("reels");
+    await act(async () => {
+      await result.current.handoff("share_sheet");
+    });
+    expect(result.current.activePath).toBe("share_sheet");
+  });
+
+  it("reset() returns to the primary path", async () => {
+    mockPrepare.mockResolvedValue({ ok: true, data: { ...SOURCE, durationS: 75 } });
+    const { result } = await renderReady();
+    expect(result.current.activePath).toBe("share_sheet");
+    act(() => result.current.reset());
+    expect(result.current.activePath).toBe("reels");
+  });
+});
+
+describe("the kill switch on every action (m2)", () => {
+  it("handoff() asks prepare again and refuses a cached file once sharing is off", async () => {
+    const { result } = await renderReady();
+    mockPrepare.mockResolvedValue({ ok: false, error: { code: "HIGHLIGHT_SHARE_DISABLED", message: "x" } });
+    await act(async () => {
+      const outcome = await result.current.handoff();
+      expect(outcome.ok).toBe(false);
+    });
+    expect(mockPrepare).toHaveBeenCalledTimes(2);
+    expect(mockShareToReels).not.toHaveBeenCalled();
+    expect(mockShareAsync).not.toHaveBeenCalled();
+    expect(result.current.error?.kind).toBe("disabled");
+    expect(result.current.stage).toBe("failed");
+  });
+
+  it("saveToPhotos() asks prepare again for a cached file and refuses once sharing is off", async () => {
+    const { result } = await renderReady();
+    mockPrepare.mockResolvedValue({ ok: false, error: { code: "HIGHLIGHT_SHARE_DISABLED", message: "x" } });
+    await act(async () => {
+      expect(await result.current.saveToPhotos()).toEqual({ ok: false, kind: "disabled" });
+    });
+    expect(mockPrepare).toHaveBeenCalledTimes(2);
+    expect(mockSaveToLibrary).not.toHaveBeenCalled();
+    expect(mockDownload).toHaveBeenCalledTimes(1);
+  });
+
+  it("a new live version since the download is downloaded before the handoff", async () => {
+    const { result } = await renderReady();
+    const v3 = { ...SOURCE, version: 3, fileName: "elorated-highlight-hl-1-v3.mp4" };
+    mockPrepare.mockResolvedValue({ ok: true, data: v3 });
+    await act(async () => {
+      await result.current.handoff();
+    });
+    expect(mockDownload).toHaveBeenCalledTimes(2);
+    expect(mockDownload.mock.calls[1][0]).toEqual(v3);
+    expect(mockShareToReels).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("prepare refusals are not connection errors (m6)", () => {
+  it.each([
+    ["HIGHLIGHT_NOT_READY", "not-ready", "This reel can't be shared right now. A new version may be on the way.", "not_ready"],
+    ["HIGHLIGHT_NOT_FOUND", "not-found", "That highlight no longer exists.", "not_found"],
+  ])("%s -> non-retryable %s with accurate copy", async (code, errCode, message, failure) => {
+    mockPrepare.mockResolvedValue({ ok: false, error: { code, message: "x" } });
+    const { result } = renderHook(() => useHighlightShare(params()));
+    await waitFor(() => expect(result.current.capabilities).not.toBeNull());
+    act(() => result.current.start());
+    await waitFor(() => expect(result.current.stage).toBe("failed"));
+    expect(result.current.error).toEqual({ kind: "download", code: errCode, message, canFallBack: false, retryable: false });
+    expect(detailOf("download_failed")).toMatchObject({ failure });
+    await act(async () => {
+      expect(await result.current.saveToPhotos()).toEqual({ ok: false, kind: "not_ready" });
+    });
+  });
+
+  it("a transient prepare failure stays a retryable download error", async () => {
+    mockPrepare.mockResolvedValue({ ok: false, error: { code: "UNKNOWN", message: "network" } });
+    const { result } = renderHook(() => useHighlightShare(params()));
+    await waitFor(() => expect(result.current.capabilities).not.toBeNull());
+    act(() => result.current.start());
+    await waitFor(() => expect(result.current.stage).toBe("failed"));
+    expect(result.current.error).toMatchObject({ code: "download-failed", retryable: true });
+  });
+});
+
+describe("telemetry dedupe (m4)", () => {
+  it("a joined in-flight download does not log download_ok again", async () => {
+    mockDownload.mockResolvedValue({ ok: true, uri: FILE, byteCount: 1000, reused: false, elapsedMs: 5, joined: true });
+    await renderReady();
+    expect(steps().filter((s) => s === "download_ok")).toHaveLength(0);
+  });
+
+  it("a joined in-flight download that failed does not log download_failed again", async () => {
+    mockDownload.mockResolvedValue({ ok: false, failure: "download_http", status: 500, elapsedMs: 5, joined: true });
+    const { result } = renderHook(() => useHighlightShare(params()));
+    await waitFor(() => expect(result.current.capabilities).not.toBeNull());
+    act(() => result.current.start());
+    await waitFor(() => expect(result.current.stage).toBe("failed"));
+    expect(steps()).not.toContain("download_failed");
+  });
+
+  it("share_tapped once per start(); a Try again in the same session carries retry: true", async () => {
+    mockDownload.mockResolvedValueOnce({ ok: false, failure: "download_http", status: 500, elapsedMs: 5 });
+    const { result } = renderHook(() => useHighlightShare(params()));
+    await waitFor(() => expect(result.current.capabilities).not.toBeNull());
+    act(() => result.current.start());
+    await waitFor(() => expect(result.current.stage).toBe("failed"));
+    act(() => result.current.start());
+    await waitFor(() => expect(result.current.stage).toBe("ready"));
+    const tapped = mockLog.mock.calls.filter((c) => c[2] === "share_tapped").map((c) => c[3]);
+    expect(tapped).toHaveLength(2);
+    expect(tapped[0].retry).toBeUndefined();
+    expect(tapped[1].retry).toBe(true);
+    // A new session (after reset) starts clean.
+    act(() => result.current.reset());
+    act(() => result.current.start());
+    await waitFor(() => expect(result.current.stage).toBe("ready"));
+    const third = mockLog.mock.calls.filter((c) => c[2] === "share_tapped")[2][3];
+    expect(third.retry).toBeUndefined();
+  });
+
+  it("caption_copied (press_and_hold) at most once per sheet session", async () => {
+    const { result } = await renderReady();
+    await act(async () => {
+      await result.current.copyCaption();
+      await result.current.copyCaption();
+      await result.current.copyCaption();
+    });
+    expect(steps().filter((s) => s === "caption_copied")).toHaveLength(1);
+    act(() => result.current.reset());
+    act(() => result.current.start());
+    await waitFor(() => expect(result.current.stage).toBe("ready"));
+    await act(async () => {
+      await result.current.copyCaption();
+    });
+    expect(steps().filter((s) => s === "caption_copied")).toHaveLength(2);
+  });
+});
+
+describe("iOS Reels return trip timing (NIT)", () => {
+  it("already back when the handoff promise settles: straight to returned", async () => {
+    let settle: (v: unknown) => void = () => undefined;
+    mockShareToReels.mockImplementation(() => new Promise((r) => (settle = r)));
+    const { result } = await renderReady();
+    let pending: Promise<unknown> = Promise.resolve();
+    act(() => {
+      pending = result.current.handoff();
+    });
+    await waitFor(() => expect(result.current.stage).toBe("handing_off"));
+    act(() => appStateHandler?.("background"));
+    const original = Object.getOwnPropertyDescriptor(AppState, "currentState");
+    Object.defineProperty(AppState, "currentState", { configurable: true, value: "active" });
+    try {
+      await act(async () => {
+        settle({ ok: true, stickerApplied: false, byteCount: 1000, oversize: false });
+        await pending;
+      });
+    } finally {
+      if (original) Object.defineProperty(AppState, "currentState", original);
+    }
+    expect(result.current.stage).toBe("returned");
+    expect(steps()).toContain("returned_from_instagram");
+  });
+
+  it("Instagram never came up: after 8 s in the foreground the sheet stops waiting (done)", async () => {
+    const { result } = await renderReady();
+    jest.useFakeTimers();
+    try {
+      await act(async () => {
+        await result.current.handoff();
+      });
+      expect(result.current.stage).toBe("handing_off");
+      act(() => jest.advanceTimersByTime(7_999));
+      expect(result.current.stage).toBe("handing_off");
+      act(() => jest.advanceTimersByTime(1));
+      expect(result.current.stage).toBe("done");
+      expect(steps()).not.toContain("returned_from_instagram");
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("the fallback timer does not fire once the app went to Instagram", async () => {
+    const { result } = await renderReady();
+    jest.useFakeTimers();
+    try {
+      await act(async () => {
+        await result.current.handoff();
+      });
+      act(() => appStateHandler?.("background"));
+      act(() => jest.advanceTimersByTime(10_000));
+      expect(result.current.stage).toBe("handing_off");
+      act(() => appStateHandler?.("active"));
+      expect(result.current.stage).toBe("returned");
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

@@ -42,6 +42,8 @@ export type ShareErrorCode =
   | ReelsShareFailure
   | "disabled"
   | "download-failed"
+  | "not-ready"
+  | "not-found"
   | "share-sheet-failed";
 
 export interface ShareError {
@@ -63,12 +65,19 @@ export type HandoffOutcome =
 /** What `saveToPhotos` did; the UI owns the toast / inline copy. */
 export type SaveOutcome =
   | { ok: true }
-  | { ok: false; kind: "permission" | "failed" | "disabled" | "download" | "unavailable" };
+  | { ok: false; kind: "permission" | "failed" | "disabled" | "download" | "unavailable" | "not_ready" };
 
 export interface UseHighlightShareResult {
   capabilities: ShareCapabilities | null;
   /** reels when capabilities.reels (and the duration fits), else share_sheet when available, else null (Share hidden). */
   primaryPath: SharePath | null;
+  /**
+   * The path the flow is ACTUALLY on: `primaryPath` until something reroutes
+   * it (the downloaded file is outside the Reels window, a Reels failure fell
+   * through, the athlete chose "Use the share sheet"), then `share_sheet`.
+   * The UI derives the CTA label and the iOS caption rule from this.
+   */
+  activePath: SharePath | null;
   stage: ShareStage;
   /** Download progress as a 0..1 fraction; null before a download starts or when the size is unknown. */
   progress: number | null;
@@ -100,10 +109,36 @@ interface ReadyFile {
 
 type Acquired = { ok: true; file: ReadyFile } | { ok: false; error: ShareError };
 
+/** A `prepare_highlight_share` refusal as the share flow's error (null: a transient failure). */
+function prepareRefusal(code: string): ShareError | null {
+  if (code === "HIGHLIGHT_SHARE_DISABLED") return DISABLED_ERROR;
+  if (code === "HIGHLIGHT_NOT_READY") return NOT_READY_ERROR;
+  if (code === "HIGHLIGHT_NOT_FOUND") return NOT_FOUND_ERROR;
+  return null;
+}
+
+/** iOS Reels: if the app never went to the background this long after the handoff, stop waiting. */
+export const IOS_HANDOFF_FALLBACK_MS = 8_000;
+
 const DISABLED_ERROR: ShareError = {
   kind: "disabled",
   code: "disabled",
   message: SHARE_COPY.shareDisabled,
+  canFallBack: false,
+  retryable: false,
+};
+/** The reel no longer has a shareable live version (replaced / being re-analysed). */
+const NOT_READY_ERROR: ShareError = {
+  kind: "download",
+  code: "not-ready",
+  message: SHARE_COPY.notReady,
+  canFallBack: false,
+  retryable: false,
+};
+const NOT_FOUND_ERROR: ShareError = {
+  kind: "download",
+  code: "not-found",
+  message: SHARE_COPY.notFound,
   canFallBack: false,
   retryable: false,
 };
@@ -176,6 +211,12 @@ export function useHighlightShare(params: UseHighlightShareParams): UseHighlight
   const busyRef = React.useRef(false);
   const savingRef = React.useRef(false);
   const handoffRef = React.useRef<{ at: number; sawBackground: boolean; confirmed: boolean } | null>(null);
+  const handoffTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** A `start()` already ran in this sheet session: later ones are retries. */
+  const sessionStartedRef = React.useRef(false);
+  /** The press-and-hold intent is logged at most once per session. */
+  const pressHoldLoggedRef = React.useRef(false);
+  const [reroutedPath, setReroutedPathState] = React.useState<SharePath | null>(null);
   const paramsRef = React.useRef({ highlightId, source, durationS });
 
   enabledRef.current = shareEnabled;
@@ -190,12 +231,20 @@ export function useHighlightShare(params: UseHighlightShareParams): UseHighlight
   const setError = React.useCallback((next: ShareError | null) => {
     if (mountedRef.current) setErrorState(next);
   }, []);
+  const setRerouted = React.useCallback((next: SharePath | null) => {
+    if (mountedRef.current) setReroutedPathState(next);
+  }, []);
+  const clearHandoffTimer = React.useCallback(() => {
+    if (handoffTimerRef.current) clearTimeout(handoffTimerRef.current);
+    handoffTimerRef.current = null;
+  }, []);
 
   React.useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
       seqRef.current += 1;
+      if (handoffTimerRef.current) clearTimeout(handoffTimerRef.current);
     };
   }, []);
 
@@ -229,10 +278,14 @@ export function useHighlightShare(params: UseHighlightShareParams): UseHighlight
     busyRef.current = false;
     fileRef.current = null;
     handoffRef.current = null;
+    sessionStartedRef.current = false;
+    pressHoldLoggedRef.current = false;
+    clearHandoffTimer();
+    setRerouted(null);
     setStage("idle");
     setProgress(null);
     setError(null);
-  }, [setError, setProgress, setStage]);
+  }, [clearHandoffTimer, setError, setProgress, setRerouted, setStage]);
 
   // A different highlight starts from scratch.
   const lastIdRef = React.useRef(highlightId);
@@ -252,14 +305,25 @@ export function useHighlightShare(params: UseHighlightShareParams): UseHighlight
    * prepare (kill switch) -> sign 300 s -> download. `onDownloading` fires
    * once the download itself begins. Logs download_ok / download_failed.
    */
+  /**
+   * The server-side gate, asked before EVERY action (start, handoff, save),
+   * so the kill switch holds even for a file already in the cache.
+   */
+  const gate = React.useCallback(async (): Promise<{ ok: true; source: HighlightShareSource } | { ok: false; error: ShareError }> => {
+    const prepared = await prepareHighlightShare(supabase, paramsRef.current.highlightId);
+    if (prepared.ok) return { ok: true, source: prepared.data };
+    return { ok: false, error: prepareRefusal(prepared.error.code) ?? DOWNLOAD_ERROR };
+  }, []);
+
   const acquire = React.useCallback(
     async (onDownloading?: () => void, onProgress?: (fraction: number | null) => void): Promise<Acquired> => {
-      const id = paramsRef.current.highlightId;
-      const prepared = await prepareHighlightShare(supabase, id);
+      const prepared = await prepareHighlightShare(supabase, paramsRef.current.highlightId);
       if (!prepared.ok) {
-        if (prepared.error.code === "HIGHLIGHT_SHARE_DISABLED") return { ok: false, error: DISABLED_ERROR };
-        log("download_failed", { failure: "unknown" });
-        return { ok: false, error: DOWNLOAD_ERROR };
+        const refusal = prepareRefusal(prepared.error.code);
+        if (refusal === DISABLED_ERROR) return { ok: false, error: DISABLED_ERROR };
+        const failure = refusal === NOT_READY_ERROR ? "not_ready" : refusal === NOT_FOUND_ERROR ? "not_found" : "unknown";
+        log("download_failed", { failure });
+        return { ok: false, error: refusal ?? DOWNLOAD_ERROR };
       }
       if (!enabledRef.current) return { ok: false, error: DISABLED_ERROR };
       const signed = await signHighlightDownload(supabase, prepared.data.storagePath, HIGHLIGHT_DOWNLOAD_URL_TTL_S);
@@ -271,6 +335,8 @@ export function useHighlightShare(params: UseHighlightShareParams): UseHighlight
       onDownloading?.();
       const result = await downloadReel(prepared.data, signed.data.url, onProgress);
       if (!result.ok) {
+        // A caller that joined an in-flight download does not log it again.
+        if (result.joined) return { ok: false, error: DOWNLOAD_ERROR };
         log("download_failed", {
           failure: result.failure,
           elapsed_ms: result.elapsedMs,
@@ -278,7 +344,9 @@ export function useHighlightShare(params: UseHighlightShareParams): UseHighlight
         });
         return { ok: false, error: DOWNLOAD_ERROR };
       }
-      log("download_ok", { elapsed_ms: result.elapsedMs, byte_count: result.byteCount, reused: result.reused });
+      if (!result.joined) {
+        log("download_ok", { elapsed_ms: result.elapsedMs, byte_count: result.byteCount, reused: result.reused });
+      }
       return { ok: true, file: { uri: result.uri, byteCount: result.byteCount, source: prepared.data } };
     },
     [log],
@@ -291,6 +359,16 @@ export function useHighlightShare(params: UseHighlightShareParams): UseHighlight
   }, [shareEnabled, capabilities, durationS]);
   const primaryPathRef = React.useRef(primaryPath);
   primaryPathRef.current = primaryPath;
+  const activePath: SharePath | null = primaryPath === null ? null : (reroutedPath ?? primaryPath);
+  const activePathRef = React.useRef(activePath);
+  activePathRef.current = activePath;
+
+  /** Whether this file can go to Reels: capability, App ID and the 3-60 s window. */
+  const reelsPossible = React.useCallback((file: ReadyFile) => {
+    // A server duration coerced to 0 (missing) is "unknown", not "too short".
+    const duration = file.source.durationS > 0 ? file.source.durationS : paramsRef.current.durationS;
+    return capsRef.current?.reels === true && !!env.facebookAppId && isWithinReelsWindow(duration);
+  }, []);
 
   const start = React.useCallback(() => {
     if (!enabledRef.current || busyRef.current) return;
@@ -301,7 +379,12 @@ export function useHighlightShare(params: UseHighlightShareParams): UseHighlight
     setError(null);
     setProgress(null);
     setStage("preparing");
-    log("share_tapped", primaryPathRef.current ? { path: primaryPathRef.current } : {});
+    const retry = sessionStartedRef.current;
+    sessionStartedRef.current = true;
+    log("share_tapped", {
+      ...(activePathRef.current ? { path: activePathRef.current } : {}),
+      ...(retry ? { retry: true } : {}),
+    });
     void (async () => {
       const acquired = await acquire(
         () => {
@@ -321,10 +404,12 @@ export function useHighlightShare(params: UseHighlightShareParams): UseHighlight
         return;
       }
       fileRef.current = acquired.file;
+      // Known before the handoff: a file Reels cannot take goes to the share sheet.
+      if (activePathRef.current === "reels" && !reelsPossible(acquired.file)) setRerouted("share_sheet");
       setProgress(1);
       setStage("ready");
     })();
-  }, [acquire, log, setError, setProgress, setStage]);
+  }, [acquire, log, reelsPossible, setError, setProgress, setRerouted, setStage]);
 
   const fail = React.useCallback(
     (next: ShareError): HandoffOutcome => {
@@ -338,6 +423,7 @@ export function useHighlightShare(params: UseHighlightShareParams): UseHighlight
   const shareSheet = React.useCallback(
     async (file: ReadyFile, seq: number): Promise<HandoffOutcome> => {
       if (!capsRef.current?.shareSheet) return fail(shareSheetError(false));
+      setRerouted("share_sheet");
       setError(null);
       setStage("handing_off");
       const result = await openShareSheet(file.uri);
@@ -350,15 +436,13 @@ export function useHighlightShare(params: UseHighlightShareParams): UseHighlight
       log("share_sheet_failed", { path: "share_sheet", failure: "unknown" });
       return fail(shareSheetError(true));
     },
-    [fail, log, setError, setStage],
+    [fail, log, setError, setRerouted, setStage],
   );
 
   const reels = React.useCallback(
     async (file: ReadyFile, seq: number, mayRedownload: boolean): Promise<HandoffOutcome> => {
       const appId = env.facebookAppId;
-      if (!capsRef.current?.reels || !appId || !isWithinReelsWindow(file.source.durationS)) {
-        return shareSheet(file, seq);
-      }
+      if (!appId || !reelsPossible(file)) return shareSheet(file, seq);
       setError(null);
       setStage("handing_off");
       const pending = { at: Date.now(), sawBackground: false, confirmed: false };
@@ -380,7 +464,17 @@ export function useHighlightShare(params: UseHighlightShareParams): UseHighlight
           handoffRef.current = null;
           log("returned_from_instagram", { path: "reels", elapsed_ms: Date.now() - pending.at });
           setStage("returned");
+          return outcome;
         }
+        // Instagram never came up (the app never left the foreground): stop
+        // waiting so the sheet is not stuck in handing_off.
+        clearHandoffTimer();
+        handoffTimerRef.current = setTimeout(() => {
+          handoffTimerRef.current = null;
+          if (handoffRef.current !== pending || pending.sawBackground || seq !== seqRef.current) return;
+          handoffRef.current = null;
+          setStage("done");
+        }, IOS_HANDOFF_FALLBACK_MS);
         return outcome;
       }
 
@@ -409,24 +503,42 @@ export function useHighlightShare(params: UseHighlightShareParams): UseHighlight
         retryable: RETRYABLE.has(result.failure),
       });
     },
-    [acquire, fail, log, setError, setProgress, setStage, shareSheet],
+    [acquire, clearHandoffTimer, fail, log, reelsPossible, setError, setProgress, setStage, shareSheet],
   );
 
   const handoff = React.useCallback(
     async (path?: SharePath): Promise<HandoffOutcome> => {
       if (!enabledRef.current || busyRef.current) return { ok: false, error: null };
-      const file = fileRef.current;
-      const chosen = path ?? primaryPathRef.current;
-      if (!file || !chosen) return { ok: false, error: null };
+      const cached = fileRef.current;
+      const chosen = path ?? activePathRef.current;
+      if (!cached || !chosen) return { ok: false, error: null };
       busyRef.current = true;
       const seq = seqRef.current;
       try {
+        // The kill switch (and the reel still existing) is re-checked on every handoff.
+        const gated = await gate();
+        if (seq !== seqRef.current) return { ok: false, error: null };
+        if (!gated.ok) return fail(gated.error);
+        let file = cached;
+        if (gated.source.fileName !== cached.source.fileName) {
+          // A new live version landed since the download: hand off that one.
+          setStage("downloading");
+          setProgress(0);
+          const again = await acquire(undefined, (fraction) => {
+            if (seq === seqRef.current && fraction !== null) setProgress(fraction);
+          });
+          if (seq !== seqRef.current) return { ok: false, error: null };
+          if (!again.ok) return fail(again.error);
+          file = again.file;
+          fileRef.current = file;
+          setProgress(1);
+        }
         return chosen === "reels" ? await reels(file, seq, true) : await shareSheet(file, seq);
       } finally {
         if (seq === seqRef.current) busyRef.current = false;
       }
     },
-    [reels, shareSheet],
+    [acquire, fail, gate, reels, setProgress, setStage, shareSheet],
   );
 
   // iOS Reels: the return trip from Instagram.
@@ -440,22 +552,33 @@ export function useHighlightShare(params: UseHighlightShareParams): UseHighlight
       }
       if (next === "active" && pending.sawBackground && pending.confirmed) {
         handoffRef.current = null;
+        clearHandoffTimer();
         log("returned_from_instagram", { path: "reels", elapsed_ms: Date.now() - pending.at });
         setStage("returned");
       }
     });
     return () => sub.remove();
-  }, [log, setStage]);
+  }, [clearHandoffTimer, log, setStage]);
 
   const saveToPhotos = React.useCallback(async (): Promise<SaveOutcome> => {
     if (!enabledRef.current) return { ok: false, kind: "disabled" };
     if (!capsRef.current?.saveToPhotos || savingRef.current) return { ok: false, kind: "unavailable" };
     savingRef.current = true;
     try {
+      const saveRefusal = (e: ShareError): SaveOutcome => ({
+        ok: false,
+        kind: e.kind === "disabled" ? "disabled" : e.code === "not-ready" || e.code === "not-found" ? "not_ready" : "download",
+      });
       let file = fileRef.current;
+      if (file) {
+        // A cached file is only saved after the server gate says yes again.
+        const gated = await gate();
+        if (!gated.ok) return saveRefusal(gated.error);
+        if (gated.source.fileName !== file.source.fileName) file = null;
+      }
       if (!file) {
         const acquired = await acquire();
-        if (!acquired.ok) return { ok: false, kind: acquired.error.kind === "disabled" ? "disabled" : "download" };
+        if (!acquired.ok) return saveRefusal(acquired.error);
         file = acquired.file;
       }
       if (!enabledRef.current) return { ok: false, kind: "disabled" };
@@ -473,7 +596,7 @@ export function useHighlightShare(params: UseHighlightShareParams): UseHighlight
     } finally {
       savingRef.current = false;
     }
-  }, [acquire, log]);
+  }, [acquire, gate, log]);
 
   const caption = React.useMemo(
     () => (captionContext ? buildHighlightCaption(captionContext) : ""),
@@ -489,7 +612,10 @@ export function useHighlightShare(params: UseHighlightShareParams): UseHighlight
     if (!capsRef.current?.clipboard) {
       // No clipboard module: the UI renders the caption selectable and calls
       // this from its long press, so this records the press-and-hold intent.
-      log("caption_copied", { clipboard: "press_and_hold" });
+      if (!pressHoldLoggedRef.current) {
+        pressHoldLoggedRef.current = true;
+        log("caption_copied", { clipboard: "press_and_hold" });
+      }
       return false;
     }
     const copied = await copyText(caption);
@@ -504,6 +630,7 @@ export function useHighlightShare(params: UseHighlightShareParams): UseHighlight
   return {
     capabilities,
     primaryPath,
+    activePath,
     stage,
     progress,
     error,

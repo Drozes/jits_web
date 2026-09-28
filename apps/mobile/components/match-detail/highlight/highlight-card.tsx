@@ -9,6 +9,7 @@ import { HighlightFailed, HighlightNote } from "./highlight-states";
 import { HighlightReel } from "./highlight-reel";
 import { HighlightOpenReelLink } from "./highlight-open-reel-link";
 import { useMarkHighlightSeen } from "@/lib/highlight/use-mark-highlight-seen";
+import { useHighlightFlags } from "@/lib/highlight/use-highlight-flags";
 
 /** Phases that render no card at all (spec 014 section 10). */
 const HIDDEN: ReadonlySet<HighlightPhase> = new Set<HighlightPhase>(["disabled", "unavailable"]);
@@ -34,7 +35,10 @@ export function HighlightCard({ matchVideoId, angleLabel, reloadToken = 0 }: Hig
   const showsReel = progress?.phase === "ready" || progress?.phase === "regenerating";
   // The live version the athlete is looking at: marked seen once per version
   // (clears the Home card and the bell's unread state), and the viewer link.
-  const liveHighlightId = showsReel && progress?.playback ? progress.highlightId : null;
+  // Phase-2 discovery (the viewer link, seen marking) follows the clips flag
+  // and fails closed: nothing until get_highlight_flags answers true.
+  const { clipsEnabled } = useHighlightFlags();
+  const liveHighlightId = clipsEnabled && showsReel && progress?.playback ? progress.highlightId : null;
   useMarkHighlightSeen(liveHighlightId, liveHighlightId ? (progress?.playback?.version ?? null) : null);
   if (!progress || HIDDEN.has(progress.phase)) return null;
   const { phase } = progress;

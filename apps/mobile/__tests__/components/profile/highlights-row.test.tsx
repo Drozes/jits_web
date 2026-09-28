@@ -87,7 +87,7 @@ describe("HighlightsRow", () => {
     const utils = render(<HighlightsRow items={[item("a", { unseen: true })]} clipsEnabled onOpen={onOpen} />);
     fireEvent.press(utils.getByTestId("highlight-tile-a"));
     expect(mockPush).toHaveBeenCalledWith("/highlight/a?source=profile");
-    expect(mockLog).toHaveBeenCalledWith({}, "a", "profile_row_tapped", expect.objectContaining({ source: "profile" }));
+    expect(mockLog).toHaveBeenCalledWith({}, "a", "profile_row_tapped", expect.objectContaining({ source: "profile", platform: expect.any(String), os_version: expect.any(String) }));
     expect(onOpen).toHaveBeenCalledWith("a");
   });
 

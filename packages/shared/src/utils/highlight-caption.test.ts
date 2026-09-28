@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildCollabTip, buildHighlightCaption, HIGHLIGHT_CAPTION_MAX } from "./highlight-caption";
+import { buildCollabTip, buildHighlightCaption, HIGHLIGHT_CAPTION_MAX, sanitiseCaptionText } from "./highlight-caption";
 import type { HighlightCaptionContext } from "../api/highlight-share";
 
 const TAIL = "Tracked on ELO RATED.\n#bjj #jiujitsu #brazilianjiujitsu #elorated";
@@ -111,5 +111,48 @@ describe("buildCollabTip", () => {
       "Tag your opponent as a collaborator: in Instagram tap Tag people, then Invite collaborator. One post shows on both profiles.",
     );
     expect(buildCollabTip("  ")).toMatch(/^Tag your opponent as a collaborator: /);
+  });
+});
+
+describe("sanitiseCaptionText (names and technique)", () => {
+  it.each([
+    ["@anasouza", "anasouza"],
+    ["#1 Ana", "1 Ana"],
+    ["Ana @ana_bjj Souza", "Ana ana_bjj Souza"],
+    ["＠full-width", "full-width"],
+    ["Ana https://evil.example/x Souza", "Ana Souza"],
+    ["Ana www.evil.com", "Ana"],
+    ["Ana evil.io/path", "Ana"],
+    ["Ana‮azuoS", "AnaazuoS"],
+    ["A​na⁦ So﻿uza⁩", "Ana Souza"],
+    ["Ana\u0000\u0007 Souza\n\tJr", "Ana Souza Jr"],
+    ["  Ana    Souza  ", "Ana Souza"],
+    ["St. Pierre", "St. Pierre"],
+    ["@@@", null],
+    ["https://only.link", null],
+    [null, null],
+  ])("%j -> %j", (input, expected) => {
+    expect(sanitiseCaptionText(input as string | null)).toBe(expected);
+  });
+
+  it("applies to the caption's names, technique and the collab tip", () => {
+    const caption = buildHighlightCaption(
+      ctx({ opponentName: "@ana https://x.co", technique: "#ARM​BAR  from guard" }),
+    );
+    expect(caption.split("\n")[0]).toBe("Got the Armbar from guard against ana.");
+    expect(buildCollabTip("#ana‮")).toMatch(/^Tag ana as a collaborator/);
+    expect(buildCollabTip("https://x.com")).toMatch(/^Tag your opponent as a collaborator/);
+  });
+
+  it("the ellipsis cut never splits a surrogate pair", () => {
+    const emojiName = "🥋".repeat(400);
+    const caption = buildHighlightCaption(ctx({ opponentName: emojiName }));
+    expect(caption.length).toBeLessThanOrEqual(HIGHLIGHT_CAPTION_MAX);
+    const line1 = caption.split("\n")[0];
+    expect(line1.endsWith("…")).toBe(true);
+    // No lone high surrogate right before the ellipsis.
+    const beforeEllipsis = line1.charCodeAt(line1.length - 2);
+    expect(beforeEllipsis >= 0xd800 && beforeEllipsis <= 0xdbff).toBe(false);
+    expect(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/.test(line1)).toBe(false);
   });
 });

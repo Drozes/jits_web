@@ -5,11 +5,11 @@ import { supabase } from "@/lib/supabase/client";
 import { signPosterKey } from "@jits/shared/api/queries";
 import {
   getMyHighlights,
-  logHighlightShareEvent,
   markHighlightSeen,
   type MyHighlightItem,
 } from "@jits/shared/api/highlight-share";
 import { useMatchExitCount } from "@/lib/arena/arena-store";
+import { logHighlightEvent } from "@/lib/highlight/highlight-event";
 
 /** Poster URLs are signed for an hour; Home re-reads far more often. */
 const POSTER_TTL_S = 3600;
@@ -104,7 +104,7 @@ export function useNewHighlight(athleteId: string | undefined): {
     seq.current += 1; // drop any read in flight
     commit(null);
     void markHighlightSeen(supabase, highlightId, version).catch(() => {});
-    void logHighlightShareEvent(supabase, highlightId, "home_card_dismissed", { source: "home" });
+    logHighlightEvent(highlightId, "home_card_dismissed", { source: "home" });
   }, [commit]);
 
   return { highlight, refresh, dismiss };

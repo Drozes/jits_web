@@ -5,7 +5,7 @@ import { ViewerButton } from "./viewer-button";
 
 interface CaptionCardProps {
   caption: string;
-  /** `expo-clipboard` is in this build: offer the button, else press-and-hold. */
+  /** The clipboard native module is in this build: offer the button, else press-and-hold. */
   clipboard: boolean;
   /** Render the outline "Copy caption" here (off when the surface's red CTA copies). */
   showCopyButton: boolean;

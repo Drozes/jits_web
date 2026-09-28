@@ -86,7 +86,10 @@ export const HIGHLIGHT_DOWNLOAD_URL_TTL_S = 300;
  * - `source`: a `HighlightShareSourceTag`.
  * - `path`: `reels` | `share_sheet`.
  * - `failure`: a Reels failure value from the mobile Reels module, or
- *   `download_timeout` | `download_http` | `permission` | `unknown`.
+ *   `download_timeout` | `download_http` | `permission` | `not_ready` |
+ *   `not_found` | `unknown`.
+ * - `retry`: true on a `share_tapped` from a "Try again" in the same sheet
+ *   session (the first `start()` of a session carries no `retry`).
  * - `elapsed_ms`, `byte_count`, `http_status`: numbers. `oversize`,
  *   `reused` (the download reused a complete cached file): booleans.
  * - `platform`, `os_version`, `app_version`, `runtime_version`: added by the

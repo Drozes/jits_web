@@ -2,8 +2,7 @@ import * as React from "react";
 import { ScrollView, View } from "react-native";
 import { useRouter } from "expo-router";
 import type { ProfileHighlight } from "@/lib/highlight/use-my-highlights";
-import { supabase } from "@/lib/supabase/client";
-import { logHighlightShareEvent } from "@jits/shared/api/highlight-share";
+import { logHighlightEvent } from "@/lib/highlight/highlight-event";
 import { highlightHref } from "@/lib/highlight/discovery";
 import { MetaTag } from "@/components/ui/elo-system";
 import { HighlightTile } from "./highlight-tile";
@@ -42,7 +41,7 @@ export function HighlightsRow({ items, clipsEnabled, onOpen }: HighlightsRowProp
             key={item.highlightId}
             item={item}
             onPress={() => {
-              void logHighlightShareEvent(supabase, item.highlightId, "profile_row_tapped", { source: "profile" });
+              logHighlightEvent(item.highlightId, "profile_row_tapped", { source: "profile" });
               onOpen?.(item.highlightId);
               router.push(highlightHref(item.highlightId, "profile") as never);
             }}

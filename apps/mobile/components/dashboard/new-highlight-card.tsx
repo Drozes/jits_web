@@ -2,8 +2,7 @@ import { Pressable, Text, View } from "react-native";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { Clapperboard, X } from "lucide-react-native";
-import { logHighlightShareEvent } from "@jits/shared/api/highlight-share";
-import { supabase } from "@/lib/supabase/client";
+import { logHighlightEvent } from "@/lib/highlight/highlight-event";
 import { MetaTag, Plate } from "@/components/ui/elo-system";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { DISCOVERY_COPY, highlightHref } from "@/lib/highlight/discovery";
@@ -29,7 +28,7 @@ export function NewHighlightCard({
   const seconds = Math.round(item.durationS);
 
   const open = () => {
-    void logHighlightShareEvent(supabase, item.highlightId, "home_card_tapped", { source: "home" });
+    logHighlightEvent(item.highlightId, "home_card_tapped", { source: "home" });
     router.push(highlightHref(item.highlightId, "home") as never);
   };
 

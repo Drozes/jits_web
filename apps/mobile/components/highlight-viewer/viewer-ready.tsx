@@ -51,7 +51,7 @@ export function ViewerReady({ detail, source }: { detail: HighlightDetail; sourc
         <ViewerMeta progress={progress} />
         <ViewerActions
           shareEnabled={detail.shareEnabled}
-          primaryPath={vs.share.primaryPath}
+          primaryPath={vs.share.activePath}
           canSaveToPhotos={vs.share.capabilities?.saveToPhotos ?? false}
           saving={vs.saving}
           savePermissionDenied={vs.savePermissionDenied}

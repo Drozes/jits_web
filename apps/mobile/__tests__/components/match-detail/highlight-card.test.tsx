@@ -13,8 +13,10 @@ jest.mock("expo-router", () => ({ useFocusEffect: jest.fn(), useRouter: () => ({
 
 // Phase 2 (spec 014 section 16.6.2): the ready card marks the live version seen.
 const mockMarkSeen = jest.fn();
+const mockFlags = jest.fn();
 jest.mock("@jits/shared/api/highlight-share", () => ({
   markHighlightSeen: (...a: unknown[]) => mockMarkSeen(...a),
+  getHighlightFlags: (...a: unknown[]) => mockFlags(...a),
 }));
 
 jest.mock("lucide-react-native", () => {
@@ -187,6 +189,7 @@ beforeEach(() => {
   });
   mockRetry.mockResolvedValue({ ok: true, data: { highlightId: "h1" } });
   mockMarkSeen.mockResolvedValue({ ok: true, data: null });
+  mockFlags.mockResolvedValue({ ok: true, data: { clipsEnabled: true, shareEnabled: true } });
 });
 
 // ---- phases ----
@@ -729,6 +732,20 @@ describe("Feedback sheet", () => {
 // ---- phase 2: Open reel + seen (jr_be spec 014 sections 16.6.2 / 16.6.4) ----
 
 describe("HighlightCard phase 2 tie-in", () => {
+  it.each([
+    ["clips off", { ok: true, data: { clipsEnabled: false, shareEnabled: true } }],
+    ["flags RPC missing (phase-2 backend not deployed)", { ok: false, error: { code: "UNKNOWN", message: "404" } }],
+  ])("%s: no Open reel link and nothing marked seen (fails closed)", async (_label, flags) => {
+    mockFlags.mockResolvedValue(flags);
+    const utils = await renderCard(progress("ready"));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(utils.getByTestId("highlight-player")).toBeTruthy();
+    expect(utils.queryByTestId("highlight-open-reel")).toBeNull();
+    expect(mockMarkSeen).not.toHaveBeenCalled();
+  });
+
   it.each(["ready", "regenerating"])("%s: a text link opens the viewer with source=match_detail", async (phase) => {
     const utils = await renderCard(progress(phase));
     fireEvent.press(utils.getByTestId("highlight-open-reel"));
