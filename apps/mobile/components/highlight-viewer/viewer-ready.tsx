@@ -1,7 +1,6 @@
 import * as React from "react";
 import { View } from "react-native";
 import type { HighlightDetail, HighlightShareSourceTag } from "@jits/shared/api/highlight-share";
-import { HIGHLIGHT_COPY } from "@/lib/highlight/highlight-copy";
 import { useMyHighlight } from "@/lib/highlight/use-my-highlight";
 import { useHighlightRating } from "@/lib/highlight/use-highlight-rating";
 import { track } from "@/lib/highlight-share";
@@ -10,23 +9,28 @@ import { useViewerShare } from "./use-viewer-share";
 import { ViewerFrame } from "./viewer-frame";
 import { ViewerMeta } from "./viewer-meta";
 import { ViewerActions } from "./viewer-actions";
-import { ViewerMessage } from "./viewer-states";
+import { ViewerProgressState } from "./viewer-progress-state";
+import { useViewerRefresh } from "./use-viewer-refresh";
 import { ViewerImproveSheet } from "./viewer-improve-sheet";
-import { VIEWER_COPY } from "./viewer-copy";
 import { PreShareSheet } from "./pre-share-sheet";
 import { ShareSheetBody } from "./share-sheet-body";
 
 /**
- * A reel with a live version: the phase-1 progress + signing hook plays the
- * LIVE render (kept playing while a new version is made), then meta, the
- * actions, the pre-share sheet and the phase-1 "Improve this reel" sheet.
+ * The reel, following its progress (the phase-1 hook: realtime + 15 s
+ * polling while it is moving, re-read on focus and foreground): the LIVE
+ * render plays (kept playing while a new version is made, a new version is
+ * swapped in place), then meta, the actions, the pre-share sheet and the
+ * phase-1 "Improve this reel" sheet. Without a live version a calm state
+ * shows until one lands.
  */
 export function ViewerReady({ detail, source }: { detail: HighlightDetail; source: HighlightShareSourceTag }) {
   const my = useMyHighlight(detail.matchVideoId);
+  useViewerRefresh(my.reload);
   const progress = my.progress;
   const playback = progress?.playback ?? null;
   const version = playback?.version ?? detail.version;
-  useViewerOpened(detail.highlightId, version, source);
+  // Seen / viewer_opened only for a version actually on screen (not a stale detail read).
+  useViewerOpened(detail.highlightId, playback?.version ?? null, source);
   const vs = useViewerShare(detail, playback?.durationS ?? null, source);
   const fb = useHighlightRating(detail.highlightId, version, my.refresh);
   const { openImprove } = fb;
@@ -35,14 +39,9 @@ export function ViewerReady({ detail, source }: { detail: HighlightDetail; sourc
     openImprove();
   }, [detail.highlightId, openImprove, source]);
 
-  if (progress && !playback) {
-    const paused = progress.phase === "disabled";
-    return (
-      <ViewerMessage
-        testID={paused ? "viewer-paused" : "viewer-invalidated"}
-        message={paused ? VIEWER_COPY.paused : HIGHLIGHT_COPY.invalidated}
-      />
-    );
+  if (progress && !playback) return <ViewerProgressState phase={progress.phase} />;
+  if (!progress) {
+    return <ViewerFrame source={null} playbackFailed={false} onPlayerError={my.onPlayerError} onRetry={my.reload} />;
   }
   return (
     <View className="flex-1 gap-3">

@@ -10,6 +10,7 @@ export const VIEWER_COPY = {
   back: "Back",
   paused: "Highlights are paused right now.",
   cannotPlay: "We couldn't play this reel right now.",
+  making: "Your reel is being made. It will play here as soon as it's ready.",
 } as const;
 
 /** `progress` is a 0..1 fraction (or null before the first byte): whole percent. */

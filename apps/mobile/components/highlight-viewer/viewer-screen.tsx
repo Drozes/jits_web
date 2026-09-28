@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { HighlightShareSourceTag } from "@jits/shared/api/highlight-share";
 import { darkTokens } from "@/lib/tokens";
 import { darkVarsStyle } from "@/lib/theme/theme-provider";
-import { HIGHLIGHT_COPY, HIGHLIGHT_ERROR_FALLBACK, highlightErrorCopy } from "@/lib/highlight/highlight-copy";
+import { HIGHLIGHT_ERROR_FALLBACK, highlightErrorCopy } from "@/lib/highlight/highlight-copy";
 import { useHighlightDetail } from "@/lib/highlight/use-highlight-detail";
 import { ViewerHeader } from "./viewer-header";
 import { ViewerFrame } from "./viewer-frame";
@@ -55,9 +55,8 @@ export function ViewerScreen({ id, source }: { id: string | undefined; source: H
   } else if (!detail.clipsEnabled) {
     // Clips are off: a calm paused state, no playback, nothing marked seen.
     body = <ViewerMessage testID="viewer-paused" message={VIEWER_COPY.paused} />;
-  } else if (detail.version == null) {
-    body = <ViewerMessage testID="viewer-invalidated" message={HIGHLIGHT_COPY.invalidated} />;
   } else {
+    // Every other state (including no live version yet) follows progress.
     body = <ViewerReady detail={detail} source={source} />;
   }
 

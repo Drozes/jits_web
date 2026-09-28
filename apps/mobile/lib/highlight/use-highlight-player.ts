@@ -15,6 +15,8 @@ export interface HighlightPlayerState {
   renderedVersion: number | null;
   /** The version of the item on screen, or null while a swap is still pending. */
   settledVersion: () => number | null;
+  /** Version whose playback has actually started (the poster stays until then). */
+  playedVersion: number | null;
 }
 
 /**
@@ -144,5 +146,5 @@ export function useHighlightPlayer(source: HighlightSource, onError: () => void)
     () => (swap.current.doneSeq === swap.current.seq ? loadedRef.current.version : null),
     [],
   );
-  return { player, renderedVersion, settledVersion };
+  return { player, renderedVersion, settledVersion, playedVersion };
 }

@@ -21,20 +21,21 @@ interface HighlightPlayerProps {
 
 /**
  * The reel, in-app only: tap toggles play/pause; the poster covers the frame
- * until a frame of THIS version is on screen (onFirstFrameRender, or
- * readyToPlay once playback has started: a paused, never-played item is
- * black). Native fullscreen always presents WITH native controls
+ * at rest until playback of THIS version has actually started AND a frame of
+ * it is on screen (onFirstFrameRender or readyToPlay). A paused,
+ * never-played item may be black (frame 0), so neither event alone lifts it. Native fullscreen always presents WITH native controls
  * (`useFullscreenControls`); the viewer, which hides the button, disables
  * fullscreen outright. PiP is off and there is NO share / save / export.
  */
 export function HighlightPlayer({ source, onError, frameStyle, showFullscreenButton = true }: HighlightPlayerProps) {
   const viewRef = React.useRef<VideoView>(null);
   const [firstFrameVersion, setFirstFrameVersion] = React.useState<number | null>(null);
-  const { player, renderedVersion, settledVersion } = useHighlightPlayer(source, onError);
+  const { player, renderedVersion, settledVersion, playedVersion } = useHighlightPlayer(source, onError);
   const fullscreen = useFullscreenControls(viewRef);
   // A first frame counts only for the item whose swap has settled (never the old one).
   const onFirstFrame = React.useCallback(() => setFirstFrameVersion(settledVersion()), [settledVersion]);
-  const covered = firstFrameVersion !== source.version && renderedVersion !== source.version;
+  const v = source.version;
+  const covered = renderedVersion !== v && !(firstFrameVersion === v && playedVersion === v);
 
   const toggle = React.useCallback(() => {
     if (player.playing) player.pause();

@@ -12,7 +12,18 @@ import { act, fireEvent, render, waitFor } from "@testing-library/react-native";
 // ---- mocks ----
 
 const mockRouter = { back: jest.fn(), replace: jest.fn(), push: jest.fn(), canGoBack: jest.fn(() => true) };
-jest.mock("expo-router", () => ({ useRouter: () => mockRouter, useFocusEffect: jest.fn() }));
+const mockFocus: (() => void)[] = [];
+jest.mock("expo-router", () => ({
+  useRouter: () => mockRouter,
+  // Records each focus callback and runs the first focus on mount, like the real hook.
+  useFocusEffect: (cb: () => void) => {
+    const R = require("react");
+    R.useEffect(() => {
+      mockFocus.push(cb);
+      cb();
+    }, [cb]);
+  },
+}));
 jest.mock("react-native-safe-area-context", () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
@@ -277,12 +288,74 @@ describe("viewer states", () => {
 
   it("no live version: the replaced copy, no share, never marked seen", async () => {
     mockGetDetail.mockResolvedValue({ ok: true, data: detail({ version: null }) });
+    mockProgress = progress("invalidated", { playback: null });
     const utils = await renderViewer();
     expect(utils.getByTestId("viewer-invalidated")).toHaveTextContent(
       "Your match video was replaced. A new reel will be made once it's analysed.",
     );
     expect(utils.queryByText("Share to Instagram")).toBeNull();
     expect(mockMarkSeen).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["waiting_for_analysis", "viewer-making", "Your reel is being made. It will play here as soon as it's ready."],
+    ["planning", "viewer-making", "Your reel is being made. It will play here as soon as it's ready."],
+    ["rendering", "viewer-making", "Your reel is being made. It will play here as soon as it's ready."],
+    ["failed", "viewer-failed", "We couldn't make your highlight reel."],
+    ["none", "viewer-none", "We couldn't find a clear highlight of you in this video."],
+  ])("no live version, %s: a calm state, no share, never marked seen", async (phase, testID, copy) => {
+    mockGetDetail.mockResolvedValue({ ok: true, data: detail({ version: null }) });
+    mockProgress = progress(phase, { playback: null });
+    const utils = await renderViewer();
+    expect(utils.getByTestId(testID)).toHaveTextContent(copy);
+    expect(utils.queryByTestId("viewer-share")).toBeNull();
+    expect(mockMarkSeen).not.toHaveBeenCalled();
+  });
+
+  it("follows progress: an invalidated / rendering reel swaps to the new live version in place", async () => {
+    mockGetDetail.mockResolvedValue({ ok: true, data: detail({ version: null }) });
+    mockProgress = progress("rendering", { playback: null });
+    const utils = await renderViewer();
+    expect(utils.getByTestId("viewer-making")).toBeTruthy();
+    expect(mockSign).not.toHaveBeenCalled();
+    // Realtime / polling (the shared progress hook) reports the new live version.
+    mockProgress = progress("ready", { renderTotal: 3, playback: { ...(progress("ready").playback as object), version: 3 } });
+    utils.rerender(<ViewerScreen id="h1" source="home" />);
+    await flush();
+    fireEvent(utils.getByTestId("viewer-frame"), "layout", { nativeEvent: { layout: { width: 390, height: 700 } } });
+    await waitFor(() => expect(utils.getByTestId("highlight-player")).toBeTruthy());
+    expect(utils.queryByTestId("viewer-making")).toBeNull();
+    expect(utils.getByTestId("viewer-meta")).toHaveTextContent("31s · Version 3");
+    expect(mockMarkSeen).toHaveBeenCalledWith({}, "h1", 3);
+    expect(utils.getByTestId("viewer-share")).toBeTruthy();
+  });
+
+  it("a regeneration landing while watching swaps the new version into the SAME player", async () => {
+    const utils = await renderViewer();
+    await waitFor(() => expect(utils.getByTestId("highlight-player")).toBeTruthy());
+    const view = utils.getByTestId("expo-video-view");
+    const player = view.props.player;
+    mockSign.mockResolvedValue({
+      ok: true,
+      data: { url: "https://signed/v3.mp4", posterUrl: "https://signed/v3.jpg", version: 3, durationS: 28 },
+    });
+    mockProgress = progress("ready", {
+      renderTotal: 3,
+      playback: { ...(progress("ready").playback as object), version: 3, storagePath: "m/u/highlights/3.mp4" },
+    });
+    utils.rerender(<ViewerScreen id="h1" source="home" />);
+    await flush();
+    await flush();
+    expect(utils.getByTestId("expo-video-view").props.player).toBe(player);
+    expect(player.replaceAsync).toHaveBeenCalledWith("https://signed/v3.mp4");
+  });
+
+  it("re-reads progress when the viewer regains focus (not on the first focus)", async () => {
+    mockFocus.length = 0;
+    await renderViewer();
+    const before = mockRefresh.mock.calls.length;
+    act(() => mockFocus.forEach((cb) => cb()));
+    expect(mockRefresh.mock.calls.length).toBeGreaterThan(before);
   });
 
   it("progress lost its playback (invalidated): the replaced copy", async () => {

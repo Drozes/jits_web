@@ -303,15 +303,25 @@ describe("HighlightPlayer", () => {
     expect(view.props.contentFit).toBe("contain");
   });
 
-  it("toggles play/pause on tap and hides the poster after the first frame", () => {
+  it("toggles play/pause on tap", () => {
     const utils = render(<HighlightPlayer source={SOURCE} onError={jest.fn()} />);
     const player = utils.getByTestId("expo-video-view").props.player;
-    expect(utils.getByTestId("highlight-poster")).toBeTruthy();
     fireEvent.press(utils.getByLabelText("Your highlight reel, 30 seconds"));
     expect(player.play).toHaveBeenCalledTimes(1);
     fireEvent.press(utils.getByLabelText("Your highlight reel, 30 seconds"));
     expect(player.pause).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the poster at rest through onFirstFrameRender until playback has started (frame 0 may be black)", () => {
+    const utils = render(<HighlightPlayer source={SOURCE} onError={jest.fn()} />);
+    const player = utils.getByTestId("expo-video-view").props.player;
+    expect(utils.getByTestId("highlight-poster")).toBeTruthy();
     act(() => utils.getByTestId("expo-video-view").props.onFirstFrameRender());
+    expect(utils.getByTestId("highlight-poster")).toBeTruthy(); // paused, never played
+    act(() => emitPlaying(player, true));
+    expect(utils.queryByTestId("highlight-poster")).toBeNull();
+    // Pausing afterwards keeps the real frame (the poster does not come back).
+    act(() => emitPlaying(player, false));
     expect(utils.queryByTestId("highlight-poster")).toBeNull();
   });
 
@@ -514,9 +524,12 @@ describe("HighlightPlayer", () => {
       <HighlightPlayer source={{ ...SOURCE, url: "https://v2", version: 2, generation: 1 }} onError={jest.fn()} />,
     );
     act(() => utils.getByTestId("expo-video-view").props.onFirstFrameRender()); // the old item
+    act(() => emitPlaying(player, true)); // also about the old item
     expect(utils.getByTestId("highlight-poster")).toBeTruthy();
     await act(async () => pending[0].resolve());
     act(() => utils.getByTestId("expo-video-view").props.onFirstFrameRender());
+    expect(utils.getByTestId("highlight-poster")).toBeTruthy(); // settled, but not played yet
+    act(() => emitPlaying(player, true));
     expect(utils.queryByTestId("highlight-poster")).toBeNull();
   });
 
