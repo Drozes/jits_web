@@ -18,7 +18,7 @@ vi.mock("@jits/shared/api/queries", () => ({
   getMatchVideoSignedUrlResult: (...a: unknown[]) => mockSigned(...a),
 }));
 
-import { VideoAnalysisViewer } from "./video-analysis-viewer";
+import { VideoAnalysisViewer, recommendationText } from "./video-analysis-viewer";
 
 beforeEach(() => {
   mockSigned.mockReset();
@@ -124,5 +124,38 @@ describe("VideoAnalysisViewer no match detected (jr_be-0qf)", () => {
     await waitFor(() => expect(r.getAllByRole("tab").length).toBe(4));
     expect(r.queryByTestId("analysis-no-match")).toBeNull();
     expect(r.getByText("Summary text.")).toBeInTheDocument();
+  });
+});
+
+describe("recommendationText", () => {
+  it("prefers a non-empty suggestion, then text, and guards non-strings", () => {
+    expect(recommendationText({ suggestion: "  Frame both.  ", text: "old" })).toBe("Frame both.");
+    expect(recommendationText({ suggestion: "   ", text: " More light. " })).toBe("More light.");
+    expect(recommendationText({ suggestion: 42, text: "Fallback." })).toBe("Fallback.");
+    expect(recommendationText({ suggestion: null, text: { nested: true } })).toBe("");
+    expect(recommendationText(null)).toBe("");
+    expect(recommendationText("junk")).toBe("");
+  });
+
+  it("drops empty and malformed tips from the no-match state and the Tips tab", async () => {
+    mockProgressData = { status: "analyzed", chunk_count: 1, chunks: [], chunks_completed: 1, failed_chunk_count: 0, requested_tier: "standard", latest_error_message: null };
+    const recs = [{ suggestion: "Keep.", text: "" }, { suggestion: "  " }, { text: 7 }, null];
+    mockSigned.mockResolvedValue({ ok: true, data: "https://x/v.mp4" });
+    fakeClient.rpc.mockResolvedValue({
+      data: { analysis: { id: "a", video_id: "vid-9", summary: "S.", positions: [], scoring_moments: [], recommendations: recs, match_detected: false }, technique_tags: [] },
+      error: null,
+    });
+    const r = render(<VideoAnalysisViewer videoId="vid-9" />);
+    const tips = await waitFor(() => r.getByTestId("analysis-no-match-tips"));
+    expect(tips.querySelectorAll("li")).toHaveLength(1);
+    expect(tips).toHaveTextContent("Keep.");
+
+    r.unmount();
+    fakeClient.rpc.mockResolvedValue({
+      data: { analysis: { id: "a", video_id: "vid-9", summary: "S.", positions: [], scoring_moments: [], recommendations: recs, match_detected: true }, technique_tags: [] },
+      error: null,
+    });
+    const t = render(<VideoAnalysisViewer videoId="vid-9" />);
+    await waitFor(() => expect(t.getByRole("tab", { name: "Tips (1)" })).toBeInTheDocument());
   });
 });

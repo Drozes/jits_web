@@ -2,6 +2,9 @@ import * as React from "react";
 import { supabase } from "@/lib/supabase/client";
 import { adminListNoMatchVideos, type NoMatchVideoRow } from "@jits/shared/api/queries";
 
+export const NO_MATCH_ADMIN_OUTDATED =
+  "This needs the latest backend. The no-match list isn't available on this server yet.";
+
 interface UseAdminNoMatchVideosResult {
   rows: NoMatchVideoRow[];
   isLoading: boolean;
@@ -31,7 +34,15 @@ export function useAdminNoMatchVideos(): UseAdminNoMatchVideosResult {
         setRows(result.data);
       } else {
         setRows([]);
-        setError(result.error.message);
+        // Never PostgREST's raw text: a backend without the RPC (or a
+        // function-not-found) gets a plain explanation.
+        setError(
+          result.error.code === "RPC_MISSING"
+            ? NO_MATCH_ADMIN_OUTDATED
+            : result.error.code === "UNKNOWN"
+              ? "Couldn't load no-match videos. Try again."
+              : result.error.message,
+        );
       }
       setIsLoading(false);
     })();

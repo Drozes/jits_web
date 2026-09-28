@@ -38,7 +38,9 @@ export default function AdminNoMatchVideosScreen() {
           </View>
         ) : error ? (
           <Plate variant="loss" className="gap-3">
-            <Text className="font-body text-[13px] text-ink leading-relaxed">{error}</Text>
+            <Text testID="no-match-error" className="font-body text-[13px] text-ink leading-relaxed">
+              {error}
+            </Text>
             <Button variant="outline" size="sm" onPress={reload}>
               Retry
             </Button>
@@ -52,7 +54,7 @@ export default function AdminNoMatchVideosScreen() {
                 </Text>
               </Plate>
             ) : (
-              rows.map((row) => <NoMatchVideoRowCard key={row.video_id} row={row} />)
+              rows.map((row) => <NoMatchVideoRowCard key={row.key} row={row} />)
             )}
             <Button variant="outline" size="sm" onPress={reload}>
               Refresh

@@ -37,8 +37,18 @@ interface Recommendation {
   category?: string;
 }
 
-function recommendationText(r: Recommendation): string {
-  return (r.suggestion ?? r.text ?? "").trim();
+/** Non-empty trimmed string, else null (the JSONB is model-written). */
+function nonEmpty(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+/** A tip's text: a non-empty `suggestion` first, then `text`; "" when neither. */
+export function recommendationText(r: unknown): string {
+  if (!r || typeof r !== "object") return "";
+  const rec = r as Recommendation;
+  return nonEmpty(rec.suggestion) ?? nonEmpty(rec.text) ?? "";
 }
 
 interface TechniqueTag {
@@ -320,14 +330,18 @@ function AnalysisTabs({
     return (
       <NoMatchState
         reason={toNoMatchReason(false, analysis.no_match_reason)}
-        tips={(analysis.recommendations ?? []).map(recommendationText).filter(Boolean)}
+        tips={(Array.isArray(analysis.recommendations) ? analysis.recommendations : [])
+          .map(recommendationText)
+          .filter((t) => t !== "")}
       />
     );
   }
 
   const positions = analysis.positions ?? [];
   const moments = analysis.scoring_moments ?? [];
-  const recs = analysis.recommendations ?? [];
+  const recs = (Array.isArray(analysis.recommendations) ? analysis.recommendations : []).filter(
+    (r) => recommendationText(r) !== "",
+  );
   const tags = payload.technique_tags ?? [];
 
   return (

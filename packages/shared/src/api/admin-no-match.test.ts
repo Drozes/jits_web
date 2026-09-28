@@ -45,6 +45,44 @@ describe("adminListNoMatchVideos (jr_be-0qf)", () => {
       no_match_reason: "An empty office.",
     });
     expect(r.data[0].participants.map((p) => p.elo_delta)).toEqual([16, -16]);
+    // No history fields on this backend: key falls back to the video id.
+    expect(r.data[0]).toMatchObject({
+      key: "v1",
+      verdict_id: null,
+      superseded: null,
+      current_match_detected: null,
+      verdict_count: null,
+      no_match_count: null,
+    });
+  });
+
+  it("maps the verdict-history fields and keeps a row whose video was deleted", async () => {
+    const { client } = rpcClient({
+      data: [
+        { ...ROW, verdict_id: "ver-1", superseded: true, current_match_detected: true, verdict_count: 3, no_match_count: "2" },
+        { ...ROW, video_id: null, verdict_id: "ver-2", superseded: true, verdict_count: 1, no_match_count: 1 },
+        { ...ROW, video_id: null, verdict_id: null },
+      ],
+      error: null,
+    });
+    const r = await adminListNoMatchVideos(client);
+    if (!r.ok) throw new Error("expected ok");
+    expect(r.data.map((x) => x.key)).toEqual(["ver-1", "ver-2"]);
+    expect(r.data[0]).toMatchObject({ superseded: true, current_match_detected: true, verdict_count: 3, no_match_count: 2 });
+    expect(r.data[1]).toMatchObject({ video_id: null, superseded: true, verdict_count: 1, no_match_count: 1 });
+  });
+
+  it.each(["PGRST202", "42883"])("maps a missing RPC (%s) to RPC_MISSING, not PostgREST's text", async (code) => {
+    const { client } = rpcClient({
+      data: null,
+      error: { code, message: "Could not find the function public.admin_list_no_match_videos", details: "", hint: "" },
+    });
+    const r = await adminListNoMatchVideos(client);
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.error.code).toBe("RPC_MISSING");
+      expect(r.error.message).toBe("This needs the latest backend.");
+    }
   });
 
   it("sends no args by default (the backend's 30-day window)", async () => {

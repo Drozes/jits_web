@@ -2277,7 +2277,10 @@ export interface NoMatchVideoParticipant {
 
 /** One row of `admin_list_no_match_videos` (jr_be-0qf). */
 export interface NoMatchVideoRow {
-  video_id: string;
+  /** Stable row key: the verdict id when the backend sends one, else the video id. */
+  key: string;
+  /** Null when the match_videos row has since been deleted (history-backed backend). */
+  video_id: string | null;
   match_id: string;
   uploaded_by: string;
   uploader_name: string | null;
@@ -2292,6 +2295,20 @@ export interface NoMatchVideoRow {
   match_result: string | null;
   match_completed_at: string | null;
   participants: NoMatchVideoParticipant[];
+  /**
+   * Verdict-history fields (optional; null on a backend without the history
+   * table). `superseded`: the video was re-uploaded (or deleted) since this
+   * verdict. Counts are every verdict ever recorded for the video.
+   */
+  verdict_id: string | null;
+  superseded: boolean | null;
+  current_match_detected: boolean | null;
+  verdict_count: number | null;
+  no_match_count: number | null;
+}
+
+function optBool(value: unknown): boolean | null {
+  return typeof value === "boolean" ? value : null;
 }
 
 function optStr(value: unknown): string | null {
@@ -2338,17 +2355,26 @@ export async function adminListNoMatchVideos(
     if (opts?.since) args.p_since = opts.since;
     if (opts?.limit != null) args.p_limit = opts.limit;
     const { data, error } = await supabase.rpc("admin_list_no_match_videos", args);
-    if (error) return { ok: false, error: mapPostgrestError(error) };
+    if (error) {
+      // An older backend without the RPC: say so instead of PostgREST's text.
+      if (error.code === "PGRST202" || error.code === "42883") {
+        return { ok: false, error: { code: "RPC_MISSING", message: "This needs the latest backend.", raw: error } };
+      }
+      return { ok: false, error: mapPostgrestError(error) };
+    }
     const rows = (Array.isArray(data) ? data : []) as unknown as Record<string, unknown>[];
     return {
       ok: true,
       data: rows.flatMap((r) => {
         const videoId = optStr(r.video_id);
+        const verdictId = optStr(r.verdict_id);
         const matchId = optStr(r.match_id);
         const uploadedBy = optStr(r.uploaded_by);
-        if (!videoId || !matchId || !uploadedBy) return [];
+        const key = verdictId ?? videoId;
+        if (!key || !matchId || !uploadedBy) return [];
         return [
           {
+            key,
             video_id: videoId,
             match_id: matchId,
             uploaded_by: uploadedBy,
@@ -2362,6 +2388,11 @@ export async function adminListNoMatchVideos(
             match_result: optStr(r.match_result),
             match_completed_at: optStr(r.match_completed_at),
             participants: toNoMatchParticipants(r.participants),
+            verdict_id: verdictId,
+            superseded: optBool(r.superseded),
+            current_match_detected: optBool(r.current_match_detected),
+            verdict_count: optNum(r.verdict_count),
+            no_match_count: optNum(r.no_match_count),
           },
         ];
       }),

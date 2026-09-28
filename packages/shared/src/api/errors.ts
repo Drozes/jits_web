@@ -53,6 +53,7 @@ export type DomainErrorCode =
   | "DISPUTE_WINDOW_CLOSED"
   | "NOT_AUTHORIZED"
   | "RLS_VIOLATION"
+  | "RPC_MISSING"
   | "UNKNOWN";
 
 export interface DomainError {
