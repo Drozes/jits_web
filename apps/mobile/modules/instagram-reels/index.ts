@@ -17,7 +17,7 @@ import { requireOptionalNativeModule } from "expo-modules-core";
  * custom URL scheme; an Android intent with a custom action and an explicit
  * URI-permission grant). No Expo module wraps it either.
  *
- * ITS ONLY CALLER IS `lib/highlight-share/` (jr_be spec 014 section 16.6.1),
+ * ITS ONLY CALLER IS `lib/highlight-share/` (jr_be spec 015 section 16.6.1),
  * and every path there is gated on the `highlight_share_enabled` feature
  * flag: the viewer hides the Share / Save actions while it is off, and the
  * share hook calls `prepare_highlight_share` (which refuses while it is off)

@@ -46,7 +46,7 @@ export interface UseHighlightRatingResult {
 }
 
 /**
- * All of the card's feedback writes (jr_be spec 014 section 10).
+ * All of the card's feedback writes (jr_be spec 015 section 10).
  *
  * Thumbs up writes `{rating: 1}` at once, optimistic, reverted with a toast on
  * error. Thumbs down opens the sheet preset to -1 and writes nothing yet; if

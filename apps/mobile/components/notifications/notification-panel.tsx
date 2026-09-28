@@ -24,7 +24,7 @@ interface NotificationPanelProps {
   items: BellItem[];
   /**
    * Opens a tappable row. Only ready-reel rows are tappable: the other rows'
-   * routes point at retired `/session/...` paths (spec 014 section 16.12).
+   * routes point at retired `/session/...` paths (spec 015 section 16.12).
    */
   onItemPress?: (item: BellItem) => void;
 }

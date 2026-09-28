@@ -12,7 +12,7 @@ export const HIGHLIGHTS_ROW_GUTTER = 16;
 
 interface HighlightsRowProps {
   items: ProfileHighlight[];
-  /** `highlight_clips_enabled`: discovery follows it (spec 014 section 16.1). */
+  /** `highlight_clips_enabled`: discovery follows it (spec 015 section 16.1). */
   clipsEnabled: boolean;
   /** Called on tap, before navigating (clears the NEW tag without a refetch). */
   onOpen?: (highlightId: string) => void;

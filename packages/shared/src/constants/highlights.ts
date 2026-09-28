@@ -1,5 +1,5 @@
 /**
- * Highlight reel feedback vocabulary (jr_be spec 014 sections 5.5 and 9.5).
+ * Highlight reel feedback vocabulary (jr_be spec 015 sections 5.5 and 9.5).
  *
  * The chip codes are a DB CHECK enum on `video_highlight_feedback.chips`
  * (`not_me`, `missed_best_moment`, `too_long`, `too_short`, `slow_start`,
@@ -34,7 +34,7 @@ export const HIGHLIGHT_FEEDBACK_CHIPS: ReadonlyArray<{
 export const HIGHLIGHT_FREE_TEXT_MAX = 280;
 
 /**
- * Share-funnel telemetry steps (jr_be spec 014 section 16.3.6). A DB CHECK
+ * Share-funnel telemetry steps (jr_be spec 015 section 16.3.6). A DB CHECK
  * enum on `video_highlight_share_events.step`: never rename one without a
  * migration. `log_highlight_share_event` rejects anything else.
  */

@@ -34,6 +34,7 @@ export function parseFinishTime(input: string): number | null {
  * valid (the result step submits no finish time in that case). A non-empty
  * input is valid only when it parses (see `parseFinishTime`) AND falls
  * within the match duration: a submission cannot land after the bout ended.
+ * Zero is rejected: `record_match_result` requires a finish time above 0.
  *
  *   isFinishTimeValid("", 600)      -> true   (optional, omitted)
  *   isFinishTimeValid("   ", 600)   -> true   (optional, omitted)
@@ -41,11 +42,12 @@ export function parseFinishTime(input: string): number | null {
  *   isFinishTimeValid("10:00", 600) -> true   (600 <= 600, boundary)
  *   isFinishTimeValid("11:00", 600) -> false  (660 > 600)
  *   isFinishTimeValid("59:59", 600) -> false  (mm:ss past duration)
+ *   isFinishTimeValid("0", 600)     -> false  (the BE rejects <= 0)
  *   isFinishTimeValid("abc", 600)   -> false  (malformed)
  */
 export function isFinishTimeValid(input: string, durationSeconds: number): boolean {
   if (!input.trim()) return true; // optional field: omitting it is allowed
   const parsed = parseFinishTime(input);
   if (parsed == null) return false;
-  return parsed <= durationSeconds;
+  return parsed > 0 && parsed <= durationSeconds;
 }

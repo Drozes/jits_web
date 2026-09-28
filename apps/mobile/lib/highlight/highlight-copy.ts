@@ -2,7 +2,7 @@ import type { DomainError, DomainErrorCode } from "@jits/shared/api/errors";
 
 /**
  * Every string the "Your highlight" card and the feedback sheet show
- * (jr_be spec 014 section 10), in one place so tests assert the exact copy.
+ * (jr_be spec 015 section 10), in one place so tests assert the exact copy.
  */
 export const HIGHLIGHT_COPY = {
   title: "Your highlight",

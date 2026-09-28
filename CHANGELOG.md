@@ -30,7 +30,7 @@ JS-only, still tier-1 OTA-eligible (no dependency, `app.json`, plugin, metro, ba
 - A highlight push tapped during a live match is held while any match screen is mounted and routed when the athlete leaves (`isInArenaMatch` / `subscribeArenaMatch` in `lib/arena/arena-store.ts`); the foreground banner for `highlight_ready` is suppressed while in a match. Cold start with the accepter rejoin already in the match waits for the exit too.
 - Sign-out resets notification routing (`resetNotificationRouterReady`, dropping any held tap) and deletes this device's push registration while the session can still write it (`removePushDeviceByToken` in `@jits/shared/api/mutations`, `unregisterPushDeviceOnSignOut`, bounded to 2 s), so the previous athlete's pushes no longer reach the next account on a shared device.
 - `apps/mobile/lib/highlight/highlight-store.ts`: the four bells and the Home card share one deduped, 2 s-throttled `get_my_highlights` read per query; a reel marked seen (viewer, match detail) or dismissed re-reads the bell and the Home card at once; Home's pull-to-refresh refreshes the bell; foreground refetches ignore iOS `inactive` -> `active`. The Home card re-signs a poster older than 50 minutes.
-- The viewer shows a calm "Highlights are paused right now." with no playback when `detail.clipsEnabled` is false. This is a deliberate, narrow extension of spec 014 section 16.14 assumption 4 (an already-open viewer and the match-detail card keep playing existing reels while clips are off): only a viewer OPENED while clips are off is paused, because it is reached from discovery surfaces that clips-off hides; an already-open viewer and the match-detail card still play.
+- The viewer shows a calm "Highlights are paused right now." with no playback when `detail.clipsEnabled` is false. This is a deliberate, narrow extension of spec 015 section 16.14 assumption 4 (an already-open viewer and the match-detail card keep playing existing reels while clips are off): only a viewer OPENED while clips are off is paused, because it is reached from discovery surfaces that clips-off hides; an already-open viewer and the match-detail card still play.
 - The cold-start read uses the synchronous `getLastNotificationResponse` / `clearLastNotificationResponse` when available.
 
 **Fixed (final review round)**
@@ -42,7 +42,7 @@ JS-only, still tier-1 OTA-eligible (no dependency, `app.json`, plugin, metro, ba
 
 ### Mobile: highlight share module + replacement guard (jits-s6mi.3, Highlight Reels phase 2 F5)
 
-JS-only, OTA-eligible (tier 1): uses only native modules already in builds 22/23 (InstagramReels, ExpoSharing, ExpoMediaLibrary, legacy expo-file-system). No dependency, `app.json`, plugin, metro, babel or `eas.json` change; `expo-clipboard` is NOT added (its native module is probed directly, so the same JS lights up the Copy button on the tier-2 build).
+JS-only, OTA-eligible (tier 1): uses only native modules already in builds 22 and 23 (an OTA of this branch targets runtime 0.4.0, so only build 23 and later receive it): InstagramReels, ExpoSharing, ExpoMediaLibrary, legacy expo-file-system. No dependency, `app.json`, plugin, metro, babel or `eas.json` change; `expo-clipboard` is NOT added (its native module is probed directly, so the same JS lights up the Copy button on the tier-2 build).
 
 **Added**
 - `apps/mobile/lib/highlight-share/` (the ONLY app code that may touch the Reels module, expo-sharing, expo-media-library or a clipboard module): `capabilities.ts` (`getShareCapabilities()`: reels = module + App ID + iOS `canOpenURL("instagram-reels://share")`, share sheet, Photos, clipboard, plus `reelsModule` / `instagramDetected` for diagnostics), `native-modules.ts` (every native package required lazily behind `requireOptionalNativeModule`, so a binary without it degrades instead of throwing), `download.ts` (`downloadReel` to `cacheDirectory/highlight-share/<fileName>` via a `.part` file, reuse of a complete cached file, 60 s timeout, non-2xx/timeout/throw delete the partial file, one in-flight download per file; `sweepShareCache` (> 24 h) and `clearShareCache`; nothing is deleted right after a handoff), `reels.ts` (3-60 s window, handoff), `share-sheet.ts`, `save-photos.ts` (write-only permission), `clipboard.ts`, `share-copy.ts` (spec 16.6.3 copy), `telemetry.ts` (`track`, adds platform / OS / app / runtime version), `use-highlight-share.ts` and `index.ts`.
@@ -64,7 +64,7 @@ Config only, OTA-eligible: `extra` is carried in the update manifest; no plugin,
 
 ### Shared: Highlight Reels phase 2 share-funnel layer (jits-s6mi.12)
 
-Coded against jr_be spec 014 section 16.3 / 16.5. The six RPCs are called through the generated `database.ts` (regenerated with B9 applied); the JSONB return shapes are narrowed by `Raw*` types in `highlight-share.ts`.
+Coded against jr_be spec 015 section 16.3 / 16.5. The six RPCs are called through the generated `database.ts` (regenerated with B9 applied); the JSONB return shapes are narrowed by `Raw*` types in `highlight-share.ts`.
 
 **Added**
 - `@jits/shared/api/highlight-share` (new `packages/shared/src/api/highlight-share.ts`, also in the `./api` barrel): `getHighlightFlags`, `getMyHighlights`, `getHighlightDetail`, `markHighlightSeen`, `prepareHighlightShare` (the server-side kill-switch check), `signHighlightDownload` (`match-videos`, 300 s, 404 -> `VIDEO_FILE_MISSING`) and `logHighlightShareEvent` (fire-and-forget, never rejects), with the `HighlightFlags` / `MyHighlightItem` / `MyHighlights` / `HighlightCaptionContext` / `HighlightDetail` / `HighlightShareSource` types. All return `Result<T>`; `getHighlightFlags` fails closed.
@@ -76,7 +76,7 @@ Coded against jr_be spec 014 section 16.3 / 16.5. The six RPCs are called throug
 
 ### Mobile: full-screen highlight viewer + pre-share sheet, Profile Highlights row (jits-s6mi.4, jits-s6mi.14, Highlight Reels Alpha phase 2 F6 + F8)
 
-JS-only, tier-1 OTA-eligible (no dependency, `app.json`, plugin, metro, babel or `eas.json` change). Built on the F4 wrappers and the F5 `useHighlightShare` hook (spec 014 sections 16.5 and 16.6.1).
+JS-only, tier-1 OTA-eligible (no dependency, `app.json`, plugin, metro, babel or `eas.json` change). Built on the F4 wrappers and the F5 `useHighlightShare` hook (spec 015 sections 16.5 and 16.6.1).
 
 **Added**
 - Route `apps/mobile/app/(app)/highlight/[id].tsx` (`?source=push|bell|home|profile|match_detail|summary`, unknown -> `match_detail`), registered as a header-less `Stack.Screen` after `video/[id]` in `app/(app)/_layout.tsx`.
@@ -90,7 +90,7 @@ JS-only, tier-1 OTA-eligible (no dependency, `app.json`, plugin, metro, babel or
 
 ### Mobile: Highlight Reels discovery surfaces (jits-s6mi.13, phase 2 F7)
 
-JS-only, OTA-eligible (no dependency, `app.json`, plugin, metro, babel or `eas.json` change). Built on the F4 wrappers (jr_be spec 014 section 16.5). Every surface follows `highlight_clips_enabled` and navigates to the viewer route `/highlight/<id>?source=...` (F6).
+JS-only, OTA-eligible (no dependency, `app.json`, plugin, metro, babel or `eas.json` change). Built on the F4 wrappers (jr_be spec 015 section 16.5). Every surface follows `highlight_clips_enabled` and navigates to the viewer route `/highlight/<id>?source=...` (F6).
 
 **Added**
 - Home "Your new highlight" card after the Resume card: the latest unseen ready reel (small 9:16 poster, "vs {opponent} · {n}s" with the duration in mono, secondary "Watch", dismiss). No Signal Red CTA. Poster/Watch open the viewer with `source=home` and log `home_card_tapped`; dismiss marks the version seen and logs `home_card_dismissed`. Re-read on focus, foreground, match exit and pull to refresh. New `apps/mobile/components/dashboard/new-highlight-card.tsx`, `apps/mobile/lib/highlight/use-new-highlight.ts`.
@@ -110,17 +110,17 @@ JS-only, OTA-eligible (no dependency, `app.json`, plugin, metro, babel or `eas.j
 
 ### Mobile: "Your highlight" card, player and feedback sheet (jits-s6mi.10, Highlight Reels Alpha)
 
-JS-only, OTA-eligible for runtime 0.3.0 (expo-video is already embedded; no dependency, `app.json`, plugin, metro, babel or `eas.json` change). Needs jr_be B1 + B6 deployed to show anything: until `get_highlight_progress` answers, the card renders nothing.
+JS-only, OTA-eligible for runtime 0.4.0 (build 23 and later; expo-video is already embedded; no dependency, `app.json`, plugin, metro, babel or `eas.json` change). Needs jr_be B1 + B6 deployed to show anything: until `get_highlight_progress` answers, the card renders nothing.
 
 **Added**
-- Match detail shows the athlete's OWN highlight reel for each match video, after the video section (`apps/mobile/components/match-detail/highlight/`: `highlight-section.tsx`, `highlight-card.tsx`, `highlight-states.tsx`, `highlight-progress-steps.tsx`, `highlight-reel.tsx`, `highlight-reel-notes.tsx`, `highlight-player.tsx`, `highlight-frame.ts`, `highlight-feedback-row.tsx`, `highlight-thumbs.tsx`, `highlight-feedback-sheet.tsx`, `highlight-feedback-form.tsx`, `highlight-feedback-text.tsx`, `highlight-form-actions.tsx`, `highlight-regenerate-button.tsx`, `highlight-sheet-background.tsx`, `highlight-fullscreen-button.tsx`). Every phase from jr_be spec 014 section 10: waiting, generating (two honest steps), ready (9:16 expo-video player, muted, looping, tap to play, poster until the first frame, native fullscreen, AirPlay and PiP off), regenerating (the current version keeps playing), failed (one red "Try again" while renders remain; a failed plan with no reel says "We couldn't find highlights in this video."), none, invalidated; disabled / unavailable render nothing. No share, save or export affordance anywhere.
+- Match detail shows the athlete's OWN highlight reel for each match video, after the video section (`apps/mobile/components/match-detail/highlight/`: `highlight-section.tsx`, `highlight-card.tsx`, `highlight-states.tsx`, `highlight-progress-steps.tsx`, `highlight-reel.tsx`, `highlight-reel-notes.tsx`, `highlight-player.tsx`, `highlight-frame.ts`, `highlight-feedback-row.tsx`, `highlight-thumbs.tsx`, `highlight-feedback-sheet.tsx`, `highlight-feedback-form.tsx`, `highlight-feedback-text.tsx`, `highlight-form-actions.tsx`, `highlight-regenerate-button.tsx`, `highlight-sheet-background.tsx`, `highlight-fullscreen-button.tsx`). Every phase from jr_be spec 015 section 10: waiting, generating (two honest steps), ready (9:16 expo-video player, muted, looping, tap to play, poster until the first frame, native fullscreen, AirPlay and PiP off), regenerating (the current version keeps playing), failed (one red "Try again" while renders remain; a failed plan with no reel says "We couldn't find highlights in this video."), none, invalidated; disabled / unavailable render nothing. No share, save or export affordance anywhere.
 - Feedback: thumbs up stores a rating at once (optimistic, reverted on error); thumbs down opens "Improve your reel" preset to -1 and stores the -1 alone if the sheet is closed without a stored submit. A Regenerate that hits the 90 s client timeout closes the sheet with "Still working on it. Check back in a minute." and re-reads progress (the render may already be armed). The sheet's submit runs in the card, so its toast / refresh / error survives the sheet closing, and the sheet cannot be swiped or backdrop-closed while it runs; the sheet's thumbs can be cleared, and a rating-only send that repeats the stored rating is not offered. The sheet has the six chips, 280-character free text with a mono counter, the one red "Regenerate (n left)" (disabled with helper at 0 left, hidden with helper when regeneration is unavailable) and "Just send feedback".
 - Orchestration hooks in `apps/mobile/lib/highlight/`: `use-my-highlight.ts` (shared progress hook + signing of the live render, renewed on demand only (player error, pull-to-refresh, return from background when older than 50 min) and swapped into the same player with `replaceAsync` (sequenced: stale or post-unmount swaps are ignored, a stale swap finishing last re-loads the latest URL), keeping position, play state and fullscreen; the poster also hides on `readyToPlay` for the current version, a "can't play" note instead of a dead player; pull-to-refresh on match detail and a return from background re-read progress and re-sign when needed; poster cached by its storage key), `use-highlight-player.ts`, `use-highlight-rating.ts`, `use-highlight-feedback-form.ts`, `use-highlight-retry.ts`, `regenerate-mode.ts`, and all copy in `highlight-copy.ts`.
 - `apps/mobile/jest.setup.js`: a global `expo-video` stand-in (its JS entry cannot load under Jest).
 
 ### Shared: Highlight Reels Alpha client layer (jits-s6mi.9)
 
-Coded against jr_be spec 014 section 9; the backend (B1 `jr_be-15c.11`) lands in parallel.
+Coded against jr_be spec 015 section 9; the backend (B1 `jr_be-15c.11`) lands in parallel.
 
 **Added**
 - `@jits/shared/api/highlights` (new `packages/shared/src/api/highlights.ts`): `getHighlightProgress`, `signHighlightPlayback` (live render + poster in `match-videos`, 3600 s, poster best effort, 404 -> `VIDEO_FILE_MISSING`), `submitHighlightFeedback`, `regenerateHighlight` (edge function `highlight-regenerate` via `supabase.functions.invoke` with a 90 s timeout, error bodies mapped by hint, non-JSON -> `UNKNOWN`, abort/timeout or any no-response fetch failure -> `HIGHLIGHT_REGEN_TIMEOUT`), `retryHighlightRender`, `toHighlightProgress`, and the `HighlightPhase` / `HighlightProgress` / `HighlightPlaybackUrls` types. All return `Result<T>`.
@@ -131,6 +131,61 @@ Coded against jr_be spec 014 section 9; the backend (B1 `jr_be-15c.11`) lands in
 
 **Changed**
 - `packages/shared/src/api/queries.ts`: `MATCH_VIDEO_BUCKET`, `signPosterKey` and the new `isStorageObjectMissing` are exported for reuse; `getMatchVideoPlaybackResult` uses the latter (same behaviour).
+### Mobile: landscape live screen (Widescreen Sideline), rotate at ready, lock at live
+
+Requires a TestFlight build; NOT OTA-eligible. Ships in `expo.version` 0.4.0 (runtime 0.4.0). Native changes: `app.json` `expo.orientation` `"portrait"` to `"default"`, and the new `expo-screen-orientation` dependency (~9.0.9) with its config plugin (`initialOrientation: "PORTRAIT_UP"`). No OTA of this change may target the `0.3.0` runtime (installed 0.3.0 binaries lack the module; the wrapper degrades them to portrait-only without crashing). No backend, upload metadata or recorder option change: orientation lives in the clip itself (1280 x 720 landscape or 720 x 1280 portrait).
+
+**Added**
+- Orientation policy for the Arena match wizard and practice: the ready check follows the phone (portrait, landscape left, landscape right); going live locks the interface to whatever orientation it is in, so the clip records in it; the lock holds through the whole live step and while the clip is still stopping; every other step, every other screen and unmount are portrait. `apps/mobile/components/match-flow/match-orientation-controller.tsx` (rendered before the step renderer so the lock lands before recording starts).
+- `apps/mobile/lib/orientation.ts`: the crash-safe `expo-screen-orientation` wrapper (`allowRotation`, `lockToCurrent`, `lockPortrait`), a no-op without the native module; a rejected lock is logged once and never thrown. A later call supersedes a `lockToCurrent` still reading the current side, so a stale landscape lock can never land after the portrait one.
+- `apps/mobile/lib/orientation-bootstrap.tsx`: the root layout locks portrait once at launch. Needed on Android, where the plugin's portrait launch mask does not apply and `"default"` would otherwise leave non-match screens free to rotate; a no-op on iOS.
+- Landscape live layout, same components reflowed (`apps/mobile/components/match-flow/live/live-landscape-layout.tsx`): HUD top-left, lower-third docked bottom-left at 320 wide (96 high slab, 80 px digits), Pause (112 x 112) and Hold to end (112 x 180, fill grows bottom to top) as tiles in a right rail, left and right scrims. Every live state (recording, paused, final 10 s, hold, time up, camera starting, no video, opponent ended) has a landscape rendering; the no-video plate sits in the free region between the lower-third and the rail. The HUD sits at `insets.top + 16`, clearing the status bar on iPad (unchanged on iPhone, where landscape hides it). Practice gets the same screen with the PRACTICE tag and EXIT pill in the HUD row.
+- Ready check hint under the preview: "Turn your phone sideways for a wide shot. It locks when the match starts." (only with a granted preview).
+
+**Changed**
+- `fitRecordedFrame` is orientation-aware: 16:9, full height and centered in a landscape window; portrait output unchanged. New `readyPreviewWidth`: the landscape ready preview card is 16:9 at `min(content width, 0.6 x window height x 16 / 9)`, centered.
+- Landscape safe area: the wizard and practice scroll content and `AppHeader` use `max(16, inset)` side padding (unchanged in portrait).
+
+### Mobile: full-screen broadcast live step, finish-time prefill, submission picker
+
+JS-only, OTA-eligible (no native, `app.json` or dependency change).
+
+**Changed**
+- Live step, Arena match and practice: a full-screen portrait broadcast lower-third drawn over the camera frame. A HUD at the top (a REC tally that shows "REC mm:ss" only while the recorder is actually recording, otherwise CAMERA STARTING, SAVING VIDEO or NO VIDEO; the RANKED / CASUAL / PRACTICE tag; the practice EXIT pill), then a state strip (paused, final 10 seconds with one segment per second, time up with a drain bar, hold in progress, camera starting), the you-vs-opponent athlete bar with rating and weight, the clock slab (LIVE / PAUSED / TIME / FINAL) and Pause plus the red end button. Ending now takes a deliberate 1.2 s hold (releasing early cancels; screen readers get an "End match" action). When the opponent ends the match, a MATCH OVER plate with the frozen final clock shows for 1.5 s before the END step, and no control, recording start, warning haptic or late pause result acts during it. Screen readers hear the state before the clock ("Paused, 4 minutes 12 seconds remaining", "Time up, ...", "Final clock, ...") and a spelled-out tally ("Camera starting, not recording yet", "No video, camera unavailable").
+- Result step, Arena match and practice: the finish time is prefilled from the match clock at the end moment (pause-aware, clamped to 1 s to the match length; still editable and required, with a "From match clock" hint until edited). A cold start or re-entry into the result step has no reading and stays empty. `isFinishTimeValid` rejects 0, which `record_match_result` refuses.
+- Result step, Arena match and practice: the submission chip grid is replaced by one select field that opens the shared full-screen `SearchSelect` overlay. Search ignores case, punctuation, spacing and diacritics, matches codes and initials (for example "rnc"), keeps Other Submission offered under no match, and still submits the submission type code.
+- `SearchSelect` (`apps/mobile/components/ui/search-select.tsx`): optional testID-derived ids, a trigger accessible name of "<field>, <selection or placeholder>", a clear button, and configurable no-match copy and options. Existing callers are unchanged.
+
+**Added**
+- `apps/mobile/components/match-flow/live/`: `live-broadcast.tsx` (the shared screen), `athlete-bar.tsx`, `clock-slab.tsx`, `state-strip.tsx`, `rec-tally.tsx`, `hud-tag.tsx`, `pause-button.tsx`, `hold-to-end-button.tsx`, `no-video-plate.tsx`, `opponent-ended-plate.tsx`, `scrims.tsx`, `broadcast-tokens.ts` (fixed colors and sizes, theme-independent because they sit over video).
+- `apps/mobile/lib/match-flow/live-view-state.ts`: `deriveLiveView` (everything the live screen shows, derived from the clock, recorder and permission state), `HOLD_TO_END_MS`, `OPPONENT_ENDED_INTERSTITIAL_MS`, `spokenDuration`, `formatAthleteMeta`, `toLiveAthlete`.
+- `apps/mobile/lib/match-flow/use-recording-elapsed.ts`: the REC tally's elapsed seconds.
+- `apps/mobile/lib/video/recorded-frame.ts`: `fitRecordedFrame`, which sizes the camera preview to fit the screen at the 9:16 aspect the camera records, so what the athlete sees is exactly what is recorded (`camera-overlay.tsx`).
+- `LivePill` (`apps/mobile/components/ui/elo-system/live-pill.tsx`): the pulsing LIVE dot and label, with `onDark` for a fixed green on the dark broadcast chrome.
+- `apps/mobile/lib/match-flow/clamp-finish-seconds.ts`, `apps/mobile/lib/match-flow/use-finish-time-field.ts` (shared by match and practice), `apps/mobile/lib/match-flow/filter-submissions.ts`.
+
+**Removed**
+- `apps/mobile/components/match-flow/steps/timer-display.tsx` and `apps/mobile/components/match-flow/steps/live-controls.tsx` (replaced by the live broadcast components).
+
+### Mobile: practice match onboarding (jits-82by, jr_be spec 014)
+
+JS-only, OTA-eligible, but ship only AFTER the jr_be `practice_match_onboarding` migration is live in prod: `ATHLETE_GUARD_SELECT` now reads two new athlete columns and every athlete load fails without them (web `requireAthlete()` shares the constant, so the next web deploy must follow the migration too).
+
+**Added**
+- `/practice` (`apps/mobile/app/(app)/practice.tsx`): a client-side walk through one Arena match (go live, challenge, accept, weights, ready, 30s clock, result, confirm, summary) against a scripted "Practice Partner" bot. Reuses the real presentational leaves (`GoLivePlate`, `CompetitorRow`, `WaitingPlate`, `WizardStepHeader`, `WeightTile`, `ReadyPanel`, the live broadcast screen, `EndStep`, result fields, `ResultBanner`, `ConfirmPanel`) with a local reducer and bot timers (`apps/mobile/lib/practice/use-practice-match.ts`, `apps/mobile/lib/practice/constants.ts`, `apps/mobile/components/practice/`). A PRACTICE tag and a coach line on every phase; no rating numbers, share, rematch or dispute. Writes no challenge, match, result, confirmation or video; the only network write is `markPracticeMatch`. Mounts `useArenaMatchScreen()` so no real challenge prompt lands over it.
+- One recorded clip per run, played back locally (muted by default) on the summary and deleted when the athlete leaves or taps Practice again. Never uploaded.
+- Home: a one-time "Try a practice match" card (`apps/mobile/components/dashboard/practice-offer-card.tsx`) for an athlete who has not answered the offer, is not a bot, has no match in flight and no completed matches. It holds Home's red CTA while shown (the Arena card steps down). Not now marks the offer skipped.
+- Settings: a PRACTICE MATCH row, always visible, to replay it.
+
+**Changed**
+- `useVideoRecorder` takes an optional `{ upload?: boolean }` (default true) and `MatchRecorderProvider` an optional `upload` prop. With `upload: false` the clip is exposed as `localUri` and nothing is uploaded or written to the match-upload store; a clip that settles after unmount is deleted. Default behavior unchanged.
+- `discardLocalClip(uri)` in `apps/mobile/lib/video/recording-file.ts`.
+- Exported `WizardStepHeader` and `STEP_LABELS` (`match-flow-wizard.tsx`) and `WeightTile` (`weight-step.tsx`) for reuse.
+
+### Shared
+**Added**
+- `practice_match_offered_at` and `practice_match_completed_at` in `ATHLETE_GUARD_SELECT` / `AthleteGuardRow` and the generated types (hand-added with the `mark_practice_match` RPC; regenerate with `npm run db:types` once the migration is local).
+- `markPracticeMatch(supabase, "offered" | "skipped" | "completed")` in `@jits/shared/api/mutations`: fire and forget, never through the mutation queue.
 
 ### Docs
 **Changed**

@@ -3,7 +3,7 @@ import { supabase } from "@/lib/supabase/client";
 import { getMyHighlights, type MyHighlightItem } from "@jits/shared/api/highlight-share";
 import { signPosterKey } from "@jits/shared/api/queries";
 
-/** Tiles on the Profile row (spec 014 section 16.6.5). */
+/** Tiles on the Profile row (spec 015 section 16.6.5). */
 export const PROFILE_HIGHLIGHTS_LIMIT = 10;
 const POSTER_TTL_S = 3600;
 

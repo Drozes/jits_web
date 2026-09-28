@@ -114,6 +114,7 @@ export function ConfirmStep(props: ConfirmStepProps) {
     return () => clearTimeout(t);
   }, [myConfirmed, opponentConfirmed]);
 
+  // The practice match (components/practice/practice-steps.tsx) mirrors this step's layout.
   async function handleConfirm() {
     if (myConfirmed) return;
     setMyConfirmed(true);

@@ -1,5 +1,5 @@
 /**
- * Bell feed (jr_be spec 014 section 16.6.4): ready-reel items merged into the
+ * Bell feed (jr_be spec 015 section 16.6.4): ready-reel items merged into the
  * challenge / match-result history, newest first, only reels with a ledger
  * row (`notifiedAt`), none with clips off, unread from `unseen`, and the
  * unseen count that feeds the badge. The highlight half re-reads on focus and

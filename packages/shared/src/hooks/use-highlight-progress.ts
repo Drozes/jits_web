@@ -41,7 +41,7 @@ export interface UseHighlightProgressResult {
 
 /**
  * Live state of the caller's own highlight reel for one match video
- * (jr_be spec 014 section 9.2).
+ * (jr_be spec 015 section 9.2).
  *
  * One channel `highlight_progress:{id}:{mount}` (opened only after a read
  * returns a phase other than disabled / unavailable) with postgres_changes on

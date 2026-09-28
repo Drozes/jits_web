@@ -17,6 +17,7 @@
  * `.catch()`, which is dead code in production.
  */
 import * as React from "react";
+import { completeHold } from "../../support/complete-hold";
 import { render, fireEvent, waitFor, act } from "@testing-library/react-native";
 
 // ---- native module stubs ----
@@ -36,7 +37,7 @@ const mockCamera: FakeCamera = {
 };
 
 /** Set by the CameraView stub each time one mounts. */
-const mockCameraMounts = { count: 0 };
+const mockCameraMounts = { count: 0, unmounts: 0 };
 
 jest.mock("expo-camera", () => {
   const R = require("react");
@@ -70,6 +71,9 @@ jest.mock("expo-camera", () => {
         R.useEffect(() => {
           mockCameraMounts.count += 1;
           props.onCameraReady?.();
+          return () => {
+            mockCameraMounts.unmounts += 1;
+          };
         }, []);
         return R.createElement(RN.View, { testID: "camera-view" });
       },
@@ -284,6 +288,33 @@ jest.mock("@/components/ui/elo-system", () => {
   );
 });
 
+// Orientation calls land in one ordered log with the camera's recordAsync,
+// so a test can prove the live lock is requested before recording starts.
+const mockCallLog: string[] = [];
+jest.mock("@/lib/orientation", () => ({
+  allowRotation: jest.fn(async () => {
+    mockCallLog.push("allowRotation");
+  }),
+  lockToCurrent: jest.fn(async () => {
+    mockCallLog.push("lockToCurrent");
+    return "landscape";
+  }),
+  lockPortrait: jest.fn(async () => {
+    mockCallLog.push("lockPortrait");
+  }),
+}));
+
+// null = the real window; set to render the wizard in a landscape window.
+const mockWindow: { current: { width: number; height: number } | null } = { current: null };
+jest.mock("react-native/Libraries/Utilities/useWindowDimensions", () => {
+  const actual = jest.requireActual("react-native/Libraries/Utilities/useWindowDimensions");
+  return {
+    __esModule: true,
+    default: () =>
+      mockWindow.current ? { ...mockWindow.current, scale: 3, fontScale: 1 } : actual.default(),
+  };
+});
+
 const mockUseMatchDetails = jest.fn();
 jest.mock("@/lib/match-flow/use-match-details", () => ({
   useMatchDetails: (matchId: string) => mockUseMatchDetails(matchId),
@@ -359,6 +390,9 @@ let logSpy: jest.SpyInstance;
 beforeEach(() => {
   jest.clearAllMocks();
   mockCameraMounts.count = 0;
+  mockCameraMounts.unmounts = 0;
+  mockCallLog.length = 0;
+  mockWindow.current = null;
   mockSyncParams.current = null;
   // The upload store is module state and outlives a render by design.
   resetMatchUploadStore();
@@ -422,9 +456,118 @@ describe("the camera is warm before the match starts (jits-2zpe)", () => {
       mockSyncParams.current?.onTimerStarted?.("2026-09-18T12:00:00.000Z");
     });
 
-    getByText("End Match");
+    // Live is the full-screen broadcast layout now; the camera element
+    // keeps its place in the tree, so it is the same native session.
+    getByTestId("live-end");
     expect(mockCameraMounts.count).toBe(1);
+    expect(mockCameraMounts.unmounts).toBe(0);
     // And the warm session records immediately, with no deferral.
+    await waitFor(() => expect(mockCamera.recordAsync).toHaveBeenCalledTimes(1));
+  });
+
+  it("keeps the camera mounted from ready through live and while the stop is in flight (T-A1)", async () => {
+    // The stop does not settle until the test says so, so the recorder sits
+    // in `stopping`.
+    let finishClip: ((v: { uri: string }) => void) | null = null;
+    mockCamera.recordAsync.mockImplementation(
+      () => new Promise<{ uri: string }>((res) => (finishClip = res)),
+    );
+    mockCamera.stopRecording.mockImplementation(() => undefined);
+    const { getByText, getByTestId, queryByTestId } = renderWizard("pending");
+    fireEvent.press(getByText("Confirm Weights"));
+    await act(async () => {
+      mockSyncParams.current?.onTimerStarted?.("2026-09-18T12:00:00.000Z");
+    });
+    await waitFor(() => expect(mockCamera.recordAsync).toHaveBeenCalledTimes(1));
+
+    await act(async () => {
+      completeHold(getByTestId("live-end"));
+    });
+    expect(queryByTestId("live-end")).toBeNull();
+    getByTestId("camera-view");
+    expect(mockCameraMounts.count).toBe(1);
+    expect(mockCameraMounts.unmounts).toBe(0);
+
+    // Let the stop land so nothing is left running after the test.
+    await act(async () => {
+      finishClip?.({ uri: "file://clip.mp4" });
+    });
+    await waitFor(() => expect(mockTusCalls).toHaveLength(1));
+  });
+});
+
+describe("orientation: rotate at ready, lock at live, portrait after", () => {
+  async function goLive(getByText: (t: string) => unknown) {
+    fireEvent.press(getByText("Confirm Weights") as never);
+    await act(async () => {
+      mockSyncParams.current?.onTimerStarted?.("2026-09-18T12:00:00.000Z");
+    });
+  }
+
+  it("wait/weight portrait, ready rotates with the hint, live locks before recording starts", async () => {
+    mockCamera.recordAsync.mockImplementation(() => {
+      mockCallLog.push("recordAsync");
+      return new Promise(() => undefined);
+    });
+    const { getByText, getByTestId } = renderWizard("pending");
+    expect(mockCallLog).toEqual(["lockPortrait"]);
+
+    fireEvent.press(getByText("Confirm Weights"));
+    expect(mockCallLog).toEqual(["lockPortrait", "allowRotation"]);
+    getByText("Turn your phone sideways for a wide shot. It locks when the match starts.");
+
+    await act(async () => {
+      mockSyncParams.current?.onTimerStarted?.("2026-09-18T12:00:00.000Z");
+    });
+    getByTestId("live-end");
+    await waitFor(() => expect(mockCallLog).toContain("recordAsync"));
+    expect(mockCallLog.indexOf("lockToCurrent")).toBeGreaterThan(-1);
+    expect(mockCallLog.indexOf("lockToCurrent")).toBeLessThan(mockCallLog.indexOf("recordAsync"));
+    expect(mockCallLog.filter((c) => c === "lockToCurrent")).toHaveLength(1);
+  });
+
+  it("holds the live lock while the clip is stopping, then restores portrait", async () => {
+    let finishClip: ((v: { uri: string }) => void) | null = null;
+    mockCamera.recordAsync.mockImplementation(
+      () => new Promise<{ uri: string }>((res) => (finishClip = res)),
+    );
+    mockCamera.stopRecording.mockImplementation(() => undefined);
+    const { getByText, getByTestId, queryByTestId } = renderWizard("pending");
+    await goLive(getByText);
+    await waitFor(() => expect(mockCamera.recordAsync).toHaveBeenCalledTimes(1));
+    mockCallLog.length = 0;
+
+    await act(async () => {
+      completeHold(getByTestId("live-end"));
+    });
+    expect(queryByTestId("live-end")).toBeNull();
+    // Off the live step but still stopping: no rotation under the clip.
+    expect(mockCallLog).toEqual([]);
+
+    await act(async () => {
+      finishClip?.({ uri: "file://clip.mp4" });
+    });
+    await waitFor(() => expect(mockCallLog).toEqual(["lockPortrait"]));
+  });
+
+  it("restores portrait when the wizard unmounts mid-ready", () => {
+    const { getByText, unmount } = renderWizard("pending");
+    fireEvent.press(getByText("Confirm Weights"));
+    mockCallLog.length = 0;
+    unmount();
+    expect(mockCallLog).toEqual(["lockPortrait"]);
+  });
+
+  it("keeps ONE capture session across ready to live in a landscape window", async () => {
+    mockWindow.current = { width: 844, height: 390 };
+    const { getByText, getByTestId } = renderWizard("pending");
+    await goLive(getByText);
+    getByTestId("live-rail");
+    expect(mockCameraMounts.count).toBe(1);
+    expect(mockCameraMounts.unmounts).toBe(0);
+    const frame = getByTestId("camera-frame").props.style;
+    expect(frame.height).toBe(390);
+    expect(frame.width).toBeCloseTo(693.33, 2);
     await waitFor(() => expect(mockCamera.recordAsync).toHaveBeenCalledTimes(1));
   });
 });
@@ -445,17 +588,17 @@ describe("record, end, upload, across the step boundary", () => {
     // retry hit it.
     mockInsertSingle.mockResolvedValue(RLS_DENIAL);
 
-    const { getByText, queryByText, getByTestId } = renderWizard("in_progress");
+    const { getByText, queryByTestId, getByTestId } = renderWizard("in_progress");
     await waitFor(() => expect(mockCamera.recordAsync).toHaveBeenCalledTimes(1));
 
     // End the match. This stops the recorder and advances the step in the
     // same tick, so LiveStep unmounts before the upload even begins.
     await act(async () => {
-      fireEvent.press(getByText("End Match"));
+      completeHold(getByTestId("live-end"));
     });
 
     // LiveStep is gone: its controls are no longer in the tree.
-    expect(queryByText("End Match")).toBeNull();
+    expect(queryByTestId("live-end")).toBeNull();
 
     // ... and the failure still reaches the user. This is the assertion the
     // old code could not satisfy at all: the only banner had unmounted.
@@ -478,13 +621,13 @@ describe("record, end, upload, across the step boundary", () => {
   });
 
   it("shows success after the live step is gone", async () => {
-    const { getByText, queryByText, getByTestId } = renderWizard("in_progress");
+    const { getByText, queryByTestId, getByTestId } = renderWizard("in_progress");
     await waitFor(() => expect(mockCamera.recordAsync).toHaveBeenCalledTimes(1));
 
     await act(async () => {
-      fireEvent.press(getByText("End Match"));
+      completeHold(getByTestId("live-end"));
     });
-    expect(queryByText("End Match")).toBeNull();
+    expect(queryByTestId("live-end")).toBeNull();
 
     await waitFor(() => expect(getByText(/match video uploaded/i)).toBeTruthy());
     getByTestId("upload-status-banner");
@@ -514,11 +657,11 @@ describe("record, end, upload, across the step boundary", () => {
   });
 
   it("uploads to the path prod storage RLS requires", async () => {
-    const { getByText } = renderWizard("in_progress");
+    const { getByTestId } = renderWizard("in_progress");
     await waitFor(() => expect(mockCamera.recordAsync).toHaveBeenCalledTimes(1));
 
     await act(async () => {
-      fireEvent.press(getByText("End Match"));
+      completeHold(getByTestId("live-end"));
     });
     await waitFor(() => expect(mockTusCalls).toHaveLength(1));
 

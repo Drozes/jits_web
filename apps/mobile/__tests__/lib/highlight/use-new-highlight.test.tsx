@@ -1,5 +1,5 @@
 /**
- * Home's "Your new highlight" source (jr_be spec 014 section 16.6.4):
+ * Home's "Your new highlight" source (jr_be spec 015 section 16.6.4):
  * `getMyHighlights({ limit: 1, unseenOnly: true })`, shown only for an unseen
  * item with clips on, re-read on focus / foreground / match exit / pull,
  * dismiss marks seen + logs `home_card_dismissed`, newest read wins.

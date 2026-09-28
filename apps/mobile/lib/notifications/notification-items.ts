@@ -3,7 +3,7 @@ import type { MyHighlightItem } from "@jits/shared/api/highlight-share";
 import { bellBody, bellTitle, highlightHref } from "@/lib/highlight/discovery";
 
 /**
- * A ready-reel row in the bell feed (jr_be spec 014 section 16.6.4). Mobile
+ * A ready-reel row in the bell feed (jr_be spec 015 section 16.6.4). Mobile
  * only: the shared `NotificationItemType` is NOT widened, since web renders
  * that union and would have to change with it.
  */

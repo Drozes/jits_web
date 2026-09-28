@@ -1,5 +1,5 @@
 /**
- * useHighlightShare (jr_be spec 014 sections 16.6.1 and 16.7 item 6).
+ * useHighlightShare (jr_be spec 015 sections 16.6.1 and 16.7 item 6).
  *
  * The three native packages, the Reels module, the shared RPC wrappers and
  * the downloader are all mocked, so every assertion is about what the hook

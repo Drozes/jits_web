@@ -6,6 +6,7 @@ import { useThemedTokens } from "@/lib/theme/use-theme";
 import { useAmber } from "@/components/match-detail/use-amber";
 import { useRecordResult } from "@/lib/match-flow/use-record-result";
 import { isFinishTimeValid } from "@/lib/match-flow/parse-finish-time";
+import { useFinishTimeField } from "@/lib/match-flow/use-finish-time-field";
 import type { BroadcastResult } from "@jits/shared/hooks/use-session-match-sync";
 import type { SubmissionType } from "@jits/shared/types/submission-type";
 import {
@@ -22,6 +23,8 @@ interface ResultStepProps {
   matchType: "ranked" | "casual";
   /** Match length in seconds; finish time can't exceed it. */
   durationSeconds: number;
+  /** Match clock at End Match; prefills the (still editable) finish time. */
+  initialFinishSeconds?: number;
   participants: ResultParticipant[];
   submissionTypes: SubmissionType[];
   onRecorded: (result: BroadcastResult) => void;
@@ -32,14 +35,15 @@ interface ResultStepProps {
  * (for submissions) winner + submission type + optional finish time.
  * The actual mutation + broadcast logic lives in `useRecordResult`.
  *
- * ELO design system: meta heading, OutcomeToggle, WinnerPicker, Chip
- * grid of submission types (D8 wireframe lines 1239-1273), and a
+ * ELO design system: meta heading, OutcomeToggle, WinnerPicker, a
+ * full-screen autocomplete submission select (SubmissionFields), and a
  * Signal Red record-result cta.
  */
 export function ResultStep({
   matchId,
   matchType,
   durationSeconds,
+  initialFinishSeconds,
   participants,
   submissionTypes,
   onRecorded,
@@ -50,7 +54,11 @@ export function ResultStep({
   const [outcome, setOutcome] = React.useState<"submission" | "draw" | null>(null);
   const [winnerId, setWinnerId] = React.useState("");
   const [submissionCode, setSubmissionCode] = React.useState("");
-  const [finishTimeStr, setFinishTimeStr] = React.useState("");
+  const {
+    finishTimeStr,
+    fromClock: finishFromClock,
+    onChange: onFinishTimeChange,
+  } = useFinishTimeField(initialFinishSeconds);
   const { loading, submit } = useRecordResult({ matchId, onRecorded });
 
   // Finish time is REQUIRED for submissions: the BE `record_match_result`
@@ -61,6 +69,7 @@ export function ResultStep({
   const finishTimeValid = isFinishTimeValid(finishTimeStr, durationSeconds);
   const finishTimeProvided = finishTimeStr.trim() !== "";
 
+  // The practice match (components/practice/practice-result.tsx) mirrors this rule; keep them in step.
   const canSubmit =
     outcome === "draw" ||
     (outcome === "submission" &&
@@ -101,8 +110,9 @@ export function ResultStep({
               finishTimeStr={finishTimeStr}
               durationSeconds={durationSeconds}
               finishTimeInvalid={!finishTimeValid}
+              finishTimeFromClock={finishFromClock}
               onSubmissionChange={setSubmissionCode}
-              onFinishTimeChange={setFinishTimeStr}
+              onFinishTimeChange={onFinishTimeChange}
             />
           ) : null}
         </>

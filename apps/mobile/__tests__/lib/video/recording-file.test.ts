@@ -88,6 +88,7 @@ jest.mock("@/modules/backup-exclusion", () => ({
 
 import {
   RETAINED_DIR_NAME,
+  discardLocalClip,
   releaseRecording,
   retainRecording,
 } from "@/lib/video/recording-file";
@@ -251,5 +252,24 @@ describe("releaseRecording", () => {
       expect.stringMatching(/could not delete retained recording/),
       expect.anything(),
     );
+  });
+});
+
+describe("discardLocalClip (practice match)", () => {
+  it("deletes a clip outside the retention directory", () => {
+    discardLocalClip(CACHE_URI);
+    expect(mockFiles.get(CACHE_URI)?.deleted).toBe(true);
+  });
+
+  it("is a no-op for a missing file or a null uri", () => {
+    expect(() => discardLocalClip("file:///cache/gone.mp4")).not.toThrow();
+    expect(() => discardLocalClip(null)).not.toThrow();
+    expect(mockFiles.get(CACHE_URI)?.deleted).toBeUndefined();
+  });
+
+  it("swallows a delete failure", () => {
+    mockThrowOn.delete = true;
+    expect(() => discardLocalClip(CACHE_URI)).not.toThrow();
+    expect(warnSpy).toHaveBeenCalled();
   });
 });

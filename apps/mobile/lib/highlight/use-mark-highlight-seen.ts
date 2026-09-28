@@ -5,7 +5,7 @@ import { notifyHighlightsChanged } from "./highlight-store";
 
 /**
  * Marks the athlete's reel seen once per version while `highlightId` and
- * `version` are both set (jr_be spec 014 section 16.6.2, the match-detail
+ * `version` are both set (jr_be spec 015 section 16.6.2, the match-detail
  * ready card): watching it there clears the Home card and the bell's unread
  * state. Fire and forget; a failure only leaves the item unread. Once the
  * mark lands, the bell and the Home card are told to re-read.

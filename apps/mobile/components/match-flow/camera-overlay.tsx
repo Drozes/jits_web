@@ -1,9 +1,11 @@
 import * as React from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { CameraView } from "expo-camera";
 import { Camera, CameraOff } from "lucide-react-native";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { cn } from "@/lib/cn";
+import { fitRecordedFrame, readyPreviewWidth } from "@/lib/video/recorded-frame";
+import { BROADCAST } from "./live/broadcast-tokens";
 
 interface CameraOverlayProps {
   cameraRef: React.MutableRefObject<CameraView | null>;
@@ -14,6 +16,15 @@ interface CameraOverlayProps {
    * recordAsync before this throws "Camera is not ready yet". */
   onCameraReady: () => void;
   recording: boolean;
+  /**
+   * `card`: the 16:9 viewfinder card (ready step). `fullscreen`: the live
+   * step, full screen on black at the recorded aspect (9:16 portrait, 16:9
+   * landscape), with the live
+   * chrome drawn over it by the step. The element nesting around
+   * `CameraView` is identical in both, so switching never remounts the
+   * native capture session.
+   */
+  layout?: "card" | "fullscreen";
 }
 
 /**
@@ -42,8 +53,21 @@ export function CameraOverlay({
   onRequestPermission,
   onCameraReady,
   recording,
+  layout = "card",
 }: CameraOverlayProps) {
   const tokens = useThemedTokens();
+  const window = useWindowDimensions();
+  const fullscreen = layout === "fullscreen";
+
+  if (!permissionGranted && fullscreen) {
+    // The live screen draws the no-video plate and the Allow Camera action.
+    return (
+      <View
+        testID="camera-no-feed-ground"
+        style={[StyleSheet.absoluteFill, { backgroundColor: BROADCAST.ground }]}
+      />
+    );
+  }
 
   if (!permissionGranted) {
     return (
@@ -78,9 +102,35 @@ export function CameraOverlay({
     );
   }
 
+  const frame = fullscreen ? fitRecordedFrame(window.width, window.height) : null;
+  // Landscape ready check: a narrower centered 16:9 card (the recorded frame)
+  // so the Ready controls stay in reach. Same nesting, so no remount.
+  const cardWidth = fullscreen ? null : readyPreviewWidth(window.width, window.height);
   return (
-    <View className="w-full overflow-hidden rounded-md border border-hairline-strong bg-black">
-      <View className="aspect-video w-full">
+    <View
+      testID="camera-card"
+      className={
+        fullscreen
+          ? undefined
+          : cn(cardWidth == null && "w-full", "overflow-hidden rounded-md border border-hairline-strong bg-black")
+      }
+      style={
+        fullscreen
+          ? [StyleSheet.absoluteFill, { backgroundColor: BROADCAST.black, overflow: "hidden" }]
+          : cardWidth != null
+            ? { width: cardWidth, maxWidth: "100%", alignSelf: "center" }
+            : undefined
+      }
+    >
+      <View
+        testID="camera-frame"
+        className={fullscreen ? undefined : "aspect-video w-full"}
+        style={
+          frame
+            ? { position: "absolute", width: frame.width, height: frame.height, left: frame.left, top: frame.top }
+            : undefined
+        }
+      >
         <CameraView
           ref={cameraRef}
           mode="video"
@@ -89,7 +139,7 @@ export function CameraOverlay({
           videoQuality="720p"
           onCameraReady={onCameraReady}
         />
-        {recording ? (
+        {recording && !fullscreen ? (
           <View className="absolute right-2 top-2 flex-row items-center gap-1.5 rounded-xs bg-black/60 px-2 py-1">
             <View className={cn("h-2 w-2 rounded-full bg-cta")} />
             <Text className="font-mono-bold text-[10px] uppercase tracking-caps-l text-white">

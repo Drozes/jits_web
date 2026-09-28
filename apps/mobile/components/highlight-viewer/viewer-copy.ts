@@ -1,6 +1,6 @@
 /**
  * The few viewer strings the share module's `SHARE_COPY` does not cover
- * (jr_be spec 014 section 16.6.3). Everything share / save / sheet related
+ * (jr_be spec 015 section 16.6.3). Everything share / save / sheet related
  * comes from `SHARE_COPY` (`@/lib/highlight-share`); strings shared with the
  * phase-1 card (not found, replaced, the regenerating banner, "Improve this
  * reel") come from `highlight-copy.ts`.

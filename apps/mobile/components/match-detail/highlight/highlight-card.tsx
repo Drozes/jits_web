@@ -11,7 +11,7 @@ import { HighlightOpenReelLink } from "./highlight-open-reel-link";
 import { useMarkHighlightSeen } from "@/lib/highlight/use-mark-highlight-seen";
 import { useHighlightFlags } from "@/lib/highlight/use-highlight-flags";
 
-/** Phases that render no card at all (spec 014 section 10). */
+/** Phases that render no card at all (spec 015 section 10). */
 const HIDDEN: ReadonlySet<HighlightPhase> = new Set<HighlightPhase>(["disabled", "unavailable"]);
 
 interface HighlightCardProps {

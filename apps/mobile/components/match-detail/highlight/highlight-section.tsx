@@ -7,7 +7,7 @@ import { HighlightCard } from "./highlight-card";
  * match (in practice one), each the viewer's OWN reel of that recording. A
  * fragment, not a wrapper View, so hidden cards leave no gap in the screen's
  * spaced ScrollView: when every card is disabled/unavailable nothing renders.
- * The opponent's reel is never shown (spec 014 non-goal).
+ * The opponent's reel is never shown (spec 015 non-goal).
  */
 export function HighlightSection({
   videos,

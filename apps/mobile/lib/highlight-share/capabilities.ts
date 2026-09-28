@@ -4,7 +4,7 @@ import { env } from "@/lib/env";
 import { hasNativeModule, loadClipboardNative, loadSharing } from "./native-modules";
 
 /**
- * What this binary and device can do for the share funnel (jr_be spec 014
+ * What this binary and device can do for the share funnel (jr_be spec 015
  * section 16.6.1). `reels`, `shareSheet`, `saveToPhotos`, `clipboard` and
  * `facebookAppIdConfigured` are the spec's five; `reelsModule` and
  * `instagramDetected` are the raw inputs, for the admin diagnostics row.

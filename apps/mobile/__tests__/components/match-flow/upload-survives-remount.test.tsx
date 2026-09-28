@@ -32,6 +32,7 @@
  */
 import * as React from "react";
 import { render, fireEvent, waitFor, act } from "@testing-library/react-native";
+import { completeHold } from "../../support/complete-hold";
 
 // ---- native module stubs ----
 
@@ -405,7 +406,7 @@ async function advanceToConfirm(screen: ReturnType<typeof render>) {
   await waitFor(() => expect(mockCamera.recordAsync).toHaveBeenCalledTimes(1), { timeout: 5000 });
 
   await act(async () => {
-    fireEvent.press(screen.getByText("End Match"));
+    completeHold(screen.getByTestId("live-end"));
   });
 
   // EndStep auto-advances to the result step after its confirmation beat.
@@ -620,7 +621,9 @@ describe("a recorder-only failure survives the confirm-to-summary refresh", () =
     );
 
     const screen = renderWizard();
-    await waitFor(() => expect(screen.getByText(/recording failed/i)).toBeTruthy());
+    // The live screen has no status chip; it says there is no video itself.
+    await waitFor(() => expect(screen.getByTestId("live-no-video-error")).toBeTruthy());
+    expect(screen.getByTestId("live-tally")).toHaveTextContent("NO VIDEO");
 
     await advanceToConfirm(screen);
     await completeMatch();
@@ -651,7 +654,9 @@ describe("a recorder-only failure survives the confirm-to-summary refresh", () =
     await act(async () => {
       resolveRecord?.(undefined);
     });
-    await waitFor(() => expect(screen.getByText(/no clip was saved/i)).toBeTruthy());
+    // The live screen has no status chip; it says there is no video itself.
+    await waitFor(() => expect(screen.getByTestId("live-no-video-error")).toBeTruthy());
+    expect(screen.getByTestId("live-tally")).toHaveTextContent("NO VIDEO");
 
     await advanceToConfirm(screen);
     await completeMatch();

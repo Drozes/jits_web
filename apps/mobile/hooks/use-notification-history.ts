@@ -17,7 +17,7 @@ import {
   useOnCountChange,
 } from "@/lib/highlight/highlight-store";
 
-/** Bell feed size for ready reels (jr_be spec 014 section 16.6.4). */
+/** Bell feed size for ready reels (jr_be spec 015 section 16.6.4). */
 const HIGHLIGHT_LIMIT = 10;
 
 /**

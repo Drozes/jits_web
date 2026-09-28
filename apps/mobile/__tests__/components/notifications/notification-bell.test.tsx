@@ -1,5 +1,5 @@
 /**
- * Bell with ready-reel items (jr_be spec 014 section 16.6.4): the badge is
+ * Bell with ready-reel items (jr_be spec 015 section 16.6.4): the badge is
  * pending challenges + unseen highlight items; only highlight rows are
  * tappable (the others' routes point at retired /session paths); a tap closes
  * the panel and opens the viewer with source=bell; unread highlight rows carry

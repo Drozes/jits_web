@@ -12,6 +12,7 @@ import { QueueStatusBanner } from "./queue-status-banner";
 import { MatchStepRenderer } from "./match-step-renderer";
 import { MatchRecorderProvider, useMatchRecorder } from "./match-recorder-context";
 import { MatchRecorderCamera, MatchRecorderStatus } from "./match-recorder-surface";
+import { MatchOrientationController, orientationModeFor } from "./match-orientation-controller";
 import { cn } from "@/lib/cn";
 import { ARENA_EXIT_LABEL } from "@/lib/arena/constants";
 
@@ -39,7 +40,7 @@ interface MatchFlowWizardProps {
   onStepChange?: (step: MatchStep | null) => void;
 }
 
-const STEP_LABELS: Record<MatchStep, string> = {
+export const STEP_LABELS: Record<MatchStep, string> = {
   wait: "Waiting",
   weight: "Weights",
   ready: "Ready",
@@ -128,7 +129,28 @@ export function MatchFlowWizard({
   // other on the ready -> live handoff.
   useMatchKeepAwake(step === "ready" || step === "live");
 
+  // Live shrinks the content to the viewport with scrolling off. Reset any
+  // offset left from scrolling the ready step, or every full-screen layer
+  // would sit shifted up with no way to scroll it back. scrollTo keeps the
+  // tree as is, so the camera is not remounted.
+  const scrollRef = React.useRef<ScrollView>(null);
+  React.useEffect(() => {
+    if (step === "live") scrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, [step]);
+
   const advanceToResult = React.useCallback(() => setStep("result"), [setStep]);
+
+  // The match clock when the live step ended, keyed to its match so a later
+  // match never inherits it. Only set by ending live on this device: a cold
+  // start or re-entry straight into result has no reading and stays empty.
+  const [clockFinish, setClockFinish] = React.useState<{ matchId: string; seconds: number } | null>(
+    null,
+  );
+  const setFinishSeconds = React.useCallback(
+    (seconds: number) => setClockFinish({ matchId, seconds }),
+    [matchId],
+  );
+  const initialFinishSeconds = clockFinish?.matchId === matchId ? clockFinish.seconds : undefined;
 
   // LOAD-BEARING. Do not delete this as a mere optimisation.
   //
@@ -193,15 +215,28 @@ export function MatchFlowWizard({
   const matchType = (match.match_type as "ranked" | "casual") ?? "casual";
   const stepIdx = MATCH_STEPS.indexOf(step);
   const ownOutcome = computeOwnOutcome(me.outcome, resultData, currentAthleteId);
+  // Live is a full-screen broadcast layout over the camera. The ScrollView
+  // and every slot stay in place (hidden slots render null) so the camera
+  // element keeps its position and the capture session is never remounted.
+  const live = step === "live";
 
   return (
     <ScrollView
-      className="flex-1 bg-surface"
-      contentContainerStyle={{
-        padding: 16,
-        paddingBottom: 32 + insets.bottom,
-        gap: 16,
-      }}
+      ref={scrollRef}
+      className={cn("flex-1", live ? "bg-black" : "bg-surface")}
+      scrollEnabled={!live}
+      contentContainerStyle={
+        live
+          ? { flexGrow: 1 }
+          : {
+              padding: 16,
+              // Landscape ready check: clear the sensor housing and corners.
+              paddingLeft: Math.max(16, insets.left),
+              paddingRight: Math.max(16, insets.right),
+              paddingBottom: 32 + insets.bottom,
+              gap: 16,
+            }
+      }
       keyboardShouldPersistTaps="handled"
     >
       <MatchRecorderProvider
@@ -211,12 +246,18 @@ export function MatchFlowWizard({
       >
         <MatchSyncProvider value={syncContext}>
           <RecorderStopBridge stopRef={stopRecorderRef} />
-          <WizardStepHeader step={step} currentIdx={stepIdx} label={STEP_LABELS[step]} />
-          <QueueStatusBanner />
+          {/* Before the step renderer so the live lock lands before recording starts. */}
+          <MatchOrientationController mode={orientationModeFor(step)} />
+          {live ? null : (
+            <WizardStepHeader step={step} currentIdx={stepIdx} label={STEP_LABELS[step]} />
+          )}
+          {live ? null : <QueueStatusBanner />}
           {/* Above the step, never inside one: the upload begins after the
               live step has already unmounted, so this is the only place its
-              outcome (success, stall or failure) can be seen. jits-od3. */}
-          <MatchRecorderStatus matchId={matchId} />
+              outcome (success, stall or failure) can be seen. jits-od3.
+              Hidden on live only: the live screen shows recorder trouble
+              itself, and the chip is back from the end step on. */}
+          {live ? null : <MatchRecorderStatus matchId={matchId} />}
           <MatchRecorderCamera step={step} />
           <MatchStepRenderer
             step={step}
@@ -239,6 +280,8 @@ export function MatchFlowWizard({
             setStartedAt={setStartedAt}
             setResultData={setResultData}
             advanceToResult={advanceToResult}
+            initialFinishSeconds={initialFinishSeconds}
+            setFinishSeconds={setFinishSeconds}
             refresh={refresh}
             onCancelledRemotely={exitCancelled}
           />
@@ -253,7 +296,7 @@ export function MatchFlowWizard({
  * with "STEP N / T" mono label, current-step name, and a row of
  * hairline bars that fill with the CTA color as the athlete advances.
  */
-function WizardStepHeader({
+export function WizardStepHeader({
   step,
   currentIdx,
   label,

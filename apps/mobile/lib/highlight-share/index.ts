@@ -1,5 +1,5 @@
 /**
- * Public face of the highlight share funnel (jr_be spec 014 section 16.6.1).
+ * Public face of the highlight share funnel (jr_be spec 015 section 16.6.1).
  *
  * This directory is the ONLY app code allowed to touch the Instagram Reels
  * module, expo-sharing, expo-media-library and the clipboard module

@@ -1,5 +1,5 @@
 /**
- * "Your highlight" card (jits-s6mi.10, jr_be spec 014 section 10): every
+ * "Your highlight" card (jits-s6mi.10, jr_be spec 015 section 10): every
  * phase with its exact copy, one Signal Red CTA per surface, the player
  * surviving a regenerate, thumbs, the feedback sheet and its payloads.
  */
@@ -11,7 +11,7 @@ import { act, fireEvent, render, waitFor, within } from "@testing-library/react-
 const mockPush = jest.fn();
 jest.mock("expo-router", () => ({ useFocusEffect: jest.fn(), useRouter: () => ({ push: mockPush }) }));
 
-// Phase 2 (spec 014 section 16.6.2): the ready card marks the live version seen.
+// Phase 2 (spec 015 section 16.6.2): the ready card marks the live version seen.
 const mockMarkSeen = jest.fn();
 const mockFlags = jest.fn();
 jest.mock("@jits/shared/api/highlight-share", () => ({
@@ -733,7 +733,7 @@ describe("Feedback sheet", () => {
   });
 });
 
-// ---- phase 2: Open reel + seen (jr_be spec 014 sections 16.6.2 / 16.6.4) ----
+// ---- phase 2: Open reel + seen (jr_be spec 015 sections 16.6.2 / 16.6.4) ----
 
 describe("HighlightCard phase 2 tie-in", () => {
   it.each([

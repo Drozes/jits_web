@@ -2,7 +2,7 @@ import type { HighlightCaptionContext } from "../api/highlight-share";
 
 /**
  * Suggested Instagram caption and collaborator tip for a highlight reel
- * (jr_be spec 014 section 16.5). Pure. Display names only: no handles, no
+ * (jr_be spec 015 section 16.5). Pure. Display names only: no handles, no
  * URLs (handle collection is a fast follow).
  */
 

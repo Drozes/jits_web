@@ -1,5 +1,5 @@
 /**
- * Full-screen highlight viewer (jits-s6mi.4, jr_be spec 014 section 16.6.2):
+ * Full-screen highlight viewer (jits-s6mi.4, jr_be spec 015 section 16.6.2):
  * every state with its exact copy, the one-Signal-Red-CTA rule, share and
  * save completely absent with `highlight_share_enabled` off, the label by
  * share path, seen + telemetry once per version, Improve, Close, Save.

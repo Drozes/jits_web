@@ -4,7 +4,7 @@
  * - After the session and gym routes were removed from mobile (jits-gewv), a
  *   payload route into a removed family must go Home, never to an unmatched
  *   screen; every other route is pushed unchanged.
- * - Highlight Reels phase 2 (jr_be spec 014 section 16.6.4): a
+ * - Highlight Reels phase 2 (jr_be spec 015 section 16.6.4): a
  *   `highlight_ready` push opens `/highlight/<id>?source=push`, both warm and
  *   from a cold start (`getLastNotificationResponseAsync`), exactly once: a
  *   tap seen by both the listener and the cold-start read never navigates

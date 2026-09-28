@@ -18,7 +18,7 @@ const NOOP = () => undefined;
 
 /**
  * The full-screen 9:16 viewer for one of the athlete's own reels
- * (spec 014 section 16.6.2). A video surface: the dark "void" tokens in both
+ * (spec 015 section 16.6.2). A video surface: the dark "void" tokens in both
  * themes. Loading shows the empty poster frame; a missing / foreign reel says
  * so with "Back"; a reel without a live version (video replaced) says a new
  * one is coming; anything else offers "Try again".

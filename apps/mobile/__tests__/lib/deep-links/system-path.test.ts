@@ -104,7 +104,7 @@ describe("isRetiredRoute", () => {
   });
 });
 
-// Highlight Reels phase 2 (jr_be spec 014 section 16.6.4): the viewer route is
+// Highlight Reels phase 2 (jr_be spec 015 section 16.6.4): the viewer route is
 // not retired, so push payloads and links reach it untouched.
 describe("resolveSystemPath: highlight viewer", () => {
   it.each([

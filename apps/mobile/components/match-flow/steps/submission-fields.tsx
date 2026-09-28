@@ -1,5 +1,10 @@
+import * as React from "react";
 import { Text, TextInput, View } from "react-native";
-import { Chip } from "@/components/ui/elo-system";
+import { SearchSelect, type SearchSelectOption } from "@/components/ui/search-select";
+import {
+  OTHER_SUBMISSION_CODE,
+  filterSubmissionTypes,
+} from "@/lib/match-flow/filter-submissions";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { formatElapsed } from "@/lib/match-flow/format-elapsed";
 import { cn } from "@/lib/cn";
@@ -13,14 +18,24 @@ interface SubmissionFieldsProps {
   durationSeconds: number;
   /** True when the entered finish time is malformed or past the duration. */
   finishTimeInvalid: boolean;
+  /** True while the finish time is the untouched match-clock prefill. */
+  finishTimeFromClock?: boolean;
   onSubmissionChange: (v: string) => void;
   onFinishTimeChange: (v: string) => void;
 }
 
+const toOption = (t: SubmissionType): SearchSelectOption => ({
+  label: t.display_name,
+  value: t.code,
+});
+
 /**
- * Submission-type chip grid + Finish Time input. Used by the result
- * step when the outcome is "submission". Mirrors D8 wireframe (lines
- * 1255-1268): two-column grid of selectable Chip cells.
+ * Submission select + Finish Time input. Used by the result step (and the
+ * practice match) when the outcome is "submission". The submission list is
+ * long, so instead of a chip grid it is a single field that opens the shared
+ * full-screen {@link SearchSelect} autocomplete; search is case-, punctuation-
+ * and spacing-insensitive and also matches codes and initials (see
+ * `filterSubmissionTypes`). The value submitted is still the type's `code`.
  */
 export function SubmissionFields({
   submissionTypes,
@@ -28,32 +43,42 @@ export function SubmissionFields({
   finishTimeStr,
   durationSeconds,
   finishTimeInvalid,
+  finishTimeFromClock = false,
   onSubmissionChange,
   onFinishTimeChange,
 }: SubmissionFieldsProps) {
   const tokens = useThemedTokens();
+  const getOptions = React.useCallback(
+    (q: string) => filterSubmissionTypes(submissionTypes, q).map(toOption),
+    [submissionTypes],
+  );
+  const other = submissionTypes.find((t) => t.code === OTHER_SUBMISSION_CODE);
+  const noMatchesOptions = React.useMemo(
+    () => (other ? [toOption(other)] : undefined),
+    [other],
+  );
+  const selectedLabel = submissionTypes.find((t) => t.code === submissionCode)?.display_name;
+
   return (
     <View className="gap-4">
       <View className="gap-2">
         <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-xl">
           Submission
         </Text>
-        <View className="flex-row flex-wrap gap-2">
-          {submissionTypes.map((st) => {
-            const active = submissionCode === st.code;
-            return (
-              <Chip
-                key={st.code}
-                testID={`result-submission-${st.code}`}
-                active={active}
-                onPress={() => onSubmissionChange(st.code)}
-                className="min-w-[46%] flex-grow justify-center"
-              >
-                {st.display_name}
-              </Chip>
-            );
-          })}
-        </View>
+        <SearchSelect
+          testID="result-submission"
+          value={submissionCode}
+          displayLabel={selectedLabel}
+          onSelect={onSubmissionChange}
+          title="Submission"
+          accessibilityLabel="Submission"
+          placeholder="Select submission"
+          searchPlaceholder="Search submissions"
+          getOptions={getOptions}
+          emptyHint="No submissions available."
+          noMatchesText="No submissions match"
+          noMatchesOptions={noMatchesOptions}
+        />
       </View>
 
       <View className="gap-2">
@@ -77,6 +102,13 @@ export function SubmissionFields({
           <Text className="font-mono text-[10px] text-negative uppercase tracking-caps-l">
             Must be within match length (
             <Text className="tabular-nums">{formatElapsed(durationSeconds)}</Text>)
+          </Text>
+        ) : finishTimeFromClock ? (
+          <Text
+            testID="result-finish-time-hint"
+            className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l"
+          >
+            From match clock
           </Text>
         ) : null}
       </View>

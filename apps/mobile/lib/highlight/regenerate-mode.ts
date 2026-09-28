@@ -6,7 +6,7 @@ export type RegenerateMode = "enabled" | "exhausted" | "in_progress" | "paused";
 type ModeInput = Pick<HighlightProgress, "phase" | "canRegenerate" | "rendersRemaining">;
 
 /**
- * Which Regenerate the sheet offers (spec 014 section 10). At 0 left it is
+ * Which Regenerate the sheet offers (spec 015 section 10). At 0 left it is
  * shown disabled with the exhausted helper; otherwise, when the backend says
  * no (flag off, no plan, render in flight) it is hidden with a helper. While
  * a new version is already rendering the helper says so rather than

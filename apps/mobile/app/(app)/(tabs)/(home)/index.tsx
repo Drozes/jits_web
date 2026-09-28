@@ -24,6 +24,8 @@ import { usePullToRefresh, useRefetchOnRefocus } from "@/lib/cache/use-refocus-r
 import { useMatchExitCount } from "@/lib/arena/arena-store";
 import { matchDetailHref } from "@/lib/match-detail/href";
 import { ResumeMatchCard } from "@/components/dashboard/resume-match-card";
+import { PracticeOfferCard } from "@/components/dashboard/practice-offer-card";
+import { shouldOfferPracticeMatch } from "@/lib/practice/constants";
 import { useMyActiveMatch } from "@/lib/match-flow/use-my-active-match";
 import { NewHighlightCard } from "@/components/dashboard/new-highlight-card";
 import { useNewHighlight } from "@/lib/highlight/use-new-highlight";
@@ -88,6 +90,8 @@ export default function DashboardScreen() {
   React.useEffect(() => {
     if (athlete) markNotificationRouterReady();
   }, [athlete]);
+  // "Not now" hides the practice offer at once, before the athlete re-reads.
+  const [practiceDismissed, setPracticeDismissed] = React.useState(false);
 
   if (!athlete) {
     return (
@@ -101,6 +105,14 @@ export default function DashboardScreen() {
   // "Welcome back" only for someone who has actually been here: a brand-new
   // athlete (zero matches) and the pre-load frame both get a plain "Welcome".
   const hasMatches = !!stats && stats.wins + stats.losses + stats.draws > 0;
+  const offerPractice =
+    !practiceDismissed &&
+    shouldOfferPracticeMatch({
+      athlete,
+      hasActiveMatch: !!activeMatch,
+      statsLoaded: !!stats,
+      hasMatches,
+    });
 
   const recentMatches = (data?.summary.recent_matches ?? []).map((m) => ({
     id: m.match_id,
@@ -166,7 +178,12 @@ export default function DashboardScreen() {
           value={athlete.current_elo}
           accentBar
         />
-        <ArenaNudgeCard secondary={!!activeMatch} />
+        {/* One-time practice offer for a brand-new athlete. While it shows
+            it holds the red CTA and the Arena card steps down. */}
+        {offerPractice ? (
+          <PracticeOfferCard onDismiss={() => setPracticeDismissed(true)} />
+        ) : null}
+        <ArenaNudgeCard secondary={!!activeMatch || offerPractice} />
 
         {isLoading ? (
           <DashboardSkeleton />

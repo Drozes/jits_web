@@ -7,7 +7,7 @@
  *   `route` field from the payload data and call `router.push(route)`. A
  *   route into a family mobile no longer has (sessions, gyms, gym-manager;
  *   jits-gewv) goes Home instead of to an unmatched screen. A
- *   `highlight_ready` push (jr_be spec 014 section 16.4) without a usable
+ *   `highlight_ready` push (jr_be spec 015 section 16.4) without a usable
  *   `route` is sent to its viewer, `/highlight/<id>?source=push`.
  * - Cold start (spec 16.6.4): a tap that LAUNCHED the app is read once with
  *   `getLastNotificationResponseAsync()` when `markNotificationRouterReady()`

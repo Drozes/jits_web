@@ -171,7 +171,7 @@ const REDOWNLOAD: ReadonlySet<ReelsShareFailure> = new Set<ReelsShareFailure>(["
 const RETRYABLE: ReadonlySet<ReelsShareFailure> = new Set<ReelsShareFailure>(["handoff-failed", "unknown"]);
 
 /**
- * The share funnel for ONE own highlight (jr_be spec 014 section 16.6.1).
+ * The share funnel for ONE own highlight (jr_be spec 015 section 16.6.1).
  *
  * Rules it enforces:
  * 1. `shareEnabled === false`: every action is a no-op that touches no

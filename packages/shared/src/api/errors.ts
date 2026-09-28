@@ -167,7 +167,7 @@ const HINT_TO_CODE: Record<string, { code: DomainErrorCode; message: string }> =
       code: "NOT_ADMIN",
       message: "You need admin access to do that.",
     },
-    // Highlight reels (jr_be spec 014 section 9.5). The same table serves the
+    // Highlight reels (jr_be spec 015 section 9.5). The same table serves the
     // RPCs (P0001 HINT) and the highlight-regenerate edge function's
     // {ok:false,error:{hint}} body, via domainErrorFromHint.
     highlight_no_athlete: {
@@ -248,7 +248,7 @@ const HINT_TO_CODE: Record<string, { code: DomainErrorCode; message: string }> =
       code: "HIGHLIGHT_BAD_SEGMENTS",
       message: "Those moments can't make a reel.",
     },
-    // Share funnel (jr_be spec 014 section 16.3.5). The kill switch hit
+    // Share funnel (jr_be spec 015 section 16.3.5). The kill switch hit
     // server side by prepare_highlight_share.
     highlight_share_disabled: {
       code: "HIGHLIGHT_SHARE_DISABLED",

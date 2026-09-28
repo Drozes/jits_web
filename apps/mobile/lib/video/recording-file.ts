@@ -112,3 +112,19 @@ export function releaseRecording(fileUri: string): void {
     console.warn(`[video] could not delete retained recording ${fileUri}:`, err);
   }
 }
+
+/**
+ * Delete a local clip wherever it lives. Used by the practice match, whose
+ * clip is never uploaded and so never moves under `match-uploads/` (which is
+ * why `releaseRecording` cannot be used). Swallows "not found" and any other
+ * failure: a leftover cache file is for the OS to reap, not a user error.
+ */
+export function discardLocalClip(fileUri: string | null | undefined): void {
+  if (!fileUri) return;
+  try {
+    const file = new File(fileUri);
+    if (file.exists) file.delete();
+  } catch (err) {
+    console.warn(`[video] could not discard local clip ${fileUri}:`, err);
+  }
+}

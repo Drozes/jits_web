@@ -1,5 +1,5 @@
 /**
- * Profile "Highlights" row (jits-s6mi.14, spec 014 section 16.6.5): hidden
+ * Profile "Highlights" row (jits-s6mi.14, spec 015 section 16.6.5): hidden
  * when empty or clips are off, 9:16 tiles with a NEW tag while unseen and a
  * mono duration badge, tap -> viewer with source=profile + profile_row_tapped,
  * a horizontal scroll that bleeds to the edge with a 16 pt gutter.

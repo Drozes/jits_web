@@ -1,5 +1,5 @@
 /**
- * The share download (jr_be spec 014 section 16.6.1): cache target, reuse,
+ * The share download (jr_be spec 015 section 16.6.1): cache target, reuse,
  * progress, the progress-aware timeout (stall + overall cap), non-2xx cleanup, in-flight sharing, 24 h sweep and
  * the sign-out clear. `expo-file-system/legacy` is replaced by an in-memory
  * fake so every file operation is observable.

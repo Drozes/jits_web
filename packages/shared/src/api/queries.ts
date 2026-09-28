@@ -63,7 +63,7 @@ type Client = SupabaseClient<Database>;
  * `default_still_url`, and `is_scoutable` to keep payloads small.
  */
 export const ATHLETE_GUARD_SELECT =
-  "id, auth_user_id, display_name, first_name, last_name, current_elo, highest_elo, current_weight, primary_gym_id, profile_photo_url, looking_for_casual, looking_for_ranked, status, free_agent, gender, date_of_birth, city, platform_role, is_bot" as const;
+  "id, auth_user_id, display_name, first_name, last_name, current_elo, highest_elo, current_weight, primary_gym_id, profile_photo_url, looking_for_casual, looking_for_ranked, status, free_agent, gender, date_of_birth, city, platform_role, is_bot, practice_match_offered_at, practice_match_completed_at" as const;
 
 /**
  * The subset of the `athletes` row returned by `getCurrentAthlete`.
@@ -91,6 +91,8 @@ export type AthleteGuardRow = Pick<
   | "city"
   | "platform_role"
   | "is_bot"
+  | "practice_match_offered_at"
+  | "practice_match_completed_at"
 >;
 
 /**

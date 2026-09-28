@@ -31,7 +31,7 @@ function keyOf(item: MyHighlightItem): string {
 
 /**
  * The athlete's latest UNSEEN ready reel, for Home's "Your new highlight"
- * card (jr_be spec 014 section 16.6.4). `get_my_highlights` returns no items
+ * card (jr_be spec 015 section 16.6.4). `get_my_highlights` returns no items
  * while `highlight_clips_enabled` is off, so the card follows the clips flag.
  *
  * Re-read on every focus, on a real return to the foreground (not iOS

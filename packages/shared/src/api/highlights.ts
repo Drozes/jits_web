@@ -17,7 +17,7 @@ import {
 } from "./queries";
 
 /**
- * Highlight reels client layer (jr_be spec 014 section 9.5). The athlete's
+ * Highlight reels client layer (jr_be spec 015 section 9.5). The athlete's
  * OWN reel of one match video: progress, playback signing, feedback,
  * regeneration and retry. Nothing here shares or exports footage.
  */
@@ -50,7 +50,7 @@ export type HighlightPlanStatus = "pending" | "planning" | "planned" | "failed" 
 export type HighlightIdentitySide = "own" | "swapped" | "mixed";
 
 /**
- * `get_highlight_progress(p_match_video_id)` JSONB (jr_be spec 014 section
+ * `get_highlight_progress(p_match_video_id)` JSONB (jr_be spec 015 section
  * 9.1), snake_case. Generated types give it as `Json`; `toHighlightProgress`
  * narrows every text column to its union at this boundary.
  */

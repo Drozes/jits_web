@@ -10,7 +10,7 @@ import { mapPostgrestError, type DomainError, type Result } from "./errors";
 import { isStorageObjectMissing, MATCH_VIDEO_BUCKET } from "./queries";
 
 /**
- * Highlight reels phase 2: discovery and the share funnel (jr_be spec 014
+ * Highlight reels phase 2: discovery and the share funnel (jr_be spec 015
  * sections 16.3 and 16.5). Own reels only, every wrapper returns a
  * `Result<T>` and never throws. The kill switch for every outbound action is
  * `prepare_highlight_share`, which refuses with HIGHLIGHT_SHARE_DISABLED

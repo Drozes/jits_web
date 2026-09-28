@@ -1,5 +1,5 @@
 /**
- * Home's "Your new highlight" card (jr_be spec 014 sections 16.6.3 / 16.6.4):
+ * Home's "Your new highlight" card (jr_be spec 015 sections 16.6.3 / 16.6.4):
  * exact copy, poster or placeholder, duration in mono, NO Signal Red CTA,
  * poster and Watch open the viewer with source=home and log home_card_tapped,
  * the dismiss icon calls onDismiss.

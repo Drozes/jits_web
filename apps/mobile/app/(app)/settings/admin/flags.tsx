@@ -105,7 +105,7 @@ function FlagRow({
 const present = (value: boolean) => (value ? "present" : "absent");
 
 /**
- * The share funnel's native embedding in THIS binary (jr_be spec 014 section
+ * The share funnel's native embedding in THIS binary (jr_be spec 015 section
  * 16.9): how an OTA's reach is confirmed on a field build.
  */
 function formatShareDiagnostics(caps: ShareCapabilities): string {

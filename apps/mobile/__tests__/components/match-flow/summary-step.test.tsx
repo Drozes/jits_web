@@ -55,7 +55,7 @@ jest.mock("@/components/ui/elo-system", () => {
 
 jest.mock("@/lib/supabase/client", () => ({ supabase: {} }));
 
-// Highlight flags for the summary note (spec 014 section 16.6.4).
+// Highlight flags for the summary note (spec 015 section 16.6.4).
 const mockGetFlags = jest.fn();
 jest.mock("@jits/shared/api/highlight-share", () => ({
   getHighlightFlags: (...a: unknown[]) => mockGetFlags(...a),
@@ -220,7 +220,7 @@ describe("View match details link", () => {
   });
 });
 
-describe("SummaryStep highlight note (spec 014 section 16.6.4)", () => {
+describe("SummaryStep highlight note (spec 015 section 16.6.4)", () => {
   const NOTE = "Your highlight is being made, we'll let you know.";
 
   beforeEach(() => {

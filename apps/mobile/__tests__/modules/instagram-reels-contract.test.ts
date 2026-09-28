@@ -2,7 +2,7 @@
  * Source-level guards for the InstagramReels module (jits-s6mi.1 / .2).
  *
  * ONE (moved): who may reach this module, expo-sharing and
- * expo-media-library is now `highlight-share-guard.test.ts` (jr_be spec 014
+ * expo-media-library is now `highlight-share-guard.test.ts` (jr_be spec 015
  * section 16.7); only the module's own-surface checks remain here.
  *
  * TWO: prove the three language halves agree. The JS wrapper maps native
@@ -93,7 +93,7 @@ function relative(file: string): string {
 
 
 // The former first block ("no outbound footage affordance is reachable")
-// is REPLACED by `highlight-share-guard.test.ts` (jr_be spec 014 section
+// is REPLACED by `highlight-share-guard.test.ts` (jr_be spec 015 section
 // 16.7): the share funnel now exists, behind `highlight_share_enabled`, and
 // `lib/highlight-share/` is its single allowed importer. The two tests below
 // are about this module's own surface and stay here unchanged.

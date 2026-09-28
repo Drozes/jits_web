@@ -3,7 +3,7 @@ import type { HighlightShareSource } from "@jits/shared/api/highlight-share";
 
 /**
  * Download of the LIVE reel into the app cache, for the share handoff and
- * Save to Photos (jr_be spec 014 section 16.6.1). Uses the legacy
+ * Save to Photos (jr_be spec 015 section 16.6.1). Uses the legacy
  * `expo-file-system` surface, the same one the upload path uses.
  *
  * - Target `${cacheDirectory}highlight-share/${fileName}`; the version is in

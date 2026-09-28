@@ -29,6 +29,17 @@ jest.mock("lucide-react-native", () => {
   );
 });
 
+const mockWindow = { width: 390, height: 844 };
+jest.mock("react-native/Libraries/Utilities/useWindowDimensions", () => ({
+  __esModule: true,
+  default: () => ({ ...mockWindow, scale: 3, fontScale: 1 }),
+}));
+
+beforeEach(() => {
+  mockWindow.width = 390;
+  mockWindow.height = 844;
+});
+
 import { CameraOverlay } from "@/components/match-flow/camera-overlay";
 
 function renderOverlay(canAskAgain: boolean) {
@@ -75,4 +86,89 @@ describe("CameraOverlay without permission", () => {
       openURL.mockRestore();
     }
   });
+});
+
+describe("CameraOverlay fullscreen (live step)", () => {
+  function renderFull(granted: boolean, recording = true) {
+    return render(
+      <CameraOverlay
+        cameraRef={{ current: null }}
+        permissionGranted={granted}
+        permissionCanAskAgain
+        onRequestPermission={jest.fn()}
+        onCameraReady={jest.fn()}
+        recording={recording}
+        layout="fullscreen"
+      />,
+    );
+  }
+
+  it("draws the camera at the recorded 9:16 aspect, top-aligned, with no REC pill", () => {
+    const screen = renderFull(true);
+    const frame = screen.getByTestId("camera-frame");
+    expect(frame.props.style).toEqual(
+      expect.objectContaining({ position: "absolute", width: 390, left: 0, top: 0 }),
+    );
+    expect(frame.props.style.height).toBeCloseTo(693.33, 2);
+    // The live HUD owns the tally.
+    expect(screen.queryByText("REC")).toBeNull();
+  });
+
+  it("renders only the solid ground without permission (the live screen draws the plate)", () => {
+    const screen = renderFull(false);
+    screen.getByTestId("camera-no-feed-ground");
+    expect(screen.queryByText("Camera access needed")).toBeNull();
+    expect(screen.queryByText("Grant Access")).toBeNull();
+  });
+
+  it("keeps the REC pill in the card layout", () => {
+    const screen = render(
+      <CameraOverlay
+        cameraRef={{ current: null }}
+        permissionGranted
+        permissionCanAskAgain
+        onRequestPermission={jest.fn()}
+        onCameraReady={jest.fn()}
+        recording
+      />,
+    );
+    screen.getByText("REC");
+  });
+});
+
+describe("CameraOverlay in landscape", () => {
+  function renderGranted(layout: "card" | "fullscreen") {
+    return render(
+      <CameraOverlay
+        cameraRef={{ current: null }}
+        permissionGranted
+        permissionCanAskAgain
+        onRequestPermission={jest.fn()}
+        onCameraReady={jest.fn()}
+        recording={false}
+        layout={layout}
+      />,
+    );
+  }
+
+  it("live: draws the camera at 16:9, full height, horizontally centered", () => {
+    mockWindow.width = 844;
+    mockWindow.height = 390;
+    const frame = renderGranted("fullscreen").getByTestId("camera-frame").props.style;
+    expect(frame).toEqual(expect.objectContaining({ position: "absolute", height: 390, top: 0 }));
+    expect(frame.width).toBeCloseTo(693.33, 2);
+    expect(frame.left).toBeCloseTo(75.33, 2);
+  });
+
+  it("ready: a centered 16:9 card at 0.6 x height x 16 / 9, capped at the content width", () => {
+    mockWindow.width = 844;
+    mockWindow.height = 390;
+    const card = renderGranted("card").getByTestId("camera-card").props.style;
+    expect(card).toEqual({ width: 416, maxWidth: "100%", alignSelf: "center" });
+  });
+
+  it("ready in portrait: the card stays full width", () => {
+    expect(renderGranted("card").getByTestId("camera-card").props.style).toBeUndefined();
+  });
+
 });

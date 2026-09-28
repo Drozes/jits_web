@@ -331,7 +331,7 @@ describe("mapRpcError", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Highlight reels (jr_be spec 014 section 9.5 table)
+// Highlight reels (jr_be spec 015 section 9.5 table)
 // ---------------------------------------------------------------------------
 
 const HIGHLIGHT_HINTS: [string, string, string][] = [

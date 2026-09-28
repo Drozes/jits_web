@@ -18,6 +18,7 @@ import {
   setMatchUpload,
   useMatchUpload,
 } from "./match-upload-store";
+import { discardLocalClip } from "./recording-file";
 
 /**
  * State machine for the recorder. Mirrors the web hook's `uploadStatus`
@@ -139,6 +140,21 @@ export interface UseVideoRecorderReturn {
   truncation: RecordingTruncation | null;
   /** The OS cap actually in force, in seconds. Exposed for diagnostics. */
   maxDurationSeconds: number;
+  /**
+   * Only set when the hook runs with `upload: false` (practice match): the
+   * finished clip's local file URI. The caller owns it and must delete it
+   * (`discardLocalClip`). Always null in the normal upload mode.
+   */
+  localUri: string | null;
+}
+
+export interface UseVideoRecorderOptions {
+  /**
+   * Default true. `false` keeps the clip on the device: no upload, no
+   * match_videos row, no match-upload store or persistence writes. The
+   * finished clip is exposed as `localUri` instead.
+   */
+  upload?: boolean;
 }
 
 /**
@@ -177,7 +193,10 @@ export function useVideoRecorder(
   matchId: string,
   uploaderAthleteId: string | null,
   matchDurationSeconds?: number | null,
+  options?: UseVideoRecorderOptions,
 ): UseVideoRecorderReturn {
+  const uploadEnabled = options?.upload !== false;
+  const [localUri, setLocalUri] = React.useState<string | null>(null);
   const cameraRef = React.useRef<CameraView | null>(null);
   const [cameraPermission, requestCameraPermission, getCameraPermission] = useCameraPermissions();
   const [micPermission, requestMicPermission, getMicPermission] = useMicrophonePermissions();
@@ -281,8 +300,8 @@ export function useVideoRecorder(
     // Written to the store, not to local state, and deliberately NOT gated
     // on mountedRef: this can land after the screen is gone and it still
     // has to reach whatever surface is showing next.
-    setMatchUpload(matchId, { truncation: reason });
-  }, [logTag, matchId]);
+    if (uploadEnabled) setMatchUpload(matchId, { truncation: reason });
+  }, [logTag, matchId, uploadEnabled]);
 
   const requestPermission = React.useCallback(async () => {
     await requestCameraPermission();
@@ -290,6 +309,14 @@ export function useVideoRecorder(
   }, [requestCameraPermission, requestMicPermission]);
 
   const handleUpload = React.useCallback(async (fileUri: string) => {
+    if (!uploadEnabled) {
+      // No-upload mode (practice): hand the clip to the caller, or delete it
+      // right away if nobody is left to own it.
+      if (mountedRef.current) setLocalUri(fileUri);
+      else discardLocalClip(fileUri);
+      transition("idle");
+      return;
+    }
     if (!uploaderAthleteId) {
       transition("error", "Cannot upload: current athlete not loaded yet.");
       return;
@@ -340,7 +367,7 @@ export function useVideoRecorder(
     // read as failed for as long as this recorder lived.
     else if (outcome.willRetryLater) transition("idle");
     else transition("error", outcome.error);
-  }, [matchId, uploaderAthleteId, transition]);
+  }, [matchId, uploaderAthleteId, transition, uploadEnabled]);
 
   const start = React.useCallback(async () => {
     if (stateRef.current === "recording" || stateRef.current === "stopping") return;
@@ -401,7 +428,7 @@ export function useVideoRecorder(
     // the camera (no ref, no permission, a deferral still pending) records
     // nothing, so the previous outcome is still the truth about this match.
     truncationRef.current = null;
-    beginMatchUploadAttempt(matchId);
+    if (uploadEnabled) beginMatchUploadAttempt(matchId);
     transition("recording");
     try {
       // recordAsync resolves only when stopRecording is called (or
@@ -537,6 +564,7 @@ export function useVideoRecorder(
     matchId,
     maxDurationSeconds,
     markTruncated,
+    uploadEnabled,
   ]);
 
   // Mutating a ref during render is not safe: React can discard or
@@ -710,5 +738,6 @@ export function useVideoRecorder(
     videoId,
     truncation,
     maxDurationSeconds,
+    localUri,
   };
 }

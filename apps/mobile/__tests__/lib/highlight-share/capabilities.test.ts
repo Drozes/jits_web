@@ -1,5 +1,5 @@
 /**
- * getShareCapabilities (jr_be spec 014 section 16.6.1): the detection matrix,
+ * getShareCapabilities (jr_be spec 015 section 16.6.1): the detection matrix,
  * and the rule that a missing native module degrades instead of throwing.
  */
 import { Linking, Platform } from "react-native";

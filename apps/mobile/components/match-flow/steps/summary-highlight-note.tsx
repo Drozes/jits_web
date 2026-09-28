@@ -5,7 +5,7 @@ import { useHighlightFlags } from "@/lib/highlight/use-highlight-flags";
 import { DISCOVERY_COPY } from "@/lib/highlight/discovery";
 
 /**
- * Post-match reassurance that a reel is on its way (jr_be spec 014 section
+ * Post-match reassurance that a reel is on its way (jr_be spec 015 section
  * 16.6.4): only when this match has a recording (landed or still uploading)
  * AND `highlight_clips_enabled` is on. Fail-closed: nothing renders until the
  * flag read says clips are on. Muted text, no link, no progress.

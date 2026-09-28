@@ -1,5 +1,5 @@
 /**
- * Source-level guard for the highlight share funnel (jr_be spec 014 section
+ * Source-level guard for the highlight share funnel (jr_be spec 015 section
  * 16.7). Replaces the first block of `instagram-reels-contract.test.ts`
  * ("no outbound footage affordance is reachable").
  *
