@@ -13,6 +13,7 @@ import { EloTile, Plate } from "@/components/ui/elo-system";
 import type { EloTileTone } from "@/components/ui/elo-system/elo-tile";
 import { useAmber } from "@/components/match-detail/use-amber";
 import { ARENA_HREF } from "@/lib/arena/constants";
+import { SummaryHighlightNote } from "./summary-highlight-note";
 
 interface SummaryStepProps {
   /** Match id, for the "View match details" fallback link. */
@@ -249,6 +250,7 @@ export function SummaryStep(props: SummaryStepProps) {
             </Text>
           </View>
         ) : null}
+        <SummaryHighlightNote hasVideo={!!videoId || videoPending} />
         {/* Always offered, not only as the no-video fallback: the Watch
             button plays only THIS device's clip, and the detail screen lists
             every video on the match from the server (both athletes'

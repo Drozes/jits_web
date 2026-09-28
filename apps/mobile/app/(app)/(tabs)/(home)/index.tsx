@@ -25,6 +25,9 @@ import { useMatchExitCount } from "@/lib/arena/arena-store";
 import { matchDetailHref } from "@/lib/match-detail/href";
 import { ResumeMatchCard } from "@/components/dashboard/resume-match-card";
 import { useMyActiveMatch } from "@/lib/match-flow/use-my-active-match";
+import { NewHighlightCard } from "@/components/dashboard/new-highlight-card";
+import { useNewHighlight } from "@/lib/highlight/use-new-highlight";
+import { markNotificationRouterReady } from "@/lib/notifications/handlers";
 
 interface DashboardData {
   summary: DashboardSummary;
@@ -67,12 +70,21 @@ export default function DashboardScreen() {
   // SWR keeps stale data on screen while revalidating; the spinner shows only
   // for a pull, never for the silent refetch when the tab regains focus.
   const { match: activeMatch, refresh: refreshActiveMatch } = useMyActiveMatch(athlete?.id);
+  const newHighlight = useNewHighlight(athlete?.id);
+  const refreshNewHighlight = newHighlight.refresh;
   const refreshAll = React.useCallback(() => {
     refresh();
     refreshActiveMatch();
-  }, [refresh, refreshActiveMatch]);
+    refreshNewHighlight();
+  }, [refresh, refreshActiveMatch, refreshNewHighlight]);
   const { refreshing, onRefresh } = usePullToRefresh(refreshAll, isValidating);
   useRefetchOnRefocus(refresh, useMatchExitCount());
+  // Home is the first signed-in screen a launch lands on: from here a
+  // notification tap (including the one that launched the app) can be routed
+  // without the auth redirect replacing it.
+  React.useEffect(() => {
+    if (athlete) markNotificationRouterReady();
+  }, [athlete]);
 
   if (!athlete) {
     return (
@@ -135,6 +147,12 @@ export default function DashboardScreen() {
         {/* A match the app lost (killed mid-match, jits-r9a) comes first and
             takes Home's one red CTA; the Arena card steps down while it shows. */}
         {activeMatch ? <ResumeMatchCard match={activeMatch} /> : null}
+
+        {/* A reel the athlete has not watched yet. Secondary only: the one
+            red CTA stays Resume or the Arena card. */}
+        {newHighlight.highlight ? (
+          <NewHighlightCard highlight={newHighlight.highlight} onDismiss={newHighlight.dismiss} />
+        ) : null}
 
         {/* Both read only the athlete, never the summary, so they paint on the
             first frame. The Arena is the only way to a match on mobile
