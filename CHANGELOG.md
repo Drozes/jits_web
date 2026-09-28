@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+### Mobile: in-app OTA update control (jits-5i2w)
+
+JS-only, OTA-eligible for runtime 0.4.0 (build 23 and later; OTAs from `main` now target 0.4.0 only).
+
+**Added**
+- Once an OTA update has downloaded, a soft dismissible banner ("App updated. Restart for the latest experience.") offers a Restart; a critical update instead shows a full-screen blocking Restart modal (optional per-publish notice copy). Both are deferred while in an Arena match, and the banner steps aside while the Arena challenge prompt sheet is up; a throttled update check also runs on foreground. The modal re-presents itself until iOS confirms it is on screen (a Modal presented while another view controller is up is otherwise silently dropped) and shows restart failures inline. New `apps/mobile/lib/updates/update-policy.ts`, `apps/mobile/lib/updates/use-ota-update.ts`, `apps/mobile/lib/updates/use-modal-present-watchdog.ts`, `apps/mobile/components/updates/update-banner.tsx`, `apps/mobile/components/updates/critical-update-modal.tsx`, `apps/mobile/components/updates/ota-update-bootstrap.tsx`.
+- Criticality counter `apps/mobile/update-critical-index.json` (a downloaded update with a strictly greater index than the running bundle is critical) and its bump script `apps/mobile/scripts/bump-update-critical-index.js` (`npm run ota:critical -w @jits/mobile`).
+
+**Changed**
+- `apps/mobile/app.config.js`: adds only `extra.updateCriticalIndex` (from the counter file) and `extra.updateNotice` (from env `UPDATE_NOTICE`); no native field changes.
+- `apps/mobile/app/_layout.tsx`: mounts `OtaUpdateBootstrap` once at the root so signed-out users also get critical updates.
+- `ship-mobile` / `testflight-release` skills: `ship-mobile` asks whether an OTA is critical (default no), bumps and commits the counter before publishing only when it is, and supports an inline `UPDATE_NOTICE`; `testflight-release` never bumps the counter or sets `UPDATE_NOTICE` for builds.
+
 ### Highlight Reels: integrated with the match-flow redesign and Film Room
 
 JS-only, OTA-eligible.

@@ -35,6 +35,7 @@ import { VideoUploadBootstrap } from "@/lib/video/video-upload-bootstrap";
 import { OrientationBootstrap } from "@/lib/orientation-bootstrap";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { OfflineBanner } from "@/components/offline-banner";
+import { OtaUpdateBootstrap } from "@/components/updates/ota-update-bootstrap";
 import { SplashReveal } from "@/components/ui/elo-system/splash-reveal";
 import { SplashStatement } from "@/components/ui/elo-system/splash-statement";
 import { SplashGlowStatement } from "@/components/ui/elo-system/splash-glow-statement";
@@ -141,6 +142,7 @@ function RootLayout() {
             </BottomSheetModalProvider>
             <OfflineBanner />
             <Toaster />
+            <OtaUpdateBootstrap suppressed={!revealDone} />
           </SafeAreaProvider>
           {!revealDone && variant === SPLASH_VARIANT.GLOW_STATEMENT && (
             <SplashGlowStatement onDone={() => setRevealDone(true)} />

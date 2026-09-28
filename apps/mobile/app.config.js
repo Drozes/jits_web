@@ -15,6 +15,53 @@
 // apps/mobile/.env (both loaded into process.env before this runs).
 const REQUIRED_ENV = ["EXPO_PUBLIC_SUPABASE_URL", "EXPO_PUBLIC_SUPABASE_ANON_KEY"];
 
+// OTA criticality (in-app update control, jits-5i2w).
+// - extra.updateCriticalIndex comes from the COMMITTED monotonic counter in
+//   update-critical-index.json. The running app compares a downloaded update's
+//   index (manifest.extra.expoClient.extra) with its own
+//   (Constants.expoConfig.extra); strictly greater => critical (blocking
+//   restart prompt), otherwise a soft banner. Because it is monotonic, a user
+//   who skipped a critical update is still forced by any later publish.
+// - Bump it ONLY for a critical OTA with `npm run ota:critical`, and commit the
+//   bump before `eas update` so later publishes keep the higher index.
+// - extra.updateNotice comes from env UPDATE_NOTICE (trimmed, omitted when
+//   blank). Env, not the JSON, so a notice never persists into later publishes.
+// A missing or corrupt counter throws: fail loudly at publish/build time.
+const fs = require("fs");
+const path = require("path");
+
+const CRITICAL_INDEX_FILE = path.join(__dirname, "update-critical-index.json");
+
+function readUpdateCriticalIndex() {
+  let raw;
+  try {
+    raw = fs.readFileSync(CRITICAL_INDEX_FILE, "utf8");
+  } catch (err) {
+    throw new Error(
+      `[app.config] Cannot read ${CRITICAL_INDEX_FILE} (OTA criticality counter): ${err.message}`,
+    );
+  }
+  let data;
+  try {
+    data = JSON.parse(raw);
+  } catch (err) {
+    throw new Error(`[app.config] ${CRITICAL_INDEX_FILE} is not valid JSON: ${err.message}`);
+  }
+  const value = data && data.criticalIndex;
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw new Error(
+      `[app.config] ${CRITICAL_INDEX_FILE} must contain {"criticalIndex": <non-negative integer>}, ` +
+        `got ${JSON.stringify(value)}`,
+    );
+  }
+  return value;
+}
+
+function readUpdateNotice() {
+  const notice = (process.env.UPDATE_NOTICE ?? "").trim();
+  return notice.length > 0 ? notice : undefined;
+}
+
 module.exports = ({ config }) => {
   const missing = REQUIRED_ENV.filter((key) => !process.env[key]);
 
@@ -74,6 +121,9 @@ module.exports = ({ config }) => {
       // not in REQUIRED_ENV: unset, the app shares through the system share
       // sheet instead. Config, not native: it reaches a field build by OTA.
       FACEBOOK_APP_ID: process.env.EXPO_PUBLIC_FACEBOOK_APP_ID || undefined,
+      // OTA criticality: see the comment block at the top of this file.
+      updateCriticalIndex: readUpdateCriticalIndex(),
+      updateNotice: readUpdateNotice(),
     },
   };
 };
