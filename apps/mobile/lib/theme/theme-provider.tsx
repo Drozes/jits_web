@@ -64,7 +64,8 @@ function buildVars(t: typeof lightTokens) {
 }
 
 const lightVarsStyle = buildVars(lightTokens);
-const darkVarsStyle = buildVars(darkTokens);
+/** Dark token vars, for surfaces that stay dark in both themes (the highlight viewer). */
+export const darkVarsStyle = buildVars(darkTokens);
 
 export interface ThemeProviderProps {
   children: React.ReactNode;

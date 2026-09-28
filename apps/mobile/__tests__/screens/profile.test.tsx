@@ -87,6 +87,26 @@ jest.mock("@/components/profile/profile-header", () => ({ ProfileHeader: mockStu
 jest.mock("@/components/profile/profile-quick-stats", () => ({ ProfileQuickStats: mockStub("quick-stats") }));
 jest.mock("@/components/profile/account-section", () => ({ AccountSection: mockStub("account") }));
 jest.mock("@/components/profile/past-match-videos", () => ({ PastMatchVideos: mockStub("videos") }));
+const mockHighlightsRefetch = jest.fn();
+const mockMarkSeenLocally = jest.fn();
+const mockHighlightsRow = jest.fn();
+jest.mock("@/lib/highlight/use-my-highlights", () => ({
+  useMyHighlights: (athleteId: string | undefined) => ({
+    athleteId,
+    items: [{ highlightId: "h1" }],
+    clipsEnabled: true,
+    refetch: mockHighlightsRefetch,
+    markSeenLocally: mockMarkSeenLocally,
+  }),
+}));
+jest.mock("@/components/profile/highlights-row", () => ({
+  HighlightsRow: (props: Record<string, unknown>) => {
+    mockHighlightsRow(props);
+    const R = require("react");
+    const RN = require("react-native");
+    return R.createElement(RN.View, { testID: "highlights-row" });
+  },
+}));
 jest.mock("@/components/notifications/notification-bell", () => ({
   NotificationBell: mockStub("notification-bell"),
 }));
@@ -149,6 +169,7 @@ describe("Profile recent matches and refresh", () => {
     });
     expect(mockProfileRefetch).toHaveBeenCalledTimes(1);
     expect(mockVideosRefetch).toHaveBeenCalledTimes(1);
+    expect(mockHighlightsRefetch).toHaveBeenCalledTimes(1);
   });
 
   it("pull-to-refresh reloads the videos list too", () => {
@@ -161,6 +182,23 @@ describe("Profile recent matches and refresh", () => {
     });
     expect(mockProfileRefetch).toHaveBeenCalledTimes(1);
     expect(mockVideosRefetch).toHaveBeenCalledTimes(1);
+    expect(mockHighlightsRefetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders the Highlights row between Recent Matches and Past Match Videos", () => {
+    const utils = render(<ProfileScreen />);
+    const ids = utils.UNSAFE_root.findAll(
+      (n: HostNode) => typeof n.type === "string" && typeof n.props.testID === "string",
+    ).map((n: HostNode) => n.props.testID as string);
+    expect(utils.getByText("Recent Matches")).toBeTruthy();
+    expect(ids.indexOf("highlights-row")).toBeGreaterThan(-1);
+    expect(ids.indexOf("highlights-row")).toBeLessThan(ids.indexOf("videos"));
+    expect(ids.indexOf("quick-stats")).toBeLessThan(ids.indexOf("highlights-row"));
+    expect(mockHighlightsRow).toHaveBeenLastCalledWith({
+      items: [{ highlightId: "h1" }],
+      clipsEnabled: true,
+      onOpen: mockMarkSeenLocally,
+    });
   });
 });
 

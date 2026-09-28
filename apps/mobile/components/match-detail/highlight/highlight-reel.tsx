@@ -11,6 +11,7 @@ import { HighlightFeedbackRow } from "./highlight-feedback-row";
 import { HighlightReelNotes } from "./highlight-reel-notes";
 import { HighlightFeedbackSheet } from "./highlight-feedback-sheet";
 import { HighlightFeedbackForm } from "./highlight-feedback-form";
+import { HighlightOpenReel } from "./highlight-open-reel";
 
 type Props = Pick<UseMyHighlightResult, "source" | "playbackFailed" | "onPlayerError" | "refresh"> & {
   progress: HighlightProgress;
@@ -36,6 +37,9 @@ export function HighlightReel({ progress, source, playbackFailed, onPlayerError,
         <View testID="highlight-player-loading" className="bg-surface-4 rounded-md" style={HIGHLIGHT_FRAME_STYLE} />
       )}
       <HighlightReelNotes progress={progress} />
+      {progress.highlightId && playback ? (
+        <HighlightOpenReel highlightId={progress.highlightId} version={playback.version} />
+      ) : null}
       <HighlightFeedbackRow
         rating={fb.rating}
         improveDisabled={regenerating}

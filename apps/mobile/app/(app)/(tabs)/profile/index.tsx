@@ -13,6 +13,8 @@ import { ProfileHeader } from "@/components/profile/profile-header";
 import { ProfileQuickStats } from "@/components/profile/profile-quick-stats";
 import { AccountSection } from "@/components/profile/account-section";
 import { PastMatchVideos } from "@/components/profile/past-match-videos";
+import { HighlightsRow } from "@/components/profile/highlights-row";
+import { useMyHighlights } from "@/lib/highlight/use-my-highlights";
 import { ShareProfileSheet } from "@/components/share-profile-sheet";
 import { AppHeader } from "@/components/layout/app-header";
 import { NotificationBell } from "@/components/notifications/notification-bell";
@@ -107,13 +109,17 @@ export default function ProfileScreen() {
     useProfileData(athlete?.id, athlete?.primary_gym_id);
   const videos = useMyMatchVideos(athlete?.id);
   const refetchVideos = videos.refetch;
+  const highlights = useMyHighlights(athlete?.id);
+  const refetchHighlights = highlights.refetch;
 
   // Pull-to-refresh and returning to the tab both reload the profile AND the
-  // videos list, so a video uploaded from the match wizard shows up here.
+  // videos list and the highlights row, so a video uploaded from the match
+  // wizard (and the reel made from it) shows up here.
   const refetchAll = React.useCallback(() => {
     refetchProfile();
     refetchVideos();
-  }, [refetchProfile, refetchVideos]);
+    refetchHighlights();
+  }, [refetchProfile, refetchVideos, refetchHighlights]);
   const { refreshing, onRefresh } = usePullToRefresh(refetchAll, profileBusy || videos.isValidating);
   useRefetchOnRefocus(refetchAll, useMatchExitCount());
   // The video row lands when the upload settles, often after that refocus.
@@ -196,6 +202,12 @@ export default function ProfileScreen() {
                 </View>
               )}
             </View>
+
+            <HighlightsRow
+              items={highlights.items}
+              clipsEnabled={highlights.clipsEnabled}
+              onOpen={highlights.markSeenLocally}
+            />
 
             <PastMatchVideos videos={videos} />
 
