@@ -40,10 +40,15 @@ export function CriticalUpdateModal({
       onRequestClose={blockClose}
       onShow={onShow}
     >
-      <View accessibilityViewIsModal className="flex-1 bg-background items-center justify-center px-6">
+      <View
+        accessibilityViewIsModal
+        className="flex-1 bg-background items-center justify-center px-6"
+      >
         <View className="w-full max-w-md items-center gap-4">
           <Wordmark size="sm" />
-          <Text className="font-heading text-xl text-foreground text-center">Update ready</Text>
+          <Text className="font-heading text-xl text-foreground text-center">
+            Update ready
+          </Text>
           <Text className="font-body text-base text-muted-foreground text-center">
             {notice ?? CRITICAL_UPDATE_DEFAULT_BODY}
           </Text>
@@ -58,7 +63,10 @@ export function CriticalUpdateModal({
             {restarting ? "Restarting..." : "Restart"}
           </Button>
           {error ? (
-            <Text className="font-body text-sm text-muted-foreground text-center" accessibilityLiveRegion="polite">
+            <Text
+              className="font-body text-sm text-muted-foreground text-center"
+              accessibilityLiveRegion="polite"
+            >
               {error}
             </Text>
           ) : null}

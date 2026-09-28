@@ -11,6 +11,7 @@ JS-only, OTA-eligible for runtime 0.4.0 (build 23 and later; OTAs from `main` no
 - Criticality counter `apps/mobile/update-critical-index.json` (a downloaded update with a strictly greater index than the running bundle is critical) and its bump script `apps/mobile/scripts/bump-update-critical-index.js` (`npm run ota:critical -w @jits/mobile`).
 
 **Changed**
+- The restart banner is now a high-contrast inverted bar ("UPDATE READY" label, larger copy, solid RESTART, 44pt dismiss target) after production feedback that it got lost; header row in `apps/mobile/components/updates/update-banner-header.tsx` (jits-5i2w.6).
 - `apps/mobile/app.config.js`: adds only `extra.updateCriticalIndex` (from the counter file) and `extra.updateNotice` (from env `UPDATE_NOTICE`); no native field changes.
 - `apps/mobile/app/_layout.tsx`: mounts `OtaUpdateBootstrap` once at the root so signed-out users also get critical updates.
 - `ship-mobile` / `testflight-release` skills: `ship-mobile` asks whether an OTA is critical (default no), bumps and commits the counter before publishing only when it is, and supports an inline `UPDATE_NOTICE`; `testflight-release` never bumps the counter or sets `UPDATE_NOTICE` for builds.

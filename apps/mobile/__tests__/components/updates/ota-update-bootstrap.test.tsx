@@ -40,11 +40,11 @@ beforeEach(() => __resetArenaStoreForTests());
 it("shows the banner, and hides it while the challenge prompt sheet is up", () => {
   mockState = state("banner");
   const { queryByText } = render(<OtaUpdateBootstrap suppressed={false} />);
-  expect(queryByText(/App updated/)).toBeTruthy();
+  expect(queryByText(/Update ready/)).toBeTruthy();
   raiseChallengePrompt();
-  expect(queryByText(/App updated/)).toBeNull();
+  expect(queryByText(/Update ready/)).toBeNull();
   act(() => publishArenaState(IDLE_ARENA_STATE));
-  expect(queryByText(/App updated/)).toBeTruthy();
+  expect(queryByText(/Update ready/)).toBeTruthy();
 });
 
 it("never hides the critical modal for a challenge prompt", () => {

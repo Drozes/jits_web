@@ -14,9 +14,10 @@ import { UpdateBanner } from "./update-banner";
  * `incoming` challenge. The critical modal is never hidden for it.
  */
 export function OtaUpdateBootstrap({ suppressed }: { suppressed: boolean }) {
-  const { prompt, notice, restarting, restartError, restart, dismiss } = useOtaUpdate({
-    suppressed,
-  });
+  const { prompt, notice, restarting, restartError, restart, dismiss } =
+    useOtaUpdate({
+      suppressed,
+    });
   const challengePromptUp = useArenaState().incoming !== null;
 
   if (prompt === "modal") {
@@ -31,7 +32,13 @@ export function OtaUpdateBootstrap({ suppressed }: { suppressed: boolean }) {
     );
   }
   if (prompt === "banner" && !challengePromptUp) {
-    return <UpdateBanner onRestart={restart} onDismiss={dismiss} restarting={restarting} />;
+    return (
+      <UpdateBanner
+        onRestart={restart}
+        onDismiss={dismiss}
+        restarting={restarting}
+      />
+    );
   }
   return null;
 }
