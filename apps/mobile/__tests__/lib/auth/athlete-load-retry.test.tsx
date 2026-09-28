@@ -43,6 +43,11 @@ jest.mock("@/lib/arena/arena-store", () => ({
   takeArenaOfflineBeforeSignOut: jest.fn(() => Promise.resolve()),
 }));
 
+const mockClearShareCache = jest.fn(() => Promise.resolve());
+jest.mock("@/lib/highlight-share", () => ({
+  clearShareCache: () => mockClearShareCache(),
+}));
+
 jest.mock("expo-router", () => ({
   Redirect: ({ href }: { href: string }) => {
     const R = require("react");
@@ -205,6 +210,20 @@ describe("cold-start athlete load", () => {
     });
     expect(r.getByTestId("redirect").props.children).toBe("/login");
     expect(mockRemoveItem).toHaveBeenCalledWith("sb-test-auth-token");
+  });
+
+  it("clears the downloaded-highlight share cache on sign-out, even when it rejects", async () => {
+    mockRead.mockResolvedValue(OK(ACTIVE));
+    mockClearShareCache.mockRejectedValueOnce(new Error("fs"));
+    const r = render(<App />);
+    await flush();
+    expect(mockClearShareCache).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await signOut!();
+    });
+    expect(mockClearShareCache).toHaveBeenCalledTimes(1);
+    expect(r.getByTestId("redirect").props.children).toBe("/login");
   });
 });
 

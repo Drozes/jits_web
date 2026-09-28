@@ -1,18 +1,9 @@
 /**
  * Source-level guards for the InstagramReels module (jits-s6mi.1 / .2).
  *
- * Two jobs, both of which a dev box CAN do and neither of which any other
- * gate here does.
- *
- * ONE: prove NO OUTBOUND FOOTAGE AFFORDANCE IS REACHABLE. The share entry
- * point is slice jits-s6mi.4, gated on `highlight_share_enabled`, which
- * must stay false while the consent decision `jr_be-17f` is open. That gate
- * is broader than Instagram: the Reels handoff, the generic system share
- * sheet AND save-to-camera-roll all hand the other athlete's likeness to a
- * destination outside the two participants, so they are one disclosure and
- * one gate. The capability is allowed to exist; a code path to it is not.
- * These tests fail the build the moment one appears, whether it goes
- * through this module or around it.
+ * ONE (moved): who may reach this module, expo-sharing and
+ * expo-media-library is now `highlight-share-guard.test.ts` (jr_be spec 014
+ * section 16.7); only the module's own-surface checks remain here.
  *
  * TWO: prove the three language halves agree. The JS wrapper maps native
  * error codes by string, the FileProvider authority is a string in Kotlin
@@ -100,107 +91,13 @@ function relative(file: string): string {
   return path.relative(REPO_ROOT, file);
 }
 
-/**
- * The argument text of every `Share.share(...)` call in `source`, found by
- * balancing parentheses from the opening one. Crude, and sufficient: these
- * are object literals a few lines long, and the alternative is a parser.
- */
-function shareCallArguments(source: string): string[] {
-  const calls: string[] = [];
-  const needle = "Share.share(";
-  let at = source.indexOf(needle);
-  while (at !== -1) {
-    const open = at + needle.length - 1;
-    let depth = 0;
-    let end = open;
-    for (let i = open; i < source.length; i += 1) {
-      if (source[i] === "(") depth += 1;
-      if (source[i] === ")") {
-        depth -= 1;
-        if (depth === 0) {
-          end = i;
-          break;
-        }
-      }
-    }
-    calls.push(source.slice(open + 1, end));
-    at = source.indexOf(needle, end);
-  }
-  return calls;
-}
 
-describe("no outbound footage affordance is reachable", () => {
-  it("has app roots to scan, so a moved directory cannot make this vacuous", () => {
-    // Without this the suite would pass loudly after a rename that made
-    // every glob empty, which is the classic way a guard like this dies.
-    for (const root of APP_ROOTS) {
-      expect(fs.existsSync(root)).toBe(true);
-    }
-    expect(sourceFilesUnder(path.join(MOBILE_ROOT, "app")).length).toBeGreaterThan(20);
-  });
-
-  it("scans the sibling local module that live code already imports", () => {
-    // Proves `modules/` is genuinely in the scanned set, by finding the
-    // file whose existence is the reason it has to be.
-    const scanned = appSourceFiles().map(relative);
-    expect(scanned).toContain(path.join("apps", "mobile", "modules", "backup-exclusion", "index.ts"));
-    expect(scanned.filter((file) => file.includes("instagram-reels"))).toEqual([]);
-  });
-
-  it("is imported by no screen, component, hook, shared module or sibling module", () => {
-    const offenders = appSourceFiles()
-      .filter((file) =>
-        /instagram-reels|InstagramReels|shareToReels/.test(fs.readFileSync(file, "utf8")),
-      )
-      .map(relative);
-
-    // If this fails, the share entry point has arrived early. It belongs in
-    // slice jits-s6mi.4, behind `highlight_share_enabled`, and that flag
-    // must not go true while jr_be-17f is open.
-    expect(offenders).toEqual([]);
-  });
-
-  it("hands the system share sheet no local file", () => {
-    // The generic share sheet is under the SAME gate as Instagram, and it
-    // is one property away from being a footage affordance: the existing
-    // call sites share a URL and a sentence, and adding `url: videoUri` to
-    // any of them would ship the disclosure with no native change, no flag
-    // and no review.
-    const calls = appSourceFiles().flatMap((file) =>
-      shareCallArguments(fs.readFileSync(file, "utf8")).map(
-        (args) => [relative(file), args] as const,
-      ),
-    );
-    // Not vacuous: there really are three today (athlete profile, own
-    // profile share sheet, match summary). The fourth, the session lobby's
-    // invite share, went with the session screens (jits-gewv).
-    expect(calls).toHaveLength(3);
-
-    const offenders = calls
-      .filter(([, args]) =>
-        /videoUri|videoUrl|recordingUri|clipUri|localUri|fileUri|file:\/\/|\.mp4|\.mov/.test(args),
-      )
-      .map(([file]) => file);
-    expect(offenders).toEqual([]);
-  });
-
-  it("imports neither expo-sharing nor expo-media-library in app code", () => {
-    // Both are installed dependencies and neither is used today. They are
-    // the two ways to put a local file in front of the OS without going
-    // near this module: `Sharing.shareAsync(fileUri)` and
-    // `MediaLibrary.saveToLibraryAsync(fileUri)`, the second being the
-    // "just save it to my photos" convenience the epic explicitly forbids
-    // shipping unflagged.
-    const offenders = appSourceFiles()
-      .filter((file) =>
-        /from "expo-sharing"|from "expo-media-library"|saveToLibraryAsync|createAssetAsync/.test(
-          fs.readFileSync(file, "utf8"),
-        ),
-      )
-      .map(relative);
-    expect(offenders).toEqual([]);
-  });
-
+// The former first block ("no outbound footage affordance is reachable")
+// is REPLACED by `highlight-share-guard.test.ts` (jr_be spec 014 section
+// 16.7): the share funnel now exists, behind `highlight_share_enabled`, and
+// `lib/highlight-share/` is its single allowed importer. The two tests below
+// are about this module's own surface and stay here unchanged.
+describe("the module's own surface", () => {
   it("ships no UI of its own", () => {
     // A `.tsx` here would mean a component, and a component is one import
     // away from a screen.

@@ -70,6 +70,10 @@ module.exports = ({ config }) => {
       // above). sentry.ts reads these from Constants.expoConfig.extra first.
       SENTRY_DSN: process.env.EXPO_PUBLIC_SENTRY_DSN,
       APP_ENV: process.env.EXPO_PUBLIC_APP_ENV,
+      // Meta App ID for the Instagram Reels handoff. OPTIONAL and deliberately
+      // not in REQUIRED_ENV: unset, the app shares through the system share
+      // sheet instead. Config, not native: it reaches a field build by OTA.
+      FACEBOOK_APP_ID: process.env.EXPO_PUBLIC_FACEBOOK_APP_ID || undefined,
     },
   };
 };

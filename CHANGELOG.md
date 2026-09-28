@@ -2,6 +2,39 @@
 
 ## [Unreleased]
 
+### Mobile: highlight share module + replacement guard (jits-s6mi.3, Highlight Reels phase 2 F5)
+
+JS-only, OTA-eligible (tier 1): uses only native modules already in builds 22/23 (InstagramReels, ExpoSharing, ExpoMediaLibrary, legacy expo-file-system). No dependency, `app.json`, plugin, metro, babel or `eas.json` change; `expo-clipboard` is NOT added (its native module is probed directly, so the same JS lights up the Copy button on the tier-2 build).
+
+**Added**
+- `apps/mobile/lib/highlight-share/` (the ONLY app code that may touch the Reels module, expo-sharing, expo-media-library or a clipboard module): `capabilities.ts` (`getShareCapabilities()`: reels = module + App ID + iOS `canOpenURL("instagram-reels://share")`, share sheet, Photos, clipboard, plus `reelsModule` / `instagramDetected` for diagnostics), `native-modules.ts` (every native package required lazily behind `requireOptionalNativeModule`, so a binary without it degrades instead of throwing), `download.ts` (`downloadReel` to `cacheDirectory/highlight-share/<fileName>` via a `.part` file, reuse of a complete cached file, 60 s timeout, non-2xx/timeout/throw delete the partial file, one in-flight download per file; `sweepShareCache` (> 24 h) and `clearShareCache`; nothing is deleted right after a handoff), `reels.ts` (3-60 s window, handoff), `share-sheet.ts`, `save-photos.ts` (write-only permission), `clipboard.ts`, `share-copy.ts` (spec 16.6.3 copy), `telemetry.ts` (`track`, adds platform / OS / app / runtime version), `use-highlight-share.ts` and `index.ts`.
+- `useHighlightShare({ highlightId, shareEnabled, durationS, captionContext, source })`: with `shareEnabled` false every action is a no-op (no native call, no network, no telemetry); `start()` always calls `prepare_highlight_share` first (kill switch -> `failed` / `disabled`, no download) then signs for 300 s and downloads; the spec 16.6.1 Reels failure table (fall through, message + share-sheet fallback, Try again, delete + re-download + retry once); iOS Reels moves to `returned` (and logs `returned_from_instagram` with `elapsed_ms`) when the app is active again after a background trip; Save to Photos independent of the share path; every share-flow step logged fire-and-forget with `source`. The hook shows no toasts: `handoff` returns `{ ok, path, oversize }`, `saveToPhotos` a `SaveOutcome`, `copyCaption` a boolean, and `ShareError` carries `code` and `retryable` for the UI.
+- Admin > Feature flags: a "Highlight share diagnostics" row (Reels module, App ID, Instagram, Share sheet, Photos, Clipboard).
+- Tests: `apps/mobile/__tests__/lib/highlight-share/` (`use-highlight-share.test.ts` incl. the behavioural gate, `capabilities.test.ts`, `download.test.ts`), `apps/mobile/__tests__/screens/admin-flags-diagnostics.test.tsx`, and a sign-out case in `__tests__/lib/auth/athlete-load-retry.test.tsx`.
+
+**Changed**
+- Sign-out (`apps/mobile/lib/auth/auth-context.tsx`) clears the share cache (fire and forget).
+- `apps/mobile/__tests__/modules/instagram-reels-contract.test.ts`: its first block ("no outbound footage affordance is reachable") is replaced by the new `apps/mobile/__tests__/modules/highlight-share-guard.test.ts` (single allowed importer, who may import the share module and which names, no native re-export from its barrel, `Share.share` unchanged, vacuity guards). The module's own-surface checks ("ships no UI", "not re-exported from any barrel") and every native-contract suite stay.
+- `apps/mobile/modules/instagram-reels/index.ts` docblock names `lib/highlight-share/` as its only caller and the flag as the gate (no code change).
+
+### Mobile: Facebook App ID plumbing (jits-r71z, Highlight Reels phase 2 F9)
+
+Config only, OTA-eligible: `extra` is carried in the update manifest; no plugin, dependency or native change.
+
+**Added**
+- `EXPO_PUBLIC_FACEBOOK_APP_ID` -> `apps/mobile/app.config.js` `extra.FACEBOOK_APP_ID` -> `env.facebookAppId: string | null` in `apps/mobile/lib/env.ts` (extra first, then `process.env`, trimmed, blank is null). Optional: NOT in `REQUIRED_ENV`, so a build without it neither throws nor warns; without it the Reels path is not offered and sharing uses the system share sheet. Documented in `apps/mobile/.env.example` (pointer to `docs/meta-app-setup.md`). Tests in `apps/mobile/__tests__/lib/env.test.ts` (extra, env fallback, absent/blank, `app.config.js` with the variable unset and on an EAS build).
+
+### Shared: Highlight Reels phase 2 share-funnel layer (jits-s6mi.12)
+
+Coded against jr_be spec 014 section 16.3 / 16.5; the backend (B9 `jr_be-15c.15`) lands in parallel, so the six new RPCs are hand-typed until `db:types` is re-run.
+
+**Added**
+- `@jits/shared/api/highlight-share` (new `packages/shared/src/api/highlight-share.ts`, also in the `./api` barrel): `getHighlightFlags`, `getMyHighlights`, `getHighlightDetail`, `markHighlightSeen`, `prepareHighlightShare` (the server-side kill-switch check), `signHighlightDownload` (`match-videos`, 300 s, 404 -> `VIDEO_FILE_MISSING`) and `logHighlightShareEvent` (fire-and-forget, never rejects), with the `HighlightFlags` / `MyHighlightItem` / `MyHighlights` / `HighlightCaptionContext` / `HighlightDetail` / `HighlightShareSource` types. All return `Result<T>`; `getHighlightFlags` fails closed.
+- `packages/shared/src/api/highlight-share-rpc.ts`: the ONLY hand-written RPC types (raw JSONB shapes, argument names, a loosely typed `rpc` call). TODO: delete once `database.ts` is regenerated with B9.
+- `buildHighlightCaption` / `buildCollabTip` (new `packages/shared/src/utils/highlight-caption.ts`): the spec 16.5 caption template (display names only, no handles or URLs, <= 400 characters).
+- `HIGHLIGHT_SHARE_STEPS`, `HIGHLIGHT_SHARE_SOURCES`, `HIGHLIGHT_DOWNLOAD_URL_TTL_S` and the event-detail key documentation in `packages/shared/src/constants/highlights.ts`.
+- Error codes `HIGHLIGHT_SHARE_DISABLED` ("Sharing is turned off right now.") and `HIGHLIGHT_EVENT_REJECTED` (never shown) for hints `highlight_share_disabled`, `highlight_bad_event`, `highlight_event_limit`.
+
 ### Mobile: "Your highlight" card, player and feedback sheet (jits-s6mi.10, Highlight Reels Alpha)
 
 JS-only, OTA-eligible for runtime 0.3.0 (expo-video is already embedded; no dependency, `app.json`, plugin, metro, babel or `eas.json` change). Needs jr_be B1 + B6 deployed to show anything: until `get_highlight_progress` answers, the card renders nothing.

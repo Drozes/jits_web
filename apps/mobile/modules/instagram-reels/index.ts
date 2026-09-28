@@ -17,19 +17,21 @@ import { requireOptionalNativeModule } from "expo-modules-core";
  * custom URL scheme; an Android intent with a custom action and an explicit
  * URI-permission grant). No Expo module wraps it either.
  *
- * NOTHING IMPORTS THIS YET, ON PURPOSE. The share entry point is slice
- * jits-s6mi.4 and is gated on the `highlight_share_enabled` feature flag,
- * which must stay false while the consent decision `jr_be-17f` is open.
- * Every outbound share affordance is covered by that gate, including the
- * generic share sheet and save-to-camera-roll, because all three hand the
- * OTHER athlete's likeness to a destination outside the two participants.
- * `__tests__/modules/instagram-reels-contract.test.ts` fails the build if
- * any app code starts importing this file.
+ * ITS ONLY CALLER IS `lib/highlight-share/` (jr_be spec 014 section 16.6.1),
+ * and every path there is gated on the `highlight_share_enabled` feature
+ * flag: the viewer hides the Share / Save actions while it is off, and the
+ * share hook calls `prepare_highlight_share` (which refuses while it is off)
+ * before every download. The owner turned sharing on accepting the consent
+ * risk `jr_be-17f`; the flag is the instant kill switch. The same gate
+ * covers the generic share sheet and save-to-camera-roll, because all three
+ * hand the OTHER athlete's likeness to a destination outside the two
+ * participants. `__tests__/modules/highlight-share-guard.test.ts` fails the
+ * build if any other app code imports this file.
  *
  * WHAT IS DELIBERATELY NOT HERE. Pre-flight "is Instagram installed"
  * detection, the generic share-sheet fallback and the share-funnel
- * instrumentation are slice jits-s6mi.3. This module only performs the
- * handoff and reports, honestly, why it could not.
+ * instrumentation live in `lib/highlight-share/`. This module only performs
+ * the handoff and reports, honestly, why it could not.
  */
 
 /**
@@ -202,8 +204,9 @@ const native = requireOptionalNativeModule<InstagramReelsNativeModule>("Instagra
  * was built for. Note what this does NOT say: nothing about whether
  * Instagram is installed. That question needs `canOpenURL` on iOS and a
  * package query on Android, both of which depend on the declarations added
- * by `plugins/with-instagram-reels.js`, and both belong to slice
- * jits-s6mi.3.
+ * by `plugins/with-instagram-reels.js`. `lib/highlight-share/capabilities.ts`
+ * asks it on iOS; on Android there is no pre-check and an
+ * `instagram-unavailable` result falls back to the share sheet.
  */
 export const isReelsShareSupported: boolean =
   native != null && (Platform.OS === "ios" || Platform.OS === "android");

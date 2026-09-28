@@ -47,6 +47,8 @@ export type DomainErrorCode =
   | "HIGHLIGHT_FEEDBACK_INVALID"
   | "HIGHLIGHT_FEEDBACK_LIMIT"
   | "HIGHLIGHT_BAD_SEGMENTS"
+  | "HIGHLIGHT_SHARE_DISABLED"
+  | "HIGHLIGHT_EVENT_REJECTED"
   | "RLS_VIOLATION"
   | "UNKNOWN";
 
@@ -245,6 +247,22 @@ const HINT_TO_CODE: Record<string, { code: DomainErrorCode; message: string }> =
     highlight_segment_out_of_range: {
       code: "HIGHLIGHT_BAD_SEGMENTS",
       message: "Those moments can't make a reel.",
+    },
+    // Share funnel (jr_be spec 014 section 16.3.5). The kill switch hit
+    // server side by prepare_highlight_share.
+    highlight_share_disabled: {
+      code: "HIGHLIGHT_SHARE_DISABLED",
+      message: "Sharing is turned off right now.",
+    },
+    // Telemetry / seen-marker refusals. NEVER shown: share events are
+    // fire-and-forget and mark_highlight_seen failing changes nothing visible.
+    highlight_bad_event: {
+      code: "HIGHLIGHT_EVENT_REJECTED",
+      message: "That event was rejected.",
+    },
+    highlight_event_limit: {
+      code: "HIGHLIGHT_EVENT_REJECTED",
+      message: "That event was rejected.",
     },
   };
 
