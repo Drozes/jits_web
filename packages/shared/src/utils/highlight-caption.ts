@@ -16,8 +16,10 @@ const TRACKED = "Tracked on ELO RATED.";
 const CONTROLS = /[\u0000-\u001F\u007F-\u009F]/g;
 /** Bidi embeddings/overrides/isolates/marks, zero-width characters and the BOM: removed outright. */
 const INVISIBLE = /[\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u2069\uFEFF]/g;
-/** A token core that reads as a link: a scheme, `www.`, or anything ending in a 2+ letter TLD (plus a path). */
-const URL_LIKE = /^(?:[a-z][a-z0-9+.-]*:\/\/\S*|www\.\S*|\S+\.[a-z]{2,}(?:[/?#]\S*)?)$/i;
+/** An unmistakable link: a scheme (`x://`) or a `www.` prefix. The whole token is dropped. */
+const EXPLICIT_LINK = /^(?:[a-z][a-z0-9+.-]*:\/\/|www\.)/i;
+/** A bare domain-looking core (anything ending in a 2+ letter TLD, plus a path): its dots become spaces. */
+const DOMAIN_LIKE = /^\S+\.[a-z]{2,}(?:[/?#]\S*)?$/i;
 /** Full-width / ideographic dots, read as "." for the link check ("evil。com"). */
 const WIDE_DOTS = /[\u3002\uFF0E\uFF61]/g;
 /** Punctuation around a token (quotes, brackets, sentence marks), not part of it. */
@@ -27,10 +29,13 @@ const HANDLE_MARKS = /^[@#\uFF20\uFF03]+/;
 
 /**
  * One token, or null to drop it. Surrounding punctuation is split off first,
- * so "(evil.com)", "evil.com." and "\"@handle\"" are judged by their core:
- * a link core drops the whole token; a leading @ / # is removed from the core
- * (no handles or hashtags injected through a name). The punctuation is kept
- * around a surviving core, so "J." stays "J." (a single letter is no TLD).
+ * so "(evil.com)", "evil.com." and "\"@handle\"" are judged by their core.
+ * A leading @ / # is removed from the core (no handles or hashtags injected
+ * through a name). A core with a scheme or `www.` is dropped outright; any
+ * other domain-looking core keeps its words but loses its dots ("Ana.Souza"
+ * -> "Ana Souza", "evil.com" -> "evil com"), so it can never render as a
+ * link and a dotted name survives. Punctuation around a surviving core is
+ * kept, so "J." stays "J." (a single letter is no TLD).
  */
 function cleanToken(token: string): string | null {
   const lead = token.match(LEADING_PUNCT)?.[0] ?? "";
@@ -40,13 +45,18 @@ function cleanToken(token: string): string | null {
   if (!core) return null;
   const unmarked = core.replace(HANDLE_MARKS, "");
   if (!unmarked) return null;
-  if (URL_LIKE.test(unmarked.replace(WIDE_DOTS, "."))) return null;
-  return `${lead}${unmarked}${trail}`;
+  const normalised = unmarked.replace(WIDE_DOTS, ".");
+  if (EXPLICIT_LINK.test(normalised)) return null;
+  const body = DOMAIN_LIKE.test(normalised)
+    ? normalised.replace(/\.+/g, " ").trim().replace(/\s+/g, " ")
+    : unmarked;
+  return body ? `${lead}${body}${trail}` : null;
 }
 
 /**
  * Free text from the database made safe for a caption: invisible and
- * direction-changing characters removed, URL-like tokens dropped, leading
+ * direction-changing characters removed, explicit links dropped and bare
+ * domains de-dotted, leading
  * `@` / `#` stripped from every word (no handles, no hashtags injected
  * through a name), whitespace collapsed. Null when nothing is left.
  */

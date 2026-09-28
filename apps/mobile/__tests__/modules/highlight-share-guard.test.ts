@@ -358,6 +358,24 @@ describe("4. the share module re-exports no native package", () => {
   });
 });
 
+/** The first argument of a call when it is an object literal (balanced braces), else null. */
+function firstObjectLiteral(args: string): string | null {
+  const text = args.trimStart();
+  if (!text.startsWith("{")) return null;
+  let depth = 0;
+  for (let i = 0; i < text.length; i += 1) {
+    if (text[i] === "{") depth += 1;
+    if (text[i] === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        const rest = text.slice(i + 1).trim();
+        return rest === "" || rest.startsWith(",") ? text.slice(0, i + 1) : null;
+      }
+    }
+  }
+  return null;
+}
+
 /**
  * Problems with the RN `Share` API in `source`: every `Share.share` url must
  * come from a known share-URL builder (`buildShareUrl(...)` inline or a
@@ -369,10 +387,18 @@ function shareApiProblems(source: string): string[] {
   if (/\{[^{}]*\bshare\b[^{}]*\}\s*=\s*Share\b/.test(source)) problems.push("destructures share from Share");
   if (/\bShare\s*\[\s*["'`]share["'`]\s*\]/.test(source)) problems.push("indexes Share['share']");
   if (/\bShare\.share\b(?!\s*\()/.test(source)) problems.push("aliases Share.share");
+  // React Native's Share itself may not be renamed (no allowlist): an alias
+  // would hide its calls from the Share.share scan.
+  if (/\bShare\s+as\s+\w+/.test(source)) problems.push("imports Share under an alias");
+  if (/=\s*[\w$]+\s*\.\s*Share\b(?!\s*\.)/.test(source)) problems.push("assigns X.Share to a variable");
+  if (/\{[^{}]*\bShare\b[^{}]*\}\s*=\s*[\w$]+/.test(source)) problems.push("destructures Share from a namespace");
   const builtVars = new Set(
     [...source.matchAll(/\b(?:const|let|var)\s+(\w+)\s*=\s*buildShareUrl\s*\(/g)].map((m) => m[1]),
   );
   for (const args of shareCallArguments(source)) {
+    const literal = firstObjectLiteral(args);
+    if (literal === null) problems.push("Share.share argument is not an object literal");
+    else if (literal.includes("...")) problems.push("Share.share object literal spreads");
     const explicit = args.match(/\burl\s*:\s*([^,}\n]+)/);
     const shorthand = /(?:^|[{,\s])url\s*(?:,|\}|$)/m.test(args);
     if (explicit) {
@@ -416,6 +442,13 @@ describe("5. Share.share stays as it is", () => {
     ["destructured with alias", "const { share: s } = Share;"],
     ["indexed share", 'await Share["share"]({ url: x });'],
     ["aliased share", "const s = Share.share; await s({ url: x });"],
+    ["Share imported under an alias", 'import { Share as S, View } from "react-native";'],
+    ["RN namespace Share assigned", 'import * as RN from "react-native";\nconst S = RN.Share;'],
+    ["ReactNative.Share assigned", "const Sharer = ReactNative.Share;"],
+    ["Share destructured from a namespace", "const { Share } = RN;"],
+    ["a non-literal argument", "const opts = { url: buildShareUrl('a', id) }; await Share.share(opts);"],
+    ["a spread in the literal", "await Share.share({ ...payload, message: 'x' });"],
+    ["a spread after a builder url", "const url = buildShareUrl('a', id); await Share.share({ url, ...extra });"],
   ])("flags %s", (_label, fixture) => {
     expect(shareApiProblems(fixture).length).toBeGreaterThan(0);
   });
@@ -425,6 +458,8 @@ describe("5. Share.share stays as it is", () => {
     ["builder variable", 'const url = buildShareUrl("athlete", id);\nawait Share.share({ title: "t", url });'],
     ["named builder variable", 'const link = buildShareUrl("athlete", id);\nawait Share.share({ url: link });'],
     ["no url at all", 'await Share.share({ message: "hi" });'],
+    ["literal with options", 'await Share.share({ message: "hi" }, { dialogTitle: "Share" });'],
+    ["plain react-native import", 'import { Share, View } from "react-native";\nawait Share.share({ message: "m" });'],
   ])("accepts %s", (_label, fixture) => {
     expect(shareApiProblems(fixture)).toEqual([]);
   });

@@ -269,17 +269,20 @@ describe("cold-start athlete load", () => {
     expect(mockSignOut).toHaveBeenCalledTimes(1);
   });
 
-  it("an involuntary sign-out (SIGNED_OUT from auth) resets routing and the highlight store", async () => {
+  it("an involuntary sign-out (SIGNED_OUT from auth) resets routing, the highlight store and the share cache", async () => {
     mockRead.mockResolvedValue(OK(ACTIVE));
     render(<App />);
     await flush();
     mockResetRouter.mockClear();
     mockResetHighlights.mockClear();
+    mockClearShareCache.mockClear();
+    mockClearShareCache.mockRejectedValueOnce(new Error("fs")); // never surfaces
     await act(async () => {
       mockAuthCallback?.("SIGNED_OUT", null);
     });
     expect(mockResetRouter).toHaveBeenCalledTimes(1);
     expect(mockResetHighlights).toHaveBeenCalledTimes(1);
+    expect(mockClearShareCache).toHaveBeenCalledTimes(1);
   });
 
   it("unregisters this device's push row and resets notification routing BEFORE the session drops", async () => {

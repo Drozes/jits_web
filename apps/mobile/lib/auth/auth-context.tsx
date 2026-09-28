@@ -142,10 +142,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setAthlete(null);
         setIsLoading(false);
         // Involuntary sign-outs too (expired refresh token, another device):
-        // no held tap or cached reel list may carry over to the next account.
-        // Both are synchronous module resets, safe inside the auth lock.
+        // no held tap, cached reel list or downloaded reel may carry over to
+        // the next account. The resets are synchronous; the cache clear is
+        // fire and forget (never awaited inside the auth lock).
         resetNotificationRouterReady();
         resetHighlightStore();
+        void clearShareCache().catch(() => undefined);
       } else if (needsAthleteLoad(nextUser.id, loadedAthleteForUserId.current)) {
         // Freshly signed-in user whose athlete row we have NOT loaded yet. Hold
         // the gate on "Loading..." (synchronously, in the same render that sets
