@@ -89,8 +89,16 @@ describe("app.config.js FACEBOOK_APP_ID", () => {
   function load(envVars: Record<string, string>): ConfigFactory {
     const mod: { exports: unknown } = { exports: undefined };
     const fakeConsole = { ...console, warn: () => undefined };
+    // `require` / `__dirname` are real: the config reads the OTA criticality
+    // counter (update-critical-index.json) from disk.
     // eslint-disable-next-line no-new-func
-    new Function("module", "process", "console", source)(mod, { env: envVars }, fakeConsole);
+    new Function("module", "process", "console", "require", "__dirname", source)(
+      mod,
+      { env: envVars },
+      fakeConsole,
+      jest.requireActual,
+      `${__dirname}/../..`,
+    );
     return mod.exports as ConfigFactory;
   }
 
