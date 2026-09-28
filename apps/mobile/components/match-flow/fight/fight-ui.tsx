@@ -1,7 +1,8 @@
 import * as React from "react";
-import { ActivityIndicator, Pressable, Text, View, type StyleProp, type ViewStyle } from "react-native";
+import { ActivityIndicator, Text, View, type StyleProp, type ViewStyle } from "react-native";
 import { ON_MEDIA, usePalette, type Palette } from "@/lib/theme/palette";
 import { FIGHT_RADIUS, TABULAR } from "./fight-tokens";
+import { StatePressable } from "@/components/ui/state-pressable";
 
 /**
  * Small building blocks shared by the match-flow screens. Kept deliberately
@@ -124,7 +125,7 @@ export function FightButton({
   const fg = variant === "primary" ? p.onCta : p.text;
   const inert = disabled || busy;
   return (
-    <Pressable
+    <StatePressable
       testID={testID}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
@@ -162,7 +163,7 @@ export function FightButton({
         </Text>
       </View>
       {trailing ?? null}
-    </Pressable>
+    </StatePressable>
   );
 }
 

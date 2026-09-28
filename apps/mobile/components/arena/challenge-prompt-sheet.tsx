@@ -11,7 +11,7 @@
  * challenger cancels, which the hook detects from the challenge row's status.
  */
 import * as React from "react";
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import {
   BottomSheetModal,
   BottomSheetView,
@@ -23,6 +23,7 @@ import { useViewerStakes } from "@/lib/match-flow/use-viewer-stakes";
 import { FIGHT_RADIUS } from "@/components/match-flow/fight/fight-tokens";
 import { usePalette } from "@/lib/theme/palette";
 import { InitialsBlock, KindTag, Mono, StakesStrip, shortName } from "@/components/match-flow/fight/fight-ui";
+import { StatePressable } from "@/components/ui/state-pressable";
 
 /**
  * The sheet's background, WITHOUT gorhom's default accessibility. The stock
@@ -192,7 +193,7 @@ export function ChallengePromptSheet({
             )}
 
             <View style={{ flexDirection: "row", gap: 12 }}>
-              <Pressable
+              <StatePressable
                 accessibilityRole="button"
                 accessibilityLabel="Decline challenge"
                 accessibilityState={{ disabled: busy }}
@@ -213,8 +214,8 @@ export function ChallengePromptSheet({
                 <Text className="font-heading uppercase" style={{ fontSize: 14, letterSpacing: 1.12, color: p.text }}>
                   Decline
                 </Text>
-              </Pressable>
-              <Pressable
+              </StatePressable>
+              <StatePressable
                 accessibilityRole="button"
                 accessibilityLabel="Accept challenge"
                 accessibilityState={{ disabled: busy }}
@@ -233,7 +234,7 @@ export function ChallengePromptSheet({
                 <Text className="font-heading uppercase" style={{ fontSize: 14, letterSpacing: 1.12, color: p.onCta }}>
                   Accept challenge
                 </Text>
-              </Pressable>
+              </StatePressable>
             </View>
           </View>
         ) : null}

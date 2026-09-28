@@ -8,6 +8,7 @@ import type { SubmissionType } from "@jits/shared/types/submission-type";
 import { usePalette } from "@/lib/theme/palette";
 import { FIGHT_RADIUS, TABULAR } from "../fight/fight-tokens";
 import { InitialsBlock, Mono, initialsOf, shortName } from "../fight/fight-ui";
+import { StatePressable } from "@/components/ui/state-pressable";
 
 export interface ResultAthlete {
   id: string;
@@ -64,7 +65,7 @@ export function WinnerTiles({
   return (
     <View style={{ flexDirection: "row", gap: 12 }}>
       {[me, opponent].map((a) => (
-        <Pressable
+        <StatePressable
           key={a.id}
           testID={`result-winner-${a.id}`}
           accessibilityRole="button"
@@ -96,7 +97,7 @@ export function WinnerTiles({
             ) : null}
             <Mono color={a.id === me.id ? p.red : p.text3}>{a.id === me.id ? "YOU" : "OPPONENT"}</Mono>
           </View>
-        </Pressable>
+        </StatePressable>
       ))}
     </View>
   );

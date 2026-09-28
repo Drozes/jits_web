@@ -1,5 +1,6 @@
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import { BROADCAST, BROADCAST_RADIUS, BROADCAST_SIZE } from "./broadcast-tokens";
+import { StatePressable } from "@/components/ui/state-pressable";
 
 const TAG_STYLE = {
   height: BROADCAST_SIZE.tally,
@@ -45,7 +46,7 @@ export function HudTagButton({
   accessibilityLabel: string;
 }) {
   return (
-    <Pressable
+    <StatePressable
       testID={testID}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
@@ -54,6 +55,6 @@ export function HudTagButton({
       style={({ pressed }) => [TAG_STYLE, pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] }]}
     >
       <TagLabel>{label}</TagLabel>
-    </Pressable>
+    </StatePressable>
   );
 }

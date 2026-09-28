@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Mobile: match-flow buttons lost their fill and border on device
+
+JS-only, OTA-eligible.
+
+**Fixed**
+- Every `Pressable` whose `style` was a function of the pressed state rendered with NO style on device: NativeWind v4's css-interop wraps RN `Pressable` and merges `style` as inline rules, and a function is spread into an empty object, so the fill, border, height and padding were all dropped (light and dark theme alike). Visible in production (OTA from `26b7aaf`) as a bare-text RECORD RESULT on the result step and bare-text WATCH FILM / BACK TO ARENA / REMATCH / SHARE on the verdict. Affected: `FightButton` (every match-flow button: face-off, confirm, result, waiting, verdict), the result step's winner cards, the face-off cancel, the live screen's HUD tag / Pause / no-video buttons, and the Arena challenge prompt's accept and decline. Introduced with `FightButton` in `86d5acd` (match-flow redesign) the live broadcast buttons in `35d87d0` and the challenge prompt buttons in `46e3e8c`. Jest never saw it because css-interop skips registering its component wrappers when `NODE_ENV` is `test`.
+- New `apps/mobile/components/ui/state-pressable.tsx` (`StatePressable`) tracks the pressed state itself and hands `Pressable` a resolved style; the seven call sites use it. Regression suite `apps/mobile/__tests__/components/ui/state-pressable-interop.test.tsx` registers the interop wrappers, renders under the real `ThemeProvider` in the light theme, asserts the resolved host styles, and fails on any new raw `<Pressable style={(...) => ...}>`.
+
 ### Mobile: no highlight note on a disputed verdict
 
 JS-only, OTA-eligible.

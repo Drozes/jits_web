@@ -6,6 +6,7 @@ import { ON_MEDIA, usePalette } from "@/lib/theme/palette";
 import { FIGHT_RADIUS, TABULAR } from "../fight/fight-tokens";
 import { InitialsBlock, KindTag, Mono, shortName } from "../fight/fight-ui";
 import { useFaceoffContext } from "./faceoff-context";
+import { StatePressable } from "@/components/ui/state-pressable";
 
 export interface FaceoffAthlete {
   display_name: string;
@@ -47,7 +48,7 @@ export function FaceoffTop({ phase, matchType, me, opponent }: FaceoffTopProps) 
     <View style={{ gap: phase === "weight" ? 20 : 16 }}>
       <View style={{ height: 44, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
         {canLeave ? (
-          <Pressable
+          <StatePressable
             testID="faceoff-leave"
             accessibilityRole="button"
             // The harness and screen readers know this control as "Cancel
@@ -63,7 +64,7 @@ export function FaceoffTop({ phase, matchType, me, opponent }: FaceoffTopProps) 
             <Text className="font-heading uppercase" style={{ fontSize: 13, letterSpacing: 1.12, color: p.text }}>
               {f.cancelling ? "Leaving..." : "Leave"}
             </Text>
-          </Pressable>
+          </StatePressable>
         ) : (
           <View style={{ width: 44 }} />
         )}

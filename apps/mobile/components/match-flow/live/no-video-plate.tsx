@@ -1,7 +1,8 @@
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import { CameraOff } from "lucide-react-native";
 import type { UnavailableVariant } from "@/lib/match-flow/live-view-state";
 import { BROADCAST, glassButtonStyle } from "./broadcast-tokens";
+import { StatePressable } from "@/components/ui/state-pressable";
 
 /**
  * The plate's words. Deliberately no Settings button: iOS restarts the app
@@ -81,7 +82,7 @@ export function NoVideoPlate({
         {copy.body}
       </Text>
       {variant === "canAsk" ? (
-        <Pressable
+        <StatePressable
           testID="live-allow-camera"
           accessibilityRole="button"
           accessibilityLabel="Allow camera"
@@ -98,7 +99,7 @@ export function NoVideoPlate({
           <Text className="font-heading" style={{ fontSize: 14, lineHeight: 16, letterSpacing: 1.12, color: BROADCAST.white }}>
             ALLOW CAMERA
           </Text>
-        </Pressable>
+        </StatePressable>
       ) : null}
     </View>
   );
