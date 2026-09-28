@@ -46,6 +46,7 @@ jest.mock("@jits/shared/api/highlights", () => ({
 }));
 
 import { HIGHLIGHT_RESIGN_AFTER_MS, useMyHighlight } from "@/lib/highlight/use-my-highlight";
+import { FULLSCREEN_ENTER_TIMEOUT_MS } from "@/lib/highlight/use-fullscreen-controls";
 import { HighlightPlayer } from "@/components/match-detail/highlight/highlight-player";
 
 function progress(version: number | null, phase = "ready") {
@@ -484,6 +485,26 @@ describe("HighlightPlayer", () => {
     expect(utils.queryByTestId("highlight-poster")).toBeNull();
   });
 
+  it("seeds ready from the player's status when readyToPlay fired before the listener subscribed", () => {
+    (globalThis as { __expoVideoInitialStatus?: string }).__expoVideoInitialStatus = "readyToPlay";
+    const utils = render(<HighlightPlayer source={SOURCE} onError={jest.fn()} />);
+    const player = utils.getByTestId("expo-video-view").props.player;
+    expect(player.status).toBe("readyToPlay");
+    // Ready but never played: the poster stays (B2) ...
+    expect(utils.getByTestId("highlight-poster")).toBeTruthy();
+    // ... and no second readyToPlay event is needed once playback starts.
+    act(() => emitPlaying(player, true));
+    expect(utils.queryByTestId("highlight-poster")).toBeNull();
+  });
+
+  it("without the seed, a missed readyToPlay would keep the poster after playback starts (control)", () => {
+    const utils = render(<HighlightPlayer source={SOURCE} onError={jest.fn()} />);
+    const player = utils.getByTestId("expo-video-view").props.player;
+    expect(player.status).toBe("idle");
+    act(() => emitPlaying(player, true));
+    expect(utils.getByTestId("highlight-poster")).toBeTruthy();
+  });
+
   it("a first-frame event while a new version's swap is pending does not hide its poster", async () => {
     const utils = render(<HighlightPlayer source={SOURCE} onError={jest.fn()} />);
     const view = utils.getByTestId("expo-video-view");
@@ -540,6 +561,44 @@ describe("HighlightPlayer", () => {
       expect(utils.getByTestId("expo-video-view").props.nativeControls).toBe(true);
       act(() => utils.getByTestId("expo-video-view").props.onFullscreenExit());
       expect(utils.getByTestId("expo-video-view").props.nativeControls).toBe(false);
+    });
+
+    it("no onFullscreenEnter within 1500 ms after enterFullscreen: controls go back off (refused presentation)", async () => {
+      jest.useFakeTimers();
+      try {
+        const utils = render(<HighlightPlayer source={SOURCE} onError={jest.fn()} />);
+        mockVideoHandle.current = { enterFullscreen: jest.fn(() => Promise.resolve()) };
+        await act(async () => {
+          fireEvent.press(utils.getByLabelText("Watch full screen"));
+        });
+        expect(utils.getByTestId("expo-video-view").props.nativeControls).toBe(true);
+        act(() => jest.advanceTimersByTime(FULLSCREEN_ENTER_TIMEOUT_MS - 1));
+        expect(utils.getByTestId("expo-video-view").props.nativeControls).toBe(true);
+        act(() => jest.advanceTimersByTime(1));
+        expect(utils.getByTestId("expo-video-view").props.nativeControls).toBe(false);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it("onFullscreenEnter in time cancels the fallback: controls stay on while fullscreen", async () => {
+      jest.useFakeTimers();
+      try {
+        const utils = render(<HighlightPlayer source={SOURCE} onError={jest.fn()} />);
+        mockVideoHandle.current = { enterFullscreen: jest.fn(() => Promise.resolve()) };
+        await act(async () => {
+          fireEvent.press(utils.getByLabelText("Watch full screen"));
+        });
+        act(() => utils.getByTestId("expo-video-view").props.onFullscreenEnter());
+        act(() => jest.advanceTimersByTime(FULLSCREEN_ENTER_TIMEOUT_MS * 3));
+        expect(utils.getByTestId("expo-video-view").props.nativeControls).toBe(true);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it("the fullscreen handle hook is reset between tests", () => {
+      expect((globalThis as { __expoVideoHandle?: unknown }).__expoVideoHandle).toBeUndefined();
     });
 
     it("any other way into fullscreen also turns the controls on", () => {

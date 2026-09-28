@@ -36,6 +36,8 @@ jest.mock("expo-video", () => {
       muted: false,
       loop: false,
       playing: false,
+      // A suite can start the item already loaded (globalThis.__expoVideoInitialStatus).
+      status: globalThis.__expoVideoInitialStatus || "idle",
       allowsExternalPlayback: true,
       play: jest.fn(() => {
         player.playing = true;
@@ -82,4 +84,15 @@ jest.mock("expo-video", () => {
     return R.createElement(RN.View, { testID: "expo-video-view", ...props });
   });
   return { useVideoPlayer, VideoView, createVideoPlayer: createPlayer };
+});
+
+// The fake VideoView's fullscreen hook (see the expo-video mock above) never
+// leaks from one test into the next.
+beforeEach(() => {
+  globalThis.__expoVideoHandle = undefined;
+  globalThis.__expoVideoInitialStatus = undefined;
+});
+afterEach(() => {
+  globalThis.__expoVideoHandle = undefined;
+  globalThis.__expoVideoInitialStatus = undefined;
 });

@@ -1,6 +1,9 @@
 import * as React from "react";
 import type { VideoView } from "expo-video";
 
+/** How long to wait for `onFullscreenEnter` after calling `enterFullscreen()`. */
+export const FULLSCREEN_ENTER_TIMEOUT_MS = 1_500;
+
 export interface FullscreenControls {
   /** Pass to `VideoView nativeControls`. */
   nativeControls: boolean;
@@ -28,15 +31,25 @@ export interface FullscreenControls {
  *    fullscreen.
  * 3. `onFullscreenExit` (and a failed `enterFullscreen`) turns them off again,
  *    so the inline card stays chrome-free.
+ * 4. iOS resolves `enterFullscreen()` before the presentation happens, so a
+ *    presentation the system silently refused would leave AVKit chrome on the
+ *    inline card: if `onFullscreenEnter` has not arrived
+ *    `FULLSCREEN_ENTER_TIMEOUT_MS` after the call, the controls go off again.
  */
 export function useFullscreenControls(viewRef: React.RefObject<VideoView | null>): FullscreenControls {
   const [nativeControls, setNativeControls] = React.useState(false);
   const pendingRef = React.useRef(false);
   const mountedRef = React.useRef(true);
+  const enterTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clearEnterTimer = React.useCallback(() => {
+    if (enterTimerRef.current) clearTimeout(enterTimerRef.current);
+    enterTimerRef.current = null;
+  }, []);
   React.useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
+      if (enterTimerRef.current) clearTimeout(enterTimerRef.current);
     };
   }, []);
 
@@ -48,11 +61,18 @@ export function useFullscreenControls(viewRef: React.RefObject<VideoView | null>
         setNativeControls(false);
         return;
       }
+      clearEnterTimer();
+      enterTimerRef.current = setTimeout(() => {
+        // No presentation arrived: never leave the chrome on the inline card.
+        enterTimerRef.current = null;
+        if (mountedRef.current) setNativeControls(false);
+      }, FULLSCREEN_ENTER_TIMEOUT_MS);
       void view.enterFullscreen().catch(() => {
+        clearEnterTimer();
         if (mountedRef.current) setNativeControls(false);
       });
     });
-  }, [viewRef]);
+  }, [clearEnterTimer, viewRef]);
 
   // Runs after the commit that turned the controls on.
   React.useEffect(() => {
@@ -70,11 +90,15 @@ export function useFullscreenControls(viewRef: React.RefObject<VideoView | null>
     setNativeControls(true);
   }, [nativeControls, present]);
 
-  const onFullscreenEnter = React.useCallback(() => setNativeControls(true), []);
+  const onFullscreenEnter = React.useCallback(() => {
+    clearEnterTimer();
+    setNativeControls(true);
+  }, [clearEnterTimer]);
   const onFullscreenExit = React.useCallback(() => {
+    clearEnterTimer();
     pendingRef.current = false;
     setNativeControls(false);
-  }, []);
+  }, [clearEnterTimer]);
 
   return { nativeControls, enterFullscreen, onFullscreenEnter, onFullscreenExit };
 }

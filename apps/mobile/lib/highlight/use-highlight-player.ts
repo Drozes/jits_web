@@ -101,6 +101,15 @@ export function useHighlightPlayer(source: HighlightSource, onError: () => void)
   }, [player, replace, source.url, source.version, source.generation]);
 
   React.useEffect(() => {
+    // A readyToPlay that fired before this listener subscribed (the initial
+    // item loads as soon as the player exists) would otherwise be missed.
+    try {
+      if (player.status === "readyToPlay" && swap.current.doneSeq === swap.current.seq) {
+        setReadyVersion(loadedRef.current.version);
+      }
+    } catch {
+      // Released player.
+    }
     const sub = player.addListener("statusChange", ({ status }) => {
       if (status === "error") onErrorRef.current();
       // Only once the latest swap has settled is "ready" about this version.
