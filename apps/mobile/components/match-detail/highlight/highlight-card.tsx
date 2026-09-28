@@ -7,6 +7,8 @@ import { useHighlightRetry } from "@/lib/highlight/use-highlight-retry";
 import { HighlightProgressSteps } from "./highlight-progress-steps";
 import { HighlightFailed, HighlightNote } from "./highlight-states";
 import { HighlightReel } from "./highlight-reel";
+import { HighlightOpenReelLink } from "./highlight-open-reel-link";
+import { useMarkHighlightSeen } from "@/lib/highlight/use-mark-highlight-seen";
 
 /** Phases that render no card at all (spec 014 section 10). */
 const HIDDEN: ReadonlySet<HighlightPhase> = new Set<HighlightPhase>(["disabled", "unavailable"]);
@@ -29,6 +31,11 @@ export function HighlightCard({ matchVideoId, angleLabel, reloadToken = 0 }: Hig
   const my = useMyHighlight(matchVideoId, reloadToken);
   const progress = my.progress;
   const retry = useHighlightRetry(progress?.highlightId ?? null, my.refresh);
+  const showsReel = progress?.phase === "ready" || progress?.phase === "regenerating";
+  // The live version the athlete is looking at: marked seen once per version
+  // (clears the Home card and the bell's unread state), and the viewer link.
+  const liveHighlightId = showsReel && progress?.playback ? progress.highlightId : null;
+  useMarkHighlightSeen(liveHighlightId, liveHighlightId ? (progress?.playback?.version ?? null) : null);
   if (!progress || HIDDEN.has(progress.phase)) return null;
   const { phase } = progress;
 
@@ -45,14 +52,17 @@ export function HighlightCard({ matchVideoId, angleLabel, reloadToken = 0 }: Hig
           <HighlightNote testID="highlight-waiting">{HIGHLIGHT_COPY.waitingForAnalysis}</HighlightNote>
         ) : phase === "planning" || phase === "rendering" ? (
           <HighlightProgressSteps activeStep={phase === "planning" ? 1 : 2} />
-        ) : phase === "ready" || phase === "regenerating" ? (
-          <HighlightReel
-            progress={progress}
-            source={my.source}
-            playbackFailed={my.playbackFailed}
-            onPlayerError={my.onPlayerError}
-            refresh={my.refresh}
-          />
+        ) : showsReel ? (
+          <>
+            <HighlightReel
+              progress={progress}
+              source={my.source}
+              playbackFailed={my.playbackFailed}
+              onPlayerError={my.onPlayerError}
+              refresh={my.refresh}
+            />
+            {liveHighlightId ? <HighlightOpenReelLink highlightId={liveHighlightId} /> : null}
+          </>
         ) : phase === "failed" && !progress.highlightId ? (
           // The plan failed: there is no reel to retry.
           <HighlightNote testID="highlight-plan-failed">{HIGHLIGHT_COPY.planFailed}</HighlightNote>

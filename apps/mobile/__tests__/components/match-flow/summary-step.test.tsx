@@ -11,7 +11,7 @@
  * - Back to Arena stays the single Signal Red cta; Share and Done stay.
  */
 import * as React from "react";
-import { render, fireEvent } from "@testing-library/react-native";
+import { render, fireEvent, act } from "@testing-library/react-native";
 
 jest.mock("lucide-react-native", () => {
   const RN = require("react-native");
@@ -53,6 +53,14 @@ jest.mock("@/components/ui/elo-system", () => {
   };
 });
 
+jest.mock("@/lib/supabase/client", () => ({ supabase: {} }));
+
+// Highlight flags for the summary note (spec 014 section 16.6.4).
+const mockGetFlags = jest.fn();
+jest.mock("@jits/shared/api/highlight-share", () => ({
+  getHighlightFlags: (...a: unknown[]) => mockGetFlags(...a),
+}));
+
 import { SummaryStep, rematchHref } from "@/components/match-flow/steps/summary-step";
 import { ARENA_EXIT_LABEL, ARENA_HREF } from "@/lib/arena/constants";
 
@@ -81,6 +89,7 @@ function renderSummary(overrides: Partial<Props> = {}) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockGetFlags.mockResolvedValue({ ok: true, data: { clipsEnabled: false, shareEnabled: false } });
 });
 
 describe("outcome colours", () => {
@@ -208,5 +217,54 @@ describe("View match details link", () => {
     ).map((n: { props: { children?: unknown } }) => n.props.children as string);
     expect(texts.indexOf("Watch Match Video")).toBeGreaterThanOrEqual(0);
     expect(texts.indexOf("Watch Match Video")).toBeLessThan(texts.indexOf("View match details"));
+  });
+});
+
+describe("SummaryStep highlight note (spec 014 section 16.6.4)", () => {
+  const NOTE = "Your highlight is being made, we'll let you know.";
+
+  beforeEach(() => {
+    mockGetFlags.mockReset();
+  });
+
+  async function renderWith(flags: unknown, video: Partial<Props>) {
+    mockGetFlags.mockResolvedValue(flags);
+    const utils = renderSummary(video);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    return utils;
+  }
+
+  const ON = { ok: true, data: { clipsEnabled: true, shareEnabled: false } };
+  const OFF = { ok: true, data: { clipsEnabled: false, shareEnabled: true } };
+  const FAILED = { ok: false, error: { code: "UNKNOWN", message: "x" } };
+
+  it.each([
+    ["clips on, video landed", ON, { videoId: "v1" }, true],
+    ["clips on, video uploading", ON, { videoPending: true }, true],
+    ["clips on, no video", ON, {}, false],
+    ["clips off, video landed", OFF, { videoId: "v1" }, false],
+    ["flag read failed (fail-closed)", FAILED, { videoId: "v1" }, false],
+  ] as const)("%s", async (_name, flags, video, shown) => {
+    const utils = await renderWith(flags, video as Partial<Props>);
+    if (shown) {
+      expect(utils.getByTestId("summary-highlight-note")).toBeTruthy();
+      expect(utils.getByText(NOTE)).toBeTruthy();
+    } else {
+      expect(utils.queryByTestId("summary-highlight-note")).toBeNull();
+      expect(utils.queryByText(NOTE)).toBeNull();
+    }
+  });
+
+  it("does not read the flags when there is no recording", async () => {
+    await renderWith(ON, {});
+    expect(mockGetFlags).not.toHaveBeenCalled();
+  });
+
+  it("is plain text, not a link", async () => {
+    const utils = await renderWith(ON, { videoId: "v1" });
+    const note = utils.getByTestId("summary-highlight-note");
+    expect(note.props.accessibilityRole).toBeUndefined();
   });
 });

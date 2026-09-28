@@ -1,13 +1,13 @@
 import { Pressable, Text, View } from "react-native";
-import { CheckCircle, Swords, XCircle, Zap } from "lucide-react-native";
+import { CheckCircle, Clapperboard, Swords, XCircle, Zap } from "lucide-react-native";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { formatRelativeDate } from "@jits/shared/utils";
-import type { NotificationItem } from "@jits/shared/types/notification";
+import { isHighlightItem, type BellItem } from "@/lib/notifications/notification-items";
 
 type IconKind = "ranked" | "challenge" | "positive" | "neutral";
 
 const iconConfig: Record<
-  NotificationItem["type"],
+  BellItem["type"],
   { Icon: typeof Swords; tone: IconKind }
 > = {
   match_result: { Icon: Swords, tone: "ranked" },
@@ -15,6 +15,7 @@ const iconConfig: Record<
   challenge_accepted: { Icon: CheckCircle, tone: "positive" },
   challenge_declined: { Icon: XCircle, tone: "neutral" },
   session_joined: { Icon: Swords, tone: "neutral" },
+  highlight_ready: { Icon: Clapperboard, tone: "neutral" },
 };
 
 function useIconColor(tone: IconKind) {
@@ -36,11 +37,12 @@ export function NotificationRow({
   item,
   onPress,
 }: {
-  item: NotificationItem;
+  item: BellItem;
   onPress?: () => void;
 }) {
   const { Icon, tone } = iconConfig[item.type];
   const iconColor = useIconColor(tone);
+  const unread = isHighlightItem(item) && item.unread;
 
   return (
     <Pressable
@@ -65,9 +67,14 @@ export function NotificationRow({
           {item.body}
         </Text>
       </View>
-      <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l pt-0.5">
-        {formatRelativeDate(item.createdAt)}
-      </Text>
+      <View className="items-end gap-1.5 pt-0.5">
+        <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">
+          {formatRelativeDate(item.createdAt)}
+        </Text>
+        {unread ? (
+          <View testID={`notification-unread-${item.id}`} className="w-2 h-2 rounded-full bg-ink" />
+        ) : null}
+      </View>
     </Pressable>
   );
 }

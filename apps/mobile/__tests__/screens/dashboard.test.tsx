@@ -179,9 +179,30 @@ jest.mock("@jits/shared/api/queries", () => ({
   getGymDetailResult: jest.fn().mockResolvedValue({ ok: true, data: null }),
   getGymsWithSessionsResult: jest.fn().mockResolvedValue({ ok: true, data: [] }),
   getMyActiveMatch: jest.fn().mockResolvedValue({ ok: true, data: null }),
+  signPosterKey: jest.fn().mockResolvedValue("https://signed/poster.jpg"),
 }));
 
 jest.mock("@jits/shared/types/composites", () => ({}), { virtual: true });
+
+// Highlight Reels phase 2 (spec 014 section 16.6.4): the "Your new highlight"
+// card's source, and cold-start push routing armed by Home.
+const mockGetMyHighlights = jest.fn();
+const mockMarkSeen = jest.fn();
+const mockLogEvent = jest.fn();
+jest.mock("@jits/shared/api/highlight-share", () => ({
+  getMyHighlights: (...a: unknown[]) => mockGetMyHighlights(...a),
+  markHighlightSeen: (...a: unknown[]) => mockMarkSeen(...a),
+  logHighlightShareEvent: (...a: unknown[]) => mockLogEvent(...a),
+}));
+const mockRouterReady = jest.fn();
+jest.mock("@/lib/notifications/handlers", () => ({
+  markNotificationRouterReady: () => mockRouterReady(),
+}));
+jest.mock("expo-image", () => {
+  const R = require("react");
+  const RN = require("react-native");
+  return { Image: (props: Record<string, unknown>) => R.createElement(RN.View, props) };
+});
 
 import DashboardScreen from "@/app/(app)/(tabs)/(home)/index";
 import { ARENA_HREF } from "@/lib/arena/constants";
@@ -214,6 +235,9 @@ beforeEach(() => {
   queries.getGymDetailResult.mockResolvedValue({ ok: true, data: null });
   queries.getGymsWithSessionsResult.mockResolvedValue({ ok: true, data: [] });
   queries.getMyActiveMatch.mockResolvedValue({ ok: true, data: null });
+  mockGetMyHighlights.mockResolvedValue({ ok: true, data: { clipsEnabled: true, shareEnabled: true, items: [] } });
+  mockMarkSeen.mockResolvedValue({ ok: true, data: null });
+  mockLogEvent.mockResolvedValue(undefined);
   mockAthlete.primary_gym_id = null;
   mockAthlete.id = `a${++athleteSeq}`;
   mockFocusCallbacks.length = 0;
@@ -612,5 +636,117 @@ describe("DashboardScreen resume-match card", () => {
     });
     await waitFor(() => expect(queries.getMyActiveMatch).toHaveBeenCalledTimes(2));
     expect(getByLabelText("Resume your match")).toBeTruthy();
+  });
+});
+
+describe("DashboardScreen new-highlight card (spec 014 section 16.6.4)", () => {
+  const store = require("@/lib/arena/arena-store") as typeof import("@/lib/arena/arena-store");
+  const reel = {
+    highlightId: "h1",
+    matchId: "m1",
+    matchVideoId: "v1",
+    version: 2,
+    durationS: 28.6,
+    posterPath: "m1/a/highlights/2.jpg",
+    readyAt: "2026-09-27T10:00:00Z",
+    opponentName: "Demo Red",
+    matchType: "ranked",
+    outcome: "win",
+    playedAt: "2026-09-27T09:00:00Z",
+    notifiedAt: "2026-09-27T10:00:01Z",
+    unseen: true,
+  };
+  const withReel = { ok: true, data: { clipsEnabled: true, shareEnabled: true, items: [reel] } };
+
+  afterEach(() => {
+    store.__resetArenaStoreForTests();
+  });
+
+  it("arms notification routing once Home is up", async () => {
+    render(React.createElement(DashboardScreen));
+    await waitFor(() => expect(mockRouterReady).toHaveBeenCalled());
+  });
+
+  it("shows nothing without an unseen reel", async () => {
+    const { queryByTestId } = render(React.createElement(DashboardScreen));
+    await waitFor(() => expect(mockGetMyHighlights).toHaveBeenCalledWith({}, { limit: 1, unseenOnly: true }));
+    expect(queryByTestId("new-highlight-card")).toBeNull();
+  });
+
+  it("stays hidden with clips disabled", async () => {
+    mockGetMyHighlights.mockResolvedValue({ ok: true, data: { clipsEnabled: false, shareEnabled: false, items: [reel] } });
+    const { queryByTestId } = render(React.createElement(DashboardScreen));
+    await waitFor(() => expect(mockGetMyHighlights).toHaveBeenCalled());
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(queryByTestId("new-highlight-card")).toBeNull();
+  });
+
+  it("sits after the Resume card and before the ELO tile, and leaves Resume as the one red CTA", async () => {
+    const queries = require("@jits/shared/api/queries") as QueryMocks;
+    queries.getMyActiveMatch.mockResolvedValue({
+      ok: true,
+      data: { matchId: "99999999-9999-4999-8999-999999999999", status: "in_progress", opponentName: "Demo Red" },
+    });
+    mockGetMyHighlights.mockResolvedValue(withReel);
+    const utils = render(React.createElement(DashboardScreen));
+    const card = await utils.findByTestId("new-highlight-card");
+    const resume = await utils.findByLabelText("Resume your match");
+
+    const order = utils.root
+      .findAll(
+        (n: { props: Record<string, unknown> }) =>
+          n.props.accessibilityLabel === "Resume your match" ||
+          n.props.testID === "new-highlight-card" ||
+          n.props.children === "Current ELO Rating",
+      )
+      .map((n: { props: Record<string, unknown> }) =>
+        n.props.testID === "new-highlight-card"
+          ? "card"
+          : n.props.accessibilityLabel === "Resume your match"
+            ? "resume"
+            : "elo",
+      )
+      .filter((v: string, i: number, a: string[]) => a.indexOf(v) === i);
+    expect(order).toEqual(["resume", "card", "elo"]);
+
+    const reds = utils.root.findAll(
+      (n: { type: unknown; props: Record<string, unknown> }) =>
+        typeof n.type === "string" &&
+        n.props.accessibilityRole === "button" &&
+        typeof n.props.className === "string" &&
+        /(^|\s)bg-cta(\s|$)/.test(n.props.className as string),
+    );
+    expect(reds).toHaveLength(1);
+    expect(resume.props.className).toContain("bg-cta");
+    expect(card).toBeTruthy();
+  });
+
+  it("Watch opens the viewer with source=home; dismiss marks seen and hides the card", async () => {
+    mockGetMyHighlights.mockResolvedValue(withReel);
+    const utils = render(React.createElement(DashboardScreen));
+    await utils.findByTestId("new-highlight-card");
+    expect(mockPush).not.toHaveBeenCalled();
+
+    fireEvent.press(utils.getByText("Watch"));
+    expect(mockPush).toHaveBeenCalledWith("/highlight/h1?source=home");
+    expect(mockLogEvent).toHaveBeenCalledWith({}, "h1", "home_card_tapped", { source: "home" });
+
+    fireEvent.press(utils.getByLabelText("Dismiss"));
+    expect(utils.queryByTestId("new-highlight-card")).toBeNull();
+    expect(mockMarkSeen).toHaveBeenCalledWith({}, "h1", 2);
+    expect(mockLogEvent).toHaveBeenCalledWith({}, "h1", "home_card_dismissed", { source: "home" });
+  });
+
+  it("pull to refresh re-reads the reel", async () => {
+    const utils = render(React.createElement(DashboardScreen));
+    await waitFor(() => expect(mockGetMyHighlights).toHaveBeenCalledTimes(1));
+    mockGetMyHighlights.mockResolvedValue(withReel);
+    const scroll = utils.UNSAFE_getByType(require("react-native").ScrollView);
+    await act(async () => {
+      scroll.props.refreshControl.props.onRefresh();
+    });
+    await utils.findByTestId("new-highlight-card");
   });
 });

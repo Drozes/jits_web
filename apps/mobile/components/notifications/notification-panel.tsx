@@ -12,15 +12,21 @@ import {
   BottomSheetScrollView,
   type BottomSheetBackdropProps,
 } from "@gorhom/bottom-sheet";
-import type { NotificationItem, NotificationDateGroup } from "@jits/shared/types/notification";
+import type { NotificationDateGroup } from "@jits/shared/types/notification";
 import { getDateGroup } from "@jits/shared/utils";
 import { useThemedTokens } from "@/lib/theme/use-theme";
+import { isHighlightItem, type BellItem } from "@/lib/notifications/notification-items";
 import { NotificationRow } from "./notification-item";
 
 interface NotificationPanelProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  items: NotificationItem[];
+  items: BellItem[];
+  /**
+   * Opens a tappable row. Only ready-reel rows are tappable: the other rows'
+   * routes point at retired `/session/...` paths (spec 014 section 16.12).
+   */
+  onItemPress?: (item: BellItem) => void;
 }
 
 const renderBackdrop = (props: BottomSheetBackdropProps) => (
@@ -31,6 +37,7 @@ export function NotificationPanel({
   open,
   onOpenChange,
   items,
+  onItemPress,
 }: NotificationPanelProps) {
   const ref = React.useRef<BottomSheetModal | null>(null);
   const tokens = useThemedTokens();
@@ -58,7 +65,7 @@ export function NotificationPanel({
   );
 
   const groups = React.useMemo(() => {
-    const result: { label: NotificationDateGroup; items: NotificationItem[] }[] = [];
+    const result: { label: NotificationDateGroup; items: BellItem[] }[] = [];
     let current: (typeof result)[number] | null = null;
     for (const item of items) {
       const label = getDateGroup(item.createdAt);
@@ -105,7 +112,12 @@ export function NotificationPanel({
               </Text>
               {g.items.map((item) => (
                 <View key={item.id} className="px-1">
-                  <NotificationRow item={item} />
+                  <NotificationRow
+                    item={item}
+                    onPress={
+                      onItemPress && isHighlightItem(item) ? () => onItemPress(item) : undefined
+                    }
+                  />
                 </View>
               ))}
             </View>

@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { hasEnvVars } from "../utils";
+import { isPublicPath } from "./public-paths";
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -47,14 +48,8 @@ export async function updateSession(request: NextRequest) {
   const { data } = await supabase.auth.getClaims();
   const user = data?.claims;
 
-  // NOTE: /design is intentionally NOT public — the design section (incl. the
-  // internal /design/board Kanban) is gated behind login. Authenticated-only.
-  const publicPaths = ["/", "/login", "/signup", "/forgot-password", "/update-password", "/confirm", "/error", "/auth/callback"];
-  const isPublicPath = publicPaths.some(
-    (path) => request.nextUrl.pathname === path || request.nextUrl.pathname.startsWith(path + "/")
-  );
-
-  if (!user && !isPublicPath) {
+  // The public list (incl. why /design is NOT on it) lives in public-paths.ts.
+  if (!user && !isPublicPath(request.nextUrl.pathname)) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);

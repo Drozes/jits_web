@@ -50,6 +50,26 @@ JS-only, tier-1 OTA-eligible (no dependency, `app.json`, plugin, metro, babel or
 **Changed**
 - `HighlightPlayer` takes optional `frameStyle` and `showFullscreenButton` (defaults unchanged); `lib/theme/theme-provider.tsx` exports `darkVarsStyle`; `@jits/shared` export map gains `./api/highlight-share` (identical to F4's entry).
 
+### Mobile: Highlight Reels discovery surfaces (jits-s6mi.13, phase 2 F7)
+
+JS-only, OTA-eligible (no dependency, `app.json`, plugin, metro, babel or `eas.json` change). Coded against the F4 wrappers in jr_be spec 014 section 16.5; the branch carried a typed stub of `packages/shared/src/api/highlight-share.ts` until `feat/hl-p2-core` merged. Every surface follows `highlight_clips_enabled` and navigates to the viewer route `/highlight/<id>?source=...` (F6).
+
+**Added**
+- Home "Your new highlight" card after the Resume card: the latest unseen ready reel (small 9:16 poster, "vs {opponent} · {n}s" with the duration in mono, secondary "Watch", dismiss). No Signal Red CTA. Poster/Watch open the viewer with `source=home` and log `home_card_tapped`; dismiss marks the version seen and logs `home_card_dismissed`. Re-read on focus, foreground, match exit and pull to refresh. New `apps/mobile/components/dashboard/new-highlight-card.tsx`, `apps/mobile/lib/highlight/use-new-highlight.ts`.
+- Bell: ready-reel rows ("Your highlight is ready" / "Your new version is ready", Clapperboard icon, unread dot) merged newest first from `getMyHighlights({ limit: 10 })` (only reels with a ready notification). Only these rows are tappable (close the panel, open the viewer with `source=bell`); the badge is pending challenges + unseen reels. The row type is mobile-only (`apps/mobile/lib/notifications/notification-items.ts`); the shared `NotificationItemType` and web are untouched.
+- Push taps: a `highlight_ready` push opens `/highlight/<id>?source=push` (built from `data.id` when `route` is absent). A tap that launched the app is read once with `getLastNotificationResponseAsync()` after Home mounts; taps are routed at most once per notification identifier and held until Home is up, so a cold start never navigates twice or under the auth redirect (`apps/mobile/lib/notifications/handlers.ts`).
+- Match-flow summary note "Your highlight is being made, we'll let you know." when a video was recorded (or is uploading) and clips are on; fail-closed flag read (`apps/mobile/components/match-flow/steps/summary-highlight-note.tsx`, `apps/mobile/lib/highlight/use-highlight-flags.ts`).
+- Match-detail ready card: an "Open reel" text link to the viewer (`source=match_detail`) and `markHighlightSeen` once per live version (`apps/mobile/components/match-detail/highlight/highlight-open-reel-link.tsx`, `apps/mobile/lib/highlight/use-mark-highlight-seen.ts`).
+- Discovery copy and the viewer href in `apps/mobile/lib/highlight/discovery.ts`; tests prove `/highlight/<id>` passes `resolveSystemPath` unchanged.
+
+### Web: public Terms and Privacy pages (jits-s6mi.7, phase 2 F10)
+
+**Added**
+- `/terms` and `/privacy` (`apps/web/app/(legal)/`), static server pages rendering the repo-root `TERMS.md` and `PRIVACY_POLICY.md`, both public (signed-out visitors, store reviewers, Meta's Live-mode check). The Markdown is bundled into `apps/web/lib/legal/documents.generated.ts` by `apps/web/scripts/sync-legal-docs.mjs` (a test fails while it is stale) and rendered by a small reader (`apps/web/lib/legal/markdown.ts`, `apps/web/components/legal/legal-document.tsx`). The four owner placeholders stay visibly marked as amber "TBD"; nothing was filled in, so Meta Live mode should not be requested until the owner supplies them.
+
+**Changed**
+- The proxy's public-path list moved to `apps/web/lib/supabase/public-paths.ts` (with tests) and gained `/terms` and `/privacy`.
+
 ### Mobile: "Your highlight" card, player and feedback sheet (jits-s6mi.10, Highlight Reels Alpha)
 
 JS-only, OTA-eligible for runtime 0.3.0 (expo-video is already embedded; no dependency, `app.json`, plugin, metro, babel or `eas.json` change). Needs jr_be B1 + B6 deployed to show anything: until `get_highlight_progress` answers, the card renders nothing.

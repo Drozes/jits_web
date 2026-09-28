@@ -103,3 +103,19 @@ describe("isRetiredRoute", () => {
     expect(isRetiredRoute(route)).toBe(false);
   });
 });
+
+// Highlight Reels phase 2 (jr_be spec 014 section 16.6.4): the viewer route is
+// not retired, so push payloads and links reach it untouched.
+describe("resolveSystemPath: highlight viewer", () => {
+  it.each([
+    "/highlight/x",
+    "/highlight/x?source=push",
+    "elorated://highlight/x?source=push",
+  ])("returns %s unchanged", (url) => {
+    expect(resolveSystemPath(url)).toBe(url);
+  });
+
+  it("is not a retired route", () => {
+    expect(isRetiredRoute("/highlight/x")).toBe(false);
+  });
+});
