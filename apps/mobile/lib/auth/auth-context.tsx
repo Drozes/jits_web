@@ -13,6 +13,7 @@ import { SecureStoreAdapter } from "../supabase/secure-storage";
 import { setCachedElo } from "../splash/elo-cache";
 import { needsAthleteLoad } from "./athlete-load";
 import { takeArenaOfflineBeforeSignOut } from "../arena/arena-store";
+import { clearShareCache } from "../highlight-share";
 
 type AuthError = { message: string };
 
@@ -314,6 +315,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // onAuthStateChange normally nulls these; clear eagerly (and always, since
     // a failed sign-out emits nothing) and drop the loading gate so Index
     // goes to /login instead of sitting on "Loading...".
+    // Downloaded highlight reels are the athlete's footage: never leave them
+    // in the cache for the next account on this device. Fire and forget.
+    void clearShareCache().catch(() => undefined);
     loadedAthleteForUserId.current = null;
     setSession(null);
     setUser(null);

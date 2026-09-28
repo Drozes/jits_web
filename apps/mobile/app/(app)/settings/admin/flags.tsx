@@ -9,6 +9,7 @@ import { toast } from "@/components/ui/toast";
 import { useAuth, useIsAdmin } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { useFeatureFlags } from "@/lib/admin/use-feature-flags";
+import { getShareCapabilities, type ShareCapabilities } from "@/lib/highlight-share";
 
 /**
  * Admin > Feature flags. Lists every feature_flags row with a Switch that
@@ -61,6 +62,7 @@ export default function AdminFlagsScreen() {
             ))}
           </Plate>
         )}
+        <ShareDiagnosticsRow />
       </PageContainer>
     </>
   );
@@ -97,5 +99,47 @@ function FlagRow({
           onValueChange. This prevents one tap firing setFeatureFlag twice. */}
       <Switch value={value} pointerEvents="none" />
     </Pressable>
+  );
+}
+
+const present = (value: boolean) => (value ? "present" : "absent");
+
+/**
+ * The share funnel's native embedding in THIS binary (jr_be spec 014 section
+ * 16.9): how an OTA's reach is confirmed on a field build.
+ */
+function formatShareDiagnostics(caps: ShareCapabilities): string {
+  const instagram =
+    caps.instagramDetected === null ? "not checked" : caps.instagramDetected ? "installed" : "not detected";
+  return [
+    `Reels module: ${present(caps.reelsModule)}`,
+    `App ID: ${caps.facebookAppIdConfigured ? "set" : "unset"}`,
+    `Instagram: ${instagram}`,
+    `Share sheet: ${present(caps.shareSheet)}`,
+    `Photos: ${present(caps.saveToPhotos)}`,
+    `Clipboard: ${present(caps.clipboard)}`,
+  ].join(" · ");
+}
+
+function ShareDiagnosticsRow() {
+  const [caps, setCaps] = React.useState<ShareCapabilities | null>(null);
+  React.useEffect(() => {
+    let cancelled = false;
+    getShareCapabilities()
+      .then((next) => {
+        if (!cancelled) setCaps(next);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  return (
+    <Plate>
+      <Text className="font-mono text-[11px] text-ink mb-1">Highlight share diagnostics</Text>
+      <Text testID="share-diagnostics" className="font-body text-[12px] text-ink-3 leading-snug">
+        {caps ? formatShareDiagnostics(caps) : "Checking…"}
+      </Text>
+    </Plate>
   );
 }

@@ -87,7 +87,8 @@ export const HIGHLIGHT_DOWNLOAD_URL_TTL_S = 300;
  * - `path`: `reels` | `share_sheet`.
  * - `failure`: a Reels failure value from the mobile Reels module, or
  *   `download_timeout` | `download_http` | `permission` | `unknown`.
- * - `elapsed_ms`, `byte_count`: numbers. `oversize`: boolean.
+ * - `elapsed_ms`, `byte_count`, `http_status`: numbers. `oversize`,
+ *   `reused` (the download reused a complete cached file): booleans.
  * - `platform`, `os_version`, `app_version`, `runtime_version`: added by the
  *   mobile telemetry wrapper on every event.
  * - `clipboard`: `button` | `press_and_hold`.
