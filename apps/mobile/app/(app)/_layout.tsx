@@ -3,7 +3,7 @@ import { useThemedTokens } from "@/lib/theme/use-theme";
 import { ArenaBootstrap } from "@/lib/arena/arena-bootstrap";
 
 // Anchor the tab navigator beneath the pushed detail screens (athlete/[id],
-// match/[matchId], video/[id], settings). Deep links / reloads into those routes otherwise land with an
+// match/[matchId], video/[id], highlight/[id], settings). Deep links / reloads into those routes otherwise land with an
 // empty stack and a dead back chevron.
 export const unstable_settings = {
   initialRouteName: "(tabs)",
@@ -34,6 +34,9 @@ export default function AppLayout() {
           live wizard, so it leaves live state alone. */}
         <Stack.Screen name="match-detail/[matchId]" />
         <Stack.Screen name="video/[id]" />
+        {/* One of the athlete's own highlight reels, full screen (push, bell,
+          Home, Profile, match detail). Header hidden: a dark video surface. */}
+        <Stack.Screen name="highlight/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="settings" />
       </Stack>
       {/* Live state, lobby presence and the incoming-challenge prompt, once for

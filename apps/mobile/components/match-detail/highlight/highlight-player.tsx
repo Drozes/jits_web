@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Pressable, View } from "react-native";
+import { Pressable, View, type ViewStyle } from "react-native";
 import { Image } from "expo-image";
 import { VideoView } from "expo-video";
 import { playerLabel } from "@/lib/highlight/highlight-copy";
@@ -18,6 +18,10 @@ function posterSource({ posterUrl, posterPath }: HighlightSource) {
 interface HighlightPlayerProps {
   source: HighlightSource;
   onError: () => void;
+  /** Overrides the card's 480 pt frame (the full-screen viewer sizes its own). */
+  frameStyle?: ViewStyle;
+  /** The card offers native fullscreen; the full-screen viewer does not need it. */
+  showFullscreenButton?: boolean;
 }
 
 /**
@@ -25,7 +29,7 @@ interface HighlightPlayerProps {
  * until the first frame renders, native fullscreen is allowed. PiP is off and
  * there is deliberately NO share / save / export affordance.
  */
-export function HighlightPlayer({ source, onError }: HighlightPlayerProps) {
+export function HighlightPlayer({ source, onError, frameStyle, showFullscreenButton = true }: HighlightPlayerProps) {
   const viewRef = React.useRef<VideoView>(null);
   const [firstFrame, setFirstFrame] = React.useState(false);
   const { player, readyVersion } = useHighlightPlayer(source, onError);
@@ -38,7 +42,7 @@ export function HighlightPlayer({ source, onError }: HighlightPlayerProps) {
   }, [player]);
 
   return (
-    <View testID="highlight-player" className="bg-surface-4 overflow-hidden rounded-md" style={HIGHLIGHT_FRAME_STYLE}>
+    <View testID="highlight-player" className="bg-surface-4 overflow-hidden rounded-md" style={frameStyle ?? HIGHLIGHT_FRAME_STYLE}>
       <Pressable
         testID="highlight-player-toggle"
         accessibilityRole="button"
@@ -67,7 +71,9 @@ export function HighlightPlayer({ source, onError }: HighlightPlayerProps) {
           />
         ) : null}
       </Pressable>
-      <HighlightFullscreenButton onPress={() => void viewRef.current?.enterFullscreen().catch(() => undefined)} />
+      {showFullscreenButton ? (
+        <HighlightFullscreenButton onPress={() => void viewRef.current?.enterFullscreen().catch(() => undefined)} />
+      ) : null}
     </View>
   );
 }

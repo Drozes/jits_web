@@ -8,7 +8,13 @@ import { act, fireEvent, render, waitFor, within } from "@testing-library/react-
 
 // ---- mocks ----
 
-jest.mock("expo-router", () => ({ useFocusEffect: jest.fn() }));
+const mockRouterPush = jest.fn();
+jest.mock("expo-router", () => ({ useFocusEffect: jest.fn(), useRouter: () => ({ push: mockRouterPush }) }));
+
+const mockMarkSeen = jest.fn(() => Promise.resolve({ ok: true, data: null }));
+jest.mock("@jits/shared/api/highlight-share", () => ({
+  markHighlightSeen: (...a: unknown[]) => mockMarkSeen(...(a as [])),
+}));
 
 jest.mock("lucide-react-native", () => {
   const RN = require("react-native");
@@ -715,5 +721,45 @@ describe("Feedback sheet", () => {
     expect(mockRefresh).toHaveBeenCalled();
     expect(utils.queryByTestId("sheet")).toBeNull();
     expect(mockSubmit).not.toHaveBeenCalled();
+  });
+});
+
+describe("Open reel (phase 2 viewer link)", () => {
+  it("ready: a secondary text link opens the viewer with source=match_detail (no red)", async () => {
+    const utils = await renderCard(progress("ready"));
+    const link = utils.getByTestId("highlight-open-reel");
+    expect(link).toHaveTextContent("Open reel");
+    expect(link.props.className ?? "").not.toMatch(/(^|\s)bg-cta(\s|$)/);
+    fireEvent.press(link);
+    expect(mockRouterPush).toHaveBeenCalledWith("/highlight/h1?source=match_detail");
+    expect(redCtas(utils)).toHaveLength(0);
+  });
+
+  it("marks the live version seen once per version while the ready card shows it", async () => {
+    const utils = await renderCard(progress("ready"));
+    expect(mockMarkSeen).toHaveBeenCalledTimes(1);
+    expect(mockMarkSeen).toHaveBeenCalledWith({}, "h1", 1);
+    utils.rerender(<HighlightCard matchVideoId="v1" angleLabel={null} />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(mockMarkSeen).toHaveBeenCalledTimes(1);
+    mockProgress = progress("ready", { renderTotal: 2, playback: { ...PLAYBACK, version: 2 } });
+    utils.rerender(<HighlightCard matchVideoId="v1" angleLabel={null} />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(mockMarkSeen).toHaveBeenCalledTimes(2);
+    expect(mockMarkSeen).toHaveBeenLastCalledWith({}, "h1", 2);
+  });
+
+  it.each([
+    ["waiting_for_analysis", { playback: null, highlightId: null }],
+    ["rendering", { playback: null }],
+    ["failed", { playback: null }],
+  ])("%s: no Open reel link and nothing marked seen", async (phase, over) => {
+    const utils = await renderCard(progress(phase, over));
+    expect(utils.queryByTestId("highlight-open-reel")).toBeNull();
+    expect(mockMarkSeen).not.toHaveBeenCalled();
   });
 });
