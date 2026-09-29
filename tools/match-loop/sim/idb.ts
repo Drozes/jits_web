@@ -29,6 +29,18 @@ export interface Query {
   label?: string | RegExp;
   /** Element type, e.g. "Button", "StaticText", "TextField". */
   type?: string;
+  /**
+   * Accessibility value (AXValue), case-insensitive exact. The header status
+   * chip reports "live" / "offline" here whatever its copy says.
+   */
+  value?: string;
+  /**
+   * true: only an element that is not reported disabled (one idb reports
+   * with no `enabled` field counts as enabled). The app's live toggle is
+   * disabled while it saves and for 2s after each transition, and a tap on
+   * it then is ignored, so taps on it wait for this.
+   */
+  enabled?: boolean;
 }
 
 export function describeQuery(q: Query): string {
@@ -36,16 +48,22 @@ export function describeQuery(q: Query): string {
   if (q.id) parts.push(`#${q.id}`);
   if (q.label !== undefined) parts.push(`label=${q.label instanceof RegExp ? q.label : JSON.stringify(q.label)}`);
   if (q.type) parts.push(`type=${q.type}`);
+  if (q.value !== undefined) parts.push(`value=${JSON.stringify(q.value)}`);
+  if (q.enabled) parts.push("enabled");
   return parts.join(" ");
 }
 
 export function matches(el: AXElement, q: Query): boolean {
   if (q.id && el.AXUniqueId !== q.id) return false;
+  if (q.enabled && el.enabled === false) return false;
   // RN Pressables surface as Button, Link, Slider or GenericElement depending
   // on what else is mounted, so "Button" means any interactive-ish element.
   if (q.type === "Button") {
     if (el.type === "StaticText" || el.type === "Application") return false;
   } else if (q.type && el.type !== q.type) return false;
+  if (q.value !== undefined && (el.AXValue ?? "").toLowerCase() !== q.value.toLowerCase()) {
+    return false;
+  }
   if (q.label !== undefined) {
     const label = el.AXLabel ?? "";
     if (q.label instanceof RegExp) {

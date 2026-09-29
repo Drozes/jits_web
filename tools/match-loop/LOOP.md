@@ -221,10 +221,20 @@ already appends a `{"type":"run",...}` line per run):
 
 ## Known harness facts
 
-- The incoming-challenge prompt is a gorhom `BottomSheetModal`; its children
-  are not in the accessibility tree (only a "Bottom Sheet" slider), so the
-  harness taps Accept/Decline by offset from the sheet handle. That same
-  fact means VoiceOver users cannot reach the buttons (a11y finding).
+- The incoming-challenge prompt is a gorhom `BottomSheetModal`. Since
+  jits-ef2a its Accept/Decline buttons are in the accessibility tree by label,
+  and the harness taps them only by label (the old offset-from-handle fallback
+  is gone). The prompt ignores taps for `PROMPT_INPUT_GUARD_MS` (600ms) after
+  it appears and disables its buttons for that window, so the harness waits
+  out the guard plus a margin and then for the button to be enabled.
+- Live state is read from the header status chip (`#header-status-chip`,
+  AXValue `live` / `offline`) on the four tab roots, or the non-interactive
+  `#header-live-dot` on pushed screens. Every chip label starts with
+  `Live status:`, so it never answers the Arena control bar's exact `Go live`
+  / `Go offline` queries; the live popover uses `Live menu: go offline` and
+  the offline offer strip `Go live to answer <name>` for the same reason.
+  `tests/label-contract.test.ts` pins these against the app source (spec 9.3)
+  without a simulator.
 - Text testIDs do not surface through idb; the wizard step is read from the
   step marker's accessibility label ("Step N of 8, <Label>").
 - Pressables surface as Button, Link, Slider or GenericElement depending on

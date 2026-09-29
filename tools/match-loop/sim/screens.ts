@@ -5,9 +5,19 @@
  * accessibility label, labels are matched case-insensitively (text-transform
  * uppercases rendered text) and filtered to Buttons where it matters.
  */
-import { Idb, summarise, type AXElement } from "./idb";
+import { Idb, summarise, type AXElement, type Query } from "./idb";
 import type { Simctl } from "./simctl";
 import { ExpectationTimeout, HarnessError } from "../lib/util";
+import { PROMPT_INPUT_GUARD_MS } from "../../../apps/mobile/lib/arena/constants";
+
+/**
+ * How long to wait after the prompt is detected before trying its buttons:
+ * the app's input guard (AC-S3, imported so the two cannot drift) plus a
+ * margin. The tap also waits for the button to report itself enabled (the
+ * sheet disables its buttons for the guard), so a prompt detected late or
+ * re-presented still lands; this floor only saves idb round trips.
+ */
+export const PROMPT_TAP_DELAY_MS = PROMPT_INPUT_GUARD_MS + 250;
 
 export type WizardStep = "wait" | "weight" | "ready" | "live" | "end" | "result" | "confirm" | "summary";
 
@@ -30,10 +40,22 @@ export interface SummaryView {
   hasExit: boolean;
 }
 
+/** testIDs from apps/mobile/components/layout/header-status-chip.tsx / header-live-dot.tsx. */
+export const HEADER_CHIP_ID = "header-status-chip";
+export const HEADER_LIVE_DOT_ID = "header-live-dot";
+/** The tab-root chip while the athlete is live. */
+export const LIVE_CHIP: Query = { id: HEADER_CHIP_ID, value: "live" };
+
 export class Screens {
   constructor(
     readonly idb: Idb,
     readonly simctl: Simctl,
+    /**
+     * How long to wait before answering the prompt (default
+     * PROMPT_TAP_DELAY_MS). Injectable so unit tests that do not assert the
+     * delay do not sleep through it.
+     */
+    readonly promptTapDelayMs: number = PROMPT_TAP_DELAY_MS,
   ) {}
 
   // --- global ---------------------------------------------------------------
@@ -43,9 +65,16 @@ export class Screens {
     await this.idb.tapQ({ label: name, type: "Button" }, 15_000);
   }
 
-  /** The header LIVE pill (testID live-header-signal). */
+  /**
+   * Whether the header says the athlete is live: the tab roots' status chip
+   * reporting value "live" (its copy varies: LIVE, WAITING, ! NAME, CONFIRM),
+   * or the pushed screens' non-interactive live dot.
+   */
   async isLivePillVisible(els?: AXElement[]): Promise<boolean> {
-    return !!(await this.idb.find({ id: "live-header-signal" }, els));
+    const all = els ?? (await this.idb.describe());
+    return !!(
+      (await this.idb.find(LIVE_CHIP, all)) || (await this.idb.find({ id: HEADER_LIVE_DOT_ID }, all))
+    );
   }
 
   async screen(): Promise<string[]> {
@@ -86,21 +115,27 @@ export class Screens {
     await this.idb.waitAny([{ label: "Go live", type: "Button" }, { label: "Go offline", type: "Button" }, { label: /^Waiting for /, type: "StaticText" }], 15_000);
   }
 
-  /** Go live through the UI if not already, and wait for the pill. */
+  /**
+   * Go live through the UI if not already, and wait for the pill. The toggle
+   * is disabled while it saves and for 2s after each transition (a tap then
+   * is ignored), so the tap waits for it to be enabled.
+   */
   async ensureLive(): Promise<void> {
     const els = await this.idb.describe();
-    const goLive = await this.idb.find({ label: "Go live", type: "Button" }, els);
-    if (goLive) await this.idb.tap(goLive);
-    await this.idb.waitFor({ id: "live-header-signal" }, 15_000);
+    if (await this.idb.find({ label: "Go live", type: "Button" }, els)) {
+      await this.idb.tapQ({ label: "Go live", type: "Button", enabled: true }, 15_000);
+    }
+    await this.idb.waitFor(LIVE_CHIP, 15_000);
     await this.idb.waitFor({ label: "Go offline", type: "Button" }, 15_000);
   }
 
   async ensureOffline(): Promise<void> {
     const els = await this.idb.describe();
-    const off = await this.idb.find({ label: "Go offline", type: "Button" }, els);
-    if (off) await this.idb.tap(off);
+    if (await this.idb.find({ label: "Go offline", type: "Button" }, els)) {
+      await this.idb.tapQ({ label: "Go offline", type: "Button", enabled: true }, 15_000);
+    }
     await this.idb.waitFor({ label: "Go live", type: "Button" }, 15_000);
-    await this.idb.waitGone({ id: "live-header-signal" }, 10_000);
+    await this.idb.waitGone(LIVE_CHIP, 10_000);
   }
 
   /**
@@ -138,11 +173,12 @@ export class Screens {
   // --- incoming prompt ------------------------------------------------------
 
   /**
-   * The gorhom BottomSheetModal exposes itself as one "Bottom Sheet" slider
-   * and hides its children from the accessibility tree, so the prompt's
-   * Accept / Decline buttons are NOT reachable by label (nor by VoiceOver).
-   * Fallback: locate the sheet by its handle and tap by offset. Offsets are
-   * from the prompt layout (buttons row ~160pt below the handle top).
+   * The sheet's drag handle. Since jits-ef2a the prompt's Accept / Decline
+   * buttons are exposed by label (the sheet no longer collapses its children
+   * into one "Bottom Sheet" element), and they are the only way the harness
+   * answers a prompt. The handle is kept as a second visibility signal, so a
+   * prompt whose buttons are momentarily missing from a describe still counts
+   * as up.
    */
   private promptSheet(els: AXElement[]): AXElement | undefined {
     return els.find((e) => e.AXLabel === "Bottom sheet handle" && e.frame.y < this.idb.screenH - 40);
@@ -173,23 +209,38 @@ export class Screens {
     }
   }
 
-  private async tapPromptButton(label: "Accept challenge" | "Decline challenge", xFrac: number): Promise<void> {
-    // Let the sheet finish its present animation.
-    await new Promise((r) => setTimeout(r, 600));
-    const els = await this.idb.describe();
-    const btn = await this.idb.find({ label, type: "Button" }, els);
-    if (btn) return this.idb.tap(btn);
-    const sheet = this.promptSheet(els);
-    if (!sheet) throw new ExpectationTimeout("the incoming challenge prompt", 0, summarise(els));
-    await this.idb.tapXY(sheet.frame.x + sheet.frame.width * xFrac, sheet.frame.y + 160);
+  /**
+   * Answer the prompt by label. The app drops (does not queue) any tap inside
+   * its input guard, so a tap that lands early would be silently lost and the
+   * run would stall until a later, unrelated timeout. Instead: wait out the
+   * guard, then wait for the button to report itself ENABLED (the sheet
+   * disables its buttons for the guard) before tapping, and fail HERE, naming
+   * the guard, if it never does. There is no offset fallback any more: the
+   * layout (countdown, stakes strip, "+N more" line, Later) moves the row, and
+   * the buttons are reachable by label since jits-ef2a.
+   */
+  private async tapPromptButton(label: "Accept challenge" | "Decline challenge", timeoutMs = 5_000): Promise<void> {
+    await new Promise((r) => setTimeout(r, this.promptTapDelayMs));
+    try {
+      await this.idb.tapQ({ label, type: "Button", enabled: true }, timeoutMs);
+    } catch (e) {
+      if (e instanceof ExpectationTimeout) {
+        throw new ExpectationTimeout(
+          `the prompt's "${label}" button to accept taps (input guard ${PROMPT_INPUT_GUARD_MS}ms)`,
+          timeoutMs,
+          summarise(await this.idb.describe()),
+        );
+      }
+      throw e;
+    }
   }
 
   async acceptPrompt(): Promise<void> {
-    await this.tapPromptButton("Accept challenge", 0.74);
+    await this.tapPromptButton("Accept challenge");
   }
 
   async declinePrompt(): Promise<void> {
-    await this.tapPromptButton("Decline challenge", 0.26);
+    await this.tapPromptButton("Decline challenge");
   }
 
   // --- wizard ---------------------------------------------------------------
