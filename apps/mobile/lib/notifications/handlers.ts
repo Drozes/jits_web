@@ -4,7 +4,9 @@
  * - Foreground display: when a push arrives while the app is open we still want
  *   the OS banner (mirrors web's toast behaviour).
  * - Tap deep-linking: when the user taps a notification we read the optional
- *   `route` field from the payload data and call `router.push(route)`. A
+ *   `route` field from the payload data and push it (tab roots: see below);
+ *   a challenge push carries its Arena link on `arena_href` instead (see
+ *   `arenaHref`). A
  *   route into a family mobile no longer has (sessions, gyms, gym-manager;
  *   jits-gewv) goes Home instead of to an unmatched screen. A
  *   `highlight_ready` push (jr_be spec 015 section 16.4) without a usable
@@ -29,6 +31,16 @@
  *   stays reachable from the bell and the Home card. The foreground banner for a
  *   `highlight_ready` push is suppressed while in a match (it still lands in
  *   the notification list).
+ * - Tab roots: a tap whose route is a tab root (`/`, `/arena?challenge=<id>`,
+ *   ...) is opened in place with `openHref` (lib/deep-links/tab-root-route.ts)
+ *   instead of pushed, so it never mounts a second Arena or tab bar. During a
+ *   match, opening it would pop back to the tabs and unmount the live match,
+ *   so every tab-root tap is DROPPED: the status pushes' plain `/arena`, and
+ *   a new challenge's `/arena?challenge=<id>`, which entering the match has
+ *   already declined (`settleOthersAfterEntry` declines every other fresh
+ *   pending incoming challenge). Held, either would open after the exit,
+ *   override the destination the athlete just chose, and show nothing. The
+ *   bell still lists them.
  * - Sign-out: `resetNotificationRouterReady()` forgets readiness and drops
  *   every held tap, so the next account never gets the previous one's tap.
  *
@@ -40,6 +52,7 @@ import { router } from "expo-router";
 import { HOME_HREF, isRetiredRoute } from "@/lib/deep-links/retired-routes";
 import { isInArenaMatch, subscribeArenaMatch } from "@/lib/arena/arena-store";
 import { takeRecentMatchExitHref } from "@/lib/match-flow/exit-to";
+import { isTabRootHref, openHref } from "@/lib/deep-links/tab-root-route";
 
 let configured = false;
 let responseSubscription: Notifications.EventSubscription | null = null;
@@ -53,13 +66,29 @@ let pendingResponse: Notifications.NotificationResponse | null = null;
 /** Identifiers already routed (or deliberately dropped), never routed again. */
 const handledIds = new Set<string>();
 /** A highlight tap received during a match; routed when the match screen unmounts. */
-let heldHighlight: Notifications.NotificationResponse | null = null;
+let heldTap: Notifications.NotificationResponse | null = null;
 let matchUnsubscribe: (() => void) | null = null;
 
 interface NotificationData {
   route?: unknown;
   type?: unknown;
   id?: unknown;
+  arena_href?: unknown;
+}
+
+/**
+ * The jr_be `push` function puts a challenge push's Arena link on its own
+ * key, `data.arena_href` (`/arena?challenge=<id>` or `/arena`), NOT on
+ * `data.route`: builds without this handler push any `data.route` with a bare
+ * `router.push`, which would stack a second Arena (or a second tab bar from a
+ * pushed screen). Old builds ignore `arena_href`, so their tap keeps doing
+ * nothing and the backend can deploy in any order with the mobile OTA. Only
+ * an Arena href is honoured from this key.
+ */
+function arenaHref(v: unknown): string | null {
+  if (typeof v !== "string") return null;
+  const href = v.trim();
+  return href === "/arena" || href.startsWith("/arena?") ? href : null;
 }
 
 /** The push `data.type` of a ready highlight reel (jr_be push function, B10). */
@@ -70,6 +99,7 @@ export function notificationTarget(data: unknown): string | null {
   const d = (data ?? {}) as NotificationData;
   let route: string | null =
     typeof d.route === "string" && d.route.trim().length > 0 ? d.route : null;
+  if (!route) route = arenaHref(d.arena_href);
   if (!route && d.type === HIGHLIGHT_READY_PUSH_TYPE && typeof d.id === "string" && d.id) {
     route = `/highlight/${encodeURIComponent(d.id)}?source=push`;
   }
@@ -85,6 +115,33 @@ export function isHighlightNotification(data: unknown): boolean {
   return target !== null && target.startsWith("/highlight/");
 }
 
+/**
+ * A tap that waits for the match to end: a highlight (never urgent). Only
+ * highlights are held, so one held slot never has to choose between kinds.
+ */
+export function holdsDuringMatch(data: unknown): boolean {
+  return isHighlightNotification(data);
+}
+
+/**
+ * A tap that is dropped during a match: any tab root. Opening one would pop
+ * back to the tabs and unmount the live match, and held until the exit it
+ * would override where the athlete chose to go, for Arena state that is stale
+ * by then: a status push's plain `/arena`, and a new challenge's
+ * `/arena?challenge=<id>` too, because entering the match already declined
+ * every other fresh pending incoming challenge (`settleOthersAfterEntry`).
+ * The bell still lists the challenge.
+ *
+ * This is deliberately broader than challenges: ANY push whose target is a
+ * tab root (`/`, `/leaderboard`, `/profile`, `/arena...`) is dropped during a
+ * match, whatever its `type`. A future push that must survive a match should
+ * target a non-tab-root screen, or be added to `holdsDuringMatch`.
+ */
+export function dropsDuringMatch(data: unknown): boolean {
+  const target = notificationTarget(data);
+  return target !== null && isTabRootHref(target);
+}
+
 function responseId(response: Notifications.NotificationResponse): string | null {
   const id = response?.notification?.request?.identifier;
   return typeof id === "string" && id.length > 0 ? id : null;
@@ -95,8 +152,9 @@ function navigate(response: Notifications.NotificationResponse): void {
   const target = notificationTarget(data);
   if (!target) return;
   try {
-    // Cast: expo-router's typed routes don't know about runtime strings.
-    router.push(target as never);
+    // A tab root (the challenge push's `/arena?challenge=<id>`) is opened in
+    // place; pushing it would mount a second copy (see tab-root-route.ts).
+    openHref(router, target);
   } catch (err) {
     console.warn("[notifications] failed to deep-link", target, err);
   }
@@ -114,7 +172,12 @@ function handleResponse(response: Notifications.NotificationResponse | null): vo
     pendingResponse = response;
     return;
   }
-  if (isInArenaMatch() && isHighlightNotification(response?.notification?.request?.content?.data)) {
+  const data = response?.notification?.request?.content?.data;
+  if (isInArenaMatch() && dropsDuringMatch(data)) {
+    if (id) handledIds.add(id);
+    return;
+  }
+  if (isInArenaMatch() && holdsDuringMatch(data)) {
     holdUntilMatchExit(response);
     return;
   }
@@ -138,9 +201,9 @@ function stopWatchingMatch(): void {
   matchUnsubscribe = null;
 }
 
-/** Keep the (latest) highlight tap until no match screen is mounted. */
+/** Keep the (latest) held tap (see `holdsDuringMatch`) until no match screen is mounted. */
 function holdUntilMatchExit(response: Notifications.NotificationResponse): void {
-  heldHighlight = response;
+  heldTap = response;
   if (matchUnsubscribe) return;
   matchUnsubscribe = subscribeArenaMatch(() => {
     if (isInArenaMatch()) return;
@@ -148,8 +211,8 @@ function holdUntilMatchExit(response: Notifications.NotificationResponse): void 
     // Next tick: the exit's own navigation (dismissTo) settles first, and a
     // match that mounts right after this one (nested) can still re-hold it.
     setTimeout(() => {
-      const held = heldHighlight;
-      heldHighlight = null;
+      const held = heldTap;
+      heldTap = null;
       // Still (or again) in a match: handleResponse re-holds it, and the
       // exit record stays for that match's own exit.
       if (!isInArenaMatch() && exitStartsRematchSend(takeRecentMatchExitHref(MATCH_EXIT_RECORD_MAX_AGE_MS))) return;
@@ -227,7 +290,7 @@ export function markNotificationRouterReady(): void {
 export function resetNotificationRouterReady(): void {
   routerReady = false;
   pendingResponse = null;
-  heldHighlight = null;
+  heldTap = null;
   stopWatchingMatch();
 }
 
@@ -244,7 +307,7 @@ export function resetNotificationRoutingForTests(): void {
   routerReady = false;
   coldStartChecked = false;
   pendingResponse = null;
-  heldHighlight = null;
+  heldTap = null;
   stopWatchingMatch();
   handledIds.clear();
 }

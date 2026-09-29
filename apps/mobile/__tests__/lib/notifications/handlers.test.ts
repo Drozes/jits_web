@@ -42,7 +42,16 @@ jest.mock("expo-notifications", () => ({
 }));
 
 const mockPush = jest.fn();
-jest.mock("expo-router", () => ({ router: { push: (...a: unknown[]) => mockPush(...a) } }));
+const mockNavigate = jest.fn();
+const mockDismissTo = jest.fn();
+jest.mock("expo-router", () => ({
+  router: {
+    push: (...a: unknown[]) => mockPush(...a),
+    navigate: (...a: unknown[]) => mockNavigate(...a),
+    dismissTo: (...a: unknown[]) => mockDismissTo(...a),
+  },
+  useSegments: () => [],
+}));
 
 import { renderHook } from "@testing-library/react-native";
 import {
@@ -58,6 +67,8 @@ import { resolveSystemPath } from "@/lib/deep-links/system-path";
 import { exitMatchTo, takeRecentMatchExitHref } from "@/lib/match-flow/exit-to";
 import { exitStartsRematchSend, MATCH_EXIT_RECORD_MAX_AGE_MS } from "@/lib/notifications/handlers";
 import { ARENA_HREF } from "@/lib/arena/constants";
+import { __setAppStackOnTabsForTests } from "@/lib/deep-links/tab-root-route";
+import { dropsDuringMatch, holdsDuringMatch } from "@/lib/notifications/handlers";
 
 let seq = 0;
 function response(data: unknown, identifier = `n-${++seq}`) {
@@ -97,6 +108,9 @@ beforeEach(() => {
   mockClearLastSync.mockReset();
   mockSetHandler.mockClear();
   mockPush.mockClear();
+  mockNavigate.mockClear();
+  mockDismissTo.mockClear();
+  __setAppStackOnTabsForTests(true);
   mockGetLast.mockReset().mockResolvedValue(null);
   mockClearLast.mockReset().mockResolvedValue(undefined);
   teardownNotificationHandlers();
@@ -110,9 +124,44 @@ describe("notification tap routing (warm, router ready)", () => {
     await flush();
   });
 
-  it.each(["/athlete/a-1", "/match/m-1", "/arena"])("pushes %s unchanged", (route) => {
+  it.each(["/athlete/a-1", "/match/m-1"])("pushes %s unchanged", (route) => {
     tap({ route });
     expect(mockPush).toHaveBeenCalledWith(route);
+  });
+
+  it("opens a tab root in place from the tabs (navigate, never push)", () => {
+    tap({ route: "/arena?challenge=c-1" });
+    expect(mockNavigate).toHaveBeenCalledWith("/arena?challenge=c-1");
+    expect(mockPush).not.toHaveBeenCalled();
+    expect(mockDismissTo).not.toHaveBeenCalled();
+  });
+
+  it("opens a challenge push's arena_href in place (the jr_be key old builds ignore)", () => {
+    tap({ type: "challenge", id: "c-1", arena_href: "/arena?challenge=c-1" });
+    expect(mockNavigate).toHaveBeenCalledWith("/arena?challenge=c-1");
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it("honours only an Arena href from arena_href", () => {
+    expect(notificationTarget({ arena_href: "/arena" })).toBe("/arena");
+    expect(notificationTarget({ arena_href: " /arena?challenge=c-2 " })).toBe("/arena?challenge=c-2");
+    expect(notificationTarget({ arena_href: "/athlete/a-1" })).toBeNull();
+    expect(notificationTarget({ arena_href: "/arenas" })).toBeNull();
+    expect(notificationTarget({ arena_href: 42 })).toBeNull();
+    // An explicit route still wins.
+    expect(notificationTarget({ route: "/match/m-1", arena_href: "/arena" })).toBe("/match/m-1");
+  });
+
+  it("drops an arena_href challenge tap during a match, like a routed one", () => {
+    expect(dropsDuringMatch({ type: "challenge", arena_href: "/arena?challenge=c-3" })).toBe(true);
+  });
+
+  it("opens a tab root from a pushed detail screen by dismissing back to the tabs", () => {
+    __setAppStackOnTabsForTests(false);
+    tap({ route: "/arena?challenge=c-1" });
+    expect(mockDismissTo).toHaveBeenCalledWith("/arena?challenge=c-1");
+    expect(mockPush).not.toHaveBeenCalled();
+    expect(mockNavigate).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -122,8 +171,9 @@ describe("notification tap routing (warm, router ready)", () => {
     "/gym-manager/roster",
   ])("sends removed route %s Home", (route) => {
     tap({ route });
-    expect(mockPush).toHaveBeenCalledTimes(1);
-    expect(mockPush).toHaveBeenCalledWith("/");
+    expect(mockNavigate).toHaveBeenCalledTimes(1);
+    expect(mockNavigate).toHaveBeenCalledWith("/");
+    expect(mockPush).not.toHaveBeenCalled();
   });
 
   it.each([undefined, {}, { route: "" }, { route: 42 }])(
@@ -154,7 +204,8 @@ describe("notification tap routing (warm, router ready)", () => {
   it("routes two different taps", () => {
     tap({ route: "/arena" });
     tap(HIGHLIGHT_PUSH);
-    expect(mockPush).toHaveBeenCalledTimes(2);
+    expect(mockNavigate).toHaveBeenCalledTimes(1);
+    expect(mockPush).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -209,7 +260,7 @@ describe("cold start", () => {
     mockGetLast.mockResolvedValue(response({ route: "/session/s-1" }, "old"));
     markNotificationRouterReady();
     await flush();
-    expect(mockPush).toHaveBeenCalledWith("/");
+    expect(mockNavigate).toHaveBeenCalledWith("/");
   });
 
   it("survives a failing cold-start read", async () => {
@@ -276,6 +327,66 @@ describe("highlight taps during a match (discovery M1)", () => {
     leaveB();
     await tick();
     expect(mockPush).toHaveBeenCalledTimes(1);
+  });
+
+  it("drops a challenge push tapped during a match: entering it declined that challenge", async () => {
+    const leave = enterMatch();
+    __setAppStackOnTabsForTests(false);
+    tap({ route: "/arena?challenge=c-7" }, "challenge-7");
+    expect(mockDismissTo).not.toHaveBeenCalled();
+    expect(mockNavigate).not.toHaveBeenCalled();
+    leave();
+    __setAppStackOnTabsForTests(true); // the exit landed on the tabs
+    await tick();
+    expect(mockNavigate).not.toHaveBeenCalled();
+    expect(mockDismissTo).not.toHaveBeenCalled();
+    // Dropped for good.
+    tap({ route: "/arena?challenge=c-7" }, "challenge-7");
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it("a challenge tap after a highlight tap in the same match never displaces the held highlight", async () => {
+    const leave = enterMatch();
+    tap(HIGHLIGHT_PUSH, "reel-1");
+    tap({ route: "/arena?challenge=c-8" }, "challenge-8");
+    leave();
+    await tick();
+    expect(mockPush).toHaveBeenCalledTimes(1);
+    expect(mockNavigate).not.toHaveBeenCalledWith("/arena?challenge=c-8");
+  });
+
+  it("drops a status push's plain /arena tapped during a match: it never navigates after the exit", async () => {
+    // e.g. 'Challenge Accepted' arriving as the challenger enters that match.
+    const leave = enterMatch();
+    tap({ type: "challenge_accepted", route: "/arena" }, "status-1");
+    expect(mockNavigate).not.toHaveBeenCalled();
+    leave();
+    await tick();
+    expect(mockNavigate).not.toHaveBeenCalled();
+    expect(mockDismissTo).not.toHaveBeenCalled();
+    expect(mockPush).not.toHaveBeenCalled();
+    // Dropped for good, not re-routed by a later delivery of the same tap.
+    tap({ type: "challenge_accepted", route: "/arena" }, "status-1");
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it("a status push's /arena outside a match still opens the Arena in place", () => {
+    tap({ type: "challenge_declined", route: "/arena" });
+    expect(mockNavigate).toHaveBeenCalledWith("/arena");
+  });
+
+  it("classifies which taps wait for the match", () => {
+    expect(holdsDuringMatch(HIGHLIGHT_PUSH)).toBe(true);
+    expect(holdsDuringMatch({ route: "/arena?challenge=c-1" })).toBe(false);
+    expect(holdsDuringMatch({ route: "/" })).toBe(false);
+    expect(holdsDuringMatch({ route: "/arena" })).toBe(false);
+    expect(dropsDuringMatch({ route: "/arena" })).toBe(true);
+    expect(dropsDuringMatch({ route: "/" })).toBe(true);
+    expect(dropsDuringMatch({ route: "/arena?challenge=c-1" })).toBe(true);
+    expect(dropsDuringMatch(HIGHLIGHT_PUSH)).toBe(false);
+    expect(dropsDuringMatch({ route: "/athlete/a-1" })).toBe(false);
+    expect(holdsDuringMatch({ route: "/athlete/a-1" })).toBe(false);
+    expect(holdsDuringMatch({ route: "/match/m-1" })).toBe(false);
   });
 
   it("does not hold other taps during a match", async () => {
@@ -433,7 +544,7 @@ describe("sign-out (discovery M2)", () => {
     markNotificationRouterReady();
     await flush();
     expect(mockGetLast).toHaveBeenCalledTimes(1);
-    expect(mockPush).toHaveBeenCalledTimes(1);
+    expect(mockNavigate).toHaveBeenCalledTimes(1);
   });
 });
 

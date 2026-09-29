@@ -1,12 +1,9 @@
 import * as React from "react";
-import { useFocusEffect } from "expo-router";
 import { supabase } from "@/lib/supabase/client";
-import { getNotificationHistory } from "@jits/shared/api/queries";
+import { getNotificationHistoryResult } from "@jits/shared/api/queries";
 import type { NotificationItem } from "@jits/shared/types/notification";
 import {
-  mergeBellItems,
   toHighlightNotificationItems,
-  type BellItem,
   type HighlightNotificationItem,
 } from "@/lib/notifications/notification-items";
 import {
@@ -16,28 +13,36 @@ import {
   useHighlightsChangedCount,
   useOnCountChange,
 } from "@/lib/highlight/highlight-store";
+import { useBellFocusCount } from "@/lib/notifications/bell-store";
 
 /** Bell feed size for ready reels (jr_be spec 015 section 16.6.4). */
 const HIGHLIGHT_LIMIT = 10;
 
 /**
- * The bell feed for the given athlete: challenges and match results from
- * `getNotificationHistory`, plus ready-reel items from `getMyHighlights`
- * (only reels the athlete was notified about; none while
- * `highlight_clips_enabled` is off), newest first.
+ * The bell feed's two sources for the given athlete: `history` (challenges
+ * and match results from `getNotificationHistoryResult`) and `highlights` (ready
+ * reels from `getMyHighlights`: only reels the athlete was notified about;
+ * none while `highlight_clips_enabled` is off). The host merges them with
+ * the pending list via `buildBellLists`.
  *
- * The full feed is read on mount and on `refresh()` (the panel opening). The
- * highlight half, which also drives the badge, is re-read cheaply on focus
- * and on a real return to the foreground, so a reel watched elsewhere stops
- * counting as unread; those reads go through the shared, deduped
- * `readMyHighlights` (four bells + Home cost one RPC). A reel marked seen or
- * dismissed anywhere re-reads it at once (forced), and Home's pull-to-refresh
- * re-reads the whole feed. A failed highlight read keeps the previous rows.
+ * Run once, by the app-wide `BellBootstrap` (jits-dq85.7). The full feed is
+ * read on mount and on `refresh()` (the panel opening). The highlight half,
+ * which also drives the badge, is re-read cheaply when a header with a bell
+ * gains focus (`notifyBellFocused`) and on a real return to the foreground,
+ * so a reel watched elsewhere stops counting as unread; those reads go
+ * through the shared, deduped `readMyHighlights` (the bell + Home cost one
+ * RPC). A focus while a full read is still in flight is skipped: that read
+ * already covers it (this is what keeps the first tab root's focus, which
+ * lands right after mount, from repeating the mount read). A reel marked
+ * seen or dismissed anywhere re-reads it at once (forced), and Home's
+ * pull-to-refresh re-reads the whole feed. A failed highlight read keeps the
+ * previous rows. A failed history read (a query error, or a rejection) keeps
+ * the previous feed and never cancels an older read that later succeeds; a
+ * slow older read never overwrites a newer one that already applied.
  */
 export function useNotificationHistory(athleteId: string | undefined) {
   const [base, setBase] = React.useState<NotificationItem[]>([]);
   const [highlights, setHighlights] = React.useState<HighlightNotificationItem[]>([]);
-  const [isLoading, setIsLoading] = React.useState(false);
   const alive = React.useRef(true);
   React.useEffect(
     () => () => {
@@ -61,18 +66,33 @@ export function useNotificationHistory(athleteId: string | undefined) {
     }
   }, [athleteId]);
 
+  // Full reads not yet resolved; a header focus during one is redundant.
+  const fullReadsInFlight = React.useRef(0);
+  // Sequence of the newest full read started, and of the newest one whose
+  // history applied. A read applies only if it succeeded and is newer than
+  // the last applied one: a slow mount read never overwrites a forced one
+  // from a panel open or pull-to-refresh, and a failed newer read never
+  // throws away an older good one (mirrors `usePendingChallenges`).
+  const baseSeq = React.useRef(0);
+  const lastAppliedBaseSeq = React.useRef(0);
+
   /** The full feed; `force` skips the shared highlight read's dedupe (panel open, pull). */
   const fetch = React.useCallback(async (force = false) => {
     if (!athleteId) return;
-    setIsLoading(true);
+    const id = ++baseSeq.current;
+    fullReadsInFlight.current++;
     try {
       const [result] = await Promise.all([
-        getNotificationHistory(supabase, athleteId, 30),
+        getNotificationHistoryResult(supabase, athleteId, 30),
         fetchHighlights(force),
       ]);
-      if (alive.current) setBase(result);
+      if (!alive.current || !result.ok || id <= lastAppliedBaseSeq.current) return;
+      lastAppliedBaseSeq.current = id;
+      setBase(result.items);
+    } catch {
+      // Best effort: keep the previous feed; the next open or pull re-reads it.
     } finally {
-      if (alive.current) setIsLoading(false);
+      fullReadsInFlight.current--;
     }
   }, [athleteId, fetchHighlights]);
 
@@ -80,28 +100,22 @@ export function useNotificationHistory(athleteId: string | undefined) {
     void fetch();
   }, [fetch]);
 
-  const firstFocus = React.useRef(true);
-  useFocusEffect(
-    React.useCallback(() => {
-      // Mount already read everything.
-      if (firstFocus.current) {
-        firstFocus.current = false;
-        return;
-      }
-      void fetchHighlights();
-    }, [fetchHighlights]),
-  );
-
-  useForegroundEffect(() => void fetchHighlights());
+  // A header focus re-reads the reels, unless a full read (the mount read,
+  // a panel open) is still in flight and will already bring them.
+  useOnCountChange(useBellFocusCount(), () => {
+    if (fullReadsInFlight.current === 0) void fetchHighlights();
+  });
+  // A return to the foreground re-reads the whole feed (not forced): a match
+  // result or an answered challenge may have landed while the app was away.
+  useForegroundEffect(() => void fetch());
   useOnCountChange(useHighlightsChangedCount(), () => void fetchHighlights(true));
   useOnCountChange(useBellRefreshCount(), () => void fetch(true));
 
-  const items: BellItem[] = React.useMemo(() => mergeBellItems(base, highlights), [base, highlights]);
   const unseenHighlights = React.useMemo(
     () => highlights.filter((h) => h.unread).length,
     [highlights],
   );
 
   const refresh = React.useCallback(() => fetch(true), [fetch]);
-  return { items, unseenHighlights, isLoading, refresh };
+  return { history: base, highlights, unseenHighlights, refresh };
 }

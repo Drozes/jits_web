@@ -2,28 +2,26 @@
  * Bell feed (jr_be spec 015 section 16.6.4): ready-reel items merged into the
  * challenge / match-result history, newest first, only reels with a ledger
  * row (`notifiedAt`), none with clips off, unread from `unseen`, and the
- * unseen count that feeds the badge. The highlight half re-reads on focus and
- * foreground; a failed highlight read never breaks the bell.
+ * unseen count that feeds the badge. The highlight half re-reads when a
+ * header bell gains focus (bell-store `notifyBellFocused`, jits-dq85.7); a
+ * return to the foreground re-reads both halves; a failed highlight read
+ * never breaks the bell.
  */
+import * as React from "react";
 import { act, renderHook } from "@testing-library/react-native";
 import { AppState } from "react-native";
 
-const mockFocus: (() => void)[] = [];
-jest.mock("expo-router", () => ({
-  useFocusEffect: (cb: () => void) => {
-    const R = require("react");
-    R.useEffect(() => {
-      mockFocus.push(cb);
-      cb();
-    }, [cb]);
-  },
-}));
-
 jest.mock("@/lib/supabase/client", () => ({ supabase: {} }));
 
+// mockHistory resolves to the feed rows, or to FAILED for a read whose query
+// returned an error (the real fetch never throws for those).
 const mockHistory = jest.fn();
+const FAILED = { failed: true } as const;
 jest.mock("@jits/shared/api/queries", () => ({
-  getNotificationHistory: (...a: unknown[]) => mockHistory(...a),
+  getNotificationHistoryResult: async (...a: unknown[]) => {
+    const rows = await mockHistory(...a);
+    return Array.isArray(rows) ? { ok: true, items: rows } : { ok: false };
+  },
 }));
 
 const mockGetMy = jest.fn();
@@ -42,6 +40,8 @@ import {
   requestBellRefresh,
   resetHighlightStore,
 } from "@/lib/highlight/highlight-store";
+import * as highlightStore from "@/lib/highlight/highlight-store";
+import { notifyBellFocused, resetBellStore } from "@/lib/notifications/bell-store";
 
 function hl(over: Record<string, unknown> = {}) {
   return {
@@ -68,7 +68,6 @@ const CHALLENGE = {
   type: "challenge_received" as const,
   title: "New challenge",
   body: "x",
-  route: "/session/s-1",
   createdAt: "2026-09-27T11:00:00Z",
 };
 const RESULT = {
@@ -91,7 +90,7 @@ beforeEach(() => {
   resetHighlightStore();
   __setHighlightReadThrottleForTests(0); // these suites test refresh wiring, not the dedupe
   jest.clearAllMocks();
-  mockFocus.length = 0;
+  resetBellStore();
   mockHistory.mockResolvedValue([CHALLENGE, RESULT]);
   mockGetMy.mockResolvedValue({
     ok: true,
@@ -155,16 +154,13 @@ describe("toHighlightNotificationItems", () => {
 });
 
 describe("useNotificationHistory", () => {
-  it("merges highlight rows into the feed and counts the unseen ones", async () => {
+  it("reads the history and the highlight rows and counts the unseen ones", async () => {
     const { result } = renderHook(() => useNotificationHistory("a1"));
     await settle();
     expect(mockGetMy).toHaveBeenCalledWith({}, { limit: 10 });
-    expect(result.current.items.map((i) => i.id)).toEqual([
-      "c1",
-      "highlight-h1-v1",
-      "highlight-h2-v1",
-      "r1",
-    ]);
+    expect(result.current.history.map((i) => i.id)).toEqual(["c1", "r1"]);
+    expect(result.current.highlights.map((i) => i.id)).toEqual(["highlight-h1-v1", "highlight-h2-v1"]);
+    expect("items" in result.current).toBe(false);
     expect(result.current.unseenHighlights).toBe(1);
   });
 
@@ -172,7 +168,8 @@ describe("useNotificationHistory", () => {
     mockGetMy.mockResolvedValue({ ok: true, data: { clipsEnabled: false, shareEnabled: false, items: [hl()] } });
     const { result } = renderHook(() => useNotificationHistory("a1"));
     await settle();
-    expect(result.current.items.map((i) => i.id)).toEqual(["c1", "r1"]);
+    expect(result.current.history.map((i) => i.id)).toEqual(["c1", "r1"]);
+    expect(result.current.highlights).toEqual([]);
     expect(result.current.unseenHighlights).toBe(0);
   });
 
@@ -180,22 +177,24 @@ describe("useNotificationHistory", () => {
     mockGetMy.mockResolvedValue({ ok: false, error: { code: "UNKNOWN", message: "x" } });
     const a = renderHook(() => useNotificationHistory("a1"));
     await settle();
-    expect(a.result.current.items.map((i) => i.id)).toEqual(["c1", "r1"]);
+    expect(a.result.current.history.map((i) => i.id)).toEqual(["c1", "r1"]);
+    expect(a.result.current.highlights).toEqual([]);
     a.unmount();
 
     mockGetMy.mockRejectedValue(new Error("boom"));
     const b = renderHook(() => useNotificationHistory("a1"));
     await settle();
-    expect(b.result.current.items.map((i) => i.id)).toEqual(["c1", "r1"]);
+    expect(b.result.current.history.map((i) => i.id)).toEqual(["c1", "r1"]);
+    expect(b.result.current.highlights).toEqual([]);
   });
 
-  it("re-reads only the highlight half on focus (not the first) and on foreground", async () => {
+  it("re-reads only the highlight half when a header bell gains focus; both halves on foreground", async () => {
     const { result } = renderHook(() => useNotificationHistory("a1"));
     await settle();
     expect(mockGetMy).toHaveBeenCalledTimes(1);
 
     mockGetMy.mockResolvedValue({ ok: true, data: { clipsEnabled: true, shareEnabled: true, items: [hl({ unseen: false })] } });
-    act(() => mockFocus.forEach((cb) => cb()));
+    act(() => notifyBellFocused());
     await settle();
     expect(mockGetMy).toHaveBeenCalledTimes(2);
     expect(mockHistory).toHaveBeenCalledTimes(1);
@@ -207,11 +206,46 @@ describe("useNotificationHistory", () => {
     await settle();
     expect(mockGetMy).toHaveBeenCalledTimes(2);
 
+    expect(mockHistory).toHaveBeenCalledTimes(1);
+
+    // A match result that landed while the app was backgrounded shows on return.
+    mockHistory.mockResolvedValue([CHALLENGE, RESULT, { ...RESULT, id: "r2", createdAt: "2026-09-27T12:00:00Z" }]);
     act(() => appStateListener?.("background"));
     act(() => appStateListener?.("active"));
     await settle();
     expect(mockGetMy).toHaveBeenCalledTimes(3);
+    expect(mockHistory).toHaveBeenCalledTimes(2);
+    expect(result.current.history.map((i) => i.id)).toContain("r2");
+  });
+
+  it("a header focus that lands right after mount does not repeat the mount read", async () => {
+    // readMyHighlights dedupes in-flight reads, so the RPC count alone would
+    // hide a repeated read; count the hook's reads instead.
+    const reads = jest.spyOn(highlightStore, "readMyHighlights");
+    // The first tab root's bell focuses in the same commit that mounts the
+    // host, before the host's own effects run.
+    renderHook(() => {
+      React.useEffect(() => notifyBellFocused(), []);
+      return useNotificationHistory("a1");
+    });
+    await settle();
+    expect(reads).toHaveBeenCalledTimes(1);
     expect(mockHistory).toHaveBeenCalledTimes(1);
+
+    // Once the mount read settled, a focus re-reads the reels again.
+    act(() => notifyBellFocused());
+    await settle();
+    expect(reads).toHaveBeenCalledTimes(2);
+  });
+
+  it("a failed history read keeps the previous feed and refresh() resolves", async () => {
+    const { result } = renderHook(() => useNotificationHistory("a1"));
+    await settle();
+    mockHistory.mockRejectedValueOnce(new Error("offline"));
+    await act(async () => {
+      await expect(result.current.refresh()).resolves.toBeUndefined();
+    });
+    expect(result.current.history.map((i) => i.id)).toEqual(["c1", "r1"]);
   });
 
   it("re-reads the highlight half (forced) when a reel is marked seen elsewhere", async () => {
@@ -232,7 +266,7 @@ describe("useNotificationHistory", () => {
     expect(result.current.unseenHighlights).toBe(1);
     let resolveSlow: (v: unknown) => void = () => undefined;
     mockGetMy.mockReturnValueOnce(new Promise((r) => (resolveSlow = r)));
-    act(() => mockFocus.forEach((cb) => cb())); // slow read, still reports unseen
+    act(() => notifyBellFocused()); // slow read, still reports unseen
     mockGetMy.mockResolvedValueOnce({ ok: true, data: { clipsEnabled: true, shareEnabled: true, items: [hl({ unseen: false })] } });
     act(() => notifyHighlightsChanged()); // forced read after a seen mark
     await settle();
@@ -242,6 +276,52 @@ describe("useNotificationHistory", () => {
     );
     await settle();
     expect(result.current.unseenHighlights).toBe(0);
+  });
+
+  it("only the newest full read writes history (a slow mount read never overwrites a forced one)", async () => {
+    let resolveSlow: (v: unknown) => void = () => undefined;
+    mockHistory.mockReturnValueOnce(new Promise((r) => (resolveSlow = r)));
+    const { result } = renderHook(() => useNotificationHistory("a1"));
+    await settle();
+    // A match result completed in between; the panel open reads it.
+    const NEWER = { ...RESULT, id: "r2", createdAt: "2026-09-27T12:00:00Z" };
+    mockHistory.mockResolvedValueOnce([NEWER, CHALLENGE, RESULT]);
+    await act(async () => {
+      await result.current.refresh();
+    });
+    expect(result.current.history.map((i) => i.id)).toEqual(["r2", "c1", "r1"]);
+    await act(async () => resolveSlow([CHALLENGE, RESULT]));
+    await settle();
+    expect(result.current.history.map((i) => i.id)).toEqual(["r2", "c1", "r1"]);
+  });
+
+  it("a forced read whose query errors keeps the feed from the mount read", async () => {
+    const { result } = renderHook(() => useNotificationHistory("a1"));
+    await settle();
+    mockHistory.mockResolvedValueOnce(FAILED);
+    await act(async () => {
+      await result.current.refresh();
+    });
+    expect(result.current.history.map((i) => i.id)).toEqual(["c1", "r1"]);
+  });
+
+  it("a failed newer read never throws away an older mount read that succeeds later", async () => {
+    for (const failure of ["error", "reject"] as const) {
+      let resolveSlow: (v: unknown) => void = () => undefined;
+      mockHistory.mockReturnValueOnce(new Promise((r) => (resolveSlow = r)));
+      const { result, unmount } = renderHook(() => useNotificationHistory("a1"));
+      await settle();
+      if (failure === "error") mockHistory.mockResolvedValueOnce(FAILED);
+      else mockHistory.mockRejectedValueOnce(new Error("offline"));
+      await act(async () => {
+        await result.current.refresh();
+      });
+      expect(result.current.history).toEqual([]);
+      await act(async () => resolveSlow([CHALLENGE, RESULT]));
+      await settle();
+      expect(result.current.history.map((i) => i.id)).toEqual(["c1", "r1"]);
+      unmount();
+    }
   });
 
   it("Home's pull-to-refresh re-reads the whole bell feed", async () => {

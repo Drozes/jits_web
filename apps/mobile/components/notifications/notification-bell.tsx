@@ -1,84 +1,50 @@
 /**
- * Bell icon with an unread badge. Tapping opens a bottom sheet listing
- * recent notifications (challenges, match results, ready highlight reels).
+ * Bell icon with an unread badge, for a tab-root header. Tapping opens the
+ * one app-wide notification panel.
  *
- * Mirrors `apps/web/components/domain/notification-bell.tsx`. Consumes the
- * shared `usePendingChallenges` hook for the badge count and
- * `useNotificationHistory` for the full feed.
+ * A thin view over `lib/notifications/bell-store.ts` (jits-dq85.7): the
+ * pending-challenges channel, the feed and the panel live once in
+ * `BellBootstrap`, so four headers cost one realtime channel, not four. The
+ * badge is fresh incoming challenges plus unseen highlight reels.
  */
 import * as React from "react";
-import { Pressable, Text, View } from "react-native";
-import { useRouter } from "expo-router";
+import { Pressable, View } from "react-native";
+import { useFocusEffect } from "expo-router";
 import { Bell } from "lucide-react-native";
-import { usePendingChallenges } from "@jits/shared/hooks/use-pending-challenges";
-import { supabase } from "@/lib/supabase/client";
 import { useThemedTokens } from "@/lib/theme/use-theme";
-import { useNotificationHistory } from "@/hooks/use-notification-history";
-import type { BellItem } from "@/lib/notifications/notification-items";
+import { CountPill, formatBadgeCount } from "@/components/ui/count-pill";
+import {
+  notifyBellFocused,
+  openBell,
+  useBellBadgeCount,
+} from "@/lib/notifications/bell-store";
 
-const NotificationPanel = React.lazy(() =>
-  import("./notification-panel").then((m) => ({
-    default: m.NotificationPanel,
-  })),
-);
-
-interface NotificationBellProps {
-  athleteId: string;
-}
-
-export function NotificationBell({ athleteId }: NotificationBellProps) {
-  const [open, setOpen] = React.useState(false);
+/** Takes no props: the bell reads the signed-in athlete's store. */
+export function NotificationBell() {
   const tokens = useThemedTokens();
-  const router = useRouter();
-  const { count: pending } = usePendingChallenges(supabase, athleteId);
-  const { items, unseenHighlights, refresh } = useNotificationHistory(athleteId);
-  // Pending challenges plus ready reels the athlete has not watched yet.
-  const count = pending + unseenHighlights;
+  const count = useBellBadgeCount();
 
-  // Close the panel first, then open the reel (source=bell) on top of it.
-  const handleItemPress = React.useCallback(
-    (item: BellItem) => {
-      if (!item.route) return;
-      setOpen(false);
-      router.push(item.route as never);
-    },
-    [router],
+  // The header this bell sits in gained focus: the host re-reads the reels
+  // (deduped), so one watched elsewhere stops counting.
+  useFocusEffect(
+    React.useCallback(() => {
+      notifyBellFocused();
+    }, []),
   );
 
-  const handleOpen = React.useCallback(() => {
-    setOpen(true);
-    void refresh();
-  }, [refresh]);
-
   return (
-    <>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Notifications"
-        onPress={handleOpen}
-        className="relative w-8 h-8 items-center justify-center rounded-xs active:bg-surface-4"
-        hitSlop={8}
-      >
-        <View pointerEvents="none">
-          <Bell size={18} color={tokens.textPrimary} />
-        </View>
-        {count > 0 && (
-          <View className="absolute top-0 right-0 h-4 min-w-4 items-center justify-center rounded-full bg-cta px-1">
-            <Text className="font-mono-bold text-[9px] text-ink-on-cta">
-              {count > 99 ? "99+" : String(count)}
-            </Text>
-          </View>
-        )}
-      </Pressable>
-
-      <React.Suspense fallback={null}>
-        <NotificationPanel
-          open={open}
-          onOpenChange={setOpen}
-          items={items}
-          onItemPress={handleItemPress}
-        />
-      </React.Suspense>
-    </>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Notifications"
+      accessibilityValue={count > 0 ? { text: `${count} new` } : undefined}
+      onPress={openBell}
+      className="relative w-8 h-8 items-center justify-center rounded-xs active:bg-surface-4"
+      hitSlop={8}
+    >
+      <View pointerEvents="none">
+        <Bell size={18} color={tokens.textPrimary} />
+      </View>
+      {count > 0 && <CountPill className="top-0 right-0" text={formatBadgeCount(count)} />}
+    </Pressable>
   );
 }

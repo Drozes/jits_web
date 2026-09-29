@@ -2,7 +2,7 @@ import { Pressable, Text, View } from "react-native";
 import { CheckCircle, Clapperboard, Swords, XCircle, Zap } from "lucide-react-native";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { formatRelativeDate } from "@jits/shared/utils";
-import { isHighlightItem, type BellItem } from "@/lib/notifications/notification-items";
+import type { BellItem } from "@/lib/notifications/notification-items";
 
 type IconKind = "ranked" | "challenge" | "positive" | "neutral";
 
@@ -42,12 +42,16 @@ export function NotificationRow({
 }) {
   const { Icon, tone } = iconConfig[item.type];
   const iconColor = useIconColor(tone);
-  const unread = isHighlightItem(item) && item.unread;
+  // Unseen reels and fresh pending challenges (the rows the badge counts).
+  const unread = item.unread === true;
 
   return (
     <Pressable
+      testID={`notification-row-${item.id}`}
       onPress={onPress}
       accessibilityRole={onPress ? "button" : undefined}
+      // The dot is visual only; tell VoiceOver which rows the badge counts.
+      accessibilityValue={unread ? { text: "new" } : undefined}
       className="flex-row items-start gap-3 rounded-xs px-3 py-3 active:bg-surface-3"
     >
       <View pointerEvents="none" className="w-8 h-8 items-center justify-center rounded-xs border border-hairline bg-surface-3">

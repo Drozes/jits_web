@@ -1,6 +1,8 @@
 /**
  * Bottom-sheet panel that lists recent notifications: challenges received,
- * accepted, declined, and match results. Items are grouped by date.
+ * accepted, declined, match results and ready reels, grouped by date, then a
+ * "Missed" section for pending challenges past the freshness window
+ * (jits-dq85.8). Rendered once, by `BellBootstrap`.
  *
  * Mirrors `apps/web/app/(app)/notifications/notification-list.tsx`.
  */
@@ -15,7 +17,7 @@ import {
 import type { NotificationDateGroup } from "@jits/shared/types/notification";
 import { getDateGroup } from "@jits/shared/utils";
 import { useThemedTokens } from "@/lib/theme/use-theme";
-import { isHighlightItem, type BellItem } from "@/lib/notifications/notification-items";
+import { bellItemRoute, type BellItem } from "@/lib/notifications/notification-items";
 import { NotificationRow } from "./notification-item";
 
 interface NotificationPanelProps {
@@ -23,8 +25,15 @@ interface NotificationPanelProps {
   onOpenChange: (open: boolean) => void;
   items: BellItem[];
   /**
-   * Opens a tappable row. Only ready-reel rows are tappable: the other rows'
-   * routes point at retired `/session/...` paths (spec 015 section 16.12).
+   * Pending challenges past the freshness window, listed after the feed.
+   * Tappable like every challenge row (spec 4.5, AC-H15): they open the
+   * Arena, where the athlete can challenge that opponent back.
+   */
+  missed?: BellItem[];
+  /**
+   * Opens a tappable row. A row is tappable when `bellItemRoute` gives it a
+   * route: reels, challenges fresh or Missed (the Arena) and match results
+   * (match detail).
    */
   onItemPress?: (item: BellItem) => void;
 }
@@ -37,6 +46,7 @@ export function NotificationPanel({
   open,
   onOpenChange,
   items,
+  missed = [],
   onItemPress,
 }: NotificationPanelProps) {
   const ref = React.useRef<BottomSheetModal | null>(null);
@@ -78,6 +88,15 @@ export function NotificationPanel({
     return result;
   }, [items]);
 
+  const renderRow = (item: BellItem) => (
+    <View key={item.id} className="px-1">
+      <NotificationRow
+        item={item}
+        onPress={onItemPress && bellItemRoute(item) ? () => onItemPress(item) : undefined}
+      />
+    </View>
+  );
+
   return (
     <BottomSheetModal
       ref={ref}
@@ -98,32 +117,40 @@ export function NotificationPanel({
       </View>
 
       <BottomSheetScrollView contentContainerStyle={{ paddingBottom: 24 }}>
-        {items.length === 0 ? (
+        {items.length === 0 && missed.length === 0 ? (
           <View className="items-center py-12">
             <Text className="font-body text-[13px] text-ink-2">
               No notifications yet
             </Text>
           </View>
         ) : (
-          groups.map((g) => (
-            <View key={g.label}>
-              <Text className="px-4 pb-1 pt-4 font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-l">
-                {g.label}
-              </Text>
-              {g.items.map((item) => (
-                <View key={item.id} className="px-1">
-                  <NotificationRow
-                    item={item}
-                    onPress={
-                      onItemPress && isHighlightItem(item) ? () => onItemPress(item) : undefined
-                    }
-                  />
-                </View>
-              ))}
-            </View>
-          ))
+          <>
+            {groups.map((g) => (
+              <View key={g.label}>
+                <SectionLabel label={g.label} />
+                {g.items.map((item) => renderRow(item))}
+              </View>
+            ))}
+            {missed.length > 0 ? (
+              <View testID="notification-missed">
+                <SectionLabel label="Missed" />
+                {missed.map((item) => renderRow(item))}
+              </View>
+            ) : null}
+          </>
         )}
       </BottomSheetScrollView>
     </BottomSheetModal>
+  );
+}
+
+function SectionLabel({ label }: { label: string }) {
+  return (
+    <Text
+      accessibilityRole="header"
+      className="px-4 pb-1 pt-4 font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-l"
+    >
+      {label}
+    </Text>
   );
 }
