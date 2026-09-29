@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Mobile: build and OTA version stamp (jits-hm43)
+
+OTA-eligible for runtime 0.4.0: the new `expo-application` dep (~7.0.8) is already linked into build 23 (EXApplication 7.0.8 via `expo-notifications`, see `ios/Podfile.lock`).
+
+**Added**
+- A small mono stamp ("v0.4.0 (23) · OTA 9287a1e5", or "· Embedded" when running the bundle shipped with the build) under the "ELO RATED Beta" footer on Profile and at the bottom of the login screen. New `apps/mobile/lib/updates/app-version.ts`, `apps/mobile/components/layout/app-version-label.tsx`.
+
 ### Video analysis: "no match detected" outcome (jr_be-0qf)
 
 JS-only, OTA-eligible. Needs jr_be migration `20260929012000_no_match_detected.sql` (and the matching edge functions) on the target backend to produce `match_detected = false`; against an older backend every new key reads as unknown (`null`) and nothing changes on screen.

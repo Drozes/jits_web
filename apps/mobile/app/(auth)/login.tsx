@@ -12,6 +12,7 @@ import { useRouter } from "expo-router";
 import { Wordmark, Plate } from "@/components/ui/elo-system";
 import { toast } from "@/components/ui";
 import { AuthFormField } from "@/components/auth/auth-form-field";
+import { AppVersionLabel } from "@/components/layout/app-version-label";
 import {
   CtaButton,
   SecondaryButton,
@@ -154,6 +155,8 @@ export default function LoginScreen() {
               onPress={() => router.push("/forgot-password")}
             />
           </View>
+
+          <AppVersionLabel />
         </ScrollView>
       </SafeAreaView>
     </KeyboardAvoidingView>

@@ -20,6 +20,7 @@ import { ShareProfileSheet } from "@/components/share-profile-sheet";
 import { AppHeader } from "@/components/layout/app-header";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { PageContainer } from "@/components/layout/page-container";
+import { AppVersionLabel } from "@/components/layout/app-version-label";
 import { MetaTag, ParticipantRow } from "@/components/ui/elo-system";
 import { HistoryRowAction } from "@/components/profile/history-row-action";
 import {
@@ -231,9 +232,12 @@ export default function ProfileScreen() {
 
             <AccountSection />
 
-            <Text className="text-center font-mono text-[10px] text-ink-3 uppercase tracking-caps-l py-2">
-              ELO RATED Beta
-            </Text>
+            <View className="items-center gap-1 py-2">
+              <Text className="text-center font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">
+                ELO RATED Beta
+              </Text>
+              <AppVersionLabel />
+            </View>
           </>
         )}
       </PageContainer>
