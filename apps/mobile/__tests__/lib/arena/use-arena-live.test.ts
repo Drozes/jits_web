@@ -37,8 +37,12 @@ jest.mock("@/lib/arena/use-lobby-presence", () => ({
 }));
 
 const mockToastError = jest.fn();
+const mockToastInfo = jest.fn();
 jest.mock("@/components/ui/toast", () => ({
-  toast: { error: (...a: unknown[]) => mockToastError(...a), info: jest.fn() },
+  toast: {
+    error: (...a: unknown[]) => mockToastError(...a),
+    info: (...a: unknown[]) => mockToastInfo(...a),
+  },
 }));
 
 // The client is an opaque handle here: the hook only ever passes it through
@@ -46,7 +50,8 @@ jest.mock("@/components/ui/toast", () => ({
 // mock above, because that is the call that wraps `channel.untrack()`.
 jest.mock("@/lib/supabase/client", () => ({ supabase: {} }));
 
-import { useArenaLive, type UseArenaLiveArgs } from "@/lib/arena/use-arena-live";
+import { CLEAR_RETRY_MS, useArenaLive, type UseArenaLiveArgs } from "@/lib/arena/use-arena-live";
+import { GO_OFFLINE_FAILED_MESSAGE } from "@/lib/arena/constants";
 
 // ---- fixtures ----
 
@@ -157,6 +162,16 @@ describe("going live", () => {
     expect(result.current.isLive).toBe(true);
   });
 
+  it("tracks a missing rating as null, not 0", async () => {
+    const { result } = mount({ currentElo: null });
+    await act(async () => {
+      await result.current.goLive();
+    });
+    expect(mockJoinLobby).toHaveBeenCalledWith(
+      expect.objectContaining({ current_elo: null }),
+    );
+  });
+
   it("never joins the lobby when the flag write failed", async () => {
     // Presence without the flag is the worse half of the inconsistency: the
     // athlete shows as online to anyone already holding the roster, while
@@ -173,7 +188,9 @@ describe("going live", () => {
 
     expect(mockJoinLobby).not.toHaveBeenCalled();
     expect(result.current.isLive).toBe(false);
-    expect(mockToastError).toHaveBeenCalled();
+    // Neutral, never Signal Red: a live-flag write failure is ink-3 (spec 3).
+    expect(mockToastInfo).toHaveBeenCalled();
+    expect(mockToastError).not.toHaveBeenCalled();
   });
 
   it("retries the flag write once before giving up", async () => {
@@ -192,6 +209,7 @@ describe("going live", () => {
     expect(mockToggleMatchPreferences).toHaveBeenCalledTimes(2);
     expect(result.current.isLive).toBe(true);
     expect(mockToastError).not.toHaveBeenCalled();
+    expect(mockToastInfo).not.toHaveBeenCalled();
   });
 
   it("produces exactly one write for a double tap", async () => {
@@ -310,6 +328,7 @@ describe("going offline", () => {
       lookingForRanked: false,
     });
     expect(mockToastError).not.toHaveBeenCalled();
+    expect(mockToastInfo).not.toHaveBeenCalled();
 
     await act(async () => {
       untrack.resolve();
@@ -585,6 +604,7 @@ describe("staying live across the app", () => {
     });
     expect(result.current.isLive).toBe(false);
     expect(mockToastError).not.toHaveBeenCalled();
+    expect(mockToastInfo).not.toHaveBeenCalled();
   });
 
   it("goOffline when already offline writes nothing", async () => {
@@ -811,9 +831,171 @@ describe("launch resume", () => {
     });
 
     expect(result.current.isLive).toBe(false);
-    expect(mockToastError).toHaveBeenCalledWith(
+    expect(mockToastInfo).toHaveBeenCalledWith(
       "You're offline. Go live again in the Arena.",
     );
+    expect(mockToastError).not.toHaveBeenCalled();
+  });
+});
+
+describe("last write failed (AC-H11, `OFFLINE · RETRY`)", () => {
+  const DOWN = { ok: false, error: { code: "UNKNOWN", message: "down" } };
+
+  it("is set by a failed go-live from the toggle and cleared by the next one that lands", async () => {
+    const { result } = mount();
+    expect(result.current.lastWriteFailed).toBe(false);
+    mockToggleMatchPreferences.mockResolvedValue(DOWN);
+    await act(async () => {
+      await result.current.toggle();
+    });
+    expect(result.current.isLive).toBe(false);
+    expect(result.current.lastWriteFailed).toBe(true);
+
+    mockToggleMatchPreferences.mockResolvedValue({ ok: true, data: undefined });
+    await act(async () => {
+      await result.current.toggle();
+    });
+    expect(result.current.isLive).toBe(true);
+    expect(result.current.lastWriteFailed).toBe(false);
+  });
+
+  it("is set by a failed foreground restore the athlete never tapped", async () => {
+    const { result } = mount();
+    await act(async () => {
+      await result.current.goLive();
+    });
+    await act(async () => {
+      appStateHandler?.("background");
+      await flush();
+    });
+    expect(result.current.lastWriteFailed).toBe(false);
+    mockToggleMatchPreferences.mockResolvedValue(DOWN);
+    await act(async () => {
+      appStateHandler?.("active");
+      await flush();
+    });
+    expect(result.current.isLive).toBe(false);
+    expect(result.current.lastWriteFailed).toBe(true);
+
+    // The chip's RETRY is a go-live; once it lands the flag clears.
+    mockToggleMatchPreferences.mockResolvedValue({ ok: true, data: undefined });
+    await act(async () => {
+      await result.current.goLive();
+    });
+    expect(result.current.lastWriteFailed).toBe(false);
+  });
+
+  it("is set by a failed arrival re-assert", async () => {
+    mockToggleMatchPreferences.mockResolvedValue(DOWN);
+    const { result } = mount({ initialRanked: true });
+    await act(flush);
+    expect(result.current.isLive).toBe(false);
+    expect(result.current.lastWriteFailed).toBe(true);
+  });
+
+  it("is cleared by a match the athlete entered after a failed go-live", async () => {
+    const { result, rerender } = mount();
+    mockToggleMatchPreferences.mockResolvedValue(DOWN);
+    await act(async () => {
+      await result.current.toggle();
+    });
+    expect(result.current.lastWriteFailed).toBe(true);
+
+    mockToggleMatchPreferences.mockResolvedValue({ ok: true, data: undefined });
+    await act(async () => {
+      rerender({ ...ARGS, inMatch: true });
+      await flush();
+    });
+    await act(async () => {
+      rerender({ ...ARGS, inMatch: false });
+      await flush();
+    });
+    expect(result.current.isLive).toBe(false);
+    expect(result.current.lastWriteFailed).toBe(false);
+  });
+
+  it("is cleared by backgrounding after a failed go-live", async () => {
+    const { result } = mount();
+    mockToggleMatchPreferences.mockResolvedValue(DOWN);
+    await act(async () => {
+      await result.current.toggle();
+    });
+    expect(result.current.lastWriteFailed).toBe(true);
+    await act(async () => {
+      appStateHandler?.("background");
+      await flush();
+    });
+    expect(result.current.lastWriteFailed).toBe(false);
+  });
+
+  it("survives a go-live queued behind a failing go-live (intent read at enqueue)", async () => {
+    const { result } = mount();
+    const first = deferred<typeof DOWN>();
+    // Both attempts of the one flag write fail (the first held open so the
+    // second go-live queues behind it).
+    mockToggleMatchPreferences.mockResolvedValue(DOWN);
+    mockToggleMatchPreferences.mockReturnValueOnce(first.promise);
+    let a: Promise<boolean> = Promise.resolve(true);
+    let b: Promise<boolean> = Promise.resolve(true);
+    act(() => {
+      a = result.current.goLive();
+      b = result.current.goLive();
+    });
+    let outA: boolean | undefined;
+    let outB: boolean | undefined;
+    await act(async () => {
+      first.resolve(DOWN);
+      outA = await a;
+      outB = await b;
+    });
+    // Only the one write (two attempts) was made; the second pass found the intent the
+    // failure dropped and must neither clear the flag nor claim success.
+    expect(mockCalls.filter((c) => c.startsWith("flag:"))).toEqual([
+      "flag:true",
+      "flag:true",
+    ]);
+    expect(result.current.isLive).toBe(false);
+    expect(result.current.lastWriteFailed).toBe(true);
+    expect(outA).toBe(false);
+    expect(outB).toBe(false);
+  });
+
+  it("does not report an earlier failure for a go-live cancelled by backgrounding", async () => {
+    const { result } = mount();
+    mockToggleMatchPreferences.mockResolvedValue(DOWN);
+    await act(async () => {
+      await result.current.goLive();
+    });
+    expect(result.current.lastWriteFailed).toBe(true);
+
+    // Tapped RETRY, then the app went to the background before the pass ran:
+    // the go-live was cancelled, not failed.
+    mockToggleMatchPreferences.mockClear();
+    let retry: Promise<boolean> = Promise.resolve(false);
+    act(() => {
+      retry = result.current.goLive();
+      appStateHandler?.("background");
+    });
+    let out: boolean | undefined;
+    await act(async () => {
+      out = await retry;
+      await flush();
+    });
+    expect(mockToggleMatchPreferences).not.toHaveBeenCalled();
+    expect(result.current.isLive).toBe(false);
+    expect(out).toBe(true);
+  });
+
+  it("is not set by a failed go-offline", async () => {
+    const { result } = mount();
+    await act(async () => {
+      await result.current.goLive();
+    });
+    mockToggleMatchPreferences.mockResolvedValue(DOWN);
+    await act(async () => {
+      await result.current.goOffline();
+    });
+    expect(result.current.lastWriteFailed).toBe(false);
   });
 });
 
@@ -923,6 +1105,7 @@ describe("a lobby join that never settles (jits-fa9x)", () => {
     expect(toggled).toBe(true);
     expect(result.current.isSaving).toBe(false);
     expect(mockToastError).not.toHaveBeenCalled();
+    expect(mockToastInfo).not.toHaveBeenCalled();
 
     let ok: boolean | undefined;
     await act(async () => {
@@ -946,6 +1129,285 @@ describe("a lobby join that never settles (jits-fa9x)", () => {
     });
     expect(result.current.isLive).toBe(true);
     expect(mockToastError).not.toHaveBeenCalled();
+    expect(mockToastInfo).not.toHaveBeenCalled();
     warn.mockRestore();
+  });
+});
+
+describe("manual go-offline vs being taken offline (decision Q3)", () => {
+  it("calls onManualOffline when the toggle turns live off, before the flag write", async () => {
+    const onManualOffline = jest.fn(() => {
+      mockCalls.push("manual");
+    });
+    const { result } = mount({ onManualOffline });
+    await act(async () => {
+      await result.current.toggle();
+    });
+    expect(onManualOffline).not.toHaveBeenCalled();
+
+    mockCalls.length = 0;
+    await act(async () => {
+      await result.current.toggle();
+    });
+    expect(onManualOffline).toHaveBeenCalledTimes(1);
+    expect(mockCalls[0]).toBe("manual");
+  });
+
+  it("settles the manual go-offline with whether the athlete is now offline", async () => {
+    const settled: boolean[] = [];
+    const onManualOffline = jest.fn(() => (wentOffline: boolean) => {
+      mockCalls.push(`settled:${wentOffline}`);
+      settled.push(wentOffline);
+    });
+    const { result } = mount({ onManualOffline });
+    await act(async () => {
+      await result.current.goLive();
+    });
+    mockCalls.length = 0;
+    await act(async () => {
+      await result.current.toggle();
+    });
+    // Told after the write, never before it.
+    expect(settled).toEqual([true]);
+    expect(mockCalls.indexOf("flag:false")).toBeLessThan(
+      mockCalls.indexOf("settled:true"),
+    );
+
+    // A clear that fails twice: presence was already untracked and the
+    // committed state is offline (grey chip, gone from the lobby), so the
+    // athlete IS offline as far as they can tell and the settle says so
+    // (decision Q3 drops the tucked challenge), even though the call itself
+    // reports the failed write.
+    await act(async () => {
+      await result.current.goLive();
+    });
+    mockToggleMatchPreferences.mockResolvedValue({
+      ok: false,
+      error: { code: "UNKNOWN", message: "down" },
+    });
+    let ok: boolean | undefined;
+    await act(async () => {
+      ok = await result.current.goOffline();
+    });
+    expect(ok).toBe(false);
+    expect(result.current.isLive).toBe(false);
+    expect(settled).toEqual([true, true]);
+  });
+
+  it("settles false when the go-offline never committed (the intent flipped back to live)", async () => {
+    const settled: boolean[] = [];
+    const onManualOffline = jest.fn(() => (wentOffline: boolean) => {
+      settled.push(wentOffline);
+    });
+    const { result } = mount({ onManualOffline });
+    await act(async () => {
+      await result.current.goLive();
+    });
+    await act(async () => {
+      const off = result.current.goOffline();
+      // Asked for live again before the queued go-offline ran.
+      const on = result.current.goLive();
+      await Promise.all([off, on]);
+      await flush();
+    });
+    expect(result.current.isLive).toBe(true);
+    expect(settled).toEqual([false]);
+  });
+
+  it("calls onManualOffline for goOffline (the popover, sign-out)", async () => {
+    const onManualOffline = jest.fn();
+    const { result } = mount({ onManualOffline });
+    await act(async () => {
+      await result.current.goOffline();
+    });
+    expect(onManualOffline).toHaveBeenCalledTimes(1);
+  });
+
+  it("does NOT call it when backgrounding takes the athlete offline", async () => {
+    const onManualOffline = jest.fn();
+    const { result } = mount({ onManualOffline });
+    await act(async () => {
+      await result.current.goLive();
+    });
+    await act(async () => {
+      appStateHandler?.("background");
+      await flush();
+    });
+    expect(result.current.isLive).toBe(false);
+    expect(onManualOffline).not.toHaveBeenCalled();
+  });
+
+  it("does NOT call it when entering a match takes the athlete offline", async () => {
+    const onManualOffline = jest.fn();
+    const { result, rerender } = mount({ onManualOffline });
+    await act(async () => {
+      await result.current.goLive();
+    });
+    await act(async () => {
+      rerender({ ...ARGS, onManualOffline, inMatch: true });
+      await flush();
+    });
+    expect(result.current.isLive).toBe(false);
+    expect(onManualOffline).not.toHaveBeenCalled();
+  });
+});
+
+describe("transition: a restore the athlete did not start (review: toggle during restore)", () => {
+  it("reads going-live while the foreground restore is in flight, and null once it landed", async () => {
+    const { result } = mount();
+    await act(async () => {
+      await result.current.goLive();
+    });
+    expect(result.current.transition).toBeNull();
+    await act(async () => {
+      appStateHandler?.("background");
+      await flush();
+    });
+    expect(result.current.transition).toBeNull();
+
+    const write = deferred<{ ok: true; data: undefined }>();
+    mockToggleMatchPreferences.mockReturnValueOnce(write.promise);
+    await act(async () => {
+      appStateHandler?.("active");
+      await flush();
+    });
+    // Intent live, nothing committed yet, and `isSaving` never set for it.
+    expect(result.current.isLive).toBe(false);
+    expect(result.current.isSaving).toBe(false);
+    expect(result.current.transition).toBe("going-live");
+
+    await act(async () => {
+      write.resolve({ ok: true, data: undefined });
+      await flush();
+    });
+    expect(result.current.isLive).toBe(true);
+    expect(result.current.transition).toBeNull();
+  });
+
+  it("reads going-offline while a background clear is in flight", async () => {
+    const { result } = mount();
+    await act(async () => {
+      await result.current.goLive();
+    });
+    const write = deferred<{ ok: true; data: undefined }>();
+    mockToggleMatchPreferences.mockReturnValueOnce(write.promise);
+    await act(async () => {
+      appStateHandler?.("background");
+      await Promise.resolve();
+    });
+    expect(result.current.transition).toBe("going-offline");
+    await act(async () => {
+      write.resolve({ ok: true, data: undefined });
+      await flush();
+    });
+    expect(result.current.transition).toBeNull();
+  });
+
+  it("stays null for a call that has nothing to do", async () => {
+    const { result } = mount();
+    await act(async () => {
+      await result.current.goOffline();
+    });
+    expect(result.current.transition).toBeNull();
+    expect(mockToggleMatchPreferences).not.toHaveBeenCalled();
+  });
+});
+
+describe("a failed flag clear is retried in the background", () => {
+  const DOWN = { ok: false, error: { code: "UNKNOWN", message: "down" } };
+  const OK = { ok: true, data: undefined };
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  async function liveThenFailedClear() {
+    const hook = mount();
+    await act(async () => {
+      await hook.result.current.goLive();
+    });
+    mockToggleMatchPreferences.mockResolvedValue(DOWN);
+    let out: boolean | undefined;
+    await act(async () => {
+      out = await hook.result.current.goOffline();
+    });
+    return { ...hook, out };
+  }
+
+  it("queues exactly one follow-up clear after CLEAR_RETRY_MS, and it lands", async () => {
+    jest.useFakeTimers();
+    const { result, out } = await liveThenFailedClear();
+    expect(out).toBe(false);
+    // Offline in the app all the same (grey chip), and not RETRY.
+    expect(result.current.isLive).toBe(false);
+    expect(result.current.lastWriteFailed).toBe(false);
+    const writes = mockToggleMatchPreferences.mock.calls.length;
+
+    mockToggleMatchPreferences.mockResolvedValue(OK);
+    await act(async () => {
+      jest.advanceTimersByTime(CLEAR_RETRY_MS - 1);
+      await flush();
+    });
+    expect(mockToggleMatchPreferences.mock.calls.length).toBe(writes);
+    await act(async () => {
+      jest.advanceTimersByTime(1);
+      await flush();
+    });
+    expect(mockToggleMatchPreferences.mock.calls.length).toBe(writes + 1);
+    expect(lastFlagWrite()).toEqual(expect.objectContaining({ lookingForRanked: false }));
+
+    // Landed: nothing further is queued, even on a later foreground.
+    await act(async () => {
+      jest.advanceTimersByTime(10 * CLEAR_RETRY_MS);
+      appStateHandler?.("active");
+      await flush();
+    });
+    expect(mockToggleMatchPreferences.mock.calls.length).toBe(writes + 1);
+  });
+
+  it("tries again on the next foreground when the follow-up failed too", async () => {
+    jest.useFakeTimers();
+    await liveThenFailedClear();
+    await act(async () => {
+      jest.advanceTimersByTime(CLEAR_RETRY_MS);
+      await flush();
+    });
+    const writes = mockToggleMatchPreferences.mock.calls.length;
+    mockToggleMatchPreferences.mockResolvedValue(OK);
+    await act(async () => {
+      appStateHandler?.("active");
+      await flush();
+    });
+    expect(mockToggleMatchPreferences.mock.calls.length).toBe(writes + 1);
+    expect(lastFlagWrite()).toEqual(expect.objectContaining({ lookingForRanked: false }));
+  });
+
+  it("drops the follow-up once the athlete goes live again", async () => {
+    jest.useFakeTimers();
+    const { result } = await liveThenFailedClear();
+    mockToggleMatchPreferences.mockResolvedValue(OK);
+    await act(async () => {
+      await result.current.goLive();
+    });
+    const writes = mockToggleMatchPreferences.mock.calls.length;
+    await act(async () => {
+      jest.advanceTimersByTime(CLEAR_RETRY_MS);
+      await flush();
+    });
+    expect(mockToggleMatchPreferences.mock.calls.length).toBe(writes);
+    expect(result.current.isLive).toBe(true);
+  });
+
+  it("toasts the honest copy from the toggle", async () => {
+    const { result } = mount();
+    await act(async () => {
+      await result.current.goLive();
+    });
+    mockToggleMatchPreferences.mockResolvedValue(DOWN);
+    await act(async () => {
+      await result.current.toggle();
+    });
+    expect(mockToastInfo).toHaveBeenCalledWith(GO_OFFLINE_FAILED_MESSAGE);
+    expect(GO_OFFLINE_FAILED_MESSAGE).not.toMatch(/try again/i);
   });
 });

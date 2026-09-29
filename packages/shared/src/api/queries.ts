@@ -561,10 +561,12 @@ export async function getPendingChallengeBetween(
 export async function getChallengeStatus(
   supabase: Client,
   challengeId: string,
-): Promise<Result<{ status: string; expiresAt: string | null } | null>> {
+): Promise<
+  Result<{ status: string; expiresAt: string | null; createdAt: string | null } | null>
+> {
   const { data, error } = await supabase
     .from("challenges")
-    .select("status, expires_at")
+    .select("status, expires_at, created_at")
     .eq("id", challengeId)
     .maybeSingle();
 
@@ -574,7 +576,11 @@ export async function getChallengeStatus(
   if (!data) return { ok: true, data: null };
   return {
     ok: true,
-    data: { status: data.status, expiresAt: data.expires_at ?? null },
+    data: {
+      status: data.status,
+      expiresAt: data.expires_at ?? null,
+      createdAt: data.created_at ?? null,
+    },
   };
 }
 
@@ -2065,29 +2071,64 @@ export async function getManagedGyms(
  * 1. Challenges involving the athlete (received: pending/accepted/declined)
  * 2. Completed matches from get_match_history RPC
  *
- * Returns items sorted newest-first, capped at `limit`.
+ * Returns items sorted newest-first, capped at `limit`. A failed query
+ * contributes no rows; use `getNotificationHistoryResult` to tell a failed
+ * read apart from an empty feed.
  */
 export async function getNotificationHistory(
   supabase: Client,
   athleteId: string,
   limit = 30,
 ): Promise<NotificationItem[]> {
+  const res = await readNotificationHistory(supabase, athleteId, limit);
+  return res.items;
+}
+
+export type NotificationHistoryResult =
+  | { ok: true; items: NotificationItem[] }
+  | { ok: false };
+
+/**
+ * Same feed as `getNotificationHistory`, but reports a failed read: if any of
+ * its queries returns an error (or no data), the result is `{ ok: false }`, so
+ * a caller holding a previous feed can keep it instead of showing an empty or
+ * partial one.
+ */
+export async function getNotificationHistoryResult(
+  supabase: Client,
+  athleteId: string,
+  limit = 30,
+): Promise<NotificationHistoryResult> {
+  const res = await readNotificationHistory(supabase, athleteId, limit);
+  return res.failed ? { ok: false } : { ok: true, items: res.items };
+}
+
+interface PartialFeed {
+  items: NotificationItem[];
+  failed: boolean;
+}
+
+async function readNotificationHistory(
+  supabase: Client,
+  athleteId: string,
+  limit: number,
+): Promise<PartialFeed> {
   const [challengeItems, matchItems] = await Promise.all([
     fetchChallengeNotifications(supabase, athleteId),
     fetchMatchNotifications(supabase, athleteId),
   ]);
 
-  const all = [...challengeItems, ...matchItems];
+  const all = [...challengeItems.items, ...matchItems.items];
   all.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  return all.slice(0, limit);
+  return { items: all.slice(0, limit), failed: challengeItems.failed || matchItems.failed };
 }
 
 async function fetchChallengeNotifications(
   supabase: Client,
   athleteId: string,
-): Promise<NotificationItem[]> {
+): Promise<PartialFeed> {
   // Received challenges (pending, accepted, declined)
-  const { data: received } = await supabase
+  const { data: received, error: receivedError } = await supabase
     .from("challenges")
     .select(
       "id, status, match_type, created_at, updated_at, challenger:athletes!fk_challenges_challenger(display_name)",
@@ -2098,7 +2139,7 @@ async function fetchChallengeNotifications(
     .limit(20);
 
   // Sent challenges that were accepted or declined
-  const { data: sent } = await supabase
+  const { data: sent, error: sentError } = await supabase
     .from("challenges")
     .select(
       "id, status, match_type, created_at, updated_at, opponent:athletes!fk_challenges_opponent(display_name)",
@@ -2117,6 +2158,7 @@ async function fetchChallengeNotifications(
     if (c.status === "pending") {
       items.push({
         id: `challenge-recv-${c.id}`,
+        challengeId: c.id,
         type: "challenge_received",
         title: "Challenge Received",
         body: `${name} sent you a ${typeLabel.toLowerCase()} challenge`,
@@ -2125,6 +2167,7 @@ async function fetchChallengeNotifications(
     } else if (c.status === "accepted") {
       items.push({
         id: `challenge-accepted-${c.id}`,
+        challengeId: c.id,
         type: "challenge_accepted",
         title: "Challenge Accepted",
         body: `You accepted ${name}'s ${typeLabel.toLowerCase()} challenge`,
@@ -2133,6 +2176,7 @@ async function fetchChallengeNotifications(
     } else if (c.status === "declined") {
       items.push({
         id: `challenge-declined-recv-${c.id}`,
+        challengeId: c.id,
         type: "challenge_declined",
         title: "Challenge Declined",
         body: `You declined ${name}'s ${typeLabel.toLowerCase()} challenge`,
@@ -2148,6 +2192,7 @@ async function fetchChallengeNotifications(
     if (c.status === "accepted") {
       items.push({
         id: `challenge-sent-accepted-${c.id}`,
+        challengeId: c.id,
         type: "challenge_accepted",
         title: "Challenge Accepted",
         body: `${name} accepted your ${typeLabel.toLowerCase()} challenge`,
@@ -2156,6 +2201,7 @@ async function fetchChallengeNotifications(
     } else if (c.status === "declined") {
       items.push({
         id: `challenge-sent-declined-${c.id}`,
+        challengeId: c.id,
         type: "challenge_declined",
         title: "Challenge Declined",
         body: `${name} declined your ${typeLabel.toLowerCase()} challenge`,
@@ -2164,21 +2210,21 @@ async function fetchChallengeNotifications(
     }
   }
 
-  return items;
+  return { items, failed: !!receivedError || !!sentError || !received || !sent };
 }
 
 async function fetchMatchNotifications(
   supabase: Client,
   athleteId: string,
-): Promise<NotificationItem[]> {
+): Promise<PartialFeed> {
   const { data, error } = await supabase.rpc("get_match_history", {
     p_athlete_id: athleteId,
   });
 
-  if (error || !data) return [];
+  if (error || !data) return { items: [], failed: true };
 
   const rows = data as MatchHistoryRow[];
-  return rows.slice(0, 20).map((m) => {
+  const items = rows.slice(0, 20).map((m) => {
     const outcome = m.athlete_outcome;
     const delta = m.elo_delta;
     const sign = delta >= 0 ? "+" : "";
@@ -2197,10 +2243,11 @@ async function fetchMatchNotifications(
       type: "match_result" as const,
       title: outcome === "win" ? "Match Won" : outcome === "loss" ? "Match Lost" : "Match Draw",
       body,
-      route: `/session/${m.match_id}`,
+      matchId: m.match_id,
       createdAt: m.completed_at,
     };
   });
+  return { items, failed: false };
 }
 
 // ---------------------------------------------------------------------------

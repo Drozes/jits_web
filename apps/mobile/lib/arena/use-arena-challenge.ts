@@ -58,8 +58,27 @@ import {
 import { ARENA_CHALLENGE_FRESH_MS } from "@jits/shared/constants";
 import { toast } from "@/components/ui/toast";
 import { supabase } from "../supabase/client";
-import { arenaMatchHref, challengeTopic, incomingTopic } from "./constants";
+import {
+  CHALLENGER_LEFT_GRACE_MS,
+  arenaMatchHref,
+  challengeTopic,
+  incomingTopic,
+} from "./constants";
+import {
+  countWaitingIncoming,
+  freshDeadline,
+  isFreshIncoming,
+  isServerClockEstablished,
+  noteServerTime,
+  CLOCK_RESUME_SETTLE_MS,
+  mergeIncomingRead,
+  nextDeadline,
+  pruneLapsed,
+  type KnownIncoming,
+} from "./incoming-challenges";
 import { requestPendingChallengeResync } from "./use-pending-challenge-recovery";
+import { notifyIncomingChallengeEnded } from "./arena-store";
+import { superviseChannel, type SupervisedChannel } from "../supabase/supervise-channel";
 
 export interface IncomingChallenge {
   challengeId: string;
@@ -67,6 +86,21 @@ export interface IncomingChallenge {
   challengerName: string;
   challengerElo: number | null;
   challengerWeight: number | null;
+  /**
+   * The row's `created_at` (server time), or null when it could not be read.
+   * The prompt's freshness countdown and the chip's `! ALEX · 8:41` run to
+   * 10 minutes after it (`ARENA_CHALLENGE_FRESH_MS`), and the prompt clears
+   * itself when that passes.
+   */
+  createdAt: string | null;
+  /** The row's `expires_at`, or null when it could not be read. */
+  expiresAt: string | null;
+}
+
+/** The row timestamps an offer may already know (a read, a realtime row). */
+export interface ChallengeTimes {
+  createdAt: string | null;
+  expiresAt: string | null;
 }
 
 export interface OutgoingChallenge {
@@ -79,6 +113,12 @@ export interface OutgoingChallenge {
    * arrived (socket down, app suspended) cannot leave the plate up forever.
    */
   expiresAt?: string | null;
+  /**
+   * The row's `created_at` (server time), when known. The chip's
+   * `WAITING · ALEX · 8:12` counts down the 10-minute freshness window from
+   * it.
+   */
+  createdAt?: string | null;
 }
 
 /**
@@ -100,13 +140,6 @@ const MAX_TIMER_MS = 2_147_483_647;
 const ENTRY_SETTLE_MS = 5_000;
 
 /**
- * Rebuild delays for a channel the server closed, by losses in a row. Same
- * shape as the lobby's (jits-fa9x): quick first, widening, then wait for the
- * next foreground instead of hammering a server that keeps closing it.
- */
-const CHANNEL_LOSS_RETRY_DELAYS_MS = [1_000, 5_000, 15_000, 30_000];
-
-/**
  * How long my outgoing challenge may sit at `accepted` before I start the
  * match myself: well past a normal accept-to-start (about a second), short
  * enough that a stranded challenger is not left staring at the plate.
@@ -119,6 +152,34 @@ const ACCEPTED_FALLBACK_MS = 12_000;
  * making at the same moment to land, short enough to feel immediate.
  */
 const START_RETRY_MS = 2_000;
+
+/**
+ * How long after a lapse withdrawal that could not reach the server (see the
+ * outgoing live window) it is tried again.
+ */
+const OUTGOING_LAPSE_RETRY_MS = 15_000;
+
+/**
+ * How many times a lapse that could not settle (withdrawal unreachable, or
+ * the row moved but could not be re-read) is tried again before the plate is
+ * cleared locally anyway, so a device with no network does not hold WAITING
+ * at 0:00 indefinitely (AC-H7). About 45s past the deadline. A row left
+ * pending server-side is past its live window, so no recipient is offered it,
+ * and the stale sweep withdraws it when it would block a new send.
+ */
+const OUTGOING_LAPSE_MAX_RETRIES = 3;
+
+/**
+ * How much later my outgoing challenge is withdrawn while the server clock
+ * offset is still unknown (no sample yet this session, for example after a
+ * cold relaunch restored the plate from a read). A device clock that runs
+ * fast would otherwise withdraw it before the server's 10-minute mark, while
+ * the recipient still sees time left, and the jr_be push function (whose
+ * silent-lapse rule allows only a 60s grace) would tell them the challenger
+ * cancelled. Harmless the other way: the recipient's prompt has lapsed by
+ * then, so the plate only waits a little longer.
+ */
+export const OUTGOING_LAPSE_UNLEARNED_CLOCK_MARGIN_MS = 30_000;
 
 /**
  * The challenge I last accepted and have not entered yet, persisted so a
@@ -156,9 +217,6 @@ function clearAccepted(athleteId: string): void {
   AsyncStorage.removeItem(ACCEPTED_KEY_PREFIX + athleteId).catch(() => {});
 }
 
-/** A channel that stayed up this long ends the losing streak. */
-const CHANNEL_LOSS_STREAK_RESET_MS = 30_000;
-
 /**
  * What the challenger is told when their challenge ended without a match.
  * `wasAccepted`: the row was seen at `accepted` before it was cancelled, and
@@ -189,6 +247,7 @@ interface ChallengeRow {
   opponent_id: string;
   status: string;
   expires_at?: string | null;
+  created_at?: string | null;
 }
 
 /**
@@ -198,6 +257,11 @@ interface ChallengeRow {
  * must never be offered again.
  */
 export type OfferResult = "raised" | "retry" | "final";
+
+/** See `UseArenaChallengeResult.offerIncoming`. */
+export interface OfferIncomingOptions {
+  replaceTucked?: boolean;
+}
 
 export interface UseArenaChallengeArgs {
   athleteId: string;
@@ -224,11 +288,81 @@ export interface UseArenaChallengeArgs {
    * the roster's "Pending" rows (read at load) can be re-read.
    */
   onStaleCancelled?: () => void;
+  /**
+   * Athlete ids in `lobby:online`. When given (the app-wide owner always
+   * passes it):
+   *  - a challenge is only SENT to someone on the mat right now (F13): an
+   *    athlete flagged "open to challenges" but not present cannot answer a
+   *    live prompt, so the client refuses rather than parking a challenge
+   *    nobody will see;
+   *  - the prompt (or the challenge tucked into the chip) clears when its
+   *    challenger leaves the lobby (spec 5, auto-clear);
+   *  - the incoming count only counts challengers who are still on the mat.
+   * Omitted (`undefined`), none of the three apply (tests, and any caller
+   * without presence).
+   *
+   * Pass `null` whenever presence is tracked but UNKNOWN right now (no sync
+   * yet, or the lobby channel was lost and is being rebuilt; see
+   * `useLobbyKnown`). Then nothing is concluded about who left and the count
+   * is not filtered, as for `undefined`, but a challenge is REFUSED rather
+   * than sent unchecked: the roster may still be showing athletes from before
+   * the outage, and one who left meanwhile would hold one of my three pending
+   * slots for the whole window. A set given here is trusted as the truth,
+   * empty included: an empty set means nobody is on the mat, not that the
+   * channel is down.
+   */
+  lobbyIds?: ReadonlySet<string> | null;
 }
 
 export interface UseArenaChallengeResult {
   incoming: IncomingChallenge | null;
   outgoing: OutgoingChallenge | null;
+  /**
+   * How many fresh challenges are waiting on me (spec 5, F9): the one on the
+   * prompt plus every other fresh pending one whose challenger is on the mat.
+   * The prompt still shows only the first; the rest are counted, not dropped.
+   */
+  incomingCount: number;
+  /**
+   * The prompt was minimized with "Later" (spec 5): the challenge is still
+   * pending and still `incoming`, but the sheet is down and the header chip
+   * carries it instead. Nothing was sent to the challenger.
+   */
+  incomingTucked: boolean;
+  /** "Later": minimize the prompt into the chip. Sends nothing. */
+  tuckIncoming: () => void;
+  /** Bring a tucked prompt back up (the chip tap). */
+  reopenIncoming: () => void;
+  /**
+   * Taken off the prompt for good without an answer (`dismissIncoming` with
+   * `final`): its live window passed, or a manual go-offline dropped it from
+   * the chip (decision Q3). It is never offered again.
+   */
+  isIncomingDismissed: (challengeId: string) => boolean;
+  /**
+   * The athlete is going offline ON PURPOSE (the toggle, the popover). Call
+   * it synchronously before the transition starts, and call the function it
+   * returns once the transition settled, with whether it took them offline.
+   *
+   * From the call until then, no queued challenge is offered: the prompt
+   * surface must not light up under an athlete on their way out. When the
+   * athlete did go offline, a challenge tucked into the chip (at the moment
+   * of the call) is dropped WITHOUT a decline and lapses on its own
+   * server-side; when the athlete is still live (the go-offline never
+   * committed), nothing is dropped. Being taken
+   * offline by backgrounding does not call this, so a tucked challenge
+   * survives a trip to the home screen (decision Q3).
+   */
+  beginManualOffline: () => (wentOffline: boolean) => void;
+  /**
+   * A pending-challenge read landed (`use-pending-challenge-recovery.ts`):
+   * fold its fresh incoming challenges into the count, and drop known ones it
+   * shows are no longer pending. `readStartedAt` is when the read was issued.
+   */
+  noteIncomingRead: (
+    fresh: readonly { challengeId: string; challengerId: string; createdAt: string; expiresAt: string }[],
+    readStartedAt: number,
+  ) => void;
   isBusy: boolean;
   /**
    * True once the database has refused an insert for the pending-challenge
@@ -247,8 +381,19 @@ export interface UseArenaChallengeResult {
    * prompt is already up, or for a challenge this instance already answered.
    * Resolves "raised", "retry" (surface busy: offer again on the next pass)
    * or "final" (answered, withdrawn or entered: never offer again).
+   *
+   * `replaceTucked`: the challenge the athlete opened from its push (AC-A8)
+   * may take the prompt from a DIFFERENT challenge tucked away with "Later"
+   * (its sheet is down, so no decision is interrupted). The tucked one is
+   * not declined: it stays counted and tucked, and recovery offers it again
+   * (back into the chip) once the prompt clears.
    */
-  offerIncoming: (challengeId: string, challengerId: string) => Promise<OfferResult>;
+  offerIncoming: (
+    challengeId: string,
+    challengerId: string,
+    times?: ChallengeTimes,
+    options?: OfferIncomingOptions,
+  ) => Promise<OfferResult>;
   /**
    * Put back the "Sent" state for my own still-pending challenge after a
    * relaunch, so the accept broadcast still reaches me. A no-op when a
@@ -257,16 +402,32 @@ export interface UseArenaChallengeResult {
   restoreOutgoing: (challenge: OutgoingChallenge) => void;
 }
 
-/** What the prompt shows, read off the challenger's row. */
+/**
+ * What the prompt shows, read off the challenger's row.
+ *
+ * `times` comes from whatever found the challenge (the realtime row, the
+ * pending read). Without it (an offer by id alone, such as a deep link) the
+ * challenge row is read as well, which also answers whether it is still
+ * pending: "gone" means it is not, and must not be offered.
+ */
 async function loadIncoming(
   challengeId: string,
   challengerId: string,
-): Promise<IncomingChallenge> {
-  const { data } = await supabase
-    .from("athletes")
-    .select("display_name, current_elo, current_weight")
-    .eq("id", challengerId)
-    .maybeSingle();
+  times?: ChallengeTimes,
+): Promise<IncomingChallenge | "gone"> {
+  const [athlete, row] = await Promise.all([
+    supabase
+      .from("athletes")
+      .select("display_name, current_elo, current_weight")
+      .eq("id", challengerId)
+      .maybeSingle(),
+    times ? null : getChallengeStatus(supabase, challengeId),
+  ]);
+  // A failed row read keeps the offer (null times): the realtime UPDATE and
+  // the accept itself still guard a challenge that is no longer answerable.
+  if (row?.ok && (!row.data || row.data.status !== "pending")) return "gone";
+  const read = row?.ok && row.data ? row.data : null;
+  const data = athlete.data;
 
   return {
     challengeId,
@@ -274,6 +435,8 @@ async function loadIncoming(
     challengerName: data?.display_name ?? "An athlete",
     challengerElo: data?.current_elo ?? null,
     challengerWeight: data?.current_weight ?? null,
+    createdAt: times?.createdAt ?? read?.createdAt ?? null,
+    expiresAt: times?.expiresAt ?? read?.expiresAt ?? null,
   };
 }
 
@@ -310,104 +473,6 @@ async function broadcast(
   return status === "ok";
 }
 
-/** True while the client still holds this exact channel instance. */
-function isRegistered(channel: RealtimeChannel): boolean {
-  return supabase.getChannels().some((c) => c === channel);
-}
-
-/**
- * Subscribe a channel and keep it alive across a server close.
- *
- * The server can stop a channel process (a rate limit, a node restart), and
- * the client then gets CLOSED with the instance already dropped from the
- * registry: nothing in realtime-js ever rejoins it, so without this the prompt
- * and the waiting plate go deaf for the rest of the session. Mirrors the
- * lobby (jits-fa9x, `use-lobby-presence.ts`):
- *  - only CLOSED on an instance that is no longer registered is a loss;
- *    CHANNEL_ERROR / TIMED_OUT leave it registered while phoenix rejoins it;
- *  - the dead instance is left alone: tearing down a closed channel clears
- *    its reply bindings, and it is already out of the registry;
- *  - rebuilds are bounded (`CHANNEL_LOSS_RETRY_DELAYS_MS`), then wait for the
- *    next foreground.
- * `build` returns a fresh, bound, NOT yet subscribed channel. `onSubscribed`
- * runs on every SUBSCRIBED; `rebuilt` is true for the first one after a loss,
- * when events may have been missed. Returns the teardown.
- */
-function superviseChannel(
-  label: string,
-  build: () => RealtimeChannel,
-  onSubscribed: (rebuilt: boolean) => void,
-): () => void {
-  let stopped = false;
-  let current: RealtimeChannel | null = null;
-  let timer: ReturnType<typeof setTimeout> | null = null;
-  let losses = 0;
-  let subscribedAt: number | null = null;
-  let rebuilt = false;
-  let gaveUp = false;
-
-  const start = () => {
-    if (stopped) return;
-    const channel = build();
-    current = channel;
-    channel.subscribe((status) => {
-      // Our own teardown (stopped) or an instance already replaced.
-      if (stopped || current !== channel) return;
-      if (status === "SUBSCRIBED") {
-        subscribedAt = Date.now();
-        const wasRebuilt = rebuilt;
-        rebuilt = false;
-        onSubscribed(wasRebuilt);
-        return;
-      }
-      if (status === "CLOSED" && !isRegistered(channel)) lost();
-    });
-  };
-
-  const lost = () => {
-    current = null;
-    if (
-      subscribedAt !== null &&
-      Date.now() - subscribedAt >= CHANNEL_LOSS_STREAK_RESET_MS
-    ) {
-      losses = 0;
-    }
-    subscribedAt = null;
-    losses += 1;
-    rebuilt = true;
-    const delay = CHANNEL_LOSS_RETRY_DELAYS_MS[losses - 1];
-    if (delay === undefined) {
-      console.warn(
-        `[arena] gave up rebuilding the ${label} channel; retrying when the app next returns to the foreground`,
-      );
-      gaveUp = true;
-      return;
-    }
-    console.warn(`[arena] ${label} channel closed; rebuilding it (loss ${losses} in a row)`);
-    timer = setTimeout(() => {
-      timer = null;
-      start();
-    }, delay);
-  };
-
-  const appStateSub = AppState.addEventListener("change", (next) => {
-    if (next !== "active" || !gaveUp || stopped) return;
-    gaveUp = false;
-    losses = 0;
-    start();
-  });
-
-  start();
-
-  return () => {
-    stopped = true;
-    appStateSub.remove();
-    if (timer) clearTimeout(timer);
-    if (current) void supabase.removeChannel(current);
-    current = null;
-  };
-}
-
 /**
  * After entering a match, settle every other challenge that involves me, so
  * nobody is left waiting on someone who is now busy:
@@ -424,7 +489,7 @@ async function settleOthersAfterEntry(
   enteredChallengeId: string,
   peerId: string | null,
   strandedOutgoingId: string | null,
-  settled: Set<string>,
+  settle: (challengeId: string) => void,
 ): Promise<void> {
   if (strandedOutgoingId) {
     await cancelChallenge(supabase, strandedOutgoingId, { onlyIfPending: true });
@@ -435,10 +500,10 @@ async function settleOthersAfterEntry(
   });
   if (!result.ok) return;
   for (const c of result.data.skipped) {
-    settled.add(c.challengeId);
+    settle(c.challengeId);
     void cancelChallenge(supabase, c.challengeId, { onlyIfPending: true });
   }
-  for (const c of result.data.declined) settled.add(c.challengeId);
+  for (const c of result.data.declined) settle(c.challengeId);
   await Promise.all(
     result.data.declined.map((c) => broadcast(c.challengeId, "declined", {})),
   );
@@ -451,12 +516,65 @@ export function useArenaChallenge({
   isLive = true,
   onOpponentUnavailable,
   onStaleCancelled,
+  lobbyIds,
 }: UseArenaChallengeArgs): UseArenaChallengeResult {
   const router = useRouter();
   const [incoming, setIncoming] = React.useState<IncomingChallenge | null>(null);
   const [outgoing, setOutgoing] = React.useState<OutgoingChallenge | null>(null);
   const [isBusy, setIsBusy] = React.useState(false);
   const [capReached, setCapReached] = React.useState(false);
+  /** Every fresh pending challenge to me that I know of (for the count). */
+  const [knownIncoming, setKnownIncomingState] = React.useState<
+    ReadonlyMap<string, KnownIncoming>
+  >(() => new Map());
+  /**
+   * The latest `knownIncoming`, updated at the same moment as each queued
+   * update (not at render), so two reads, or a read and an INSERT, landing
+   * before a re-render each see the other's result.
+   */
+  const knownIncomingRef = React.useRef(knownIncoming);
+  const setKnownIncoming = React.useCallback(
+    (
+      update: (
+        prev: ReadonlyMap<string, KnownIncoming>,
+      ) => ReadonlyMap<string, KnownIncoming>,
+    ) => {
+      const next = update(knownIncomingRef.current);
+      if (next === knownIncomingRef.current) return;
+      knownIncomingRef.current = next;
+      setKnownIncomingState(next);
+    },
+    [],
+  );
+  /**
+   * Challenges minimized with "Later". A set rather than the one on the
+   * prompt, because a tuck outlives a soft clear: a challenger who drops off
+   * the mat past the grace and comes back is offered again by recovery, and
+   * the challenge the athlete set aside must come back into the chip, not as
+   * a full sheet. An id leaves the set when its challenge is settled,
+   * dismissed for good, or reopened.
+   */
+  const [tuckedIds, setTuckedIds] = React.useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  const tuckedIdsRef = React.useRef(tuckedIds);
+  tuckedIdsRef.current = tuckedIds;
+  const untuckAll = React.useCallback((challengeIds: Iterable<string>) => {
+    const drop = [...challengeIds];
+    if (drop.length === 0) return;
+    setTuckedIds((prev) => {
+      if (!drop.some((id) => prev.has(id))) return prev;
+      const next = new Set(prev);
+      for (const id of drop) next.delete(id);
+      return next;
+    });
+  }, []);
+  const untuck = React.useCallback(
+    (challengeId: string) => untuckAll([challengeId]),
+    [untuckAll],
+  );
+  const lobbyIdsRef = React.useRef(lobbyIds);
+  lobbyIdsRef.current = lobbyIds;
 
   // Synchronous: `isBusy` is still false for the whole await window below, so
   // only a ref closes the double-tap window.
@@ -533,6 +651,119 @@ export function useArenaChallenge({
     [],
   );
 
+  /** Count a pending challenge to me (the prompt's, or one queued behind it). */
+  const rememberIncoming = React.useCallback(
+    (c: Omit<KnownIncoming, "seenAt">) => {
+      setKnownIncoming((prev) => {
+        if (prev.has(c.challengeId)) return prev;
+        const next = new Map(prev);
+        next.set(c.challengeId, { ...c, seenAt: Date.now() });
+        return next;
+      });
+    },
+    [],
+  );
+  const forgetIncoming = React.useCallback((challengeId: string) => {
+    setKnownIncoming((prev) => {
+      if (!prev.has(challengeId)) return prev;
+      const next = new Map(prev);
+      next.delete(challengeId);
+      return next;
+    });
+  }, []);
+
+  /**
+   * This challenge is over for this instance: answered, withdrawn, entered or
+   * seen to leave `pending`. Never offered again, and no longer counted.
+   */
+  const settle = React.useCallback(
+    (challengeId: string) => {
+      settledRef.current.add(challengeId);
+      forgetIncoming(challengeId);
+      untuck(challengeId);
+      // A surface showing it somewhere other than the prompt (the Arena's
+      // deep-link offer) drops it too.
+      notifyIncomingChallengeEnded(challengeId);
+    },
+    [forgetIncoming, untuck],
+  );
+
+  /** Raise the prompt for `next`, and count it. */
+  const surfaceIncoming = React.useCallback(
+    (next: IncomingChallenge) => {
+      rememberIncoming({
+        challengeId: next.challengeId,
+        challengerId: next.challengerId,
+        createdAt: next.createdAt,
+        expiresAt: next.expiresAt,
+      });
+      setIncomingBoth(next);
+    },
+    [rememberIncoming, setIncomingBoth],
+  );
+
+  /**
+   * Challenges this instance took off the prompt WITHOUT answering them, for
+   * good: the live window passed, or the athlete went offline on purpose with
+   * it tucked away. Nothing was written, so the challenge is still pending
+   * server-side, but it must not be offered again.
+   */
+  const dismissedRef = React.useRef<Set<string>>(new Set());
+  /**
+   * Take a challenge off the prompt (or out of the chip) without answering.
+   *  - `final` (default true): never offer or count it again. False for a
+   *    challenger who left the lobby: they may come back (a trip to their home
+   *    screen takes them out of the lobby for a few seconds), and recovery
+   *    then offers it again, since it only offers a challenge whose challenger
+   *    is on the mat.
+   *  - `resync` (default true): ask recovery for a fresh read so the next
+   *    challenger queued behind this one gets offered. False when the athlete
+   *    is going offline: there is nobody to offer it to.
+   */
+  const dismissIncoming = React.useCallback(
+    (
+      challengeId: string,
+      { final = true, resync = true }: { final?: boolean; resync?: boolean } = {},
+    ) => {
+      if (final) {
+        dismissedRef.current.add(challengeId);
+        forgetIncoming(challengeId);
+        untuck(challengeId);
+        // Ended for this athlete: a deep-link offer for it (a push tapped
+        // after the manual go-offline) must go too, never a go-live for a
+        // challenge recovery will not raise.
+        notifyIncomingChallengeEnded(challengeId);
+      }
+      if (incomingRef.current?.challengeId !== challengeId) return;
+      setIncomingBoth(null);
+      if (resync) {
+        requestPendingChallengeResync(final ? undefined : { reoffer: challengeId });
+      }
+    },
+    [forgetIncoming, setIncomingBoth, untuck],
+  );
+  /**
+   * Set while a manual go-offline is in flight; no queued challenge is offered
+   * meanwhile (see `beginManualOffline`). Cleared when that transition
+   * settles without taking the athlete offline, or once the live state has
+   * visibly changed, after which `isLive` itself gates the offers.
+   */
+  const offersSuppressedRef = React.useRef(false);
+  React.useEffect(() => {
+    offersSuppressedRef.current = false;
+  }, [isLive]);
+
+  /**
+   * The incoming-challenge channel's supervisor. If that channel gave up while
+   * the athlete was offline, going live restarts it: a live phone is held
+   * awake (`useArenaLiveKeepAwake`), so the foreground that would otherwise
+   * resume it never comes, and a live athlete would get no prompts.
+   */
+  const incomingSupervisorRef = React.useRef<SupervisedChannel | null>(null);
+  React.useEffect(() => {
+    if (isLive) incomingSupervisorRef.current?.resume();
+  }, [isLive]);
+
   /**
    * A match screen this instance pushed and that has not reported itself
    * mounted yet (`inMatch`). Together with `inMatch` it makes entry
@@ -569,26 +800,29 @@ export function useArenaChallenge({
       enteredIdsRef.current.add(challengeId);
       acceptedNotEnteredRef.current.delete(challengeId);
       clearAccepted(athleteIdRef.current);
-      settledRef.current.add(challengeId);
+      settle(challengeId);
       // My own challenge that did not become this match is over too. Settled
       // now, so recovery's restore cannot put its plate back while the
       // withdrawal below is in flight.
       const mine = outgoingRef.current;
       const stranded =
         mine && mine.challengeId !== challengeId ? mine.challengeId : null;
-      if (stranded) settledRef.current.add(stranded);
+      if (stranded) settle(stranded);
       setIncomingBoth(null);
       setOutgoingBoth(null);
+      // Entering declines every other pending challenge to me, so none of
+      // them is waiting any more.
+      setKnownIncoming((prev) => (prev.size === 0 ? prev : new Map()));
       router.push(arenaMatchHref(matchId));
       void settleOthersAfterEntry(
         athleteIdRef.current,
         challengeId,
         peerId,
         stranded,
-        settledRef.current,
+        settle,
       );
     },
-    [router, entryBlocked, setIncomingBoth, setOutgoingBoth],
+    [router, entryBlocked, setIncomingBoth, setOutgoingBoth, settle],
   );
 
   /**
@@ -597,27 +831,30 @@ export function useArenaChallenge({
    */
   const endOutgoing = React.useCallback(
     (challengeId: string, toastMessage: string | null) => {
-      settledRef.current.add(challengeId);
+      settle(challengeId);
       if (outgoingRef.current?.challengeId !== challengeId) return;
       setOutgoingBoth(null);
       // A slot freed up, so the cap can no longer be asserted.
       setCapReached(false);
       if (toastMessage) toast.info(toastMessage);
     },
-    [setOutgoingBoth],
+    [setOutgoingBoth, settle],
   );
 
   /**
    * Decline a challenge that arrived while I am entering or in a match, and
    * tell its challenger, so their plate clears instead of waiting on me.
    */
-  const declineAsBusy = React.useCallback((challengeId: string) => {
-    if (settledRef.current.has(challengeId)) return;
-    settledRef.current.add(challengeId);
-    void declineChallenge(supabase, challengeId).then((result) => {
-      if (result.ok) void broadcast(challengeId, "declined", {});
-    });
-  }, []);
+  const declineAsBusy = React.useCallback(
+    (challengeId: string) => {
+      if (settledRef.current.has(challengeId)) return;
+      settle(challengeId);
+      void declineChallenge(supabase, challengeId).then((result) => {
+        if (result.ok) void broadcast(challengeId, "declined", {});
+      });
+    },
+    [settle],
+  );
 
   /**
    * An INSERT that landed while I am entering or in a match. From the athlete
@@ -632,21 +869,34 @@ export function useArenaChallenge({
         return;
       }
       if (settledRef.current.has(row.id)) return;
-      settledRef.current.add(row.id);
+      settle(row.id);
       void cancelChallenge(supabase, row.id, { onlyIfPending: true });
     },
-    [declineAsBusy],
+    [declineAsBusy, settle],
   );
+
+  /**
+   * My outgoing challenges this instance withdrew because their live window
+   * passed (see the freshness lapse below). Their `cancelled` is told as
+   * "expired", whichever of the cancel's reply or its realtime UPDATE clears
+   * the plate first.
+   */
+  const lapsedOutgoingRef = React.useRef<Set<string>>(new Set());
 
   /** Why my outgoing challenge ended, as a toast (or null for a quiet end). */
   const outgoingEndedToast = React.useCallback(
     (challengeId: string, status: string, opponentName: string) =>
-      endedToast(
-        status,
-        opponentName,
-        acceptedSeenRef.current.has(challengeId) &&
-          !selfCancelledRef.current.has(challengeId),
-      ),
+      // My own cancel is never news, even after a lapse that failed first.
+      status === "cancelled" &&
+      lapsedOutgoingRef.current.has(challengeId) &&
+      !selfCancelledRef.current.has(challengeId)
+        ? `Your challenge to ${opponentName} expired.`
+        : endedToast(
+            status,
+            opponentName,
+            acceptedSeenRef.current.has(challengeId) &&
+              !selfCancelledRef.current.has(challengeId),
+          ),
     [],
   );
 
@@ -877,6 +1127,21 @@ export function useArenaChallenge({
     return () => sub.remove();
   }, []);
 
+  /**
+   * When the app last came back to the foreground (0: it has not been away),
+   * so a realtime INSERT flushed on resume is not taken as a clock sample.
+   */
+  const activeSinceRef = React.useRef(0);
+  React.useEffect(() => {
+    let wasActive = AppState.currentState === "active";
+    const sub = AppState.addEventListener("change", (next) => {
+      const active = next === "active";
+      if (active && !wasActive) activeSinceRef.current = Date.now();
+      wasActive = active;
+    });
+    return () => sub.remove();
+  }, []);
+
   // --- Realtime: challenges involving me ------------------------------------
   React.useEffect(() => {
     if (!athleteId) return;
@@ -897,6 +1162,17 @@ export function useArenaChallenge({
           },
           async (payload) => {
             const row = payload.new as ChallengeRow;
+            // Delivered as it is written, so this row's `created_at` is the
+            // server's "now": it calibrates the live-window clock. Not while
+            // the app is not active: frames flushed on the way back from a
+            // suspension arrive late by the length of the suspension, and the
+            // estimator already distrusts a lone late sample.
+            if (
+              AppState.currentState === "active" &&
+              Date.now() - activeSinceRef.current >= CLOCK_RESUME_SETTLE_MS
+            ) {
+              noteServerTime(row.created_at);
+            }
             if (row.status !== "pending") return;
             if (row.expires_at && new Date(row.expires_at) <= new Date()) return;
             // Entering or in a match: I am busy, so the challenger is told
@@ -908,17 +1184,32 @@ export function useArenaChallenge({
               settleBusyInsert(row);
               return;
             }
+            const times: ChallengeTimes = {
+              createdAt: row.created_at ?? null,
+              expiresAt: row.expires_at ?? null,
+            };
+            // Counted whether or not it gets the prompt: one queued behind
+            // the prompt still "wants to roll" (the chip's `! 3`).
+            rememberIncoming({
+              challengeId: row.id,
+              challengerId: row.challenger_id,
+              ...times,
+            });
             // Already showing a prompt: the first one keeps the surface rather
             // than being silently replaced mid-decision (recovery offers the
             // next one when it clears). Offline: no live prompt; recovery
             // offers it on going live if it is still fresh.
+            // Nor on the way out of a manual go-offline: `isLive` is still
+            // true until that transition commits (decision Q3).
             const skip = () =>
               !!incomingRef.current ||
               !isLiveRef.current ||
-              settledRef.current.has(row.id);
+              offersSuppressedRef.current ||
+              settledRef.current.has(row.id) ||
+              dismissedRef.current.has(row.id);
             if (skip()) return;
 
-            const next = await loadIncoming(row.id, row.challenger_id);
+            const next = await loadIncoming(row.id, row.challenger_id, times);
             // Re-checked after the read: another INSERT, a recovery offer, a
             // match or going offline can land inside that await, and the first
             // prompt keeps the surface.
@@ -926,8 +1217,8 @@ export function useArenaChallenge({
               settleBusyInsert(row);
               return;
             }
-            if (skip()) return;
-            setIncomingBoth(next);
+            if (skip() || next === "gone") return;
+            surfaceIncoming(next);
           },
         )
         .on(
@@ -945,7 +1236,7 @@ export function useArenaChallenge({
             // than failing under the athlete's thumb, and the next challenger
             // queued behind it gets offered.
             if (row.status === "pending") return;
-            settledRef.current.add(row.id);
+            settle(row.id);
             // One I accepted but never entered, now started by the
             // challenger's fallback: join it (F1). Any other status for it
             // means there will be no match to join.
@@ -1019,16 +1310,28 @@ export function useArenaChallenge({
     // reads pending challenges again), my plate's UPDATE (re-read it), or the
     // `started` UPDATE for a match I accepted and never entered (rejoin).
     let subscribedBefore = false;
-    return superviseChannel("incoming challenge", build, () => {
-      if (!subscribedBefore) {
-        subscribedBefore = true;
-        return;
-      }
-      requestPendingChallengeResync();
-      const mine = outgoingRef.current;
-      if (mine) void recheckOutgoingRef.current(mine.challengeId);
-      void rejoinRef.current();
-    });
+    const supervised = superviseChannel(
+      "incoming challenge",
+      build,
+      () => {
+        if (!subscribedBefore) {
+          subscribedBefore = true;
+          return;
+        }
+        requestPendingChallengeResync();
+        const mine = outgoingRef.current;
+        if (mine) void recheckOutgoingRef.current(mine.challengeId);
+        void rejoinRef.current();
+      },
+      // A live athlete is held awake and challengeable, so no foreground
+      // would ever resume a channel that gave up: keep rebuilding at 30s.
+      { keepRetrying: () => isLiveRef.current },
+    );
+    incomingSupervisorRef.current = supervised;
+    return () => {
+      if (incomingSupervisorRef.current === supervised) incomingSupervisorRef.current = null;
+      supervised();
+    };
   }, [
     athleteId,
     enterMatch,
@@ -1038,6 +1341,9 @@ export function useArenaChallenge({
     outgoingEndedToast,
     joinAccepted,
     setIncomingBoth,
+    rememberIncoming,
+    surfaceIncoming,
+    settle,
   ]);
 
   // --- Client-side expiry of my outgoing challenge ---------------------------
@@ -1113,6 +1419,133 @@ export function useArenaChallenge({
     }
   }, []);
 
+  // --- The live window of my outgoing challenge -----------------------------
+  // The recipient's prompt clears itself 10 minutes after the challenge was
+  // sent (`ARENA_CHALLENGE_FRESH_MS`) without writing anything, as does a
+  // prompt soft-cleared or dropped by a manual go-offline. So the challenger
+  // cannot wait on the realtime UPDATE (or `expires_at`, 7 days out): at the
+  // same deadline the challenge is withdrawn here, pending-guarded, and the
+  // plate clears with "expired" (AC-H7: the chip returns to base at 0:00).
+  // No row changed means it is already past pending: the row is read and
+  // followed, so a match started at the last second is still joined. Timers
+  // do not run while iOS has the app suspended, so the same check runs on
+  // every return to the foreground.
+  const outgoingCreatedAt = outgoing?.createdAt ?? null;
+  const outgoingIdForFresh = outgoing?.challengeId;
+  React.useEffect(() => {
+    if (!outgoingIdForFresh || !outgoingCreatedAt) return;
+    const id = outgoingIdForFresh;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let inFlight = false;
+    let disposed = false;
+    // An earlier withdrawal came back unknown: it may have landed with only
+    // its reply lost, so a later `cancelled` is still this lapse's doing.
+    let priorUnknown = false;
+    let retries = 0;
+
+    const deadline = () => {
+      const at = freshDeadline({ createdAt: outgoingCreatedAt });
+      if (at === null) return null;
+      return isServerClockEstablished() ? at : at + OUTGOING_LAPSE_UNLEARNED_CLOCK_MARGIN_MS;
+    };
+    const schedule = (delay: number) => {
+      if (disposed) return;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        timer = null;
+        void lapse();
+      }, Math.max(0, Math.min(delay, MAX_TIMER_MS)));
+    };
+
+    // Try the lapse again shortly, or past the retry budget clear the plate
+    // locally. A row known to have moved past pending ends quietly (it may
+    // have been answered); otherwise it is told as expired.
+    const retryOrGiveUp = (opponentName: string, rowMoved: boolean) => {
+      if (retries < OUTGOING_LAPSE_MAX_RETRIES) {
+        retries += 1;
+        schedule(OUTGOING_LAPSE_RETRY_MS);
+        return;
+      }
+      endOutgoing(
+        id,
+        rowMoved ? null : `Your challenge to ${opponentName} expired.`,
+      );
+    };
+
+    const lapse = async (): Promise<void> => {
+      if (disposed || inFlight) return;
+      if (outgoingRef.current?.challengeId !== id) return;
+      const at = deadline();
+      if (at === null) return;
+      // Re-read at fire time: the learned clock offset may have moved.
+      if (Date.now() < at) {
+        schedule(at - Date.now());
+        return;
+      }
+      // Mid-accept, mid-cancel or on the way into a match: those settle my
+      // plate themselves; look again shortly.
+      if (busyRef.current || entryBlocked()) {
+        schedule(START_RETRY_MS);
+        return;
+      }
+      inFlight = true;
+      try {
+        await runExclusive(async () => {
+          const mine = outgoingRef.current;
+          if (!mine || mine.challengeId !== id) return;
+          lapsedOutgoingRef.current.add(id);
+          const withdrawn = await cancelChallenge(supabase, id, {
+            onlyIfPending: true,
+          });
+          if (!withdrawn.ok) {
+            // Unknown (network): the challenge may still be live, so the
+            // plate stays and the lapse is tried again. The id stays marked:
+            // the cancel may have landed with only its reply lost, and past
+            // the window only this lapse (or a stale sweep) withdraws the
+            // row, so a `cancelled` UPDATE that follows is "expired".
+            priorUnknown = true;
+            retryOrGiveUp(mine.opponentName, false);
+            return;
+          }
+          if (withdrawn.data.cancelled) {
+            endOutgoing(id, `Your challenge to ${mine.opponentName} expired.`);
+            return;
+          }
+          // Already past pending: accepted, started, declined or cancelled
+          // by someone else. Follow the row, whatever it says. After an
+          // unknown attempt the mark stays: the `cancelled` found now is most
+          // likely that earlier withdrawal, and is still "expired".
+          if (!priorUnknown) lapsedOutgoingRef.current.delete(id);
+          await recheckOutgoingRef.current(id);
+          // The re-read settles the plate on any terminal state. Still up
+          // means it could not tell (read failed, or the row still reads
+          // live): look again rather than strand the plate past 0:00.
+          if (outgoingRef.current?.challengeId === id) {
+            retryOrGiveUp(mine.opponentName, true);
+          }
+        });
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    const at = deadline();
+    if (at !== null) schedule(at - Date.now());
+    const sub = AppState.addEventListener("change", (next) => {
+      if (next === "active") void lapse();
+    });
+    return () => {
+      disposed = true;
+      if (timer) clearTimeout(timer);
+      sub.remove();
+      // The plate is over (its toast already told), so its mark goes too;
+      // the set only holds challenges still on the plate.
+      if (outgoingRef.current?.challengeId !== id) {
+        lapsedOutgoingRef.current.delete(id);
+      }
+    };
+  }, [outgoingIdForFresh, outgoingCreatedAt, endOutgoing, entryBlocked, runExclusive]);
+
   /**
    * Work out what a refused insert actually means before saying anything.
    *
@@ -1160,6 +1593,22 @@ export function useArenaChallenge({
   const sendChallenge = React.useCallback(
     (opponentId: string, opponentName: string) =>
       runExclusive(async () => {
+        // F13: only someone on the mat right now can answer a live prompt.
+        // An athlete still flagged "open to challenges" but gone from the
+        // lobby is stale, and a challenge to them would sit unanswered for
+        // the whole live window, holding one of my three pending slots.
+        const lobby = lobbyIdsRef.current;
+        if (lobby === null) {
+          // Presence is unknown (the lobby channel is syncing or rejoining):
+          // refuse rather than send to someone who may have left.
+          toast.info("Reconnecting to the mat, try again in a moment.");
+          return;
+        }
+        if (lobby && !lobby.has(opponentId)) {
+          toast.info(`${opponentName} isn't on the mat right now.`);
+          unavailableRef.current?.(opponentId);
+          return;
+        }
         const create = () =>
           createChallenge(supabase, {
             opponentId,
@@ -1180,7 +1629,7 @@ export function useArenaChallenge({
           );
           if (swept.ok && swept.data.cancelled.length > 0) {
             for (const c of swept.data.cancelled) {
-              settledRef.current.add(c.challengeId);
+              settle(c.challengeId);
             }
             staleCancelledRef.current?.();
             result = await create();
@@ -1197,14 +1646,16 @@ export function useArenaChallenge({
         }
 
         setCapReached(false);
+        noteServerTime(result.data.createdAt, Date.now(), "roundtrip");
         setOutgoingBoth({
           challengeId: result.data.id,
           opponentId,
           opponentName,
           expiresAt: result.data.expiresAt ?? null,
+          createdAt: result.data.createdAt ?? null,
         });
       }),
-    [runExclusive, setOutgoingBoth, explainRefusedInsert],
+    [runExclusive, setOutgoingBoth, explainRefusedInsert, settle],
   );
 
   /**
@@ -1264,7 +1715,7 @@ export function useArenaChallenge({
       if (status === "accepted") {
         acceptedSeenRef.current.add(mine.challengeId);
         scheduleAcceptedFallbackRef.current(mine.challengeId);
-        settledRef.current.add(current.challengeId);
+        settle(current.challengeId);
         setIncomingBoth(null);
         if (crossing) {
           // The other half of a crossing pair: its sender is walking into a
@@ -1284,7 +1735,7 @@ export function useArenaChallenge({
       endOutgoing(mine.challengeId, null);
       return "proceed";
     },
-    [endOutgoing, enterMatch, setIncomingBoth],
+    [endOutgoing, enterMatch, setIncomingBoth, settle],
   );
 
   const accept = React.useCallback(
@@ -1360,7 +1811,7 @@ export function useArenaChallenge({
           }
         }
         if (!started.ok) {
-          settledRef.current.add(current.challengeId);
+          settle(current.challengeId);
           setIncomingBoth(null);
           // Crossing, and the other side won the canonical row by withdrawing
           // it to accept mine instead: its broadcast is on its way to my
@@ -1393,7 +1844,7 @@ export function useArenaChallenge({
         // my own challenge if it is still out (the crossing case).
         enterMatch(current.challengeId, started.data.match_id, current.challengerId);
       }),
-    [runExclusive, resolveOwnOutgoing, setIncomingBoth, entryBlocked, enterMatch],
+    [runExclusive, resolveOwnOutgoing, setIncomingBoth, entryBlocked, enterMatch, settle],
   );
 
   const decline = React.useCallback(
@@ -1411,13 +1862,13 @@ export function useArenaChallenge({
           return;
         }
 
-        settledRef.current.add(current.challengeId);
+        settle(current.challengeId);
         await broadcast(current.challengeId, "declined", {});
         setIncomingBoth(null);
         // The next challenger queued behind this one gets offered.
         requestPendingChallengeResync();
       }),
-    [runExclusive, setIncomingBoth],
+    [runExclusive, setIncomingBoth, settle],
   );
 
   const cancelOutgoing = React.useCallback(
@@ -1467,30 +1918,63 @@ export function useArenaChallenge({
   const clearCap = React.useCallback(() => setCapReached(false), []);
 
   const offerIncoming = React.useCallback(
-    async (challengeId: string, challengerId: string): Promise<OfferResult> => {
+    async (
+      challengeId: string,
+      challengerId: string,
+      times?: ChallengeTimes,
+      options: OfferIncomingOptions = {},
+    ): Promise<OfferResult> => {
+      /** The prompt this offer may take over: tucked, and a different one. */
+      const replaceable = (): IncomingChallenge | null => {
+        const current = incomingRef.current;
+        if (!options.replaceTucked || !current) return null;
+        if (current.challengeId === challengeId) return null;
+        return tuckedIdsRef.current.has(current.challengeId) ? current : null;
+      };
       const check = (): OfferResult | null => {
-        // Final: this challenge has been answered, withdrawn or entered.
+        // Final: this challenge has been answered, withdrawn, entered, or
+        // taken off the prompt without an answer (see `dismissIncoming`).
         if (
           settledRef.current.has(challengeId) ||
+          dismissedRef.current.has(challengeId) ||
           enteredForRef.current === challengeId
         ) {
           return "final";
         }
+        // Past its live window: the challenger is no longer waiting.
+        if (times && !isFreshIncoming(times, Date.now())) return "final";
         // Retryable: the surface is busy right now, not the challenge dead.
-        if (entryBlocked() || incomingRef.current) return "retry";
+        if (entryBlocked()) return "retry";
+        if (incomingRef.current && !replaceable()) return "retry";
+        // Retryable too: no live prompt for an athlete who is offline or on
+        // the way out (a manual go-offline commits `isLive` a beat later).
+        // Going live re-reads and offers it then, if it is still fresh.
+        if (!isLiveRef.current || offersSuppressedRef.current) return "retry";
         return null;
       };
       const before = check();
       if (before) return before;
-      const next = await loadIncoming(challengeId, challengerId);
+      const next = await loadIncoming(challengeId, challengerId, times);
+      if (next === "gone") {
+        // No longer pending (answered, withdrawn, expired): stop counting it
+        // now rather than waiting on a realtime UPDATE that may have been
+        // missed while the socket was down.
+        settle(challengeId);
+        return "final";
+      }
       // Re-checked after the read: the realtime INSERT or an answer can land
       // inside that await, and the first prompt keeps the surface.
       const after = check();
       if (after) return after;
-      setIncomingBoth(next);
+      if (!isFreshIncoming(next, Date.now())) return "final";
+      const displaced = replaceable();
+      surfaceIncoming(next);
+      // The tucked challenge it replaced was never answered: recovery may
+      // offer it again once this prompt clears, and it keeps its tuck.
+      if (displaced) requestPendingChallengeResync({ reoffer: displaced.challengeId });
       return "raised";
     },
-    [entryBlocked, setIncomingBoth],
+    [entryBlocked, surfaceIncoming, settle],
   );
 
   const restoreOutgoing = React.useCallback(
@@ -1505,9 +1989,212 @@ export function useArenaChallenge({
     [entryBlocked, setOutgoingBoth],
   );
 
+  // --- Later, auto-clear and the count (spec 5) -----------------------------
+  const incomingId = incoming?.challengeId ?? null;
+  // A tuck belongs to one challenge: a new prompt always opens as a sheet,
+  // and one the athlete set aside comes back into the chip.
+  const incomingTucked = incomingId !== null && tuckedIds.has(incomingId);
+
+  const tuckIncoming = React.useCallback(() => {
+    const current = incomingRef.current;
+    if (!current) return;
+    setTuckedIds((prev) => {
+      if (prev.has(current.challengeId)) return prev;
+      const next = new Set(prev);
+      next.add(current.challengeId);
+      return next;
+    });
+  }, []);
+  const reopenIncoming = React.useCallback(() => {
+    const current = incomingRef.current;
+    if (current) untuck(current.challengeId);
+  }, [untuck]);
+  const beginManualOffline = React.useCallback(() => {
+    offersSuppressedRef.current = true;
+    // EVERY challenge set aside with "Later", not only the one on the prompt:
+    // a tucked challenge soft-cleared because its challenger stepped out of
+    // the lobby keeps its tuck, and without this recovery would re-offer it
+    // into the chip after the athlete went offline on purpose (decision Q3).
+    const tucked = [...tuckedIdsRef.current];
+    return (wentOffline: boolean) => {
+      // Offline and committed: `isLive` gates the offers from here on.
+      // Still live (the transition failed): nothing to hold back any more.
+      if (!wentOffline || !isLiveRef.current) offersSuppressedRef.current = false;
+      if (!wentOffline) {
+        // An INSERT or a recovery pass during the suppressed window was
+        // skipped (recovery got "retry"), and nothing else re-runs it on a
+        // quiet lobby: read again so a fresh challenge still gets its prompt.
+        requestPendingChallengeResync();
+        return;
+      }
+      for (const id of tucked) {
+        // Reopened while the go-offline was in flight: the athlete brought
+        // it back up, so it is no longer "tucked away" and stays.
+        if (!tuckedIdsRef.current.has(id)) continue;
+        // Quietly and for good: no decline is sent, nothing is offered in
+        // its place, and it is never offered again (it lapses server-side).
+        dismissIncoming(id, { resync: false });
+      }
+    };
+  }, [dismissIncoming]);
+
+  const noteIncomingRead = React.useCallback<UseArenaChallengeResult["noteIncomingRead"]>(
+    (fresh, readStartedAt) => {
+      const surfaced = incomingRef.current?.challengeId;
+      const keep = surfaced ? new Set([surfaced]) : undefined;
+      const read = fresh.map((c) => ({
+        challengeId: c.challengeId,
+        challengerId: c.challengerId,
+        createdAt: c.createdAt,
+        expiresAt: c.expiresAt,
+      }));
+      const skip = (id: string) =>
+        settledRef.current.has(id) || dismissedRef.current.has(id);
+      // A known challenge the read drops is no longer a pending, fresh one
+      // (its UPDATE was missed), so it can never come back: its tuck goes
+      // with it, keeping the tuck set to challenges that still could.
+      // Computed once, against the latest set (the ref moves with every
+      // update, not at render, so a read or INSERT that landed before a
+      // re-render is already in it).
+      let dropped: string[] = [];
+      setKnownIncoming((prev) => {
+        const after = mergeIncomingRead(prev, read, readStartedAt, skip, keep);
+        dropped = [...prev.keys()].filter((id) => !after.has(id));
+        return after;
+      });
+      untuckAll(dropped);
+      for (const id of dropped) notifyIncomingChallengeEnded(id);
+    },
+    [untuckAll, setKnownIncoming],
+  );
+
+  // The live window. Lapsed challenges stop counting, and a prompt (up or
+  // tucked) whose window passed clears itself without an answer: the
+  // challenger has stopped waiting. Timers do not run while iOS has the app
+  // suspended, so the same check runs on every return to the foreground.
+  const incomingDeadline = incoming ? freshDeadline(incoming) : null;
+  const knownDeadline = nextDeadline(knownIncoming);
+  React.useEffect(() => {
+    const deadlines = [incomingDeadline, knownDeadline].filter(
+      (d): d is number => d !== null,
+    );
+    if (deadlines.length === 0) return;
+    const lapse = () => {
+      const now = Date.now();
+      // A tucked challenge that lapsed while NOT on the prompt (soft-cleared,
+      // its challenger off the mat) leaves the tuck set too, so the set only
+      // ever holds challenges that could still come back.
+      const lapsed: string[] = [];
+      for (const [id, c] of knownIncomingRef.current) {
+        if (!isFreshIncoming(c, now)) lapsed.push(id);
+      }
+      untuckAll(lapsed);
+      setKnownIncoming((prev) => pruneLapsed(prev, now));
+      const current = incomingRef.current;
+      if (current && !isFreshIncoming(current, now)) {
+        dismissIncoming(current.challengeId);
+      }
+    };
+    const delay = Math.min(...deadlines) - Date.now();
+    if (delay <= 0) {
+      lapse();
+      return;
+    }
+    const timer = setTimeout(lapse, Math.min(delay, MAX_TIMER_MS));
+    const sub = AppState.addEventListener("change", (next) => {
+      if (next === "active") lapse();
+    });
+    return () => {
+      clearTimeout(timer);
+      sub.remove();
+    };
+  }, [incomingDeadline, knownDeadline, dismissIncoming, untuckAll]);
+
+  // The challenger LEFT the mat (AC-S5): they cannot drop into a match any
+  // more, so the prompt (or the tucked chip) clears, after a short grace for
+  // a presence re-track. Only once they have been SEEN in the lobby with this
+  // prompt up (including at the moment it surfaced): a challenger never seen
+  // there did not leave, they may never have been in it at all (a web
+  // profile-sheet challenge, spec F2, comes from outside the Arena), and
+  // recovery would never re-offer such a challenge, so clearing it would
+  // leave them waiting on an answer that cannot come. The 10-minute live
+  // window bounds how long a never-seen prompt stays up. Never while presence
+  // is unknown (`lobbyIds` undefined or null: a lost lobby channel is not
+  // everyone leaving).
+  //
+  // The grace runs from when they were first seen MISSING, not from the
+  // latest presence sync: every sync (anyone joining, leaving or re-tracking)
+  // hands this effect a new set, and restarting a full grace on each would
+  // let a busy lobby hold a dead prompt up until it lapses.
+  //
+  // A soft clear (`final: false`): a challenger back on the mat with the
+  // challenge still pending and fresh is offered again by recovery.
+  const seenChallengerRef = React.useRef<string | null>(null);
+  const missingSinceRef = React.useRef<{ key: string; at: number } | null>(null);
+  const challengerId = incoming?.challengerId ?? null;
+  React.useEffect(() => {
+    if (!incomingId || !challengerId) {
+      missingSinceRef.current = null;
+      return;
+    }
+    const key = `${incomingId}:${challengerId}`;
+    if (missingSinceRef.current?.key !== key) missingSinceRef.current = null;
+    if (!lobbyIds) return;
+    if (lobbyIds.has(challengerId)) {
+      seenChallengerRef.current = key;
+      missingSinceRef.current = null;
+      return;
+    }
+    // Never seen with this prompt up: they have not left, see above.
+    if (seenChallengerRef.current !== key) return;
+    const grace = CHALLENGER_LEFT_GRACE_MS;
+    missingSinceRef.current ??= { key, at: Date.now() };
+    const clear = () => {
+      const lobby = lobbyIdsRef.current;
+      const current = incomingRef.current;
+      if (!lobby || !current) return;
+      if (current.challengeId !== incomingId || lobby.has(challengerId)) return;
+      missingSinceRef.current = null;
+      dismissIncoming(incomingId, { final: false });
+    };
+    const delay = missingSinceRef.current.at + grace - Date.now();
+    if (delay <= 0) {
+      clear();
+      return;
+    }
+    const timer = setTimeout(clear, delay);
+    return () => clearTimeout(timer);
+  }, [lobbyIds, incomingId, challengerId, dismissIncoming]);
+
+  // Offline, only the challenge already in hand counts (one tucked away when
+  // the app was backgrounded): an athlete who is not live gets no live
+  // prompts, so "! 2 WANT TO ROLL" would be a call to something they cannot
+  // answer. The rest stay known, and count again the moment they go live.
+  const incomingCount = React.useMemo(
+    () =>
+      isLive
+        ? countWaitingIncoming(knownIncoming, incomingId, lobbyIds ?? null, Date.now())
+        : incomingId
+          ? 1
+          : 0,
+    [isLive, knownIncoming, incomingId, lobbyIds],
+  );
+
+  const isIncomingDismissed = React.useCallback(
+    (challengeId: string) => dismissedRef.current.has(challengeId),
+    [],
+  );
+
   return {
     incoming,
     outgoing,
+    incomingCount,
+    incomingTucked,
+    tuckIncoming,
+    reopenIncoming,
+    isIncomingDismissed,
+    beginManualOffline,
+    noteIncomingRead,
     isBusy,
     capReached,
     sendChallenge,

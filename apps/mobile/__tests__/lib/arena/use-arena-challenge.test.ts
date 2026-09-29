@@ -114,14 +114,17 @@ jest.mock("@jits/shared/api/queries", () => ({
 
 const mockResync = jest.fn();
 jest.mock("@/lib/arena/use-pending-challenge-recovery", () => ({
-  requestPendingChallengeResync: () => mockResync(),
+  requestPendingChallengeResync: (...a: unknown[]) => mockResync(...a),
 }));
 
 const mockPush = jest.fn((href: string) => {
   mockCalls.push(`push:${href}`);
 });
+// Stable across renders, like expo-router's: an unstable router would rebuild
+// the channels on every rerender and hide supervisor bugs.
+const mockRouter = { push: mockPush, replace: jest.fn(), back: jest.fn() };
 jest.mock("expo-router", () => ({
-  useRouter: () => ({ push: mockPush, replace: jest.fn(), back: jest.fn() }),
+  useRouter: () => mockRouter,
 }));
 
 const mockToastError = jest.fn();
@@ -134,7 +137,15 @@ jest.mock("@/components/ui/toast", () => ({
   },
 }));
 
-import { useArenaChallenge } from "@/lib/arena/use-arena-challenge";
+import {
+  OUTGOING_LAPSE_UNLEARNED_CLOCK_MARGIN_MS,
+  useArenaChallenge,
+} from "@/lib/arena/use-arena-challenge";
+import { subscribeIncomingChallengeEnded } from "@/lib/arena/arena-store";
+import {
+  __resetServerClockForTests,
+  getServerClockOffsetMs,
+} from "@/lib/arena/incoming-challenges";
 
 // ---- fixtures ----
 
@@ -201,6 +212,7 @@ async function raiseIncoming(
 
 beforeEach(async () => {
   await AsyncStorage.clear();
+  __resetServerClockForTests();
   mockCalls.length = 0;
   mockBindings.length = 0;
   mockChannelTopics.length = 0;
@@ -258,7 +270,21 @@ describe("sending a challenge", () => {
       opponentId: OPPONENT,
       opponentName: "Rival",
       expiresAt: FAR_EXPIRY,
+      createdAt: null,
     });
+  });
+
+  it("keeps the row's created_at on the plate for the WAITING countdown", async () => {
+    const created = new Date().toISOString();
+    mockCreateChallenge.mockResolvedValue({
+      ok: true,
+      data: { id: CHALLENGE, expiresAt: FAR_EXPIRY, createdAt: created },
+    });
+    const { result } = mount();
+    await act(async () => {
+      await result.current.sendChallenge(OPPONENT, "Rival");
+    });
+    expect(result.current.outgoing?.createdAt).toBe(created);
   });
 
   it("produces exactly one challenge for a double tap", async () => {
@@ -415,7 +441,8 @@ describe("sending a challenge", () => {
 describe("receiving a challenge", () => {
   it("raises a live prompt from the filtered INSERT", async () => {
     const { result } = mount();
-    await raiseIncoming(result);
+    const created = new Date().toISOString();
+    await raiseIncoming(result, { created_at: created, expires_at: FAR_EXPIRY });
 
     expect(result.current.incoming).toEqual({
       challengeId: CHALLENGE,
@@ -423,7 +450,11 @@ describe("receiving a challenge", () => {
       challengerName: "Rival",
       challengerElo: 1350,
       challengerWeight: 190,
+      createdAt: created,
+      expiresAt: FAR_EXPIRY,
     });
+    // The row carried its timestamps: no second read of the challenge.
+    expect(mockGetStatus).not.toHaveBeenCalled();
   });
 
   it("names the challenger honestly when the lookup returns nothing", async () => {
@@ -858,12 +889,15 @@ describe("recovery entry points (pending challenges read at mount)", () => {
       await result.current.offerIncoming(CHALLENGE, OPPONENT);
     });
 
+    // Offered by id alone (a deep link): the row is read for its timestamps.
     expect(result.current.incoming).toEqual({
       challengeId: CHALLENGE,
       challengerId: OPPONENT,
       challengerName: "Rival",
       challengerElo: 1350,
       challengerWeight: 190,
+      createdAt: null,
+      expiresAt: FAR_EXPIRY,
     });
   });
 
@@ -1521,8 +1555,13 @@ async function withIncoming(
   challengeId: string,
   challengerId: string,
 ) {
+  // With the row's timestamps, as recovery offers it, so the challenge row
+  // is not re-read (tests below drive `getChallengeStatus` for MY challenge).
   await act(async () => {
-    await result.current.offerIncoming(challengeId, challengerId);
+    await result.current.offerIncoming(challengeId, challengerId, {
+      createdAt: new Date().toISOString(),
+      expiresAt: FAR_EXPIRY,
+    });
   });
   expect(result.current.incoming?.challengeId).toBe(challengeId);
 }
@@ -2222,8 +2261,8 @@ describe("channels the server closed are rebuilt (jits-fa9x pattern)", () => {
     expect(incomingChannels()).toHaveLength(1);
   });
 
-  it("backs off 1s, 5s, 15s, 30s, then waits for the foreground", async () => {
-    mount();
+  it("offline: backs off 1s, 5s, 15s, 30s, then waits for the foreground", async () => {
+    renderHook(() => useArenaChallenge({ athleteId: ME, athleteWeight: 180, isLive: false }));
     const delays = [1_000, 5_000, 15_000, 30_000];
     for (let i = 0; i < delays.length; i++) {
       serverClose(incomingChannels()[i]);
@@ -2244,6 +2283,55 @@ describe("channels the server closed are rebuilt (jits-fa9x pattern)", () => {
     expect(incomingChannels()).toHaveLength(5);
 
     act(() => handlers.forEach((h) => h("active")));
+    expect(incomingChannels()).toHaveLength(6);
+  });
+
+  it("going live restarts an incoming channel that gave up while offline (no foreground comes)", async () => {
+    const { rerender } = renderHook(
+      ({ isLive }: { isLive: boolean }) =>
+        useArenaChallenge({ athleteId: ME, athleteWeight: 180, isLive }),
+      { initialProps: { isLive: false } },
+    );
+    const delays = [1_000, 5_000, 15_000, 30_000];
+    for (let i = 0; i < delays.length; i++) {
+      serverClose(incomingChannels()[i]);
+      await act(async () => {
+        jest.advanceTimersByTime(delays[i]);
+      });
+    }
+    serverClose(incomingChannels()[4]);
+    await act(async () => {
+      jest.advanceTimersByTime(10 * 60_000);
+    });
+    expect(incomingChannels()).toHaveLength(5);
+
+    // Go live: the phone is held awake, so no AppState "active" arrives.
+    rerender({ isLive: true });
+    await act(async () => {});
+    expect(incomingChannels()).toHaveLength(6);
+  });
+
+  it("live: keeps rebuilding the incoming channel every 30s past the table (no foreground will come)", async () => {
+    // A live phone is held awake, so waiting for a foreground would leave a
+    // challengeable athlete deaf to new challenges.
+    mount(); // isLive defaults to true
+    const delays = [1_000, 5_000, 15_000, 30_000];
+    for (let i = 0; i < delays.length; i++) {
+      serverClose(incomingChannels()[i]);
+      await act(async () => {
+        jest.advanceTimersByTime(delays[i]);
+      });
+    }
+    expect(incomingChannels()).toHaveLength(5);
+
+    serverClose(incomingChannels()[4]);
+    await act(async () => {
+      jest.advanceTimersByTime(29_999);
+    });
+    expect(incomingChannels()).toHaveLength(5);
+    await act(async () => {
+      jest.advanceTimersByTime(1);
+    });
     expect(incomingChannels()).toHaveLength(6);
   });
 
@@ -3182,5 +3270,1407 @@ describe("the accepter withdrew after a failed start (accepted -> cancelled)", (
     });
     expect(result.current.outgoing).toBeNull();
     expect(mockToastInfo).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Live Chip store foundation (spec arena-live-chip, F5/F8/F9/F13)
+// ---------------------------------------------------------------------------
+
+describe("incoming count, Later and auto-clear (spec 5)", () => {
+  const FRESH_MS = 10 * 60_000;
+  type Props = Parameters<typeof useArenaChallenge>[0];
+
+  function mountWith(over: Partial<Props> = {}) {
+    return renderHook((props: Props) => useArenaChallenge(props), {
+      initialProps: { athleteId: ME, athleteWeight: 180, ...over },
+    });
+  }
+
+  async function insert(id: string, challengerId: string, createdAt = new Date().toISOString()) {
+    await act(async () => {
+      await incomingBinding().handler({
+        new: {
+          id,
+          challenger_id: challengerId,
+          opponent_id: ME,
+          status: "pending",
+          created_at: createdAt,
+          expires_at: FAR_EXPIRY,
+        },
+      });
+    });
+  }
+
+  async function update(id: string, challengerId: string, status: string) {
+    await act(async () => {
+      await opponentUpdateBinding().handler({
+        new: { id, challenger_id: challengerId, opponent_id: ME, status },
+      });
+    });
+  }
+
+  afterEach(() => {
+    jest.useRealTimers();
+    // A test here freezes Date.now with a spy; never let it leak onward.
+    jest.restoreAllMocks();
+  });
+
+  it("carries the row's created_at and expires_at onto a realtime prompt, for the countdown (AC-S1)", async () => {
+    // The sheet's freshness countdown runs off these; a realtime INSERT
+    // always has them (created_at is NOT NULL with a default), so the
+    // countdown is only ever hidden for an offer by id whose row read failed.
+    const created = new Date().toISOString();
+    const { result } = mountWith({ lobbyIds: new Set(["a"]) });
+    await insert("ch-a", "a", created);
+    await waitFor(() => expect(result.current.incoming?.challengeId).toBe("ch-a"));
+    expect(result.current.incoming).toMatchObject({ createdAt: created, expiresAt: FAR_EXPIRY });
+  });
+
+  it("counts challenges queued behind the prompt instead of dropping them (AC-S6)", async () => {
+    const { result } = mountWith({ lobbyIds: new Set(["a", "b", "c"]) });
+    await insert("ch-a", "a");
+    await waitFor(() => expect(result.current.incoming?.challengeId).toBe("ch-a"));
+    await insert("ch-b", "b");
+    await insert("ch-c", "c");
+
+    // The first keeps the surface; the other two are counted.
+    expect(result.current.incoming?.challengeId).toBe("ch-a");
+    expect(result.current.incomingCount).toBe(3);
+
+    // One of the queued ones is cancelled by its challenger.
+    await update("ch-b", "b", "cancelled");
+    expect(result.current.incomingCount).toBe(2);
+  });
+
+  it("a push-preferred challenge takes the prompt from a DIFFERENT tucked one, which is not declined (AC-A8)", async () => {
+    const times = { createdAt: new Date().toISOString(), expiresAt: FAR_EXPIRY };
+    const { result } = mountWith({ lobbyIds: new Set([OPPONENT, "b"]) });
+    await raiseIncoming(result, { created_at: new Date().toISOString() });
+    act(() => result.current.tuckIncoming());
+    await insert("ch-b", "b");
+    mockResync.mockClear();
+
+    // Without the option, the tucked one still keeps the surface.
+    let outcome: string | undefined;
+    await act(async () => {
+      outcome = await result.current.offerIncoming("ch-b", "b", times);
+    });
+    expect(outcome).toBe("retry");
+    expect(result.current.incoming?.challengeId).toBe(CHALLENGE);
+
+    await act(async () => {
+      outcome = await result.current.offerIncoming("ch-b", "b", times, { replaceTucked: true });
+    });
+    expect(outcome).toBe("raised");
+    // The pushed challenge opens as a sheet; the tucked one still counts.
+    expect(result.current.incoming?.challengeId).toBe("ch-b");
+    expect(result.current.incomingTucked).toBe(false);
+    expect(result.current.incomingCount).toBe(2);
+    expect(mockDeclineChallenge).not.toHaveBeenCalled();
+    expect(mockSend).not.toHaveBeenCalled();
+    // Recovery may offer the displaced one again once this prompt clears.
+    expect(mockResync).toHaveBeenCalledWith({ reoffer: CHALLENGE });
+
+    // It does, and it comes back into the chip (still tucked), not as a sheet.
+    await update("ch-b", "b", "cancelled");
+    expect(result.current.incoming).toBeNull();
+    await act(async () => {
+      outcome = await result.current.offerIncoming(CHALLENGE, OPPONENT, times);
+    });
+    expect(outcome).toBe("raised");
+    expect(result.current.incoming?.challengeId).toBe(CHALLENGE);
+    expect(result.current.incomingTucked).toBe(true);
+  });
+
+  it("replaceTucked never takes a prompt that is up (not tucked)", async () => {
+    const times = { createdAt: new Date().toISOString(), expiresAt: FAR_EXPIRY };
+    const { result } = mountWith({ lobbyIds: new Set([OPPONENT, "b"]) });
+    await raiseIncoming(result, { created_at: new Date().toISOString() });
+    let outcome: string | undefined;
+    await act(async () => {
+      outcome = await result.current.offerIncoming("ch-b", "b", times, { replaceTucked: true });
+    });
+    expect(outcome).toBe("retry");
+    expect(result.current.incoming?.challengeId).toBe(CHALLENGE);
+  });
+
+  it("says when an incoming challenge ends, whether or not it was on the prompt", async () => {
+    const ended: string[] = [];
+    const unsubscribe = subscribeIncomingChallengeEnded((id) => ended.push(id));
+    try {
+      const { result } = mountWith({ lobbyIds: new Set(["a", "b"]) });
+      await insert("ch-a", "a");
+      await waitFor(() => expect(result.current.incoming?.challengeId).toBe("ch-a"));
+      // Queued behind the prompt, then cancelled by its challenger.
+      await insert("ch-b", "b");
+      await update("ch-b", "b", "cancelled");
+      expect(ended).toEqual(["ch-b"]);
+
+      // A read that no longer lists a known challenge ends it too.
+      await act(async () => {
+        result.current.noteIncomingRead([], Date.now());
+      });
+      expect(ended).toEqual(["ch-b"]);
+      await insert("ch-c", "b");
+      await act(async () => {
+        result.current.noteIncomingRead([], Date.now() + 1);
+      });
+      expect(ended).toContain("ch-c");
+    } finally {
+      unsubscribe();
+    }
+  });
+
+  it("counts only queued challengers who are still on the mat", async () => {
+    const { result, rerender } = mountWith({ lobbyIds: new Set(["a", "b"]) });
+    await insert("ch-a", "a");
+    await waitFor(() => expect(result.current.incoming).not.toBeNull());
+    await insert("ch-b", "b");
+    expect(result.current.incomingCount).toBe(2);
+
+    rerender({ athleteId: ME, athleteWeight: 180, lobbyIds: new Set(["a"]) });
+    expect(result.current.incomingCount).toBe(1);
+  });
+
+  it("stops counting a declined challenge", async () => {
+    const { result } = mountWith({ lobbyIds: new Set(["a"]) });
+    await insert("ch-a", "a");
+    await waitFor(() => expect(result.current.incomingCount).toBe(1));
+
+    await act(async () => {
+      await result.current.decline();
+    });
+    expect(result.current.incomingCount).toBe(0);
+  });
+
+  it("clears the count on entering a match (the others are declined)", async () => {
+    const { result } = mountWith({ lobbyIds: new Set(["a", "b"]) });
+    await insert("ch-a", "a");
+    await waitFor(() => expect(result.current.incoming).not.toBeNull());
+    await insert("ch-b", "b");
+    expect(result.current.incomingCount).toBe(2);
+
+    await act(async () => {
+      await result.current.accept();
+    });
+    expect(mockPush).toHaveBeenCalled();
+    expect(result.current.incomingCount).toBe(0);
+  });
+
+  it("folds a pending read into the count and drops known ones the read shows are gone", async () => {
+    const { result } = mountWith({ lobbyIds: new Set(["a", "b", "c"]) });
+    const now = Date.now();
+    const created = new Date(now - 60_000).toISOString();
+    act(() => {
+      result.current.noteIncomingRead(
+        [
+          { challengeId: "ch-a", challengerId: "a", createdAt: created, expiresAt: FAR_EXPIRY },
+          { challengeId: "ch-b", challengerId: "b", createdAt: created, expiresAt: FAR_EXPIRY },
+        ],
+        now,
+      );
+    });
+    expect(result.current.incomingCount).toBe(2);
+
+    // A later read no longer returns ch-b (its UPDATE was missed).
+    act(() => {
+      result.current.noteIncomingRead(
+        [{ challengeId: "ch-a", challengerId: "a", createdAt: created, expiresAt: FAR_EXPIRY }],
+        now + 1_000,
+      );
+    });
+    expect(result.current.incomingCount).toBe(1);
+  });
+
+  it("two reads landing before a re-render each see the other's result", async () => {
+    const { result } = mountWith({ lobbyIds: new Set(["a", "b"]) });
+    const now = Date.now();
+    const created = new Date(now - 60_000).toISOString();
+    act(() => {
+      result.current.noteIncomingRead(
+        [
+          { challengeId: "ch-a", challengerId: "a", createdAt: created, expiresAt: FAR_EXPIRY },
+          { challengeId: "ch-b", challengerId: "b", createdAt: created, expiresAt: FAR_EXPIRY },
+        ],
+        now,
+      );
+      // Same batch, no render between: ch-b is already gone.
+      result.current.noteIncomingRead(
+        [{ challengeId: "ch-a", challengerId: "a", createdAt: created, expiresAt: FAR_EXPIRY }],
+        now + 1_000,
+      );
+    });
+    expect(result.current.incomingCount).toBe(1);
+  });
+
+  it("an offer whose row read shows it is no longer pending stops counting it", async () => {
+    const { result } = mountWith({ lobbyIds: new Set(["a", "b"]) });
+    const now = Date.now();
+    const created = new Date(now - 60_000).toISOString();
+    act(() => {
+      result.current.noteIncomingRead(
+        [
+          { challengeId: "ch-a", challengerId: "a", createdAt: created, expiresAt: FAR_EXPIRY },
+          { challengeId: "ch-b", challengerId: "b", createdAt: created, expiresAt: FAR_EXPIRY },
+        ],
+        now,
+      );
+    });
+    expect(result.current.incomingCount).toBe(2);
+
+    // Offered by id alone: the row read says it was declined meanwhile, and
+    // its realtime UPDATE was missed (socket down).
+    mockGetStatus.mockResolvedValueOnce({
+      ok: true,
+      data: { status: "declined", expiresAt: FAR_EXPIRY },
+    });
+    let outcome: string | undefined;
+    await act(async () => {
+      outcome = await result.current.offerIncoming("ch-b", "b");
+    });
+    expect(outcome).toBe("final");
+    expect(result.current.incoming).toBeNull();
+    expect(result.current.incomingCount).toBe(1);
+  });
+
+  it("Later tucks the prompt without writing anything, and reopen brings it back (AC-S4)", async () => {
+    const { result } = mountWith({ lobbyIds: new Set([OPPONENT]) });
+    await raiseIncoming(result, { created_at: new Date().toISOString() });
+
+    act(() => result.current.tuckIncoming());
+    expect(result.current.incomingTucked).toBe(true);
+    // Still pending, still mine to answer.
+    expect(result.current.incoming?.challengeId).toBe(CHALLENGE);
+    expect(mockDeclineChallenge).not.toHaveBeenCalled();
+    expect(mockCancelChallenge).not.toHaveBeenCalled();
+    expect(mockSend).not.toHaveBeenCalled();
+
+    act(() => result.current.reopenIncoming());
+    expect(result.current.incomingTucked).toBe(false);
+  });
+
+  it("a manual go-offline drops a tucked challenge without declining it (decision Q3)", async () => {
+    const { result, rerender } = mountWith({ lobbyIds: new Set([OPPONENT]) });
+    await raiseIncoming(result, { created_at: new Date().toISOString() });
+    act(() => result.current.tuckIncoming());
+    mockResync.mockClear();
+
+    let settle!: (wentOffline: boolean) => void;
+    act(() => {
+      settle = result.current.beginManualOffline();
+    });
+    // Nothing is dropped until the go-offline actually landed.
+    expect(result.current.incoming?.challengeId).toBe(CHALLENGE);
+    rerender({ athleteId: ME, athleteWeight: 180, lobbyIds: new Set([OPPONENT]), isLive: false });
+    act(() => settle(true));
+
+    expect(result.current.incoming).toBeNull();
+    expect(result.current.incomingTucked).toBe(false);
+    expect(result.current.incomingCount).toBe(0);
+    expect(mockDeclineChallenge).not.toHaveBeenCalled();
+    expect(mockSend).not.toHaveBeenCalled();
+    // Quietly: nothing is re-read to be offered to an athlete going offline.
+    expect(mockResync).not.toHaveBeenCalled();
+    // Never offered again by recovery, even once live again.
+    rerender({ athleteId: ME, athleteWeight: 180, lobbyIds: new Set([OPPONENT]), isLive: true });
+    let outcome: string | undefined;
+    await act(async () => {
+      outcome = await result.current.offerIncoming(CHALLENGE, OPPONENT, {
+        createdAt: new Date().toISOString(),
+        expiresAt: FAR_EXPIRY,
+      });
+    });
+    expect(outcome).toBe("final");
+    expect(result.current.incoming).toBeNull();
+  });
+
+  it("a manual go-offline marks the tucked challenge dismissed and says it ended (Q3, AC-A8)", async () => {
+    const ended: string[] = [];
+    const unsubscribe = subscribeIncomingChallengeEnded((id) => ended.push(id));
+    try {
+      const { result, rerender } = mountWith({ lobbyIds: new Set([OPPONENT]) });
+      await raiseIncoming(result, { created_at: new Date().toISOString() });
+      expect(result.current.isIncomingDismissed(CHALLENGE)).toBe(false);
+      act(() => result.current.tuckIncoming());
+      let settle!: (wentOffline: boolean) => void;
+      act(() => {
+        settle = result.current.beginManualOffline();
+      });
+      rerender({ athleteId: ME, athleteWeight: 180, lobbyIds: new Set([OPPONENT]), isLive: false });
+      act(() => settle(true));
+      // A push for it tapped later must not offer a go-live (the deep link
+      // reads this through the arena store).
+      expect(result.current.isIncomingDismissed(CHALLENGE)).toBe(true);
+      expect(ended).toContain(CHALLENGE);
+    } finally {
+      unsubscribe();
+    }
+  });
+
+  it("backgrounding (not a manual go-offline) never marks a tucked challenge dismissed (Q3)", async () => {
+    const { result, rerender } = mountWith({ lobbyIds: new Set([OPPONENT]) });
+    await raiseIncoming(result, { created_at: new Date().toISOString() });
+    act(() => result.current.tuckIncoming());
+    rerender({ athleteId: ME, athleteWeight: 180, lobbyIds: new Set([OPPONENT]), isLive: false });
+    expect(result.current.isIncomingDismissed(CHALLENGE)).toBe(false);
+  });
+
+  it("a manual go-offline never raises the NEXT queued challenge on the way out (Q3)", async () => {
+    // A and B both challenge me; A has the sheet, B is queued behind it.
+    const lobby = new Set(["a", "b"]);
+    const { result, rerender } = mountWith({ lobbyIds: lobby });
+    await insert("ch-a", "a");
+    await waitFor(() => expect(result.current.incoming?.challengeId).toBe("ch-a"));
+    await insert("ch-b", "b");
+    act(() => result.current.tuckIncoming());
+
+    const offerB = async () => {
+      let outcome: string | undefined;
+      await act(async () => {
+        outcome = await result.current.offerIncoming("ch-b", "b", {
+          createdAt: new Date().toISOString(),
+          expiresAt: FAR_EXPIRY,
+        });
+      });
+      return outcome;
+    };
+
+    // Go offline from the popover. `isLive` is still true for a render or
+    // two, and that is exactly when recovery used to offer B.
+    let settle!: (wentOffline: boolean) => void;
+    act(() => {
+      settle = result.current.beginManualOffline();
+    });
+    expect(await offerB()).toBe("retry");
+
+    rerender({ athleteId: ME, athleteWeight: 180, lobbyIds: lobby, isLive: false });
+    act(() => settle(true));
+    expect(result.current.incoming).toBeNull();
+    // Still offline: no live prompt, and B stays eligible (retry, not final).
+    expect(await offerB()).toBe("retry");
+    expect(result.current.incoming).toBeNull();
+
+    // Live again: B is offered then.
+    rerender({ athleteId: ME, athleteWeight: 180, lobbyIds: lobby, isLive: true });
+    expect(await offerB()).toBe("raised");
+    expect(result.current.incoming?.challengeId).toBe("ch-b");
+    expect(mockDeclineChallenge).not.toHaveBeenCalled();
+  });
+
+  it("a failed manual go-offline keeps the tucked challenge and lifts the hold on offers", async () => {
+    const { result } = mountWith({ lobbyIds: new Set([OPPONENT, "b"]) });
+    await raiseIncoming(result, { created_at: new Date().toISOString() });
+    act(() => result.current.tuckIncoming());
+
+    let settle!: (wentOffline: boolean) => void;
+    act(() => {
+      settle = result.current.beginManualOffline();
+    });
+    mockResync.mockClear();
+    act(() => settle(false));
+    expect(result.current.incoming?.challengeId).toBe(CHALLENGE);
+    expect(result.current.incomingTucked).toBe(true);
+    // A recovery pass skipped while offers were held is run again.
+    expect(mockResync).toHaveBeenCalledTimes(1);
+
+    // Not dismissed for good: once it clears for another reason and comes
+    // back through recovery, it can still be offered.
+    act(() => result.current.reopenIncoming());
+    await act(async () => {
+      await result.current.decline();
+    });
+    let outcome: string | undefined;
+    await act(async () => {
+      outcome = await result.current.offerIncoming("ch-b", "b", {
+        createdAt: new Date().toISOString(),
+        expiresAt: FAR_EXPIRY,
+      });
+    });
+    expect(outcome).toBe("raised");
+  });
+
+  it("a manual go-offline leaves a prompt that is up (not tucked) alone", async () => {
+    const { result } = mountWith();
+    await raiseIncoming(result, { created_at: new Date().toISOString() });
+
+    act(() => result.current.beginManualOffline()(true));
+    expect(result.current.incoming?.challengeId).toBe(CHALLENGE);
+  });
+
+  it("a new prompt always opens as a sheet, not tucked", async () => {
+    const { result } = mountWith({ lobbyIds: new Set([OPPONENT, "b"]) });
+    await raiseIncoming(result, { created_at: new Date().toISOString() });
+    act(() => result.current.tuckIncoming());
+    await update(CHALLENGE, OPPONENT, "cancelled");
+    expect(result.current.incoming).toBeNull();
+
+    await act(async () => {
+      await result.current.offerIncoming("ch-b", "b", {
+        createdAt: new Date().toISOString(),
+        expiresAt: FAR_EXPIRY,
+      });
+    });
+    expect(result.current.incoming?.challengeId).toBe("ch-b");
+    expect(result.current.incomingTucked).toBe(false);
+  });
+
+  it("clears the prompt (tucked or not) when the 10-minute window passes, without declining (AC-S5)", async () => {
+    jest.useFakeTimers();
+    const { result } = mountWith({ lobbyIds: new Set([OPPONENT]) });
+    const created = new Date(Date.now() - FRESH_MS + 5_000).toISOString();
+    await act(async () => {
+      await result.current.offerIncoming(CHALLENGE, OPPONENT, {
+        createdAt: created,
+        expiresAt: FAR_EXPIRY,
+      });
+    });
+    expect(result.current.incoming?.challengeId).toBe(CHALLENGE);
+    act(() => result.current.tuckIncoming());
+
+    act(() => {
+      jest.advanceTimersByTime(5_001);
+    });
+
+    expect(result.current.incoming).toBeNull();
+    expect(result.current.incomingCount).toBe(0);
+    expect(mockDeclineChallenge).not.toHaveBeenCalled();
+  });
+
+  it("never offers a challenge whose live window has already passed", async () => {
+    const { result } = mountWith();
+    let outcome: string | undefined;
+    await act(async () => {
+      outcome = await result.current.offerIncoming(CHALLENGE, OPPONENT, {
+        createdAt: new Date(Date.now() - FRESH_MS - 1).toISOString(),
+        expiresAt: FAR_EXPIRY,
+      });
+    });
+    expect(outcome).toBe("final");
+    expect(result.current.incoming).toBeNull();
+  });
+
+  it("an offer by id alone reads the row and refuses one no longer pending", async () => {
+    mockGetStatus.mockResolvedValue({
+      ok: true,
+      data: { status: "cancelled", expiresAt: FAR_EXPIRY, createdAt: null },
+    });
+    const { result } = mountWith();
+    let outcome: string | undefined;
+    await act(async () => {
+      outcome = await result.current.offerIncoming(CHALLENGE, OPPONENT);
+    });
+    expect(outcome).toBe("final");
+    expect(result.current.incoming).toBeNull();
+  });
+
+  it("an offer by id alone carries the row's created_at for the countdown", async () => {
+    const created = new Date().toISOString();
+    mockGetStatus.mockResolvedValue({
+      ok: true,
+      data: { status: "pending", expiresAt: FAR_EXPIRY, createdAt: created },
+    });
+    const { result } = mountWith();
+    await act(async () => {
+      await result.current.offerIncoming(CHALLENGE, OPPONENT);
+    });
+    expect(result.current.incoming?.createdAt).toBe(created);
+  });
+
+  it("clears the prompt when the challenger leaves the lobby, after a grace (AC-S5)", async () => {
+    const { result, rerender } = mountWith({ lobbyIds: new Set([OPPONENT, "x"]) });
+    await raiseIncoming(result, { created_at: new Date().toISOString() });
+    act(() => result.current.tuckIncoming());
+    jest.useFakeTimers();
+
+    rerender({ athleteId: ME, athleteWeight: 180, lobbyIds: new Set(["x"]) });
+    act(() => {
+      jest.advanceTimersByTime(2_999);
+    });
+    expect(result.current.incoming).not.toBeNull();
+
+    act(() => {
+      jest.advanceTimersByTime(2);
+    });
+    expect(result.current.incoming).toBeNull();
+    expect(mockDeclineChallenge).not.toHaveBeenCalled();
+  });
+
+  it("keeps the prompt when the challenger is back within the grace", async () => {
+    const { result, rerender } = mountWith({ lobbyIds: new Set([OPPONENT, "x"]) });
+    await raiseIncoming(result, { created_at: new Date().toISOString() });
+    jest.useFakeTimers();
+
+    rerender({ athleteId: ME, athleteWeight: 180, lobbyIds: new Set(["x"]) });
+    act(() => {
+      jest.advanceTimersByTime(1_000);
+    });
+    rerender({ athleteId: ME, athleteWeight: 180, lobbyIds: new Set([OPPONENT, "x"]) });
+    act(() => {
+      jest.advanceTimersByTime(5_000);
+    });
+    expect(result.current.incoming?.challengeId).toBe(CHALLENGE);
+  });
+
+  it("does not read an unknown lobby (a lost channel) as the challenger leaving", async () => {
+    const { result, rerender } = mountWith({ lobbyIds: new Set([OPPONENT]) });
+    await raiseIncoming(result, { created_at: new Date().toISOString() });
+    jest.useFakeTimers();
+
+    rerender({ athleteId: ME, athleteWeight: 180, lobbyIds: undefined });
+    act(() => {
+      jest.advanceTimersByTime(10_000);
+    });
+    expect(result.current.incoming?.challengeId).toBe(CHALLENGE);
+  });
+
+  it("clears when the challenger was the only other one there and the known lobby empties", async () => {
+    // I am offline and untracked, so a known-empty lobby is a real answer.
+    const { result, rerender } = mountWith({ lobbyIds: new Set([OPPONENT]) });
+    await raiseIncoming(result, { created_at: new Date().toISOString() });
+    act(() => result.current.tuckIncoming());
+    jest.useFakeTimers();
+
+    rerender({ athleteId: ME, athleteWeight: 180, lobbyIds: new Set() });
+    act(() => {
+      jest.advanceTimersByTime(3_001);
+    });
+    expect(result.current.incoming).toBeNull();
+  });
+
+  it("runs the grace from when the challenger left, not from the latest presence sync", async () => {
+    const { result, rerender } = mountWith({ lobbyIds: new Set([OPPONENT, "x"]) });
+    await raiseIncoming(result, { created_at: new Date().toISOString() });
+    jest.useFakeTimers();
+
+    rerender({ athleteId: ME, athleteWeight: 180, lobbyIds: new Set(["x"]) });
+    // A busy lobby: an unrelated sync every second hands over a new set.
+    for (let i = 0; i < 2; i++) {
+      act(() => {
+        jest.advanceTimersByTime(1_000);
+      });
+      rerender({ athleteId: ME, athleteWeight: 180, lobbyIds: new Set(["x", `y${i}`]) });
+    }
+    act(() => {
+      jest.advanceTimersByTime(999);
+    });
+    expect(result.current.incoming).not.toBeNull();
+    act(() => {
+      jest.advanceTimersByTime(2);
+    });
+    expect(result.current.incoming).toBeNull();
+  });
+
+  it("offers it again when the challenger comes back to the mat (a soft clear)", async () => {
+    const { result, rerender } = mountWith({ lobbyIds: new Set([OPPONENT, "x"]) });
+    const created = new Date().toISOString();
+    await raiseIncoming(result, { created_at: created, expires_at: FAR_EXPIRY });
+    jest.useFakeTimers();
+
+    rerender({ athleteId: ME, athleteWeight: 180, lobbyIds: new Set(["x"]) });
+    act(() => {
+      jest.advanceTimersByTime(3_001);
+    });
+    expect(result.current.incoming).toBeNull();
+    // Recovery is told this one may be offered again.
+    expect(mockResync).toHaveBeenCalledWith({ reoffer: CHALLENGE });
+    // Gone from the mat: not counted meanwhile.
+    expect(result.current.incomingCount).toBe(0);
+
+    // Back (a trip to their home screen). Counted again, and offerable.
+    rerender({ athleteId: ME, athleteWeight: 180, lobbyIds: new Set([OPPONENT, "x"]) });
+    expect(result.current.incomingCount).toBe(1);
+    jest.useRealTimers();
+    let outcome: string | undefined;
+    await act(async () => {
+      outcome = await result.current.offerIncoming(CHALLENGE, OPPONENT, {
+        createdAt: created,
+        expiresAt: FAR_EXPIRY,
+      });
+    });
+    expect(outcome).toBe("raised");
+    expect(result.current.incoming?.challengeId).toBe(CHALLENGE);
+  });
+
+  it("re-checks the live window on return to the foreground (iOS suspends timers)", async () => {
+    const onAppState = mockAppStateHandlers();
+    jest.useFakeTimers();
+    const { result } = mountWith({ lobbyIds: new Set([OPPONENT, "b"]) });
+    const created = new Date(Date.now() - FRESH_MS + 5_000).toISOString();
+    await act(async () => {
+      await result.current.offerIncoming(CHALLENGE, OPPONENT, {
+        createdAt: created,
+        expiresAt: FAR_EXPIRY,
+      });
+    });
+    act(() => result.current.tuckIncoming());
+    expect(result.current.incomingCount).toBe(1);
+
+    // Suspended past the deadline: the clock moved, the timer never ran.
+    jest.setSystemTime(Date.now() + 6_000);
+    expect(result.current.incoming).not.toBeNull();
+
+    act(() => onAppState("active"));
+    expect(result.current.incoming).toBeNull();
+    expect(result.current.incomingCount).toBe(0);
+    expect(mockDeclineChallenge).not.toHaveBeenCalled();
+    jest.restoreAllMocks();
+  });
+
+  it("counts every queued challenger while presence is unknown (a lost channel)", async () => {
+    const { result, rerender } = mountWith({ lobbyIds: new Set(["a", "b", "c"]) });
+    await insert("ch-a", "a");
+    await waitFor(() => expect(result.current.incoming?.challengeId).toBe("ch-a"));
+    await insert("ch-b", "b");
+    await insert("ch-c", "c");
+    expect(result.current.incomingCount).toBe(3);
+
+    rerender({ athleteId: ME, athleteWeight: 180, lobbyIds: undefined });
+    expect(result.current.incomingCount).toBe(3);
+  });
+
+  it("offline, counts only the challenge already in hand", async () => {
+    const lobby = new Set(["a", "b"]);
+    const { result, rerender } = mountWith({ lobbyIds: lobby });
+    await insert("ch-a", "a");
+    await waitFor(() => expect(result.current.incoming?.challengeId).toBe("ch-a"));
+    await insert("ch-b", "b");
+    act(() => result.current.tuckIncoming());
+    expect(result.current.incomingCount).toBe(2);
+
+    // Backgrounded (taken offline, tuck kept): the tucked one still counts.
+    rerender({ athleteId: ME, athleteWeight: 180, lobbyIds: lobby, isLive: false });
+    expect(result.current.incomingCount).toBe(1);
+    expect(result.current.incoming?.challengeId).toBe("ch-a");
+    expect(result.current.incomingTucked).toBe(true);
+    // One arriving while offline is not a live "wants to roll".
+    await insert("ch-c", "a");
+    expect(result.current.incomingCount).toBe(1);
+
+    // Live again: everything still fresh counts at once.
+    rerender({ athleteId: ME, athleteWeight: 180, lobbyIds: lobby, isLive: true });
+    expect(result.current.incomingCount).toBe(3);
+    expect(result.current.incomingTucked).toBe(true);
+  });
+
+  it("keeps a realtime prompt up on a device whose clock runs 15 minutes fast", async () => {
+    setAppStateNow("active");
+    jest.useFakeTimers();
+    const { result } = mountWith({ lobbyIds: new Set([OPPONENT]) });
+    // Server time is 15 minutes behind this device.
+    const serverNow = new Date(Date.now() - 15 * 60_000).toISOString();
+    await act(async () => {
+      await incomingBinding().handler({
+        new: {
+          id: CHALLENGE,
+          challenger_id: OPPONENT,
+          opponent_id: ME,
+          status: "pending",
+          created_at: serverNow,
+          expires_at: FAR_EXPIRY,
+        },
+      });
+    });
+    expect(result.current.incoming?.challengeId).toBe(CHALLENGE);
+    act(() => {
+      jest.advanceTimersByTime(60_000);
+    });
+    expect(result.current.incoming?.challengeId).toBe(CHALLENGE);
+
+    // The full window still applies, measured on the server's clock.
+    act(() => {
+      jest.advanceTimersByTime(FRESH_MS);
+    });
+    expect(result.current.incoming).toBeNull();
+  });
+
+  it("takes no clock sample from an INSERT that lands while the app is not active", async () => {
+    setAppStateNow("background");
+    mountWith({ lobbyIds: new Set([OPPONENT]) });
+    await insert("ch-late", OPPONENT, new Date(Date.now() - 240_000).toISOString());
+    expect(getServerClockOffsetMs()).toBe(0);
+    setAppStateNow("active");
+  });
+
+  it("takes no clock sample from an INSERT flushed just after a resume, only once it settles", async () => {
+    setAppStateNow("active");
+    const onAppState = mockAppStateHandlers();
+    mountWith({ lobbyIds: new Set([OPPONENT, "b"]) });
+    act(() => onAppState("background"));
+    act(() => onAppState("active"));
+    // Buffered while suspended: four minutes late.
+    await insert("ch-late", OPPONENT, new Date(Date.now() - 240_000).toISOString());
+    expect(getServerClockOffsetMs()).toBe(0);
+
+    const later = Date.now() + 6_000;
+    jest.spyOn(Date, "now").mockReturnValue(later);
+    await insert("ch-b", "b", new Date(later - 700).toISOString());
+    expect(getServerClockOffsetMs()).toBe(700);
+  });
+
+  it("raises no prompt from an INSERT that lands during a manual go-offline (Q3)", async () => {
+    const { result, rerender } = mountWith({ lobbyIds: new Set(["a"]) });
+    let settle!: (wentOffline: boolean) => void;
+    act(() => {
+      settle = result.current.beginManualOffline();
+    });
+    // `isLive` is still true: the go-offline has not committed yet.
+    await insert("ch-a", "a");
+    expect(result.current.incoming).toBeNull();
+    // Counted, and left for recovery if the athlete comes back live.
+    expect(result.current.incomingCount).toBe(1);
+    rerender({ athleteId: ME, athleteWeight: 180, lobbyIds: new Set(["a"]), isLive: false });
+    act(() => settle(true));
+    expect(result.current.incoming).toBeNull();
+    expect(mockDeclineChallenge).not.toHaveBeenCalled();
+  });
+
+  it("a challenge set aside with Later comes back into the chip, not as a sheet, after a soft clear", async () => {
+    const { result, rerender } = mountWith({ lobbyIds: new Set([OPPONENT, "x"]) });
+    const created = new Date().toISOString();
+    await raiseIncoming(result, { created_at: created, expires_at: FAR_EXPIRY });
+    act(() => result.current.tuckIncoming());
+    jest.useFakeTimers();
+
+    // The challenger drops off the mat past the grace: a soft clear.
+    rerender({ athleteId: ME, athleteWeight: 180, lobbyIds: new Set(["x"]) });
+    act(() => {
+      jest.advanceTimersByTime(3_001);
+    });
+    expect(result.current.incoming).toBeNull();
+
+    // Back again; recovery re-offers it.
+    rerender({ athleteId: ME, athleteWeight: 180, lobbyIds: new Set([OPPONENT, "x"]) });
+    jest.useRealTimers();
+    await act(async () => {
+      await result.current.offerIncoming(CHALLENGE, OPPONENT, {
+        createdAt: created,
+        expiresAt: FAR_EXPIRY,
+      });
+    });
+    expect(result.current.incoming?.challengeId).toBe(CHALLENGE);
+    expect(result.current.incomingTucked).toBe(true);
+
+    // Reopened, then soft-cleared and back again: now it is a sheet.
+    act(() => result.current.reopenIncoming());
+    expect(result.current.incomingTucked).toBe(false);
+  });
+
+  it("a manual go-offline also drops a tucked challenge that was soft-cleared (Q3)", async () => {
+    const lobby = new Set([OPPONENT, "x"]);
+    const { result, rerender } = mountWith({ lobbyIds: lobby });
+    const created = new Date().toISOString();
+    await raiseIncoming(result, { created_at: created, expires_at: FAR_EXPIRY });
+    act(() => result.current.tuckIncoming());
+    jest.useFakeTimers();
+
+    // The challenger steps out past the grace: soft clear, tuck kept.
+    rerender({ athleteId: ME, athleteWeight: 180, lobbyIds: new Set(["x"]) });
+    act(() => {
+      jest.advanceTimersByTime(3_001);
+    });
+    expect(result.current.incoming).toBeNull();
+    jest.useRealTimers();
+
+    // The athlete goes offline on purpose.
+    let settle!: (wentOffline: boolean) => void;
+    act(() => {
+      settle = result.current.beginManualOffline();
+    });
+    rerender({ athleteId: ME, athleteWeight: 180, lobbyIds: new Set(["x"]), isLive: false });
+    act(() => settle(true));
+
+    // Live again with the challenger back: recovery must not bring it back.
+    rerender({ athleteId: ME, athleteWeight: 180, lobbyIds: lobby, isLive: true });
+    let outcome: string | undefined;
+    await act(async () => {
+      outcome = await result.current.offerIncoming(CHALLENGE, OPPONENT, {
+        createdAt: created,
+        expiresAt: FAR_EXPIRY,
+      });
+    });
+    expect(outcome).toBe("final");
+    expect(result.current.incoming).toBeNull();
+    expect(result.current.incomingTucked).toBe(false);
+    expect(mockDeclineChallenge).not.toHaveBeenCalled();
+  });
+
+  it("a challenge reopened while the manual go-offline was in flight is kept (Q3)", async () => {
+    const { result, rerender } = mountWith({ lobbyIds: new Set([OPPONENT]) });
+    await raiseIncoming(result, { created_at: new Date().toISOString() });
+    act(() => result.current.tuckIncoming());
+    let settle!: (wentOffline: boolean) => void;
+    act(() => {
+      settle = result.current.beginManualOffline();
+    });
+    act(() => result.current.reopenIncoming());
+    rerender({ athleteId: ME, athleteWeight: 180, lobbyIds: new Set([OPPONENT]), isLive: false });
+    act(() => settle(true));
+    expect(result.current.incoming?.challengeId).toBe(CHALLENGE);
+  });
+
+  it("forgets the tuck of a soft-cleared challenge once its live window lapses", async () => {
+    const lobby = new Set([OPPONENT, "x"]);
+    const { result, rerender } = mountWith({ lobbyIds: lobby });
+    await raiseIncoming(result, {
+      created_at: new Date().toISOString(),
+      expires_at: FAR_EXPIRY,
+    });
+    act(() => result.current.tuckIncoming());
+    jest.useFakeTimers();
+
+    rerender({ athleteId: ME, athleteWeight: 180, lobbyIds: new Set(["x"]) });
+    act(() => {
+      jest.advanceTimersByTime(3_001);
+    });
+    expect(result.current.incoming).toBeNull();
+    expect(result.current.incomingCount).toBe(0);
+    // Past the 10-minute window while it is off the prompt.
+    act(() => {
+      jest.advanceTimersByTime(FRESH_MS);
+    });
+    jest.useRealTimers();
+
+    // Only observable by bringing the same id back: it is no longer tucked.
+    rerender({ athleteId: ME, athleteWeight: 180, lobbyIds: lobby });
+    const now = new Date().toISOString();
+    await act(async () => {
+      await result.current.offerIncoming(CHALLENGE, OPPONENT, {
+        createdAt: now,
+        expiresAt: FAR_EXPIRY,
+      });
+    });
+    expect(result.current.incoming?.challengeId).toBe(CHALLENGE);
+    expect(result.current.incomingTucked).toBe(false);
+  });
+
+  it("clears when the challenger was in the lobby as the prompt surfaced and is gone on the next sync", async () => {
+    const { result, rerender } = mountWith({ lobbyIds: new Set([OPPONENT, "x"]) });
+    await insert(CHALLENGE, OPPONENT);
+    await waitFor(() => expect(result.current.incoming?.challengeId).toBe(CHALLENGE));
+    jest.useFakeTimers();
+    rerender({ athleteId: ME, athleteWeight: 180, lobbyIds: new Set(["x"]) });
+    act(() => {
+      jest.advanceTimersByTime(3_001);
+    });
+    expect(result.current.incoming).toBeNull();
+  });
+
+  it("keeps the prompt of a challenger never seen in the lobby (a web challenge) until its window lapses", async () => {
+    // Spec F2: a challenge from a web profile sheet comes from someone who is
+    // not tracked in `lobby:online`. They never LEFT (AC-S5), and recovery
+    // would never re-offer the challenge, so it must not be cleared early.
+    jest.useFakeTimers();
+    const { result } = mountWith({ lobbyIds: new Set(["x"]) });
+    await insert(CHALLENGE, OPPONENT);
+    expect(result.current.incoming?.challengeId).toBe(CHALLENGE);
+    act(() => {
+      jest.advanceTimersByTime(60_000);
+    });
+    expect(result.current.incoming?.challengeId).toBe(CHALLENGE);
+
+    // The 10-minute live window still bounds it.
+    act(() => {
+      jest.advanceTimersByTime(FRESH_MS);
+    });
+    expect(result.current.incoming).toBeNull();
+    expect(mockDeclineChallenge).not.toHaveBeenCalled();
+  });
+
+  it("clears a challenger first seen after the prompt surfaced, once they leave", async () => {
+    jest.useFakeTimers();
+    const { result, rerender } = mountWith({ lobbyIds: new Set(["x"]) });
+    await insert(CHALLENGE, OPPONENT);
+    // Their presence sync lands late, then they leave.
+    rerender({ athleteId: ME, athleteWeight: 180, lobbyIds: new Set([OPPONENT, "x"]) });
+    rerender({ athleteId: ME, athleteWeight: 180, lobbyIds: new Set(["x"]) });
+    act(() => {
+      jest.advanceTimersByTime(3_001);
+    });
+    expect(result.current.incoming).toBeNull();
+  });
+
+  it("a tuck the pending read shows is gone is forgotten with it", async () => {
+    const lobby = new Set([OPPONENT, "x"]);
+    const { result, rerender } = mountWith({ lobbyIds: lobby });
+    const created = new Date().toISOString();
+    await raiseIncoming(result, { created_at: created, expires_at: FAR_EXPIRY });
+    act(() => result.current.tuckIncoming());
+    jest.useFakeTimers();
+
+    // Soft-cleared: the challenger stepped out past the grace (tuck kept).
+    rerender({ athleteId: ME, athleteWeight: 180, lobbyIds: new Set(["x"]) });
+    act(() => {
+      jest.advanceTimersByTime(3_001);
+    });
+    expect(result.current.incoming).toBeNull();
+    jest.useRealTimers();
+
+    // The challenger cancelled and this client missed the UPDATE: the next
+    // pending read no longer returns it.
+    act(() => {
+      result.current.noteIncomingRead([], Date.now() + 1);
+    });
+
+    // Were the same id ever offered again, it must open as a sheet.
+    rerender({ athleteId: ME, athleteWeight: 180, lobbyIds: lobby });
+    await act(async () => {
+      await result.current.offerIncoming(CHALLENGE, OPPONENT, {
+        createdAt: created,
+        expiresAt: FAR_EXPIRY,
+      });
+    });
+    expect(result.current.incoming?.challengeId).toBe(CHALLENGE);
+    expect(result.current.incomingTucked).toBe(false);
+  });
+
+  it("being taken offline by backgrounding keeps a tucked challenge tucked (Q3)", async () => {
+    const lobby = new Set([OPPONENT]);
+    const { result, rerender } = mountWith({ lobbyIds: lobby });
+    await raiseIncoming(result, {
+      created_at: new Date().toISOString(),
+      expires_at: FAR_EXPIRY,
+    });
+    act(() => result.current.tuckIncoming());
+    expect(result.current.incomingTucked).toBe(true);
+
+    // Offline WITHOUT beginManualOffline: the app took them offline.
+    rerender({ athleteId: ME, athleteWeight: 180, lobbyIds: lobby, isLive: false });
+    expect(result.current.incoming?.challengeId).toBe(CHALLENGE);
+    expect(result.current.incomingTucked).toBe(true);
+
+    rerender({ athleteId: ME, athleteWeight: 180, lobbyIds: lobby, isLive: true });
+    expect(result.current.incoming?.challengeId).toBe(CHALLENGE);
+    expect(result.current.incomingTucked).toBe(true);
+    expect(mockDeclineChallenge).not.toHaveBeenCalled();
+  });
+});
+
+describe("my outgoing challenge lapses with its live window", () => {
+  const FRESH_MS = 10 * 60_000;
+
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.restoreAllMocks();
+  });
+
+  async function flushAsync() {
+    for (let i = 0; i < 12; i++) await Promise.resolve();
+  }
+
+  async function advance(ms: number) {
+    await act(async () => {
+      jest.advanceTimersByTime(ms);
+      await flushAsync();
+    });
+  }
+
+  async function sendFresh(result: { current: ReturnType<typeof useArenaChallenge> }) {
+    mockCreateChallenge.mockResolvedValue({
+      ok: true,
+      data: { id: CHALLENGE, expiresAt: FAR_EXPIRY, createdAt: new Date().toISOString() },
+    });
+    await sendOne(result);
+  }
+
+  it("withdraws it at 10:00, not before, and clears the plate as expired", async () => {
+    jest.useFakeTimers();
+    const { result } = mount();
+    await sendFresh(result);
+
+    await advance(FRESH_MS - 1);
+    expect(result.current.outgoing).not.toBeNull();
+    expect(mockCancelChallenge).not.toHaveBeenCalled();
+
+    await advance(1);
+    expect(mockCancelChallenge).toHaveBeenCalledWith(expect.anything(), CHALLENGE, {
+      onlyIfPending: true,
+    });
+    expect(result.current.outgoing).toBeNull();
+    expect(mockToastInfo).toHaveBeenCalledWith("Your challenge to Rival expired.");
+    expect(mockToastInfo).toHaveBeenCalledTimes(1);
+  });
+
+  it("waits 30s past 10:00 while the server clock offset is still unknown (a cold relaunch)", async () => {
+    jest.useFakeTimers();
+    const { result } = mount();
+    await sendFresh(result);
+    // As after a relaunch that restored the plate from a read: no sample.
+    __resetServerClockForTests();
+
+    await advance(FRESH_MS);
+    expect(mockCancelChallenge).not.toHaveBeenCalled();
+    expect(result.current.outgoing).not.toBeNull();
+
+    await advance(OUTGOING_LAPSE_UNLEARNED_CLOCK_MARGIN_MS);
+    expect(mockCancelChallenge).toHaveBeenCalledWith(expect.anything(), CHALLENGE, {
+      onlyIfPending: true,
+    });
+    expect(result.current.outgoing).toBeNull();
+  });
+
+  it("says expired once when the cancel's own UPDATE clears the plate first", async () => {
+    jest.useFakeTimers();
+    let resolveCancel!: (v: unknown) => void;
+    mockCancelChallenge.mockImplementation(
+      () => new Promise((r) => (resolveCancel = r)),
+    );
+    const { result } = mount();
+    await sendFresh(result);
+
+    await advance(FRESH_MS);
+    expect(mockCancelChallenge).toHaveBeenCalledTimes(1);
+    await challengerUpdate("cancelled");
+    expect(result.current.outgoing).toBeNull();
+    await act(async () => {
+      resolveCancel({ ok: true, data: { cancelled: true } });
+      await flushAsync();
+    });
+    expect(mockToastInfo).toHaveBeenCalledTimes(1);
+    expect(mockToastInfo).toHaveBeenCalledWith("Your challenge to Rival expired.");
+  });
+
+  it("joins the match when the lapse finds the row already started", async () => {
+    jest.useFakeTimers();
+    mockCancelChallenge.mockResolvedValue({ ok: true, data: { cancelled: false } });
+    mockGetStatus.mockResolvedValue({
+      ok: true,
+      data: { status: "started", expiresAt: FAR_EXPIRY },
+    });
+    const { result } = mount();
+    await sendFresh(result);
+
+    await advance(FRESH_MS);
+    expect(mockStartMatch).toHaveBeenCalledWith(expect.anything(), CHALLENGE);
+    expect(mockPush).toHaveBeenCalledTimes(1);
+    expect(mockToastInfo).not.toHaveBeenCalledWith("Your challenge to Rival expired.");
+  });
+
+  it("keeps the plate and tries again when the withdrawal cannot reach the server", async () => {
+    jest.useFakeTimers();
+    mockCancelChallenge.mockResolvedValueOnce({
+      ok: false,
+      error: { code: "UNKNOWN", message: "down" },
+    });
+    const { result } = mount();
+    await sendFresh(result);
+
+    await advance(FRESH_MS);
+    expect(result.current.outgoing).not.toBeNull();
+    await advance(15_000);
+    expect(mockCancelChallenge).toHaveBeenCalledTimes(2);
+    expect(result.current.outgoing).toBeNull();
+  });
+
+  it("says expired when the withdrawal's reply was lost but its UPDATE arrives", async () => {
+    jest.useFakeTimers();
+    // The cancel landed; only its reply was lost.
+    mockCancelChallenge.mockResolvedValueOnce({
+      ok: false,
+      error: { code: "UNKNOWN", message: "down" },
+    });
+    const { result } = mount();
+    await sendFresh(result);
+
+    await advance(FRESH_MS);
+    expect(result.current.outgoing).not.toBeNull();
+    await challengerUpdate("cancelled");
+    expect(result.current.outgoing).toBeNull();
+    expect(mockToastInfo).toHaveBeenCalledWith("Your challenge to Rival expired.");
+    expect(mockToastInfo).toHaveBeenCalledTimes(1);
+    // The plate is gone, so the retry never fires.
+    await advance(15_000);
+    expect(mockCancelChallenge).toHaveBeenCalledTimes(1);
+  });
+
+  it("still says expired when a lost-reply withdrawal is found cancelled by the retry", async () => {
+    jest.useFakeTimers();
+    // The first withdrawal landed, but its reply and the UPDATE were lost.
+    mockCancelChallenge
+      .mockResolvedValueOnce({ ok: false, error: { code: "UNKNOWN", message: "down" } })
+      .mockResolvedValueOnce({ ok: true, data: { cancelled: false } });
+    mockGetStatus.mockResolvedValue({
+      ok: true,
+      data: { status: "cancelled", expiresAt: FAR_EXPIRY },
+    });
+    const { result } = mount();
+    await sendFresh(result);
+
+    await advance(FRESH_MS);
+    expect(result.current.outgoing).not.toBeNull();
+    await advance(15_000);
+    expect(mockCancelChallenge).toHaveBeenCalledTimes(2);
+    expect(result.current.outgoing).toBeNull();
+    expect(mockToastInfo).toHaveBeenCalledWith("Your challenge to Rival expired.");
+    expect(mockToastInfo).toHaveBeenCalledTimes(1);
+  });
+
+  it("says nothing when I cancel after a failed lapse and its UPDATE lands first", async () => {
+    jest.useFakeTimers();
+    let resolveCancel!: (v: unknown) => void;
+    mockCancelChallenge
+      .mockResolvedValueOnce({ ok: false, error: { code: "UNKNOWN", message: "down" } })
+      .mockImplementationOnce(() => new Promise((r) => (resolveCancel = r)));
+    const { result } = mount();
+    await sendFresh(result);
+
+    await advance(FRESH_MS);
+    expect(result.current.outgoing).not.toBeNull();
+    act(() => {
+      void result.current.cancelOutgoing();
+    });
+    await act(flushAsync);
+    expect(mockCancelChallenge).toHaveBeenCalledTimes(2);
+    await challengerUpdate("cancelled");
+    expect(result.current.outgoing).toBeNull();
+    await act(async () => {
+      resolveCancel({ ok: true, data: { cancelled: true } });
+      await flushAsync();
+    });
+    expect(mockToastInfo).not.toHaveBeenCalled();
+  });
+
+  it("clears the plate as expired after a bounded number of unreachable retries", async () => {
+    jest.useFakeTimers();
+    mockCancelChallenge.mockResolvedValue({
+      ok: false,
+      error: { code: "UNKNOWN", message: "down" },
+    });
+    const { result } = mount();
+    await sendFresh(result);
+
+    await advance(FRESH_MS);
+    await advance(15_000);
+    await advance(15_000);
+    expect(result.current.outgoing).not.toBeNull();
+    await advance(15_000);
+    // One attempt at 0:00 plus three retries, then the plate goes.
+    expect(mockCancelChallenge).toHaveBeenCalledTimes(4);
+    expect(result.current.outgoing).toBeNull();
+    expect(mockToastInfo).toHaveBeenCalledWith("Your challenge to Rival expired.");
+    expect(mockToastInfo).toHaveBeenCalledTimes(1);
+    await advance(60_000);
+    expect(mockCancelChallenge).toHaveBeenCalledTimes(4);
+  });
+
+  it("ends quietly after the retry budget when the row moved but stays unreadable", async () => {
+    jest.useFakeTimers();
+    mockCancelChallenge.mockResolvedValue({ ok: true, data: { cancelled: false } });
+    mockGetStatus.mockResolvedValue({
+      ok: false,
+      error: { code: "UNKNOWN", message: "down" },
+    });
+    const { result } = mount();
+    await sendFresh(result);
+
+    await advance(FRESH_MS);
+    for (let i = 0; i < 3; i++) await advance(15_000);
+    expect(mockCancelChallenge).toHaveBeenCalledTimes(4);
+    expect(result.current.outgoing).toBeNull();
+    expect(mockToastInfo).not.toHaveBeenCalled();
+  });
+
+  it("tries again when the row moved but the re-read cannot say where (AC-H7)", async () => {
+    jest.useFakeTimers();
+    mockCancelChallenge
+      .mockResolvedValueOnce({ ok: true, data: { cancelled: false } })
+      .mockResolvedValueOnce({ ok: true, data: { cancelled: true } });
+    mockGetStatus.mockResolvedValueOnce({
+      ok: false,
+      error: { code: "UNKNOWN", message: "down" },
+    });
+    const { result } = mount();
+    await sendFresh(result);
+
+    await advance(FRESH_MS);
+    expect(mockCancelChallenge).toHaveBeenCalledTimes(1);
+    // Not stranded at 0:00: the lapse is tried again.
+    expect(result.current.outgoing).not.toBeNull();
+    await advance(15_000);
+    expect(mockCancelChallenge).toHaveBeenCalledTimes(2);
+    expect(result.current.outgoing).toBeNull();
+    expect(mockToastInfo).toHaveBeenCalledWith("Your challenge to Rival expired.");
+  });
+
+  it("holds off while busy, and never withdraws a plate my own cancel settled", async () => {
+    jest.useFakeTimers();
+    let resolveCancel!: (v: unknown) => void;
+    mockCancelChallenge.mockImplementationOnce(
+      () => new Promise((r) => (resolveCancel = r)),
+    );
+    const { result } = mount();
+    await sendFresh(result);
+
+    await advance(FRESH_MS - 1_000);
+    act(() => {
+      void result.current.cancelOutgoing();
+    });
+    // Past the deadline while my cancel is in flight: the lapse waits.
+    await advance(5_000);
+    expect(mockCancelChallenge).toHaveBeenCalledTimes(1);
+    expect(result.current.outgoing).not.toBeNull();
+
+    await act(async () => {
+      resolveCancel({ ok: true, data: { cancelled: true } });
+      await flushAsync();
+    });
+    expect(result.current.outgoing).toBeNull();
+    await advance(10_000);
+    expect(mockCancelChallenge).toHaveBeenCalledTimes(1);
+    expect(mockToastInfo).not.toHaveBeenCalledWith("Your challenge to Rival expired.");
+  });
+
+  it("holds off while busy, then lapses about 2s after the busy state clears", async () => {
+    jest.useFakeTimers();
+    let resolveCancel!: (v: unknown) => void;
+    mockCancelChallenge.mockImplementationOnce(
+      () => new Promise((r) => (resolveCancel = r)),
+    );
+    const { result } = mount();
+    await sendFresh(result);
+
+    await advance(FRESH_MS - 1_000);
+    act(() => {
+      void result.current.cancelOutgoing();
+    });
+    await advance(5_000);
+    expect(mockCancelChallenge).toHaveBeenCalledTimes(1);
+
+    // My cancel could not reach the server: the plate stays, busy clears.
+    await act(async () => {
+      resolveCancel({ ok: false, error: { code: "UNKNOWN", message: "down" } });
+      await flushAsync();
+    });
+    expect(result.current.outgoing).not.toBeNull();
+    await advance(2_000);
+    expect(mockCancelChallenge).toHaveBeenCalledTimes(2);
+    expect(mockCancelChallenge).toHaveBeenLastCalledWith(expect.anything(), CHALLENGE, {
+      onlyIfPending: true,
+    });
+    expect(result.current.outgoing).toBeNull();
+  });
+
+  it("lapses on return to the foreground when the app was suspended past the deadline", async () => {
+    jest.useFakeTimers();
+    const onAppState = mockAppStateHandlers();
+    const { result } = mount();
+    await sendFresh(result);
+
+    // Suspended: the clock moved, no timer ran.
+    jest.setSystemTime(Date.now() + FRESH_MS + 1_000);
+    expect(mockCancelChallenge).not.toHaveBeenCalled();
+    await act(async () => {
+      onAppState("active");
+      await flushAsync();
+    });
+    expect(mockCancelChallenge).toHaveBeenCalledTimes(1);
+    expect(result.current.outgoing).toBeNull();
+  });
+
+  it("does nothing on a foreground return inside the window", async () => {
+    jest.useFakeTimers();
+    const onAppState = mockAppStateHandlers();
+    const { result } = mount();
+    await sendFresh(result);
+    jest.setSystemTime(Date.now() + FRESH_MS - 60_000);
+    await act(async () => {
+      onAppState("active");
+      await flushAsync();
+    });
+    expect(mockCancelChallenge).not.toHaveBeenCalled();
+    expect(result.current.outgoing).not.toBeNull();
+  });
+});
+
+describe("stale offline athletes are never challengeable (F13)", () => {
+  it("refuses to send to someone not on the mat, and corrects the roster", async () => {
+    const onOpponentUnavailable = jest.fn();
+    const { result } = renderHook(() =>
+      useArenaChallenge({
+        athleteId: ME,
+        athleteWeight: 180,
+        lobbyIds: new Set(["someone-else"]),
+        onOpponentUnavailable,
+      }),
+    );
+
+    await act(async () => {
+      await result.current.sendChallenge(OPPONENT, "Rival");
+    });
+
+    expect(mockCreateChallenge).not.toHaveBeenCalled();
+    expect(mockToastInfo).toHaveBeenCalledWith("Rival isn't on the mat right now.");
+    expect(onOpponentUnavailable).toHaveBeenCalledWith(OPPONENT);
+    expect(result.current.outgoing).toBeNull();
+  });
+
+  it("refuses while presence is tracked but unknown (a lost channel), without blaming the opponent", async () => {
+    const onOpponentUnavailable = jest.fn();
+    const { result } = renderHook(() =>
+      useArenaChallenge({
+        athleteId: ME,
+        athleteWeight: 180,
+        lobbyIds: null,
+        onOpponentUnavailable,
+      }),
+    );
+    await act(async () => {
+      await result.current.sendChallenge(OPPONENT, "Rival");
+    });
+    expect(mockCreateChallenge).not.toHaveBeenCalled();
+    expect(mockToastInfo).toHaveBeenCalledWith(
+      "Reconnecting to the mat, try again in a moment.",
+    );
+    expect(onOpponentUnavailable).not.toHaveBeenCalled();
+    expect(result.current.outgoing).toBeNull();
+  });
+
+  it("known, then the channel is lost: a send to someone from the stale set is refused", async () => {
+    type Props = Parameters<typeof useArenaChallenge>[0];
+    const { result, rerender } = renderHook((props: Props) => useArenaChallenge(props), {
+      initialProps: { athleteId: ME, athleteWeight: 180, lobbyIds: new Set([OPPONENT]) },
+    });
+    // CHANNEL_ERROR: the owner passes null while phoenix rejoins, even
+    // though the roster may still show the pre-outage ids.
+    rerender({ athleteId: ME, athleteWeight: 180, lobbyIds: null });
+    await act(async () => {
+      await result.current.sendChallenge(OPPONENT, "Rival");
+    });
+    expect(mockCreateChallenge).not.toHaveBeenCalled();
+
+    // The rejoin syncs: sends go out again.
+    rerender({ athleteId: ME, athleteWeight: 180, lobbyIds: new Set([OPPONENT]) });
+    await act(async () => {
+      await result.current.sendChallenge(OPPONENT, "Rival");
+    });
+    expect(mockCreateChallenge).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not refuse when presence is not tracked at all (no lobby given)", async () => {
+    const onOpponentUnavailable = jest.fn();
+    const { result } = renderHook(() =>
+      useArenaChallenge({
+        athleteId: ME,
+        athleteWeight: 180,
+        lobbyIds: undefined,
+        onOpponentUnavailable,
+      }),
+    );
+    await act(async () => {
+      await result.current.sendChallenge(OPPONENT, "Rival");
+    });
+    expect(mockCreateChallenge).toHaveBeenCalledTimes(1);
+    expect(onOpponentUnavailable).not.toHaveBeenCalled();
+  });
+
+  it("sends to someone who is on the mat", async () => {
+    const { result } = renderHook(() =>
+      useArenaChallenge({ athleteId: ME, athleteWeight: 180, lobbyIds: new Set([OPPONENT]) }),
+    );
+    await act(async () => {
+      await result.current.sendChallenge(OPPONENT, "Rival");
+    });
+    expect(mockCreateChallenge).toHaveBeenCalledTimes(1);
+    expect(result.current.outgoing?.challengeId).toBe(CHALLENGE);
   });
 });

@@ -133,7 +133,11 @@ export interface RematchAutoSendInput {
   blocked: boolean;
   capReached: boolean;
   outgoingOpponentId: string | null;
-  /** Idempotent go-live (`arenaActions.goLive`), never a toggle. */
+  /**
+   * Idempotent go-live, never a toggle: `arenaActions.goLiveUnguarded`. Not
+   * the guarded `arenaActions.goLive`: this is programmatic, not a tap, and
+   * the switch cooldown would silently swallow it ("ignored").
+   */
   goLive: () => void;
   send: (opponentId: string, opponentName: string) => Promise<void>;
 }
@@ -210,13 +214,4 @@ export function useRematchAutoSend({
     toastedForRef.current = id;
     toast.success({ text1: `Rematch sent to ${sentNameRef.current ?? "your opponent"}` });
   }, [outgoingOpponentId]);
-}
-
-/** Moves the row with `id` to the front; everyone else keeps roster order. */
-export function pinFirst<T extends { id: string }>(
-  list: T[],
-  id: string | null,
-): T[] {
-  const i = id ? list.findIndex((c) => c.id === id) : -1;
-  return i > 0 ? [list[i], ...list.slice(0, i), ...list.slice(i + 1)] : list;
 }

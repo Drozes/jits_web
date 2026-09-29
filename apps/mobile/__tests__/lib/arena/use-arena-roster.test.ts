@@ -22,6 +22,7 @@ jest.mock("@/lib/supabase/client", () => ({ supabase: {} }));
 
 import { useArenaRoster } from "@/lib/arena/use-arena-roster";
 import { useArenaMatchScreen } from "@/lib/arena/arena-store";
+import { getMatRosterIds, resetMatRosterStore } from "@/lib/arena/mat-roster-store";
 
 // ---- fixtures ----
 
@@ -58,6 +59,33 @@ beforeEach(() => {
   mockGetArenaData.mockResolvedValue(ROSTER);
 });
 
+describe("roster publishing for the header chip (spec 14, D2)", () => {
+  beforeEach(() => resetMatRosterStore());
+
+  it("publishes nothing until a read succeeds, then the roster ids, and clears on unmount", async () => {
+    let resolve: (v: unknown) => void = () => {};
+    mockGetArenaData.mockReturnValueOnce(new Promise((r) => (resolve = r)));
+    const { result, unmount } = renderHook(() => useArenaRoster(1200));
+    expect(result.current.hasRoster).toBe(false);
+    expect(getMatRosterIds()).toBeNull();
+    await act(async () => resolve(ROSTER));
+    await waitFor(() => expect(result.current.hasRoster).toBe(true));
+    expect(getMatRosterIds()).toEqual(["a-1", "a-2"]);
+    unmount();
+    expect(getMatRosterIds()).toBeNull();
+  });
+
+  it("a failed first read publishes no roster", async () => {
+    mockGetArenaData.mockResolvedValueOnce(null);
+    const { result, unmount } = renderHook(() => useArenaRoster(1200));
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.hasError).toBe(true);
+    expect(result.current.hasRoster).toBe(false);
+    expect(getMatRosterIds()).toBeNull();
+    unmount();
+  });
+});
+
 describe("useArenaRoster", () => {
   it("asks for the full roster, not the RPC default", async () => {
     const { result } = renderHook(() => useArenaRoster(1200));
@@ -91,6 +119,38 @@ describe("useArenaRoster", () => {
       }),
     ]);
     expect([...result.current.challengedIds]).toEqual(["a-2"]);
+    expect(result.current.hasError).toBe(false);
+  });
+
+  it("hands Just Rolled the recent_activity of the last good read", async () => {
+    const activity = [
+      {
+        match_id: "m-1",
+        winner_name: "Kofi",
+        loser_name: "Jordan",
+        result: "submission",
+        match_type: "ranked",
+        completed_at: "2026-09-28T12:00:00Z",
+      },
+    ];
+    mockGetArenaData.mockResolvedValueOnce({ ...ROSTER, recent_activity: activity });
+    const { result } = renderHook(() => useArenaRoster(1200));
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.recentActivity).toEqual(activity);
+
+    // A quiet read that fails keeps the ticker with the roster it belongs to.
+    mockGetArenaData.mockResolvedValueOnce(null);
+    act(() => result.current.refreshQuietly());
+    await waitFor(() => expect(result.current.isFetching).toBe(false));
+    expect(result.current.recentActivity).toEqual(activity);
+  });
+
+  it("reads a payload without recent_activity as an empty ticker", async () => {
+    const { recent_activity: _drop, ...noActivity } = ROSTER;
+    mockGetArenaData.mockResolvedValueOnce(noActivity);
+    const { result } = renderHook(() => useArenaRoster(1200));
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.recentActivity).toEqual([]);
     expect(result.current.hasError).toBe(false);
   });
 

@@ -18,20 +18,24 @@ import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
 import { ATHLETE_STATUS } from "@jits/shared/constants";
 import type { AthleteGuardRow } from "@jits/shared/api/queries";
 import { ChallengePromptSheet } from "@/components/arena/challenge-prompt-sheet";
+import { REOPEN_SURFACE_GRACE_MS } from "./constants";
 import { useAuth } from "../auth/hooks";
 import {
   IDLE_ARENA_STATE,
   notifyOpponentUnavailable,
   notifyStaleChallengesCancelled,
+  useHasIncomingReopenSurface,
   useIsInArenaMatch,
   useMatchExitCount,
+  publishArenaSelfId,
   publishArenaState,
   registerArenaController,
 } from "./arena-store";
 import { useArenaChallenge } from "./use-arena-challenge";
 import { useArenaLive } from "./use-arena-live";
-import { useLobbyIds, useLobbyPresence } from "./use-lobby-presence";
+import { useLobbyIds, useLobbyKnown, useLobbyPresence } from "./use-lobby-presence";
 import { usePendingChallengeRecovery } from "./use-pending-challenge-recovery";
+import { useActiveMatchOwner } from "../match-flow/active-match-store";
 
 const ARENA_KEEP_AWAKE_TAG = "arena-live";
 
@@ -79,14 +83,34 @@ export function ArenaBootstrap() {
 function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
   useLobbyPresence(athlete.id);
   const lobbyIds = useLobbyIds();
+  // An empty set reads the same whether the lobby is empty or its channel is
+  // down; the challenge hook must only act on a lobby that is actually known.
+  const lobbyKnown = useLobbyKnown();
   const inMatch = useIsInArenaMatch();
+  // The app-wide "result to confirm" / Resume source (F10).
+  useActiveMatchOwner(athlete.id);
+  // Who the header chip counts as "self" (left out of the lobby count).
+  React.useEffect(() => {
+    publishArenaSelfId(athlete.id);
+    return () => publishArenaSelfId(null);
+  }, [athlete.id]);
 
+  // The challenge hook is created after the live hook, so a manual
+  // go-offline reaches it through a ref.
+  const beginManualOfflineRef = React.useRef<
+    () => ((wentOffline: boolean) => void) | void
+  >(() => {});
   const live = useArenaLive({
     athleteId: athlete.id,
     displayName: athlete.display_name ?? "",
-    currentElo: athlete.current_elo ?? 0,
+    // Null, not 0: an unrated athlete never tracks a placeholder rating.
+    currentElo:
+      typeof athlete.current_elo === "number" && Number.isFinite(athlete.current_elo)
+        ? athlete.current_elo
+        : null,
     initialRanked: athlete.looking_for_ranked ?? false,
     inMatch,
+    onManualOffline: () => beginManualOfflineRef.current(),
   });
 
   const challenge = useArenaChallenge({
@@ -96,7 +120,11 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
     isLive: live.isLive,
     onOpponentUnavailable: notifyOpponentUnavailable,
     onStaleCancelled: notifyStaleChallengesCancelled,
+    // Null, not undefined: presence is tracked but UNKNOWN right now, so
+    // the hook refuses to send rather than skip the on-the-mat check (F13).
+    lobbyIds: lobbyKnown ? lobbyIds : null,
   });
+  beginManualOfflineRef.current = challenge.beginManualOffline;
 
   // Also withdraws my own stale outgoing challenges (jits-celf) on the same
   // triggers: mount, going live, foreground. The one on my plate is kept.
@@ -105,19 +133,69 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
     isLive: live.isLive,
     inMatch,
     hasIncoming: !!challenge.incoming,
+    tuckedIncomingId: challenge.incomingTucked
+      ? (challenge.incoming?.challengeId ?? null)
+      : null,
     lobbyIds,
+    lobbyKnown,
     offerIncoming: challenge.offerIncoming,
     restoreOutgoing: challenge.restoreOutgoing,
     outgoingChallengeId: challenge.outgoing?.challengeId ?? null,
     onStaleCancelled: notifyStaleChallengesCancelled,
+    onIncomingRead: challenge.noteIncomingRead,
   });
 
   const { isLive, isSaving } = live;
-  const { incoming, outgoing, isBusy, capReached } = challenge;
+  const liveTransition = live.transition ?? null;
+  const lastLiveWriteFailed = live.lastWriteFailed ?? false;
+  // Live, with the lobby channel down or rejoining: nobody can vouch that
+  // this athlete is on the mat right now (AC-H11, `◌ RECONNECTING`).
+  const reconnecting = isLive && !lobbyKnown;
+  const { incoming, outgoing, incomingCount, incomingTucked, isBusy, capReached } =
+    challenge;
   useArenaLiveKeepAwake(isLive && !inMatch);
+
+  // "Later" is only offered while something on screen can bring the prompt
+  // back (the header chip registers itself, see useIncomingReopenSurface). If
+  // the last such surface goes away while a challenge is tucked, it comes
+  // straight back up as the sheet rather than staying hidden with no way to
+  // answer it until it lapses (AC-S4). After a short grace, so a surface that
+  // registers in a later effect (this owner's effects run before a sibling
+  // header's) or remounts across a navigation does not bounce the sheet up.
+  const canReopen = useHasIncomingReopenSurface();
+  const reopenIncoming = challenge.reopenIncoming;
   React.useEffect(() => {
-    publishArenaState({ isLive, isSaving, incoming, outgoing, isBusy, capReached });
-  }, [isLive, isSaving, incoming, outgoing, isBusy, capReached]);
+    if (!incomingTucked || canReopen) return;
+    const timer = setTimeout(reopenIncoming, REOPEN_SURFACE_GRACE_MS);
+    return () => clearTimeout(timer);
+  }, [incomingTucked, canReopen, reopenIncoming]);
+  React.useEffect(() => {
+    publishArenaState({
+      isLive,
+      isSaving,
+      liveTransition,
+      incoming,
+      outgoing,
+      incomingCount,
+      incomingTucked,
+      isBusy,
+      capReached,
+      lastLiveWriteFailed,
+      reconnecting,
+    });
+  }, [
+    isLive,
+    isSaving,
+    liveTransition,
+    incoming,
+    outgoing,
+    incomingCount,
+    incomingTucked,
+    isBusy,
+    capReached,
+    lastLiveWriteFailed,
+    reconnecting,
+  ]);
 
   // Registered through refs so the controller is registered once and still
   // always calls the latest callbacks.
@@ -133,6 +211,9 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
       sendChallenge: (id, name) => challengeRef.current.sendChallenge(id, name),
       cancelOutgoing: () => challengeRef.current.cancelOutgoing(),
       clearCap: () => challengeRef.current.clearCap(),
+      tuckIncoming: () => challengeRef.current.tuckIncoming(),
+      reopenIncoming: () => challengeRef.current.reopenIncoming(),
+      isIncomingDismissed: (id) => challengeRef.current.isIncomingDismissed(id),
     });
     return () => {
       unregister();
@@ -146,11 +227,18 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
     // recovery re-offers it after the match only if it is still fresh and
     // its challenger is still in the lobby (jits-yiwx). The `inMatch` guard
     // here covers the render between the match starting and that clear.
+    // A challenge tucked away with "Later" keeps its sheet down; the header
+    // chip carries it until it is reopened or clears.
     <ChallengePromptSheet
-      challenge={inMatch ? null : incoming}
+      challenge={inMatch || incomingTucked ? null : incoming}
       busy={isBusy}
       onAccept={() => void challenge.accept()}
       onDecline={() => void challenge.decline()}
+      // "Later" (AC-S4): minimize into the header chip; nothing is written.
+      // No chip mounted, no Later.
+      onLater={canReopen ? () => challenge.tuckIncoming() : undefined}
+      // The prompt shows the first challenge; the rest are "+N more" (AC-S6).
+      moreCount={Math.max(0, incomingCount - 1)}
       viewer={{ elo: athlete.current_elo ?? null, weight: athlete.current_weight ?? null }}
     />
   );

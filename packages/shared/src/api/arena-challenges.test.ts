@@ -223,9 +223,9 @@ describe("cancelStaleOutgoingChallenges", () => {
 });
 
 describe("createChallenge", () => {
-  it("returns the row's expires_at so the challenger can expire it locally", async () => {
+  it("returns the row's expires_at and created_at (client expiry, freshness countdown)", async () => {
     const single = vi.fn().mockResolvedValue({
-      data: { id: "c1", expires_at: "2026-10-02T12:00:00Z" },
+      data: { id: "c1", expires_at: "2026-10-02T12:00:00Z", created_at: "2026-09-25T12:00:00Z" },
       error: null,
     });
     const select = vi.fn(() => ({ single }));
@@ -239,11 +239,25 @@ describe("createChallenge", () => {
       matchType: "ranked",
     });
 
-    expect(select).toHaveBeenCalledWith("id, expires_at");
+    expect(select).toHaveBeenCalledWith("id, expires_at, created_at");
     expect(result).toEqual({
       ok: true,
-      data: { id: "c1", expiresAt: "2026-10-02T12:00:00Z" },
+      data: {
+        id: "c1",
+        expiresAt: "2026-10-02T12:00:00Z",
+        createdAt: "2026-09-25T12:00:00Z",
+      },
     });
+  });
+
+  it("returns null timestamps when the row omits them", async () => {
+    const single = vi.fn().mockResolvedValue({ data: { id: "c1" }, error: null });
+    const client = {
+      rpc: vi.fn().mockResolvedValue({ data: ME, error: null }),
+      from: vi.fn(() => ({ insert: () => ({ select: () => ({ single }) }) })),
+    } as never;
+    const result = await createChallenge(client, { opponentId: "opp", matchType: "ranked" });
+    expect(result).toEqual({ ok: true, data: { id: "c1", expiresAt: null, createdAt: null } });
   });
 });
 
@@ -348,16 +362,25 @@ describe("getChallengeStatus", () => {
     return { client: { from: vi.fn(() => ({ select })) } as never, select, eq };
   }
 
-  it("returns the row's status", async () => {
-    const { client, eq } = selectClient({
-      data: { status: "started", expires_at: "2026-10-02T12:00:00Z" },
+  it("returns the row's status, expiry and creation time", async () => {
+    const { client, eq, select } = selectClient({
+      data: {
+        status: "started",
+        expires_at: "2026-10-02T12:00:00Z",
+        created_at: "2026-09-25T12:00:00Z",
+      },
       error: null,
     });
     const result = await getChallengeStatus(client, "c1");
+    expect(select).toHaveBeenCalledWith("status, expires_at, created_at");
     expect(eq).toHaveBeenCalledWith("id", "c1");
     expect(result).toEqual({
       ok: true,
-      data: { status: "started", expiresAt: "2026-10-02T12:00:00Z" },
+      data: {
+        status: "started",
+        expiresAt: "2026-10-02T12:00:00Z",
+        createdAt: "2026-09-25T12:00:00Z",
+      },
     });
   });
 

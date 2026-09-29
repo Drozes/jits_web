@@ -6,10 +6,11 @@
  */
 import * as React from "react";
 import { getArenaData } from "@jits/shared/api/queries";
-import type { ArenaData } from "@jits/shared/types/composites";
+import type { ArenaData, RecentActivityItem } from "@jits/shared/types/composites";
 import { supabase } from "../supabase/client";
 import { useMatchExitCount } from "./arena-store";
 import { ARENA_ROSTER_LIMIT } from "./constants";
+import { publishMatRoster } from "./mat-roster-store";
 
 export interface ArenaCompetitor {
   id: string;
@@ -35,6 +36,11 @@ export interface UseArenaRosterResult {
   competitors: ArenaCompetitor[];
   /** Opponent ids with a pending challenge in EITHER direction. */
   challengedIds: Set<string>;
+  /**
+   * `get_arena_data.recent_activity` from the last good read, newest first:
+   * the Mat Board's Just Rolled ticker. Empty until a read lands.
+   */
+  recentActivity: RecentActivityItem[];
   isLoading: boolean;
   isRefreshing: boolean;
   /** True when the last read failed. Distinct from an empty roster. */
@@ -52,6 +58,12 @@ export interface UseArenaRosterResult {
   refreshQuietly: () => void;
   /** Whether the most recent completed read succeeded. */
   lastReadOk: boolean;
+  /**
+   * A read has succeeded at least once, so `competitors` is a real roster
+   * (possibly empty) and not the empty placeholder before any answer. Every
+   * count the Arena shows is null until then (spec 14, D2).
+   */
+  hasRoster: boolean;
 }
 
 export function useArenaRoster(currentElo: number): UseArenaRosterResult {
@@ -59,12 +71,14 @@ export function useArenaRoster(currentElo: number): UseArenaRosterResult {
   const [challengedIds, setChallengedIds] = React.useState<Set<string>>(
     () => new Set(),
   );
+  const [recentActivity, setRecentActivity] = React.useState<RecentActivityItem[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [isRefreshing, setIsRefreshing] = React.useState(false);
   const [hasError, setHasError] = React.useState(false);
   // Starts true: the mount read is in flight from the first render.
   const [isFetching, setIsFetching] = React.useState(true);
   const [lastReadOk, setLastReadOk] = React.useState(true);
+  const [hasRoster, setHasRoster] = React.useState(false);
   const [tick, setTick] = React.useState(0);
   /** The next read was asked for by `refreshQuietly`. */
   const quietNext = React.useRef(false);
@@ -132,7 +146,11 @@ export function useArenaRoster(currentElo: number): UseArenaRosterResult {
         })),
       );
       setChallengedIds(new Set(arena.challenged_opponent_ids ?? []));
+      setRecentActivity(
+        Array.isArray(arena.recent_activity) ? arena.recent_activity : [],
+      );
       hasGoodRoster.current = true;
+      setHasRoster(true);
       setLastReadOk(true);
       setHasError(false);
       setIsLoading(false);
@@ -153,9 +171,16 @@ export function useArenaRoster(currentElo: number): UseArenaRosterResult {
     [competitors, currentElo],
   );
 
+  // App-wide, so the header chip counts exactly who the rows can show.
+  React.useEffect(() => {
+    publishMatRoster(hasRoster ? competitors.map((c) => c.id) : null);
+  }, [competitors, hasRoster]);
+  React.useEffect(() => () => publishMatRoster(null), []);
+
   return {
     competitors: withGap,
     challengedIds,
+    recentActivity,
     isLoading,
     isRefreshing,
     hasError,
@@ -163,5 +188,6 @@ export function useArenaRoster(currentElo: number): UseArenaRosterResult {
     refresh,
     refreshQuietly,
     lastReadOk,
+    hasRoster,
   };
 }

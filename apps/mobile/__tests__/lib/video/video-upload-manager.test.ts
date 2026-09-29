@@ -543,7 +543,10 @@ describe("resuming persisted jobs", () => {
     // transferring when a later sweep crosses it. `abandonJob` deletes the
     // local clip, so expiring it there pulls the file out from under a live
     // upload.
-    seedJob({ createdAt: Date.now() - UPLOAD_JOB_MAX_AGE_MS + 1 });
+    // A minute inside the window, not 1ms: under a loaded full-suite run the
+    // first resume can start more than 1ms after the seed, and the job would
+    // already have expired before it launched.
+    seedJob({ createdAt: Date.now() - UPLOAD_JOB_MAX_AGE_MS + 60_000 });
     const held = heldGate();
     mockUploadFileResumable.mockImplementation(held.impl);
 

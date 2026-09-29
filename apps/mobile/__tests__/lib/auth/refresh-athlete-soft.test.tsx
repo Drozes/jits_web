@@ -27,6 +27,8 @@ jest.mock("@jits/shared/api/queries", () => ({
       ? { ok: true, data: row }
       : { ok: false, error: { code: "UNKNOWN", message: "blip" } };
   },
+  // The Arena owner also keeps the app-wide open-match store fresh (F10).
+  getMyActiveMatch: async () => ({ ok: true, data: null }),
 }));
 
 jest.mock("@/lib/supabase/client", () => ({
@@ -66,6 +68,7 @@ jest.mock("@/lib/arena/use-lobby-presence", () => ({
     }, []);
   },
   useLobbyIds: () => new Set<string>(),
+  useLobbyKnown: () => true,
 }));
 jest.mock("@/lib/arena/use-arena-live", () => ({
   useArenaLive: () => ({ isLive: true, isSaving: false, toggle: jest.fn(), goOffline: jest.fn() }),

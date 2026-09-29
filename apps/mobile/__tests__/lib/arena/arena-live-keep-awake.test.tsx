@@ -25,9 +25,13 @@ let mockAthlete: Record<string, unknown> | null = null;
 jest.mock("@/lib/auth/hooks", () => ({
   useAuth: () => ({ athlete: mockAthlete, refreshAthleteSoft: () => Promise.resolve() }),
 }));
+jest.mock("@/lib/match-flow/active-match-store", () => ({
+  useActiveMatchOwner: () => {},
+}));
 jest.mock("@/lib/arena/use-lobby-presence", () => ({
   useLobbyPresence: () => {},
   useLobbyIds: () => new Set<string>(),
+  useLobbyKnown: () => true,
 }));
 let mockIsLive = false;
 jest.mock("@/lib/arena/use-arena-live", () => ({

@@ -44,11 +44,14 @@ import { toggleMatchPreferences } from "@jits/shared/api/mutations";
 import { toast } from "@/components/ui/toast";
 import { supabase } from "../supabase/client";
 import { joinLobby, leaveLobby } from "./use-lobby-presence";
+import type { LiveSwitchDirection } from "./arena-store";
+import { GO_OFFLINE_FAILED_MESSAGE } from "./constants";
 
 export interface UseArenaLiveArgs {
   athleteId: string;
   displayName: string;
-  currentElo: number;
+  /** Null when the athlete has no rating; tracked as null, never as 0. */
+  currentElo: number | null;
   /** `athletes.looking_for_ranked` as the auth context last read it. */
   initialRanked: boolean;
   /**
@@ -57,11 +60,45 @@ export interface UseArenaLiveArgs {
    * they were live going in.
    */
   inMatch?: boolean;
+  /**
+   * The athlete is going offline ON PURPOSE: `toggle` turning live off, or
+   * `goOffline` (the popover, sign-out). Called synchronously before the
+   * transition starts; the function it may return is called once the
+   * transition settled, with whether it took the athlete offline: the
+   * committed live state is off, which is what the athlete sees (grey chip,
+   * gone from the lobby), even when the flag clear itself failed. NOT called when the app takes them offline
+   * (backgrounding, entering a match), which is the whole distinction:
+   * a manual go-offline drops a challenge tucked into the chip, a trip to
+   * the home screen does not (decision Q3).
+   */
+  onManualOffline?: () => ((wentOffline: boolean) => void) | void;
 }
 
 export interface UseArenaLiveResult {
   isLive: boolean;
   isSaving: boolean;
+  /**
+   * Which way a transition is heading while one is running and the intent
+   * differs from what is committed, null otherwise. Set for ANY live
+   * transition in flight, the athlete's own toggle included, and in
+   * particular for the ones the athlete did not start (restoring live on
+   * return to the foreground or after a match, the arrival re-assert), which
+   * `isSaving` does not cover: the
+   * live switch reads this so it is locked, and labelled with where it is
+   * going, while one of those is in flight. Otherwise a tap on "Go live"
+   * during a restore would reach `toggle`, which reverses the INTENT (live)
+   * and would take the athlete offline.
+   */
+  transition: LiveSwitchDirection | null;
+  /**
+   * The last go-live attempt failed its flag write, whichever path started
+   * it (toggle, goLive, a foreground or post-match restore, the arrival
+   * re-assert). Cleared by the next transition that lands, either way, and
+   * by any later offline intent (entering a match, backgrounding, a
+   * go-offline), even one with nothing to write. The
+   * chip's `○ OFFLINE · RETRY` (AC-H11) reads this through the store.
+   */
+  lastWriteFailed: boolean;
   /** Toggle. Resolves once the write has settled. */
   toggle: () => Promise<void>;
   /**
@@ -76,6 +113,14 @@ export interface UseArenaLiveResult {
    */
   goLive: () => Promise<boolean>;
 }
+
+/**
+ * How long after a failed flag clear the one follow-up clear goes out. The
+ * app is already offline (presence untracked, grey chip), but the column
+ * still says "looking", so other athletes and web keep listing this athlete
+ * until it lands. A later foreground tries again if this one fails too.
+ */
+export const CLEAR_RETRY_MS = 15_000;
 
 /** Longest a transition waits on joining the lobby's presence. */
 const LOBBY_CALL_BOUND_MS = 12_000;
@@ -133,9 +178,17 @@ export function useArenaLive({
   currentElo,
   initialRanked,
   inMatch = false,
+  onManualOffline,
 }: UseArenaLiveArgs): UseArenaLiveResult {
   const [isLive, setIsLive] = React.useState(false);
   const [isSaving, setIsSaving] = React.useState(false);
+  const [transition, setTransition] = React.useState<LiveSwitchDirection | null>(
+    null,
+  );
+  const [lastWriteFailed, setLastWriteFailedState] = React.useState(false);
+  const setLastWriteFailed = React.useCallback((failed: boolean) => {
+    setLastWriteFailedState(failed);
+  }, []);
 
   /** What we intend. Set synchronously by every caller, before any await. */
   const desiredRef = React.useRef(false);
@@ -158,6 +211,51 @@ export function useArenaLive({
 
   const identityRef = React.useRef({ athleteId, displayName, currentElo });
   identityRef.current = { athleteId, displayName, currentElo };
+  const manualOfflineRef = React.useRef(onManualOffline);
+  manualOfflineRef.current = onManualOffline;
+
+  /**
+   * The last flag clear failed (twice, see `writeLookingFlag`), so the
+   * column may still read "looking" while the app is offline. Cleared by a
+   * clear or a go-live write that lands.
+   */
+  const clearFailedRef = React.useRef(false);
+  const clearRetryTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  /**
+   * Queue one follow-up clear, serialized behind any transition, and only
+   * while the athlete still means to be offline. Called by a timer after a
+   * failed clear and on the next foreground.
+   */
+  const retryFailedClear = React.useCallback(() => {
+    if (clearRetryTimerRef.current) {
+      clearTimeout(clearRetryTimerRef.current);
+      clearRetryTimerRef.current = null;
+    }
+    if (!clearFailedRef.current || desiredRef.current) return;
+    queueRef.current = queueRef.current
+      .then(async () => {
+        const id = identityRef.current.athleteId;
+        if (!id || !clearFailedRef.current || desiredRef.current || actualRef.current) return;
+        if (await writeLookingFlag(id, false)) clearFailedRef.current = false;
+      })
+      .then(
+        () => undefined,
+        () => undefined,
+      );
+  }, []);
+  const scheduleClearRetry = React.useCallback(() => {
+    if (clearRetryTimerRef.current) clearTimeout(clearRetryTimerRef.current);
+    clearRetryTimerRef.current = setTimeout(() => {
+      clearRetryTimerRef.current = null;
+      retryFailedClear();
+    }, CLEAR_RETRY_MS);
+  }, [retryFailedClear]);
+  React.useEffect(
+    () => () => {
+      if (clearRetryTimerRef.current) clearTimeout(clearRetryTimerRef.current);
+    },
+    [],
+  );
 
   /** One transition toward the current intent. */
   const step = React.useCallback(async (): Promise<boolean> => {
@@ -175,6 +273,7 @@ export function useArenaLive({
         return false;
       }
       actualRef.current = true;
+      clearFailedRef.current = false;
       setIsLive(true);
 
       // Intent can flip during that round trip. Tracking now would raise a
@@ -218,16 +317,65 @@ export function useArenaLive({
       // never reject the transition. Said out loud rather than swallowed.
       console.warn("[arena] leaving the lobby failed:", error);
     });
-    return writeLookingFlag(id, false);
+    const cleared = await writeLookingFlag(id, false);
+    // A failed clear still commits offline here (above), so nothing in the
+    // UI offers a go-offline to retry it: retry it in the background.
+    clearFailedRef.current = !cleared;
+    if (!cleared) scheduleClearRetry();
+    return cleared;
+  }, [scheduleClearRetry]);
+
+  /** Reconcile passes queued or running (for `transition`). */
+  const pendingRef = React.useRef(0);
+  const syncTransition = React.useCallback(() => {
+    const desired = desiredRef.current;
+    setTransition(
+      pendingRef.current > 0 && desired !== actualRef.current
+        ? desired
+          ? "going-live"
+          : "going-offline"
+        : null,
+    );
   }, []);
 
+  /** Count of failed go-live writes; see `reconcile`. */
+  const goLiveFailuresRef = React.useRef(0);
+
   const reconcile = React.useCallback((): Promise<boolean> => {
+    pendingRef.current += 1;
+    // Failed go-live writes so far. A pass whose intent was dropped reports a
+    // failure only when one landed AFTER it was enqueued (a go-live queued
+    // ahead of it), never one left over from an earlier, unrelated attempt.
+    const failuresBefore = goLiveFailuresRef.current;
+    syncTransition();
+    // The intent this pass was ENQUEUED for. Read at start instead, a go-live
+    // queued behind a failing go-live would see the `desiredRef = false` that
+    // failure left behind and wipe the failure it should be reporting.
+    const intent = desiredRef.current;
     const run = queueRef.current.then(async () => {
       let ok = true;
+      // An offline intent reconciled, even as a no-op (a failed go-live has
+      // already left the athlete offline, so entering a match or backgrounding
+      // finds nothing to write): the failure is behind them now, and the
+      // chip must not keep offering RETRY for it hours later.
+      if (!intent && !desiredRef.current) setLastWriteFailed(false);
       // Bounded, because a pass that keeps finding new intent means someone
       // holding down the toggle, not a loop that cannot settle.
       for (let i = 0; i < 4 && desiredRef.current !== actualRef.current; i++) {
+        syncTransition();
+        const goingLive = desiredRef.current;
         ok = await step();
+        if (goingLive && !ok) goLiveFailuresRef.current += 1;
+        // Only a failed go-live is "last write failed": a failed clear still
+        // leaves the athlete offline in the app (see `step`), and any pass
+        // that lands clears the flag.
+        setLastWriteFailed(goingLive && !ok);
+      }
+      // A go-live that found nothing to do because the go-live queued ahead
+      // of it failed (and dropped the intent) did not land either: report
+      // the failure to its caller too, rather than a silent success.
+      if (intent && !desiredRef.current && !actualRef.current) {
+        return goLiveFailuresRef.current === failuresBefore && ok;
       }
       return ok;
     });
@@ -235,8 +383,12 @@ export function useArenaLive({
       () => undefined,
       () => undefined,
     );
+    void queueRef.current.then(() => {
+      pendingRef.current -= 1;
+      syncTransition();
+    });
     return run;
-  }, [step]);
+  }, [step, syncTransition, setLastWriteFailed]);
 
   const requestLive = React.useCallback((): Promise<boolean> => {
     desiredRef.current = true;
@@ -248,6 +400,29 @@ export function useArenaLive({
     return reconcile();
   }, [reconcile]);
 
+  /**
+   * A go-offline the athlete asked for. The hook is told before (so nothing
+   * new is offered on the way out) and after, with whether the athlete is now
+   * offline. That is read off the COMMITTED state, not the flag write: the
+   * offline branch of `step` commits offline and untracks presence before the
+   * write, so a clear that fails twice still leaves the athlete offline as
+   * far as they (grey chip) and the lobby can tell, and a tucked challenge
+   * then drops as decision Q3 says. Only a go-offline that never committed
+   * (the intent flipped back to live meanwhile) keeps it.
+   */
+  const manualOffline = React.useCallback(async (): Promise<boolean> => {
+    const settle = manualOfflineRef.current?.();
+    let ok = false;
+    try {
+      ok = await requestOffline();
+    } finally {
+      if (typeof settle === "function") {
+        settle(!actualRef.current && !desiredRef.current);
+      }
+    }
+    return ok;
+  }, [requestOffline]);
+
   const toggle = React.useCallback(async () => {
     if (inFlightRef.current) return;
     inFlightRef.current = true;
@@ -256,19 +431,20 @@ export function useArenaLive({
       // Read the INTENT, not the committed state: a tap during an in-flight
       // transition should reverse what was asked for, not what has landed.
       const wantLive = !desiredRef.current;
-      const ok = wantLive ? await requestLive() : await requestOffline();
+      const ok = wantLive ? await requestLive() : await manualOffline();
       if (!ok) {
-        toast.error(
+        // Neutral, never red: a live-flag write failure is ink-3 (spec 3).
+        toast.info(
           wantLive
             ? "Couldn't take you live. Try again."
-            : "Couldn't take you offline. Try again.",
+            : GO_OFFLINE_FAILED_MESSAGE,
         );
       }
     } finally {
       inFlightRef.current = false;
       setIsSaving(false);
     }
-  }, [requestLive, requestOffline]);
+  }, [requestLive, manualOffline]);
 
   const requestOfflineRef = React.useRef(requestOffline);
   requestOfflineRef.current = requestOffline;
@@ -295,7 +471,7 @@ export function useArenaLive({
    */
   const restoreLive = React.useCallback(async () => {
     const ok = await requestLiveRef.current();
-    if (!ok) toast.error("You're offline. Go live again in the Arena.");
+    if (!ok) toast.info("You're offline. Go live again in the Arena.");
   }, []);
 
   // Re-assert a flag the athlete arrived with. This hook is mounted once per
@@ -378,6 +554,7 @@ export function useArenaLive({
       // athlete comes back silently offline with a toggle that still looks
       // live-capable, and nothing else can fix it: this handler ignores
       // "active" otherwise and the arrival effect is one-shot.
+      if (next === "active") retryFailedClear();
       if (next !== "active" || !resumeLiveRef.current) return;
       resumeLiveRef.current = false;
       if (inMatchRef.current) {
@@ -388,7 +565,7 @@ export function useArenaLive({
     };
     const sub = AppState.addEventListener("change", onChange);
     return () => sub.remove();
-  }, [restoreLive]);
+  }, [restoreLive, retryFailedClear]);
 
   // Offline for the length of a match, back afterwards.
   const wasInMatchRef = React.useRef(false);
@@ -423,5 +600,13 @@ export function useArenaLive({
     };
   }, []);
 
-  return { isLive, isSaving, toggle, goOffline: requestOffline, goLive: requestLive };
+  return {
+    isLive,
+    isSaving,
+    transition,
+    lastWriteFailed,
+    toggle,
+    goOffline: manualOffline,
+    goLive: requestLive,
+  };
 }

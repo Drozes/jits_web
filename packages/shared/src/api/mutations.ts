@@ -34,7 +34,7 @@ interface CreateChallengeParams {
 export async function createChallenge(
   supabase: Client,
   params: CreateChallengeParams,
-): Promise<Result<{ id: string; expiresAt: string | null }>> {
+): Promise<Result<{ id: string; expiresAt: string | null; createdAt: string | null }>> {
   const authResult = await supabase.rpc("auth_athlete_id");
   if (authResult.error || !authResult.data) {
     return { ok: false, error: { code: "UNKNOWN" as const, message: "Could not identify current athlete" } };
@@ -49,13 +49,21 @@ export async function createChallenge(
       challenger_weight: params.challengerWeight,
       proposed_gym_id: params.proposedGymId,
     })
-    .select("id, expires_at")
+    .select("id, expires_at, created_at")
     .single();
 
   if (error) {
     return { ok: false, error: mapPostgrestError(error, "challenge_create") };
   }
-  return { ok: true, data: { id: data.id, expiresAt: data.expires_at ?? null } };
+  return {
+    ok: true,
+    data: {
+      id: data.id,
+      expiresAt: data.expires_at ?? null,
+      // Server time: the Arena's 10-minute freshness countdown runs from it.
+      createdAt: data.created_at ?? null,
+    },
+  };
 }
 
 interface AcceptChallengeParams {

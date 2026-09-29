@@ -59,6 +59,8 @@ import { AppState } from "react-native";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabase } from "../supabase/client";
 import { LOBBY_TOPIC } from "./constants";
+import { countOnTheMat } from "./mat-board";
+import { getMatRosterIds, subscribeMatRoster } from "./mat-roster-store";
 
 /**
  * Tracked payload. `looking_for_casual` / `looking_for_ranked` are carried for
@@ -70,7 +72,11 @@ import { LOBBY_TOPIC } from "./constants";
 export interface LobbyPayload {
   athlete_id: string;
   display_name: string;
-  current_elo: number;
+  /**
+   * Null when the athlete has no rating: never a placeholder 0. No count
+   * reads it (IN BAND uses the roster rating the rows display).
+   */
+  current_elo: number | null;
   looking_for_casual: boolean;
   looking_for_ranked: boolean;
 }
@@ -98,7 +104,8 @@ const STALE_RETRY_DELAYS_MS = [1_000, 2_000, 4_000];
  * visible again within a couple of seconds. The steps then widen so a server
  * that keeps closing the channel is not hammered with joins and tracks, and
  * past the last step setup waits for the next foreground (or an explicit
- * go-live) instead.
+ * go-live) instead, unless the athlete is live, in which case it keeps
+ * retrying at the last step (see `recoverLater`).
  */
 const LOSS_RETRY_DELAYS_MS = [1_000, 5_000, 15_000, 30_000];
 
@@ -133,7 +140,28 @@ const UNCONFIRMED_RESYNC_MS = 2_000;
 // ---------------------------------------------------------------------------
 
 let lobbyIds: Set<string> = new Set();
+/**
+ * Whether `lobbyIds` reflects a real sync of the current channel. False until
+ * the first sync, and again from a channel loss or release until the next
+ * one: in those windows an empty set means "unknown", not "nobody is here".
+ */
+let lobbyKnown = false;
 const listeners = new Set<() => void>();
+
+/**
+ * Read the presence state into the snapshot. Only the keys are read: the
+ * payload's `current_elo` is not used for any count (IN BAND uses the rating
+ * the On The Mat rows display, from the roster; spec 14, D2).
+ */
+function readPresence(state: Record<string, LobbyPayload[]>): void {
+  lobbyIds = new Set(Object.keys(state));
+  lobbyKnown = true;
+}
+
+function clearPresence(): void {
+  lobbyIds = new Set();
+  lobbyKnown = false;
+}
 
 function emitChange() {
   for (const l of listeners) l();
@@ -158,6 +186,47 @@ export function useLobbyIds(): Set<string> {
 /** True when this athlete is present in the lobby. */
 export function useLobbyStatus(athleteId: string): boolean {
   return useLobbyIds().has(athleteId);
+}
+
+function getLobbyKnown(): boolean {
+  return lobbyKnown;
+}
+
+/**
+ * True once the lobby channel has synced, and until it is lost or released.
+ * While false, `useLobbyIds()` is empty because nothing is known, so nothing
+ * may be concluded from who is missing from it.
+ */
+export function useLobbyKnown(): boolean {
+  return useSyncExternalStore(subscribe, getLobbyKnown, getLobbyKnown);
+}
+
+function subscribeLobbyAndRoster(callback: () => void): () => void {
+  const offLobby = subscribe(callback);
+  const offRoster = subscribeMatRoster(callback);
+  return () => {
+    offLobby();
+    offRoster();
+  };
+}
+
+/**
+ * ON MAT count for the header chip, as a primitive, so a header re-renders
+ * only when the number changes, not on every presence sync. It is the
+ * number of On The Mat rows the Arena renders (spec 14, D2): the roster
+ * (`mat-roster-store`) intersected with the lobby, self excluded, by the
+ * same rule (`countOnTheMat`). A presence key with no roster athlete is
+ * never counted. Works while offline: the lobby is observed app-wide
+ * without tracking, so "12" means "12 you could roll with if you went live".
+ *
+ * NULL while the lobby is unknown (before the first sync, or after a channel
+ * loss until the next one) and while no roster is loaded: rendering either
+ * as 0 ("JUST YOU") would be a false statement.
+ */
+export function useOnMatCount(selfId: string | null | undefined): number | null {
+  const get = () =>
+    lobbyKnown ? countOnTheMat(getMatRosterIds(), lobbyIds, selfId) : null;
+  return useSyncExternalStore(subscribeLobbyAndRoster, get, get);
 }
 
 // ---------------------------------------------------------------------------
@@ -286,7 +355,7 @@ function handleChannelLoss(channel: RealtimeChannel, reason: string): void {
   goneSignal(channel).resolve();
   cancelResync();
   // We no longer receive syncs, so the roster we hold is going stale.
-  lobbyIds = new Set();
+  clearPresence();
   emitChange();
   owner?.onChannelLost();
 }
@@ -408,7 +477,7 @@ async function releaseChannel(): Promise<void> {
   // A deliberate release (athlete change, sign-out) starts a new story.
   consecutiveLosses = 0;
   cancelResync();
-  lobbyIds = new Set();
+  clearPresence();
   emitChange();
   if (!channel) return;
   goneSignal(channel).resolve();
@@ -476,7 +545,17 @@ export function useLobbyPresence(athleteId: string): void {
      */
     function recoverLater() {
       if (cancelled || retryTimer) return;
-      const delay = LOSS_RETRY_DELAYS_MS[consecutiveLosses - 1];
+      // Past the last step, a LIVE athlete keeps retrying at that step rather
+      // than giving up: a live phone is held awake (`useArenaLiveKeepAwake`),
+      // so no foreground would ever come to resume setup, and the athlete
+      // would stay flagged live, missing from presence and unchallengeable
+      // (F13), with the chip reading RECONNECTING for good. An observer
+      // (nothing tracked) gives up until the next foreground or go-live.
+      const delay =
+        LOSS_RETRY_DELAYS_MS[consecutiveLosses - 1] ??
+        (desiredPayload
+          ? LOSS_RETRY_DELAYS_MS[LOSS_RETRY_DELAYS_MS.length - 1]
+          : undefined);
       if (delay === undefined) {
         console.warn(
           "[arena] gave up rebuilding the lost lobby channel; retrying when the app next returns to the foreground",
@@ -551,8 +630,7 @@ export function useLobbyPresence(athleteId: string): void {
         // Identity guard rather than a mount counter: the only question that
         // matters is whether this is still the channel the module owns.
         if (channelRef !== channel) return;
-        const state = channel.presenceState<LobbyPayload>();
-        lobbyIds = new Set(Object.keys(state));
+        readPresence(channel.presenceState<LobbyPayload>());
         emitChange();
       });
 
@@ -572,7 +650,19 @@ export function useLobbyPresence(athleteId: string): void {
         // CLOSED lands after realtime-js has already dropped the instance
         // from the registry, and nothing will ever rejoin it. CHANNEL_ERROR
         // and TIMED_OUT leave it registered while phoenix rejoins it itself.
-        if (!isRegistered(channel)) handleChannelLoss(channel, status);
+        if (!isRegistered(channel)) {
+          handleChannelLoss(channel, status);
+          return;
+        }
+        // A network blip on a channel phoenix is rejoining: the roster we
+        // hold is from before the outage, so stop presenting it as current
+        // (the counts read unknown, the challenge hook stops concluding who
+        // left from it). The ids are kept, and the rejoin's SUBSCRIBED plus
+        // its presence sync restore known state; nothing is torn down.
+        if ((status === "CHANNEL_ERROR" || status === "TIMED_OUT") && lobbyKnown) {
+          lobbyKnown = false;
+          emitChange();
+        }
       });
 
       channelRef = channel;

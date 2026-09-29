@@ -7,4 +7,5 @@ export * from "./upload-retry";
 export * from "./match-video";
 export * from "./highlight-caption";
 export * from "./key-moments";
+export * from "./challenge-freshness";
 export * from "./match-detection";

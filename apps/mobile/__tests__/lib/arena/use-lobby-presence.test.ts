@@ -120,8 +120,11 @@ import {
   joinLobby,
   leaveLobby,
   useLobbyIds,
+  useLobbyKnown,
   useLobbyPresence,
+  useOnMatCount,
 } from "@/lib/arena/use-lobby-presence";
+import { publishMatRoster, resetMatRosterStore } from "@/lib/arena/mat-roster-store";
 
 // ---- fixtures ----
 
@@ -722,7 +725,11 @@ describe("useLobbyPresence: server-closed channel recovery (jits-fa9x)", () => {
       expect(mockChannels[i + 1].track).toHaveBeenCalledWith(PAYLOAD);
     }
 
-    // A fifth loss in a row gives up rather than hammering the server.
+    // Not live any more (observing only): a fifth loss in a row gives up
+    // rather than hammering the server.
+    await act(async () => {
+      await leaveLobby();
+    });
     act(() => {
       mockClose(mockChannels[4]);
     });
@@ -741,7 +748,7 @@ describe("useLobbyPresence: server-closed channel recovery (jits-fa9x)", () => {
     await act(async () => {
       mockChannels[5].subscribeHandler?.("SUBSCRIBED");
     });
-    expect(mockChannels[5].track).toHaveBeenCalledWith(PAYLOAD);
+    expect(mockChannels[5].track).not.toHaveBeenCalled();
 
     hook.unmount();
     AppState.addEventListener = original;
@@ -753,6 +760,12 @@ describe("useLobbyPresence: server-closed channel recovery (jits-fa9x)", () => {
     const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
     const { hook } = await mountLive();
     for (let i = 0; i < 5; i++) {
+      // Offline before the loss that exhausts the backoff, so it gives up.
+      if (i === 4) {
+        await act(async () => {
+          await leaveLobby();
+        });
+      }
       act(() => {
         mockClose(mockChannels[i]);
       });
@@ -765,12 +778,42 @@ describe("useLobbyPresence: server-closed channel recovery (jits-fa9x)", () => {
     }
     expect(mockChannels).toHaveLength(5);
 
+    await advance(10 * 60_000);
+    expect(mockChannels).toHaveLength(5);
+
     await act(async () => {
-      await leaveLobby();
       await joinLobby(PAYLOAD);
       await settle();
     });
     expect(mockChannels).toHaveLength(6);
+
+    hook.unmount();
+    warn.mockRestore();
+  });
+
+  it("keeps rebuilding at the last step while live instead of giving up", async () => {
+    // A live phone is held awake, so no foreground would ever resume setup:
+    // giving up would leave the athlete flagged live but out of presence.
+    jest.useFakeTimers();
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    const { hook } = await mountLive();
+    const delays = [1_000, 5_000, 15_000, 30_000, 30_000, 30_000];
+    for (const [i, delay] of delays.entries()) {
+      act(() => {
+        mockClose(mockChannels[i]);
+      });
+      await advance(delay - 1);
+      expect(mockChannels).toHaveLength(i + 1);
+      await advance(1);
+      expect(mockChannels).toHaveLength(i + 2);
+      await act(async () => {
+        mockChannels[i + 1].subscribeHandler?.("SUBSCRIBED");
+      });
+      expect(mockChannels[i + 1].track).toHaveBeenCalledWith(PAYLOAD);
+    }
+    expect(warn).not.toHaveBeenCalledWith(
+      expect.stringContaining("gave up rebuilding the lost lobby channel"),
+    );
 
     hook.unmount();
     warn.mockRestore();
@@ -1072,5 +1115,144 @@ describe("useLobbyPresence: presence calls that never settle", () => {
     expect(channel.track).toHaveBeenCalledTimes(2);
 
     hook.unmount();
+  });
+});
+
+describe("ON MAT count for the header chip (spec 6.1, spec 14 D2)", () => {
+  function mountCount(selfId: string) {
+    return renderHook(() => {
+      useLobbyPresence(ME);
+      return { onMat: useOnMatCount(selfId), known: useLobbyKnown() };
+    });
+  }
+
+  beforeEach(() => {
+    resetMatRosterStore();
+  });
+  afterEach(() => {
+    resetMatRosterStore();
+  });
+
+  it("reads null, not 0, before the first sync, and 0 for a synced empty lobby", async () => {
+    publishMatRoster(["athlete-a"]);
+    const { result, unmount } = mountCount(ME);
+    await settle();
+    expect(result.current.known).toBe(false);
+    expect(result.current.onMat).toBeNull();
+    act(() => {
+      mockChannels[0].presenceState.mockReturnValue({});
+      mockChannels[0].syncHandler?.();
+    });
+    expect(result.current.onMat).toBe(0);
+    unmount();
+  });
+
+  it("reads null while no roster is loaded, however many are present", async () => {
+    const { result, unmount } = mountCount(ME);
+    await settle();
+    act(() => {
+      mockChannels[0].presenceState.mockReturnValue({
+        "athlete-a": [{ current_elo: 1250 }],
+        "athlete-b": [{ current_elo: 1250 }],
+      });
+      mockChannels[0].syncHandler?.();
+    });
+    expect(result.current.known).toBe(true);
+    expect(result.current.onMat).toBeNull();
+    // The roster lands: the count follows it, without a presence sync.
+    act(() => {
+      publishMatRoster(["athlete-a"]);
+    });
+    expect(result.current.onMat).toBe(1);
+    // And the roster going away (the Arena unmounted) is unknown again.
+    act(() => {
+      publishMatRoster(null);
+    });
+    expect(result.current.onMat).toBeNull();
+    unmount();
+  });
+
+  it("counts only roster athletes in the lobby: never self, never a stray presence key", async () => {
+    publishMatRoster(["athlete-a", "athlete-b", "athlete-c"]);
+    const { result, unmount } = mountCount(ME);
+    await settle();
+    act(() => {
+      mockChannels[0].presenceState.mockReturnValue({
+        [ME]: [{ ...PAYLOAD, current_elo: 1200 }],
+        "athlete-a": [{ current_elo: 1300 }],
+        "athlete-b": [{ current_elo: 1099 }],
+        // Present but not on the roster (not looking, past the roster
+        // limit, or a stale key): never a row, so never counted.
+        "athlete-stray": [{ current_elo: 1200 }],
+      });
+      mockChannels[0].syncHandler?.();
+    });
+    // athlete-c is on the roster but not present.
+    expect(result.current.onMat).toBe(2);
+    unmount();
+  });
+
+  it.each(["CHANNEL_ERROR", "TIMED_OUT"])(
+    "reads unknown (null) through a %s blip and known again after the rejoin's sync",
+    async (status) => {
+      publishMatRoster(["athlete-a"]);
+      const { result, unmount } = mountCount(ME);
+      await settle();
+      const channel = mockChannels[0];
+      channel.presenceState.mockReturnValue({
+        "athlete-a": [{ current_elo: 1250 }],
+      });
+      act(() => {
+        channel.syncHandler?.();
+      });
+      expect(result.current.onMat).toBe(1);
+
+      // Still registered: phoenix rejoins it, nothing is torn down.
+      act(() => {
+        channel.state = "errored";
+        channel.subscribeHandler?.(status);
+      });
+      expect(result.current.known).toBe(false);
+      expect(result.current.onMat).toBeNull();
+      expect(mockChannels).toHaveLength(1);
+      expect(mockRemoveChannel).not.toHaveBeenCalled();
+
+      await act(async () => {
+        channel.state = "joined";
+        channel.subscribeHandler?.("SUBSCRIBED");
+      });
+      act(() => {
+        channel.syncHandler?.();
+      });
+      expect(result.current.known).toBe(true);
+      expect(result.current.onMat).toBe(1);
+      unmount();
+    },
+  );
+
+  it("empties the count when the server closes the channel", async () => {
+    publishMatRoster(["athlete-a"]);
+    const { result, unmount } = mountCount(ME);
+    await settle();
+    const channel = mockChannels[0];
+    act(() => {
+      channel.subscribeHandler?.("SUBSCRIBED");
+    });
+    channel.presenceState.mockReturnValue({ "athlete-a": [{ current_elo: 1210 }] });
+    act(() => {
+      channel.syncHandler?.();
+    });
+    expect(result.current.onMat).toBe(1);
+    expect(result.current.known).toBe(true);
+
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    act(() => {
+      mockClose(channel);
+    });
+    // Unknown, not zero: never "JUST YOU" during a reconnect.
+    expect(result.current.onMat).toBeNull();
+    expect(result.current.known).toBe(false);
+    warn.mockRestore();
+    unmount();
   });
 });

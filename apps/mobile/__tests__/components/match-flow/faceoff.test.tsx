@@ -128,6 +128,13 @@ describe("weigh-in", () => {
     expect(s.getByTestId("faceoff-opponent-weight")).toHaveTextContent("167 LBS");
     s.getByText("3 LBS APART · SAME DIVISION");
     expect(s.getByTestId("weight-stakes-win")).toHaveTextContent("▲ +14");
+    // The face-off passes no Dynamic Type cap, so the shared strip neither
+    // caps nor truncates its cells here (only the incoming prompt does).
+    for (const key of ["win", "draw", "loss"]) {
+      const cell = s.getByTestId(`weight-stakes-${key}`);
+      expect([key, cell.props.numberOfLines, cell.props.maxFontSizeMultiplier]).toEqual([key, undefined, undefined]);
+    }
+    expect(s.getByText("WIN").props.numberOfLines).toBeUndefined();
     // Viewer as challenger, with both weights.
     expect(mockGetEloStakes).toHaveBeenCalledWith(expect.anything(), 1512, 1498, 170, 167);
   });

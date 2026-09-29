@@ -10,7 +10,9 @@ import { isImmersiveRoute } from "./nav-config";
  * Header LIVE pill: while the athlete is live in the Arena, every non-Arena
  * page shows it so they know they can be challenged, and it taps through to
  * the Arena. Renders nothing when offline (and outside the signed-in app,
- * where the store reads "not live"). Parity with mobile's live-header-signal.
+ * where the store reads "not live"). Mobile's tab roots now use a header status chip
+ * (apps/mobile/components/layout/header-status-chip.tsx); this web pill has
+ * not been migrated.
  */
 export function LiveHeaderSignal() {
   const isLive = useIsArenaLive();

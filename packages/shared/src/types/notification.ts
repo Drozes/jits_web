@@ -25,7 +25,12 @@ export interface NotificationItem {
   type: NotificationItemType;
   title: string;
   body: string;
-  route?: string;
+  // No route field: a shared route once carried the retired `/session/<id>`
+  // path. Each platform maps `challengeId` / `matchId` to its own screens.
+  /** The challenge behind a `challenge_*` row. */
+  challengeId?: string;
+  /** The completed match behind a `match_result` row. */
+  matchId?: string;
   createdAt: string;
 }
 

@@ -177,10 +177,11 @@ describe("ArenaMatchScreen", () => {
     expect(screen.queryByTestId("app-header")).toBeNull();
   });
 
-  it("shows the LIVE signal as static, so tapping it cannot pop the match", () => {
+  it("uses the pushed-screen AppHeader, whose live dot has nothing to tap (never the interactive chip)", () => {
     render(<ArenaMatchScreen />);
-    expect(mockHeaderProps).toHaveBeenCalledWith(
-      expect.objectContaining({ liveSignal: "static" }),
+    expect(mockHeaderProps).toHaveBeenCalledWith(expect.objectContaining({ title: "Match" }));
+    expect(mockHeaderProps).not.toHaveBeenCalledWith(
+      expect.objectContaining({ rightAction: expect.anything() }),
     );
   });
 });
