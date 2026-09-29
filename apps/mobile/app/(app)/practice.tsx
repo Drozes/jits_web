@@ -150,7 +150,7 @@ export default function PracticeScreen() {
       <Stack.Screen options={{ headerShown: false }} />
       <View className={live ? "flex-1 bg-black" : "flex-1 bg-surface"}>
         {live ? null : (
-          <AppHeader title="Practice Match" back backFallback="/" liveSignal="static" />
+          <AppHeader title="Practice Match" back backFallback="/" />
         )}
         <ScrollView
           ref={scrollRef}

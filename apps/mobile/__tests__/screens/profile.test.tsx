@@ -241,18 +241,19 @@ describe("Film Room preview after an upload lands", () => {
 });
 
 describe("Profile tab", () => {
-  it("header right side is LIVE then the bell, with no Share action", () => {
+  it("header is the PROFILE title at the left, then the status chip and the bell, with no Share action", () => {
     act(() => publishArenaState({ ...IDLE_ARENA_STATE, isLive: true }));
-    const { getByTestId, queryByLabelText, UNSAFE_root } = render(<ProfileScreen />);
+    const { getByTestId, getByRole, queryByLabelText, UNSAFE_root } = render(<ProfileScreen />);
 
+    expect(getByRole("header").props.children).toBe("Profile");
     expect(getByTestId("notification-bell")).toBeTruthy();
-    expect(getByTestId("live-header-signal")).toBeTruthy();
+    expect(getByTestId("header-status-chip")).toBeTruthy();
     expect(queryByLabelText("Share")).toBeNull();
     const ids = UNSAFE_root.findAll(
       (n: HostNode) => typeof n.type === "string" && typeof n.props.testID === "string",
     ).map((n: HostNode) => n.props.testID as string);
-    expect(ids.indexOf("live-header-signal")).toBeGreaterThan(-1);
-    expect(ids.indexOf("live-header-signal")).toBeLessThan(ids.indexOf("notification-bell"));
+    expect(ids.indexOf("header-status-chip")).toBeGreaterThan(-1);
+    expect(ids.indexOf("header-status-chip")).toBeLessThan(ids.indexOf("notification-bell"));
   });
 
   it("shows the Film Room preview in place of Past Match Videos", () => {

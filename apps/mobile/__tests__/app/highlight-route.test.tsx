@@ -23,10 +23,11 @@ jest.mock("expo-router", () => {
     return R.createElement(R.Fragment, null, props.children);
   };
   Stack.Screen = Screen;
-  return { Stack, useLocalSearchParams: () => mockParams };
+  return { Stack, useLocalSearchParams: () => mockParams, useSegments: () => ["(app)", "(tabs)"] };
 });
 jest.mock("@/lib/theme/use-theme", () => ({ useThemedTokens: () => ({}) }));
 jest.mock("@/lib/arena/arena-bootstrap", () => ({ ArenaBootstrap: () => null }));
+jest.mock("@/components/notifications/bell-bootstrap", () => ({ BellBootstrap: () => null }));
 const mockViewer = jest.fn((_p: unknown) => null);
 jest.mock("@/components/highlight-viewer/viewer-screen", () => ({
   ViewerScreen: (p: unknown) => mockViewer(p),

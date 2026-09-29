@@ -2,6 +2,13 @@
  * Practice match phases built from the real Arena and match-flow leaves.
  * Only presentational components are reused: every real step container is
  * wired to RPCs or a realtime channel, and practice must touch neither.
+ *
+ * The lobby phase deliberately keeps the pre-Mat-Board plates (GoLivePlate,
+ * WaitingPlate, CompetitorRow under an "Online now" label): the real Arena
+ * is now the Mat Board (`components/arena/mat-board.tsx`), and bringing this
+ * walkthrough in line with it is a follow-up, not part of that rebuild
+ * (recorded in specs/arena-live-chip/spec.md section 11, "Practice
+ * walkthrough on the Mat Board", which carries the tracker reference).
  */
 import * as React from "react";
 import { Pressable, Text, View } from "react-native";

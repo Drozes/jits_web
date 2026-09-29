@@ -17,8 +17,7 @@ import { FilmRoomPreview } from "@/components/profile/film-room-preview";
 import { HighlightsRow } from "@/components/profile/highlights-row";
 import { useMyHighlights } from "@/lib/highlight/use-my-highlights";
 import { ShareProfileSheet } from "@/components/share-profile-sheet";
-import { AppHeader } from "@/components/layout/app-header";
-import { NotificationBell } from "@/components/notifications/notification-bell";
+import { TabHeader } from "@/components/layout/tab-header";
 import { PageContainer } from "@/components/layout/page-container";
 import { AppVersionLabel } from "@/components/layout/app-version-label";
 import { MetaTag, ParticipantRow } from "@/components/ui/elo-system";
@@ -152,10 +151,7 @@ export default function ProfileScreen() {
 
   return (
     <View className="flex-1 bg-surface">
-      <AppHeader
-        title="Profile"
-        rightAction={<NotificationBell athleteId={athlete.id} />}
-      />
+      <TabHeader title="Profile" />
       <PageContainer
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={tokens.accentCta} />

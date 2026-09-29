@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter, type Href } from "expo-router";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { cn } from "@/lib/cn";
-import { LiveHeaderSignal } from "./live-header-signal";
+import { HeaderLiveDot } from "./header-live-dot";
 
 interface AppHeaderProps {
   title?: string;
@@ -19,23 +19,25 @@ interface AppHeaderProps {
   backFallback?: Href;
   icon?: React.ReactNode;
   rightAction?: React.ReactNode;
-  /**
-   * How the LIVE pill behaves (it only renders while the athlete is live).
-   * "link" taps through to the Arena; the Arena itself passes "static".
-   */
-  liveSignal?: "link" | "static";
   className?: string;
 }
 
 /**
- * Mobile equivalent of apps/web/components/layout/app-header.tsx.
- * 56pt tall, [back | title | live pill + right] grid, font-heading caps title.
+ * Mobile equivalent of apps/web/components/layout/app-header.tsx, for PUSHED
+ * screens (match, practice, settings, athlete, stats) and the auth screens.
+ * 56pt tall, [back | title | live dot + right] grid, font-heading caps title.
+ * The four tab roots use `BrandHeader` / `TabHeader` instead, which carry the
+ * interactive status chip.
+ *
+ * While live, the right slot shows a small NON-interactive live dot (decision
+ * Q1, `HeaderLiveDot`); nothing to tap, so a pushed screen never offers a
+ * shortcut out of a match or a settings flow.
  *
  * The two side slots share the leftover width equally (flex 1, basis 0), so
- * the title stays optically centred whatever sits on the right, and the LIVE
- * pill appearing or disappearing never moves it. The title is capped at half
+ * the title stays optically centred whatever sits on the right, and the live
+ * dot appearing or disappearing never moves it. The title is capped at half
  * the bar, which leaves each side at least a quarter (about 86pt on a 375pt
- * iPhone SE): room for the pill plus one 32pt action.
+ * iPhone SE): room for the dot plus one 32pt action.
  */
 export function AppHeader({
   title,
@@ -43,7 +45,6 @@ export function AppHeader({
   backFallback,
   icon,
   rightAction,
-  liveSignal = "link",
   className,
 }: AppHeaderProps) {
   const insets = useSafeAreaInsets();
@@ -108,7 +109,7 @@ export function AppHeader({
         className="flex-row items-center justify-end gap-2"
         style={{ flex: 1, flexBasis: 0, height: 32 }}
       >
-        <LiveHeaderSignal variant={liveSignal} />
+        <HeaderLiveDot />
         {rightAction}
       </View>
     </View>

@@ -70,7 +70,7 @@ export default function ArenaMatchScreen() {
       <>
         <Stack.Screen options={{ headerShown: false }} />
         <View className="flex-1 bg-surface">
-          <AppHeader title="Match" liveSignal="static" />
+          <AppHeader title="Match" />
           <View className="flex-1 items-center justify-center">
             <ActivityIndicator color={tokens.textSecondary} />
           </View>
@@ -90,7 +90,7 @@ export default function ArenaMatchScreen() {
           below it moves in the tree. */}
       <ThemedStatusBar />
       <View className="flex-1 bg-surface" style={step === "live" ? { backgroundColor: BROADCAST.black } : undefined}>
-        {step == null ? <AppHeader title="Match" liveSignal="static" /> : null}
+        {step == null ? <AppHeader title="Match" /> : null}
         {/* The wizard derives its own starting step from `matches.status`, so
             backgrounding and reopening mid-match resumes where it left off. */}
         <MatchFlowWizard

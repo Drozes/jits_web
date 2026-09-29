@@ -23,7 +23,23 @@ const ON_DARK_GREEN = "#22C55E";
 
 const PULSE_DURATION_MS = 1400;
 
-export function LivePill({ label = "LIVE", className, onDark = false }: LivePillProps) {
+interface LiveDotProps {
+  /** Dot diameter in points. 7 by default (the LIVE pill's). */
+  size?: number;
+  /** Fixed #22C55E, for dark chrome over video. */
+  onDark?: boolean;
+  testID?: string;
+}
+
+/**
+ * The pulsing green LIVE dot on its own. It is the app's ONE pulse (1400ms,
+ * `PULSE_DURATION_MS`): the LIVE pill and the header status chip render this,
+ * so there is never a second rhythm. The pushed screens' `HeaderLiveDot`
+ * (`components/layout/header-live-dot.tsx`) is deliberately STATIC and must
+ * not use this (decision Q1, spec 3: one pulse).
+ * Decorative: hidden from assistive tech, the caller labels the state.
+ */
+export function LiveDot({ size = 7, onDark = false, testID }: LiveDotProps) {
   const opacity = useSharedValue(1);
   const scale = useSharedValue(1);
 
@@ -46,18 +62,25 @@ export function LivePill({ label = "LIVE", className, onDark = false }: LivePill
   }));
 
   return (
+    <Animated.View
+      testID={testID}
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      className={onDark ? undefined : "bg-positive"}
+      style={[
+        { width: size, height: size, borderRadius: size / 2 },
+        onDark ? { backgroundColor: ON_DARK_GREEN } : null,
+        dotStyle,
+      ]}
+    />
+  );
+}
+
+export function LivePill({ label = "LIVE", className, onDark = false }: LivePillProps) {
+  return (
     // 6 px on dark chrome, matching the broadcast slab's static labels.
     <View className={cn("flex-row items-center", onDark ? undefined : "gap-2", className)} style={onDark ? { gap: 6 } : undefined}>
-      <Animated.View
-        accessibilityElementsHidden
-        importantForAccessibility="no-hide-descendants"
-        className={onDark ? undefined : "bg-positive"}
-        style={[
-          { width: 7, height: 7, borderRadius: 3.5 },
-          onDark ? { backgroundColor: ON_DARK_GREEN } : null,
-          dotStyle,
-        ]}
-      />
+      <LiveDot onDark={onDark} />
       <Text
         className={cn(
           "font-mono-bold text-[10px] uppercase tracking-caps-xl",

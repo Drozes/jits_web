@@ -76,7 +76,7 @@ export default function LeaderboardScreen() {
 
   return (
     <View className="flex-1 bg-surface">
-      <BrandHeader athleteId={athlete.id} />
+      <BrandHeader />
 
       <View className="px-4 py-3 border-b border-hairline-faint" style={{ gap: 8 }}>
         <View className="flex-row flex-wrap" style={{ gap: 8 }}>

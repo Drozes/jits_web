@@ -11,7 +11,7 @@ export { Plate, type PlateVariant } from "./plate";
 export { EloTile } from "./elo-tile";
 export { Wordmark } from "./wordmark";
 export { Avatar32 } from "./avatar-32";
-export { LivePill } from "./live-pill";
+export { LiveDot, LivePill } from "./live-pill";
 export { MetaTag } from "./meta-tag";
 export { Chip } from "./chip";
 export { DataRow } from "./data-row";

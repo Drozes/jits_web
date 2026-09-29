@@ -134,7 +134,7 @@ export default function DashboardScreen() {
 
   return (
     <View className="flex-1 bg-surface">
-      <BrandHeader athleteId={athlete.id} />
+      <BrandHeader />
 
       <ScrollView
         className="flex-1"

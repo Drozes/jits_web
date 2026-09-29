@@ -238,6 +238,13 @@ let athleteSeq = 0;
 
 beforeEach(() => {
   resetHighlightStore();
+  // Home's Resume card reads the app-wide open-match store (F10); a match
+  // left there by the previous test must not show on this one's first frame.
+  (
+    require("@/lib/match-flow/active-match-store") as {
+      __resetActiveMatchStoreForTests: () => void;
+    }
+  ).__resetActiveMatchStoreForTests();
   jest.clearAllMocks();
   // Re-wire the resolved value each test since clearAllMocks resets mockResolvedValue
   const queries = require("@jits/shared/api/queries") as QueryMocks;
@@ -262,6 +269,15 @@ beforeEach(() => {
 afterEach(() => {
   jest.restoreAllMocks();
 });
+
+/**
+ * Let Home's open-match read (the app-wide store, F10) land inside act. A
+ * test that asserts synchronously otherwise ends with that store write still
+ * pending, and it wakes the screen outside act.
+ */
+async function settleActiveMatchRead() {
+  await act(async () => {});
+}
 
 describe("DashboardScreen", () => {
   it("renders the greeting with the athlete name", async () => {
@@ -433,7 +449,7 @@ describe("DashboardScreen (zero state)", () => {
 });
 
 describe("DashboardScreen (loading)", () => {
-  it("shows the athlete name while data is loading", () => {
+  it("shows the athlete name while data is loading", async () => {
     const queries = require("@jits/shared/api/queries") as {
       getDashboardSummary: jest.Mock;
     };
@@ -441,9 +457,10 @@ describe("DashboardScreen (loading)", () => {
 
     const { getByText } = render(React.createElement(DashboardScreen));
     expect(getByText("TestUser")).toBeTruthy();
+    await settleActiveMatchRead();
   });
 
-  it("shows the Arena CTA before the summary has loaded", () => {
+  it("shows the Arena CTA before the summary has loaded", async () => {
     const queries = require("@jits/shared/api/queries") as {
       getDashboardSummary: jest.Mock;
     };
@@ -454,6 +471,7 @@ describe("DashboardScreen (loading)", () => {
     expect(mockPush).toHaveBeenCalledWith(ARENA_HREF);
     // The summary-driven sections are still behind the skeleton.
     expect(queryByText("RecentActivitySection")).toBeNull();
+    await settleActiveMatchRead();
   });
 });
 
@@ -467,15 +485,16 @@ describe("DashboardScreen Arena card (live-aware)", () => {
     store.__resetArenaStoreForTests();
   });
 
-  it("invites an offline athlete to go live", () => {
+  it("invites an offline athlete to go live", async () => {
     const { getByText, queryByText } = render(React.createElement(DashboardScreen));
     expect(getByText("Find a match")).toBeTruthy();
     expect(getByText(/Go live in the Arena/)).toBeTruthy();
     expect(getByText("Enter the Arena →")).toBeTruthy();
     expect(queryByText("You're live")).toBeNull();
+    await settleActiveMatchRead();
   });
 
-  it("says the athlete is already live, and still leads to the Arena", () => {
+  it("says the athlete is already live, and still leads to the Arena", async () => {
     act(() => {
       store.publishArenaState({ ...store.IDLE_ARENA_STATE, isLive: true });
     });
@@ -484,6 +503,8 @@ describe("DashboardScreen Arena card (live-aware)", () => {
     );
 
     expect(getByText("You're live")).toBeTruthy();
+    // No second pulsing LIVE pill: the header chip's dot is the one pulse.
+    expect(queryByText("Live")).toBeNull();
     expect(
       getByText("You're in the lobby. Challenges reach you on any tab."),
     ).toBeTruthy();
@@ -493,9 +514,10 @@ describe("DashboardScreen Arena card (live-aware)", () => {
 
     fireEvent.press(getByLabelText("Go to the Arena"));
     expect(mockPush).toHaveBeenCalledWith(ARENA_HREF);
+    await settleActiveMatchRead();
   });
 
-  it("flips back when the athlete goes offline", () => {
+  it("flips back when the athlete goes offline", async () => {
     act(() => {
       store.publishArenaState({ ...store.IDLE_ARENA_STATE, isLive: true });
     });
@@ -507,6 +529,7 @@ describe("DashboardScreen Arena card (live-aware)", () => {
     });
     expect(getByText("Find a match")).toBeTruthy();
     expect(queryByText("You're live")).toBeNull();
+    await settleActiveMatchRead();
   });
 });
 

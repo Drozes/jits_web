@@ -1,6 +1,6 @@
 import { Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
-import { LivePill, MetaTag, Plate } from "@/components/ui/elo-system";
+import { MetaTag, Plate } from "@/components/ui/elo-system";
 import { ARENA_HREF } from "@/lib/arena/constants";
 import { useIsArenaLive } from "@/lib/arena/arena-store";
 import { cn } from "@/lib/cn";
@@ -12,6 +12,10 @@ import { cn } from "@/lib/cn";
  * Live-aware (jits-sq3a): while the header says LIVE, telling the athlete to
  * go live contradicts it. The live bit is only READ from the arena store;
  * the live writer is mounted once, app-wide, by <ArenaBootstrap />.
+ *
+ * No LIVE pill here: the header chip's dot is the app's one pulse (spec 3),
+ * and a second pulsing dot on the same screen would run out of step with it.
+ * The title says the athlete is live; the chip shows it.
  *
  * `secondary`: another card holds Home's red CTA (Resume, jits-r9a), so this
  * button steps down to the outline style to keep one Signal Red per surface.
@@ -26,7 +30,7 @@ export function ArenaNudgeCard({ secondary = false }: { secondary?: boolean }) {
         <Text className="font-heading text-[18px] text-ink flex-1" numberOfLines={1}>
           {isLive ? "You're live" : "Find a match"}
         </Text>
-        {isLive ? <LivePill label="Live" /> : <MetaTag>Arena</MetaTag>}
+        <MetaTag>Arena</MetaTag>
       </View>
       <Text className="font-body text-[13px] text-ink-2 mb-3">
         {isLive

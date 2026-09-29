@@ -385,7 +385,9 @@ describe("PracticeScreen", () => {
     advance(AUTO_END_DELAY_MS);
     await flush();
     expect(s.getByTestId("match-step-end")).toBeTruthy();
-  });
+    // Fake timers already drive the clock; the budget is for render work
+    // (35s of ticks), which can pass 5s when the full suite loads the machine.
+  }, 30_000);
 
   it("validates the result with the real rules and offers no dispute", async () => {
     const s = render(<PracticeScreen />);
@@ -461,7 +463,9 @@ describe("PracticeScreen", () => {
     fireEvent.press(s.getByTestId("result-outcome-submission"));
     fireEvent.press(s.getByTestId(`result-winner-${PRACTICE_BOT_ID}`));
     expect(s.getByTestId("result-finish-time").props.value).toBe("00:30");
-  });
+    // Same budget as the auto-end test: this also runs the whole clock out
+    // (35s of ticks), which can pass 5s when the full suite loads the machine.
+  }, 30_000);
 
   it("offers only a draw when the submission list could not load", async () => {
     (queries.getSubmissionTypes as jest.Mock).mockResolvedValue([]);

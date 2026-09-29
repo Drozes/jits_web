@@ -48,16 +48,19 @@ interface MonoProps {
   numberOfLines?: number;
   style?: StyleProp<ViewStyle>;
   accessibilityLabel?: string;
+  /** Caps Dynamic Type scaling where a row must not overflow (for example 1.3). */
+  maxFontSizeMultiplier?: number;
 }
 
 /** JetBrains Mono caps label. */
-export function Mono({ children, color, size = 10, bold = false, spacing = 2.52, testID, numberOfLines, accessibilityLabel }: MonoProps) {
+export function Mono({ children, color, size = 10, bold = false, spacing = 2.52, testID, numberOfLines, accessibilityLabel, maxFontSizeMultiplier }: MonoProps) {
   const p = usePalette();
   return (
     <Text
       testID={testID}
       accessibilityLabel={accessibilityLabel}
       numberOfLines={numberOfLines}
+      maxFontSizeMultiplier={maxFontSizeMultiplier}
       className={bold ? "font-mono-bold" : "font-mono-medium"}
       style={[{ fontSize: size, letterSpacing: spacing, color: color ?? p.text2 }, TABULAR]}
     >
@@ -67,7 +70,15 @@ export function Mono({ children, color, size = 10, bold = false, spacing = 2.52,
 }
 
 /** The bordered RANKED / CASUAL tag; `onScrim` over camera or a photo. */
-export function KindTag({ kind, onScrim = false }: { kind: "ranked" | "casual"; onScrim?: boolean }) {
+export function KindTag({
+  kind,
+  onScrim = false,
+  maxFontSizeMultiplier,
+}: {
+  kind: "ranked" | "casual";
+  onScrim?: boolean;
+  maxFontSizeMultiplier?: number;
+}) {
   const p = usePalette();
   return (
     <View
@@ -81,7 +92,9 @@ export function KindTag({ kind, onScrim = false }: { kind: "ranked" | "casual"; 
         backgroundColor: onScrim ? ON_MEDIA.tag : undefined,
       }}
     >
-      <Mono color={onScrim ? ON_MEDIA.tagText : p.text2}>{kind === "ranked" ? "RANKED" : "CASUAL"}</Mono>
+      <Mono color={onScrim ? ON_MEDIA.tagText : p.text2} maxFontSizeMultiplier={maxFontSizeMultiplier}>
+        {kind === "ranked" ? "RANKED" : "CASUAL"}
+      </Mono>
     </View>
   );
 }
@@ -175,10 +188,13 @@ export function InitialsBlock({
   display = false,
   accent,
   style,
+  maxFontSizeMultiplier,
 }: {
   name: string;
   size: number | "fill";
   fontSize: number;
+  /** Dynamic Type cap for the initials (the block is a fixed size). */
+  maxFontSizeMultiplier?: number;
   /** Bebas Neue instead of DM Sans. */
   display?: boolean;
   /** Bottom rule color (the face-off card: red for you). */
@@ -205,6 +221,7 @@ export function InitialsBlock({
       ]}
     >
       <Text
+        maxFontSizeMultiplier={maxFontSizeMultiplier}
         className={display ? "font-display" : "font-heading"}
         style={{ fontSize, letterSpacing: 1, color: p.text }}
       >
@@ -222,6 +239,7 @@ export function StakesStrip({
   height = 56,
   background,
   testID,
+  maxFontSizeMultiplier,
 }: {
   win: number;
   draw: number;
@@ -230,8 +248,15 @@ export function StakesStrip({
   /** Defaults to the plate. */
   background?: string;
   testID?: string;
+  /**
+   * Dynamic Type cap for the cell text (the strip is a fixed height). Passing
+   * one also keeps each cell to one line; without it (the face-off) the text
+   * scales and wraps freely, as before.
+   */
+  maxFontSizeMultiplier?: number;
 }) {
   const p = usePalette();
+  const lines = maxFontSizeMultiplier != null ? 1 : undefined;
   const cells = [
     { key: "win", label: "WIN", value: win },
     { key: "draw", label: "DRAW", value: draw },
@@ -263,9 +288,11 @@ export function StakesStrip({
             borderColor: p.hairline,
           }}
         >
-          <Mono color={p.text3}>{c.label}</Mono>
+          <Mono color={p.text3} numberOfLines={lines} maxFontSizeMultiplier={maxFontSizeMultiplier}>{c.label}</Mono>
           <Text
             testID={testID ? `${testID}-${c.key}` : undefined}
+            numberOfLines={lines}
+            maxFontSizeMultiplier={maxFontSizeMultiplier}
             className="font-mono-bold"
             style={[{ fontSize: 16, color: c.key === "draw" ? (c.value < 0 ? p.amber : p.text) : deltaColor(c.value, p) }, TABULAR]}
           >
