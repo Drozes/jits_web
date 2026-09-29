@@ -1,6 +1,18 @@
 import { Tabs } from "expo-router";
 import { Home, Swords, Trophy, User } from "lucide-react-native";
+import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { EloTabBar } from "@/components/layout/elo-tab-bar";
+import { useArenaTabBadge } from "@/lib/arena/use-arena-tab-badge";
+
+/**
+ * The bar plus its status marks. Its own component so the Arena badge
+ * (red count, green dot, hollow ring; `useArenaTabBadge`) re-renders the bar
+ * only, never the navigator.
+ */
+function TabBar(props: BottomTabBarProps) {
+  const arena = useArenaTabBadge();
+  return <EloTabBar {...props} badges={{ arena }} />;
+}
 
 /**
  * Bottom tab navigator. Every route directory inside this `(tabs)` group gets a
@@ -20,7 +32,7 @@ import { EloTabBar } from "@/components/layout/elo-tab-bar";
 export default function TabsLayout() {
   return (
     <Tabs
-      tabBar={(props) => <EloTabBar {...props} />}
+      tabBar={(props) => <TabBar {...props} />}
       screenOptions={{
         headerShown: false,
       }}

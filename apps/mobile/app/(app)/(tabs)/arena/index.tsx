@@ -1,54 +1,75 @@
 /**
- * The Arena: go live, see who else is, challenge them, roll.
+ * The Arena, as a Mat Board (spec arena-live-chip section 6): who should I
+ * roll with right now? Sticky control bar, the challenge strips, the Closest
+ * Match card (the surface's one red CTA), On The Mat and Just Rolled. Rules
+ * live in `lib/arena/mat-board.ts`, pieces in `components/arena/mat-board.tsx`.
  *
- * Mirrors the shipped web surface (`apps/web/app/(app)/arena/`). The roster
- * splits on two different signals: "Online now" is Presence (`lobby:online`),
- * "Open to challenges" is the `looking_for_ranked` column. Only the first can
- * answer a live prompt, so only those rows carry a Challenge.
+ * On The Mat is the roster (`get_arena_data.looking_athletes`) intersected
+ * with `lobby:online`, self excluded; online athletes only (spec 14, D1), and
+ * every number on the screen and the chip's `· N` comes from those rows (D2).
  *
- * This screen OWNS NOTHING realtime. Being live persists across tabs, so the
- * live state machine, the `lobby:online` channel and the incoming-challenge
- * listener and prompt are mounted once, app-wide, by `<ArenaBootstrap />`
- * (`lib/arena/arena-bootstrap.tsx`), and this screen reads and drives them
- * through `lib/arena/arena-store.ts`. Mounting any of them here as well would
- * mean a second flag writer and a second prompt for every challenge.
- * Observing the lobby is not joining it: an athlete is only tracked in
- * `lobby:online` while they are live.
- * Rematch (jits-00fr): see `lib/arena/use-rematch-pin.ts`. Never auto-sends.
- * Someone who goes live after the roster loaded re-reads it
- * (`lib/arena/use-roster-lobby-sync.ts`, jits-hlm1.4).
+ * This screen owns nothing realtime: the live state, the lobby channel and
+ * the incoming prompt are mounted once by `<ArenaBootstrap />` and read here
+ * through `arena-store.ts`. A second mount would mean a second flag writer
+ * and a second prompt per challenge.
  */
 import * as React from "react";
-import { RefreshControl, Text, View } from "react-native";
+import { RefreshControl, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useIsFocused } from "@react-navigation/native";
 import { useRequireAthlete } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
-import { AppHeader } from "@/components/layout/app-header";
+import { TabHeader } from "@/components/layout/tab-header";
 import { PageContainer } from "@/components/layout/page-container";
-import { NotificationBell } from "@/components/notifications/notification-bell";
-import { useLobbyIds } from "@/lib/arena/use-lobby-presence";
+import { useLobbyIds, useLobbyKnown } from "@/lib/arena/use-lobby-presence";
 import { useArenaRoster } from "@/lib/arena/use-arena-roster";
 import { useRosterLobbySync } from "@/lib/arena/use-roster-lobby-sync";
-import { pinFirst, useRematchAutoSend, useRematchPin } from "@/lib/arena/use-rematch-pin";
+import { useRematchAutoSend, useRematchPin } from "@/lib/arena/use-rematch-pin";
+import { goLiveWithFeedback, goOfflineWithFeedback } from "@/lib/arena/go-live-feedback";
+import { useChallengeDeepLink } from "@/lib/arena/use-challenge-deep-link";
+import { openMatchToConfirm } from "@/lib/arena/open-match-to-confirm";
+import {
+  chooseStrip,
+  closestCta,
+  formatMatCounts,
+  matCounts,
+  onTheMatRows,
+  pickClosest,
+} from "@/lib/arena/mat-board";
+import { useMatchToConfirm } from "@/lib/match-flow/active-match-store";
+import { useFreshIncomingCount } from "@/lib/notifications/bell-store";
 import {
   arenaActions,
   setOpponentUnavailableHandler,
+  clearOpponentUnavailableHandler,
   useArenaState,
   useIsInArenaMatch,
+  useLiveSwitchPhase,
 } from "@/lib/arena/arena-store";
-import { GoLivePlate } from "@/components/arena/go-live-plate";
-import { CompetitorRow, type RowAction } from "@/components/arena/competitor-row";
-import { ArenaSkeleton } from "@/components/arena/arena-skeleton";
 import {
-  CapPlate,
-  EmptyLobbyPlate,
-  NobodyOnlineNote,
-  RematchHint,
-  RosterErrorPlate,
-  SectionLabel,
-  WaitingPlate,
-} from "@/components/arena/arena-plates";
+  ClosestMatchCard,
+  ConfirmStrip,
+  IncomingStrip,
+  JustRolled,
+  MatControlBar,
+  MatRow,
+  MatSectionLabel,
+  OfferStrip,
+  AwayStrip,
+  WaitingStrip,
+  type MatRowAction,
+} from "@/components/arena/mat-board";
+import { ArenaSkeleton } from "@/components/arena/arena-skeleton";
+import { CapPlate, RosterErrorPlate } from "@/components/arena/arena-plates";
+
+/**
+ * The tab bar sits below the screen and pads its own inset, so the shared
+ * `PageContainer` default (96 + inset) would leave blank space (AC-A7).
+ */
+const ARENA_BOTTOM_PAD = 24;
+
+/** Just Rolled shows this many recent matches at most. */
+const JUST_ROLLED_MAX = 5;
 
 export default function ArenaScreen() {
   const router = useRouter();
@@ -56,28 +77,44 @@ export default function ArenaScreen() {
   const { athlete, isLoading: authLoading } = useRequireAthlete();
 
   const lobbyIds = useLobbyIds();
-  const { isLive, isSaving, incoming, outgoing, isBusy, capReached } =
-    useArenaState();
-  const { toggle, sendChallenge, cancelOutgoing, clearCap } = arenaActions;
+  const selfElo =
+    typeof athlete?.current_elo === "number" && Number.isFinite(athlete.current_elo)
+      ? athlete.current_elo
+      : null;
+  const {
+    isLive,
+    isSaving,
+    incoming,
+    incomingCount,
+    incomingTucked,
+    outgoing,
+    isBusy,
+    capReached,
+  } = useArenaState();
+  const { sendChallenge, cancelOutgoing, clearCap } = arenaActions;
+  // The switch guard (saving + cooldown): show it disabled, not dead.
+  const switchPhase = useLiveSwitchPhase();
+  const switchLocked = switchPhase !== "ready";
+  // Any live transition in flight, from any surface: no Challenge meanwhile.
+  const liveSaving = switchPhase === "saving";
+  const confirm = useMatchToConfirm(athlete?.id ?? null);
 
   const {
     competitors,
     challengedIds,
+    recentActivity,
     isLoading,
     isRefreshing,
     hasError,
     isFetching,
     lastReadOk,
+    hasRoster,
     refresh,
     refreshQuietly,
   } = useArenaRoster(athlete?.current_elo ?? 0);
 
-  const rosterIds = React.useMemo(
-    () => competitors.map((c) => c.id),
-    [competitors],
-  );
-  // A pushed profile or another tab keeps this screen mounted: read nothing
-  // then, and catch up on return.
+  const rosterIds = React.useMemo(() => competitors.map((c) => c.id), [competitors]);
+  // Unfocused (another tab or a pushed profile), read nothing; catch up on return.
   const isFocused = useIsFocused();
   useRosterLobbySync({
     rosterIds,
@@ -91,15 +128,13 @@ export default function ArenaScreen() {
     refresh: refreshQuietly,
   });
 
-  // An opponent who left between the roster load and the tap leaves a stale
-  // row behind; re-reading the roster is what corrects it. The challenge hook
-  // lives app-wide, so the roster's refresh is handed to it here. An empty id
-  // is the stale-challenge sweep (`notifyStaleChallengesCancelled`), which
-  // nobody tapped for, so it reads in the background: no spinner, and a
-  // failed read keeps the roster instead of swapping in the error plate.
+  // An opponent who left leaves a stale row: the app-wide challenge hook
+  // re-reads the roster through this. An empty id is the background stale
+  // sweep, which nobody tapped for, so it reads quietly.
   React.useEffect(() => {
-    setOpponentUnavailableHandler((id) => (id ? refresh() : refreshQuietly()));
-    return () => setOpponentUnavailableHandler(null);
+    const handler = (id: string) => (id ? refresh() : refreshQuietly());
+    setOpponentUnavailableHandler(handler);
+    return () => clearOpponentUnavailableHandler(handler);
   }, [refresh, refreshQuietly]);
 
   useRefreshOnChallengeEnd(
@@ -120,60 +155,98 @@ export default function ArenaScreen() {
   useRematchAutoSend({
     pin: rematch,
     isLive,
-    isSaving,
+    isSaving: liveSaving,
     blocked: isBusy || !!incoming,
     capReached,
     outgoingOpponentId: outgoing?.opponentId ?? null,
-    goLive: () => void arenaActions.goLive(),
+    // Programmatic, not a tap: never swallowed by the switch cooldown.
+    goLive: () => void arenaActions.goLiveUnguarded(),
     send: sendChallenge,
   });
 
-  const online = pinFirst(
-    competitors.filter((c) => lobbyIds.has(c.id)),
-    rematch.isOnline ? rematch.pinnedId : null,
-  );
-  const offline = competitors.filter((c) => !lobbyIds.has(c.id));
+  const lobbyKnown = useLobbyKnown();
+  const freshIncomingCount = useFreshIncomingCount();
+  // A challenge push: `?challenge=<id>` (AC-A8).
+  const deepLink = useChallengeDeepLink({
+    athleteId: athlete?.id ?? null,
+    isLive,
+    incoming,
+    incomingTucked,
+    lobbyIds,
+    lobbyKnown,
+    // The Arena tab's red count source (AC-T1): offline, an offer strip backs it.
+    freshIncomingCount,
+  });
+  const offer = deepLink.offer;
 
-  // One challenge at a time: a second outgoing prompt while one is unanswered
-  // would give the athlete two matches to walk into.
+  // While the lobby is unknown (down or rejoining) keep the last known rows
+  // rather than claiming the mat emptied. Challenges are refused meanwhile
+  // (use-arena-challenge), so a stale row cannot send.
+  const lastKnownLobbyRef = React.useRef<Set<string>>(lobbyIds);
+  if (lobbyKnown) lastKnownLobbyRef.current = lobbyIds;
+  const matLobbyIds = lobbyKnown ? lobbyIds : lastKnownLobbyRef.current;
+
+  // Closest first, strictly (AC-A4): a rematch opponent only gets a tag.
+  const selfId = athlete?.id ?? null;
+  const onTheMat = React.useMemo(
+    () => onTheMatRows(competitors, matLobbyIds, selfId),
+    [competitors, matLobbyIds, selfId],
+  );
+  // Counts from exactly these rows (D2); unknown while the rows are a
+  // placeholder (roster not loaded) or a last-known snapshot (lobby unknown).
+  const { onMat, inBand } = matCounts(
+    hasRoster && lobbyKnown ? onTheMat : null,
+    selfElo !== null,
+  );
+  // Never suggest someone a challenge is already pending with, either way.
+  const outgoingOpponentId = outgoing?.opponentId ?? null;
+  const closest = React.useMemo(
+    () =>
+      pickClosest(onTheMat, (c) => challengedIds.has(c.id) || outgoingOpponentId === c.id),
+    [onTheMat, challengedIds, outgoingOpponentId],
+  );
+
+  const strip = chooseStrip({
+    hasIncoming: !!incoming,
+    incomingTucked,
+    hasOutgoing: !!outgoing,
+    hasOffer: !!offer,
+    hasConfirm: !!confirm,
+  });
+  const cta = closestCta({
+    isLive,
+    hasClosest: !!closest,
+    hasIncoming: !!incoming,
+    hasOutgoing: !!outgoing,
+    // The offer owns red only while its strip is the one showing.
+    hasOffer: strip.challenge === "offer",
+    capped: capReached,
+  });
+
+  // Countdowns tick in leaf components, only while this tab is focused.
+  const ticking = isFocused;
+
+  // One challenge at a time.
   const actionsLocked = isBusy || !!outgoing || !!incoming;
 
-  const actionFor = React.useCallback(
-    (id: string, acceptsRanked: boolean, inLobby: boolean): RowAction => {
-      if (!inLobby) return { kind: "none" };
-      if (challengedIds.has(id) || outgoing?.opponentId === id) {
-        return { kind: "pending" };
-      }
-      if (!acceptsRanked) return { kind: "casual-only" };
-      if (!isLive) return { kind: "go-live" };
-      if (capReached) return { kind: "capped" };
-      return { kind: "challenge" };
-    },
-    [challengedIds, outgoing, isLive, capReached],
-  );
+  const actionFor = (id: string, acceptsRanked: boolean): MatRowAction => {
+    if (outgoing?.opponentId === id) return { kind: "sent", source: outgoing, active: ticking };
+    if (challengedIds.has(id)) return { kind: "pending" };
+    if (!acceptsRanked) return { kind: "casual-only" };
+    if (!isLive) return { kind: "go-live" };
+    if (capReached) return { kind: "capped" };
+    return { kind: "roll" };
+  };
 
-  const renderRow = (inLobby: boolean) =>
-    function Row(c: (typeof competitors)[number]) {
-      return (
-        <CompetitorRow
-          key={c.id}
-          competitor={c}
-          inLobby={inLobby}
-          action={actionFor(c.id, c.acceptsRanked, inLobby)}
-          disabled={actionsLocked || isSaving}
-          pinned={inLobby && c.id === rematch.pinnedId}
-          onChallenge={() => void sendChallenge(c.id, c.displayName)}
-          onGoLive={() => void toggle()}
-          onOpenProfile={() => router.push(`/athlete/${c.id}`)}
-        />
-      );
-    };
+  // Guarded and non-reversing, never a toggle.
+  const goLive = () => void goLiveWithFeedback();
+  const openProfile = (id: string) => router.push(`/athlete/${id}`);
 
   if (authLoading || !athlete) {
     return (
       <View className="flex-1 bg-surface">
-        <AppHeader title="Arena" liveSignal="static" />
-        <PageContainer contentContainerStyle={{ paddingTop: 16 }}>
+        <TabHeader title="Arena" onArena />
+        <PageContainer contentContainerStyle={{ paddingTop: 16, paddingBottom: ARENA_BOTTOM_PAD }}>
           <ArenaSkeleton />
         </PageContainer>
       </View>
@@ -182,14 +255,20 @@ export default function ArenaScreen() {
 
   return (
     <View className="flex-1 bg-surface">
-      <AppHeader
-        title="Arena"
-        liveSignal="static"
-        rightAction={<NotificationBell athleteId={athlete.id} />}
+      <TabHeader title="Arena" onArena />
+
+      {/* Outside the scroll view, so it stays put (sticky, AC-A1). */}
+      <MatControlBar
+        isLive={isLive}
+        locked={switchLocked}
+        saving={isSaving || liveSaving}
+        counts={formatMatCounts(onMat, inBand)}
+        onGoLive={goLive}
+        onGoOffline={() => void goOfflineWithFeedback()}
       />
 
       <PageContainer
-        contentContainerStyle={{ paddingTop: 16, gap: 24 }}
+        contentContainerStyle={{ paddingTop: 12, paddingBottom: ARENA_BOTTOM_PAD, gap: 16 }}
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}
@@ -198,64 +277,125 @@ export default function ArenaScreen() {
           />
         }
       >
+        {strip.challenge === "incoming" && incoming ? (
+          <IncomingStrip
+            name={incoming.challengerName}
+            // Offline, fresh on-mat challenges not in hand count here too.
+            count={incomingCount + deepLink.moreOnMat}
+            source={incoming}
+            active={ticking}
+            onOpen={() => arenaActions.reopenIncoming()}
+          />
+        ) : null}
+        {strip.challenge === "offer" && offer ? (
+          <OfferStrip
+            name={offer.challengerName}
+            count={1 + deepLink.moreOnMat}
+            source={offer}
+            active={ticking}
+            onGoLive={deepLink.acceptOffer}
+            disabled={switchLocked}
+          />
+        ) : null}
+        {/* Also under a tucked incoming (or offer) strip: my own challenge
+            stays cancellable while another waits in the chip. */}
+        {(strip.challenge === "waiting" || strip.alsoWaiting) && outgoing ? (
+          <WaitingStrip
+            name={outgoing.opponentName}
+            source={outgoing}
+            active={ticking}
+            onCancel={() => void cancelOutgoing()}
+            disabled={isBusy}
+          />
+        ) : null}
+        {/* Fresh challenges the Arena cannot raise yet (challenger off the
+            mat): the tab and the bell count them, so they show here. */}
+        {deepLink.away.length > 0 ? (
+          <AwayStrip
+            name={deepLink.away[0].challengerName}
+            count={deepLink.away.length}
+            source={deepLink.away[0]}
+            active={ticking}
+          />
+        ) : null}
+        {/* Under a challenge strip, never displaced by one. */}
+        {strip.confirm && confirm ? (
+          <ConfirmStrip
+            opponentName={confirm.opponentName}
+            onConfirm={() => openMatchToConfirm(router, confirm.matchId)}
+          />
+        ) : null}
+
         {isLoading ? (
           <ArenaSkeleton />
         ) : (
           <>
-            {outgoing ? (
-              <WaitingPlate
-                name={outgoing.opponentName}
-                onCancel={() => void cancelOutgoing()}
-                disabled={isBusy}
-              />
-            ) : (
-              <GoLivePlate
-                isLive={isLive}
-                isSaving={isSaving}
-                onToggle={() => void toggle()}
-              />
-            )}
-
             {capReached ? <CapPlate onDismiss={clearCap} /> : null}
 
             {hasError ? <RosterErrorPlate onRetry={refresh} /> : null}
 
-            {!hasError && rematch.pinnedId && !rematch.isOnline ? (
-              <RematchHint name={rematch.name} autoSend={rematch.autoSend} />
+            {/* A failed roster read hides the suggestion, but going live
+                does not depend on it: offline keeps GO LIVE TO ROLL (AC-A3). */}
+            {!hasError || !isLive ? (
+              <ClosestMatchCard
+                athlete={hasError ? null : closest}
+                emptyText={
+                  hasError
+                    ? null
+                    : !lobbyKnown
+                      ? "Reconnecting to the mat"
+                      : onTheMat.length === 0
+                        ? "Nobody else on the mat"
+                        : "No ranked opponent free on the mat"
+                }
+                kind={cta.kind}
+                red={cta.red}
+                disabled={
+                  cta.kind === "challenge"
+                    ? actionsLocked || liveSaving || capReached
+                    : switchLocked
+                }
+                viewer={{ elo: selfElo, weight: athlete.current_weight ?? null }}
+                onChallenge={() => {
+                  if (closest) void sendChallenge(closest.id, closest.displayName);
+                }}
+                onGoLive={goLive}
+              />
             ) : null}
 
-            {!hasError && competitors.length === 0 ? (
-              <EmptyLobbyPlate isLive={isLive} />
-            ) : null}
-
-            {competitors.length > 0 ? (
-              <>
-                {/* Rendered even at zero so the split stays learnable instead
-                    of the page silently losing its structure. */}
-                <View className="gap-2">
-                  <SectionLabel label="Online now" count={online.length} />
-                  {online.length > 0 ? (
-                    online.map(renderRow(true))
-                  ) : (
-                    <NobodyOnlineNote isLive={isLive} />
-                  )}
-                </View>
-
-                {offline.length > 0 ? (
-                  <View className="gap-2">
-                    <SectionLabel
-                      label="Open to challenges"
-                      count={offline.length}
+            {onTheMat.length > 0 ? (
+              <View testID="arena-on-the-mat">
+                <MatSectionLabel
+                  label="On the mat · closest first"
+                  right={String(onTheMat.length)}
+                />
+                {onTheMat.map((c) => {
+                  const action = actionFor(c.id, c.acceptsRanked);
+                  return (
+                    <MatRow
+                      key={c.id}
+                      competitor={c}
+                      action={action}
+                      // A row's go-live is the live switch too; ROLL is not.
+                      disabled={
+                        action.kind === "go-live"
+                          ? actionsLocked || switchLocked
+                          : actionsLocked || liveSaving
+                      }
+                      rematch={c.id === rematch.pinnedId}
+                      onRoll={() => void sendChallenge(c.id, c.displayName)}
+                      onGoLive={goLive}
+                      onOpenProfile={() => openProfile(c.id)}
                     />
-                    <Text className="font-body text-[12px] text-ink-3">
-                      Not in the app right now. They can take a challenge once
-                      they open it and go live.
-                    </Text>
-                    {offline.map(renderRow(false))}
-                  </View>
-                ) : null}
-              </>
+                  );
+                })}
+              </View>
             ) : null}
+
+            <JustRolled
+              items={recentActivity.slice(0, JUST_ROLLED_MAX)}
+              active={ticking}
+            />
           </>
         )}
       </PageContainer>

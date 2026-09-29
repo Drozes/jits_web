@@ -1,14 +1,16 @@
 /**
- * The Arena screen: the roster split and the action matrix.
+ * The Arena screen as a Mat Board (spec arena-live-chip section 6): the
+ * control bar, the challenge strip, Closest Match, On The Mat and Just
+ * Rolled. The Arena lists online athletes only (spec 14, D1), and every
+ * count on it is derived from exactly the rows it renders (D2).
  *
- * The split is the product: "Online now" comes from Presence and is the only
- * section that can carry a Challenge, because an offline opponent cannot
- * answer a live prompt. Everything below fixes one cell of that matrix, and
- * every state the screen can reach has to be reachable here, none of them a
- * dead end.
+ * The split is the product: "on the mat" comes from Presence and is the only
+ * place that can carry a challenge, because an athlete who is not live cannot
+ * answer a live prompt. Every state the screen can reach has to be reachable
+ * here, none of them a dead end.
  */
 import * as React from "react";
-import { act, fireEvent, render } from "@testing-library/react-native";
+import { act, fireEvent, render, waitFor, within } from "@testing-library/react-native";
 
 // ---- mocks ----
 
@@ -50,7 +52,21 @@ jest.mock("@/lib/theme/use-theme", () => ({
 // The bell has its own realtime subscription; it is not what this screen test
 // is about.
 jest.mock("@/components/notifications/notification-bell", () => ({
-  NotificationBell: () => null,
+  NotificationBell: () => {
+    const R = require("react");
+    const RN = require("react-native");
+    return R.createElement(RN.View, { testID: "notification-bell" });
+  },
+}));
+
+// The header status chip reads app-wide stores this suite mocks; it has its
+// own suite (__tests__/components/layout/header-status-chip.test.tsx).
+jest.mock("@/components/layout/header-status-chip", () => ({
+  HeaderStatusChip: () => {
+    const R = require("react");
+    const RN = require("react-native");
+    return R.createElement(RN.View, { testID: "header-status-chip" });
+  },
 }));
 
 jest.mock("@gorhom/bottom-sheet", () => {
@@ -78,11 +94,14 @@ const mockAthlete = {
   current_weight: 180,
   looking_for_ranked: false,
 };
+// Null while auth is still resolving (a push can land before it does).
+let mockAuthAthlete: typeof mockAthlete | null = mockAthlete;
 jest.mock("@/lib/auth/hooks", () => ({
-  useRequireAthlete: () => ({ athlete: mockAthlete, isLoading: false }),
+  useRequireAthlete: () => ({ athlete: mockAuthAthlete, isLoading: false }),
 }));
 
 const mockPush = jest.fn();
+const mockNavigate = jest.fn();
 const mockSetParams = jest.fn();
 let mockParams: Record<string, string | undefined> = {};
 // Records each focus effect so a test can simulate the tab losing focus.
@@ -90,6 +109,7 @@ const mockFocusCleanups: (() => void)[] = [];
 // Stable, like expo-router's own (useRouter returns the imperative singleton).
 const mockRouter = {
   push: (...a: unknown[]) => mockPush(...a),
+  navigate: (...a: unknown[]) => mockNavigate(...a),
   replace: jest.fn(),
   back: jest.fn(),
   // The rematch param must be cleared on THIS route, never through the
@@ -131,10 +151,35 @@ jest.mock("expo-haptics", () => ({
 }));
 
 let mockLobbyIds = new Set<string>();
+let mockLobbyKnown = true;
 const mockUseLobbyPresence = jest.fn();
 jest.mock("@/lib/arena/use-lobby-presence", () => ({
   useLobbyPresence: (...a: unknown[]) => mockUseLobbyPresence(...a),
   useLobbyIds: () => mockLobbyIds,
+  useLobbyKnown: () => mockLobbyKnown,
+}));
+
+let mockConfirm: { matchId: string; status: string; opponentName: string | null } | null = null;
+jest.mock("@/lib/match-flow/active-match-store", () => ({
+  useMatchToConfirm: () => mockConfirm,
+}));
+
+let mockStakes: Record<string, number> | null = null;
+jest.mock("@/lib/match-flow/use-viewer-stakes", () => ({
+  useViewerStakes: () => mockStakes,
+}));
+
+jest.mock("@/lib/supabase/client", () => ({ supabase: {} }));
+const mockGetPending = jest.fn();
+jest.mock("@jits/shared/api/queries", () => ({
+  getPendingChallengesForAthlete: (...a: unknown[]) => mockGetPending(...a),
+}));
+const mockResync = jest.fn();
+jest.mock("@/lib/arena/use-pending-challenge-recovery", () => ({
+  requestPendingChallengeResync: (...a: unknown[]) => mockResync(...a),
+  // The real freshness rule: created within 10 minutes, not expired.
+  isFreshPending: (c: { createdAt: string; expiresAt: string }, now: number) =>
+    Date.parse(c.expiresAt) > now && now - Date.parse(c.createdAt) <= 10 * 60_000,
 }));
 
 // The screen must never own a live writer or a challenge listener of its own:
@@ -154,11 +199,13 @@ const mockRefreshQuietly = jest.fn();
 let mockRoster = {
   competitors: [] as unknown[],
   challengedIds: new Set<string>(),
+  recentActivity: [] as unknown[],
   isLoading: false,
   isRefreshing: false,
   hasError: false,
   isFetching: false,
   lastReadOk: true,
+  hasRoster: true,
   refresh: mockRefresh,
   refreshQuietly: mockRefreshQuietly,
 };
@@ -170,15 +217,33 @@ jest.mock("@/components/ui/toast", () => ({ toast: { success: jest.fn(), error: 
 
 const mockToggle = jest.fn();
 const mockGoLive = jest.fn(() => Promise.resolve(true));
+const mockGuardedGoLive = jest.fn<Promise<boolean | "ignored">, []>(() =>
+  Promise.resolve(true),
+);
 const mockSendChallenge = jest.fn();
 const mockCancelOutgoing = jest.fn();
 const mockClearCap = jest.fn();
 const mockSetUnavailable = jest.fn();
+const mockClearUnavailable = jest.fn();
+const mockGuardedGoOffline = jest.fn<Promise<boolean | "ignored">, []>(() =>
+  Promise.resolve(true),
+);
+// The challenge hook's "this incoming challenge ended" signal.
+const mockEndedListeners = new Set<(id: string) => void>();
+function endIncomingChallenge(id: string) {
+  for (const l of [...mockEndedListeners]) l(id);
+}
+const mockReopen = jest.fn();
+// Challenges the owner's challenge hook dismissed for good (decision Q3).
+const mockDismissed = new Set<string>();
 let mockIsLive = false;
 let mockInMatch = false;
+let mockSwitchPhase: "ready" | "saving" | "cooldown" = "ready";
 let mockChallenge = {
   incoming: null as unknown,
   outgoing: null as unknown,
+  incomingCount: 0,
+  incomingTucked: false,
   isBusy: false,
   capReached: false,
 };
@@ -186,18 +251,28 @@ jest.mock("@/lib/arena/arena-store", () => ({
   useArenaState: () => ({ isLive: mockIsLive, isSaving: false, ...mockChallenge }),
   useIsArenaLive: () => mockIsLive,
   useIsInArenaMatch: () => mockInMatch,
+  useLiveSwitchPhase: () => mockSwitchPhase,
   arenaActions: {
     toggle: (...a: unknown[]) => mockToggle(...a),
     sendChallenge: (...a: unknown[]) => mockSendChallenge(...a),
     cancelOutgoing: (...a: unknown[]) => mockCancelOutgoing(...a),
     clearCap: (...a: unknown[]) => mockClearCap(...a),
-    goOffline: jest.fn(),
-    goLive: () => mockGoLive(),
+    reopenIncoming: () => mockReopen(),
+    goOffline: () => mockGuardedGoOffline(),
+    goLive: () => mockGuardedGoLive(),
+    goLiveUnguarded: () => mockGoLive(),
   },
   setOpponentUnavailableHandler: (...a: unknown[]) => mockSetUnavailable(...a),
+  clearOpponentUnavailableHandler: (...a: unknown[]) => mockClearUnavailable(...a),
+  subscribeIncomingChallengeEnded: (l: (id: string) => void) => {
+    mockEndedListeners.add(l);
+    return () => mockEndedListeners.delete(l);
+  },
+  isIncomingChallengeDismissed: (id: string) => mockDismissed.has(id),
 }));
 
 import ArenaScreen from "@/app/(app)/(tabs)/arena/index";
+import { publishBellBadge, resetBellStore } from "@/lib/notifications/bell-store";
 
 // ---- fixtures ----
 
@@ -217,45 +292,92 @@ function competitor(over: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockAuthAthlete = mockAthlete;
+  mockDismissed.clear();
   mockParams = {};
   mockFocusCleanups.length = 0;
   mockLobbyIds = new Set();
+  mockLobbyKnown = true;
   mockIsFocused = true;
   mockIsLive = false;
   mockInMatch = false;
+  mockSwitchPhase = "ready";
   mockRoster = {
     competitors: [],
     challengedIds: new Set(),
+    recentActivity: [],
     isLoading: false,
     isRefreshing: false,
     hasError: false,
     isFetching: false,
     lastReadOk: true,
+    hasRoster: true,
     refresh: mockRefresh,
     refreshQuietly: mockRefreshQuietly,
   };
   mockChallenge = {
     incoming: null,
     outgoing: null,
+    incomingCount: 0,
+    incomingTucked: false,
     isBusy: false,
     capReached: false,
   };
+  mockConfirm = null;
+  mockStakes = null;
+  mockGetPending.mockResolvedValue({ ok: true, data: { incoming: [], outgoing: [] } });
 });
 
 afterEach(() => {
   jest.useRealTimers();
 });
 
+/** The ROLL button on an On The Mat row (the Closest Match CTA shares its label). */
+function rowButton(
+  r: { getByTestId: (id: string) => unknown },
+  id: string,
+  label: string,
+) {
+  return within(r.getByTestId(`arena-mat-row-${id}`) as never).getByLabelText(label);
+}
+
+function isDisabled(node: { props: { accessibilityState?: { disabled?: boolean } } }) {
+  return node.props.accessibilityState?.disabled === true;
+}
+
+/** Distinct Signal Red buttons on screen (composite and host share props). */
+function redCount(r: { UNSAFE_root: { findAll: (p: (n: { props: Record<string, unknown> }) => boolean) => { props: Record<string, unknown> }[] } }) {
+  const reds = r.UNSAFE_root.findAll(
+    (n) =>
+      typeof n.props.className === "string" &&
+      /(^|\s)bg-cta(\s|$)/.test(n.props.className as string) &&
+      n.props.accessibilityRole === "button",
+  );
+  return new Set(reds.map((n) => n.props.accessibilityLabel)).size;
+}
+
+const INCOMING = {
+  challengeId: "ch-1",
+  challengerId: "a-9",
+  challengerName: "Rival",
+  challengerElo: 1350,
+  challengerWeight: 190,
+  createdAt: null,
+  expiresAt: null,
+};
+
 describe("Arena screen", () => {
   it("shows a skeleton, never a blank screen, while the roster loads", () => {
     mockRoster.isLoading = true;
-    const { getByLabelText, queryByText } = render(<ArenaScreen />);
+    const { getByLabelText, queryByTestId } = render(<ArenaScreen />);
 
     expect(getByLabelText("Loading the Arena")).toBeTruthy();
-    expect(queryByText("Online now")).toBeNull();
+    expect(queryByTestId("arena-on-the-mat")).toBeNull();
+    // The control bar is not roster data: it is there from the first frame.
+    expect(queryByTestId("arena-control-bar")).toBeTruthy();
   });
 
-  it("splits the roster on presence and counts each side", () => {
+  it("splits the roster on presence: only athletes on the mat carry a challenge (F13)", () => {
     mockIsLive = true;
     mockRoster.competitors = [
       competitor({ id: "a-1", displayName: "Alpha" }),
@@ -263,52 +385,85 @@ describe("Arena screen", () => {
     ];
     mockLobbyIds = new Set(["a-1"]);
 
-    const { getByText, getByLabelText, queryByLabelText } = render(
-      <ArenaScreen />,
-    );
+    const r = render(<ArenaScreen />);
 
-    expect(getByText("Online now")).toBeTruthy();
-    expect(getByText("Open to challenges")).toBeTruthy();
-    // Only the present athlete can answer a live prompt, so only that row
-    // carries the action.
-    expect(getByLabelText("Challenge Alpha")).toBeTruthy();
-    expect(queryByLabelText("Challenge Bravo")).toBeNull();
+    expect(r.getByTestId("arena-mat-row-a-1")).toBeTruthy();
+    expect(r.queryByTestId("arena-mat-row-a-2")).toBeNull();
+    expect(rowButton(r, "a-1", "Challenge Alpha")).toBeTruthy();
+    expect(r.queryByLabelText("Challenge Bravo")).toBeNull();
+    // Bravo is not on the mat, so not on the Arena at all (D1).
+    expect(r.queryByText("Bravo")).toBeNull();
+    expect(r.queryByText(/off the mat/i)).toBeNull();
   });
 
-  it("challenges by id and name when the action is tapped", () => {
+  it("challenges by id and name when a row's ROLL is tapped", () => {
     mockIsLive = true;
     mockRoster.competitors = [competitor()];
     mockLobbyIds = new Set(["a-1"]);
 
-    const { getByLabelText } = render(<ArenaScreen />);
-    fireEvent.press(getByLabelText("Challenge Alpha"));
+    const r = render(<ArenaScreen />);
+    fireEvent.press(rowButton(r, "a-1", "Challenge Alpha"));
 
     expect(mockSendChallenge).toHaveBeenCalledWith("a-1", "Alpha");
   });
 
-  it("offers a working way to go live instead of a dead button", () => {
-    // The viewer is offline. The affordance names the reason AND fixes it.
+  it("offers a working way to go live from a row instead of a dead button", () => {
     mockIsLive = false;
     mockRoster.competitors = [competitor()];
     mockLobbyIds = new Set(["a-1"]);
 
-    const { getByLabelText, queryByLabelText } = render(<ArenaScreen />);
-    expect(queryByLabelText("Challenge Alpha")).toBeNull();
+    const r = render(<ArenaScreen />);
+    expect(r.queryByLabelText("Challenge Alpha")).toBeNull();
 
-    fireEvent.press(getByLabelText("Go live to challenge Alpha"));
-    expect(mockToggle).toHaveBeenCalled();
+    fireEvent.press(rowButton(r, "a-1", "Go live to challenge Alpha"));
+    // The guarded, non-reversing go-live, never a toggle of the intent.
+    expect(mockGuardedGoLive).toHaveBeenCalled();
+    expect(mockToggle).not.toHaveBeenCalled();
+  });
+
+  it("says so when a row's go-live fails, and stays silent when it was ignored", async () => {
+    mockIsLive = false;
+    mockRoster.competitors = [competitor()];
+    mockLobbyIds = new Set(["a-1"]);
+    const { toast } = jest.requireMock("@/components/ui/toast") as {
+      toast: { error: jest.Mock; info: jest.Mock };
+    };
+    toast.info.mockClear();
+
+    const { getByLabelText } = render(<ArenaScreen />);
+    mockGuardedGoLive.mockImplementationOnce(() => Promise.resolve("ignored"));
+    await act(async () => {
+      fireEvent.press(getByLabelText("Go live to challenge Alpha"));
+    });
+    expect(toast.info).not.toHaveBeenCalled();
+
+    mockGuardedGoLive.mockImplementationOnce(() => Promise.resolve(false));
+    await act(async () => {
+      fireEvent.press(getByLabelText("Go live to challenge Alpha"));
+    });
+    expect(toast.info).toHaveBeenCalledWith("Couldn't take you live. Try again.");
+
+    // A rejected go-live is a failure too.
+    toast.info.mockClear();
+    mockGuardedGoLive.mockImplementationOnce(() => Promise.reject(new Error("x")));
+    await act(async () => {
+      fireEvent.press(getByLabelText("Go live to challenge Alpha"));
+    });
+    expect(toast.info).toHaveBeenCalledWith("Couldn't take you live. Try again.");
+    // Neutral, never Signal Red: a live-flag write failure is ink-3 (spec 3).
+    expect(toast.error).not.toHaveBeenCalled();
   });
 
   it("suppresses the action for an athlete who does not take ranked", () => {
-    // opponent_accepts_match_type() reads looking_for_ranked, so the insert
-    // would be refused by RLS. Offering it would promise a failure.
     mockIsLive = true;
     mockRoster.competitors = [competitor({ acceptsRanked: false })];
     mockLobbyIds = new Set(["a-1"]);
 
-    const { getByText, queryByLabelText } = render(<ArenaScreen />);
+    const { getByText, queryByLabelText, getByTestId } = render(<ArenaScreen />);
     expect(queryByLabelText("Challenge Alpha")).toBeNull();
     expect(getByText("Casual only")).toBeTruthy();
+    // Never the Closest Match either: the database would refuse it.
+    expect(getByTestId("arena-closest-empty")).toBeTruthy();
   });
 
   it("shows an already-challenged athlete as pending", () => {
@@ -317,9 +472,117 @@ describe("Arena screen", () => {
     mockLobbyIds = new Set(["a-1"]);
     mockRoster.challengedIds = new Set(["a-1"]);
 
-    const { getByText, queryByLabelText } = render(<ArenaScreen />);
-    expect(getByText("Pending")).toBeTruthy();
-    expect(queryByLabelText("Challenge Alpha")).toBeNull();
+    const r = render(<ArenaScreen />);
+    expect(r.getByText("Pending")).toBeTruthy();
+    // Nowhere on screen: not the row, and not the Closest Match card either.
+    expect(r.queryByLabelText("Challenge Alpha")).toBeNull();
+    expect(r.queryByTestId("arena-closest-cta")).toBeNull();
+    expect(r.getByText("No ranked opponent free on the mat")).toBeTruthy();
+  });
+
+  it("never suggests an athlete a challenge is already pending with; the next one instead", () => {
+    mockIsLive = true;
+    mockRoster.competitors = [
+      competitor({ id: "a-1", displayName: "Alpha", eloDiff: 5 }),
+      competitor({ id: "a-2", displayName: "Bravo", eloDiff: 40 }),
+    ];
+    mockLobbyIds = new Set(["a-1", "a-2"]);
+    // Pending in either direction (a web profile challenge, an older tuck).
+    mockRoster.challengedIds = new Set(["a-1"]);
+
+    const r = render(<ArenaScreen />);
+    expect(r.getByTestId("arena-closest-cta").props.accessibilityLabel).toBe("Challenge Bravo");
+    expect(r.queryByLabelText("Challenge Alpha")).toBeNull();
+    fireEvent.press(r.getByTestId("arena-closest-cta"));
+    expect(mockSendChallenge).toHaveBeenCalledWith("a-2", "Bravo");
+    expect(mockSendChallenge).not.toHaveBeenCalledWith("a-1", "Alpha");
+  });
+
+  it("never suggests the athlete my outgoing challenge is waiting on", () => {
+    mockIsLive = true;
+    mockRoster.competitors = [
+      competitor({ id: "a-1", displayName: "Alpha", eloDiff: 5 }),
+      competitor({ id: "a-2", displayName: "Bravo", eloDiff: 40 }),
+    ];
+    mockLobbyIds = new Set(["a-1", "a-2"]);
+    mockChallenge.outgoing = { challengeId: "o-1", opponentId: "a-1", opponentName: "Alpha" };
+
+    const r = render(<ArenaScreen />);
+    // One state per person: Alpha's row reads SENT, and no second
+    // `Challenge Alpha` button exists for the harness to match.
+    expect(r.queryByLabelText("Challenge Alpha")).toBeNull();
+    expect(r.getByTestId("arena-closest-cta").props.accessibilityLabel).toBe("Challenge Bravo");
+  });
+
+  it("a lost lobby channel keeps the last On The Mat split, never 'Nobody else on the mat'", () => {
+    mockIsLive = true;
+    mockRoster.competitors = [competitor()];
+    mockLobbyIds = new Set(["a-1"]);
+    const r = render(<ArenaScreen />);
+    expect(r.getByTestId("arena-on-the-mat")).toHaveTextContent(/Alpha/);
+
+    // The channel drops: presence is cleared and marked unknown.
+    mockLobbyKnown = false;
+    mockLobbyIds = new Set();
+    r.rerender(<ArenaScreen />);
+    expect(r.getByTestId("arena-on-the-mat")).toHaveTextContent(/Alpha/);
+    expect(r.queryByText("Nobody else on the mat")).toBeNull();
+
+    // Back and synced with an empty mat: now it is true.
+    mockLobbyKnown = true;
+    r.rerender(<ArenaScreen />);
+    expect(r.queryByTestId("arena-on-the-mat")).toBeNull();
+    expect(r.getByText("Nobody else on the mat")).toBeTruthy();
+  });
+
+  it("while the lobby is not known yet, the empty mat reads Reconnecting, not Nobody", () => {
+    mockIsLive = true;
+    mockRoster.competitors = [competitor()];
+    mockLobbyKnown = false;
+    mockLobbyIds = new Set();
+    const r = render(<ArenaScreen />);
+    expect(r.getByText("Reconnecting to the mat")).toBeTruthy();
+    expect(r.queryByText("Nobody else on the mat")).toBeNull();
+  });
+
+  it("says nobody ranked is free when everyone on the mat is casual-only", () => {
+    mockIsLive = true;
+    mockRoster.competitors = [competitor({ acceptsRanked: false })];
+    mockLobbyIds = new Set(["a-1"]);
+    const r = render(<ArenaScreen />);
+    expect(r.getByText("No ranked opponent free on the mat")).toBeTruthy();
+    expect(r.queryByText("Nobody else on the mat")).toBeNull();
+  });
+
+  it("says so when the Closest Match go-live fails, and stays silent when it was ignored", async () => {
+    mockRoster.competitors = [competitor()];
+    mockLobbyIds = new Set(["a-1"]);
+    const { toast } = jest.requireMock("@/components/ui/toast") as {
+      toast: { error: jest.Mock; info: jest.Mock };
+    };
+    toast.info.mockClear();
+    const r = render(<ArenaScreen />);
+
+    mockGuardedGoLive.mockImplementationOnce(() => Promise.resolve("ignored"));
+    await act(async () => {
+      fireEvent.press(r.getByTestId("arena-closest-cta"));
+    });
+    expect(toast.info).not.toHaveBeenCalled();
+
+    mockGuardedGoLive.mockImplementationOnce(() => Promise.resolve(false));
+    await act(async () => {
+      fireEvent.press(r.getByTestId("arena-closest-cta"));
+    });
+    expect(toast.info).toHaveBeenCalledWith("Couldn't take you live. Try again.");
+
+    toast.info.mockClear();
+    mockGuardedGoLive.mockImplementationOnce(() => Promise.reject(new Error("x")));
+    await act(async () => {
+      fireEvent.press(r.getByTestId("arena-closest-cta"));
+    });
+    expect(toast.info).toHaveBeenCalledWith("Couldn't take you live. Try again.");
+    // Neutral, never Signal Red: a live-flag write failure is ink-3 (spec 3).
+    expect(toast.error).not.toHaveBeenCalled();
   });
 
   it("states the 3-challenge cap and stops offering challenges", () => {
@@ -328,81 +591,626 @@ describe("Arena screen", () => {
     mockRoster.competitors = [competitor()];
     mockLobbyIds = new Set(["a-1"]);
 
-    const { getByText, queryByLabelText } = render(<ArenaScreen />);
+    const r = render(<ArenaScreen />);
 
-    expect(getByText("You have 3 challenges out")).toBeTruthy();
-    expect(queryByLabelText("Challenge Alpha")).toBeNull();
-    expect(getByText("3 out")).toBeTruthy();
+    expect(r.getByText("You have 3 challenges out")).toBeTruthy();
+    expect(r.getByText("3 out")).toBeTruthy();
+    expect(within(r.getByTestId("arena-mat-row-a-1")).queryByLabelText("Challenge Alpha")).toBeNull();
+    expect(isDisabled(r.getByTestId("arena-closest-cta"))).toBe(true);
   });
 
   it("offers a retry inline when the roster read failed", () => {
+    mockIsLive = true;
     mockRoster.hasError = true;
-    const { getByText, getByLabelText } = render(<ArenaScreen />);
+    const { getByText, getByLabelText, queryByTestId } = render(<ArenaScreen />);
 
     expect(getByText(/couldn't reach the lobby/i)).toBeTruthy();
+    // A failed read is not an empty mat.
+    expect(queryByTestId("arena-closest-empty")).toBeNull();
+    expect(queryByTestId("arena-closest-cta")).toBeNull();
     fireEvent.press(getByLabelText("Retry"));
     expect(mockRefresh).toHaveBeenCalled();
   });
 
-  it("does not claim the lobby is empty when the read failed", () => {
+  it("offline with a failed roster read: still a red GO LIVE TO ROLL, no empty-mat claim (AC-A3)", () => {
     mockRoster.hasError = true;
-    const { queryByText } = render(<ArenaScreen />);
-    expect(queryByText("Lobby empty")).toBeNull();
+    const r = render(<ArenaScreen />);
+    expect(r.getByText(/couldn't reach the lobby/i)).toBeTruthy();
+    expect(r.queryByText("Nobody else on the mat")).toBeNull();
+    const cta = r.getByTestId("arena-closest-cta");
+    expect(cta.props.accessibilityLabel).toBe("Go live to roll");
+    expect(cta.props.className).toMatch(/bg-cta/);
+    expect(redCount(r)).toBe(1);
+    fireEvent.press(cta);
+    expect(mockGuardedGoLive).toHaveBeenCalledTimes(1);
   });
 
-  it("says the lobby is empty only when the read succeeded with nobody in it", () => {
-    const { getByText } = render(<ArenaScreen />);
-    expect(getByText("Lobby empty")).toBeTruthy();
-  });
-
-  it("keeps the offline list when nobody is online", () => {
-    mockRoster.competitors = [competitor()];
-    mockLobbyIds = new Set();
-
-    const { getByText } = render(<ArenaScreen />);
-    expect(
-      getByText(
-        "Nobody is live right now. Go live and you'll be first in the lobby.",
-      ),
-    ).toBeTruthy();
-    expect(getByText("Open to challenges")).toBeTruthy();
-    expect(getByText("Alpha")).toBeTruthy();
-  });
-
-  it("never tells a live viewer that nobody is live", () => {
-    // The viewer is in the lobby themselves, so "nobody" has to mean "nobody
-    // else", and the offline rows must not be promised a challenge.
+  it("live, shows an empty Closest Match with no CTA when nobody else is on the mat", () => {
     mockIsLive = true;
     mockRoster.competitors = [competitor()];
     mockLobbyIds = new Set();
 
-    const { getByText, queryByText } = render(<ArenaScreen />);
-    expect(
-      getByText(
-        "Nobody else is live right now. Stay live and anyone who goes live shows up here.",
-      ),
-    ).toBeTruthy();
-    expect(queryByText(/Nobody has the app open/)).toBeNull();
-    expect(queryByText(/will see it next time/)).toBeNull();
-    expect(
-      getByText(
-        "Not in the app right now. They can take a challenge once they open it and go live.",
-      ),
-    ).toBeTruthy();
+    const { getByTestId, queryByTestId, queryByText } = render(<ArenaScreen />);
+    expect(getByTestId("arena-closest-empty")).toBeTruthy();
+    expect(queryByTestId("arena-closest-cta")).toBeNull();
+    // The roster athlete who is not live is listed nowhere (D1).
+    expect(queryByText("Alpha")).toBeNull();
+    expect(getByTestId("arena-mat-counts").props.children).toBe("NOBODY ELSE ON MAT");
   });
 
-  it("titles the plate as offline until the athlete is live", () => {
-    const offline = render(<ArenaScreen />);
-    expect(offline.getByText("You're offline")).toBeTruthy();
-    expect(offline.queryByText(/Looking for/)).toBeNull();
-    expect(offline.getByLabelText("Go live")).toBeTruthy();
-    offline.unmount();
+  it("removes the old prose plates (AC-A7)", () => {
+    mockRoster.competitors = [competitor({ id: "a-1" }), competitor({ id: "a-2", displayName: "Bravo" })];
+    mockLobbyIds = new Set(["a-1"]);
+    const { queryByText, queryByTestId } = render(<ArenaScreen />);
+    expect(queryByText("You're offline")).toBeNull();
+    expect(queryByText("Looking for a match")).toBeNull();
+    expect(queryByText("Online now")).toBeNull();
+    expect(queryByText("Open to challenges")).toBeNull();
+    expect(queryByText(/Not in the app right now/)).toBeNull();
+    expect(queryByText(/Nobody (else )?is live right now/)).toBeNull();
+    expect(queryByTestId("arena-waiting-plate")).toBeNull();
+  });
 
+  it("clears the tab bar without the shared container's 96pt pad (AC-A7)", () => {
+    mockRoster.competitors = [competitor()];
+    const { UNSAFE_root } = render(<ArenaScreen />);
+    const { ScrollView } = require("react-native");
+    const scroll = UNSAFE_root.findByType(ScrollView);
+    const styles = [scroll.props.contentContainerStyle].flat(3);
+    const pad = Object.assign({}, ...styles).paddingBottom;
+    expect(pad).toBe(24);
+  });
+
+  describe("control bar (AC-A1)", () => {
+    it("offers Go live while offline and states where the athlete is", () => {
+      const { getByLabelText, queryByLabelText } = render(<ArenaScreen />);
+      const goLive = getByLabelText("Go live");
+      expect(isDisabled(goLive)).toBe(false);
+      expect(getByLabelText("You are offline").props.accessibilityState).toEqual(
+        expect.objectContaining({ selected: true }),
+      );
+      // Exactly one live action on screen: the harness taps it by label.
+      expect(queryByLabelText("Go offline")).toBeNull();
+      fireEvent.press(goLive);
+      // The guarded, non-reversing go-live: never the reversing toggle.
+      expect(mockGuardedGoLive).toHaveBeenCalledTimes(1);
+      expect(mockGuardedGoOffline).not.toHaveBeenCalled();
+      expect(mockToggle).not.toHaveBeenCalled();
+    });
+
+    it("offers Go offline while live", () => {
+      mockIsLive = true;
+      const { getByLabelText, queryByLabelText } = render(<ArenaScreen />);
+      expect(queryByLabelText("Go live")).toBeNull();
+      expect(getByLabelText("You are live")).toBeTruthy();
+      fireEvent.press(getByLabelText("Go offline"));
+      expect(mockGuardedGoOffline).toHaveBeenCalledTimes(1);
+      expect(mockGuardedGoLive).not.toHaveBeenCalled();
+      expect(mockToggle).not.toHaveBeenCalled();
+    });
+
+    it("a tap on a segment rendered from a stale live state never flips the other way", () => {
+      // The LIVE segment is always go-live and OFFLINE always go-offline,
+      // whatever `isLive` the render held: a restore that commits between
+      // paint and press cannot turn "Go live" into a go-offline.
+      const offline = render(<ArenaScreen />);
+      const goLive = offline.getByLabelText("Go live");
+      // A restore commits live after this render painted, before the tap.
+      mockIsLive = true;
+      fireEvent.press(goLive);
+      expect(mockGuardedGoLive).toHaveBeenCalledTimes(1);
+      expect(mockGuardedGoOffline).not.toHaveBeenCalled();
+      offline.unmount();
+
+      mockIsLive = true;
+      const live = render(<ArenaScreen />);
+      const goOffline = live.getByLabelText("Go offline");
+      mockIsLive = false;
+      fireEvent.press(goOffline);
+      expect(mockGuardedGoOffline).toHaveBeenCalledTimes(1);
+      expect(mockGuardedGoLive).toHaveBeenCalledTimes(1);
+      expect(mockToggle).not.toHaveBeenCalled();
+    });
+
+    it("says so when a segment's go-offline fails, and stays silent when it was ignored", async () => {
+      mockIsLive = true;
+      const { toast } = jest.requireMock("@/components/ui/toast") as {
+        toast: { error: jest.Mock; info: jest.Mock };
+      };
+      const r = render(<ArenaScreen />);
+      mockGuardedGoOffline.mockImplementationOnce(() => Promise.resolve("ignored"));
+      await act(async () => {
+        fireEvent.press(r.getByLabelText("Go offline"));
+      });
+      expect(toast.info).not.toHaveBeenCalled();
+      mockGuardedGoOffline.mockImplementationOnce(() => Promise.resolve(false));
+      await act(async () => {
+        fireEvent.press(r.getByLabelText("Go offline"));
+      });
+      expect(toast.info).toHaveBeenCalledWith(
+        "You're offline here, but we couldn't update your status. We'll retry.",
+      );
+      // Neutral, never Signal Red: a live-flag write failure is ink-3 (spec 3).
+      expect(toast.error).not.toHaveBeenCalled();
+    });
+
+    it("mirrors the store: flipping live re-renders the selected segment", () => {
+      const r = render(<ArenaScreen />);
+      expect(r.getByLabelText("You are offline")).toBeTruthy();
+      mockIsLive = true;
+      r.rerender(<ArenaScreen />);
+      expect(r.getByLabelText("You are live")).toBeTruthy();
+      expect(r.queryByLabelText("You are offline")).toBeNull();
+    });
+
+    it("disables the switch while locked (saving or cooldown), keeping its label", () => {
+      mockSwitchPhase = "cooldown";
+      mockRoster.competitors = [competitor()];
+      mockLobbyIds = new Set(["a-1"]);
+      const offline = render(<ArenaScreen />);
+      const seg = offline.getByLabelText("Go live");
+      expect(isDisabled(seg)).toBe(true);
+      fireEvent.press(seg);
+      // Every go-live on the surface is the same switch.
+      fireEvent.press(rowButton(offline, "a-1", "Go live to challenge Alpha"));
+      fireEvent.press(offline.getByTestId("arena-closest-cta"));
+      expect(mockToggle).not.toHaveBeenCalled();
+      expect(mockGuardedGoLive).not.toHaveBeenCalled();
+      expect(mockGuardedGoOffline).not.toHaveBeenCalled();
+      offline.unmount();
+
+      // A challenge is not the live switch: the cooldown must not hold it.
+      mockIsLive = true;
+      const live = render(<ArenaScreen />);
+      expect(isDisabled(live.getByLabelText("Go offline"))).toBe(true);
+      fireEvent.press(rowButton(live, "a-1", "Challenge Alpha"));
+      expect(mockSendChallenge).toHaveBeenCalledWith("a-1", "Alpha");
+    });
+
+    it("shows ON MAT and IN BAND counts from the rows, and CONNECTING when the lobby is unknown", () => {
+      mockRoster.competitors = [
+        competitor({ id: "a-1", displayName: "Alpha", currentElo: 1300, eloDiff: 100 }),
+        competitor({ id: "a-2", displayName: "Bravo", currentElo: 1301, eloDiff: 101 }),
+        competitor({ id: "a-3", displayName: "Charlie", currentElo: 1150, eloDiff: -50 }),
+      ];
+      mockLobbyIds = new Set(["a-1", "a-2", "a-3"]);
+      const r = render(<ArenaScreen />);
+      // In band is inclusive at the displayed +100 gap; +101 is out.
+      expect(r.getByTestId("arena-mat-counts").props.children).toBe("3 ON MAT · 2 IN BAND");
+      mockLobbyKnown = false;
+      r.rerender(<ArenaScreen />);
+      expect(r.getByTestId("arena-mat-counts").props.children).toBe("CONNECTING");
+    });
+  });
+
+  describe("every displayed count is derived from its rows (spec 14, D2)", () => {
+    /**
+     * The invariant: whatever the bar says, it says about exactly the rows
+     * On The Mat renders. A number with no rows behind it (a stray presence
+     * key, self, a roster not loaded yet) fails here.
+     */
+    function assertCountsMatchRows(r: ReturnType<typeof render>) {
+      const rows = r.queryAllByTestId(/^arena-mat-row-/);
+      const text = r.getByTestId("arena-mat-counts").props.children as string;
+      if (text === "CONNECTING") return { rows: rows.length, onMat: null };
+      if (text === "NOBODY ELSE ON MAT") {
+        expect(rows).toHaveLength(0);
+        return { rows: 0, onMat: 0 };
+      }
+      const m = /^(\d+) ON MAT · (\d+) IN BAND$/.exec(text);
+      expect(m).not.toBeNull();
+      const onMat = Number(m![1]);
+      const inBand = Number(m![2]);
+      expect(onMat).toBeGreaterThan(0);
+      expect(onMat).toBe(rows.length);
+      // The section's own count reads the same rows.
+      const section = r.getByTestId("arena-on-the-mat");
+      expect(within(section).getByText(String(onMat))).toBeTruthy();
+      // IN BAND uses the gap each row displays.
+      const shownGaps = mockRoster.competitors
+        .filter((c) => rows.some((row) => row.props.testID === `arena-mat-row-${(c as { id: string }).id}`))
+        .map((c) => Math.abs((c as { eloDiff: number }).eloDiff));
+      expect(inBand).toBe(shownGaps.filter((g) => g <= 100).length);
+      return { rows: rows.length, onMat };
+    }
+
+    it("never counts stray presence keys or self", () => {
+      mockIsLive = true;
+      mockRoster.competitors = [
+        competitor({ id: "a-1", displayName: "Alpha", eloDiff: 40 }),
+        competitor({ id: "a-2", displayName: "Bravo", eloDiff: 250 }),
+        // Not present: no row, no count.
+        competitor({ id: "a-3", displayName: "Charlie", eloDiff: 10 }),
+      ];
+      // Self, and three keys no roster athlete stands behind.
+      mockLobbyIds = new Set(["me-1", "a-1", "a-2", "ghost-1", "ghost-2", "ghost-3"]);
+      const r = render(<ArenaScreen />);
+      expect(assertCountsMatchRows(r)).toEqual({ rows: 2, onMat: 2 });
+      expect(r.getByTestId("arena-mat-counts").props.children).toBe("2 ON MAT · 1 IN BAND");
+    });
+
+    it("presence with nobody on the roster claims nobody", () => {
+      mockIsLive = true;
+      mockRoster.competitors = [];
+      mockLobbyIds = new Set(["me-1", "ghost-1", "ghost-2"]);
+      const r = render(<ArenaScreen />);
+      expect(assertCountsMatchRows(r)).toEqual({ rows: 0, onMat: 0 });
+      expect(r.getByTestId("arena-mat-counts").props.children).toBe("NOBODY ELSE ON MAT");
+    });
+
+    it("reads CONNECTING, never a number, while the roster has not loaded", () => {
+      mockRoster.isLoading = true;
+      mockRoster.hasRoster = false;
+      mockLobbyIds = new Set(["a-1", "a-2", "ghost-1"]);
+      const r = render(<ArenaScreen />);
+      expect(r.getByTestId("arena-mat-counts").props.children).toBe("CONNECTING");
+      expect(r.queryAllByTestId(/^arena-mat-row-/)).toHaveLength(0);
+    });
+
+    it("reads CONNECTING after a failed first read, with presence but no roster", () => {
+      mockRoster.hasError = true;
+      mockRoster.lastReadOk = false;
+      mockRoster.hasRoster = false;
+      mockLobbyIds = new Set(["a-1", "ghost-1"]);
+      const r = render(<ArenaScreen />);
+      expect(r.getByTestId("arena-mat-counts").props.children).toBe("CONNECTING");
+      expect(assertCountsMatchRows(r)).toEqual({ rows: 0, onMat: null });
+    });
+
+    it("follows the rows as the lobby changes", () => {
+      mockIsLive = true;
+      mockRoster.competitors = [
+        competitor({ id: "a-1", displayName: "Alpha", eloDiff: 0 }),
+        competitor({ id: "a-2", displayName: "Bravo", eloDiff: -100 }),
+      ];
+      mockLobbyIds = new Set(["a-1"]);
+      const r = render(<ArenaScreen />);
+      expect(assertCountsMatchRows(r)).toEqual({ rows: 1, onMat: 1 });
+      mockLobbyIds = new Set(["a-1", "a-2", "ghost"]);
+      r.rerender(<ArenaScreen />);
+      expect(assertCountsMatchRows(r)).toEqual({ rows: 2, onMat: 2 });
+      mockLobbyIds = new Set(["ghost"]);
+      r.rerender(<ArenaScreen />);
+      expect(assertCountsMatchRows(r)).toEqual({ rows: 0, onMat: 0 });
+    });
+  });
+
+  describe("Closest Match (AC-A3)", () => {
+    function mat() {
+      mockRoster.competitors = [
+        competitor({ id: "far", displayName: "Far", currentElo: 1500, eloDiff: 300 }),
+        competitor({ id: "near", displayName: "Near", currentElo: 1190, eloDiff: -10 }),
+        competitor({ id: "mid", displayName: "Mid", currentElo: 1250, eloDiff: 50 }),
+      ];
+      mockLobbyIds = new Set(["far", "near", "mid"]);
+    }
+
+    it("suggests the smallest |ΔELO| with its stakes and one red CHALLENGE", () => {
+      mockIsLive = true;
+      mat();
+      mockStakes = { challenger_win: 15, challenger_loss: -15, challenger_draw: 0 };
+      const r = render(<ArenaScreen />);
+      const cta = r.getByTestId("arena-closest-cta");
+      expect(cta.props.accessibilityLabel).toBe("Challenge Near");
+      expect(cta.props.className).toMatch(/bg-cta/);
+      expect(r.getByTestId("arena-closest-stakes").props.children).toBe("Win +15 · Loss −15");
+      expect(redCount(r)).toBe(1);
+
+      fireEvent.press(cta);
+      expect(mockSendChallenge).toHaveBeenCalledWith("near", "Near");
+      expect(mockImpact).toHaveBeenCalledWith("light");
+    });
+
+    it("offline, the CTA is a red GO LIVE TO ROLL", () => {
+      mat();
+      const r = render(<ArenaScreen />);
+      const cta = r.getByTestId("arena-closest-cta");
+      expect(cta.props.accessibilityLabel).toBe("Go live to roll");
+      expect(cta.props.className).toMatch(/bg-cta/);
+      expect(redCount(r)).toBe(1);
+      fireEvent.press(cta);
+      expect(mockGuardedGoLive).toHaveBeenCalledTimes(1);
+      expect(mockSendChallenge).not.toHaveBeenCalled();
+    });
+
+    // AC-A3's offline red GO LIVE TO ROLL; spec 6.3's "empty lobby: no red
+    // CTA" is read as the LIVE empty lobby (pending product confirmation).
+    it("offline on an empty mat: the empty state still carries a red GO LIVE TO ROLL", () => {
+      mockRoster.competitors = [competitor()];
+      mockLobbyIds = new Set();
+      const r = render(<ArenaScreen />);
+      expect(r.getByText("Nobody else on the mat")).toBeTruthy();
+      const cta = r.getByTestId("arena-closest-cta");
+      expect(cta.props.accessibilityLabel).toBe("Go live to roll");
+      expect(cta.props.className).toMatch(/bg-cta/);
+      expect(redCount(r)).toBe(1);
+      fireEvent.press(cta);
+      expect(mockGuardedGoLive).toHaveBeenCalledTimes(1);
+    });
+
+    it("offline with only casual-only athletes on the mat: still a red GO LIVE TO ROLL", () => {
+      mockRoster.competitors = [competitor({ acceptsRanked: false })];
+      mockLobbyIds = new Set(["a-1"]);
+      const r = render(<ArenaScreen />);
+      expect(r.getByText("No ranked opponent free on the mat")).toBeTruthy();
+      expect(r.getByTestId("arena-closest-cta").props.accessibilityLabel).toBe("Go live to roll");
+      expect(redCount(r)).toBe(1);
+    });
+
+    it("at the 3-challenge cap the disabled CHALLENGE is outline: no dead red button", () => {
+      mockIsLive = true;
+      mat();
+      mockChallenge.capReached = true;
+      const r = render(<ArenaScreen />);
+      const cta = r.getByTestId("arena-closest-cta");
+      expect(isDisabled(cta)).toBe(true);
+      expect(cta.props.className).not.toMatch(/bg-cta/);
+      expect(redCount(r)).toBe(0);
+    });
+
+    it("demotes to outline with an incoming or a waiting challenge (red means someone wants you)", () => {
+      mockIsLive = true;
+      mat();
+      mockChallenge.incoming = INCOMING;
+      mockChallenge.incomingCount = 1;
+      const a = render(<ArenaScreen />);
+      expect(a.getByTestId("arena-closest-cta").props.className).not.toMatch(/bg-cta/);
+      expect(redCount(a)).toBe(0);
+      a.unmount();
+
+      mockChallenge.incoming = null;
+      mockChallenge.outgoing = { challengeId: "o-1", opponentId: "far", opponentName: "Far" };
+      const b = render(<ArenaScreen />);
+      expect(b.getByTestId("arena-closest-cta").props.className).not.toMatch(/bg-cta/);
+      expect(redCount(b)).toBe(0);
+    });
+
+    it("tells the card's Challenge apart from the same athlete's ROLL row", () => {
+      mockIsLive = true;
+      mat();
+      const r = render(<ArenaScreen />);
+      // Harness contract: both read `Challenge Near`, the card first.
+      const both = r.getAllByLabelText("Challenge Near");
+      expect(both).toHaveLength(2);
+      expect(both[0].props.testID).toBe("arena-closest-cta");
+      expect(both[0].props.accessibilityHint).toBe("Closest match");
+      expect(both[1].props.accessibilityHint).toBeUndefined();
+    });
+  });
+
+  describe("On The Mat (AC-A4)", () => {
+    it("sorts rows by |ΔELO| ascending with a signed gap", () => {
+      mockIsLive = true;
+      mockRoster.competitors = [
+        competitor({ id: "far", displayName: "Far", eloDiff: 300 }),
+        competitor({ id: "near", displayName: "Near", eloDiff: -10 }),
+        competitor({ id: "mid", displayName: "Mid", eloDiff: 50 }),
+      ];
+      mockLobbyIds = new Set(["far", "near", "mid"]);
+      const r = render(<ArenaScreen />);
+      const order = r
+        .getAllByTestId(/^arena-mat-row-/)
+        .map((n) => String(n.props.testID).replace("arena-mat-row-", ""));
+      expect(order).toEqual(["near", "mid", "far"]);
+      expect(r.getByTestId("arena-mat-gap-near").props.children).toBe("−10");
+      expect(r.getByTestId("arena-mat-gap-mid").props.children).toBe("+50");
+    });
+
+    it("the signed gap is data: ink, never red or green (spec 3)", () => {
+      mockIsLive = true;
+      mockRoster.competitors = [
+        competitor({ id: "near", displayName: "Near", eloDiff: -10 }),
+        competitor({ id: "mid", displayName: "Mid", eloDiff: 50 }),
+      ];
+      mockLobbyIds = new Set(["near", "mid"]);
+      const r = render(<ArenaScreen />);
+      for (const id of ["near", "mid"]) {
+        const cls = String(r.getByTestId(`arena-mat-gap-${id}`).props.className);
+        expect(cls).toMatch(/text-ink-2/);
+        expect(cls).not.toMatch(/text-negative|text-positive|text-cta/);
+      }
+    });
+
+    it("shows SENT m:ss instead of ROLL on the row I challenged", () => {
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date("2026-09-28T12:01:48Z"));
+      mockIsLive = true;
+      mockRoster.competitors = [competitor()];
+      mockLobbyIds = new Set(["a-1"]);
+      mockChallenge.outgoing = {
+        challengeId: "o-1",
+        opponentId: "a-1",
+        opponentName: "Alpha",
+        createdAt: "2026-09-28T12:00:00Z",
+        expiresAt: "2026-10-05T12:00:00Z",
+      };
+      const r = render(<ArenaScreen />);
+      expect(r.getByTestId("arena-mat-sent-a-1").props.children).toBe("Sent 8:12");
+      expect(within(r.getByTestId("arena-mat-row-a-1")).queryByLabelText("Challenge Alpha")).toBeNull();
+      // Ticks once a second.
+      act(() => {
+        jest.advanceTimersByTime(1_000);
+      });
+      expect(r.getByTestId("arena-mat-sent-a-1").props.children).toBe("Sent 8:11");
+    });
+  });
+
+  describe("challenge strip (AC-A2)", () => {
+    it("is absent when nothing is in flight", () => {
+      const { queryByTestId } = render(<ArenaScreen />);
+      expect(queryByTestId(/^arena-strip-/)).toBeNull();
+    });
+
+    it("waiting: keeps the harness text and a cancellable challenge", () => {
+      mockIsLive = true;
+      mockChallenge.outgoing = { challengeId: "ch-1", opponentId: "a-1", opponentName: "Alpha" };
+      const { getByLabelText, getByTestId } = render(<ArenaScreen />);
+
+      expect(getByTestId("arena-strip-waiting")).toBeTruthy();
+      // The StaticText the match-loop harness waits for.
+      expect(getByLabelText("Waiting for Alpha")).toBeTruthy();
+      fireEvent.press(getByLabelText("Cancel challenge"));
+      expect(mockCancelOutgoing).toHaveBeenCalled();
+    });
+
+    it("incoming: a red rail, the challenger and OPEN, which reopens the prompt", () => {
+      mockIsLive = true;
+      mockChallenge.incoming = INCOMING;
+      mockChallenge.incomingCount = 1;
+      mockChallenge.incomingTucked = true;
+      const { getByTestId, getByText, getByLabelText } = render(<ArenaScreen />);
+      expect(getByTestId("arena-strip-incoming").props.className).toMatch(/border-l-cta/);
+      expect(getByText("Rival wants to roll")).toBeTruthy();
+      fireEvent.press(getByLabelText("Open challenge"));
+      expect(mockReopen).toHaveBeenCalledTimes(1);
+    });
+
+    it("incoming tucked with my own challenge out: the waiting strip and Cancel challenge stay reachable", () => {
+      mockIsLive = true;
+      mockRoster.competitors = [competitor()];
+      mockLobbyIds = new Set(["a-1"]);
+      mockChallenge.incoming = INCOMING;
+      mockChallenge.incomingCount = 1;
+      mockChallenge.incomingTucked = true;
+      mockChallenge.outgoing = { challengeId: "o-1", opponentId: "a-1", opponentName: "Alpha" };
+      const r = render(<ArenaScreen />);
+      // The tucked incoming leads (red rail), my challenge is under it.
+      expect(r.getByTestId("arena-strip-incoming").props.className).toMatch(/border-l-cta/);
+      expect(r.getByTestId("arena-strip-waiting")).toBeTruthy();
+      expect(r.getByLabelText("Waiting for Alpha")).toBeTruthy();
+      fireEvent.press(r.getByLabelText("Cancel challenge"));
+      expect(mockCancelOutgoing).toHaveBeenCalled();
+      // Both are outline actions: no red CTA is added.
+      expect(redCount(r)).toBe(0);
+    });
+
+    it("incoming, several: keeps the first challenger's name and counts the rest after the countdown", () => {
+      mockIsLive = true;
+      mockChallenge.incoming = INCOMING;
+      mockChallenge.incomingCount = 3;
+      const { getByText, getByTestId, queryByText } = render(<ArenaScreen />);
+      expect(getByText("Rival wants to roll")).toBeTruthy();
+      expect(queryByText("3 want to roll")).toBeNull();
+      const tail = getByTestId("arena-strip-tail");
+      expect(tail.props.children).toBe(" · +2");
+      expect(tail.props.accessibilityLabel).toBe("plus 2 more");
+    });
+
+    it("incoming, one: no count tail", () => {
+      mockIsLive = true;
+      mockChallenge.incoming = INCOMING;
+      mockChallenge.incomingCount = 1;
+      const { queryByTestId } = render(<ArenaScreen />);
+      expect(queryByTestId("arena-strip-tail")).toBeNull();
+    });
+
+    it("result to confirm: Confirm opens the match, and live state is untouched", () => {
+      mockIsLive = true;
+      mockConfirm = { matchId: "m-1", status: "in_progress", opponentName: "Alpha" };
+      const { getByTestId, getByLabelText } = render(<ArenaScreen />);
+      expect(getByTestId("arena-strip-confirm")).toBeTruthy();
+      expect(getByLabelText("You are live")).toBeTruthy();
+      fireEvent.press(getByLabelText("Confirm result"));
+      fireEvent.press(getByLabelText("Confirm result"));
+      // navigate, like the chip's CONFIRM: a double tap never stacks two
+      // match screens.
+      expect(mockNavigate).toHaveBeenCalledWith("/match/m-1");
+      expect(mockPush).not.toHaveBeenCalled();
+    });
+
+    it("keeps a result to confirm reachable under a challenge strip", () => {
+      mockIsLive = true;
+      mockConfirm = { matchId: "m-1", status: "in_progress", opponentName: "Alpha" };
+      mockChallenge.outgoing = { challengeId: "ch-1", opponentId: "a-1", opponentName: "Alpha" };
+      const r = render(<ArenaScreen />);
+      // Both strips, the challenge first.
+      const ids = r
+        .getAllByTestId(/^arena-strip-(waiting|confirm)$/)
+        .map((n) => n.props.testID);
+      expect(ids).toEqual(["arena-strip-waiting", "arena-strip-confirm"]);
+      fireEvent.press(r.getByLabelText("Confirm result"));
+      expect(mockNavigate).toHaveBeenCalledWith("/match/m-1");
+      r.unmount();
+
+      // Under an incoming strip too.
+      mockChallenge.outgoing = null;
+      mockChallenge.incoming = INCOMING;
+      mockChallenge.incomingCount = 1;
+      const b = render(<ArenaScreen />);
+      expect(b.getByTestId("arena-strip-incoming")).toBeTruthy();
+      expect(b.getByTestId("arena-strip-confirm")).toBeTruthy();
+    });
+
+    it("keeps the countdown in its own node that never shrinks, so a long name truncates first", () => {
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date("2026-09-28T12:01:48Z"));
+      mockIsLive = true;
+      const name = "Christopher Montgomery-Wellington";
+      mockChallenge.outgoing = {
+        challengeId: "ch-1",
+        opponentId: "a-1",
+        opponentName: name,
+        createdAt: "2026-09-28T12:00:00Z",
+        expiresAt: "2026-10-05T12:00:00Z",
+      };
+      const r = render(<ArenaScreen />);
+      const strip = r.getByTestId("arena-strip-waiting");
+      // The harness StaticText is still exact, on the name node alone.
+      const head = within(strip).getByLabelText(`Waiting for ${name}`);
+      expect(head.props.numberOfLines).toBe(1);
+      expect(head.props.className).toMatch(/(^|\s)shrink(\s|$)/);
+      const countdown = within(strip).getByTestId("arena-strip-countdown");
+      expect(countdown.props.children).toBe(" · 8:12");
+      expect(countdown.props.className).toMatch(/shrink-0/);
+      // VoiceOver hears the countdown too.
+      expect(countdown.props.accessibilityLabel).toBe("8 minutes 12 seconds left");
+    });
+  });
+
+  describe("Just Rolled (AC-A5)", () => {
+    it("lists recent_activity as text, no avatars", () => {
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date("2026-09-28T12:10:00Z"));
+      mockRoster.recentActivity = [
+        { match_id: "m-1", winner_name: "Kofi Mensah", loser_name: "Jordan Kim", result: "submission", match_type: "ranked", completed_at: "2026-09-28T12:06:00Z" },
+        { match_id: "m-2", winner_name: "Ana", loser_name: "Bea", result: "draw", match_type: "ranked", completed_at: "2026-09-28T10:00:00Z" },
+      ];
+      const { getByText, getByTestId } = render(<ArenaScreen />);
+      expect(getByText("Kofi Mensah def. Jordan Kim · Submission · 4m")).toBeTruthy();
+      expect(getByText("Ana drew Bea · Draw · 2h")).toBeTruthy();
+      expect(within(getByTestId("arena-just-rolled")).queryAllByLabelText(/Kofi/)).toHaveLength(0);
+    });
+
+    it("keeps the ages current on an idle, focused Arena", () => {
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date("2026-09-28T12:06:30Z"));
+      mockRoster.recentActivity = [
+        { match_id: "m-1", winner_name: "Kofi", loser_name: "Jordan", result: "points", match_type: "ranked", completed_at: "2026-09-28T12:06:00Z" },
+      ];
+      const r = render(<ArenaScreen />);
+      expect(r.getByText("Kofi def. Jordan · Points · now")).toBeTruthy();
+      act(() => {
+        jest.advanceTimersByTime(60_000);
+      });
+      expect(r.getByText("Kofi def. Jordan · Points · 1m")).toBeTruthy();
+      act(() => {
+        jest.advanceTimersByTime(3 * 60_000);
+      });
+      expect(r.getByText("Kofi def. Jordan · Points · 4m")).toBeTruthy();
+    });
+  });
+
+  it("locks Challenge while any live transition is in flight, not only the toggle's own (liveTransition, chip)", () => {
+    mockSwitchPhase = "saving";
     mockIsLive = true;
-    const live = render(<ArenaScreen />);
-    expect(live.getByText("Looking for a match")).toBeTruthy();
-    expect(live.queryByText("You're offline")).toBeNull();
-    expect(live.getByLabelText("Go offline")).toBeTruthy();
+    mockRoster.competitors = [competitor()];
+    mockLobbyIds = new Set(["a-1"]);
+    const r = render(<ArenaScreen />);
+    const row = rowButton(r, "a-1", "Challenge Alpha");
+    expect(isDisabled(row)).toBe(true);
+    fireEvent.press(row);
+    fireEvent.press(r.getByTestId("arena-closest-cta"));
+    expect(mockSendChallenge).not.toHaveBeenCalled();
   });
 
   it("gives a light haptic when a challenge is sent, and none when locked", () => {
@@ -410,16 +1218,16 @@ describe("Arena screen", () => {
     mockRoster.competitors = [competitor()];
     mockLobbyIds = new Set(["a-1"]);
 
-    const { getByLabelText, unmount } = render(<ArenaScreen />);
-    fireEvent.press(getByLabelText("Challenge Alpha"));
+    const r = render(<ArenaScreen />);
+    fireEvent.press(rowButton(r, "a-1", "Challenge Alpha"));
     expect(mockImpact).toHaveBeenCalledTimes(1);
     expect(mockImpact).toHaveBeenCalledWith("light");
-    unmount();
+    r.unmount();
 
     mockImpact.mockClear();
     mockChallenge.isBusy = true;
     const locked = render(<ArenaScreen />);
-    fireEvent.press(locked.getByLabelText("Challenge Alpha"));
+    fireEvent.press(rowButton(locked, "a-1", "Challenge Alpha"));
     expect(mockImpact).not.toHaveBeenCalled();
     expect(mockSendChallenge).toHaveBeenCalledTimes(1);
   });
@@ -430,72 +1238,42 @@ describe("Arena screen", () => {
     mockLobbyIds = new Set(["a-1"]);
     mockImpact.mockImplementationOnce(() => Promise.reject(new Error("no")));
 
-    const { getByLabelText } = render(<ArenaScreen />);
-    fireEvent.press(getByLabelText("Challenge Alpha"));
+    const r = render(<ArenaScreen />);
+    fireEvent.press(rowButton(r, "a-1", "Challenge Alpha"));
     expect(mockSendChallenge).toHaveBeenCalledWith("a-1", "Alpha");
-  });
-
-  it("replaces the go-live plate with a cancellable waiting plate", () => {
-    mockChallenge.outgoing = {
-      challengeId: "ch-1",
-      opponentId: "a-1",
-      opponentName: "Alpha",
-    };
-    const { getByText, getByLabelText, queryByLabelText } = render(
-      <ArenaScreen />,
-    );
-
-    expect(getByText("Waiting for Alpha")).toBeTruthy();
-    expect(queryByLabelText("Go live")).toBeNull();
-    fireEvent.press(getByLabelText("Cancel challenge"));
-    expect(mockCancelOutgoing).toHaveBeenCalled();
   });
 
   it("does not render its own challenge prompt", () => {
     // The prompt is app-wide (ArenaBootstrap). A second copy here would show
     // two sheets for one challenge.
-    mockChallenge.incoming = {
-      challengeId: "ch-1",
-      challengerId: "a-9",
-      challengerName: "Rival",
-      challengerElo: 1350,
-      challengerWeight: 190,
-    };
-    const { queryByText, queryByLabelText } = render(<ArenaScreen />);
-
-    expect(queryByText("Rival is live in the Arena")).toBeNull();
+    mockChallenge.incoming = INCOMING;
+    const { queryByLabelText } = render(<ArenaScreen />);
     expect(queryByLabelText("Accept challenge")).toBeNull();
+    expect(queryByLabelText("Decline challenge")).toBeNull();
   });
 
   it("locks row actions while a challenge prompt is up", () => {
     mockIsLive = true;
     mockRoster.competitors = [competitor()];
     mockLobbyIds = new Set(["a-1"]);
-    mockChallenge.incoming = {
-      challengeId: "ch-1",
-      challengerId: "a-9",
-      challengerName: "Rival",
-      challengerElo: 1350,
-      challengerWeight: 190,
-    };
-    const { getByLabelText } = render(<ArenaScreen />);
+    mockChallenge.incoming = INCOMING;
+    const r = render(<ArenaScreen />);
 
-    fireEvent.press(getByLabelText("Challenge Alpha"));
+    fireEvent.press(rowButton(r, "a-1", "Challenge Alpha"));
+    fireEvent.press(r.getByTestId("arena-closest-cta"));
     expect(mockSendChallenge).not.toHaveBeenCalled();
   });
 
   it("opens the athlete profile from a row", () => {
     mockRoster.competitors = [competitor()];
+    mockLobbyIds = new Set(["a-1"]);
     const { getByLabelText } = render(<ArenaScreen />);
 
-    fireEvent.press(getByLabelText("Alpha, ELO 1300"));
+    fireEvent.press(getByLabelText("Alpha, ELO 1300, plus 100 vs you, 185 pounds"));
     expect(mockPush).toHaveBeenCalledWith("/athlete/a-1");
   });
 
   it("owns no live writer, presence channel or challenge listener", () => {
-    // Being live persists across tabs, so all three are mounted once by the
-    // app-wide owner. Mounting any of them here would double-write the flag,
-    // double-track presence, or double-prompt.
     render(<ArenaScreen />);
 
     expect(mockUseArenaLive).not.toHaveBeenCalled();
@@ -503,17 +1281,20 @@ describe("Arena screen", () => {
     expect(mockUseArenaChallenge).not.toHaveBeenCalled();
   });
 
-  it("shows the header LIVE signal as static, not as a link to itself", () => {
+  it("header is the ARENA title, then the status chip (kept on the Arena, decision) and the bell", () => {
     mockIsLive = true;
-    const { getByTestId, getByLabelText } = render(<ArenaScreen />);
+    const { getByTestId, getByRole, UNSAFE_root } = render(<ArenaScreen />);
 
-    expect(getByTestId("live-header-signal")).toBeTruthy();
-    expect(getByLabelText("You are live in the Arena")).toBeTruthy();
+    expect(getByRole("header").props.children).toBe("Arena");
+    const ids = UNSAFE_root.findAll(
+      (n: { type: unknown; props: { testID?: unknown } }) =>
+        typeof n.type === "string" && typeof n.props.testID === "string",
+    ).map((n: { props: { testID?: unknown } }) => n.props.testID as string);
+    expect(ids.indexOf("header-status-chip")).toBeGreaterThan(-1);
+    expect(ids.indexOf("header-status-chip")).toBeLessThan(ids.indexOf("notification-bell"));
   });
 
   it("re-reads the roster when an opponent turns out to have left", () => {
-    // The roster is a snapshot with no realtime feed on `athletes`, so the
-    // stale row has to be corrected by something.
     const { unmount } = render(<ArenaScreen />);
 
     const handler = mockSetUnavailable.mock.calls[0][0] as (id: string) => void;
@@ -521,18 +1302,388 @@ describe("Arena screen", () => {
     expect(mockRefresh).toHaveBeenCalledTimes(1);
     expect(mockRefreshQuietly).not.toHaveBeenCalled();
     unmount();
-    expect(mockSetUnavailable).toHaveBeenLastCalledWith(null);
+    // Identity-safe: clears only the handler this screen installed.
+    expect(mockClearUnavailable).toHaveBeenLastCalledWith(handler);
   });
 
   it("re-reads quietly after the stale-challenge sweep (no spinner, no error plate)", () => {
-    // `notifyStaleChallengesCancelled` calls the handler with an empty id:
-    // a background sweep nobody tapped for.
     render(<ArenaScreen />);
 
     const handler = mockSetUnavailable.mock.calls[0][0] as (id: string) => void;
     handler("");
     expect(mockRefreshQuietly).toHaveBeenCalledTimes(1);
     expect(mockRefresh).not.toHaveBeenCalled();
+  });
+});
+
+describe("Arena screen: a challenge push (?challenge=<id>, AC-A8)", () => {
+  const ID = "11111111-1111-4111-8111-111111111111";
+
+  function pending(createdAgoMs: number) {
+    const now = Date.now();
+    return {
+      challengeId: ID,
+      challengerId: "a-9",
+      opponentId: mockAthlete.id,
+      challengerName: "Rival",
+      opponentName: "Me",
+      matchType: "ranked",
+      createdAt: new Date(now - createdAgoMs).toISOString(),
+      expiresAt: new Date(now + 7 * 86_400_000).toISOString(),
+      challengerWeight: null,
+      opponentWeight: null,
+    };
+  }
+
+  it("clears the param on this route at once", async () => {
+    mockParams = { challenge: ID };
+    render(<ArenaScreen />);
+    expect(mockSetParams).toHaveBeenCalledWith({ challenge: undefined });
+    expect(mockRouter.setParams).not.toHaveBeenCalled();
+    await waitFor(() => expect(mockGetPending).toHaveBeenCalledTimes(1));
+  });
+
+  it("live: asks recovery to raise THAT challenge, and shows no offer", async () => {
+    mockIsLive = true;
+    mockGetPending.mockResolvedValue({ ok: true, data: { incoming: [pending(60_000)], outgoing: [] } });
+    mockParams = { challenge: ID };
+    const { queryByTestId } = render(<ArenaScreen />);
+    await waitFor(() => expect(mockResync).toHaveBeenCalledWith({ prefer: ID }));
+    expect(queryByTestId("arena-strip-offer")).toBeNull();
+  });
+
+  it("offline: offers going live as the one red CTA; going live is the guarded switch", async () => {
+    mockRoster.competitors = [competitor()];
+    mockLobbyIds = new Set(["a-1", "a-9"]);
+    mockGetPending.mockResolvedValue({ ok: true, data: { incoming: [pending(60_000)], outgoing: [] } });
+    mockParams = { challenge: ID };
+    const r = render(<ArenaScreen />);
+    const strip = await r.findByTestId("arena-strip-offer");
+    expect(within(strip).getByText("Rival wants to roll")).toBeTruthy();
+    expect(within(strip).getByTestId("arena-strip-countdown").props.children).toMatch(
+      /^ · [89]:\d\d$/,
+    );
+    expect(mockResync).toHaveBeenCalledWith({ prefer: ID });
+    // The Closest Match demotes so red stays single.
+    expect(r.getByTestId("arena-closest-cta").props.className).not.toMatch(/bg-cta/);
+
+    fireEvent.press(r.getByLabelText("Go live to answer Rival"));
+    expect(mockGuardedGoLive).toHaveBeenCalledTimes(1);
+
+    // Once live, recovery owns it: the offer goes.
+    mockIsLive = true;
+    r.rerender(<ArenaScreen />);
+    expect(r.queryByTestId("arena-strip-offer")).toBeNull();
+  });
+
+  it("offline: a failed go-live from the offer says so", async () => {
+    mockLobbyIds = new Set(["a-9"]);
+    mockGetPending.mockResolvedValue({ ok: true, data: { incoming: [pending(60_000)], outgoing: [] } });
+    mockParams = { challenge: ID };
+    const { toast } = jest.requireMock("@/components/ui/toast") as {
+      toast: { error: jest.Mock; info: jest.Mock };
+    };
+    toast.info.mockClear();
+    const r = render(<ArenaScreen />);
+    await r.findByTestId("arena-strip-offer");
+    mockGuardedGoLive.mockImplementationOnce(() => Promise.resolve(false));
+    await act(async () => {
+      fireEvent.press(r.getByLabelText("Go live to answer Rival"));
+    });
+    expect(toast.info).toHaveBeenCalledWith("Couldn't take you live. Try again.");
+    // Neutral, never Signal Red: a live-flag write failure is ink-3 (spec 3).
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it("offline: offers going live only while the challenger is on the mat", async () => {
+    // The challenger is not in lobby:online: recovery could not raise the
+    // prompt, so a red go-live would take the athlete live for nothing.
+    mockLobbyIds = new Set();
+    mockGetPending.mockResolvedValue({ ok: true, data: { incoming: [pending(60_000)], outgoing: [] } });
+    mockParams = { challenge: ID };
+    const r = render(<ArenaScreen />);
+    await waitFor(() => expect(mockResync).toHaveBeenCalledWith({ prefer: ID }));
+    await act(async () => {});
+    expect(r.queryByTestId("arena-strip-offer")).toBeNull();
+
+    // They come back inside the window: the offer shows.
+    mockLobbyIds = new Set(["a-9"]);
+    r.rerender(<ArenaScreen />);
+    expect(r.getByTestId("arena-strip-offer")).toBeTruthy();
+
+    // They leave again: it hides.
+    mockLobbyIds = new Set();
+    r.rerender(<ArenaScreen />);
+    expect(r.queryByTestId("arena-strip-offer")).toBeNull();
+  });
+
+  it("a stale challenge shows nothing and asks for nothing", async () => {
+    mockGetPending.mockResolvedValue({ ok: true, data: { incoming: [pending(11 * 60_000)], outgoing: [] } });
+    mockParams = { challenge: ID };
+    const { queryByTestId } = render(<ArenaScreen />);
+    await waitFor(() => expect(mockGetPending).toHaveBeenCalled());
+    await act(async () => {});
+    expect(queryByTestId("arena-strip-offer")).toBeNull();
+    expect(mockResync).not.toHaveBeenCalled();
+  });
+
+  it("an unknown id or a failed read shows nothing", async () => {
+    mockGetPending.mockResolvedValueOnce({ ok: false, error: { message: "x" } });
+    mockParams = { challenge: ID };
+    const { queryByTestId } = render(<ArenaScreen />);
+    await waitFor(() => expect(mockGetPending).toHaveBeenCalled());
+    await act(async () => {});
+    expect(queryByTestId("arena-strip-offer")).toBeNull();
+    expect(mockResync).not.toHaveBeenCalled();
+  });
+
+  it("a challenge dropped by a manual go-offline (Q3) is never offered from its push", async () => {
+    // Tucked with "Later", then the athlete went offline on purpose: the
+    // challenge hook dismissed it for good, so recovery would never raise it.
+    mockDismissed.add(ID);
+    mockLobbyIds = new Set(["a-9"]);
+    mockGetPending.mockResolvedValue({ ok: true, data: { incoming: [pending(60_000)], outgoing: [] } });
+    mockParams = { challenge: ID };
+    const r = render(<ArenaScreen />);
+    await waitFor(() => expect(mockGetPending).toHaveBeenCalledTimes(1));
+    await act(async () => {});
+    expect(r.queryByTestId("arena-strip-offer")).toBeNull();
+    expect(mockResync).not.toHaveBeenCalled();
+    // The Closest Match keeps the surface's red.
+    expect(r.getByTestId("arena-closest-cta").props.className).toMatch(/bg-cta/);
+  });
+
+  describe("no param: the tab's red count has an offer behind it (AC-T1)", () => {
+    afterEach(() => {
+      act(() => resetBellStore());
+    });
+
+    it("offline, 1 fresh incoming from an on-mat challenger: the Arena shows the offer strip", async () => {
+      mockRoster.competitors = [competitor()];
+      mockLobbyIds = new Set(["a-1", "a-9"]);
+      mockGetPending.mockResolvedValue({ ok: true, data: { incoming: [pending(60_000)], outgoing: [] } });
+      act(() => publishBellBadge(1, 1));
+      const r = render(<ArenaScreen />);
+      const strip = await r.findByTestId("arena-strip-offer");
+      expect(within(strip).getByText("Rival wants to roll")).toBeTruthy();
+      // The Closest Match demotes so red stays single.
+      expect(r.getByTestId("arena-closest-cta").props.className).not.toMatch(/bg-cta/);
+      expect(mockResync).not.toHaveBeenCalled();
+
+      fireEvent.press(r.getByLabelText("Go live to answer Rival"));
+      // Recovery is asked to raise THIS challenge once live.
+      expect(mockResync).toHaveBeenCalledWith({ prefer: ID });
+      expect(mockGuardedGoLive).toHaveBeenCalledTimes(1);
+
+      mockIsLive = true;
+      r.rerender(<ArenaScreen />);
+      expect(r.queryByTestId("arena-strip-offer")).toBeNull();
+    });
+
+    it("no read and no offer while the bell counts nothing fresh", async () => {
+      mockLobbyIds = new Set(["a-9"]);
+      mockGetPending.mockResolvedValue({ ok: true, data: { incoming: [pending(60_000)], outgoing: [] } });
+      const r = render(<ArenaScreen />);
+      await act(async () => {});
+      expect(mockGetPending).not.toHaveBeenCalled();
+      expect(r.queryByTestId("arena-strip-offer")).toBeNull();
+    });
+
+    it("the challenger off the mat: no red offer, but a neutral Not-on-the-mat strip (spec 14)", async () => {
+      mockLobbyIds = new Set();
+      mockGetPending.mockResolvedValue({ ok: true, data: { incoming: [pending(60_000)], outgoing: [] } });
+      act(() => publishBellBadge(1, 1));
+      const r = render(<ArenaScreen />);
+      const away = await r.findByTestId("arena-strip-away");
+      expect(r.queryByTestId("arena-strip-offer")).toBeNull();
+      expect(within(away).getByText("Rival wants to roll")).toBeTruthy();
+      expect(within(away).getByText("Not on the mat")).toBeTruthy();
+      // Neutral rail and no action: nothing can be answered yet.
+      expect(away.props.className).toMatch(/border-l-ink-3/);
+      expect(within(away).queryByRole("button")).toBeNull();
+      // The Closest Match keeps the surface's one red CTA.
+      expect(r.getByTestId("arena-closest-cta").props.className).toMatch(/bg-cta/);
+
+      // The challenger comes back: the away strip becomes the red offer.
+      mockLobbyIds = new Set(["a-9"]);
+      r.rerender(<ArenaScreen />);
+      expect(r.getByTestId("arena-strip-offer")).toBeTruthy();
+      expect(r.queryByTestId("arena-strip-away")).toBeNull();
+    });
+
+    it("a dismissed (Q3) or stale challenge is never seeded", async () => {
+      mockDismissed.add(ID);
+      mockLobbyIds = new Set(["a-9"]);
+      const stale = { ...pending(11 * 60_000), challengeId: "22222222-2222-4222-8222-222222222222" };
+      mockGetPending.mockResolvedValue({ ok: true, data: { incoming: [pending(60_000), stale], outgoing: [] } });
+      act(() => publishBellBadge(1, 1));
+      const r = render(<ArenaScreen />);
+      await waitFor(() => expect(mockGetPending).toHaveBeenCalled());
+      await act(async () => {});
+      expect(r.queryByTestId("arena-strip-offer")).toBeNull();
+    });
+  });
+
+  it("offline with A tucked: a push for B shows B's offer as the one red CTA", async () => {
+    mockChallenge.incoming = { ...INCOMING, challengeId: "ch-a" };
+    mockChallenge.incomingCount = 1;
+    mockChallenge.incomingTucked = true;
+    mockLobbyIds = new Set(["a-9"]);
+    mockGetPending.mockResolvedValue({ ok: true, data: { incoming: [pending(60_000)], outgoing: [] } });
+    mockParams = { challenge: ID };
+    const r = render(<ArenaScreen />);
+    const strip = await r.findByTestId("arena-strip-offer");
+    expect(within(strip).getByText("Rival wants to roll")).toBeTruthy();
+    expect(r.queryByTestId("arena-strip-incoming")).toBeNull();
+    expect(mockResync).toHaveBeenCalledWith({ prefer: ID });
+    expect(r.getByTestId("arena-closest-cta").props.className).not.toMatch(/bg-cta/);
+    expect(redCount(r)).toBe(1);
+    fireEvent.press(r.getByLabelText("Go live to answer Rival"));
+    expect(mockGuardedGoLive).toHaveBeenCalledTimes(1);
+  });
+
+  it("offline with my own challenge out: the push's offer leads and Cancel challenge stays under it", async () => {
+    mockRoster.competitors = [competitor()];
+    mockLobbyIds = new Set(["a-1", "a-9"]);
+    mockChallenge.outgoing = { challengeId: "o-1", opponentId: "a-1", opponentName: "Alpha" };
+    mockGetPending.mockResolvedValue({ ok: true, data: { incoming: [pending(60_000)], outgoing: [] } });
+    mockParams = { challenge: ID };
+    const r = render(<ArenaScreen />);
+    const strip = await r.findByTestId("arena-strip-offer");
+    expect(within(strip).getByText("Rival wants to roll")).toBeTruthy();
+    // My own challenge is under it, still cancellable.
+    expect(r.getByTestId("arena-strip-waiting")).toBeTruthy();
+    expect(r.getByLabelText("Waiting for Alpha")).toBeTruthy();
+    fireEvent.press(r.getByLabelText("Cancel challenge"));
+    expect(mockCancelOutgoing).toHaveBeenCalled();
+    // The offer's go-live is the one red CTA.
+    expect(r.getByTestId("arena-closest-cta").props.className).not.toMatch(/bg-cta/);
+    expect(redCount(r)).toBe(1);
+  });
+
+  it("the challenge already tucked into the chip is reopened without a read", () => {
+    mockIsLive = true;
+    mockChallenge.incoming = { ...INCOMING, challengeId: ID };
+    mockChallenge.incomingCount = 1;
+    mockChallenge.incomingTucked = true;
+    mockParams = { challenge: ID };
+    render(<ArenaScreen />);
+    expect(mockReopen).toHaveBeenCalledTimes(1);
+    expect(mockGetPending).not.toHaveBeenCalled();
+  });
+
+  it("ignores an id that is not a UUID", () => {
+    mockParams = { challenge: "not-a-uuid" };
+    render(<ArenaScreen />);
+    expect(mockSetParams).toHaveBeenCalledWith({ challenge: undefined });
+    expect(mockGetPending).not.toHaveBeenCalled();
+  });
+
+  it("offline: the offer goes the moment its challenge ends (cancelled by the challenger)", async () => {
+    mockLobbyIds = new Set(["a-9"]);
+    mockGetPending.mockResolvedValue({ ok: true, data: { incoming: [pending(60_000)], outgoing: [] } });
+    mockParams = { challenge: ID };
+    const r = render(<ArenaScreen />);
+    await r.findByTestId("arena-strip-offer");
+
+    // Another challenge ending changes nothing.
+    act(() => endIncomingChallenge("22222222-2222-4222-8222-222222222222"));
+    expect(r.getByTestId("arena-strip-offer")).toBeTruthy();
+
+    // The challenger cancels from their waiting strip, and stays on the mat.
+    act(() => endIncomingChallenge(ID));
+    expect(r.queryByTestId("arena-strip-offer")).toBeNull();
+    expect(mockGuardedGoLive).not.toHaveBeenCalled();
+  });
+
+  it("offline: a challenge that ended while its read was in flight is never offered", async () => {
+    mockLobbyIds = new Set(["a-9"]);
+    let resolve: (v: unknown) => void = () => {};
+    mockGetPending.mockImplementationOnce(() => new Promise((r) => (resolve = r)));
+    mockParams = { challenge: ID };
+    const r = render(<ArenaScreen />);
+    await waitFor(() => expect(mockGetPending).toHaveBeenCalledTimes(1));
+    act(() => endIncomingChallenge(ID));
+    await act(async () => {
+      resolve({ ok: true, data: { incoming: [pending(60_000)], outgoing: [] } });
+    });
+    expect(r.queryByTestId("arena-strip-offer")).toBeNull();
+  });
+
+  it("a push that lands before auth resolves waits for the athlete, then reads once", async () => {
+    mockAuthAthlete = null;
+    mockParams = { challenge: ID };
+    const r = render(<ArenaScreen />);
+    expect(mockSetParams).toHaveBeenCalledWith({ challenge: undefined });
+    await act(async () => {});
+    expect(mockGetPending).not.toHaveBeenCalled();
+
+    mockAuthAthlete = mockAthlete;
+    r.rerender(<ArenaScreen />);
+    await waitFor(() => expect(mockGetPending).toHaveBeenCalledTimes(1));
+    expect(mockGetPending).toHaveBeenCalledWith(expect.anything(), mockAthlete.id);
+    await act(async () => {});
+    expect(mockGetPending).toHaveBeenCalledTimes(1);
+  });
+
+  it("a second push while the first read is in flight: only the latest is acted on", async () => {
+    const ID_B = "33333333-3333-4333-8333-333333333333";
+    mockLobbyIds = new Set(["a-9", "a-8"]);
+    const resolvers: ((v: unknown) => void)[] = [];
+    mockGetPending.mockImplementation(() => new Promise((r) => resolvers.push(r)));
+    const both = {
+      ok: true,
+      data: {
+        incoming: [
+          pending(60_000),
+          { ...pending(30_000), challengeId: ID_B, challengerId: "a-8", challengerName: "Other" },
+        ],
+        outgoing: [],
+      },
+    };
+    mockParams = { challenge: ID };
+    const r = render(<ArenaScreen />);
+    await waitFor(() => expect(resolvers).toHaveLength(1));
+
+    mockParams = { ...mockParams, challenge: ID_B };
+    r.rerender(<ArenaScreen />);
+    await waitFor(() => expect(resolvers).toHaveLength(2));
+
+    // The first read lands late: it was cancelled, so it raises nothing.
+    await act(async () => {
+      resolvers[0](both);
+    });
+    expect(mockResync).not.toHaveBeenCalled();
+    expect(r.queryByTestId("arena-strip-offer")).toBeNull();
+
+    await act(async () => {
+      resolvers[1](both);
+    });
+    expect(mockResync).toHaveBeenCalledTimes(1);
+    expect(mockResync).toHaveBeenCalledWith({ prefer: ID_B });
+    expect(within(r.getByTestId("arena-strip-offer")).getByText("Other wants to roll")).toBeTruthy();
+  });
+
+  it("the offer lapses at the 10-minute mark", async () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date("2026-09-28T12:00:00Z"));
+    mockLobbyIds = new Set(["a-9"]);
+    // 9:59 left in the fresh window.
+    mockGetPending.mockResolvedValue({ ok: true, data: { incoming: [pending(1_000)], outgoing: [] } });
+    mockParams = { challenge: ID };
+    const r = render(<ArenaScreen />);
+    await act(async () => {});
+    expect(r.getByTestId("arena-strip-offer")).toBeTruthy();
+
+    act(() => {
+      jest.advanceTimersByTime(9 * 60_000 + 58_000);
+    });
+    expect(r.getByTestId("arena-strip-offer")).toBeTruthy();
+
+    act(() => {
+      jest.advanceTimersByTime(2_000);
+    });
+    expect(r.queryByTestId("arena-strip-offer")).toBeNull();
   });
 });
 
@@ -652,7 +1803,7 @@ describe("Arena screen: rematch handoff (jits-00fr)", () => {
     );
   }
 
-  it("pins the rematch opponent to the top of Online now with a tag", () => {
+  it("tags the rematch opponent's row without moving it out of closest-first order (AC-A4)", () => {
     rematchRoster();
     mockLobbyIds = new Set(["a-1", "a-2", "a-3"]);
     mockParams = { rematch: "a-3" };
@@ -661,7 +1812,7 @@ describe("Arena screen: rematch handoff (jits-00fr)", () => {
       <ArenaScreen />,
     );
 
-    expect(rowOrder(getAllByLabelText)).toEqual(["Charlie", "Alpha", "Bravo"]);
+    expect(rowOrder(getAllByLabelText)).toEqual(["Alpha", "Bravo", "Charlie"]);
     expect(getByText("Rematch")).toBeTruthy();
     expect(queryByTestId("arena-rematch-hint")).toBeNull();
   });
@@ -671,10 +1822,11 @@ describe("Arena screen: rematch handoff (jits-00fr)", () => {
     mockLobbyIds = new Set(["a-3"]);
     mockParams = { rematch: "a-3" };
 
-    const { getByLabelText, queryByText } = render(<ArenaScreen />);
+    const r = render(<ArenaScreen />);
+    const { queryByText } = r;
     expect(mockSendChallenge).not.toHaveBeenCalled();
 
-    fireEvent.press(getByLabelText("Challenge Charlie"));
+    fireEvent.press(rowButton(r, "a-3", "Challenge Charlie"));
     expect(mockSendChallenge).toHaveBeenCalledWith("a-3", "Charlie");
     expect(queryByText("Rematch")).toBeTruthy();
   });
@@ -684,10 +1836,9 @@ describe("Arena screen: rematch handoff (jits-00fr)", () => {
     mockLobbyIds = new Set(["a-3"]);
     mockParams = { rematch: "a-3" };
 
-    const { getByLabelText, getByText, queryByText, rerender } = render(
-      <ArenaScreen />,
-    );
-    fireEvent.press(getByLabelText("Challenge Charlie"));
+    const r = render(<ArenaScreen />);
+    const { getByText, queryByText, rerender } = r;
+    fireEvent.press(rowButton(r, "a-3", "Challenge Charlie"));
     // The tap alone is not success: the pin holds until the outgoing slot
     // names them.
     expect(getByText("Rematch")).toBeTruthy();
@@ -713,12 +1864,13 @@ describe("Arena screen: rematch handoff (jits-00fr)", () => {
     // A refused or failed send leaves no outgoing challenge behind.
     mockSendChallenge.mockResolvedValueOnce(undefined);
 
-    const { getByLabelText, getByText, rerender } = render(<ArenaScreen />);
-    fireEvent.press(getByLabelText("Challenge Charlie"));
+    const r = render(<ArenaScreen />);
+    const { getByText, rerender } = r;
+    fireEvent.press(rowButton(r, "a-3", "Challenge Charlie"));
     rerender(<ArenaScreen />);
 
     expect(getByText("Rematch")).toBeTruthy();
-    expect(getByLabelText("Challenge Charlie")).toBeTruthy();
+    expect(rowButton(r, "a-3", "Challenge Charlie")).toBeTruthy();
   });
 
   it("does not end the pin for a challenge to someone else", () => {
@@ -741,9 +1893,22 @@ describe("Arena screen: rematch handoff (jits-00fr)", () => {
     mockLobbyIds = new Set(["a-3"]);
     mockParams = { rematch: "a-3" };
 
-    const { getByLabelText } = render(<ArenaScreen />);
-    expect(getByLabelText("Charlie, ELO 1300, rematch")).toBeTruthy();
-    expect(getByLabelText("Challenge Charlie")).toBeTruthy();
+    const r = render(<ArenaScreen />);
+    expect(r.getByLabelText(/^Charlie, ELO 1300, .*, rematch$/)).toBeTruthy();
+    expect(rowButton(r, "a-3", "Challenge Charlie")).toBeTruthy();
+  });
+
+  it("does not list a pinned opponent who is not on the mat anywhere (D1)", () => {
+    rematchRoster();
+    mockLobbyIds = new Set(["a-1"]);
+    mockParams = { rematch: "a-3" };
+
+    const r = render(<ArenaScreen />);
+    expect(r.queryByText("Charlie")).toBeNull();
+    expect(r.queryByText("Rematch")).toBeNull();
+    // Never an action either (F13).
+    expect(r.queryByLabelText("Challenge Charlie")).toBeNull();
+    expect(r.queryByText(/off the mat/i)).toBeNull();
   });
 
   it("clears the route param as soon as it is read", () => {
@@ -761,10 +1926,11 @@ describe("Arena screen: rematch handoff (jits-00fr)", () => {
       rematchRoster();
       mockLobbyIds = new Set(["a-1"]);
       mockParams = { rematch: "a-3", send: "1" };
-      const { rerender, getByText } = render(<ArenaScreen />);
+      const { rerender, queryByTestId } = render(<ArenaScreen />);
       // Still on their own verdict: their app would decline it as busy.
       expect(mockSendChallenge).not.toHaveBeenCalled();
-      getByText("Charlie isn't back in the Arena yet. Your rematch goes to them the moment they are.");
+      // No prose while waiting (AC-A7): the send is still pending.
+      expect(queryByTestId("arena-rematch-hint")).toBeNull();
 
       mockLobbyIds = new Set(["a-1", "a-3"]);
       rerender(<ArenaScreen />);
@@ -867,24 +2033,19 @@ describe("Arena screen: rematch handoff (jits-00fr)", () => {
     });
   });
 
-  it("names an opponent on the roster who is not live", () => {
+  it("an opponent on the roster who is not live gets no prose and no row (AC-A7, spec 6.4, D1)", () => {
     rematchRoster();
     mockLobbyIds = new Set(["a-1"]);
     mockParams = { rematch: "a-2" };
 
-    const { getByTestId, getByText, queryByText } = render(<ArenaScreen />);
-    expect(getByTestId("arena-rematch-hint")).toBeTruthy();
-    expect(getByText("Bravo isn't back in the Arena yet. Their Challenge button appears here the moment they are.")).toBeTruthy();
-    // Not in the lobby, so not pinned and never challengeable.
+    const { queryByTestId, queryByText, queryByLabelText } = render(<ArenaScreen />);
+    expect(queryByTestId("arena-rematch-hint")).toBeNull();
+    expect(queryByText(/isn't back in the Arena yet/)).toBeNull();
+    // Not on the mat, so not listed and never challengeable.
     expect(queryByText("Rematch")).toBeNull();
-  });
-
-  it("falls back to a neutral name when the opponent is not on the roster", () => {
-    rematchRoster();
-    mockParams = { rematch: "zz-9" };
-
-    const { getByText } = render(<ArenaScreen />);
-    expect(getByText("Your opponent isn't back in the Arena yet. Their Challenge button appears here the moment they are.")).toBeTruthy();
+    expect(queryByText("Bravo")).toBeNull();
+    expect(queryByTestId("arena-mat-row-a-2")).toBeNull();
+    expect(queryByLabelText("Challenge Bravo")).toBeNull();
   });
 
   it("re-reads the roster once when the opponent is live but not listed yet", () => {
@@ -1012,7 +2173,8 @@ describe("Arena screen: rematch handoff (jits-00fr)", () => {
     const { getAllByLabelText, queryByText, queryByTestId } = render(
       <ArenaScreen />,
     );
-    expect(rowOrder(getAllByLabelText)).toEqual(["Alpha", "Charlie", "Bravo"]);
+    // Bravo is not on the mat, so not listed.
+    expect(rowOrder(getAllByLabelText)).toEqual(["Alpha", "Charlie"]);
     expect(queryByText("Rematch")).toBeNull();
     expect(queryByTestId("arena-rematch-hint")).toBeNull();
     expect(mockSetParams).not.toHaveBeenCalled();

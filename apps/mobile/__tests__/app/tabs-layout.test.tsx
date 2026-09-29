@@ -27,6 +27,7 @@ const path = require("path") as { join: (...parts: string[]) => string };
 const TABS_DIR = path.join(__dirname, "..", "..", "app", "(app)", "(tabs)");
 
 const capturedScreens: { name: string; options: Record<string, unknown> }[] = [];
+const capturedTabBar: { current: ((p: unknown) => React.ReactNode) | null } = { current: null };
 
 jest.mock("expo-router", () => {
   const R = require("react");
@@ -37,8 +38,10 @@ jest.mock("expo-router", () => {
     return null;
   };
 
-  const Tabs = (props: { children: React.ReactNode }) =>
-    R.createElement(RN.View, {}, props.children);
+  const Tabs = (props: { children: React.ReactNode; tabBar?: (p: unknown) => React.ReactNode }) => {
+    capturedTabBar.current = props.tabBar ?? null;
+    return R.createElement(RN.View, {}, props.children);
+  };
   Tabs.Screen = Screen;
 
   return { Tabs };
@@ -59,8 +62,14 @@ jest.mock("lucide-react-native", () => {
   );
 });
 
+const mockEloTabBar = jest.fn((_p: Record<string, unknown>) => null);
 jest.mock("@/components/layout/elo-tab-bar", () => ({
-  EloTabBar: () => null,
+  EloTabBar: (p: Record<string, unknown>) => mockEloTabBar(p),
+}));
+
+let mockArenaBadge: unknown = null;
+jest.mock("@/lib/arena/use-arena-tab-badge", () => ({
+  useArenaTabBadge: () => mockArenaBadge,
 }));
 
 // If the layout ever reaches for managed gyms again, this mock records it. The
@@ -145,5 +154,25 @@ describe("(tabs)/_layout", () => {
       expect(typeof screen.options.title).toBe("string");
       expect(typeof screen.options.tabBarIcon).toBe("function");
     }
+  });
+
+  it("hands the Arena tab its badge from the app-wide stores (jits-dq85.16)", () => {
+    render(React.createElement(TabsLayout));
+    expect(capturedTabBar.current).toBeTruthy();
+    mockArenaBadge = { kind: "count", count: 2, label: "2 challenges" };
+    const barProps = { state: { routes: [], index: 0 }, descriptors: {}, navigation: {} };
+    render(capturedTabBar.current!(barProps) as React.ReactElement);
+    expect(mockEloTabBar).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        ...barProps,
+        badges: { arena: { kind: "count", count: 2, label: "2 challenges" } },
+      }),
+    );
+
+    mockArenaBadge = null;
+    render(capturedTabBar.current!(barProps) as React.ReactElement);
+    expect(mockEloTabBar).toHaveBeenLastCalledWith(
+      expect.objectContaining({ badges: { arena: null } }),
+    );
   });
 });

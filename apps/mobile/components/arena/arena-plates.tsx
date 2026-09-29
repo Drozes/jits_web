@@ -93,6 +93,9 @@ export function WaitingPlate({
   );
 }
 
+/** A degraded state's rail (spec 3): 3px ink-3, never Signal Red. */
+const DEGRADED_RAIL = "border-l-[3px] border-l-ink-3";
+
 /**
  * The server's cap, stated plainly.
  *
@@ -109,7 +112,9 @@ export function WaitingPlate({
  */
 export function CapPlate({ onDismiss }: { onDismiss: () => void }) {
   return (
-    <Plate variant="accent">
+    // Neutral ink-3 rail, not Signal Red: red is only for "someone wants
+    // you" and the one CTA (spec 3); a notice is a degraded state.
+    <Plate testID="arena-cap-plate" className={DEGRADED_RAIL}>
       <Text className="font-mono-bold text-[10px] text-ink-2 uppercase tracking-caps-xl">
         Challenge limit
       </Text>
@@ -128,7 +133,7 @@ export function CapPlate({ onDismiss }: { onDismiss: () => void }) {
 /** The roster read failed. Distinct from an empty roster, on purpose. */
 export function RosterErrorPlate({ onRetry }: { onRetry: () => void }) {
   return (
-    <Plate variant="accent">
+    <Plate testID="arena-roster-error-plate" className={DEGRADED_RAIL}>
       <Text className="font-mono-bold text-[10px] text-ink-2 uppercase tracking-caps-xl">
         Couldn&apos;t load
       </Text>
@@ -138,56 +143,5 @@ export function RosterErrorPlate({ onRetry }: { onRetry: () => void }) {
       </Text>
       <OutlineButton label="Retry" onPress={onRetry} />
     </Plate>
-  );
-}
-
-/** Nobody is flagged as looking at all. */
-export function EmptyLobbyPlate({ isLive }: { isLive: boolean }) {
-  return (
-    <Plate variant="accent">
-      <Text className="font-mono-bold text-[10px] text-ink-2 uppercase tracking-caps-xl">
-        Lobby empty
-      </Text>
-      <Text className="mt-2 font-body text-[13px] text-ink">
-        {isLive
-          ? "You're live, but nobody else is yet. You'll show up here for them the moment they arrive."
-          : "When athletes go live, they show up here. Go live above and be the first."}
-      </Text>
-    </Plate>
-  );
-}
-
-/**
- * Roster has people, but none of them are present right now. The viewer may
- * be live themselves, so "nobody" never includes them, and the copy never
- * promises that the offline rows below can take a challenge.
- */
-export function NobodyOnlineNote({ isLive }: { isLive: boolean }) {
-  return (
-    <Text className="font-body text-[13px] text-ink-2">
-      {isLive
-        ? "Nobody else is live right now. Stay live and anyone who goes live shows up here."
-        : "Nobody is live right now. Go live and you'll be first in the lobby."}
-    </Text>
-  );
-}
-
-/**
- * Arrived from a match summary's Rematch (`/arena?rematch=<id>`) while that
- * opponent is not in the lobby. Their row pins to the top of Online now the
- * moment they are; this line says so. The name is
- * known only when they are on the roster, so it falls back to a neutral one.
- */
-export function RematchHint({ name, autoSend = false }: { name: string | null; autoSend?: boolean }) {
-  const who = name ?? "Your opponent";
-  return (
-    <Text
-      testID="arena-rematch-hint"
-      className="font-body text-[12px] text-ink-3"
-    >
-      {autoSend
-        ? `${who} isn't back in the Arena yet. Your rematch goes to them the moment they are.`
-        : `${who} isn't back in the Arena yet. Their Challenge button appears here the moment they are.`}
-    </Text>
   );
 }
