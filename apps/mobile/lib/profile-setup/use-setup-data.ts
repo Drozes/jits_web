@@ -1,5 +1,6 @@
 import * as React from "react";
 import { ATHLETE_STATUS } from "@jits/shared/constants";
+import { getManagedGyms } from "@jits/shared/api/queries";
 import { supabase } from "@/lib/supabase/client";
 
 export interface SetupAthleteRow {
@@ -14,6 +15,8 @@ export interface SetupAthleteRow {
   date_of_birth: string | null;
   city: string | null;
   free_agent: boolean;
+  instagram_handle: string | null;
+  platform_role: string | null;
 }
 
 export const ATHLETE_READ_FAILED_MESSAGE =
@@ -23,6 +26,8 @@ export interface GymOption {
   id: string;
   name: string;
   city: string | null;
+  /** Stored normalized handle (no @), or null when the gym has none. */
+  instagram_handle: string | null;
 }
 
 export interface SetupBootstrap {
@@ -32,6 +37,9 @@ export interface SetupBootstrap {
   waiverId: string | null;
   hasAcceptedTos: boolean;
   isEditing: boolean;
+  /** Gyms this athlete manages, for the gym Instagram field (read-only vs editable). */
+  managedGymIds: string[];
+  isAdmin: boolean;
 }
 
 /**
@@ -57,6 +65,8 @@ function buildCityList(gyms: GymOption[]): string[] {
  *   - Active gym list (id, name, city) for the gym picker.
  *   - Active app waiver (`slug = "app-liability-v1"`).
  *   - Whether this athlete already has a waiver acknowledgement.
+ *   - The gyms this athlete manages (`gym_managers`), so a manager can edit an
+ *     existing gym Instagram handle that a member only sees read-only.
  *
  * The web equivalent runs server-side; on mobile we fetch in a hook so the
  * screen can show a spinner while loading. RLS on these tables is permissive
@@ -81,13 +91,13 @@ export function useSetupData(authUserId: string | null) {
           supabase
             .from("athletes")
             .select(
-              "id, display_name, first_name, last_name, current_weight, primary_gym_id, status, gender, date_of_birth, city, free_agent",
+              "id, display_name, first_name, last_name, current_weight, primary_gym_id, status, gender, date_of_birth, city, free_agent, instagram_handle, platform_role",
             )
             .eq("auth_user_id", authUserId)
             .maybeSingle(),
           supabase
             .from("gyms")
-            .select("id, name, city")
+            .select("id, name, city, instagram_handle")
             .eq("status", "active")
             .order("name"),
           supabase
@@ -119,6 +129,10 @@ export function useSetupData(authUserId: string | null) {
           .maybeSingle();
         hasAcceptedTos = !!ack;
       }
+      // Returns [] on error: worst case a manager sees their gym's existing
+      // handle read-only, never a write the RPC would refuse.
+      const managed = athlete ? await getManagedGyms(supabase, athlete.id) : [];
+      const role = athlete?.platform_role ?? null;
 
       const gymList = (gyms as GymOption[] | null) ?? [];
       setData({
@@ -128,6 +142,8 @@ export function useSetupData(authUserId: string | null) {
         waiverId: waiver?.id ?? null,
         hasAcceptedTos,
         isEditing: !!athlete && athlete.status !== ATHLETE_STATUS.PENDING,
+        managedGymIds: managed.map((g) => g.gymId),
+        isAdmin: role === "admin" || role === "founder",
       });
     } catch (e) {
       const message = e instanceof Error ? e.message : "Failed to load setup.";

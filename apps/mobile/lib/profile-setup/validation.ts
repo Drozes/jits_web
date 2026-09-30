@@ -4,7 +4,14 @@
  *   - Display name: non-empty after trim
  *   - DOB: must parse to a real date and resolve to age >= 16
  *   - Weight: numeric, 50–400 lbs
+ *   - Instagram handles (athlete and gym): optional; the server's
+ *     normalize-then-CHECK rule (`isValidInstagramInput`), blank is valid
  */
+import { isValidInstagramInput } from "@jits/shared/utils";
+import { FREE_AGENT_OPTION } from "../../components/profile-setup/types";
+
+export const INSTAGRAM_HANDLE_ERROR =
+  "Use up to 30 letters, numbers, periods or underscores.";
 
 const DOB_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -40,31 +47,42 @@ export function isValidWeight(value: string): boolean {
   return !Number.isNaN(parsed) && parsed >= 50 && parsed <= 400;
 }
 
+/**
+ * "Who Are You" step: name, gender, DOB (16+), weight (moved here from the
+ * training step, jits-02vo.5) and an optional, well-formed Instagram handle.
+ */
 export function isIdentityComplete(values: {
   firstName: string;
   lastName: string;
   gender: string;
   dateOfBirth: string;
+  weight: string;
+  instagram: string;
 }): boolean {
   return (
     !!values.firstName.trim() &&
     !!values.lastName.trim() &&
     !!values.gender &&
-    isAtLeast16(values.dateOfBirth)
+    isAtLeast16(values.dateOfBirth) &&
+    isValidWeight(values.weight) &&
+    isValidInstagramInput(values.instagram)
   );
 }
 
 /**
- * Training step is complete when the weight is valid, a gym is selected (a real
- * gym id OR the free-agent sentinel), and a city has been chosen. An empty
- * `gymId` means the picker is still on its placeholder.
+ * Training step is complete when a gym is selected (a real gym id OR the
+ * free-agent sentinel), a city has been chosen, and the optional gym Instagram
+ * is well-formed. An empty `gymId` means the picker is still on its
+ * placeholder. The gym handle is ignored for free agents (the field is hidden).
  */
 export function isTrainingComplete(values: {
-  weight: string;
   gymId: string;
   city: string;
+  gymInstagram: string;
 }): boolean {
-  if (!isValidWeight(values.weight)) return false;
   if (!values.gymId) return false;
+  if (values.gymId !== FREE_AGENT_OPTION && !isValidInstagramInput(values.gymInstagram)) {
+    return false;
+  }
   return !!values.city.trim();
 }

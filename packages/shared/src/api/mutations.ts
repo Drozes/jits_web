@@ -8,6 +8,7 @@ import type {
 } from "../types/composites";
 import { ARENA_CHALLENGE_FRESH_MS } from "../constants";
 import {
+  type DomainErrorCode,
   type Result,
   mapPostgrestError,
 } from "./errors";
@@ -1432,6 +1433,80 @@ export async function markPracticeMatch(
     data: {
       practice_match_offered_at: row?.practice_match_offered_at ?? null,
       practice_match_completed_at: row?.practice_match_completed_at ?? null,
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Gym Instagram handle (jr_be-ahn.3)
+// ---------------------------------------------------------------------------
+
+export interface GymInstagramHandleResult {
+  gymId: string;
+  /** The gym's stored handle after the call (normalized, no @), or null. */
+  instagramHandle: string | null;
+  /**
+   * False when a non-manager member suggested a handle for a gym that already
+   * has one: nothing changed and `instagramHandle` is the existing value. Not
+   * an error; show the existing handle.
+   */
+  applied: boolean;
+}
+
+/**
+ * Hints whose shared-table messages would mislead here (`not_found` reads
+ * "Match not found.", `not_authorized` talks about a match).
+ */
+const GYM_INSTAGRAM_HINT_ERRORS: Record<string, { code: DomainErrorCode; message: string }> = {
+  not_found: { code: "GYM_NOT_FOUND", message: "Gym not found." },
+  not_authorized: {
+    code: "NOT_AUTHORIZED",
+    message: "You can't set this gym's Instagram handle.",
+  },
+  invalid_instagram_handle: {
+    code: "UNKNOWN",
+    message: "That Instagram handle isn't valid.",
+  },
+  not_authenticated: { code: "UNKNOWN", message: "Please sign in again." },
+};
+
+/**
+ * Set (or, for a manager/admin, change or clear) a gym's Instagram handle via
+ * the `set_gym_instagram_handle` SECURITY DEFINER RPC. A member of the gym
+ * (athletes.primary_gym_id) may only fill a blank handle, so save the
+ * athlete's primary_gym_id BEFORE calling this. Pass "" to clear.
+ */
+export async function setGymInstagramHandle(
+  supabase: Client,
+  params: { gymId: string; handle: string },
+): Promise<Result<GymInstagramHandleResult>> {
+  const { data, error } = await supabase.rpc("set_gym_instagram_handle", {
+    p_gym_id: params.gymId,
+    p_handle: params.handle,
+  });
+
+  if (error) {
+    const mapped =
+      error.code === "P0001" &&
+      error.hint &&
+      Object.prototype.hasOwnProperty.call(GYM_INSTAGRAM_HINT_ERRORS, error.hint)
+        ? GYM_INSTAGRAM_HINT_ERRORS[error.hint]
+        : undefined;
+    if (mapped) return { ok: false, error: { ...mapped, raw: error } };
+    return { ok: false, error: mapPostgrestError(error) };
+  }
+
+  const row = (data ?? {}) as {
+    gym_id?: string;
+    instagram_handle?: string | null;
+    applied?: boolean;
+  };
+  return {
+    ok: true,
+    data: {
+      gymId: row.gym_id ?? params.gymId,
+      instagramHandle: row.instagram_handle ?? null,
+      applied: row.applied === true,
     },
   };
 }

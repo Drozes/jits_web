@@ -9,3 +9,4 @@ export * from "./highlight-caption";
 export * from "./key-moments";
 export * from "./challenge-freshness";
 export * from "./match-detection";
+export * from "./instagram-handle";

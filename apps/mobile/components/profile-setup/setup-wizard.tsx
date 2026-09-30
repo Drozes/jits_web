@@ -4,6 +4,8 @@ import { useRouter } from "expo-router";
 import { TertiaryButton } from "@/components/auth/auth-buttons";
 import { useAuth } from "@/lib/auth/hooks";
 import { useSetupSubmit } from "@/lib/profile-setup/use-setup-submit";
+import { gymInstagramField, type GymAccess } from "@/lib/profile-setup/gym-instagram";
+import { formatInstagramHandle } from "@jits/shared/utils";
 import type { GymOption, SetupAthleteRow } from "@/lib/profile-setup/use-setup-data";
 import { IdentityStep } from "./identity-step";
 import { TosStep } from "./tos-step";
@@ -47,6 +49,7 @@ interface SetupWizardProps {
   waiverId: string | null;
   hasAcceptedTos: boolean;
   isEditing: boolean;
+  gymAccess: GymAccess;
 }
 
 /** ELO-styled multi-step setup wizard. */
@@ -58,6 +61,7 @@ export function SetupWizard({
   waiverId,
   hasAcceptedTos,
   isEditing,
+  gymAccess,
 }: SetupWizardProps) {
   const router = useRouter();
   const { signOut, user } = useAuth();
@@ -88,6 +92,10 @@ export function SetupWizard({
     gender: athlete?.gender ?? "",
     dateOfBirth: athlete?.date_of_birth ?? "",
     city: athlete?.city ?? "",
+    instagram: formatInstagramHandle(athlete?.instagram_handle),
+    gymInstagram: formatInstagramHandle(
+      gyms.find((g) => g.id === athlete?.primary_gym_id)?.instagram_handle,
+    ),
   });
   const currentIdx = steps.indexOf(currentStep);
 
@@ -102,12 +110,18 @@ export function SetupWizard({
     [],
   );
 
+  const gymInstagramFor = React.useCallback(
+    (gymId: string) => gymInstagramField(gymId, gyms, gymAccess),
+    [gyms, gymAccess],
+  );
+
   const { loading, error, acceptTos, submit } = useSetupSubmit({
     athleteId: athlete?.id ?? null,
     authUserId,
     waiverId,
     isEditing,
     onAfterTos: goNext,
+    gymInstagramFor,
   });
 
   const handleExit = React.useCallback(async () => {
@@ -138,6 +152,7 @@ export function SetupWizard({
           isEditing={isEditing}
           gyms={gyms}
           cities={cities}
+          gymInstagram={gymInstagramFor(values.gymId)}
         />
       )}
 

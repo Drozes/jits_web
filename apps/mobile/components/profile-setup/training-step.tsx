@@ -3,9 +3,12 @@ import { NativeSelect } from "@/components/ui/native-select";
 import { Plate } from "@/components/ui/elo-system";
 import { CtaButton } from "@/components/auth/auth-buttons";
 import type { GymOption } from "@/lib/profile-setup/use-setup-data";
-import { isTrainingComplete, isValidWeight } from "@/lib/profile-setup/validation";
+import { formatInstagramHandle } from "@jits/shared/utils";
+import type { GymInstagramField } from "@/lib/profile-setup/gym-instagram";
+import { isTrainingComplete } from "@/lib/profile-setup/validation";
 import { FREE_AGENT_OPTION, type WizardValues } from "./types";
-import { EloField, EloTextInput } from "./elo-form-field";
+import { EloField } from "./elo-form-field";
+import { InstagramField } from "./instagram-field";
 import { CityAutocomplete } from "./city-autocomplete";
 
 interface TrainingStepProps {
@@ -16,12 +19,15 @@ interface TrainingStepProps {
   isEditing: boolean;
   gyms: GymOption[];
   cities: string[];
+  gymInstagram: GymInstagramField;
 }
 
 /**
- * ELO-styled training step, now the final submitting step of the wizard.
- * Collects weight, gym (with free-agent folded in as the first picker option),
- * and the required city. Free-agent status is derived from the gym picker:
+ * ELO-styled training step, the final submitting step of the wizard.
+ * Collects gym (with free-agent folded in as the first picker option), the
+ * optional gym Instagram (hidden for free agents; read-only when the gym
+ * already has one and the athlete does not manage it), and the required city.
+ * Weight moved to the identity step (jits-02vo.5). Free-agent status is derived from the gym picker:
  * selecting "Free agent (no gym)" sets `gymId` to the FREE_AGENT_OPTION
  * sentinel; selecting a real gym auto-fills city if empty.
  */
@@ -33,9 +39,8 @@ export function TrainingStep({
   isEditing,
   gyms,
   cities,
+  gymInstagram,
 }: TrainingStepProps) {
-  const weightAttempted = values.weight.length > 0;
-  const weightValid = !weightAttempted || isValidWeight(values.weight);
   const canSubmit = isTrainingComplete(values) && !loading;
 
   const gymOptions = React.useMemo(
@@ -51,32 +56,21 @@ export function TrainingStep({
 
   const onGymChange = (next: string) => {
     if (next === FREE_AGENT_OPTION) {
-      onChange({ gymId: FREE_AGENT_OPTION });
+      onChange({ gymId: FREE_AGENT_OPTION, gymInstagram: "" });
       return;
     }
     const gym = gyms.find((g) => g.id === next);
-    const patch: Partial<WizardValues> = { gymId: next };
+    // Each gym brings its own stored handle; a typed one never carries over.
+    const patch: Partial<WizardValues> = {
+      gymId: next,
+      gymInstagram: formatInstagramHandle(gym?.instagram_handle),
+    };
     if (gym?.city && !values.city) patch.city = gym.city;
     onChange(patch);
   };
 
   return (
     <Plate className="gap-5">
-      <EloField
-        label="Weight (lbs)"
-        helper="Used for weight class matching."
-        error={!weightValid ? "Enter a weight between 50 and 400 lbs." : null}
-      >
-        <EloTextInput
-          placeholder="e.g. 155"
-          value={values.weight}
-          onChangeText={(text) => onChange({ weight: text })}
-          keyboardType="decimal-pad"
-          maxLength={5}
-          hasError={!weightValid}
-        />
-      </EloField>
-
       <EloField
         label="Home Gym"
         helper="Required to activate your profile and appear to other athletes."
@@ -90,6 +84,22 @@ export function TrainingStep({
           searchPlaceholder="Search gyms"
         />
       </EloField>
+
+      {gymInstagram.visible ? (
+        <InstagramField
+          label="Gym Instagram"
+          placeholder="@gymhandle"
+          helper={
+            gymInstagram.readOnly
+              ? "Already set for your gym. Only a gym manager can change it."
+              : "Optional. Tag your gym on shared highlights."
+          }
+          value={values.gymInstagram}
+          onChange={(text) => onChange({ gymInstagram: text })}
+          readOnly={gymInstagram.readOnly}
+          testID="setup-gym-instagram"
+        />
+      ) : null}
 
       <EloField
         label="City"

@@ -84,6 +84,7 @@ export default function ProfileSetupScreen() {
                 waiverId={data.waiverId}
                 hasAcceptedTos={data.hasAcceptedTos}
                 isEditing={data.isEditing}
+                gymAccess={data}
               />
             </>
           )}

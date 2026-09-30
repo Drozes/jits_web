@@ -41,6 +41,8 @@ const ATHLETE = {
   date_of_birth: null,
   city: null,
   free_agent: false,
+  instagram_handle: null,
+  platform_role: "member",
 };
 
 function seed(athlete: Res) {
@@ -48,6 +50,7 @@ function seed(athlete: Res) {
   mockTables.gyms = [{ data: [{ id: "g1", name: "Gym", city: "Toronto" }], error: null }];
   mockTables.waivers = [{ data: { id: "w1" }, error: null }];
   mockTables.waiver_acknowledgements = [{ data: null, error: null }];
+  mockTables.gym_managers = [{ data: [], error: null }];
 }
 
 beforeEach(() => {
@@ -81,6 +84,16 @@ describe("useSetupData", () => {
     expect(result.current.error).toBeNull();
     expect(result.current.data?.athlete?.id).toBe("me-1");
     expect(result.current.data?.isEditing).toBe(false);
+  });
+
+  it("loads the gyms the athlete manages for the gym Instagram field", async () => {
+    seed({ data: { ...ATHLETE, platform_role: "admin" }, error: null });
+    mockTables.gym_managers = [{ data: [{ gym_id: "g1", gyms: { name: "Gym", city: null } }], error: null }];
+    const { result } = renderHook(() => useSetupData("u-1"));
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.data?.managedGymIds).toEqual(["g1"]);
+    expect(result.current.data?.isAdmin).toBe(true);
   });
 
   it("still treats a successful read with no row as a fresh setup", async () => {

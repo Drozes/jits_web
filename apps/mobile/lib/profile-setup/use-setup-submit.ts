@@ -2,6 +2,8 @@ import * as React from "react";
 import { useRouter } from "expo-router";
 import { ATHLETE_STATUS } from "@jits/shared/constants";
 import { ATHLETE_GUARD_SELECT, type AthleteGuardRow } from "@jits/shared/api/queries";
+import { setGymInstagramHandle } from "@jits/shared/api/mutations";
+import { formatInstagramHandle, normalizeInstagramHandle } from "@jits/shared/utils";
 import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth/hooks";
 import { toast } from "@/components/ui/toast";
@@ -9,6 +11,18 @@ import {
   FREE_AGENT_OPTION,
   type WizardValues,
 } from "../../components/profile-setup/types";
+import { planGymInstagramWrite, type GymInstagramField } from "./gym-instagram";
+
+/**
+ * The client validates the handle first, so a CHECK violation (23514) on
+ * `chk_athletes_instagram_handle` means the rules drifted; say so plainly.
+ */
+function athleteSaveMessage(error: { code?: string; message: string }): string {
+  if (error.code === "23514" && error.message.includes("instagram_handle")) {
+    return "That Instagram handle isn't valid.";
+  }
+  return error.message;
+}
 
 interface UseSetupSubmitArgs {
   athleteId: string | null;
@@ -16,6 +30,8 @@ interface UseSetupSubmitArgs {
   waiverId: string | null;
   isEditing: boolean;
   onAfterTos: () => void;
+  /** Gym Instagram field state for the gym picked at submit time. */
+  gymInstagramFor: (gymId: string) => GymInstagramField;
 }
 
 /**
@@ -25,7 +41,12 @@ interface UseSetupSubmitArgs {
  *   2. Submit either UPDATEs an existing athlete row or INSERTs a new one
  *      (`auth_user_id` is required on insert because there is no row yet
  *      when the user has just signed up).
- *   3. Verifies the trigger flipped status to `active`, then calls
+ *   3. Sets the gym's Instagram handle via `set_gym_instagram_handle`, only
+ *      AFTER the athletes write: a non-manager may only fill the handle of
+ *      their own primary gym, so `primary_gym_id` must already be saved. A
+ *      failure or `applied: false` is non-blocking (the profile is saved) and
+ *      is reported with the final toast.
+ *   4. Verifies the trigger flipped status to `active`, then calls
  *      `refreshAthlete()` so the AuthContext reflects the activated state
  *      before we navigate.
  */
@@ -35,6 +56,7 @@ export function useSetupSubmit({
   waiverId,
   isEditing,
   onAfterTos,
+  gymInstagramFor,
 }: UseSetupSubmitArgs) {
   const router = useRouter();
   const { refreshAthlete } = useAuth();
@@ -92,6 +114,8 @@ export function useSetupSubmit({
         city: values.city.trim(),
         free_agent: freeAgent,
         primary_gym_id: freeAgent ? null : values.gymId || null,
+        // The server trigger normalizes too; blank clears (NULL).
+        instagram_handle: normalizeInstagramHandle(values.instagram),
       };
 
       let resolvedAthleteId = athleteId;
@@ -101,7 +125,7 @@ export function useSetupSubmit({
           .update(basePayload)
           .eq("id", athleteId);
         if (saveError) {
-          setError(saveError.message);
+          setError(athleteSaveMessage(saveError));
           setLoading(false);
           return;
         }
@@ -117,11 +141,34 @@ export function useSetupSubmit({
           .select("id")
           .single();
         if (saveError || !inserted) {
-          setError(saveError?.message ?? "Failed to create athlete profile.");
+          setError(
+            saveError ? athleteSaveMessage(saveError) : "Failed to create athlete profile.",
+          );
           setLoading(false);
           return;
         }
         resolvedAthleteId = inserted.id;
+      }
+
+      // Only after the athletes write (primary_gym_id saved), see step 3.
+      // Surfaced with the final toast: back-to-back toasts replace each other.
+      let gymNotice: { type: "error" | "info"; text1: string; description: string } | null = null;
+      const gymWrite = planGymInstagramWrite(values, gymInstagramFor(values.gymId));
+      if (gymWrite) {
+        const res = await setGymInstagramHandle(supabase, gymWrite);
+        if (!res.ok) {
+          gymNotice = {
+            type: "error",
+            text1: "Profile saved, gym Instagram not saved",
+            description: res.error.message,
+          };
+        } else if (!res.data.applied && res.data.instagramHandle) {
+          gymNotice = {
+            type: "info",
+            text1: "Gym Instagram already set",
+            description: `Your gym is tagged as ${formatInstagramHandle(res.data.instagramHandle)}.`,
+          };
+        }
       }
 
       // Record the TOS/waiver acknowledgement. On the primary signup path the
@@ -170,14 +217,25 @@ export function useSetupSubmit({
       // routes a just-activated athlete back into setup (as Edit Profile).
       await refreshAthlete(updated as unknown as AthleteGuardRow);
 
+      if (gymNotice?.type === "error") {
+        toast.error(gymNotice);
+      } else if (isEditing) {
+        toast.success(
+          gymNotice
+            ? { text1: "Profile updated successfully", description: gymNotice.description }
+            : "Profile updated successfully",
+        );
+      } else if (gymNotice) {
+        toast.info(gymNotice);
+      }
+
       if (isEditing) {
-        toast.success("Profile updated successfully");
         router.replace("/(app)/profile");
       } else {
         router.replace("/");
       }
     },
-    [athleteId, authUserId, waiverId, isEditing, refreshAthlete, router],
+    [athleteId, authUserId, waiverId, isEditing, refreshAthlete, router, gymInstagramFor],
   );
 
   return { loading, error, acceptTos, submit };

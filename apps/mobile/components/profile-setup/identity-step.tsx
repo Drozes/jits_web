@@ -1,11 +1,12 @@
 import { Pressable, Text, View } from "react-native";
 import { Plate } from "@/components/ui/elo-system";
 import { CtaButton } from "@/components/auth/auth-buttons";
-import { isIdentityComplete } from "@/lib/profile-setup/validation";
+import { isIdentityComplete, isValidWeight } from "@/lib/profile-setup/validation";
 import { cn } from "@/lib/cn";
 import type { WizardValues } from "./types";
 import { DateOfBirthPicker } from "./date-of-birth-picker";
 import { EloField, EloTextInput } from "./elo-form-field";
+import { InstagramField } from "./instagram-field";
 
 interface IdentityStepProps {
   values: WizardValues;
@@ -15,6 +16,7 @@ interface IdentityStepProps {
 
 export function IdentityStep({ values, onChange, onNext }: IdentityStepProps) {
   const canContinue = isIdentityComplete(values);
+  const weightValid = values.weight.length === 0 || isValidWeight(values.weight);
 
   return (
     <Plate className="gap-5">
@@ -58,6 +60,30 @@ export function IdentityStep({ values, onChange, onNext }: IdentityStepProps) {
       <DateOfBirthPicker
         value={values.dateOfBirth}
         onChange={(dateOfBirth) => onChange({ dateOfBirth })}
+      />
+
+      <EloField
+        label="Weight (lbs)"
+        helper="Used for weight class matching."
+        error={!weightValid ? "Enter a weight between 50 and 400 lbs." : null}
+      >
+        <EloTextInput
+          placeholder="e.g. 155"
+          value={values.weight}
+          onChangeText={(text) => onChange({ weight: text })}
+          keyboardType="decimal-pad"
+          maxLength={5}
+          hasError={!weightValid}
+        />
+      </EloField>
+
+      <InstagramField
+        label="Instagram"
+        placeholder="@yourhandle"
+        helper="Optional. Shown on your profile."
+        value={values.instagram}
+        onChange={(instagram) => onChange({ instagram })}
+        testID="setup-instagram"
       />
 
       <CtaButton label="Continue" onPress={onNext} disabled={!canContinue} />

@@ -169,6 +169,7 @@ export type Database = {
           gender: string | null
           highest_elo: number
           id: string
+          instagram_handle: string | null
           is_bot: boolean
           is_scoutable: boolean
           last_name: string | null
@@ -197,6 +198,7 @@ export type Database = {
           gender?: string | null
           highest_elo?: number
           id?: string
+          instagram_handle?: string | null
           is_bot?: boolean
           is_scoutable?: boolean
           last_name?: string | null
@@ -225,6 +227,7 @@ export type Database = {
           gender?: string | null
           highest_elo?: number
           id?: string
+          instagram_handle?: string | null
           is_bot?: boolean
           is_scoutable?: boolean
           last_name?: string | null
@@ -577,6 +580,7 @@ export type Database = {
           country: string | null
           created_at: string
           id: string
+          instagram_handle: string | null
           is_verified: boolean
           latitude: number | null
           longitude: number | null
@@ -590,6 +594,7 @@ export type Database = {
           country?: string | null
           created_at?: string
           id?: string
+          instagram_handle?: string | null
           is_verified?: boolean
           latitude?: number | null
           longitude?: number | null
@@ -603,6 +608,7 @@ export type Database = {
           country?: string | null
           created_at?: string
           id?: string
+          instagram_handle?: string | null
           is_verified?: boolean
           latitude?: number | null
           longitude?: number | null
@@ -2834,6 +2840,7 @@ export type Database = {
         Args: { p_video_id: string }
         Returns: boolean
       }
+      is_valid_instagram_handle: { Args: { p: string }; Returns: boolean }
       is_video_upload_allowed: {
         Args: { p_athlete_id: string }
         Returns: boolean
@@ -2862,6 +2869,7 @@ export type Database = {
         Args: { p_analysis: Json; p_technique_tags: Json; p_video_id: string }
         Returns: string
       }
+      normalize_instagram_handle: { Args: { p: string }; Returns: string }
       notify_chunk_analyze: { Args: { p_chunk_id: string }; Returns: undefined }
       notify_merge_function: {
         Args: { p_video_id: string }
@@ -2941,6 +2949,10 @@ export type Database = {
         Returns: undefined
       }
       set_default_still: { Args: { p_still_url: string }; Returns: string }
+      set_gym_instagram_handle: {
+        Args: { p_gym_id: string; p_handle: string }
+        Returns: Json
+      }
       set_highlight_failed: {
         Args: {
           p_error_message?: string

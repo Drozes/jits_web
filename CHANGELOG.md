@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+### Mobile: profile setup, weight on step 2, athlete and gym Instagram (Sept 30 design review, jits-02vo.5)
+
+JS-only, OTA-eligible (no native dependency, `app.json`, plugin, metro, babel or `eas.json` change).
+
+**Cross-repo dependency (jr_be-ahn.2, jr_be-ahn.3):** the setup screen now selects `athletes.instagram_handle` and `gyms.instagram_handle` and calls `set_gym_instagram_handle`. **Rollout order: apply jr_be `20260930165000_athletes_instagram_handle` and `20260930170002_gyms_instagram_handle` to prod BEFORE this OTA**, or the setup / Edit Profile read fails with "Couldn't load your profile" (every athlete entering setup or editing their profile is blocked).
+
+**Added**
+- `packages/shared/src/utils/instagram-handle.ts`: `normalizeInstagramHandle` / `isValidInstagramHandle` / `isValidInstagramInput` (client mirror of the server's normalize-then-CHECK rule; blank is valid) and `formatInstagramHandle`, with tests.
+- `setGymInstagramHandle` in `packages/shared/src/api/mutations.ts` (returns `{ gymId, instagramHandle, applied }`; gym-specific messages for the `not_found` / `not_authorized` / `invalid_instagram_handle` / `not_authenticated` hints), tested in `packages/shared/src/api/gym-instagram.test.ts`.
+- `apps/mobile/components/profile-setup/instagram-field.tsx` (optional handle input with inline error, optional read-only) and `apps/mobile/lib/profile-setup/gym-instagram.ts` (`gymInstagramField`: hidden for free agents, read-only for a non-manager when the gym already has a handle; `planGymInstagramWrite`: which RPC call, if any, the submit makes).
+- Tests: `apps/mobile/__tests__/lib/profile-setup/validation.test.ts`, `apps/mobile/__tests__/components/profile-setup/setup-steps.test.tsx`; `use-setup-submit.test.ts` covers save ordering and `applied=false`.
+- `packages/shared/src/types/database.ts`: `athletes.instagram_handle`, `gyms.instagram_handle`, and the `normalize_instagram_handle` / `is_valid_instagram_handle` / `set_gym_instagram_handle` functions (hand-merged: the regenerated file from the local stack lacked several existing objects).
+
+**Changed**
+- "Who Are You" (boards P-Setup-Who) is First Name, Last Name, Gender, Date of Birth, Weight (lbs) (moved from step 3, same 50-400 check and helper), then an optional Instagram ("@yourhandle", "Optional. Shown on your profile."). Continue now also needs a valid weight and a well-formed or blank handle.
+- "Where You Train" (P-Setup-Where) is Home Gym, an optional Gym Instagram ("@gymhandle", "Optional. Tag your gym on shared highlights."; hidden for free agents; read-only when the gym already has a handle and the athlete neither manages it nor is an admin), then City. Picking a gym prefills its stored handle.
+- Submit saves the athlete row (including `primary_gym_id`, `current_weight` and the normalized `instagram_handle`) first, then calls `set_gym_instagram_handle` only if the gym handle changed, because a member may only fill their own primary gym's blank handle. A failed or `applied: false` gym call does not block the saved profile; it is reported in the final toast. Edit Profile uses the same steps and saves the same fields. `useSetupData` also loads the athlete's managed gyms and platform role.
+
 ### Mobile: P-Home, record in the Elo tile (Sept 30 design review, jits-02vo.1)
 
 JS-only, OTA-eligible (no native dependency, `app.json`, plugin, metro, babel or `eas.json` change). No backend change: the record reads the wins / losses / draws Home already loads from `getDashboardSummary`.

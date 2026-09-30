@@ -17,6 +17,10 @@ export interface WizardValues {
   gender: string;
   dateOfBirth: string;
   city: string;
+  /** Raw athlete Instagram input ("@handle" or "handle"); blank = not set. */
+  instagram: string;
+  /** Raw gym Instagram input for the selected gym; ignored for free agents. */
+  gymInstagram: string;
 }
 
 export type WizardStep = "tos" | "identity" | "training";
