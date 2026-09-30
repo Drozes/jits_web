@@ -2771,7 +2771,7 @@ export type Database = {
       }
       get_dashboard_summary: { Args: never; Returns: Json }
       get_elo_history: {
-        Args: { p_athlete_id: string }
+        Args: { p_athlete_id: string; p_since?: string }
         Returns: {
           created_at: string
           delta: number
@@ -2837,7 +2837,7 @@ export type Database = {
       }
       get_match_details: { Args: { p_match_id: string }; Returns: Json }
       get_match_history: {
-        Args: { p_athlete_id: string }
+        Args: { p_athlete_id: string; p_since?: string }
         Returns: {
           athlete_outcome: Database["public"]["Enums"]["participant_outcome_enum"]
           completed_at: string
@@ -2880,6 +2880,14 @@ export type Database = {
       get_scouting_matchup: { Args: { p_opponent_id: string }; Returns: Json }
       get_scouting_report: { Args: { p_opponent_id: string }; Returns: Json }
       get_session_lobby: { Args: { p_session_id: string }; Returns: Json }
+      get_submission_breakdown: {
+        Args: { p_athlete_id: string; p_outcome?: string; p_since?: string }
+        Returns: {
+          count: number
+          submission_type_code: string
+          submission_type_display_name: string
+        }[]
+      }
       get_unread_counts: {
         Args: never
         Returns: {

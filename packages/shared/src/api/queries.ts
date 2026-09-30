@@ -25,6 +25,8 @@ import type { NotificationItem } from "../types/notification";
 import type {
   WeeklyActivity,
   SubmissionBreakdown,
+  SubmissionOutcome,
+  SubmissionOutcomeCount,
   WeightClassStats,
   GymManagerStats,
 } from "../types/analytics";
@@ -40,6 +42,7 @@ import { mapPostgrestError, type DomainError, type Result } from "./errors";
 import { ARENA_CHALLENGE_FRESH_MS, MATCH_RESUME_WINDOW_MS } from "../constants";
 import { isUuid } from "../utils/shared";
 import { recordedEloDelta } from "../utils/recorded-delta";
+import { buildWeeklyActivity } from "../utils/stats-window";
 import {
   videoPlayability,
   videoAngleLabel,
@@ -293,13 +296,19 @@ export async function getAthletesStatsRpc(
 // Match history (via RPC)
 // ---------------------------------------------------------------------------
 
-/** Fetch match history for an athlete using the get_match_history RPC */
+/**
+ * Fetch match history for an athlete using the get_match_history RPC.
+ * `since` (ISO timestamp) limits it to matches completed at or after that
+ * instant; omit it (or pass null) for all time.
+ */
 export async function getMatchHistory(
   supabase: Client,
   athleteId: string,
+  since?: string | null,
 ): Promise<MatchHistoryRow[]> {
   const { data, error } = await supabase.rpc("get_match_history", {
     p_athlete_id: athleteId,
+    ...(since ? { p_since: since } : {}),
   });
   if (error) {
     console.error("getMatchHistory:", error);
@@ -312,13 +321,19 @@ export async function getMatchHistory(
 // ELO
 // ---------------------------------------------------------------------------
 
-/** Fetch ELO rating history using the get_elo_history RPC */
+/**
+ * Fetch ELO rating history (newest first) using the get_elo_history RPC.
+ * `since` (ISO timestamp) limits it to rows at or after that instant; omit
+ * it (or pass null) for all time.
+ */
 export async function getEloHistory(
   supabase: Client,
   athleteId: string,
+  since?: string | null,
 ): Promise<EloHistoryRow[]> {
   const { data, error } = await supabase.rpc("get_elo_history", {
     p_athlete_id: athleteId,
+    ...(since ? { p_since: since } : {}),
   });
   if (error) {
     console.error("getEloHistory:", error);
@@ -1685,32 +1700,35 @@ export async function getWeeklyMatchActivity(
   athleteId: string,
 ): Promise<WeeklyActivity[]> {
   const history = await getMatchHistory(supabase, athleteId);
+  return buildWeeklyActivity(history);
+}
 
-  const now = new Date();
-  const eightWeeksAgo = new Date(now.getTime() - 8 * 7 * 24 * 60 * 60 * 1000);
-
-  // Build 8 weekly buckets (Mon-Sun)
-  const weeks: WeeklyActivity[] = [];
-  for (let i = 7; i >= 0; i--) {
-    const weekStart = new Date(now.getTime() - i * 7 * 24 * 60 * 60 * 1000);
-    const mon = new Date(weekStart);
-    mon.setDate(mon.getDate() - ((mon.getDay() + 6) % 7));
-    const label = `${mon.getMonth() + 1}/${mon.getDate()}`;
-    weeks.push({ week: label, matches: 0, wins: 0 });
+/**
+ * Submission counts by type from the get_submission_breakdown RPC (own
+ * athlete only): the submissions the athlete won with (`outcome: "wins"`,
+ * the default) or lost to (`"losses"`), optionally limited to matches
+ * completed at or after `since`. Ordered by count DESC, then name ASC.
+ * Throws on an RPC error (unlike the older history wrappers) so the caller
+ * can tell a failed load from a genuinely empty result.
+ */
+export async function getSubmissionBreakdownRpc(
+  supabase: Client,
+  athleteId: string,
+  opts: { since?: string | null; outcome?: SubmissionOutcome } = {},
+): Promise<SubmissionOutcomeCount[]> {
+  const { data, error } = await supabase.rpc("get_submission_breakdown", {
+    p_athlete_id: athleteId,
+    p_outcome: opts.outcome ?? "wins",
+    ...(opts.since ? { p_since: opts.since } : {}),
+  });
+  if (error) {
+    throw new Error(`getSubmissionBreakdownRpc: ${error.message}`);
   }
-
-  for (const m of history) {
-    const d = new Date(m.completed_at);
-    if (d < eightWeeksAgo) continue;
-    const diffDays = Math.floor((now.getTime() - d.getTime()) / (24 * 60 * 60 * 1000));
-    const weekIndex = 7 - Math.floor(diffDays / 7);
-    if (weekIndex >= 0 && weekIndex < 8) {
-      weeks[weekIndex].matches++;
-      if (m.athlete_outcome === "win") weeks[weekIndex].wins++;
-    }
-  }
-
-  return weeks;
+  return (data ?? []).map((row) => ({
+    code: row.submission_type_code,
+    name: row.submission_type_display_name,
+    count: Number(row.count),
+  }));
 }
 
 /**

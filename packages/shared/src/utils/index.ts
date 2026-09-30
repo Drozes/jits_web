@@ -11,3 +11,4 @@ export * from "./challenge-freshness";
 export * from "./match-detection";
 export * from "./instagram-handle";
 export * from "./recorded-delta";
+export * from "./stats-window";

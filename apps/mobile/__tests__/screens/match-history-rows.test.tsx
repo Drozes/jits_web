@@ -39,8 +39,8 @@ jest.mock("@/components/profile/submission-breakdown", () => ({
 jest.mock("@/components/profile/weekly-activity", () => ({
   WeeklyActivitySection: mockStub("weekly"),
 }));
-jest.mock("@/components/profile/milestone-progress", () => ({
-  MilestoneProgress: mockStub("milestone"),
+jest.mock("@/components/profile/elo-progression", () => ({
+  EloProgressionChart: mockStub("elo-progression"),
 }));
 jest.mock("@/components/athlete/competitor-header", () => ({
   CompetitorHeader: mockStub("competitor-header"),
@@ -97,8 +97,7 @@ const HISTORY = [
 jest.mock("@jits/shared/api/queries", () => ({
   getMatchHistory: jest.fn(async () => HISTORY),
   getEloHistory: jest.fn(async () => []),
-  getWeeklyMatchActivity: jest.fn(async () => []),
-  getSubmissionBreakdown: jest.fn(async () => []),
+  getSubmissionBreakdownRpc: jest.fn(async () => []),
 }));
 
 import ProfileStatsScreen from "@/app/(app)/(tabs)/profile/stats";
@@ -125,7 +124,9 @@ describe("Stats: every match is ranked (jits-02vo.2)", () => {
   it("has no All/Ranked filter chips and counts the record over every completed match", async () => {
     const s = render(<ProfileStatsScreen />);
     await s.findByLabelText("Open match vs Old Rival");
-    expect(s.queryByText("All")).toBeNull();
+    // The only "All" left is the timeline window chip (jits-02vo.4).
+    expect(s.getAllByText("All")).toHaveLength(1);
+    expect(s.getByLabelText("Show all time")).toBeTruthy();
     expect(s.queryByText("Ranked")).toBeNull();
     expect(s.getByText("1W")).toBeTruthy();
     expect(s.getByText("1L")).toBeTruthy();
