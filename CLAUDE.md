@@ -92,6 +92,8 @@ Not discoverable from frontend code. Full reference: `research/005-backend-refer
 
 ## Design System
 
+**Main design artifact:** the team's canonical mobile screen set is the Claude Design canvas "ELO RATED Native Screens", https://claude.ai/artifact/PJWm2WeqsG56HS13jHsd5D. Its "Current app" page must mirror the shipped `apps/mobile` code, so update the affected boards whenever a mobile UI change ships. Its proposed pages hold review items and redesigns. Always update it in place, reading `project/canvas.json` first. Full rules are in `~/code/EloRated/CLAUDE.md` section 5. The old `apps/web/public/design/native-screen-inventory.html` and `wireframe.html` are stale; don't use them as a source.
+
 ### Color and token semantics (no decorative color)
 - **Signal Red** (`text-primary`, `#E63946` / hsl(355 78% 56%)): CTAs and state-negative (losses, destructive) only.
 - **Gain Green** (`text-success`): rating increases only.
