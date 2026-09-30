@@ -80,25 +80,6 @@ jest.mock("@/components/notifications/notification-bell", () => ({
   },
 }));
 
-// New StatOverview signature is { wins, losses, draws } only — no rank/streak.
-jest.mock("@/components/dashboard/stat-overview", () => ({
-  StatOverview: ({
-    stats,
-  }: {
-    stats: { wins: number; losses: number; draws: number };
-  }) => {
-    const R = require("react");
-    const RN = require("react-native");
-    return R.createElement(
-      RN.View,
-      { testID: "stat-overview" },
-      R.createElement(RN.Text, {}, `${stats.wins}W`),
-      R.createElement(RN.Text, {}, `${stats.losses}L`),
-      R.createElement(RN.Text, {}, `${stats.draws}D`),
-    );
-  },
-}));
-
 // Renders the section title plus one pressable per "Me" row, so the screen's
 // onPressMatch wiring is exercised without the real section.
 jest.mock("@/components/dashboard/recent-activity-section", () => ({
@@ -216,8 +197,22 @@ jest.mock("expo-image", () => {
 });
 
 import DashboardScreen from "@/app/(app)/(tabs)/(home)/index";
-import { ARENA_HREF } from "@/lib/arena/constants";
 import { resetHighlightStore } from "@/lib/highlight/highlight-store";
+
+// The record line inside the Elo tile for mockSummary (5-2-1) and for zero.
+const RECORD = "5W · 2L · 1D";
+const ZERO_RECORD = "0W · 0L · 0D";
+
+/** The (only) red CTA buttons on screen: one Signal Red per surface. */
+function redCtas(utils: { root: { findAll: (p: (n: never) => boolean) => unknown[] } }) {
+  return utils.root.findAll(
+    (n: { type: unknown; props: Record<string, unknown> }) =>
+      typeof n.type === "string" &&
+      n.props.accessibilityRole === "button" &&
+      typeof n.props.className === "string" &&
+      /(^|\s)bg-cta(\s|$)/.test(n.props.className as string),
+  );
+}
 
 interface QueryMocks {
   getDashboardSummary: jest.Mock;
@@ -296,28 +291,34 @@ describe("DashboardScreen", () => {
     });
   });
 
-  it("renders record stats after data loads", async () => {
-    const { getByText } = render(React.createElement(DashboardScreen));
-    await waitFor(() => {
-      expect(getByText("5W")).toBeTruthy();
-      expect(getByText("2L")).toBeTruthy();
-      expect(getByText("1D")).toBeTruthy();
-    });
+  // P-Home (jits-02vo.1): the record rides inside the Elo tile as one mono
+  // meta line; there is no separate Record section.
+  it("renders the record inside the Elo tile, with a spoken label", async () => {
+    const { findByText, getByText, queryByText } = render(React.createElement(DashboardScreen));
+    const line = await findByText(RECORD);
+    expect(line.props.testID).toBe("elo-tile-meta");
+    expect(line.props.accessibilityLabel).toBe("Record: 5 wins, 2 losses, 1 draw");
+    expect(getByText("1200")).toBeTruthy();
+    expect(queryByText("Record")).toBeNull();
   });
 
-  // The Arena is the only way to a match on mobile (jits-gewv), so Home must
-  // always point there, for a gym member and a free agent alike.
+  // P-Home: no "Current ELO Rating" label and no Arena nudge card (the Arena
+  // tab covers it), for a gym member and a free agent alike.
   it.each([
     ["a free agent", null],
     ["a gym member", "g1"],
-  ])("nudges %s toward the Arena", async (_name, gymId) => {
+  ])("shows %s no Elo label and no Arena nudge card", async (_name, gymId) => {
     mockAthlete.primary_gym_id = gymId;
-    const { getByLabelText, getByText } = render(React.createElement(DashboardScreen));
-    await waitFor(() => {
-      expect(getByText("Find a match")).toBeTruthy();
-    });
-    fireEvent.press(getByLabelText("Go to the Arena"));
-    expect(mockPush).toHaveBeenCalledWith(ARENA_HREF);
+    const { findByText, queryByText, queryByLabelText } = render(
+      React.createElement(DashboardScreen),
+    );
+    await findByText(RECORD);
+    expect(queryByText("Current ELO Rating")).toBeNull();
+    expect(queryByText("Find a match")).toBeNull();
+    expect(queryByText("You're live")).toBeNull();
+    expect(queryByText(/Go live in the Arena/)).toBeNull();
+    expect(queryByText(/Enter the Arena|Open the Arena/)).toBeNull();
+    expect(queryByLabelText("Go to the Arena")).toBeNull();
   });
 
   it("makes no gym or session reads", async () => {
@@ -325,7 +326,7 @@ describe("DashboardScreen", () => {
     mockAthlete.primary_gym_id = "g1";
     const { getByText } = render(React.createElement(DashboardScreen));
     await waitFor(() => {
-      expect(getByText("5W")).toBeTruthy();
+      expect(getByText(RECORD)).toBeTruthy();
     });
     expect(queries.getDashboardSummary).toHaveBeenCalledTimes(1);
     expect(queries.getActiveSession).not.toHaveBeenCalled();
@@ -338,7 +339,7 @@ describe("DashboardScreen", () => {
   it("renders no session or gym copy", async () => {
     const { getByText, queryByText } = render(React.createElement(DashboardScreen));
     await waitFor(() => {
-      expect(getByText("5W")).toBeTruthy();
+      expect(getByText(RECORD)).toBeTruthy();
     });
     expect(queryByText(/session/i)).toBeNull();
     expect(queryByText(/Enter Lobby|Check In/)).toBeNull();
@@ -372,7 +373,7 @@ describe("DashboardScreen", () => {
     const queries = require("@jits/shared/api/queries") as QueryMocks;
     const { getByText } = render(React.createElement(DashboardScreen));
     await waitFor(() => {
-      expect(getByText("5W")).toBeTruthy();
+      expect(getByText(RECORD)).toBeTruthy();
     });
     expect(queries.getDashboardSummary).toHaveBeenCalledTimes(1);
 
@@ -411,7 +412,7 @@ describe("DashboardScreen greeting", () => {
       stats: { wins: 0, losses: 0, draws: 0, win_streak: 0, best_win_streak: 0, total_matches: 0 },
     });
     const { getByText, queryByText } = render(React.createElement(DashboardScreen));
-    await waitFor(() => expect(getByText("0W")).toBeTruthy());
+    await waitFor(() => expect(getByText(ZERO_RECORD)).toBeTruthy());
     expect(getByText("Welcome")).toBeTruthy();
     expect(queryByText("Welcome back")).toBeNull();
   });
@@ -420,7 +421,7 @@ describe("DashboardScreen greeting", () => {
     const queries = require("@jits/shared/api/queries") as QueryMocks;
     queries.getDashboardSummary.mockResolvedValue({ ...mockSummary, stats: null });
     const { getByText, queryByText } = render(React.createElement(DashboardScreen));
-    await waitFor(() => expect(getByText("0W")).toBeTruthy());
+    await waitFor(() => expect(getByText(ZERO_RECORD)).toBeTruthy());
     expect(getByText("Welcome")).toBeTruthy();
     expect(queryByText("Welcome back")).toBeNull();
   });
@@ -441,9 +442,9 @@ describe("DashboardScreen (zero state)", () => {
     const { getByText } = render(React.createElement(DashboardScreen));
     await waitFor(() => {
       expect(getByText("1200")).toBeTruthy(); // ELO from athlete
-      expect(getByText("0W")).toBeTruthy();
-      expect(getByText("0L")).toBeTruthy();
-      expect(getByText("0D")).toBeTruthy();
+      expect(getByText(ZERO_RECORD).props.accessibilityLabel).toBe(
+        "Record: 0 wins, 0 losses, 0 draws",
+      );
     });
   });
 });
@@ -460,82 +461,56 @@ describe("DashboardScreen (loading)", () => {
     await settleActiveMatchRead();
   });
 
-  it("shows the Arena CTA before the summary has loaded", async () => {
+  it("paints the rating before the summary has loaded, and the record line after", async () => {
     const queries = require("@jits/shared/api/queries") as {
       getDashboardSummary: jest.Mock;
     };
     queries.getDashboardSummary.mockReturnValue(new Promise(() => {}));
 
-    const { getByLabelText, queryByText } = render(React.createElement(DashboardScreen));
-    fireEvent.press(getByLabelText("Go to the Arena"));
-    expect(mockPush).toHaveBeenCalledWith(ARENA_HREF);
+    const { getByText, queryByText, queryByTestId } = render(React.createElement(DashboardScreen));
+    // The rating reads only the athlete, so it is on the first frame.
+    expect(getByText("1200")).toBeTruthy();
+    // The record needs the summary: no guessed 0-0-0 while it loads.
+    expect(queryByTestId("elo-tile-meta")).toBeNull();
+    // Its slot is held so the hero tile does not grow when the record lands.
+    expect(
+      queryByTestId("elo-tile-meta-placeholder", { includeHiddenElements: true }),
+    ).toBeTruthy();
     // The summary-driven sections are still behind the skeleton.
     expect(queryByText("RecentActivitySection")).toBeNull();
     await settleActiveMatchRead();
   });
 });
 
-// Home's Arena card reads the live bit from the app-wide arena store and
-// nothing else (jits-sq3a): while the header says LIVE, it must not tell the
-// athlete to go live.
-describe("DashboardScreen Arena card (live-aware)", () => {
+// The Arena nudge card is gone from Home (P-Home, jits-02vo.1): neither the
+// offline "Find a match" nor the live "You're live" variant shows, whatever
+// the arena store says.
+describe("DashboardScreen without the Arena nudge card", () => {
   const store = require("@/lib/arena/arena-store") as typeof import("@/lib/arena/arena-store");
 
   afterEach(() => {
     store.__resetArenaStoreForTests();
   });
 
-  it("invites an offline athlete to go live", async () => {
-    const { getByText, queryByText } = render(React.createElement(DashboardScreen));
-    expect(getByText("Find a match")).toBeTruthy();
-    expect(getByText(/Go live in the Arena/)).toBeTruthy();
-    expect(getByText("Enter the Arena →")).toBeTruthy();
-    expect(queryByText("You're live")).toBeNull();
-    await settleActiveMatchRead();
-  });
-
-  it("says the athlete is already live, and still leads to the Arena", async () => {
+  it.each([
+    ["offline", false],
+    ["live", true],
+  ])("shows no nudge copy while %s", async (_name, isLive) => {
     act(() => {
-      store.publishArenaState({ ...store.IDLE_ARENA_STATE, isLive: true });
+      store.publishArenaState({ ...store.IDLE_ARENA_STATE, isLive });
     });
-    const { getByText, queryByText, getByLabelText } = render(
-      React.createElement(DashboardScreen),
-    );
-
-    expect(getByText("You're live")).toBeTruthy();
-    // No second pulsing LIVE pill: the header chip's dot is the one pulse.
-    expect(queryByText("Live")).toBeNull();
-    expect(
-      getByText("You're in the lobby. Challenges reach you on any tab."),
-    ).toBeTruthy();
-    expect(getByText("Open the Arena →")).toBeTruthy();
+    const { queryByText, queryByLabelText } = render(React.createElement(DashboardScreen));
     expect(queryByText("Find a match")).toBeNull();
-    expect(queryByText(/Go live in the Arena/)).toBeNull();
-
-    fireEvent.press(getByLabelText("Go to the Arena"));
-    expect(mockPush).toHaveBeenCalledWith(ARENA_HREF);
-    await settleActiveMatchRead();
-  });
-
-  it("flips back when the athlete goes offline", async () => {
-    act(() => {
-      store.publishArenaState({ ...store.IDLE_ARENA_STATE, isLive: true });
-    });
-    const { getByText, queryByText } = render(React.createElement(DashboardScreen));
-    expect(getByText("You're live")).toBeTruthy();
-
-    act(() => {
-      store.publishArenaState({ ...store.IDLE_ARENA_STATE, isLive: false });
-    });
-    expect(getByText("Find a match")).toBeTruthy();
     expect(queryByText("You're live")).toBeNull();
+    expect(queryByText("You're in the lobby. Challenges reach you on any tab.")).toBeNull();
+    expect(queryByLabelText("Go to the Arena")).toBeNull();
     await settleActiveMatchRead();
   });
 });
 
 // jits-r9a: an app killed mid-match leaves the match open with no way back.
 // Home offers it as a card (never an automatic navigation), and while it shows
-// Resume is Home's one red CTA and the Arena button steps down.
+// Resume is Home's one red CTA.
 describe("DashboardScreen resume-match card", () => {
   const store = require("@/lib/arena/arena-store") as typeof import("@/lib/arena/arena-store");
   const open = {
@@ -547,32 +522,30 @@ describe("DashboardScreen resume-match card", () => {
     store.__resetArenaStoreForTests();
   });
 
-  it("shows nothing extra when no match is open, and the Arena CTA stays red", async () => {
+  it("shows nothing extra when no match is open, and no red CTA at all", async () => {
     const queries = require("@jits/shared/api/queries") as QueryMocks;
-    const { getByLabelText, queryByLabelText } = render(React.createElement(DashboardScreen));
+    const utils = render(React.createElement(DashboardScreen));
     await waitFor(() => expect(queries.getMyActiveMatch).toHaveBeenCalledTimes(1));
     expect(queries.getMyActiveMatch.mock.calls[0][1]).toBe(mockAthlete.id);
-    expect(queryByLabelText("Resume your match")).toBeNull();
-    expect(getByLabelText("Go to the Arena").props.className).toContain("bg-cta");
+    expect(utils.queryByLabelText("Resume your match")).toBeNull();
+    await utils.findByText(RECORD);
+    expect(redCtas(utils)).toHaveLength(0);
   });
 
   it("offers the open match, pushes the Arena match route on tap, and never navigates by itself", async () => {
     const queries = require("@jits/shared/api/queries") as QueryMocks;
     queries.getMyActiveMatch.mockResolvedValue(open);
-    const { findByLabelText, getByText, getByLabelText } = render(
-      React.createElement(DashboardScreen),
-    );
+    const utils = render(React.createElement(DashboardScreen));
+    const { findByLabelText, getByText } = utils;
 
     const resume = await findByLabelText("Resume your match");
     expect(getByText("Match in progress")).toBeTruthy();
     expect(getByText(/vs Demo Red/)).toBeTruthy();
     expect(mockPush).not.toHaveBeenCalled();
 
-    // One Signal Red CTA per surface: Resume takes it, the Arena steps down.
+    // One Signal Red CTA per surface: Resume takes it.
     expect(resume.props.className).toContain("bg-cta");
-    const arena = getByLabelText("Go to the Arena");
-    expect(arena.props.className).not.toContain("bg-cta");
-    expect(arena.props.className).toContain("border-hairline-strong");
+    expect(redCtas(utils)).toHaveLength(1);
 
     fireEvent.press(resume);
     expect(mockPush).toHaveBeenCalledWith("/match/99999999-9999-4999-8999-999999999999");
@@ -605,9 +578,7 @@ describe("DashboardScreen resume-match card", () => {
   it("drops the card once a match screen closes and the match is over", async () => {
     const queries = require("@jits/shared/api/queries") as QueryMocks;
     queries.getMyActiveMatch.mockResolvedValue(open);
-    const { findByLabelText, queryByLabelText, getByLabelText } = render(
-      React.createElement(DashboardScreen),
-    );
+    const { findByLabelText, queryByLabelText } = render(React.createElement(DashboardScreen));
     await findByLabelText("Resume your match");
 
     // A match screen mounts and unmounts: the exit counter bumps.
@@ -627,7 +598,6 @@ describe("DashboardScreen resume-match card", () => {
 
     expect(queries.getMyActiveMatch).toHaveBeenCalledTimes(2);
     expect(queryByLabelText("Resume your match")).toBeNull();
-    expect(getByLabelText("Go to the Arena").props.className).toContain("bg-cta");
   });
 
   it("never offers a match the athlete left in this app process", async () => {
@@ -737,7 +707,7 @@ describe("DashboardScreen new-highlight card (spec 015 section 16.6.4)", () => {
         (n: { props: Record<string, unknown> }) =>
           n.props.accessibilityLabel === "Resume your match" ||
           n.props.testID === "new-highlight-card" ||
-          n.props.children === "Current ELO Rating",
+          n.props.children === mockAthlete.current_elo,
       )
       .map((n: { props: Record<string, unknown> }) =>
         n.props.testID === "new-highlight-card"
@@ -749,14 +719,7 @@ describe("DashboardScreen new-highlight card (spec 015 section 16.6.4)", () => {
       .filter((v: string, i: number, a: string[]) => a.indexOf(v) === i);
     expect(order).toEqual(["resume", "card", "elo"]);
 
-    const reds = utils.root.findAll(
-      (n: { type: unknown; props: Record<string, unknown> }) =>
-        typeof n.type === "string" &&
-        n.props.accessibilityRole === "button" &&
-        typeof n.props.className === "string" &&
-        /(^|\s)bg-cta(\s|$)/.test(n.props.className as string),
-    );
-    expect(reds).toHaveLength(1);
+    expect(redCtas(utils)).toHaveLength(1);
     expect(resume.props.className).toContain("bg-cta");
     expect(card).toBeTruthy();
   });
@@ -797,22 +760,18 @@ describe("DashboardScreen practice match offer", () => {
     queries.getDashboardSummary.mockResolvedValue({ ...mockSummary, stats: ZERO });
   }
 
-  it("offers the practice match to a brand-new athlete and steps the Arena CTA down", async () => {
+  it("offers the practice match to a brand-new athlete as Home's one red CTA", async () => {
     zeroMatches();
-    const { findByTestId, getByLabelText, getByTestId } = render(
-      React.createElement(DashboardScreen),
-    );
-    expect(await findByTestId("practice-offer-card")).toBeTruthy();
-    // One Signal Red CTA: the practice card holds it, the Arena steps down.
-    expect(getByTestId("practice-offer-start").props.className).toContain("bg-cta");
-    const arena = getByLabelText("Go to the Arena");
-    expect(arena.props.className).not.toContain("bg-cta");
-    expect(arena.props.className).toContain("border-hairline-strong");
+    const utils = render(React.createElement(DashboardScreen));
+    expect(await utils.findByTestId("practice-offer-card")).toBeTruthy();
+    // One Signal Red CTA: the practice card holds it.
+    expect(utils.getByTestId("practice-offer-start").props.className).toContain("bg-cta");
+    expect(redCtas(utils)).toHaveLength(1);
   });
 
   it("does not offer to an athlete with completed matches", async () => {
     const { getByText, queryByTestId } = render(React.createElement(DashboardScreen));
-    await waitFor(() => expect(getByText("5W")).toBeTruthy());
+    await waitFor(() => expect(getByText(RECORD)).toBeTruthy());
     expect(queryByTestId("practice-offer-card")).toBeNull();
   });
 
@@ -820,7 +779,7 @@ describe("DashboardScreen practice match offer", () => {
     zeroMatches();
     mockAthlete.practice_match_offered_at = "2026-09-26T00:00:00Z";
     const { getByText, queryByTestId } = render(React.createElement(DashboardScreen));
-    await waitFor(() => expect(getByText("0W")).toBeTruthy());
+    await waitFor(() => expect(getByText(ZERO_RECORD)).toBeTruthy());
     expect(queryByTestId("practice-offer-card")).toBeNull();
   });
 
@@ -828,7 +787,7 @@ describe("DashboardScreen practice match offer", () => {
     zeroMatches();
     mockAthlete.is_bot = true;
     const { getByText, queryByTestId } = render(React.createElement(DashboardScreen));
-    await waitFor(() => expect(getByText("0W")).toBeTruthy());
+    await waitFor(() => expect(getByText(ZERO_RECORD)).toBeTruthy());
     expect(queryByTestId("practice-offer-card")).toBeNull();
   });
 
@@ -840,7 +799,7 @@ describe("DashboardScreen practice match offer", () => {
       data: { matchId: "m1", status: "in_progress", opponentName: "X" },
     });
     const { getByText, queryByTestId } = render(React.createElement(DashboardScreen));
-    await waitFor(() => expect(getByText("0W")).toBeTruthy());
+    await waitFor(() => expect(getByText(ZERO_RECORD)).toBeTruthy());
     await waitFor(() => expect(getByText("Match in progress")).toBeTruthy());
     expect(queryByTestId("practice-offer-card")).toBeNull();
   });

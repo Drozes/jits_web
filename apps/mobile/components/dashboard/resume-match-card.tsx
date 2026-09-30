@@ -7,7 +7,7 @@ import { arenaMatchHref } from "@/lib/arena/constants";
 /**
  * Home's way back into a match the app lost (jits-r9a: killed or restarted
  * mid-match). Only shown while one is open, and while it is, Resume is the
- * one Signal Red CTA on Home (the Arena card steps down to secondary).
+ * one Signal Red CTA on Home.
  *
  * Resume pushes the same `/match/<id>` route the Arena handshake lands on, so
  * the match screen's `useArenaMatchScreen` takes the athlete offline and

@@ -12,7 +12,7 @@ import type { NewHighlight } from "@/lib/highlight/use-new-highlight";
  * Home's "Your new highlight" card (jr_be spec 015 section 16.6.4): the
  * athlete's latest unseen ready reel, a small 9:16 poster, "Watch" and a
  * dismiss. It carries NO Signal Red CTA: Home's one red CTA is Resume or the
- * Arena card. Poster and Watch both open the viewer (`source=home`).
+ * practice offer. Poster and Watch both open the viewer (`source=home`).
  */
 export function NewHighlightCard({
   highlight,

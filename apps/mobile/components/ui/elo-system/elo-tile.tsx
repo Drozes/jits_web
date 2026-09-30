@@ -20,7 +20,8 @@ const SIZE_PX: Record<EloTileSize, number> = {
 export const RATING_TICK_MS = 480;
 
 interface EloTileProps {
-  label: string;
+  /** Mono caps label above the number. Optional: Home's hero tile has none. */
+  label?: string;
   value?: number | string;
   size?: EloTileSize;
   accent?: boolean;
@@ -30,11 +31,24 @@ interface EloTileProps {
   after?: string | number;
   /** Before/after mode only: border tone of the after tile (overrides accent). */
   tone?: EloTileTone;
+  /**
+   * Single-value mode only: a mono meta line under the number, such as
+   * Home's record "14W · 6L · 1D".
+   */
+  meta?: string;
+  /** Accessibility label for the meta line (read instead of its glyphs). */
+  metaLabel?: string;
+  /**
+   * Single-value mode only: hold the meta line's height while `meta` is not
+   * known yet (Home's record waits on the summary), so the tile does not grow
+   * when it lands. The placeholder is blank and hidden from accessibility.
+   */
+  reserveMeta?: boolean;
   className?: string;
 }
 
 interface SingleTileProps {
-  label: string;
+  label?: string;
   value: string | number;
   size: EloTileSize;
   accent?: boolean;
@@ -45,7 +59,19 @@ interface SingleTileProps {
   /** Accessibility label for the number (the final value while it ticks). */
   valueLabel?: string;
   valueTestID?: string;
+  meta?: string;
+  metaLabel?: string;
+  reserveMeta?: boolean;
 }
+
+/** The meta line's box: 18 line height plus 4 above and 4 below. */
+const META_STYLE = {
+  lineHeight: 18,
+  letterSpacing: 1.12,
+  marginTop: 4,
+  marginBottom: 4,
+  fontVariant: ["tabular-nums" as const],
+};
 
 function SingleTile({
   label,
@@ -57,7 +83,11 @@ function SingleTile({
   borderClass,
   valueLabel,
   valueTestID,
+  meta,
+  metaLabel,
+  reserveMeta,
 }: SingleTileProps) {
+  const hasLabel = !!label;
   return (
     <View
       className={cn(
@@ -69,12 +99,14 @@ function SingleTile({
         borderClass ?? (accent ? "border-cta" : "border-hairline"),
       )}
     >
-      <Text
-        className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-xl"
-        numberOfLines={compact ? 1 : undefined}
-      >
-        {label}
-      </Text>
+      {hasLabel ? (
+        <Text
+          className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-xl"
+          numberOfLines={compact ? 1 : undefined}
+        >
+          {label}
+        </Text>
+      ) : null}
       <Text
         testID={valueTestID}
         accessibilityLabel={valueLabel}
@@ -88,12 +120,34 @@ function SingleTile({
           // ~10% breathing room so the hero number isn't vertically clipped.
           lineHeight: SIZE_PX[size] * 1.1,
           letterSpacing: -SIZE_PX[size] * 0.04,
-          marginTop: 8,
+          marginTop: hasLabel ? 8 : 0,
           fontVariant: ["tabular-nums"],
         }}
       >
         {value}
       </Text>
+      {meta ? (
+        <Text
+          testID="elo-tile-meta"
+          accessibilityLabel={metaLabel}
+          // P-Home draws the record in #9CA3AF, which is ink-2 (textSecondary).
+          className="font-mono-bold text-[14px] text-ink-2 uppercase"
+          style={META_STYLE}
+        >
+          {meta}
+        </Text>
+      ) : reserveMeta ? (
+        <View
+          testID="elo-tile-meta-placeholder"
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          style={{
+            height: META_STYLE.lineHeight,
+            marginTop: META_STYLE.marginTop,
+            marginBottom: META_STYLE.marginBottom,
+          }}
+        />
+      ) : null}
       {accentBar ? (
         <View className="absolute left-0 right-0 bottom-0 h-[3px] bg-cta" />
       ) : null}
@@ -195,8 +249,8 @@ function BeforeAfter({
   after,
   tone,
   className,
-}: Required<Pick<EloTileProps, "label" | "size" | "before" | "after">> &
-  Pick<EloTileProps, "accent" | "tone" | "className">) {
+}: Required<Pick<EloTileProps, "size" | "before" | "after">> &
+  Pick<EloTileProps, "label" | "accent" | "tone" | "className">) {
   const shown = useRatingTick(before, after);
   const afterProps: SingleTileProps = {
     label,
@@ -226,6 +280,9 @@ export function EloTile({
   before,
   after,
   tone,
+  meta,
+  metaLabel,
+  reserveMeta,
   className,
 }: EloTileProps) {
   if (before !== undefined && after !== undefined) {
@@ -243,7 +300,16 @@ export function EloTile({
   }
   return (
     <View className={className}>
-      <SingleTile label={label} value={value ?? ""} size={size} accent={accent} accentBar={accentBar} />
+      <SingleTile
+        label={label}
+        value={value ?? ""}
+        size={size}
+        accent={accent}
+        accentBar={accentBar}
+        meta={meta}
+        metaLabel={metaLabel}
+        reserveMeta={reserveMeta}
+      />
     </View>
   );
 }

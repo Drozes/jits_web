@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+### Mobile: P-Home, record in the Elo tile (Sept 30 design review, jits-02vo.1)
+
+JS-only, OTA-eligible (no native dependency, `app.json`, plugin, metro, babel or `eas.json` change). No backend change: the record reads the wins / losses / draws Home already loads from `getDashboardSummary`.
+
+**Added**
+- `apps/mobile/lib/athlete/record.ts`: `formatRecord` ("14W · 6L · 1D") and `recordA11yLabel` ("Record: 14 wins, 6 losses, 1 draw"), with `apps/mobile/__tests__/lib/athlete/record.test.ts`.
+- `EloTile` (`apps/mobile/components/ui/elo-system/elo-tile.tsx`): `label` is now optional (other tiles keep theirs), and single-value tiles gain an optional `meta` / `metaLabel` mono meta line under the number (14px, tabular, ink-2 to match the board's #9CA3AF) plus `reserveMeta`, a blank placeholder of the same height, hidden from accessibility, that holds the line's slot until `meta` is known.
+
+**Changed**
+- Home's hero Elo tile drops the "Current ELO Rating" label and carries the W·L·D record as its meta line. The rating still paints on the first frame; the record joins when the summary lands, into the reserved slot, so the tile does not grow and push the cards below it (no guessed 0-0-0 while loading).
+- The Recent Activity empty state keeps its muted "Find a match in the Arena →" link: it is not the removed nudge card, and Recent Activity is outside this slice (triage rows 25-26).
+
+**Removed**
+- The separate Record section on Home: `apps/mobile/components/dashboard/stat-overview.tsx` (no other importers).
+- The Arena nudge card ("Find a match" offline, "You're live" live) on Home: `apps/mobile/components/dashboard/arena-nudge-card.tsx` (no other importers). The Arena tab is the way to a match.
+
 ### Mobile: Mat Board Arena, challenge sheet, single bell and tab badges (spec `specs/arena-live-chip/spec.md`, jits-dq85)
 
 JS-only, OTA-eligible (no native dependency, `app.json`, plugin, metro, babel or `eas.json` change).

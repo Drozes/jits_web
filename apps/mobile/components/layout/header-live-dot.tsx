@@ -10,8 +10,7 @@ export const HEADER_LIVE_DOT_MARK_TEST_ID = "header-live-dot-mark";
  * Pushed screens' live indicator (decision Q1): a small STATIC green dot,
  * only while the athlete is live, and nothing to tap. The tab roots carry the
  * interactive `HeaderStatusChip` instead. It does not pulse: spec 3 keeps the
- * chip's dot as the only pulse in the app (the same reason Home's Arena card
- * dropped its LIVE pill).
+ * chip's dot as the only pulse in the app.
  *
  * Reads the app-wide store, so it works in any header without a Provider and
  * reads "not live" outside the signed-in app (auth screens, profile setup).

@@ -9,13 +9,10 @@ import { supabase } from "@/lib/supabase/client";
 import { getDashboardSummary } from "@jits/shared/api/queries";
 import type { DashboardSummary } from "@jits/shared/types/composites";
 import { EloTile, MetaTag } from "@/components/ui/elo-system";
-import { ArenaNudgeCard } from "@/components/dashboard/arena-nudge-card";
 import { RecentActivitySection } from "@/components/dashboard/recent-activity-section";
-import { StatOverview } from "@/components/dashboard/stat-overview";
 import { toast } from "@/components/ui/toast";
 import {
   SkeletonProvider,
-  SkeletonBlock,
   SkeletonPlate,
   SkeletonParticipantRow,
 } from "@/components/ui/skeleton";
@@ -31,6 +28,7 @@ import { NewHighlightCard } from "@/components/dashboard/new-highlight-card";
 import { useNewHighlight } from "@/lib/highlight/use-new-highlight";
 import { requestBellRefresh } from "@/lib/highlight/highlight-store";
 import { markNotificationRouterReady } from "@/lib/notifications/handlers";
+import { formatRecord, recordA11yLabel } from "@/lib/athlete/record";
 
 interface DashboardData {
   summary: DashboardSummary;
@@ -50,7 +48,7 @@ function useDashboardData(athleteId: string | undefined) {
   return { data, isLoading, isValidating, refresh };
 }
 
-/** Cold-start placeholder mirroring RecentActivity + StatOverview. */
+/** Cold-start placeholder mirroring RecentActivity. */
 function DashboardSkeleton() {
   return (
     <SkeletonProvider>
@@ -59,7 +57,6 @@ function DashboardSkeleton() {
         <SkeletonParticipantRow />
         <SkeletonParticipantRow />
       </SkeletonPlate>
-      <SkeletonBlock height={72} radius="md" className="mt-5" />
     </SkeletonProvider>
   );
 }
@@ -114,6 +111,12 @@ export default function DashboardScreen() {
       hasMatches,
     });
 
+  // The record rides in the Elo tile (P-Home). It needs the summary, so the
+  // line appears once that lands; a summary with no stats is a 0-0-0 record.
+  const record = data
+    ? { wins: stats?.wins ?? 0, losses: stats?.losses ?? 0, draws: stats?.draws ?? 0 }
+    : null;
+
   const recentMatches = (data?.summary.recent_matches ?? []).map((m) => ({
     id: m.match_id,
     opponentName: m.opponent_name,
@@ -160,49 +163,41 @@ export default function DashboardScreen() {
         </View>
 
         {/* A match the app lost (killed mid-match, jits-r9a) comes first and
-            takes Home's one red CTA; the Arena card steps down while it shows. */}
+            takes Home's one red CTA. */}
         {activeMatch ? <ResumeMatchCard match={activeMatch} /> : null}
 
         {/* A reel the athlete has not watched yet. Secondary only: the one
-            red CTA stays Resume or the Arena card. */}
+            red CTA stays Resume or the practice offer. */}
         {newHighlight.highlight ? (
           <NewHighlightCard highlight={newHighlight.highlight} onDismiss={newHighlight.dismiss} />
         ) : null}
 
-        {/* Both read only the athlete, never the summary, so they paint on the
-            first frame. The Arena is the only way to a match on mobile
-            (jits-gewv), so its CTA must not wait behind a skeleton. */}
+        {/* The rating reads only the athlete, so it paints on the first frame;
+            the record line under it joins once the summary lands, into a
+            reserved slot so the tile never grows. No label and no Arena card
+            (P-Home): the Arena tab is the way to a match. */}
         <EloTile
           size="hero"
-          label="Current ELO Rating"
           value={athlete.current_elo}
+          meta={record ? formatRecord(record) : undefined}
+          metaLabel={record ? recordA11yLabel(record) : undefined}
+          reserveMeta
           accentBar
         />
         {/* One-time practice offer for a brand-new athlete. While it shows
-            it holds the red CTA and the Arena card steps down. */}
+            it holds Home's red CTA. */}
         {offerPractice ? (
           <PracticeOfferCard onDismiss={() => setPracticeDismissed(true)} />
         ) : null}
-        <ArenaNudgeCard secondary={!!activeMatch || offerPractice} />
 
         {isLoading ? (
           <DashboardSkeleton />
         ) : (
-          <>
-            <RecentActivitySection
-              myMatches={recentMatches}
-              allActivity={recentActivity}
-              onPressMatch={(id) => router.push(matchDetailHref(id))}
-            />
-
-            <StatOverview
-              stats={{
-                wins: stats?.wins ?? 0,
-                losses: stats?.losses ?? 0,
-                draws: stats?.draws ?? 0,
-              }}
-            />
-          </>
+          <RecentActivitySection
+            myMatches={recentMatches}
+            allActivity={recentActivity}
+            onPressMatch={(id) => router.push(matchDetailHref(id))}
+          />
         )}
       </ScrollView>
     </View>

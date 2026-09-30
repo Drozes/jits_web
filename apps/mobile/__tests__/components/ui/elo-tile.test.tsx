@@ -223,3 +223,70 @@ describe("after tile tone (jits-9cgj)", () => {
     expect(afterTileClass(utils)).toContain("border-amber-500");
   });
 });
+
+// P-Home (jits-02vo.1): Home's hero tile has no label and carries the record
+// as a mono meta line under the number. Other tiles keep their label.
+describe("optional label and meta line", () => {
+  it("renders no label row and no top gap when the label is omitted", () => {
+    const utils = render(<EloTile size="hero" value={1487} accentBar />);
+    const texts = utils.UNSAFE_getAllByType(Text);
+    expect(texts).toHaveLength(1);
+    const num = utils.getByText("1487");
+    expect(num.props.style.marginTop).toBe(0);
+    expect(num.props.style.fontSize).toBe(96);
+    expect(utils.queryByTestId("elo-tile-meta")).toBeNull();
+  });
+
+  it("keeps the label and its gap when one is given", () => {
+    const utils = render(<EloTile label="lbs" value={185} size="medium" />);
+    expect(utils.getByText("lbs")).toBeTruthy();
+    expect(utils.getByText("185").props.style.marginTop).toBe(8);
+  });
+
+  it("renders the meta line under the number with its spoken label", () => {
+    const utils = render(
+      <EloTile
+        size="hero"
+        value={1487}
+        meta="14W · 6L · 1D"
+        metaLabel="Record: 14 wins, 6 losses, 1 draw"
+        accentBar
+      />,
+    );
+    const meta = utils.getByTestId("elo-tile-meta");
+    expect(meta.props.children).toBe("14W · 6L · 1D");
+    expect(meta.props.accessibilityLabel).toBe("Record: 14 wins, 6 losses, 1 draw");
+    expect(meta.props.className).toContain("text-[14px]");
+    // P-Home draws the record in #9CA3AF: ink-2, not ink-3.
+    expect(meta.props.className).toContain("text-ink-2");
+    expect(meta.props.className).not.toContain("text-ink-3");
+    expect(meta.props.style.fontVariant).toEqual(["tabular-nums"]);
+    // Order inside the tile: number first, then the meta line.
+    const texts = utils.UNSAFE_getAllByType(Text).map((t) => t.props.children);
+    expect(texts).toEqual([1487, "14W · 6L · 1D"]);
+  });
+
+  it("reserves the meta line's height, hidden from accessibility, while meta is unknown", () => {
+    const utils = render(<EloTile size="hero" value={1487} reserveMeta accentBar />);
+    expect(utils.queryByTestId("elo-tile-meta")).toBeNull();
+    // Hidden from accessibility, so the default query does not see it.
+    expect(utils.queryByTestId("elo-tile-meta-placeholder")).toBeNull();
+    const slot = utils.getByTestId("elo-tile-meta-placeholder", { includeHiddenElements: true });
+    // Same box as the real line: 18 line height plus 4 above and 4 below.
+    expect(slot.props.style).toEqual({ height: 18, marginTop: 4, marginBottom: 4 });
+    expect(slot.props.accessibilityElementsHidden).toBe(true);
+    expect(slot.props.importantForAccessibility).toBe("no-hide-descendants");
+    // Only the number is text; the slot reads nothing.
+    expect(utils.UNSAFE_getAllByType(Text)).toHaveLength(1);
+  });
+
+  it("swaps the reserved slot for the meta line once meta is known", () => {
+    const utils = render(
+      <EloTile size="hero" value={1487} meta="1W · 0L · 0D" reserveMeta accentBar />,
+    );
+    expect(utils.getByTestId("elo-tile-meta")).toBeTruthy();
+    expect(
+      utils.queryByTestId("elo-tile-meta-placeholder", { includeHiddenElements: true }),
+    ).toBeNull();
+  });
+});
