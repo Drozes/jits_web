@@ -95,6 +95,12 @@ npx eas build --platform ios --profile production --auto-submit
 3. **"What to Test" notes:** EAS submit does not set TestFlight tester notes. If the user wants tester-
    facing notes, they set those in App Store Connect (or via the `--what-to-test` workflow); offer to
    draft the copy, but don't claim you pushed notes you didn't.
+4. **Sync the design canvas.** Skip if this run was handed off from `ship-mobile`; its Step 4 does it.
+   Otherwise run `/canvas-sync <sha>` for the commit this build was cut from, so the "Current app" page
+   of the ELO RATED Native Screens canvas matches what testers now have. It is a no-op when
+   `node design/native-screens/drift.mjs --to <sha>` exits 0 (no board drift AND no unmapped screens).
+   `/canvas-sync` commits and pushes `design/native-screens/last-sync.json` (and `board-map.json` if it
+   changed) on `development`; that is the stated exception to the commit guardrail below.
 
 ## Failure recovery
 
@@ -111,5 +117,7 @@ npx eas build --platform ios --profile production --auto-submit
 
 - iOS/TestFlight only; do not run Android submit until its `eas.json` service-account path is real.
 - Do not hand-edit `ios.buildNumber` — EAS owns it (remote + autoIncrement).
-- Do not commit/push unless the user asks; if you bump `expo.version` or touch `CHANGELOG.md`, surface
-  the diff and let the user decide.
+- Do not commit/push unless the user asks (one stated exception: the `/canvas-sync` commit of
+  `design/native-screens/last-sync.json` and, if changed, `board-map.json` on `development`, because the
+  user asked for the canvas to update on release; only those files). If you bump `expo.version` or touch
+  `CHANGELOG.md`, surface the diff and let the user decide.

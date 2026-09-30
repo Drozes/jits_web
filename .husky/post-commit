@@ -1,0 +1,12 @@
+# Tag commits that touch screens drawn on the ELO RATED Native Screens design canvas.
+# Runs detached in the background: it never slows down, blocks, or fails a commit.
+# HUSKY=0 skips it like every other husky hook. See design/native-screens/README.md.
+command -v node >/dev/null 2>&1 || exit 0
+[ -f design/native-screens/drift.mjs ] || exit 0
+# Commits replayed by a rebase were already tagged when first made.
+gd=$(git rev-parse --git-dir 2>/dev/null) || exit 0
+if [ -d "$gd/rebase-merge" ] || [ -d "$gd/rebase-apply" ]; then exit 0; fi
+# Pass the sha now: HEAD may move (the next commit) before the background run starts.
+sha=$(git rev-parse HEAD 2>/dev/null) || exit 0
+(node design/native-screens/drift.mjs --tag --commit "$sha" </dev/null >/dev/null 2>&1 &) || true
+exit 0

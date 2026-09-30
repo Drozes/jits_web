@@ -119,11 +119,34 @@ Quality gate first, both paths (never ship on red): from repo root `npm run type
 - **TestFlight path:** hand off to the `testflight-release` skill. Do NOT duplicate its
   pre-flight (it verifies the production Supabase env, credentials, build number, etc.).
 
+## Step 4: post-release canvas sync (both paths)
+
+Once the OTA is published or the TestFlight build is submitted, bring the design canvas
+("ELO RATED Native Screens", the team's main design artifact) up to date with what just
+shipped: run `/canvas-sync <sha>`, where `<sha>` is the released commit. For the OTA path
+that is the HEAD the update was exported from, which should be a clean tree; if the tree was
+dirty, sync to HEAD anyway and note in the sync that uncommitted changes shipped. For the
+TestFlight path it is the commit the build was cut from (hand-off to `testflight-release`
+does not run the sync a second time; this step covers it). First check
+`node design/native-screens/drift.mjs --to <sha>`: exit 0 means no board drift AND no
+unmapped screens, so the sync is a no-op: say so and stop. Exit 2 lists the boards to redraw
+and any changed screen files no board claims. The canvas follows releases, not commits, so
+never sync from unreleased work. If the user declines the sync now, leave the open
+`canvas-drift` bead in place so the next session picks it up.
+
+`/canvas-sync` ends by committing and pushing `design/native-screens/last-sync.json` (and
+`board-map.json` if it changed) on `development`. That commit is a stated exception to the
+guardrail below about commits: the user asked for the canvas to update on every release.
+
 ## Guardrails
 
 - Default to OTA ONLY when Step 1 is cleanly JS/asset-only; when in doubt, build.
 - Never publish an OTA that is supposed to carry a native change; it silently will not.
 - An env change does not always need a build: `EXPO_PUBLIC_*` values re-resolve on an OTA
   re-export, but native/build-time secrets do not.
+- Do not commit or push anything this command did not ask for (the critical-OTA counter
+  commit in Step 3 is the documented case). Exception: the `/canvas-sync` commit of
+  `design/native-screens/last-sync.json` (and `board-map.json`) in Step 4, on `development`,
+  because the user asked for the canvas to update on release; commit and push only those files.
 - iOS / TestFlight only (Android submit is not configured). Never paste secrets, env values,
   or the `.p8` key into chat or commits.
