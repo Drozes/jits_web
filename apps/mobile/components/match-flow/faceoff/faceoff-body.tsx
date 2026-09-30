@@ -11,7 +11,6 @@ import type { FaceoffAthlete } from "./faceoff-top";
 
 interface FaceoffBodyProps {
   phase: "weight" | "ready";
-  matchType: "ranked" | "casual";
   me: FaceoffAthlete;
   opponent: FaceoffAthlete;
 }
@@ -25,17 +24,16 @@ export function FaceoffBody(props: FaceoffBodyProps) {
   return props.phase === "weight" ? <WeighIn {...props} /> : <ReadyCheck {...props} />;
 }
 
-function WeighIn({ matchType, me, opponent }: FaceoffBodyProps) {
+function WeighIn({ me, opponent }: FaceoffBodyProps) {
   const f = useFaceoffContext();
   const p = usePalette();
-  const ranked = matchType === "ranked";
   // Priced on the challenge's rated weights, exactly as record_match_result
   // will rate it (a missing one means no gap), and only once they are read.
-  const stakes = useViewerStakes(ranked && f.weightsRated, me.current_elo, opponent.current_elo, f.myWeight, f.opponentWeight);
+  const stakes = useViewerStakes(f.weightsRated, me.current_elo, opponent.current_elo, f.myWeight, f.opponentWeight);
   const gap = stakes?.weight_division_gap ?? 0;
   const both = f.myWeight != null && f.opponentWeight != null;
   const diff = both ? Math.round(Math.abs(f.myWeight! - f.opponentWeight!) * 10) / 10 : null;
-  const division = !ranked || !stakes ? null : gap > 0 ? `${gap} ${gap > 1 ? "DIVISIONS" : "DIVISION"} APART` : "SAME DIVISION";
+  const division = !stakes ? null : gap > 0 ? `${gap} ${gap > 1 ? "DIVISIONS" : "DIVISION"} APART` : "SAME DIVISION";
   const gapLine = [diff != null ? `${diff} LBS APART` : null, division].filter(Boolean).join(" · ");
   const oppName = shortName(opponent.display_name).toUpperCase();
   const cta = f.myWeight != null ? `Confirm ${Number(f.myWeight.toFixed(1))} lbs` : "Confirm weight";
@@ -49,10 +47,10 @@ function WeighIn({ matchType, me, opponent }: FaceoffBodyProps) {
           <Mono size={11}>{gapLine}</Mono>
         </View>
       ) : null}
-      {ranked && stakes ? (
+      {stakes ? (
         <StakesStrip testID="weight-stakes" win={stakes.challenger_win} draw={stakes.challenger_draw} loss={stakes.challenger_loss} />
       ) : null}
-      {ranked && gap > 0 ? (
+      {gap > 0 ? (
         <Text testID="weight-gap-note" className="font-body" style={{ fontSize: 13, color: p.text2 }}>
           The heavier athlete{"’"}s rating is adjusted for the weight gap.
         </Text>

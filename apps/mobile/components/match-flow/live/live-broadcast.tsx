@@ -20,7 +20,7 @@ import { OpponentEndedPlate } from "./opponent-ended-plate";
 import { LiveLandscapeLayout } from "./live-landscape-layout";
 
 export interface LiveBroadcastProps {
-  kindLabel: "RANKED" | "CASUAL" | "PRACTICE";
+  kindLabel: "RANKED" | "PRACTICE";
   me: LiveAthlete;
   opponent: LiveAthlete;
   durationSeconds: number;

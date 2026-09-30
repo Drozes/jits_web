@@ -193,7 +193,7 @@ export default function ProfileScreen() {
                         subtitle={formatRelativeDate(m.completed_at)}
                         onPress={() => router.push(matchDetailHref(m.match_id))}
                         accessibilityLabel={`Open match vs ${name}`}
-                        action={<HistoryRowAction matchType={m.match_type} eloDelta={m.elo_delta} />}
+                        action={<HistoryRowAction eloDelta={m.elo_delta} eloAfter={m.elo_after} />}
                       />
                     );
                   })}

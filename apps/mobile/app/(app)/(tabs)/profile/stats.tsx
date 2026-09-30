@@ -24,17 +24,11 @@ import { SubmissionBreakdownSection } from "@/components/profile/submission-brea
 import { WeeklyActivitySection } from "@/components/profile/weekly-activity";
 import { MilestoneProgress } from "@/components/profile/milestone-progress";
 import { AppHeader } from "@/components/layout/app-header";
-import { MetaTag, Chip } from "@/components/ui/elo-system";
+import { MetaTag } from "@/components/ui/elo-system";
 import { toast } from "@/components/ui/toast";
 import { matchDetailHref } from "@/lib/match-detail/href";
 import type { MatchOutcome } from "@jits/shared/constants";
-
-type Filter = "all" | "ranked";
-
-const filters: { value: Filter; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "ranked", label: "Ranked" },
-];
+import { recordedEloDelta } from "@jits/shared/utils";
 
 interface StatsData {
   matchHistory: MatchHistoryRow[];
@@ -51,7 +45,6 @@ export default function ProfileStatsScreen() {
   const [isLoading, setIsLoading] = React.useState(true);
   const [refreshTick, setRefreshTick] = React.useState(0);
   const [refreshing, setRefreshing] = React.useState(false);
-  const [filter, setFilter] = React.useState<Filter>("all");
 
   React.useEffect(() => {
     if (!athlete) return;
@@ -83,10 +76,10 @@ export default function ProfileStatsScreen() {
   }, []);
 
   const matchHistory = data?.matchHistory ?? [];
-  const filtered = filter === "all" ? matchHistory : matchHistory.filter((m) => m.match_type === filter);
-  const wins = filtered.filter((m) => m.athlete_outcome === "win").length;
-  const losses = filtered.filter((m) => m.athlete_outcome === "loss").length;
-  const draws = filtered.filter((m) => m.athlete_outcome === "draw").length;
+  // Every match is ranked: the record covers all completed matches (no filter).
+  const wins = matchHistory.filter((m) => m.athlete_outcome === "win").length;
+  const losses = matchHistory.filter((m) => m.athlete_outcome === "loss").length;
+  const draws = matchHistory.filter((m) => m.athlete_outcome === "draw").length;
   const total = wins + losses;
   const winRate = total > 0 ? Math.round((wins / total) * 100) : 0;
 
@@ -103,7 +96,7 @@ export default function ProfileStatsScreen() {
       <AppHeader title="Stats" back />
 
       <FlatList
-        data={filtered}
+        data={matchHistory}
         keyExtractor={(m) => m.match_id}
         contentContainerStyle={{ padding: 16, paddingBottom: 120, gap: 8 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={tokens.accentCta} />}
@@ -111,8 +104,6 @@ export default function ProfileStatsScreen() {
           <StatsHeader
             athlete={athlete}
             data={data}
-            filter={filter}
-            setFilter={setFilter}
             wins={wins}
             losses={losses}
             draws={draws}
@@ -127,7 +118,7 @@ export default function ProfileStatsScreen() {
               <Swords size={28} color={tokens.textTertiary} />
               <Text className="font-heading text-[14px] text-ink uppercase tracking-caps">No matches yet</Text>
               <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">
-                {filter === "all" ? "Complete a match to see your history" : `No ${filter} matches yet`}
+                Complete a match to see your history
               </Text>
             </View>
           )
@@ -137,8 +128,7 @@ export default function ProfileStatsScreen() {
             type="match"
             opponentName={item.opponent_display_name}
             result={item.athlete_outcome as MatchOutcome}
-            matchType={item.match_type as "ranked" | "casual"}
-            eloDelta={item.match_type === "ranked" ? item.elo_delta : undefined}
+            eloDelta={recordedEloDelta(item) ?? undefined}
             date={item.completed_at}
             onPress={() => router.push(matchDetailHref(item.match_id))}
           />
@@ -170,11 +160,9 @@ function StatTile({ label, value, valueClassName }: StatTileProps) {
   );
 }
 
-function StatsHeader({ athlete, data, filter, setFilter, wins, losses, draws, winRate }: {
+function StatsHeader({ athlete, data, wins, losses, draws, winRate }: {
   athlete: { current_elo: number };
   data: StatsData | null;
-  filter: Filter;
-  setFilter: (f: Filter) => void;
   wins: number;
   losses: number;
   draws: number;
@@ -194,17 +182,7 @@ function StatsHeader({ athlete, data, filter, setFilter, wins, losses, draws, wi
       {data?.submissions && <SubmissionBreakdownSection submissions={data.submissions} />}
 
       <View className="flex-row items-center justify-between">
-        <View className="flex-row gap-2">
-          {filters.map((f) => (
-            <Chip
-              key={f.value}
-              active={filter === f.value}
-              onPress={() => setFilter(f.value)}
-            >
-              {f.label}
-            </Chip>
-          ))}
-        </View>
+        <MetaTag>Record</MetaTag>
         <View className="flex-row items-center gap-2">
           <Text className="font-mono-bold text-[11px] text-ink tabular-nums">{wins}W</Text>
           <Text className="font-mono text-[11px] text-ink-3">·</Text>

@@ -269,7 +269,7 @@ export function FinishTimeField({
 }
 
 /** The draw confirmation plate. */
-export function DrawPlate({ matchType, onChange }: { matchType: "ranked" | "casual"; onChange: () => void }) {
+export function DrawPlate({ onChange }: { onChange: () => void }) {
   const p = usePalette();
   return (
     <View
@@ -283,7 +283,7 @@ export function DrawPlate({ matchType, onChange }: { matchType: "ranked" | "casu
         <ChangeButton onPress={onChange} testID="result-change-draw" />
       </View>
       <Text className="font-body" style={{ fontSize: 13, color: p.text2 }}>
-        {matchType === "ranked" ? "Draws cost both athletes rating." : "Casual match: no rating change."}
+        Draws cost both athletes rating.
       </Text>
     </View>
   );

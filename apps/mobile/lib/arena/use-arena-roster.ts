@@ -21,15 +21,6 @@ export interface ArenaCompetitor {
   profilePhotoUrl?: string | null;
   /** Opponent ELO minus yours: a strength GAP, not a rating change. */
   eloDiff: number;
-  /**
-   * `looking_for_ranked`. The `challenges_insert` RLS policy calls
-   * `opponent_accepts_match_type(opponent_id, 'ranked')`, which is literally
-   * this column, so a ranked challenge to an athlete without it is rejected by
-   * the database. The roster still lists them (they are open to a casual
-   * match) but the Challenge affordance has to come off, or the row promises
-   * something the server will refuse.
-   */
-  acceptsRanked: boolean;
 }
 
 export interface UseArenaRosterResult {
@@ -142,7 +133,6 @@ export function useArenaRoster(currentElo: number): UseArenaRosterResult {
           weight: a.current_weight ?? undefined,
           profilePhotoUrl: a.profile_photo_url,
           eloDiff: 0,
-          acceptsRanked: a.looking_for_ranked === true,
         })),
       );
       setChallengedIds(new Set(arena.challenged_opponent_ids ?? []));

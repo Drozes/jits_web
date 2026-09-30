@@ -74,7 +74,23 @@ const HISTORY = [
     athlete_outcome: "win",
     match_type: "ranked",
     elo_delta: 14,
+    elo_before: 1200,
+    elo_after: 1214,
     completed_at: "2026-09-24T12:00:00.000Z",
+  },
+  // A legacy casual row (written before casual was retired), in the shape the
+  // backend really returns: match_participants.elo_delta is NOT NULL DEFAULT 0,
+  // so the delta is 0 and only elo_after NULL says no rating was recorded.
+  {
+    match_id: "m-10",
+    opponent_id: "opp-2",
+    opponent_display_name: "Old Rival",
+    athlete_outcome: "loss",
+    match_type: "casual",
+    elo_delta: 0,
+    elo_before: null,
+    elo_after: null,
+    completed_at: "2026-09-20T12:00:00.000Z",
   },
 ];
 
@@ -87,6 +103,7 @@ jest.mock("@jits/shared/api/queries", () => ({
 
 import ProfileStatsScreen from "@/app/(app)/(tabs)/profile/stats";
 import AthleteProfileScreen from "@/app/(app)/athlete/[id]";
+import { getMatchHistory } from "@jits/shared/api/queries";
 
 beforeEach(() => mockPush.mockClear());
 
@@ -101,5 +118,39 @@ describe("match history rows open the match detail screen", () => {
     const { findByLabelText } = render(<AthleteProfileScreen />);
     fireEvent.press(await findByLabelText("Open match vs Demo Red"));
     expect(mockPush).toHaveBeenCalledWith("/(app)/match-detail/m-11");
+  });
+});
+
+describe("Stats: every match is ranked (jits-02vo.2)", () => {
+  it("has no All/Ranked filter chips and counts the record over every completed match", async () => {
+    const s = render(<ProfileStatsScreen />);
+    await s.findByLabelText("Open match vs Old Rival");
+    expect(s.queryByText("All")).toBeNull();
+    expect(s.queryByText("Ranked")).toBeNull();
+    expect(s.getByText("1W")).toBeTruthy();
+    expect(s.getByText("1L")).toBeTruthy();
+    expect(s.getByText("50%")).toBeTruthy();
+  });
+
+  it("rows carry no ranked/casual suffix, and a legacy row with no delta shows none", async () => {
+    const s = render(<ProfileStatsScreen />);
+    await s.findByLabelText("Open match vs Old Rival");
+    expect(s.queryByText(/casual/i)).toBeNull();
+    expect(s.queryByText(/· Ranked/)).toBeNull();
+    expect(s.getByText("+14")).toBeTruthy();
+    expect(s.queryByText("null")).toBeNull();
+    // The legacy row's elo_delta 0 must not read as a fake flat change.
+    expect(s.queryByText("0")).toBeNull();
+  });
+
+  it("athlete page: a legacy row with elo_after NULL shows no delta (no flat 0)", async () => {
+    // Head-to-head only lists matches vs opp-1, so serve one legacy row vs them.
+    (getMatchHistory as jest.Mock).mockResolvedValueOnce([
+      { ...HISTORY[1], match_id: "m-9", opponent_id: "opp-1", opponent_display_name: "Demo Red" },
+    ]);
+    const s = render(<AthleteProfileScreen />);
+    await s.findByLabelText("Open match vs Demo Red");
+    expect(s.queryByText("0")).toBeNull();
+    expect(s.queryByText("—")).toBeNull();
   });
 });

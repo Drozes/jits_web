@@ -72,13 +72,13 @@ function VerdictHistory({ row }: { row: NoMatchVideoRow }) {
 }
 
 /**
- * One no-match video for admin review: what match it was attached to (type,
- * status, result), who uploaded it, the rating changes it recorded and the
+ * One no-match video for admin review: what match it was attached to (status
+ * and result; every match is ranked, so the type is not shown), who uploaded it, the rating changes it recorded and the
  * model's reason (plain text). Read only.
  */
 export function NoMatchVideoRowCard({ row }: { row: NoMatchVideoRow }) {
   const when = row.analyzed_at ?? row.video_created_at;
-  const matchLine = [row.match_type, row.match_status, row.match_result].filter(Boolean).join(" · ");
+  const matchLine = [row.match_status, row.match_result].filter(Boolean).join(" · ");
   return (
     <Plate testID={`no-match-row-${row.key}`} className="gap-2">
       <View className="flex-row items-center justify-between">

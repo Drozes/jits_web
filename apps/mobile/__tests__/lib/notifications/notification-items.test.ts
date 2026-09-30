@@ -111,11 +111,15 @@ describe("pendingChallengeToBellItem", () => {
       id: "challenge-recv-c1",
       type: "challenge_received",
       title: "Challenge Received",
-      body: "Alex sent you a ranked challenge",
+      body: "Alex sent you a challenge",
       challengeId: "c1",
       createdAt: new Date(NOW - MIN).toISOString(),
     });
-    expect(pendingChallengeToBellItem(pending("c2", MIN, { matchType: "casual" })).body).toMatch(/casual challenge$/);
+    // Every match is ranked: the copy carries no ranked/casual adjective, even
+    // for a legacy row that still reads casual.
+    expect(pendingChallengeToBellItem(pending("c2", MIN, { challengerName: "Bo", matchType: "casual" })).body).toBe(
+      "Bo sent you a challenge",
+    );
   });
 
   it("marks a fresh row unread and leaves a Missed row unmarked", () => {

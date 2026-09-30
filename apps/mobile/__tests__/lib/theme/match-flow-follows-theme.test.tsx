@@ -139,7 +139,7 @@ describe("shared match-flow pieces render with the active theme", () => {
       <View>
         <StakesStrip testID="stakes" win={12} draw={-2} loss={-9} />
         <FightButton testID="btn" variant="secondary" label="Record it myself" onPress={jest.fn()} />
-        <KindTag kind="ranked" />
+        <KindTag />
       </View>,
     );
     expect(bgOf(s.getByTestId("stakes"))).toBe(t.bgElevated);
@@ -153,11 +153,11 @@ describe("shared match-flow pieces render with the active theme", () => {
     mockScheme = "light";
     const s = render(
       <View>
-        <KindTag kind="casual" onScrim />
+        <KindTag onScrim />
         <FilmBadge label="2 ANGLES" tone="outline" />
       </View>,
     );
-    expect(color(s.getByText("CASUAL"))).toBe(ON_MEDIA.tagText);
+    expect(color(s.getByText("RANKED"))).toBe(ON_MEDIA.tagText);
     expect(color(s.getByText("2 ANGLES"))).toBe(ON_MEDIA.text);
   });
 });

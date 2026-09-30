@@ -34,7 +34,6 @@ interface MatchStepRendererProps {
   /** Copy on the verdict's exit cta. */
   exitLabel: string;
   matchId: string;
-  matchType: "ranked" | "casual";
   matchStatus: string;
   durationSeconds: number;
   /** The server's `started_at` (the countdown and clock shift it to GO). */
@@ -75,7 +74,6 @@ export function MatchStepRenderer(props: MatchStepRendererProps) {
     exitHref,
     exitLabel,
     matchId,
-    matchType,
     matchStatus,
     durationSeconds,
     startedAt,
@@ -107,13 +105,12 @@ export function MatchStepRenderer(props: MatchStepRendererProps) {
     return <WaitStep message="Waiting for opponent..." allowSkip onSkip={() => setStep("weight")} />;
   }
   if (step === "weight" || step === "ready") {
-    return <FaceoffBody phase={step} matchType={matchType} me={me} opponent={opponent} />;
+    return <FaceoffBody phase={step} me={me} opponent={opponent} />;
   }
   if (step === "live") {
     return (
       <LiveStage
         matchId={matchId}
-        matchType={matchType}
         me={me}
         opponent={opponent}
         durationSeconds={durationSeconds}
@@ -144,7 +141,6 @@ export function MatchStepRenderer(props: MatchStepRendererProps) {
     return (
       <ResultStep
         matchId={matchId}
-        matchType={matchType}
         durationSeconds={durationSeconds}
         initialFinishSeconds={initialFinishSeconds}
         me={athlete(me)}
@@ -173,7 +169,6 @@ export function MatchStepRenderer(props: MatchStepRendererProps) {
     return (
       <ConfirmStep
         matchId={matchId}
-        matchType={matchType}
         me={me}
         opponent={opponent}
         resultData={resultData}
@@ -200,7 +195,6 @@ export function MatchStepRenderer(props: MatchStepRendererProps) {
         matchId={matchId}
         exitHref={exitHref}
         exitLabel={exitLabel}
-        matchType={matchType}
         matchStatus={matchStatus}
         outcome={ownOutcome}
         me={me}

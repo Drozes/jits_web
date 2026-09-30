@@ -35,7 +35,6 @@ export function practiceBot(athlete: {
     weight: athlete.current_weight ?? undefined,
     gymName: "Practice bot",
     profilePhotoUrl: null,
-    acceptsRanked: true,
   };
 }
 

@@ -121,8 +121,6 @@ export default function DashboardScreen() {
     id: m.match_id,
     opponentName: m.opponent_name,
     result: m.outcome,
-    matchType:
-      m.match_type === "ranked" ? ("ranked" as const) : m.match_type === "casual" ? ("casual" as const) : undefined,
     eloDelta: m.elo_delta,
     date: m.completed_at,
   }));

@@ -76,7 +76,6 @@ describe("RecentActivitySection Me rows", () => {
             id: "m-3",
             opponentName: "Demo Blue",
             result: "win",
-            matchType: "ranked",
             eloDelta: 10,
             date: "2026-09-24T12:00:00.000Z",
           },

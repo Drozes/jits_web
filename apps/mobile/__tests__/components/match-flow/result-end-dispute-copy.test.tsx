@@ -69,11 +69,10 @@ beforeEach(() => {
 });
 
 describe("ResultStep draw", () => {
-  function renderResult(matchType: "ranked" | "casual" = "ranked") {
+  function renderResult() {
     return render(
       <ResultStep
         matchId="M1"
-        matchType={matchType}
         durationSeconds={300}
         me={{ id: "me-1", displayName: "Me", elo: null, weight: null }}
         opponent={{ id: "opp-1", displayName: "Demo Red", elo: null, weight: null }}
@@ -102,12 +101,10 @@ describe("ResultStep draw", () => {
     expect(icon.props.color).not.toBe(TOKENS.stateNegative);
   });
 
-  it("does not claim a casual draw costs rating", () => {
-    const screen = renderResult("casual");
+  it("never offers casual copy: every draw is ranked", () => {
+    const screen = renderResult();
     fireEvent.press(screen.getByText("Draw"));
-    screen.getByText("Match ends in a draw");
-    expect(screen.queryByText(/cost both athletes rating/i)).toBeNull();
-    screen.getByText("Casual match: no rating change.");
+    expect(screen.queryByText(/casual/i)).toBeNull();
   });
 
   it("follows the app theme: amber-500 on dark, the AA amber-800 on light", () => {

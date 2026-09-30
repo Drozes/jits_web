@@ -17,7 +17,6 @@ import { LiveBroadcast } from "../live/live-broadcast";
 
 interface LiveStepProps {
   matchId: string;
-  matchType: "ranked" | "casual";
   /** This device's athlete (left on the athlete bar). */
   me: LiveParticipant;
   /** The opponent (right on the athlete bar, and named if they end it). */
@@ -71,7 +70,6 @@ const TIME_WARNING_SECONDS = 10;
 export function LiveStep(props: LiveStepProps) {
   const {
     matchId,
-    matchType,
     me,
     opponent,
     durationSeconds,
@@ -250,7 +248,7 @@ export function LiveStep(props: LiveStepProps) {
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       <LiveBroadcast
-        kindLabel={matchType === "ranked" ? "RANKED" : "CASUAL"}
+        kindLabel="RANKED"
         me={toLiveAthlete(me)}
         opponent={toLiveAthlete(opponent)}
         durationSeconds={durationSeconds}

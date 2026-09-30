@@ -81,7 +81,7 @@ describe("methodLabel", () => {
 });
 
 describe("sortByEloGap / pickClosest (AC-A3, AC-A4)", () => {
-  const a = (id: string, eloDiff: number, acceptsRanked = true) => ({ id, eloDiff, acceptsRanked });
+  const a = (id: string, eloDiff: number) => ({ id, eloDiff });
 
   it("sorts by |ΔELO| ascending, stable for ties, without mutating", () => {
     const list = [a("far", 300), a("tieA", -40), a("near", 5), a("tieB", 40)];
@@ -90,9 +90,8 @@ describe("sortByEloGap / pickClosest (AC-A3, AC-A4)", () => {
     expect(list.map((c) => c.id)).toEqual(["far", "tieA", "near", "tieB"]);
   });
 
-  it("picks the closest athlete who takes ranked, or nobody", () => {
-    expect(pickClosest([a("x", 0, false), a("y", 10)])?.id).toBe("y");
-    expect(pickClosest([a("x", 0, false)])).toBeNull();
+  it("picks the closest athlete (every match is ranked), or nobody", () => {
+    expect(pickClosest([a("x", 0), a("y", 10)])?.id).toBe("x");
     expect(pickClosest([])).toBeNull();
   });
 
@@ -219,7 +218,7 @@ describe("closestCta (AC-A3: one red CTA)", () => {
   it("live on an empty mat: no CTA at all", () => {
     expect(closestCta({ ...idle, hasClosest: false })).toEqual({ kind: "none", red: false });
   });
-  it("offline on an empty mat (or one of only casual-only / pending athletes): still a red GO LIVE TO ROLL", () => {
+  it("offline on an empty mat (or one of only pending athletes): still a red GO LIVE TO ROLL", () => {
     expect(closestCta({ ...idle, isLive: false, hasClosest: false })).toEqual({
       kind: "go-live",
       red: true,

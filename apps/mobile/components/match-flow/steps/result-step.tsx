@@ -22,7 +22,6 @@ import { ResultWaiting } from "./result-waiting";
 
 interface ResultStepProps {
   matchId: string;
-  matchType: "ranked" | "casual";
   /** Match length in seconds; finish time can't exceed it. */
   durationSeconds: number;
   /** Match clock at End Match; prefills the (still editable) finish time. */
@@ -44,7 +43,7 @@ interface ResultStepProps {
  */
 export function ResultStep(props: ResultStepProps) {
   const p = usePalette();
-  const { matchId, matchType, durationSeconds, initialFinishSeconds, me, opponent, submissionTypes, onRecorded } = props;
+  const { matchId, durationSeconds, initialFinishSeconds, me, opponent, submissionTypes, onRecorded } = props;
   const [outcome, setOutcome] = React.useState<"submission" | "draw" | null>(null);
   const [winnerId, setWinnerId] = React.useState("");
   const [submissionCode, setSubmissionCode] = React.useState("");
@@ -74,7 +73,6 @@ export function ResultStep(props: ResultStepProps) {
         claimer={claimer}
         me={me}
         opponent={opponent}
-        matchType={matchType}
         durationSeconds={durationSeconds}
         endedAtSeconds={initialFinishSeconds}
         onTakeOver={claim.canTakeOver ? claim.takeOver : undefined}
@@ -108,7 +106,7 @@ export function ResultStep(props: ResultStepProps) {
     <View style={{ gap: 20 }}>
       <View style={{ gap: 10 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-          <KindTag kind={matchType} />
+          <KindTag />
           {endedAt ? <Mono>{endedAt}</Mono> : null}
         </View>
         {/* A plain text element on purpose: the match-loop harness taps the
@@ -133,7 +131,7 @@ export function ResultStep(props: ResultStepProps) {
           />
         </>
       ) : outcome === "draw" ? (
-        <DrawPlate matchType={matchType} onChange={reset} />
+        <DrawPlate onChange={reset} />
       ) : winner ? (
         <>
           <WinnerChip winner={winner} onChange={reset} />

@@ -55,16 +55,14 @@ export function deltaLabel(delta: number | null | undefined): string | null {
 
 /**
  * The card's data line: rating change then how long it went, e.g.
- * "▲ +14 · 06:17". Casual matches read "CASUAL"; the time is the finish time
- * of a submission, else the configured clock.
+ * "▲ +14 · 06:17". Every match is ranked; a legacy row with no recorded delta
+ * shows only the time. The time is the finish time of a submission, else the
+ * configured clock.
  */
 export function cardLine(item: MatchLibraryItem): string {
   const parts: string[] = [];
-  if (item.match_type === "casual") parts.push("CASUAL");
-  else {
-    const delta = deltaLabel(item.elo_delta);
-    if (delta) parts.push(delta);
-  }
+  const delta = deltaLabel(item.elo_delta);
+  if (delta) parts.push(delta);
   const t = item.finish_time_seconds ?? item.duration_seconds;
   if (t != null && t > 0) parts.push(formatClock(t));
   return parts.join(" · ");

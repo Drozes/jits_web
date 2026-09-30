@@ -502,7 +502,7 @@ function PromptHeader({ challenge }: { challenge: IncomingChallenge }) {
           createdAt={challenge.createdAt ?? null}
           expiresAt={challenge.expiresAt ?? null}
         />
-        <KindTag kind="ranked" maxFontSizeMultiplier={MAX_FONT_SCALE} />
+        <KindTag maxFontSizeMultiplier={MAX_FONT_SCALE} />
       </View>
     </View>
   );

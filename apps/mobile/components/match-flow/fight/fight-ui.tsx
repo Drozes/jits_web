@@ -69,13 +69,11 @@ export function Mono({ children, color, size = 10, bold = false, spacing = 2.52,
   );
 }
 
-/** The bordered RANKED / CASUAL tag; `onScrim` over camera or a photo. */
+/** The bordered static RANKED tag (every match is ranked); `onScrim` over camera or a photo. */
 export function KindTag({
-  kind,
   onScrim = false,
   maxFontSizeMultiplier,
 }: {
-  kind: "ranked" | "casual";
   onScrim?: boolean;
   maxFontSizeMultiplier?: number;
 }) {
@@ -93,7 +91,7 @@ export function KindTag({
       }}
     >
       <Mono color={onScrim ? ON_MEDIA.tagText : p.text2} maxFontSizeMultiplier={maxFontSizeMultiplier}>
-        {kind === "ranked" ? "RANKED" : "CASUAL"}
+        RANKED
       </Mono>
     </View>
   );

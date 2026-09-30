@@ -116,8 +116,11 @@ function signed(delta: number): string {
   return delta > 0 ? `+${delta}` : `${delta}`;
 }
 
+/**
+ * Every match is ranked (casual was retired, jr_be-ahn.1): a legacy casual reel
+ * reads like any match, with ELO only when the server recorded it.
+ */
 function secondLine(ctx: HighlightCaptionContext): string {
-  if (ctx.matchType !== "ranked") return "Casual roll.";
   if (ctx.eloAfter === null || !Number.isFinite(ctx.eloAfter)) return "Ranked match.";
   const after = Math.round(ctx.eloAfter);
   const delta = ctx.eloDelta === null || !Number.isFinite(ctx.eloDelta) ? 0 : Math.round(ctx.eloDelta);

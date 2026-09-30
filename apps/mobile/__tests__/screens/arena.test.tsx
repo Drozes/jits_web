@@ -283,7 +283,6 @@ function competitor(over: Record<string, unknown> = {}) {
     weight: 185,
     profilePhotoUrl: null,
     eloDiff: 100,
-    acceptsRanked: true,
     ...over,
   };
 }
@@ -452,16 +451,16 @@ describe("Arena screen", () => {
     expect(toast.error).not.toHaveBeenCalled();
   });
 
-  it("suppresses the action for an athlete who does not take ranked", () => {
+  it("every on-mat row offers Roll: there is no casual-only state (every match is ranked)", () => {
     mockIsLive = true;
-    mockRoster.competitors = [competitor({ acceptsRanked: false })];
+    mockRoster.competitors = [competitor()];
     mockLobbyIds = new Set(["a-1"]);
 
-    const { getByText, queryByLabelText, getByTestId } = render(<ArenaScreen />);
-    expect(queryByLabelText("Challenge Alpha")).toBeNull();
-    expect(getByText("Casual only")).toBeTruthy();
-    // Never the Closest Match either: the database would refuse it.
-    expect(getByTestId("arena-closest-empty")).toBeTruthy();
+    const r = render(<ArenaScreen />);
+    expect(r.queryByText(/casual/i)).toBeNull();
+    // The mat row's Roll and the Closest Match card both offer the challenge.
+    expect(r.getAllByLabelText("Challenge Alpha").length).toBe(2);
+    expect(r.getByTestId("arena-closest-cta")).toBeTruthy();
   });
 
   it("shows an already-challenged athlete as pending", () => {
@@ -540,15 +539,6 @@ describe("Arena screen", () => {
     mockLobbyIds = new Set();
     const r = render(<ArenaScreen />);
     expect(r.getByText("Reconnecting to the mat")).toBeTruthy();
-    expect(r.queryByText("Nobody else on the mat")).toBeNull();
-  });
-
-  it("says nobody ranked is free when everyone on the mat is casual-only", () => {
-    mockIsLive = true;
-    mockRoster.competitors = [competitor({ acceptsRanked: false })];
-    mockLobbyIds = new Set(["a-1"]);
-    const r = render(<ArenaScreen />);
-    expect(r.getByText("No ranked opponent free on the mat")).toBeTruthy();
     expect(r.queryByText("Nobody else on the mat")).toBeNull();
   });
 
@@ -926,9 +916,10 @@ describe("Arena screen", () => {
       expect(mockGuardedGoLive).toHaveBeenCalledTimes(1);
     });
 
-    it("offline with only casual-only athletes on the mat: still a red GO LIVE TO ROLL", () => {
-      mockRoster.competitors = [competitor({ acceptsRanked: false })];
+    it("offline with only pending athletes on the mat: still a red GO LIVE TO ROLL", () => {
+      mockRoster.competitors = [competitor()];
       mockLobbyIds = new Set(["a-1"]);
+      mockRoster.challengedIds = new Set(["a-1"]);
       const r = render(<ArenaScreen />);
       expect(r.getByText("No ranked opponent free on the mat")).toBeTruthy();
       expect(r.getByTestId("arena-closest-cta").props.accessibilityLabel).toBe("Go live to roll");

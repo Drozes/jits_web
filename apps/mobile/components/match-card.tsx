@@ -7,7 +7,7 @@ import { cn } from "../lib/cn";
 import { athletePhotoSource } from "../lib/athlete-photo";
 import { useThemedTokens } from "../lib/theme/use-theme";
 import { formatRelativeDate, getInitials } from "@jits/shared/utils";
-import { MATCH_OUTCOME, type MatchOutcome, type MatchType } from "@jits/shared/constants";
+import { MATCH_OUTCOME, type MatchOutcome } from "@jits/shared/constants";
 
 interface MatchCardProps {
   type?: "match" | "challenge";
@@ -16,7 +16,6 @@ interface MatchCardProps {
   result?: MatchOutcome | null;
   status?: string;
   direction?: "incoming" | "sent";
-  matchType?: MatchType;
   eloDelta?: number;
   date: string;
   onPress?: () => void;
@@ -50,12 +49,11 @@ function ChallengePill({ children, accent }: { children: React.ReactNode; accent
   );
 }
 
-function CardInner({ type = "match", opponentName, opponentPhotoUrl, result, status, direction, matchType, eloDelta, date, onPress }: MatchCardProps) {
+function CardInner({ type = "match", opponentName, opponentPhotoUrl, result, status, direction, eloDelta, date, onPress }: MatchCardProps) {
   const tokens = useThemedTokens();
   const photoSrc = athletePhotoSource(opponentPhotoUrl);
-  const matchTypeLabel = matchType ? (matchType === "ranked" ? "Ranked" : "Casual") : null;
-  const dateText = formatRelativeDate(date);
-  const subtitle = matchTypeLabel ? `${dateText} · ${matchTypeLabel}` : dateText;
+  // Every match is ranked, so the row carries no "· Ranked" suffix (P-Profile-Stats).
+  const subtitle = formatRelativeDate(date);
 
   return (
     <View className="flex-row items-center justify-between gap-3 bg-surface-3 border border-hairline-faint rounded-xs px-4 py-3">

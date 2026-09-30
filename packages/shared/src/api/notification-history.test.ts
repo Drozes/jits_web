@@ -71,6 +71,39 @@ describe("getNotificationHistory ids and routes", () => {
   });
 });
 
+describe("getNotificationHistory copy (every match is ranked)", () => {
+  it("drops the ranked/casual adjective and omits the ELO suffix when a legacy row has no delta", async () => {
+    const items = await getNotificationHistory(
+      mockClient(
+        [
+          { id: "c-pending", status: "pending", match_type: "ranked", created_at: T, updated_at: T, challenger: { display_name: "Alex" } },
+          { id: "c-acc", status: "accepted", match_type: "casual", created_at: T, updated_at: T, challenger: { display_name: "Bo" } },
+          { id: "c-dec", status: "declined", match_type: "casual", created_at: T, updated_at: T, challenger: { display_name: "Cy" } },
+        ],
+        [
+          { id: "s-acc", status: "accepted", match_type: "ranked", created_at: T, updated_at: T, opponent: { display_name: "Di" } },
+          { id: "s-dec", status: "declined", match_type: "casual", created_at: T, updated_at: T, opponent: { display_name: "Ed" } },
+        ],
+        [
+          { match_id: "m1", athlete_outcome: "win", elo_delta: 18, elo_after: 1218, opponent_display_name: "Fay", completed_at: T },
+          // Real backend shape for a legacy unrated row: elo_delta 0, elo_after NULL.
+          { match_id: "m2", athlete_outcome: "loss", elo_delta: 0, elo_after: null, opponent_display_name: "Gus", completed_at: T },
+        ],
+      ),
+      "me",
+    );
+    const body = Object.fromEntries(items.map((i) => [i.id, i.body]));
+    expect(body["challenge-recv-c-pending"]).toBe("Alex sent you a challenge");
+    expect(body["challenge-accepted-c-acc"]).toBe("You accepted Bo's challenge");
+    expect(body["challenge-declined-recv-c-dec"]).toBe("You declined Cy's challenge");
+    expect(body["challenge-sent-accepted-s-acc"]).toBe("Di accepted your challenge");
+    expect(body["challenge-sent-declined-s-dec"]).toBe("Ed declined your challenge");
+    expect(body["match-m1"]).toBe("You defeated Fay (+18 ELO)");
+    expect(body["match-m2"]).toBe("Gus defeated you");
+    for (const item of items) expect(item.body).not.toMatch(/ranked|casual/i);
+  });
+});
+
 describe("getNotificationHistoryResult", () => {
   function client(opts: { challengeError?: boolean; rpcError?: boolean }) {
     function builder() {

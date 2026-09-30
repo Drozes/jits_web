@@ -16,7 +16,6 @@ export function ResultWaiting({
   claimer,
   me,
   opponent,
-  matchType,
   durationSeconds,
   endedAtSeconds,
   onTakeOver,
@@ -24,7 +23,6 @@ export function ResultWaiting({
   claimer: ResultAthlete;
   me: ResultAthlete;
   opponent: ResultAthlete;
-  matchType: "ranked" | "casual";
   durationSeconds: number;
   endedAtSeconds?: number;
   /** Offered once the claim has gone a minute without a result. */
@@ -34,7 +32,7 @@ export function ResultWaiting({
   const name = shortName(claimer.displayName);
   const cells = [
     { label: "ENDED AT", value: endedAtSeconds != null ? formatElapsed(endedAtSeconds) : "--:--" },
-    { label: "TYPE", value: matchType === "ranked" ? "RANKED" : "CASUAL" },
+    { label: "TYPE", value: "RANKED" },
     { label: "CLOCK", value: formatElapsed(durationSeconds) },
   ];
   return (

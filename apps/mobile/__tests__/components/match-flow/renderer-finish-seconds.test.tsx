@@ -64,7 +64,6 @@ function renderStep(
       exitHref="/arena"
       exitLabel="Arena"
       matchId="M1"
-      matchType="ranked"
       matchStatus="in_progress"
       durationSeconds={300}
       // Past the 3 s countdown, so the live step itself is up.

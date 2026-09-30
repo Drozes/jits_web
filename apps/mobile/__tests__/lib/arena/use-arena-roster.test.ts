@@ -43,8 +43,8 @@ const ROSTER = {
       display_name: "Bravo",
       current_elo: 1100,
       gym_name: null,
-      looking_for_casual: true,
-      looking_for_ranked: false,
+      looking_for_casual: false,
+      looking_for_ranked: true,
       profile_photo_url: null,
       current_weight: null,
     },
@@ -95,7 +95,7 @@ describe("useArenaRoster", () => {
     expect(ARENA_ROSTER_LIMIT).toBe(100);
   });
 
-  it("maps the ELO gap and the ranked flag each row carries", async () => {
+  it("maps the ELO gap each row carries", async () => {
     const { result } = renderHook(() => useArenaRoster(1200));
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
@@ -106,16 +106,12 @@ describe("useArenaRoster", () => {
         eloDiff: 100,
         gymName: "Gracie",
         weight: 180,
-        acceptsRanked: true,
       }),
       expect.objectContaining({
         id: "a-2",
         eloDiff: -100,
         gymName: undefined,
         weight: undefined,
-        // Listed as looking, but not for ranked. The insert would be refused
-        // by opponent_accepts_match_type, so the row must not offer one.
-        acceptsRanked: false,
       }),
     ]);
     expect([...result.current.challengedIds]).toEqual(["a-2"]);

@@ -1612,7 +1612,6 @@ export function useArenaChallenge({
         const create = () =>
           createChallenge(supabase, {
             opponentId,
-            matchType: "ranked", // ranked-only product
             challengerWeight: weightRef.current ?? undefined,
           });
         let result = await create();

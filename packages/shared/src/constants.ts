@@ -1,4 +1,8 @@
-/** Match type: casual (no ELO) or ranked (ELO at stake) */
+/**
+ * Match type. Every new match is ranked (ELO at stake); `CASUAL` survives only
+ * as a type for legacy rows the server wrote before casual was retired
+ * (jr_be-ahn.1). Never branch UI or copy on it.
+ */
 export const MATCH_TYPE = {
   CASUAL: "casual",
   RANKED: "ranked",

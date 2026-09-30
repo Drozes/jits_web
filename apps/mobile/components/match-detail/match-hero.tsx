@@ -16,7 +16,6 @@ interface MatchHeroProps {
   me: StillAthlete;
   opponent: StillAthlete | null;
   fallbackLabel: string;
-  ranked: boolean;
   /** Clock shown bottom right (match clock), seconds. */
   clockSeconds: number | null;
   /** Null when nothing can play yet (no video, or still uploading). */
@@ -24,11 +23,12 @@ interface MatchHeroProps {
 }
 
 /**
- * Opening still with scrims, back, RANKED tag, play, and the clock. The
+ * Opening still with scrims, back, the static RANKED tag (every match is
+ * ranked), play, and the clock. The
  * chrome sits on the photo's scrims (ON_MEDIA); the bottom scrim fades into
  * the themed page.
  */
-export function MatchHero({ posterUrl, posterKey, me, opponent, fallbackLabel, ranked, clockSeconds, onPlay }: MatchHeroProps) {
+export function MatchHero({ posterUrl, posterKey, me, opponent, fallbackLabel, clockSeconds, onPlay }: MatchHeroProps) {
   const insets = useSafeAreaInsets();
   const p = usePalette();
   const tagStyle = { height: 24, paddingHorizontal: 8, borderRadius: 2, borderWidth: 1, borderColor: ON_MEDIA.strong, backgroundColor: ON_MEDIA.tag, justifyContent: "center" as const };
@@ -43,7 +43,7 @@ export function MatchHero({ posterUrl, posterKey, me, opponent, fallbackLabel, r
       </View>
       <View style={[tagStyle, { position: "absolute", right: 16, top: insets.top + 16 }]}>
         <Text className="font-mono-medium" style={{ fontSize: 10, letterSpacing: 2.52, color: ON_MEDIA.tagText }}>
-          {ranked ? "RANKED" : "CASUAL"}
+          RANKED
         </Text>
       </View>
 

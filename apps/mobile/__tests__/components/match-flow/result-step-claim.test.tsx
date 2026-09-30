@@ -58,7 +58,6 @@ function renderStep() {
   return render(
     <ResultStep
       matchId="M1"
-      matchType="ranked"
       durationSeconds={600}
       initialFinishSeconds={377}
       me={{ id: "me-1", displayName: "Kai Reyes", elo: 1512, weight: 170 }}

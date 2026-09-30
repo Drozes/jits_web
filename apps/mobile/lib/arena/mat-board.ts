@@ -143,15 +143,15 @@ export function matCounts(
 }
 
 /**
- * The Closest Match: the first on-mat athlete (closest first) who takes
- * ranked and is not `exclude`d (the screen excludes anyone a challenge is
+ * The Closest Match: the first on-mat athlete (closest first) who is not
+ * `exclude`d (the screen excludes anyone a challenge is
  * already pending with: the database does not make pending pairs unique).
  */
-export function pickClosest<T extends { acceptsRanked: boolean }>(
+export function pickClosest<T>(
   sortedOnMat: readonly T[],
   exclude?: (c: T) => boolean,
 ): T | null {
-  return sortedOnMat.find((c) => c.acceptsRanked && !exclude?.(c)) ?? null;
+  return sortedOnMat.find((c) => !exclude?.(c)) ?? null;
 }
 
 // ---------------------------------------------------------------------------

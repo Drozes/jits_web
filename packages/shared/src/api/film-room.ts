@@ -54,7 +54,7 @@ export interface MatchLibraryOpponent {
 export interface MatchLibraryItem {
   match_id: string;
   completed_at: string | null;
-  /** "ranked" | "casual" */
+  /** Always "ranked" for new rows; a legacy row may still read "casual" (never shown). */
   match_type: string | null;
   /** "completed" | "disputed" */
   status: string;

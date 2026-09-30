@@ -13,13 +13,11 @@ import type { BroadcastResult } from "@jits/shared/hooks/use-session-match-sync"
 export function ResultBanner({
   resultData,
   currentAthleteId,
-  matchType,
   subtitle,
   kicker = "Match Recorded",
 }: {
   resultData: BroadcastResult | null;
   currentAthleteId: string;
-  matchType: "ranked" | "casual";
   /** Overrides the default line under the verdict (practice has no dispute). */
   subtitle?: string;
   /** Overrides the small line above the verdict. */
@@ -58,9 +56,7 @@ export function ResultBanner({
       </Text>
       <Text className="text-center font-body text-[12px] text-ink-2">
         {subtitle ??
-          (matchType === "ranked"
-          ? "Your rating is already updated. Confirm if this is right, or dispute it and an admin will review."
-          : "Confirm if this is right, or dispute it.")}
+          "Your rating is already updated. Confirm if this is right, or dispute it and an admin will review."}
       </Text>
     </Plate>
   );

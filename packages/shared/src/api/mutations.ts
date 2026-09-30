@@ -6,7 +6,7 @@ import type {
   RecordResultResponse,
   PendingChallenge,
 } from "../types/composites";
-import { ARENA_CHALLENGE_FRESH_MS } from "../constants";
+import { ARENA_CHALLENGE_FRESH_MS, MATCH_TYPE } from "../constants";
 import {
   type DomainErrorCode,
   type Result,
@@ -26,7 +26,11 @@ type Client = SupabaseClient<Database>;
 
 interface CreateChallengeParams {
   opponentId: string;
-  matchType: "ranked" | "casual";
+  /**
+   * Deprecated and ignored: every challenge is ranked (casual was retired,
+   * jr_be-ahn.1). Kept optional so older callers still compile.
+   */
+  matchType?: "ranked";
   challengerWeight?: number;
   proposedGymId?: string;
 }
@@ -46,7 +50,7 @@ export async function createChallenge(
     .insert({
       challenger_id: authResult.data,
       opponent_id: params.opponentId,
-      match_type: params.matchType,
+      match_type: MATCH_TYPE.RANKED,
       challenger_weight: params.challengerWeight,
       proposed_gym_id: params.proposedGymId,
     })

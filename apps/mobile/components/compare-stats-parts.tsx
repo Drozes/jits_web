@@ -1,5 +1,4 @@
 import { Text, View } from "react-native";
-import { Chip } from "./ui/elo-system";
 import { cn } from "../lib/cn";
 
 export interface AthleteStats {
@@ -12,18 +11,10 @@ export interface AthleteStats {
   weight: number | null;
 }
 
+/** One completed match between the viewer and the competitor. Every match is ranked. */
 export interface HeadToHeadMatch {
-  matchType: "ranked" | "casual";
   result: "win" | "loss" | "draw" | null;
 }
-
-export type Filter = "all" | "ranked" | "casual";
-
-export const FILTERS: { value: Filter; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "ranked", label: "Ranked" },
-  { value: "casual", label: "Casual" },
-];
 
 export function StatRow({
   label,
@@ -62,39 +53,6 @@ export function StatRow({
       >
         {fmt(right)}
       </Text>
-    </View>
-  );
-}
-
-export function computeH2H(matches: HeadToHeadMatch[], filter: Filter) {
-  const filtered =
-    filter === "all" ? matches : matches.filter((m) => m.matchType === filter);
-  const wins = filtered.filter((m) => m.result === "win").length;
-  const losses = filtered.filter((m) => m.result === "loss").length;
-  const draws = filtered.filter((m) => m.result === "draw").length;
-  const total = wins + losses;
-  const winRate = total > 0 ? Math.round((wins / total) * 100) : 0;
-  return { wins, losses, draws, winRate };
-}
-
-export function FilterPillRow({
-  current,
-  onSelect,
-}: {
-  current: Filter;
-  onSelect: (f: Filter) => void;
-}) {
-  return (
-    <View className="flex-row justify-center gap-2 pt-3">
-      {FILTERS.map((f) => (
-        <Chip
-          key={f.value}
-          active={current === f.value}
-          onPress={() => onSelect(f.value)}
-        >
-          {f.label}
-        </Chip>
-      ))}
     </View>
   );
 }

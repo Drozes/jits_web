@@ -229,16 +229,16 @@ describe("createChallenge", () => {
       error: null,
     });
     const select = vi.fn(() => ({ single }));
+    const insert = vi.fn(() => ({ select }));
     const client = {
       rpc: vi.fn().mockResolvedValue({ data: ME, error: null }),
-      from: vi.fn(() => ({ insert: () => ({ select }) })),
+      from: vi.fn(() => ({ insert })),
     } as never;
 
-    const result = await createChallenge(client, {
-      opponentId: "opp",
-      matchType: "ranked",
-    });
+    const result = await createChallenge(client, { opponentId: "opp" });
 
+    // Every challenge is ranked: the wrapper always writes ranked.
+    expect(insert).toHaveBeenCalledWith(expect.objectContaining({ match_type: "ranked" }));
     expect(select).toHaveBeenCalledWith("id, expires_at, created_at");
     expect(result).toEqual({
       ok: true,
@@ -256,7 +256,7 @@ describe("createChallenge", () => {
       rpc: vi.fn().mockResolvedValue({ data: ME, error: null }),
       from: vi.fn(() => ({ insert: () => ({ select: () => ({ single }) }) })),
     } as never;
-    const result = await createChallenge(client, { opponentId: "opp", matchType: "ranked" });
+    const result = await createChallenge(client, { opponentId: "opp" });
     expect(result).toEqual({ ok: true, data: { id: "c1", expiresAt: null, createdAt: null } });
   });
 });

@@ -1,4 +1,3 @@
-import * as React from "react";
 import { Text, View } from "react-native";
 import {
   Dialog,
@@ -6,66 +5,22 @@ import {
   DialogHeader,
   DialogTitle,
 } from "./ui/dialog";
-import {
-  type AthleteStats,
-  type Filter,
-  type HeadToHeadMatch,
-  StatRow,
-  FilterPillRow,
-  computeH2H,
-} from "./compare-stats-parts";
-
-export type { HeadToHeadMatch } from "./compare-stats-parts";
+import { type AthleteStats, StatRow } from "./compare-stats-parts";
 
 interface CompareStatsModalProps {
   currentAthlete: AthleteStats;
   competitor: AthleteStats;
-  headToHead: HeadToHeadMatch[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
+/** Career stats side by side. Every match is ranked, so there is no filter. */
 export function CompareStatsModal({
   currentAthlete,
   competitor,
-  headToHead,
   open,
   onOpenChange,
 }: CompareStatsModalProps) {
-  const [filter, setFilter] = React.useState<Filter>("all");
-
-  const myStats = React.useMemo(() => {
-    if (filter === "all") {
-      return {
-        wins: currentAthlete.wins,
-        losses: currentAthlete.losses,
-        draws: currentAthlete.draws,
-        winRate: currentAthlete.winRate,
-      };
-    }
-    return computeH2H(headToHead, filter);
-  }, [filter, currentAthlete, headToHead]);
-
-  const theirStats = React.useMemo(() => {
-    if (filter === "all") {
-      return {
-        wins: competitor.wins,
-        losses: competitor.losses,
-        draws: competitor.draws,
-        winRate: competitor.winRate,
-      };
-    }
-    const h2h = computeH2H(headToHead, filter);
-    return {
-      wins: h2h.losses,
-      losses: h2h.wins,
-      draws: h2h.draws,
-      winRate: h2h.winRate > 0 ? 100 - h2h.winRate : 0,
-    };
-  }, [filter, competitor, headToHead]);
-
-  const isFiltered = filter !== "all";
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
@@ -84,16 +39,17 @@ export function CompareStatsModal({
         </View>
 
         <View>
-          {!isFiltered ? (
-            <StatRow label="ELO" left={currentAthlete.elo} right={competitor.elo} />
-          ) : null}
-          <StatRow label="Wins" left={myStats.wins} right={theirStats.wins} />
-          <StatRow label="Losses" left={myStats.losses} right={theirStats.losses} higherIsBetter={false} />
-          <StatRow label="Draws" left={myStats.draws} right={theirStats.draws} higherIsBetter={false} />
-          <StatRow label="Win Rate" left={myStats.winRate} right={theirStats.winRate} format={(v) => `${v}%`} />
+          <StatRow label="ELO" left={currentAthlete.elo} right={competitor.elo} />
+          <StatRow label="Wins" left={currentAthlete.wins} right={competitor.wins} />
+          <StatRow label="Losses" left={currentAthlete.losses} right={competitor.losses} higherIsBetter={false} />
+          <StatRow label="Draws" left={currentAthlete.draws} right={competitor.draws} higherIsBetter={false} />
+          <StatRow
+            label="Win Rate"
+            left={currentAthlete.winRate}
+            right={competitor.winRate}
+            format={(v) => `${v}%`}
+          />
         </View>
-
-        <FilterPillRow current={filter} onSelect={setFilter} />
       </DialogContent>
     </Dialog>
   );

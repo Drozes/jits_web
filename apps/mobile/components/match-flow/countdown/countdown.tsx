@@ -23,7 +23,6 @@ export function countdownNumeral(msLeft: number): number {
 interface CountdownProps {
   /** Epoch ms of GO on this device. */
   goAt: number;
-  matchType: "ranked" | "casual";
   recording: boolean;
   me: FaceoffAthlete;
   opponent: FaceoffAthlete;
@@ -45,7 +44,7 @@ export function numeralSize(windowHeight: number): number {
  * One heavy haptic per numeral. Reduce Motion shows the numerals without
  * the scale-in. Over the camera it is dark in both app themes (ON_MEDIA).
  */
-export function Countdown({ goAt, matchType, recording, me, opponent, myWeight, opponentWeight }: CountdownProps) {
+export function Countdown({ goAt, recording, me, opponent, myWeight, opponentWeight }: CountdownProps) {
   const insets = useSafeAreaInsets();
   const window = useWindowDimensions();
   const landscape = window.width > window.height;
@@ -106,7 +105,7 @@ export function Countdown({ goAt, matchType, recording, me, opponent, myWeight, 
             {recording ? "REC ARMS AT GO" : "NOT RECORDING"}
           </Mono>
         </View>
-        <KindTag kind={matchType} onScrim />
+        <KindTag onScrim />
       </View>
       <View
         accessible

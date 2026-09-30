@@ -254,7 +254,7 @@ beforeEach(async () => {
 });
 
 describe("sending a challenge", () => {
-  it("sends a ranked challenge and shows it as pending", async () => {
+  it("sends a challenge (always ranked, server side) and shows it as pending", async () => {
     const { result } = mount();
 
     await act(async () => {
@@ -263,7 +263,7 @@ describe("sending a challenge", () => {
 
     expect(mockCreateChallenge).toHaveBeenCalledWith(
       expect.anything(),
-      { opponentId: OPPONENT, matchType: "ranked", challengerWeight: 180 },
+      { opponentId: OPPONENT, challengerWeight: 180 },
     );
     expect(result.current.outgoing).toEqual({
       challengeId: CHALLENGE,

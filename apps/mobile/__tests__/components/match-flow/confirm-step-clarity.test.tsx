@@ -73,11 +73,10 @@ import { ConfirmPanel, ResultBanner } from "@/components/match-flow/steps/confir
 
 type StepProps = React.ComponentProps<typeof ConfirmStep>;
 
-function renderStep(matchType: "ranked" | "casual" = "ranked", overrides: Partial<StepProps> = {}) {
+function renderStep(overrides: Partial<StepProps> = {}) {
   return render(
     <ConfirmStep
       matchId="M1"
-      matchType={matchType}
       me={{ athlete_id: "me-1", display_name: "Mina Park", elo_before: 1498, elo_after: 1489, elo_delta: -9 }}
       opponent={{ athlete_id: "opp-1", display_name: "Demo Red" }}
       resultData={{ result: "submission", winnerId: "me-1" }}
@@ -100,9 +99,9 @@ beforeEach(() => {
 afterEach(() => jest.useRealTimers());
 
 describe("ResultBanner subtitle", () => {
-  it("ranked: says the rating is already updated and what to do", () => {
+  it("says the rating is already updated and what to do (every match is ranked)", () => {
     const { getByText, queryByText } = render(
-      <ResultBanner resultData={null} currentAthleteId="me-1" matchType="ranked" />,
+      <ResultBanner resultData={null} currentAthleteId="me-1" />,
     );
     getByText(
       "Your rating is already updated. Confirm if this is right, or dispute it and an admin will review.",
@@ -110,19 +109,11 @@ describe("ResultBanner subtitle", () => {
     expect(queryByText(/ELO already applied/i)).toBeNull();
   });
 
-  it("casual: short confirm-or-dispute line", () => {
-    const { getByText } = render(
-      <ResultBanner resultData={null} currentAthleteId="me-1" matchType="casual" />,
-    );
-    getByText("Confirm if this is right, or dispute it.");
-  });
-
   it("subtitle override replaces the default line (practice has no dispute)", () => {
     const { getByText, queryByText } = render(
       <ResultBanner
         resultData={null}
         currentAthleteId="me-1"
-        matchType="casual"
         subtitle="Confirm if this is right."
       />,
     );
@@ -135,7 +126,6 @@ describe("ResultBanner subtitle", () => {
       <ResultBanner
         resultData={{ result: "draw" }}
         currentAthleteId="me-1"
-        matchType="ranked"
       />,
     );
     expect(getByTestId("confirm-verdict").props.children).toBe("DRAW");
@@ -170,7 +160,7 @@ describe("ConfirmPanel states", () => {
 
 describe("ConfirmStep (opponent view, match-flow redesign)", () => {
   it("shows who won, how, and the viewer's rating move; keeps the harness verdict", () => {
-    const s = renderStep("ranked", {
+    const s = renderStep({
       resultData: { result: "submission", winnerId: "opp-1" },
       submissionName: "Rear-naked choke",
       finishTimeSeconds: 377,
@@ -185,7 +175,7 @@ describe("ConfirmStep (opponent view, match-flow redesign)", () => {
   });
 
   it("the recorder is shown already confirmed (auto-confirmed server-side)", () => {
-    const s = renderStep("ranked", { confirmedAthleteIds: ["opp-1"] });
+    const s = renderStep({ confirmedAthleteIds: ["opp-1"] });
     s.getByText("RESULT RECORDED BY D. RED");
     s.getByTestId("confirm-panel-opponent-confirmed");
     s.getByText("D. RED CONFIRMED \u2713");
@@ -194,7 +184,7 @@ describe("ConfirmStep (opponent view, match-flow redesign)", () => {
 
   it("dispute is a full-size secondary button; leaving counts as confirming, then the lock line (P-Confirm)", () => {
     const locks = new Date(Date.now() + 23.5 * 3_600_000).toISOString();
-    const s = renderStep("ranked", { disputeLocksAt: locks });
+    const s = renderStep({ disputeLocksAt: locks });
     expect(s.getByTestId("confirm-dispute")).toBeTruthy();
     s.getByText("Dispute result");
     const notes = s.getByTestId("confirm-lock-notes");
@@ -206,7 +196,7 @@ describe("ConfirmStep (opponent view, match-flow redesign)", () => {
 
   it("falls back to completed_at + match_result_lock_seconds() without dispute_locks_at", async () => {
     const completedAt = new Date(Date.now() - 30 * 60_000).toISOString();
-    const s = renderStep("ranked", { disputeLocksAt: null, completedAt });
+    const s = renderStep({ disputeLocksAt: null, completedAt });
     await s.findByText("Locks automatically in 23 h.");
     s.getByText("If you leave without disputing, it counts as confirming.");
     expect(mockLockSeconds).toHaveBeenCalledTimes(1);
@@ -214,14 +204,14 @@ describe("ConfirmStep (opponent view, match-flow redesign)", () => {
 
   it("with no lock time at all, keeps the leave line and hard-codes no window", async () => {
     mockLockSeconds.mockResolvedValue(null);
-    const s = renderStep("ranked", { disputeLocksAt: null, completedAt: new Date().toISOString() });
+    const s = renderStep({ disputeLocksAt: null, completedAt: new Date().toISOString() });
     await act(async () => {});
     s.getByText("If you leave without disputing, it counts as confirming.");
     expect(s.queryByText(/Locks automatically/)).toBeNull();
   });
 
   it("hides dispute once the window has closed", () => {
-    const s = renderStep("ranked", { disputeLocksAt: new Date(Date.now() - 1000).toISOString() });
+    const s = renderStep({ disputeLocksAt: new Date(Date.now() - 1000).toISOString() });
     expect(s.queryByTestId("confirm-dispute")).toBeNull();
     s.getByText("The dispute window has closed.");
     expect(s.queryByText(/If you leave without disputing/)).toBeNull();
@@ -250,7 +240,7 @@ describe("ConfirmStep (opponent view, match-flow redesign)", () => {
   it("after confirming: shows it, gives a light impact, and moves on while the opponent is pending", async () => {
     jest.useFakeTimers();
     const onCompleted = jest.fn();
-    const { getByTestId, queryByTestId, queryByText } = renderStep("ranked", { onCompleted });
+    const { getByTestId, queryByTestId, queryByText } = renderStep({ onCompleted });
     await act(async () => {
       fireEvent.press(getByTestId("confirm-result"));
     });
@@ -272,7 +262,7 @@ describe("ConfirmStep (opponent view, match-flow redesign)", () => {
   it("an athlete who already confirmed (DB row) moves straight on", () => {
     jest.useFakeTimers();
     const onCompleted = jest.fn();
-    renderStep("ranked", { onCompleted, confirmedAthleteIds: ["me-1"] });
+    renderStep({ onCompleted, confirmedAthleteIds: ["me-1"] });
     act(() => {
       jest.advanceTimersByTime(1_500);
     });

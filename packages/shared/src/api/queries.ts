@@ -39,6 +39,7 @@ import type {
 import { mapPostgrestError, type DomainError, type Result } from "./errors";
 import { ARENA_CHALLENGE_FRESH_MS, MATCH_RESUME_WINDOW_MS } from "../constants";
 import { isUuid } from "../utils/shared";
+import { recordedEloDelta } from "../utils/recorded-delta";
 import {
   videoPlayability,
   videoAngleLabel,
@@ -2143,7 +2144,7 @@ async function fetchChallengeNotifications(
   const { data: received, error: receivedError } = await supabase
     .from("challenges")
     .select(
-      "id, status, match_type, created_at, updated_at, challenger:athletes!fk_challenges_challenger(display_name)",
+      "id, status, created_at, updated_at, challenger:athletes!fk_challenges_challenger(display_name)",
     )
     .eq("opponent_id", athleteId)
     .in("status", ["pending", "accepted", "declined"])
@@ -2154,7 +2155,7 @@ async function fetchChallengeNotifications(
   const { data: sent, error: sentError } = await supabase
     .from("challenges")
     .select(
-      "id, status, match_type, created_at, updated_at, opponent:athletes!fk_challenges_opponent(display_name)",
+      "id, status, created_at, updated_at, opponent:athletes!fk_challenges_opponent(display_name)",
     )
     .eq("challenger_id", athleteId)
     .in("status", ["accepted", "declined"])
@@ -2165,7 +2166,6 @@ async function fetchChallengeNotifications(
 
   for (const c of received ?? []) {
     const name = (c.challenger as unknown as { display_name: string } | null)?.display_name ?? "Unknown";
-    const typeLabel = c.match_type === "ranked" ? "Ranked" : "Casual";
 
     if (c.status === "pending") {
       items.push({
@@ -2173,7 +2173,7 @@ async function fetchChallengeNotifications(
         challengeId: c.id,
         type: "challenge_received",
         title: "Challenge Received",
-        body: `${name} sent you a ${typeLabel.toLowerCase()} challenge`,
+        body: `${name} sent you a challenge`,
         createdAt: c.created_at,
       });
     } else if (c.status === "accepted") {
@@ -2182,7 +2182,7 @@ async function fetchChallengeNotifications(
         challengeId: c.id,
         type: "challenge_accepted",
         title: "Challenge Accepted",
-        body: `You accepted ${name}'s ${typeLabel.toLowerCase()} challenge`,
+        body: `You accepted ${name}'s challenge`,
         createdAt: c.updated_at,
       });
     } else if (c.status === "declined") {
@@ -2191,7 +2191,7 @@ async function fetchChallengeNotifications(
         challengeId: c.id,
         type: "challenge_declined",
         title: "Challenge Declined",
-        body: `You declined ${name}'s ${typeLabel.toLowerCase()} challenge`,
+        body: `You declined ${name}'s challenge`,
         createdAt: c.updated_at,
       });
     }
@@ -2199,7 +2199,6 @@ async function fetchChallengeNotifications(
 
   for (const c of sent ?? []) {
     const name = (c.opponent as unknown as { display_name: string } | null)?.display_name ?? "Unknown";
-    const typeLabel = c.match_type === "ranked" ? "Ranked" : "Casual";
 
     if (c.status === "accepted") {
       items.push({
@@ -2207,7 +2206,7 @@ async function fetchChallengeNotifications(
         challengeId: c.id,
         type: "challenge_accepted",
         title: "Challenge Accepted",
-        body: `${name} accepted your ${typeLabel.toLowerCase()} challenge`,
+        body: `${name} accepted your challenge`,
         createdAt: c.updated_at,
       });
     } else if (c.status === "declined") {
@@ -2216,7 +2215,7 @@ async function fetchChallengeNotifications(
         challengeId: c.id,
         type: "challenge_declined",
         title: "Challenge Declined",
-        body: `${name} declined your ${typeLabel.toLowerCase()} challenge`,
+        body: `${name} declined your challenge`,
         createdAt: c.updated_at,
       });
     }
@@ -2238,16 +2237,20 @@ async function fetchMatchNotifications(
   const rows = data as MatchHistoryRow[];
   const items = rows.slice(0, 20).map((m) => {
     const outcome = m.athlete_outcome;
-    const delta = m.elo_delta;
-    const sign = delta >= 0 ? "+" : "";
+    // Every match is ranked; a legacy row with no recorded rating (the retired
+    // casual type: elo_delta 0, elo_after NULL) reads without the "(+N ELO)"
+    // suffix, never "casual".
+    const delta = recordedEloDelta(m);
+    const deltaText =
+      typeof delta === "number" ? ` (${delta >= 0 ? "+" : ""}${delta} ELO)` : "";
     let body: string;
 
     if (outcome === "win") {
-      body = `You defeated ${m.opponent_display_name} (${sign}${delta} ELO)`;
+      body = `You defeated ${m.opponent_display_name}${deltaText}`;
     } else if (outcome === "loss") {
-      body = `${m.opponent_display_name} defeated you (${sign}${delta} ELO)`;
+      body = `${m.opponent_display_name} defeated you${deltaText}`;
     } else {
-      body = `Draw with ${m.opponent_display_name} (${sign}${delta} ELO)`;
+      body = `Draw with ${m.opponent_display_name}${deltaText}`;
     }
 
     return {
@@ -2348,7 +2351,7 @@ export interface NoMatchVideoRow {
   video_created_at: string | null;
   analyzed_at: string | null;
   no_match_reason: string | null;
-  /** "ranked" | "casual" */
+  /** Always "ranked" for new rows; a legacy row may still read "casual" (never shown). */
   match_type: string | null;
   match_status: string | null;
   /** "submission" | "draw" | null */
@@ -3180,7 +3183,7 @@ export interface MatchVideoListItem {
   match_id: string;
   /** "completed" for history matches, else get_match_details status ("disputed", ...), or "unknown". */
   match_status: string;
-  /** "ranked" | "casual" */
+  /** Always "ranked" for new rows; a legacy row may still read "casual" (never shown). */
   match_type: string | null;
   /** completed_at, else the newest video's created_at. */
   match_date: string | null;

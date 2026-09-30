@@ -39,7 +39,6 @@ function renderStage(startedAtMs: number, recording = true) {
   return render(
     <LiveStage
       matchId="M1"
-      matchType="ranked"
       me={who("Kai Reyes")}
       opponent={who("Mina Park")}
       durationSeconds={600}

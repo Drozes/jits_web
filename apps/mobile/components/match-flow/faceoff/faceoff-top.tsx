@@ -15,7 +15,6 @@ export interface FaceoffAthlete {
 
 interface FaceoffTopProps {
   phase: "weight" | "ready";
-  matchType: "ranked" | "casual";
   me: FaceoffAthlete;
   opponent: FaceoffAthlete;
 }
@@ -29,7 +28,7 @@ function weightText(lbs: number | null): string {
  * and the fight card. Big on the weigh-in, compressed to the light athlete
  * chip on the ready phase so the camera framing panel fits under it.
  */
-export function FaceoffTop({ phase, matchType, me, opponent }: FaceoffTopProps) {
+export function FaceoffTop({ phase, me, opponent }: FaceoffTopProps) {
   const f = useFaceoffContext();
   const p = usePalette();
   const { canLeave, leave } = f;
@@ -71,7 +70,7 @@ export function FaceoffTop({ phase, matchType, me, opponent }: FaceoffTopProps) 
         <Mono bold color={p.text3}>
           {phase === "weight" ? "FACE-OFF · WEIGH IN" : "FACE-OFF · READY"}
         </Mono>
-        <KindTag kind={matchType} />
+        <KindTag />
       </View>
       {phase === "weight" ? (
         <FightCard me={me} opponent={opponent} />

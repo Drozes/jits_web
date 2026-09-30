@@ -84,7 +84,6 @@ function renderVerdict(overrides: Partial<Props> = {}) {
     matchId: "M1",
     exitHref: ARENA_HREF,
     exitLabel: ARENA_EXIT_LABEL,
-    matchType: "ranked",
     matchStatus: "completed",
     outcome: "win",
     me: { athlete_id: "me", display_name: "Kai Reyes", elo_before: 1512, elo_after: 1526, elo_delta: 14, weight_division_gap: 0 },
@@ -174,10 +173,11 @@ describe("verdict copy and the harness contract", () => {
     expect(s.queryByTestId("summary-share")).toBeNull();
   });
 
-  it("casual: no rating block", async () => {
-    const s = renderVerdict({ matchType: "casual" });
+  it("a legacy row with no recorded rating shows no rating block and never casual", async () => {
+    const s = renderVerdict({ me: { athlete_id: "me", display_name: "Kai Reyes", elo_before: null, elo_after: null, elo_delta: null, weight_division_gap: 0 } });
     await flush();
     expect(s.queryByTestId("summary-elo-delta")).toBeNull();
+    expect(s.queryByText(/casual/i)).toBeNull();
   });
 
   it("keeps the weight-gap note the harness looks for", async () => {
@@ -390,7 +390,6 @@ describe("status bar over the opening still", () => {
     matchId: "M1",
     exitHref: ARENA_HREF,
     exitLabel: ARENA_EXIT_LABEL,
-    matchType: "ranked",
     matchStatus: "completed",
     outcome: "win",
     me: { athlete_id: "me", display_name: "Kai Reyes", elo_before: 1512, elo_after: 1526, elo_delta: 14 },
@@ -500,7 +499,6 @@ describe("highlight note (spec 015 section 16.6.4)", () => {
         matchId="M1"
         exitHref={ARENA_HREF}
         exitLabel={ARENA_EXIT_LABEL}
-        matchType="ranked"
         matchStatus="disputed"
         outcome="win"
         me={{ athlete_id: "me", display_name: "Kai Reyes", elo_before: 1512, elo_after: 1526, elo_delta: 14, weight_division_gap: 0 }}

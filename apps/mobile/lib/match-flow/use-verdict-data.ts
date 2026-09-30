@@ -72,9 +72,9 @@ export function useVerdictVideos(matchId: string, viewerId: string, uploadedKey:
 }
 
 /**
- * The viewer's Rankings move for this match (B6). Null while loading, for a
- * casual match, and whenever the RPC is unavailable (older backend): the
- * verdict then simply shows no rank strip.
+ * The viewer's Rankings move for this match (B6). Null while loading, when
+ * not enabled (the verdict asks only on a win), and whenever the RPC is
+ * unavailable (older backend): the verdict then simply shows no rank strip.
  */
 export function useRankChange(matchId: string, enabled: boolean): MatchRankChange | null {
   const [change, setChange] = React.useState<MatchRankChange | null>(null);

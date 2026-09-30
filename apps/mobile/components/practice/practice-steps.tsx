@@ -184,11 +184,10 @@ export function PracticeConfirm({
 }) {
   return (
     <View className="gap-4">
-      {/* Casual copy: never "Your rating is already updated". */}
+      {/* Practice is unrated: the subtitle overrides "Your rating is already updated". */}
       <ResultBanner
         resultData={result}
         currentAthleteId={athleteId}
-        matchType="casual"
         kicker="Practice result"
         subtitle="Confirm if this is right."
       />

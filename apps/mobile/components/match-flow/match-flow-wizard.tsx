@@ -237,7 +237,6 @@ export function MatchFlowWizard({
     );
   }
 
-  const matchType = (match.match_type as "ranked" | "casual") ?? "casual";
   const ownOutcome = computeOwnOutcome(me.outcome, resultData, currentAthleteId);
   const extras = readMatchExtras(match);
   // Live is a full-screen broadcast layout over the camera, and the verdict
@@ -300,7 +299,7 @@ export function MatchFlowWizard({
               <StepMarker step={step} />
               {live ? null : <QueueStatusBanner />}
               {faceoff ? (
-                <FaceoffTop phase={step} matchType={matchType} me={me} opponent={opponent} />
+                <FaceoffTop phase={step} me={me} opponent={opponent} />
               ) : null}
               <MatchRecorderCamera step={step} optedIn={recording} />
               <MatchStepRenderer
@@ -308,7 +307,6 @@ export function MatchFlowWizard({
                 exitHref={exitHref}
                 exitLabel={exitLabel}
                 matchId={matchId}
-                matchType={matchType}
                 matchStatus={match.status}
                 durationSeconds={match.duration_seconds}
                 startedAt={startedAt ?? match.started_at ?? new Date().toISOString()}

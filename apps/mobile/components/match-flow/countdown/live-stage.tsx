@@ -20,7 +20,6 @@ export function clockStartFor(startedAt: string): string {
 
 interface LiveStageProps {
   matchId: string;
-  matchType: "ranked" | "casual";
   me: LiveParticipant;
   opponent: LiveParticipant;
   durationSeconds: number;
@@ -48,7 +47,7 @@ interface LiveStageProps {
  * not sit on "3" for longer than the countdown lasts.
  */
 export function LiveStage(props: LiveStageProps) {
-  const { startedAt, recording, matchType, me, opponent, myWeight, opponentWeight, ...liveProps } = props;
+  const { startedAt, recording, me, opponent, myWeight, opponentWeight, ...liveProps } = props;
   const [mountedAt] = React.useState(() => Date.now());
   const serverGo = Date.parse(startedAt) + COUNTDOWN_MS;
   const goAt = Number.isFinite(serverGo) ? Math.min(serverGo, mountedAt + COUNTDOWN_MS) : mountedAt;
@@ -74,7 +73,6 @@ export function LiveStage(props: LiveStageProps) {
     return (
       <Countdown
         goAt={goAt}
-        matchType={matchType}
         recording={recording}
         me={me}
         opponent={opponent}
@@ -87,7 +85,6 @@ export function LiveStage(props: LiveStageProps) {
     <>
       <LiveStep
         {...liveProps}
-        matchType={matchType}
         me={me}
         opponent={opponent}
         startedAt={clockStartFor(startedAt)}

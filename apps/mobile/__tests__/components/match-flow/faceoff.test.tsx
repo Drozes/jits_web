@@ -72,13 +72,12 @@ const STAKES = {
   draw_score: 0.25,
 };
 
-function Harness({ phase, onWeighedIn = jest.fn(), onStarted = jest.fn(), onCancelledRemotely = jest.fn(), matchType = "ranked" as "ranked" | "casual", weightsRated = true }: {
+function Harness({ phase, onWeighedIn = jest.fn(), onStarted = jest.fn(), onCancelledRemotely = jest.fn(), weightsRated = true }: {
   phase: "weight" | "ready";
   weightsRated?: boolean;
   onWeighedIn?: () => void;
   onStarted?: (s: string) => void;
   onCancelledRemotely?: (d?: string) => void;
-  matchType?: "ranked" | "casual";
 }) {
   return (
     <FaceoffProvider
@@ -95,8 +94,8 @@ function Harness({ phase, onWeighedIn = jest.fn(), onStarted = jest.fn(), onCanc
       onStarted={onStarted}
       onCancelledRemotely={onCancelledRemotely}
     >
-      <FaceoffTop phase={phase} matchType={matchType} me={ME} opponent={OPP} />
-      <FaceoffBody phase={phase} matchType={matchType} me={ME} opponent={OPP} />
+      <FaceoffTop phase={phase} me={ME} opponent={OPP} />
+      <FaceoffBody phase={phase} me={ME} opponent={OPP} />
     </FaceoffProvider>
   );
 }
@@ -139,12 +138,11 @@ describe("weigh-in", () => {
     expect(mockGetEloStakes).toHaveBeenCalledWith(expect.anything(), 1512, 1498, 170, 167);
   });
 
-  it("casual: no stakes, no division", async () => {
-    const s = render(<Harness phase="weight" matchType="casual" />);
+  it("every match is ranked: the static RANKED tag, never CASUAL", async () => {
+    const s = render(<Harness phase="weight" />);
     await flush();
-    expect(mockGetEloStakes).not.toHaveBeenCalled();
-    s.getByText("3 LBS APART");
-    expect(s.queryByTestId("weight-stakes")).toBeNull();
+    s.getByText("RANKED");
+    expect(s.queryByText(/casual/i)).toBeNull();
   });
 
   it("Confirm (weight-confirm) moves on and tells the opponent this side weighed in", async () => {

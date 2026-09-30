@@ -24,7 +24,7 @@ function TagLabel({ children }: { children: string }) {
   );
 }
 
-/** Top-right glass tag: RANKED / CASUAL / PRACTICE. */
+/** Top-right glass tag: RANKED / PRACTICE. */
 export function HudTag({ label, testID }: { label: string; testID?: string }) {
   return (
     <View testID={testID} style={TAG_STYLE}>

@@ -45,7 +45,8 @@ const FIRST_LINES: Row[] = [
 
 describe("buildHighlightCaption", () => {
   describe.each(["casual", "ranked"] as const)("%s", (matchType) => {
-    const second = matchType === "casual" ? "Casual roll." : "Ranked match.";
+    // Every match is ranked: a legacy casual reel reads the same.
+    const second = "Ranked match.";
     it.each(FIRST_LINES)("outcome %s, technique %s, opponent %s", (outcome, technique, opponentName, line1) => {
       expect(buildHighlightCaption(ctx({ matchType, outcome, technique, opponentName }))).toBe(
         `${line1}\n${second}\n${TAIL}`,
@@ -63,10 +64,10 @@ describe("buildHighlightCaption", () => {
     expect(buildHighlightCaption(ctx({ matchType: "ranked", eloAfter, eloDelta })).split("\n")[1]).toBe(line2);
   });
 
-  it("ignores ELO on a casual match", () => {
-    expect(buildHighlightCaption(ctx({ matchType: "casual", eloAfter: 1200, eloDelta: 5 })).split("\n")[1]).toBe(
-      "Casual roll.",
-    );
+  it("never says casual: a legacy casual reel reads like a ranked match", () => {
+    const caption = buildHighlightCaption(ctx({ matchType: "casual", eloAfter: null, eloDelta: null }));
+    expect(caption.split("\n")[1]).toBe("Ranked match.");
+    expect(caption).not.toMatch(/casual/i);
   });
 
   it("normalises the technique: trimmed, collapsed, lower-cased after the first letter", () => {

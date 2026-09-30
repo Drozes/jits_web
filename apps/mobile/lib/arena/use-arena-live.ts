@@ -29,9 +29,9 @@
  * the one that can be left to finish or not. See `step()`.
  *
  * Ranked only. `toggleMatchPreferences` always writes
- * `looking_for_casual: false`; casual was removed from the product and
- * `get_arena_data` filters on (casual OR ranked), so ranked alone is enough to
- * appear.
+ * `looking_for_casual: false` (the server forces it false anyway since
+ * jr_be-ahn.1); every match is ranked and `get_arena_data` filters on
+ * `looking_for_ranked`, so ranked is what makes an athlete appear.
  *
  * Mounted ONCE for the signed-in athlete, by `<ArenaBootstrap />`
  * (`lib/arena/arena-bootstrap.tsx`), and read everywhere else through

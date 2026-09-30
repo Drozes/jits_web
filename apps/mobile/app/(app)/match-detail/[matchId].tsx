@@ -83,7 +83,6 @@ export default function MatchDetailScreen() {
             me={{ name: data.me.display_name, photoUrl: data.me.profile_photo_url }}
             opponent={data.opponent ? { name: data.opponent.display_name, photoUrl: data.opponent.profile_photo_url } : null}
             fallbackLabel={film.fallbackLabel}
-            ranked={data.match.match_type === "ranked"}
             clockSeconds={data.match.duration_seconds}
             onPlay={active && active.playability !== "processing" ? () => play(active.id) : null}
           />

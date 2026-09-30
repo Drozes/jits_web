@@ -207,10 +207,11 @@ export default function ArenaScreen() {
   // One challenge at a time.
   const actionsLocked = isBusy || !!outgoing || !!incoming;
 
-  const actionFor = (id: string, acceptsRanked: boolean): MatRowAction => {
+  // Every match is ranked and `get_arena_data` lists only athletes with
+  // `looking_for_ranked`, so every on-mat row falls through to Roll / Sent.
+  const actionFor = (id: string): MatRowAction => {
     if (outgoing?.opponentId === id) return { kind: "sent", source: outgoing, active: ticking };
     if (challengedIds.has(id)) return { kind: "pending" };
-    if (!acceptsRanked) return { kind: "casual-only" };
     if (!isLive) return { kind: "go-live" };
     if (capReached) return { kind: "capped" };
     return { kind: "roll" };
@@ -348,7 +349,7 @@ export default function ArenaScreen() {
                   right={String(onTheMat.length)}
                 />
                 {onTheMat.map((c) => {
-                  const action = actionFor(c.id, c.acceptsRanked);
+                  const action = actionFor(c.id);
                   return (
                     <MatRow
                       key={c.id}

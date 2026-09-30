@@ -175,12 +175,11 @@ export function pendingChallengeToBellItem(
   c: PendingChallenge,
   fresh = false,
 ): FeedNotificationItem {
-  const typeLabel = c.matchType === "ranked" ? "ranked" : "casual";
   return {
     id: `challenge-recv-${c.id}`,
     type: "challenge_received",
     title: "Challenge Received",
-    body: `${c.challengerName} sent you a ${typeLabel} challenge`,
+    body: `${c.challengerName} sent you a challenge`,
     challengeId: c.id,
     createdAt: c.createdAt,
     ...(fresh ? { unread: true } : {}),

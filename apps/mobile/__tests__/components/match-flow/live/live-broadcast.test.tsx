@@ -253,9 +253,9 @@ it("keeps the digits one color in every state (never amber or red)", () => {
   expect(new Set(colors)).toEqual(new Set(["#E8EDF2"]));
 });
 
-it("shows CASUAL and the practice HUD extra", () => {
-  const casual = render(<LiveBroadcast {...props({ kindLabel: "CASUAL" })} />);
-  expect(casual.getByTestId("live-kind-tag")).toHaveTextContent("CASUAL");
+it("shows RANKED and the practice HUD extra", () => {
+  const ranked = render(<LiveBroadcast {...props({ kindLabel: "RANKED" })} />);
+  expect(ranked.getByTestId("live-kind-tag")).toHaveTextContent("RANKED");
   const { Text } = require("react-native");
   const practice = render(
     <LiveBroadcast {...props({ kindLabel: "PRACTICE", hudExtra: <Text testID="extra">EXIT</Text> })} />,

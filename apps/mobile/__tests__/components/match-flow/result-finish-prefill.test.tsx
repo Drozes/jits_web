@@ -44,7 +44,6 @@ function renderResult(initialFinishSeconds?: number) {
   const s = render(
     <ResultStep
       matchId="M1"
-      matchType="ranked"
       durationSeconds={300}
       initialFinishSeconds={initialFinishSeconds}
       me={{ id: "me-1", displayName: "Me", elo: 1500, weight: 170 }}

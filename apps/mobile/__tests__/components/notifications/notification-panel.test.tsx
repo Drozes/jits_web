@@ -98,11 +98,11 @@ describe("NotificationPanel open/close", () => {
 describe("NotificationPanel sections and rows (jits-dq85.8)", () => {
   const now = new Date().toISOString();
   const feed: BellItem[] = [
-    { id: "challenge-recv-f", type: "challenge_received", title: "Challenge Received", body: "Alex sent you a ranked challenge", challengeId: "f", createdAt: now, unread: true },
+    { id: "challenge-recv-f", type: "challenge_received", title: "Challenge Received", body: "Alex sent you a challenge", challengeId: "f", createdAt: now, unread: true },
     { id: "session-s", type: "session_joined", title: "Joined", body: "Session row", createdAt: now },
   ];
   const missed: BellItem[] = [
-    { id: "challenge-recv-o", type: "challenge_received", title: "Challenge Received", body: "Bo sent you a ranked challenge", challengeId: "o", createdAt: "2026-01-01T00:00:00Z" },
+    { id: "challenge-recv-o", type: "challenge_received", title: "Challenge Received", body: "Bo sent you a challenge", challengeId: "o", createdAt: "2026-01-01T00:00:00Z" },
   ];
 
   it("lists the Missed section after the feed", () => {
@@ -113,7 +113,7 @@ describe("NotificationPanel sections and rows (jits-dq85.8)", () => {
     expect(u.getByRole("header", { name: "Missed" })).toBeTruthy();
     expect(u.getByTestId("notification-missed")).toHaveTextContent(/Bo sent you/);
     const texts = u.getAllByText(/sent you/).map((n) => n.props.children);
-    expect(texts).toEqual(["Alex sent you a ranked challenge", "Bo sent you a ranked challenge"]);
+    expect(texts).toEqual(["Alex sent you a challenge", "Bo sent you a challenge"]);
   });
 
   it("has no Missed section with nothing missed, and the empty state only when both lists are empty", () => {
@@ -142,9 +142,9 @@ describe("NotificationPanel sections and rows (jits-dq85.8)", () => {
     expect(u.getAllByRole("button")).toHaveLength(2); // the fresh and the Missed challenge rows
     fireEvent.press(u.getByText("Session row"));
     expect(onItemPress).not.toHaveBeenCalled();
-    fireEvent.press(u.getByText("Bo sent you a ranked challenge"));
+    fireEvent.press(u.getByText("Bo sent you a challenge"));
     expect(onItemPress).toHaveBeenLastCalledWith(missed[0]);
-    fireEvent.press(u.getByText("Alex sent you a ranked challenge"));
+    fireEvent.press(u.getByText("Alex sent you a challenge"));
     expect(onItemPress).toHaveBeenLastCalledWith(feed[0]);
     expect(onItemPress).toHaveBeenCalledTimes(2);
   });

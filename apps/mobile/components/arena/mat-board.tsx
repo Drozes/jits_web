@@ -745,8 +745,6 @@ export type MatRowAction =
   | { kind: "sent"; source: CountdownSource | null; active: boolean }
   /** A challenge is pending between us (either direction). */
   | { kind: "pending" }
-  /** They do not take ranked: the insert would be refused. */
-  | { kind: "casual-only" }
   /** I am at the server's 3 pending outgoing cap. */
   | { kind: "capped" };
 
@@ -843,7 +841,6 @@ export function MatRow({
           />
         ) : null}
         {action.kind === "pending" ? <MetaTag>Pending</MetaTag> : null}
-        {action.kind === "casual-only" ? <MetaTag>Casual only</MetaTag> : null}
         {action.kind === "capped" ? <MetaTag>3 out</MetaTag> : null}
       </View>
     </View>

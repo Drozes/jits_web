@@ -28,7 +28,6 @@ export interface ConfirmAthlete {
 
 interface ConfirmStepProps {
   matchId: string;
-  matchType: "ranked" | "casual";
   me: ConfirmAthlete;
   opponent: ConfirmAthlete;
   resultData: BroadcastResult | null;
@@ -73,7 +72,7 @@ export function confirmVerdict(resultData: BroadcastResult | null, meId: string)
  */
 export function ConfirmStep(props: ConfirmStepProps) {
   const p = usePalette();
-  const { matchId, matchType, me, opponent, resultData, confirmedAthleteIds, submissionName, finishTimeSeconds, disputeLocksAt: rawLocksAt, completedAt = null, onCompleted } = props;
+  const { matchId, me, opponent, resultData, confirmedAthleteIds, submissionName, finishTimeSeconds, disputeLocksAt: rawLocksAt, completedAt = null, onCompleted } = props;
   const disputeLocksAt = useDisputeLocksAt(rawLocksAt, completedAt);
   const [myConfirmedLocal, setMyConfirmed] = React.useState(false);
   const [opponentConfirmedLocal, setOpponentConfirmed] = React.useState(false);
@@ -190,7 +189,7 @@ export function ConfirmStep(props: ConfirmStepProps) {
             </Text>
           ) : null}
         </View>
-        {matchType === "ranked" && me.elo_after != null ? (
+        {me.elo_after != null ? (
           <View style={{ borderTopWidth: 1, borderColor: p.hairline, padding: 12 }}>
             <RatingBlock label="YOUR RATING" before={me.elo_before ?? null} after={me.elo_after} delta={me.elo_delta ?? null} />
           </View>

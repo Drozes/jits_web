@@ -441,11 +441,11 @@ describe("fresh-only badge (AC-H15)", () => {
       { ...pendingRow("c-old", 2 * 60 * MIN, "Bo"), expires_at: new Date(Date.now() + MIN).toISOString() },
     ];
     const u = await renderApp();
-    expect(u.getByText("Bo sent you a ranked challenge")).toBeTruthy();
+    expect(u.getByText("Bo sent you a challenge")).toBeTruthy();
     await act(async () => {
       jest.advanceTimersByTime(MIN + 1);
     });
-    expect(u.queryByText("Bo sent you a ranked challenge")).toBeNull();
+    expect(u.queryByText("Bo sent you a challenge")).toBeNull();
     expect(u.queryByTestId("notification-missed")).toBeNull();
   });
 
@@ -464,7 +464,7 @@ describe("fresh-only badge (AC-H15)", () => {
     });
     // Nothing fired, so nothing re-armed and nothing re-rendered in a loop.
     expect(armed).not.toHaveBeenCalled();
-    expect(u.getByTestId("notification-missed")).toHaveTextContent(/Bo sent you a ranked challenge/);
+    expect(u.getByTestId("notification-missed")).toHaveTextContent(/Bo sent you a challenge/);
   });
 
   it("clears the badge when the host unmounts (sign-out)", async () => {
@@ -483,16 +483,16 @@ describe("panel rows", () => {
     mockPendingRows = [pendingRow("c-fresh", 2 * MIN, "Alex"), pendingRow("c-old", 2 * 60 * MIN, "Bo")];
     const u = await renderApp();
     const missed = u.getByTestId("notification-missed");
-    expect(missed).toHaveTextContent(/Bo sent you a ranked challenge/);
+    expect(missed).toHaveTextContent(/Bo sent you a challenge/);
     expect(missed).not.toHaveTextContent(/Alex/);
-    expect(u.getByText("Alex sent you a ranked challenge")).toBeTruthy();
+    expect(u.getByText("Alex sent you a challenge")).toBeTruthy();
   });
 
   it("a fresh challenge row closes the panel and opens the Arena on that challenge, in place", async () => {
     mockPendingRows = [pendingRow("c-fresh", 2 * MIN, "Alex"), pendingRow("c-old", 2 * 60 * MIN, "Bo")];
     const u = await renderApp();
     await pressBell(u, 0);
-    fireEvent.press(u.getByText("Alex sent you a ranked challenge"));
+    fireEvent.press(u.getByText("Alex sent you a challenge"));
     // A tab root is navigated to, never pushed (no second Arena stacks).
     expect(mockNavigate).toHaveBeenLastCalledWith("/arena?challenge=c-fresh");
     expect(mockPush).not.toHaveBeenCalled();
@@ -504,7 +504,7 @@ describe("panel rows", () => {
     mockPendingRows = [pendingRow("c-fresh", 2 * MIN, "Alex")];
     const u = await renderApp();
     await pressBell(u, 0);
-    fireEvent.press(u.getByText("Alex sent you a ranked challenge"));
+    fireEvent.press(u.getByText("Alex sent you a challenge"));
     expect(mockNavigate).toHaveBeenCalledTimes(1);
     expect(mockNavigate).toHaveBeenLastCalledWith("/arena?challenge=c-fresh");
     expect(mockPush).not.toHaveBeenCalled();
@@ -514,7 +514,7 @@ describe("panel rows", () => {
     mockPendingRows = [pendingRow("c-old", 2 * 60 * MIN, "Bo")];
     const u = await renderApp();
     await pressBell(u, 0);
-    fireEvent.press(u.getByText("Bo sent you a ranked challenge"));
+    fireEvent.press(u.getByText("Bo sent you a challenge"));
     expect(mockDismiss).toHaveBeenCalledTimes(1);
     expect(mockNavigate).toHaveBeenCalledTimes(1);
     expect(mockNavigate).toHaveBeenLastCalledWith("/arena");
@@ -576,11 +576,11 @@ describe("Q3: a challenge dropped by a manual go-offline (tucked with Later)", (
     });
     expect(badgeTexts(u)).toEqual([]);
     expect(getFreshIncomingCountForTests()).toBe(0);
-    expect(u.getByTestId("notification-missed")).toHaveTextContent(/Alex sent you a ranked challenge/);
+    expect(u.getByTestId("notification-missed")).toHaveTextContent(/Alex sent you a challenge/);
     expect(u.queryByTestId("notification-unread-challenge-recv-c-fresh")).toBeNull();
 
     await pressBell(u, 0);
-    fireEvent.press(u.getByText("Alex sent you a ranked challenge"));
+    fireEvent.press(u.getByText("Alex sent you a challenge"));
     expect(mockNavigate).toHaveBeenLastCalledWith("/arena");
   });
 });
@@ -650,9 +650,9 @@ describe("pending re-sync (realtime does not replay missed events)", () => {
     });
     await settle();
     expect(badgeTexts(u)).toEqual(["1", "1", "1", "1"]);
-    expect(u.queryByText("Alex sent you a ranked challenge")).toBeNull();
+    expect(u.queryByText("Alex sent you a challenge")).toBeNull();
     expect(u.queryByTestId("notification-missed")).toBeNull();
-    expect(u.getByText("Cy sent you a ranked challenge")).toBeTruthy();
+    expect(u.getByText("Cy sent you a challenge")).toBeTruthy();
     u.unmount();
   };
 

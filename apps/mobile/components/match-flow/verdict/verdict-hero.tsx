@@ -9,7 +9,6 @@ import { InitialsBlock, KindTag, Mono, shortName } from "../fight/fight-ui";
 export const HERO_HEIGHT = 360;
 
 interface VerdictHeroProps {
-  matchType: "ranked" | "casual";
   posterUrl: string | null;
   posterKey: string | null;
   /** Winner first when there is one (the fallback plate's left avatar). */
@@ -29,7 +28,7 @@ function pct(p: number | null): string | null {
  * The verdict's hero: the match's opening still (the slicer poster), or
  * while there is none yet both athletes on a plate with where the still is.
  */
-export function VerdictHero({ matchType, posterUrl, posterKey, left, right, upload, filmExpected, topInset }: VerdictHeroProps) {
+export function VerdictHero({ posterUrl, posterKey, left, right, upload, filmExpected, topInset }: VerdictHeroProps) {
   const p = usePalette();
   if (posterUrl) {
     return (
@@ -50,7 +49,7 @@ export function VerdictHero({ matchType, posterUrl, posterKey, left, right, uplo
           <View style={{ height: 28, paddingHorizontal: 10, justifyContent: "center", borderWidth: 1, borderColor: ON_MEDIA.strong, borderRadius: FIGHT_RADIUS.tag, backgroundColor: ON_MEDIA.tag }}>
             <Mono color={ON_MEDIA.tagText}>OPENING STILL</Mono>
           </View>
-          <KindTag kind={matchType} onScrim />
+          <KindTag onScrim />
         </View>
       </View>
     );
@@ -68,7 +67,7 @@ export function VerdictHero({ matchType, posterUrl, posterKey, left, right, uplo
   return (
     <View testID="verdict-still-fallback" style={{ height: HERO_HEIGHT, backgroundColor: p.plate, borderBottomWidth: 1, borderColor: p.hairline }}>
       <View style={{ position: "absolute", left: 16, right: 16, top: topInset + 12, alignItems: "flex-end" }}>
-        <KindTag kind={matchType} />
+        <KindTag />
       </View>
       <View style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 20, paddingTop: topInset }}>
         {[left, right].map((name, i) => (

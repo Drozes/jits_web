@@ -4,7 +4,7 @@ import { formatClock } from "@jits/shared/utils";
 import type { MatchDetailView } from "@jits/shared/api/queries";
 import { usePalette, TABULAR, type Palette } from "@/lib/theme/palette";
 import { deltaLabel, shortName, titleDate } from "@/lib/film-room/format";
-import { humanizeAnalysisLabel } from "@jits/shared/utils";
+import { humanizeAnalysisLabel, recordedEloDelta } from "@jits/shared/utils";
 
 const VERDICT: Record<string, string> = { win: "YOU WON", loss: "YOU LOST", draw: "DRAW" };
 /** Statuses whose result stands for nothing: muted chip, no rating change. */
@@ -21,7 +21,8 @@ export function verdictLine(view: MatchDetailView): string {
     parts.push(`on ${humanizeAnalysisLabel(match.result)?.toLowerCase() ?? match.result}`);
   }
   if (opponent) parts.push(`vs ${shortName(opponent.display_name)}`);
-  parts.push(match.match_type === "ranked" ? "Ranked" : "Casual");
+  // Every match is ranked (casual was retired); a legacy row reads the same.
+  parts.push("Ranked");
   const when = titleDate(match.completed_at ?? match.started_at);
   if (when) parts.push(when);
   return parts.join(" · ");
@@ -36,13 +37,14 @@ function deltaColor(delta: number, p: Palette): string {
 /**
  * YOU WON / YOU LOST / DRAW in Bebas, the rating change with its ▲/▼ prefix
  * and before → after on the right, and how it ended underneath. A disputed
- * result says so in amber; casual matches read "Casual, unrated".
+ * result says so in amber. Every match is ranked; a legacy row with no
+ * recorded rating change (elo_after NULL) shows no delta (never "casual").
  */
 export function MatchVerdict({ view }: { view: MatchDetailView }) {
   const p = usePalette();
   const { match, me } = view;
   const muted = MUTED[match.status];
-  const ranked = match.match_type === "ranked";
+  const hasDelta = recordedEloDelta(me) != null;
   const verdict = (!muted && me.outcome && VERDICT[me.outcome]) || "NO RESULT";
   return (
     <View testID="match-result-header" style={{ gap: 8 }}>
@@ -54,7 +56,7 @@ export function MatchVerdict({ view }: { view: MatchDetailView }) {
           <Text className="font-body" style={{ fontSize: 12, color: p.text2, paddingBottom: 6 }}>
             Rating unchanged
           </Text>
-        ) : ranked ? (
+        ) : hasDelta ? (
           <View className="items-end" style={{ gap: 5, paddingBottom: 3 }}>
             <Text testID="match-elo-delta" className="font-mono-bold" style={[{ fontSize: 18, color: deltaColor(me.elo_delta, p) }, TABULAR]}>
               {deltaLabel(me.elo_delta)}
@@ -65,11 +67,7 @@ export function MatchVerdict({ view }: { view: MatchDetailView }) {
               </Text>
             ) : null}
           </View>
-        ) : (
-          <Text className="font-body" style={{ fontSize: 12, color: p.text2, paddingBottom: 6 }}>
-            Casual, unrated
-          </Text>
-        )}
+        ) : null}
       </View>
       <Text testID="match-verdict-line" className="font-mono-medium uppercase" style={{ fontSize: 11, lineHeight: 16, letterSpacing: 0.8, color: p.text2 }}>
         {verdictLine(view)}

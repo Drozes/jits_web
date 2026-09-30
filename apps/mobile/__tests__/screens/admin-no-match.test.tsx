@@ -78,12 +78,12 @@ beforeEach(() => {
 });
 
 describe("AdminNoMatchVideosScreen", () => {
-  it("lists each video with match type/result, uploader, ELO changes and the reason", async () => {
+  it("lists each video with match status/result (no type), uploader, ELO changes and the reason", async () => {
     mockList.mockResolvedValue({ ok: true, data: [ROW] });
     const r = await renderScreen();
     const row = await waitFor(() => r.getByTestId("no-match-row-vid-1"));
     const inRow = within(row);
-    expect(inRow.getByText("ranked · completed · submission")).toBeTruthy();
+    expect(inRow.getByText("completed · submission")).toBeTruthy();
     expect(inRow.getByText("Uploaded by Kai Reyes")).toBeTruthy();
     expect(inRow.getByText("Kai Reyes · win")).toBeTruthy();
     expect(inRow.getByText("Mina Park · loss")).toBeTruthy();

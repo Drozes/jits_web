@@ -22,8 +22,6 @@ export type RowAction =
   | { kind: "go-live" }
   /** A challenge is already pending in one direction or the other. */
   | { kind: "pending" }
-  /** Listed as looking, but not for ranked. The insert would be refused. */
-  | { kind: "casual-only" }
   /** The viewer is at the server's 3 pending outgoing challenge cap. */
   | { kind: "capped" }
   /** Nothing to offer: an offline athlete on the "Open to challenges" list. */
@@ -150,7 +148,6 @@ export function CompetitorRow({
           ) : null}
 
           {action.kind === "pending" ? <Tag label="Pending" /> : null}
-          {action.kind === "casual-only" ? <Tag label="Casual only" /> : null}
           {action.kind === "capped" ? <Tag label="3 out" /> : null}
           {action.kind === "none" && inLobby ? <LivePill label="In lobby" /> : null}
         </View>

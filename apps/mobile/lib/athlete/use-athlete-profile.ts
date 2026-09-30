@@ -59,7 +59,6 @@ export function useAthleteProfile(
         const headToHead: HeadToHeadMatch[] = history
           .filter((m) => m.opponent_id === competitorId)
           .map((m) => ({
-            matchType: m.match_type as "ranked" | "casual",
             result: m.athlete_outcome as "win" | "loss" | "draw" | null,
           }));
         const gymName = extractGymName(

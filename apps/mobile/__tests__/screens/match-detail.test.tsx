@@ -274,11 +274,16 @@ describe("MatchDetailScreen (Film Room match page)", () => {
     expect(draw.getByTestId("match-verdict")).toHaveTextContent("DRAW");
   });
 
-  it("says Casual, unrated instead of a delta for a casual match", async () => {
-    const utils = await renderLoaded(view({ match: { match_type: "casual" } }));
-    expect(utils.getByText("Casual, unrated")).toBeTruthy();
-    expect(utils.getByText("CASUAL")).toBeTruthy();
+  it("renders a legacy casual match like any match: RANKED tag, no delta when none was recorded, never casual", async () => {
+    const utils = await renderLoaded(
+      // Real backend shape: elo_delta is NOT NULL DEFAULT 0, elo_after NULL.
+      view({ match: { match_type: "casual" }, me: { elo_delta: 0, elo_before: null, elo_after: null } }),
+    );
+    expect(utils.queryByText(/casual/i)).toBeNull();
+    expect(utils.getByText("RANKED")).toBeTruthy();
     expect(utils.queryByTestId("match-elo-delta")).toBeNull();
+    expect(utils.queryByText(/± 0/)).toBeNull();
+    expect(utils.getByTestId("match-verdict-line")).toHaveTextContent(/Ranked/);
   });
 
   it("flags a disputed result and still lists the film", async () => {

@@ -128,7 +128,6 @@ function renderLive(remainingSeconds: number, pausedForSeconds?: number, granted
   const element = () => (
     <LiveStep
       matchId="M1"
-      matchType="ranked"
       me={{ display_name: "Kai Reyes", current_elo: 1512, current_weight: 77 }}
       opponent={{ display_name: "Mina Park", current_elo: 1498, current_weight: 76 }}
       durationSeconds={DURATION}

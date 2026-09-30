@@ -40,7 +40,6 @@ interface VerdictStepProps {
   matchId: string;
   exitHref: string;
   exitLabel: string;
-  matchType: "ranked" | "casual";
   matchStatus: string;
   outcome: "win" | "loss" | "draw" | null;
   me: VerdictAthlete;
@@ -71,7 +70,7 @@ interface VerdictStepProps {
  */
 export function VerdictStep(props: VerdictStepProps) {
   const p = usePalette();
-  const { matchId, exitHref, exitLabel, matchType, matchStatus, outcome, me, opponent, submissionName, finishTimeSeconds, upload, uploadedVideoId, confirmedAthleteIds = [] } = props;
+  const { matchId, exitHref, exitLabel, matchStatus, outcome, me, opponent, submissionName, finishTimeSeconds, upload, uploadedVideoId, confirmedAthleteIds = [] } = props;
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [disputedHere, setDisputedHere] = React.useState(false);
@@ -108,20 +107,20 @@ export function VerdictStep(props: VerdictStepProps) {
     return () => clearInterval(id);
   }, [awaitingOpponent, reconcileNow]);
 
-  const ranked = matchType === "ranked";
   const win = !disputed && outcome === "win";
   const loss = !disputed && outcome === "loss";
 
   const videos = useVerdictVideos(matchId, me.athlete_id, uploadedVideoId);
-  const rank = useRankChange(matchId, ranked && win);
+  const rank = useRankChange(matchId, win);
   const rankText = win ? rankStripText(rank, shortName) : null;
 
-  const eloBefore = ranked ? (me.elo_before ?? null) : null;
+  // Every match is ranked (casual was retired).
+  const eloBefore = me.elo_before ?? null;
   // The stamped post-match rating only: before the refresh lands,
   // current_elo is still the PRE-match rating and would read as no change.
-  const eloAfter = ranked ? (me.elo_after ?? null) : null;
-  const eloDelta = ranked ? (me.elo_delta ?? null) : null;
-  const gap = ranked ? (me.weight_division_gap ?? 0) : 0;
+  const eloAfter = me.elo_after ?? null;
+  const eloDelta = me.elo_delta ?? null;
+  const gap = me.weight_division_gap ?? 0;
 
   const verdict = disputed ? "DISPUTED" : win ? "YOU WON" : loss ? "YOU LOST" : outcome === "draw" ? "DRAW" : "MATCH RECORDED";
   const verdictColor = outcome === "draw" && !disputed ? p.amber : p.text;
@@ -159,7 +158,6 @@ export function VerdictStep(props: VerdictStepProps) {
     <View style={{ paddingBottom: Math.max(insets.bottom, 16) + 16 }}>
       <ThemedStatusBar overMedia={!!videos.posterUrl && !pastHero} />
       <VerdictHero
-        matchType={matchType}
         posterUrl={videos.posterUrl}
         posterKey={videos.posterKey}
         left={outcome === "loss" ? opponent.display_name : me.display_name}
@@ -189,7 +187,7 @@ export function VerdictStep(props: VerdictStepProps) {
           ) : null}
         </View>
 
-        {ranked && eloAfter != null ? (
+        {eloAfter != null ? (
           <RatingBlock
             before={eloBefore}
             after={eloAfter}
