@@ -1,3 +1,4 @@
+import * as React from "react";
 import { AccessibilityInfo, Pressable, Text } from "react-native";
 import RNToast, {
   type ToastConfig,
@@ -23,13 +24,47 @@ function normalize(input: ToastInput): ToastShowParams {
   return { ...rest, text2: rest.text2 ?? description };
 }
 
+/** The library's own default, for a toast that does not set one. */
+const DEFAULT_VISIBILITY_MS = 4000;
+
+/**
+ * The toast most recently shown through this module, so a host that is torn
+ * down while showing it (the in-modal `ModalToaster`) can hand it to the host
+ * underneath. `seq` orders shows; `hidden` flips when the toast hides by any
+ * route (auto-hide, a tap, a swipe, `toast.hide()`) or is replaced.
+ */
+type ShownToast = { seq: number; at: number; params: ToastShowParams; hidden: boolean };
+let showSeq = 0;
+let lastShown: ShownToast | null = null;
+
+function showTracked(params: ToastShowParams) {
+  if (lastShown) lastShown.hidden = true;
+  const userOnHide = params.onHide;
+  const entry: ShownToast = { seq: ++showSeq, at: Date.now(), params, hidden: false };
+  entry.params = {
+    ...params,
+    onHide: () => {
+      entry.hidden = true;
+      userOnHide?.();
+    },
+  };
+  lastShown = entry;
+  RNToast.show(entry.params);
+}
+
+/** Test-only: forget the tracked toast between tests. */
+export function __resetToastTrackingForTests() {
+  showSeq = 0;
+  lastShown = null;
+}
+
 /**
  * Shows the toast and reads it out to VoiceOver, which does not otherwise
  * notice a toast appearing over the current screen.
  */
 function showAndAnnounce(type: "success" | "error" | "info", input: ToastInput) {
   const params = normalize(input);
-  RNToast.show({ type, ...params });
+  showTracked({ type, ...params });
   if (params.text1) {
     AccessibilityInfo.announceForAccessibility(
       params.text1 + (params.text2 ? ". " + params.text2 : ""),
@@ -48,9 +83,10 @@ export const toast = {
     showAndAnnounce("info", input);
   },
   show(params: ToastShowParams) {
-    RNToast.show(params);
+    showTracked(params);
   },
   hide() {
+    if (lastShown) lastShown.hidden = true;
     RNToast.hide();
   },
 };
@@ -126,6 +162,36 @@ export const toastConfig: ToastConfig = {
 
 /** The library host, pre-wired with the branded config. */
 export function Toaster() {
+  return <RNToast config={toastConfig} />;
+}
+
+/**
+ * A second host for inside a React Native `<Modal>`, which renders above the
+ * root `<Toaster />`. The library routes `toast.*` to the newest mounted host
+ * and keeps the toast's state in that host, so a toast raised just before
+ * the modal's host unmounts (an action that fails and clears the modal in
+ * the same flow) would vanish with it. On unmount this re-shows such a toast
+ * on the host underneath for the rest of its visibility window. Deferred one
+ * tick so the library has already dropped this host's ref and routes the
+ * re-show to the root host.
+ */
+export function ModalToaster() {
+  React.useEffect(() => {
+    const mountedSeq = showSeq;
+    return () => {
+      const entry = lastShown;
+      if (!entry || entry.hidden || entry.seq <= mountedSeq) return;
+      const autoHide = entry.params.autoHide ?? true;
+      const total = entry.params.visibilityTime ?? DEFAULT_VISIBILITY_MS;
+      const remaining = total - (Date.now() - entry.at);
+      if (autoHide && remaining <= 0) return;
+      setTimeout(() => {
+        // Replaced or hidden in the meantime: nothing to hand over.
+        if (lastShown !== entry || entry.hidden) return;
+        RNToast.show({ ...entry.params, visibilityTime: autoHide ? remaining : total });
+      }, 0);
+    };
+  }, []);
   return <RNToast config={toastConfig} />;
 }
 

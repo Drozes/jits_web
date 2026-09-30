@@ -19,7 +19,7 @@ interface HighlightFeedbackSheetProps {
 }
 
 /**
- * The gorhom modal around the feedback form. Per `challenge-prompt-sheet.tsx`,
+ * The gorhom modal around the feedback form. Per `notification-panel.tsx`,
  * only `dismiss()` a sheet this component presented and that has not closed
  * itself, or gorhom sticks in DISMISSING and the next `present()` is blank.
  */

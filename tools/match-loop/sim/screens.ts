@@ -173,15 +173,21 @@ export class Screens {
   // --- incoming prompt ------------------------------------------------------
 
   /**
-   * The sheet's drag handle. Since jits-ef2a the prompt's Accept / Decline
-   * buttons are exposed by label (the sheet no longer collapses its children
-   * into one "Bottom Sheet" element), and they are the only way the harness
-   * answers a prompt. The handle is kept as a second visibility signal, so a
-   * prompt whose buttons are momentarily missing from a describe still counts
-   * as up.
+   * The prompt's "INCOMING CHALLENGE" title. Since jits-02vo.3 the prompt is a
+   * centered modal, not a gorhom bottom sheet, so there is no drag handle to
+   * look for. Its Accept / Decline buttons are exposed by label (jits-ef2a)
+   * and are the only way the harness answers a prompt; the title is kept as a
+   * second visibility signal, so a prompt whose buttons are momentarily
+   * missing from a describe still counts as up.
+   *
+   * A card that is fading out (about 300ms after an answer) is still drawn,
+   * but the app hides it from the accessibility tree the moment its
+   * challenge clears (`accessibilityElementsHidden`), so neither the title
+   * nor the buttons of a closing card are reported here. A zero-size or
+   * off-screen title is ignored as well, as the old sheet-handle check did.
    */
   private promptSheet(els: AXElement[]): AXElement | undefined {
-    return els.find((e) => e.AXLabel === "Bottom sheet handle" && e.frame.y < this.idb.screenH - 40);
+    return els.find((e) => e.AXLabel === "INCOMING CHALLENGE" && this.idb.onScreen(e, 0, 0));
   }
 
   async isPromptVisible(els?: AXElement[]): Promise<boolean> {

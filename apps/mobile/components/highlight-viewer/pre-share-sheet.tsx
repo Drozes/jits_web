@@ -13,7 +13,7 @@ interface PreShareSheetProps {
 }
 
 /**
- * The gorhom modal around the pre-share flow. Per `challenge-prompt-sheet.tsx`,
+ * The gorhom modal around the pre-share flow. Per `notification-panel.tsx`,
  * only `dismiss()` a sheet this component presented and that has not closed
  * itself, or gorhom sticks in DISMISSING and the next `present()` is blank.
  */

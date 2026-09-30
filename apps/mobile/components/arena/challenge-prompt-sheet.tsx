@@ -1,12 +1,16 @@
 /**
  * The live incoming challenge prompt.
  *
- * A bottom sheet rather than a plate in the list: it has to be answerable
+ * A centered modal over a dimmed backdrop (jits-02vo.3, board
+ * P-Challenge-Sheet) rather than a plate in the list: it has to be answerable
  * wherever the athlete happens to be, on any tab, because being live persists
- * across the app. Mounted once, app-wide, by `<ArenaBootstrap />`.
+ * across the app. Mounted once, app-wide, by `<ArenaBootstrap />`. The card is
+ * inset 16pt from each side, about 75% of the window tall (633 of 844 on the
+ * board), radius 8, with its content centered inside it and scrolling on a
+ * small phone at a large text size rather than clipping Accept and Decline.
  *
- * It cannot be swiped away (AC-S7): a swipe is too easy to make by accident
- * for something that decides a match. There are three explicit exits:
+ * It cannot be dismissed by accident (AC-S7): a backdrop tap does nothing and
+ * Android back does nothing. There are three explicit exits:
  *  - Accept and Decline send the challenger a real answer;
  *  - Later minimizes the prompt into the header chip (`! ALEX · 8:41`) and
  *    sends NOTHING: the challenge stays pending and the challenger keeps
@@ -14,22 +18,35 @@
  * Accept, Decline and Later ignore taps for `PROMPT_INPUT_GUARD_MS` after the
  * prompt appears (AC-S3), so a finger already on its way to a button on the
  * screen underneath cannot answer a challenge the athlete never saw. The
- * guard runs for exactly 600ms from the moment the sheet is presented, and
- * the buttons are disabled for it, so a dropped tap does not show pressed
+ * guard runs for exactly 600ms from the moment the prompt is shown, and the
+ * buttons are disabled for it, so a dropped tap does not show pressed
  * feedback either.
  *
  * The prompt clears itself (the owner passes `challenge={null}`) when the
  * challenger cancels, when the 10-minute live window counted down here
  * passes, or when the challenger leaves the lobby (AC-S5); those rules live
  * in `use-arena-challenge.ts`.
+ *
+ * Feedback stays visible over it. A React Native Modal is its own native
+ * presentation (a presented view controller on iOS, a Dialog window on
+ * Android), so it sits ABOVE the root `<Toaster />` and `<OfflineBanner />`
+ * in `app/_layout.tsx`. While the prompt is up it mounts its own copy of
+ * both: react-native-toast-message routes `toast.*` to the newest mounted
+ * host, so a toast raised while the prompt is open (a failed Decline, which
+ * keeps the prompt up; an outgoing challenge ending) lands on top of the
+ * card, and the offline banner explains a failure there too. Both unmount
+ * the moment the challenge clears, so toasts go back to the root host
+ * before the card has finished fading out. A toast raised in the same flow
+ * that clears the prompt (a failed Accept) first lands on the in-modal host;
+ * `ModalToaster` re-shows it on the root host as it unmounts, so it is not
+ * lost with the prompt.
+ *
+ * The file keeps its `-sheet` name (and the component its `Sheet` name) so
+ * the bootstrap, the mocks in other suites and the CHANGELOG stay valid.
  */
 import * as React from "react";
-import { Text, View } from "react-native";
-import {
-  BottomSheetModal,
-  BottomSheetView,
-  type BottomSheetBackgroundProps,
-} from "@gorhom/bottom-sheet";
+import { Keyboard, Modal, ScrollView, Text, View, useWindowDimensions } from "react-native";
+import { SafeAreaInsetsContext } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import type { IncomingChallenge } from "@/lib/arena/use-arena-challenge";
 import { PROMPT_INPUT_GUARD_MS } from "@/lib/arena/constants";
@@ -39,43 +56,61 @@ import {
   useFreshCountdown,
 } from "@/lib/arena/fresh-countdown";
 import { useViewerStakes, viewerStakesKey } from "@/lib/match-flow/use-viewer-stakes";
+import { useModalPresentWatchdog } from "@/lib/updates/use-modal-present-watchdog";
 import type { EloStakes } from "@jits/shared/types/composites";
 import { FIGHT_RADIUS } from "@/components/match-flow/fight/fight-tokens";
 import { usePalette } from "@/lib/theme/palette";
 import { InitialsBlock, KindTag, Mono, StakesStrip, shortName } from "@/components/match-flow/fight/fight-ui";
 import { StatePressable } from "@/components/ui/state-pressable";
+import { ModalToaster } from "@/components/ui/toast";
+import { OfflineBanner } from "@/components/offline-banner";
 
 /**
- * The sheet's background, WITHOUT gorhom's default accessibility. The stock
- * `BottomSheetBackground` is an `accessible` element labelled "Bottom Sheet"
- * with role "adjustable": a meaningless stop for VoiceOver on a sheet that
- * cannot be dragged. Purely visual here. The stock one also rounds to 15px;
- * the brand cap for modals is 8px.
- */
-function PromptBackground({ style, pointerEvents }: BottomSheetBackgroundProps) {
-  return (
-    <View
-      pointerEvents={pointerEvents}
-      accessible={false}
-      importantForAccessibility="no"
-      style={[style, { borderTopLeftRadius: 8, borderTopRightRadius: 8 }]}
-    />
-  );
-}
-
-/**
- * No text on the prompt grows past this Dynamic Type multiple. The sheet is a
- * fixed, non-scrolling block that cannot be swiped away, so on an iPhone SE at
- * the largest sizes uncapped text would overflow the header row, spill labels
- * out of the fixed-height buttons, and push Accept and Decline off screen,
- * leaving the prompt unanswerable. Every label is also one line.
+ * No text on the prompt grows past this Dynamic Type multiple. The card has a
+ * fixed height; the content scrolls inside it when it must, but uncapped text
+ * would still overflow the header row and spill labels out of the
+ * fixed-height buttons. Every label is also one line.
  */
 const MAX_FONT_SCALE = 1.3;
+
+/** The card's share of the window height: 633 of 844 on the board. */
+export const PROMPT_HEIGHT_RATIO = 0.75;
+/** The card's inset from each side of the window (board: 16px). */
+export const PROMPT_SIDE_INSET = 16;
+/** The card's corner radius: the brand cap for modals. */
+export const PROMPT_RADIUS = 8;
+/** The backdrop: the board's dim, the same in both themes. */
+export const PROMPT_BACKDROP = "rgba(0,0,0,0.55)";
+/**
+ * Room kept clear above and below the card inside the safe area, so on a
+ * short window (landscape iPad split view, a very large inset) the 75% card
+ * never runs under the status bar or the home indicator.
+ */
+const PROMPT_MIN_VERTICAL_MARGIN = 16;
+
+/**
+ * The card height for a window: 75% of it, clamped so it always fits inside
+ * the safe area with a margin. 844pt (iPhone 14/15): 633. 667pt (iPhone SE):
+ * 500. 932pt (Pro Max): 699.
+ */
+export function promptCardHeight(
+  windowHeight: number,
+  insets: { top: number; bottom: number },
+): number {
+  const available = windowHeight - insets.top - insets.bottom - 2 * PROMPT_MIN_VERTICAL_MARGIN;
+  return Math.max(0, Math.min(Math.round(windowHeight * PROMPT_HEIGHT_RATIO), available));
+}
+
+// Deliberately a no-op: Android back (and iOS's modal close request) must not
+// dismiss a prompt that decides a match (AC-S7).
+const blockClose = () => {};
+
+const NO_INSETS = { top: 0, bottom: 0, left: 0, right: 0 };
 
 /**
  * The live window (AC-S1): m:ss until 10 minutes after the challenge was
  * created. Its own memoized component so the once-a-second tick re-renders
- * this one line, not the whole sheet. Never truncated: it does not shrink,
+ * this one line, not the whole prompt. Never truncated: it does not shrink,
  * the label beside it does.
  *
  * Renders nothing when neither timestamp is known. Every source fills
@@ -133,6 +168,14 @@ interface ChallengePromptSheetProps {
   viewer?: { elo: number | null; weight: number | null };
 }
 
+/** What the card shows: frozen while the modal fades out after a null. */
+interface Shown {
+  challenge: IncomingChallenge;
+  stakes: EloStakes | null;
+  moreCount: number;
+  viewerElo: number | null;
+}
+
 export function ChallengePromptSheet({
   challenge,
   busy,
@@ -142,12 +185,16 @@ export function ChallengePromptSheet({
   moreCount = 0,
   viewer,
 }: ChallengePromptSheetProps) {
-  const ref = React.useRef<BottomSheetModal | null>(null);
   const p = usePalette();
+  const { height: windowHeight } = useWindowDimensions();
+  // Read the context directly rather than useSafeAreaInsets(), which throws
+  // without a provider; the app mounts one, so this is only a safety net.
+  const insets = React.useContext(SafeAreaInsetsContext) ?? NO_INSETS;
+  const cardHeight = promptCardHeight(windowHeight, insets);
+
   // Later passes challenge=null, which resets the stakes read below. Keep the
   // last stakes read so reopening from the chip shows the strip at once
-  // instead of the fallback line followed by the 64pt strip (the dynamically
-  // sized sheet would change height while being read). The cache is keyed on
+  // instead of the fallback line followed by the strip. The cache is keyed on
   // the four inputs the stakes were computed from, never on the challenge id:
   // useViewerStakes only returns stakes for its current inputs, and reuse
   // here requires the viewer's and the challenger's rating and weight to
@@ -192,13 +239,36 @@ export function ChallengePromptSheet({
     liveStakes ??
     (challenge && viewer?.elo != null && cacheHit ? cached.stakes : null);
 
-  // Only dismiss a sheet this component presented and that has not closed
-  // itself. dismiss() on a gorhom modal that was never presented (this
-  // effect's first run, challenge=null, on every launch) leaves it stuck in
-  // DISMISSING, and the next present() mounts the portal but never renders
-  // it: the FIRST challenge after every launch was invisible. Same fix as
-  // `notification-panel.tsx`.
-  const presentedRef = React.useRef(false);
+  // React Native keeps rendering a Modal's children while it fades out after
+  // visible turns false. The last committed content is kept for that fade so
+  // the card does not go blank (or swap its strip for the fallback line) on
+  // its way out. Written from an effect, like the stakes cache, and only
+  // read while there is no challenge.
+  const [lastShown, setLastShown] = React.useState<Shown | null>(null);
+  const viewerElo = viewer?.elo ?? null;
+  React.useEffect(() => {
+    if (!challenge) return;
+    setLastShown((prev) =>
+      prev &&
+      prev.challenge === challenge &&
+      prev.stakes === stakes &&
+      prev.moreCount === moreCount &&
+      prev.viewerElo === viewerElo
+        ? prev
+        : { challenge, stakes, moreCount, viewerElo },
+    );
+  }, [challenge, stakes, moreCount, viewerElo]);
+  const shown: Shown | null = challenge
+    ? { challenge, stakes, moreCount, viewerElo }
+    : lastShown;
+
+  const visible = challenge !== null;
+  // iOS presents a Modal exactly once and silently gives up when another
+  // view controller is already up (the live menu popover, a select, the
+  // profile-setup modal screen). The watchdog remounts it until onShow
+  // confirms it is really on screen (same hook as the critical-update gate).
+  const { modalKey, onShow: watchdogOnShow } = useModalPresentWatchdog(visible);
+
   // The prompt can appear on any tab, so it buzzes once per challenge (a
   // Warning notification: it wants an answer). Keyed by id so a re-render
   // with the same challenge never buzzes twice.
@@ -206,29 +276,22 @@ export function ChallengePromptSheet({
   // The input guard (AC-S3) runs for exactly PROMPT_INPUT_GUARD_MS from each
   // APPEARANCE: a new challenge, or the same one brought back up from the
   // chip after Later. A re-render with the same challenge while it is showing
-  // does not restart it. It is stamped when present() is called (and again
-  // when a swallowed present() is re-issued from onDismiss, which is the
-  // real appearance in that case). It is NOT restarted when gorhom reports
-  // the sheet settled: the signed-off AC-S3 counts from the sheet appearing.
+  // does not restart it, and neither does onShow for an ordinary present (the
+  // signed-off AC-S3 counts from the prompt appearing, not from the fade-in
+  // settling). The one exception is a present iOS refused: the watchdog's
+  // remount is then the real appearance, so its onShow re-arms the guard.
   const shownIdRef = React.useRef<string | null>(null);
   const appearedAtRef = React.useRef(0);
-  // Set when this component asked for a dismiss that has not reported back.
-  // If the athlete reopens from the chip (or a new challenge arrives) before
-  // that dismiss finishes, the present() does NOT interrupt it: gorhom
-  // (5.2.x) force-closes on dismiss, and snapToIndex returns early while a
-  // forced close runs. The close then completes (onChange(-1)) and the modal
-  // unmounts (onDismiss) with nothing on screen, although a challenge is
-  // waiting. handleChange marks the sheet closed, and handleDismiss presents
-  // it again once gorhom has finished unmounting it.
-  const dismissPendingRef = React.useRef(false);
-  const challengeRef = React.useRef(challenge);
-  challengeRef.current = challenge;
+  const armedKeyRef = React.useRef(modalKey);
+  const modalKeyRef = React.useRef(modalKey);
+  modalKeyRef.current = modalKey;
   // Mirrors the guard as state so the buttons are `disabled` for it (no
   // pressed feedback on a tap that will be dropped). One timer per stamp.
   const [guardActive, setGuardActive] = React.useState(false);
   const guardTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const armGuard = React.useCallback(() => {
     appearedAtRef.current = Date.now();
+    armedKeyRef.current = modalKeyRef.current;
     setGuardActive(true);
     if (guardTimerRef.current) clearTimeout(guardTimerRef.current);
     guardTimerRef.current = setTimeout(() => {
@@ -247,9 +310,11 @@ export function ChallengePromptSheet({
       if (shownIdRef.current !== challenge.challengeId) {
         shownIdRef.current = challenge.challengeId;
         armGuard();
+        // A focused field's keyboard is its own window on iOS and would stay
+        // above the Modal, covering Decline, Accept and Later on a small
+        // phone. The prompt has no inputs, so the keyboard just goes away.
+        Keyboard.dismiss();
       }
-      ref.current?.present();
-      presentedRef.current = true;
       if (buzzedIdRef.current !== challenge.challengeId) {
         buzzedIdRef.current = challenge.challengeId;
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(
@@ -258,45 +323,13 @@ export function ChallengePromptSheet({
       }
     } else {
       shownIdRef.current = null;
-      if (presentedRef.current) {
-        ref.current?.dismiss();
-        presentedRef.current = false;
-        dismissPendingRef.current = true;
-      }
     }
   }, [challenge, armGuard]);
 
-  const handleChange = React.useCallback(
-    (index: number) => {
-      if (index === -1) {
-        // Closed, including the close of a dismiss that a reopen asked to
-        // override (see dismissPendingRef): that present() was dropped, so
-        // the sheet is NOT up. Recording it closed keeps the next null from
-        // dismissing an unmounting modal (which leaves gorhom stuck), and
-        // handleDismiss brings the waiting challenge back up.
-        dismissPendingRef.current = false;
-        presentedRef.current = false;
-        return;
-      }
-      dismissPendingRef.current = false;
-    },
-    [],
-  );
-
-  // gorhom has closed AND unmounted the modal (it calls onDismiss from its
-  // unmount, after onChange(-1)). Normally that follows our own dismiss with
-  // no challenge left. If a challenge is waiting, a present() was swallowed
-  // by a dismiss still running, so present it now: it is a fresh appearance,
-  // with its own input guard re-armed from this present().
-  const handleDismiss = React.useCallback(() => {
-    dismissPendingRef.current = false;
-    // Not gated on presentedRef: a present() the effect made between the
-    // close and this unmount (a new challenge arriving) was swallowed too.
-    if (!challengeRef.current) return;
-    armGuard();
-    ref.current?.present();
-    presentedRef.current = true;
-  }, [armGuard]);
+  const handleShow = React.useCallback(() => {
+    watchdogOnShow();
+    if (modalKeyRef.current !== armedKeyRef.current) armGuard();
+  }, [watchdogOnShow, armGuard]);
 
   /** Wrap an answer so taps inside the input guard are dropped, not queued. */
   const guarded = React.useCallback(
@@ -308,262 +341,332 @@ export function ChallengePromptSheet({
     [],
   );
 
-  const inputDisabled = busy || guardActive;
-
-  const meta = challenge
-    ? [
-        challenge.challengerElo != null ? `ELO ${challenge.challengerElo}` : null,
-        challenge.challengerWeight != null
-          ? `${challenge.challengerWeight} LBS`
-          : null,
-      ]
-        .filter(Boolean)
-        .join(" · ")
-    : "";
+  // No answers from a card that is fading out after its challenge cleared.
+  const inputDisabled = busy || guardActive || !visible;
 
   return (
-    <BottomSheetModal
-      ref={ref}
-      // Sized to its content (gorhom v5 dynamic sizing over a BottomSheetView)
-      // rather than a percentage snap point: the prompt is a fixed, short
-      // block, and a percentage either clips it on an SE or leaves dead
-      // space on a Pro Max.
-      enableDynamicSizing
-      enablePanDownToClose={false}
-      onChange={handleChange}
-      onDismiss={handleDismiss}
-      // ACCESSIBILITY (jits-ef2a). gorhom defaults the sheet's content
-      // container to `accessible` with the label "Bottom Sheet", and an
-      // accessible element is a LEAF to VoiceOver and to idb: everything
-      // inside it, including Accept and Decline, collapsed into one opaque
-      // "Bottom Sheet" stop. Turning that off exposes the real elements.
-      accessible={false}
-      backgroundComponent={PromptBackground}
-      // Follows the app theme: the theme's plate (the same light value as the
-      // shared Sheet's card token), with the plates inside on the page color.
-      backgroundStyle={{ backgroundColor: p.plate, borderTopWidth: 1, borderColor: p.strong }}
-      // The sheet cannot be swiped closed (AC-S7), so no grabber that invites
-      // a swipe: the indicator is invisible. The handle itself stays (it is
-      // the harness's secondary "Bottom sheet handle" visibility signal).
-      handleIndicatorStyle={{ backgroundColor: p.strong, width: 40, opacity: 0 }}
+    <Modal
+      key={modalKey}
+      visible={visible}
+      transparent
+      animationType="fade"
+      statusBarTranslucent
+      // Never dismissed by the system: Android back and the iOS close
+      // request both do nothing (AC-S7).
+      onRequestClose={blockClose}
+      onShow={handleShow}
+      supportedOrientations={["portrait", "landscape"]}
     >
-      <BottomSheetView>
-        {challenge ? (
+      {/* The backdrop is a plain View with no press handler: a tap outside
+          the card does nothing. It still takes the touch, so nothing on the
+          screen underneath can be pressed through it. */}
+      <View
+        testID="challenge-prompt-backdrop"
+        style={{
+          flex: 1,
+          backgroundColor: PROMPT_BACKDROP,
+          justifyContent: "center",
+          paddingHorizontal: PROMPT_SIDE_INSET,
+        }}
+      >
+        {shown ? (
           <View
-            testID="challenge-prompt"
-            style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 34, gap: 16 }}
-            // The prompt demands an answer: keep VoiceOver focus inside it
-            // rather than wandering to the screen behind the sheet.
-            accessibilityViewIsModal
+            testID="challenge-prompt-card"
+            // A card fading out after its challenge cleared is not the prompt
+            // any more: hide it from VoiceOver (and from the match-loop
+            // harness, which reads the same accessibility tree) so its title
+            // does not count as a prompt still up.
+            accessibilityElementsHidden={!visible}
+            importantForAccessibility={visible ? "auto" : "no-hide-descendants"}
+            style={{
+              height: cardHeight,
+              borderRadius: PROMPT_RADIUS,
+              borderWidth: 1,
+              borderColor: p.strong,
+              // Follows the app theme: the theme's plate, with the stakes
+              // strip inside on the page color.
+              backgroundColor: p.plate,
+              overflow: "hidden",
+            }}
           >
-            <View
-              testID="challenge-prompt-header"
-              style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10 }}
+            <ScrollView
+              testID="challenge-prompt-scroll"
+              bounces={false}
+              showsVerticalScrollIndicator={false}
+              // Centered while it fits; scrolls (never clips the actions)
+              // once an SE at a large text size runs out of room.
+              contentContainerStyle={{
+                flexGrow: 1,
+                justifyContent: "center",
+                paddingHorizontal: 16,
+                paddingVertical: 24,
+              }}
             >
-              {/* The label is the part that gives way on a narrow screen at
-                  a large text size; the countdown and the tag never shrink. */}
               <View
-                testID="challenge-prompt-header-label"
-                style={{ flexDirection: "row", alignItems: "center", gap: 7, flexShrink: 1, minWidth: 0 }}
+                testID="challenge-prompt"
+                style={{ gap: 28 }}
+                // The prompt demands an answer: keep VoiceOver focus inside
+                // it rather than wandering to the screen behind the modal.
+                accessibilityViewIsModal
               >
-                {/* ink-3, not green: green is reserved for live status
-                    (the header chip), and this label is not a status. */}
-                <Mono
-                  bold
-                  testID="challenge-prompt-title"
-                  color={p.text3}
-                  numberOfLines={1}
-                  maxFontSizeMultiplier={MAX_FONT_SCALE}
-                >
-                  INCOMING CHALLENGE
-                </Mono>
-              </View>
-              <View
-                testID="challenge-prompt-header-trailing"
-                style={{ flexDirection: "row", alignItems: "center", gap: 10, flexShrink: 0 }}
-              >
-                <PromptCountdown
-                  createdAt={challenge.createdAt ?? null}
-                  expiresAt={challenge.expiresAt ?? null}
-                />
-                <KindTag kind="ranked" maxFontSizeMultiplier={MAX_FONT_SCALE} />
-              </View>
-            </View>
+                <PromptHeader challenge={shown.challenge} />
+                <PromptChallenger challenge={shown.challenge} />
 
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 16 }}>
-              <InitialsBlock
-                name={challenge.challengerName}
-                size={88}
-                fontSize={30}
-                maxFontSizeMultiplier={MAX_FONT_SCALE}
-              />
-              <View style={{ flex: 1, gap: 8, minWidth: 0 }}>
-                <Text
-                  testID="challenge-prompt-name"
-                  numberOfLines={1}
-                  maxFontSizeMultiplier={MAX_FONT_SCALE}
-                  className="font-display"
-                  style={{ fontSize: 44, lineHeight: 42, color: p.text }}
-                >
-                  {shortName(challenge.challengerName)}
-                </Text>
-                {meta ? (
+                {shown.stakes ? (
+                  <View style={{ gap: 8 }}>
+                    <Mono color={p.text3} numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE}>{`YOUR STAKES${shown.viewerElo != null ? ` · ${shown.viewerElo}` : ""}`}</Mono>
+                    <StakesStrip
+                      testID="challenge-prompt-stakes"
+                      win={shown.stakes.challenger_win}
+                      draw={shown.stakes.challenger_draw}
+                      loss={shown.stakes.challenger_loss}
+                      height={64}
+                      background={p.bg}
+                      maxFontSizeMultiplier={MAX_FONT_SCALE}
+                    />
+                  </View>
+                ) : (
                   <Text
-                    testID="challenge-prompt-meta"
+                    testID="challenge-prompt-fallback"
+                    numberOfLines={2}
+                    maxFontSizeMultiplier={MAX_FONT_SCALE}
+                    className="font-body"
+                    style={{ fontSize: 13, color: p.text2 }}
+                  >
+                    Accept and you both drop straight into the match.
+                  </Text>
+                )}
+
+                {shown.moreCount > 0 ? (
+                  <Text
+                    testID="challenge-prompt-more"
                     numberOfLines={1}
                     maxFontSizeMultiplier={MAX_FONT_SCALE}
-                    className="font-mono"
-                    style={{ fontSize: 13, color: p.text2, fontVariant: ["tabular-nums"] }}
+                    className="font-body"
+                    style={{ fontSize: 13, color: p.text }}
                   >
-                    {meta}
+                    {`+${shown.moreCount} more`}
                   </Text>
                 ) : null}
-                <Text
-                  testID="challenge-prompt-subtitle"
-                  numberOfLines={1}
-                  maxFontSizeMultiplier={MAX_FONT_SCALE}
-                  className="font-body"
-                  style={{ fontSize: 13, color: p.text2 }}
-                >
-                  {`${shortName(challenge.challengerName)} is live in the Arena`}
-                </Text>
-              </View>
-            </View>
 
-            {stakes ? (
-              <View style={{ gap: 8 }}>
-                <Mono color={p.text3} numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE}>{`YOUR STAKES${viewer?.elo != null ? ` \u00b7 ${viewer.elo}` : ""}`}</Mono>
-                <StakesStrip
-                  testID="challenge-prompt-stakes"
-                  win={stakes.challenger_win}
-                  draw={stakes.challenger_draw}
-                  loss={stakes.challenger_loss}
-                  height={64}
-                  background={p.bg}
-                  maxFontSizeMultiplier={MAX_FONT_SCALE}
+                <PromptActions
+                  busy={busy}
+                  disabled={inputDisabled}
+                  onAccept={guarded(onAccept)}
+                  onDecline={guarded(onDecline)}
+                  onLater={onLater ? guarded(onLater) : undefined}
                 />
               </View>
-            ) : (
-              <Text
-                testID="challenge-prompt-fallback"
-                numberOfLines={2}
-                maxFontSizeMultiplier={MAX_FONT_SCALE}
-                className="font-body"
-                style={{ fontSize: 13, color: p.text2 }}
-              >
-                Accept and you both drop straight into the match.
-              </Text>
-            )}
-
-            {moreCount > 0 ? (
-              <Text
-                testID="challenge-prompt-more"
-                numberOfLines={1}
-                maxFontSizeMultiplier={MAX_FONT_SCALE}
-                className="font-body"
-                style={{ fontSize: 13, color: p.text }}
-              >
-                {`+${moreCount} more`}
-              </Text>
-            ) : null}
-
-            <View style={{ gap: 4 }}>
-              {/* Thumb zone (AC-S2): 56pt, Decline 1/3 outline, Accept 2/3 in
-                  Signal Red, the sheet's one red CTA. */}
-              <View style={{ flexDirection: "row", gap: 12 }}>
-                <StatePressable
-                  testID="challenge-prompt-decline"
-                  accessibilityRole="button"
-                  accessibilityLabel="Decline challenge"
-                  accessibilityState={{ disabled: inputDisabled }}
-                  onPress={guarded(onDecline)}
-                  disabled={inputDisabled}
-                  style={({ pressed }) => ({
-                    flex: 1,
-                    height: 56,
-                    alignItems: "center",
-                    justifyContent: "center",
-                    borderRadius: FIGHT_RADIUS.button,
-                    borderWidth: 1,
-                    borderColor: p.strong,
-                    // A true outline (spec 5): transparent at rest, tinted
-                    // only while pressed.
-                    backgroundColor: pressed ? p.secondaryBgPressed : "transparent",
-                    opacity: busy ? 0.6 : 1,
-                  })}
-                >
-                  <Text
-                    testID="challenge-prompt-decline-text"
-                    numberOfLines={1}
-                    maxFontSizeMultiplier={MAX_FONT_SCALE}
-                    className="font-heading uppercase"
-                    style={{ fontSize: 14, letterSpacing: 1.12, color: p.text }}
-                  >
-                    Decline
-                  </Text>
-                </StatePressable>
-                <StatePressable
-                  testID="challenge-prompt-accept"
-                  accessibilityRole="button"
-                  accessibilityLabel="Accept challenge"
-                  accessibilityState={{ disabled: inputDisabled }}
-                  onPress={guarded(onAccept)}
-                  disabled={inputDisabled}
-                  style={({ pressed }) => ({
-                    flex: 2,
-                    height: 56,
-                    alignItems: "center",
-                    justifyContent: "center",
-                    borderRadius: FIGHT_RADIUS.button,
-                    backgroundColor: pressed ? p.ctaPressed : p.cta,
-                    opacity: busy ? 0.6 : 1,
-                  })}
-                >
-                  {/* Visible "ACCEPT" (spec 5); the harness and VoiceOver
-                      keep the label "Accept challenge". */}
-                  <Text
-                    testID="challenge-prompt-accept-text"
-                    numberOfLines={1}
-                    maxFontSizeMultiplier={MAX_FONT_SCALE}
-                    className="font-heading uppercase"
-                    style={{ fontSize: 14, letterSpacing: 1.12, color: p.onCta }}
-                  >
-                    Accept
-                  </Text>
-                </StatePressable>
-              </View>
-              {onLater ? (
-                // A plain text button, not a swipe (AC-S7). Tucks the prompt
-                // into the header chip and sends nothing (AC-S4).
-                <StatePressable
-                  testID="challenge-prompt-later"
-                  accessibilityRole="button"
-                  accessibilityLabel="Later"
-                  accessibilityHint="Keeps this challenge in the header without answering it"
-                  accessibilityState={{ disabled: inputDisabled }}
-                  onPress={guarded(onLater)}
-                  disabled={inputDisabled}
-                  style={{ height: 44, alignItems: "center", justifyContent: "center", opacity: busy ? 0.6 : 1 }}
-                >
-                  <Text
-                    testID="challenge-prompt-later-text"
-                    numberOfLines={1}
-                    maxFontSizeMultiplier={MAX_FONT_SCALE}
-                    className="font-heading"
-                    style={{
-                      fontSize: 14,
-                      color: p.text2,
-                      textDecorationLine: "underline",
-                    }}
-                  >
-                    Later
-                  </Text>
-                </StatePressable>
-              ) : null}
-            </View>
+            </ScrollView>
           </View>
         ) : null}
-      </BottomSheetView>
-    </BottomSheetModal>
+      </View>
+      {/* Feedback over the prompt: see the header comment. Mounted only
+          while there is a challenge, never during the fade-out. */}
+      {visible ? <OfflineBanner /> : null}
+      {visible ? <ModalToaster /> : null}
+    </Modal>
+  );
+}
+
+function PromptHeader({ challenge }: { challenge: IncomingChallenge }) {
+  const p = usePalette();
+  return (
+    <View
+      testID="challenge-prompt-header"
+      style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10 }}
+    >
+      {/* The label is the part that gives way on a narrow screen at a large
+          text size; the countdown and the tag never shrink. */}
+      <View
+        testID="challenge-prompt-header-label"
+        style={{ flexDirection: "row", alignItems: "center", gap: 7, flexShrink: 1, minWidth: 0 }}
+      >
+        {/* ink-3, not green: green is reserved for live status (the header
+            chip), and this label is not a status. */}
+        <Mono
+          bold
+          testID="challenge-prompt-title"
+          color={p.text3}
+          numberOfLines={1}
+          maxFontSizeMultiplier={MAX_FONT_SCALE}
+        >
+          INCOMING CHALLENGE
+        </Mono>
+      </View>
+      <View
+        testID="challenge-prompt-header-trailing"
+        style={{ flexDirection: "row", alignItems: "center", gap: 10, flexShrink: 0 }}
+      >
+        <PromptCountdown
+          createdAt={challenge.createdAt ?? null}
+          expiresAt={challenge.expiresAt ?? null}
+        />
+        <KindTag kind="ranked" maxFontSizeMultiplier={MAX_FONT_SCALE} />
+      </View>
+    </View>
+  );
+}
+
+function PromptChallenger({ challenge }: { challenge: IncomingChallenge }) {
+  const p = usePalette();
+  const meta = [
+    challenge.challengerElo != null ? `ELO ${challenge.challengerElo}` : null,
+    challenge.challengerWeight != null ? `${challenge.challengerWeight} LBS` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 16 }}>
+      <InitialsBlock
+        name={challenge.challengerName}
+        size={88}
+        fontSize={30}
+        maxFontSizeMultiplier={MAX_FONT_SCALE}
+      />
+      <View style={{ flex: 1, gap: 8, minWidth: 0 }}>
+        <Text
+          testID="challenge-prompt-name"
+          numberOfLines={1}
+          maxFontSizeMultiplier={MAX_FONT_SCALE}
+          className="font-display"
+          style={{ fontSize: 44, lineHeight: 42, color: p.text }}
+        >
+          {shortName(challenge.challengerName)}
+        </Text>
+        {meta ? (
+          <Text
+            testID="challenge-prompt-meta"
+            numberOfLines={1}
+            maxFontSizeMultiplier={MAX_FONT_SCALE}
+            className="font-mono"
+            style={{ fontSize: 13, color: p.text2, fontVariant: ["tabular-nums"] }}
+          >
+            {meta}
+          </Text>
+        ) : null}
+        <Text
+          testID="challenge-prompt-subtitle"
+          numberOfLines={1}
+          maxFontSizeMultiplier={MAX_FONT_SCALE}
+          className="font-body"
+          style={{ fontSize: 13, color: p.text2 }}
+        >
+          {`${shortName(challenge.challengerName)} is live in the Arena`}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+function PromptActions({
+  busy,
+  disabled,
+  onAccept,
+  onDecline,
+  onLater,
+}: {
+  busy: boolean;
+  disabled: boolean;
+  onAccept: () => void;
+  onDecline: () => void;
+  onLater?: () => void;
+}) {
+  const p = usePalette();
+  return (
+    <View style={{ gap: 4 }}>
+      {/* Thumb zone (AC-S2): 56pt, Decline 1/3 outline, Accept 2/3 in Signal
+          Red, the prompt's one red CTA. */}
+      <View style={{ flexDirection: "row", gap: 12 }}>
+        <StatePressable
+          testID="challenge-prompt-decline"
+          accessibilityRole="button"
+          accessibilityLabel="Decline challenge"
+          accessibilityState={{ disabled }}
+          onPress={onDecline}
+          disabled={disabled}
+          style={({ pressed }) => ({
+            flex: 1,
+            height: 56,
+            alignItems: "center",
+            justifyContent: "center",
+            borderRadius: FIGHT_RADIUS.button,
+            borderWidth: 1,
+            borderColor: p.strong,
+            // A true outline (spec 5): transparent at rest, tinted only
+            // while pressed.
+            backgroundColor: pressed ? p.secondaryBgPressed : "transparent",
+            opacity: busy ? 0.6 : 1,
+          })}
+        >
+          <Text
+            testID="challenge-prompt-decline-text"
+            numberOfLines={1}
+            maxFontSizeMultiplier={MAX_FONT_SCALE}
+            className="font-heading uppercase"
+            style={{ fontSize: 14, letterSpacing: 1.12, color: p.text }}
+          >
+            Decline
+          </Text>
+        </StatePressable>
+        <StatePressable
+          testID="challenge-prompt-accept"
+          accessibilityRole="button"
+          accessibilityLabel="Accept challenge"
+          accessibilityState={{ disabled }}
+          onPress={onAccept}
+          disabled={disabled}
+          style={({ pressed }) => ({
+            flex: 2,
+            height: 56,
+            alignItems: "center",
+            justifyContent: "center",
+            borderRadius: FIGHT_RADIUS.button,
+            backgroundColor: pressed ? p.ctaPressed : p.cta,
+            opacity: busy ? 0.6 : 1,
+          })}
+        >
+          {/* Visible "ACCEPT" (spec 5); the harness and VoiceOver keep the
+              label "Accept challenge". */}
+          <Text
+            testID="challenge-prompt-accept-text"
+            numberOfLines={1}
+            maxFontSizeMultiplier={MAX_FONT_SCALE}
+            className="font-heading uppercase"
+            style={{ fontSize: 14, letterSpacing: 1.12, color: p.onCta }}
+          >
+            Accept
+          </Text>
+        </StatePressable>
+      </View>
+      {onLater ? (
+        // A plain text button (AC-S7). Tucks the prompt into the header chip
+        // and sends nothing (AC-S4).
+        <StatePressable
+          testID="challenge-prompt-later"
+          accessibilityRole="button"
+          accessibilityLabel="Later"
+          accessibilityHint="Keeps this challenge in the header without answering it"
+          accessibilityState={{ disabled }}
+          onPress={onLater}
+          disabled={disabled}
+          style={{ height: 44, alignItems: "center", justifyContent: "center", opacity: busy ? 0.6 : 1 }}
+        >
+          <Text
+            testID="challenge-prompt-later-text"
+            numberOfLines={1}
+            maxFontSizeMultiplier={MAX_FONT_SCALE}
+            className="font-heading"
+            style={{
+              fontSize: 14,
+              color: p.text2,
+              textDecorationLine: "underline",
+            }}
+          >
+            Later
+          </Text>
+        </StatePressable>
+      ) : null}
+    </View>
   );
 }

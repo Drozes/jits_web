@@ -24,6 +24,15 @@ jest.mock("@gorhom/bottom-sheet", () => {
   };
 });
 
+// The real prompt mounts its own offline banner, which reads NetInfo.
+jest.mock("@react-native-community/netinfo", () => ({
+  __esModule: true,
+  default: {
+    fetch: async () => ({ isConnected: true }),
+    addEventListener: () => () => undefined,
+  },
+}));
+
 jest.mock("@/lib/theme/use-theme", () => ({
   useResolvedColorScheme: () => "light",
   useThemedTokens: () => ({ bgSecondary: "#13151B", textTertiary: "#8D929D" }),
@@ -114,6 +123,7 @@ jest.mock("@/lib/arena/use-pending-challenge-recovery", () => ({
 }));
 
 import { ArenaBootstrap } from "@/lib/arena/arena-bootstrap";
+import { Toaster, __resetToastTrackingForTests, toast } from "@/components/ui/toast";
 import { PROMPT_INPUT_GUARD_MS, REOPEN_SURFACE_GRACE_MS } from "@/lib/arena/constants";
 import { renderHook } from "@testing-library/react-native";
 import {
@@ -168,6 +178,7 @@ beforeEach(() => {
   mockIncoming = null;
   mockIncomingTucked = false;
   mockIncomingCount = 0;
+  __resetToastTrackingForTests();
 });
 
 afterEach(() => {
@@ -263,6 +274,35 @@ describe("ArenaBootstrap", () => {
     expect(mockAccept).toHaveBeenCalled();
     fireEvent.press(getByLabelText("Decline challenge"));
     expect(mockDecline).toHaveBeenCalled();
+  });
+
+  it("keeps a failed Accept's toast on screen after the prompt closes", () => {
+    // use-arena-challenge's accept -> start_match CHALLENGE_NOT_ACCEPTED path:
+    // it clears the prompt and toasts in the same flow. The toast first lands
+    // on the prompt's in-modal host, which unmounts with the prompt.
+    jest.useFakeTimers();
+    mockIncoming = RIVAL;
+    const App = () => (
+      <>
+        <Toaster />
+        <ArenaBootstrap />
+      </>
+    );
+    const screen = render(<App />);
+    act(() => jest.advanceTimersByTime(PROMPT_INPUT_GUARD_MS));
+    mockAccept.mockImplementation(() => {
+      mockIncoming = null;
+      toast.error("That challenge is no longer available.");
+    });
+    act(() => {
+      fireEvent.press(screen.getByLabelText("Accept challenge"));
+      screen.rerender(<App />);
+    });
+    act(() => jest.advanceTimersByTime(0));
+
+    expect(screen.queryByText("Rival is live in the Arena")).toBeNull();
+    expect(screen.getAllByText("That challenge is no longer available.")).toHaveLength(1);
+    mockAccept.mockReset();
   });
 
   it("publishes live and challenge state to the store", () => {

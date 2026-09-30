@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Animated, Text, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaInsetsContext } from "react-native-safe-area-context";
 import { WifiOff } from "lucide-react-native";
 import { useNetworkStatus } from "@/lib/network/use-network-status";
 import { useThemedTokens } from "@/lib/theme/use-theme";
@@ -8,14 +8,19 @@ import { useThemedTokens } from "@/lib/theme/use-theme";
 /**
  * Top-of-screen banner shown when the device is offline. Slides in/out via
  * `Animated.timing` on the `translateY` axis. Sits inside the root layout
- * above the navigation stack so it overlays all routes.
+ * above the navigation stack so it overlays all routes. A React Native Modal
+ * is presented above the root, so a modal that must explain an offline
+ * failure (the incoming challenge prompt) mounts its own copy.
  *
  * Color: `bg-destructive` / `text-destructive-foreground`.
  * Copy: "You're offline. Some features may not work."
  */
 export function OfflineBanner() {
   const { isConnected } = useNetworkStatus();
-  const insets = useSafeAreaInsets();
+  // Read the context directly rather than useSafeAreaInsets(), which throws
+  // without a provider: the banner is also mounted inside the incoming
+  // challenge Modal, which suites render without one.
+  const insets = React.useContext(SafeAreaInsetsContext) ?? { top: 0 };
   const tokens = useThemedTokens();
   const translateY = React.useRef(new Animated.Value(-100)).current;
 

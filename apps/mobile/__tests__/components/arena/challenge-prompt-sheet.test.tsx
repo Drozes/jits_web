@@ -1,47 +1,28 @@
 /**
  * The live incoming challenge prompt (`ChallengePromptSheet`). Covers:
  *
- *  - open/close: the regression where the FIRST challenge after every launch
- *    was invisible. gorhom's BottomSheetModal gets stuck in DISMISSING when
- *    dismiss() is called on a sheet that is not showing, so the prompt must
- *    only dismiss a sheet it presented and that has not already closed
- *    itself; plus the Later-then-quick-reopen race;
+ *  - the centered modal (jits-02vo.3, board P-Challenge-Sheet): shown only
+ *    while there is a challenge, 16pt side insets, 75% of the window tall
+ *    (clamped inside the safe area), radius 8, dimmed backdrop, content that
+ *    scrolls inside the card rather than clipping the actions;
+ *  - non-dismissable (AC-S7): a backdrop tap and Android back do nothing;
+ *  - the present watchdog: a present iOS refused is retried, and the retry's
+ *    real appearance gets its own input guard;
  *  - accessibility (jits-ef2a): the buttons stay reachable by label;
  *  - the Warning haptic (jits-4zp.7) and the stakes preview (with its cache
  *    across a Later and reopen);
- *  - the sheet upgrade (spec 5): countdown AC-S1, buttons AC-S2, input guard
+ *  - the prompt upgrade (spec 5): countdown AC-S1, buttons AC-S2, input guard
  *    AC-S3 (including a challenge replaced in place), Later AC-S4/AC-S7,
- *    "+N more" AC-S6, and the Dynamic Type caps.
+ *    "+N more" AC-S6, and the Dynamic Type caps;
+ *  - feedback over the prompt: toasts and the offline banner render inside
+ *    the Modal while it is up (a Modal is presented above the root hosts),
+ *    and go back to the root host once it clears;
+ *  - a focused field's keyboard is dismissed when a challenge appears.
  */
 import * as React from "react";
-import { act, fireEvent, render } from "@testing-library/react-native";
-
-const mockPresent = jest.fn();
-const mockDismiss = jest.fn();
-let mockOnChange: ((idx: number) => void) | undefined;
-let mockSheetProps: Record<string, unknown> = {};
-let mockSheetRenders = 0;
-
-jest.mock("@gorhom/bottom-sheet", () => {
-  const R = require("react");
-  const RN = require("react-native");
-  return {
-    BottomSheetModal: R.forwardRef(
-      (
-        props: { children: React.ReactNode; onChange?: (idx: number) => void },
-        ref: unknown,
-      ) => {
-        mockOnChange = props.onChange;
-        mockSheetRenders += 1;
-        mockSheetProps = props as Record<string, unknown>;
-        R.useImperativeHandle(ref, () => ({ present: mockPresent, dismiss: mockDismiss }));
-        return R.createElement(RN.View, {}, props.children);
-      },
-    ),
-    BottomSheetView: (props: { children: React.ReactNode }) =>
-      R.createElement(RN.View, {}, props.children),
-  };
-});
+import { act, fireEvent, render, within } from "@testing-library/react-native";
+import { Keyboard, Modal, ScrollView, StyleSheet } from "react-native";
+import { SafeAreaInsetsContext } from "react-native-safe-area-context";
 
 const mockNotify = jest.fn((_type: unknown) => Promise.resolve());
 jest.mock("expo-haptics", () => ({
@@ -54,6 +35,20 @@ jest.mock("@/lib/theme/use-theme", () => ({
   useThemedTokens: () => ({ bgSecondary: "#13151B", textTertiary: "#8D929D" }),
 }));
 
+// The offline banner mounted inside the prompt reads NetInfo. Online unless
+// a test says otherwise.
+let mockNetState: { isConnected: boolean } = { isConnected: true };
+jest.mock("@react-native-community/netinfo", () => ({
+  __esModule: true,
+  default: {
+    fetch: async () => mockNetState,
+    addEventListener: (cb: (s: { isConnected: boolean }) => void) => {
+      cb(mockNetState);
+      return () => undefined;
+    },
+  },
+}));
+
 jest.mock("@/lib/supabase/client", () => ({ supabase: { tag: "client" } }));
 
 const mockGetEloStakes = jest.fn();
@@ -61,11 +56,52 @@ jest.mock("@jits/shared/api/queries", () => ({
   getEloStakes: (...args: unknown[]) => mockGetEloStakes(...args),
 }));
 
-import { ChallengePromptSheet } from "@/components/arena/challenge-prompt-sheet";
+// The window the prompt sizes itself against. Default: iPhone 14/15 (844pt).
+let mockWindow = { width: 390, height: 844, scale: 3, fontScale: 1 };
+jest.mock("react-native/Libraries/Utilities/useWindowDimensions", () => ({
+  __esModule: true,
+  default: () => mockWindow,
+}));
+
+// The present watchdog, stubbed so a suite on fake timers is not remounted
+// every 1.5s by a Modal mock that never fires onShow. `useRealWatchdog`
+// switches one test to the real hook.
+let mockWatchdogKey = 0;
+const mockWatchdogOnShow = jest.fn();
+let mockUseRealWatchdog = false;
+jest.mock("@/lib/updates/use-modal-present-watchdog", () => {
+  const actual = jest.requireActual("@/lib/updates/use-modal-present-watchdog");
+  return {
+    ...actual,
+    useModalPresentWatchdog: (visible: boolean) =>
+      mockUseRealWatchdog
+        ? actual.useModalPresentWatchdog(visible)
+        : { modalKey: mockWatchdogKey, onShow: mockWatchdogOnShow },
+  };
+});
+
+// Counts renders of the prompt body (not the countdown line).
+let mockBodyRenders = 0;
+jest.mock("@/components/match-flow/fight/fight-ui", () => {
+  const actual = jest.requireActual("@/components/match-flow/fight/fight-ui");
+  return {
+    ...actual,
+    InitialsBlock: (props: Record<string, unknown>) => {
+      mockBodyRenders += 1;
+      return actual.InitialsBlock(props);
+    },
+  };
+});
+
+import {
+  ChallengePromptSheet,
+  PROMPT_BACKDROP,
+  promptCardHeight,
+} from "@/components/arena/challenge-prompt-sheet";
 import { PROMPT_INPUT_GUARD_MS } from "@/lib/arena/constants";
+import { ModalToaster, Toaster, __resetToastTrackingForTests, toast } from "@/components/ui/toast";
 import { __resetServerClockForTests } from "@/lib/arena/incoming-challenges";
 import { formatCountdown, useFreshCountdown } from "@/lib/arena/fresh-countdown";
-import { StyleSheet } from "react-native";
 import { paletteFor } from "@/lib/theme/palette";
 import type { IncomingChallenge } from "@/lib/arena/use-arena-challenge";
 
@@ -90,173 +126,274 @@ function Harness({ challenge }: { challenge: IncomingChallenge | null }) {
   );
 }
 
+type Screen = ReturnType<typeof render>;
+const modalOf = (screen: Screen) => screen.UNSAFE_getByType(Modal);
+
 beforeEach(() => {
   mockGetEloStakes.mockReset();
   mockGetEloStakes.mockResolvedValue(null);
-  mockPresent.mockClear();
-  mockDismiss.mockClear();
   mockNotify.mockClear();
-  mockOnChange = undefined;
+  mockWatchdogOnShow.mockClear();
+  mockWatchdogKey = 0;
+  mockUseRealWatchdog = false;
+  mockWindow = { width: 390, height: 844, scale: 3, fontScale: 1 };
+  mockNetState = { isConnected: true };
   __resetServerClockForTests();
+  __resetToastTrackingForTests();
 });
 
 afterEach(() => {
   jest.useRealTimers();
 });
 
-describe("ChallengePromptSheet open/close", () => {
-  it("does not dismiss a sheet that was never presented (every launch)", () => {
-    render(<Harness challenge={null} />);
-    expect(mockDismiss).not.toHaveBeenCalled();
-    expect(mockPresent).not.toHaveBeenCalled();
+describe("ChallengePromptSheet centered modal (jits-02vo.3)", () => {
+  it("is not shown without a challenge (every launch)", () => {
+    const screen = render(<Harness challenge={null} />);
+    expect(modalOf(screen).props.visible).toBe(false);
+    expect(screen.queryByTestId("challenge-prompt")).toBeNull();
   });
 
-  it("presents the first challenge after launch without a prior dismiss", () => {
-    const { rerender } = render(<Harness challenge={null} />);
-    rerender(<Harness challenge={RIVAL} />);
+  it("shows for a challenge and hides once it is answered or withdrawn", () => {
+    const screen = render(<Harness challenge={null} />);
+    screen.rerender(<Harness challenge={RIVAL} />);
+    expect(modalOf(screen).props.visible).toBe(true);
+    expect(screen.getByTestId("challenge-prompt")).toBeTruthy();
 
-    expect(mockDismiss).not.toHaveBeenCalled();
-    expect(mockPresent).toHaveBeenCalledTimes(1);
+    screen.rerender(<Harness challenge={null} />);
+    expect(modalOf(screen).props.visible).toBe(false);
+
+    // And comes back for the next one.
+    screen.rerender(<Harness challenge={{ ...RIVAL, challengeId: "ch-2" }} />);
+    expect(modalOf(screen).props.visible).toBe(true);
   });
 
-  it("dismisses once the challenge is answered or withdrawn", () => {
-    const { rerender } = render(<Harness challenge={null} />);
-    rerender(<Harness challenge={RIVAL} />);
-    rerender(<Harness challenge={null} />);
-    expect(mockDismiss).toHaveBeenCalledTimes(1);
-
-    // A second null render does not dismiss again.
-    rerender(<Harness challenge={null} />);
-    expect(mockDismiss).toHaveBeenCalledTimes(1);
+  it("is a transparent, fading modal over the status bar", () => {
+    const screen = render(<Harness challenge={RIVAL} />);
+    const modal = modalOf(screen);
+    expect(modal.props.transparent).toBe(true);
+    expect(modal.props.animationType).toBe("fade");
+    expect(modal.props.statusBarTranslucent).toBe(true);
   });
 
-  it("does not dismiss a sheet that already closed itself, and can present again", () => {
-    const { rerender } = render(<Harness challenge={RIVAL} />);
-    act(() => mockOnChange?.(-1));
-    rerender(<Harness challenge={null} />);
-    expect(mockDismiss).not.toHaveBeenCalled();
+  it("dims the screen behind with a backdrop and insets the card 16pt from each side", () => {
+    const screen = render(<Harness challenge={RIVAL} />);
+    const backdrop = StyleSheet.flatten(screen.getByTestId("challenge-prompt-backdrop").props.style);
+    expect(backdrop.backgroundColor).toBe(PROMPT_BACKDROP);
+    expect(PROMPT_BACKDROP).toBe("rgba(0,0,0,0.55)");
+    expect(backdrop.flex).toBe(1);
+    expect(backdrop.justifyContent).toBe("center");
+    expect(backdrop.paddingHorizontal).toBe(16);
 
-    rerender(<Harness challenge={{ ...RIVAL, challengeId: "ch-2" }} />);
-    expect(mockPresent).toHaveBeenCalledTimes(2);
+    const card = StyleSheet.flatten(screen.getByTestId("challenge-prompt-card").props.style);
+    expect(card.borderRadius).toBe(8);
+    expect(card.borderWidth).toBe(1);
+    const light = paletteFor("light");
+    expect(card.backgroundColor).toBe(light.plate);
+    expect(card.borderColor).toBe(light.strong);
+    expect(card.overflow).toBe("hidden");
   });
 
-  it("re-presents after a quick reopen whose present() the running dismiss swallowed", () => {
-    // Later (null), then the chip reopens it before the dismiss animation
-    // ends. gorhom 5.2.x ignores that present() while its forced close runs,
-    // finishes the close (onChange(-1)) and unmounts the modal (onDismiss).
-    const { rerender } = render(<Harness challenge={RIVAL} />);
-    act(() => mockOnChange?.(0));
-    rerender(<Harness challenge={null} />);
-    expect(mockDismiss).toHaveBeenCalledTimes(1);
-    rerender(<Harness challenge={RIVAL} />);
-    expect(mockPresent).toHaveBeenCalledTimes(2); // swallowed by the mock's gorhom
-
-    act(() => mockOnChange?.(-1));
-    // The close alone does not re-present: the modal is still unmounting.
-    expect(mockPresent).toHaveBeenCalledTimes(2);
-    act(() => (mockSheetProps.onDismiss as () => void)());
-    expect(mockPresent).toHaveBeenCalledTimes(3);
-
-    // The re-presented sheet is tracked as up: the next null dismisses it.
-    act(() => mockOnChange?.(0));
-    rerender(<Harness challenge={null} />);
-    expect(mockDismiss).toHaveBeenCalledTimes(2);
+  it.each([
+    ["iPhone 14/15 (the board)", 844, { top: 47, bottom: 34 }, 633],
+    ["iPhone SE", 667, { top: 20, bottom: 0 }, 500],
+    ["iPhone Pro Max", 932, { top: 59, bottom: 34 }, 699],
+  ])("is 75%% of the window tall on an %s", (_label, height, insets, expected) => {
+    mockWindow = { width: 390, height, scale: 3, fontScale: 1 };
+    const screen = render(
+      <SafeAreaInsetsContext.Provider value={{ ...insets, left: 0, right: 0 }}>
+        <Harness challenge={RIVAL} />
+      </SafeAreaInsetsContext.Provider>,
+    );
+    const card = StyleSheet.flatten(screen.getByTestId("challenge-prompt-card").props.style);
+    expect(card.height).toBe(expected);
   });
 
-  it("presents a challenge that arrives while the previous one's dismiss is running", () => {
-    // Challenge A cancelled (null), challenge B arrives before A's close ends.
-    const { rerender } = render(<Harness challenge={RIVAL} />);
-    act(() => mockOnChange?.(0));
-    rerender(<Harness challenge={null} />);
-    rerender(<Harness challenge={{ ...RIVAL, challengeId: "ch-2" }} />);
-    act(() => mockOnChange?.(-1));
-    act(() => (mockSheetProps.onDismiss as () => void)());
-    expect(mockPresent).toHaveBeenCalledTimes(3);
+  it("never runs the card under the status bar or home indicator on a short window", () => {
+    // 75% of 400 is 300, but only 400 - 40 - 80 - 32 = 248 fits.
+    expect(promptCardHeight(400, { top: 40, bottom: 80 })).toBe(248);
+    expect(promptCardHeight(844, { top: 47, bottom: 34 })).toBe(633);
+    expect(promptCardHeight(20, { top: 40, bottom: 40 })).toBe(0);
   });
 
-  it("re-arms the input guard for the re-presented sheet", () => {
+  it("works without a safe area provider", () => {
+    const screen = render(<Harness challenge={RIVAL} />);
+    expect(StyleSheet.flatten(screen.getByTestId("challenge-prompt-card").props.style).height).toBe(633);
+  });
+
+  it("centers the content, and scrolls it inside the card on a small phone instead of clipping", () => {
+    const screen = render(<Harness challenge={RIVAL} />);
+    const scroll = screen.UNSAFE_getByType(ScrollView);
+    expect(scroll.props.testID).toBe("challenge-prompt-scroll");
+    const content = StyleSheet.flatten(scroll.props.contentContainerStyle);
+    // flexGrow (not flex): centered while it fits, scrollable once it does
+    // not, so Accept and Decline are always reachable.
+    expect(content.flexGrow).toBe(1);
+    expect(content.justifyContent).toBe("center");
+    expect(content.paddingHorizontal).toBe(16);
+    expect(content.paddingVertical).toBe(24);
+    expect(scroll.props.bounces).toBe(false);
+    // Actions live inside the scrolling content.
+    expect(screen.getByTestId("challenge-prompt-scroll")).toContainElement(
+      screen.getByTestId("challenge-prompt-accept"),
+    );
+  });
+
+  it("keeps the board's content order", () => {
+    mockGetEloStakes.mockResolvedValue(undefined);
+    const screen = render(
+      <ChallengePromptSheet
+        challenge={RIVAL}
+        busy={false}
+        onAccept={jest.fn()}
+        onDecline={jest.fn()}
+        onLater={jest.fn()}
+      />,
+    );
+    const ids = [
+      "challenge-prompt-title",
+      "challenge-prompt-name",
+      "challenge-prompt-meta",
+      "challenge-prompt-subtitle",
+      "challenge-prompt-fallback",
+      "challenge-prompt-decline",
+      "challenge-prompt-accept",
+      "challenge-prompt-later",
+    ];
+    type Node = { props: { testID?: unknown }; type: unknown };
+    const all: Node[] = screen.UNSAFE_root.findAll(
+      (n: Node) => typeof n.props.testID === "string" && typeof n.type !== "string",
+    );
+    const order = ids.map((id) => all.findIndex((n) => n.props.testID === id));
+    expect(order.every((i) => i >= 0)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+    expect(screen.getByTestId("challenge-prompt-meta")).toHaveTextContent("ELO 1350 · 190 LBS");
+  });
+
+  it("keeps the last card on screen while it fades out, with its answers disabled", async () => {
+    jest.useFakeTimers();
+    mockGetEloStakes.mockResolvedValue({ challenger_win: 14, challenger_loss: -9, challenger_draw: -2 });
+    const viewer = { elo: 1512, weight: 170 };
+    const onAccept = jest.fn();
+    const screen = render(
+      <ChallengePromptSheet challenge={RIVAL} busy={false} onAccept={onAccept} onDecline={jest.fn()} viewer={viewer} moreCount={1} />,
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+    act(() => jest.advanceTimersByTime(PROMPT_INPUT_GUARD_MS));
+    expect(screen.getByTestId("challenge-prompt-stakes")).toBeTruthy();
+
+    // RN keeps rendering a Modal's children through its dismiss animation.
+    // The jest Modal mock drops them at visible=false, so render the
+    // children it was handed on their own, as the real one keeps them.
+    screen.rerender(
+      <ChallengePromptSheet challenge={null} busy={false} onAccept={onAccept} onDecline={jest.fn()} viewer={viewer} moreCount={1} />,
+    );
+    const modal = modalOf(screen);
+    expect(modal.props.visible).toBe(false);
+    // The fading card is hidden from the accessibility tree (see the
+    // fade-out accessibility suite), so query hidden elements here.
+    const { getByTestId, queryByTestId } = render(<>{modal.props.children}</>);
+    const hidden = { includeHiddenElements: true };
+    expect(getByTestId("challenge-prompt-name", hidden)).toHaveTextContent("Rival");
+    expect(getByTestId("challenge-prompt-stakes", hidden)).toBeTruthy();
+    expect(queryByTestId("challenge-prompt-fallback", hidden)).toBeNull();
+    expect(getByTestId("challenge-prompt-more", hidden)).toHaveTextContent("+1 more");
+    expect(getByTestId("challenge-prompt-accept", hidden).props.accessibilityState).toMatchObject({ disabled: true });
+    fireEvent.press(getByTestId("challenge-prompt-accept", hidden));
+    expect(onAccept).not.toHaveBeenCalled();
+  });
+});
+
+describe("ChallengePromptSheet cannot be dismissed by accident (AC-S7)", () => {
+  it("ignores Android back and the iOS close request", () => {
     jest.useFakeTimers();
     const onAccept = jest.fn();
-    const { rerender, getByTestId } = render(
-      <ChallengePromptSheet challenge={RIVAL} busy={false} onAccept={onAccept} onDecline={jest.fn()} />,
+    const onDecline = jest.fn();
+    const onLater = jest.fn();
+    const screen = render(
+      <ChallengePromptSheet challenge={RIVAL} busy={false} onAccept={onAccept} onDecline={onDecline} onLater={onLater} />,
     );
-    act(() => mockOnChange?.(0));
     act(() => jest.advanceTimersByTime(PROMPT_INPUT_GUARD_MS));
-    rerender(<ChallengePromptSheet challenge={null} busy={false} onAccept={onAccept} onDecline={jest.fn()} />);
-    rerender(<ChallengePromptSheet challenge={RIVAL} busy={false} onAccept={onAccept} onDecline={jest.fn()} />);
-    act(() => jest.advanceTimersByTime(PROMPT_INPUT_GUARD_MS));
-    act(() => mockOnChange?.(-1));
-    act(() => (mockSheetProps.onDismiss as () => void)());
+    const onRequestClose = modalOf(screen).props.onRequestClose as () => void;
+    expect(typeof onRequestClose).toBe("function");
+    act(() => onRequestClose());
+    expect(modalOf(screen).props.visible).toBe(true);
+    expect(onAccept).not.toHaveBeenCalled();
+    expect(onDecline).not.toHaveBeenCalled();
+    expect(onLater).not.toHaveBeenCalled();
+  });
 
-    // Just back up: guarded.
-    expect(getByTestId("challenge-prompt-accept").props.accessibilityState).toEqual({ disabled: true });
-    fireEvent.press(getByTestId("challenge-prompt-accept"));
+  it("does nothing on a backdrop tap", () => {
+    jest.useFakeTimers();
+    const onAccept = jest.fn();
+    const onDecline = jest.fn();
+    const onLater = jest.fn();
+    const screen = render(
+      <ChallengePromptSheet challenge={RIVAL} busy={false} onAccept={onAccept} onDecline={onDecline} onLater={onLater} />,
+    );
+    act(() => jest.advanceTimersByTime(PROMPT_INPUT_GUARD_MS));
+    const backdrop = screen.getByTestId("challenge-prompt-backdrop");
+    // A plain View: nothing to press, not a button.
+    expect(backdrop.props.onPress).toBeUndefined();
+    expect(backdrop.props.accessibilityRole).toBeUndefined();
+    fireEvent.press(backdrop);
+    expect(modalOf(screen).props.visible).toBe(true);
+    expect(onAccept).not.toHaveBeenCalled();
+    expect(onDecline).not.toHaveBeenCalled();
+    expect(onLater).not.toHaveBeenCalled();
+  });
+});
+
+describe("ChallengePromptSheet present watchdog", () => {
+  it("re-arms the input guard when a refused present is retried and really shows", () => {
+    jest.useFakeTimers();
+    const onAccept = jest.fn();
+    const props = { busy: false, onAccept, onDecline: jest.fn() };
+    const screen = render(<ChallengePromptSheet challenge={RIVAL} {...props} />);
+    act(() => jest.advanceTimersByTime(PROMPT_INPUT_GUARD_MS));
+
+    // iOS refused the present; the watchdog remounted the Modal and it is
+    // only now really on screen.
+    mockWatchdogKey = 1;
+    screen.rerender(<ChallengePromptSheet challenge={{ ...RIVAL }} {...props} />);
+    act(() => (modalOf(screen).props.onShow as () => void)());
+    expect(mockWatchdogOnShow).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("challenge-prompt-accept").props.accessibilityState).toEqual({ disabled: true });
+    fireEvent.press(screen.getByTestId("challenge-prompt-accept"));
     expect(onAccept).not.toHaveBeenCalled();
     act(() => jest.advanceTimersByTime(PROMPT_INPUT_GUARD_MS));
-    fireEvent.press(getByTestId("challenge-prompt-accept"));
+    fireEvent.press(screen.getByTestId("challenge-prompt-accept"));
     expect(onAccept).toHaveBeenCalledTimes(1);
   });
 
-  it("does not dismiss or re-present when the challenge is gone by the time the close lands", () => {
-    const { rerender } = render(<Harness challenge={RIVAL} />);
-    act(() => mockOnChange?.(0));
-    rerender(<Harness challenge={null} />);
-    rerender(<Harness challenge={RIVAL} />);
-    act(() => mockOnChange?.(-1));
-    rerender(<Harness challenge={null} />);
-    // Already closing and unmounting: dismissing it again would leave gorhom
-    // stuck in DISMISSING.
-    expect(mockDismiss).toHaveBeenCalledTimes(1);
-    act(() => (mockSheetProps.onDismiss as () => void)());
-    expect(mockPresent).toHaveBeenCalledTimes(2);
+  it("does not restart the guard on an ordinary onShow", () => {
+    jest.useFakeTimers();
+    const onAccept = jest.fn();
+    const screen = render(<ChallengePromptSheet challenge={RIVAL} busy={false} onAccept={onAccept} onDecline={jest.fn()} />);
+    // The fade-in settles at 300ms: that does not buy another 600ms.
+    act(() => jest.advanceTimersByTime(300));
+    act(() => (modalOf(screen).props.onShow as () => void)());
+    act(() => jest.advanceTimersByTime(PROMPT_INPUT_GUARD_MS - 300));
+    fireEvent.press(screen.getByTestId("challenge-prompt-accept"));
+    expect(onAccept).toHaveBeenCalledTimes(1);
   });
 
-  it("does nothing on the unmount that follows its own dismiss", () => {
-    const { rerender } = render(<Harness challenge={RIVAL} />);
-    act(() => mockOnChange?.(0));
-    rerender(<Harness challenge={null} />);
-    act(() => mockOnChange?.(-1));
-    act(() => (mockSheetProps.onDismiss as () => void)());
-    expect(mockPresent).toHaveBeenCalledTimes(1);
-  });
-
-  it("hides the grabber on a sheet that cannot be swiped closed (AC-S7)", () => {
-    render(<Harness challenge={RIVAL} />);
-    expect(mockSheetProps.enablePanDownToClose).toBe(false);
-    expect((mockSheetProps.handleIndicatorStyle as { opacity?: number }).opacity).toBe(0);
-  });
-
-  it("sizes to its content rather than a percentage snap point", () => {
-    render(<Harness challenge={null} />);
-    expect(mockSheetProps.enableDynamicSizing).toBe(true);
-    expect(mockSheetProps.snapPoints).toBeUndefined();
+  it("remounts a Modal iOS never presented, and stops once it shows (real hook)", () => {
+    jest.useFakeTimers();
+    mockUseRealWatchdog = true;
+    const screen = render(<Harness challenge={RIVAL} />);
+    const first = modalOf(screen);
+    act(() => jest.advanceTimersByTime(1_600));
+    const second = modalOf(screen);
+    expect(second).not.toBe(first);
+    act(() => (second.props.onShow as () => void)());
+    act(() => jest.advanceTimersByTime(10_000));
+    expect(modalOf(screen)).toBe(second);
   });
 });
 
 describe("ChallengePromptSheet accessibility (jits-ef2a)", () => {
-  it("turns off gorhom's accessible 'Bottom Sheet' container, which hid Accept/Decline", () => {
-    // gorhom defaults the content container to accessible=true with the
-    // label "Bottom Sheet"; an accessible element is a leaf to VoiceOver and
-    // idb, so nothing inside it could be reached.
-    render(<Harness challenge={RIVAL} />);
-    expect(mockSheetProps.accessible).toBe(false);
-  });
-
-  it("replaces the background that announced itself as an adjustable 'Bottom Sheet'", () => {
-    render(<Harness challenge={RIVAL} />);
-    const Background = mockSheetProps.backgroundComponent as React.ComponentType<{
-      style?: unknown;
-      pointerEvents?: string;
-    }>;
-    expect(Background).toBeDefined();
-
-    const { UNSAFE_root } = render(<Background style={{}} pointerEvents="none" />);
-    const view = UNSAFE_root.findByType(require("react-native").View);
-    expect(view.props.accessible).toBe(false);
-    expect(view.props.accessibilityLabel).toBeUndefined();
-    expect(view.props.accessibilityRole).toBeUndefined();
-  });
-
   it("exposes Accept and Decline as labelled buttons", () => {
     jest.useFakeTimers();
     const onAccept = jest.fn();
@@ -284,6 +421,8 @@ describe("ChallengePromptSheet accessibility (jits-ef2a)", () => {
     expect(prompt.props.accessibilityViewIsModal).toBe(true);
     // A container, not a leaf: its buttons must stay individually reachable.
     expect(prompt.props.accessible).not.toBe(true);
+    expect(getByTestId("challenge-prompt-card").props.accessible).not.toBe(true);
+    expect(getByTestId("challenge-prompt-backdrop").props.accessible).not.toBe(true);
   });
 });
 
@@ -311,11 +450,11 @@ describe("ChallengePromptSheet haptic (jits-4zp.7)", () => {
 
   it("never lets a haptics failure escape", async () => {
     mockNotify.mockImplementationOnce(() => Promise.reject(new Error("no engine")));
-    render(<Harness challenge={RIVAL} />);
+    const screen = render(<Harness challenge={RIVAL} />);
     await act(async () => {
       await Promise.resolve();
     });
-    expect(mockPresent).toHaveBeenCalledTimes(1);
+    expect(modalOf(screen).props.visible).toBe(true);
   });
 });
 
@@ -355,7 +494,7 @@ describe("ChallengePromptSheet face-off preview (match-flow redesign)", () => {
     expect(screen.getByText("Rival is live in the Arena")).toBeTruthy();
   });
 
-  it("keeps the stakes across a Later and reopen, so the sheet does not change height", async () => {
+  it("keeps the stakes across a Later and reopen, so the strip does not flicker", async () => {
     mockGetEloStakes.mockResolvedValue(STAKES);
     const viewer = { elo: 1512, weight: 170 };
     const screen = render(
@@ -606,19 +745,22 @@ describe("ChallengePromptSheet freshness countdown (AC-S1)", () => {
     const screen = render(<Sheet challenge={challenge} />);
     act(() => jest.advanceTimersByTime(5_000));
     expect(screen.getByTestId("challenge-prompt-countdown")).toHaveTextContent("0:00 LEFT");
+    // Well past 0:00 (and past the in-modal toast host's own mount timer),
+    // a countdown still ticking once a second would leave a timer here.
+    act(() => jest.advanceTimersByTime(60_000));
     expect(jest.getTimerCount()).toBe(0);
   });
 
-  it("ticks without re-rendering the rest of the sheet", () => {
-    // The sheet's own render count is observed through the gorhom mock,
-    // which re-renders whenever ChallengePromptSheet does.
+  it("ticks without re-rendering the rest of the prompt", () => {
+    // The body's render count is observed through the InitialsBlock mock,
+    // which re-renders whenever the prompt body does.
     const challenge = { ...RIVAL, createdAt: iso(NOW), expiresAt: null };
-    const before = mockSheetRenders;
+    const before = mockBodyRenders;
     render(<Sheet challenge={challenge} />);
     act(() => jest.advanceTimersByTime(PROMPT_INPUT_GUARD_MS));
-    const settled = mockSheetRenders;
+    const settled = mockBodyRenders;
     act(() => jest.advanceTimersByTime(5_000));
-    expect(mockSheetRenders).toBe(settled);
+    expect(mockBodyRenders).toBe(settled);
     expect(settled).toBeGreaterThan(before);
   });
 });
@@ -649,7 +791,7 @@ describe("ChallengePromptSheet header at large text sizes", () => {
     expect(screen.getByText("RANKED").props.maxFontSizeMultiplier).toBe(1.3);
   });
 
-  it("caps every label on the non-scrolling sheet so Accept and Decline stay on screen", async () => {
+  it("caps every label on the prompt so Accept and Decline keep their size", async () => {
     jest.useFakeTimers({ now: NOW });
     mockGetEloStakes.mockResolvedValue({
       challenger_win: 14,
@@ -791,14 +933,14 @@ describe("ChallengePromptSheet input guard (AC-S3)", () => {
     }
   });
 
-  it("runs exactly 600ms from present(), not restarted when the sheet settles (AC-S3)", () => {
+  it("runs exactly 600ms from the appearance, not restarted when the fade-in settles (AC-S3)", () => {
     const onAccept = jest.fn();
     const screen = render(<Sheet onAccept={onAccept} />);
-    // The present animation takes a while; the sheet settles at 400ms. The
-    // signed-off AC-S3 counts from the sheet appearing, so the settle does
-    // not buy another 600ms.
+    // The fade-in takes a while; onShow lands at 400ms. The signed-off AC-S3
+    // counts from the prompt appearing, so the settle does not buy another
+    // 600ms.
     act(() => jest.advanceTimersByTime(400));
-    act(() => mockOnChange?.(0));
+    act(() => (modalOf(screen).props.onShow as () => void)());
     act(() => jest.advanceTimersByTime(PROMPT_INPUT_GUARD_MS - 400 - 1));
     fireEvent.press(screen.getByLabelText("Accept challenge"));
     expect(onAccept).not.toHaveBeenCalled();
@@ -810,7 +952,7 @@ describe("ChallengePromptSheet input guard (AC-S3)", () => {
     expect(onAccept).toHaveBeenCalledTimes(1);
   });
 
-  it("does not re-arm when the sheet settles after the first window already ran out", () => {
+  it("does not re-arm when onShow lands after the first window already ran out", () => {
     // A slow present or a busy JS thread: the settle arrives 700ms in.
     const onAccept = jest.fn();
     const screen = render(<Sheet onAccept={onAccept} />);
@@ -818,7 +960,7 @@ describe("ChallengePromptSheet input guard (AC-S3)", () => {
     expect(screen.getByTestId("challenge-prompt-accept").props.accessibilityState).toMatchObject({
       disabled: false,
     });
-    act(() => mockOnChange?.(0));
+    act(() => (modalOf(screen).props.onShow as () => void)());
     // Enabled stays enabled: no flip back to disabled, and the tap lands.
     expect(screen.getByTestId("challenge-prompt-accept").props.accessibilityState).toMatchObject({
       disabled: false,
@@ -827,12 +969,12 @@ describe("ChallengePromptSheet input guard (AC-S3)", () => {
     expect(onAccept).toHaveBeenCalledTimes(1);
   });
 
-  it("does not re-arm at a later snap when a challenge replaces another in place", () => {
-    // Decline A with B queued: B replaces A on a sheet that is already
-    // settled at index 0, so gorhom fires no onChange for B's appearance.
+  it("does not re-arm at a later onShow when a challenge replaces another in place", () => {
+    // Decline A with B queued: B replaces A on a modal that is already
+    // shown, so no onShow fires for B's appearance.
     const onAccept = jest.fn();
     const screen = render(<Sheet onAccept={onAccept} />);
-    act(() => mockOnChange?.(0));
+    act(() => (modalOf(screen).props.onShow as () => void)());
     act(() => jest.advanceTimersByTime(PROMPT_INPUT_GUARD_MS));
 
     screen.rerender(<Sheet challenge={{ ...RIVAL, challengeId: "ch-2" }} onAccept={onAccept} />);
@@ -841,9 +983,9 @@ describe("ChallengePromptSheet input guard (AC-S3)", () => {
     expect(onAccept).not.toHaveBeenCalled();
     act(() => jest.advanceTimersByTime(PROMPT_INPUT_GUARD_MS + 100));
 
-    // A later snap (say, the stakes strip resizing the sheet) must not
-    // restart the guard and drop a deliberate tap.
-    act(() => mockOnChange?.(0));
+    // A stray later onShow must not restart the guard and drop a
+    // deliberate tap.
+    act(() => (modalOf(screen).props.onShow as () => void)());
     expect(screen.getByTestId("challenge-prompt-accept").props.accessibilityState).toMatchObject({
       disabled: false,
     });
@@ -857,7 +999,7 @@ describe("ChallengePromptSheet input guard (AC-S3)", () => {
     act(() => jest.advanceTimersByTime(200));
     screen.rerender(<Sheet challenge={{ ...RIVAL, challengeId: "ch-2" }} onAccept={onAccept} />);
     act(() => jest.advanceTimersByTime(200));
-    act(() => mockOnChange?.(0));
+    act(() => (modalOf(screen).props.onShow as () => void)());
     act(() => jest.advanceTimersByTime(PROMPT_INPUT_GUARD_MS - 200 - 1));
     fireEvent.press(screen.getByLabelText("Accept challenge"));
     expect(onAccept).not.toHaveBeenCalled();
@@ -921,9 +1063,10 @@ describe("ChallengePromptSheet Later (AC-S4, AC-S7)", () => {
     expect(screen.queryByTestId("challenge-prompt-later")).toBeNull();
   });
 
-  it("cannot be swiped closed", () => {
-    render(<Sheet onLater={jest.fn()} />);
-    expect(mockSheetProps.enablePanDownToClose).toBe(false);
+  it("minimizing is only ever the Later button: the modal itself never closes", () => {
+    const screen = render(<Sheet onLater={jest.fn()} />);
+    act(() => (modalOf(screen).props.onRequestClose as () => void)());
+    expect(modalOf(screen).props.visible).toBe(true);
   });
 });
 
@@ -943,5 +1086,151 @@ describe("ChallengePromptSheet multiple incoming (AC-S6)", () => {
   it("says nothing when this is the only one", () => {
     const screen = render(<Sheet moreCount={0} />);
     expect(screen.queryByTestId("challenge-prompt-more")).toBeNull();
+  });
+});
+
+describe("ChallengePromptSheet feedback over the prompt", () => {
+  // The app's root host, as app/_layout.tsx mounts it, beside the prompt.
+  function App({ challenge }: { challenge: IncomingChallenge | null }) {
+    return (
+      <>
+        <Toaster />
+        <Harness challenge={challenge} />
+      </>
+    );
+  }
+
+  it("renders a toast raised while the prompt is up inside the Modal, over the card", () => {
+    const screen = render(<App challenge={RIVAL} />);
+    act(() => toast.error("Couldn't decline that challenge. Try again."));
+    const inModal = within(modalOf(screen)).getAllByText("Couldn't decline that challenge. Try again.");
+    expect(inModal).toHaveLength(1);
+    // Only the prompt's host took it: the root host, under the Modal, did not.
+    expect(screen.getAllByText("Couldn't decline that challenge. Try again.")).toHaveLength(1);
+    act(() => toast.hide());
+  });
+
+  it("hands toasts back to the root host once the prompt clears", () => {
+    const screen = render(<App challenge={RIVAL} />);
+    screen.rerender(<App challenge={null} />);
+    act(() => toast.info("Rival just left the Arena"));
+    expect(screen.getAllByText("Rival just left the Arena")).toHaveLength(1);
+    expect(within(modalOf(screen)).queryByText("Rival just left the Arena")).toBeNull();
+    act(() => toast.hide());
+  });
+
+  it("keeps a toast raised in the same flow that clears the prompt, on the root host", () => {
+    // A failed Accept: the hook toasts, then clears the prompt, in one batch.
+    // The toast first lands on the in-modal host, which unmounts right after.
+    jest.useFakeTimers();
+    const onHide = jest.fn();
+    const screen = render(<App challenge={RIVAL} />);
+    act(() => {
+      toast.error({ text1: "That challenge is no longer available.", onHide });
+      screen.rerender(<App challenge={null} />);
+    });
+    act(() => jest.advanceTimersByTime(0));
+    expect(screen.getAllByText("That challenge is no longer available.")).toHaveLength(1);
+    expect(within(modalOf(screen)).queryByText("That challenge is no longer available.")).toBeNull();
+    // The root host auto-hides it on the usual schedule, calling the owner's onHide.
+    act(() => jest.advanceTimersByTime(3900));
+    expect(onHide).not.toHaveBeenCalled();
+    act(() => jest.advanceTimersByTime(200));
+    expect(onHide).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps a toast raised just before the prompt clears, for the rest of its window", () => {
+    jest.useFakeTimers();
+    const onHide = jest.fn();
+    const screen = render(<App challenge={RIVAL} />);
+    act(() => toast.error({ text1: "Couldn't accept that challenge.", onHide }));
+    act(() => jest.advanceTimersByTime(1500));
+    screen.rerender(<App challenge={null} />);
+    act(() => jest.advanceTimersByTime(0));
+    expect(screen.getAllByText("Couldn't accept that challenge.")).toHaveLength(1);
+    expect(within(modalOf(screen)).queryByText("Couldn't accept that challenge.")).toBeNull();
+    // Only the 2.5s left of its 4s window, not a fresh 4s.
+    act(() => jest.advanceTimersByTime(2400));
+    expect(onHide).not.toHaveBeenCalled();
+    act(() => jest.advanceTimersByTime(200));
+    expect(onHide).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not bring back a toast that already hid, or one the root host already shows", () => {
+    jest.useFakeTimers();
+    const screen = render(<App challenge={null} />);
+    // Raised before the prompt: the root host owns it and keeps it.
+    act(() => toast.info("Rival just left the Arena"));
+    screen.rerender(<App challenge={RIVAL} />);
+    screen.rerender(<App challenge={null} />);
+    act(() => jest.advanceTimersByTime(0));
+    expect(screen.getAllByText("Rival just left the Arena")).toHaveLength(1);
+    act(() => toast.hide());
+
+    // Raised on the prompt and dismissed before it clears: stays gone.
+    screen.rerender(<App challenge={RIVAL} />);
+    act(() => toast.error("Couldn't decline that challenge. Try again."));
+    act(() => toast.hide());
+    screen.rerender(<App challenge={null} />);
+    act(() => jest.advanceTimersByTime(0));
+    expect(screen.queryByText("Couldn't decline that challenge. Try again.")).toBeNull();
+  });
+
+  it("shows the offline banner inside the Modal while offline", async () => {
+    mockNetState = { isConnected: false };
+    const screen = render(<Harness challenge={RIVAL} />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(within(modalOf(screen)).getByText("You're offline. Some features may not work.")).toBeTruthy();
+  });
+
+  it("shows no offline banner while online", async () => {
+    const screen = render(<Harness challenge={RIVAL} />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.queryByText("You're offline. Some features may not work.")).toBeNull();
+  });
+
+  it("mounts no feedback hosts while there is no challenge", () => {
+    const screen = render(<Harness challenge={null} />);
+    const modal = modalOf(screen);
+    const { UNSAFE_queryByType } = render(<>{modal.props.children}</>);
+    expect(UNSAFE_queryByType(ModalToaster)).toBeNull();
+    expect(UNSAFE_queryByType(Toaster)).toBeNull();
+  });
+});
+
+describe("ChallengePromptSheet keyboard", () => {
+  it("dismisses a focused field's keyboard when a challenge appears, once per challenge", () => {
+    const dismiss = jest.spyOn(Keyboard, "dismiss").mockImplementation(() => undefined);
+    const screen = render(<Harness challenge={null} />);
+    expect(dismiss).not.toHaveBeenCalled();
+    screen.rerender(<Harness challenge={RIVAL} />);
+    expect(dismiss).toHaveBeenCalledTimes(1);
+    screen.rerender(<Harness challenge={{ ...RIVAL }} />);
+    expect(dismiss).toHaveBeenCalledTimes(1);
+    screen.rerender(<Harness challenge={{ ...RIVAL, challengeId: "ch-2" }} />);
+    expect(dismiss).toHaveBeenCalledTimes(2);
+    dismiss.mockRestore();
+  });
+});
+
+describe("ChallengePromptSheet fade-out accessibility", () => {
+  it("exposes the card while shown and hides the fading card from the accessibility tree", () => {
+    const screen = render(<Harness challenge={RIVAL} />);
+    const card = screen.getByTestId("challenge-prompt-card");
+    expect(card.props.accessibilityElementsHidden).toBe(false);
+    expect(card.props.importantForAccessibility).toBe("auto");
+
+    screen.rerender(<Harness challenge={null} />);
+    const { getByTestId, queryByText } = render(<>{modalOf(screen).props.children}</>);
+    const fading = getByTestId("challenge-prompt-card", { includeHiddenElements: true });
+    expect(fading.props.accessibilityElementsHidden).toBe(true);
+    expect(fading.props.importantForAccessibility).toBe("no-hide-descendants");
+    // So the title the match-loop harness looks for is gone from the tree.
+    expect(queryByText("INCOMING CHALLENGE")).toBeNull();
+    expect(queryByText("INCOMING CHALLENGE", { includeHiddenElements: true })).toBeTruthy();
   });
 });

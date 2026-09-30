@@ -100,12 +100,28 @@ describe("toast announces to VoiceOver", () => {
 describe("toast API (unchanged)", () => {
   it("maps description to text2 and sets the type", () => {
     toast.error({ text1: "Couldn't record result", description: "nope" });
+    // onHide is always wrapped: the module tracks when the toast hides so a
+    // closing modal host can hand a still-visible toast to the root host.
     expect(mockShow).toHaveBeenCalledWith({
       type: "error",
       text1: "Couldn't record result",
       text2: "nope",
+      onHide: expect.any(Function),
     });
     toast.info("Plain");
-    expect(mockShow).toHaveBeenLastCalledWith({ type: "info", text1: "Plain" });
+    expect(mockShow).toHaveBeenLastCalledWith({
+      type: "info",
+      text1: "Plain",
+      onHide: expect.any(Function),
+    });
+  });
+
+  it("still calls the caller's own onHide through the wrapper", () => {
+    const onHide = jest.fn();
+    toast.success({ text1: "Saved", onHide });
+    const shown = mockShow.mock.calls[mockShow.mock.calls.length - 1][0] as { onHide: () => void };
+    expect(shown.onHide).not.toBe(onHide);
+    shown.onHide();
+    expect(onHide).toHaveBeenCalledTimes(1);
   });
 });
