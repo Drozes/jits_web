@@ -72,6 +72,8 @@ next-env.d.ts
 
 # build output / tooling artifacts
 /dist/
+__pycache__/
+*.pyc
 .playwright-mcp/
 
 # match-loop harness run artifacts (screenshots, traces, result.json) and

@@ -106,6 +106,7 @@
         "apps/mobile/components/profile-setup/date-of-birth-picker.tsx",
         "apps/mobile/components/profile-setup/elo-form-field.tsx",
         "apps/mobile/components/profile-setup/identity-step.tsx",
+        "apps/mobile/components/profile-setup/instagram-field.tsx",
         "apps/mobile/components/profile-setup/setup-wizard.tsx",
         "apps/mobile/components/profile-setup/types.ts",
         "apps/mobile/components/profile-setup/wizard-progress.tsx",
@@ -123,6 +124,7 @@
         "apps/mobile/components/layout/header-live-dot.tsx",
         "apps/mobile/components/profile-setup/city-autocomplete.tsx",
         "apps/mobile/components/profile-setup/elo-form-field.tsx",
+        "apps/mobile/components/profile-setup/instagram-field.tsx",
         "apps/mobile/components/profile-setup/setup-wizard.tsx",
         "apps/mobile/components/profile-setup/training-step.tsx",
         "apps/mobile/components/profile-setup/types.ts",
@@ -308,6 +310,7 @@
         "apps/mobile/components/match-detail/use-amber.ts",
         "apps/mobile/components/match-flow/fight/**",
         "apps/mobile/components/notifications/notification-bell.tsx",
+        "apps/mobile/components/offline-banner.tsx",
         "apps/mobile/components/ui/count-pill.tsx",
         "apps/mobile/components/ui/elo-system/chip.tsx",
         "apps/mobile/components/ui/elo-system/elo-tile.tsx",
@@ -414,7 +417,7 @@
         "apps/mobile/components/layout/elo-tab-bar.tsx",
         "apps/mobile/components/layout/header-live-dot.tsx",
         "apps/mobile/components/match-card.tsx",
-        "apps/mobile/components/profile/milestone-progress.tsx",
+        "apps/mobile/components/profile/elo-progression.tsx",
         "apps/mobile/components/profile/submission-breakdown.tsx",
         "apps/mobile/components/profile/weekly-activity.tsx",
         "apps/mobile/components/ui/count-pill.tsx",
@@ -424,7 +427,6 @@
         "apps/mobile/components/ui/elo-system/plate.tsx",
         "apps/mobile/components/ui/toast.tsx",
         "apps/mobile/lib/navigation/**",
-        "packages/shared/src/utils/milestones.ts",
         "packages/shared/src/utils/shared.ts"
       ]
     },
@@ -852,7 +854,6 @@
         "apps/mobile/components/layout/header-live-dot.tsx",
         "apps/mobile/components/profile/history-row-action.tsx",
         "apps/mobile/components/ui/dialog.tsx",
-        "apps/mobile/components/ui/elo-system/chip.tsx",
         "apps/mobile/components/ui/elo-system/delta-number.tsx",
         "apps/mobile/components/ui/elo-system/meta-tag.tsx",
         "apps/mobile/components/ui/elo-system/participant-row.tsx",
@@ -1043,6 +1044,21 @@
         "apps/mobile/lib/navigation/**",
         "apps/mobile/lib/practice/constants.ts",
         "apps/mobile/lib/updates/update-policy.ts",
+        "packages/shared/src/utils/shared.ts"
+      ]
+    },
+    "49-Admin-Disputers.dc.html": {
+      "title": "Settings: admin repeat disputers",
+      "sources": [
+        "apps/mobile/app/(app)/_layout.tsx",
+        "apps/mobile/app/(app)/settings/_layout.tsx",
+        "apps/mobile/app/(app)/settings/admin/disputers.tsx",
+        "apps/mobile/components/admin/repeat-disputer-row.tsx",
+        "apps/mobile/components/layout/app-header.tsx",
+        "apps/mobile/components/layout/header-live-dot.tsx",
+        "apps/mobile/components/layout/page-container.tsx",
+        "apps/mobile/components/ui/button.tsx",
+        "apps/mobile/components/ui/elo-system/plate.tsx",
         "packages/shared/src/utils/shared.ts"
       ]
     }

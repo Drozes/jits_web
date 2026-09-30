@@ -386,6 +386,8 @@ BOARDS = {
     "48-System-Overlays.dc.html": dict(
         seeds=HOME + ["components/offline-banner.tsx", "components/updates/ota-update-bootstrap.tsx",
                       "lib/updates/update-policy.ts"]),
+    # Admin repeat disputers list (Settings > Admin > Repeat disputers).
+    "49-Admin-Disputers.dc.html": dict(seeds=SETTINGS + ["app/(app)/settings/admin/disputers.tsx"]),
 }
 
 

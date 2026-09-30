@@ -1,7 +1,7 @@
 {
   "canvas": "https://claude.ai/artifact/PJWm2WeqsG56HS13jHsd5D",
-  "commit": "9a4da43e0fdf20cab4f7b82ba74ca57545a44af0",
-  "synced_at": "2026-09-29T20:00:00-04:00",
-  "version": null,
-  "note": "Baseline: the canvas was built on 2026-09-29 (roughly 17:00 to 20:00 America/Toronto) from development at this commit, the last commit before the build ('docs: current mobile release is OTA 5640ca9d'). This baseline is LATER than the last production OTA, which was cut from 6a749c8, so until the next release the canvas already shows some unreleased work: the live status chip and live menu (1f2d764), the Arena Mat Board and tab badge (5bf1b2e), the challenge prompt sheet upgrade (990d221), and the single bell store with fresh-only badges (40413a8). The publish version id of the initial build was not recorded. /canvas-sync rewrites this file after every sync."
+  "commit": "331315f5ac3e0ddafd515dd3eceec63d4477f9e4",
+  "synced_at": "2026-09-30T18:22:22-04:00",
+  "version": "1790806838-5c77",
+  "note": "Synced after the Sept 30 design review (epics jits-02vo / jr_be-ahn) shipped as OTA 9c5e3210; the affected Current app boards were redrawn per item and independently reviewed against the code. New board 49-Admin-Disputers (Settings: admin repeat disputers)."
 }
