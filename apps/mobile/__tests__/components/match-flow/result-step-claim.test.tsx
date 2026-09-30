@@ -54,7 +54,7 @@ const TYPES = [
   type("other", "Other Submission", 11),
 ];
 
-function renderStep(onLeave?: () => void) {
+function renderStep() {
   return render(
     <ResultStep
       matchId="M1"
@@ -65,7 +65,6 @@ function renderStep(onLeave?: () => void) {
       opponent={{ id: "opp-1", displayName: "Mina Park", elo: 1498, weight: 168 }}
       submissionTypes={TYPES}
       onRecorded={jest.fn()}
-      onLeave={onLeave}
     />,
   );
 }
@@ -87,15 +86,25 @@ describe("claim-first", () => {
   });
 
   it("an opponent's claim shows the waiting view, with no way into the form", () => {
-    const onLeave = jest.fn();
-    const s = renderStep(onLeave);
+    const s = renderStep();
     act(() => mockOnResultClaimed?.("opp-1", 1000));
     s.getByTestId("result-waiting");
+    s.getByText("MATCH OVER");
     s.getByText("M. Park is recording the result");
+    s.getByText("You\u2019ll confirm it in a moment.");
+    s.getByText("ENDED AT");
+    s.getByText("RANKED");
     expect(s.queryByTestId("result-winner-me-1")).toBeNull();
     expect(s.queryByTestId("result-outcome-draw")).toBeNull();
-    fireEvent.press(s.getByTestId("result-leave-later"));
-    expect(onLeave).toHaveBeenCalledTimes(1);
+  });
+
+  it("the waiting view has no 'confirm later' exit (jits-02vo.7, P-Result-Waiting)", () => {
+    const s = renderStep();
+    act(() => mockOnResultClaimed?.("opp-1", 1000));
+    s.getByTestId("result-waiting");
+    expect(s.queryByTestId("result-leave-later")).toBeNull();
+    expect(s.queryByText(/confirm later/i)).toBeNull();
+    expect(s.queryByText(/leave/i)).toBeNull();
   });
 
   it("unlocks the form when the claimer goes quiet for 20 s, not before", () => {

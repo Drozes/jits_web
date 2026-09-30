@@ -11,7 +11,8 @@ import { SEND_GRACE_MS, useMatchSyncContext, useStepMatchSync } from "@/lib/matc
 import { mutationQueue, isQueuedResult } from "@/lib/network/mutation-queue";
 import { matchHaptics } from "@/lib/match-flow/use-haptics";
 import { formatElapsed } from "@/lib/match-flow/format-elapsed";
-import { disputeLockNote, isDisputeWindowClosed } from "@/lib/match-flow/match-extras";
+import { LEAVE_COUNTS_AS_CONFIRMING, disputeLockNote, isDisputeWindowClosed } from "@/lib/match-flow/match-extras";
+import { useDisputeLocksAt } from "@/lib/match-flow/use-dispute-locks-at";
 import { usePalette } from "@/lib/theme/palette";
 import { FIGHT_RADIUS } from "../fight/fight-tokens";
 import { FightButton, InitialsBlock, Mono, RatingBlock, shortName } from "../fight/fight-ui";
@@ -38,12 +39,14 @@ interface ConfirmStepProps {
   finishTimeSeconds: number | null;
   /** B3: completed_at + 24 h; null on an older backend. */
   disputeLocksAt: string | null;
+  /** Lock-time fallback: completed_at + match_result_lock_seconds(). */
+  completedAt?: string | null;
   onCompleted: () => void;
 }
 
-/** After this athlete has confirmed, how long before they may stop waiting
- * on an opponent who never confirms. */
-const LEAVE_AFTER_MS = 20_000;
+/** After this athlete confirms, how long the CONFIRMED row shows before the
+ * step moves on to the verdict. */
+const ADVANCE_AFTER_CONFIRM_MS = 1_500;
 
 /** "YOU WON" / "YOU LOST" / "DRAW" / "MATCH COMPLETE" (the harness reads it). */
 export function confirmVerdict(resultData: BroadcastResult | null, meId: string): string {
@@ -58,18 +61,24 @@ export function confirmVerdict(resultData: BroadcastResult | null, meId: string)
  * confirms their side with the result (B2) and they go straight to the
  * verdict. A dispute is only possible for 24 h after the match (B3).
  *
+ * Leaving counts as confirming (jits-02vo.7): the backend confirms an
+ * undisputed result once its lock window passes (jr_be-ahn.5), so there is
+ * no "continue without waiting" exit. Once this athlete has confirmed, the
+ * step moves on to the verdict, which itself waits on (and polls for) an
+ * opponent who has not confirmed yet.
+ *
  * Signals, fastest first: result_confirmed / match_disputed broadcasts, then
  * the wizard's reconciler (confirmations from the DB), which also moves the
  * wizard to the verdict once both rows exist or the match is disputed.
  */
 export function ConfirmStep(props: ConfirmStepProps) {
   const p = usePalette();
-  const { matchId, matchType, me, opponent, resultData, confirmedAthleteIds, submissionName, finishTimeSeconds, disputeLocksAt, onCompleted } = props;
+  const { matchId, matchType, me, opponent, resultData, confirmedAthleteIds, submissionName, finishTimeSeconds, disputeLocksAt: rawLocksAt, completedAt = null, onCompleted } = props;
+  const disputeLocksAt = useDisputeLocksAt(rawLocksAt, completedAt);
   const [myConfirmedLocal, setMyConfirmed] = React.useState(false);
   const [opponentConfirmedLocal, setOpponentConfirmed] = React.useState(false);
   const [showDispute, setShowDispute] = React.useState(false);
   const [windowClosed, setWindowClosed] = React.useState(() => isDisputeWindowClosed(disputeLocksAt));
-  const [canLeave, setCanLeave] = React.useState(false);
   const { reconcileNow } = useMatchSyncContext();
   const myConfirmed = myConfirmedLocal || confirmedAthleteIds.includes(me.athlete_id);
   const opponentConfirmed = opponentConfirmedLocal || confirmedAthleteIds.includes(opponent.athlete_id);
@@ -96,16 +105,10 @@ export function ConfirmStep(props: ConfirmStepProps) {
   });
 
   React.useEffect(() => {
-    if (!myConfirmed || !opponentConfirmed) return;
-    const t = setTimeout(advance, 1500);
+    if (!myConfirmed) return;
+    const t = setTimeout(advance, ADVANCE_AFTER_CONFIRM_MS);
     return () => clearTimeout(t);
-  }, [myConfirmed, opponentConfirmed, advance]);
-
-  React.useEffect(() => {
-    if (!myConfirmed || opponentConfirmed) return;
-    const t = setTimeout(() => setCanLeave(true), LEAVE_AFTER_MS);
-    return () => clearTimeout(t);
-  }, [myConfirmed, opponentConfirmed]);
+  }, [myConfirmed, advance]);
 
   React.useEffect(() => {
     if (isDisputeWindowClosed(disputeLocksAt)) setWindowClosed(true);
@@ -222,18 +225,18 @@ export function ConfirmStep(props: ConfirmStepProps) {
               icon={(c) => <Flag size={16} color={c} />}
             />
           )}
-          {lockNote ? (
-            <Text className="font-mono" style={{ textAlign: "center", fontSize: 11, letterSpacing: 0.4, color: p.text2 }}>
-              {lockNote}
-            </Text>
-          ) : null}
-        </View>
-      ) : !opponentConfirmed ? (
-        <View style={{ gap: 12, alignItems: "center" }}>
-          <Mono>{`Waiting for ${opponent.display_name} to confirm...`}</Mono>
-          {canLeave ? (
-            <FightButton testID="confirm-leave" variant="ghost" label="Continue without waiting" onPress={advance} height={44} />
-          ) : null}
+          <View testID="confirm-lock-notes" style={{ gap: 6, alignItems: "center" }}>
+            {windowClosed ? null : (
+              <Text className="font-mono-bold" style={{ textAlign: "center", fontSize: 11, letterSpacing: 0.4, color: p.text }}>
+                {LEAVE_COUNTS_AS_CONFIRMING}
+              </Text>
+            )}
+            {lockNote ? (
+              <Text className="font-mono" style={{ textAlign: "center", fontSize: 11, letterSpacing: 0.4, color: p.text2 }}>
+                {lockNote}
+              </Text>
+            ) : null}
+          </View>
         </View>
       ) : null}
     </View>

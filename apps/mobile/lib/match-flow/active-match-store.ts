@@ -128,9 +128,9 @@ export function useActiveMatch(athleteId: string | null | undefined): MyActiveMa
  *
  * Known limit, by the no-new-RPC rule: mobile keeps an ended match
  * `in_progress` until the result is recorded (it never calls `end_match`),
- * so the database cannot tell "ended, result not recorded yet" (the "Leave
- * and confirm later" exit) from "left mid-roll" (an app killed during the
- * timer). Both read as CONFIRM; both need the athlete back in that match to
+ * so the database cannot tell "ended, result not recorded yet" (an app
+ * closed while the opponent records the result) from "left mid-roll" (an app
+ * killed during the timer). Both read as CONFIRM; both need the athlete back in that match to
  * finish it. A recorded result flips the match to `completed`, which
  * `getMyActiveMatch()` does not return, so CONFIRM clears then.
  */

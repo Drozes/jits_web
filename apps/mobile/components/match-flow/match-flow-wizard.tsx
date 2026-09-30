@@ -46,12 +46,6 @@ interface MatchFlowWizardProps {
   currentAthleteId: string;
   /** Reports the active wizard step so the screen can guard back-nav. */
   onStepChange?: (step: MatchStep | null) => void;
-  /**
-   * Leave a back-guarded step on purpose ("Leave and confirm later" while
-   * the opponent records the result). The screen lifts its guard, then
-   * exits; without it the option is not offered.
-   */
-  onLeaveMatch?: () => void;
 }
 
 export const STEP_LABELS: Record<MatchStep, string> = {
@@ -96,7 +90,6 @@ export function MatchFlowWizard({
   matchId,
   currentAthleteId,
   onStepChange,
-  onLeaveMatch,
 }: MatchFlowWizardProps) {
   // Single resolution point for the label: every downstream consumer takes a
   // required non-empty string, so blank and whitespace-only are normalised
@@ -336,7 +329,6 @@ export function MatchFlowWizard({
                 initialFinishSeconds={initialFinishSeconds}
                 setFinishSeconds={setFinishSeconds}
                 refresh={refresh}
-                onLeaveMatch={onLeaveMatch}
               />
             </FaceoffProvider>
           </MatchSyncProvider>

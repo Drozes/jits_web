@@ -13,13 +13,12 @@
  */
 import * as React from "react";
 import { ActivityIndicator, View } from "react-native";
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { Stack, useLocalSearchParams } from "expo-router";
 import { usePreventRemove } from "@react-navigation/native";
 import { useRequireAthlete } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { ThemedStatusBar } from "@/lib/theme/themed-status-bar";
 import { BROADCAST } from "@/components/match-flow/live/broadcast-tokens";
-import { exitMatchTo } from "@/lib/match-flow/exit-to";
 import { MatchFlowWizard } from "@/components/match-flow/match-flow-wizard";
 import type { MatchStep } from "@/lib/match-flow/step-router";
 import { AppHeader } from "@/components/layout/app-header";
@@ -47,7 +46,6 @@ const NO_SWIPE_STEPS: ReadonlySet<MatchStep> = new Set<MatchStep>(["weight", "re
 
 export default function ArenaMatchScreen() {
   const tokens = useThemedTokens();
-  const router = useRouter();
   const { matchId } = useLocalSearchParams<{ matchId: string }>();
   const { athlete, isLoading: authLoading } = useRequireAthlete();
   const [step, setStep] = React.useState<MatchStep | null>(null);
@@ -55,14 +53,11 @@ export default function ArenaMatchScreen() {
   // the way out (every exit path unmounts this screen). See arena-store.ts.
   useArenaMatchScreen(matchId);
 
-  // "Leave and confirm later": lift the guard, then exit once it is off.
-  const [leaving, setLeaving] = React.useState(false);
-  const guarded = step != null && GUARDED_STEPS.has(step) && !leaving;
+  // No in-app "leave and confirm later" exit (jits-02vo.7): closing the app
+  // is allowed, and the backend confirms an undisputed result once its lock
+  // window passes (jr_be-ahn.5).
+  const guarded = step != null && GUARDED_STEPS.has(step);
   usePreventRemove(guarded, () => {});
-  React.useEffect(() => {
-    if (leaving) exitMatchTo(router, ARENA_HREF);
-  }, [leaving, router]);
-  const onLeaveMatch = React.useCallback(() => setLeaving(true), []);
   const swipeable = !guarded && !(step != null && NO_SWIPE_STEPS.has(step));
 
   if (authLoading || !athlete) {
@@ -99,7 +94,6 @@ export default function ArenaMatchScreen() {
           matchId={matchId}
           currentAthleteId={athlete.id}
           onStepChange={setStep}
-          onLeaveMatch={onLeaveMatch}
         />
       </View>
     </>

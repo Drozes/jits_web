@@ -31,8 +31,6 @@ interface ResultStepProps {
   opponent: ResultAthlete;
   submissionTypes: SubmissionType[];
   onRecorded: (result: BroadcastResult, meta: RecordedMeta) => void;
-  /** "Leave and confirm later" on the waiting view. */
-  onLeave?: () => void;
 }
 
 /**
@@ -46,7 +44,7 @@ interface ResultStepProps {
  */
 export function ResultStep(props: ResultStepProps) {
   const p = usePalette();
-  const { matchId, matchType, durationSeconds, initialFinishSeconds, me, opponent, submissionTypes, onRecorded, onLeave } = props;
+  const { matchId, matchType, durationSeconds, initialFinishSeconds, me, opponent, submissionTypes, onRecorded } = props;
   const [outcome, setOutcome] = React.useState<"submission" | "draw" | null>(null);
   const [winnerId, setWinnerId] = React.useState("");
   const [submissionCode, setSubmissionCode] = React.useState("");
@@ -79,7 +77,6 @@ export function ResultStep(props: ResultStepProps) {
         matchType={matchType}
         durationSeconds={durationSeconds}
         endedAtSeconds={initialFinishSeconds}
-        onLeave={onLeave}
         onTakeOver={claim.canTakeOver ? claim.takeOver : undefined}
       />
     );

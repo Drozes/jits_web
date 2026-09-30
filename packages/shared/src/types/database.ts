@@ -2865,6 +2865,7 @@ export type Database = {
           practice_match_offered_at: string
         }[]
       }
+      match_result_lock_seconds: { Args: never; Returns: number }
       merge_finalize: {
         Args: { p_analysis: Json; p_technique_tags: Json; p_video_id: string }
         Returns: string

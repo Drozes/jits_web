@@ -77,7 +77,7 @@ function renderStep(
       resultData={null}
       ownOutcome={null}
       confirmedAthleteIds={[]}
-      extras={{ winnerId: null, submissionName: null, finishTimeSeconds: null, disputeLocksAt: null }}
+      extras={{ winnerId: null, submissionName: null, finishTimeSeconds: null, disputeLocksAt: null, completedAt: null }}
       recording
       setStep={setStep}
       setResultData={jest.fn()}

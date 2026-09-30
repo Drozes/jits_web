@@ -4,12 +4,18 @@
  * - The subtitle is plain English, not "RANKED. ELO ALREADY APPLIED...".
  * - The viewer's own pending panel reads "Your call" with an empty circle,
  *   not the spinner the opponent's pending panel keeps ("Confirming...").
- * - After confirming, the wait line names the opponent.
+ * - Under Confirm / Dispute: "If you leave without disputing, it counts as
+ *   confirming." then "Locks automatically in {n} h." (jits-02vo.7), with
+ *   the lock time from dispute_locks_at, else completed_at +
+ *   match_result_lock_seconds().
+ * - After confirming, the step moves on to the verdict, even while the
+ *   opponent is still pending: no "Continue without waiting" exit.
  * - A successful confirm gives a light impact; a failed one the error buzz.
  */
 import * as React from "react";
 import { act, fireEvent, render } from "@testing-library/react-native";
 import { ActivityIndicator } from "react-native";
+import { resetLockSecondsCache } from "@/lib/match-flow/use-dispute-locks-at";
 
 jest.mock("@/lib/supabase/client", () => ({ supabase: {} }));
 jest.mock("@/components/ui/toast", () => ({
@@ -44,6 +50,10 @@ const mockDispute = jest.fn();
 jest.mock("@jits/shared/api/mutations", () => ({
   confirmMatchResult: (...a: unknown[]) => mockConfirm(...a),
   disputeMatchResult: (...a: unknown[]) => mockDispute(...a),
+}));
+const mockLockSeconds = jest.fn();
+jest.mock("@jits/shared/api/queries", () => ({
+  getMatchResultLockSeconds: (...a: unknown[]) => mockLockSeconds(...a),
 }));
 jest.mock("@/lib/network/mutation-queue", () => ({
   mutationQueue: { enqueue: (_k: string, fn: () => unknown) => fn() },
@@ -83,8 +93,11 @@ function renderStep(matchType: "ranked" | "casual" = "ranked", overrides: Partia
 
 beforeEach(() => {
   jest.clearAllMocks();
+  resetLockSecondsCache();
   mockConfirm.mockResolvedValue({ ok: true, data: {} });
+  mockLockSeconds.mockResolvedValue(86_400);
 });
+afterEach(() => jest.useRealTimers());
 
 describe("ResultBanner subtitle", () => {
   it("ranked: says the rating is already updated and what to do", () => {
@@ -179,18 +192,39 @@ describe("ConfirmStep (opponent view, match-flow redesign)", () => {
     s.getByText("WAITING ON YOU");
   });
 
-  it("dispute is a full-size secondary button with the 24 h lock note", () => {
+  it("dispute is a full-size secondary button; leaving counts as confirming, then the lock line (P-Confirm)", () => {
     const locks = new Date(Date.now() + 23.5 * 3_600_000).toISOString();
     const s = renderStep("ranked", { disputeLocksAt: locks });
     expect(s.getByTestId("confirm-dispute")).toBeTruthy();
     s.getByText("Dispute result");
-    s.getByText("Locks automatically in 23 h if nobody disputes.");
+    const notes = s.getByTestId("confirm-lock-notes");
+    expect(notes).toHaveTextContent("If you leave without disputing, it counts as confirming.Locks automatically in 23 h.");
+    expect(s.queryByText(/if nobody disputes/)).toBeNull();
+    // dispute_locks_at in hand: no fallback RPC.
+    expect(mockLockSeconds).not.toHaveBeenCalled();
+  });
+
+  it("falls back to completed_at + match_result_lock_seconds() without dispute_locks_at", async () => {
+    const completedAt = new Date(Date.now() - 30 * 60_000).toISOString();
+    const s = renderStep("ranked", { disputeLocksAt: null, completedAt });
+    await s.findByText("Locks automatically in 23 h.");
+    s.getByText("If you leave without disputing, it counts as confirming.");
+    expect(mockLockSeconds).toHaveBeenCalledTimes(1);
+  });
+
+  it("with no lock time at all, keeps the leave line and hard-codes no window", async () => {
+    mockLockSeconds.mockResolvedValue(null);
+    const s = renderStep("ranked", { disputeLocksAt: null, completedAt: new Date().toISOString() });
+    await act(async () => {});
+    s.getByText("If you leave without disputing, it counts as confirming.");
+    expect(s.queryByText(/Locks automatically/)).toBeNull();
   });
 
   it("hides dispute once the window has closed", () => {
     const s = renderStep("ranked", { disputeLocksAt: new Date(Date.now() - 1000).toISOString() });
     expect(s.queryByTestId("confirm-dispute")).toBeNull();
     s.getByText("The dispute window has closed.");
+    expect(s.queryByText(/If you leave without disputing/)).toBeNull();
   });
 
   it("a dispute refused with dispute_window_closed closes the form and hides dispute", async () => {
@@ -213,16 +247,36 @@ describe("ConfirmStep (opponent view, match-flow redesign)", () => {
     getByTestId("confirm-dispute");
   });
 
-  it("after confirming: names the opponent and gives a light impact", async () => {
-    const { getByTestId, getByText } = renderStep();
+  it("after confirming: shows it, gives a light impact, and moves on while the opponent is pending", async () => {
+    jest.useFakeTimers();
+    const onCompleted = jest.fn();
+    const { getByTestId, queryByTestId, queryByText } = renderStep("ranked", { onCompleted });
     await act(async () => {
       fireEvent.press(getByTestId("confirm-result"));
     });
-    getByText("Waiting for Demo Red to confirm...");
     getByTestId("confirm-panel-you-confirmed");
     getByTestId("confirm-panel-opponent-confirming");
     expect(mockImpact).toHaveBeenCalledWith("light");
     expect(mockHapticError).not.toHaveBeenCalled();
+    // No leave exit and no dead-end wait: leaving counts as confirming.
+    expect(queryByTestId("confirm-leave")).toBeNull();
+    expect(queryByText(/Continue without waiting/)).toBeNull();
+    expect(queryByText(/confirm later/i)).toBeNull();
+    expect(onCompleted).not.toHaveBeenCalled();
+    act(() => {
+      jest.advanceTimersByTime(1_500);
+    });
+    expect(onCompleted).toHaveBeenCalledTimes(1);
+  });
+
+  it("an athlete who already confirmed (DB row) moves straight on", () => {
+    jest.useFakeTimers();
+    const onCompleted = jest.fn();
+    renderStep("ranked", { onCompleted, confirmedAthleteIds: ["me-1"] });
+    act(() => {
+      jest.advanceTimersByTime(1_500);
+    });
+    expect(onCompleted).toHaveBeenCalledTimes(1);
   });
 
   it("a failed confirm buzzes the error haptic and no success impact", async () => {

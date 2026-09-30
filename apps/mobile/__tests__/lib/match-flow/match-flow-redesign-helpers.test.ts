@@ -14,7 +14,13 @@ import {
   hydrateRecordingOptIn,
   setRecordingOptIn,
 } from "@/lib/match-flow/recording-optin";
-import { disputeLockNote, isDisputeWindowClosed, readMatchExtras } from "@/lib/match-flow/match-extras";
+import {
+  LEAVE_COUNTS_AS_CONFIRMING,
+  disputeLockNote,
+  isDisputeWindowClosed,
+  readMatchExtras,
+  resolveDisputeLocksAt,
+} from "@/lib/match-flow/match-extras";
 import { rankStripText } from "@/lib/match-flow/use-verdict-data";
 import { deriveLiveView } from "@/lib/match-flow/live-view-state";
 import { noVideoCopy } from "@/components/match-flow/live/no-video-plate";
@@ -56,12 +62,14 @@ describe("readMatchExtras", () => {
       submission_name: "Armbar",
       finish_time_seconds: 90,
       dispute_locks_at: "2026-09-28T12:00:00Z",
+      completed_at: "2026-09-27T12:00:00Z",
     } as never;
     expect(readMatchExtras(m)).toEqual({
       winnerId: "a",
       submissionName: "Armbar",
       finishTimeSeconds: 90,
       disputeLocksAt: "2026-09-28T12:00:00Z",
+      completedAt: "2026-09-27T12:00:00Z",
     });
   });
 
@@ -71,6 +79,7 @@ describe("readMatchExtras", () => {
       submissionName: null,
       finishTimeSeconds: null,
       disputeLocksAt: null,
+      completedAt: null,
     });
     expect(readMatchExtras(null).disputeLocksAt).toBeNull();
   });
@@ -79,10 +88,20 @@ describe("readMatchExtras", () => {
 describe("dispute window", () => {
   const now = Date.parse("2026-09-27T12:00:00Z");
   it("hours, then minutes, then nothing once passed", () => {
-    expect(disputeLockNote("2026-09-28T12:00:00Z", now)).toBe("Locks automatically in 24 h if nobody disputes.");
-    expect(disputeLockNote("2026-09-27T12:20:00Z", now)).toBe("Locks automatically in 20 min if nobody disputes.");
+    expect(disputeLockNote("2026-09-28T12:00:00Z", now)).toBe("Locks automatically in 24 h.");
+    expect(disputeLockNote("2026-09-27T12:20:00Z", now)).toBe("Locks automatically in 20 min.");
     expect(disputeLockNote("2026-09-27T11:00:00Z", now)).toBeNull();
     expect(disputeLockNote(null, now)).toBeNull();
+  });
+  it("the leave line says leaving counts as confirming (P-Confirm)", () => {
+    expect(LEAVE_COUNTS_AS_CONFIRMING).toBe("If you leave without disputing, it counts as confirming.");
+  });
+  it("lock time: dispute_locks_at first, else completed_at + the backend lock window", () => {
+    expect(resolveDisputeLocksAt("2026-09-28T12:00:00Z", "2026-09-27T00:00:00Z", 60)).toBe("2026-09-28T12:00:00Z");
+    expect(resolveDisputeLocksAt(null, "2026-09-27T12:00:00Z", 86_400)).toBe("2026-09-28T12:00:00.000Z");
+    expect(resolveDisputeLocksAt(null, "2026-09-27T12:00:00Z", null)).toBeNull();
+    expect(resolveDisputeLocksAt(null, null, 86_400)).toBeNull();
+    expect(resolveDisputeLocksAt(null, "not a date", 86_400)).toBeNull();
   });
   it("closed only once the lock time has passed", () => {
     expect(isDisputeWindowClosed("2026-09-27T11:59:59Z", now)).toBe(true);

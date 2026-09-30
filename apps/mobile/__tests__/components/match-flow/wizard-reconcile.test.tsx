@@ -328,12 +328,6 @@ describe("missed result_confirmed (jits-bmei, E8)", () => {
 
   it("the confirm poll reaches summary once both confirmations are in the DB", async () => {
     const screen = await mountAt("completed", { outcome: "win" });
-    await act(async () => {
-      fireEvent.press(screen.getByTestId("confirm-result"));
-    });
-    await flush();
-    screen.getByText("Waiting for Opponent to confirm...");
-
     mockGetMatchConfirmations.mockResolvedValue(["me-1", "opp-1"]);
     await tick(4_000);
 
@@ -354,17 +348,19 @@ describe("missed result_confirmed (jits-bmei, E8)", () => {
     screen.getByTestId("match-step-summary");
   });
 
-  it("offers a way out after a long wait on an opponent who never confirms", async () => {
+  it("after my confirm, moves on to the verdict while the opponent is pending (jits-02vo.7)", async () => {
     const screen = await mountAt("completed", { outcome: "win" });
     await act(async () => {
       fireEvent.press(screen.getByTestId("confirm-result"));
     });
-    expect(screen.queryByTestId("confirm-leave")).toBeNull();
-    await tick(20_000);
-    await act(async () => {
-      fireEvent.press(screen.getByTestId("confirm-leave"));
-    });
+    // The DB has my row now, so the reconciler does not bounce me back.
+    mockGetMatchConfirmations.mockResolvedValue(["me-1"]);
+    await tick(1_500);
     await flush();
+    screen.getByTestId("match-step-summary");
+    expect(screen.queryByTestId("confirm-leave")).toBeNull();
+    // The verdict keeps waiting on the opponent's confirmation.
+    await tick(4_000);
     screen.getByTestId("match-step-summary");
   });
 });
@@ -570,13 +566,17 @@ describe("a realtime matches UPDATE never skips confirmation", () => {
     screen.getByTestId("confirm-result");
   });
 
-  it("'completed' with only this athlete's confirmation does not advance", async () => {
+  it("'completed' with only this athlete's confirmation: the reconciler holds, the step moves on after its beat", async () => {
     const screen = await onConfirmStep();
     mockGetMatchConfirmations.mockResolvedValue(["me-1"]);
     await act(async () => mockRow.handler?.({ new: { status: "completed" } }));
     await flush();
     screen.getByTestId("match-step-confirm");
-    screen.getByText("Waiting for Opponent to confirm...");
+    screen.getByTestId("confirm-panel-you-confirmed");
+    expect(screen.queryByTestId("confirm-leave")).toBeNull();
+    // Leaving counts as confirming (jits-02vo.7): no wait on the opponent here.
+    await tick(1_500);
+    screen.getByTestId("match-step-summary");
   });
 
   it("advances once both confirmations exist", async () => {

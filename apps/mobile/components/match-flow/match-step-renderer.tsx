@@ -62,8 +62,6 @@ interface MatchStepRendererProps {
   /** Records the match clock reading taken when the live step ended. */
   setFinishSeconds: (seconds: number) => void;
   refresh: () => void;
-  /** Leave a guarded step on purpose ("Leave and confirm later"). */
-  onLeaveMatch?: () => void;
 }
 
 /**
@@ -98,7 +96,6 @@ export function MatchStepRenderer(props: MatchStepRendererProps) {
     initialFinishSeconds,
     setFinishSeconds,
     refresh,
-    onLeaveMatch,
   } = props;
   // One recorder for the whole wizard, owned by MatchRecorderProvider above
   // this component. The verdict reads the match-keyed upload store, which
@@ -153,7 +150,6 @@ export function MatchStepRenderer(props: MatchStepRendererProps) {
         me={athlete(me)}
         opponent={athlete(opponent)}
         submissionTypes={submissionTypes}
-        onLeave={onLeaveMatch}
         onRecorded={(r: BroadcastResult, meta: RecordedMeta) => {
           setResultData(r);
           if (meta.recorderConfirmed) {
@@ -185,6 +181,7 @@ export function MatchStepRenderer(props: MatchStepRendererProps) {
         submissionName={submissionName}
         finishTimeSeconds={extras.finishTimeSeconds ?? resultData?.finishTimeSeconds ?? null}
         disputeLocksAt={extras.disputeLocksAt}
+        completedAt={extras.completedAt}
         onCompleted={() => {
           refresh();
           setStep("summary");

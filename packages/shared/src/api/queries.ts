@@ -481,6 +481,18 @@ export async function getMatchConfirmations(
   return (data as { athlete_id: string }[]).map((r) => r.athlete_id);
 }
 
+/**
+ * How long an undisputed result stays open before the backend confirms it
+ * on the athletes' behalf (jr_be-ahn.5 `match_result_lock_seconds()`, 86400
+ * today). Null when the RPC is missing (older backend) or fails, so callers
+ * leave the lock line out rather than guess.
+ */
+export async function getMatchResultLockSeconds(supabase: Client): Promise<number | null> {
+  const { data, error } = await supabase.rpc("match_result_lock_seconds");
+  if (error || typeof data !== "number" || !Number.isFinite(data) || data <= 0) return null;
+  return data;
+}
+
 export interface ChallengeBetween {
   id: string;
   status: string;

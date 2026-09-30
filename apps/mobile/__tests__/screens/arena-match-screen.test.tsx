@@ -154,17 +154,17 @@ describe("ArenaMatchScreen", () => {
     expect(mockScreenOptions).toHaveBeenLastCalledWith(expect.objectContaining({ gestureEnabled: false }));
   });
 
-  it("'Leave and confirm later' lifts the guard, then exits to the Arena", async () => {
+  it("result and confirm stay guarded with no 'leave and confirm later' exit (jits-02vo.7)", async () => {
     render(<ArenaMatchScreen />);
     await waitFor(() => expect(mockOnStepChange).toBeDefined());
-    act(() => {
-      mockOnStepChange?.("result");
-    });
-    expect(mockUsePreventRemove.mock.calls.at(-1)?.[0]).toBe(true);
-    const onLeave = mockWizardProps.mock.calls.at(-1)?.[0].onLeaveMatch as () => void;
-    act(() => onLeave());
-    expect(mockUsePreventRemove.mock.calls.at(-1)?.[0]).toBe(false);
-    await waitFor(() => expect(mockDismissTo).toHaveBeenCalledWith(ARENA_HREF));
+    for (const step of ["result", "confirm"] as const) {
+      act(() => {
+        mockOnStepChange?.(step);
+      });
+      expect(mockUsePreventRemove.mock.calls.at(-1)?.[0]).toBe(true);
+    }
+    expect(mockWizardProps.mock.calls.at(-1)?.[0]).not.toHaveProperty("onLeaveMatch");
+    expect(mockDismissTo).not.toHaveBeenCalled();
   });
 
   it("drops the app header once a step is up (the steps carry their own chrome)", async () => {

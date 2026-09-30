@@ -7,8 +7,10 @@ import type { ResultAthlete } from "./result-form";
 
 /**
  * The other phone while one athlete records the result. Nothing to do here
- * but wait (the result arrives by broadcast or the reconciler and moves this
- * phone to confirm) or leave and confirm later from Home's resume card.
+ * but wait: the result arrives by broadcast or the reconciler and moves this
+ * phone to confirm. There is no "leave and confirm later" button (jits-02vo.7):
+ * closing the app is still allowed, and an undisputed result is confirmed by
+ * the backend once its lock window passes (jr_be-ahn.5).
  */
 export function ResultWaiting({
   claimer,
@@ -17,7 +19,6 @@ export function ResultWaiting({
   matchType,
   durationSeconds,
   endedAtSeconds,
-  onLeave,
   onTakeOver,
 }: {
   claimer: ResultAthlete;
@@ -26,7 +27,6 @@ export function ResultWaiting({
   matchType: "ranked" | "casual";
   durationSeconds: number;
   endedAtSeconds?: number;
-  onLeave?: () => void;
   /** Offered once the claim has gone a minute without a result. */
   onTakeOver?: () => void;
 }) {
@@ -77,9 +77,6 @@ export function ResultWaiting({
           </Text>
           <FightButton testID="result-take-over" variant="secondary" label="Record it myself" onPress={onTakeOver} />
         </View>
-      ) : null}
-      {onLeave ? (
-        <FightButton testID="result-leave-later" variant="secondary" label="Leave and confirm later" onPress={onLeave} />
       ) : null}
     </View>
   );
