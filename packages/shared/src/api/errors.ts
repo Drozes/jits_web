@@ -51,6 +51,14 @@ export type DomainErrorCode =
   | "HIGHLIGHT_SHARE_DISABLED"
   | "HIGHLIGHT_EVENT_REJECTED"
   | "DISPUTE_WINDOW_CLOSED"
+  | "WEIGHT_CHANGED"
+  | "INVALID_WEIGHT"
+  | "WEIGHT_FLAGGED"
+  | "WEIGHT_CHECK_PENDING"
+  | "WEIGHT_RECHECK_PENDING"
+  | "NOT_FLAGGED"
+  | "OPPONENT_NOT_CHECKED"
+  | "NO_CHALLENGE"
   | "NOT_AUTHORIZED"
   | "RLS_VIOLATION"
   | "RPC_MISSING"
@@ -178,6 +186,40 @@ const HINT_TO_CODE: Record<string, { code: DomainErrorCode; message: string }> =
     not_admin: {
       code: "NOT_ADMIN",
       message: "You need admin access to do that.",
+    },
+    // Face-off weight checks (jr_be-ahn.4): check_opponent_weight,
+    // reweigh_for_match and the start_match weight gate.
+    weight_changed: {
+      code: "WEIGHT_CHANGED",
+      message: "Their weight just changed. Check it again.",
+    },
+    invalid_weight: {
+      code: "INVALID_WEIGHT",
+      message: "Enter a weight between 0 and 500 lbs.",
+    },
+    weight_flagged: {
+      code: "WEIGHT_FLAGGED",
+      message: "A weigh-in was flagged. The match is on hold until it is resolved.",
+    },
+    weight_check_pending: {
+      code: "WEIGHT_CHECK_PENDING",
+      message: "Both athletes need to confirm each other's weigh-in first.",
+    },
+    weight_recheck_pending: {
+      code: "WEIGHT_RECHECK_PENDING",
+      message: "A new weigh-in needs to be checked before the match can start.",
+    },
+    not_flagged: {
+      code: "NOT_FLAGGED",
+      message: "You have no open flag on this match.",
+    },
+    opponent_not_checked: {
+      code: "OPPONENT_NOT_CHECKED",
+      message: "Your opponent hasn't checked your weigh-in yet.",
+    },
+    no_challenge: {
+      code: "NO_CHALLENGE",
+      message: "Weight checks apply to Arena matches only.",
     },
     // Highlight reels (jr_be spec 015 section 9.5). The same table serves the
     // RPCs (P0001 HINT) and the highlight-regenerate edge function's

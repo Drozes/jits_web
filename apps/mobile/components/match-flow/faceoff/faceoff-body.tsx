@@ -7,6 +7,7 @@ import { usePalette } from "@/lib/theme/palette";
 import { FIGHT_RADIUS } from "../fight/fight-tokens";
 import { FightButton, Mono, StakesStrip, StatusPlate, shortName } from "../fight/fight-ui";
 import { useFaceoffContext } from "./faceoff-context";
+import { WeightCheckPanel, WeightCheckPlate } from "./faceoff-weight-check";
 import type { FaceoffAthlete } from "./faceoff-top";
 
 interface FaceoffBodyProps {
@@ -37,6 +38,9 @@ function WeighIn({ me, opponent }: FaceoffBodyProps) {
   const gapLine = [diff != null ? `${diff} LBS APART` : null, division].filter(Boolean).join(" · ");
   const oppName = shortName(opponent.display_name).toUpperCase();
   const cta = f.myWeight != null ? `Confirm ${Number(f.myWeight.toFixed(1))} lbs` : "Confirm weight";
+  // Once my weight is in, the opponent's plate becomes my check of their
+  // weigh-in (board P-Faceoff-Weight), when this match has checks.
+  const checking = f.myWeighed && f.weightCheck.active;
 
   return (
     <View style={{ gap: 20 }}>
@@ -57,21 +61,29 @@ function WeighIn({ me, opponent }: FaceoffBodyProps) {
       ) : null}
       <View style={{ flexDirection: "row", gap: 12 }}>
         <StatusPlate label={f.myWeighed ? "WEIGHED IN" : "CONFIRM WEIGHT"} done={f.myWeighed} accessibilityLabel={`You, ${f.myWeighed ? "weighed in" : "not weighed in"}`} />
-        <StatusPlate
-          testID="faceoff-opponent-weighed"
-          label={f.opponentWeighed ? "WEIGHED IN" : `${oppName} WEIGHING IN`}
-          done={f.opponentWeighed}
-          align="right"
-          accessibilityLabel={`${oppName}, ${f.opponentWeighed ? "weighed in" : "not weighed in yet"}`}
-        />
+        {checking ? (
+          <WeightCheckPlate opponentName={oppName} />
+        ) : (
+          <StatusPlate
+            testID="faceoff-opponent-weighed"
+            label={f.opponentWeighed ? "WEIGHED IN" : `${oppName} WEIGHING IN`}
+            done={f.opponentWeighed}
+            align="right"
+            accessibilityLabel={`${oppName}, ${f.opponentWeighed ? "weighed in" : "not weighed in yet"}`}
+          />
+        )}
       </View>
-      <FightButton
-        testID="weight-confirm"
-        label={cta}
-        height={64}
-        onPress={() => void f.confirmWeight()}
-        disabled={f.savingWeight || f.weightEditorOpen}
-      />
+      {checking ? (
+        <WeightCheckPanel opponentDisplayName={opponent.display_name} />
+      ) : (
+        <FightButton
+          testID="weight-confirm"
+          label={cta}
+          height={64}
+          onPress={() => void f.confirmWeight()}
+          disabled={f.savingWeight || f.weightEditorOpen}
+        />
+      )}
     </View>
   );
 }
@@ -104,7 +116,17 @@ function ReadyCheck({ opponent }: FaceoffBodyProps) {
           accessibilityLabel={`Opponent, ${f.opponentReady ? "ready" : "waiting"}`}
         />
       </View>
-      {f.starting ? (
+      {f.weightCheck.active && !f.weightCheck.canStart && !f.starting ? (
+        // The weight gate (jr_be-ahn.4): a flag or a recheck holds the match,
+        // and so does a check still owed while the rollout flag is on.
+        <View testID="ready-weight-hold" style={{ gap: 12 }}>
+          <WeightCheckPanel opponentDisplayName={opponent.display_name} />
+          <FightButton testID="ready-button" label="I'm ready" height={72} onPress={f.tapReady} disabled />
+          <View style={{ alignItems: "center" }}>
+            <Mono>{f.weightCheck.blocked ? "MATCH ON HOLD · WEIGHT CHECK" : "WAITING FOR WEIGHT CHECKS"}</Mono>
+          </View>
+        </View>
+      ) : f.starting ? (
         <View style={{ alignItems: "center", gap: 8, paddingVertical: 12 }}>
           <ActivityIndicator color={p.text2} />
           <Mono>STARTING MATCH...</Mono>

@@ -10,6 +10,7 @@ import type { BroadcastResult } from "@jits/shared/hooks/use-session-match-sync"
 import { readMatchExtras } from "@/lib/match-flow/match-extras";
 import { useRecordingOptIn } from "@/lib/match-flow/recording-optin";
 import { useMatchWeights } from "@/lib/match-flow/use-match-weights";
+import { useMatchWeightChecks } from "@/lib/match-flow/use-match-weight-checks";
 import { WizardError, WizardLoading } from "./wizard-status";
 import { QueueStatusBanner } from "./queue-status-banner";
 import { MatchStepRenderer } from "./match-step-renderer";
@@ -135,12 +136,25 @@ export function MatchFlowWizard({
 
   // The weights this match is rated on (the challenge's), for the face-off
   // and the countdown. Read here, above the early returns, for hook order.
-  const weights = useMatchWeights(
+  const challengeWeights = useMatchWeights(
     match?.challenge_id,
     currentAthleteId,
     match?.participants.find((p) => p.athlete_id === currentAthleteId)?.current_weight ?? null,
     match?.participants.find((p) => p.athlete_id !== currentAthleteId)?.current_weight ?? null,
   );
+  // The face-off weight checks (jr_be-ahn.4), challenge-backed matches only.
+  // Their weights are the challenge's too, read fresh, so a re-weigh on
+  // either phone shows here (and on the countdown) without a reload.
+  const weightChecks = useMatchWeightChecks(
+    matchId,
+    isParticipant && !error && !!match?.challenge_id && (step === "weight" || step === "ready"),
+  );
+  const opponentIdForWeights = match?.participants.find((p) => p.athlete_id !== currentAthleteId)?.athlete_id;
+  const checkedWeights = weightChecks.state?.weights;
+  const weights =
+    checkedWeights && opponentIdForWeights && currentAthleteId in checkedWeights && opponentIdForWeights in checkedWeights
+      ? { mine: checkedWeights[currentAthleteId] ?? null, theirs: checkedWeights[opponentIdForWeights] ?? null, rated: true }
+      : challengeWeights;
 
   // Screen wake-lock for every step the recorder camera is up, not just
   // live. The ready check shows the preview and the phone is typically
@@ -286,6 +300,7 @@ export function MatchFlowWizard({
               myWeight={weights.mine}
               opponentWeight={weights.theirs}
               weightsRated={weights.rated}
+              weightChecks={weightChecks}
               onWeighedIn={() => setStep("ready")}
               onStarted={(s) => {
                 setStartedAt(s);

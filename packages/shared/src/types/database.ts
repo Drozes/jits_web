@@ -969,6 +969,70 @@ export type Database = {
           },
         ]
       }
+      match_weight_checks: {
+        Row: {
+          checker_id: string
+          created_at: string
+          flag_count: number
+          flagged_at: string | null
+          match_id: string
+          reweighed_at: string | null
+          status: string
+          subject_id: string
+          updated_at: string
+          weight_seen: number | null
+          withdrawn_at: string | null
+        }
+        Insert: {
+          checker_id: string
+          created_at?: string
+          flag_count?: number
+          flagged_at?: string | null
+          match_id: string
+          reweighed_at?: string | null
+          status?: string
+          subject_id: string
+          updated_at?: string
+          weight_seen?: number | null
+          withdrawn_at?: string | null
+        }
+        Update: {
+          checker_id?: string
+          created_at?: string
+          flag_count?: number
+          flagged_at?: string | null
+          match_id?: string
+          reweighed_at?: string | null
+          status?: string
+          subject_id?: string
+          updated_at?: string
+          weight_seen?: number | null
+          withdrawn_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "match_weight_checks_checker_id_fkey"
+            columns: ["checker_id"]
+            isOneToOne: false
+            referencedRelation: "athletes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_weight_checks_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_weight_checks_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "athletes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       matches: {
         Row: {
           challenge_id: string | null
@@ -2550,6 +2614,10 @@ export type Database = {
         | { Args: never; Returns: boolean }
         | { Args: { p_opponent_id?: string }; Returns: boolean }
       cancel_session_match: { Args: { p_match_id: string }; Returns: Json }
+      check_opponent_weight: {
+        Args: { p_match_id: string; p_verdict: string; p_weight_seen?: number }
+        Returns: Json
+      }
       claim_highlight_for_render: {
         Args: { p_deadline_seconds?: number; p_highlight_id: string }
         Returns: {
@@ -2789,6 +2857,7 @@ export type Database = {
       }
       get_match_rank_change: { Args: { p_match_id: string }; Returns: Json }
       get_match_videos: { Args: { p_match_id: string }; Returns: Json }
+      get_match_weight_checks: { Args: { p_match_id: string }; Returns: Json }
       get_my_highlights: {
         Args: { p_before?: string; p_limit?: number; p_unseen_only?: boolean }
         Returns: Json
@@ -2940,6 +3009,10 @@ export type Database = {
       retry_highlight_render: {
         Args: { p_highlight_id: string }
         Returns: string
+      }
+      reweigh_for_match: {
+        Args: { p_match_id: string; p_weight: number }
+        Returns: Json
       }
       set_active_avatar: { Args: { p_avatar_id: string }; Returns: Json }
       set_athlete_role: {

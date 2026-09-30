@@ -10,3 +10,4 @@ export * from "./poster-signing";
 export * from "./match-rank-change";
 export * from "./athlete-weight";
 export * from "./match-weights";
+export * from "./match-weight-checks";

@@ -6,6 +6,16 @@ import { supabase } from "@/lib/supabase/client";
 import { cancelSessionMatch, startMatch } from "@jits/shared/api/mutations";
 import { updateAthleteWeight } from "@jits/shared/api/athlete-weight";
 import { getMatchDetails } from "@jits/shared/api/queries";
+import {
+  checkOpponentWeight,
+  checksFor,
+  reweighForMatch,
+  reweighedSinceFlag,
+  type WeightCheck,
+  type WeightVerdict,
+} from "@jits/shared/api/match-weight-checks";
+import type { DomainErrorCode } from "@jits/shared/api/errors";
+import { NO_WEIGHT_CHECKS, type WeightChecksHandle } from "./use-match-weight-checks";
 import { settleWithin } from "@jits/shared/hooks/session-match-channel";
 import { exitMatchTo } from "./exit-to";
 import { SEND_GRACE_MS, useMatchSyncContext, useStepMatchSync } from "./match-sync-context";
@@ -29,6 +39,9 @@ export interface FaceoffParams {
   opponentWeight: number | null;
   /** True once those are the challenge's rated weights. */
   weightsRated: boolean;
+  /** The DB weight checks (jr_be-ahn.4). Absent or unavailable: the
+   * pre-check flow (Confirm my weight moves straight to ready). */
+  weightChecks?: WeightChecksHandle;
   /** Move the wizard to the ready step (weights confirmed). */
   onWeighedIn: () => void;
   /** start_match completed here, or the opponent's timer_started arrived. */
@@ -65,7 +78,51 @@ export interface Faceoff {
   tapReady: () => void;
   /** The Leave control: confirm, then cancel the match for both. */
   leave: () => void;
+  /** The opponent weight check (jr_be-ahn.4). */
+  weightCheck: WeightCheckView;
 }
+
+/**
+ * What the face-off shows for the weight checks. `active` is false when the
+ * match has none (no challenge, older backend): everything else is then
+ * inert and the start is never gated here.
+ */
+export interface WeightCheckView {
+  active: boolean;
+  /** The first read is still in flight. */
+  loading: boolean;
+  /** My check of the opponent, and the opponent's check of me. */
+  mine: WeightCheck | null;
+  theirs: WeightCheck | null;
+  /** A check is flagged or awaiting a recheck: the match is on hold. */
+  blocked: boolean;
+  /** The weight gate lets the match start (always true when inactive). */
+  canStart: boolean;
+  /** I still owe a verdict on the opponent's (current) weight. */
+  needsMyVerdict: boolean;
+  /** The opponent re-weighed since I flagged, or since I confirmed. */
+  opponentReweighed: boolean;
+  /** I flagged, and they have not re-weighed since: offer Withdraw. */
+  myFlagOpen: boolean;
+  /** The opponent flagged me and I have not re-weighed since. */
+  mustReweigh: boolean;
+  /** I re-weighed; the opponent has yet to check the new weight. */
+  awaitingTheirRecheck: boolean;
+  /** Pending checks block the start (rollout flag on) and theirs is pending. */
+  awaitingTheirCheck: boolean;
+  busy: boolean;
+  check: (verdict: WeightVerdict) => Promise<void>;
+  /** Re-weigh for this match; false when refused. */
+  reweigh: (lbs: number) => Promise<boolean>;
+}
+
+/** reweigh_for_match accepts 0 < w < 500 lbs (stored to 0.01). */
+export function isValidReweigh(lbs: number): boolean {
+  return Number.isFinite(lbs) && Math.round(lbs * 100) / 100 > 0 && Math.round(lbs * 100) / 100 < 500;
+}
+
+/** start_match refusals from the weight gate. */
+const WEIGHT_GATE_CODES: readonly DomainErrorCode[] = ["WEIGHT_FLAGGED", "WEIGHT_CHECK_PENDING", "WEIGHT_RECHECK_PENDING"];
 
 /**
  * The face-off (weight + ready merged into one screen, two phases): the
@@ -95,6 +152,16 @@ export function useFaceoff(p: FaceoffParams): Faceoff {
   const cancelledRef = React.useRef(false);
   const myWeight = p.myWeight;
   const opponentWeight = p.opponentWeight;
+  const checks = p.weightChecks ?? NO_WEIGHT_CHECKS;
+  const checksRef = React.useRef(checks);
+  checksRef.current = checks;
+  const [checkBusy, setCheckBusy] = React.useState(false);
+  const checksActive = checks.status === "ready" || checks.status === "loading";
+  const { mine: myCheck, theirs: theirCheck } = checksFor(checks.state, p.meId);
+  const blocked = checks.status === "ready" && !!checks.state?.blocked;
+  const canStart = checks.status === "ready" ? !!checks.state?.canStart : checks.status !== "loading";
+  const canStartRef = React.useRef(canStart);
+  canStartRef.current = canStart;
 
   const weightEditorOpenRef = React.useRef(weightEditorOpen);
   weightEditorOpenRef.current = weightEditorOpen;
@@ -172,6 +239,16 @@ export function useFaceoff(p: FaceoffParams): Faceoff {
       setStarting(false);
       return;
     }
+    if (!result.ok && WEIGHT_GATE_CODES.includes(result.error.code)) {
+      // The weight gate refused (a flag, or a check still owed): back to the
+      // checks. Clear ready so a retry needs a fresh tap, not a loop.
+      startedRef.current = false;
+      setStarting(false);
+      setMyReady(false);
+      checksRef.current.refetch();
+      toast.info({ text1: "Match on hold", description: result.error.message });
+      return;
+    }
     if (!result.ok) {
       // Both devices race start_match; losing the race is not an error.
       const match = await getMatchDetails(supabase, pRef.current.matchId);
@@ -191,8 +268,8 @@ export function useFaceoff(p: FaceoffParams): Faceoff {
   }, [broadcastTimerStarted]);
 
   React.useEffect(() => {
-    if (myReady && opponentReady && !startedRef.current && !starting) void handleStart();
-  }, [myReady, opponentReady, starting, handleStart]);
+    if (myReady && opponentReady && canStart && !startedRef.current && !starting) void handleStart();
+  }, [myReady, opponentReady, canStart, starting, handleStart]);
 
   const editWeight = React.useCallback(async (lbs: number) => {
     setSavingWeight(true);
@@ -206,14 +283,59 @@ export function useFaceoff(p: FaceoffParams): Faceoff {
     return true;
   }, []);
 
+  // Ready once my weight is in and my check of theirs is confirmed; with no
+  // checks for this match, once my weight is in (the pre-check flow).
+  const myCheckDone = myCheck?.status === "confirmed";
+  React.useEffect(() => {
+    if (p.phase !== "weight" || !myWeighed) return;
+    if (checks.status === "unavailable" || checks.status === "idle" || myCheckDone) pRef.current.onWeighedIn();
+  }, [p.phase, myWeighed, checks.status, myCheckDone]);
+
   const confirmWeight = React.useCallback(async () => {
     if (weightEditorOpenRef.current) return;
     setMyWeighed(true);
-    pRef.current.onWeighedIn();
+  }, []);
+
+  const check = React.useCallback(async (verdict: WeightVerdict) => {
+    const handle = checksRef.current;
+    if (handle.status !== "ready") return;
+    setCheckBusy(true);
+    // The opponent weight on screen is the one being judged.
+    const seen = verdict === "withdraw" ? undefined : pRef.current.opponentWeight;
+    const res = await checkOpponentWeight(supabase, pRef.current.matchId, verdict, seen);
+    setCheckBusy(false);
+    if (res.ok) {
+      handle.apply(res.data);
+      return;
+    }
+    handle.refetch();
+    if (res.error.code === "WEIGHT_CHANGED") {
+      toast.info({ text1: "Weight changed", description: res.error.message });
+      return;
+    }
+    toast.error({ text1: "Couldn't save your check", description: res.error.message });
+  }, []);
+
+  const reweigh = React.useCallback(async (lbs: number) => {
+    const handle = checksRef.current;
+    if (!isValidReweigh(lbs)) {
+      toast.error({ text1: "Couldn't re-weigh", description: "Enter a weight between 0 and 500 lbs." });
+      return false;
+    }
+    setCheckBusy(true);
+    const res = await reweighForMatch(supabase, pRef.current.matchId, Math.round(lbs * 100) / 100);
+    setCheckBusy(false);
+    if (res.ok) {
+      handle.apply(res.data);
+      return true;
+    }
+    handle.refetch();
+    toast.error({ text1: "Couldn't re-weigh", description: res.error.message });
+    return false;
   }, []);
 
   const tapReady = React.useCallback(() => {
-    if (stateRef.current.myReady) return;
+    if (stateRef.current.myReady || !canStartRef.current) return;
     setMyReady(true);
   }, []);
 
@@ -262,5 +384,23 @@ export function useFaceoff(p: FaceoffParams): Faceoff {
     editWeight,
     tapReady,
     leave,
+    weightCheck: {
+      active: checksActive,
+      loading: checks.status === "loading",
+      mine: myCheck,
+      theirs: theirCheck,
+      blocked,
+      canStart,
+      needsMyVerdict:
+        myCheck?.status === "pending" || myCheck?.status === "recheck" || reweighedSinceFlag(myCheck),
+      opponentReweighed: myCheck?.status === "recheck" || reweighedSinceFlag(myCheck),
+      myFlagOpen: myCheck?.status === "flagged" && !reweighedSinceFlag(myCheck),
+      mustReweigh: theirCheck?.status === "flagged" && !reweighedSinceFlag(theirCheck),
+      awaitingTheirRecheck: theirCheck?.status === "recheck" || reweighedSinceFlag(theirCheck),
+      awaitingTheirCheck: !!checks.state?.required && theirCheck?.status === "pending",
+      busy: checkBusy,
+      check,
+      reweigh,
+    },
   };
 }
