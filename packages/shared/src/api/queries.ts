@@ -2462,6 +2462,69 @@ export async function adminListNoMatchVideos(
   }
 }
 
+/**
+ * An athlete flagged for repeat disputing (jr_be-ahn.6): 3 or more disputes
+ * resolved AGAINST them in a rolling 30 days. The backend applies the rule;
+ * the client only renders what it returns.
+ */
+export interface RepeatDisputerRow {
+  athlete_id: string;
+  display_name: string | null;
+  lost_disputes_30d: number;
+  total_disputes_30d: number;
+  last_lost_at: string | null;
+  lost_match_ids: string[];
+}
+
+type RepeatDisputerRpcRow = Database["public"]["Functions"]["admin_list_repeat_disputers"]["Returns"][number];
+
+/**
+ * Admin-only, read-only: athletes flagged by the repeat-disputer rule, in the
+ * backend's order (most lost disputes first, then most recent loss). Nothing
+ * is sanctioned automatically. A non-admin gets `NOT_ADMIN`; a backend
+ * without the RPC gets `RPC_MISSING`.
+ */
+export async function listRepeatDisputers(supabase: Client): Promise<Result<RepeatDisputerRow[]>> {
+  try {
+    const { data, error } = await supabase.rpc("admin_list_repeat_disputers");
+    if (error) {
+      if (error.code === "PGRST202" || error.code === "42883") {
+        return { ok: false, error: { code: "RPC_MISSING", message: "This needs the latest backend.", raw: error } };
+      }
+      return { ok: false, error: mapPostgrestError(error) };
+    }
+    // Keyed by the GENERATED Returns columns, so a backend rename fails the
+    // typecheck instead of silently reading null. Values stay `unknown`.
+    const rows = (Array.isArray(data) ? data : []) as unknown as Partial<Record<keyof RepeatDisputerRpcRow, unknown>>[];
+    return {
+      ok: true,
+      data: rows.flatMap((r) => {
+        const athleteId = optStr(r.athlete_id);
+        if (!athleteId) return [];
+        const matchIds = Array.isArray(r.lost_match_ids)
+          ? r.lost_match_ids.filter((m): m is string => typeof m === "string" && m.length > 0)
+          : [];
+        return [
+          {
+            athlete_id: athleteId,
+            display_name: optStr(r.display_name),
+            lost_disputes_30d: optNum(r.lost_disputes_30d) ?? 0,
+            total_disputes_30d: optNum(r.total_disputes_30d) ?? 0,
+            last_lost_at: optStr(r.last_lost_at),
+            lost_match_ids: matchIds,
+          },
+        ];
+      }),
+    };
+  } catch (err) {
+    console.error("listRepeatDisputers:", err);
+    return {
+      ok: false,
+      error: { code: "UNKNOWN", message: err instanceof Error ? err.message : "Something went wrong." },
+    };
+  }
+}
+
 /** A feature flag row as surfaced to the admin flags screen. */
 export interface FeatureFlagRow {
   key: string;

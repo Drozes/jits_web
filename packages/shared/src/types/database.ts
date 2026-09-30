@@ -2462,6 +2462,17 @@ export type Database = {
           video_status: string
         }[]
       }
+      admin_list_repeat_disputers: {
+        Args: never
+        Returns: {
+          athlete_id: string
+          display_name: string
+          last_lost_at: string
+          lost_disputes_30d: number
+          lost_match_ids: string[]
+          total_disputes_30d: number
+        }[]
+      }
       admin_remove_gym_manager: {
         Args: { p_athlete_id: string; p_gym_id: string }
         Returns: undefined
