@@ -40,8 +40,6 @@ interface CompetitorRowProps {
   onOpenProfile?: () => void;
   /** Replaces the rating number (the practice bot has no real rating). */
   ratingLabel?: string;
-  /** The opponent a match summary's Rematch pointed here: tagged, not recoloured. */
-  pinned?: boolean;
 }
 
 function Tag({ label }: { label: string }) {
@@ -57,7 +55,6 @@ export function CompetitorRow({
   onGoLive,
   onOpenProfile,
   ratingLabel,
-  pinned = false,
 }: CompetitorRowProps) {
   const { displayName, currentElo, eloDiff, gymName, weight } = competitor;
   const gap = eloDiff > 0 ? `+${eloDiff}` : String(eloDiff);
@@ -102,7 +99,7 @@ export function CompetitorRow({
         {onOpenProfile ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={`${displayName}, ELO ${rating}${pinned ? ", rematch" : ""}`}
+            accessibilityLabel={`${displayName}, ELO ${rating}`}
             onPress={onOpenProfile}
             className="flex-1 flex-row items-center gap-3"
           >
@@ -113,7 +110,6 @@ export function CompetitorRow({
         )}
 
         <View className="shrink-0 items-end gap-1">
-          {pinned ? <Tag label="Rematch" /> : null}
           {action.kind === "challenge" ? (
             <Pressable
               accessibilityRole="button"

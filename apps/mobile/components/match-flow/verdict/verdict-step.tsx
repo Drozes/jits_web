@@ -2,11 +2,10 @@ import * as React from "react";
 import { Share, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Film, RotateCcw, Share2, TrendingUp } from "lucide-react-native";
+import { Film, Share2, TrendingUp } from "lucide-react-native";
 import { toast } from "@/components/ui/toast";
 import { exitMatchTo } from "@/lib/match-flow/exit-to";
 import { matchDetailHref } from "@/lib/match-detail/href";
-import { ARENA_HREF } from "@/lib/arena/constants";
 import { formatElapsed } from "@/lib/match-flow/format-elapsed";
 import { useMatchSyncContext, useStepMatchSync } from "@/lib/match-flow/match-sync-context";
 import { rankStripText, useRankChange, useVerdictVideos } from "@/lib/match-flow/use-verdict-data";
@@ -21,17 +20,6 @@ import { HERO_HEIGHT, VerdictHero } from "./verdict-hero";
 import { ThemedStatusBar } from "@/lib/theme/themed-status-bar";
 import { useScrolledPast } from "../wizard-scroll";
 import { SummaryHighlightNote } from "../steps/summary-highlight-note";
-
-/**
- * The Arena with the opponent to run it back against (jits-00fr). Navigated
- * with exitMatchTo, never a push: the match screen must unmount. `send`
- * asks the Arena to send the challenge itself once the opponent is back in
- * the lobby (see `useRematchAutoSend`): sending from here, while they are
- * still on their own verdict, gets it declined as busy by their app.
- */
-export function rematchHref(opponentId: string, opts: { send?: boolean } = {}): string {
-  return `${ARENA_HREF}?rematch=${encodeURIComponent(opponentId)}${opts.send ? "&send=1" : ""}`;
-}
 
 /** While the opponent's confirmation is missing, re-read the match this often. */
 export const VERDICT_DISPUTE_POLL_MS = 15_000;
@@ -69,9 +57,11 @@ interface VerdictStepProps {
 
 /**
  * Step 8, the verdict. A win celebrates (confetti, the verdict slams in, the
- * rating ticks, the rank strip rises); a loss is calm and makes the rematch
- * the red CTA. Two primary actions plus a small row; the opening still (or
- * the athletes, until it exists) as the hero; this phone's upload as a card.
+ * rating ticks, the rank strip rises); a loss is calm. Every outcome gets
+ * the same actions (P-Verdict, jits-02vo.8): Watch film, Back to Arena, and
+ * Share match as one full-width tertiary row. Running it back is an
+ * ordinary Arena challenge, never a shortcut here. The opening still (or the
+ * athletes, until it exists) as the hero; this phone's upload as a card.
  *
  * A recorder reaches this before the opponent has confirmed (auto-confirm,
  * B2), and the opponent may still dispute. So the verdict listens for
@@ -84,7 +74,6 @@ export function VerdictStep(props: VerdictStepProps) {
   const { matchId, exitHref, exitLabel, matchType, matchStatus, outcome, me, opponent, submissionName, finishTimeSeconds, upload, uploadedVideoId, confirmedAthleteIds = [] } = props;
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [rematching, setRematching] = React.useState(false);
   const [disputedHere, setDisputedHere] = React.useState(false);
   const { reconcileNow } = useMatchSyncContext();
   // Light status bar over the still's dark top scrim until the page scrolls
@@ -147,14 +136,6 @@ export function VerdictStep(props: VerdictStepProps) {
   const watch = () => router.push(matchDetailHref(matchId));
   const back = () => exitMatchTo(router, exitHref);
 
-  function rematch() {
-    if (rematching) return;
-    setRematching(true);
-    // The Arena sends it once the opponent is back in the lobby (and takes
-    // this athlete live if they are not), then says so.
-    exitMatchTo(router, rematchHref(opponent.athlete_id, { send: true }));
-  }
-
   async function share() {
     if (!outcome) return;
     const url = buildShareUrl("match", matchId);
@@ -173,31 +154,6 @@ export function VerdictStep(props: VerdictStepProps) {
     }
   }
 
-  const rematchButton = (primary: boolean) =>
-    disputed ? null : (
-      <FightButton
-        testID="summary-rematch"
-        variant={primary ? "primary" : "ghost"}
-        accessibilityLabel={`Rematch ${opponent.display_name}`}
-        label={`Rematch ${oppShort}`}
-        busy={rematching}
-        onPress={rematch}
-        height={primary ? 56 : 44}
-        icon={(c) => <RotateCcw size={16} color={c} />}
-        style={primary ? undefined : { flex: 1, paddingHorizontal: 4 }}
-      />
-    );
-  const watchButton = (primary: boolean) => (
-    <FightButton
-      testID="summary-watch-film"
-      variant={primary ? "primary" : "secondary"}
-      label={watchLabel}
-      disabled={uploadBusy}
-      onPress={watch}
-      icon={(c) => <Film size={16} color={c} />}
-      trailing={uploadBusy && !primary ? <Mono color={p.amber}>PROCESSING</Mono> : undefined}
-    />
-  );
 
   return (
     <View style={{ paddingBottom: Math.max(insets.bottom, 16) + 16 }}>
@@ -275,41 +231,26 @@ export function VerdictStep(props: VerdictStepProps) {
             under admin review, so no reel is promised. */}
         <SummaryHighlightNote hasVideo={(uploadedVideoId != null || uploadBusy) && !disputed} />
 
-        {loss ? (
-          <Text className="font-body" style={{ fontSize: 15, color: p.text }}>
-            Run it back?
-          </Text>
-        ) : null}
-
         <View style={{ gap: 12 }}>
-          {loss ? (
-            <>
-              {rematchButton(true)}
-              {watchButton(false)}
-              <FightButton testID="summary-exit" variant="ghost" label={exitLabel} onPress={back} height={44} />
-            </>
-          ) : (
-            <>
-              {watchButton(true)}
-              <FightButton testID="summary-exit" variant="secondary" label={exitLabel} onPress={back} />
-              {disputed ? null : (
-                <View style={{ flexDirection: "row", gap: 12 }}>
-                  {rematchButton(false)}
-                  {outcome ? (
-                    <FightButton
-                      testID="summary-share"
-                      variant="ghost"
-                      label="Share match"
-                      onPress={() => void share()}
-                      height={44}
-                      icon={(c) => <Share2 size={16} color={c} />}
-                      style={{ flex: 1, paddingHorizontal: 4 }}
-                    />
-                  ) : null}
-                </View>
-              )}
-            </>
-          )}
+          <FightButton
+            testID="summary-watch-film"
+            variant="primary"
+            label={watchLabel}
+            disabled={uploadBusy}
+            onPress={watch}
+            icon={(c) => <Film size={16} color={c} />}
+          />
+          <FightButton testID="summary-exit" variant="secondary" label={exitLabel} onPress={back} />
+          {outcome && !disputed ? (
+            <FightButton
+              testID="summary-share"
+              variant="ghost"
+              label="Share match"
+              onPress={() => void share()}
+              height={44}
+              icon={(c) => <Share2 size={16} color={c} />}
+            />
+          ) : null}
         </View>
       </View>
     </View>

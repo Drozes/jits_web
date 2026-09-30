@@ -10,31 +10,13 @@
  * `dismissTo` dispatches POP_TO on the `(app)` Stack instead (expo-router
  * 6.0.23 build/global-state/routing.js, @react-navigation/routers StackRouter
  * POP_TO): it pops back to the existing `(tabs)` route, which switches to the
- * target tab and hands it the href's params (`?rematch=<id>` reaches the
- * already-mounted Arena index), and it replaces the current route only when
- * no `(tabs)` route is below it. Either way the match route is removed, so it
+ * target tab and hands it the href's params, and it replaces the current
+ * route only when no `(tabs)` route is below it. Either way the match route is removed, so it
  * unmounts and `useArenaMatchScreen` restores live.
  */
 import type { Href, Router } from "expo-router";
 
-/** The latest exit's target, for notification routing (see below). */
-let lastExit: { href: string; at: number } | null = null;
-
 export function exitMatchTo(router: Pick<Router, "dismissTo">, href: Href): void {
-  lastExit = typeof href === "string" ? { href, at: Date.now() } : null;
   router.dismissTo(href);
 }
 
-/**
- * The href of an exit taken within the last `maxAgeMs`, consumed (read once).
- * A highlight tap held during the match is released right after the exit
- * (lib/notifications/handlers.ts) and must know where the exit went: pushing
- * the viewer over an Arena that is finishing a Rematch auto-send blurs it,
- * and the blur clears the rematch pin. Time-bounded so an exit that took
- * another path (a back gesture) never reads a stale target.
- */
-export function takeRecentMatchExitHref(maxAgeMs: number, now = Date.now()): string | null {
-  const exit = lastExit;
-  lastExit = null;
-  return exit && now - exit.at <= maxAgeMs ? exit.href : null;
-}

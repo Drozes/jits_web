@@ -12,7 +12,7 @@
  *   - delayed and coalesced (a burst of joins costs one read),
  *   - at most one read in flight, and a minimum gap between reads,
  *   - an id is tried once. Every lobby id missing when ANY read starts (this
- *     one, pull-to-refresh, match exit, the rematch pin's own re-read) counts
+ *     one, pull-to-refresh, match exit) counts
  *     as tried, so an athlete the roster will never list (not looking, past
  *     `ARENA_ROSTER_LIMIT`) costs one read, not a loop. The tried set resets
  *     when a read comes back with a different roster, and an id is forgotten

@@ -97,19 +97,17 @@ export function spokenGap(diff: number): string {
 
 /**
  * What VoiceOver reads for an On The Mat row's profile button: every fact
- * the row shows (AC-A4), `Alex, ELO 1412, plus 40 vs you, 185 pounds,
- * rematch`. The Challenge button keeps its own `Challenge <name>` label.
+ * the row shows (AC-A4), `Alex, ELO 1412, plus 40 vs you, 185 pounds`.
+ * The Challenge button keeps its own `Challenge <name>` label.
  */
 export function matRowLabel(
   displayName: string,
   currentElo: number,
   eloDiff: number,
   weight: number | null | undefined,
-  rematch: boolean,
 ): string {
   const parts = [displayName, `ELO ${currentElo}`, `${spokenGap(eloDiff)} vs you`];
   if (weight) parts.push(`${weight} pounds`);
-  if (rematch) parts.push("rematch");
   return parts.join(", ");
 }
 
@@ -756,8 +754,6 @@ interface MatRowProps {
   competitor: ArenaCompetitor;
   action: MatRowAction;
   disabled: boolean;
-  /** The opponent a match summary's Rematch pointed here. */
-  rematch?: boolean;
   onRoll: () => void;
   onGoLive: () => void;
   onOpenProfile: () => void;
@@ -765,13 +761,12 @@ interface MatRowProps {
 
 /**
  * 48pt: avatar, name, ELO, signed gap vs you (state coloured), weight, and
- * the action (AC-A4). A rematch pin is a tag, not prose.
+ * the action (AC-A4).
  */
 export function MatRow({
   competitor,
   action,
   disabled,
-  rematch = false,
   onRoll,
   onGoLive,
   onOpenProfile,
@@ -784,7 +779,7 @@ export function MatRow({
     >
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={matRowLabel(displayName, currentElo, eloDiff, weight, rematch)}
+        accessibilityLabel={matRowLabel(displayName, currentElo, eloDiff, weight)}
         onPress={onOpenProfile}
         className="flex-1 flex-row items-center gap-3"
       >
@@ -818,7 +813,6 @@ export function MatRow({
       </Pressable>
 
       <View className="shrink-0 flex-row items-center gap-2">
-        {rematch ? <MetaTag>Rematch</MetaTag> : null}
         {action.kind === "roll" ? (
           <OutlineAction
             label="Roll"

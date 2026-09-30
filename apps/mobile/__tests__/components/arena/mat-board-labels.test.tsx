@@ -22,12 +22,12 @@ describe("spokenGap", () => {
 
 describe("matRowLabel", () => {
   it("reads the name, rating, gap and weight", () => {
-    expect(matRowLabel("Alex", 1412, 40, 185, false)).toBe(
+    expect(matRowLabel("Alex", 1412, 40, 185)).toBe(
       "Alex, ELO 1412, plus 40 vs you, 185 pounds",
     );
   });
-  it("leaves out a missing weight and ends with the rematch tag", () => {
-    expect(matRowLabel("Sam", 1300, -5, null, true)).toBe("Sam, ELO 1300, minus 5 vs you, rematch");
+  it("leaves out a missing weight", () => {
+    expect(matRowLabel("Sam", 1300, -5, null)).toBe("Sam, ELO 1300, minus 5 vs you");
   });
 });
 

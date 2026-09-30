@@ -109,7 +109,7 @@ export interface UseArenaLiveResult {
   /**
    * Go live, idempotently: sets the intent to live (never reverses it the
    * way `toggle` does) and resolves true once it landed. For flows that want
-   * the athlete live whatever the current intent (the verdict's rematch).
+   * the athlete live whatever the current intent.
    */
   goLive: () => Promise<boolean>;
 }

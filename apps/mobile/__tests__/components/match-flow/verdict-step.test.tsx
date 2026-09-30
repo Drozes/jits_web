@@ -2,7 +2,7 @@
  * Verdict (the redesigned summary step): win celebration vs calm loss, the
  * harness contract (summary-verdict / summary-elo-delta with the ▲/▼ prefix /
  * summary-exit), the rank strip from get_match_rank_change (B6) and its
- * graceful absence, Rematch sending the challenge directly, Share with a
+ * graceful absence, the P-Verdict actions (no Rematch, jits-02vo.8), Share with a
  * match link, the opening still with its fallback, and the upload card.
  */
 import * as React from "react";
@@ -72,7 +72,7 @@ jest.mock("@jits/shared/api/highlight-share", () => ({
 }));
 
 import { Share } from "react-native";
-import { VerdictStep, rematchHref } from "@/components/match-flow/verdict/verdict-step";
+import { VerdictStep } from "@/components/match-flow/verdict/verdict-step";
 import { WizardScrollContext, useWizardScrollSource } from "@/components/match-flow/wizard-scroll";
 import { ARENA_EXIT_LABEL, ARENA_HREF } from "@/lib/arena/constants";
 
@@ -170,7 +170,7 @@ describe("verdict copy and the harness contract", () => {
     await flush();
     expect(s.getByTestId("summary-verdict")).toHaveTextContent("DISPUTED");
     expect(s.getByTestId("summary-disputed-note")).toBeTruthy();
-    expect(s.queryByTestId("summary-rematch")).toBeNull();
+    expect(s.queryByText(/rematch/i)).toBeNull();
     expect(s.queryByTestId("summary-share")).toBeNull();
   });
 
@@ -198,20 +198,38 @@ describe("actions", () => {
     expect(s.getByText(ARENA_EXIT_LABEL)).toBeTruthy();
   });
 
-  it("loss: Rematch is the red CTA and hands the send to the Arena (send=1)", async () => {
+  it("win: exactly Watch film, Back to Arena, Share match, in that order, and no Rematch (P-Verdict)", async () => {
+    const s = renderVerdict();
+    await flush();
+    expect(s.queryByTestId("summary-rematch")).toBeNull();
+    expect(s.queryByText(/rematch/i)).toBeNull();
+    const order = s.getAllByTestId(/^summary-(watch-film|exit|share)$/).map((n) => String(n.props.testID));
+    expect(order).toEqual(["summary-watch-film", "summary-exit", "summary-share"]);
+    // Share is its own full-width tertiary row, not half of a split row.
+    expect(StyleSheet.flatten(s.getByTestId("summary-share").props.style)?.flex).toBeUndefined();
+  });
+
+  it("loss: the same actions as a win, calm, with no Rematch or run-it-back prompt", async () => {
     const s = renderVerdict({ outcome: "loss", me: { athlete_id: "me", display_name: "Kai Reyes", elo_delta: -9, elo_before: 1498, elo_after: 1489 } });
     await flush();
-    expect(s.getByText("Run it back?")).toBeTruthy();
-    fireEvent.press(s.getByTestId("summary-rematch"));
-    // Not sent from here: the opponent is likely still on their verdict,
-    // where their app declines every challenge as busy.
-    expect(mockDismissTo).toHaveBeenCalledWith("/arena?rematch=opp&send=1");
+    expect(s.queryByTestId("summary-rematch")).toBeNull();
+    expect(s.queryByText(/rematch/i)).toBeNull();
+    expect(s.queryByText("Run it back?")).toBeNull();
+    s.getByTestId("summary-watch-film");
+    s.getByTestId("summary-share");
+    fireEvent.press(s.getByTestId("summary-exit"));
+    expect(mockDismissTo).toHaveBeenCalledTimes(1);
+    expect(mockDismissTo).toHaveBeenCalledWith(ARENA_HREF);
     expect(mockPush).not.toHaveBeenCalled();
   });
 
-  it("encodes the rematch href", () => {
-    expect(rematchHref("a b&c")).toBe(`${ARENA_HREF}?rematch=a%20b%26c`);
-    expect(rematchHref("x", { send: true })).toBe(`${ARENA_HREF}?rematch=x&send=1`);
+  it("draw: the same three actions", async () => {
+    const s = renderVerdict({ outcome: "draw", me: { athlete_id: "me", display_name: "Kai Reyes", elo_before: 1500, elo_after: 1498, elo_delta: -2 } });
+    await flush();
+    s.getByTestId("summary-watch-film");
+    s.getByTestId("summary-exit");
+    s.getByTestId("summary-share");
+    expect(s.queryByText(/rematch/i)).toBeNull();
   });
 
   it("shares the live web match page once, with the stamped rating", async () => {
@@ -247,7 +265,6 @@ describe("actions", () => {
     });
     await flush();
     expect(s.getByTestId("summary-watch-film").props.accessibilityState.disabled).toBe(true);
-    expect(s.getByText("PROCESSING")).toBeTruthy();
     expect(s.getByText(/UPLOADING 64% · STILL ARRIVES AFTER UPLOAD/)).toBeTruthy();
     // The upload card replaced the banner over every post-live step.
     expect(s.getByTestId("upload-status-banner")).toBeTruthy();
@@ -323,7 +340,7 @@ describe("the recorder learns of a dispute (S1)", () => {
     expect(s.getByTestId("summary-verdict")).toHaveTextContent("DISPUTED");
     s.getByTestId("summary-disputed-note");
     expect(s.queryByTestId("verdict-confetti", { includeHiddenElements: true })).toBeNull();
-    expect(s.queryByTestId("summary-rematch")).toBeNull();
+    expect(s.queryByTestId("summary-share")).toBeNull();
     expect(mockReconcileNow).toHaveBeenCalled();
   });
 

@@ -396,20 +396,20 @@ describe("MatchFlowWizard exit navigation", () => {
     expect(scrollTo).toHaveBeenCalledWith({ y: 0, animated: false });
   });
 
-  it("offers a Rematch of the opponent that dismisses the match to the Arena (jits-00fr)", async () => {
+  it("offers no Rematch on the verdict; Back to Arena is the way back (jits-02vo.8)", async () => {
     mockUseMatchDetails.mockReturnValue(completedMatchResult());
 
-    const { getByTestId, getByText } = render(
+    const { getByTestId, queryByTestId, queryByText } = render(
       <MatchFlowWizard exitHref={ARENA_EXIT} exitLabel={ARENA_LABEL} matchId="M1" currentAthleteId="me-1" />,
     );
 
-    const rematch = getByTestId("summary-rematch");
-    expect(rematch.props.accessibilityLabel).toBe("Rematch Opponent");
-    getByText(ARENA_LABEL);
+    expect(queryByTestId("summary-rematch")).toBeNull();
+    expect(queryByText(/rematch/i)).toBeNull();
     await act(async () => {
-      fireEvent.press(rematch);
+      fireEvent.press(getByTestId("summary-exit"));
     });
-    await waitFor(() => expect(mockRouterDismissTo).toHaveBeenCalledWith(`${ARENA_HREF}?rematch=opp-1&send=1`));
+    await waitFor(() => expect(mockRouterDismissTo).toHaveBeenCalledWith(ARENA_EXIT));
+    expect(mockRouterDismissTo.mock.calls.some(([h]: [unknown]) => String(h).includes("rematch"))).toBe(false);
   });
 
   it("keeps a caller label that merely has surrounding whitespace", () => {

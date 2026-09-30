@@ -17,8 +17,8 @@ function verdict(result: BroadcastResult | null, athleteId: string): string {
 }
 
 /**
- * The end of the practice run. No rating number, no share, no rematch, no
- * match details. The clip (if any) plays from the local file and is deleted
+ * The end of the practice run. No rating number, no share, no match
+ * details. The clip (if any) plays from the local file and is deleted
  * when the athlete leaves; see `PracticeClipCustodian`.
  */
 export function PracticeSummary({

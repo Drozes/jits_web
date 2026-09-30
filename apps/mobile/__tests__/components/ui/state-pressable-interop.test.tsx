@@ -41,7 +41,7 @@ describe("function styles survive the NativeWind Pressable interop (light theme,
     expect(flat(s.getByTestId("raw")).backgroundColor).toBeUndefined();
   });
 
-  it("primary FightButton (RECORD RESULT, primary rematch / watch film) keeps its Signal Red fill and height", () => {
+  it("primary FightButton (RECORD RESULT, primary watch film) keeps its Signal Red fill and height", () => {
     const s = render(
       <ThemeProvider>
         <FightButton testID="result-record" label="Record result" onPress={jest.fn()} />
@@ -67,22 +67,15 @@ describe("function styles survive the NativeWind Pressable interop (light theme,
     expect(st.height).toBe(56);
   });
 
-  it("ghost FightButton (REMATCH / SHARE row) keeps its layout", () => {
+  it("ghost FightButton (the full-width SHARE row) keeps its layout", () => {
     const s = render(
       <ThemeProvider>
-        <FightButton
-          testID="summary-rematch"
-          variant="ghost"
-          label="Rematch M. Park"
-          height={44}
-          onPress={jest.fn()}
-          style={{ flex: 1, paddingHorizontal: 4 }}
-        />
+        <FightButton testID="summary-share" variant="ghost" label="Share match" height={44} onPress={jest.fn()} />
       </ThemeProvider>,
     );
-    const st = flat(s.getByTestId("summary-rematch"));
+    const st = flat(s.getByTestId("summary-share"));
     expect(st.height).toBe(44);
-    expect(st.flex).toBe(1);
+    expect(st.flex).toBeUndefined();
     expect(st.flexDirection).toBe("row");
   });
 

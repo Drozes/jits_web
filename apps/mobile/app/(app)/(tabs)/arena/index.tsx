@@ -24,7 +24,6 @@ import { PageContainer } from "@/components/layout/page-container";
 import { useLobbyIds, useLobbyKnown } from "@/lib/arena/use-lobby-presence";
 import { useArenaRoster } from "@/lib/arena/use-arena-roster";
 import { useRosterLobbySync } from "@/lib/arena/use-roster-lobby-sync";
-import { useRematchAutoSend, useRematchPin } from "@/lib/arena/use-rematch-pin";
 import { goLiveWithFeedback, goOfflineWithFeedback } from "@/lib/arena/go-live-feedback";
 import { useChallengeDeepLink } from "@/lib/arena/use-challenge-deep-link";
 import { openMatchToConfirm } from "@/lib/arena/open-match-to-confirm";
@@ -143,27 +142,6 @@ export default function ArenaScreen() {
     refreshQuietly,
   );
 
-  const rematch = useRematchPin({
-    competitors,
-    lobbyIds,
-    isLoading,
-    refresh: refreshQuietly,
-    outgoingOpponentId: outgoing?.opponentId ?? null,
-  });
-
-  // The verdict's Rematch: send once the opponent is back (see the hook).
-  useRematchAutoSend({
-    pin: rematch,
-    isLive,
-    isSaving: liveSaving,
-    blocked: isBusy || !!incoming,
-    capReached,
-    outgoingOpponentId: outgoing?.opponentId ?? null,
-    // Programmatic, not a tap: never swallowed by the switch cooldown.
-    goLive: () => void arenaActions.goLiveUnguarded(),
-    send: sendChallenge,
-  });
-
   const lobbyKnown = useLobbyKnown();
   const freshIncomingCount = useFreshIncomingCount();
   // A challenge push: `?challenge=<id>` (AC-A8).
@@ -186,7 +164,7 @@ export default function ArenaScreen() {
   if (lobbyKnown) lastKnownLobbyRef.current = lobbyIds;
   const matLobbyIds = lobbyKnown ? lobbyIds : lastKnownLobbyRef.current;
 
-  // Closest first, strictly (AC-A4): a rematch opponent only gets a tag.
+  // Closest first, strictly (AC-A4).
   const selfId = athlete?.id ?? null;
   const onTheMat = React.useMemo(
     () => onTheMatRows(competitors, matLobbyIds, selfId),
@@ -382,7 +360,6 @@ export default function ArenaScreen() {
                           ? actionsLocked || switchLocked
                           : actionsLocked || liveSaving
                       }
-                      rematch={c.id === rematch.pinnedId}
                       onRoll={() => void sendChallenge(c.id, c.displayName)}
                       onGoLive={goLive}
                       onOpenProfile={() => openProfile(c.id)}

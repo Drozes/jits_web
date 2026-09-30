@@ -3,9 +3,8 @@
  * jits-dq85.11). The push lands on `/arena?challenge=<id>`
  * (`lib/notifications/handlers.ts` honours `data.route`).
  *
- * Like the rematch param (`use-rematch-pin.ts`), the id is copied into local
- * state and cleared from THIS route at once, so a later visit never replays
- * it. Then:
+ * The id is copied into local state and cleared from THIS route at once, so
+ * a later visit never replays it. Then:
  *  - the challenge is already the one on the prompt: a prompt tucked away
  *    with "Later" is reopened; one that is up needs nothing;
  *  - otherwise it is read (`getPendingChallengesForAthlete`), and only a

@@ -112,8 +112,8 @@ const mockRouter = {
   navigate: (...a: unknown[]) => mockNavigate(...a),
   replace: jest.fn(),
   back: jest.fn(),
-  // The rematch param must be cleared on THIS route, never through the
-  // global router, so this one must stay untouched.
+  // Route params are cleared on THIS route, never through the global
+  // router, so this one must stay untouched.
   setParams: jest.fn(),
 };
 // Route-scoped navigation. setParams really updates the params, as the route
@@ -216,7 +216,6 @@ jest.mock("@/lib/arena/use-arena-roster", () => ({
 jest.mock("@/components/ui/toast", () => ({ toast: { success: jest.fn(), error: jest.fn(), info: jest.fn() } }));
 
 const mockToggle = jest.fn();
-const mockGoLive = jest.fn(() => Promise.resolve(true));
 const mockGuardedGoLive = jest.fn<Promise<boolean | "ignored">, []>(() =>
   Promise.resolve(true),
 );
@@ -260,7 +259,6 @@ jest.mock("@/lib/arena/arena-store", () => ({
     reopenIncoming: () => mockReopen(),
     goOffline: () => mockGuardedGoOffline(),
     goLive: () => mockGuardedGoLive(),
-    goLiveUnguarded: () => mockGoLive(),
   },
   setOpponentUnavailableHandler: (...a: unknown[]) => mockSetUnavailable(...a),
   clearOpponentUnavailableHandler: (...a: unknown[]) => mockClearUnavailable(...a),
@@ -1787,8 +1785,8 @@ describe("Arena screen: a challenge ending without a match (Pending tag)", () =>
   });
 });
 
-describe("Arena screen: rematch handoff (jits-00fr)", () => {
-  function rematchRoster() {
+describe("Arena screen: no rematch handoff (jits-02vo.8)", () => {
+  function roster() {
     mockIsLive = true;
     mockRoster.competitors = [
       competitor({ id: "a-1", displayName: "Alpha" }),
@@ -1797,267 +1795,33 @@ describe("Arena screen: rematch handoff (jits-00fr)", () => {
     ];
   }
 
-  function rowOrder(getAllByLabelText: (r: RegExp) => { props: { accessibilityLabel?: string } }[]) {
-    return getAllByLabelText(/, ELO \d+/).map((n) =>
-      String(n.props.accessibilityLabel).split(",")[0],
-    );
-  }
+  it("ignores a stale ?rematch=<id>&send=1 link: no tag, no auto-send, no go-live, no param handling", () => {
+    jest.useFakeTimers();
+    roster();
+    mockIsLive = false;
+    mockLobbyIds = new Set(["a-1", "a-3"]);
+    mockParams = { rematch: "a-3", send: "1" };
 
-  it("tags the rematch opponent's row without moving it out of closest-first order (AC-A4)", () => {
-    rematchRoster();
-    mockLobbyIds = new Set(["a-1", "a-2", "a-3"]);
-    mockParams = { rematch: "a-3" };
+    const { queryByText, queryByLabelText, rerender } = render(<ArenaScreen />);
+    act(() => {
+      jest.advanceTimersByTime(5_000);
+    });
+    rerender(<ArenaScreen />);
 
-    const { getAllByLabelText, getByText, queryByTestId } = render(
-      <ArenaScreen />,
-    );
-
-    expect(rowOrder(getAllByLabelText)).toEqual(["Alpha", "Bravo", "Charlie"]);
-    expect(getByText("Rematch")).toBeTruthy();
-    expect(queryByTestId("arena-rematch-hint")).toBeNull();
+    expect(queryByText("Rematch")).toBeNull();
+    expect(queryByLabelText(/, rematch$/)).toBeNull();
+    expect(mockSendChallenge).not.toHaveBeenCalled();
+    expect(mockGuardedGoLive).not.toHaveBeenCalled();
+    expect(mockSetParams).not.toHaveBeenCalled();
   });
 
-  it("never sends a challenge on its own; the row's Challenge does", () => {
-    rematchRoster();
-    mockLobbyIds = new Set(["a-3"]);
-    mockParams = { rematch: "a-3" };
+  it("a normal Arena challenge to the same opponent still works", () => {
+    roster();
+    mockLobbyIds = new Set(["a-1", "a-3"]);
 
     const r = render(<ArenaScreen />);
-    const { queryByText } = r;
-    expect(mockSendChallenge).not.toHaveBeenCalled();
-
     fireEvent.press(rowButton(r, "a-3", "Challenge Charlie"));
     expect(mockSendChallenge).toHaveBeenCalledWith("a-3", "Charlie");
-    expect(queryByText("Rematch")).toBeTruthy();
-  });
-
-  it("ends the pin only once the challenge to them actually went out", () => {
-    rematchRoster();
-    mockLobbyIds = new Set(["a-3"]);
-    mockParams = { rematch: "a-3" };
-
-    const r = render(<ArenaScreen />);
-    const { getByText, queryByText, rerender } = r;
-    fireEvent.press(rowButton(r, "a-3", "Challenge Charlie"));
-    // The tap alone is not success: the pin holds until the outgoing slot
-    // names them.
-    expect(getByText("Rematch")).toBeTruthy();
-
-    mockChallenge.outgoing = {
-      challengeId: "ch-1",
-      opponentId: "a-3",
-      opponentName: "Charlie",
-    };
-    rerender(<ArenaScreen />);
-    expect(queryByText("Rematch")).toBeNull();
-
-    // And it does not come back once the challenge resolves.
-    mockChallenge.outgoing = null;
-    rerender(<ArenaScreen />);
-    expect(queryByText("Rematch")).toBeNull();
-  });
-
-  it("keeps the pin and tag when the challenge send fails", () => {
-    rematchRoster();
-    mockLobbyIds = new Set(["a-3"]);
-    mockParams = { rematch: "a-3" };
-    // A refused or failed send leaves no outgoing challenge behind.
-    mockSendChallenge.mockResolvedValueOnce(undefined);
-
-    const r = render(<ArenaScreen />);
-    const { getByText, rerender } = r;
-    fireEvent.press(rowButton(r, "a-3", "Challenge Charlie"));
-    rerender(<ArenaScreen />);
-
-    expect(getByText("Rematch")).toBeTruthy();
-    expect(rowButton(r, "a-3", "Challenge Charlie")).toBeTruthy();
-  });
-
-  it("does not end the pin for a challenge to someone else", () => {
-    rematchRoster();
-    mockLobbyIds = new Set(["a-1", "a-3"]);
-    mockParams = { rematch: "a-3" };
-
-    const { getByText, rerender } = render(<ArenaScreen />);
-    mockChallenge.outgoing = {
-      challengeId: "ch-2",
-      opponentId: "a-1",
-      opponentName: "Alpha",
-    };
-    rerender(<ArenaScreen />);
-    expect(getByText("Rematch")).toBeTruthy();
-  });
-
-  it("marks the pinned row's profile label, not the Challenge label", () => {
-    rematchRoster();
-    mockLobbyIds = new Set(["a-3"]);
-    mockParams = { rematch: "a-3" };
-
-    const r = render(<ArenaScreen />);
-    expect(r.getByLabelText(/^Charlie, ELO 1300, .*, rematch$/)).toBeTruthy();
-    expect(rowButton(r, "a-3", "Challenge Charlie")).toBeTruthy();
-  });
-
-  it("does not list a pinned opponent who is not on the mat anywhere (D1)", () => {
-    rematchRoster();
-    mockLobbyIds = new Set(["a-1"]);
-    mockParams = { rematch: "a-3" };
-
-    const r = render(<ArenaScreen />);
-    expect(r.queryByText("Charlie")).toBeNull();
-    expect(r.queryByText("Rematch")).toBeNull();
-    // Never an action either (F13).
-    expect(r.queryByLabelText("Challenge Charlie")).toBeNull();
-    expect(r.queryByText(/off the mat/i)).toBeNull();
-  });
-
-  it("clears the route param as soon as it is read", () => {
-    rematchRoster();
-    mockParams = { rematch: "a-3" };
-
-    render(<ArenaScreen />);
-    expect(mockSetParams).toHaveBeenCalledWith({ rematch: undefined, send: undefined });
-    expect(mockRouter.setParams).not.toHaveBeenCalled();
-  });
-
-  describe("from the verdict's Rematch (send=1)", () => {
-    it("sends once the opponent is back in the lobby, never before, and says so", () => {
-      const { toast } = jest.requireMock("@/components/ui/toast") as { toast: { success: jest.Mock } };
-      rematchRoster();
-      mockLobbyIds = new Set(["a-1"]);
-      mockParams = { rematch: "a-3", send: "1" };
-      const { rerender, queryByTestId } = render(<ArenaScreen />);
-      // Still on their own verdict: their app would decline it as busy.
-      expect(mockSendChallenge).not.toHaveBeenCalled();
-      // No prose while waiting (AC-A7): the send is still pending.
-      expect(queryByTestId("arena-rematch-hint")).toBeNull();
-
-      mockLobbyIds = new Set(["a-1", "a-3"]);
-      rerender(<ArenaScreen />);
-      expect(mockSendChallenge).toHaveBeenCalledTimes(1);
-      expect(mockSendChallenge).toHaveBeenCalledWith("a-3", "Charlie");
-      rerender(<ArenaScreen />);
-      expect(mockSendChallenge).toHaveBeenCalledTimes(1);
-
-      mockChallenge.outgoing = { challengeId: "ch-9", opponentId: "a-3", opponentName: "Charlie" };
-      rerender(<ArenaScreen />);
-      expect(toast.success).toHaveBeenCalledWith({ text1: "Rematch sent to Charlie" });
-    });
-
-    it("never sends over a prompt, a busy challenge, or the cap", () => {
-      rematchRoster();
-      mockLobbyIds = new Set(["a-3"]);
-      mockParams = { rematch: "a-3", send: "1" };
-      mockChallenge.capReached = true;
-      render(<ArenaScreen />);
-      expect(mockSendChallenge).not.toHaveBeenCalled();
-    });
-
-    it("takes a rematcher who is not live, live, idempotently (never a toggle)", () => {
-      jest.useFakeTimers();
-      rematchRoster();
-      mockIsLive = false;
-      mockParams = { rematch: "a-3", send: "1" };
-      render(<ArenaScreen />);
-      expect(mockGoLive).not.toHaveBeenCalled();
-      act(() => {
-        jest.advanceTimersByTime(1_600);
-      });
-      expect(mockGoLive).toHaveBeenCalledTimes(1);
-      expect(mockToggle).not.toHaveBeenCalled();
-      jest.useRealTimers();
-    });
-
-    it("a match-exit restore still in flight at 1.5 s: asks for live again, never toggles offline", () => {
-      // restoreLive has set the intent to live but isLive has not flipped
-      // and isSaving is never set for it: a toggle here would read the live
-      // intent and take the athlete OFFLINE.
-      jest.useFakeTimers();
-      rematchRoster();
-      mockIsLive = false;
-      mockParams = { rematch: "a-3", send: "1" };
-      const { rerender } = render(<ArenaScreen />);
-      act(() => {
-        jest.advanceTimersByTime(1_600);
-      });
-      expect(mockToggle).not.toHaveBeenCalled();
-      expect(mockGoLive).toHaveBeenCalledTimes(1);
-      // The restore lands: live, and the rematch goes out.
-      mockIsLive = true;
-      mockLobbyIds = new Set(["a-3"]);
-      rerender(<ArenaScreen />);
-      expect(mockSendChallenge).toHaveBeenCalledWith("a-3", "Charlie");
-      jest.useRealTimers();
-    });
-
-    it("does not ask for live when the match exit already took them live", () => {
-      jest.useFakeTimers();
-      rematchRoster();
-      mockParams = { rematch: "a-3", send: "1" };
-      render(<ArenaScreen />);
-      act(() => {
-        jest.advanceTimersByTime(2_000);
-      });
-      expect(mockGoLive).not.toHaveBeenCalled();
-      expect(mockToggle).not.toHaveBeenCalled();
-      jest.useRealTimers();
-    });
-
-    it("a second rematch of the same opponent on the still-mounted Arena sends again", () => {
-      const { toast } = jest.requireMock("@/components/ui/toast") as { toast: { success: jest.Mock } };
-      rematchRoster();
-      mockLobbyIds = new Set(["a-3"]);
-      mockParams = { rematch: "a-3", send: "1" };
-      const { rerender } = render(<ArenaScreen />);
-      expect(mockSendChallenge).toHaveBeenCalledTimes(1);
-      mockChallenge.outgoing = { challengeId: "ch-1", opponentId: "a-3", opponentName: "Charlie" };
-      rerender(<ArenaScreen />);
-      expect(toast.success).toHaveBeenCalledTimes(1);
-      // They played it; the challenge resolved; back to the verdict and Rematch again.
-      mockChallenge.outgoing = null;
-      rerender(<ArenaScreen />);
-      mockParams = { rematch: "a-3", send: "1" };
-      rerender(<ArenaScreen />);
-      expect(mockSendChallenge).toHaveBeenCalledTimes(2);
-      mockChallenge.outgoing = { challengeId: "ch-2", opponentId: "a-3", opponentName: "Charlie" };
-      rerender(<ArenaScreen />);
-      expect(toast.success).toHaveBeenCalledTimes(2);
-    });
-
-    it("a plain rematch param (no send) still never sends", () => {
-      rematchRoster();
-      mockLobbyIds = new Set(["a-3"]);
-      mockParams = { rematch: "a-3" };
-      render(<ArenaScreen />);
-      expect(mockSendChallenge).not.toHaveBeenCalled();
-    });
-  });
-
-  it("an opponent on the roster who is not live gets no prose and no row (AC-A7, spec 6.4, D1)", () => {
-    rematchRoster();
-    mockLobbyIds = new Set(["a-1"]);
-    mockParams = { rematch: "a-2" };
-
-    const { queryByTestId, queryByText, queryByLabelText } = render(<ArenaScreen />);
-    expect(queryByTestId("arena-rematch-hint")).toBeNull();
-    expect(queryByText(/isn't back in the Arena yet/)).toBeNull();
-    // Not on the mat, so not listed and never challengeable.
-    expect(queryByText("Rematch")).toBeNull();
-    expect(queryByText("Bravo")).toBeNull();
-    expect(queryByTestId("arena-mat-row-a-2")).toBeNull();
-    expect(queryByLabelText("Challenge Bravo")).toBeNull();
-  });
-
-  it("re-reads the roster once when the opponent is live but not listed yet", () => {
-    rematchRoster();
-    mockLobbyIds = new Set(["zz-9"]);
-    mockParams = { rematch: "zz-9" };
-
-    const { rerender } = render(<ArenaScreen />);
-    rerender(<ArenaScreen />);
-    // A background read: no pull spinner, no error plate over a good roster.
-    expect(mockRefreshQuietly).toHaveBeenCalledTimes(1);
-    expect(mockRefresh).not.toHaveBeenCalled();
   });
 
   it("quietly re-reads the roster when someone goes live after it loaded (jits-hlm1.4)", () => {
@@ -2109,74 +1873,5 @@ describe("Arena screen: rematch handoff (jits-00fr)", () => {
       jest.advanceTimersByTime(5_000);
     });
     expect(mockRefreshQuietly).not.toHaveBeenCalled();
-  });
-
-  it("does not re-read the roster for an opponent who is simply offline", () => {
-    rematchRoster();
-    mockParams = { rematch: "a-2" };
-
-    render(<ArenaScreen />);
-    expect(mockRefresh).not.toHaveBeenCalled();
-    expect(mockRefreshQuietly).not.toHaveBeenCalled();
-  });
-
-  it("drops the pin when the tab loses focus", () => {
-    rematchRoster();
-    mockLobbyIds = new Set(["a-1", "a-3"]);
-    mockParams = { rematch: "a-3" };
-
-    const { getByText, queryByText, rerender } = render(<ArenaScreen />);
-    expect(getByText("Rematch")).toBeTruthy();
-
-    // The param was cleared on read, so coming back cannot re-pin.
-    expect(mockParams.rematch).toBeUndefined();
-    act(() => {
-      mockFocusCleanups.forEach((c) => c());
-    });
-    rerender(<ArenaScreen />);
-    expect(queryByText("Rematch")).toBeNull();
-  });
-
-  it("clears a param that outlived the read when the tab loses focus (jits-tlk3)", () => {
-    // A match exit into an already-mounted Arena (dismissTo) re-applies the
-    // params after the read-time clear, so the param can still be there.
-    rematchRoster();
-    mockLobbyIds = new Set(["a-1", "a-3"]);
-    mockParams = { rematch: "a-3" };
-    const { rerender } = render(<ArenaScreen />);
-    mockParams = { rematch: "a-3" };
-    rerender(<ArenaScreen />);
-    mockSetParams.mockClear();
-
-    act(() => {
-      mockFocusCleanups.forEach((c) => c());
-    });
-    expect(mockSetParams).toHaveBeenCalledWith({ rematch: undefined, send: undefined });
-    expect(mockParams.rematch).toBeUndefined();
-    expect(mockRouter.setParams).not.toHaveBeenCalled();
-  });
-
-  it("dispatches nothing on blur when there is no param to clear", () => {
-    rematchRoster();
-    render(<ArenaScreen />);
-
-    act(() => {
-      mockFocusCleanups.forEach((c) => c());
-    });
-    expect(mockSetParams).not.toHaveBeenCalled();
-  });
-
-  it("is inert without the param", () => {
-    rematchRoster();
-    mockLobbyIds = new Set(["a-1", "a-3"]);
-
-    const { getAllByLabelText, queryByText, queryByTestId } = render(
-      <ArenaScreen />,
-    );
-    // Bravo is not on the mat, so not listed.
-    expect(rowOrder(getAllByLabelText)).toEqual(["Alpha", "Charlie"]);
-    expect(queryByText("Rematch")).toBeNull();
-    expect(queryByTestId("arena-rematch-hint")).toBeNull();
-    expect(mockSetParams).not.toHaveBeenCalled();
   });
 });

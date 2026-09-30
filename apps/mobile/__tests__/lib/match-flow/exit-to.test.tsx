@@ -15,8 +15,7 @@
  *  - the `(app)` Stack keeps exactly one `(tabs)` route after any exit,
  *    however many matches are played;
  *  - the match screen unmounts (useArenaMatchScreen restores live on unmount);
- *  - the Arena tab screen is NOT remounted, yet still receives `?rematch=`,
- *    and the real useRematchPin pins it and clears it off the route;
+ *  - the Arena tab screen is NOT remounted;
  *  - Done (`/`) lands on the Home tab, not the root redirect index;
  *  - with no `(tabs)` route beneath the match at all, the exit still lands;
  *  - a match entered on top of athlete/[id] pops that profile too;
@@ -40,24 +39,19 @@ jest.mock("@jits/shared/api/queries", () => ({
 jest.mock("@/lib/supabase/client", () => ({ supabase: {} }));
 
 import { exitMatchTo } from "@/lib/match-flow/exit-to";
-import { useRematchPin } from "@/lib/arena/use-rematch-pin";
 import { useArenaRoster } from "@/lib/arena/use-arena-roster";
 import { useArenaMatchScreen, useMatchExitCount } from "@/lib/arena/arena-store";
 import { useRefetchOnRefocus } from "@/lib/cache/use-refocus-refetch";
 import { ARENA_HREF } from "@/lib/arena/constants";
 
-// Same shape as summary-step's rematchHref (pinned in summary-step.test.tsx);
-// importing that module here would drag in the Supabase client.
-const rematchHref = (id: string) => `${ARENA_HREF}?rematch=${encodeURIComponent(id)}`;
-
 describe("exitMatchTo", () => {
   it("dismisses to the href, never replacing or pushing", () => {
     const fake = { dismissTo: jest.fn(), replace: jest.fn(), push: jest.fn() };
 
-    exitMatchTo(fake, "/arena?rematch=opp-1");
+    exitMatchTo(fake, ARENA_HREF);
 
     expect(fake.dismissTo).toHaveBeenCalledTimes(1);
-    expect(fake.dismissTo).toHaveBeenCalledWith("/arena?rematch=opp-1");
+    expect(fake.dismissTo).toHaveBeenCalledWith(ARENA_HREF);
     expect(fake.replace).not.toHaveBeenCalled();
     expect(fake.push).not.toHaveBeenCalled();
   });
@@ -77,23 +71,13 @@ function useTrackMount(name: string) {
   }, [name]);
 }
 
-const NO_LOBBY = new Set<string>();
-const noop = () => {};
 const mockHomeRefetch = jest.fn();
 
 function ArenaIndex() {
   useTrackMount("arena");
-  const roster = useArenaRoster(1500);
-  // The real hook, so the handoff is proven end to end: the param is read,
-  // pinned, and cleared off this route with route-scoped setParams.
-  const pin = useRematchPin({
-    competitors: roster.competitors,
-    lobbyIds: NO_LOBBY,
-    isLoading: false,
-    refresh: noop,
-    outgoingOpponentId: null,
-  });
-  return <Text testID="arena-pin">{pin.pinnedId ?? "none"}</Text>;
+  // The real roster hook, so the post-exit re-read is proven end to end.
+  useArenaRoster(1500);
+  return <Text testID="arena">arena</Text>;
 }
 
 function HomeIndex() {
@@ -198,49 +182,15 @@ describe("match exits on the real router", () => {
     expect(r.getPathname()).toBe("/arena");
   });
 
-  it("Rematch delivers ?rematch= to the already-mounted Arena, which pins it", () => {
-    const r = renderRouter(appTree(), { initialUrl: ARENA_HREF });
-    expect(r.getByTestId("arena-pin").props.children).toBe("none");
-    act(() => router.push("/match/M1"));
-
-    act(() => exitMatchTo(router, rematchHref("opp-1")));
-
-    expect(appStackNames(r.getRouterState())).toEqual(["(tabs)"]);
-    expect(mounts.arena).toBe(1);
-    expect(unmounts.match).toBe(1);
-    expect(r.getByTestId("arena-pin").props.children).toBe("opp-1");
-  });
-
-  it("re-pins a second rematch of the SAME opponent (the param is dropped on blur)", () => {
-    // The Arena stays mounted across matches now, so the pin effect only
-    // re-fires if the param actually changes. useRematchPin's own immediate
-    // setParams loses a race with the navigator applying the dismissTo
-    // params; clearing again on blur is what makes the next one land.
-    const r = renderRouter(appTree(), { initialUrl: ARENA_HREF });
-    act(() => router.push("/match/M1"));
-    act(() => exitMatchTo(router, rematchHref("opp-1")));
-    expect(r.getByTestId("arena-pin").props.children).toBe("opp-1");
-
-    // The rematch itself: entering its match blurs the Arena, which drops
-    // both the pin and the param.
-    act(() => router.push("/match/M2"));
-    expect(r.getByTestId("arena-pin", { includeHiddenElements: true }).props.children).toBe("none");
-
-    // Straight back into another rematch of the same opponent.
-    act(() => exitMatchTo(router, rematchHref("opp-1")));
-    expect(r.getByTestId("arena-pin").props.children).toBe("opp-1");
-    expect(mounts.arena).toBe(1);
-  });
-
-  it("Rematch switches to the Arena tab when the match was entered from Home", () => {
+  it("Back to Arena switches to the Arena tab when the match was entered from Home", () => {
     const r = renderRouter(appTree(), { initialUrl: "/" });
     act(() => router.push("/match/M1"));
 
-    act(() => exitMatchTo(router, rematchHref("opp-2")));
+    act(() => exitMatchTo(router, ARENA_HREF));
 
     expect(appStackNames(r.getRouterState())).toEqual(["(tabs)"]);
     expect(focusedTab(r.getRouterState())).toBe("arena");
-    expect(r.getByTestId("arena-pin").props.children).toBe("opp-2");
+    expect(r.getByTestId("arena")).toBeTruthy();
     expect(mounts.home).toBe(1);
     expect(unmounts.home).toBeUndefined();
   });
@@ -261,7 +211,7 @@ describe("match exits on the real router", () => {
 
   it("keeps a single tabs navigator across many matches", () => {
     const r = renderRouter(appTree(), { initialUrl: ARENA_HREF });
-    const exits = [ARENA_HREF, rematchHref("opp-1"), "/", ARENA_HREF];
+    const exits = [ARENA_HREF, "/", ARENA_HREF, ARENA_HREF];
 
     exits.forEach((href, i) => {
       act(() => router.push(`/match/M${i}`));
@@ -280,11 +230,11 @@ describe("match exits on the real router", () => {
     const r = renderRouter(appTree(), { initialUrl: "/match/M1" });
     expect(appStackNames(r.getRouterState())).toEqual(["(tabs)", "match/[matchId]"]);
 
-    act(() => exitMatchTo(router, rematchHref("opp-1")));
+    act(() => exitMatchTo(router, ARENA_HREF));
 
     expect(appStackNames(r.getRouterState())).toEqual(["(tabs)"]);
     expect(unmounts.match).toBe(1);
-    expect(r.getByTestId("arena-pin").props.children).toBe("opp-1");
+    expect(r.getByTestId("arena")).toBeTruthy();
   });
 
   it("replaces the match when no (tabs) route is beneath it at all", () => {
@@ -296,22 +246,22 @@ describe("match exits on the real router", () => {
     expect(appStackNames(r.getRouterState())).toEqual(["(tabs)"]);
     expect(unmounts.match).toBe(1);
     expect(mounts.arena).toBe(1);
-    expect(r.getByTestId("arena-pin")).toBeTruthy();
+    expect(r.getByTestId("arena")).toBeTruthy();
   });
 
-  it("pops an athlete profile the match was entered from, and still delivers the param", () => {
+  it("pops an athlete profile the match was entered from", () => {
     const r = renderRouter(appTree(), { initialUrl: ARENA_HREF });
     act(() => router.push("/athlete/A1"));
     act(() => router.push("/match/M1"));
     expect(appStackNames(r.getRouterState())).toEqual(["(tabs)", "athlete/[id]", "match/[matchId]"]);
 
-    act(() => exitMatchTo(router, rematchHref("opp-1")));
+    act(() => exitMatchTo(router, ARENA_HREF));
 
     expect(appStackNames(r.getRouterState())).toEqual(["(tabs)"]);
     expect(unmounts.athlete).toBe(1);
     expect(unmounts.match).toBe(1);
     expect(mounts.arena).toBe(1);
-    expect(r.getByTestId("arena-pin").props.children).toBe("opp-1");
+    expect(r.getByTestId("arena")).toBeTruthy();
   });
 });
 
@@ -337,7 +287,7 @@ describe("match exits refresh the screens that stayed mounted", () => {
     expect(mounts.arena).toBe(1);
 
     act(() => router.push("/match/M2"));
-    act(() => exitMatchTo(router, rematchHref("opp-1")));
+    act(() => exitMatchTo(router, ARENA_HREF));
     await settle();
     expect(mockGetArenaData).toHaveBeenCalledTimes(3);
   });

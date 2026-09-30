@@ -144,7 +144,7 @@ describe("useRosterLobbySync", () => {
   });
 
   it("holds while a read is in flight and counts that read as the attempt", () => {
-    // The rematch pin (or a pull) already started a read for this face.
+    // A pull (or another read) already started a read for this face.
     let p = props();
     const { rerender } = mount(p);
     p = { ...p, lobbyIds: new Set(["a-1", "a-2"]), isFetching: true };

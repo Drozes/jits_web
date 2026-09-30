@@ -380,9 +380,9 @@ export const liveSwitch = Object.freeze({
  * What the rest of the app calls. `toggle`, `goLive` and `goOffline` are the
  * TAP-facing calls and run under the live switch guard, exactly like
  * `liveSwitch` (they are the same functions): a swallowed tap resolves
- * "ignored", never a failure. `goLiveUnguarded` is for programmatic flows
- * only. There is deliberately no unguarded go-offline: a programmatic
- * go-offline is sign-out, which uses `takeArenaOfflineBeforeSignOut`.
+ * "ignored", never a failure. There is deliberately no unguarded go-offline:
+ * a programmatic go-offline is sign-out, which uses
+ * `takeArenaOfflineBeforeSignOut`.
  *
  * `toggle` has no UI caller since the Arena control bar moved to explicit
  * `goLiveWithFeedback` / `goOfflineWithFeedback`. It is kept, guarded, as the
@@ -394,11 +394,6 @@ export interface ArenaActions
   extends Omit<ArenaController, "goLive" | "goOffline"> {
   goLive: () => Promise<boolean | LiveSwitchIgnored>;
   goOffline: () => Promise<boolean | LiveSwitchIgnored>;
-  /**
-   * Go live WITHOUT the guard, for a flow the athlete did not tap (the
-   * verdict's rematch), which must never be swallowed by the cooldown.
-   */
-  goLiveUnguarded: () => Promise<boolean>;
 }
 
 /**
@@ -411,7 +406,6 @@ export const arenaActions: ArenaActions = Object.freeze({
   toggle: () => liveSwitch.toggle().then(() => undefined),
   goOffline: liveSwitch.goOffline,
   goLive: liveSwitch.goLive,
-  goLiveUnguarded: () => controller?.goLive() ?? Promise.resolve(false),
   sendChallenge: (opponentId: string, opponentName: string) =>
     controller?.sendChallenge(opponentId, opponentName) ?? Promise.resolve(),
   cancelOutgoing: () => controller?.cancelOutgoing() ?? Promise.resolve(),

@@ -608,21 +608,22 @@ describe("live switch guard (F11: disabled while saving, 2s cooldown, no undo)",
     expect(result.current).toBe("cooldown");
   });
 
-  it("never gates the raw programmatic calls (rematch, sign-out)", async () => {
+  it("never gates the raw programmatic sign-out call", async () => {
     const c = controller();
     registerArenaController(c);
     await act(async () => {
       await liveSwitch.goLive();
     });
     await act(async () => {
-      await arenaActions.goLiveUnguarded();
       await takeArenaOfflineBeforeSignOut();
     });
-    expect(c.goLive).toHaveBeenCalledTimes(2);
+    expect(c.goLive).toHaveBeenCalledTimes(1);
     expect(c.goOffline).toHaveBeenCalledTimes(1);
     // No unguarded MANUAL go-offline exists (it would drop a tucked
-    // challenge, Q3, outside the athlete's own tap).
+    // challenge, Q3, outside the athlete's own tap), and the verdict's
+    // Rematch (the only unguarded go-live) is gone (jits-02vo.8).
     expect("goOfflineUnguarded" in arenaActions).toBe(false);
+    expect("goLiveUnguarded" in arenaActions).toBe(false);
   });
 
   it("guards the tap-facing arenaActions.goLive/goOffline exactly like liveSwitch (AC-H2..H4)", async () => {
