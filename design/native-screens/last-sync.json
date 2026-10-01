@@ -1,7 +1,7 @@
 {
   "canvas": "https://claude.ai/artifact/PJWm2WeqsG56HS13jHsd5D",
-  "commit": "331315f5ac3e0ddafd515dd3eceec63d4477f9e4",
-  "synced_at": "2026-09-30T18:22:22-04:00",
-  "version": "1790806838-5c77",
-  "note": "Synced after the Sept 30 design review (epics jits-02vo / jr_be-ahn) shipped as OTA 9c5e3210; the affected Current app boards were redrawn per item and independently reviewed against the code. New board 49-Admin-Disputers (Settings: admin repeat disputers)."
+  "commit": "de5b9a3413cc154c60f11a768ad73df4e24ad876",
+  "synced_at": "2026-10-01T09:59:35-04:00",
+  "version": "1790863147-d5c2",
+  "note": "Synced 2026-10-01 after a full canvas audit against the live OTA 9c5e3210 (code de5b9a3): fixed 48, 36, 37, 43, 31, 11, 32, a11y labels on 14/16/21/26/28, triage rows 13 and 16; added weight-check boards 21b, 21c, 22b; 45 retitled as the Sentry-off fallback. Commit is pinned to de5b9a3 on purpose: 80e9c36 (jits-5tgt, jits-ccrc, jits-mg6r) is not in an OTA yet, so drift should keep flagging boards 07, 08, 24 and 46 until it ships."
 }

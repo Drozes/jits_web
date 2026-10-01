@@ -480,6 +480,80 @@
         "apps/mobile/lib/video/upload-banner-state.ts"
       ]
     },
+    "21b-Faceoff-Flagged.dc.html": {
+      "title": "Match 1b: face-off, you flagged the weight",
+      "sources": [
+        "apps/mobile/app/(app)/_layout.tsx",
+        "apps/mobile/app/(app)/match/**",
+        "apps/mobile/components/layout/app-header.tsx",
+        "apps/mobile/components/layout/header-live-dot.tsx",
+        "apps/mobile/components/match-flow/faceoff/**",
+        "apps/mobile/components/match-flow/fight/**",
+        "apps/mobile/components/match-flow/live/broadcast-tokens.ts",
+        "apps/mobile/components/match-flow/match-flow-wizard.tsx",
+        "apps/mobile/components/match-flow/match-orientation-controller.tsx",
+        "apps/mobile/components/match-flow/match-recorder-context.tsx",
+        "apps/mobile/components/match-flow/match-step-renderer.tsx",
+        "apps/mobile/components/match-flow/queue-status-banner.tsx",
+        "apps/mobile/components/match-flow/wizard-scroll.tsx",
+        "apps/mobile/components/match-flow/wizard-status.tsx",
+        "apps/mobile/components/ui/state-pressable.tsx",
+        "apps/mobile/lib/arena/constants.ts",
+        "apps/mobile/lib/match-flow/match-extras.ts",
+        "apps/mobile/lib/match-flow/step-router.ts",
+        "apps/mobile/lib/video/upload-banner-state.ts"
+      ]
+    },
+    "21c-Faceoff-Reweigh.dc.html": {
+      "title": "Match 1c: face-off, re-weigh requested",
+      "sources": [
+        "apps/mobile/app/(app)/_layout.tsx",
+        "apps/mobile/app/(app)/match/**",
+        "apps/mobile/components/layout/app-header.tsx",
+        "apps/mobile/components/layout/header-live-dot.tsx",
+        "apps/mobile/components/match-flow/faceoff/**",
+        "apps/mobile/components/match-flow/fight/**",
+        "apps/mobile/components/match-flow/live/broadcast-tokens.ts",
+        "apps/mobile/components/match-flow/match-flow-wizard.tsx",
+        "apps/mobile/components/match-flow/match-orientation-controller.tsx",
+        "apps/mobile/components/match-flow/match-recorder-context.tsx",
+        "apps/mobile/components/match-flow/match-step-renderer.tsx",
+        "apps/mobile/components/match-flow/queue-status-banner.tsx",
+        "apps/mobile/components/match-flow/wizard-scroll.tsx",
+        "apps/mobile/components/match-flow/wizard-status.tsx",
+        "apps/mobile/components/ui/state-pressable.tsx",
+        "apps/mobile/lib/arena/constants.ts",
+        "apps/mobile/lib/match-flow/match-extras.ts",
+        "apps/mobile/lib/match-flow/step-router.ts",
+        "apps/mobile/lib/video/upload-banner-state.ts"
+      ]
+    },
+    "22b-Ready-Hold.dc.html": {
+      "title": "Match 2b: ready check on weight hold",
+      "sources": [
+        "apps/mobile/app/(app)/_layout.tsx",
+        "apps/mobile/app/(app)/match/**",
+        "apps/mobile/components/layout/app-header.tsx",
+        "apps/mobile/components/layout/header-live-dot.tsx",
+        "apps/mobile/components/match-flow/camera-overlay.tsx",
+        "apps/mobile/components/match-flow/faceoff/**",
+        "apps/mobile/components/match-flow/fight/**",
+        "apps/mobile/components/match-flow/live/broadcast-tokens.ts",
+        "apps/mobile/components/match-flow/match-flow-wizard.tsx",
+        "apps/mobile/components/match-flow/match-orientation-controller.tsx",
+        "apps/mobile/components/match-flow/match-recorder-context.tsx",
+        "apps/mobile/components/match-flow/match-recorder-surface.tsx",
+        "apps/mobile/components/match-flow/match-step-renderer.tsx",
+        "apps/mobile/components/match-flow/queue-status-banner.tsx",
+        "apps/mobile/components/match-flow/wizard-scroll.tsx",
+        "apps/mobile/components/match-flow/wizard-status.tsx",
+        "apps/mobile/components/ui/state-pressable.tsx",
+        "apps/mobile/lib/arena/constants.ts",
+        "apps/mobile/lib/match-flow/match-extras.ts",
+        "apps/mobile/lib/match-flow/step-router.ts",
+        "apps/mobile/lib/video/upload-banner-state.ts"
+      ]
+    },
     "23-Countdown.dc.html": {
       "title": "Match 3a: countdown",
       "sources": [
@@ -971,7 +1045,7 @@
       ]
     },
     "45-Feedback.dc.html": {
-      "title": "Settings: feedback",
+      "title": "Settings: feedback (fallback when Sentry is off)",
       "sources": [
         "apps/mobile/app/(app)/_layout.tsx",
         "apps/mobile/app/(app)/settings/_layout.tsx",
