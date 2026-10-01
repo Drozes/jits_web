@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { hasEnvVars } from "../utils";
 import { isPublicPath } from "./public-paths";
-import { INVITE_COOKIE } from "../invites/constants";
+import { INVITE_ATTR_COOKIE, INVITE_COOKIE, INVITE_COOKIE_OPTIONS } from "../invites/constants";
 import { attributeInviteCookie } from "../invites/cookie-attribution";
 import { INVITE_SKIP_RE, planInviteCookie } from "../invites/cookie-plan";
 import { applyLandingSideEffects, isPrefetch, landingToken } from "../invites/landing-proxy";
@@ -61,7 +61,7 @@ export async function updateSession(request: NextRequest) {
 
   const token = landingToken(request);
   if (token) {
-    await applyLandingSideEffects(request, supabaseResponse, token, !!user);
+    await applyLandingSideEffects(request, supabaseResponse, token, user ? supabase : null);
     // Also set in next.config headers(); repeated here because Next's own
     // dynamic-page Cache-Control would otherwise win over the config rule.
     supabaseResponse.headers.set("Cache-Control", "private, no-store");
@@ -77,7 +77,8 @@ export async function updateSession(request: NextRequest) {
     !INVITE_SKIP_RE.test(pathname) &&
     !isPrefetch(request)
   ) {
-    const decision = await attributeInviteCookie(supabase, inviteCookie);
+    const alreadyRecorded = request.cookies.get(INVITE_ATTR_COOKIE)?.value === inviteCookie;
+    const decision = await attributeInviteCookie(supabase, inviteCookie, { alreadyRecorded });
     const plan = planInviteCookie(decision, pathname);
     if (plan.redirectTo) {
       const url = request.nextUrl.clone();
@@ -86,10 +87,21 @@ export async function updateSession(request: NextRequest) {
       const redirect = NextResponse.redirect(url);
       // Keep any refreshed session cookies on the redirect.
       supabaseResponse.cookies.getAll().forEach((c) => redirect.cookies.set(c));
-      if (plan.clear) redirect.cookies.delete(INVITE_COOKIE);
+      if (plan.clear) {
+        redirect.cookies.delete(INVITE_COOKIE);
+        redirect.cookies.delete(INVITE_ATTR_COOKIE);
+      }
       return redirect;
     }
-    if (plan.clear) supabaseResponse.cookies.delete(INVITE_COOKIE);
+    if (plan.clear) {
+      supabaseResponse.cookies.delete(INVITE_COOKIE);
+      supabaseResponse.cookies.delete(INVITE_ATTR_COOKIE);
+    } else if (decision.recorded && !alreadyRecorded) {
+      // The open challenge keeps er_invite through setup; mark it recorded
+      // so the next setup-page GET skips the public RPC (no repeat
+      // attribution_rejected events).
+      supabaseResponse.cookies.set(INVITE_ATTR_COOKIE, inviteCookie, INVITE_COOKIE_OPTIONS);
+    }
   }
 
   // IMPORTANT: You *must* return the supabaseResponse object as it is.

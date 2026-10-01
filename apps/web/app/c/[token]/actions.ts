@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { withNext } from "@/lib/auth/safe-next-path";
 import {
+  INVITE_ATTR_COOKIE,
   INVITE_COOKIE,
   INVITE_COOKIE_OPTIONS,
   INVITE_TOKEN_RE,
@@ -74,7 +75,10 @@ export async function signOutKeepInviteAction(token: string): Promise<void> {
   const supabase = await createClient();
   await supabase.auth.signOut();
   if (INVITE_TOKEN_RE.test(token)) {
-    (await cookies()).set(INVITE_COOKIE, token, INVITE_COOKIE_OPTIONS);
+    const jar = await cookies();
+    jar.set(INVITE_COOKIE, token, INVITE_COOKIE_OPTIONS);
+    // The next person signing in must be attributed afresh.
+    jar.delete(INVITE_ATTR_COOKIE);
   }
   redirect(invitePath(token));
 }

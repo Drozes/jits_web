@@ -1,6 +1,8 @@
 import "server-only";
 import { after, type NextRequest, type NextResponse } from "next/server";
-import { INVITE_COOKIE, INVITE_COOKIE_OPTIONS, INVITE_TOKEN_RE } from "./constants";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { INVITE_ATTR_COOKIE, INVITE_COOKIE, INVITE_COOKIE_OPTIONS, INVITE_TOKEN_RE } from "./constants";
+import { recordInviteAttribution } from "./cookie-attribution";
 import { logLandingEvent } from "./landing-events";
 import { getInvitePreview } from "./preview";
 import { detectInAppBrowser, isLinkPreviewCrawler } from "./user-agent";
@@ -11,7 +13,14 @@ const LANDING_PATH_RE = /^\/c\/([^/]+)\/?$/;
 export function landingToken(request: NextRequest): string | null {
   if (request.method !== "GET") return null;
   const match = LANDING_PATH_RE.exec(request.nextUrl.pathname);
-  return match ? decodeURIComponent(match[1]) : null;
+  if (!match) return null;
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    // Malformed percent-encoding: keep the raw segment, which fails the
+    // token format check and renders the uniform unavailable page.
+    return match[1];
+  }
 }
 
 /**
@@ -51,7 +60,11 @@ export function isDocumentRequest(request: NextRequest): boolean {
  * would only bounce them back here later (CONTRACT DEVIATION, see summary).
  * A signed-in athlete who arrives here with this token pending has reached
  * the accept step, so the pending cookie is consumed now (it would
- * otherwise bounce them back after they decide not to accept).
+ * otherwise bounce them back after they decide not to accept). Consuming it
+ * is their first authenticated request with the cookie (password login
+ * goes straight here via ?next=), so the attribution is recorded first,
+ * unless the er_invite_attr marker says it already was. A transport error
+ * keeps the cookie so a later request retries.
  *
  * Speculative prefetches are not views, nor are client-side navigations
  * back to the page. The event insert runs after the response (after()),
@@ -61,8 +74,10 @@ export async function applyLandingSideEffects(
   request: NextRequest,
   response: NextResponse,
   token: string,
-  signedIn: boolean,
+  /** The signed-in athlete's client, or null for a signed-out visitor. */
+  supabase: SupabaseClient | null,
 ): Promise<void> {
+  const signedIn = supabase !== null;
   if (!INVITE_TOKEN_RE.test(token)) return;
   if (isPrefetch(request)) return;
 
@@ -72,9 +87,16 @@ export async function applyLandingSideEffects(
 
   if (open && !signedIn) {
     response.cookies.set(INVITE_COOKIE, token, INVITE_COOKIE_OPTIONS);
+    // A fresh visitor must be attributed afresh once they sign in.
+    if (request.cookies.has(INVITE_ATTR_COOKIE)) response.cookies.delete(INVITE_ATTR_COOKIE);
   }
-  if (signedIn && request.cookies.get(INVITE_COOKIE)?.value === token) {
-    response.cookies.delete(INVITE_COOKIE);
+  if (supabase && request.cookies.get(INVITE_COOKIE)?.value === token) {
+    const alreadyRecorded = request.cookies.get(INVITE_ATTR_COOKIE)?.value === token;
+    const outcome = alreadyRecorded ? "recorded" : await recordInviteAttribution(supabase, token);
+    if (outcome !== "error") {
+      response.cookies.delete(INVITE_COOKIE);
+      response.cookies.delete(INVITE_ATTR_COOKIE);
+    }
   }
   if (!isLinkPreviewCrawler(ua) && isDocumentRequest(request)) {
     const detail = {

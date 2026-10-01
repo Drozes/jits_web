@@ -14,6 +14,15 @@ export const INVITE_COOKIE_OPTIONS = {
 };
 
 /**
+ * Marks the er_invite token already recorded by record_invite_attribution.
+ * An open challenge keeps er_invite through the setup pages (cookie-plan.ts);
+ * without this marker every signed-in GET there would call the public RPC
+ * again and log a spurious attribution_rejected (already_attributed) event.
+ * Holds the same token; it counts only while it equals er_invite.
+ */
+export const INVITE_ATTR_COOKIE = "er_invite_attr";
+
+/**
  * App Store listing. The listing is not live yet, so this falls back to the
  * App Store search for the app name until NEXT_PUBLIC_APP_STORE_URL is set.
  * TODO(jits-b3js): set NEXT_PUBLIC_APP_STORE_URL once the listing is public.

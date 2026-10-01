@@ -1,7 +1,7 @@
 import { Wordmark } from "@/components/ui/elo-system";
 import type { InAppBrowser, InvitePreview } from "@/lib/invites/types";
 import type { InviteViewer } from "@/lib/invites/viewer";
-import { AppStoreButton } from "./app-links";
+import { AppStoreButton, OpenInAppButton } from "./app-links";
 import { InAppBrowserHint } from "./in-app-browser-hint";
 import { InviteActions } from "./invite-actions";
 import { InviteCodeBlock } from "./invite-code-block";
@@ -43,7 +43,11 @@ export function InviteLanding({ token, preview, viewer, inAppBrowser }: InviteLa
             )}
           </>
         ) : (
-          <Unavailable token={token} inAppBrowser={inAppBrowser} />
+          <Unavailable
+            token={token}
+            inAppBrowser={inAppBrowser}
+            signedIn={viewer.state === "active" || viewer.state === "pending"}
+          />
         )}
         <p style={{ ...CAPS_LABEL, textAlign: "center", marginTop: "auto", paddingTop: "var(--space-6)" }}>
           Ranked jiu-jitsu. Find out where you stand.
@@ -53,7 +57,21 @@ export function InviteLanding({ token, preview, viewer, inAppBrowser }: InviteLa
   );
 }
 
-function Unavailable({ token, inAppBrowser }: { token: string; inAppBrowser: InAppBrowser }) {
+/**
+ * The preview never says why (claimed, expired, revoked all read alike), so
+ * a signed-in viewer who already accepted this challenge (plan 10.5 "already
+ * used: route the claimer to their match") gets an Open in app path: the
+ * app's claim on this token returns their existing booking or match.
+ */
+function Unavailable({
+  token,
+  inAppBrowser,
+  signedIn,
+}: {
+  token: string;
+  inAppBrowser: InAppBrowser;
+  signedIn: boolean;
+}) {
   return (
     <section data-testid="invite-unavailable" style={{ display: "flex", flexDirection: "column", gap: "var(--space-5)", textAlign: "center" }}>
       <h1 style={{ fontFamily: "var(--font-display)", fontSize: "clamp(40px, 12vw, 56px)", lineHeight: "var(--lh-display)", color: "var(--text-primary)", margin: 0 }}>
@@ -62,7 +80,17 @@ function Unavailable({ token, inAppBrowser }: { token: string; inAppBrowser: InA
       <p style={{ ...BODY_TEXT, fontSize: "var(--size-body-l)" }}>
         This invite is no longer available. Ask your training partner for a new one.
       </p>
-      <AppStoreButton token={token} inAppBrowser={inAppBrowser} primary />
+      {signedIn ? (
+        <>
+          <div data-testid="invite-unavailable-accepted" style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+            <p style={BODY_TEXT}>Already accepted it? Your match is waiting in the app.</p>
+            <OpenInAppButton token={token} inAppBrowser={inAppBrowser} primary />
+          </div>
+          <AppStoreButton token={token} inAppBrowser={inAppBrowser} primary={false} />
+        </>
+      ) : (
+        <AppStoreButton token={token} inAppBrowser={inAppBrowser} primary />
+      )}
     </section>
   );
 }

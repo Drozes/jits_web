@@ -65,10 +65,13 @@ export function claimOutcome(result: ClaimResult): InviteOutcome {
     case "inviter_unavailable":
       return { kind: "error", title: "Not available", body: `${nameAtStart(result.inviter)} can't take matches right now.` };
     case "inviter_weekly_cap":
+      // CONTRACT AMENDMENT: contract 7 says "You're now friends", but the
+      // backend returns this code before _ensure_friendship (friendship only
+      // on an accepted invite), so no friendship exists. Do not claim one.
       return {
         kind: "error",
-        title: "You're friends now",
-        body: `${nameAtStart(result.inviter)} has played this week's invite matches. You're now friends, so challenge them from the Arena.`,
+        title: "Weekly limit reached",
+        body: `${nameAtStart(result.inviter)} has played this week's invite matches. Challenge them from the Arena.`,
       };
     case "accuracy_too_low":
       return {
@@ -90,10 +93,11 @@ export function claimOutcome(result: ClaimResult): InviteOutcome {
 export function joinOutcome(result: AcceptJoinResult, fallbackName: string | null): InviteOutcome {
   if (result.ok) {
     const who = name(result.inviter);
+    const already = result.result === "already_friends";
     return {
       kind: "friends",
-      title: result.result === "already_friends" ? "Already friends" : "You're friends",
-      body: `You and ${who} are now friends on ELO RATED. You'll see when they're on the mat.`,
+      title: already ? "Already friends" : "You're friends",
+      body: `You and ${who} are ${already ? "already" : "now"} friends on ELO RATED. You'll see when they're on the mat.`,
     };
   }
   const who = fallbackName || "your training partner";

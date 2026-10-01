@@ -33,7 +33,7 @@ describe("attributeInviteCookie", () => {
   it("attributes as landing_web on web and sends an open challenge back to accept", async () => {
     const { client: c, rpc } = client({ data: { ok: true, result: "attributed" }, error: null });
     getInvitePreview.mockResolvedValue({ state: "open", kind: "challenge", inviter: INVITER, short_code_display: null });
-    expect(await attributeInviteCookie(c, TOKEN)).toEqual({ clear: true, acceptPath: `/c/${TOKEN}` });
+    expect(await attributeInviteCookie(c, TOKEN)).toEqual({ clear: true, acceptPath: `/c/${TOKEN}`, recorded: true });
     expect(rpc).toHaveBeenCalledWith("record_invite_attribution", {
       p_token: TOKEN,
       p_gateway: "landing_web",
@@ -44,7 +44,7 @@ describe("attributeInviteCookie", () => {
   it("clears a join invite without redirecting", async () => {
     const { client: c } = client({ data: { ok: true, result: "existing_user" }, error: null });
     getInvitePreview.mockResolvedValue({ state: "open", kind: "join", inviter: INVITER, short_code_display: null });
-    expect(await attributeInviteCookie(c, TOKEN)).toEqual({ clear: true, acceptPath: null });
+    expect(await attributeInviteCookie(c, TOKEN)).toEqual({ clear: true, acceptPath: null, recorded: true });
   });
 
   it("clears an invalid or self result", async () => {
@@ -58,5 +58,16 @@ describe("attributeInviteCookie", () => {
   it("keeps the cookie on an RPC error so the next request retries", async () => {
     const { client: c } = client({ data: null, error: { message: "boom" } });
     expect(await attributeInviteCookie(c, TOKEN)).toEqual({ clear: false, acceptPath: null });
+  });
+
+  it("skips the RPC when the marker says the token was already recorded", async () => {
+    const { client: c, rpc } = client({ data: null, error: null });
+    getInvitePreview.mockResolvedValue({ state: "open", kind: "challenge", inviter: INVITER, short_code_display: null });
+    expect(await attributeInviteCookie(c, TOKEN, { alreadyRecorded: true })).toEqual({
+      clear: true,
+      acceptPath: `/c/${TOKEN}`,
+      recorded: true,
+    });
+    expect(rpc).not.toHaveBeenCalled();
   });
 });

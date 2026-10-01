@@ -76,7 +76,7 @@ describe("claimOutcome", () => {
     ["inviter_unavailable", "Alex can't take matches right now."],
     [
       "inviter_weekly_cap",
-      "Alex has played this week's invite matches. You're now friends, so challenge them from the Arena.",
+      "Alex has played this week's invite matches. Challenge them from the Arena.",
     ],
     ["invalid", "This invite link isn't valid. Ask your training partner to send it again."],
   ])("%s -> contract copy", (code, body) => {
@@ -99,5 +99,22 @@ describe("joinOutcome", () => {
       body: "This invite link was turned off. Ask Alex for a new one.",
     });
     expect(joinOutcome({ ok: false, code: "claimer_not_active" }, "Alex")).toEqual({ kind: "setup" });
+  });
+
+  it("does not say 'now friends' under 'Already friends'", () => {
+    expect(joinOutcome({ ok: true, result: "already_friends", inviter: ALEX }, "Alex")).toMatchObject({
+      title: "Already friends",
+      body: "You and Alex are already friends on ELO RATED. You'll see when they're on the mat.",
+    });
+    expect(joinOutcome({ ok: true, result: "friends", inviter: ALEX }, "Alex")).toMatchObject({
+      title: "You're friends",
+      body: "You and Alex are now friends on ELO RATED. You'll see when they're on the mat.",
+    });
+  });
+
+  it("never claims a friendship on the weekly cap", () => {
+    const out = claimOutcome({ ok: false, code: "inviter_weekly_cap", inviter: ALEX });
+    expect(out).toMatchObject({ title: "Weekly limit reached" });
+    expect(JSON.stringify(out)).not.toMatch(/friends/i);
   });
 });
