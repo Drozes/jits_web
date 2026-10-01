@@ -1,6 +1,6 @@
 /**
  * The Mat Board's rules (spec arena-live-chip section 6 and 7): countdowns,
- * the Just Rolled line, closest-first order, which strip shows, whether the
+ * closest-first order, which strip shows, whether the
  * Closest Match CTA is the surface's one red, the control bar counts, and the
  * Arena tab badge.
  */
@@ -8,77 +8,14 @@ import {
   arenaTabBadge,
   chooseStrip,
   closestCta,
-  formatAge,
-  formatJustRolled,
   countOnTheMat,
   formatMatCounts,
   isOnTheMat,
   matCounts,
   onTheMatRows,
-  methodLabel,
   pickClosest,
   sortByEloGap,
 } from "@/lib/arena/mat-board";
-import { useClockTick } from "@/lib/arena/fresh-countdown";
-import { renderHook, act } from "@testing-library/react-native";
-
-describe("formatAge", () => {
-  const now = Date.parse("2026-09-28T12:00:00Z");
-  it("is compact", () => {
-    expect(formatAge("2026-09-28T11:59:30Z", now)).toBe("now");
-    expect(formatAge("2026-09-28T11:56:00Z", now)).toBe("4m");
-    expect(formatAge("2026-09-28T09:00:00Z", now)).toBe("3h");
-    expect(formatAge("2026-09-26T12:00:00Z", now)).toBe("2d");
-  });
-  it("reads a future time (skew) as now and an unreadable one as nothing", () => {
-    expect(formatAge("2026-09-28T12:05:00Z", now)).toBe("now");
-    expect(formatAge("nope", now)).toBe("");
-  });
-});
-
-describe("formatJustRolled (AC-A5)", () => {
-  const now = Date.parse("2026-09-28T12:00:00Z");
-  const base = {
-    match_id: "m",
-    winner_name: "Kofi Mensah",
-    loser_name: "Jordan Kim",
-    match_type: "ranked",
-    completed_at: "2026-09-28T11:56:00Z",
-  };
-  it("is winner def. loser · method · age", () => {
-    expect(formatJustRolled({ ...base, result: "submission" }, now)).toBe(
-      "Kofi Mensah def. Jordan Kim · Submission · 4m",
-    );
-  });
-  it("never names a winner for a draw", () => {
-    expect(formatJustRolled({ ...base, result: "draw" }, now)).toBe(
-      "Kofi Mensah drew Jordan Kim · Draw · 4m",
-    );
-  });
-  it("drops parts it cannot read rather than printing junk", () => {
-    expect(formatJustRolled({ ...base, result: "", completed_at: "x" }, now)).toBe(
-      "Kofi Mensah def. Jordan Kim",
-    );
-  });
-});
-
-describe("methodLabel", () => {
-  it("maps the known results", () => {
-    expect(methodLabel("submission")).toBe("Submission");
-    expect(methodLabel("draw")).toBe("Draw");
-    expect(methodLabel("SUBMISSION")).toBe("Submission");
-  });
-  it("bounds an unknown result: underscores as spaces, each word title-cased", () => {
-    expect(methodLabel("points_advantage")).toBe("Points Advantage");
-    expect(methodLabel("dq")).toBe("Dq");
-    expect(methodLabel("  referee__decision ")).toBe("Referee Decision");
-  });
-  it("is empty for nothing", () => {
-    expect(methodLabel("")).toBe("");
-    expect(methodLabel(null)).toBe("");
-    expect(methodLabel(undefined)).toBe("");
-  });
-});
 
 describe("sortByEloGap / pickClosest (AC-A3, AC-A4)", () => {
   const a = (id: string, eloDiff: number) => ({ id, eloDiff });
@@ -175,30 +112,6 @@ describe("chooseStrip (AC-A2)", () => {
     ).toBe(false);
     // Waiting already leads: never twice.
     expect(chooseStrip({ ...none, hasOutgoing: true }).alsoWaiting).toBe(false);
-  });
-});
-
-describe("useClockTick", () => {
-  afterEach(() => {
-    jest.useRealTimers();
-  });
-  it("ticks at its own period while active, and not at all while inactive", () => {
-    jest.useFakeTimers();
-    jest.setSystemTime(new Date("2026-09-28T12:00:00Z"));
-    const { result, rerender } = renderHook(
-      ({ active }: { active: boolean }) => useClockTick(active, 60_000),
-      { initialProps: { active: true } },
-    );
-    act(() => {
-      jest.advanceTimersByTime(59_000);
-    });
-    expect(result.current).toBe(Date.parse("2026-09-28T12:00:00Z"));
-    act(() => {
-      jest.advanceTimersByTime(1_000);
-    });
-    expect(result.current).toBe(Date.parse("2026-09-28T12:01:00Z"));
-    rerender({ active: false });
-    expect(jest.getTimerCount()).toBe(0);
   });
 });
 

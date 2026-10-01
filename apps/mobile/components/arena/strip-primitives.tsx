@@ -7,7 +7,8 @@ import * as React from "react";
 import { Pressable, Text, View } from "react-native";
 import { cn } from "@/lib/cn";
 
-const MAX_SCALE = 1.3;
+/** Largest Dynamic Type scale on the dense Arena strip text (spec 4.2). */
+export const MAX_SCALE = 1.3;
 
 /** A small outline action: ROLL, OPEN, CANCEL, CONFIRM. 44pt hit area. */
 export function OutlineAction({

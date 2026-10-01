@@ -2,20 +2,26 @@ import { Alert, Linking, Text, View } from "react-native";
 import type { Booking } from "@jits/shared/api/invites";
 import {
   ACCURACY_TOO_LOW_COPY,
+  ACCURACY_TOO_LOW_STRIP_COPY,
   LOCATION_DENIED_COPY,
+  LOCATION_DENIED_STRIP_COPY,
   LOCATION_UNAVAILABLE_COPY,
+  LOCATION_UNAVAILABLE_STRIP_COPY,
   bookedMessage,
+  bookedStripMessage,
 } from "@jits/shared/utils";
-import { OutlineAction, StripShell } from "@/components/arena/strip-primitives";
+import { MAX_SCALE, OutlineAction, StripShell } from "@/components/arena/strip-primitives";
 import type { BookingLocation, BookingPresence, CancelBookingResult } from "@/lib/invites/use-bookings";
-
-const MAX_SCALE = 1.3;
 
 /**
  * One booked invite match on the Arena (US5), built on the same strip shell
  * as the challenge strips so it sits at their size: `BOOKED · ALEX`, one
  * short status line (why it has not started: a busy athlete, location off, a
  * coarse reading), a fix when there is one, and Cancel.
+ *
+ * The status shows a short strip copy (it must fit beside two buttons at
+ * 375pt) and carries the full copy as its accessibilityLabel. A location fix
+ * takes precedence over the busy line: nothing starts until it is fixed.
  */
 export function BookedStrip({
   booking,
@@ -50,14 +56,24 @@ export function BookedStrip({
 
   const fix =
     location === "ask"
-      ? { copy: LOCATION_DENIED_COPY, label: "Enable", a11y: "Turn on location", onPress: onAskLocation }
+      ? { short: LOCATION_DENIED_STRIP_COPY, full: LOCATION_DENIED_COPY, label: "Enable", a11y: "Turn on location", onPress: onAskLocation }
       : location === "denied"
-        ? { copy: LOCATION_DENIED_COPY, label: "Settings", a11y: "Open Settings", onPress: () => void Linking.openSettings() }
+        ? {
+            short: LOCATION_DENIED_STRIP_COPY,
+            full: LOCATION_DENIED_COPY,
+            label: "Settings",
+            a11y: "Open Settings",
+            onPress: () => void Linking.openSettings(),
+          }
         : location === "unavailable"
-          ? { copy: LOCATION_UNAVAILABLE_COPY, label: "Retry", a11y: "Try again", onPress: onRetry }
+          ? { short: LOCATION_UNAVAILABLE_STRIP_COPY, full: LOCATION_UNAVAILABLE_COPY, label: "Retry", a11y: "Try again", onPress: onRetry }
           : presence?.accuracyTooLow
-            ? { copy: ACCURACY_TOO_LOW_COPY, label: "Retry", a11y: "Try again", onPress: onRetry }
+            ? { short: ACCURACY_TOO_LOW_STRIP_COPY, full: ACCURACY_TOO_LOW_COPY, label: "Retry", a11y: "Try again", onPress: onRetry }
             : null;
+  const blockedReason = presence?.blockedReason ?? null;
+  const status = fix
+    ? { short: fix.short, full: fix.full }
+    : { short: bookedStripMessage(blockedReason, name), full: bookedMessage(blockedReason, name) };
 
   return (
     <View accessibilityLiveRegion="polite">
@@ -75,9 +91,10 @@ export function BookedStrip({
             numberOfLines={2}
             maxFontSizeMultiplier={MAX_SCALE}
             accessibilityRole={fix ? "alert" : undefined}
+            accessibilityLabel={status.full}
             className="font-body text-[11px] leading-4 text-ink-3"
           >
-            {fix ? fix.copy : bookedMessage(presence?.blockedReason ?? null, name)}
+            {status.short}
           </Text>
         </View>
         {fix ? <OutlineAction label={fix.label} accessibilityLabel={fix.a11y} onPress={fix.onPress} /> : null}

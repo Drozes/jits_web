@@ -114,26 +114,3 @@ export function useFreshCountdown(
 
   return current.value;
 }
-
-/**
- * The current time, re-read every `periodMs` while `active` and not at all
- * otherwise. Used by the Just Rolled ages (countdowns use the shared
- * `useFreshCountdown` instead), never by the whole screen, so a tick
- * re-renders a text node and not the roster. A text change, never an
- * animation (brand motion rule).
- *
- * While active it never returns a time older than the render: the tick
- * state is frozen while inactive, and the effect that refreshes it runs only
- * after paint, so a value that first appears after a long idle would
- * otherwise paint one frame computed from a stale clock.
- */
-export function useClockTick(active: boolean, periodMs: number): number {
-  const [now, setNow] = React.useState(() => Date.now());
-  React.useEffect(() => {
-    if (!active) return;
-    setNow(Date.now());
-    const id = setInterval(() => setNow(Date.now()), periodMs);
-    return () => clearInterval(id);
-  }, [active, periodMs]);
-  return active ? Math.max(now, Date.now()) : now;
-}

@@ -193,6 +193,45 @@ export function bookedMessage(reason: StartBlockedReason | null | undefined, inv
   return BOOKED_COPY;
 }
 
+// ---------------------------------------------------------------------------
+// Booked strip (Arena): short copies
+// ---------------------------------------------------------------------------
+//
+// The Arena's Booked strip has room for about 46 characters (two 11px lines
+// beside two outline buttons at 375pt). It shows these short lines and keeps
+// the full copy above as the status line's accessibilityLabel, so VoiceOver
+// still hears the whole instruction. Precedence on the strip: a location fix
+// (ask / denied, unavailable, accuracy too low) always wins over the busy
+// line, because nothing can start until the location is fixed.
+
+/** Longest strip status the Booked strip fits without truncating. */
+export const BOOKED_STRIP_MAX_CHARS = 46;
+
+/** Strip form of LOCATION_DENIED_COPY (never asked, or denied). */
+export const LOCATION_DENIED_STRIP_COPY = "Location off. Needed to start.";
+
+/** Strip form of LOCATION_UNAVAILABLE_COPY. */
+export const LOCATION_UNAVAILABLE_STRIP_COPY = "No location signal. Try again.";
+
+/** Strip form of ACCURACY_TOO_LOW_COPY. */
+export const ACCURACY_TOO_LOW_STRIP_COPY = "Can't pin your location. Try near a window.";
+
+/** Strip form of BOOKED_COPY. */
+export const BOOKED_STRIP_COPY = "Starts when you're both on the mat.";
+
+/** Strip form of the claimer_busy line. */
+export const CLAIMER_BUSY_STRIP_COPY = "Finish your match first.";
+
+/**
+ * The Booked strip's short busy line for a start-blocked reason; the full
+ * `bookedMessage` is its accessibilityLabel.
+ */
+export function bookedStripMessage(reason: StartBlockedReason | null | undefined, inviterName: string): string {
+  if (reason === "inviter_busy") return `${inviterName} is mid-match. We'll hold your spot.`;
+  if (reason === "claimer_busy") return CLAIMER_BUSY_STRIP_COPY;
+  return BOOKED_STRIP_COPY;
+}
+
 /** Copy for an inviter-side create / refresh failure. */
 export function createInviteErrorMessage(code: CreateInviteErrorCode | string): string {
   switch (code) {

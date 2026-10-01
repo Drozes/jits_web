@@ -118,38 +118,6 @@ describe("useArenaRoster", () => {
     expect(result.current.hasError).toBe(false);
   });
 
-  it("hands Just Rolled the recent_activity of the last good read", async () => {
-    const activity = [
-      {
-        match_id: "m-1",
-        winner_name: "Kofi",
-        loser_name: "Jordan",
-        result: "submission",
-        match_type: "ranked",
-        completed_at: "2026-09-28T12:00:00Z",
-      },
-    ];
-    mockGetArenaData.mockResolvedValueOnce({ ...ROSTER, recent_activity: activity });
-    const { result } = renderHook(() => useArenaRoster(1200));
-    await waitFor(() => expect(result.current.isLoading).toBe(false));
-    expect(result.current.recentActivity).toEqual(activity);
-
-    // A quiet read that fails keeps the ticker with the roster it belongs to.
-    mockGetArenaData.mockResolvedValueOnce(null);
-    act(() => result.current.refreshQuietly());
-    await waitFor(() => expect(result.current.isFetching).toBe(false));
-    expect(result.current.recentActivity).toEqual(activity);
-  });
-
-  it("reads a payload without recent_activity as an empty ticker", async () => {
-    const { recent_activity: _drop, ...noActivity } = ROSTER;
-    mockGetArenaData.mockResolvedValueOnce(noActivity);
-    const { result } = renderHook(() => useArenaRoster(1200));
-    await waitFor(() => expect(result.current.isLoading).toBe(false));
-    expect(result.current.recentActivity).toEqual([]);
-    expect(result.current.hasError).toBe(false);
-  });
-
   it("re-reads after a match is left, with no pull spinner (jits-tlk3)", async () => {
     const { result } = renderHook(() => useArenaRoster(1200));
     await waitFor(() => expect(result.current.isLoading).toBe(false));

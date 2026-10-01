@@ -1,7 +1,7 @@
 /**
  * The Arena screen as a Mat Board (spec arena-live-chip section 6): the
- * control bar, the challenge strip, Closest Match, On The Mat and Just
- * Rolled. The Arena lists online athletes only (spec 14, D1), and every
+ * control bar, the challenge strip, Closest Match and On The Mat (Just
+ * Rolled was removed by the owner, 2026-10-01). The Arena lists online athletes only (spec 14, D1), and every
  * count on it is derived from exactly the rows it renders (D2).
  *
  * The split is the product: "on the mat" comes from Presence and is the only
@@ -211,7 +211,6 @@ const mockRefreshQuietly = jest.fn();
 let mockRoster = {
   competitors: [] as unknown[],
   challengedIds: new Set<string>(),
-  recentActivity: [] as unknown[],
   isLoading: false,
   isRefreshing: false,
   hasError: false,
@@ -316,7 +315,6 @@ beforeEach(() => {
   mockRoster = {
     competitors: [],
     challengedIds: new Set(),
-    recentActivity: [],
     isLoading: false,
     isRefreshing: false,
     hasError: false,
@@ -1057,6 +1055,26 @@ describe("Arena screen", () => {
       expect(insideScroll(invite)).toBe(false);
     });
 
+    it("the invite actions stay hidden while the roster loads and on a roster error", () => {
+      mockInvitesOn = true;
+      mockIsLive = true;
+      mockRoster.isLoading = true;
+      const loading = render(<ArenaScreen />);
+      expect(loading.queryByTestId("arena-invite-actions")).toBeNull();
+      expect(loading.queryByText("Invite a training partner")).toBeNull();
+      loading.unmount();
+      mockRoster.isLoading = false;
+      mockRoster.hasError = true;
+      const failed = render(<ArenaScreen />);
+      expect(failed.queryByTestId("arena-invite-actions")).toBeNull();
+      expect(failed.queryByText("Got a challenge code?")).toBeNull();
+      failed.unmount();
+      // Back to a good read: the footer returns.
+      mockRoster.hasError = false;
+      const ok = render(<ArenaScreen />);
+      expect(ok.getByTestId("arena-invite-actions")).toBeTruthy();
+    });
+
     it("the signed gap is data: ink, never red or green (spec 3)", () => {
       mockIsLive = true;
       mockRoster.competitors = [
@@ -1229,14 +1247,10 @@ describe("Arena screen", () => {
   });
 
   describe("Just Rolled is removed (owner, 2026-10-01)", () => {
-    it("renders no Just Rolled section even with recent activity", () => {
-      mockRoster.recentActivity = [
-        { match_id: "m-1", winner_name: "Kofi Mensah", loser_name: "Jordan Kim", result: "submission", match_type: "ranked", completed_at: "2026-09-28T12:06:00Z" },
-      ];
+    it("renders no Just Rolled section", () => {
       const { queryByTestId, queryByText } = render(<ArenaScreen />);
       expect(queryByTestId("arena-just-rolled")).toBeNull();
       expect(queryByText(/Just rolled/i)).toBeNull();
-      expect(queryByText(/Kofi Mensah def\. Jordan Kim/)).toBeNull();
     });
   });
 

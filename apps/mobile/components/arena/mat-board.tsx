@@ -1,6 +1,6 @@
 /**
  * The Arena's Mat Board pieces (spec arena-live-chip section 6): control bar,
- * strips, Closest Match card, On The Mat rows and the Just Rolled ticker.
+ * strips, Closest Match card and On The Mat rows.
  * Presentational only; the screen decides what shows with the rules in
  * `lib/arena/mat-board.ts`.
  *
@@ -12,26 +12,20 @@
  * `Challenge <name>` (the Closest Match one adds the hint `Closest match`),
  * the waiting strip's StaticText `Waiting for <name>` and `Cancel challenge`.
  */
-import * as React from "react";
 import { Pressable, Text, View } from "react-native";
 import * as Haptics from "expo-haptics";
 import { Avatar32, MetaTag } from "@/components/ui/elo-system";
 import { cn } from "@/lib/cn";
-import { OutlineAction, StripShell } from "@/components/arena/strip-primitives";
-import type { RecentActivityItem } from "@jits/shared/types/composites";
+import { MAX_SCALE, OutlineAction, StripShell } from "@/components/arena/strip-primitives";
 import type { ArenaCompetitor } from "@/lib/arena/use-arena-roster";
 import {
   formatCountdown,
   spokenCountdown,
-  useClockTick,
   useFreshCountdown,
 } from "@/lib/arena/fresh-countdown";
-import { formatJustRolled } from "@/lib/arena/mat-board";
 import { useViewerStakes } from "@/lib/match-flow/use-viewer-stakes";
 
 const TABULAR = { fontVariant: ["tabular-nums" as const] };
-/** Largest Dynamic Type scale on the dense Mat Board text (spec 4.2). */
-const MAX_SCALE = 1.3;
 
 /** What a countdown counts down to: a challenge's live window. */
 export interface CountdownSource {
@@ -787,41 +781,6 @@ export function MatRow({
         {action.kind === "pending" ? <MetaTag>Pending</MetaTag> : null}
         {action.kind === "capped" ? <MetaTag>3 out</MetaTag> : null}
       </View>
-    </View>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Just Rolled
-// ---------------------------------------------------------------------------
-
-/** How often the Just Rolled ages (`now`, `4m`) are re-read. */
-export const JUST_ROLLED_TICK_MS = 60_000;
-
-/** Text ticker, newest first (AC-A5); ages re-read each minute while `active`. */
-export function JustRolled({
-  items,
-  active,
-}: {
-  items: readonly RecentActivityItem[];
-  active: boolean;
-}) {
-  const now = useClockTick(active && items.length > 0, JUST_ROLLED_TICK_MS);
-  if (items.length === 0) return null;
-  return (
-    <View testID="arena-just-rolled" className="gap-1.5">
-      <MatSectionLabel label="Just rolled" />
-      {items.map((a) => (
-        <Text
-          key={a.match_id}
-          numberOfLines={1}
-          maxFontSizeMultiplier={MAX_SCALE}
-          className="font-mono text-[11px] text-ink-2"
-          style={TABULAR}
-        >
-          {formatJustRolled(a, now)}
-        </Text>
-      ))}
     </View>
   );
 }

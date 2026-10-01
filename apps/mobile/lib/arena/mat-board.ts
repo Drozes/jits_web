@@ -3,73 +3,8 @@
  * behind what it shows. No stores, no network, no hooks: the screen passes
  * in what the Arena store, the lobby and the roster know.
  */
-import type { RecentActivityItem } from "@jits/shared/types/composites";
 import type { TabBadge } from "@/lib/navigation/tab-badge";
 import { IN_BAND_ELO } from "./constants";
-
-// ---------------------------------------------------------------------------
-// Time
-// ---------------------------------------------------------------------------
-
-/**
- * How long ago, as the ticker's compact age: `now`, `4m`, `3h`, `2d`.
- * A future timestamp (clock skew) reads `now`; an unreadable one reads "".
- */
-export function formatAge(iso: string, now: number): string {
-  const t = Date.parse(iso);
-  if (Number.isNaN(t)) return "";
-  const s = Math.max(0, Math.floor((now - t) / 1000));
-  if (s < 60) return "now";
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h`;
-  return `${Math.floor(h / 24)}d`;
-}
-
-// ---------------------------------------------------------------------------
-// Just Rolled
-// ---------------------------------------------------------------------------
-
-/** Labels for the `matches.result` values the schema allows today. */
-const METHOD_LABELS: Readonly<Record<string, string>> = Object.freeze({
-  submission: "Submission",
-  draw: "Draw",
-});
-
-/**
- * The method from `matches.result`: a known result maps to its label; any
- * other value is shown bounded, underscores as spaces and each word
- * title-cased (`points_advantage` -> `Points Advantage`), so a result added
- * server-side later never renders as a raw identifier.
- */
-export function methodLabel(result: string | null | undefined): string {
-  const raw = (result ?? "").trim();
-  if (!raw) return "";
-  const known = METHOD_LABELS[raw.toLowerCase()];
-  if (known) return known;
-  return raw
-    .split(/[_\s]+/)
-    .filter(Boolean)
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-    .join(" ");
-}
-
-/**
- * One Just Rolled line: `winner def. loser · method · age` (spec 6.5), from
- * `get_arena_data.recent_activity` exactly as returned. A draw has no winner
- * (`get_recent_activity` returns the pair in name order), so it reads
- * `A drew B · Draw · age` rather than claiming a result that did not happen.
- */
-export function formatJustRolled(item: RecentActivityItem, now: number): string {
-  const isDraw = item.result === "draw";
-  const head = isDraw
-    ? `${item.winner_name} drew ${item.loser_name}`
-    : `${item.winner_name} def. ${item.loser_name}`;
-  return [head, methodLabel(item.result), formatAge(item.completed_at, now)]
-    .filter(Boolean)
-    .join(" · ");
-}
 
 // ---------------------------------------------------------------------------
 // On The Mat

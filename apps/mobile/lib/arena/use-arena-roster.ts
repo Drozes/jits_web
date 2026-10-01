@@ -6,7 +6,7 @@
  */
 import * as React from "react";
 import { getArenaData } from "@jits/shared/api/queries";
-import type { ArenaData, RecentActivityItem } from "@jits/shared/types/composites";
+import type { ArenaData } from "@jits/shared/types/composites";
 import { supabase } from "../supabase/client";
 import { useMatchExitCount } from "./arena-store";
 import { ARENA_ROSTER_LIMIT } from "./constants";
@@ -27,11 +27,6 @@ export interface UseArenaRosterResult {
   competitors: ArenaCompetitor[];
   /** Opponent ids with a pending challenge in EITHER direction. */
   challengedIds: Set<string>;
-  /**
-   * `get_arena_data.recent_activity` from the last good read, newest first:
-   * the Mat Board's Just Rolled ticker. Empty until a read lands.
-   */
-  recentActivity: RecentActivityItem[];
   isLoading: boolean;
   isRefreshing: boolean;
   /** True when the last read failed. Distinct from an empty roster. */
@@ -62,7 +57,6 @@ export function useArenaRoster(currentElo: number): UseArenaRosterResult {
   const [challengedIds, setChallengedIds] = React.useState<Set<string>>(
     () => new Set(),
   );
-  const [recentActivity, setRecentActivity] = React.useState<RecentActivityItem[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [isRefreshing, setIsRefreshing] = React.useState(false);
   const [hasError, setHasError] = React.useState(false);
@@ -136,9 +130,6 @@ export function useArenaRoster(currentElo: number): UseArenaRosterResult {
         })),
       );
       setChallengedIds(new Set(arena.challenged_opponent_ids ?? []));
-      setRecentActivity(
-        Array.isArray(arena.recent_activity) ? arena.recent_activity : [],
-      );
       hasGoodRoster.current = true;
       setHasRoster(true);
       setLastReadOk(true);
@@ -170,7 +161,6 @@ export function useArenaRoster(currentElo: number): UseArenaRosterResult {
   return {
     competitors: withGap,
     challengedIds,
-    recentActivity,
     isLoading,
     isRefreshing,
     hasError,

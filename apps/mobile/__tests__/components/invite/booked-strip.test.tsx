@@ -1,7 +1,9 @@
 /**
  * The Arena's Booked strip (contract 7 booking surface): the busy copy, the
  * three location states, the accuracy retry, and Cancel booking behind a
- * confirm.
+ * confirm. The strip shows short copy that fits at 375pt and keeps the full
+ * copy as the status line's accessibilityLabel; a location fix wins over the
+ * busy line.
  *
  * Source: apps/mobile/components/invite/booked-strip.tsx
  */
@@ -27,39 +29,72 @@ function renderStrip(
 
 beforeEach(() => jest.restoreAllMocks());
 
+const status = () => screen.getByTestId("booked-message");
+
 it.each([
-  ["inviter_busy", "Alex is mid-match. We'll hold your spot."],
-  ["claimer_busy", "Finish your current match first. Your booking with Alex is saved."],
-  [null, "You're booked. The match starts when you're both on the mat."],
-] as const)("start blocked %s reads the named copy", (reason, copy) => {
+  ["inviter_busy", "Alex is mid-match. We'll hold your spot.", "Alex is mid-match. We'll hold your spot."],
+  ["claimer_busy", "Finish your match first.", "Finish your current match first. Your booking with Alex is saved."],
+  [null, "Starts when you're both on the mat.", "You're booked. The match starts when you're both on the mat."],
+] as const)("start blocked %s shows the short line, full copy for VoiceOver", (reason, short, full) => {
   renderStrip({ presence: { blockedReason: reason, accuracyTooLow: false } });
-  expect(screen.getByTestId("booked-message")).toHaveTextContent(copy);
+  expect(status()).toHaveTextContent(short);
+  expect(status().props.accessibilityLabel).toBe(full);
+  expect(screen.queryByLabelText("Try again")).toBeNull();
 });
 
-it("never asked: Turn on location asks", () => {
+it("never asked: the short copy and Enable, which asks", () => {
   const h = renderStrip({ location: "ask" });
+  expect(status()).toHaveTextContent("Location off. Needed to start.");
+  expect(status().props.accessibilityLabel).toBe(
+    "Location is off. ELO RATED checks you're both on the same mat before a match starts.",
+  );
+  expect(screen.getByText("Enable")).toBeTruthy();
   fireEvent.press(screen.getByLabelText("Turn on location"));
   expect(h.onAskLocation).toHaveBeenCalled();
   expect(screen.queryByLabelText("Open Settings")).toBeNull();
 });
 
-it("denied: Open Settings", () => {
+it("denied: the short copy and Settings", () => {
   renderStrip({ location: "denied" });
+  expect(status()).toHaveTextContent("Location off. Needed to start.");
+  expect(status().props.accessibilityLabel).toBe(
+    "Location is off. ELO RATED checks you're both on the same mat before a match starts.",
+  );
+  expect(screen.getByText("Settings")).toBeTruthy();
   expect(screen.getByLabelText("Open Settings")).toBeTruthy();
 });
 
-it("no fix in time: the copy and Try again", () => {
+it("no fix in time: the short copy and Retry", () => {
   const h = renderStrip({ location: "unavailable" });
-  expect(screen.getByText("We couldn't get your location. Check your signal, then try again.")).toBeTruthy();
+  expect(status()).toHaveTextContent("No location signal. Try again.");
+  expect(status().props.accessibilityLabel).toBe(
+    "We couldn't get your location. Check your signal, then try again.",
+  );
+  expect(screen.getByText("Retry")).toBeTruthy();
   fireEvent.press(screen.getByLabelText("Try again"));
   expect(h.onRetry).toHaveBeenCalled();
 });
 
-it("accuracy too low: the copy and Try again", () => {
+it("accuracy too low: the short copy and Retry", () => {
   const h = renderStrip({ presence: { blockedReason: null, accuracyTooLow: true } });
-  expect(screen.getByText(/We couldn't pin your location/)).toBeTruthy();
+  expect(status()).toHaveTextContent("Can't pin your location. Try near a window.");
+  expect(status().props.accessibilityLabel).toBe(
+    "We couldn't pin your location. Move near a window or turn on Wi-Fi, then try again.",
+  );
+  expect(screen.getByText("Retry")).toBeTruthy();
   fireEvent.press(screen.getByLabelText("Try again"));
   expect(h.onRetry).toHaveBeenCalled();
+});
+
+it.each([
+  ["denied", false, "Location off. Needed to start."],
+  ["unavailable", false, "No location signal. Try again."],
+  ["ok", true, "Can't pin your location. Try near a window."],
+] as const)("a location fix (%s) takes precedence over a busy line", (location, accuracyTooLow, short) => {
+  renderStrip({ location, presence: { blockedReason: "inviter_busy", accuracyTooLow } });
+  expect(status()).toHaveTextContent(short);
+  expect(status()).not.toHaveTextContent(/mid-match/);
+  expect(status().props.accessibilityLabel).not.toMatch(/mid-match/);
 });
 
 it("Cancel booking confirms first", async () => {

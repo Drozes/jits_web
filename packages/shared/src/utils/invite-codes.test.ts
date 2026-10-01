@@ -2,7 +2,12 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { extractInviteFromText, formatInviteCode, isInviteToken, normalizeInviteCode } from "./invite-codes";
 import { buildInviteShareMessage } from "./invite-share";
 import {
+  ACCURACY_TOO_LOW_STRIP_COPY,
+  BOOKED_STRIP_MAX_CHARS,
+  LOCATION_DENIED_STRIP_COPY,
+  LOCATION_UNAVAILABLE_STRIP_COPY,
   bookedMessage,
+  bookedStripMessage,
   checkDateOfBirth,
   utcTodayYmd,
   claimFailureView,
@@ -139,6 +144,23 @@ describe("claim copy (contract section 7)", () => {
     for (const r of ["far", "stale", "waiting", "no_location", null] as const) {
       expect(bookedMessage(r, "Alex")).toBe("You're booked. The match starts when you're both on the mat.");
     }
+  });
+  it("booked strip copy is short enough for the Arena strip", () => {
+    expect(LOCATION_DENIED_STRIP_COPY).toBe("Location off. Needed to start.");
+    expect(LOCATION_UNAVAILABLE_STRIP_COPY).toBe("No location signal. Try again.");
+    expect(ACCURACY_TOO_LOW_STRIP_COPY).toBe("Can't pin your location. Try near a window.");
+    expect(bookedStripMessage("inviter_busy", "Alex")).toBe("Alex is mid-match. We'll hold your spot.");
+    expect(bookedStripMessage("claimer_busy", "Alex")).toBe("Finish your match first.");
+    for (const r of ["far", "stale", "waiting", "no_location", null] as const) {
+      expect(bookedStripMessage(r, "Alex")).toBe("Starts when you're both on the mat.");
+    }
+    const all = [
+      LOCATION_DENIED_STRIP_COPY,
+      LOCATION_UNAVAILABLE_STRIP_COPY,
+      ACCURACY_TOO_LOW_STRIP_COPY,
+      ...(["inviter_busy", "claimer_busy", null] as const).map((r) => bookedStripMessage(r, "Alexandra")),
+    ];
+    for (const copy of all) expect(copy.length).toBeLessThanOrEqual(BOOKED_STRIP_MAX_CHARS);
   });
   it("create limits", () => {
     expect(createInviteErrorMessage("too_many_open_invites")).toBe("You have 5 open challenges. Revoke one to send another.");
