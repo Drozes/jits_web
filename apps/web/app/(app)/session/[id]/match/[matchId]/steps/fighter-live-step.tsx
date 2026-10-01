@@ -24,7 +24,6 @@ interface FighterLiveStepProps {
   startedAt: string;
   pausedAt: string | null;
   totalPausedDuration: number;
-  matchType: "casual" | "ranked";
   timekeeperEnabled: boolean;
   hasTimekeeper: boolean;
 }
@@ -60,7 +59,7 @@ function fireExpirySignals() {
   }
 }
 
-export function FighterLiveStep({ onNext, exitHref, matchId, durationSeconds, startedAt, pausedAt, totalPausedDuration, matchType, timekeeperEnabled, hasTimekeeper }: FighterLiveStepProps) {
+export function FighterLiveStep({ onNext, exitHref, matchId, durationSeconds, startedAt, pausedAt, totalPausedDuration, timekeeperEnabled, hasTimekeeper }: FighterLiveStepProps) {
   const router = useRouter();
   const endedRef = useRef(false);
   /** Set on unmount so a late re-read cannot advance or navigate. Reset in

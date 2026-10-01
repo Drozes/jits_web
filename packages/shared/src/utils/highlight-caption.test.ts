@@ -46,11 +46,9 @@ const FIRST_LINES: Row[] = [
 describe("buildHighlightCaption", () => {
   describe.each(["casual", "ranked"] as const)("%s", (matchType) => {
     // Every match is the same kind: a legacy casual reel reads the same.
-    const second = "Every roll counts.";
+    // No ELO recorded (the ctx default): no second line at all.
     it.each(FIRST_LINES)("outcome %s, technique %s, opponent %s", (outcome, technique, opponentName, line1) => {
-      expect(buildHighlightCaption(ctx({ matchType, outcome, technique, opponentName }))).toBe(
-        `${line1}\n${second}\n${TAIL}`,
-      );
+      expect(buildHighlightCaption(ctx({ matchType, outcome, technique, opponentName }))).toBe(`${line1}\n${TAIL}`);
     });
   });
 
@@ -59,15 +57,23 @@ describe("buildHighlightCaption", () => {
     [1234, -8, "Now 1234 ELO (-8)."],
     [1234, 0, "Now 1234 ELO."],
     [1234, null, "Now 1234 ELO."],
-    [null, 12, "Every roll counts."],
   ])("eloAfter %s, delta %s", (eloAfter, eloDelta, line2) => {
     expect(buildHighlightCaption(ctx({ matchType: "ranked", eloAfter, eloDelta })).split("\n")[1]).toBe(line2);
   });
 
   it("never says casual or ranked: a legacy casual reel reads like any match", () => {
     const caption = buildHighlightCaption(ctx({ matchType: "casual", eloAfter: null, eloDelta: null }));
-    expect(caption.split("\n")[1]).toBe("Every roll counts.");
     expect(caption).not.toMatch(/casual|ranked/i);
+  });
+
+  it.each([null, Number.NaN])("drops the ELO line entirely when no ELO was recorded (eloAfter %s)", (eloAfter) => {
+    const caption = buildHighlightCaption(ctx({ eloAfter, eloDelta: 12 }));
+    expect(caption.split("\n")).toEqual([
+      "Took the win against Ana Souza.",
+      "Tracked on ELO RATED.",
+      "#bjj #jiujitsu #brazilianjiujitsu #elorated",
+    ]);
+    expect(caption).not.toMatch(/Every roll counts/);
   });
 
   it("normalises the technique: trimmed, collapsed, lower-cased after the first letter", () => {
@@ -81,7 +87,7 @@ describe("buildHighlightCaption", () => {
     expect(buildHighlightCaption(ctx({ opponentName: "   " })).split("\n")[0]).toBe("Took the win today.");
   });
 
-  it("has four lines, no handles and no URLs", () => {
+  it("has four lines when an ELO was recorded, no handles and no URLs", () => {
     const caption = buildHighlightCaption(ctx({ matchType: "ranked", eloAfter: 1500, eloDelta: 3, technique: "kimura" }));
     expect(caption.split("\n")).toHaveLength(4);
     expect(caption).not.toMatch(/@|https?:|www\./);

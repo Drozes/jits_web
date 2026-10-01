@@ -31,6 +31,7 @@ describe("/c/[token] generateMetadata", () => {
   it("uses the challenge title and keeps the page out of search and referrers", async () => {
     const meta = await generateMetadata({ params });
     expect(meta.title).toBe("ALEX R. challenges you | ELO RATED");
+    expect(meta.description).toBe("A jiu-jitsu challenge. Tap to accept.");
     expect(meta.robots).toEqual({ index: false, follow: false });
     expect(meta.referrer).toBe("no-referrer");
   });

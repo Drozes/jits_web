@@ -43,7 +43,6 @@ function renderActions(
       currentAthleteId="me"
       currentAthlete={{ ...stats, displayName: "Me" }}
       competitor={{ ...stats, displayName: "Opp" }}
-      headToHead={[]}
       pendingChallengeId={pendingChallengeId}
       pendingChallengeCreatedAt={pendingChallengeCreatedAt}
       competitorInArena={competitorInArena}

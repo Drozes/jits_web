@@ -18,19 +18,9 @@ interface AthleteStats {
   weight: number | null;
 }
 
-export interface HeadToHeadMatch {
-  matchType: "ranked" | "casual";
-  result: "win" | "loss" | "draw" | null;
-}
-
 interface CompareStatsModalProps {
   currentAthlete: AthleteStats;
   competitor: AthleteStats;
-  /**
-   * Head-to-head rows. Not shown since the All / Ranked / Casual filter was
-   * removed (every match is the same kind); kept so the caller is unchanged.
-   */
-  headToHead: HeadToHeadMatch[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }

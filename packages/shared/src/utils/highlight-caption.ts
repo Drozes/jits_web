@@ -118,24 +118,25 @@ function signed(delta: number): string {
 
 /**
  * Every match is the same kind (casual was retired, jr_be-ahn.1), so the line
- * names no match type: the new ELO when the server recorded it, else a
- * neutral line. A legacy casual reel reads like any match.
+ * names no match type: the new ELO when the server recorded it, else null
+ * (no line at all). A legacy casual reel reads like any match.
  */
-function secondLine(ctx: HighlightCaptionContext): string {
-  if (ctx.eloAfter === null || !Number.isFinite(ctx.eloAfter)) return "Every roll counts.";
+function secondLine(ctx: HighlightCaptionContext): string | null {
+  if (ctx.eloAfter === null || !Number.isFinite(ctx.eloAfter)) return null;
   const after = Math.round(ctx.eloAfter);
   const delta = ctx.eloDelta === null || !Number.isFinite(ctx.eloDelta) ? 0 : Math.round(ctx.eloDelta);
   return delta === 0 ? `Now ${after} ELO.` : `Now ${after} ELO (${signed(delta)}).`;
 }
 
 /**
- * Four lines joined by `\n`: what happened, the ELO line (see secondLine),
- * "Tracked on ELO RATED.", the hashtags. Never longer than
+ * Lines joined by `\n`: what happened, the ELO line (see secondLine; left
+ * out when no ELO was recorded), "Tracked on ELO RATED.", the hashtags. Never longer than
  * HIGHLIGHT_CAPTION_MAX: an over-long first line (a very long name or
  * technique) is cut with an ellipsis, the other lines are fixed.
  */
 export function buildHighlightCaption(ctx: HighlightCaptionContext): string {
-  const tail = [secondLine(ctx), TRACKED, HASHTAGS].join("\n");
+  const line2 = secondLine(ctx);
+  const tail = [...(line2 === null ? [] : [line2]), TRACKED, HASHTAGS].join("\n");
   const budget = HIGHLIGHT_CAPTION_MAX - tail.length - 1;
   let line1 = firstLine(ctx);
   if (line1.length > budget) line1 = cutWithEllipsis(line1, budget);

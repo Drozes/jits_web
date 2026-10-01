@@ -22,4 +22,28 @@ describe("MatchHistoryList", () => {
     );
     expect(screen.getByRole("link", { name: "Open match vs Demo Red, win, +11" })).toHaveAttribute("href", "/matches/m-7");
   });
+
+  it("shows no All / Ranked / Casual filter pills: every match is the same kind", () => {
+    render(
+      <MatchHistoryList
+        matches={[
+          {
+            match_id: "m-8",
+            match_type: "ranked",
+            athlete_outcome: "loss",
+            opponent_display_name: "Demo Blue",
+            elo_delta: -9,
+            completed_at: "2026-09-21T10:05:00Z",
+            submission_type_display_name: "",
+            result: "points",
+          },
+        ]}
+      />,
+    );
+    for (const name of [/^all$/i, /^ranked$/i, /^casual$/i]) {
+      expect(screen.queryByRole("button", { name })).toBeNull();
+      expect(screen.queryByRole("tab", { name })).toBeNull();
+      expect(screen.queryByText(name)).toBeNull();
+    }
+  });
 });

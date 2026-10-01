@@ -34,10 +34,9 @@ export function MatchHistoryList({ matches }: MatchHistoryListProps) {
   }
 
   // Every match is the same kind (casual was retired), so there is no filter.
-  const filtered = matches;
-  const wins = filtered.filter((m) => m.athlete_outcome === "win").length;
-  const losses = filtered.filter((m) => m.athlete_outcome === "loss").length;
-  const draws = filtered.filter((m) => m.athlete_outcome === "draw").length;
+  const wins = matches.filter((m) => m.athlete_outcome === "win").length;
+  const losses = matches.filter((m) => m.athlete_outcome === "loss").length;
+  const draws = matches.filter((m) => m.athlete_outcome === "draw").length;
 
   return (
     <div className="flex flex-col gap-3">
@@ -54,7 +53,7 @@ export function MatchHistoryList({ matches }: MatchHistoryListProps) {
 
       {/* Match list */}
       <div className="flex flex-col gap-2">
-          {filtered.map((m) => (
+          {matches.map((m) => (
             <MatchCard
               key={m.match_id}
               type="match"

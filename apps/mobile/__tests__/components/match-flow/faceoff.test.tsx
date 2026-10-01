@@ -300,6 +300,26 @@ describe("Leave", () => {
     alert.mockRestore();
   });
 
+  it("centres the label in both states: the side slots flex equally, with or without Leave", async () => {
+    const flexOne = (el: { props: { style?: unknown } }) => {
+      const style = [el.props.style].flat(Infinity).reduce<Record<string, unknown>>((a, x) => ({ ...a, ...(x as object) }), {});
+      return [style.flex, style.justifyContent];
+    };
+    mockStart.mockReturnValue(new Promise(() => {}));
+    const s = render(<Harness phase="ready" />);
+    // With Leave showing.
+    s.getByTestId("faceoff-leave");
+    expect(flexOne(s.getByTestId("faceoff-top-left"))).toEqual([1, "flex-start"]);
+    expect(flexOne(s.getByTestId("faceoff-top-right"))).toEqual([1, "flex-end"]);
+    // Both ready and the start in flight: Leave is gone, the slots stay.
+    fireEvent.press(s.getByTestId("ready-button"));
+    act(() => mockHandlers.onReadySignal?.("opp-1"));
+    await flush();
+    expect(s.queryByTestId("faceoff-leave")).toBeNull();
+    expect(flexOne(s.getByTestId("faceoff-top-left"))).toEqual([1, "flex-start"]);
+    expect(flexOne(s.getByTestId("faceoff-top-right"))).toEqual([1, "flex-end"]);
+  });
+
   it("an opponent's cancel leaves through the wizard's exit, once, with phase copy", () => {
     const onCancelledRemotely = jest.fn();
     render(<Harness phase="ready" onCancelledRemotely={onCancelledRemotely} />);

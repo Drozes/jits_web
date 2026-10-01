@@ -24,7 +24,7 @@ function TagLabel({ children }: { children: string }) {
   );
 }
 
-/** Top-right glass tag: RANKED / PRACTICE. */
+/** Top-right glass tag: PRACTICE (shown only on a practice match). */
 export function HudTag({ label, testID }: { label: string; testID?: string }) {
   return (
     <View testID={testID} style={TAG_STYLE}>

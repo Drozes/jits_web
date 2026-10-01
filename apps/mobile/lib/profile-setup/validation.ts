@@ -7,7 +7,7 @@
  *   - Instagram handles (athlete and gym): optional; the server's
  *     normalize-then-CHECK rule (`isValidInstagramInput`), blank is valid
  */
-import { isValidInstagramInput } from "@jits/shared/utils";
+import { checkDateOfBirth, isValidInstagramInput } from "@jits/shared/utils";
 import { FREE_AGENT_OPTION } from "../../components/profile-setup/types";
 
 export const INSTAGRAM_HANDLE_ERROR =
@@ -28,18 +28,15 @@ export function isValidDateOfBirth(value: string): boolean {
   return true;
 }
 
-export function isAtLeast16(dateOfBirth: string): boolean {
+/**
+ * 16 or older on today's UTC calendar date: the server checks age against
+ * Postgres `current_date` (UTC), and so do the shared `checkDateOfBirth` and
+ * the DOB picker, so all three agree on the 16th birthday whatever the
+ * device's time zone.
+ */
+export function isAtLeast16(dateOfBirth: string, today: Date = new Date()): boolean {
   if (!isValidDateOfBirth(dateOfBirth)) return false;
-  const dob = new Date(dateOfBirth);
-  const now = new Date();
-  const age =
-    now.getFullYear() -
-    dob.getFullYear() -
-    (now.getMonth() < dob.getMonth() ||
-    (now.getMonth() === dob.getMonth() && now.getDate() < dob.getDate())
-      ? 1
-      : 0);
-  return age >= 16;
+  return checkDateOfBirth(dateOfBirth, today) === "ok";
 }
 
 export function isValidWeight(value: string): boolean {

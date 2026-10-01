@@ -58,10 +58,6 @@ export async function AthleteProfileContent({
 
   // Head-to-head from current athlete's history
   const headToHead = matchHistory.filter((m) => m.opponent_id === competitor.id);
-  const headToHeadCompact = headToHead.map((m) => ({
-    matchType: m.match_type as "ranked" | "casual",
-    result: m.athlete_outcome as "win" | "loss" | "draw" | null,
-  }));
 
   const recent = headToHead.slice(0, 6).map((m) => ({
     matchId: m.match_id,
@@ -117,7 +113,6 @@ export async function AthleteProfileContent({
               ...compStats,
               weight: competitor.current_weight,
             }}
-            headToHead={headToHeadCompact}
             pendingChallengeId={pendingChallenge?.id ?? null}
             pendingChallengeCreatedAt={pendingChallenge?.createdAt ?? null}
             competitorInArena={competitor.looking_for_ranked === true}

@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BROADCAST_LANDSCAPE as L, BROADCAST_SIZE } from "./broadcast-tokens";
 
 interface LiveLandscapeLayoutProps {
-  /** The HUD row items, left to right: tally, kind tag, extra. */
+  /** The HUD row items, left to right: tally, practice tag (practice match only), extra. */
   hud: React.ReactNode;
   /** Opponent-ended plate (if any) above the strip, athlete bar and slab. */
   lowerThird: React.ReactNode;

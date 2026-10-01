@@ -3,10 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Swords, BarChart3 } from "lucide-react";
-import {
-  CompareStatsModal,
-  type HeadToHeadMatch,
-} from "@/components/domain/compare-stats-modal";
+import { CompareStatsModal } from "@/components/domain/compare-stats-modal";
 import { ChallengeSheet } from "@/components/domain/challenge-sheet";
 import { useArenaState } from "@/lib/arena/arena-store";
 import { isFreshChallenge } from "@/lib/arena/challenge-freshness";
@@ -26,7 +23,6 @@ interface AthleteProfileActionsProps {
   currentAthleteId: string;
   currentAthlete: AthleteStats;
   competitor: AthleteStats;
-  headToHead: HeadToHeadMatch[];
   pendingChallengeId: string | null;
   /** When that pending challenge was sent. Older than the Arena window, it
    * is not answered live any more and does not block a new challenge. */
@@ -41,7 +37,6 @@ export function AthleteProfileActions({
   currentAthleteId,
   currentAthlete,
   competitor,
-  headToHead,
   pendingChallengeId: rawPendingChallengeId,
   pendingChallengeCreatedAt,
   competitorInArena,
@@ -128,7 +123,6 @@ export function AthleteProfileActions({
       <CompareStatsModal
         currentAthlete={currentAthlete}
         competitor={competitor}
-        headToHead={headToHead}
         open={compareOpen}
         onOpenChange={setCompareOpen}
       />

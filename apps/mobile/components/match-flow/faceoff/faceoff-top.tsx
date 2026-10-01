@@ -24,7 +24,7 @@ function weightText(lbs: number | null): string {
 }
 
 /**
- * The face-off header, above the camera: the top bar (Leave, phase, kind)
+ * The face-off header, above the camera: the top bar (Leave, phase)
  * and the fight card. Big on the weigh-in, compressed to the light athlete
  * chip on the ready phase so the camera framing panel fits under it.
  */
@@ -45,33 +45,35 @@ export function FaceoffTop({ phase, me, opponent }: FaceoffTopProps) {
 
   return (
     <View style={{ gap: phase === "weight" ? 20 : 16 }}>
-      <View style={{ height: 44, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-        {canLeave ? (
-          <StatePressable
-            testID="faceoff-leave"
-            accessibilityRole="button"
-            // The harness and screen readers know this control as "Cancel
-            // match": it cancels the match for both athletes.
-            accessibilityLabel="Cancel match"
-            accessibilityState={{ disabled: f.cancelling }}
-            disabled={f.cancelling}
-            onPress={leave}
-            hitSlop={8}
-            style={({ pressed }) => ({ height: 44, flexDirection: "row", alignItems: "center", gap: 6, opacity: pressed || f.cancelling ? 0.6 : 1 })}
-          >
-            <ChevronLeft size={18} color={p.text} />
-            <Text className="font-heading uppercase" style={{ fontSize: 13, letterSpacing: 1.12, color: p.text }}>
-              {f.cancelling ? "Leaving..." : "Leave"}
-            </Text>
-          </StatePressable>
-        ) : (
-          <View style={{ width: 44 }} />
-        )}
+      {/* Both side slots flex equally, so the label is centred whether or
+          not the Leave button (wider than the 44 pt spacer) is showing. */}
+      <View style={{ height: 44, flexDirection: "row", alignItems: "center" }}>
+        <View testID="faceoff-top-left" style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "flex-start" }}>
+          {canLeave ? (
+            <StatePressable
+              testID="faceoff-leave"
+              accessibilityRole="button"
+              // The harness and screen readers know this control as "Cancel
+              // match": it cancels the match for both athletes.
+              accessibilityLabel="Cancel match"
+              accessibilityState={{ disabled: f.cancelling }}
+              disabled={f.cancelling}
+              onPress={leave}
+              hitSlop={8}
+              style={({ pressed }) => ({ height: 44, flexDirection: "row", alignItems: "center", gap: 6, opacity: pressed || f.cancelling ? 0.6 : 1 })}
+            >
+              <ChevronLeft size={18} color={p.text} />
+              <Text className="font-heading uppercase" style={{ fontSize: 13, letterSpacing: 1.12, color: p.text }}>
+                {f.cancelling ? "Leaving..." : "Leave"}
+              </Text>
+            </StatePressable>
+          ) : null}
+        </View>
         <Mono bold color={p.text3}>
           {phase === "weight" ? "FACE-OFF · WEIGH IN" : "FACE-OFF · READY"}
         </Mono>
-        {/* Right slot spacer: keeps the label off the edge (no match-kind tag). */}
-        <View style={{ width: 44 }} />
+        {/* Right slot: empty (no match-kind tag), mirrors the left slot. */}
+        <View testID="faceoff-top-right" style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "flex-end" }} />
       </View>
       {phase === "weight" ? (
         <FightCard me={me} opponent={opponent} />

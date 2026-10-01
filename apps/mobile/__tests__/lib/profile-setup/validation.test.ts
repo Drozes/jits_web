@@ -1,4 +1,5 @@
 import {
+  isAtLeast16,
   isIdentityComplete,
   isTrainingComplete,
 } from "@/lib/profile-setup/validation";
@@ -100,5 +101,31 @@ describe("gym Instagram field + write plan", () => {
     expect(
       planGymInstagramWrite({ gymId: FREE_AGENT_OPTION, gymInstagram: "@x" }, hidden),
     ).toBeNull();
+  });
+});
+
+describe("isAtLeast16 (the UTC calendar date, like the server's current_date)", () => {
+  const originalTz = process.env.TZ;
+  // A zone behind UTC, so the local and UTC calendar dates differ at both
+  // boundaries below (21:00 and 19:30 on Oct 1 in Toronto).
+  beforeAll(() => {
+    process.env.TZ = "America/Toronto";
+  });
+  afterAll(() => {
+    process.env.TZ = originalTz;
+  });
+
+  it("01:00 UTC on Oct 2 counts as Oct 2: the 16th birthday has arrived", () => {
+    expect(isAtLeast16("2010-10-02", new Date("2026-10-02T01:00:00Z"))).toBe(true);
+  });
+
+  it("23:30 UTC on Oct 1 counts as Oct 1: still 15", () => {
+    expect(isAtLeast16("2010-10-02", new Date("2026-10-01T23:30:00Z"))).toBe(false);
+    expect(isAtLeast16("2010-10-01", new Date("2026-10-01T23:30:00Z"))).toBe(true);
+  });
+
+  it("rejects an invalid date", () => {
+    expect(isAtLeast16("2010-02-30", new Date("2026-10-02T01:00:00Z"))).toBe(false);
+    expect(isAtLeast16("", new Date("2026-10-02T01:00:00Z"))).toBe(false);
   });
 });

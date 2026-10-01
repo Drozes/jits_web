@@ -66,7 +66,7 @@ describe("share message", () => {
       "I'm calling you out on ELO RATED. One roll, my number vs yours. Accept: https://x/c/t",
     );
     expect(buildInviteShareMessage("join", "https://x/c/t")).toBe(
-      "Train jiu-jitsu with me on ELO RATED. Join me: https://x/c/t",
+      "Train jiu-jitsu with me on ELO RATED: https://x/c/t",
     );
   });
 });

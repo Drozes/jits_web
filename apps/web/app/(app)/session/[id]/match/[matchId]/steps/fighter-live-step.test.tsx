@@ -52,7 +52,6 @@ function renderStep(strict = false) {
       startedAt="2026-09-26T10:00:00.000Z"
       pausedAt={null}
       totalPausedDuration={0}
-      matchType="ranked"
       timekeeperEnabled={false}
       hasTimekeeper={false}
     />

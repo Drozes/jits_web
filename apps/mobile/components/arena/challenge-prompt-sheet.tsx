@@ -477,7 +477,7 @@ function PromptHeader({ challenge }: { challenge: IncomingChallenge }) {
       style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10 }}
     >
       {/* The label is the part that gives way on a narrow screen at a large
-          text size; the countdown and the tag never shrink. */}
+          text size; the countdown never shrinks. */}
       <View
         testID="challenge-prompt-header-label"
         style={{ flexDirection: "row", alignItems: "center", gap: 7, flexShrink: 1, minWidth: 0 }}

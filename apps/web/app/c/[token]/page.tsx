@@ -17,7 +17,7 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   const description =
     preview.state === "open"
       ? preview.kind === "challenge"
-        ? "Jiu-jitsu match. Tap to accept."
+        ? "A jiu-jitsu challenge. Tap to accept."
         : "Train jiu-jitsu on ELO RATED. Tap to join."
       : "Find out where you stand in jiu-jitsu.";
   return {
