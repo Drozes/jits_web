@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { extractInviteFromText, formatInviteCode, isInviteToken, normalizeInviteCode } from "./invite-codes";
 import { buildInviteShareMessage } from "./invite-share";
 import {
@@ -127,18 +127,6 @@ describe("claim copy (contract section 7)", () => {
     // Padded input is the same date (the save trims it too).
     expect(checkDateOfBirth(" 1990-05-01 ", today)).toBe("ok");
   });
-  it("checkDateOfBirth: the 16th birthday follows the UTC date, like the server's current_date", () => {
-    // 01:00 UTC on Oct 2 is still Oct 1 in the Americas: the server already
-    // says Oct 2, so a 16th birthday on Oct 2 is old enough.
-    expect(checkDateOfBirth("2010-10-02", new Date("2026-10-02T01:00:00Z"))).toBe("ok");
-    // 23:30 UTC on Oct 1 is already Oct 2 east of UTC: the server still says
-    // Oct 1, so the same date is a day short.
-    expect(checkDateOfBirth("2010-10-02", new Date("2026-10-01T23:30:00Z"))).toBe("underage");
-    // "Today" on the server is not in the future even where the local date is behind.
-    expect(checkDateOfBirth("2026-10-02", new Date("2026-10-02T01:00:00Z"))).toBe("underage");
-    expect(utcTodayYmd(new Date("2026-10-02T01:00:00Z"))).toBe("2026-10-02");
-    expect(utcTodayYmd(new Date("2026-10-01T23:30:00Z"))).toBe("2026-10-01");
-  });
   it("routes claimer_not_active to setup and accuracy to a retry", () => {
     expect(claimFailureView("claimer_not_active").next).toBe("setup");
     expect(claimFailureView("accuracy_too_low")).toMatchObject({ next: "retry_location", actionLabel: "Try again" });
@@ -169,5 +157,34 @@ describe("claim copy (contract section 7)", () => {
     expect(joinFailureMessage("brand_new_code", "Alex")).toBe("Something went wrong opening this invite. Try again.");
     expect(inviteSignupBanner("challenge", "Alex")).toBe("Alex challenged you. Create your account to accept.");
     expect(inviteSignupBanner("join", "Alex")).toBe("Alex invited you. Create your account to join.");
+  });
+});
+
+describe("checkDateOfBirth on the UTC date, with the local zone behind UTC", () => {
+  const originalTz = process.env.TZ;
+  // A zone behind UTC (as the mobile validation test pins), so the local and
+  // UTC calendar dates differ at both boundaries below; a local-date bug fails.
+  beforeAll(() => {
+    process.env.TZ = "America/Toronto";
+  });
+  afterAll(() => {
+    process.env.TZ = originalTz;
+  });
+
+  it("the pin is in effect: 01:00 UTC on Oct 2 is Oct 1 locally", () => {
+    expect(new Date("2026-10-02T01:00:00Z").getDate()).toBe(1);
+  });
+
+  it("checkDateOfBirth: the 16th birthday follows the UTC date, like the server's current_date", () => {
+    // 01:00 UTC on Oct 2 is still Oct 1 in the Americas: the server already
+    // says Oct 2, so a 16th birthday on Oct 2 is old enough.
+    expect(checkDateOfBirth("2010-10-02", new Date("2026-10-02T01:00:00Z"))).toBe("ok");
+    // 23:30 UTC on Oct 1 is already Oct 2 east of UTC: the server still says
+    // Oct 1, so the same date is a day short.
+    expect(checkDateOfBirth("2010-10-02", new Date("2026-10-01T23:30:00Z"))).toBe("underage");
+    // "Today" on the server is not in the future even where the local date is behind.
+    expect(checkDateOfBirth("2026-10-02", new Date("2026-10-02T01:00:00Z"))).toBe("underage");
+    expect(utcTodayYmd(new Date("2026-10-02T01:00:00Z"))).toBe("2026-10-02");
+    expect(utcTodayYmd(new Date("2026-10-01T23:30:00Z"))).toBe("2026-10-01");
   });
 });

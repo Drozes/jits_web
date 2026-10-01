@@ -4,6 +4,8 @@
  * weight is captured in pounds (50-400 range) with no conversion.
  */
 
+import { checkDateOfBirth } from "@jits/shared/utils";
+
 export interface SignupFormValues {
   email: string;
   password: string;
@@ -28,17 +30,14 @@ export const EMPTY_SIGNUP_VALUES: SignupFormValues = {
   gymId: "",
 };
 
-export function isAtLeast16(isoDate: string): boolean {
+/**
+ * 16 or older on the UTC calendar date: the shared check that mobile and the
+ * claim RPC use too, so the three agree on the 16th birthday whatever the
+ * browser's time zone.
+ */
+export function isAtLeast16(isoDate: string, today: Date = new Date()): boolean {
   if (!isoDate) return false;
-  const dob = new Date(isoDate);
-  if (Number.isNaN(dob.getTime())) return false;
-  const now = new Date();
-  const sixteenAgo = new Date(
-    now.getFullYear() - 16,
-    now.getMonth(),
-    now.getDate(),
-  );
-  return dob.getTime() <= sixteenAgo.getTime();
+  return checkDateOfBirth(isoDate, today) === "ok";
 }
 
 export function isEmailValid(email: string): boolean {
