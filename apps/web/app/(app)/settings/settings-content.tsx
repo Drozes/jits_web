@@ -62,6 +62,8 @@ function AccountSection({ email }: { email: string }) {
           SIGN OUT
         </span>
       </button>
+      <RowDivider />
+      <RowLink href="/settings/delete-account" label="DELETE ACCOUNT" />
     </Plate>
   );
 }

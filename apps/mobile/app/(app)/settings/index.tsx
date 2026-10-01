@@ -24,6 +24,7 @@ type SettingsRoute =
   | "/settings/feedback"
   | "/settings/help"
   | "/settings/admin"
+  | "/settings/delete-account"
   | "/practice";
 
 export default function SettingsScreen() {
@@ -95,6 +96,8 @@ function AccountPlate({
           SIGN OUT
         </Text>
       </Pressable>
+      <RowDivider />
+      <SettingsRow href="/settings/delete-account" label="DELETE ACCOUNT" />
     </Plate>
   );
 }
