@@ -31,3 +31,19 @@ describe("safeNextPath", () => {
     expect(safeNextPath("/\n/evil.com")).toBe("/");
   });
 });
+
+describe("safeNextPath invite limits (016)", () => {
+  it("refuses values over 512 characters", async () => {
+    const { safeNextPath: safe } = await import("./safe-next-path");
+    expect(safe("/" + "a".repeat(511))).toBe("/" + "a".repeat(511));
+    expect(safe("/" + "a".repeat(512))).toBe("/");
+  });
+
+  it("withNext appends only a safe next", async () => {
+    const { withNext } = await import("./safe-next-path");
+    expect(withNext("/signup", "/c/abc")).toBe("/signup?next=%2Fc%2Fabc");
+    expect(withNext("/a?x=1", "/c/abc")).toBe("/a?x=1&next=%2Fc%2Fabc");
+    expect(withNext("/signup", "//evil.com")).toBe("/signup");
+    expect(withNext("/signup", null)).toBe("/signup");
+  });
+});

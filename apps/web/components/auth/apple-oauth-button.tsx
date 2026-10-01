@@ -1,14 +1,17 @@
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
+import { withNext } from "@/lib/auth/safe-next-path";
 import { useState } from "react";
 
 interface AppleOAuthButtonProps {
   disabled?: boolean;
   onError: (message: string) => void;
+  /** Safe same-origin path to land on after the callback (invite ?next=). */
+  next?: string | null;
 }
 
-export function AppleOAuthButton({ disabled, onError }: AppleOAuthButtonProps) {
+export function AppleOAuthButton({ disabled, onError, next }: AppleOAuthButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleClick = async () => {
@@ -17,7 +20,7 @@ export function AppleOAuthButton({ disabled, onError }: AppleOAuthButtonProps) {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "apple",
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: withNext(`${window.location.origin}/auth/callback`, next),
       },
     });
     if (error) {

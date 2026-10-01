@@ -3,24 +3,29 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentAthlete } from "@jits/shared/api/queries";
 import { EuaForm } from "@/components/auth/eua-form";
+import { safeNextParam, withNext } from "@/lib/auth/safe-next-path";
 
-export default function Page() {
+type SearchParams = Promise<{ next?: string | string[] }>;
+
+export default function Page({ searchParams }: { searchParams: SearchParams }) {
   return (
     <Suspense>
-      <EuaContent />
+      <EuaContent searchParams={searchParams} />
     </Suspense>
   );
 }
 
-async function EuaContent() {
+async function EuaContent({ searchParams }: { searchParams: SearchParams }) {
+  const { next: rawNext } = await searchParams;
+  const next = safeNextParam(typeof rawNext === "string" ? rawNext : null);
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  if (!user) redirect(withNext("/login", next));
 
   const athlete = await getCurrentAthlete(supabase, user.id);
-  if (!athlete) redirect("/signup");
+  if (!athlete) redirect(withNext("/signup", next));
 
   // A pending athlete can only activate once their profile carries the fields
   // the `handle_athlete_activation` trigger requires (weight + gym/free-agent),
@@ -48,6 +53,7 @@ async function EuaContent() {
 
   return (
     <EuaForm
+      next={next}
       needsProfile={needsProfile}
       gyms={(gyms ?? []).map((g) => ({ id: g.id, name: g.name }))}
       cities={cities.length > 0 ? cities : ["Toronto", "Vancouver"]}

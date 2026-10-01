@@ -12,6 +12,8 @@ import { AppHeader } from "@/components/layout/app-header";
 import { Plate } from "@/components/ui/elo-system";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CityAutocomplete } from "@/components/profile-setup/city-autocomplete";
+import { safeNextPath } from "@/lib/auth/safe-next-path";
+import { inviteTokenFromNextPath } from "@/lib/invites/next-path";
 
 interface ParsedBlock {
   type: "title" | "section" | "paragraph";
@@ -33,6 +35,8 @@ interface EuaFormProps {
   gyms: { id: string; name: string }[];
   cities: string[];
   initialProfile: ProfileValues;
+  /** Safe same-origin path to continue to (invite ?next=). */
+  next?: string | null;
 }
 
 function parseEuaBody(raw: string): ParsedBlock[] {
@@ -56,7 +60,8 @@ function parseEuaBody(raw: string): ParsedBlock[] {
   return blocks;
 }
 
-function validateProfile(v: ProfileValues): string | null {
+/** `invite`: the invite path defers city and uses the contract-7 age copy. */
+function validateProfile(v: ProfileValues, invite: boolean): string | null {
   if (!isValidWeight(v.weight)) {
     return "Enter a valid weight in pounds (50-400).";
   }
@@ -64,9 +69,11 @@ function validateProfile(v: ProfileValues): string | null {
     return "Select a gender.";
   }
   if (!v.dateOfBirth || !isAtLeast16(v.dateOfBirth)) {
-    return "You must be at least 16 years old.";
+    return invite
+      ? "You must be 16 or older to compete on ELO RATED."
+      : "You must be at least 16 years old.";
   }
-  if (!v.city.trim()) {
+  if (!invite && !v.city.trim()) {
     return "Enter your city.";
   }
   return null;
@@ -77,8 +84,10 @@ export function EuaForm({
   gyms,
   cities,
   initialProfile,
+  next = null,
 }: EuaFormProps) {
   const router = useRouter();
+  const invite = inviteTokenFromNextPath(next) !== null;
   const [accepted, setAccepted] = useState(false);
   const [profile, setProfile] = useState<ProfileValues>(initialProfile);
   const [error, setError] = useState<string | null>(null);
@@ -94,7 +103,7 @@ export function EuaForm({
     setError(null);
 
     if (needsProfile) {
-      const msg = validateProfile(profile);
+      const msg = validateProfile(profile, invite);
       if (msg) {
         setError(msg);
         return;
@@ -132,7 +141,7 @@ export function EuaForm({
             current_weight: parseFloat(profile.weight),
             gender: profile.gender,
             date_of_birth: profile.dateOfBirth,
-            city: profile.city.trim(),
+            city: profile.city.trim() || null,
             primary_gym_id: gymId || null,
             free_agent: !gymId,
           })
@@ -166,7 +175,7 @@ export function EuaForm({
         if (ackError) throw ackError;
       }
 
-      router.push("/");
+      router.push(safeNextPath(next));
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to record agreement.");

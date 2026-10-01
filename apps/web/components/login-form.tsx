@@ -9,6 +9,7 @@ import { EmailInput } from "@/components/auth/email-input";
 import { PasswordInput } from "@/components/auth/password-input";
 import { GoogleOAuthButton } from "@/components/auth/google-oauth-button";
 import { AppleOAuthButton } from "@/components/auth/apple-oauth-button";
+import { safeNextPath, withNext } from "@/lib/auth/safe-next-path";
 
 /** Mirrors `sign-up-form.tsx` so the two email-auth surfaces read identically. */
 const FIELD_LABEL_STYLE: React.CSSProperties = {
@@ -78,7 +79,7 @@ function signInErrorMessage(error: { code?: string; message?: string }): string 
   return "Could not sign you in. Please try again.";
 }
 
-export function LoginForm() {
+export function LoginForm({ next = null }: { next?: string | null }) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -110,7 +111,7 @@ export function LoginForm() {
     // and `eua-form`): `requireAthlete()` there sends a pending athlete to /eua
     // and a user with no athlete row to /signup. refresh() lets the server
     // components re-read the session cookie the browser client just wrote.
-    router.push("/");
+    router.push(safeNextPath(next));
     router.refresh();
   };
 
@@ -210,11 +211,11 @@ export function LoginForm() {
         <Divider label="Or" />
 
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
-          <GoogleOAuthButton disabled={isLoading} onError={setError} />
-          <AppleOAuthButton disabled={isLoading} onError={setError} />
+          <GoogleOAuthButton disabled={isLoading} onError={setError} next={next} />
+          <AppleOAuthButton disabled={isLoading} onError={setError} next={next} />
 
           <Link
-            href="/signup"
+            href={withNext("/signup", next)}
             className="font-heading font-bold uppercase"
             style={SECONDARY_BUTTON_STYLE}
           >

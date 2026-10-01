@@ -54,7 +54,14 @@ export function isValidWeight(weight: string): boolean {
   return Number.isFinite(n) && n >= 50 && n <= 400;
 }
 
-export function validateSignupForm(values: SignupFormValues): {
+/**
+ * `invite`: the invite path (016) sets free agent automatically and defers
+ * city, so neither is required there, and the age copy matches contract 7.
+ */
+export function validateSignupForm(
+  values: SignupFormValues,
+  options: { invite?: boolean } = {},
+): {
   valid: boolean;
   error: string | null;
 } {
@@ -68,7 +75,12 @@ export function validateSignupForm(values: SignupFormValues): {
     return { valid: false, error: "First and last name are required." };
   }
   if (!values.dateOfBirth || !isAtLeast16(values.dateOfBirth)) {
-    return { valid: false, error: "You must be at least 16 years old." };
+    return {
+      valid: false,
+      error: options.invite
+        ? "You must be 16 or older to compete on ELO RATED."
+        : "You must be at least 16 years old.",
+    };
   }
   if (values.gender !== "M" && values.gender !== "F") {
     return { valid: false, error: "Select a gender." };
@@ -76,6 +88,7 @@ export function validateSignupForm(values: SignupFormValues): {
   if (!isValidWeight(values.weight)) {
     return { valid: false, error: "Enter a valid weight in pounds (50-400)." };
   }
+  if (options.invite) return { valid: true, error: null };
   if (!values.city.trim()) {
     return { valid: false, error: "Enter your city." };
   }

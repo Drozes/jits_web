@@ -10,6 +10,7 @@ import {
   validateSignupForm,
 } from "@/lib/profile-setup/signup-form-validation";
 import { CityAutocomplete } from "@/components/profile-setup/city-autocomplete";
+import { withNext } from "@/lib/auth/safe-next-path";
 
 interface GymOption {
   id: string;
@@ -19,6 +20,10 @@ interface GymOption {
 interface SignUpFormProps {
   gyms: GymOption[];
   cities: string[];
+  /** Safe same-origin path to continue to after setup (invite ?next=). */
+  next?: string | null;
+  /** Invite banner (`ALEX challenged you. ...`); its presence marks the invite path. */
+  inviteBanner?: string | null;
 }
 
 const FIELD_LABEL_STYLE: React.CSSProperties = {
@@ -44,7 +49,8 @@ const FIELD_INPUT_STYLE: React.CSSProperties = {
   transition: "border-color var(--motion-hover)",
 };
 
-export function SignUpForm({ gyms, cities }: SignUpFormProps) {
+export function SignUpForm({ gyms, cities, next = null, inviteBanner = null }: SignUpFormProps) {
+  const invite = !!inviteBanner;
   const router = useRouter();
   const [values, setValues] = useState<SignupFormValues>(EMPTY_SIGNUP_VALUES);
   const [error, setError] = useState<string | null>(null);
@@ -57,7 +63,7 @@ export function SignUpForm({ gyms, cities }: SignUpFormProps) {
     e.preventDefault();
     setError(null);
 
-    const result = validateSignupForm(values);
+    const result = validateSignupForm(values, { invite });
     if (!result.valid) {
       setError(result.error);
       return;
@@ -85,9 +91,11 @@ export function SignUpForm({ gyms, cities }: SignUpFormProps) {
         date_of_birth: values.dateOfBirth,
         gender: values.gender,
         current_weight: parseFloat(values.weight),
-        city: values.city.trim(),
-        primary_gym_id: values.gymId,
-        free_agent: false,
+        city: values.city.trim() || null,
+        // The invite path defaults to free agent (016 plan 10.4): activation
+        // needs a gym OR free_agent, and an invitee may not train at one.
+        primary_gym_id: values.gymId || null,
+        free_agent: !values.gymId,
       };
 
       const { error: updateError } = await supabase
@@ -96,7 +104,7 @@ export function SignUpForm({ gyms, cities }: SignUpFormProps) {
         .eq("auth_user_id", signUpData.user.id);
       if (updateError) throw updateError;
 
-      router.push("/eua");
+      router.push(withNext("/eua", next));
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
       setIsLoading(false);
@@ -116,6 +124,25 @@ export function SignUpForm({ gyms, cities }: SignUpFormProps) {
           flexDirection: "column",
         }}
       >
+        {inviteBanner && (
+          <p
+            role="status"
+            style={{
+              background: "var(--bg-elevated)",
+              borderLeft: "2px solid var(--accent-cta)",
+              borderRadius: "var(--radius-xs)",
+              padding: "var(--space-3) var(--space-4)",
+              marginBottom: "var(--space-4)",
+              fontFamily: "var(--font-heading)",
+              fontWeight: 700,
+              fontSize: "var(--size-body)",
+              color: "var(--text-primary)",
+            }}
+          >
+            {inviteBanner}
+          </p>
+        )}
+
         <SectionHeading label="Account" showSeparator={false} />
 
         <Field label="Email">
@@ -236,7 +263,7 @@ export function SignUpForm({ gyms, cities }: SignUpFormProps) {
           </div>
         </Field>
 
-        <Field label="City">
+        <Field label={invite ? "City (optional)" : "City"}>
           <CityAutocomplete
             value={values.city}
             onChange={(city) => onChange({ city })}
@@ -251,7 +278,7 @@ export function SignUpForm({ gyms, cities }: SignUpFormProps) {
             value={values.gymId}
             onChange={(e) => onChange({ gymId: e.target.value })}
           >
-            <option value="">Select a gym</option>
+            <option value="">{invite ? "Free agent (no gym)" : "Select a gym"}</option>
             {gyms.map((g) => (
               <option key={g.id} value={g.id}>
                 {g.name}
