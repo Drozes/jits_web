@@ -105,14 +105,7 @@ export function startInviteBooking(
   supabase: Client,
   challengeId: string,
 ): Promise<InviteResult<StartInviteBookingResult>> {
-  // Newer than the generated types until `npm run db:types` runs against the
-  // migrated stack, hence the cast.
-  return rpc(
-    supabase,
-    "start_invite_booking" as Parameters<typeof rpc>[1],
-    { p_challenge_id: challengeId },
-    parseStartInviteBooking,
-  );
+  return rpc(supabase, "start_invite_booking", { p_challenge_id: challengeId }, parseStartInviteBooking);
 }
 
 /**
@@ -209,9 +202,7 @@ export function parseArenaNearby(data: unknown): ArenaNearby | null {
  * Arena then shows today's list. Never throws.
  */
 export function getArenaNearby(supabase: Client): Promise<InviteResult<ArenaNearby>> {
-  // Newer than the generated types until `npm run db:types` runs against the
-  // migrated stack, hence the cast.
-  return rpc(supabase, "get_arena_nearby" as Parameters<typeof rpc>[1], {}, parseArenaNearby);
+  return rpc(supabase, "get_arena_nearby", {}, parseArenaNearby);
 }
 
 /** What a close row shows for its band. */

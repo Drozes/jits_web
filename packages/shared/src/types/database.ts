@@ -123,6 +123,32 @@ export type Database = {
         }
         Relationships: []
       }
+      arena_nearby_cache: {
+        Row: {
+          athlete_id: string
+          evaluated_at: string
+          result: Json
+        }
+        Insert: {
+          athlete_id: string
+          evaluated_at?: string
+          result: Json
+        }
+        Update: {
+          athlete_id?: string
+          evaluated_at?: string
+          result?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "arena_nearby_cache_athlete_id_fkey"
+            columns: ["athlete_id"]
+            isOneToOne: true
+            referencedRelation: "athletes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       athlete_avatars: {
         Row: {
           athlete_id: string
@@ -259,6 +285,50 @@ export type Database = {
             columns: ["invite_id"]
             isOneToOne: false
             referencedRelation: "invites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      athlete_live_sessions: {
+        Row: {
+          accuracy_m: number | null
+          athlete_id: string
+          ended_reason: string | null
+          id: number
+          lat: number | null
+          lng: number | null
+          platform: string | null
+          went_live_at: string
+          went_offline_at: string | null
+        }
+        Insert: {
+          accuracy_m?: number | null
+          athlete_id: string
+          ended_reason?: string | null
+          id?: never
+          lat?: number | null
+          lng?: number | null
+          platform?: string | null
+          went_live_at?: string
+          went_offline_at?: string | null
+        }
+        Update: {
+          accuracy_m?: number | null
+          athlete_id?: string
+          ended_reason?: string | null
+          id?: never
+          lat?: number | null
+          lng?: number | null
+          platform?: string | null
+          went_live_at?: string
+          went_offline_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "athlete_live_sessions_athlete_id_fkey"
+            columns: ["athlete_id"]
+            isOneToOne: false
+            referencedRelation: "athletes"
             referencedColumns: ["id"]
           },
         ]
@@ -3012,6 +3082,7 @@ export type Database = {
         Args: { p_expected_pending_since: string; p_plan_id: string }
         Returns: boolean
       }
+      _go_live_location_ok: { Args: { p_athlete: string }; Returns: boolean }
       _gym_range_cutoff: { Args: { p_range: string }; Returns: string }
       _haversine_m: {
         Args: { p_lat1: number; p_lat2: number; p_lng1: number; p_lng2: number }
@@ -3081,9 +3152,36 @@ export type Database = {
         Returns: undefined
       }
       _match_weight_check_state: { Args: { p_match_id: string }; Returns: Json }
+      _nearby_params: {
+        Args: never
+        Returns: {
+          band_1km_m: number
+          band_500_m: number
+          max_rows: number
+          radius_m: number
+          rate_window: string
+        }[]
+      }
       _new_invite_token: { Args: never; Returns: string }
       _new_short_code: { Args: never; Returns: string }
       _normalize_invite_code: { Args: { p_code: string }; Returns: string }
+      _presence_guard_params: {
+        Args: never
+        Returns: {
+          browse_rate: string
+          default_rate: string
+          max_speed_mps: number
+        }[]
+      }
+      _presence_movement_ok: {
+        Args: {
+          p_accuracy_m: number
+          p_athlete: string
+          p_lat: number
+          p_lng: number
+        }
+        Returns: boolean
+      }
       _proximity_params: {
         Args: never
         Returns: {
@@ -3157,7 +3255,7 @@ export type Database = {
         Returns: string
       }
       _start_invite_booking: {
-        Args: { p_challenge_id: string }
+        Args: { p_challenge_id: string; p_trigger?: string }
         Returns: string
       }
       _valid_invite_token: { Args: { p_token: string }; Returns: boolean }
@@ -3193,6 +3291,10 @@ export type Database = {
         Returns: Json
       }
       admin_list_invite_farming: { Args: { p_since?: string }; Returns: Json }
+      admin_list_live_sessions: {
+        Args: { p_athlete_id?: string; p_since: string }
+        Returns: Json
+      }
       admin_list_managed_gyms: {
         Args: { p_athlete_id: string }
         Returns: {
@@ -3436,6 +3538,7 @@ export type Database = {
       }
       get_admin_metrics: { Args: never; Returns: Json }
       get_arena_data: { Args: { p_limit?: number }; Returns: Json }
+      get_arena_nearby: { Args: never; Returns: Json }
       get_athlete_avatars: { Args: { p_athlete_id: string }; Returns: Json }
       get_athlete_profile_stills: {
         Args: { p_athlete_id: string }
@@ -3634,6 +3737,7 @@ export type Database = {
       is_highlight_rendering_enabled: { Args: never; Returns: boolean }
       is_highlight_share_enabled: { Args: never; Returns: boolean }
       is_invites_enabled: { Args: never; Returns: boolean }
+      is_match_location_required: { Args: never; Returns: boolean }
       is_match_video_participant: {
         Args: { p_video_id: string }
         Returns: boolean
@@ -3851,6 +3955,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      start_invite_booking: { Args: { p_challenge_id: string }; Returns: Json }
       start_match: { Args: { p_match_id: string }; Returns: Json }
       start_match_from_challenge: {
         Args: { p_challenge_id: string }
