@@ -20,7 +20,6 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.elorated.mobile",
-      "usesAppleSignIn": true,
       "buildNumber": "1",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
@@ -101,7 +100,6 @@
         }
       ],
       "expo-secure-store",
-      "expo-apple-authentication",
       [
         "expo-image-picker",
         {
@@ -152,7 +150,8 @@
       ],
       "@react-native-community/datetimepicker",
       "./plugins/with-android-backup-rules",
-      "./plugins/with-instagram-reels"
+      "./plugins/with-instagram-reels",
+      "./plugins/with-no-apple-signin"
     ],
     "extra": {
       "eas": {

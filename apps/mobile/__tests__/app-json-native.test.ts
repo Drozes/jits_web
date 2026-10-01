@@ -15,9 +15,16 @@ const plugin = (name: string) =>
   appJson.expo.plugins.find((p) => (Array.isArray(p) ? p[0] === name : p === name));
 
 describe("app.json native config", () => {
-  it("enables Sign in with Apple", () => {
-    expect(appJson.expo.ios.usesAppleSignIn).toBe(true);
-    expect(plugin("expo-apple-authentication")).toBeTruthy();
+  it("does not request the Sign in with Apple entitlement yet", () => {
+    // Release 2026-10-01: the App Store provisioning profile lacks the Sign
+    // in with Apple capability (EAS build 24 failed on it) and the button is
+    // hidden (APPLE_SIGN_IN_ENABLED=false). Enable the capability on the App
+    // ID, then restore both lines in a native build (jits-22mp).
+    expect(appJson.expo.ios.usesAppleSignIn).toBeUndefined();
+    expect(plugin("expo-apple-authentication")).toBeUndefined();
+    // Expo auto-applies expo-apple-authentication (it adds the entitlement
+    // unconditionally), so this local plugin strips it.
+    expect(plugin("./plugins/with-no-apple-signin")).toBeTruthy();
   });
 
   it("explains location as the same-mat check", () => {
