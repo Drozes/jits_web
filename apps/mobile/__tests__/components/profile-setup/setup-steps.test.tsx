@@ -133,6 +133,8 @@ describe("TrainingStep", () => {
     const input = utils.getByTestId("setup-gym-instagram");
     expect(input.props.editable).toBe(false);
     expect(input.props.value).toBe("@atos");
+    expect(utils.getByText("Already set for your gym. Only a gym manager can change it.")).toBeTruthy();
+    expect(utils.queryByText("Optional.")).toBeNull();
   });
 
   it("blocks submit on a malformed gym handle", () => {
