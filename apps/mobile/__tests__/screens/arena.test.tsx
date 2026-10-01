@@ -170,6 +170,17 @@ jest.mock("@/lib/match-flow/use-viewer-stakes", () => ({
 }));
 
 jest.mock("@/lib/supabase/client", () => ({ supabase: {} }));
+// Invites + friends (jr_be spec 016): controllable stand-ins for the realtime
+// and RPC-backed hooks the Arena reads.
+// eslint-disable-next-line no-var
+var mockFriendIds: Set<string> = new Set();
+// eslint-disable-next-line no-var
+var mockInvitesOn = false;
+jest.mock("@/lib/invites/use-friend-ids", () => ({ useFriendIds: () => mockFriendIds }));
+jest.mock("@/lib/invites/use-invites-enabled", () => ({ useInvitesEnabled: () => mockInvitesOn }));
+jest.mock("@/lib/invites/use-bookings", () => ({
+  useBookings: () => ({ bookings: [], locationOff: false, reload: jest.fn() }),
+}));
 const mockGetPending = jest.fn();
 jest.mock("@jits/shared/api/queries", () => ({
   getPendingChallengesForAthlete: (...a: unknown[]) => mockGetPending(...a),
@@ -288,6 +299,8 @@ function competitor(over: Record<string, unknown> = {}) {
 }
 
 beforeEach(() => {
+  mockFriendIds = new Set();
+  mockInvitesOn = false;
   jest.clearAllMocks();
   mockAuthAthlete = mockAthlete;
   mockDismissed.clear();
@@ -983,6 +996,37 @@ describe("Arena screen", () => {
       expect(order).toEqual(["near", "mid", "far"]);
       expect(r.getByTestId("arena-mat-gap-near").props.children).toBe("−10");
       expect(r.getByTestId("arena-mat-gap-mid").props.children).toBe("+50");
+    });
+
+    it("friends sort first with a FRIEND badge; the closest card stays strictly closest (jr_be spec 016)", () => {
+      mockIsLive = true;
+      mockFriendIds = new Set(["far"]);
+      mockRoster.competitors = [
+        competitor({ id: "far", displayName: "Far", eloDiff: 300 }),
+        competitor({ id: "near", displayName: "Near", eloDiff: -10 }),
+        competitor({ id: "mid", displayName: "Mid", eloDiff: 50 }),
+      ];
+      mockLobbyIds = new Set(["far", "near", "mid"]);
+      const r = render(<ArenaScreen />);
+      const order = r
+        .getAllByTestId(/^arena-mat-row-/)
+        .map((n) => String(n.props.testID).replace("arena-mat-row-", ""));
+      expect(order).toEqual(["far", "near", "mid"]);
+      expect(r.getByTestId("arena-friend-badge-far")).toBeTruthy();
+      expect(r.queryByTestId("arena-friend-badge-near")).toBeNull();
+      expect(r.getAllByLabelText("Challenge Near")[0].props.testID).toBe("arena-closest-cta");
+    });
+
+    it("the empty mat offers an invite only while invites are enabled", () => {
+      mockIsLive = true;
+      mockRoster.competitors = [];
+      mockLobbyIds = new Set();
+      const off = render(<ArenaScreen />);
+      expect(off.queryByLabelText("Invite a training partner")).toBeNull();
+      off.unmount();
+      mockInvitesOn = true;
+      const on = render(<ArenaScreen />);
+      expect(on.getByText("Invite a training partner")).toBeTruthy();
     });
 
     it("the signed gap is data: ink, never red or green (spec 3)", () => {

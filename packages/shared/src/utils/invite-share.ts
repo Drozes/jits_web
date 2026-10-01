@@ -1,6 +1,6 @@
 /**
  * Invite share copy (jr_be spec 016, contract section 6). The link goes inside
- * the message only: `Share.share({ message })`, never `url`, so every target
+ * the message only (the share sheet gets no `url` key), so every target
  * app receives one text with the link in it.
  */
 

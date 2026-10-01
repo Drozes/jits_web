@@ -17,6 +17,7 @@ import { FilmRoomPreview } from "@/components/profile/film-room-preview";
 import { HighlightsRow } from "@/components/profile/highlights-row";
 import { useMyHighlights } from "@/lib/highlight/use-my-highlights";
 import { ShareProfileSheet } from "@/components/share-profile-sheet";
+import { ProfileInviteActions } from "@/components/invite/profile-invite-actions";
 import { TabHeader } from "@/components/layout/tab-header";
 import { PageContainer } from "@/components/layout/page-container";
 import { AppVersionLabel } from "@/components/layout/app-version-label";
@@ -165,6 +166,7 @@ export default function ProfileScreen() {
             <ProfileHeader athlete={athlete} gymName={gymName} />
 
             <ShareProfileButton athlete={shareAthlete} />
+            <ProfileInviteActions />
 
             <ProfileQuickStats
               totalMatches={stats?.totalMatches ?? 0}

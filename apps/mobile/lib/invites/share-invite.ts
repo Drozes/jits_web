@@ -1,6 +1,6 @@
 /**
- * Invite sharing (contract 6): `Share.share({ message })` with the link inside
- * the message only, plus WhatsApp and SMS shortcuts. The resolved
+ * Invite sharing (contract 6): the share sheet gets a message only, with the
+ * link inside it, plus WhatsApp and SMS shortcuts. The resolved
  * `{action, activityType}` is logged as the `shared` step.
  */
 import { Linking, Share } from "react-native";

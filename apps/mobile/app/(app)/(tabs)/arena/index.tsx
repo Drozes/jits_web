@@ -15,7 +15,7 @@
  */
 import * as React from "react";
 import { RefreshControl, View } from "react-native";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter, type Href } from "expo-router";
 import { useIsFocused } from "@react-navigation/native";
 import { useRequireAthlete } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
@@ -60,6 +60,14 @@ import {
 } from "@/components/arena/mat-board";
 import { ArenaSkeleton } from "@/components/arena/arena-skeleton";
 import { CapPlate, RosterErrorPlate } from "@/components/arena/arena-plates";
+import { SecondaryButton } from "@/components/auth/auth-buttons";
+import { toast } from "@/components/ui/toast";
+import { BookedStrip } from "@/components/invite/booked-strip";
+import { sortFriendsFirst } from "@jits/shared/api/friends";
+import { useFriendIds } from "@/lib/invites/use-friend-ids";
+import { useInvitesEnabled } from "@/lib/invites/use-invites-enabled";
+import { useBookings } from "@/lib/invites/use-bookings";
+import { arenaMatchHref } from "@/lib/arena/constants";
 
 /**
  * The tab bar sits below the screen and pads its own inset, so the shared
@@ -170,6 +178,25 @@ export default function ArenaScreen() {
     () => onTheMatRows(competitors, matLobbyIds, selfId),
     [competitors, matLobbyIds, selfId],
   );
+  // Invites + friends (jr_be spec 016): friends sort first in the list (the
+  // closest-match pick above stays strictly closest), and a friend_live push
+  // (`?athlete=<id>`) puts that friend on top, one tap from a challenge.
+  const { athlete: focusAthleteId } = useLocalSearchParams<{ athlete?: string }>();
+  const friendIds = useFriendIds(selfId);
+  const matRows = React.useMemo(() => {
+    const sorted = sortFriendsFirst(onTheMat, (c) => c.id, friendIds);
+    if (!focusAthleteId) return sorted;
+    return sortFriendsFirst(sorted, (c) => c.id, new Set([focusAthleteId]));
+  }, [onTheMat, friendIds, focusAthleteId]);
+  const invitesOn = useInvitesEnabled();
+  const inMatch = useIsInArenaMatch();
+  const { bookings, locationOff } = useBookings({
+    visible: isFocused,
+    onStarted: (matchId) => {
+      if (!inMatch) router.push(arenaMatchHref(matchId) as Href);
+    },
+    onClosed: (message) => toast.info(message),
+  });
   // Counts from exactly these rows (D2); unknown while the rows are a
   // placeholder (roster not loaded) or a last-known snapshot (lobby unknown).
   const { onMat, inBand } = matCounts(
@@ -305,6 +332,10 @@ export default function ArenaScreen() {
           />
         ) : null}
 
+        {bookings.map((b) => (
+          <BookedStrip key={b.challenge_id} booking={b} locationOff={locationOff} />
+        ))}
+
         {isLoading ? (
           <ArenaSkeleton />
         ) : (
@@ -342,13 +373,21 @@ export default function ArenaScreen() {
               />
             ) : null}
 
+            {/* Invites (jr_be spec 016): secondary, the red stays GO LIVE. */}
+            {invitesOn && !hasError && onTheMat.length === 0 ? (
+              <SecondaryButton
+                label="Invite a training partner"
+                onPress={() => router.push("/invite?from=arena" as Href)}
+              />
+            ) : null}
+
             {onTheMat.length > 0 ? (
               <View testID="arena-on-the-mat">
                 <MatSectionLabel
                   label="On the mat · closest first"
                   right={String(onTheMat.length)}
                 />
-                {onTheMat.map((c) => {
+                {matRows.map((c) => {
                   const action = actionFor(c.id);
                   return (
                     <MatRow
@@ -364,6 +403,7 @@ export default function ArenaScreen() {
                       onRoll={() => void sendChallenge(c.id, c.displayName)}
                       onGoLive={goLive}
                       onOpenProfile={() => openProfile(c.id)}
+                      isFriend={friendIds.has(c.id)}
                     />
                   );
                 })}

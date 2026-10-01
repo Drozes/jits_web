@@ -755,6 +755,8 @@ interface MatRowProps {
   onRoll: () => void;
   onGoLive: () => void;
   onOpenProfile: () => void;
+  /** A friend (jr_be spec 016): FRIEND badge; the Arena sorts friends first. */
+  isFriend?: boolean;
 }
 
 /**
@@ -768,6 +770,7 @@ export function MatRow({
   onRoll,
   onGoLive,
   onOpenProfile,
+  isFriend = false,
 }: MatRowProps) {
   const { displayName, currentElo, eloDiff, weight } = competitor;
   return (
@@ -777,19 +780,30 @@ export function MatRow({
     >
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={matRowLabel(displayName, currentElo, eloDiff, weight)}
+        accessibilityLabel={`${isFriend ? "Friend, " : ""}${matRowLabel(displayName, currentElo, eloDiff, weight)}`}
         onPress={onOpenProfile}
         className="flex-1 flex-row items-center gap-3"
       >
         <Avatar32 name={displayName} photoUrl={competitor.profilePhotoUrl ?? null} />
         <View className="flex-1">
-          <Text
-            numberOfLines={1}
-            maxFontSizeMultiplier={MAX_SCALE}
-            className="font-heading text-[13px] text-ink"
-          >
-            {displayName}
-          </Text>
+          <View className="flex-row items-center gap-2">
+            <Text
+              numberOfLines={1}
+              maxFontSizeMultiplier={MAX_SCALE}
+              className="shrink font-heading text-[13px] text-ink"
+            >
+              {displayName}
+            </Text>
+            {isFriend ? (
+              <Text
+                testID={`arena-friend-badge-${competitor.id}`}
+                maxFontSizeMultiplier={MAX_SCALE}
+                className="rounded-xs border border-hairline-strong px-1 font-heading text-[9px] uppercase tracking-caps-l text-ink-2"
+              >
+                Friend
+              </Text>
+            ) : null}
+          </View>
           <Text
             numberOfLines={1}
             maxFontSizeMultiplier={MAX_SCALE}
