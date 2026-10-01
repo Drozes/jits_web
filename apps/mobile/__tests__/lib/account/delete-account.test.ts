@@ -24,6 +24,13 @@ describe("deleteAccount", () => {
     expect(await deleteAccount(c as never)).toEqual({ ok: false, code: "not_authenticated" });
   });
 
+  it("maps a gateway 401 (verify_jwt body, numeric code) to not_authenticated", async () => {
+    const c = client({ data: null, error: httpError(401, { code: 401, msg: "Invalid JWT" }) });
+    expect(await deleteAccount(c as never)).toEqual({ ok: false, code: "not_authenticated" });
+    const empty = client({ data: null, error: { name: "FunctionsHttpError", context: new Response("", { status: 401 }) } });
+    expect(await deleteAccount(empty as never)).toEqual({ ok: false, code: "not_authenticated" });
+  });
+
   it("maps a 409 to match_in_progress", async () => {
     const c = client({ data: null, error: httpError(409, { ok: false, code: "match_in_progress" }) });
     expect(await deleteAccount(c as never)).toEqual({ ok: false, code: "match_in_progress" });

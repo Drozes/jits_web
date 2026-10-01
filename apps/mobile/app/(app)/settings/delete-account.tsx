@@ -9,10 +9,11 @@ import { useAuth } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { supabase } from "@/lib/supabase/client";
 import { DELETE_CONFIRM_WORD, deleteAccount, isDeleteConfirmed } from "@/lib/account/delete-account";
-import { CtaButton, TertiaryButton } from "@/components/auth/auth-buttons";
+import { CtaButton, DestructiveButton, TertiaryButton } from "@/components/auth/auth-buttons";
 
 const FAILED = "We couldn't delete your account. Check your connection and try again.";
 const MATCH_LIVE = "Finish your match first. You can delete your account once it ends.";
+const CONFIRM = `Type ${DELETE_CONFIRM_WORD} exactly to confirm.`;
 const SIGNED_OUT = "You're signed out. If your account still exists, sign in to delete it.";
 
 /**
@@ -42,7 +43,9 @@ export default function DeleteAccountScreen() {
     }
     if (!result.ok) {
       setDeleting(false);
-      toast.error(result.code === "match_in_progress" ? MATCH_LIVE : FAILED);
+      toast.error(
+        result.code === "match_in_progress" ? MATCH_LIVE : result.code === "confirm_required" ? CONFIRM : FAILED,
+      );
       return;
     }
     await signOut();
@@ -64,9 +67,10 @@ export default function DeleteAccountScreen() {
             This permanently deletes your profile, photos and ELO. Your past matches stay in your opponents&apos; history as a deleted athlete. This can&apos;t be undone.
           </Text>
           <Text className="font-body text-[13px] text-ink-2 leading-relaxed">
-            Your name, profile photo, avatar, weight, birthday, Instagram, friends, invites, push devices
-            and messages are erased and you leave the rankings. Match videos and their stills stay with
-            the matches they belong to.
+            Your name, profile photo, avatar, current weight, birthday, Instagram, friends, open invites,
+            push devices, and the messages and chat photos you sent are erased, and you leave the
+            rankings. Match records (including weigh-ins, videos and stills) stay with the matches they
+            belong to, under a deleted athlete.
           </Text>
         </Plate>
 
@@ -113,7 +117,7 @@ function ConfirmStep({
         accessibilityLabel={`Type ${DELETE_CONFIRM_WORD} to confirm`}
         className="font-mono text-[16px] text-ink bg-surface-3 border border-hairline rounded-xs px-3 py-3"
       />
-      <CtaButton
+      <DestructiveButton
         testID="delete-submit"
         label={deleting ? "Deleting..." : "Delete account"}
         onPress={onDelete}

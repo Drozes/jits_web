@@ -9,6 +9,7 @@ import { DELETE_CONFIRM_WORD, deleteAccount, isDeleteConfirmed } from "./delete-
 
 const FAILED = "We couldn't delete your account. Check your connection and try again.";
 const MATCH_LIVE = "Finish your match first. You can delete your account once it ends.";
+const CONFIRM = `Type ${DELETE_CONFIRM_WORD} exactly to confirm.`;
 const SIGNED_OUT = "You're signed out. If your account still exists, sign in to delete it.";
 
 /** Two steps: read and Continue, then type DELETE and confirm. */
@@ -35,7 +36,9 @@ export function DeleteAccountForm() {
     }
     if (!result.ok) {
       setDeleting(false);
-      toast.error(result.code === "match_in_progress" ? MATCH_LIVE : FAILED);
+      toast.error(
+        result.code === "match_in_progress" ? MATCH_LIVE : result.code === "confirm_required" ? CONFIRM : FAILED,
+      );
       return;
     }
     // The auth user is gone; clear the local session (a server error here is
@@ -54,9 +57,10 @@ export function DeleteAccountForm() {
             This permanently deletes your profile, photos and ELO. Your past matches stay in your opponents&apos; history as a deleted athlete. This can&apos;t be undone.
           </p>
           <p style={bodyStyle}>
-            Your name, profile photo, avatar, weight, birthday, Instagram, friends, invites, push
-            devices and messages are erased and you leave the rankings. Match videos and their stills
-            stay with the matches they belong to.
+            Your name, profile photo, avatar, current weight, birthday, Instagram, friends, open
+            invites, push devices, and the messages and chat photos you sent are erased, and you leave
+            the rankings. Match records (including weigh-ins, videos and stills) stay with the matches
+            they belong to, under a deleted athlete.
           </p>
         </div>
       </Plate>
@@ -81,7 +85,7 @@ export function DeleteAccountForm() {
             disabled={deleting}
             style={inputStyle}
           />
-          <button type="submit" disabled={!ready || deleting} style={ctaStyle(!ready || deleting)}>
+          <button type="submit" disabled={!ready || deleting} style={dangerStyle(!ready || deleting)}>
             {deleting ? "DELETING..." : "DELETE ACCOUNT"}
           </button>
         </form>
@@ -141,6 +145,15 @@ function ctaStyle(disabled: boolean): React.CSSProperties {
     padding: "var(--space-4) var(--space-5)",
     cursor: disabled ? "not-allowed" : "pointer",
     opacity: disabled ? 0.5 : 1,
+  };
+}
+
+/** The irreversible final action uses the destructive token, never the accent CTA. */
+function dangerStyle(disabled: boolean): React.CSSProperties {
+  return {
+    ...ctaStyle(disabled),
+    color: "hsl(var(--destructive-foreground))",
+    background: "hsl(var(--destructive))",
   };
 }
 

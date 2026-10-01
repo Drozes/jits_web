@@ -66,7 +66,12 @@ export async function signInWithApple(
       token: credential.identityToken,
       nonce: nonce.raw,
     });
-    if (error) return { status: "error", message: error.message || APPLE_SIGN_IN_FAILED };
+    if (error) {
+      // The raw Supabase message ("Unacceptable audience in id_token") is for
+      // logs, not people.
+      console.warn("[apple] signInWithIdToken failed", error.message);
+      return { status: "error", message: APPLE_SIGN_IN_FAILED };
+    }
 
     const meta = appleNameMetadata(credential.fullName);
     if (meta) {

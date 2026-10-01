@@ -27,6 +27,9 @@ export function isDeleteConfirmed(typed: string): boolean {
 async function errorCode(error: unknown): Promise<string | null> {
   // FunctionsHttpError carries the Response in `context`.
   const ctx = (error as { context?: unknown } | null)?.context;
+  // Any 401 is a dead session, whatever the body says: the gateway's own JWT
+  // check (verify_jwt) answers with its own body ({code: 401, msg}), not ours.
+  if ((ctx as { status?: unknown } | null)?.status === 401) return "not_authenticated";
   if (ctx && typeof (ctx as Response).json === "function") {
     try {
       const body = (await (ctx as Response).clone().json()) as { code?: unknown };

@@ -82,10 +82,13 @@ describe("signInWithApple", () => {
     expect(c.auth.signInWithIdToken).not.toHaveBeenCalled();
   });
 
-  it("surfaces a Supabase error (supabase-js resolves, never rejects)", async () => {
+  it("maps a Supabase error to friendly copy and logs the raw message (supabase-js never rejects)", async () => {
     mockSignInAsync.mockResolvedValue({ identityToken: "t" });
-    const r = await signInWithApple(client({ signInError: { message: "Provider is not enabled" } }) as never);
-    expect(r).toEqual({ status: "error", message: "Provider is not enabled" });
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    const r = await signInWithApple(client({ signInError: { message: "Unacceptable audience in id_token" } }) as never);
+    expect(r).toEqual({ status: "error", message: APPLE_SIGN_IN_FAILED });
+    expect(warn).toHaveBeenCalledWith("[apple] signInWithIdToken failed", "Unacceptable audience in id_token");
+    warn.mockRestore();
   });
 });
 

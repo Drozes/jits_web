@@ -24,6 +24,11 @@ export async function deleteAccount(
   });
   if (error) {
     const ctx = (error as { context?: unknown }).context;
+    // Any 401 is a dead session, whatever the body says: the gateway's own
+    // JWT check (verify_jwt) answers with its own body ({code: 401, msg}).
+    if ((ctx as { status?: unknown } | null)?.status === 401) {
+      return { ok: false, code: "not_authenticated" };
+    }
     if (ctx instanceof Response) {
       try {
         const body = (await ctx.clone().json()) as { code?: unknown };

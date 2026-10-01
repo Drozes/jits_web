@@ -95,9 +95,32 @@ describe("DeleteAccountForm", () => {
     expect(mocks.replace).not.toHaveBeenCalled();
   });
 
-  it("does not claim match videos are erased", () => {
+  it("shows confirm copy, not the connection copy, for confirm_required", async () => {
+    mocks.invoke.mockResolvedValue({
+      data: null,
+      error: { context: new Response(JSON.stringify({ ok: false, code: "confirm_required" }), { status: 400 }) },
+    });
+    toConfirm();
+    fireEvent.change(screen.getByLabelText("TYPE DELETE TO CONFIRM"), { target: { value: "DELETE" } });
+    fireEvent.click(screen.getByRole("button", { name: "DELETE ACCOUNT" }));
+    await waitFor(() => expect(mocks.toastError).toHaveBeenCalledWith("Type DELETE exactly to confirm."));
+    expect(mocks.signOut).not.toHaveBeenCalled();
+  });
+
+  it("does not claim match records, weigh-ins or videos are erased", () => {
     render(<DeleteAccountForm />);
-    expect(screen.getByText(/Match videos and their stills stay with the matches they belong to\./)).toBeTruthy();
+    expect(
+      screen.getByText(/Match records \(including weigh-ins, videos and stills\) stay with the matches they\s+belong to, under a deleted athlete\./),
+    ).toBeTruthy();
+    expect(screen.getByText(/the messages and chat photos you sent are erased/)).toBeTruthy();
+    expect(screen.getByText(/open\s+invites/)).toBeTruthy();
+  });
+
+  it("styles the final delete with the destructive token, not the accent CTA", () => {
+    toConfirm();
+    const submit = screen.getByRole("button", { name: "DELETE ACCOUNT" });
+    expect(submit.getAttribute("style")).toContain("var(--destructive)");
+    expect(submit.getAttribute("style")).not.toContain("--accent-cta");
   });
 
   it("Keep my account goes back", () => {
@@ -114,6 +137,18 @@ describe("deleteAccount", () => {
         invoke: vi.fn().mockResolvedValue({
           data: null,
           error: { context: new Response(JSON.stringify({ ok: false, code: "not_authenticated" }), { status: 401 }) },
+        }),
+      },
+    };
+    expect(await deleteAccount(client as never)).toEqual({ ok: false, code: "not_authenticated" });
+  });
+
+  it("maps a gateway 401 (verify_jwt body, numeric code) to not_authenticated", async () => {
+    const client = {
+      functions: {
+        invoke: vi.fn().mockResolvedValue({
+          data: null,
+          error: { context: new Response(JSON.stringify({ code: 401, msg: "Invalid JWT" }), { status: 401 }) },
         }),
       },
     };

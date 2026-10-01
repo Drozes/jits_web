@@ -36,6 +36,30 @@ export function CtaButton({ label, onPress, disabled, className, testID }: CtaBu
   );
 }
 
+/**
+ * Destructive button: same shape as CtaButton on the destructive token, for
+ * irreversible actions (account deletion). Never the accent CTA.
+ */
+export function DestructiveButton({ label, onPress, disabled, className, testID }: CtaButtonProps) {
+  return (
+    <Pressable
+      testID={testID}
+      accessibilityRole="button"
+      onPress={onPress}
+      disabled={disabled}
+      className={cn(
+        "bg-destructive items-center justify-center rounded-sm px-5 py-4 active:opacity-90",
+        disabled && "opacity-50",
+        className,
+      )}
+    >
+      <Text className="font-heading text-[14px] text-destructive-foreground uppercase tracking-caps-l">
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
 interface SecondaryButtonProps {
   label: string;
   onPress: () => void;

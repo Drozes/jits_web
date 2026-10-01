@@ -96,9 +96,29 @@ it("refuses during a live match and keeps the account", async () => {
   expect(s.getByTestId("delete-submit")).toBeTruthy();
 });
 
-it("does not claim match videos are erased", () => {
+it("shows confirm copy, not the connection copy, for confirm_required", async () => {
+  mockDelete.mockResolvedValue({ ok: false, code: "confirm_required" });
+  const s = toConfirm();
+  fireEvent.changeText(s.getByTestId("delete-confirm-input"), "DELETE");
+  fireEvent.press(s.getByTestId("delete-submit"));
+  await waitFor(() => expect(mockToast.error).toHaveBeenCalledWith("Type DELETE exactly to confirm."));
+  expect(mockSignOut).not.toHaveBeenCalled();
+});
+
+it("does not claim match records, weigh-ins or videos are erased", () => {
   const s = render(<DeleteAccountScreen />);
-  expect(s.getByText(/Match videos and their stills stay with the matches they belong to\./)).toBeTruthy();
+  expect(
+    s.getByText(/Match records \(including weigh-ins, videos and stills\) stay with the matches they belong to, under a deleted athlete\./),
+  ).toBeTruthy();
+  expect(s.getByText(/the messages and chat photos you sent are erased/)).toBeTruthy();
+  expect(s.getByText(/open invites/)).toBeTruthy();
+});
+
+it("uses the destructive button, not the accent CTA, for the final delete", () => {
+  const s = toConfirm();
+  const cls = String(s.getByTestId("delete-submit").props.className ?? "");
+  expect(cls).toContain("bg-destructive");
+  expect(cls).not.toContain("bg-cta");
 });
 
 it("Keep my account goes back", () => {
