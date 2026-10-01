@@ -125,12 +125,17 @@ export function useClaimRunner(
   /** Save the date of birth (dob_required), then claim again. */
   const submitDob = React.useCallback(
     async (dateOfBirth: string) => {
-      if (!pending || !athleteId || running.current) return;
+      if (!pending || running.current) return;
+      if (!athleteId) {
+        // No athlete row loaded yet: say so instead of doing nothing.
+        setDobError(DOB_SAVE_FAILED_COPY);
+        return;
+      }
       running.current = true;
       try {
         setDobError(null);
         setState({ phase: "saving_dob" });
-        const saved = await setMyDateOfBirth(supabase, athleteId, dateOfBirth);
+        const saved = await setMyDateOfBirth(supabase, athleteId, dateOfBirth.trim());
         if (!saved.ok) {
           setDobError(DOB_SAVE_FAILED_COPY);
           setState({ phase: "done", step: { type: "dob", message: DOB_REQUIRED_COPY } });

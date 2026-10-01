@@ -189,6 +189,13 @@ describe("setMyDateOfBirth", () => {
     expect(calls).toContainEqual(["eq", "id", "me"]);
   });
 
+  it("trims padded input once, saving and comparing the same value", async () => {
+    const { supabase, calls } = fromClient({ data: { date_of_birth: "1990-05-01" }, error: null });
+    const res = await setMyDateOfBirth(supabase, "me", "  1990-05-01 ");
+    expect(res).toEqual({ ok: true, data: { date_of_birth: "1990-05-01" } });
+    expect(calls).toContainEqual(["update", { date_of_birth: "1990-05-01" }]);
+  });
+
   it("is not saved when RLS matched no row", async () => {
     const res = await setMyDateOfBirth(fromClient({ data: null, error: null }).supabase, "me", "1990-05-01");
     expect(res).toMatchObject({ ok: false, error: { hint: "not_saved" } });

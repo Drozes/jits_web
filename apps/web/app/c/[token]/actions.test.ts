@@ -176,10 +176,23 @@ describe("confirmDobAndClaimAction (dob_required)", () => {
     expect(outcome).toMatchObject({ kind: "booked" });
   });
 
-  it("a date under 16 is claimed and the server's underage answer shows the underage copy", async () => {
-    rpc.mockResolvedValue({ data: { ok: false, code: "underage", inviter: ALEX }, error: null });
+  it("a date under 16 stays on the step with the underage copy, never saved or claimed", async () => {
     const outcome = await confirmDobAndClaimAction(TOKEN, "2015-01-01");
-    expect(outcome).toMatchObject({ kind: "error", body: "You must be 16 or older to compete on ELO RATED." });
+    expect(outcome).toEqual({
+      kind: "dob",
+      title: "Confirm your date of birth",
+      body: "We need your date of birth before your first match. You must be 16 or older.",
+      error: "You must be 16 or older to compete on ELO RATED.",
+    });
+    expect(setMyDateOfBirth).not.toHaveBeenCalled();
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("trims padded input once and saves the trimmed date", async () => {
+    rpc.mockResolvedValue({ data: BOOKED, error: null });
+    const outcome = await confirmDobAndClaimAction(TOKEN, "  1990-05-01 ");
+    expect(setMyDateOfBirth).toHaveBeenCalledWith(expect.anything(), "me", "1990-05-01");
+    expect(outcome).toMatchObject({ kind: "booked" });
   });
 
   it("a date that is not real stays on the step without saving or claiming", async () => {

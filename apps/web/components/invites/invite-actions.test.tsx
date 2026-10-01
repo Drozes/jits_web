@@ -70,15 +70,31 @@ describe("InviteActions: dob_required", () => {
     expect(screen.queryByTestId("invite-dob")).toBeNull();
   });
 
-  it("shows the underage copy when the entered date is under 16", async () => {
+  it("an under-16 date shows the underage copy inline, sends nothing and stays editable", async () => {
     await reachDobStep();
-    confirmDobAndClaimAction.mockResolvedValue({
-      kind: "error",
-      title: "16 and over",
-      body: "You must be 16 or older to compete on ELO RATED.",
-    });
     enterDob("2015-01-01");
+    await waitFor(() =>
+      expect(screen.getByRole("alert").textContent).toBe("You must be 16 or older to compete on ELO RATED."),
+    );
+    expect(confirmDobAndClaimAction).not.toHaveBeenCalled();
+    // The mistyped year can be corrected and saved.
+    confirmDobAndClaimAction.mockResolvedValue(BOOKED);
+    enterDob("1990-05-01");
+    await screen.findByText("Challenge accepted");
+    expect(confirmDobAndClaimAction).toHaveBeenCalledWith(TOKEN, "1990-05-01");
+  });
+
+  it("a server underage answer on the step keeps the input and lets the athlete fix it", async () => {
+    await reachDobStep();
+    confirmDobAndClaimAction.mockResolvedValueOnce({ ...DOB, error: "You must be 16 or older to compete on ELO RATED." });
+    // Passes the client check (UTC drift is the server's call), then corrected.
+    enterDob("1990-05-02");
     await screen.findByText("You must be 16 or older to compete on ELO RATED.");
+    const input = screen.getByLabelText("Date of birth") as HTMLInputElement;
+    expect(input.value).toBe("1990-05-02");
+    confirmDobAndClaimAction.mockResolvedValueOnce(BOOKED);
+    enterDob("1990-05-01");
+    await screen.findByText("Challenge accepted");
   });
 
   it("keeps the step open with a message when the save fails", async () => {

@@ -12,7 +12,7 @@
 import * as React from "react";
 import { ActivityIndicator, Linking, ScrollView, Text, View } from "react-native";
 import { Redirect, useRouter, type Href } from "expo-router";
-import { ACCURACY_TOO_LOW_COPY, LOCATION_DENIED_COPY } from "@jits/shared/utils";
+import { ACCURACY_TOO_LOW_COPY, DOB_REQUIRED_COPY, LOCATION_DENIED_COPY } from "@jits/shared/utils";
 import { AppHeader } from "@/components/layout/app-header";
 import { CtaButton, SecondaryButton, TertiaryButton } from "@/components/auth/auth-buttons";
 import { Plate } from "@/components/ui/elo-system";
@@ -61,6 +61,10 @@ export default function InviteClaimScreen() {
   };
 
   const step = state.phase === "done" ? state.step : null;
+  // The DOB step stays mounted while it saves (same slot, so its picked date
+  // survives a failed save); the runner returns to it on failure.
+  const savingDob = state.phase === "saving_dob";
+  const dobMessage = step?.type === "dob" ? step.message : savingDob ? DOB_REQUIRED_COPY : null;
 
   React.useEffect(() => {
     if (!step) return;
@@ -99,7 +103,7 @@ export default function InviteClaimScreen() {
             <SecondaryButton label="Sign out" onPress={() => void notMe()} />
             <TertiaryButton label="Not now" onPress={() => void notNow()} />
           </Plate>
-        ) : name && !step ? (
+        ) : name && !step && !savingDob ? (
           <View className="flex-row flex-wrap items-center gap-x-2" testID="claim-signed-in-as">
             <Text className="font-body text-[12px] text-ink-3">Signed in as {name}. Not you?</Text>
             <TertiaryButton label="Sign out" onPress={() => void notMe()} className="px-0 py-1" />
@@ -116,7 +120,7 @@ export default function InviteClaimScreen() {
           </Plate>
         ) : null}
 
-        {!awaitingConfirm && (!step || (step.type === "go_match" && !isInArenaMatch()) || step.type === "setup") ? (
+        {!awaitingConfirm && !savingDob && (!step || (step.type === "go_match" && !isInArenaMatch()) || step.type === "setup") ? (
           <View className="items-center gap-3 py-10" accessibilityLiveRegion="polite">
             <ActivityIndicator color={tokens.textSecondary} />
             <Text className="font-body text-[14px] text-ink-2">
@@ -124,9 +128,7 @@ export default function InviteClaimScreen() {
                 ? "Checking you're on the mat..."
                 : state.phase === "checking"
                   ? "Opening your invite..."
-                  : state.phase === "saving_dob"
-                    ? "Saving your date of birth..."
-                    : "Accepting the challenge..."}
+                  : "Accepting the challenge..."}
             </Text>
           </View>
         ) : null}
@@ -149,10 +151,11 @@ export default function InviteClaimScreen() {
           </Plate>
         ) : null}
 
-        {step?.type === "dob" ? (
+        {dobMessage ? (
           <ClaimDobStep
-            message={step.message}
+            message={dobMessage}
             error={dobError}
+            busy={savingDob}
             onSubmit={(dob) => void submitDob(dob)}
             onNotNow={() => void notNow()}
           />

@@ -383,16 +383,18 @@ export async function setMyDateOfBirth(
   athleteId: string,
   dateOfBirth: string,
 ): Promise<InviteResult<{ date_of_birth: string }>> {
+  // Saved and compared in one normal form, so padded input is not "not_saved".
+  const dob = dateOfBirth.trim();
   try {
     const { data, error } = await supabase
       .from("athletes")
-      .update({ date_of_birth: dateOfBirth })
+      .update({ date_of_birth: dob })
       .eq("id", athleteId)
       .select("date_of_birth")
       .maybeSingle();
     if (error) return { ok: false, error: { hint: error.hint || "unknown", message: error.message ?? "" } };
     const saved = str((data as { date_of_birth?: unknown } | null)?.date_of_birth);
-    if (saved !== dateOfBirth) {
+    if (saved !== dob) {
       return { ok: false, error: { hint: "not_saved", message: "Date of birth was not saved." } };
     }
     return { ok: true, data: { date_of_birth: saved } };

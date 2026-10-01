@@ -200,4 +200,33 @@ describe("dob_required", () => {
     expect(result.current.state).toMatchObject({ step: { type: "dob" } });
     expect(result.current.dobError).toBe("Couldn't save your date of birth. Check your connection and try again.");
   });
+
+  it("with no athlete row loaded, says the save failed instead of doing nothing", async () => {
+    const pending = makePendingInvite({ token: TOKEN }, "universal_link");
+    await AsyncStorage.setItem(PENDING_INVITE_KEY, JSON.stringify(pending));
+    mockJoin.mockResolvedValue(NOT_A_JOIN);
+    mockReading.mockResolvedValue({ status: "unavailable" });
+    mockClaim.mockResolvedValueOnce(DOB_REQUIRED);
+    const { result } = renderHook(() => useClaimRunner(pending, "active", { athleteId: null }));
+    await act(async () => {
+      await result.current.run();
+    });
+    await act(async () => {
+      await result.current.submitDob("1990-05-01");
+    });
+    expect(mockSetDob).not.toHaveBeenCalled();
+    expect(mockClaim).toHaveBeenCalledTimes(1);
+    expect(result.current.state).toMatchObject({ phase: "done", step: { type: "dob" } });
+    expect(result.current.dobError).toBe("Couldn't save your date of birth. Check your connection and try again.");
+  });
+
+  it("trims padded input before saving", async () => {
+    const { result } = await reachDob();
+    mockSetDob.mockResolvedValue({ ok: true, data: { date_of_birth: "1990-05-01" } });
+    mockClaim.mockResolvedValueOnce(BOOKED);
+    await act(async () => {
+      await result.current.submitDob(" 1990-05-01 ");
+    });
+    expect(mockSetDob).toHaveBeenCalledWith(expect.anything(), "me", "1990-05-01");
+  });
 });

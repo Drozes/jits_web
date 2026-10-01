@@ -5,7 +5,7 @@
  */
 import * as React from "react";
 import { Text } from "react-native";
-import { checkDateOfBirth, DOB_INVALID_COPY, DOB_REQUIRED_TITLE } from "@jits/shared/utils";
+import { checkDateOfBirth, DOB_INVALID_COPY, DOB_REQUIRED_TITLE, UNDERAGE_COPY } from "@jits/shared/utils";
 import { CtaButton, SecondaryButton } from "@/components/auth/auth-buttons";
 import { DateOfBirthPicker } from "@/components/profile-setup/date-of-birth-picker";
 import { Plate } from "@/components/ui/elo-system";
@@ -14,18 +14,26 @@ interface ClaimDobStepProps {
   message: string;
   /** Inline error from the last save (null when none). */
   error: string | null;
+  /**
+   * The save is in flight. The step stays mounted while it saves, so the
+   * picked date survives a failed save and Save works again straight away.
+   */
+  busy?: boolean;
   onSubmit: (dateOfBirth: string) => void;
   onNotNow: () => void;
 }
 
-export function ClaimDobStep({ message, error, onSubmit, onNotNow }: ClaimDobStepProps) {
+export function ClaimDobStep({ message, error, busy = false, onSubmit, onNotNow }: ClaimDobStepProps) {
   const [value, setValue] = React.useState("");
   const [localError, setLocalError] = React.useState<string | null>(null);
   const shown = localError ?? error;
 
   const submit = () => {
-    if (checkDateOfBirth(value) === "invalid") {
-      setLocalError(DOB_INVALID_COPY);
+    if (busy) return;
+    const check = checkDateOfBirth(value);
+    if (check !== "ok") {
+      // The picker cannot select under 16; this guards the UTC day edge.
+      setLocalError(check === "underage" ? UNDERAGE_COPY : DOB_INVALID_COPY);
       return;
     }
     setLocalError(null);
@@ -43,13 +51,18 @@ export function ClaimDobStep({ message, error, onSubmit, onNotNow }: ClaimDobSte
           setLocalError(null);
         }}
       />
-      {shown ? (
+      {shown && !busy ? (
         <Text testID="claim-dob-error" accessibilityRole="alert" className="font-body text-[14px] text-cta">
           {shown}
         </Text>
       ) : null}
-      <CtaButton label="Save and accept" testID="claim-dob-save" disabled={!value} onPress={submit} />
-      <SecondaryButton label="Not now" onPress={onNotNow} />
+      <CtaButton
+        label={busy ? "Saving..." : "Save and accept"}
+        testID="claim-dob-save"
+        disabled={!value || busy}
+        onPress={submit}
+      />
+      <SecondaryButton label="Not now" disabled={busy} onPress={onNotNow} />
     </Plate>
   );
 }

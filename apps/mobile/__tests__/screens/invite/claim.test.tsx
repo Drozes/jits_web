@@ -196,3 +196,36 @@ it("dob_required: a failed save keeps the step with an error", async () => {
   expect(screen.getByText("Couldn't save your date of birth. Check your connection and try again.")).toBeTruthy();
   expect(mockClaim).toHaveBeenCalledTimes(1);
 });
+
+it("dob_required: the picked date survives a failed save, so Save works again without re-picking", async () => {
+  await withPending({ code: "K7Q4M2" }, "code");
+  mockClaim
+    .mockResolvedValueOnce({ ok: true, data: { ok: false, code: "dob_required", inviter } })
+    .mockResolvedValueOnce({
+      ok: true,
+      data: { ok: true, result: "booked", challenge_id: "c1", match_id: null, inviter, start_blocked_reason: "far" },
+    });
+  let failSave: (v: unknown) => void = () => {};
+  mockSetDob
+    .mockImplementationOnce(() => new Promise((resolve) => (failSave = resolve)))
+    .mockResolvedValueOnce({ ok: true, data: { date_of_birth: "1990-05-01" } });
+  render(<InviteClaimScreen />);
+  await screen.findByTestId("claim-dob");
+  fireEvent.press(screen.getByTestId("dob-picker"));
+  fireEvent.press(screen.getByTestId("claim-dob-save"));
+  // While saving: the step stays on screen with the date, Save busy and disabled.
+  await waitFor(() => expect(screen.getByText("Saving...")).toBeTruthy());
+  expect(screen.getByTestId("claim-dob")).toBeTruthy();
+  expect(screen.getByText("1990-05-01")).toBeTruthy();
+  expect(screen.getByTestId("claim-dob-save").props.accessibilityState).toMatchObject({ disabled: true });
+  failSave({ ok: false, error: { hint: "unknown", message: "offline" } });
+  expect(await screen.findByTestId("claim-dob-error")).toBeTruthy();
+  // The date is still picked and Save is enabled: re-submit without touching the picker.
+  expect(screen.getByText("1990-05-01")).toBeTruthy();
+  expect(screen.getByTestId("claim-dob-save").props.accessibilityState).toMatchObject({ disabled: false });
+  fireEvent.press(screen.getByTestId("claim-dob-save"));
+  expect(await screen.findByTestId("claim-booked")).toBeTruthy();
+  expect(mockSetDob).toHaveBeenCalledTimes(2);
+  expect(mockSetDob).toHaveBeenLastCalledWith(expect.anything(), "me", "1990-05-01");
+  expect(mockClaim).toHaveBeenCalledTimes(2);
+});

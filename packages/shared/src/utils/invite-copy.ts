@@ -69,7 +69,9 @@ export type DateOfBirthCheck = "ok" | "invalid" | "underage";
 /**
  * Client check of a `YYYY-MM-DD` date of birth before it is saved: a real
  * calendar date, not in the future, not before 1900, and 16 or older on
- * `today` (local calendar). The claim RPC re-checks age on the server date.
+ * `today`. "Today" is the UTC calendar date, because the claim RPC re-checks
+ * age against Postgres `current_date` (UTC), and the two must agree on the
+ * 16th birthday or the client could pass a date the server calls underage.
  */
 export function checkDateOfBirth(value: string, today: Date = new Date()): DateOfBirthCheck {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
@@ -80,12 +82,20 @@ export function checkDateOfBirth(value: string, today: Date = new Date()): DateO
   const date = new Date(Date.UTC(y, mo - 1, d));
   if (date.getUTCFullYear() !== y || date.getUTCMonth() !== mo - 1 || date.getUTCDate() !== d) return "invalid";
   if (y < 1900) return "invalid";
-  const ty = today.getFullYear();
-  const tm = today.getMonth() + 1;
-  const td = today.getDate();
+  const ty = today.getUTCFullYear();
+  const tm = today.getUTCMonth() + 1;
+  const td = today.getUTCDate();
   if (y > ty || (y === ty && (mo > tm || (mo === tm && d > td)))) return "invalid";
   const age = ty - y - (tm < mo || (tm === mo && td < d) ? 1 : 0);
   return age >= 16 ? "ok" : "underage";
+}
+
+/** Today's UTC calendar date as `YYYY-MM-DD` (the server's `current_date`). */
+export function utcTodayYmd(today: Date = new Date()): string {
+  const y = today.getUTCFullYear();
+  const m = String(today.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(today.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
 }
 
 /** First name for copy: `ALEX` style comes from the server card; falls back. */

@@ -56,8 +56,10 @@ export function DateOfBirthPicker({ value, onChange }: DateOfBirthPickerProps) {
 
   const now = new Date();
   // Under-16 cannot be selected; default the picker to the 16th birthday cutoff.
+  // The cutoff follows the UTC date, like the server's `current_date` age
+  // check, so a date the picker allows is never one the server calls underage.
   const maximumDate = React.useMemo(
-    () => new Date(now.getFullYear() - 16, now.getMonth(), now.getDate()),
+    () => new Date(now.getUTCFullYear() - 16, now.getUTCMonth(), now.getUTCDate()),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );

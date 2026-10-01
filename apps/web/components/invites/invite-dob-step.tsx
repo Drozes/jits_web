@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
-import { checkDateOfBirth, DOB_INVALID_COPY } from "@jits/shared/utils";
+import { checkDateOfBirth, DOB_INVALID_COPY, UNDERAGE_COPY, utcTodayYmd } from "@jits/shared/utils";
 import type { InviteOutcome } from "@/lib/invites/outcome-copy";
 import { BODY_TEXT, CAPS_LABEL, PRIMARY_CTA } from "./styles";
 
@@ -11,12 +11,6 @@ interface InviteDobStepProps {
   outcome: DobOutcome;
   pending: boolean;
   onSubmit: (dateOfBirth: string) => void;
-}
-
-/** Local YYYY-MM-DD for the date input's max (no UTC shift). */
-function todayYmd(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 /**
@@ -33,8 +27,11 @@ export function InviteDobStep({ outcome, pending, onSubmit }: InviteDobStepProps
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (checkDateOfBirth(value) === "invalid") {
-      setLocalError(DOB_INVALID_COPY);
+    const check = checkDateOfBirth(value);
+    if (check !== "ok") {
+      // An under-16 date (often a mistyped year) is never sent: saved, it
+      // would be permanent and the claim would dead-end on `underage`.
+      setLocalError(check === "underage" ? UNDERAGE_COPY : DOB_INVALID_COPY);
       return;
     }
     setLocalError(null);
@@ -53,7 +50,7 @@ export function InviteDobStep({ outcome, pending, onSubmit }: InviteDobStepProps
         type="date"
         required
         min="1900-01-01"
-        max={todayYmd()}
+        max={utcTodayYmd()}
         value={value}
         onChange={(e) => {
           setValue(e.target.value);
