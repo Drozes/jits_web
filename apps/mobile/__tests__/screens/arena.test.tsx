@@ -11,6 +11,7 @@
  */
 import * as React from "react";
 import { act, fireEvent, render, waitFor, within } from "@testing-library/react-native";
+import { ScrollView } from "react-native";
 
 // ---- mocks ----
 
@@ -1020,7 +1021,7 @@ describe("Arena screen", () => {
       expect(r.queryByText("On the mat · closest first")).toBeNull();
     });
 
-    it("the invite actions sit at the bottom, only while invites are enabled", () => {
+    it("the invite actions are pinned at the bottom, only while invites are enabled", () => {
       mockIsLive = true;
       mockRoster.competitors = [];
       mockLobbyIds = new Set();
@@ -1042,6 +1043,18 @@ describe("Arena screen", () => {
         .UNSAFE_root.findAll((n: { props: { testID?: unknown } }) => typeof n.props.testID === "string")
         .map((n: { props: { testID?: unknown } }) => n.props.testID as string);
       expect(ids.lastIndexOf("arena-invite-actions")).toBeGreaterThan(ids.indexOf("arena-on-the-mat"));
+      // Pinned: the actions live outside the scroll view, so they never
+      // scroll off screen.
+      const insideScroll = (start: unknown) => {
+        let node = start as { type: unknown; parent: unknown } | null;
+        while (node) {
+          if (node.type === ScrollView) return true;
+          node = node.parent as { type: unknown; parent: unknown } | null;
+        }
+        return false;
+      };
+      expect(insideScroll(full.getByTestId("arena-on-the-mat"))).toBe(true);
+      expect(insideScroll(invite)).toBe(false);
     });
 
     it("the signed gap is data: ink, never red or green (spec 3)", () => {

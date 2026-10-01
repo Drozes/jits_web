@@ -1,7 +1,8 @@
 /**
  * The Arena, as a Mat Board (spec arena-live-chip section 6): who should I
  * roll with right now? Sticky control bar, the challenge strips, the Closest
- * Match card (the surface's one red CTA), On The Mat and the invite actions. Rules
+ * Match card (the surface's one red CTA) and On The Mat, with the invite actions
+ * pinned above the tab bar. Rules
  * live in `lib/arena/mat-board.ts`, pieces in `components/arena/mat-board.tsx`.
  *
  * On The Mat is the roster (`get_arena_data.looking_athletes`) intersected
@@ -407,24 +408,28 @@ export default function ArenaScreen() {
                 })}
               </View>
             ) : null}
-
-            {/* Invites (jr_be spec 016): always at the bottom, secondary
-                styling, the red stays GO LIVE. */}
-            {invitesOn && !hasError ? (
-              <View testID="arena-invite-actions" className="gap-2">
-                <SecondaryButton
-                  label="Invite a training partner"
-                  onPress={() => router.push("/invite?from=arena" as Href)}
-                />
-                <TertiaryButton
-                  label="Got a challenge code?"
-                  onPress={() => router.push("/invite-code" as Href)}
-                />
-              </View>
-            ) : null}
           </>
         )}
       </PageContainer>
+
+      {/* Invites (jr_be spec 016): pinned above the tab bar, outside the
+          scroll, so it is always reachable. Secondary styling: the red stays
+          GO LIVE. */}
+      {invitesOn && !hasError && !isLoading ? (
+        <View
+          testID="arena-invite-actions"
+          className="gap-2 border-t border-hairline bg-surface px-4 pb-3 pt-3"
+        >
+          <SecondaryButton
+            label="Invite a training partner"
+            onPress={() => router.push("/invite?from=arena" as Href)}
+          />
+          <TertiaryButton
+            label="Got a challenge code?"
+            onPress={() => router.push("/invite-code" as Href)}
+          />
+        </View>
+      ) : null}
     </View>
   );
 }
