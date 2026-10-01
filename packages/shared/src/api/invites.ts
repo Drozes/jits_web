@@ -404,19 +404,29 @@ export function logInviteEvent(
 // ---------------------------------------------------------------------------
 // Flag
 
-/** `invites_enabled` from `feature_flags`. Fail-closed: any error reads as off. */
-export async function isInvitesEnabled(supabase: Client): Promise<boolean> {
+/**
+ * `invites_enabled` from `feature_flags`: true / false when the read worked
+ * (a missing row is off), null when it failed (offline, token refresh), so a
+ * caller can retry instead of caching a transient failure as "off".
+ */
+export async function readInvitesEnabled(supabase: Client): Promise<boolean | null> {
   try {
     const { data, error } = await supabase
       .from("feature_flags")
       .select("enabled")
       .eq("key", "invites_enabled")
       .maybeSingle();
-    if (error || !data) return false;
+    if (error) return null;
+    if (!data) return false;
     return (data as { enabled?: boolean }).enabled === true;
   } catch {
-    return false;
+    return null;
   }
+}
+
+/** `invites_enabled`, fail-closed: any error reads as off. */
+export async function isInvitesEnabled(supabase: Client): Promise<boolean> {
+  return (await readInvitesEnabled(supabase)) === true;
 }
 
 /** Live updates of one invite row (the inviter's waiting screen). */
@@ -458,5 +468,47 @@ export async function getInviteStatus(
     return data as { status: string; claimed_by: string | null; challenge_id: string | null };
   } catch {
     return null;
+  }
+}
+
+/** One of my open challenge invites (the token and link are never readable). */
+export interface OpenChallengeInvite {
+  id: string;
+  short_code: string | null;
+  code_expires_at: string | null;
+  link_expires_at: string;
+  created_at: string;
+}
+
+/**
+ * My open challenge invites (inviter RLS on `invites`), newest first: the ones
+ * that count toward the 5-open limit (`too_many_open_invites`), so each can be
+ * withdrawn with `revokeInvite`.
+ */
+export async function listMyOpenChallengeInvites(
+  supabase: Client,
+  athleteId: string,
+  now: Date = new Date(),
+): Promise<InviteResult<OpenChallengeInvite[]>> {
+  try {
+    type Q = {
+      select: (c: string) => Q;
+      eq: (k: string, v: string) => Q;
+      gt: (k: string, v: string) => Q;
+      order: (k: string, o: { ascending: boolean }) => PromiseLike<{ data: unknown; error: RawError }>;
+    };
+    const from = supabase.from as unknown as (t: string) => Q;
+    const { data, error } = await from
+      .call(supabase, "invites")
+      .select("id, short_code, code_expires_at, link_expires_at, created_at")
+      .eq("inviter_id", athleteId)
+      .eq("kind", "challenge")
+      .eq("status", "open")
+      .gt("link_expires_at", now.toISOString())
+      .order("created_at", { ascending: false });
+    if (error) return { ok: false, error: { hint: error.hint || "unknown", message: error.message ?? "" } };
+    return { ok: true, data: Array.isArray(data) ? (data as OpenChallengeInvite[]) : [] };
+  } catch (err) {
+    return { ok: false, error: { hint: "unknown", message: err instanceof Error ? err.message : String(err) } };
   }
 }

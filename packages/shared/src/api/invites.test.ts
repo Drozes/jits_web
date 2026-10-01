@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { claimChallengeInvite, createInvite, parseClaimResult } from "./invites";
+import { claimChallengeInvite, createInvite, listMyOpenChallengeInvites, parseClaimResult, readInvitesEnabled } from "./invites";
 import { getMyFriends, parseFriends, sortFriendsFirst } from "./friends";
 
 function client(result: { data: unknown; error: unknown }) {
@@ -106,5 +106,52 @@ describe("friends", () => {
   it("sortFriendsFirst is a stable partition", () => {
     const out = sortFriendsFirst(["a", "b", "c", "d"], (x) => x, new Set(["c", "a"]));
     expect(out).toEqual(["a", "c", "b", "d"]);
+  });
+});
+
+function fromClient(result: { data: unknown; error: unknown }) {
+  const calls: [string, ...unknown[]][] = [];
+  const q: Record<string, unknown> = {};
+  for (const m of ["select", "eq", "gt"]) {
+    q[m] = (...a: unknown[]) => {
+      calls.push([m, ...a]);
+      return q;
+    };
+  }
+  q.order = (...a: unknown[]) => {
+    calls.push(["order", ...a]);
+    return Promise.resolve(result);
+  };
+  q.maybeSingle = () => Promise.resolve(result);
+  const from = vi.fn(() => q);
+  return { supabase: { from } as unknown as SupabaseClient<never>, from, calls };
+}
+
+describe("readInvitesEnabled", () => {
+  it("is null on an error (retryable), false for a missing row, true when on", async () => {
+    expect(await readInvitesEnabled(fromClient({ data: null, error: { message: "offline" } }).supabase)).toBeNull();
+    expect(await readInvitesEnabled(fromClient({ data: null, error: null }).supabase)).toBe(false);
+    expect(await readInvitesEnabled(fromClient({ data: { enabled: true }, error: null }).supabase)).toBe(true);
+  });
+});
+
+describe("listMyOpenChallengeInvites", () => {
+  it("reads my open, unexpired challenge invites newest first", async () => {
+    const row = { id: "i1", short_code: "K7Q4M2", code_expires_at: null, link_expires_at: "x", created_at: "y" };
+    const { supabase, from, calls } = fromClient({ data: [row], error: null });
+    const now = new Date("2026-10-01T12:00:00Z");
+    const res = await listMyOpenChallengeInvites(supabase, "me", now);
+    expect(res).toEqual({ ok: true, data: [row] });
+    expect(from).toHaveBeenCalledWith("invites");
+    expect(calls).toContainEqual(["eq", "inviter_id", "me"]);
+    expect(calls).toContainEqual(["eq", "kind", "challenge"]);
+    expect(calls).toContainEqual(["eq", "status", "open"]);
+    expect(calls).toContainEqual(["gt", "link_expires_at", now.toISOString()]);
+    expect(calls).toContainEqual(["order", "created_at", { ascending: false }]);
+  });
+
+  it("returns the error instead of throwing", async () => {
+    const res = await listMyOpenChallengeInvites(fromClient({ data: null, error: { message: "nope" } }).supabase, "me");
+    expect(res.ok).toBe(false);
   });
 });

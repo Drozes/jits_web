@@ -20,12 +20,14 @@ const mockCreate = jest.fn();
 const mockPresence = jest.fn();
 const mockStatus = jest.fn();
 const mockBookings = jest.fn();
+const mockRevoke = jest.fn();
+const mockRefresh = jest.fn();
 // eslint-disable-next-line no-var
 var mockOnRow: ((row: { status: string; claimed_by: string | null; challenge_id: string | null }) => void) | null = null;
 jest.mock("@jits/shared/api/invites", () => ({
   createInvite: (...a: unknown[]) => mockCreate(...a),
-  refreshInviteCode: jest.fn(),
-  revokeInvite: jest.fn(),
+  refreshInviteCode: (...a: unknown[]) => mockRefresh(...a),
+  revokeInvite: (...a: unknown[]) => mockRevoke(...a),
   getInviteStatus: (...a: unknown[]) => mockStatus(...a),
   getMyBookings: (...a: unknown[]) => mockBookings(...a),
   reportMatchPresence: (...a: unknown[]) => mockPresence(...a),
@@ -60,6 +62,7 @@ beforeEach(() => {
   mockStatus.mockResolvedValue({ status: "open", claimed_by: null, challenge_id: null });
   mockPresence.mockResolvedValue({ ok: true, data: { ok: true, verdict: "waiting", started: false, match_id: null } });
   mockBookings.mockResolvedValue({ ok: true, data: [] });
+  mockRevoke.mockResolvedValue({ ok: true, data: { invite_id: "i1", status: "revoked" } });
 });
 
 it("shows the named limit copy when creation is refused", async () => {
@@ -69,6 +72,7 @@ it("shows the named limit copy when creation is refused", async () => {
     expect(result.current.phase).toEqual({
       kind: "error",
       message: "You have 5 open challenges. Revoke one to send another.",
+      hint: "too_many_open_invites",
     }),
   );
   expect(mockCreate).toHaveBeenCalledTimes(1);
@@ -99,4 +103,80 @@ it("falls back to the row read when realtime missed the claim, and books when no
   });
   const { result } = renderHook(() => useChallengeInvite(null));
   await waitFor(() => expect(result.current.phase).toEqual({ kind: "booked", challengeId: "c1", opponentName: "Sam" }));
+});
+
+describe("leaving the screen (orphaned invites count toward the 5-open limit)", () => {
+  it("withdraws an open invite that was never shared or kept", async () => {
+    mockCreate.mockResolvedValue({ ok: true, data: INVITE });
+    const { result, unmount } = renderHook(() => useChallengeInvite("arena"));
+    await waitFor(() => expect(result.current.phase.kind).toBe("open"));
+    expect(result.current.wouldWithdrawOnLeave()).toBe(true);
+    unmount();
+    expect(mockRevoke).toHaveBeenCalledWith(expect.anything(), "i1");
+  });
+
+  it("keeps a shared (or explicitly kept) invite open", async () => {
+    mockCreate.mockResolvedValue({ ok: true, data: INVITE });
+    const { result, unmount } = renderHook(() => useChallengeInvite("arena"));
+    await waitFor(() => expect(result.current.phase.kind).toBe("open"));
+    act(() => result.current.keepOpen());
+    expect(result.current.wouldWithdrawOnLeave()).toBe(false);
+    unmount();
+    expect(mockRevoke).not.toHaveBeenCalled();
+  });
+
+  it("never withdraws a claimed invite", async () => {
+    mockCreate.mockResolvedValue({ ok: true, data: INVITE });
+    const { result, unmount } = renderHook(() => useChallengeInvite("arena"));
+    await waitFor(() => expect(result.current.phase.kind).toBe("open"));
+    await act(async () => {
+      mockOnRow?.({ status: "claimed", claimed_by: "b", challenge_id: "c1" });
+    });
+    unmount();
+    expect(mockRevoke).not.toHaveBeenCalled();
+  });
+});
+
+it("revoke failures come back with copy", async () => {
+  mockCreate.mockResolvedValue({ ok: true, data: INVITE });
+  mockRevoke.mockResolvedValue({ ok: false, error: { hint: "unknown", message: "offline" } });
+  const { result } = renderHook(() => useChallengeInvite("arena"));
+  await waitFor(() => expect(result.current.phase.kind).toBe("open"));
+  let res: Awaited<ReturnType<typeof result.current.revoke>> | undefined;
+  await act(async () => {
+    res = await result.current.revoke();
+  });
+  expect(res).toEqual({
+    ok: false,
+    hint: "unknown",
+    message: "Couldn't withdraw the challenge. Check your connection and try again.",
+  });
+  expect(result.current.phase.kind).toBe("open");
+});
+
+it("a failed code refresh marks the code stale and retries", async () => {
+  jest.useFakeTimers();
+  try {
+    mockCreate.mockResolvedValue({ ok: true, data: { ...INVITE, code_expires_at: new Date(Date.now() + 1000).toISOString() } });
+    mockRefresh.mockResolvedValueOnce({ ok: false, error: { hint: "unknown", message: "offline" } });
+    mockRefresh.mockResolvedValueOnce({
+      ok: true,
+      data: { invite_id: "i1", short_code: "ABCDEF", short_code_display: "ABC-DEF", code_expires_at: new Date(Date.now() + 30 * 60e3).toISOString() },
+    });
+    const { result } = renderHook(() => useChallengeInvite("arena"));
+    await waitFor(() => expect(result.current.phase.kind).toBe("open"));
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(2000);
+    });
+    expect(mockRefresh).toHaveBeenCalledTimes(1);
+    expect(result.current.codeStale).toBe(true);
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(16_000);
+    });
+    expect(mockRefresh).toHaveBeenCalledTimes(2);
+    expect(result.current.codeStale).toBe(false);
+    expect(result.current.invite?.short_code_display).toBe("ABC-DEF");
+  } finally {
+    jest.useRealTimers();
+  }
 });

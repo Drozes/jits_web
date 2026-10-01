@@ -167,3 +167,24 @@ export async function clearPushDeferral(): Promise<void> {
     // Nothing to do.
   }
 }
+
+const deferralListeners = new Set<() => void>();
+
+/** Called when the deferral is lifted early, so push registration runs now. */
+export function onPushDeferralReleased(listener: () => void): () => void {
+  deferralListeners.add(listener);
+  return () => {
+    deferralListeners.delete(listener);
+  };
+}
+
+/**
+ * Lift the deferral before a first match: the invite turned out not to be a
+ * challenge (a join link), so there is no match to wait for, and the athlete
+ * needs push for friend_live.
+ */
+export async function releasePushDeferral(): Promise<void> {
+  if (!(await isPushDeferred())) return;
+  await clearPushDeferral();
+  for (const l of deferralListeners) l();
+}

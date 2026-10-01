@@ -60,7 +60,7 @@ import {
 } from "@/components/arena/mat-board";
 import { ArenaSkeleton } from "@/components/arena/arena-skeleton";
 import { CapPlate, RosterErrorPlate } from "@/components/arena/arena-plates";
-import { SecondaryButton } from "@/components/auth/auth-buttons";
+import { SecondaryButton, TertiaryButton } from "@/components/auth/auth-buttons";
 import { toast } from "@/components/ui/toast";
 import { BookedStrip } from "@/components/invite/booked-strip";
 import { sortFriendsFirst } from "@jits/shared/api/friends";
@@ -190,7 +190,7 @@ export default function ArenaScreen() {
   }, [onTheMat, friendIds, focusAthleteId]);
   const invitesOn = useInvitesEnabled();
   const inMatch = useIsInArenaMatch();
-  const { bookings, locationOff } = useBookings({
+  const booked = useBookings({
     visible: isFocused,
     onStarted: (matchId) => {
       if (!inMatch) router.push(arenaMatchHref(matchId) as Href);
@@ -332,8 +332,16 @@ export default function ArenaScreen() {
           />
         ) : null}
 
-        {bookings.map((b) => (
-          <BookedStrip key={b.challenge_id} booking={b} locationOff={locationOff} />
+        {booked.bookings.map((b) => (
+          <BookedStrip
+            key={b.challenge_id}
+            booking={b}
+            location={booked.location}
+            presence={booked.presence[b.challenge_id]}
+            onRetry={() => void booked.retry()}
+            onAskLocation={() => void booked.askLocation()}
+            onCancel={() => booked.cancel(b.challenge_id)}
+          />
         ))}
 
         {isLoading ? (
@@ -378,6 +386,12 @@ export default function ArenaScreen() {
               <SecondaryButton
                 label="Invite a training partner"
                 onPress={() => router.push("/invite?from=arena" as Href)}
+              />
+            ) : null}
+            {invitesOn && !hasError ? (
+              <TertiaryButton
+                label="Got a challenge code?"
+                onPress={() => router.push("/invite-code" as Href)}
               />
             ) : null}
 

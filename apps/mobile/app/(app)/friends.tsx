@@ -7,7 +7,9 @@ import { ActivityIndicator, Alert, FlatList, Pressable, Text, View } from "react
 import { useFocusEffect, useRouter, type Href } from "expo-router";
 import { getMyFriends, removeFriend, type FriendCard } from "@jits/shared/api/friends";
 import { AppHeader } from "@/components/layout/app-header";
-import { CtaButton, SecondaryButton } from "@/components/auth/auth-buttons";
+import { CtaButton, SecondaryButton, TertiaryButton } from "@/components/auth/auth-buttons";
+import { OpenChallenges } from "@/components/invite/open-challenges";
+import { useAuth } from "@/lib/auth/hooks";
 import { Avatar32, LivePill, Plate } from "@/components/ui/elo-system";
 import { supabase } from "@/lib/supabase/client";
 import { useThemedTokens } from "@/lib/theme/use-theme";
@@ -17,6 +19,7 @@ export default function FriendsScreen() {
   const router = useRouter();
   const tokens = useThemedTokens();
   const invitesOn = useInvitesEnabled();
+  const { athlete } = useAuth();
   const [friends, setFriends] = React.useState<FriendCard[] | null>(null);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -76,6 +79,14 @@ export default function FriendsScreen() {
                 <CtaButton label="Invite a training partner" onPress={() => router.push("/invite/join" as Href)} />
               ) : null}
             </Plate>
+          }
+          ListFooterComponent={
+            invitesOn ? (
+              <View className="gap-4 pt-4">
+                <OpenChallenges athleteId={athlete?.id ?? null} />
+                <TertiaryButton label="Got a challenge code?" onPress={() => router.push("/invite-code" as Href)} />
+              </View>
+            ) : null
           }
           renderItem={({ item }) => (
             <View className="flex-row items-center gap-3 rounded-sm bg-surface-2 px-3 py-3">

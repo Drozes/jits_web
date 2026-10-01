@@ -26,7 +26,7 @@ export type ClaimStep =
  */
 export function stepForClaim(
   result: ClaimResult,
-  ctx: { viaCode: boolean; athleteStatus: string | null | undefined; locationOff: boolean },
+  ctx: { viaCode: boolean; athleteStatus: string | null | undefined; locationOff: boolean; joinTried?: boolean },
 ): ClaimStep {
   if (result.ok) {
     if (result.match_id) return { type: "go_match", matchId: result.match_id };
@@ -39,7 +39,7 @@ export function stepForClaim(
       locationOff: ctx.locationOff,
     };
   }
-  if (result.code === "invalid" && !ctx.viaCode) return { type: "try_join" };
+  if (result.code === "invalid" && !ctx.viaCode && !ctx.joinTried) return { type: "try_join" };
   if (result.code === "claimer_not_active" && (!ctx.athleteStatus || ctx.athleteStatus === "pending")) {
     return { type: "setup" };
   }
@@ -62,10 +62,22 @@ export function stepForClaim(
   return { type: "message", message: view.message, terminal };
 }
 
-/** What to do with an `accept_join_invite` answer (a token that was not a challenge). */
-export function stepForJoin(result: AcceptJoinResult, athleteStatus: string | null | undefined): ClaimStep {
+/**
+ * What to do with an `accept_join_invite` answer. `newAccount`: the account
+ * was created after the link was captured, so invite setup's attribution
+ * already made the friendship and `already_friends` reads as "now friends".
+ */
+export function stepForJoin(
+  result: AcceptJoinResult,
+  athleteStatus: string | null | undefined,
+  opts: { newAccount?: boolean } = {},
+): ClaimStep {
   if (result.ok) {
-    return { type: "friends", inviterName: inviterNameForCopy(result.inviter), already: result.result === "already_friends" };
+    return {
+      type: "friends",
+      inviterName: inviterNameForCopy(result.inviter),
+      already: result.result === "already_friends" && !opts.newAccount,
+    };
   }
   if (result.code === "claimer_not_active" && (!athleteStatus || athleteStatus === "pending")) return { type: "setup" };
   return { type: "message", message: joinFailureMessage(result.code, "your training partner"), terminal: true };
@@ -83,4 +95,15 @@ export function clearsPendingInvite(step: ClaimStep): boolean {
     default:
       return false;
   }
+}
+
+/**
+ * The account was created after the invite was captured on this device (it
+ * came through signup), so it is the intended account and invite setup has
+ * already attributed it.
+ */
+export function isNewAccountForInvite(userCreatedAt: string | null | undefined, firstTouchAt: string): boolean {
+  const created = Date.parse(userCreatedAt ?? "");
+  const touched = Date.parse(firstTouchAt);
+  return Number.isFinite(created) && Number.isFinite(touched) && created >= touched;
 }

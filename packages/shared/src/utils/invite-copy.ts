@@ -182,3 +182,25 @@ export function inviteSignupBanner(kind: "join" | "challenge" | null, inviterNam
     ? `${alex} invited you. Create your account to join.`
     : `${alex} challenged you. Create your account to accept.`;
 }
+
+/** Banner on the one-screen invite setup (the account already exists). */
+export function inviteSetupBanner(kind: "join" | "challenge" | null): string {
+  if (kind === "challenge") return "Finish your profile to accept the challenge.";
+  if (kind === "join") return "Finish your profile to join your training partner.";
+  return "Finish your profile and we'll open your invite.";
+}
+
+export const LOCATION_UNAVAILABLE_COPY = "We couldn't get your location. Check your signal, then try again.";
+
+/** Copy for a failed `revoke_invite`. */
+export function revokeInviteErrorMessage(hint: string): string {
+  switch (hint) {
+    case "invite_already_claimed":
+      return "Your training partner already accepted this challenge.";
+    case "invite_not_open":
+    case "invite_expired":
+      return "This challenge already closed.";
+    default:
+      return "Couldn't withdraw the challenge. Check your connection and try again.";
+  }
+}

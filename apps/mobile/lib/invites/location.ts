@@ -8,7 +8,8 @@ import type { LocationReading } from "@jits/shared/api/invites";
 
 export type ReadingResult =
   | { status: "ok"; reading: LocationReading }
-  | { status: "denied" }
+  /** `canAskAgain`: the system prompt can still be shown (never asked yet). */
+  | { status: "denied"; canAskAgain: boolean }
   | { status: "unavailable" };
 
 const TIMEOUT_MS = 10_000;
@@ -17,10 +18,13 @@ export async function readLocationOnce(opts: { ask: boolean } = { ask: true }): 
   try {
     const current = await Location.getForegroundPermissionsAsync();
     let granted = current.granted;
-    if (!granted && opts.ask && current.canAskAgain) {
-      granted = (await Location.requestForegroundPermissionsAsync()).granted;
+    let canAskAgain = current.canAskAgain;
+    if (!granted && opts.ask && canAskAgain) {
+      const asked = await Location.requestForegroundPermissionsAsync();
+      granted = asked.granted;
+      canAskAgain = asked.canAskAgain;
     }
-    if (!granted) return { status: "denied" };
+    if (!granted) return { status: "denied", canAskAgain: Boolean(canAskAgain) };
     const position = await Promise.race([
       Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High }),
       new Promise<null>((resolve) => setTimeout(() => resolve(null), TIMEOUT_MS)),

@@ -78,6 +78,22 @@ describe("invitee push deferral (jr_be spec 016: asked after the first match)", 
     await AsyncStorage.clear();
   });
 
+  // Runs before the match test: the match-exit count is module state.
+  it("a join-link invitee (no match to wait for) registers as soon as the deferral is released", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { releasePushDeferral } = require("@/lib/invites/pending-invite");
+    await AsyncStorage.setItem("elorated.invite.deferPush.v1", "1");
+    mockAthlete = { id: "me-1", status: "active" };
+    render(<PushRegistrationBootstrap />);
+    await flush();
+    expect(mockRegister).not.toHaveBeenCalled();
+    await act(async () => {
+      await releasePushDeferral();
+    });
+    await flush();
+    expect(mockRegister).toHaveBeenCalledTimes(1);
+  });
+
   it("holds registration until a match screen has been left, then clears the flag", async () => {
     await AsyncStorage.setItem("elorated.invite.deferPush.v1", "1");
     mockAthlete = { id: "me-1", status: "active" };
@@ -92,4 +108,5 @@ describe("invitee push deferral (jr_be spec 016: asked after the first match)", 
     expect(mockRegister).toHaveBeenCalledTimes(1);
     expect(await AsyncStorage.getItem("elorated.invite.deferPush.v1")).toBeNull();
   });
+
 });

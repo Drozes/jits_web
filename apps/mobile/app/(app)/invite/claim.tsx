@@ -3,6 +3,11 @@
  * location, claims, then lands on the face-off (both on the mat), the booking,
  * a new friendship (join link) or the named error state (contract 7). Never
  * leaves the invitee on Home.
+ *
+ * A link opened on an account that existed before the link was captured may
+ * be the wrong account (a shared phone), so nothing is claimed until the
+ * athlete confirms "Signed in as <name>" (AC3.3). A code typed in the app,
+ * or a link that led through signup, runs straight away.
  */
 import * as React from "react";
 import { ActivityIndicator, Linking, ScrollView, Text, View } from "react-native";
@@ -16,6 +21,7 @@ import { usePendingInvite } from "@/lib/invites/use-pending-invite";
 import { useClaimRunner } from "@/lib/invites/use-claim-runner";
 import { INVITE_SETUP_HREF } from "@/lib/invites/launch-route";
 import { clearPendingInvite } from "@/lib/invites/pending-invite";
+import { isNewAccountForInvite } from "@/lib/invites/claim-flow";
 import { ARENA_HREF, arenaMatchHref } from "@/lib/arena/constants";
 import { isInArenaMatch } from "@/lib/arena/arena-store";
 import { useThemedTokens } from "@/lib/theme/use-theme";
@@ -23,13 +29,23 @@ import { useThemedTokens } from "@/lib/theme/use-theme";
 export default function InviteClaimScreen() {
   const router = useRouter();
   const tokens = useThemedTokens();
-  const { athlete, signOut } = useAuth();
+  const { user, athlete, signOut } = useAuth();
   const { pending, loaded } = usePendingInvite();
-  const { state, run, locationDenied } = useClaimRunner(pending, athlete?.status);
+  const newAccount = pending ? isNewAccountForInvite(user?.created_at, pending.first_touch_at) : false;
+  const { state, run, locationDenied } = useClaimRunner(pending, athlete?.status, { newAccount });
+  const needsConfirm = Boolean(pending?.token) && !newAccount && pending?.gateway !== "paste";
+  const [confirmed, setConfirmed] = React.useState(false);
 
   React.useEffect(() => {
-    if (loaded && pending && state.phase === "idle") void run();
-  }, [loaded, pending, state.phase, run]);
+    if (loaded && pending && state.phase === "idle" && (!needsConfirm || confirmed)) void run();
+  }, [loaded, pending, state.phase, run, needsConfirm, confirmed]);
+
+  // "Not you?": sign out but keep the pending invite, then let the launch
+  // router send the right person to signup with the banner.
+  const notMe = async () => {
+    await signOut();
+    router.replace("/");
+  };
 
   const step = state.phase === "done" ? state.step : null;
 
@@ -54,23 +70,47 @@ export default function InviteClaimScreen() {
   if (loaded && !pending && !step) return <Redirect href="/" />;
 
   const name = athlete?.display_name ?? null;
+  const awaitingConfirm = Boolean(pending) && needsConfirm && !confirmed && state.phase === "idle";
 
   return (
     <View className="flex-1 bg-surface">
       <AppHeader title="Challenge" back backFallback={ARENA_HREF as Href} />
       <ScrollView contentContainerStyle={{ padding: 24, gap: 20 }}>
-        {name ? (
+        {awaitingConfirm ? (
+          <Plate className="gap-4" testID="claim-confirm">
+            <Text className="font-heading text-[18px] text-ink uppercase">Open this invite?</Text>
+            <Text className="font-body text-[14px] text-ink leading-6">
+              Signed in as {name ?? "your account"}. Not you? Sign out and the invite waits for the right account.
+            </Text>
+            <CtaButton label="Continue" onPress={() => setConfirmed(true)} />
+            <SecondaryButton label="Sign out" onPress={() => void notMe()} />
+          </Plate>
+        ) : name && !step ? (
           <View className="flex-row flex-wrap items-center gap-x-2" testID="claim-signed-in-as">
             <Text className="font-body text-[12px] text-ink-3">Signed in as {name}. Not you?</Text>
-            <TertiaryButton label="Sign out" onPress={() => void signOut()} className="px-0 py-1" />
+            <TertiaryButton label="Sign out" onPress={() => void notMe()} className="px-0 py-1" />
           </View>
         ) : null}
 
-        {!step || step.type === "go_match" || step.type === "setup" ? (
+        {step?.type === "go_match" && isInArenaMatch() ? (
+          <Plate className="gap-4" testID="claim-match-ready">
+            <Text className="font-heading text-[18px] text-ink uppercase">Your match is ready</Text>
+            <Text className="font-body text-[14px] text-ink leading-6">
+              Finish your current match, then start this one.
+            </Text>
+            <CtaButton label="Go to the match" onPress={() => router.replace(arenaMatchHref(step.matchId) as Href)} />
+          </Plate>
+        ) : null}
+
+        {!awaitingConfirm && (!step || (step.type === "go_match" && !isInArenaMatch()) || step.type === "setup") ? (
           <View className="items-center gap-3 py-10" accessibilityLiveRegion="polite">
             <ActivityIndicator color={tokens.textSecondary} />
             <Text className="font-body text-[14px] text-ink-2">
-              {state.phase === "locating" ? "Checking you're on the mat..." : "Accepting the challenge..."}
+              {state.phase === "locating"
+                ? "Checking you're on the mat..."
+                : state.phase === "checking"
+                  ? "Opening your invite..."
+                  : "Accepting the challenge..."}
             </Text>
           </View>
         ) : null}

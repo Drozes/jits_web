@@ -17,6 +17,8 @@ import { clearShareCache } from "../highlight-share";
 import { resetNotificationRouterReady } from "../notifications/handlers";
 import { unregisterPushDeviceOnSignOut } from "../notifications/register-push";
 import { resetHighlightStore } from "../highlight/highlight-store";
+import { clearPushDeferral } from "../invites/pending-invite";
+import { resetInvitesEnabledCache } from "../invites/use-invites-enabled";
 
 type AuthError = { message: string };
 
@@ -333,6 +335,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // in the cache for the next account on this device. Fire and forget.
     void clearShareCache().catch(() => undefined);
     resetHighlightStore(); // cached reel lists belong to the old account
+    // Invite state of the old account: the push deferral and the flag read.
+    // (A pending invite is cleared by the deliberate sign-out buttons; the
+    // claim screen's "Not you?" sign-out keeps it, contract 7.)
+    void clearPushDeferral();
+    resetInvitesEnabledCache();
     loadedAthleteForUserId.current = null;
     setSession(null);
     setUser(null);

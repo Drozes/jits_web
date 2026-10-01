@@ -9,26 +9,28 @@
  */
 import * as React from "react";
 import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from "react-native";
-import { Redirect } from "expo-router";
+import { Redirect, useRouter, type Href } from "expo-router";
 import { recordInviteAttribution } from "@jits/shared/api/invites";
-import { TOS_TEXT } from "@jits/shared/utils";
+import { TOS_TEXT, claimFailureView, inviteSetupBanner } from "@jits/shared/utils";
 import { AppHeader } from "@/components/layout/app-header";
 import { CtaButton, TertiaryButton } from "@/components/auth/auth-buttons";
 import { Plate } from "@/components/ui/elo-system";
 import { IdentityStep } from "@/components/profile-setup/identity-step";
 import { FREE_AGENT_OPTION, type WizardValues } from "@/components/profile-setup/types";
-import { InviteBanner } from "@/components/invite/invite-banner";
 import { useAuth } from "@/lib/auth/hooks";
 import { supabase } from "@/lib/supabase/client";
 import { useSetupData } from "@/lib/profile-setup/use-setup-data";
 import { useSetupSubmit } from "@/lib/profile-setup/use-setup-submit";
 import { isAtLeast16, isValidDateOfBirth } from "@/lib/profile-setup/validation";
 import { usePendingInvite } from "@/lib/invites/use-pending-invite";
-import { deferPushUntilFirstMatch } from "@/lib/invites/pending-invite";
+import { clearPendingInvite, deferPushUntilFirstMatch, type PendingInvite } from "@/lib/invites/pending-invite";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { cn } from "@/lib/cn";
 
 const UNDERAGE_COPY = "You must be 16 or older to compete on ELO RATED.";
+const WRONG_CODE_COPY = "That code didn't match. Check it and try again.";
+
+const inviteKey = (p: PendingInvite) => p.token ?? `code:${p.code}`;
 
 function metaName(meta: Record<string, unknown> | undefined): { first: string; last: string } {
   const given = typeof meta?.given_name === "string" ? meta.given_name : "";
@@ -41,6 +43,7 @@ function metaName(meta: Record<string, unknown> | undefined): { first: string; l
 
 export default function InviteSetupScreen() {
   const { user, athlete, signOut } = useAuth();
+  const router = useRouter();
   const tokens = useThemedTokens();
   const { pending, loaded } = usePendingInvite();
   const setup = useSetupData(user?.id ?? null);
@@ -48,17 +51,39 @@ export default function InviteSetupScreen() {
   const [showWaiver, setShowWaiver] = React.useState(false);
   const [values, setValues] = React.useState<WizardValues | null>(null);
 
-  // Attribute before anything else (idempotent server side, first write wins).
+  // Attribute before anything else (idempotent server side, first write
+  // wins), once per pending invite: a code attribution counts against the
+  // code throttle, so it must not re-run on a token refresh or a remount. A
+  // wrong or throttled code goes back to code entry before setup, so the
+  // claim never counts the same wrong code a second time.
+  const userId = user?.id ?? null;
+  const attributedRef = React.useRef<string | null>(null);
   React.useEffect(() => {
-    if (!user || !pending) return;
+    if (!userId || !pending) return;
+    const key = `${userId}:${inviteKey(pending)}`;
+    if (attributedRef.current === key) return;
+    attributedRef.current = key;
     void deferPushUntilFirstMatch();
-    void recordInviteAttribution(supabase, {
-      token: pending.token,
-      code: pending.code,
-      gateway: pending.gateway,
-      firstTouchAt: pending.first_touch_at,
-    });
-  }, [user, pending]);
+    void (async () => {
+      const res = await recordInviteAttribution(supabase, {
+        token: pending.token,
+        code: pending.code,
+        gateway: pending.gateway,
+        firstTouchAt: pending.first_touch_at,
+      });
+      if (!pending.code || !res.ok) return;
+      const r = res.data;
+      const throttled = !r.ok && r.code === "throttled";
+      if (!throttled && !(r.ok && r.result === "invalid")) return;
+      const retryAfterS = !r.ok ? r.retry_after_s : null;
+      const msg = throttled ? claimFailureView("throttled", { retryAfterS }).message : WRONG_CODE_COPY;
+      await clearPendingInvite();
+      router.replace({
+        pathname: "/invite-code",
+        params: { msg, ...(retryAfterS ? { until: String(Date.now() + retryAfterS * 1000) } : {}) },
+      } as Href);
+    })();
+  }, [userId, pending, router]);
 
   React.useEffect(() => {
     if (values || !setup.data) return;
@@ -110,7 +135,17 @@ export default function InviteSetupScreen() {
     <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }} className="bg-surface">
       <AppHeader title="Your Profile" />
       <ScrollView contentContainerStyle={{ padding: 24, gap: 20 }} keyboardShouldPersistTaps="handled">
-        {pending ? <InviteBanner kind={pending.code ? "challenge" : null} inviterName={null} /> : null}
+        {pending ? (
+          <View
+            testID="invite-setup-banner"
+            accessibilityRole="summary"
+            className="rounded-sm border border-hairline-strong bg-surface-2 px-4 py-3"
+          >
+            <Text className="font-heading text-[14px] text-ink">
+              {inviteSetupBanner(pending.code ? "challenge" : null)}
+            </Text>
+          </View>
+        ) : null}
 
         <Plate className="gap-3">
           <Pressable
