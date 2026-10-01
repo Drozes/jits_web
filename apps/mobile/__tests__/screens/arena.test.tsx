@@ -1020,7 +1020,7 @@ describe("Arena screen", () => {
       expect(r.queryByText("On the mat · closest first")).toBeNull();
     });
 
-    it("the empty mat offers an invite only while invites are enabled", () => {
+    it("the invite actions sit at the bottom, only while invites are enabled", () => {
       mockIsLive = true;
       mockRoster.competitors = [];
       mockLobbyIds = new Set();
@@ -1030,6 +1030,18 @@ describe("Arena screen", () => {
       mockInvitesOn = true;
       const on = render(<ArenaScreen />);
       expect(on.getByText("Invite a training partner")).toBeTruthy();
+      on.unmount();
+      // Shown with athletes on the mat too, and after the On The Mat list.
+      mockRoster.competitors = [competitor({ id: "near", displayName: "Near", eloDiff: -10 })];
+      mockLobbyIds = new Set(["near"]);
+      const full = render(<ArenaScreen />);
+      const invite = full.getByTestId("arena-invite-actions");
+      expect(within(invite).getByText("Invite a training partner")).toBeTruthy();
+      expect(within(invite).getByText("Got a challenge code?")).toBeTruthy();
+      const ids = full
+        .UNSAFE_root.findAll((n: { props: { testID?: unknown } }) => typeof n.props.testID === "string")
+        .map((n: { props: { testID?: unknown } }) => n.props.testID as string);
+      expect(ids.lastIndexOf("arena-invite-actions")).toBeGreaterThan(ids.indexOf("arena-on-the-mat"));
     });
 
     it("the signed gap is data: ink, never red or green (spec 3)", () => {
@@ -1203,36 +1215,15 @@ describe("Arena screen", () => {
     });
   });
 
-  describe("Just Rolled (AC-A5)", () => {
-    it("lists recent_activity as text, no avatars", () => {
-      jest.useFakeTimers();
-      jest.setSystemTime(new Date("2026-09-28T12:10:00Z"));
+  describe("Just Rolled is removed (owner, 2026-10-01)", () => {
+    it("renders no Just Rolled section even with recent activity", () => {
       mockRoster.recentActivity = [
         { match_id: "m-1", winner_name: "Kofi Mensah", loser_name: "Jordan Kim", result: "submission", match_type: "ranked", completed_at: "2026-09-28T12:06:00Z" },
-        { match_id: "m-2", winner_name: "Ana", loser_name: "Bea", result: "draw", match_type: "ranked", completed_at: "2026-09-28T10:00:00Z" },
       ];
-      const { getByText, getByTestId } = render(<ArenaScreen />);
-      expect(getByText("Kofi Mensah def. Jordan Kim · Submission · 4m")).toBeTruthy();
-      expect(getByText("Ana drew Bea · Draw · 2h")).toBeTruthy();
-      expect(within(getByTestId("arena-just-rolled")).queryAllByLabelText(/Kofi/)).toHaveLength(0);
-    });
-
-    it("keeps the ages current on an idle, focused Arena", () => {
-      jest.useFakeTimers();
-      jest.setSystemTime(new Date("2026-09-28T12:06:30Z"));
-      mockRoster.recentActivity = [
-        { match_id: "m-1", winner_name: "Kofi", loser_name: "Jordan", result: "points", match_type: "ranked", completed_at: "2026-09-28T12:06:00Z" },
-      ];
-      const r = render(<ArenaScreen />);
-      expect(r.getByText("Kofi def. Jordan · Points · now")).toBeTruthy();
-      act(() => {
-        jest.advanceTimersByTime(60_000);
-      });
-      expect(r.getByText("Kofi def. Jordan · Points · 1m")).toBeTruthy();
-      act(() => {
-        jest.advanceTimersByTime(3 * 60_000);
-      });
-      expect(r.getByText("Kofi def. Jordan · Points · 4m")).toBeTruthy();
+      const { queryByTestId, queryByText } = render(<ArenaScreen />);
+      expect(queryByTestId("arena-just-rolled")).toBeNull();
+      expect(queryByText(/Just rolled/i)).toBeNull();
+      expect(queryByText(/Kofi Mensah def\. Jordan Kim/)).toBeNull();
     });
   });
 

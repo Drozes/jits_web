@@ -1,7 +1,7 @@
 /**
  * The Arena, as a Mat Board (spec arena-live-chip section 6): who should I
  * roll with right now? Sticky control bar, the challenge strips, the Closest
- * Match card (the surface's one red CTA), On The Mat and Just Rolled. Rules
+ * Match card (the surface's one red CTA), On The Mat and the invite actions. Rules
  * live in `lib/arena/mat-board.ts`, pieces in `components/arena/mat-board.tsx`.
  *
  * On The Mat is the roster (`get_arena_data.looking_athletes`) intersected
@@ -49,7 +49,6 @@ import {
   ClosestMatchCard,
   ConfirmStrip,
   IncomingStrip,
-  JustRolled,
   MatControlBar,
   MatRow,
   MatSectionLabel,
@@ -75,8 +74,6 @@ import { arenaMatchHref } from "@/lib/arena/constants";
  */
 const ARENA_BOTTOM_PAD = 24;
 
-/** Just Rolled shows this many recent matches at most. */
-const JUST_ROLLED_MAX = 5;
 
 export default function ArenaScreen() {
   const router = useRouter();
@@ -109,7 +106,6 @@ export default function ArenaScreen() {
   const {
     competitors,
     challengedIds,
-    recentActivity,
     isLoading,
     isRefreshing,
     hasError,
@@ -383,20 +379,6 @@ export default function ArenaScreen() {
               />
             ) : null}
 
-            {/* Invites (jr_be spec 016): secondary, the red stays GO LIVE. */}
-            {invitesOn && !hasError && onTheMat.length === 0 ? (
-              <SecondaryButton
-                label="Invite a training partner"
-                onPress={() => router.push("/invite?from=arena" as Href)}
-              />
-            ) : null}
-            {invitesOn && !hasError ? (
-              <TertiaryButton
-                label="Got a challenge code?"
-                onPress={() => router.push("/invite-code" as Href)}
-              />
-            ) : null}
-
             {onTheMat.length > 0 ? (
               <View testID="arena-on-the-mat">
                 <MatSectionLabel
@@ -426,10 +408,20 @@ export default function ArenaScreen() {
               </View>
             ) : null}
 
-            <JustRolled
-              items={recentActivity.slice(0, JUST_ROLLED_MAX)}
-              active={ticking}
-            />
+            {/* Invites (jr_be spec 016): always at the bottom, secondary
+                styling, the red stays GO LIVE. */}
+            {invitesOn && !hasError ? (
+              <View testID="arena-invite-actions" className="gap-2">
+                <SecondaryButton
+                  label="Invite a training partner"
+                  onPress={() => router.push("/invite?from=arena" as Href)}
+                />
+                <TertiaryButton
+                  label="Got a challenge code?"
+                  onPress={() => router.push("/invite-code" as Href)}
+                />
+              </View>
+            ) : null}
           </>
         )}
       </PageContainer>
