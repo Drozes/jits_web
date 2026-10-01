@@ -154,6 +154,10 @@ export default function LoginScreen() {
               label="Forgot password?"
               onPress={() => router.push("/forgot-password")}
             />
+            <TertiaryButton
+              label="Got a challenge code?"
+              onPress={() => router.push("/invite-code")}
+            />
           </View>
 
           <AppVersionLabel />
