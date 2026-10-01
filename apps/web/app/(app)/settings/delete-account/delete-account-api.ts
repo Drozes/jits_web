@@ -10,7 +10,7 @@ export const DELETE_CONFIRM_WORD = "DELETE";
 
 export type DeleteAccountResult =
   | { ok: true }
-  | { ok: false; code: "confirm_required" | "not_authenticated" | "failed" };
+  | { ok: false; code: "confirm_required" | "not_authenticated" | "match_in_progress" | "failed" };
 
 export function isDeleteConfirmed(typed: string): boolean {
   return typed.trim() === DELETE_CONFIRM_WORD;
@@ -27,7 +27,11 @@ export async function deleteAccount(
     if (ctx instanceof Response) {
       try {
         const body = (await ctx.clone().json()) as { code?: unknown };
-        if (body.code === "confirm_required" || body.code === "not_authenticated") {
+        if (
+          body.code === "confirm_required" ||
+          body.code === "not_authenticated" ||
+          body.code === "match_in_progress"
+        ) {
           return { ok: false, code: body.code };
         }
       } catch {

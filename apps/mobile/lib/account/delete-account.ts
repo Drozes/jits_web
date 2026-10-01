@@ -7,6 +7,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  * JWT (supabase-js attaches it) and the typed confirmation. The function
  * anonymises the athlete (opponents keep their match results against an
  * anonymous athlete), removes the profile photos, then deletes the auth user.
+ * It refuses with match_in_progress while the athlete is in a live match.
+ * not_authenticated during a delete is terminal: either the session is gone
+ * or a previous attempt already deleted the account (its 200 was lost).
  * Never throws: supabase-js reports failures in `error`.
  */
 
@@ -14,7 +17,7 @@ export const DELETE_CONFIRM_WORD = "DELETE";
 
 export type DeleteAccountResult =
   | { ok: true }
-  | { ok: false; code: "confirm_required" | "not_authenticated" | "failed" };
+  | { ok: false; code: "confirm_required" | "not_authenticated" | "match_in_progress" | "failed" };
 
 /** True when the typed text is the confirmation word (case and spaces exact, trimmed ends). */
 export function isDeleteConfirmed(typed: string): boolean {
@@ -43,7 +46,9 @@ export async function deleteAccount(
   });
   if (error) {
     const code = await errorCode(error);
-    if (code === "confirm_required" || code === "not_authenticated") return { ok: false, code };
+    if (code === "confirm_required" || code === "not_authenticated" || code === "match_in_progress") {
+      return { ok: false, code };
+    }
     return { ok: false, code: "failed" };
   }
   if ((data as { ok?: unknown } | null)?.ok === true) return { ok: true };

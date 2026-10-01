@@ -8,7 +8,8 @@ import { createClient } from "@/lib/supabase/client";
 import { DELETE_CONFIRM_WORD, deleteAccount, isDeleteConfirmed } from "./delete-account-api";
 
 const FAILED = "We couldn't delete your account. Check your connection and try again.";
-const EXPIRED = "Your session expired. Sign in again, then delete your account.";
+const MATCH_LIVE = "Finish your match first. You can delete your account once it ends.";
+const SIGNED_OUT = "You're signed out. If your account still exists, sign in to delete it.";
 
 /** Two steps: read and Continue, then type DELETE and confirm. */
 export function DeleteAccountForm() {
@@ -24,9 +25,17 @@ export function DeleteAccountForm() {
     setDeleting(true);
     const supabase = createClient();
     const result = await deleteAccount(supabase);
+    if (!result.ok && result.code === "not_authenticated") {
+      // Terminal: the session is gone, or an earlier attempt already deleted
+      // the account and its response was lost. Either way, sign out locally.
+      await supabase.auth.signOut({ scope: "local" });
+      toast.error(SIGNED_OUT);
+      router.replace("/login");
+      return;
+    }
     if (!result.ok) {
       setDeleting(false);
-      toast.error(result.code === "not_authenticated" ? EXPIRED : FAILED);
+      toast.error(result.code === "match_in_progress" ? MATCH_LIVE : FAILED);
       return;
     }
     // The auth user is gone; clear the local session (a server error here is
@@ -42,12 +51,12 @@ export function DeleteAccountForm() {
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
           <h2 style={headingStyle}>DELETE ACCOUNT</h2>
           <p style={{ ...bodyStyle, color: "var(--text-primary)" }}>
-            This permanently deletes your profile, matches and ELO. This can&apos;t be undone.
+            This permanently deletes your profile, photos and ELO. Your past matches stay in your opponents&apos; history as a deleted athlete. This can&apos;t be undone.
           </p>
           <p style={bodyStyle}>
-            Your name, photo, weight, birthday, Instagram, push devices and messages are erased and
-            you leave the rankings. Opponents keep their own results, shown against a deleted
-            athlete.
+            Your name, profile photo, avatar, weight, birthday, Instagram, friends, invites, push
+            devices and messages are erased and you leave the rankings. Match videos and their stills
+            stay with the matches they belong to.
           </p>
         </div>
       </Plate>

@@ -24,7 +24,7 @@ beforeEach(() => vi.clearAllMocks());
 
 function toConfirm() {
   render(<DeleteAccountForm />);
-  expect(screen.getByText("This permanently deletes your profile, matches and ELO. This can't be undone.")).toBeTruthy();
+  expect(screen.getByText("This permanently deletes your profile, photos and ELO. Your past matches stay in your opponents' history as a deleted athlete. This can't be undone.")).toBeTruthy();
   expect(screen.queryByLabelText("TYPE DELETE TO CONFIRM")).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "CONTINUE" }));
 }
@@ -66,6 +66,38 @@ describe("DeleteAccountForm", () => {
     );
     expect(mocks.signOut).not.toHaveBeenCalled();
     expect(mocks.replace).not.toHaveBeenCalled();
+  });
+
+  it("treats not_authenticated as terminal: signs out locally with neutral copy", async () => {
+    mocks.invoke.mockResolvedValue({
+      data: null,
+      error: { context: new Response(JSON.stringify({ ok: false, code: "not_authenticated" }), { status: 401 }) },
+    });
+    toConfirm();
+    fireEvent.change(screen.getByLabelText("TYPE DELETE TO CONFIRM"), { target: { value: "DELETE" } });
+    fireEvent.click(screen.getByRole("button", { name: "DELETE ACCOUNT" }));
+    await waitFor(() => expect(mocks.replace).toHaveBeenCalledWith("/login"));
+    expect(mocks.signOut).toHaveBeenCalledWith({ scope: "local" });
+    expect(mocks.toastError).toHaveBeenCalledWith("You're signed out. If your account still exists, sign in to delete it.");
+    expect(mocks.toastSuccess).not.toHaveBeenCalled();
+  });
+
+  it("refuses during a live match and keeps the account", async () => {
+    mocks.invoke.mockResolvedValue({
+      data: null,
+      error: { context: new Response(JSON.stringify({ ok: false, code: "match_in_progress" }), { status: 409 }) },
+    });
+    toConfirm();
+    fireEvent.change(screen.getByLabelText("TYPE DELETE TO CONFIRM"), { target: { value: "DELETE" } });
+    fireEvent.click(screen.getByRole("button", { name: "DELETE ACCOUNT" }));
+    await waitFor(() => expect(mocks.toastError).toHaveBeenCalledWith("Finish your match first. You can delete your account once it ends."));
+    expect(mocks.signOut).not.toHaveBeenCalled();
+    expect(mocks.replace).not.toHaveBeenCalled();
+  });
+
+  it("does not claim match videos are erased", () => {
+    render(<DeleteAccountForm />);
+    expect(screen.getByText(/Match videos and their stills stay with the matches they belong to\./)).toBeTruthy();
   });
 
   it("Keep my account goes back", () => {

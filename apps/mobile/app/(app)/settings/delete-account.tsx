@@ -11,6 +11,10 @@ import { supabase } from "@/lib/supabase/client";
 import { DELETE_CONFIRM_WORD, deleteAccount, isDeleteConfirmed } from "@/lib/account/delete-account";
 import { CtaButton, TertiaryButton } from "@/components/auth/auth-buttons";
 
+const FAILED = "We couldn't delete your account. Check your connection and try again.";
+const MATCH_LIVE = "Finish your match first. You can delete your account once it ends.";
+const SIGNED_OUT = "You're signed out. If your account still exists, sign in to delete it.";
+
 /**
  * Settings > Delete account (jits-b3js.10). Two steps so it can never happen
  * by accident: (1) read what is deleted and tap Continue, (2) type DELETE and
@@ -28,13 +32,17 @@ export default function DeleteAccountScreen() {
     if (deleting || !isDeleteConfirmed(typed)) return;
     setDeleting(true);
     const result = await deleteAccount(supabase);
+    if (!result.ok && result.code === "not_authenticated") {
+      // Terminal: the session is gone, or an earlier attempt already deleted
+      // the account and its response was lost. Either way, sign out locally.
+      await signOut();
+      toast.error(SIGNED_OUT);
+      router.replace("/login");
+      return;
+    }
     if (!result.ok) {
       setDeleting(false);
-      toast.error(
-        result.code === "not_authenticated"
-          ? "Your session expired. Sign in again, then delete your account."
-          : "We couldn't delete your account. Check your connection and try again.",
-      );
+      toast.error(result.code === "match_in_progress" ? MATCH_LIVE : FAILED);
       return;
     }
     await signOut();
@@ -53,11 +61,12 @@ export default function DeleteAccountScreen() {
         <Plate className="gap-3">
           <Text className="font-heading text-[18px] text-ink uppercase tracking-caps">Delete account</Text>
           <Text className="font-body text-[14px] text-ink leading-relaxed">
-            This permanently deletes your profile, matches and ELO. This can&apos;t be undone.
+            This permanently deletes your profile, photos and ELO. Your past matches stay in your opponents&apos; history as a deleted athlete. This can&apos;t be undone.
           </Text>
           <Text className="font-body text-[13px] text-ink-2 leading-relaxed">
-            Your name, photo, weight, birthday, Instagram, push devices and messages are erased and you
-            leave the rankings. Opponents keep their own results, shown against a deleted athlete.
+            Your name, profile photo, avatar, weight, birthday, Instagram, friends, invites, push devices
+            and messages are erased and you leave the rankings. Match videos and their stills stay with
+            the matches they belong to.
           </Text>
         </Plate>
 

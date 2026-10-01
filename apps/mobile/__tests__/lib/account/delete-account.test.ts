@@ -24,6 +24,11 @@ describe("deleteAccount", () => {
     expect(await deleteAccount(c as never)).toEqual({ ok: false, code: "not_authenticated" });
   });
 
+  it("maps a 409 to match_in_progress", async () => {
+    const c = client({ data: null, error: httpError(409, { ok: false, code: "match_in_progress" }) });
+    expect(await deleteAccount(c as never)).toEqual({ ok: false, code: "match_in_progress" });
+  });
+
   it("maps a 400 to confirm_required", async () => {
     const c = client({ data: null, error: httpError(400, { ok: false, code: "confirm_required" }) });
     expect(await deleteAccount(c as never)).toEqual({ ok: false, code: "confirm_required" });

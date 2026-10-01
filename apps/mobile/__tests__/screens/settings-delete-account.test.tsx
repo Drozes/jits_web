@@ -35,7 +35,7 @@ beforeEach(() => jest.clearAllMocks());
 
 function toConfirm() {
   const s = render(<DeleteAccountScreen />);
-  expect(s.getByText("This permanently deletes your profile, matches and ELO. This can't be undone.")).toBeTruthy();
+  expect(s.getByText("This permanently deletes your profile, photos and ELO. Your past matches stay in your opponents' history as a deleted athlete. This can't be undone.")).toBeTruthy();
   expect(s.queryByTestId("delete-confirm-input")).toBeNull();
   fireEvent.press(s.getByTestId("delete-continue"));
   return s;
@@ -74,14 +74,31 @@ it("keeps the account and explains a failure", async () => {
   expect(mockReplace).not.toHaveBeenCalled();
 });
 
-it("asks to sign in again when the session expired", async () => {
+it("treats not_authenticated as terminal: signs out locally with neutral copy", async () => {
   mockDelete.mockResolvedValue({ ok: false, code: "not_authenticated" });
   const s = toConfirm();
   fireEvent.changeText(s.getByTestId("delete-confirm-input"), "DELETE");
   fireEvent.press(s.getByTestId("delete-submit"));
-  await waitFor(() =>
-    expect(mockToast.error).toHaveBeenCalledWith("Your session expired. Sign in again, then delete your account."),
-  );
+  await waitFor(() => expect(mockReplace).toHaveBeenCalledWith("/login"));
+  expect(mockSignOut).toHaveBeenCalled();
+  expect(mockToast.error).toHaveBeenCalledWith("You're signed out. If your account still exists, sign in to delete it.");
+  expect(mockToast.success).not.toHaveBeenCalled();
+});
+
+it("refuses during a live match and keeps the account", async () => {
+  mockDelete.mockResolvedValue({ ok: false, code: "match_in_progress" });
+  const s = toConfirm();
+  fireEvent.changeText(s.getByTestId("delete-confirm-input"), "DELETE");
+  fireEvent.press(s.getByTestId("delete-submit"));
+  await waitFor(() => expect(mockToast.error).toHaveBeenCalledWith("Finish your match first. You can delete your account once it ends."));
+  expect(mockSignOut).not.toHaveBeenCalled();
+  expect(mockReplace).not.toHaveBeenCalled();
+  expect(s.getByTestId("delete-submit")).toBeTruthy();
+});
+
+it("does not claim match videos are erased", () => {
+  const s = render(<DeleteAccountScreen />);
+  expect(s.getByText(/Match videos and their stills stay with the matches they belong to\./)).toBeTruthy();
 });
 
 it("Keep my account goes back", () => {
