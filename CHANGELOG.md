@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+### Location flag and Arena nearby: review fixes (mobile, web, shared)
+
+JS-only on both apps (OTA-eligible on mobile). No backend change: every fix reads replies jr_be already sends.
+
+**Fixed**
+- Kill switch reaches running clients (mobile): any reply only a flag-off server gives (`start_blocked_reason: 'start_available'` from a booking or invite reading or a claim, `get_arena_nearby` mode `flag_off`) turns the client flag off at once, and any other nearby mode turns it on; the Arena also re-reads the flag each time it gains focus. A server signal wins over a flag read already in flight. The Booked strip no longer says "Tap Start..." with no Start button.
+- Kill switch on web: `useMatchLocationRequired` re-reads on Arena navigation (and tab visibility, as before), takes `mark(on)` from server replies (a proximity refusal marks it on) and lets a mark win over a read in flight.
+- Header chip (mobile, rule D2): in nearby mode its `· N` is the Arena's nearby On the mat count (`publishNearbyOnMatCount`), not every live lobby athlete. Fallback modes unchanged.
+- Web accept: a blocked accepter whose challenge goes `started` joins that match (idempotent `start_match_from_challenge`) instead of having its prompt cleared, and Cancel on a blocked prompt that was started meanwhile joins it too. A failed accept-time reading no longer stops the start; it is shown only when the server answers `proximity_required` with the viewer's side in DETAIL.
+- Mobile: no second modal; the incoming prompt is held while the start-blocked sheet is up. The start-blocked title matches the reason ("Location needed", "Waiting for ALEX", "Not on the same mat"; shared `arenaProximityTitle`).
+- Web location layer uses `@jits/shared/api/location` (`getMatchLocationRequired`, `reportGoLivePresence`, `reportArenaPresence`) and the shared copy; Go Live denied now shows the shared Go Live denied copy plus the web-only browser-settings line.
+- Web Go Live: a server `location_required` on a write the client thought flag-off re-runs the location gate (explain or a reading) instead of jumping to "denied"; background refreshes and the send-time arena reading need permission `granted` (Safari's `unknown` could prompt); a post-match restore that shows a location prompt no longer also toasts "You're offline"; navigating away drops a stale prompt.
+- Mobile cold start: `useMatchLocationFlag()` exposes `known`; Start match and the location variants of the Booked strip and the invite booked state stay hidden until it is known, and the bookings hook runs neither readings nor Start match realtime meanwhile.
+- Mobile: a Go Live waiting on the location sheet answers "cancel" when the live owner unmounts and on sign-out, so the live switch cannot stay locked; the waiting challenger's arena explain closes when its challenge stops waiting.
+
 ### Mobile: Arena "On the mat" by proximity and "Online & close" (2 km), plus location-flag follow-ups (jr_be 016 addendum)
 
 Built to `specs/016-invites/contract-arena-nearby.md` sections 1 and 3 (jr_be). JS-only, OTA-eligible (no native change; `expo-location` is already linked). Web Arena is unchanged (follow-up bead).

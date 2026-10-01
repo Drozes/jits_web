@@ -51,7 +51,13 @@ jest.mock("expo-keep-awake", () => ({
   activateKeepAwakeAsync: () => Promise.resolve(),
   deactivateKeepAwake: () => Promise.resolve(),
 }));
-jest.mock("@/components/arena/challenge-prompt-sheet", () => ({ ChallengePromptSheet: () => null }));
+const mockPromptProps = jest.fn();
+jest.mock("@/components/arena/challenge-prompt-sheet", () => ({
+  ChallengePromptSheet: (props: unknown) => {
+    mockPromptProps(props);
+    return null;
+  },
+}));
 
 let mockAthlete: Record<string, unknown> | null = null;
 jest.mock("@/lib/auth/hooks", () => ({
@@ -86,6 +92,7 @@ jest.mock("@/lib/arena/use-arena-live", () => ({
 
 let mockStartBlocked: unknown = null;
 let mockOutgoing: unknown = null;
+let mockIncoming: unknown = null;
 const mockRetryBlocked = jest.fn();
 const mockCancelBlocked = jest.fn();
 const mockChallengeArgs = jest.fn();
@@ -93,7 +100,7 @@ jest.mock("@/lib/arena/use-arena-challenge", () => ({
   useArenaChallenge: (args: unknown) => {
     mockChallengeArgs(args);
     return {
-      incoming: null,
+      incoming: mockIncoming,
       outgoing: mockOutgoing,
       incomingCount: 0,
       incomingTucked: false,
@@ -141,6 +148,7 @@ beforeEach(() => {
   mockRefusal = null;
   mockStartBlocked = null;
   mockOutgoing = null;
+  mockIncoming = null;
   __resetChallengerArenaReadingForTests();
   mockArenaReport.mockResolvedValue(RECORDED);
   mockGoLive.mockResolvedValue(true);
@@ -411,12 +419,14 @@ describe("Arena start refused by the proximity gate", () => {
     challengeId: "c1",
     challengerId: "a1",
     challengerName: "ALEX",
+    title: "Not on the same mat",
     message: "You need to be on the same mat as ALEX to start.",
   };
 
   it("shows the reason with Retry and Cancel, never a generic error", () => {
     mockStartBlocked = BLOCKED;
     render(<ArenaBootstrap />);
+    expect(screen.getByTestId("arena-start-blocked-title")).toHaveTextContent("Not on the same mat");
     expect(screen.getByTestId("arena-start-blocked-message")).toHaveTextContent(BLOCKED.message);
     fireEvent.press(screen.getByText("Retry"));
     expect(mockRetryBlocked).toHaveBeenCalled();
@@ -434,6 +444,60 @@ describe("Arena start refused by the proximity gate", () => {
   it("shows nothing when nothing is blocked", () => {
     render(<ArenaBootstrap />);
     expect(screen.queryByTestId("arena-start-blocked")).toBeNull();
+  });
+
+  it.each([
+    ["my side missing", "Location needed", "Can't confirm your location. Try again."],
+    ["their side missing", "Waiting for ALEX", "Waiting for ALEX's location."],
+  ])("%s: the title matches the reason", (_case, title, message) => {
+    mockStartBlocked = { ...BLOCKED, title, message };
+    render(<ArenaBootstrap />);
+    expect(screen.getByTestId("arena-start-blocked-title")).toHaveTextContent(title);
+    expect(screen.getByTestId("arena-start-blocked-message")).toHaveTextContent(message);
+  });
+
+  it("M4: a challenge arriving while the blocked sheet is up never opens a second modal", () => {
+    const INCOMING = { challengeId: "c2", challengerId: "a2", challengerName: "SAM" };
+    mockIncoming = INCOMING;
+    mockStartBlocked = BLOCKED;
+    const { rerender } = render(<ArenaBootstrap />);
+    expect(screen.getByTestId("arena-start-blocked")).toBeTruthy();
+    expect(mockPromptProps.mock.calls.at(-1)?.[0]).toMatchObject({ challenge: null });
+    // Answered (Retry started it, or Cancel): the waiting prompt comes up.
+    mockStartBlocked = null;
+    rerender(<ArenaBootstrap />);
+    expect(screen.queryByTestId("arena-start-blocked")).toBeNull();
+    expect(mockPromptProps.mock.calls.at(-1)?.[0]).toMatchObject({ challenge: INCOMING });
+  });
+});
+
+describe("a location sheet never outlives its owner (L5, L6)", () => {
+  it("L5: the live owner unmounting (sign-out) answers a waiting Go Live 'cancel' and clears the sheet", async () => {
+    mockLocationRequired = true;
+    mockPermission.mockResolvedValue({ granted: false, canAskAgain: true });
+    const { unmount } = render(<ArenaBootstrap />);
+    const tap = tapGoLive();
+    await waitFor(() => expect(screen.getByTestId("go-live-location-explain")).toBeTruthy());
+    unmount();
+    // The Go Live unwinds (the live switch is not held), silently.
+    expect(await tap.done).toBe("ignored");
+    expect(mockGoLive).not.toHaveBeenCalled();
+    // The next owner (the next account) starts with no sheet up.
+    render(<ArenaBootstrap />);
+    expect(screen.queryByTestId("go-live-location-explain")).toBeNull();
+  });
+
+  it("L6: the challenger's explain closes when its challenge stops waiting", async () => {
+    mockLocationRequired = true;
+    mockOutgoing = { challengeId: "ch-out", opponentId: "a-2", opponentName: "ALEX", createdAt: null, expiresAt: null };
+    mockPermission.mockResolvedValue({ granted: false, canAskAgain: true });
+    const { rerender } = render(<ArenaBootstrap />);
+    await waitFor(() => expect(screen.getByTestId("go-live-location-explain")).toBeTruthy());
+    // The opponent declined: no outgoing challenge any more.
+    mockOutgoing = null;
+    rerender(<ArenaBootstrap />);
+    await waitFor(() => expect(screen.queryByTestId("go-live-location-explain")).toBeNull());
+    expect(mockArenaReport).not.toHaveBeenCalled();
   });
 });
 

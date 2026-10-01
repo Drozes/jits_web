@@ -172,6 +172,39 @@ export function useArenaIncomingCount(): number {
 }
 
 // ---------------------------------------------------------------------------
+// Nearby On the mat count (jr_be 016 addendum)
+// ---------------------------------------------------------------------------
+
+/**
+ * The Arena's On the mat count while it is in nearby mode (only the athletes
+ * on my mat), or null in any fallback mode. The header chip's `· N` must be
+ * the number of On the mat rows the Arena renders (spec 14, D2), so
+ * `useOnMatCount` prefers this over the whole-lobby count. `count: null`:
+ * nearby mode, but the rows are not known yet.
+ */
+export type NearbyOnMatCount = { count: number | null } | null;
+
+let nearbyOnMat: NearbyOnMatCount = null;
+const nearbyListeners = new Set<() => void>();
+
+export function publishNearbyOnMatCount(next: NearbyOnMatCount): void {
+  if (next === nearbyOnMat || (next && nearbyOnMat && next.count === nearbyOnMat.count)) return;
+  nearbyOnMat = next;
+  for (const l of nearbyListeners) l();
+}
+
+export function getNearbyOnMatCount(): NearbyOnMatCount {
+  return nearbyOnMat;
+}
+
+export function subscribeNearbyOnMatCount(callback: () => void): () => void {
+  nearbyListeners.add(callback);
+  return () => {
+    nearbyListeners.delete(callback);
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Signed-in athlete
 // ---------------------------------------------------------------------------
 

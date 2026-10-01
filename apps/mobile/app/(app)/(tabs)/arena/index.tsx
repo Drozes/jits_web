@@ -49,6 +49,7 @@ import {
   setOpponentUnavailableHandler,
   clearOpponentUnavailableHandler,
   useArenaState,
+  publishNearbyOnMatCount,
   useIsInArenaMatch,
   useLiveSwitchPhase,
 } from "@/lib/arena/arena-store";
@@ -73,7 +74,7 @@ import { sortFriendsFirst } from "@jits/shared/api/friends";
 import { useFriendIds } from "@/lib/invites/use-friend-ids";
 import { useInvitesEnabled } from "@/lib/invites/use-invites-enabled";
 import { useBookings } from "@/lib/invites/use-bookings";
-import { useMatchLocationRequired } from "@/lib/arena/match-location-flag";
+import { loadMatchLocationRequired, useMatchLocationFlag } from "@/lib/arena/match-location-flag";
 import { arenaMatchHref } from "@/lib/arena/constants";
 
 /**
@@ -187,7 +188,12 @@ export default function ArenaScreen() {
   // (`?athlete=<id>`) puts that friend on top, one tap from a challenge.
   const { athlete: focusAthleteId } = useLocalSearchParams<{ athlete?: string }>();
   const friendIds = useFriendIds(selfId);
-  const locationRequired = useMatchLocationRequired();
+  const { required: locationRequired, known: flagKnown } = useMatchLocationFlag();
+  // The owner may flip the flag while the app is open: re-read it each time
+  // the Arena gains focus (server replies flip it in between).
+  React.useEffect(() => {
+    if (isFocused) void loadMatchLocationRequired();
+  }, [isFocused]);
   // On the mat by proximity (jr_be 016 addendum): with the flag on and a
   // usable location, On the mat is only the athletes on my mat, and the live
   // ones within 2 km are "Online & close". Otherwise today's list.
@@ -209,7 +215,8 @@ export default function ArenaScreen() {
   const inMatch = useIsInArenaMatch();
   const booked = useBookings({
     visible: isFocused,
-    locationRequired,
+    // Unknown (cold start): neither location readings nor Start match.
+    locationRequired: flagKnown ? locationRequired : null,
     onStarted: (matchId) => {
       if (!inMatch) router.push(arenaMatchHref(matchId) as Href);
     },
@@ -221,6 +228,8 @@ export default function ArenaScreen() {
     hasRoster && lobbyKnown ? onTheMat : null,
     selfElo !== null,
   );
+  // The chip's `· N` is these same rows (D2): in nearby mode only my mat.
+  useNearbyOnMatCountPublisher(nearby.mode === "nearby", onMat);
   // Never suggest someone a challenge is already pending with, either way.
   const outgoingOpponentId = outgoing?.opponentId ?? null;
   const closest = React.useMemo(
@@ -360,6 +369,7 @@ export default function ArenaScreen() {
             onAskLocation={() => void booked.askLocation()}
             onCancel={() => booked.cancel(b.challenge_id)}
             locationRequired={locationRequired}
+            flagKnown={flagKnown}
             onStart={() => void booked.start(b.challenge_id)}
             starting={Boolean(booked.starting[b.challenge_id])}
             startError={booked.startErrors[b.challenge_id] ?? null}
@@ -474,6 +484,18 @@ export default function ArenaScreen() {
       ) : null}
     </View>
   );
+}
+
+/**
+ * Publish the nearby On the mat count for the header chip while the Arena
+ * is in nearby mode (`null` count: rows not known yet); fallback mode, or
+ * the Arena going away, hands the chip back to the lobby count.
+ */
+function useNearbyOnMatCountPublisher(nearbyMode: boolean, onMat: number | null): void {
+  React.useEffect(() => {
+    publishNearbyOnMatCount(nearbyMode ? { count: onMat } : null);
+  }, [nearbyMode, onMat]);
+  React.useEffect(() => () => publishNearbyOnMatCount(null), []);
 }
 
 /**

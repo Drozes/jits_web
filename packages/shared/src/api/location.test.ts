@@ -17,6 +17,7 @@ import {
   ARENA_SELF_LOCATION_MISSING_COPY,
   arenaProximityCopy,
   arenaProximityMessage,
+  arenaProximityTitle,
   bookedMessage,
   bookedStripMessage,
   startBookingErrorView,
@@ -297,5 +298,27 @@ describe("booking_closed start-blocked reason", () => {
   it("reads as the closed-booking copy on the full and strip lines", () => {
     expect(bookedMessage("booking_closed", "Alex")).toBe("This booking was cancelled.");
     expect(bookedStripMessage("booking_closed", "Alex")).toBe("This booking was cancelled.");
+  });
+});
+
+describe("arenaProximityTitle (matches the message)", () => {
+  it.each([
+    ["opponent", "opponent", "Location needed"],
+    ["challenger", "challenger", "Location needed"],
+    ["challenger", "opponent", "Waiting for ALEX"],
+    ["opponent", "challenger", "Waiting for ALEX"],
+    ["both", "opponent", "Not on the same mat"],
+    [null, "opponent", "Not on the same mat"],
+  ] as const)("DETAIL %s seen by the %s", (detail, selfRole, title) => {
+    expect(arenaProximityTitle({ hint: "proximity_required", detail, selfRole, opponentName: "ALEX" })).toBe(title);
+  });
+
+  it("proximity_failed is always Not on the same mat; a missing name says your opponent", () => {
+    expect(
+      arenaProximityTitle({ hint: "proximity_failed", detail: "opponent", selfRole: "opponent", opponentName: "ALEX" }),
+    ).toBe("Not on the same mat");
+    expect(
+      arenaProximityTitle({ hint: "proximity_required", detail: "challenger", selfRole: "opponent", opponentName: " " }),
+    ).toBe("Waiting for your opponent");
   });
 });

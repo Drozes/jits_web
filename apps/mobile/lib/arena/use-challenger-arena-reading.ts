@@ -21,7 +21,7 @@ import * as React from "react";
 import { AppState } from "react-native";
 import * as Location from "expo-location";
 import { reportArenaReading } from "./arena-presence";
-import { closeLocationSheet, explainArenaLocation } from "./go-live-location";
+import { cancelLocationSheet, closeLocationSheet, explainArenaLocation } from "./go-live-location";
 
 /** How often the waiting challenger's reading is refreshed. */
 export const CHALLENGER_READING_REFRESH_MS = 60_000;
@@ -84,6 +84,9 @@ export function useChallengerArenaReading(challengeId: string | null, active: bo
     return () => {
       clearInterval(t);
       sub.remove();
+      // The wait ended (answered, cancelled, a match, the flag off): an
+      // explain still up for it is moot, and must not linger over the app.
+      cancelLocationSheet("arena");
     };
   }, [active, challengeId, tick]);
 }

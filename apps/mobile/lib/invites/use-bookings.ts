@@ -70,10 +70,12 @@ export function useBookings(opts: {
   onClosed: (message: string) => void;
   /**
    * `match_location_required`. On (the default): location readings start
-   * the match. Off: no location, the Start match button starts it.
+   * the match. Off: no location, the Start match button starts it. Null:
+   * not known yet (cold start), so neither runs.
    */
-  locationRequired?: boolean;
+  locationRequired?: boolean | null;
 }) {
+  const flagKnown = opts.locationRequired !== null;
   const locationRequired = opts.locationRequired ?? true;
   const [bookings, setBookings] = React.useState<Booking[]>([]);
   const [starting, setStarting] = React.useState<Record<string, boolean>>({});
@@ -111,6 +113,12 @@ export function useBookings(opts: {
     for (const b of list) {
       const res = await reportMatchPresence(supabase, loc.reading, "booking_open", { challengeId: b.challenge_id });
       if (!res.ok) continue;
+      // Only a flag-off server answers `start_available`: the owner turned
+      // the flag off mid-session. The strip switches to Start match.
+      if (res.data.ok && res.data.start_blocked_reason === "start_available") {
+        markMatchLocationRequired(false);
+        return;
+      }
       if (res.data.ok && res.data.started && res.data.match_id) {
         cb.current.onStarted(res.data.match_id);
         return;
@@ -141,7 +149,7 @@ export function useBookings(opts: {
 
   const hasBookings = bookings.length > 0;
   React.useEffect(() => {
-    if (!opts.visible || !hasBookings || !locationRequired) return;
+    if (!opts.visible || !hasBookings || !flagKnown || !locationRequired) return;
     let cancelled = false;
     const run = () => {
       if (!cancelled) void tick();
@@ -156,7 +164,7 @@ export function useBookings(opts: {
       clearInterval(t);
       sub.remove();
     };
-  }, [opts.visible, hasBookings, tick, locationRequired]);
+  }, [opts.visible, hasBookings, tick, locationRequired, flagKnown]);
 
   // The flag turned on (or a refusal proved it on): the Start errors are moot.
   React.useEffect(() => {
@@ -225,7 +233,7 @@ export function useBookings(opts: {
   // a cancel or expiry closes the booking.
   const bookingIds = bookings.map((b) => b.challenge_id).join(",");
   React.useEffect(() => {
-    if (!opts.visible || locationRequired || !bookingIds) return;
+    if (!opts.visible || !flagKnown || locationRequired || !bookingIds) return;
     const unsubs = bookingIds.split(",").map((id) =>
       subscribeToChallengeStatus(supabase, id, (status) => {
         if (status === "started") {
@@ -241,7 +249,7 @@ export function useBookings(opts: {
     return () => {
       for (const u of unsubs) u();
     };
-  }, [opts.visible, locationRequired, bookingIds, removeBooking, fireStarted]);
+  }, [opts.visible, flagKnown, locationRequired, bookingIds, removeBooking, fireStarted]);
 
   /**
    * Cancel a booking (either side), only while it is still `accepted`.

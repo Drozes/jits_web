@@ -27,6 +27,7 @@ import {
 } from "@jits/shared/api/location";
 import { supabase } from "@/lib/supabase/client";
 import { readLocationOnce } from "@/lib/invites/location";
+import { markMatchLocationRequired } from "./match-location-flag";
 
 /** How often the nearby lists are re-read while the Arena is focused. */
 export const ARENA_NEARBY_REFRESH_MS = 60_000;
@@ -102,6 +103,10 @@ export function useArenaNearby({ focused, isLive, locationRequired, lobbyKey }: 
       // A live viewer already has a fresh go_live reading (60 s refresh).
       if (flagOn && !live) await reportBrowseReading();
       const res = await getArenaNearby(supabase);
+      // The server's mode is the flag as it is right now: `flag_off` means
+      // the owner turned it off (the client may still think it on), any
+      // other mode means it is on. Either reaches every flag reader at once.
+      if (res.ok) markMatchLocationRequired(res.data.mode !== "flag_off");
       if (!mounted.current) return;
       if (res.ok && res.data.mode === "nearby") {
         setView({

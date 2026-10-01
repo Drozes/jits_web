@@ -120,6 +120,21 @@ export function closeLocationSheet(): void {
   closeSheet();
 }
 
+/**
+ * Drop whatever location state is up, answering its wait "cancel" so the
+ * flow behind it (a Go Live holding the live switch) unwinds instead of
+ * waiting forever. `purpose`: only a sheet shown for that purpose. Called
+ * when its owner goes away: ArenaOwner unmount, sign-out, the challenger's
+ * waiting state ending.
+ */
+export function cancelLocationSheet(purpose?: "go_live" | "arena"): void {
+  if (purpose && (sheet?.purpose ?? "go_live") !== purpose) return;
+  const resolve = resolver;
+  resolver = null;
+  if (sheet) setSheet(null);
+  resolve?.("cancel");
+}
+
 // ---------------------------------------------------------------------------
 // Reading
 // ---------------------------------------------------------------------------

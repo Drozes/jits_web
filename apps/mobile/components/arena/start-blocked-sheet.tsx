@@ -1,7 +1,8 @@
 /**
  * An Arena accept the proximity gate refused (`match_location_required` on,
- * `proximity_required` / `proximity_failed`): "You need to be on the same mat
- * as ALEX to start." with Retry and Cancel. The challenge stays `accepted`
+ * `proximity_required` / `proximity_failed`): a title that matches the reason
+ * ("Location needed", "Waiting for ALEX", "Not on the same mat") over the
+ * message, with Retry and Cancel. The challenge stays `accepted`
  * until one of them answers, so neither athlete is stranded: Retry sends a
  * fresh reading and starts it, Cancel withdraws it (the challenger's plate
  * then clears). Not dismissable by back or backdrop, like the prompt.
@@ -30,8 +31,12 @@ export function StartBlockedSheet({
             accessibilityViewIsModal
             className="w-full max-w-md gap-4 rounded-lg border border-hairline bg-surface-2 p-5"
           >
-            <Text accessibilityRole="header" className="font-heading text-[18px] uppercase text-ink">
-              Not on the same mat
+            <Text
+              testID="arena-start-blocked-title"
+              accessibilityRole="header"
+              className="font-heading text-[18px] uppercase text-ink"
+            >
+              {blocked.title}
             </Text>
             <Text
               testID="arena-start-blocked-message"

@@ -18,6 +18,7 @@ import {
   markMatchLocationRequired,
   readMatchLocationRequired,
   resetMatchLocationRequired,
+  useMatchLocationFlag,
   useMatchLocationRequired,
 } from "@/lib/arena/match-location-flag";
 
@@ -84,4 +85,48 @@ it("a server refusal marks it on for every reader", async () => {
   act(() => markMatchLocationRequired(true));
   expect(result.current).toBe(true);
   expect(await readMatchLocationRequired()).toBe(true);
+});
+
+describe("server signals and the known state (M1, L4)", () => {
+  it("a server signal wins over a read that was already in flight", async () => {
+    let resolveRead!: (v: unknown) => void;
+    mockGetFlag.mockReturnValue(new Promise((r) => (resolveRead = r)));
+    const { result } = renderHook(() => useMatchLocationRequired());
+    // The owner turned it off; a flag-off reply arrives before the stale read.
+    act(() => markMatchLocationRequired(false));
+    await act(async () => {
+      resolveRead({ ok: true, data: true });
+    });
+    expect(result.current).toBe(false);
+    await expect(readMatchLocationRequired()).resolves.toBe(false);
+  });
+
+  it("markMatchLocationRequired(false) turns a known-on flag off for every reader", async () => {
+    mockGetFlag.mockResolvedValue({ ok: true, data: true });
+    const a = renderHook(() => useMatchLocationRequired());
+    const b = renderHook(() => useMatchLocationFlag());
+    await waitFor(() => expect(a.result.current).toBe(true));
+    act(() => markMatchLocationRequired(false));
+    expect(a.result.current).toBe(false);
+    expect(b.result.current).toEqual({ required: false, known: true });
+  });
+
+  it("not known until the first read settles; known again only after sign-out's next read", async () => {
+    let resolveRead!: (v: unknown) => void;
+    mockGetFlag.mockReturnValue(new Promise((r) => (resolveRead = r)));
+    const { result } = renderHook(() => useMatchLocationFlag());
+    expect(result.current).toEqual({ required: false, known: false });
+    await act(async () => {
+      resolveRead({ ok: true, data: true });
+    });
+    expect(result.current).toEqual({ required: true, known: true });
+    act(() => resetMatchLocationRequired());
+    expect(result.current).toEqual({ required: false, known: false });
+  });
+
+  it("a failed read is known (rendered as off) so the UI is not held back", async () => {
+    mockGetFlag.mockResolvedValue({ ok: false, error: { code: "UNKNOWN", message: "offline" } });
+    const { result } = renderHook(() => useMatchLocationFlag());
+    await waitFor(() => expect(result.current).toEqual({ required: false, known: true }));
+  });
 });

@@ -9,6 +9,8 @@ import {
   LOCATION_UNAVAILABLE_STRIP_COPY,
   START_AVAILABLE_COPY,
   START_AVAILABLE_STRIP_COPY,
+  BOOKED_COPY,
+  BOOKED_STRIP_COPY,
   IMPLAUSIBLE_MOVEMENT_COPY,
   bookedMessage,
   bookedStripMessage,
@@ -42,6 +44,7 @@ export function BookedStrip({
   onStart,
   starting = false,
   startError = null,
+  flagKnown = true,
 }: {
   booking: Booking;
   location: BookingLocation;
@@ -56,6 +59,12 @@ export function BookedStrip({
   starting?: boolean;
   /** Why the last Start match was refused (short line + full copy). */
   startError?: StartBookingErrorView | null;
+  /**
+   * `match_location_required` has an answer yet. Until it has, the strip
+   * shows only that the match is booked: neither Start match nor a location
+   * fix, so a cold start never flashes the wrong variant.
+   */
+  flagKnown?: boolean;
 }) {
   const name = booking.opponent.first_name || booking.opponent.display_name;
   const confirmCancel = () =>
@@ -73,7 +82,7 @@ export function BookedStrip({
       },
     ]);
 
-  const fix = !locationRequired
+  const fix = !flagKnown || !locationRequired
     ? null
     : location === "ask"
       ? { short: LOCATION_DENIED_STRIP_COPY, full: LOCATION_DENIED_COPY, label: "Enable", a11y: "Turn on location", onPress: onAskLocation }
@@ -94,7 +103,9 @@ export function BookedStrip({
                 { short: IMPLAUSIBLE_MOVEMENT_COPY, full: IMPLAUSIBLE_MOVEMENT_COPY, label: "Retry", a11y: "Try again", onPress: onRetry }
               : null;
   const blockedReason = presence?.blockedReason ?? null;
-  const status = !locationRequired
+  const status = !flagKnown
+    ? { short: BOOKED_STRIP_COPY, full: BOOKED_COPY }
+    : !locationRequired
     ? startError
       ? { short: startError.short, full: startError.full }
       : { short: START_AVAILABLE_STRIP_COPY, full: START_AVAILABLE_COPY }
@@ -125,7 +136,7 @@ export function BookedStrip({
           </Text>
         </View>
         {fix ? <OutlineAction label={fix.label} accessibilityLabel={fix.a11y} onPress={fix.onPress} /> : null}
-        {!locationRequired && onStart ? (
+        {flagKnown && !locationRequired && onStart ? (
           <OutlineAction
             testID={`arena-booked-start-${booking.challenge_id}`}
             label={starting ? "Starting" : "Start match"}

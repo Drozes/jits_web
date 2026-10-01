@@ -236,3 +236,35 @@ describe("useArenaNearby: when it reads", () => {
     expect(mockNearby).toHaveBeenCalledTimes(2);
   });
 });
+
+describe("useArenaNearby: the server's mode is the flag (M1 kill switch)", () => {
+  it("mode flag_off turns the client flag off at once (the owner flipped it mid-session)", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const flag = require("@/lib/arena/match-location-flag") as typeof import("@/lib/arena/match-location-flag");
+    flag.markMatchLocationRequired(true);
+    mockNearby.mockResolvedValue({ ok: true, data: { mode: "flag_off", onTheMat: [], close: [] } });
+    mount();
+    await flush();
+    await expect(flag.readMatchLocationRequired()).resolves.toBe(false);
+  });
+
+  it("any other mode turns it on (the client read it off)", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const flag = require("@/lib/arena/match-location-flag") as typeof import("@/lib/arena/match-location-flag");
+    flag.markMatchLocationRequired(false);
+    mockNearby.mockResolvedValue({ ok: true, data: { mode: "no_location", onTheMat: [], close: [] } });
+    mount({ locationRequired: false });
+    await flush();
+    await expect(flag.readMatchLocationRequired()).resolves.toBe(true);
+  });
+
+  it("a failed read says nothing about the flag", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const flag = require("@/lib/arena/match-location-flag") as typeof import("@/lib/arena/match-location-flag");
+    flag.markMatchLocationRequired(true);
+    mockNearby.mockResolvedValue({ ok: false, error: { hint: "unknown", message: "offline" } });
+    mount();
+    await flush();
+    await expect(flag.readMatchLocationRequired()).resolves.toBe(true);
+  });
+});

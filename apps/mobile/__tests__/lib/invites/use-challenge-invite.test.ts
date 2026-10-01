@@ -313,3 +313,37 @@ describe("match_location_required off", () => {
     expect(result.current.phase).toEqual({ kind: "closed" });
   });
 });
+
+describe("the kill switch reaches the inviter (M1)", () => {
+  const START_AVAILABLE = {
+    ok: true,
+    data: { ok: true, verdict: "recorded", started: false, match_id: null, start_blocked_reason: "start_available" },
+  };
+
+  it("a claim booked with start_available turns the flag off (booked offers Start match)", async () => {
+    mockCreate.mockResolvedValue({ ok: true, data: INVITE });
+    const { result } = renderHook(() => useChallengeInvite("arena"));
+    await waitFor(() => expect(result.current.phase.kind).toBe("open"));
+    mockPresence.mockResolvedValue(START_AVAILABLE);
+    await act(async () => {
+      mockOnRow?.({ status: "claimed", claimed_by: "b", challenge_id: "c1" });
+    });
+    await waitFor(() => expect(result.current.phase.kind).toBe("booked"));
+    expect(mockMarkLocation).toHaveBeenCalledWith(false);
+  });
+
+  it("an invite_waiting reply with start_available turns it off too", async () => {
+    mockCreate.mockResolvedValue({ ok: true, data: INVITE });
+    mockPresence.mockResolvedValue(START_AVAILABLE);
+    renderHook(() => useChallengeInvite("arena"));
+    await waitFor(() => expect(mockMarkLocation).toHaveBeenCalledWith(false));
+  });
+
+  it("an ordinary reply leaves the flag alone", async () => {
+    mockCreate.mockResolvedValue({ ok: true, data: INVITE });
+    const { result } = renderHook(() => useChallengeInvite("arena"));
+    await waitFor(() => expect(result.current.phase.kind).toBe("open"));
+    await waitFor(() => expect(mockPresence).toHaveBeenCalled());
+    expect(mockMarkLocation).not.toHaveBeenCalled();
+  });
+});

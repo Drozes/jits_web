@@ -181,7 +181,14 @@ jest.mock("@/lib/invites/use-friend-ids", () => ({ useFriendIds: () => mockFrien
 jest.mock("@/lib/invites/use-invites-enabled", () => ({ useInvitesEnabled: () => mockInvitesOn }));
 // eslint-disable-next-line no-var
 var mockLocationRequired = false;
-jest.mock("@/lib/arena/match-location-flag", () => ({ useMatchLocationRequired: () => mockLocationRequired }));
+// eslint-disable-next-line no-var
+var mockFlagKnown = true;
+const mockLoadFlag = jest.fn();
+jest.mock("@/lib/arena/match-location-flag", () => ({
+  useMatchLocationRequired: () => mockLocationRequired,
+  useMatchLocationFlag: () => ({ required: mockLocationRequired, known: mockFlagKnown }),
+  loadMatchLocationRequired: () => mockLoadFlag(),
+}));
 // eslint-disable-next-line no-var
 var mockBooked: Record<string, unknown> = {};
 const mockUseBookings = jest.fn();
@@ -279,7 +286,9 @@ let mockChallenge = {
   isBusy: false,
   capReached: false,
 };
+const mockPublishNearbyCount = jest.fn();
 jest.mock("@/lib/arena/arena-store", () => ({
+  publishNearbyOnMatCount: (...a: unknown[]) => mockPublishNearbyCount(...a),
   useArenaState: () => ({ isLive: mockIsLive, isSaving: false, ...mockChallenge }),
   useIsArenaLive: () => mockIsLive,
   useIsInArenaMatch: () => mockInMatch,
@@ -325,6 +334,7 @@ beforeEach(() => {
   mockNearbyView = { mode: "fallback" };
   __resetArenaNearbyForTests();
   mockLocationRequired = false;
+  mockFlagKnown = true;
   mockBooked = {};
   mockFriendIds = new Set();
   mockInvitesOn = false;
@@ -1988,6 +1998,29 @@ describe("Arena Booked strip and match_location_required", () => {
     expect(r.getByText("Finish your match first.")).toBeTruthy();
   });
 
+  it("M1: re-reads the flag each time the Arena gains focus", () => {
+    mockIsFocused = false;
+    const r = render(<ArenaScreen />);
+    expect(mockLoadFlag).not.toHaveBeenCalled();
+    mockIsFocused = true;
+    r.rerender(<ArenaScreen />);
+    expect(mockLoadFlag).toHaveBeenCalledTimes(1);
+    mockIsFocused = false;
+    r.rerender(<ArenaScreen />);
+    mockIsFocused = true;
+    r.rerender(<ArenaScreen />);
+    expect(mockLoadFlag).toHaveBeenCalledTimes(2);
+  });
+
+  it("L4: flag not known yet: the bookings run nothing and the strip shows no Start match", () => {
+    mockFlagKnown = false;
+    mockBooked = { bookings: [BOOKING], location: "unknown", start: jest.fn() };
+    const r = render(<ArenaScreen />);
+    expect(mockUseBookings).toHaveBeenLastCalledWith(expect.objectContaining({ locationRequired: null }));
+    expect(r.queryByTestId("arena-booked-start-c1")).toBeNull();
+    expect(r.getByTestId("booked-message")).toHaveTextContent("Starts when you're both on the mat.");
+  });
+
   it("flag on: no Start match, the location flow drives it", () => {
     mockLocationRequired = true;
     mockBooked = { bookings: [BOOKING], location: "denied", start: jest.fn() };
@@ -2014,6 +2047,22 @@ describe("Arena nearby: On the mat by proximity and Online & close (016 addendum
       competitor({ id: "a-5", displayName: "Echo", eloDiff: 5 }),
     ];
     mockLobbyIds = new Set(["a-1", "a-2", "a-3", "a-4", "a-5"]);
+  });
+
+  it("M2: publishes the nearby On the mat count for the header chip; fallback publishes none", () => {
+    mockNearbyView = nearby(["a-1"], [["a-2", "under_500m"], ["a-3", "under_2km"]]);
+    const r = render(<ArenaScreen />);
+    // One row on my mat: the chip's number, not the five live in the lobby.
+    expect(mockPublishNearbyCount).toHaveBeenLastCalledWith({ count: 1 });
+    mockNearbyView = { mode: "fallback" };
+    r.rerender(<ArenaScreen />);
+    expect(mockPublishNearbyCount).toHaveBeenLastCalledWith(null);
+    // And leaving the Arena hands the chip back to the lobby count.
+    mockNearbyView = nearby(["a-1"], []);
+    r.rerender(<ArenaScreen />);
+    expect(mockPublishNearbyCount).toHaveBeenLastCalledWith({ count: 1 });
+    r.unmount();
+    expect(mockPublishNearbyCount).toHaveBeenLastCalledWith(null);
   });
 
   it("reads the nearby view with focus, live state, flag and the lobby", () => {

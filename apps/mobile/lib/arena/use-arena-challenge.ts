@@ -77,7 +77,12 @@ import {
   type KnownIncoming,
 } from "./incoming-challenges";
 import { requestPendingChallengeResync } from "./use-pending-challenge-recovery";
-import { isProximityRefusal, proximityRefusalCopy, reportArenaReading } from "./arena-presence";
+import {
+  isProximityRefusal,
+  proximityRefusalCopy,
+  proximityRefusalTitle,
+  reportArenaReading,
+} from "./arena-presence";
 import { markMatchLocationRequired } from "./match-location-flag";
 import { notifyIncomingChallengeEnded } from "./arena-store";
 import { superviseChannel, type SupervisedChannel } from "../supabase/supervise-channel";
@@ -331,6 +336,8 @@ export interface StartBlocked {
   challengeId: string;
   challengerId: string;
   challengerName: string;
+  /** Matches the reason: "Location needed", "Waiting for ALEX" or "Not on the same mat". */
+  title: string;
   message: string;
 }
 
@@ -1864,6 +1871,7 @@ export function useArenaChallenge({
             challengerId: current.challengerId,
             challengerName: current.challengerName,
             // I am the accepter: the challenge's `opponent`.
+            title: proximityRefusalTitle(started.error, "opponent", current.challengerName),
             message: proximityRefusalCopy(started.error, "opponent", current.challengerName),
           });
           return;
@@ -1941,6 +1949,7 @@ export function useArenaChallenge({
           // so the sheet re-announces it.
           setStartBlocked({
             ...blocked,
+            title: proximityRefusalTitle(started.error, "opponent", blocked.challengerName),
             message: proximityRefusalCopy(started.error, "opponent", blocked.challengerName),
           });
           return;

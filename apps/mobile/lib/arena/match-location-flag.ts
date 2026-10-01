@@ -7,8 +7,8 @@
  * A failed read counts as OFF (the server is the authority and refuses with
  * HINT `location_required` / `proximity_required` when it is actually on),
  * but is not remembered as known, so the next foreground reads again. A
- * server refusal that proves the flag is on flips it here at once
- * (`markMatchLocationRequired`).
+ * server answer that proves the flag's state flips it here at once, either
+ * way (`markMatchLocationRequired`), and the Arena re-reads it on focus.
  */
 import * as React from "react";
 import { AppState } from "react-native";
@@ -16,21 +16,39 @@ import { getMatchLocationRequired } from "@jits/shared/api/location";
 import { supabase } from "@/lib/supabase/client";
 
 let value = false;
+/** A successful read (or a server signal) confirmed `value`. */
 let known = false;
+/**
+ * Some answer is in hand (a read settled, even a failed one, or a server
+ * signal): the UI may render the flag's variant. False from launch (and after
+ * sign-out) until then, so nothing flashes the flag-off UI (a Start match
+ * button) on a cold start with the flag on.
+ */
+let resolved = false;
+/** Bumped by every server signal, so a read that started earlier never overrides it. */
+let generation = 0;
 let inflight: Promise<boolean> | null = null;
-const listeners = new Set<(on: boolean) => void>();
+const listeners = new Set<() => void>();
+
+function emit() {
+  for (const l of listeners) l();
+}
 
 function publish(next: boolean) {
-  if (next === value) return;
+  const changed = next !== value || !resolved;
   value = next;
-  for (const l of listeners) l(next);
+  resolved = true;
+  if (changed) emit();
 }
 
 /** Read the flag from the server (deduped). Resolves the value now in effect. */
 export function loadMatchLocationRequired(): Promise<boolean> {
   if (!inflight) {
-    inflight = getMatchLocationRequired(supabase)
+    const gen = generation;
+    const p = getMatchLocationRequired(supabase)
       .then((res) => {
+        // A server signal landed while this read was in flight: it is newer.
+        if (gen !== generation) return value;
         if (res.ok) {
           known = true;
           publish(res.data);
@@ -42,8 +60,9 @@ export function loadMatchLocationRequired(): Promise<boolean> {
         return value;
       })
       .finally(() => {
-        inflight = null;
+        if (inflight === p) inflight = null;
       });
+    inflight = p;
   }
   return inflight;
 }
@@ -53,37 +72,72 @@ export function readMatchLocationRequired(): Promise<boolean> {
   return known ? Promise.resolve(value) : loadMatchLocationRequired();
 }
 
-/** The server refused with a location HINT: the flag is on, whatever we read. */
+/**
+ * A server answer proved the flag's state, whatever we last read: a refusal
+ * with HINT `location_required` / `proximity_required` (on), or a reply only
+ * a flag-off server gives (`start_blocked_reason: 'start_available'`,
+ * `get_arena_nearby` mode `flag_off`). This is how an owner's mid-session
+ * flip reaches a running client before its next foreground read.
+ */
 export function markMatchLocationRequired(on: boolean): void {
+  generation += 1;
+  inflight = null;
   known = true;
   publish(on);
 }
 
 /** Forget the flag (sign-out, tests). */
 export function resetMatchLocationRequired(): void {
+  generation += 1;
   known = false;
+  resolved = false;
   inflight = null;
   value = false;
-  for (const l of listeners) l(false);
+  emit();
+}
+
+function subscribe(cb: () => void): () => void {
+  listeners.add(cb);
+  return () => {
+    listeners.delete(cb);
+  };
+}
+
+function getValue(): boolean {
+  return value;
+}
+
+function getResolved(): boolean {
+  return resolved;
 }
 
 /**
- * The flag for rendering. Read on mount when unknown and again on every
- * return to the foreground (the owner may flip it while the app is open).
+ * Read on mount when unknown and again on every return to the foreground
+ * (the owner may flip it while the app is open).
  */
-export function useMatchLocationRequired(): boolean {
-  const [on, setOn] = React.useState(value);
+function useFlagReads(): void {
   React.useEffect(() => {
-    listeners.add(setOn);
-    setOn(value);
     if (!known) void loadMatchLocationRequired();
     const sub = AppState.addEventListener("change", (s) => {
       if (s === "active") void loadMatchLocationRequired();
     });
-    return () => {
-      listeners.delete(setOn);
-      sub.remove();
-    };
+    return () => sub.remove();
   }, []);
-  return on;
+}
+
+/** The flag for rendering (false until known; see `useMatchLocationFlag`). */
+export function useMatchLocationRequired(): boolean {
+  useFlagReads();
+  return React.useSyncExternalStore(subscribe, getValue, getValue);
+}
+
+/**
+ * The flag plus whether it is known yet. Surfaces that differ by the flag
+ * (Start match vs location) render neither variant until `known`.
+ */
+export function useMatchLocationFlag(): { required: boolean; known: boolean } {
+  useFlagReads();
+  const required = React.useSyncExternalStore(subscribe, getValue, getValue);
+  const known = React.useSyncExternalStore(subscribe, getResolved, getResolved);
+  return { required, known };
 }

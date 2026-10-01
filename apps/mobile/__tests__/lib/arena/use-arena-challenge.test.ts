@@ -4745,6 +4745,7 @@ describe("match_location_required: Arena accept and the proximity gate", () => {
         challengeId: CHALLENGE,
         challengerId: OPPONENT,
         challengerName: "Rival",
+        title: "Not on the same mat",
         message: "You need to be on the same mat as Rival to start.",
       });
       expect(mockMarkLocation).toHaveBeenCalledWith(true);
@@ -4893,11 +4894,11 @@ describe("proximity_required DETAIL: whose location is missing (M1)", () => {
 
   it.each([
     // I accepted, so I am the challenge's opponent.
-    ["opponent", "Can't confirm your location. Try again."],
-    ["challenger", "Waiting for Rival's location."],
-    ["both", "You need to be on the same mat as Rival to start."],
-    [null, "You need to be on the same mat as Rival to start."],
-  ] as const)("DETAIL %s on accept shows %s", async (details, copy) => {
+    ["opponent", "Can't confirm your location. Try again.", "Location needed"],
+    ["challenger", "Waiting for Rival's location.", "Waiting for Rival"],
+    ["both", "You need to be on the same mat as Rival to start.", "Not on the same mat"],
+    [null, "You need to be on the same mat as Rival to start.", "Not on the same mat"],
+  ] as const)("DETAIL %s on accept shows %s under a matching title", async (details, copy, title) => {
     mockStartMatch.mockResolvedValue(refusal("PROXIMITY_REQUIRED", details));
     const { result } = mount();
     await raiseIncoming(result);
@@ -4905,6 +4906,7 @@ describe("proximity_required DETAIL: whose location is missing (M1)", () => {
       await result.current.accept();
     });
     expect(result.current.startBlocked?.message).toBe(copy);
+    expect(result.current.startBlocked?.title).toBe(title);
     expect(mockCancelChallenge).not.toHaveBeenCalled();
   });
 

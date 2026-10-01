@@ -65,6 +65,13 @@ async function athleteFirstName(id: string | null): Promise<string | null> {
   return row.first_name || row.display_name || null;
 }
 
+/** A presence reply only a flag-off server gives flips the client flag off. */
+function noteFlagOff(res: Awaited<ReturnType<typeof reportMatchPresence>>): void {
+  if (res.ok && res.data.ok && res.data.start_blocked_reason === "start_available") {
+    markMatchLocationRequired(false);
+  }
+}
+
 export function useChallengeInvite(
   entryPoint: InviteEntryPoint | null,
   opts: { locationRequired?: boolean } = {},
@@ -157,6 +164,9 @@ export function useChallengeInvite(
         setPhase({ kind: "started", matchId: res.data.match_id });
         return;
       }
+      // Only a flag-off server answers `start_available`: the owner turned
+      // the flag off mid-session, so the booked state offers Start match.
+      noteFlagOff(res);
     }
     const { data: match } = await supabase.from("matches").select("id").eq("challenge_id", challengeId).maybeSingle();
     if (match?.id) {
@@ -227,7 +237,7 @@ export function useChallengeInvite(
         void logInviteEvent(supabase, "location_denied", { inviteId, detail: { context: "invite_waiting" } });
       }
       if (loc.status === "ok") {
-        void reportMatchPresence(supabase, loc.reading, "invite_waiting", { inviteId });
+        noteFlagOff(await reportMatchPresence(supabase, loc.reading, "invite_waiting", { inviteId }));
       }
     };
     void tick();

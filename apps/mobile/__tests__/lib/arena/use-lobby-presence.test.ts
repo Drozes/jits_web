@@ -1256,3 +1256,38 @@ describe("ON MAT count for the header chip (spec 6.1, spec 14 D2)", () => {
     unmount();
   });
 });
+
+describe("useOnMatCount in the Arena's nearby mode (M2)", () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const store = require("@/lib/arena/arena-store") as typeof import("@/lib/arena/arena-store");
+
+  afterEach(() => {
+    store.publishNearbyOnMatCount(null);
+    resetMatRosterStore();
+  });
+
+  it("prefers the nearby On the mat count over every live lobby athlete, and falls back after", async () => {
+    publishMatRoster(["athlete-a", "athlete-b", "athlete-c"]);
+    const { result, unmount } = renderHook(() => {
+      useLobbyPresence(ME);
+      return useOnMatCount(ME);
+    });
+    await settle();
+    act(() => {
+      mockChannels[0].presenceState.mockReturnValue({
+        "athlete-a": [{ current_elo: 1250 }],
+        "athlete-b": [{ current_elo: 1250 }],
+        "athlete-c": [{ current_elo: 1250 }],
+      });
+      mockChannels[0].syncHandler?.();
+    });
+    expect(result.current).toBe(3);
+    // Nearby mode: only athlete-a is on my mat.
+    act(() => store.publishNearbyOnMatCount({ count: 1 }));
+    expect(result.current).toBe(1);
+    // Back to a fallback mode: every live lobby athlete again.
+    act(() => store.publishNearbyOnMatCount(null));
+    expect(result.current).toBe(3);
+    unmount();
+  });
+});

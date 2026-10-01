@@ -61,6 +61,7 @@ import { supabase } from "../supabase/client";
 import { LOBBY_TOPIC } from "./constants";
 import { countOnTheMat } from "./mat-board";
 import { getMatRosterIds, subscribeMatRoster } from "./mat-roster-store";
+import { getNearbyOnMatCount, subscribeNearbyOnMatCount } from "./arena-store";
 
 /**
  * Tracked payload. `looking_for_casual` / `looking_for_ranked` are carried for
@@ -204,9 +205,11 @@ export function useLobbyKnown(): boolean {
 function subscribeLobbyAndRoster(callback: () => void): () => void {
   const offLobby = subscribe(callback);
   const offRoster = subscribeMatRoster(callback);
+  const offNearby = subscribeNearbyOnMatCount(callback);
   return () => {
     offLobby();
     offRoster();
+    offNearby();
   };
 }
 
@@ -222,10 +225,18 @@ function subscribeLobbyAndRoster(callback: () => void): () => void {
  * NULL while the lobby is unknown (before the first sync, or after a channel
  * loss until the next one) and while no roster is loaded: rendering either
  * as 0 ("JUST YOU") would be a false statement.
+ *
+ * In nearby mode the Arena publishes its own On the mat count
+ * (`publishNearbyOnMatCount`), which wins: those are the rows it renders.
  */
 export function useOnMatCount(selfId: string | null | undefined): number | null {
-  const get = () =>
-    lobbyKnown ? countOnTheMat(getMatRosterIds(), lobbyIds, selfId) : null;
+  const get = () => {
+    // Nearby mode (jr_be 016 addendum): the Arena's On the mat rows are only
+    // the athletes on my mat, so the chip counts exactly those (D2).
+    const nearby = getNearbyOnMatCount();
+    if (nearby) return nearby.count;
+    return lobbyKnown ? countOnTheMat(getMatRosterIds(), lobbyIds, selfId) : null;
+  };
   return useSyncExternalStore(subscribeLobbyAndRoster, get, get);
 }
 

@@ -18,9 +18,11 @@ jest.mock("@/lib/arena/arena-presence", () => ({
 }));
 const mockExplain = jest.fn();
 const mockClose = jest.fn();
+const mockCancelSheet = jest.fn();
 jest.mock("@/lib/arena/go-live-location", () => ({
   explainArenaLocation: () => mockExplain(),
   closeLocationSheet: () => mockClose(),
+  cancelLocationSheet: (...a: unknown[]) => mockCancelSheet(...a),
 }));
 
 import {
@@ -172,5 +174,27 @@ describe("useChallengerArenaReading", () => {
     await flush();
     expect(mockExplain).not.toHaveBeenCalled();
     expect(mockArenaReading).not.toHaveBeenCalled();
+  });
+});
+
+describe("useChallengerArenaReading cleanup (L6)", () => {
+  it("closes an open arena explain when the wait ends, never a go_live one", async () => {
+    mockPermission.mockResolvedValue({ granted: false, canAskAgain: true });
+    // The athlete has not answered the explain yet.
+    mockExplain.mockReturnValue(new Promise(() => undefined));
+    const r = mount({ id: "ch-1", active: true });
+    await flush();
+    expect(mockExplain).toHaveBeenCalledTimes(1);
+    expect(mockCancelSheet).not.toHaveBeenCalled();
+    // The challenge was answered (or cancelled): the explain is moot.
+    r.rerender({ id: null, active: true });
+    expect(mockCancelSheet).toHaveBeenCalledWith("arena");
+  });
+
+  it("closes it on unmount too", async () => {
+    const r = mount({ id: "ch-1", active: true });
+    await flush();
+    r.unmount();
+    expect(mockCancelSheet).toHaveBeenCalledWith("arena");
   });
 });

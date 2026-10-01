@@ -38,6 +38,7 @@ import {
 import { useArenaChallenge } from "./use-arena-challenge";
 import { useArenaLive } from "./use-arena-live";
 import {
+  cancelLocationSheet,
   ensureGoLiveLocation,
   goLiveWithLocation,
   useGoLiveReadingRefresh,
@@ -274,6 +275,9 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
     return () => {
       unregister();
       publishArenaState(IDLE_ARENA_STATE);
+      // A Go Live waiting on the location sheet would otherwise hold the
+      // live switch locked with nothing left to answer it.
+      cancelLocationSheet();
     };
   }, []);
 
@@ -289,7 +293,9 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
       {/* Go Live location states (explain, denied, accuracy, no fix). */}
       <GoLiveLocationSheet />
       <ChallengePromptSheet
-        challenge={inMatch || incomingTucked ? null : incoming}
+        // Never two modals: a blocked start's sheet holds the screen until
+        // it is answered; a challenge arriving meanwhile waits in the chip.
+        challenge={inMatch || incomingTucked || challenge.startBlocked ? null : incoming}
         busy={isBusy}
         onAccept={() => void challenge.accept()}
         onDecline={() => void challenge.decline()}

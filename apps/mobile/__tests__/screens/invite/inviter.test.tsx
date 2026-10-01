@@ -18,6 +18,7 @@ const mockDispatch = jest.fn();
 let mockLocationRequired = true;
 jest.mock("@/lib/arena/match-location-flag", () => ({
   useMatchLocationRequired: () => mockLocationRequired,
+  useMatchLocationFlag: () => ({ required: mockLocationRequired, known: true }),
   readMatchLocationRequired: () => Promise.resolve(mockLocationRequired),
   markMatchLocationRequired: jest.fn(),
 }));

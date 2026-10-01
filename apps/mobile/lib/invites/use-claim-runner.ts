@@ -21,6 +21,7 @@ import { DOB_REQUIRED_COPY, DOB_SAVE_FAILED_COPY } from "@jits/shared/utils";
 import { supabase } from "@/lib/supabase/client";
 import { clearPendingInvite, releasePushDeferral, takeBufferedEvents, type PendingInvite } from "./pending-invite";
 import { readLocationOnce } from "./location";
+import { markMatchLocationRequired } from "@/lib/arena/match-location-flag";
 import { notifyFriendsChanged } from "./use-friend-ids";
 import { clearsPendingInvite, stepForClaim, stepForJoin, type ClaimStep } from "./claim-flow";
 
@@ -89,6 +90,9 @@ export function useClaimRunner(
       setState({ phase: "done", step: { type: "message", message: NETWORK_COPY, terminal: false } });
       return;
     }
+    // Only a flag-off server books with `start_available`: the owner turned
+    // the flag off mid-session (the Booked strip then offers Start match).
+    if (res.data.ok && res.data.start_blocked_reason === "start_available") markMatchLocationRequired(false);
     await finish(
       stepForClaim(res.data, {
         viaCode: Boolean(pending.code),

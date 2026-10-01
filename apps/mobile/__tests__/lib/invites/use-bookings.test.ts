@@ -362,3 +362,28 @@ describe("match_location_required off (Start match)", () => {
     expect(mockStatusHandlers.c1).toBeUndefined();
   });
 });
+
+describe("the flag as the strip's server answers say (M1, L4)", () => {
+  it("a start_available reading reply turns the flag off (only a flag-off server says it)", async () => {
+    mockPresence.mockResolvedValue({
+      ok: true,
+      data: { ok: true, verdict: "recorded", started: false, match_id: null, start_blocked_reason: "start_available" },
+    });
+    setup();
+    await waitFor(() => expect(mockMarkLocation).toHaveBeenCalledWith(false));
+  });
+
+  it("an unknown flag (null) runs neither the readings nor the Start match realtime", async () => {
+    for (const k of Object.keys(mockStatusHandlers)) delete mockStatusHandlers[k];
+    const hook = renderHook(() =>
+      useBookings({ visible: true, onStarted: jest.fn(), onClosed: jest.fn(), locationRequired: null }),
+    );
+    await waitFor(() => expect(hook.result.current.bookings).toHaveLength(1));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(mockReading).not.toHaveBeenCalled();
+    expect(mockPresence).not.toHaveBeenCalled();
+    expect(Object.keys(mockStatusHandlers)).toHaveLength(0);
+  });
+});

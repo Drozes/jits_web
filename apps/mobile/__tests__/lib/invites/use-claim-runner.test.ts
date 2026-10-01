@@ -230,3 +230,17 @@ describe("dob_required", () => {
     expect(mockSetDob).toHaveBeenCalledWith(expect.anything(), "me", "1990-05-01");
   });
 });
+
+it("M1: a claim booked with start_available turns the client flag off (the owner flipped it)", async () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const flag = require("@/lib/arena/match-location-flag") as typeof import("@/lib/arena/match-location-flag");
+  flag.markMatchLocationRequired(true);
+  mockJoin.mockResolvedValue(NOT_A_JOIN);
+  mockReading.mockResolvedValue({ status: "ok", reading: { lat: 1, lng: 2, accuracyM: 10 } });
+  mockClaim.mockResolvedValue({
+    ok: true,
+    data: { ok: true, result: "booked", challenge_id: "c1", match_id: null, inviter, start_blocked_reason: "start_available" },
+  });
+  await runWith(makePendingInvite({ token: TOKEN }, "universal_link"));
+  await expect(flag.readMatchLocationRequired()).resolves.toBe(false);
+});

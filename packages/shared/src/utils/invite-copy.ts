@@ -378,6 +378,28 @@ export function arenaProximityCopy(input: {
   return arenaProximityMessage(input.opponentName);
 }
 
+/**
+ * The title over an Arena start the proximity gate refused, matching the
+ * message: my side's reading missing is "Location needed", the other
+ * side's is "Waiting for ALEX", anything else (both missing, too far apart,
+ * `proximity_failed`, no DETAIL) is "Not on the same mat".
+ */
+export function arenaProximityTitle(input: {
+  hint: "proximity_required" | "proximity_failed";
+  detail: string | null | undefined;
+  selfRole: ArenaChallengeRole;
+  opponentName: string | null | undefined;
+}): string {
+  if (input.hint === "proximity_required") {
+    const missing = input.detail?.trim();
+    if (missing === input.selfRole) return "Location needed";
+    if (missing === "challenger" || missing === "opponent") {
+      return `Waiting for ${input.opponentName?.trim() || "your opponent"}`;
+    }
+  }
+  return "Not on the same mat";
+}
+
 /** What a failed Start match says: a strip-sized line plus the full copy. */
 export interface StartBookingErrorView {
   /** Fits the Booked strip (BOOKED_STRIP_MAX_CHARS for a name up to 12 chars). */

@@ -8,7 +8,7 @@
  */
 import { reportArenaPresence } from "@jits/shared/api/location";
 import type { DomainError } from "@jits/shared/api/errors";
-import { arenaProximityCopy, type ArenaChallengeRole } from "@jits/shared/utils";
+import { arenaProximityCopy, arenaProximityTitle, type ArenaChallengeRole } from "@jits/shared/utils";
 import { supabase } from "@/lib/supabase/client";
 import { readLocationOnce } from "@/lib/invites/location";
 
@@ -40,6 +40,20 @@ export function proximityRefusalCopy(
   opponentName: string | null | undefined,
 ): string {
   return arenaProximityCopy({
+    hint: error.code === "PROXIMITY_FAILED" ? "proximity_failed" : "proximity_required",
+    detail: error.raw?.details ?? null,
+    selfRole,
+    opponentName,
+  });
+}
+
+/** The title over a proximity refusal (matches `proximityRefusalCopy`). */
+export function proximityRefusalTitle(
+  error: DomainError,
+  selfRole: ArenaChallengeRole,
+  opponentName: string | null | undefined,
+): string {
+  return arenaProximityTitle({
     hint: error.code === "PROXIMITY_FAILED" ? "proximity_failed" : "proximity_required",
     detail: error.raw?.details ?? null,
     selfRole,
