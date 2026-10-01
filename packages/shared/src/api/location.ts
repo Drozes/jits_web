@@ -140,3 +140,97 @@ export function subscribeToChallengeStatus(
     void supabase.removeChannel(channel);
   };
 }
+
+// ---------------------------------------------------------------------------
+// Arena nearby (contract-arena-nearby.md, 016 addendum)
+// ---------------------------------------------------------------------------
+
+/**
+ * The viewer-level Arena browse reading (`p_context = 'browse'`, no scope):
+ * a NON-live viewer on the Arena with the flag on and location permission
+ * already granted. It only feeds the viewer's own `get_arena_nearby`; it
+ * never counts for Go Live or a match start. The server answers only
+ * `{ ok:true, verdict:'recorded' }` (no distance), or `{ ok:false, code }`
+ * (`accuracy_too_low`, a rate limit of one per 30 s, an implausible jump):
+ * the caller treats every refusal as "no location".
+ */
+export function reportBrowsePresence(supabase: Client, reading: LocationReading): Promise<InviteResult<PresenceResult>> {
+  return rpc(
+    supabase,
+    "report_match_presence",
+    { ...readingArgs(reading), p_context: "browse", p_challenge_id: null, p_invite_id: null },
+    parsePresence,
+  );
+}
+
+export type ArenaNearbyMode = "flag_off" | "no_location" | "nearby";
+export type ArenaDistanceBand = "on_the_mat" | "under_500m" | "under_1km" | "under_2km";
+export type ArenaCloseBand = Exclude<ArenaDistanceBand, "on_the_mat">;
+
+export interface ArenaNearby {
+  mode: ArenaNearbyMode;
+  /** Athletes on the viewer's mat (the match-start proximity rule). */
+  onTheMat: string[];
+  /** Live athletes within 2 km who are not on the mat, banded, never a number. */
+  close: { athleteId: string; band: ArenaCloseBand }[];
+}
+
+const NEARBY_MODES: ReadonlySet<string> = new Set(["flag_off", "no_location", "nearby"]);
+const CLOSE_BANDS: ReadonlySet<string> = new Set(["under_500m", "under_1km", "under_2km"]);
+
+/**
+ * Parse `get_arena_nearby()`. A refusal (`{ ok:false, code:'not_active' }`)
+ * or an unknown shape is null (the caller falls back to today's list). Rows
+ * with an unknown band are dropped rather than guessed.
+ */
+export function parseArenaNearby(data: unknown): ArenaNearby | null {
+  const o = obj(data);
+  if (!o || o.ok !== true) return null;
+  const mode = str(o.mode);
+  if (!mode || !NEARBY_MODES.has(mode)) return null;
+  const onTheMat: string[] = [];
+  for (const row of Array.isArray(o.on_the_mat) ? o.on_the_mat : []) {
+    const id = str(obj(row)?.athlete_id);
+    if (id) onTheMat.push(id);
+  }
+  const close: ArenaNearby["close"] = [];
+  for (const row of Array.isArray(o.close) ? o.close : []) {
+    const r = obj(row);
+    const id = str(r?.athlete_id);
+    const band = str(r?.distance_band);
+    if (id && band && CLOSE_BANDS.has(band)) close.push({ athleteId: id, band: band as ArenaCloseBand });
+  }
+  return { mode: mode as ArenaNearbyMode, onTheMat, close };
+}
+
+/**
+ * Which live athletes are on the viewer's mat and which are within 2 km
+ * (bands only). Mode `flag_off` / `no_location` carries empty lists; the
+ * Arena then shows today's list. Never throws.
+ */
+export function getArenaNearby(supabase: Client): Promise<InviteResult<ArenaNearby>> {
+  // Newer than the generated types until `npm run db:types` runs against the
+  // migrated stack, hence the cast.
+  return rpc(supabase, "get_arena_nearby" as Parameters<typeof rpc>[1], {}, parseArenaNearby);
+}
+
+/** What a close row shows for its band. */
+export const ARENA_BAND_LABEL: Record<ArenaCloseBand, string> = {
+  under_500m: "< 500 m",
+  under_1km: "< 1 km",
+  under_2km: "< 2 km",
+};
+
+/** What VoiceOver reads for a band. */
+export const ARENA_BAND_SPOKEN: Record<ArenaCloseBand, string> = {
+  under_500m: "under 500 meters",
+  under_1km: "under 1 kilometer",
+  under_2km: "under 2 kilometers",
+};
+
+/** Band order for sorting (nearest first). */
+export const ARENA_BAND_ORDER: Record<ArenaCloseBand, number> = {
+  under_500m: 0,
+  under_1km: 1,
+  under_2km: 2,
+};

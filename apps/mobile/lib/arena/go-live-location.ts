@@ -26,13 +26,19 @@ import type { LiveSwitchIgnored } from "./arena-store";
 /** How often a live athlete's `go_live` reading is refreshed (contract 6). */
 export const GO_LIVE_REFRESH_MS = 60_000;
 
-export type GoLiveLocationPhase = "explain" | "denied" | "accuracy" | "unavailable";
+export type GoLiveLocationPhase = "explain" | "denied" | "accuracy" | "unavailable" | "movement";
 export type GoLiveLocationChoice = "continue" | "retry" | "cancel";
 
 export interface GoLiveLocationSheetState {
   phase: GoLiveLocationPhase;
   /** A reading is being taken after Continue / Retry. */
   busy: boolean;
+  /**
+   * Why location is asked: `go_live` (default) or `arena`, the challenger's
+   * waiting state asking once so its challenge can start (same copy, a
+   * title that does not say "go live").
+   */
+  purpose?: "go_live" | "arena";
 }
 
 // ---------------------------------------------------------------------------
@@ -53,11 +59,14 @@ function setSheet(next: GoLiveLocationSheetState | null) {
 }
 
 /** Show a phase and wait for the athlete's answer. */
-function present(phase: GoLiveLocationPhase): Promise<GoLiveLocationChoice> {
+function present(
+  phase: GoLiveLocationPhase,
+  purpose: "go_live" | "arena" = "go_live",
+): Promise<GoLiveLocationChoice> {
   // A previous wait still open (should not happen: callers are serialized
   // by the live switch guard) is answered "cancel" rather than leaked.
   resolver?.("cancel");
-  setSheet({ phase, busy: false });
+  setSheet({ phase, busy: false, purpose });
   return new Promise((resolve) => {
     resolver = resolve;
   });
@@ -97,11 +106,25 @@ export function __resetGoLiveLocationForTests(): void {
   emit();
 }
 
+/**
+ * The challenger's one-time ask (flag on, permission not granted, waiting on
+ * an outgoing challenge): the same explain copy, then the system prompt.
+ * Resolves true on Continue, with the sheet left up (busy) until
+ * `closeLocationSheet()`; false when the athlete chose Not now.
+ */
+export async function explainArenaLocation(): Promise<boolean> {
+  return (await present("explain", "arena")) === "continue";
+}
+
+export function closeLocationSheet(): void {
+  closeSheet();
+}
+
 // ---------------------------------------------------------------------------
 // Reading
 // ---------------------------------------------------------------------------
 
-type ReadOutcome = "ok" | "denied" | "accuracy" | "unavailable" | "error";
+type ReadOutcome = "ok" | "denied" | "accuracy" | "unavailable" | "movement" | "error";
 
 /** One reading, reported as `go_live`. `ask`: the system prompt may show. */
 async function readAndReport(ask: boolean): Promise<ReadOutcome> {
@@ -113,7 +136,13 @@ async function readAndReport(ask: boolean): Promise<ReadOutcome> {
     console.warn("[location] go_live report failed:", res.error.hint, res.error.message);
     return "error";
   }
-  if (!res.data.ok) return res.data.code === "accuracy_too_low" ? "accuracy" : "error";
+  if (!res.data.ok) {
+    if (res.data.code === "accuracy_too_low") return "accuracy";
+    // An implied speed over 50 m/s from the previous reading: say so, and
+    // only the athlete's own Retry sends another reading.
+    if (res.data.code === "implausible_movement") return "movement";
+    return "error";
+  }
   return "ok";
 }
 

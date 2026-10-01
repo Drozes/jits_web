@@ -27,7 +27,9 @@ export type StartBlockedReason =
   | "inviter_busy"
   | "claimer_busy"
   /** `match_location_required` off: either athlete can tap Start match. */
-  | "start_available";
+  | "start_available"
+  /** The booking was cancelled (flag-on proximity path). */
+  | "booking_closed";
 
 /** Hints raised by create_invite / refresh_invite_code / get_or_create_personal_invite. */
 export type CreateInviteErrorCode =
@@ -196,6 +198,7 @@ export function bookedMessage(reason: StartBlockedReason | null | undefined, inv
     return `Finish your current match first. Your booking with ${inviterName} is saved.`;
   }
   if (reason === "start_available") return START_AVAILABLE_COPY;
+  if (reason === "booking_closed") return BOOKING_CLOSED_COPY;
   return BOOKED_COPY;
 }
 
@@ -239,6 +242,7 @@ export function bookedStripMessage(reason: StartBlockedReason | null | undefined
   if (reason === "inviter_busy") return `${inviterName} is mid-match. We'll hold your spot.`;
   if (reason === "claimer_busy") return CLAIMER_BUSY_STRIP_COPY;
   if (reason === "start_available") return START_AVAILABLE_STRIP_COPY;
+  if (reason === "booking_closed") return BOOKING_CLOSED_COPY;
   return BOOKED_STRIP_COPY;
 }
 
@@ -333,6 +337,45 @@ export const GO_LIVE_LOCATION_DENIED_COPY =
 export function arenaProximityMessage(opponentName: string | null | undefined): string {
   const name = opponentName?.trim() || "your opponent";
   return `You need to be on the same mat as ${name} to start.`;
+}
+
+/**
+ * A reading the server refused as `implausible_movement` (the implied speed
+ * from the previous reading is over 50 m/s). Shown once; the client never
+ * retries it on its own (the next reading comes from the usual cadence or
+ * from the athlete's own Retry).
+ */
+export const IMPLAUSIBLE_MOVEMENT_COPY = "Can't pin your location. Try again.";
+
+/** Shown when the server has no fresh reading from this athlete for the start. */
+export const ARENA_SELF_LOCATION_MISSING_COPY = "Can't confirm your location. Try again.";
+
+/** Who an Arena challenge belongs to, from the caller's side. */
+export type ArenaChallengeRole = "challenger" | "opponent";
+
+/**
+ * An Arena start refused by the proximity gate, worded by whose reading is
+ * missing. `proximity_required` carries `challenger` | `opponent` | `both`
+ * in the exception DETAIL: the side named has no fresh reading. My side
+ * missing reads "Can't confirm your location. Try again.", the other side
+ * "Waiting for ALEX's location.", and `both`, a missing DETAIL or a
+ * `proximity_failed` (both read, too far apart) the same-mat copy.
+ */
+export function arenaProximityCopy(input: {
+  hint: "proximity_required" | "proximity_failed";
+  detail: string | null | undefined;
+  selfRole: ArenaChallengeRole;
+  opponentName: string | null | undefined;
+}): string {
+  if (input.hint === "proximity_required") {
+    const missing = input.detail?.trim();
+    if (missing === input.selfRole) return ARENA_SELF_LOCATION_MISSING_COPY;
+    if (missing === "challenger" || missing === "opponent") {
+      const name = input.opponentName?.trim() || "your opponent";
+      return `Waiting for ${name}'s location.`;
+    }
+  }
+  return arenaProximityMessage(input.opponentName);
 }
 
 /** What a failed Start match says: a strip-sized line plus the full copy. */

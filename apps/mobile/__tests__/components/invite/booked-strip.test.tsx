@@ -86,6 +86,18 @@ it("accuracy too low: the short copy and Retry", () => {
   expect(h.onRetry).toHaveBeenCalled();
 });
 
+it("implausible movement: its copy and the athlete's own Retry", () => {
+  const h = renderStrip({ presence: { blockedReason: null, accuracyTooLow: false, implausibleMovement: true } });
+  expect(status()).toHaveTextContent("Can't pin your location. Try again.");
+  fireEvent.press(screen.getByLabelText("Try again"));
+  expect(h.onRetry).toHaveBeenCalledTimes(1);
+});
+
+it("a booking_closed reason shows the closed-booking copy", () => {
+  renderStrip({ presence: { blockedReason: "booking_closed", accuracyTooLow: false } });
+  expect(status()).toHaveTextContent("This booking was cancelled.");
+});
+
 it.each([
   ["denied", false, "Location off. Needed to start."],
   ["unavailable", false, "No location signal. Try again."],

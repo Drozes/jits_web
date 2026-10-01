@@ -54,6 +54,11 @@ export type CancelBookingResult = "cancelled" | "too_late" | "failed";
 export interface BookingPresence {
   blockedReason: StartBlockedReason | null;
   accuracyTooLow: boolean;
+  /**
+   * The server refused the reading as `implausible_movement` (an implied
+   * speed over 50 m/s). Shown once; never retried automatically.
+   */
+  implausibleMovement?: boolean;
 }
 
 /** What a Start match tap did. */
@@ -110,7 +115,12 @@ export function useBookings(opts: {
         cb.current.onStarted(res.data.match_id);
         return;
       }
-      if (!res.data.ok && res.data.code === "booking_closed") {
+      // Closed either way: the refusal code, or (flag-on proximity path) an
+      // ok reply whose start_blocked_reason says the booking was cancelled.
+      if (
+        (!res.data.ok && res.data.code === "booking_closed") ||
+        (res.data.ok && res.data.start_blocked_reason === "booking_closed")
+      ) {
         const remaining = bookingsRef.current.filter((x) => x.challenge_id !== b.challenge_id);
         bookingsRef.current = remaining;
         setBookings(remaining);
@@ -120,7 +130,11 @@ export function useBookings(opts: {
       }
       const next: BookingPresence = res.data.ok
         ? { blockedReason: res.data.start_blocked_reason ?? null, accuracyTooLow: false }
-        : { blockedReason: null, accuracyTooLow: res.data.code === "accuracy_too_low" };
+        : {
+            blockedReason: null,
+            accuracyTooLow: res.data.code === "accuracy_too_low",
+            ...(res.data.code === "implausible_movement" ? { implausibleMovement: true } : {}),
+          };
       setPresence((cur) => ({ ...cur, [b.challenge_id]: next }));
     }
   }, []);

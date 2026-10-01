@@ -670,7 +670,12 @@ export type MatRowAction =
   /** A challenge is pending between us (either direction). */
   | { kind: "pending" }
   /** I am at the server's 3 pending outgoing cap. */
-  | { kind: "capped" };
+  | { kind: "capped" }
+  /**
+   * Online & close (within 2 km, not on my mat): no ROLL, a challenge would
+   * fail the proximity gate. A neutral hint instead, never red.
+   */
+  | { kind: "not-on-mat" };
 
 interface MatRowProps {
   competitor: ArenaCompetitor;
@@ -681,6 +686,11 @@ interface MatRowProps {
   onOpenProfile: () => void;
   /** A friend (jr_be spec 016): FRIEND badge; the Arena sorts friends first. */
   isFriend?: boolean;
+  /**
+   * Online & close only: the distance band as shown (`< 500 m`) and as
+   * spoken (`under 500 meters`). Never a number.
+   */
+  band?: { label: string; spoken: string } | null;
 }
 
 /**
@@ -695,6 +705,7 @@ export function MatRow({
   onGoLive,
   onOpenProfile,
   isFriend = false,
+  band = null,
 }: MatRowProps) {
   const { displayName, currentElo, eloDiff, weight } = competitor;
   return (
@@ -704,7 +715,7 @@ export function MatRow({
     >
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${isFriend ? "Friend, " : ""}${matRowLabel(displayName, currentElo, eloDiff, weight)}`}
+        accessibilityLabel={`${isFriend ? "Friend, " : ""}${matRowLabel(displayName, currentElo, eloDiff, weight)}${band ? `, ${band.spoken}` : ""}`}
         onPress={onOpenProfile}
         className="flex-1 flex-row items-center gap-3"
       >
@@ -749,6 +760,19 @@ export function MatRow({
       </Pressable>
 
       <View className="shrink-0 flex-row items-center gap-2">
+        {band ? (
+          <Text
+            testID={`arena-close-band-${competitor.id}`}
+            maxFontSizeMultiplier={MAX_SCALE}
+            className="font-mono-bold text-[11px] text-ink-2"
+            style={TABULAR}
+            // Already part of the row's label.
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+          >
+            {band.label}
+          </Text>
+        ) : null}
         {action.kind === "roll" ? (
           <OutlineAction
             label="Roll"
@@ -780,6 +804,15 @@ export function MatRow({
         ) : null}
         {action.kind === "pending" ? <MetaTag>Pending</MetaTag> : null}
         {action.kind === "capped" ? <MetaTag>3 out</MetaTag> : null}
+        {action.kind === "not-on-mat" ? (
+          <Text
+            testID={`arena-not-on-mat-${competitor.id}`}
+            maxFontSizeMultiplier={MAX_SCALE}
+            className="font-heading text-[9px] uppercase tracking-caps-l text-ink-3"
+          >
+            Not on your mat
+          </Text>
+        ) : null}
       </View>
     </View>
   );

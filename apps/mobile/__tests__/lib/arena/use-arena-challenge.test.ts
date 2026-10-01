@@ -4879,3 +4879,64 @@ describe("match_location_required: Arena accept and the proximity gate", () => {
     }
   });
 });
+
+describe("proximity_required DETAIL: whose location is missing (M1)", () => {
+  const refusal = (code: "PROXIMITY_REQUIRED" | "PROXIMITY_FAILED", details: string | null) => ({
+    ok: false,
+    error: { code, message: "not on one mat", raw: { code: "P0001", message: "x", hint: code.toLowerCase(), details } },
+  });
+  const STARTED = { ok: true, data: { success: true, match_id: MATCH, challenge_id: CHALLENGE } };
+
+  function mount() {
+    return renderHook(() => useArenaChallenge({ athleteId: ME, athleteWeight: 180, locationRequired: true }));
+  }
+
+  it.each([
+    // I accepted, so I am the challenge's opponent.
+    ["opponent", "Can't confirm your location. Try again."],
+    ["challenger", "Waiting for Rival's location."],
+    ["both", "You need to be on the same mat as Rival to start."],
+    [null, "You need to be on the same mat as Rival to start."],
+  ] as const)("DETAIL %s on accept shows %s", async (details, copy) => {
+    mockStartMatch.mockResolvedValue(refusal("PROXIMITY_REQUIRED", details));
+    const { result } = mount();
+    await raiseIncoming(result);
+    await act(async () => {
+      await result.current.accept();
+    });
+    expect(result.current.startBlocked?.message).toBe(copy);
+    expect(mockCancelChallenge).not.toHaveBeenCalled();
+  });
+
+  it("proximity_failed is the same-mat copy whatever the DETAIL", async () => {
+    mockStartMatch.mockResolvedValue(refusal("PROXIMITY_FAILED", "opponent"));
+    const { result } = mount();
+    await raiseIncoming(result);
+    await act(async () => {
+      await result.current.accept();
+    });
+    expect(result.current.startBlocked?.message).toBe("You need to be on the same mat as Rival to start.");
+  });
+
+  it("Retry re-words the reason from the new refusal, then starts", async () => {
+    mockStartMatch
+      .mockResolvedValueOnce(refusal("PROXIMITY_REQUIRED", "challenger"))
+      .mockResolvedValueOnce(refusal("PROXIMITY_REQUIRED", "opponent"))
+      .mockResolvedValue(STARTED);
+    const { result } = mount();
+    await raiseIncoming(result);
+    await act(async () => {
+      await result.current.accept();
+    });
+    expect(result.current.startBlocked?.message).toBe("Waiting for Rival's location.");
+    await act(async () => {
+      await result.current.retryBlockedStart();
+    });
+    expect(result.current.startBlocked?.message).toBe("Can't confirm your location. Try again.");
+    await act(async () => {
+      await result.current.retryBlockedStart();
+    });
+    expect(result.current.startBlocked).toBeNull();
+    expect(mockPush).toHaveBeenCalledWith(`/match/${MATCH}`);
+  });
+});

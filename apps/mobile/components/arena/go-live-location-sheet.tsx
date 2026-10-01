@@ -10,6 +10,7 @@ import {
   GO_LIVE_ACCURACY_COPY,
   GO_LIVE_LOCATION_DENIED_COPY,
   GO_LIVE_LOCATION_EXPLAIN_COPY,
+  IMPLAUSIBLE_MOVEMENT_COPY,
   LOCATION_UNAVAILABLE_COPY,
 } from "@jits/shared/utils";
 import { CtaButton, SecondaryButton, TertiaryButton } from "@/components/auth/auth-buttons";
@@ -24,6 +25,7 @@ const TITLES: Record<GoLiveLocationPhase, string> = {
   denied: "Location is off",
   accuracy: "Location too rough",
   unavailable: "No location",
+  movement: "Location check",
 };
 
 const BODY: Record<GoLiveLocationPhase, string> = {
@@ -31,6 +33,7 @@ const BODY: Record<GoLiveLocationPhase, string> = {
   denied: GO_LIVE_LOCATION_DENIED_COPY,
   accuracy: GO_LIVE_ACCURACY_COPY,
   unavailable: LOCATION_UNAVAILABLE_COPY,
+  movement: IMPLAUSIBLE_MOVEMENT_COPY,
 };
 
 export function GoLiveLocationSheet() {
@@ -46,7 +49,7 @@ export function GoLiveLocationSheet() {
             className="w-full max-w-md gap-4 rounded-lg border border-hairline bg-surface-2 p-5"
           >
             <Text accessibilityRole="header" className="font-heading text-[18px] uppercase text-ink">
-              {TITLES[state.phase]}
+              {state.purpose === "arena" && state.phase === "explain" ? "Location to start" : TITLES[state.phase]}
             </Text>
             <Text
               testID="go-live-location-body"

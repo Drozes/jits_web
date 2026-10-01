@@ -4,7 +4,9 @@
  * in what the Arena store, the lobby and the roster know.
  */
 import type { TabBadge } from "@/lib/navigation/tab-badge";
+import { ARENA_BAND_ORDER, type ArenaCloseBand } from "@jits/shared/api/location";
 import { IN_BAND_ELO } from "./constants";
+import type { ArenaNearbyView } from "./use-arena-nearby";
 
 // ---------------------------------------------------------------------------
 // On The Mat
@@ -87,6 +89,39 @@ export function pickClosest<T>(
   exclude?: (c: T) => boolean,
 ): T | null {
   return sortedOnMat.find((c) => !exclude?.(c)) ?? null;
+}
+
+/**
+ * The nearby split (jr_be 016 addendum, contract-arena-nearby 3). `rows` are
+ * the On The Mat rows (roster in the lobby, self excluded, closest first).
+ *
+ * - `fallback` (flag off, no usable location, RPC failed): today's list,
+ *   every row on the mat, nothing close.
+ * - `nearby`: On The Mat keeps only the rows on the viewer's mat (closest
+ *   first, unchanged), Online & close the rows within 2 km, sorted by band,
+ *   friends first within a band, then by name. Rows in neither list are not
+ *   shown at all.
+ */
+export function partitionNearby<T extends { id: string; displayName: string }>(
+  rows: readonly T[],
+  nearby: ArenaNearbyView,
+  friendIds: ReadonlySet<string>,
+): { mode: ArenaNearbyView["mode"]; onTheMat: T[]; close: { row: T; band: ArenaCloseBand }[] } {
+  if (nearby.mode !== "nearby") return { mode: "fallback", onTheMat: [...rows], close: [] };
+  const onTheMat = rows.filter((r) => nearby.onTheMat.has(r.id));
+  const close: { row: T; band: ArenaCloseBand }[] = [];
+  for (const row of rows) {
+    if (nearby.onTheMat.has(row.id)) continue;
+    const band = nearby.close.get(row.id);
+    if (band) close.push({ row, band });
+  }
+  close.sort(
+    (a, b) =>
+      ARENA_BAND_ORDER[a.band] - ARENA_BAND_ORDER[b.band] ||
+      Number(friendIds.has(b.row.id)) - Number(friendIds.has(a.row.id)) ||
+      a.row.displayName.localeCompare(b.row.displayName),
+  );
+  return { mode: "nearby", onTheMat, close };
 }
 
 // ---------------------------------------------------------------------------

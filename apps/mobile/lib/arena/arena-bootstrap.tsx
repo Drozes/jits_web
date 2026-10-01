@@ -20,6 +20,7 @@ import type { AthleteGuardRow } from "@jits/shared/api/queries";
 import { ChallengePromptSheet } from "@/components/arena/challenge-prompt-sheet";
 import { GoLiveLocationSheet } from "@/components/arena/go-live-location-sheet";
 import { StartBlockedSheet } from "@/components/arena/start-blocked-sheet";
+import { useChallengerArenaReading } from "./use-challenger-arena-reading";
 import { toast } from "@/components/ui/toast";
 import { REOPEN_SURFACE_GRACE_MS } from "./constants";
 import { useAuth } from "../auth/hooks";
@@ -179,6 +180,10 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
   useArenaLiveKeepAwake(isLive && !inMatch);
   // Keep the go_live reading fresh while live so an Arena start finds one.
   useGoLiveReadingRefresh(isLive && !inMatch && locationRequired);
+  // The challenger's reading while its challenge waits (pending or
+  // accepted): a challenger who is not live, or whose go_live reading went
+  // stale in the background, would otherwise fail the start's proximity gate.
+  useChallengerArenaReading(outgoing?.challengeId ?? null, locationRequired && !inMatch);
 
   // "Later" is only offered while something on screen can bring the prompt
   // back (the header chip registers itself, see useIncomingReopenSurface). If

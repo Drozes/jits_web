@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  getArenaNearby,
   getMatchLocationRequired,
+  parseArenaNearby,
   parseStartInviteBooking,
+  reportBrowsePresence,
   reportArenaPresence,
   reportGoLivePresence,
   startInviteBooking,
@@ -11,6 +14,8 @@ import {
   BOOKED_STRIP_MAX_CHARS,
   START_AVAILABLE_COPY,
   START_AVAILABLE_STRIP_COPY,
+  ARENA_SELF_LOCATION_MISSING_COPY,
+  arenaProximityCopy,
   arenaProximityMessage,
   bookedMessage,
   bookedStripMessage,
@@ -178,5 +183,119 @@ describe("location copy", () => {
     expect(startBookingErrorView("inviter_weekly_cap", { role: "inviter", opponentName: "Alex" }).full).toMatch(
       /^You've played/,
     );
+  });
+});
+
+describe("arena presence replies carry no verdict or distance", () => {
+  it("reportArenaPresence parses the privacy reply as recorded", async () => {
+    const { supabase } = rpcClient({
+      data: { ok: true, verdict: "recorded", started: false, match_id: null },
+      error: null,
+    });
+    const res = await reportArenaPresence(supabase, READING, "ch-1");
+    expect(res).toEqual({
+      ok: true,
+      data: {
+        ok: true,
+        verdict: "recorded",
+        reason: null,
+        distance_m: null,
+        started: false,
+        match_id: null,
+        start_blocked_reason: null,
+      },
+    });
+  });
+
+  it("reportBrowsePresence sends the browse context with no scope", async () => {
+    const { supabase, rpc } = rpcClient({ data: { ok: true, verdict: "recorded", started: false, match_id: null }, error: null });
+    await reportBrowsePresence(supabase, READING);
+    expect(rpc).toHaveBeenCalledWith("report_match_presence", {
+      p_lat: 43.6,
+      p_lng: -79.4,
+      p_accuracy_m: 20,
+      p_context: "browse",
+      p_challenge_id: null,
+      p_invite_id: null,
+    });
+  });
+
+  it("reportBrowsePresence passes a refusal through as data (implausible speed, rate limit)", async () => {
+    const { supabase } = rpcClient({ data: { ok: false, code: "implausible_movement" }, error: null });
+    expect(await reportBrowsePresence(supabase, READING)).toEqual({ ok: true, data: { ok: false, code: "implausible_movement" } });
+  });
+});
+
+describe("getArenaNearby", () => {
+  it("parses nearby mode with both lists", async () => {
+    const { supabase, rpc } = rpcClient({
+      data: {
+        ok: true,
+        mode: "nearby",
+        on_the_mat: [{ athlete_id: "a-1", distance_band: "on_the_mat" }],
+        close: [
+          { athlete_id: "a-2", distance_band: "under_500m" },
+          { athlete_id: "a-3", distance_band: "under_2km" },
+        ],
+      },
+      error: null,
+    });
+    expect(await getArenaNearby(supabase)).toEqual({
+      ok: true,
+      data: {
+        mode: "nearby",
+        onTheMat: ["a-1"],
+        close: [
+          { athleteId: "a-2", band: "under_500m" },
+          { athleteId: "a-3", band: "under_2km" },
+        ],
+      },
+    });
+    expect(rpc).toHaveBeenCalledWith("get_arena_nearby", {});
+  });
+
+  it.each(["flag_off", "no_location"])("parses %s with empty lists", (mode) => {
+    expect(parseArenaNearby({ ok: true, mode, on_the_mat: [], close: [] })).toEqual({ mode, onTheMat: [], close: [] });
+  });
+
+  it("drops rows with an unknown band and refuses unknown shapes", () => {
+    expect(
+      parseArenaNearby({ ok: true, mode: "nearby", on_the_mat: [], close: [{ athlete_id: "a", distance_band: "under_5km" }] }),
+    ).toEqual({ mode: "nearby", onTheMat: [], close: [] });
+    expect(parseArenaNearby({ ok: false, code: "not_active" })).toBeNull();
+    expect(parseArenaNearby({ ok: true, mode: "weird" })).toBeNull();
+    expect(parseArenaNearby(null)).toBeNull();
+  });
+
+  it("a RAISE is an error, never a mode", async () => {
+    const { supabase } = rpcClient({ data: null, error: { message: "nope", code: "PGRST202" } });
+    const res = await getArenaNearby(supabase);
+    expect(res.ok).toBe(false);
+  });
+});
+
+describe("arenaProximityCopy", () => {
+  it.each([
+    ["challenger", "challenger", ARENA_SELF_LOCATION_MISSING_COPY],
+    ["opponent", "opponent", ARENA_SELF_LOCATION_MISSING_COPY],
+    ["challenger", "opponent", "Waiting for ALEX's location."],
+    ["opponent", "challenger", "Waiting for ALEX's location."],
+    ["both", "opponent", "You need to be on the same mat as ALEX to start."],
+    [null, "opponent", "You need to be on the same mat as ALEX to start."],
+  ] as const)("DETAIL %s seen by the %s", (detail, selfRole, copy) => {
+    expect(arenaProximityCopy({ hint: "proximity_required", detail, selfRole, opponentName: "ALEX" })).toBe(copy);
+  });
+
+  it("proximity_failed is always the same-mat copy", () => {
+    expect(arenaProximityCopy({ hint: "proximity_failed", detail: "opponent", selfRole: "opponent", opponentName: "ALEX" })).toBe(
+      "You need to be on the same mat as ALEX to start.",
+    );
+  });
+});
+
+describe("booking_closed start-blocked reason", () => {
+  it("reads as the closed-booking copy on the full and strip lines", () => {
+    expect(bookedMessage("booking_closed", "Alex")).toBe("This booking was cancelled.");
+    expect(bookedStripMessage("booking_closed", "Alex")).toBe("This booking was cancelled.");
   });
 });

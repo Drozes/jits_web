@@ -77,8 +77,7 @@ import {
   type KnownIncoming,
 } from "./incoming-challenges";
 import { requestPendingChallengeResync } from "./use-pending-challenge-recovery";
-import { arenaProximityMessage } from "@jits/shared/utils";
-import { isProximityRefusal, reportArenaReading } from "./arena-presence";
+import { isProximityRefusal, proximityRefusalCopy, reportArenaReading } from "./arena-presence";
 import { markMatchLocationRequired } from "./match-location-flag";
 import { notifyIncomingChallengeEnded } from "./arena-store";
 import { superviseChannel, type SupervisedChannel } from "../supabase/supervise-channel";
@@ -1864,7 +1863,8 @@ export function useArenaChallenge({
             challengeId: current.challengeId,
             challengerId: current.challengerId,
             challengerName: current.challengerName,
-            message: arenaProximityMessage(current.challengerName),
+            // I am the accepter: the challenge's `opponent`.
+            message: proximityRefusalCopy(started.error, "opponent", current.challengerName),
           });
           return;
         }
@@ -1937,8 +1937,12 @@ export function useArenaChallenge({
           return;
         }
         if (isProximityRefusal(started.error.code)) {
-          // Still apart: same reason, a new object so the sheet re-announces it.
-          setStartBlocked({ ...blocked });
+          // Still not startable: the server's current reason, a new object
+          // so the sheet re-announces it.
+          setStartBlocked({
+            ...blocked,
+            message: proximityRefusalCopy(started.error, "opponent", blocked.challengerName),
+          });
           return;
         }
         if (started.error.code === "CHALLENGE_NOT_ACCEPTED") {

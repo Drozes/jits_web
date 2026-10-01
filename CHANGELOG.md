@@ -2,6 +2,25 @@
 
 ## [Unreleased]
 
+### Mobile: Arena "On the mat" by proximity and "Online & close" (2 km), plus location-flag follow-ups (jr_be 016 addendum)
+
+Built to `specs/016-invites/contract-arena-nearby.md` sections 1 and 3 (jr_be). JS-only, OTA-eligible (no native change; `expo-location` is already linked). Web Arena is unchanged (follow-up bead).
+
+**Cross-repo dependency:** jr_be `20261001300600_arena_nearby` (`get_arena_nearby()`, the `browse` presence context) and the follow-up that makes `report_match_presence` answer only `{ ok:true, verdict:'recorded' }` for `go_live` / `browse` / `arena`, refuses `implausible_movement` readings, adds `booking_closed` as a start-blocked reason and puts `challenger` | `opponent` | `both` in the `proximity_required` DETAIL. `get_arena_nearby` is called through a cast until `npm run db:types` runs against a stack with it. Without the RPC the Arena keeps today's list.
+
+**Added**
+- `packages/shared/src/api/location.ts`: `getArenaNearby` (Result; `flag_off` / `no_location` / `nearby`, a `not_active` refusal is an error), `parseArenaNearby`, `reportBrowsePresence`, band labels (`< 500 m`, `< 1 km`, `< 2 km`), spoken forms and order.
+- Shared copy: `arenaProximityCopy` (DETAIL to "Can't confirm your location. Try again." for my side, "Waiting for ALEX's location." for the other, the same-mat copy otherwise), `IMPLAUSIBLE_MOVEMENT_COPY`, `booking_closed` in `StartBlockedReason` (closed-booking copy).
+- `apps/mobile/lib/arena/use-arena-nearby.ts`: reads `get_arena_nearby` on focus, every 60 s while focused, on foreground and (debounced 1.5 s) on lobby, live or flag changes; a non-live viewer with the flag on and permission already granted sends a `browse` reading first (never a prompt, at most one per 30 s). Any non-`nearby` answer or failure is today's list.
+- `apps/mobile/components/arena/online-close-section.tsx`: "Online & close · N", collapsed by default, expanded state remembered for the app session, hidden at zero, an accessible button ("Online and close, N athletes", expanded state). Rows show their band and a neutral "Not on your mat" hint instead of ROLL; friends badged and first within a band.
+- `apps/mobile/lib/arena/use-challenger-arena-reading.ts`: with the flag on, the waiting challenger (pending or accepted outgoing challenge, foreground, not in a match) reports an `arena` reading at once, on every foreground and every 60 s; without permission it explains once per session (Go Live explain copy) then asks.
+
+**Changed**
+- Arena (nearby mode): On the mat is only the athletes on my mat, labelled "On the mat · near you" (friends-first label kept); the Closest Match card and the control bar counts come from those rows only. Fallback modes are unchanged.
+- An accept (or Retry) refused by `proximity_required` words the reason from the DETAIL; `proximity_failed` keeps the same-mat copy.
+- Go Live: an `implausible_movement` refusal shows "Can't pin your location. Try again." with a Retry the athlete taps (never retried automatically). The Booked strip shows the same copy; a `booking_closed` start-blocked reason closes the booking like the `booking_closed` code. Browse and arena refusals are logged and never retried before the next tick.
+- Nothing reads a verdict or distance from `report_match_presence` for `go_live` / `browse` / `arena`.
+
 ### Mobile: `match_location_required` flag, Go Live location, Start match (jr_be 016 addendum)
 
 Built to `specs/016-invites/contract-location-flag.md` (jr_be). JS-only on mobile (`expo-location` is already linked; the permission string comes from the native slice), so OTA-eligible once the native build that carries the location string is in the field.

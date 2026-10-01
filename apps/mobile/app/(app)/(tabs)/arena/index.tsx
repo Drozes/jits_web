@@ -8,6 +8,9 @@
  * On The Mat is the roster (`get_arena_data.looking_athletes`) intersected
  * with `lobby:online`, self excluded; online athletes only (spec 14, D1), and
  * every number on the screen and the chip's `· N` comes from those rows (D2).
+ * With `match_location_required` on and a usable location (jr_be 016
+ * addendum, `get_arena_nearby`), those rows split further: On the mat is only
+ * the athletes on my mat, "Online & close" the live ones within 2 km.
  *
  * This screen owns nothing realtime: the live state, the lobby channel and
  * the incoming prompt are mounted once by `<ArenaBootstrap />` and read here
@@ -34,8 +37,11 @@ import {
   formatMatCounts,
   matCounts,
   onTheMatRows,
+  partitionNearby,
   pickClosest,
 } from "@/lib/arena/mat-board";
+import { useArenaNearby } from "@/lib/arena/use-arena-nearby";
+import { OnlineCloseSection } from "@/components/arena/online-close-section";
 import { useMatchToConfirm } from "@/lib/match-flow/active-match-store";
 import { useFreshIncomingCount } from "@/lib/notifications/bell-store";
 import {
@@ -172,7 +178,7 @@ export default function ArenaScreen() {
 
   // Closest first, strictly (AC-A4).
   const selfId = athlete?.id ?? null;
-  const onTheMat = React.useMemo(
+  const lobbyRows = React.useMemo(
     () => onTheMatRows(competitors, matLobbyIds, selfId),
     [competitors, matLobbyIds, selfId],
   );
@@ -181,6 +187,17 @@ export default function ArenaScreen() {
   // (`?athlete=<id>`) puts that friend on top, one tap from a challenge.
   const { athlete: focusAthleteId } = useLocalSearchParams<{ athlete?: string }>();
   const friendIds = useFriendIds(selfId);
+  const locationRequired = useMatchLocationRequired();
+  // On the mat by proximity (jr_be 016 addendum): with the flag on and a
+  // usable location, On the mat is only the athletes on my mat, and the live
+  // ones within 2 km are "Online & close". Otherwise today's list.
+  const lobbyKey = React.useMemo(() => [...lobbyIds].sort().join(","), [lobbyIds]);
+  const nearbyView = useArenaNearby({ focused: isFocused, isLive, locationRequired, lobbyKey });
+  const nearby = React.useMemo(
+    () => partitionNearby(lobbyRows, nearbyView, friendIds),
+    [lobbyRows, nearbyView, friendIds],
+  );
+  const onTheMat = nearby.onTheMat;
   const matRows = React.useMemo(() => {
     const sorted = sortFriendsFirst(onTheMat, (c) => c.id, friendIds);
     if (!focusAthleteId) return sorted;
@@ -190,7 +207,6 @@ export default function ArenaScreen() {
   const matHasFriend = React.useMemo(() => onTheMat.some((c) => friendIds.has(c.id)), [onTheMat, friendIds]);
   const invitesOn = useInvitesEnabled();
   const inMatch = useIsInArenaMatch();
-  const locationRequired = useMatchLocationRequired();
   const booked = useBookings({
     visible: isFocused,
     locationRequired,
@@ -390,7 +406,13 @@ export default function ArenaScreen() {
             {onTheMat.length > 0 ? (
               <View testID="arena-on-the-mat">
                 <MatSectionLabel
-                  label={matHasFriend ? "On the mat · friends first" : "On the mat · closest first"}
+                  label={
+                    matHasFriend
+                      ? "On the mat · friends first"
+                      : nearby.mode === "nearby"
+                        ? "On the mat · near you"
+                        : "On the mat · closest first"
+                  }
                   right={String(onTheMat.length)}
                 />
                 {matRows.map((c) => {
@@ -414,6 +436,17 @@ export default function ArenaScreen() {
                   );
                 })}
               </View>
+            ) : null}
+
+            {/* Live within 2 km but not on my mat: collapsed with a count,
+                no ROLL (nearby mode only; hidden at zero). */}
+            {!hasError ? (
+              <OnlineCloseSection
+                rows={nearby.close}
+                friendIds={friendIds}
+                actionFor={actionFor}
+                onOpenProfile={openProfile}
+              />
             ) : null}
           </>
         )}

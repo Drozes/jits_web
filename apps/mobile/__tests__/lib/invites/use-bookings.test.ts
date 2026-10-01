@@ -83,6 +83,29 @@ it("a closed booking leaves the strip with the toast copy", async () => {
   expect(mockRelease).toHaveBeenCalled();
 });
 
+it("a booking_closed start-blocked reason (flag-on proximity path) closes it like the code", async () => {
+  mockPresence.mockResolvedValue({
+    ok: true,
+    data: { ok: true, started: false, match_id: null, verdict: "waiting", start_blocked_reason: "booking_closed" },
+  });
+  const { result, onClosed } = setup();
+  await waitFor(() => expect(onClosed).toHaveBeenCalledWith("This booking was cancelled."));
+  expect(result.current.bookings).toEqual([]);
+});
+
+it("implausible_movement is kept for the strip and never retried on its own", async () => {
+  mockPresence.mockResolvedValue({ ok: true, data: { ok: false, code: "implausible_movement" } });
+  const { result } = setup();
+  await waitFor(() =>
+    expect(result.current.presence.c1).toEqual({ blockedReason: null, accuracyTooLow: false, implausibleMovement: true }),
+  );
+  const calls = mockPresence.mock.calls.length;
+  await act(async () => {
+    await Promise.resolve();
+  });
+  expect(mockPresence.mock.calls.length).toBe(calls);
+});
+
 it("a started match does not release the push deferral (the match exit does)", async () => {
   mockPresence.mockResolvedValue({ ok: true, data: { ok: true, started: true, match_id: "m1", verdict: "passed" } });
   const { onStarted } = setup();

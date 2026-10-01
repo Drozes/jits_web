@@ -9,6 +9,7 @@ import {
   LOCATION_UNAVAILABLE_STRIP_COPY,
   START_AVAILABLE_COPY,
   START_AVAILABLE_STRIP_COPY,
+  IMPLAUSIBLE_MOVEMENT_COPY,
   bookedMessage,
   bookedStripMessage,
   type StartBookingErrorView,
@@ -88,7 +89,10 @@ export function BookedStrip({
           ? { short: LOCATION_UNAVAILABLE_STRIP_COPY, full: LOCATION_UNAVAILABLE_COPY, label: "Retry", a11y: "Try again", onPress: onRetry }
           : presence?.accuracyTooLow
             ? { short: ACCURACY_TOO_LOW_STRIP_COPY, full: ACCURACY_TOO_LOW_COPY, label: "Retry", a11y: "Try again", onPress: onRetry }
-            : null;
+            : presence?.implausibleMovement
+              ? // Only the athlete's own Retry sends another reading.
+                { short: IMPLAUSIBLE_MOVEMENT_COPY, full: IMPLAUSIBLE_MOVEMENT_COPY, label: "Retry", a11y: "Try again", onPress: onRetry }
+              : null;
   const blockedReason = presence?.blockedReason ?? null;
   const status = !locationRequired
     ? startError

@@ -41,8 +41,10 @@ jest.mock("expo-location", () => ({
 const mockReading = jest.fn();
 jest.mock("@/lib/invites/location", () => ({ readLocationOnce: (...a: unknown[]) => mockReading(...a) }));
 const mockReport = jest.fn();
+const mockArenaReport = jest.fn();
 jest.mock("@jits/shared/api/location", () => ({
   reportGoLivePresence: (...a: unknown[]) => mockReport(...a),
+  reportArenaPresence: (...a: unknown[]) => mockArenaReport(...a),
 }));
 
 jest.mock("expo-keep-awake", () => ({
@@ -83,6 +85,7 @@ jest.mock("@/lib/arena/use-arena-live", () => ({
 }));
 
 let mockStartBlocked: unknown = null;
+let mockOutgoing: unknown = null;
 const mockRetryBlocked = jest.fn();
 const mockCancelBlocked = jest.fn();
 const mockChallengeArgs = jest.fn();
@@ -91,7 +94,7 @@ jest.mock("@/lib/arena/use-arena-challenge", () => ({
     mockChallengeArgs(args);
     return {
       incoming: null,
-      outgoing: null,
+      outgoing: mockOutgoing,
       incomingCount: 0,
       incomingTucked: false,
       isBusy: false,
@@ -118,6 +121,7 @@ jest.mock("@/lib/arena/use-pending-challenge-recovery", () => ({ usePendingChall
 import { ArenaBootstrap } from "@/lib/arena/arena-bootstrap";
 import { __resetArenaStoreForTests, arenaActions, useArenaMatchScreen } from "@/lib/arena/arena-store";
 import { GO_LIVE_REFRESH_MS, __resetGoLiveLocationForTests } from "@/lib/arena/go-live-location";
+import { __resetChallengerArenaReadingForTests } from "@/lib/arena/use-challenger-arena-reading";
 
 const ACTIVE = { id: "me-1", display_name: "Me", current_elo: 1200, current_weight: 180, status: "active" };
 const OK_READING = { status: "ok", reading: { lat: 43.6, lng: -79.4, accuracyM: 12 } };
@@ -136,6 +140,9 @@ beforeEach(() => {
   mockLocationRequired = false;
   mockRefusal = null;
   mockStartBlocked = null;
+  mockOutgoing = null;
+  __resetChallengerArenaReadingForTests();
+  mockArenaReport.mockResolvedValue(RECORDED);
   mockGoLive.mockResolvedValue(true);
   mockPermission.mockResolvedValue({ granted: true, canAskAgain: true });
   mockReading.mockResolvedValue(OK_READING);
@@ -427,5 +434,75 @@ describe("Arena start refused by the proximity gate", () => {
   it("shows nothing when nothing is blocked", () => {
     render(<ArenaBootstrap />);
     expect(screen.queryByTestId("arena-start-blocked")).toBeNull();
+  });
+});
+
+describe("the waiting challenger's arena reading (M1)", () => {
+  const OUTGOING = { challengeId: "ch-out", opponentId: "a-2", opponentName: "ALEX", createdAt: null, expiresAt: null };
+
+  it("flag on, permission granted: reports an arena reading for my outgoing challenge, not live", async () => {
+    mockLocationRequired = true;
+    mockOutgoing = OUTGOING;
+    render(<ArenaBootstrap />);
+    await waitFor(() => expect(mockArenaReport).toHaveBeenCalledTimes(1));
+    expect(mockArenaReport).toHaveBeenCalledWith(expect.anything(), OK_READING.reading, "ch-out");
+    expect(mockReading).toHaveBeenCalledWith({ ask: false });
+    // The privacy reply (recorded only) is all it needs: no sheet, no copy.
+    expect(screen.queryByTestId("go-live-location-explain")).toBeNull();
+  });
+
+  it("flag off: no arena reading while waiting", async () => {
+    mockOutgoing = OUTGOING;
+    render(<ArenaBootstrap />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(mockArenaReport).not.toHaveBeenCalled();
+  });
+
+  it("permission not granted: the waiting state explains once, then asks and reports", async () => {
+    mockLocationRequired = true;
+    mockOutgoing = OUTGOING;
+    mockPermission.mockResolvedValue({ granted: false, canAskAgain: true });
+    render(<ArenaBootstrap />);
+    await waitFor(() => expect(screen.getByTestId("go-live-location-explain")).toBeTruthy());
+    expect(screen.getByText("Location to start")).toBeTruthy();
+    expect(screen.getByTestId("go-live-location-body").props.children).toBe(EXPLAIN);
+    expect(mockArenaReport).not.toHaveBeenCalled();
+    fireEvent.press(screen.getByTestId("go-live-location-continue"));
+    await waitFor(() => expect(mockArenaReport).toHaveBeenCalledTimes(1));
+    expect(mockReading).toHaveBeenCalledWith({ ask: true });
+    await waitFor(() => expect(screen.queryByTestId("go-live-location-explain")).toBeNull());
+  });
+});
+
+describe("implausible_movement (reading refused for an implied speed over 50 m/s)", () => {
+  it("Go Live: says so once, sends nothing more until the athlete taps Retry", async () => {
+    mockLocationRequired = true;
+    mockPermission.mockResolvedValue({ granted: true, canAskAgain: true });
+    mockReport.mockResolvedValueOnce({ ok: true, data: { ok: false, code: "implausible_movement" } });
+    render(<ArenaBootstrap />);
+    const tap = tapGoLive();
+    await waitFor(() => expect(screen.getByTestId("go-live-location-movement")).toBeTruthy());
+    expect(screen.getByTestId("go-live-location-body").props.children).toBe("Can't pin your location. Try again.");
+    expect(mockReport).toHaveBeenCalledTimes(1);
+    expect(mockGoLive).not.toHaveBeenCalled();
+    fireEvent.press(screen.getByText("Retry"));
+    expect(await tap.done).toBe(true);
+    expect(mockReport).toHaveBeenCalledTimes(2);
+  });
+
+  it("the waiting challenger's refused arena reading is not retried before the next 60 s tick", async () => {
+    mockLocationRequired = true;
+    mockOutgoing = { challengeId: "ch-out", opponentId: "a-2", opponentName: "ALEX", createdAt: null, expiresAt: null };
+    mockArenaReport.mockResolvedValue({ ok: true, data: { ok: false, code: "implausible_movement" } });
+    jest.spyOn(console, "warn").mockImplementation(() => {});
+    render(<ArenaBootstrap />);
+    await waitFor(() => expect(mockArenaReport).toHaveBeenCalledTimes(1));
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 20));
+    });
+    expect(mockArenaReport).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId("go-live-location-movement")).toBeNull();
   });
 });
