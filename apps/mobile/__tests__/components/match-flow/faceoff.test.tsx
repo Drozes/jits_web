@@ -320,6 +320,38 @@ describe("Leave", () => {
     expect(flexOne(s.getByTestId("faceoff-top-right"))).toEqual([1, "flex-end"]);
   });
 
+  it("never overlaps the label: Leave keeps one width while cancelling, both texts are capped and single-line, and both side slots reserve Leave's width", async () => {
+    const flat = (el: { props: { style?: unknown } }) =>
+      [el.props.style].flat(Infinity).reduce<Record<string, unknown>>((a, x) => ({ ...a, ...(x as object) }), {});
+    mockCancel.mockReturnValue(new Promise(() => {}));
+    const alert = jest.spyOn(Alert, "alert").mockImplementation((_t, _m, buttons) => buttons?.[1]?.onPress?.());
+    const s = render(<Harness phase="weight" />);
+    // The label ellipsizes rather than wrapping or growing past the slots.
+    const label = s.getByTestId("faceoff-top-label");
+    expect(label).toHaveTextContent("FACE-OFF · WEIGH IN");
+    expect([label.props.numberOfLines, label.props.maxFontSizeMultiplier]).toEqual([1, 1.3]);
+    const leaveText = s.getByTestId("faceoff-leave-text");
+    expect([leaveText.props.numberOfLines, leaveText.props.maxFontSizeMultiplier]).toEqual([1, 1.3]);
+    // Both slots reserve Leave's measured width, so the centred label can
+    // never sit under it, whatever the screen width or text size.
+    act(() => {
+      s.getByTestId("faceoff-leave-measure").props.onLayout({ nativeEvent: { layout: { x: 0, y: 0, width: 101.4, height: 44 } } });
+    });
+    expect(flat(s.getByTestId("faceoff-top-left")).minWidth).toBe(102);
+    expect(flat(s.getByTestId("faceoff-top-right")).minWidth).toBe(102);
+    // Cancelling: the text stays "Leave" (no wider "Leaving..."), a spinner
+    // replaces the chevron in the same 18 pt box, and the control is busy.
+    fireEvent.press(s.getByLabelText("Cancel match"));
+    await flush();
+    expect(s.getByTestId("faceoff-leave-spinner")).toBeTruthy();
+    expect(s.queryByTestId("icon-ChevronLeft")).toBeNull();
+    expect(s.getByTestId("faceoff-leave-text")).toHaveTextContent(/^Leave$/);
+    expect(s.queryByText(/Leaving/)).toBeNull();
+    expect(s.getByTestId("faceoff-leave").props.accessibilityState).toMatchObject({ disabled: true, busy: true });
+    expect(flat(s.getByTestId("faceoff-top-left")).minWidth).toBe(flat(s.getByTestId("faceoff-top-right")).minWidth);
+    alert.mockRestore();
+  });
+
   it("an opponent's cancel leaves through the wizard's exit, once, with phase copy", () => {
     const onCancelledRemotely = jest.fn();
     render(<Harness phase="ready" onCancelledRemotely={onCancelledRemotely} />);

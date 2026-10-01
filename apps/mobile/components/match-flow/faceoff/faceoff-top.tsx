@@ -1,5 +1,5 @@
 import * as React from "react";
-import { BackHandler, Pressable, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, BackHandler, Pressable, Text, TextInput, View } from "react-native";
 import { ChevronLeft, Pencil } from "lucide-react-native";
 import { isValidAthleteWeight } from "@jits/shared/api/athlete-weight";
 import { ON_MEDIA, usePalette } from "@/lib/theme/palette";
@@ -19,6 +19,14 @@ interface FaceoffTopProps {
   opponent: FaceoffAthlete;
 }
 
+/** Dynamic Type cap for the top bar texts, so Leave and the label stay on one line. */
+export const TOP_BAR_FONT_CAP = 1.3;
+/**
+ * Leave's width before it is measured (chevron, gap and "LEAVE" at the font
+ * cap), so the first frame already reserves room for it.
+ */
+const LEAVE_MIN_WIDTH = 88;
+
 function weightText(lbs: number | null): string {
   return lbs != null ? `${Number(lbs.toFixed(1))} LBS` : "-- LBS";
 }
@@ -32,6 +40,8 @@ export function FaceoffTop({ phase, me, opponent }: FaceoffTopProps) {
   const f = useFaceoffContext();
   const p = usePalette();
   const { canLeave, leave } = f;
+  // Leave's laid-out width: both side slots keep at least this much room.
+  const [leaveWidth, setLeaveWidth] = React.useState(LEAVE_MIN_WIDTH);
 
   // Android back is the Leave control here: leaving without cancelling left
   // the match pending with nobody in it (jits-bh2v).
@@ -45,35 +55,61 @@ export function FaceoffTop({ phase, me, opponent }: FaceoffTopProps) {
 
   return (
     <View style={{ gap: phase === "weight" ? 20 : 16 }}>
-      {/* Both side slots flex equally, so the label is centred whether or
-          not the Leave button (wider than the 44 pt spacer) is showing. */}
+      {/* The label sits between two equal side slots, so it is centred
+          whether or not Leave is showing. Each slot is at least as wide as
+          Leave (measured), so a narrow screen or a large Dynamic Type size
+          ellipsizes the label instead of drawing Leave over it. The Leave
+          text never changes width (cancelling swaps the chevron for a
+          same-size spinner) and both texts cap their font scale. */}
       <View style={{ height: 44, flexDirection: "row", alignItems: "center" }}>
-        <View testID="faceoff-top-left" style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "flex-start" }}>
+        <View
+          testID="faceoff-top-left"
+          style={{ flex: 1, minWidth: leaveWidth, flexDirection: "row", alignItems: "center", justifyContent: "flex-start" }}
+        >
           {canLeave ? (
-            <StatePressable
-              testID="faceoff-leave"
-              accessibilityRole="button"
-              // The harness and screen readers know this control as "Cancel
-              // match": it cancels the match for both athletes.
-              accessibilityLabel="Cancel match"
-              accessibilityState={{ disabled: f.cancelling }}
-              disabled={f.cancelling}
-              onPress={leave}
-              hitSlop={8}
-              style={({ pressed }) => ({ height: 44, flexDirection: "row", alignItems: "center", gap: 6, opacity: pressed || f.cancelling ? 0.6 : 1 })}
-            >
-              <ChevronLeft size={18} color={p.text} />
-              <Text className="font-heading uppercase" style={{ fontSize: 13, letterSpacing: 1.12, color: p.text }}>
-                {f.cancelling ? "Leaving..." : "Leave"}
-              </Text>
-            </StatePressable>
+            <View testID="faceoff-leave-measure" onLayout={(e) => setLeaveWidth(Math.ceil(e.nativeEvent.layout.width))}>
+              <StatePressable
+                testID="faceoff-leave"
+                accessibilityRole="button"
+                // The harness and screen readers know this control as "Cancel
+                // match": it cancels the match for both athletes.
+                accessibilityLabel="Cancel match"
+                accessibilityState={{ disabled: f.cancelling, busy: f.cancelling }}
+                disabled={f.cancelling}
+                onPress={leave}
+                hitSlop={8}
+                style={({ pressed }) => ({ height: 44, flexDirection: "row", alignItems: "center", gap: 6, opacity: pressed || f.cancelling ? 0.6 : 1 })}
+              >
+                <View style={{ width: 18, height: 18, alignItems: "center", justifyContent: "center" }}>
+                  {f.cancelling ? (
+                    <ActivityIndicator testID="faceoff-leave-spinner" size="small" color={p.text} />
+                  ) : (
+                    <ChevronLeft size={18} color={p.text} />
+                  )}
+                </View>
+                <Text
+                  testID="faceoff-leave-text"
+                  numberOfLines={1}
+                  maxFontSizeMultiplier={TOP_BAR_FONT_CAP}
+                  className="font-heading uppercase"
+                  style={{ fontSize: 13, letterSpacing: 1.12, color: p.text }}
+                >
+                  Leave
+                </Text>
+              </StatePressable>
+            </View>
           ) : null}
         </View>
-        <Mono bold color={p.text3}>
-          {phase === "weight" ? "FACE-OFF · WEIGH IN" : "FACE-OFF · READY"}
-        </Mono>
+        <View style={{ flexShrink: 1, minWidth: 0, alignItems: "center" }}>
+          <Mono testID="faceoff-top-label" bold color={p.text3} numberOfLines={1} maxFontSizeMultiplier={TOP_BAR_FONT_CAP}>
+            {phase === "weight" ? "FACE-OFF · WEIGH IN" : "FACE-OFF · READY"}
+          </Mono>
+        </View>
         {/* Right slot: empty (no match-kind tag), mirrors the left slot. */}
-        <View testID="faceoff-top-right" style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "flex-end" }} />
+        <View
+          testID="faceoff-top-right"
+          style={{ flex: 1, minWidth: leaveWidth, flexDirection: "row", alignItems: "center", justifyContent: "flex-end" }}
+        />
       </View>
       {phase === "weight" ? (
         <FightCard me={me} opponent={opponent} />
