@@ -7,7 +7,7 @@ type State = {
   isLive: boolean;
   isSaving: boolean;
   isLocating?: boolean;
-  locationPrompt?: "explain" | "denied" | "accuracy" | null;
+  locationPrompt?: "explain" | "denied" | "accuracy" | "implausible" | null;
 };
 const store = vi.hoisted(() => ({
   state: { ready: true, isLive: false, isSaving: false } as State,
@@ -90,6 +90,13 @@ describe("LookingForMatchToggle", () => {
       expect(screen.getByRole("alert")).toHaveTextContent(
         "Can't pin your location. Try near a window.",
       );
+      expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
+    });
+
+    it("implausible: announces the can't-pin try-again copy with Try again", () => {
+      store.state = { ...store.state, locationPrompt: "implausible" };
+      render(<LookingForMatchToggle initialRanked={false} />);
+      expect(screen.getByRole("alert")).toHaveTextContent("Can't pin your location. Try again.");
       expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
     });
 

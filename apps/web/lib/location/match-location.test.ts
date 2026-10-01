@@ -5,6 +5,8 @@ import {
   hintOf,
   isProximityHint,
   locationPermission,
+  proximityBlockFor,
+  proximityMissingOf,
   readMatchLocationRequired,
   reportMatchPresence,
 } from "./match-location";
@@ -130,7 +132,8 @@ describe("reportMatchPresence", () => {
 
   it("sends the contract args for go_live (no scope)", async () => {
     const c = rpcClient({ data: { ok: true, verdict: "recorded", started: false, match_id: null }, error: null });
-    expect(await reportMatchPresence(c, reading, "go_live")).toEqual({ ok: true, verdict: "recorded" });
+    // Success carries nothing: the server no longer returns a usable verdict.
+    expect(await reportMatchPresence(c, reading, "go_live")).toEqual({ ok: true });
     expect(c.rpc).toHaveBeenCalledWith("report_match_presence", {
       p_lat: 1,
       p_lng: 2,
@@ -142,8 +145,8 @@ describe("reportMatchPresence", () => {
   });
 
   it("scopes an arena reading to the challenge", async () => {
-    const c = rpcClient({ data: { ok: true, verdict: "waiting" }, error: null });
-    await reportMatchPresence(c, reading, "arena", "c1");
+    const c = rpcClient({ data: { ok: true, verdict: "recorded", started: false, match_id: null }, error: null });
+    expect(await reportMatchPresence(c, reading, "arena", "c1")).toEqual({ ok: true });
     expect(c.rpc.mock.calls[0][1]).toMatchObject({ p_context: "arena", p_challenge_id: "c1" });
   });
 
@@ -175,6 +178,29 @@ describe("captureAndReport", () => {
     expect(await captureAndReport(c, "go_live")).toEqual({ ok: false, failure: "accuracy" });
   });
 
+  it("maps a server implausible_movement to the implausible failure", async () => {
+    stubGeo((ok) => ok(fix(40)));
+    for (const ctx of ["go_live", "arena"] as const) {
+      const c = rpcClient({ data: { ok: false, code: "implausible_movement" }, error: null });
+      expect(await captureAndReport(c, ctx, ctx === "arena" ? "c1" : null)).toEqual({
+        ok: false,
+        failure: "implausible",
+      });
+      // One report, no automatic retry.
+      expect(c.rpc).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it("passes not_active through as a report failure (the server decides)", async () => {
+    stubGeo((ok) => ok(fix(40)));
+    const c = rpcClient({ data: { ok: false, code: "not_active" }, error: null });
+    expect(await captureAndReport(c, "go_live")).toEqual({
+      ok: false,
+      failure: null,
+      report: { ok: false, code: "not_active" },
+    });
+  });
+
   it("passes other report failures through with no athlete-facing failure", async () => {
     stubGeo((ok) => ok(fix(40)));
     const c = rpcClient({ data: { ok: false, code: "booking_closed" }, error: null });
@@ -193,5 +219,30 @@ describe("hints", () => {
     expect(isProximityHint("proximity_required")).toBe(true);
     expect(isProximityHint("proximity_failed")).toBe(true);
     expect(isProximityHint("location_required")).toBe(false);
+  });
+});
+
+describe("proximity_required DETAIL", () => {
+  const err = (hint: string, details?: string | null) => ({ raw: { hint, details } });
+
+  it("reads only the known DETAIL values", () => {
+    expect(proximityMissingOf(err("proximity_required", "challenger"))).toBe("challenger");
+    expect(proximityMissingOf(err("proximity_required", "opponent"))).toBe("opponent");
+    expect(proximityMissingOf(err("proximity_required", "both"))).toBe("both");
+    expect(proximityMissingOf(err("proximity_required", "Failing row"))).toBeNull();
+    expect(proximityMissingOf(err("proximity_required"))).toBeNull();
+  });
+
+  it("maps the missing side relative to the viewer", () => {
+    expect(proximityBlockFor(err("proximity_required", "opponent"), "opponent")).toBe("self_location");
+    expect(proximityBlockFor(err("proximity_required", "challenger"), "opponent")).toBe("peer_location");
+    expect(proximityBlockFor(err("proximity_required", "challenger"), "challenger")).toBe("self_location");
+    expect(proximityBlockFor(err("proximity_required", "opponent"), "challenger")).toBe("peer_location");
+  });
+
+  it("both, no DETAIL, and proximity_failed keep the same-mat reason", () => {
+    expect(proximityBlockFor(err("proximity_required", "both"), "opponent")).toBe("proximity");
+    expect(proximityBlockFor(err("proximity_required"), "opponent")).toBe("proximity");
+    expect(proximityBlockFor(err("proximity_failed", "opponent"), "opponent")).toBe("proximity");
   });
 });

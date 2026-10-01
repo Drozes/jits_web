@@ -17,20 +17,25 @@ import {
 import { getPendingChallengesForAthlete } from "@jits/shared/api/queries";
 import { isFreshChallenge } from "@/lib/arena/challenge-freshness";
 import {
+  ARENA_WAIT_REFRESH_MS,
   captureAndReport,
   hintOf,
   isProximityHint,
   locationPermission,
+  proximityBlockFor,
   type LocationFailure,
+  type ProximityBlock,
 } from "@/lib/location/match-location";
 
 /**
  * Why an accepted Arena challenge could not start yet (flag on): the
- * accepter's own reading failed (`denied` / `accuracy`), or the server's
- * proximity gate refused (`proximity`). The challenge stays accepted, so the
+ * accepter's own reading failed (`denied` / `accuracy` / `implausible`), or
+ * the server's proximity gate refused: `self_location` / `peer_location`
+ * (HINT `proximity_required` with DETAIL naming one side) or `proximity`
+ * (both sides, or `proximity_failed`). The challenge stays accepted, so the
  * prompt stays up with Retry (no second accept) and Cancel.
  */
-export type StartBlock = LocationFailure | "proximity";
+export type StartBlock = LocationFailure | ProximityBlock;
 
 export interface IncomingChallenge {
   challengeId: string;
@@ -483,6 +488,55 @@ export function useArenaChallenge({
     };
   }, [outgoingId, enterMatch, resolveOutgoing]);
 
+  // --- Outgoing: keep my arena reading fresh while I wait ------------------
+  // Flag on (jr_be M1): the proximity gate needs both readings under 2
+  // minutes old when the opponent accepts, so the waiting challenger reports
+  // an `arena` reading every 60 s with the tab visible and at once when the
+  // tab comes back. Only with permission already granted (never a prompt in
+  // the background); a failed reading just waits for the next tick.
+  const lastArenaReportAt = useRef(0);
+  const arenaReporting = useRef(false);
+  useEffect(() => {
+    if (!outgoingId || inMatch) return;
+    let timer: ReturnType<typeof setInterval> | null = null;
+    let stopped = false;
+    const capture = async () => {
+      if (arenaReporting.current) return;
+      arenaReporting.current = true;
+      try {
+        if (!(await isLocationRequired())) return;
+        if ((await locationPermission()) !== "granted") return;
+        if (stopped || outgoingRef.current?.challengeId !== outgoingId) return;
+        lastArenaReportAt.current = Date.now();
+        await captureAndReport(createClient(), "arena", outgoingId);
+      } finally {
+        arenaReporting.current = false;
+      }
+    };
+    const start = (immediate: boolean) => {
+      if (timer) return;
+      if (immediate || Date.now() - lastArenaReportAt.current >= ARENA_WAIT_REFRESH_MS) {
+        void capture();
+      }
+      timer = setInterval(() => void capture(), ARENA_WAIT_REFRESH_MS);
+    };
+    const stop = () => {
+      if (timer) clearInterval(timer);
+      timer = null;
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") start(true);
+      else stop();
+    };
+    if (document.visibilityState === "visible") start(false);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      stopped = true;
+      stop();
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [outgoingId, inMatch, isLocationRequired]);
+
   /** Guard every mutation against double-taps; a ref, because state is async. */
   const runExclusive = useCallback(async (fn: () => Promise<void>) => {
     if (busyRef.current) return;
@@ -557,6 +611,9 @@ export function useArenaChallenge({
           toast.error(result.error.message || "Couldn't send that challenge.");
           return;
         }
+        // Before the bar goes up, so the waiting refresher does not report
+        // again right behind this one.
+        lastArenaReportAt.current = Date.now();
         setOutgoing({ challengeId: result.data.id, opponentId, opponentName });
         // Flag on: give the proximity gate a fresh reading of mine for this
         // challenge (a challenger who is not live has no go_live one). Best
@@ -645,7 +702,8 @@ export function useArenaChallenge({
           }
           if (!started.ok) {
             if (isProximityHint(hintOf(started.error))) {
-              blockStart(current, "proximity");
+              // The accepter is always the challenge's opponent.
+              blockStart(current, proximityBlockFor(started.error, "opponent"));
               return;
             }
             toast.error(

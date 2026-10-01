@@ -4,7 +4,10 @@ import {
   LOCATION_ACCURACY_COPY,
   LOCATION_DENIED_COPY,
   LOCATION_DENIED_HELP_COPY,
+  LOCATION_IMPLAUSIBLE_COPY,
+  LOCATION_SELF_MISSING_COPY,
   proximityCopy,
+  waitingForLocationCopy,
 } from "@/lib/location/match-location";
 import { PlateButton } from "./plate-button";
 
@@ -24,7 +27,10 @@ interface IncomingChallengePlateProps {
 
 function blockedLines(block: StartBlock, name: string): string[] {
   if (block === "proximity") return [proximityCopy(name)];
+  if (block === "self_location") return [LOCATION_SELF_MISSING_COPY];
+  if (block === "peer_location") return [waitingForLocationCopy(name)];
   if (block === "accuracy") return [LOCATION_ACCURACY_COPY];
+  if (block === "implausible") return [LOCATION_IMPLAUSIBLE_COPY];
   return [LOCATION_DENIED_COPY, LOCATION_DENIED_HELP_COPY];
 }
 

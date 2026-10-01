@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { act, renderHook } from "@testing-library/react";
 import { CHALLENGE_GONE_MESSAGE, useArenaChallenge } from "./use-arena-challenge";
 
@@ -300,5 +300,160 @@ describe("useArenaChallenge with match_location_required", () => {
     await act(() => off.result.current.sendChallenge("ana", "Ana"));
     await act(async () => {});
     expect(loc.captureAndReport).not.toHaveBeenCalled();
+  });
+});
+
+const detailError = (details: string | null) => ({
+  ok: false,
+  error: {
+    code: "UNKNOWN",
+    message: "no fresh reading",
+    raw: { code: "P0001", hint: "proximity_required", details },
+  },
+});
+
+describe("proximity_required DETAIL at accept (viewer is the opponent)", () => {
+  it.each([
+    ["opponent", "self_location"],
+    ["challenger", "peer_location"],
+    ["both", "proximity"],
+    [null, "proximity"],
+  ])("DETAIL %s blocks with %s, never retried", async (details, block) => {
+    m.startMatchFromChallenge.mockResolvedValue(detailError(details));
+    const { result } = mount(true);
+    await insertChallenge();
+    await act(() => result.current.accept());
+    expect(m.startMatchFromChallenge).toHaveBeenCalledTimes(1);
+    expect(result.current.incoming).toMatchObject({ challengeId: "c1", startBlocked: block });
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("implausible movement at accept: blocked, no start, no automatic re-report", async () => {
+    loc.captureAndReport.mockResolvedValue({ ok: false, failure: "implausible" });
+    const { result } = mount(true);
+    await insertChallenge();
+    await act(() => result.current.accept());
+    await act(async () => {});
+    expect(result.current.incoming?.startBlocked).toBe("implausible");
+    expect(loc.captureAndReport).toHaveBeenCalledTimes(1);
+    expect(m.startMatchFromChallenge).not.toHaveBeenCalled();
+  });
+});
+
+describe("waiting challenger keeps an arena reading fresh (M1)", () => {
+  let visibility: DocumentVisibilityState = "visible";
+  const setVisibility = (v: DocumentVisibilityState) => {
+    visibility = v;
+    document.dispatchEvent(new Event("visibilitychange"));
+  };
+  const arenaReports = () =>
+    loc.captureAndReport.mock.calls.filter((c) => c[1] === "arena" && c[2] === "out1").length;
+  const tick = (ms: number) =>
+    act(async () => {
+      await vi.advanceTimersByTimeAsync(ms);
+    });
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    visibility = "visible";
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      get: () => visibility,
+    });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  async function send(required: boolean) {
+    const hook = mount(required);
+    await act(() => hook.result.current.sendChallenge("ana", "Ana"));
+    await act(async () => {});
+    return hook;
+  }
+
+  it("reports at send, then every 60 s while waiting", async () => {
+    await send(true);
+    expect(arenaReports()).toBe(1);
+    await tick(59_000);
+    expect(arenaReports()).toBe(1);
+    await tick(1_000);
+    expect(arenaReports()).toBe(2);
+    await tick(60_000);
+    expect(arenaReports()).toBe(3);
+  });
+
+  it("stops while hidden and reports at once when the tab comes back", async () => {
+    await send(true);
+    act(() => setVisibility("hidden"));
+    await tick(180_000);
+    expect(arenaReports()).toBe(1);
+    act(() => setVisibility("visible"));
+    await act(async () => {});
+    expect(arenaReports()).toBe(2);
+    await tick(60_000);
+    expect(arenaReports()).toBe(3);
+  });
+
+  it("only with permission already granted, never a prompt", async () => {
+    loc.locationPermission.mockResolvedValue("unknown");
+    await send(true);
+    // The send-time best-effort report still runs on unknown; the waiting
+    // refresher needs granted.
+    const atSend = arenaReports();
+    await tick(180_000);
+    act(() => setVisibility("hidden"));
+    act(() => setVisibility("visible"));
+    await act(async () => {});
+    expect(arenaReports()).toBe(atSend);
+  });
+
+  it("never runs with the flag off", async () => {
+    await send(false);
+    await tick(180_000);
+    expect(loc.captureAndReport).not.toHaveBeenCalled();
+  });
+
+  it("stops once the bar clears (cancelled)", async () => {
+    const { result } = await send(true);
+    await act(() => result.current.cancelOutgoing());
+    expect(result.current.outgoing).toBeNull();
+    await tick(180_000);
+    expect(arenaReports()).toBe(1);
+  });
+
+  it("a failed reading (implausible) waits for the next tick, no tight loop", async () => {
+    loc.captureAndReport.mockResolvedValue({ ok: false, failure: "implausible" });
+    await send(true);
+    await tick(30_000);
+    expect(arenaReports()).toBe(1);
+    await tick(30_000);
+    expect(arenaReports()).toBe(2);
+  });
+
+  it("a restored bar (after a reload) reports at once, then every 60 s", async () => {
+    q.getPendingChallengesForAthlete.mockResolvedValue({
+      ok: true,
+      data: {
+        incoming: [],
+        outgoing: [
+          {
+            challengeId: "out1",
+            challengerId: "me",
+            opponentId: "ana",
+            opponentName: "Ana",
+            createdAt: new Date().toISOString(),
+          },
+        ],
+      },
+    });
+    const { result } = mount(true);
+    await act(async () => {});
+    await act(async () => {});
+    expect(result.current.outgoing?.challengeId).toBe("out1");
+    expect(arenaReports()).toBe(1);
+    await tick(60_000);
+    expect(arenaReports()).toBe(2);
   });
 });
