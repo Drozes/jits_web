@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+### Mobile: invites and friends (jr_be spec 016, jits-b3js.4 to .8)
+
+Adds the pure-JS `qrcode-generator` dependency (drawn on the existing `react-native-svg`); no native module, `app.json`, plugin, metro or babel change in this slice, so the JS is OTA-eligible on its own. The native slice (`feat/invites-native`) adds `expo-clipboard`, Sign in with Apple and the location permission string, which need a TestFlight build.
+
+**Cross-repo dependency (jr_be `20261001*` migrations, jr_be-77s):** every new screen calls the invite, friends and presence RPCs and reads `invites_enabled` from `feature_flags`. Apply the migrations (flag off) before this OTA. With the flag off every entry point stays hidden; claims of already-issued invites, friends and bookings still work. `database.ts` is NOT regenerated yet (the RPCs are called through local casts); run `npm run db:types` once the backend migrations are applied locally.
+
+**Added**
+- `packages/shared/src/api/invites.ts` (create, refresh, revoke, personal invite, attribution, accept join, claim, presence, bookings, stats, telemetry, flag read, invite-row realtime) and `packages/shared/src/api/friends.ts` (list, remove, friend ids, friends-first sort, `enable_friends` preference). All return results and never throw; RAISE hints come back on `error.hint`.
+- `packages/shared/src/utils/invite-codes.ts` (code normaliser identical to the server, `XXX-XXX` display, link and code extraction from pasted text), `invite-share.ts` (exact share templates, WhatsApp and SMS shortcuts) and `invite-copy.ts` (every contract section 7 message).
+- Routes: `app/c/[token].tsx` (stores the token, signed out or in), `app/invite-setup.tsx` (one-screen setup: waiver, names, gender, DOB 16+, weight; free agent; city deferred; attribution first), `app/(auth)/invite-code.tsx` ("Got a challenge code?", wrong-code and throttle countdown), `app/(app)/invite/index.tsx` (QR, big monospace code, Share / WhatsApp / SMS, live waiting, code refresh, withdraw, presence every 60 s), `app/(app)/invite/join.tsx` (personal QR and link, friends-joined count), `app/(app)/invite/claim.tsx` (location, claim, face-off or booking, every error state, "Signed in as ... Not you?"), `app/(app)/friends.tsx`.
+- `apps/mobile/lib/invites/*`: pre-auth AsyncStorage persistence (`elorated.invite.pending.v1`, buffered `token_captured` events), launch routing, claim decisions, location reading, share logging, bookings with presence, friend ids, flag hook, QR matrix.
+- Entry points behind `invites_enabled`: Arena empty state (secondary), Profile (invite row and Friends row), post-match verdict, Home fallback card. Arena friend badges and friends-first sort, Booked strip, `?athlete=<id>` puts that friend on top. Settings > Notifications: "Friends on the mat".
+- Push routing: `match_href` > `profile_href` > `arena_href`, each validated.
+
+**Changed**
+- `app/index.tsx` consumes a pending invite before the Home / setup redirects (signup first when signed out). Signup shows the invitee banner and drops confirm-password on the invite path; signup and login link to "Got a challenge code?".
+- Push permission for an invitee waits for the first match exit. A deliberate sign-out (Settings, Profile) clears a pending invite.
+
 ### Mobile: profile setup, weight on step 2, athlete and gym Instagram (Sept 30 design review, jits-02vo.5)
 
 JS-only, OTA-eligible (no native dependency, `app.json`, plugin, metro, babel or `eas.json` change).

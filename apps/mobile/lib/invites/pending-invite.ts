@@ -136,3 +136,34 @@ export async function takeBufferedEvents(): Promise<BufferedInviteEvent[]> {
     return [];
   }
 }
+
+// ---------------------------------------------------------------------------
+// Push permission waits for an invitee's first match (plan section 5: "Push
+// permission is asked after the first match, not before"), so the location
+// prompt at the claim is the only system prompt on the way in.
+
+export const DEFER_PUSH_KEY = "elorated.invite.deferPush.v1";
+
+export async function deferPushUntilFirstMatch(): Promise<void> {
+  try {
+    await AsyncStorage.setItem(DEFER_PUSH_KEY, "1");
+  } catch {
+    // Worst case the prompt comes early, as for any other athlete.
+  }
+}
+
+export async function isPushDeferred(): Promise<boolean> {
+  try {
+    return (await AsyncStorage.getItem(DEFER_PUSH_KEY)) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export async function clearPushDeferral(): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(DEFER_PUSH_KEY);
+  } catch {
+    // Nothing to do.
+  }
+}

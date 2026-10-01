@@ -62,3 +62,34 @@ describe("PushRegistrationBootstrap", () => {
     expect(mockRegister).not.toHaveBeenCalled();
   });
 });
+
+describe("invitee push deferral (jr_be spec 016: asked after the first match)", () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const AsyncStorage = jest.requireMock("@react-native-async-storage/async-storage");
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { useArenaMatchScreen } = require("@/lib/arena/arena-store");
+
+  function MatchScreen() {
+    useArenaMatchScreen();
+    return null;
+  }
+
+  afterEach(async () => {
+    await AsyncStorage.clear();
+  });
+
+  it("holds registration until a match screen has been left, then clears the flag", async () => {
+    await AsyncStorage.setItem("elorated.invite.deferPush.v1", "1");
+    mockAthlete = { id: "me-1", status: "active" };
+    render(<PushRegistrationBootstrap />);
+    await flush();
+    expect(mockRegister).not.toHaveBeenCalled();
+
+    const match = render(<MatchScreen />);
+    await flush();
+    match.unmount();
+    await flush();
+    expect(mockRegister).toHaveBeenCalledTimes(1);
+    expect(await AsyncStorage.getItem("elorated.invite.deferPush.v1")).toBeNull();
+  });
+});

@@ -6,7 +6,7 @@
  */
 import * as React from "react";
 import { KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, View } from "react-native";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { extractInviteFromText, formatInviteCode } from "@jits/shared/utils";
 import { AppHeader } from "@/components/layout/app-header";
 import { CtaButton } from "@/components/auth/auth-buttons";
@@ -18,8 +18,19 @@ export default function InviteCodeScreen() {
   const router = useRouter();
   const tokens = useThemedTokens();
   const [value, setValue] = React.useState("");
-  const [error, setError] = React.useState<string | null>(null);
+  // Back from the claim with a wrong code (tries left) or a throttle.
+  const params = useLocalSearchParams<{ msg?: string; until?: string }>();
+  const [error, setError] = React.useState<string | null>(typeof params.msg === "string" ? params.msg : null);
   const [saving, setSaving] = React.useState(false);
+  const lockedUntil = Number(params.until) || 0;
+  const [now, setNow] = React.useState(Date.now());
+  const locked = lockedUntil > now;
+  React.useEffect(() => {
+    if (!locked) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [locked]);
+  const remaining = Math.max(0, Math.ceil((lockedUntil - now) / 1000));
 
   const submit = async () => {
     // Accept a pasted link or message too, not just the bare code.
@@ -57,18 +68,27 @@ export default function InviteCodeScreen() {
             placeholderTextColor={tokens.textTertiary}
             autoCapitalize="characters"
             autoCorrect={false}
-            autoFocus
+            autoFocus={!locked}
+            editable={!locked}
             maxLength={200}
             onSubmitEditing={() => void submit()}
             className="rounded-sm border border-hairline-strong bg-surface-3 px-4 py-4 text-center font-mono text-[28px] tracking-[6px] text-ink"
           />
-          {error ? (
+          {locked ? (
+            <Text accessibilityRole="alert" className="font-body text-[13px] text-cta" testID="invite-code-throttled">
+              Too many tries. Try again in{" "}
+              <Text className="font-mono tabular-nums">
+                {Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, "0")}
+              </Text>
+              .
+            </Text>
+          ) : error ? (
             <Text accessibilityRole="alert" className="font-body text-[13px] text-cta">
               {error}
             </Text>
           ) : null}
           {/* Slot: the native slice mounts <PasteInviteButton /> here. */}
-          <CtaButton label={saving ? "Checking..." : "Continue"} onPress={() => void submit()} disabled={saving || !value.trim()} />
+          <CtaButton label={saving ? "Checking..." : "Continue"} onPress={() => void submit()} disabled={saving || locked || !value.trim()} />
         </Plate>
         <View>
           <Text className="font-body text-[12px] text-ink-3 text-center">

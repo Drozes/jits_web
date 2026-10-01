@@ -2,7 +2,9 @@ import * as React from "react";
 import { Share, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Film, Share2, TrendingUp } from "lucide-react-native";
+import { Film, Share2, TrendingUp, UserPlus } from "lucide-react-native";
+import type { Href } from "expo-router";
+import { useInvitesEnabled } from "@/lib/invites/use-invites-enabled";
 import { toast } from "@/components/ui/toast";
 import { exitMatchTo } from "@/lib/match-flow/exit-to";
 import { matchDetailHref } from "@/lib/match-detail/href";
@@ -72,6 +74,7 @@ export function VerdictStep(props: VerdictStepProps) {
   const p = usePalette();
   const { matchId, exitHref, exitLabel, matchStatus, outcome, me, opponent, submissionName, finishTimeSeconds, upload, uploadedVideoId, confirmedAthleteIds = [] } = props;
   const router = useRouter();
+  const invitesOn = useInvitesEnabled();
   const insets = useSafeAreaInsets();
   const [disputedHere, setDisputedHere] = React.useState(false);
   const { reconcileNow } = useMatchSyncContext();
@@ -247,6 +250,17 @@ export function VerdictStep(props: VerdictStepProps) {
               onPress={() => void share()}
               height={44}
               icon={(c) => <Share2 size={16} color={c} />}
+            />
+          ) : null}
+          {/* Invites (jr_be spec 016): leaves the match like every exit. */}
+          {invitesOn && outcome && !disputed ? (
+            <FightButton
+              testID="summary-invite"
+              variant="ghost"
+              label="Know someone who'd beat you? Invite them."
+              onPress={() => exitMatchTo(router, "/invite?from=verdict" as Href)}
+              height={44}
+              icon={(c) => <UserPlus size={16} color={c} />}
             />
           ) : null}
         </View>

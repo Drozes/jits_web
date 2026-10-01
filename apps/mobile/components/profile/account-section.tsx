@@ -7,6 +7,7 @@ import { useThemedTokens } from "@/lib/theme/use-theme";
 import { useThemePreference, type ThemePreference } from "@/lib/theme";
 import { Plate, MetaTag } from "@/components/ui/elo-system";
 import { cn } from "@/lib/cn";
+import { clearPendingInvite } from "@/lib/invites/pending-invite";
 
 function SettingsRow({
   icon,
@@ -128,6 +129,7 @@ export function AccountSection() {
           label="Sign Out"
           destructive
           onPress={async () => {
+            await clearPendingInvite();
             await signOut();
           }}
         />

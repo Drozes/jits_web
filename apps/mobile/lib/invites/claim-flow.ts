@@ -11,7 +11,7 @@ export type ClaimStep =
   | { type: "booked"; challengeId: string; message: string; inviterName: string; locationOff: boolean }
   | { type: "setup" }
   | { type: "retry_location"; message: string }
-  | { type: "message"; message: string; terminal: boolean }
+  | { type: "message"; message: string; terminal: boolean; retryAfterS?: number | null }
   | { type: "try_join" }
   | { type: "friends"; inviterName: string; already: boolean };
 
@@ -56,6 +56,9 @@ export function stepForClaim(
   // A wrong code (tries left) or a throttle is not terminal: the athlete fixes
   // the code. Everything else ends the invite on this device.
   const terminal = !(ctx.viaCode && (result.code === "invalid" || result.code === "throttled"));
+  if (result.code === "throttled") {
+    return { type: "message", message: view.message, terminal, retryAfterS: result.retry_after_s };
+  }
   return { type: "message", message: view.message, terminal };
 }
 

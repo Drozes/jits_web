@@ -22,6 +22,7 @@ import { useMatchExitCount } from "@/lib/arena/arena-store";
 import { matchDetailHref } from "@/lib/match-detail/href";
 import { ResumeMatchCard } from "@/components/dashboard/resume-match-card";
 import { PracticeOfferCard } from "@/components/dashboard/practice-offer-card";
+import { InviteHomeCard } from "@/components/invite/invite-home-card";
 import { shouldOfferPracticeMatch } from "@/lib/practice/constants";
 import { useMyActiveMatch } from "@/lib/match-flow/use-my-active-match";
 import { NewHighlightCard } from "@/components/dashboard/new-highlight-card";
@@ -187,6 +188,8 @@ export default function DashboardScreen() {
         {offerPractice ? (
           <PracticeOfferCard onDismiss={() => setPracticeDismissed(true)} />
         ) : null}
+        {/* Invite fallback (jr_be spec 016): never beside a practice offer or a resume prompt. */}
+        {!offerPractice && !activeMatch ? <InviteHomeCard /> : null}
 
         {isLoading ? (
           <DashboardSkeleton />

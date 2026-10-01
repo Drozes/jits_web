@@ -62,6 +62,7 @@ describe("stepForClaim", () => {
       type: "message",
       message: "Too many tries. Try again in 5 minutes.",
       terminal: false,
+      retryAfterS: 300,
     });
   });
   it("claimer_not_active routes a pending profile to setup, never an inactive one", () => {

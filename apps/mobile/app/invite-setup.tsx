@@ -24,6 +24,7 @@ import { useSetupData } from "@/lib/profile-setup/use-setup-data";
 import { useSetupSubmit } from "@/lib/profile-setup/use-setup-submit";
 import { isAtLeast16, isValidDateOfBirth } from "@/lib/profile-setup/validation";
 import { usePendingInvite } from "@/lib/invites/use-pending-invite";
+import { deferPushUntilFirstMatch } from "@/lib/invites/pending-invite";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { cn } from "@/lib/cn";
 
@@ -50,6 +51,7 @@ export default function InviteSetupScreen() {
   // Attribute before anything else (idempotent server side, first write wins).
   React.useEffect(() => {
     if (!user || !pending) return;
+    void deferPushUntilFirstMatch();
     void recordInviteAttribution(supabase, {
       token: pending.token,
       code: pending.code,

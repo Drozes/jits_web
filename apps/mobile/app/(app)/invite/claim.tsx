@@ -39,8 +39,17 @@ export default function InviteClaimScreen() {
       router.replace(arenaMatchHref(step.matchId) as Href);
     } else if (step.type === "setup") {
       router.replace(INVITE_SETUP_HREF);
+    } else if (step.type === "message" && !step.terminal && pending?.code) {
+      // A wrong code or a throttle belongs on the code entry screen.
+      const until = step.retryAfterS ? Date.now() + step.retryAfterS * 1000 : null;
+      void clearPendingInvite().then(() =>
+        router.replace({
+          pathname: "/invite-code",
+          params: { msg: step.message, ...(until ? { until: String(until) } : {}) },
+        } as Href),
+      );
     }
-  }, [step, router]);
+  }, [step, router, pending?.code]);
 
   if (loaded && !pending && !step) return <Redirect href="/" />;
 
