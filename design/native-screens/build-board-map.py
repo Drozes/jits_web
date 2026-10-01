@@ -391,6 +391,22 @@ BOARDS = {
                       "lib/updates/update-policy.ts"]),
     # Admin repeat disputers list (Settings > Admin > Repeat disputers).
     "49-Admin-Disputers.dc.html": dict(seeds=SETTINGS + ["app/(app)/settings/admin/disputers.tsx"]),
+    # Invites, friends & location (jr_be spec 016, shipped dark in 41d79a4; drawn flag-on).
+    "50-Invite-Challenge.dc.html": dict(seeds=APP + ["app/(app)/invite/index.tsx"]),
+    "51-Invite-Join.dc.html": dict(seeds=APP + ["app/(app)/invite/join.tsx"]),
+    "52-Invite-Claim.dc.html": dict(seeds=APP + ["app/(app)/invite/claim.tsx", "app/c/[token].tsx"]),
+    "53-Invite-Setup.dc.html": dict(seeds=["app/invite-setup.tsx"]),
+    "54-Invite-Code.dc.html": dict(seeds=AUTH + ["app/(auth)/invite-code.tsx"]),
+    "55-Friends.dc.html": dict(seeds=APP + ["app/(app)/friends.tsx"]),
+    "56-Delete-Account.dc.html": dict(seeds=SETTINGS + ["app/(app)/settings/delete-account.tsx"]),
+    "57-Arena-Nearby.dc.html": dict(seeds=ARENA),
+    # Offline Arena with the Go Live location sheet (mounted by ArenaBootstrap).
+    "58-Go-Live-Location.dc.html": dict(
+        seeds=ARENA + ["lib/arena/arena-bootstrap.tsx", "components/arena/go-live-location-sheet.tsx"]),
+    "59-Start-Blocked.dc.html": dict(
+        seeds=ARENA + ["lib/arena/arena-bootstrap.tsx", "components/arena/start-blocked-sheet.tsx"]),
+    "60-Arena-Booked.dc.html": dict(seeds=ARENA),
+    "61-Home-Invite.dc.html": dict(seeds=HOME),
 }
 
 
