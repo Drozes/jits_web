@@ -6,12 +6,16 @@ import {
   LOCATION_UNAVAILABLE_COPY,
   bookedMessage,
 } from "@jits/shared/utils";
-import { SecondaryButton, TertiaryButton } from "@/components/auth/auth-buttons";
+import { OutlineAction, StripShell } from "@/components/arena/strip-primitives";
 import type { BookingLocation, BookingPresence, CancelBookingResult } from "@/lib/invites/use-bookings";
 
+const MAX_SCALE = 1.3;
+
 /**
- * One booked invite match on the Arena (US5): who, why it has not started
- * (a busy athlete, location off, a coarse reading), and a way out (cancel).
+ * One booked invite match on the Arena (US5), built on the same strip shell
+ * as the challenge strips so it sits at their size: `BOOKED · ALEX`, one
+ * short status line (why it has not started: a busy athlete, location off, a
+ * coarse reading), a fix when there is one, and Cancel.
  */
 export function BookedStrip({
   booking,
@@ -44,42 +48,41 @@ export function BookedStrip({
       },
     ]);
 
+  const fix =
+    location === "ask"
+      ? { copy: LOCATION_DENIED_COPY, label: "Enable", a11y: "Turn on location", onPress: onAskLocation }
+      : location === "denied"
+        ? { copy: LOCATION_DENIED_COPY, label: "Settings", a11y: "Open Settings", onPress: () => void Linking.openSettings() }
+        : location === "unavailable"
+          ? { copy: LOCATION_UNAVAILABLE_COPY, label: "Retry", a11y: "Try again", onPress: onRetry }
+          : presence?.accuracyTooLow
+            ? { copy: ACCURACY_TOO_LOW_COPY, label: "Retry", a11y: "Try again", onPress: onRetry }
+            : null;
+
   return (
-    <View
-      testID={`arena-booked-${booking.challenge_id}`}
-      accessibilityLiveRegion="polite"
-      className="gap-2 border-l-2 border-l-positive bg-surface-2 px-3 py-3"
-    >
-      <Text className="font-heading text-[12px] uppercase tracking-caps-l text-ink">Booked · vs {name}</Text>
-      <Text testID="booked-message" className="font-body text-[13px] text-ink-2 leading-5">
-        {bookedMessage(presence?.blockedReason ?? null, name)}
-      </Text>
-
-      {location === "ask" ? (
-        <>
-          <Text className="font-body text-[12px] text-ink-3 leading-5">{LOCATION_DENIED_COPY}</Text>
-          <SecondaryButton label="Turn on location" onPress={onAskLocation} />
-        </>
-      ) : location === "denied" ? (
-        <>
-          <Text className="font-body text-[12px] text-ink-3 leading-5">{LOCATION_DENIED_COPY}</Text>
-          <SecondaryButton label="Open Settings" onPress={() => void Linking.openSettings()} />
-        </>
-      ) : location === "unavailable" ? (
-        <>
-          <Text className="font-body text-[12px] text-ink-3 leading-5">{LOCATION_UNAVAILABLE_COPY}</Text>
-          <SecondaryButton label="Try again" onPress={onRetry} />
-        </>
-      ) : presence?.accuracyTooLow ? (
-        <>
-          <Text accessibilityRole="alert" className="font-body text-[12px] text-ink-3 leading-5">
-            {ACCURACY_TOO_LOW_COPY}
+    <View accessibilityLiveRegion="polite">
+      <StripShell rail="neutral" testID={`arena-booked-${booking.challenge_id}`}>
+        <View className="flex-1 py-0.5">
+          <Text
+            numberOfLines={1}
+            maxFontSizeMultiplier={MAX_SCALE}
+            className="font-mono-bold text-[11px] text-ink uppercase"
+          >
+            {`Booked · ${name}`}
           </Text>
-          <SecondaryButton label="Try again" onPress={onRetry} />
-        </>
-      ) : null}
-
-      <TertiaryButton label="Cancel booking" onPress={confirmCancel} className="self-start px-0 py-1" />
+          <Text
+            testID="booked-message"
+            numberOfLines={2}
+            maxFontSizeMultiplier={MAX_SCALE}
+            accessibilityRole={fix ? "alert" : undefined}
+            className="font-body text-[11px] leading-4 text-ink-3"
+          >
+            {fix ? fix.copy : bookedMessage(presence?.blockedReason ?? null, name)}
+          </Text>
+        </View>
+        {fix ? <OutlineAction label={fix.label} accessibilityLabel={fix.a11y} onPress={fix.onPress} /> : null}
+        <OutlineAction label="Cancel" accessibilityLabel="Cancel booking" onPress={confirmCancel} />
+      </StripShell>
     </View>
   );
 }

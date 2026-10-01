@@ -17,6 +17,7 @@ import { Pressable, Text, View } from "react-native";
 import * as Haptics from "expo-haptics";
 import { Avatar32, MetaTag } from "@/components/ui/elo-system";
 import { cn } from "@/lib/cn";
+import { OutlineAction, StripShell } from "@/components/arena/strip-primitives";
 import type { RecentActivityItem } from "@jits/shared/types/composites";
 import type { ArenaCompetitor } from "@/lib/arena/use-arena-roster";
 import {
@@ -133,54 +134,6 @@ export function MatSectionLabel({ label, right }: { label: string; right?: strin
   );
 }
 
-/** A small outline action: ROLL, OPEN, CANCEL, CONFIRM. 44pt hit area. */
-function OutlineAction({
-  label,
-  accessibilityLabel,
-  accessibilityHint,
-  onPress,
-  disabled = false,
-  dim = false,
-  testID,
-}: {
-  label: string;
-  accessibilityLabel: string;
-  /** Tells apart two buttons with the same label (the chip's CONFIRM). */
-  accessibilityHint?: string;
-  onPress: () => void;
-  disabled?: boolean;
-  /** Muted ink: an offline ROLL, which goes live rather than challenging. */
-  dim?: boolean;
-  testID?: string;
-}) {
-  return (
-    <Pressable
-      testID={testID}
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
-      accessibilityHint={accessibilityHint}
-      accessibilityState={{ disabled }}
-      onPress={onPress}
-      disabled={disabled}
-      hitSlop={{ top: 8, bottom: 8 }}
-      className={cn(
-        "h-8 justify-center rounded-xs border px-3 active:bg-surface-4",
-        dim ? "border-hairline" : "border-hairline-strong",
-      )}
-      style={disabled ? { opacity: 0.5 } : undefined}
-    >
-      <Text
-        maxFontSizeMultiplier={MAX_SCALE}
-        className={cn(
-          "font-heading text-[11px] uppercase tracking-caps",
-          dim ? "text-ink-3" : "text-ink",
-        )}
-      >
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // Control bar
@@ -276,29 +229,6 @@ export function MatControlBar({
 // Challenge strip
 // ---------------------------------------------------------------------------
 
-function StripShell({
-  rail,
-  testID,
-  children,
-}: {
-  /** `red` only for "someone wants you" (a rail, never a CTA). */
-  rail: "red" | "neutral";
-  testID: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <View
-      testID={testID}
-      className={cn(
-        "min-h-[48px] flex-row items-center gap-3 rounded-xs border border-hairline bg-surface-2 py-1.5 pl-3 pr-2",
-        "border-l-[3px]",
-        rail === "red" ? "border-l-cta" : "border-l-ink-3",
-      )}
-    >
-      {children}
-    </View>
-  );
-}
 
 /**
  * The strip's words: a head that may shrink and truncate (the name goes

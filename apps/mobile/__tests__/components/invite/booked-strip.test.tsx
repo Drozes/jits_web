@@ -38,34 +38,34 @@ it.each([
 
 it("never asked: Turn on location asks", () => {
   const h = renderStrip({ location: "ask" });
-  fireEvent.press(screen.getByText("Turn on location"));
+  fireEvent.press(screen.getByLabelText("Turn on location"));
   expect(h.onAskLocation).toHaveBeenCalled();
-  expect(screen.queryByText("Open Settings")).toBeNull();
+  expect(screen.queryByLabelText("Open Settings")).toBeNull();
 });
 
 it("denied: Open Settings", () => {
   renderStrip({ location: "denied" });
-  expect(screen.getByText("Open Settings")).toBeTruthy();
+  expect(screen.getByLabelText("Open Settings")).toBeTruthy();
 });
 
 it("no fix in time: the copy and Try again", () => {
   const h = renderStrip({ location: "unavailable" });
   expect(screen.getByText("We couldn't get your location. Check your signal, then try again.")).toBeTruthy();
-  fireEvent.press(screen.getByText("Try again"));
+  fireEvent.press(screen.getByLabelText("Try again"));
   expect(h.onRetry).toHaveBeenCalled();
 });
 
 it("accuracy too low: the copy and Try again", () => {
   const h = renderStrip({ presence: { blockedReason: null, accuracyTooLow: true } });
   expect(screen.getByText(/We couldn't pin your location/)).toBeTruthy();
-  fireEvent.press(screen.getByText("Try again"));
+  fireEvent.press(screen.getByLabelText("Try again"));
   expect(h.onRetry).toHaveBeenCalled();
 });
 
 it("Cancel booking confirms first", async () => {
   const alert = jest.spyOn(Alert, "alert");
   const h = renderStrip();
-  fireEvent.press(screen.getByText("Cancel booking"));
+  fireEvent.press(screen.getByLabelText("Cancel booking"));
   expect(h.onCancel).not.toHaveBeenCalled();
   const buttons = alert.mock.calls[0][2] as { text: string; onPress?: () => Promise<void> }[];
   await act(async () => {
@@ -81,11 +81,21 @@ it.each([
 ] as const)("a %s cancel shows the connection alert: %s", async (result, shown) => {
   const alert = jest.spyOn(Alert, "alert");
   renderStrip({}, result);
-  fireEvent.press(screen.getByText("Cancel booking"));
+  fireEvent.press(screen.getByLabelText("Cancel booking"));
   const buttons = alert.mock.calls[0][2] as { text: string; onPress?: () => Promise<void> }[];
   await act(async () => {
     await buttons.find((b) => b.text === "Cancel booking")?.onPress?.();
   });
   const titles = alert.mock.calls.map((c) => c[0]);
   expect(titles.includes("Couldn't cancel")).toBe(shown);
+});
+
+it("sits on the shared strip shell at the challenge strips' size", () => {
+  renderStrip({ presence: { blockedReason: null, accuracyTooLow: false } });
+  const strip = screen.getByTestId("arena-booked-c1");
+  expect(String(strip.props.className)).toMatch(/min-h-\[48px\]/);
+  expect(screen.getByText("Booked · Alex")).toBeTruthy();
+  // Status is one short line at strip size, never a block of body copy.
+  expect(screen.getByTestId("booked-message").props.numberOfLines).toBe(2);
+  expect(String(screen.getByTestId("booked-message").props.className)).toMatch(/text-\[11px\]/);
 });
