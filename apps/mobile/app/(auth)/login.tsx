@@ -19,6 +19,7 @@ import {
   TertiaryButton,
 } from "@/components/auth/auth-buttons";
 import { useAuth } from "@/lib/auth/hooks";
+import { AppleSignInButton } from "@/components/auth/AppleSignInButton";
 
 /**
  * Mobile login screen. Mirrors the wireframe A1 visual pattern:
@@ -136,6 +137,7 @@ export default function LoginScreen() {
               onPress={onGooglePress}
               disabled={googleSubmitting || submitting}
             />
+            <AppleSignInButton />
           </Plate>
 
           <View className="gap-3">

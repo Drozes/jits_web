@@ -13,6 +13,7 @@ import { toast } from "@/components/ui";
 import { AppHeader } from "@/components/layout/app-header";
 import { AuthFormField } from "@/components/auth/auth-form-field";
 import { CtaButton } from "@/components/auth/auth-buttons";
+import { AppleSignInButton } from "@/components/auth/AppleSignInButton";
 import { useAuth } from "@/lib/auth/hooks";
 
 /**
@@ -144,6 +145,7 @@ export default function SignupScreen() {
                   onPress={onSubmit}
                   disabled={submitting || (allTouched && formInvalid)}
                 />
+                <AppleSignInButton variant="continue" />
               </Plate>
 
               <Pressable

@@ -98,6 +98,22 @@ function forbiddenHits(source: string): string[] {
   return FORBIDDEN_PATTERNS.filter(([, re]) => re.test(source)).map(([name]) => name);
 }
 
+/**
+ * The one narrow exception (invites, jits-b3js.9): the system paste control
+ * READS the clipboard on the athlete's own tap (UIPasteControl, no prompt) so
+ * an invite link copied on the landing page survives the App Store install.
+ * It may import expo-clipboard and nothing else on this list, and may never
+ * call a clipboard WRITE, so it can never carry footage or likeness out.
+ */
+const PASTE_ONLY_FILES = [path.join(MOBILE_ROOT, "components", "invite", "PasteInviteButton.tsx")];
+const CLIPBOARD_WRITE = /\bset(String|Image|Url)(Async)?\s*\(/;
+
+function pasteOnlyHits(source: string): string[] {
+  const hits = forbiddenHits(source);
+  const onlyClipboard = !/["'`]expo-(sharing|media-library)/.test(source) && !CLIPBOARD_WRITE.test(source);
+  return onlyClipboard ? hits.filter((h) => h !== "share package specifier") : hits;
+}
+
 interface ImportRef {
   specifier: string;
   names: string[];
@@ -193,10 +209,23 @@ describe("2. lib/highlight-share/ is the single importer of the share packages",
   it("no app file outside it touches the Reels module, expo-sharing, expo-media-library or expo-clipboard", () => {
     const offenders = appSourceFiles()
       .filter((file) => !isInside(file, SHARE_ROOT))
-      .map((file) => [relative(file), forbiddenHits(fs.readFileSync(file, "utf8"))] as const)
+      .map((file) => {
+        const src = fs.readFileSync(file, "utf8");
+        return [relative(file), PASTE_ONLY_FILES.includes(file) ? pasteOnlyHits(src) : forbiddenHits(src)] as const;
+      })
       .filter(([, hits]) => hits.length > 0)
       .map(([file, hits]) => `${file}: ${hits.join(", ")}`);
     expect(offenders).toEqual([]);
+  });
+
+  it("the paste-only exception never writes the clipboard", () => {
+    for (const file of PASTE_ONLY_FILES) {
+      expect(fs.existsSync(file)).toBe(true);
+      expect(fs.readFileSync(file, "utf8")).not.toMatch(CLIPBOARD_WRITE);
+    }
+    expect(pasteOnlyHits('import * as C from "expo-clipboard"; C.setStringAsync("x");')).toEqual([
+      "share package specifier",
+    ]);
   });
 
   it.each([
