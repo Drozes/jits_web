@@ -418,15 +418,17 @@ export default function ArenaScreen() {
       {invitesOn && !hasError && !isLoading ? (
         <View
           testID="arena-invite-actions"
-          className="gap-2 border-t border-hairline bg-surface px-4 pb-3 pt-3"
+          className="gap-0.5 border-t border-hairline bg-surface px-4 pb-1 pt-2"
         >
           <SecondaryButton
             label="Invite a training partner"
             onPress={() => router.push("/invite?from=arena" as Href)}
+            className="py-3"
           />
           <TertiaryButton
             label="Got a challenge code?"
             onPress={() => router.push("/invite-code" as Href)}
+            className="py-1.5"
           />
         </View>
       ) : null}
