@@ -161,19 +161,64 @@ describe("useArenaLive with match_location_required", () => {
     expect(result.current.isLive).toBe(true);
   });
 
-  it("server HINT location_required: rolls back to the denied state, no generic toast", async () => {
-    const location = flag(false);
+  /** A flag the owner's markRequired really turns on (like useMatchLocationRequired). */
+  function liveFlag(initial: boolean): LiveLocationFlag & { markRequired: ReturnType<typeof vi.fn> } {
+    let on = initial;
+    return {
+      required: initial,
+      ensure: vi.fn(async () => on),
+      markRequired: vi.fn(() => {
+        on = true;
+      }),
+    };
+  }
+
+  it("L2: server HINT location_required re-runs the gate: the explain step, not a denied state", async () => {
+    const location = liveFlag(false);
+    loc.locationPermission.mockResolvedValue("prompt");
+    mutations.toggleMatchPreferences.mockResolvedValueOnce({
+      ok: false,
+      error: { code: "UNKNOWN", message: "x", raw: { hint: "location_required" } },
+    });
+    const { result } = mount(location);
+    await act(() => result.current.goLive());
+    expect(location.markRequired).toHaveBeenCalled();
+    expect(result.current.isLive).toBe(false);
+    expect(result.current.locationPrompt).toBe("explain");
+    expect(toastError).not.toHaveBeenCalled();
+    expect(lobby.leaveLobby).toHaveBeenCalled();
+    // Allow location: reading, report, live.
+    await act(() => result.current.confirmLocation());
+    expect(loc.captureAndReport).toHaveBeenCalledWith({}, "go_live");
+    expect(result.current.isLive).toBe(true);
+  });
+
+  it("L2: permission already granted: the re-run takes a reading and goes live at once", async () => {
+    const location = liveFlag(false);
+    mutations.toggleMatchPreferences.mockResolvedValueOnce({
+      ok: false,
+      error: { code: "UNKNOWN", message: "x", raw: { hint: "location_required" } },
+    });
+    const { result } = mount(location);
+    await act(() => result.current.goLive());
+    expect(loc.captureAndReport).toHaveBeenCalledWith({}, "go_live");
+    expect(mutations.toggleMatchPreferences).toHaveBeenCalledTimes(2);
+    expect(result.current.isLive).toBe(true);
+    expect(result.current.locationPrompt).toBeNull();
+  });
+
+  it("a second location_required after a gated write is a real denied state (no loop)", async () => {
+    const location = liveFlag(false);
     mutations.toggleMatchPreferences.mockResolvedValue({
       ok: false,
       error: { code: "UNKNOWN", message: "x", raw: { hint: "location_required" } },
     });
     const { result } = mount(location);
     await act(() => result.current.goLive());
+    expect(mutations.toggleMatchPreferences).toHaveBeenCalledTimes(2);
     expect(result.current.isLive).toBe(false);
     expect(result.current.locationPrompt).toBe("denied");
-    expect(location.markRequired).toHaveBeenCalled();
     expect(toastError).not.toHaveBeenCalled();
-    expect(lobby.leaveLobby).toHaveBeenCalled();
   });
 
   it("waits for a flag read still in flight before deciding", async () => {
@@ -207,7 +252,7 @@ describe("useArenaLive with match_location_required", () => {
     expect(loc.captureAndReport).not.toHaveBeenCalled();
   });
 
-  it("match restore never shows explain; a failed reading leaves them offline with a toast", async () => {
+  it("L7: match restore never shows explain; a failed reading shows its prompt and no offline toast", async () => {
     const { result, rerender } = mount(flag(true), true);
     rerender({ inMatch: true });
     await act(async () => {});
@@ -218,7 +263,36 @@ describe("useArenaLive with match_location_required", () => {
     await act(async () => {});
     expect(result.current.isLive).toBe(false);
     expect(result.current.locationPrompt).toBe("denied");
+    // The prompt already says why: a toast on top would contradict it.
+    expect(toastError).not.toHaveBeenCalled();
+  });
+
+  it("match restore that fails for any other reason still says you're offline", async () => {
+    const { result, rerender } = mount(flag(false), true);
+    rerender({ inMatch: true });
+    await act(async () => {});
+    mutations.toggleMatchPreferences.mockResolvedValue({ ok: false, error: { code: "UNKNOWN", message: "x" } });
+    rerender({ inMatch: false });
+    await act(async () => {});
+    expect(result.current.isLive).toBe(false);
+    expect(result.current.locationPrompt).toBeNull();
     expect(toastError).toHaveBeenCalledWith("You're offline. Go live again in the Arena.");
+  });
+
+  it("L7: navigating away drops a stale location prompt", async () => {
+    loc.captureAndReport.mockResolvedValue({ ok: false, failure: "accuracy" });
+    const location = flag(true);
+    const { result, rerender } = renderHook(
+      ({ routeKey }: { routeKey: string }) =>
+        useArenaLive({ athleteId: "me", initialLive: false, location, routeKey }),
+      { initialProps: { routeKey: "/arena" } },
+    );
+    await act(() => result.current.goLive());
+    expect(result.current.locationPrompt).toBe("accuracy");
+    rerender({ routeKey: "/arena" });
+    expect(result.current.locationPrompt).toBe("accuracy");
+    rerender({ routeKey: "/rankings" });
+    expect(result.current.locationPrompt).toBeNull();
   });
 });
 
@@ -296,12 +370,15 @@ describe("go_live refresh while live", () => {
     expect(captures()).toBe(0);
   });
 
-  it("never raises a browser prompt in the background", async () => {
-    loc.locationPermission.mockResolvedValue("prompt");
-    mount(flag(true), true);
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(120_000);
-    });
-    expect(captures()).toBe(0);
-  });
+  it.each(["prompt", "unknown", "denied"])(
+    "never reads in the background unless permission is granted (%s)",
+    async (perm) => {
+      loc.locationPermission.mockResolvedValue(perm);
+      mount(flag(true), true);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(120_000);
+      });
+      expect(captures()).toBe(0);
+    },
+  );
 });

@@ -1,18 +1,31 @@
 /**
  * Web side of the `match_location_required` flag (jr_be spec 016 addendum,
- * contract-location-flag.md section 6). Typed locally on purpose: the shared
- * package is owned by the mobile team, so the web calls the RPC itself here.
+ * contract-location-flag.md section 6). The flag read, the presence RPC and
+ * the copy all come from `@jits/shared` (the same wrappers and strings as
+ * mobile); only the browser geolocation reading lives here.
  *
- * - Flag read: `feature_flags.match_location_required`; any failed read is
- *   false (the server is the authority and refuses with a HINT when on).
+ * - Flag read: `getMatchLocationRequired`; any failed read is false (the
+ *   server is the authority and refuses with a HINT when on).
  * - Reading: `navigator.geolocation.getCurrentPosition`, high accuracy, 10 s
  *   timeout, never a cached fix.
- * - Report: `report_match_presence(..., 'go_live')` before going live, and
- *   `(..., 'arena', challengeId)` before an Arena match start.
+ * - Report: `reportGoLivePresence` before going live, and
+ *   `reportArenaPresence(challengeId)` before an Arena match start.
  */
-import type { SupabaseClient } from "@supabase/supabase-js";
-
-export const MATCH_LOCATION_FLAG = "match_location_required";
+import {
+  getMatchLocationRequired,
+  reportArenaPresence,
+  reportGoLivePresence,
+} from "@jits/shared/api/location";
+import {
+  ARENA_SELF_LOCATION_MISSING_COPY,
+  GO_LIVE_ACCURACY_COPY,
+  GO_LIVE_LOCATION_DENIED_COPY,
+  GO_LIVE_LOCATION_EXPLAIN_COPY,
+  IMPLAUSIBLE_MOVEMENT_COPY,
+  LOCATION_DENIED_COPY as SHARED_LOCATION_DENIED_COPY,
+  arenaProximityCopy,
+  arenaProximityMessage,
+} from "@jits/shared/utils";
 
 /** Same ceiling as the server (`_proximity_params().accuracy_ceiling_m`). */
 export const ACCURACY_CEILING_M = 100;
@@ -23,43 +36,40 @@ export const GO_LIVE_REFRESH_MS = 60_000;
 export const ARENA_WAIT_REFRESH_MS = 60_000;
 
 // ---------------------------------------------------------------------------
-// Copy (no em dashes)
+// Copy: the shared strings (mobile says the same), plus the one web-only line.
 
-export const LOCATION_EXPLAIN_COPY =
-  "ELO RATED checks you're on the same mat as your opponent. Your location is only used to start matches.";
-export const LOCATION_DENIED_COPY =
-  "Location is off. ELO RATED checks you're both on the same mat before a match starts.";
+export const LOCATION_EXPLAIN_COPY = GO_LIVE_LOCATION_EXPLAIN_COPY;
+/** An Arena accept with location off. */
+export const LOCATION_DENIED_COPY = SHARED_LOCATION_DENIED_COPY;
+/** Go Live with location off (mobile's Go Live denied state says the same). */
+export const GO_LIVE_DENIED_COPY = GO_LIVE_LOCATION_DENIED_COPY;
 /** Web has no Open Settings deep link, so say where the switch is. */
 export const LOCATION_DENIED_HELP_COPY =
   "Allow location for this site in your browser settings, then try again.";
-export const LOCATION_ACCURACY_COPY = "Can't pin your location. Try near a window.";
+export const LOCATION_ACCURACY_COPY = GO_LIVE_ACCURACY_COPY;
 /** A reading the server refused as implausible movement (> 50 m/s). */
-export const LOCATION_IMPLAUSIBLE_COPY = "Can't pin your location. Try again.";
+export const LOCATION_IMPLAUSIBLE_COPY = IMPLAUSIBLE_MOVEMENT_COPY;
 /** start_match_from_challenge: MY side has no fresh reading. */
-export const LOCATION_SELF_MISSING_COPY = "Can't confirm your location. Try again.";
+export const LOCATION_SELF_MISSING_COPY = ARENA_SELF_LOCATION_MISSING_COPY;
 /** start_match_from_challenge: the OTHER side has no fresh reading. */
-export const waitingForLocationCopy = (name: string) => `Waiting for ${name}'s location.`;
-export const proximityCopy = (name: string) =>
-  `You need to be on the same mat as ${name} to start.`;
+export const waitingForLocationCopy = (name: string) =>
+  arenaProximityCopy({
+    hint: "proximity_required",
+    detail: "challenger",
+    selfRole: "opponent",
+    opponentName: name,
+  });
+export const proximityCopy = (name: string) => arenaProximityMessage(name);
 
 // ---------------------------------------------------------------------------
 // Flag
 
-type Client = SupabaseClient;
+type Client = Parameters<typeof getMatchLocationRequired>[0];
 
 /** `match_location_required`, fail-closed on the client: any error is false. */
 export async function readMatchLocationRequired(supabase: Client): Promise<boolean> {
-  try {
-    const { data, error } = await supabase
-      .from("feature_flags")
-      .select("enabled")
-      .eq("key", MATCH_LOCATION_FLAG)
-      .maybeSingle();
-    if (error || !data) return false;
-    return (data as { enabled?: boolean }).enabled === true;
-  } catch {
-    return false;
-  }
+  const res = await getMatchLocationRequired(supabase);
+  return res.ok && res.data;
 }
 
 // ---------------------------------------------------------------------------
@@ -163,22 +173,17 @@ export async function reportMatchPresence(
   context: PresenceContext,
   challengeId: string | null = null,
 ): Promise<ReportOutcome> {
-  try {
-    const { data, error } = await supabase.rpc("report_match_presence", {
-      p_lat: reading.lat,
-      p_lng: reading.lng,
-      p_accuracy_m: reading.accuracy,
-      p_context: context,
-      p_challenge_id: challengeId,
-      p_invite_id: null,
-    });
-    if (error) return { ok: false, code: "error", hint: error.hint ?? null };
-    const body = (data ?? {}) as { ok?: boolean; code?: string };
-    if (body.ok === false) return { ok: false, code: body.code ?? "unknown" };
-    return { ok: true };
-  } catch {
-    return { ok: false, code: "error", hint: null };
+  const shared = { lat: reading.lat, lng: reading.lng, accuracyM: reading.accuracy };
+  const res =
+    context === "arena" && challengeId
+      ? await reportArenaPresence(supabase, shared, challengeId)
+      : await reportGoLivePresence(supabase, shared);
+  if (!res.ok) {
+    const hint = res.error.hint === "unknown" ? null : res.error.hint;
+    return { ok: false, code: "error", hint };
   }
+  if (!res.data.ok) return { ok: false, code: res.data.code ?? "unknown" };
+  return { ok: true };
 }
 
 /**

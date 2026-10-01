@@ -67,4 +67,41 @@ describe("useMatchLocationRequired", () => {
     expect(result.current.required).toBe(true);
     expect(await result.current.ensure()).toBe(true);
   });
+
+  it("mark(false) turns it off (a flag-off server reply), and wins over a read in flight", async () => {
+    let resolve!: (v: boolean) => void;
+    flag.read.mockResolvedValueOnce(true);
+    const { result } = renderHook(() => useMatchLocationRequired());
+    await act(async () => {});
+    expect(result.current.required).toBe(true);
+    flag.read.mockReturnValue(new Promise<boolean>((r) => (resolve = r)));
+    visibility = "visible";
+    act(() => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    act(() => result.current.mark(false));
+    await act(async () => {
+      resolve(true); // the stale read lands after the server's answer
+    });
+    expect(result.current.required).toBe(false);
+    expect(await result.current.ensure()).toBe(false);
+  });
+
+  it("re-reads each time the Arena is navigated to (the owner may flip it mid-session)", async () => {
+    flag.read.mockResolvedValue(false);
+    const { result, rerender } = renderHook(
+      ({ arenaFocused }: { arenaFocused: boolean }) => useMatchLocationRequired({ arenaFocused }),
+      { initialProps: { arenaFocused: true } },
+    );
+    await act(async () => {});
+    expect(flag.read).toHaveBeenCalledTimes(1);
+    rerender({ arenaFocused: false });
+    expect(flag.read).toHaveBeenCalledTimes(1);
+    flag.read.mockResolvedValue(true);
+    await act(async () => {
+      rerender({ arenaFocused: true });
+    });
+    expect(flag.read).toHaveBeenCalledTimes(2);
+    expect(result.current.required).toBe(true);
+  });
 });

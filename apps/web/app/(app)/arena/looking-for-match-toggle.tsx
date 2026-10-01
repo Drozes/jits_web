@@ -5,8 +5,8 @@ import { arenaActions, useArenaState } from "@/lib/arena/arena-store";
 import { PlateButton } from "@/components/arena/plate-button";
 import type { LiveLocationPrompt } from "@/hooks/use-arena-live";
 import {
+  GO_LIVE_DENIED_COPY,
   LOCATION_ACCURACY_COPY,
-  LOCATION_DENIED_COPY,
   LOCATION_DENIED_HELP_COPY,
   LOCATION_EXPLAIN_COPY,
   LOCATION_IMPLAUSIBLE_COPY,
@@ -139,7 +139,7 @@ export function LookingForMatchToggle({
 function LocationAlert({ prompt }: { prompt: LiveLocationPrompt }) {
   const lines =
     prompt === "denied"
-      ? [LOCATION_DENIED_COPY, LOCATION_DENIED_HELP_COPY]
+      ? [GO_LIVE_DENIED_COPY, LOCATION_DENIED_HELP_COPY]
       : prompt === "accuracy"
         ? [LOCATION_ACCURACY_COPY]
         : prompt === "implausible"

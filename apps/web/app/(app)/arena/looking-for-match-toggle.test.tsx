@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { GO_LIVE_LOCATION_DENIED_COPY } from "@jits/shared/utils";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { LookingForMatchToggle } from "./looking-for-match-toggle";
 
@@ -72,13 +73,12 @@ describe("LookingForMatchToggle", () => {
       expect(store.toggle).not.toHaveBeenCalled();
     });
 
-    it("denied: announces the denied copy in an alert with Try again", () => {
+    it("denied: announces the shared Go Live denied copy plus the browser line, with Try again", () => {
       store.state = { ...store.state, locationPrompt: "denied" };
       render(<LookingForMatchToggle initialRanked={false} />);
       const alert = screen.getByRole("alert");
-      expect(alert).toHaveTextContent(
-        "Location is off. ELO RATED checks you're both on the same mat before a match starts.",
-      );
+      // The same string mobile's Go Live denied state shows (@jits/shared).
+      expect(alert).toHaveTextContent(GO_LIVE_LOCATION_DENIED_COPY);
       expect(alert).toHaveTextContent(/browser settings/);
       fireEvent.click(screen.getByRole("button", { name: "Try again" }));
       expect(store.confirmLocation).toHaveBeenCalledOnce();

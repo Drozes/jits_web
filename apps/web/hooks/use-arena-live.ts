@@ -78,11 +78,14 @@ export function useArenaLive({
   initialLive,
   inMatch = false,
   location = FLAG_OFF,
+  routeKey = "",
 }: {
   athleteId: string;
   initialLive: boolean;
   inMatch?: boolean;
   location?: LiveLocationFlag;
+  /** The current route (pathname): a change drops a stale location prompt. */
+  routeKey?: string;
 }) {
   const router = useRouter();
   const [isLive, setIsLive] = useState(initialLive);
@@ -97,7 +100,13 @@ export function useArenaLive({
   const lastWritten = useRef<boolean | null>(null);
   /** Whether entering the current match is what took the athlete offline. */
   const resumeAfterMatch = useRef(false);
-  const [locationPrompt, setLocationPrompt] = useState<LiveLocationPrompt>(null);
+  const [locationPrompt, setLocationPromptState] = useState<LiveLocationPrompt>(null);
+  /** Mirror of `locationPrompt`, read after an await. */
+  const promptRef = useRef<LiveLocationPrompt>(null);
+  const setLocationPrompt = useCallback((next: LiveLocationPrompt) => {
+    promptRef.current = next;
+    setLocationPromptState(next);
+  }, []);
   const [isLocating, setIsLocating] = useState(false);
   const locationRef = useRef(location);
   locationRef.current = location;
@@ -134,7 +143,7 @@ export function useArenaLive({
         setIsLocating(false);
       }
     },
-    [],
+    [setLocationPrompt],
   );
 
   /** A new, external `initialLive` value, or null if there is none. */
@@ -165,7 +174,7 @@ export function useArenaLive({
   const setLive = useCallback(
     async (
       next: boolean,
-      { refresh = true, interactive = true } = {},
+      { refresh = true, interactive = true, locationRetried = false } = {},
     ): Promise<WriteOutcome> => {
       if (inFlight.current) {
         queued.current = next;
@@ -178,6 +187,8 @@ export function useArenaLive({
 
       const gate = next ? await locationGate(interactive) : "pass";
       let ok = false;
+      /** The server has the flag on although our read said off: gate again. */
+      let regate = false;
       if (gate === "pass") {
         liveRef.current = next;
         setIsLive(next);
@@ -207,9 +218,13 @@ export function useArenaLive({
           if (next) resumeAfterMatch.current = false;
           syncPresence(athleteId, !next);
           if (hint === "location_required") {
-            // The server has the flag on even if our read said off.
+            // The server has the flag on even if our read said off. Run the
+            // location gate now (explain, or a fresh reading) rather than
+            // jumping to "denied": nothing was ever asked. A refusal that
+            // comes back after a gated write is a real denied state.
             locationRef.current.markRequired();
-            setLocationPrompt("denied");
+            if (locationRetried) setLocationPrompt("denied");
+            else regate = true;
           } else {
             toast.error("Couldn't update your status. Try again.");
           }
@@ -225,10 +240,11 @@ export function useArenaLive({
       if (pending !== null && pending !== liveRef.current) {
         return setLive(pending, { refresh: false, interactive });
       }
+      if (regate) return setLive(true, { refresh, interactive, locationRetried: true });
       if (gate === "explain") return null;
       return gate === "pass" ? ok : false;
     },
-    [athleteId, router, locationGate],
+    [athleteId, router, locationGate, setLocationPrompt],
   );
 
   const toggle = useCallback(async () => {
@@ -248,7 +264,16 @@ export function useArenaLive({
   }, [setLive]);
   const dismissLocation = useCallback(() => {
     if (!inFlight.current) setLocationPrompt(null);
-  }, []);
+  }, [setLocationPrompt]);
+
+  // A prompt belongs to the page it was raised on: navigating away drops it,
+  // so the Arena never shows a stale one on the way back.
+  const seenRoute = useRef(routeKey);
+  useEffect(() => {
+    if (routeKey === seenRoute.current) return;
+    seenRoute.current = routeKey;
+    if (!inFlight.current && promptRef.current !== null) setLocationPrompt(null);
+  }, [routeKey, setLocationPrompt]);
 
   // Offline for the length of a match, back afterwards.
   const wasInMatch = useRef(false);
@@ -271,7 +296,8 @@ export function useArenaLive({
     resumeAfterMatch.current = false;
     // Not interactive: no explain step on the way out of a match.
     void setLive(true, { interactive: false }).then((outcome) => {
-      if (outcome === false) {
+      // A location prompt already says why (and how to fix it): no toast.
+      if (outcome === false && promptRef.current === null) {
         toast.error("You're offline. Go live again in the Arena.");
       }
     });
@@ -298,8 +324,9 @@ export function useArenaLive({
       refreshing.current = true;
       try {
         // Never surprise the athlete with a browser prompt in the background.
-        const perm = await locationPermission();
-        if (perm === "denied" || perm === "prompt") return;
+        // `unknown` (no Permissions API, Safari) could still prompt: only
+        // an explicit `granted` reads in the background.
+        if ((await locationPermission()) !== "granted") return;
         const result = await captureAndReport(createClient(), "go_live");
         if (result.ok) lastReadingAt.current = Date.now();
       } finally {

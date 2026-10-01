@@ -23,6 +23,7 @@ import {
   isProximityHint,
   locationPermission,
   proximityBlockFor,
+  proximityMissingOf,
   type LocationFailure,
   type ProximityBlock,
 } from "@/lib/location/match-location";
@@ -160,6 +161,7 @@ export function useArenaChallenge({
   canReceive = true,
   inMatch = false,
   locationRequired,
+  onLocationRequired,
 }: {
   athleteId: string;
   athleteWeight: number | null;
@@ -172,6 +174,8 @@ export function useArenaChallenge({
    * Omitted: off.
    */
   locationRequired?: () => Promise<boolean>;
+  /** A proximity refusal proved the flag on (the read may have said off). */
+  onLocationRequired?: () => void;
 }) {
   const router = useRouter();
   const [incoming, setIncomingState] = useState<IncomingChallenge | null>(null);
@@ -186,6 +190,8 @@ export function useArenaChallenge({
   inMatchRef.current = inMatch;
   const locationRequiredRef = useRef(locationRequired);
   locationRequiredRef.current = locationRequired;
+  const onLocationRequiredRef = useRef(onLocationRequired);
+  onLocationRequiredRef.current = onLocationRequired;
   const isLocationRequired = useCallback(
     async () => (await locationRequiredRef.current?.()) ?? false,
     [],
@@ -376,7 +382,7 @@ export function useArenaChallenge({
           table: "challenges",
           filter: `opponent_id=eq.${athleteId}`,
         },
-        (payload) => {
+        async (payload) => {
           const row = payload.new as { id: string; status: string };
           if (row.status === "pending") return;
           // My own accept flips the row to accepted before the match exists.
@@ -385,6 +391,17 @@ export function useArenaChallenge({
           const shown = incomingRef.current;
           if (row.status === "accepted" && shown?.challengeId === row.id && shown.startBlocked) {
             return;
+          }
+          // I am the blocked accepter and the challenger's side started it
+          // (its fallback, or a later reading passed the gate): join that
+          // match rather than drop the prompt and strand them in it alone.
+          // start_match_from_challenge is idempotent and returns it.
+          if (row.status === "started" && shown?.challengeId === row.id && shown.startBlocked) {
+            const started = await startMatchFromChallenge(supabase, row.id);
+            if (started.ok) {
+              enterMatch(row.id, started.data.match_id, shown.challengerId);
+              return;
+            }
           }
           if (incomingRef.current?.challengeId === row.id) setIncoming(null);
         },
@@ -620,8 +637,8 @@ export function useArenaChallenge({
         // effort, and only when it cannot raise a browser prompt.
         void (async () => {
           if (!(await isLocationRequired())) return;
-          const perm = await locationPermission();
-          if (perm === "denied" || perm === "prompt") return;
+          // `unknown` (no Permissions API, Safari) could still prompt.
+          if ((await locationPermission()) !== "granted") return;
           await captureAndReport(supabase, "arena", result.data.id);
         })();
       }),
@@ -671,13 +688,20 @@ export function useArenaChallenge({
 
           // Flag on: my fresh reading for this challenge goes in first, so
           // the server's proximity gate has it (contract-location-flag 6).
+          // A failed reading does not stop the start: an earlier reading
+          // (go_live, a previous arena one) may still be fresh, and only the
+          // server knows. It is shown only if the server then says MY side
+          // has no reading.
+          let readingFailure: LocationFailure | null = null;
           if (await isLocationRequired()) {
             const capture = await captureAndReport(supabase, "arena", current.challengeId);
-            if (!capture.ok && capture.failure) {
-              blockStart(current, capture.failure);
-              return;
-            }
-            if (!capture.ok && capture.report.ok === false && capture.report.code === "booking_closed") {
+            if (!capture.ok && capture.failure) readingFailure = capture.failure;
+            if (
+              !capture.ok &&
+              capture.failure === null &&
+              capture.report.ok === false &&
+              capture.report.code === "booking_closed"
+            ) {
               toast.error(CHALLENGE_GONE_MESSAGE);
               setIncoming(null);
               return;
@@ -702,8 +726,20 @@ export function useArenaChallenge({
           }
           if (!started.ok) {
             if (isProximityHint(hintOf(started.error))) {
-              // The accepter is always the challenge's opponent.
-              blockStart(current, proximityBlockFor(started.error, "opponent"));
+              onLocationRequiredRef.current?.();
+              // The accepter is always the challenge's opponent. My side
+              // missing after my own reading failed: that failure is the fix.
+              const missing =
+                hintOf(started.error) === "proximity_required"
+                  ? proximityMissingOf(started.error)
+                  : null;
+              const mineMissing = missing === "opponent" || missing === "both";
+              blockStart(
+                current,
+                readingFailure && mineMissing
+                  ? readingFailure
+                  : proximityBlockFor(started.error, "opponent"),
+              );
               return;
             }
             toast.error(
@@ -747,6 +783,16 @@ export function useArenaChallenge({
             toast.error("Couldn't cancel that challenge. Try again.");
             return;
           }
+          if (!res.data.cancelled) {
+            // Not accepted any more: most likely the challenger's side
+            // started it a moment ago. Join it rather than leave them alone
+            // in it (mobile cancelBlockedStart).
+            const started = await startMatchFromChallenge(supabase, current.challengeId);
+            if (started.ok) {
+              enterMatch(current.challengeId, started.data.match_id, current.challengerId);
+              return;
+            }
+          }
           settledRef.current.add(current.challengeId);
           if (res.data.cancelled) {
             await broadcast(incomingChannelRef.current, current.challengeId, "cancelled");
@@ -767,7 +813,7 @@ export function useArenaChallenge({
         );
         setIncoming(null);
       }),
-    [runExclusive, setIncoming],
+    [runExclusive, setIncoming, enterMatch],
   );
 
   const cancelOutgoing = useCallback(

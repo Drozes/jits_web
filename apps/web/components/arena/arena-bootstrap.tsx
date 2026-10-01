@@ -31,10 +31,12 @@ export function ArenaBootstrap({
   athleteWeight,
   initialLive,
 }: ArenaBootstrapProps) {
-  const inMatch = isImmersiveRoute(usePathname());
-  // match_location_required: read here once, shared by both hooks.
-  const location = useMatchLocationRequired();
-  const live = useArenaLive({ athleteId, initialLive, inMatch, location });
+  const pathname = usePathname();
+  const inMatch = isImmersiveRoute(pathname);
+  // match_location_required: read here once, shared by both hooks, and again
+  // whenever the Arena is navigated to (the owner may flip it mid-session).
+  const location = useMatchLocationRequired({ arenaFocused: pathname === "/arena" });
+  const live = useArenaLive({ athleteId, initialLive, inMatch, location, routeKey: pathname ?? "" });
   // Observing is not joining: self is tracked only while live.
   useLobbyPresence(athleteId, false, live.isLive);
   const onlineCount = useActiveLobbyCount(useLobbyIds(), athleteId);
@@ -44,6 +46,7 @@ export function ArenaBootstrap({
     canReceive: live.isLive && !inMatch,
     inMatch,
     locationRequired: location.ensure,
+    onLocationRequired: location.markRequired,
   });
   useRegisterArenaController(live, challenge);
 
