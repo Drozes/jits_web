@@ -25,6 +25,7 @@ import { clearPendingInvite } from "@/lib/invites/pending-invite";
 import { isNewAccountForInvite } from "@/lib/invites/claim-flow";
 import { ARENA_HREF, arenaMatchHref } from "@/lib/arena/constants";
 import { isInArenaMatch } from "@/lib/arena/arena-store";
+import { readMatchLocationRequired } from "@/lib/arena/match-location-flag";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 
 export default function InviteClaimScreen() {
@@ -38,6 +39,8 @@ export default function InviteClaimScreen() {
     athleteId: athlete?.id ?? null,
     // The saved date of birth must reach the auth context's athlete row too.
     onDobSaved: () => void refreshAthleteSoft(),
+    // Flag off: no location prompt, the claim books and Start match starts it.
+    readLocationRequired: readMatchLocationRequired,
   });
   const needsConfirm = Boolean(pending?.token) && !newAccount && pending?.gateway !== "paste";
   const [confirmed, setConfirmed] = React.useState(false);

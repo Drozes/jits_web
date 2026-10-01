@@ -72,8 +72,12 @@ export interface ArenaController {
   toggle: () => Promise<void>;
   /** Take the athlete offline; resolves true once the flag clear landed. */
   goOffline: () => Promise<boolean>;
-  /** Go live without reversing a live intent (unlike toggle). */
-  goLive: () => Promise<boolean>;
+  /**
+   * Go live without reversing a live intent (unlike toggle). "ignored": the
+   * athlete closed a Go Live location state (match_location_required), which
+   * already said why, so callers stay silent.
+   */
+  goLive: () => Promise<boolean | LiveSwitchIgnored>;
   sendChallenge: (opponentId: string, opponentName: string) => Promise<void>;
   cancelOutgoing: () => Promise<void>;
   clearCap: () => void;

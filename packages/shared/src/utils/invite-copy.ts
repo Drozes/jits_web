@@ -25,7 +25,9 @@ export type StartBlockedReason =
   | "far"
   | "stale"
   | "inviter_busy"
-  | "claimer_busy";
+  | "claimer_busy"
+  /** `match_location_required` off: either athlete can tap Start match. */
+  | "start_available";
 
 /** Hints raised by create_invite / refresh_invite_code / get_or_create_personal_invite. */
 export type CreateInviteErrorCode =
@@ -182,6 +184,9 @@ export const LOCATION_DENIED_COPY =
 
 export const BOOKED_COPY = "You're booked. The match starts when you're both on the mat.";
 
+/** Booked with `match_location_required` off: the Start match button starts it. */
+export const START_AVAILABLE_COPY = "You're booked. Tap Start match when you're both on the mat.";
+
 export const BOOKING_CLOSED_COPY = "This booking was cancelled.";
 
 /** The booked-state line for a start-blocked reason. */
@@ -190,6 +195,7 @@ export function bookedMessage(reason: StartBlockedReason | null | undefined, inv
   if (reason === "claimer_busy") {
     return `Finish your current match first. Your booking with ${inviterName} is saved.`;
   }
+  if (reason === "start_available") return START_AVAILABLE_COPY;
   return BOOKED_COPY;
 }
 
@@ -219,6 +225,9 @@ export const ACCURACY_TOO_LOW_STRIP_COPY = "Can't pin your location. Try near a 
 /** Strip form of BOOKED_COPY. */
 export const BOOKED_STRIP_COPY = "Starts when you're both on the mat.";
 
+/** Strip form of START_AVAILABLE_COPY. */
+export const START_AVAILABLE_STRIP_COPY = "Tap Start when you're both on the mat.";
+
 /** Strip form of the claimer_busy line. */
 export const CLAIMER_BUSY_STRIP_COPY = "Finish your match first.";
 
@@ -229,6 +238,7 @@ export const CLAIMER_BUSY_STRIP_COPY = "Finish your match first.";
 export function bookedStripMessage(reason: StartBlockedReason | null | undefined, inviterName: string): string {
   if (reason === "inviter_busy") return `${inviterName} is mid-match. We'll hold your spot.`;
   if (reason === "claimer_busy") return CLAIMER_BUSY_STRIP_COPY;
+  if (reason === "start_available") return START_AVAILABLE_STRIP_COPY;
   return BOOKED_STRIP_COPY;
 }
 
@@ -301,5 +311,79 @@ export function revokeInviteErrorMessage(hint: string): string {
       return "This challenge already closed.";
     default:
       return "Couldn't withdraw the challenge. Check your connection and try again.";
+  }
+}
+
+// ---------------------------------------------------------------------------
+// match_location_required (016 addendum)
+// ---------------------------------------------------------------------------
+
+/** Shown before the location permission prompt on Go Live (flag on). */
+export const GO_LIVE_LOCATION_EXPLAIN_COPY =
+  "ELO RATED checks you're on the same mat as your opponent. Your location is only used to start matches.";
+
+/** Go Live with a reading too coarse to use (flag on). */
+export const GO_LIVE_ACCURACY_COPY = "Can't pin your location. Try near a window.";
+
+/** Go Live with location off (denied, or the server's `location_required`). */
+export const GO_LIVE_LOCATION_DENIED_COPY =
+  "Location is off. ELO RATED checks you're on the same mat as your opponent before a match starts. Turn it on in Settings to go live.";
+
+/** An Arena start refused with `proximity_required` / `proximity_failed`. */
+export function arenaProximityMessage(opponentName: string | null | undefined): string {
+  const name = opponentName?.trim() || "your opponent";
+  return `You need to be on the same mat as ${name} to start.`;
+}
+
+/** What a failed Start match says: a strip-sized line plus the full copy. */
+export interface StartBookingErrorView {
+  /** Fits the Booked strip (BOOKED_STRIP_MAX_CHARS for a name up to 12 chars). */
+  short: string;
+  full: string;
+  /** The booking is gone: remove it and toast `full`. */
+  closed?: boolean;
+}
+
+/**
+ * Copy for a `start_invite_booking` failure code (or an RPC hint). `role` is
+ * this athlete's side of the booking: the busy and cap codes name a side, so
+ * the copy says whether it is me or my opponent.
+ */
+export function startBookingErrorView(
+  code: string,
+  ctx: { role: "inviter" | "invitee"; opponentName: string },
+): StartBookingErrorView {
+  const alex = ctx.opponentName;
+  const meIsInviter = ctx.role === "inviter";
+  switch (code) {
+    case "inviter_busy":
+    case "claimer_busy": {
+      const meBusy = (code === "inviter_busy") === meIsInviter;
+      return meBusy
+        ? { short: CLAIMER_BUSY_STRIP_COPY, full: `Finish your current match first. Your booking with ${alex} is saved.` }
+        : { short: `${alex} is mid-match. We'll hold your spot.`, full: `${alex} is mid-match. We'll hold your spot.` };
+    }
+    case "inviter_weekly_cap":
+      return meIsInviter
+        ? {
+            short: "No invite matches left this week.",
+            full: "You've played this week's 3 invite matches. Challenge friends from the Arena.",
+          }
+        : {
+            short: "No invite matches left this week.",
+            full: `${alex} has played this week's invite matches. You're now friends, so challenge them from the Arena.`,
+          };
+    case "booking_closed":
+      return { short: BOOKING_CLOSED_COPY, full: BOOKING_CLOSED_COPY, closed: true };
+    case "location_required":
+      return {
+        short: "Location needed to start. Try again.",
+        full: "Matches now need your location to start. Allow location, then try again.",
+      };
+    default:
+      return {
+        short: "Couldn't start. Try again.",
+        full: "Couldn't start the match. Check your connection and try again.",
+      };
   }
 }

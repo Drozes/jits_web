@@ -12,6 +12,15 @@ import { act, render, renderHook } from "@testing-library/react-native";
 
 const mockActivate = jest.fn((_tag: string) => Promise.resolve());
 const mockDeactivate = jest.fn((_tag: string) => Promise.resolve());
+jest.mock("@/lib/supabase/client", () => ({ supabase: {} }));
+// match_location_required: off unless a test turns it on.
+let mockLocationRequired = false;
+jest.mock("@/lib/arena/match-location-flag", () => ({
+  useMatchLocationRequired: () => mockLocationRequired,
+  readMatchLocationRequired: () => Promise.resolve(mockLocationRequired),
+  markMatchLocationRequired: jest.fn(),
+}));
+
 jest.mock("expo-keep-awake", () => ({
   activateKeepAwakeAsync: (tag: string) => mockActivate(tag),
   deactivateKeepAwake: (tag: string) => mockDeactivate(tag),

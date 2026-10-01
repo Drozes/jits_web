@@ -8,6 +8,11 @@
  * Invites are single use and the server caps open ones at 5, so an invite
  * that was never shared, never claimed and not explicitly kept is withdrawn
  * when the screen goes away (it would otherwise sit open for 7 days).
+ *
+ * With `match_location_required` OFF no location is read: a claim books the
+ * match, the booked state offers Start match (`start_invite_booking`), and
+ * the claimer's own Start match reaches this screen through the challenge
+ * row's realtime `started` (contract-location-flag 5 and 6).
  */
 import * as React from "react";
 import { AppState } from "react-native";
@@ -23,7 +28,9 @@ import {
   type ChallengeInvite,
   type InviteEntryPoint,
 } from "@jits/shared/api/invites";
-import { createInviteErrorMessage, revokeInviteErrorMessage } from "@jits/shared/utils";
+import { startInviteBooking, subscribeToChallengeStatus } from "@jits/shared/api/location";
+import { createInviteErrorMessage, revokeInviteErrorMessage, startBookingErrorView } from "@jits/shared/utils";
+import { markMatchLocationRequired } from "@/lib/arena/match-location-flag";
 import { supabase } from "@/lib/supabase/client";
 import { readLocationOnce } from "./location";
 
@@ -33,7 +40,17 @@ export type InviterPhase =
   | { kind: "open" }
   | { kind: "claimed"; claimerName: string | null }
   | { kind: "started"; matchId: string }
-  | { kind: "booked"; challengeId: string; opponentName: string | null }
+  | {
+      kind: "booked";
+      challengeId: string;
+      opponentName: string | null;
+      /** A Start match tap is in flight (flag off). */
+      starting?: boolean;
+      /** Why the last Start match was refused (flag off). */
+      startError?: string | null;
+    }
+  /** The booking was cancelled or expired before it started. */
+  | { kind: "closed" }
   | { kind: "revoked" }
   | { kind: "expired" };
 
@@ -48,7 +65,13 @@ async function athleteFirstName(id: string | null): Promise<string | null> {
   return row.first_name || row.display_name || null;
 }
 
-export function useChallengeInvite(entryPoint: InviteEntryPoint | null) {
+export function useChallengeInvite(
+  entryPoint: InviteEntryPoint | null,
+  opts: { locationRequired?: boolean } = {},
+) {
+  const locationRequired = opts.locationRequired ?? true;
+  const locationRequiredRef = React.useRef(locationRequired);
+  locationRequiredRef.current = locationRequired;
   const [invite, setInvite] = React.useState<ChallengeInvite | null>(null);
   const [phase, setPhase] = React.useState<InviterPhase>({ kind: "creating" });
   const [locationDenied, setLocationDenied] = React.useState(false);
@@ -127,8 +150,8 @@ export function useChallengeInvite(entryPoint: InviteEntryPoint | null) {
   }, [invite, phase.kind, refreshAttempt]);
 
   const settleClaim = React.useCallback(async (challengeId: string) => {
-    const loc = await readLocationOnce({ ask: false });
-    if (loc.status === "ok") {
+    const loc = locationRequiredRef.current ? await readLocationOnce({ ask: false }) : null;
+    if (loc?.status === "ok") {
       const res = await reportMatchPresence(supabase, loc.reading, "booking_open", { challengeId });
       if (res.ok && res.data.ok && res.data.match_id) {
         setPhase({ kind: "started", matchId: res.data.match_id });
@@ -194,6 +217,8 @@ export function useChallengeInvite(entryPoint: InviteEntryPoint | null) {
       const row = await getInviteStatus(supabase, inviteId);
       if (cancelled) return;
       if (row) onRow(row);
+      // Flag off: no location anywhere; the row read above is the tick.
+      if (!locationRequiredRef.current) return;
       const loc = await readLocationOnce({ ask: true });
       if (cancelled) return;
       setLocationDenied(loc.status === "denied");
@@ -215,7 +240,50 @@ export function useChallengeInvite(entryPoint: InviteEntryPoint | null) {
       clearInterval(t);
       sub.remove();
     };
-  }, [inviteId, isOpen, onRow]);
+  }, [inviteId, isOpen, onRow, locationRequired]);
+
+  /** Start match (flag off): either athlete can start the booking. */
+  const start = React.useCallback(async () => {
+    const current = phaseRef.current;
+    if (current.kind !== "booked" || current.starting) return;
+    const { challengeId } = current;
+    setPhase({ ...current, starting: true, startError: null });
+    const res = await startInviteBooking(supabase, challengeId);
+    const ctx = { role: "inviter" as const, opponentName: current.opponentName ?? "your training partner" };
+    if (res.ok && res.data.ok) {
+      setPhase({ kind: "started", matchId: res.data.match_id });
+      return;
+    }
+    const code = res.ok ? (res.data.ok ? "unknown" : res.data.code) : res.error.hint;
+    if (!res.ok) console.warn("[invites] start_invite_booking failed:", res.error.hint, res.error.message);
+    const view = startBookingErrorView(code, ctx);
+    if (view.closed) {
+      setPhase({ kind: "closed" });
+      return;
+    }
+    if (code === "location_required") markMatchLocationRequired(true);
+    setPhase((cur) =>
+      cur.kind === "booked" && cur.challengeId === challengeId
+        ? { ...cur, starting: false, startError: view.full }
+        : cur,
+    );
+  }, []);
+
+  // Booked with the flag off: the claimer's Start match moves the row to
+  // `started` (realtime on challenges), which takes this screen to the face-off.
+  const bookedChallengeId = phase.kind === "booked" ? phase.challengeId : null;
+  React.useEffect(() => {
+    if (!bookedChallengeId || locationRequired) return;
+    return subscribeToChallengeStatus(supabase, bookedChallengeId, (status) => {
+      if (status === "started") {
+        void startInviteBooking(supabase, bookedChallengeId).then((res) => {
+          if (res.ok && res.data.ok) setPhase({ kind: "started", matchId: res.data.match_id });
+        });
+      } else if (status !== "accepted") {
+        setPhase((cur) => (cur.kind === "booked" ? { kind: "closed" } : cur));
+      }
+    });
+  }, [bookedChallengeId, locationRequired]);
 
   const revoke = React.useCallback(async () => {
     const current = inviteRef.current;
@@ -237,5 +305,5 @@ export function useChallengeInvite(entryPoint: InviteEntryPoint | null) {
     [],
   );
 
-  return { invite, phase, locationDenied, codeStale, revoke, retry: create, keepOpen, wouldWithdrawOnLeave };
+  return { invite, phase, locationDenied, codeStale, revoke, retry: create, keepOpen, wouldWithdrawOnLeave, start };
 }

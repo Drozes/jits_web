@@ -7,8 +7,11 @@ import {
   LOCATION_DENIED_STRIP_COPY,
   LOCATION_UNAVAILABLE_COPY,
   LOCATION_UNAVAILABLE_STRIP_COPY,
+  START_AVAILABLE_COPY,
+  START_AVAILABLE_STRIP_COPY,
   bookedMessage,
   bookedStripMessage,
+  type StartBookingErrorView,
 } from "@jits/shared/utils";
 import { MAX_SCALE, OutlineAction, StripShell } from "@/components/arena/strip-primitives";
 import type { BookingLocation, BookingPresence, CancelBookingResult } from "@/lib/invites/use-bookings";
@@ -22,6 +25,10 @@ import type { BookingLocation, BookingPresence, CancelBookingResult } from "@/li
  * The status shows a short strip copy (it must fit beside two buttons at
  * 375pt) and carries the full copy as its accessibilityLabel. A location fix
  * takes precedence over the busy line: nothing starts until it is fixed.
+ *
+ * With `match_location_required` off (`locationRequired` false) there is no
+ * location at all: the strip offers Start match (an outline button: red
+ * stays GO LIVE) and says why a start was refused, in the same short form.
  */
 export function BookedStrip({
   booking,
@@ -30,6 +37,10 @@ export function BookedStrip({
   onRetry,
   onAskLocation,
   onCancel,
+  locationRequired = true,
+  onStart,
+  starting = false,
+  startError = null,
 }: {
   booking: Booking;
   location: BookingLocation;
@@ -37,6 +48,13 @@ export function BookedStrip({
   onRetry: () => void;
   onAskLocation: () => void;
   onCancel: () => Promise<CancelBookingResult>;
+  /** `match_location_required`; off shows Start match instead of location. */
+  locationRequired?: boolean;
+  onStart?: () => void;
+  /** A Start match tap is in flight. */
+  starting?: boolean;
+  /** Why the last Start match was refused (short line + full copy). */
+  startError?: StartBookingErrorView | null;
 }) {
   const name = booking.opponent.first_name || booking.opponent.display_name;
   const confirmCancel = () =>
@@ -54,8 +72,9 @@ export function BookedStrip({
       },
     ]);
 
-  const fix =
-    location === "ask"
+  const fix = !locationRequired
+    ? null
+    : location === "ask"
       ? { short: LOCATION_DENIED_STRIP_COPY, full: LOCATION_DENIED_COPY, label: "Enable", a11y: "Turn on location", onPress: onAskLocation }
       : location === "denied"
         ? {
@@ -71,9 +90,13 @@ export function BookedStrip({
             ? { short: ACCURACY_TOO_LOW_STRIP_COPY, full: ACCURACY_TOO_LOW_COPY, label: "Retry", a11y: "Try again", onPress: onRetry }
             : null;
   const blockedReason = presence?.blockedReason ?? null;
-  const status = fix
-    ? { short: fix.short, full: fix.full }
-    : { short: bookedStripMessage(blockedReason, name), full: bookedMessage(blockedReason, name) };
+  const status = !locationRequired
+    ? startError
+      ? { short: startError.short, full: startError.full }
+      : { short: START_AVAILABLE_STRIP_COPY, full: START_AVAILABLE_COPY }
+    : fix
+      ? { short: fix.short, full: fix.full }
+      : { short: bookedStripMessage(blockedReason, name), full: bookedMessage(blockedReason, name) };
 
   return (
     <View accessibilityLiveRegion="polite">
@@ -90,7 +113,7 @@ export function BookedStrip({
             testID="booked-message"
             numberOfLines={2}
             maxFontSizeMultiplier={MAX_SCALE}
-            accessibilityRole={fix ? "alert" : undefined}
+            accessibilityRole={fix || startError ? "alert" : undefined}
             accessibilityLabel={status.full}
             className="font-body text-[11px] leading-4 text-ink-3"
           >
@@ -98,6 +121,15 @@ export function BookedStrip({
           </Text>
         </View>
         {fix ? <OutlineAction label={fix.label} accessibilityLabel={fix.a11y} onPress={fix.onPress} /> : null}
+        {!locationRequired && onStart ? (
+          <OutlineAction
+            testID={`arena-booked-start-${booking.challenge_id}`}
+            label={starting ? "Starting" : "Start match"}
+            accessibilityLabel={`Start match with ${name}`}
+            disabled={starting}
+            onPress={onStart}
+          />
+        ) : null}
         <OutlineAction label="Cancel" accessibilityLabel="Cancel booking" onPress={confirmCancel} />
       </StripShell>
     </View>

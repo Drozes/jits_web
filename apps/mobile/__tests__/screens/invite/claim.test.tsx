@@ -13,6 +13,14 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { PENDING_INVITE_KEY, makePendingInvite } from "@/lib/invites/pending-invite";
 
 const mockReplace = jest.fn();
+// match_location_required: on (these suites were written for it) unless a test turns it off.
+let mockLocationRequired = true;
+jest.mock("@/lib/arena/match-location-flag", () => ({
+  useMatchLocationRequired: () => mockLocationRequired,
+  readMatchLocationRequired: () => Promise.resolve(mockLocationRequired),
+  markMatchLocationRequired: jest.fn(),
+}));
+
 jest.mock("expo-router", () => ({
   useRouter: () => ({ replace: mockReplace, push: jest.fn() }),
   Redirect: () => null,
@@ -68,6 +76,7 @@ beforeEach(async () => {
   jest.clearAllMocks();
   await AsyncStorage.clear();
   mockAuth.user.created_at = "2026-01-01T00:00:00Z";
+  mockLocationRequired = true;
   mockJoin.mockResolvedValue({ ok: true, data: { ok: false, code: "invalid" } });
   mockReading.mockResolvedValue({ status: "ok", reading: { lat: 1, lng: 2, accuracyM: 10 } });
 });
@@ -228,4 +237,35 @@ it("dob_required: the picked date survives a failed save, so Save works again wi
   expect(mockSetDob).toHaveBeenCalledTimes(2);
   expect(mockSetDob).toHaveBeenLastCalledWith(expect.anything(), "me", "1990-05-01");
   expect(mockClaim).toHaveBeenCalledTimes(2);
+});
+
+describe("match_location_required off", () => {
+  it("claims with no location prompt and books with the Start match line", async () => {
+    mockLocationRequired = false;
+    mockClaim.mockResolvedValue({
+      ok: true,
+      data: { ok: true, result: "booked", challenge_id: "c1", match_id: null, inviter, start_blocked_reason: "start_available" },
+    });
+    await withPending({ code: "K7Q4M2" }, "code");
+    render(<InviteClaimScreen />);
+    expect(await screen.findByTestId("claim-booked")).toBeTruthy();
+    expect(mockReading).not.toHaveBeenCalled();
+    // No reading is sent at all.
+    expect(mockClaim).toHaveBeenCalledWith(expect.anything(), expect.anything(), null);
+    expect(screen.getByText("You're booked. Tap Start match when you're both on the mat.")).toBeTruthy();
+    expect(screen.queryByTestId("claim-location-off")).toBeNull();
+    expect(screen.queryByText("Checking you're on the mat...")).toBeNull();
+  });
+
+  it("flag on: the claim still reads a location", async () => {
+    mockClaim.mockResolvedValue({
+      ok: true,
+      data: { ok: true, result: "booked", challenge_id: "c1", match_id: null, inviter, start_blocked_reason: "waiting" },
+    });
+    await withPending({ code: "K7Q4M2" }, "code");
+    render(<InviteClaimScreen />);
+    expect(await screen.findByTestId("claim-booked")).toBeTruthy();
+    expect(mockReading).toHaveBeenCalledWith({ ask: true });
+    expect(mockClaim).toHaveBeenCalledWith(expect.anything(), expect.anything(), { lat: 1, lng: 2, accuracyM: 10 });
+  });
 });

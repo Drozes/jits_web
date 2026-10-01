@@ -127,6 +127,21 @@ jest.mock("expo-router", () => ({
   useRouter: () => mockRouter,
 }));
 
+// match_location_required (contract-location-flag 6): the arena reading
+// before a start, and the flag flip a proximity refusal proves.
+const mockArenaReading = jest.fn((..._a: unknown[]) => {
+  mockCalls.push("arena-reading");
+  return Promise.resolve();
+});
+jest.mock("@/lib/arena/arena-presence", () => ({
+  ...jest.requireActual("@/lib/arena/arena-presence"),
+  reportArenaReading: (...a: unknown[]) => mockArenaReading(...a),
+}));
+const mockMarkLocation = jest.fn();
+jest.mock("@/lib/arena/match-location-flag", () => ({
+  markMatchLocationRequired: (...a: unknown[]) => mockMarkLocation(...a),
+}));
+
 const mockToastError = jest.fn();
 const mockToastInfo = jest.fn();
 jest.mock("@/components/ui/toast", () => ({
@@ -4672,5 +4687,195 @@ describe("stale offline athletes are never challengeable (F13)", () => {
     });
     expect(mockCreateChallenge).toHaveBeenCalledTimes(1);
     expect(result.current.outgoing?.challengeId).toBe(CHALLENGE);
+  });
+});
+
+describe("match_location_required: Arena accept and the proximity gate", () => {
+  const proximity = (code: "PROXIMITY_REQUIRED" | "PROXIMITY_FAILED") => ({
+    ok: false,
+    error: { code, message: "not on one mat" },
+  });
+  const STARTED = { ok: true, data: { success: true, match_id: MATCH, challenge_id: CHALLENGE } };
+
+  function mountWithFlag(locationRequired: boolean) {
+    return renderHook(() => useArenaChallenge({ athleteId: ME, athleteWeight: 180, locationRequired }));
+  }
+
+  it("flag on: reports an arena reading for the challenge before starting it", async () => {
+    mockStartMatch.mockImplementation(async () => {
+      mockCalls.push("start");
+      return STARTED;
+    });
+    const { result } = mountWithFlag(true);
+    await raiseIncoming(result);
+    await act(async () => {
+      await result.current.accept();
+    });
+    expect(mockArenaReading).toHaveBeenCalledWith(CHALLENGE, { ask: true });
+    expect(mockCalls.indexOf("arena-reading")).toBeLessThan(mockCalls.indexOf("start"));
+    expect(mockPush).toHaveBeenCalledWith(`/match/${MATCH}`);
+  });
+
+  it("flag off: accept is unchanged, no reading", async () => {
+    const { result } = mountWithFlag(false);
+    await raiseIncoming(result);
+    await act(async () => {
+      await result.current.accept();
+    });
+    expect(mockArenaReading).not.toHaveBeenCalled();
+    expect(mockPush).toHaveBeenCalledWith(`/match/${MATCH}`);
+  });
+
+  it.each(["PROXIMITY_REQUIRED", "PROXIMITY_FAILED"] as const)(
+    "%s: clear copy, no generic error, the challenge is NOT withdrawn",
+    async (code) => {
+      mockStartMatch.mockResolvedValue(proximity(code));
+      const { result } = mountWithFlag(true);
+      await raiseIncoming(result);
+      await act(async () => {
+        await result.current.accept();
+      });
+      // No blind retry and no withdraw: the challenge stays accepted.
+      expect(mockStartMatch).toHaveBeenCalledTimes(1);
+      expect(mockCancelChallenge).not.toHaveBeenCalled();
+      expect(mockToastError).not.toHaveBeenCalled();
+      expect(mockPush).not.toHaveBeenCalled();
+      expect(result.current.incoming).toBeNull();
+      expect(result.current.startBlocked).toEqual({
+        challengeId: CHALLENGE,
+        challengerId: OPPONENT,
+        challengerName: "Rival",
+        message: "You need to be on the same mat as Rival to start.",
+      });
+      expect(mockMarkLocation).toHaveBeenCalledWith(true);
+    },
+  );
+
+  it("a refusal with the client flag still off is handled the same way", async () => {
+    mockStartMatch.mockResolvedValue(proximity("PROXIMITY_REQUIRED"));
+    const { result } = mountWithFlag(false);
+    await raiseIncoming(result);
+    await act(async () => {
+      await result.current.accept();
+    });
+    expect(result.current.startBlocked?.challengeId).toBe(CHALLENGE);
+    expect(mockMarkLocation).toHaveBeenCalledWith(true);
+  });
+
+  it("Retry sends a fresh reading and enters the match once on one mat", async () => {
+    mockStartMatch.mockResolvedValueOnce(proximity("PROXIMITY_FAILED")).mockResolvedValue(STARTED);
+    const { result } = mountWithFlag(true);
+    await raiseIncoming(result);
+    await act(async () => {
+      await result.current.accept();
+    });
+    await act(async () => {
+      await result.current.retryBlockedStart();
+    });
+    expect(mockArenaReading).toHaveBeenCalledTimes(2);
+    expect(mockSend).toHaveBeenCalledWith(
+      expect.objectContaining({ event: "match_started" }),
+      challengeTopic(CHALLENGE),
+    );
+    expect(mockPush).toHaveBeenCalledWith(`/match/${MATCH}`);
+    expect(result.current.startBlocked).toBeNull();
+  });
+
+  it("Retry still apart keeps the reason up", async () => {
+    mockStartMatch.mockResolvedValue(proximity("PROXIMITY_FAILED"));
+    const { result } = mountWithFlag(true);
+    await raiseIncoming(result);
+    await act(async () => {
+      await result.current.accept();
+    });
+    await act(async () => {
+      await result.current.retryBlockedStart();
+    });
+    expect(result.current.startBlocked?.message).toBe("You need to be on the same mat as Rival to start.");
+    expect(mockToastError).not.toHaveBeenCalled();
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it("Retry on a challenge that is gone clears it and says so", async () => {
+    mockStartMatch
+      .mockResolvedValueOnce(proximity("PROXIMITY_REQUIRED"))
+      .mockResolvedValue({ ok: false, error: { code: "CHALLENGE_NOT_ACCEPTED", message: "no" } });
+    const { result } = mountWithFlag(true);
+    await raiseIncoming(result);
+    await act(async () => {
+      await result.current.accept();
+    });
+    await act(async () => {
+      await result.current.retryBlockedStart();
+    });
+    expect(result.current.startBlocked).toBeNull();
+    expect(mockToastInfo).toHaveBeenCalledWith("That challenge is no longer available.");
+  });
+
+  it("Cancel withdraws the accepted challenge, freeing the challenger's plate", async () => {
+    mockStartMatch.mockResolvedValue(proximity("PROXIMITY_REQUIRED"));
+    const { result } = mountWithFlag(true);
+    await raiseIncoming(result);
+    await act(async () => {
+      await result.current.accept();
+    });
+    await act(async () => {
+      await result.current.cancelBlockedStart();
+    });
+    expect(mockCancelChallenge).toHaveBeenCalledWith(expect.anything(), CHALLENGE);
+    expect(result.current.startBlocked).toBeNull();
+  });
+
+  it("Cancel that finds the match already started joins it", async () => {
+    mockStartMatch.mockResolvedValueOnce(proximity("PROXIMITY_REQUIRED")).mockResolvedValue(STARTED);
+    mockCancelChallenge.mockResolvedValue({ ok: true, data: { cancelled: false } });
+    const { result } = mountWithFlag(true);
+    await raiseIncoming(result);
+    await act(async () => {
+      await result.current.accept();
+    });
+    await act(async () => {
+      await result.current.cancelBlockedStart();
+    });
+    expect(mockPush).toHaveBeenCalledWith(`/match/${MATCH}`);
+    expect(result.current.startBlocked).toBeNull();
+  });
+
+  it("the challenger cancelling clears the reason", async () => {
+    mockStartMatch.mockResolvedValue(proximity("PROXIMITY_REQUIRED"));
+    const { result } = mountWithFlag(true);
+    await raiseIncoming(result);
+    await act(async () => {
+      await result.current.accept();
+    });
+    await act(async () => {
+      await opponentUpdateBinding().handler({
+        new: { id: CHALLENGE, challenger_id: OPPONENT, opponent_id: ME, status: "cancelled" },
+      });
+    });
+    expect(result.current.startBlocked).toBeNull();
+    expect(mockToastInfo).toHaveBeenCalledWith("That challenge is no longer available.");
+  });
+
+  it("the challenger's fallback start sends its own arena reading first (flag on)", async () => {
+    jest.useFakeTimers();
+    try {
+      const { result } = mountWithFlag(true);
+      await sendOne(result);
+      await act(async () => {
+        await challengerUpdateBinding().handler({
+          new: { id: CHALLENGE, challenger_id: ME, opponent_id: OPPONENT, status: "accepted" },
+        });
+      });
+      mockGetStatus.mockResolvedValue({ ok: true, data: { status: "accepted", expiresAt: FAR_EXPIRY } });
+      await act(async () => {
+        jest.advanceTimersByTime(12_000);
+        await flushAsync();
+      });
+      expect(mockArenaReading).toHaveBeenCalledWith(CHALLENGE, { ask: false });
+      expect(mockStartMatch).toHaveBeenCalledWith(expect.anything(), CHALLENGE);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

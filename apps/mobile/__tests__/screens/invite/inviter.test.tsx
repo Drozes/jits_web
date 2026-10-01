@@ -14,6 +14,14 @@ const mockReplace = jest.fn();
 type Listener = (e: { preventDefault: () => void; data: { action: unknown } }) => void;
 const mockListeners: Record<string, Listener> = {};
 const mockDispatch = jest.fn();
+// match_location_required: on (these suites were written for it) unless a test turns it off.
+let mockLocationRequired = true;
+jest.mock("@/lib/arena/match-location-flag", () => ({
+  useMatchLocationRequired: () => mockLocationRequired,
+  readMatchLocationRequired: () => Promise.resolve(mockLocationRequired),
+  markMatchLocationRequired: jest.fn(),
+}));
+
 jest.mock("expo-router", () => ({
   useRouter: () => ({ replace: mockReplace, push: jest.fn() }),
   useLocalSearchParams: () => ({ from: "arena" }),
@@ -54,6 +62,7 @@ const mockHook = {
   retry: jest.fn(),
   keepOpen: jest.fn(),
   wouldWithdrawOnLeave: jest.fn(() => true),
+  start: jest.fn(),
 };
 jest.mock("@/lib/invites/use-challenge-invite", () => ({ useChallengeInvite: () => mockHook }));
 
@@ -73,6 +82,7 @@ beforeEach(() => {
   mockHook.phase = { kind: "open" };
   mockHook.codeStale = false;
   mockHook.wouldWithdrawOnLeave.mockReturnValue(true);
+  mockLocationRequired = true;
 });
 
 it("too_many_open_invites lists the open challenges so one can be withdrawn", () => {
@@ -168,4 +178,47 @@ it("booked shows the booking with the Arena link", () => {
   render(<InviteScreen />);
   expect(screen.getByTestId("invite-booked")).toBeTruthy();
   expect(screen.getByText("You're booked: Alex vs Sam")).toBeTruthy();
+});
+
+describe("booked, match_location_required", () => {
+  const BOOKED = { kind: "booked", challengeId: "c1", opponentName: "Sam" };
+
+  it("flag on: the proximity copy and no Start match", () => {
+    mockHook.phase = BOOKED;
+    render(<InviteScreen />);
+    expect(screen.getByText("You're booked. The match starts when you're both on the mat.")).toBeTruthy();
+    expect(screen.queryByText("Start match")).toBeNull();
+  });
+
+  it("flag off: Start match (secondary) starts the booking", () => {
+    mockLocationRequired = false;
+    mockHook.phase = BOOKED;
+    render(<InviteScreen />);
+    expect(screen.getByText("You're booked. Tap Start match when you're both on the mat.")).toBeTruthy();
+    fireEvent.press(screen.getByText("Start match"));
+    expect(mockHook.start).toHaveBeenCalled();
+    // Red stays the one CTA on the plate.
+    expect(screen.getByText("Go to the Arena")).toBeTruthy();
+  });
+
+  it("flag off: a refused start says why", () => {
+    mockLocationRequired = false;
+    mockHook.phase = { ...BOOKED, startError: "Sam is mid-match. We'll hold your spot." };
+    render(<InviteScreen />);
+    expect(screen.getByTestId("invite-start-error")).toHaveTextContent("Sam is mid-match. We'll hold your spot.");
+  });
+
+  it("flag off: Start match is disabled while starting", () => {
+    mockLocationRequired = false;
+    mockHook.phase = { ...BOOKED, starting: true };
+    render(<InviteScreen />);
+    fireEvent.press(screen.getByText("Starting..."));
+    expect(mockHook.start).not.toHaveBeenCalled();
+  });
+
+  it("a cancelled booking says so", () => {
+    mockHook.phase = { kind: "closed" };
+    render(<InviteScreen />);
+    expect(screen.getByTestId("invite-booking-closed")).toHaveTextContent(/^This booking was cancelled\./);
+  });
 });

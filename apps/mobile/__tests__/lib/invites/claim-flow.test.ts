@@ -136,3 +136,27 @@ describe("inviteLaunchRoute", () => {
     expect(inviteLaunchRoute({ pending: null, signedIn: true, athleteStatus: "active" })).toBeNull();
   });
 });
+
+it("match_location_required off: a booked claim says Start match starts it", () => {
+  const step = stepForClaim(
+    {
+      ok: true,
+      result: "booked",
+      invite_id: "i1",
+      challenge_id: "c1",
+      match_id: null,
+      booking_expires_at: null,
+      inviter: null,
+      proximity: null,
+      start_blocked_reason: "start_available",
+    },
+    { viaCode: false, athleteStatus: "active", locationOff: false },
+  );
+  expect(step).toEqual(
+    expect.objectContaining({
+      type: "booked",
+      message: "You're booked. Tap Start match when you're both on the mat.",
+      locationOff: false,
+    }),
+  );
+});

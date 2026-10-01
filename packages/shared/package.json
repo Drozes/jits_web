@@ -21,6 +21,8 @@
     "./api/match-weight-checks": "./src/api/match-weight-checks.ts",
     "./api/invites": "./src/api/invites.ts",
     "./api/friends": "./src/api/friends.ts",
+    "./api/location": "./src/api/location.ts",
+    "./api/invite-rpc": "./src/api/invite-rpc.ts",
     "./constants": "./src/constants.ts",
     "./constants/highlights": "./src/constants/highlights.ts",
     "./geo": "./src/geo/index.ts",

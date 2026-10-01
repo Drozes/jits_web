@@ -7,12 +7,24 @@
  * why it has not started (a busy athlete, a coarse reading), and a booking
  * can be cancelled through the existing challenge cancel path (contract
  * 4.19: `accepted` -> `cancelled`).
+ *
+ * With `match_location_required` OFF (contract-location-flag 5 and 6) no
+ * location is read at all: either athlete taps Start match
+ * (`start_invite_booking`), and the other one follows the challenge row's
+ * realtime `started` into the same match.
  */
 import * as React from "react";
 import { AppState } from "react-native";
 import { getMyBookings, reportMatchPresence, type Booking } from "@jits/shared/api/invites";
 import { cancelChallenge } from "@jits/shared/api/mutations";
-import { BOOKING_CLOSED_COPY, type StartBlockedReason } from "@jits/shared/utils";
+import { startInviteBooking, subscribeToChallengeStatus } from "@jits/shared/api/location";
+import {
+  BOOKING_CLOSED_COPY,
+  startBookingErrorView,
+  type StartBlockedReason,
+  type StartBookingErrorView,
+} from "@jits/shared/utils";
+import { markMatchLocationRequired } from "@/lib/arena/match-location-flag";
 import { supabase } from "@/lib/supabase/client";
 import { readLocationOnce } from "./location";
 import { releasePushDeferral } from "./pending-invite";
@@ -44,12 +56,23 @@ export interface BookingPresence {
   accuracyTooLow: boolean;
 }
 
+/** What a Start match tap did. */
+export type StartBookingOutcome = "started" | "closed" | "failed";
+
 export function useBookings(opts: {
   visible: boolean;
   onStarted: (matchId: string) => void;
   onClosed: (message: string) => void;
+  /**
+   * `match_location_required`. On (the default): location readings start
+   * the match. Off: no location, the Start match button starts it.
+   */
+  locationRequired?: boolean;
 }) {
+  const locationRequired = opts.locationRequired ?? true;
   const [bookings, setBookings] = React.useState<Booking[]>([]);
+  const [starting, setStarting] = React.useState<Record<string, boolean>>({});
+  const [startErrors, setStartErrors] = React.useState<Record<string, StartBookingErrorView>>({});
   const [location, setLocation] = React.useState<BookingLocation>("unknown");
   const [presence, setPresence] = React.useState<Record<string, BookingPresence>>({});
   const cb = React.useRef(opts);
@@ -104,7 +127,7 @@ export function useBookings(opts: {
 
   const hasBookings = bookings.length > 0;
   React.useEffect(() => {
-    if (!opts.visible || !hasBookings) return;
+    if (!opts.visible || !hasBookings || !locationRequired) return;
     let cancelled = false;
     const run = () => {
       if (!cancelled) void tick();
@@ -119,7 +142,92 @@ export function useBookings(opts: {
       clearInterval(t);
       sub.remove();
     };
-  }, [opts.visible, hasBookings, tick]);
+  }, [opts.visible, hasBookings, tick, locationRequired]);
+
+  // The flag turned on (or a refusal proved it on): the Start errors are moot.
+  React.useEffect(() => {
+    if (locationRequired) setStartErrors({});
+  }, [locationRequired]);
+
+  /** Each booking routes once, whether my tap or the realtime row got there first. */
+  const routedRef = React.useRef(new Set<string>());
+  const fireStarted = React.useCallback((challengeId: string, matchId: string) => {
+    if (routedRef.current.has(challengeId)) return;
+    routedRef.current.add(challengeId);
+    cb.current.onStarted(matchId);
+  }, []);
+
+  const removeBooking = React.useCallback((challengeId: string) => {
+    const remaining = bookingsRef.current.filter((x) => x.challenge_id !== challengeId);
+    bookingsRef.current = remaining;
+    setBookings(remaining);
+    releaseIfNoneLeft(remaining);
+  }, []);
+
+  /**
+   * Start match (flag off). Either athlete may tap it; the server is
+   * idempotent, so a started booking just answers with its match id.
+   */
+  const start = React.useCallback(
+    async (challengeId: string): Promise<StartBookingOutcome> => {
+      const booking = bookingsRef.current.find((b) => b.challenge_id === challengeId);
+      if (!booking) return "failed";
+      const ctx = {
+        role: booking.role,
+        opponentName: booking.opponent.first_name || booking.opponent.display_name,
+      };
+      setStarting((cur) => ({ ...cur, [challengeId]: true }));
+      setStartErrors(({ [challengeId]: _drop, ...rest }) => rest);
+      try {
+        const res = await startInviteBooking(supabase, challengeId);
+        if (!res.ok) {
+          console.warn("[invites] start_invite_booking failed:", res.error.hint, res.error.message);
+          setStartErrors((cur) => ({ ...cur, [challengeId]: startBookingErrorView(res.error.hint, ctx) }));
+          return "failed";
+        }
+        if (res.data.ok) {
+          fireStarted(challengeId, res.data.match_id);
+          return "started";
+        }
+        const view = startBookingErrorView(res.data.code, ctx);
+        if (view.closed) {
+          removeBooking(challengeId);
+          cb.current.onClosed(BOOKING_CLOSED_COPY);
+          return "closed";
+        }
+        // The flag is on after all: the location readings take over.
+        if (res.data.code === "location_required") markMatchLocationRequired(true);
+        setStartErrors((cur) => ({ ...cur, [challengeId]: view }));
+        return "failed";
+      } finally {
+        setStarting(({ [challengeId]: _done, ...rest }) => rest);
+      }
+    },
+    [removeBooking, fireStarted],
+  );
+
+  // Flag off: the other athlete's Start match moves the row to `started`
+  // (realtime on challenges), which takes this athlete into the same match;
+  // a cancel or expiry closes the booking.
+  const bookingIds = bookings.map((b) => b.challenge_id).join(",");
+  React.useEffect(() => {
+    if (!opts.visible || locationRequired || !bookingIds) return;
+    const unsubs = bookingIds.split(",").map((id) =>
+      subscribeToChallengeStatus(supabase, id, (status) => {
+        if (status === "started") {
+          void startInviteBooking(supabase, id).then((res) => {
+            if (res.ok && res.data.ok) fireStarted(id, res.data.match_id);
+          });
+        } else if (status !== "accepted") {
+          removeBooking(id);
+          cb.current.onClosed(BOOKING_CLOSED_COPY);
+        }
+      }),
+    );
+    return () => {
+      for (const u of unsubs) u();
+    };
+  }, [opts.visible, locationRequired, bookingIds, removeBooking, fireStarted]);
 
   /**
    * Cancel a booking (either side), only while it is still `accepted`.
@@ -162,6 +270,9 @@ export function useBookings(opts: {
     location,
     presence,
     reload: load,
+    starting,
+    startErrors,
+    start,
     retry: () => tick(false),
     askLocation: () => tick(true),
     cancel,

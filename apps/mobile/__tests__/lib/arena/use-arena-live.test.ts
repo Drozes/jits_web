@@ -1411,3 +1411,120 @@ describe("a failed flag clear is retried in the background", () => {
     expect(GO_OFFLINE_FAILED_MESSAGE).not.toMatch(/try again/i);
   });
 });
+
+describe("match_location_required (contract-location-flag 4 and 6)", () => {
+  const refused = { ok: false, error: { code: "LOCATION_REQUIRED", message: "no reading" } };
+
+  it("a location_required refusal is not retried and is reported", async () => {
+    mockToggleMatchPreferences.mockResolvedValue(refused);
+    const { result } = mount();
+    let ok = true;
+    await act(async () => {
+      ok = await result.current.goLive();
+    });
+    expect(ok).toBe(false);
+    // One write: the same write cannot fix a missing reading.
+    expect(mockToggleMatchPreferences).toHaveBeenCalledTimes(1);
+    expect(result.current.lastGoLiveRefusal()).toBe("location_required");
+    expect(result.current.isLive).toBe(false);
+  });
+
+  it("any other failure is retried once and carries no refusal", async () => {
+    mockToggleMatchPreferences.mockResolvedValue({ ok: false, error: { code: "UNKNOWN", message: "offline" } });
+    const { result } = mount();
+    await act(async () => {
+      await result.current.goLive();
+    });
+    expect(mockToggleMatchPreferences).toHaveBeenCalledTimes(2);
+    expect(result.current.lastGoLiveRefusal()).toBeNull();
+  });
+
+  it("a landed go-live clears an earlier refusal", async () => {
+    mockToggleMatchPreferences.mockResolvedValueOnce(refused);
+    const { result } = mount();
+    await act(async () => {
+      await result.current.goLive();
+    });
+    await act(async () => {
+      await result.current.goLive();
+    });
+    expect(result.current.isLive).toBe(true);
+    expect(result.current.lastGoLiveRefusal()).toBeNull();
+  });
+
+  it("a foreground restore takes a silent reading before the live write", async () => {
+    const beforeAutoLive = jest.fn(async () => {
+      mockCalls.push("reading");
+    });
+    const { result } = mount({ beforeAutoLive });
+    await act(async () => {
+      await result.current.goLive();
+    });
+    await act(async () => {
+      setAppState("background");
+      appStateHandler?.("background");
+      await flush();
+    });
+    mockCalls.length = 0;
+    await act(async () => {
+      setAppState("active");
+      appStateHandler?.("active");
+      await flush();
+      await flush();
+    });
+    expect(beforeAutoLive).toHaveBeenCalledTimes(1);
+    expect(mockCalls.indexOf("reading")).toBeLessThan(mockCalls.indexOf("flag:true"));
+    expect(result.current.isLive).toBe(true);
+  });
+
+  it("backgrounded again during that reading: stays offline, restores on the next foreground", async () => {
+    const reading = deferred();
+    const beforeAutoLive = jest.fn(() => reading.promise);
+    const { result } = mount({ beforeAutoLive });
+    await act(async () => {
+      await result.current.goLive();
+    });
+    await act(async () => {
+      setAppState("background");
+      appStateHandler?.("background");
+      await flush();
+    });
+    await act(async () => {
+      setAppState("active");
+      appStateHandler?.("active");
+      await flush();
+    });
+    mockCalls.length = 0;
+    await act(async () => {
+      setAppState("background");
+      appStateHandler?.("background");
+      reading.resolve();
+      await flush();
+      await flush();
+    });
+    expect(mockCalls).not.toContain("flag:true");
+    expect(result.current.isLive).toBe(false);
+    beforeAutoLive.mockResolvedValue(undefined);
+    await act(async () => {
+      setAppState("active");
+      appStateHandler?.("active");
+      await flush();
+      await flush();
+    });
+    expect(result.current.isLive).toBe(true);
+  });
+
+  it("the arrival re-assert also reads first", async () => {
+    const beforeAutoLive = jest.fn(async () => {
+      mockCalls.push("reading");
+    });
+    const { result } = mount({ initialRanked: true, beforeAutoLive });
+    await act(async () => {
+      await flush();
+      await flush();
+    });
+    expect(beforeAutoLive).toHaveBeenCalledTimes(1);
+    expect(mockCalls.indexOf("reading")).toBeLessThan(mockCalls.indexOf("flag:true"));
+    expect(result.current.isLive).toBe(true);
+  });
+});

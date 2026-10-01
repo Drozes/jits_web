@@ -7,7 +7,7 @@ import * as React from "react";
 import { ActivityIndicator, Alert, Linking, ScrollView, Text, View } from "react-native";
 import { useLocalSearchParams, useNavigation, useRouter, type Href } from "expo-router";
 import type { InviteEntryPoint } from "@jits/shared/api/invites";
-import { BOOKED_COPY, LOCATION_DENIED_COPY } from "@jits/shared/utils";
+import { BOOKED_COPY, BOOKING_CLOSED_COPY, LOCATION_DENIED_COPY, START_AVAILABLE_COPY } from "@jits/shared/utils";
 import { AppHeader } from "@/components/layout/app-header";
 import { CtaButton, SecondaryButton, TertiaryButton } from "@/components/auth/auth-buttons";
 import { Plate } from "@/components/ui/elo-system";
@@ -15,6 +15,7 @@ import { InviteQr } from "@/components/invite/invite-qr";
 import { InviteShareRow } from "@/components/invite/share-row";
 import { OpenChallenges } from "@/components/invite/open-challenges";
 import { useChallengeInvite } from "@/lib/invites/use-challenge-invite";
+import { useMatchLocationRequired } from "@/lib/arena/match-location-flag";
 import { ARENA_HREF, arenaMatchHref } from "@/lib/arena/constants";
 import { isInArenaMatch } from "@/lib/arena/arena-store";
 import { useThemedTokens } from "@/lib/theme/use-theme";
@@ -29,8 +30,9 @@ export default function InviteScreen() {
   const me = athlete?.first_name || athlete?.display_name || "You";
   const { from } = useLocalSearchParams<{ from?: string }>();
   const entry = ENTRY_POINTS.includes(from as InviteEntryPoint) ? (from as InviteEntryPoint) : null;
-  const { invite, phase, locationDenied, codeStale, revoke, retry, keepOpen, wouldWithdrawOnLeave } =
-    useChallengeInvite(entry);
+  const locationRequired = useMatchLocationRequired();
+  const { invite, phase, locationDenied, codeStale, revoke, retry, keepOpen, wouldWithdrawOnLeave, start } =
+    useChallengeInvite(entry, { locationRequired });
   const [openListKey, setOpenListKey] = React.useState(0);
 
   React.useEffect(() => {
@@ -162,8 +164,32 @@ export default function InviteScreen() {
             <Text className="font-heading text-[18px] text-ink uppercase">
               {phase.opponentName ? `You're booked: ${me} vs ${phase.opponentName}` : "You're booked"}
             </Text>
-            <Text className="font-body text-[14px] text-ink leading-6">{BOOKED_COPY}</Text>
+            <Text className="font-body text-[14px] text-ink leading-6">
+              {locationRequired ? BOOKED_COPY : START_AVAILABLE_COPY}
+            </Text>
+            {!locationRequired && phase.startError ? (
+              <Text testID="invite-start-error" accessibilityRole="alert" className="font-body text-[14px] text-ink leading-6">
+                {phase.startError}
+              </Text>
+            ) : null}
+            {!locationRequired ? (
+              // Secondary: red stays the one CTA on this plate.
+              <SecondaryButton
+                label={phase.starting ? "Starting..." : "Start match"}
+                disabled={Boolean(phase.starting)}
+                onPress={() => void start()}
+              />
+            ) : null}
             <CtaButton label="Go to the Arena" onPress={() => router.replace(`${ARENA_HREF}?booking=${phase.challengeId}` as Href)} />
+          </Plate>
+        ) : null}
+
+        {phase.kind === "closed" ? (
+          <Plate className="gap-4" testID="invite-booking-closed">
+            <Text accessibilityRole="alert" className="font-body text-[14px] text-ink leading-6">
+              {BOOKING_CLOSED_COPY}
+            </Text>
+            <CtaButton label="Go to the Arena" onPress={() => router.replace(ARENA_HREF as Href)} />
           </Plate>
         ) : null}
 

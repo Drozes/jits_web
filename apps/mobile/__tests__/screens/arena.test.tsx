@@ -179,8 +179,17 @@ var mockFriendIds: Set<string> = new Set();
 var mockInvitesOn = false;
 jest.mock("@/lib/invites/use-friend-ids", () => ({ useFriendIds: () => mockFriendIds }));
 jest.mock("@/lib/invites/use-invites-enabled", () => ({ useInvitesEnabled: () => mockInvitesOn }));
+// eslint-disable-next-line no-var
+var mockLocationRequired = false;
+jest.mock("@/lib/arena/match-location-flag", () => ({ useMatchLocationRequired: () => mockLocationRequired }));
+// eslint-disable-next-line no-var
+var mockBooked: Record<string, unknown> = {};
+const mockUseBookings = jest.fn();
 jest.mock("@/lib/invites/use-bookings", () => ({
-  useBookings: () => ({ bookings: [], locationOff: false, reload: jest.fn() }),
+  useBookings: (args: unknown) => {
+    mockUseBookings(args);
+    return { bookings: [], locationOff: false, reload: jest.fn(), presence: {}, starting: {}, startErrors: {}, ...mockBooked };
+  },
 }));
 const mockGetPending = jest.fn();
 jest.mock("@jits/shared/api/queries", () => ({
@@ -299,6 +308,8 @@ function competitor(over: Record<string, unknown> = {}) {
 }
 
 beforeEach(() => {
+  mockLocationRequired = false;
+  mockBooked = {};
   mockFriendIds = new Set();
   mockInvitesOn = false;
   jest.clearAllMocks();
@@ -1929,5 +1940,44 @@ describe("Arena screen: no rematch handoff (jits-02vo.8)", () => {
       jest.advanceTimersByTime(5_000);
     });
     expect(mockRefreshQuietly).not.toHaveBeenCalled();
+  });
+});
+
+describe("Arena Booked strip and match_location_required", () => {
+  const BOOKING = {
+    challenge_id: "c1",
+    invite_id: "i1",
+    role: "invitee",
+    opponent: { athlete_id: "a1", display_name: "Alex R", first_name: "Alex" },
+  };
+
+  it("flag off: the strip offers Start match, which starts that booking", () => {
+    const start = jest.fn(() => Promise.resolve("started"));
+    mockBooked = { bookings: [BOOKING], location: "unknown", start };
+    const r = render(<ArenaScreen />);
+    expect(mockUseBookings).toHaveBeenLastCalledWith(expect.objectContaining({ locationRequired: false }));
+    expect(r.getByText("Tap Start when you're both on the mat.")).toBeTruthy();
+    fireEvent.press(r.getByTestId("arena-booked-start-c1"));
+    expect(start).toHaveBeenCalledWith("c1");
+  });
+
+  it("flag off: a refused start shows on the strip", () => {
+    mockBooked = {
+      bookings: [BOOKING],
+      location: "unknown",
+      start: jest.fn(),
+      startErrors: { c1: { short: "Finish your match first.", full: "Finish your current match first. Your booking with Alex is saved." } },
+    };
+    const r = render(<ArenaScreen />);
+    expect(r.getByText("Finish your match first.")).toBeTruthy();
+  });
+
+  it("flag on: no Start match, the location flow drives it", () => {
+    mockLocationRequired = true;
+    mockBooked = { bookings: [BOOKING], location: "denied", start: jest.fn() };
+    const r = render(<ArenaScreen />);
+    expect(mockUseBookings).toHaveBeenLastCalledWith(expect.objectContaining({ locationRequired: true }));
+    expect(r.queryByTestId("arena-booked-start-c1")).toBeNull();
+    expect(r.getByLabelText("Open Settings")).toBeTruthy();
   });
 });

@@ -18,6 +18,9 @@ import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
 import { ATHLETE_STATUS } from "@jits/shared/constants";
 import type { AthleteGuardRow } from "@jits/shared/api/queries";
 import { ChallengePromptSheet } from "@/components/arena/challenge-prompt-sheet";
+import { GoLiveLocationSheet } from "@/components/arena/go-live-location-sheet";
+import { StartBlockedSheet } from "@/components/arena/start-blocked-sheet";
+import { toast } from "@/components/ui/toast";
 import { REOPEN_SURFACE_GRACE_MS } from "./constants";
 import { useAuth } from "../auth/hooks";
 import {
@@ -33,6 +36,17 @@ import {
 } from "./arena-store";
 import { useArenaChallenge } from "./use-arena-challenge";
 import { useArenaLive } from "./use-arena-live";
+import {
+  ensureGoLiveLocation,
+  goLiveWithLocation,
+  useGoLiveReadingRefresh,
+} from "./go-live-location";
+import { GO_LIVE_FAILED_MESSAGE } from "./go-live-feedback";
+import {
+  markMatchLocationRequired,
+  readMatchLocationRequired,
+  useMatchLocationRequired,
+} from "./match-location-flag";
 import { useLobbyIds, useLobbyKnown, useLobbyPresence } from "./use-lobby-presence";
 import { usePendingChallengeRecovery } from "./use-pending-challenge-recovery";
 import { useActiveMatchOwner } from "../match-flow/active-match-store";
@@ -100,6 +114,9 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
   const beginManualOfflineRef = React.useRef<
     () => ((wentOffline: boolean) => void) | void
   >(() => {});
+  // match_location_required: Go Live needs a fresh go_live reading, and an
+  // Arena start needs both athletes on one mat (contract-location-flag 6).
+  const locationRequired = useMatchLocationRequired();
   const live = useArenaLive({
     athleteId: athlete.id,
     displayName: athlete.display_name ?? "",
@@ -111,6 +128,11 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
     initialRanked: athlete.looking_for_ranked ?? false,
     inMatch,
     onManualOffline: () => beginManualOfflineRef.current(),
+    // A restore the athlete did not tap: a silent reading first, so the
+    // server accepts the live write (it never asks or shows anything).
+    beforeAutoLive: async () => {
+      if (await readMatchLocationRequired()) await ensureGoLiveLocation({ interactive: false });
+    },
   });
 
   const challenge = useArenaChallenge({
@@ -123,6 +145,7 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
     // Null, not undefined: presence is tracked but UNKNOWN right now, so
     // the hook refuses to send rather than skip the on-the-mat check (F13).
     lobbyIds: lobbyKnown ? lobbyIds : null,
+    locationRequired,
   });
   beginManualOfflineRef.current = challenge.beginManualOffline;
 
@@ -154,6 +177,8 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
   const { incoming, outgoing, incomingCount, incomingTucked, isBusy, capReached } =
     challenge;
   useArenaLiveKeepAwake(isLive && !inMatch);
+  // Keep the go_live reading fresh while live so an Arena start finds one.
+  useGoLiveReadingRefresh(isLive && !inMatch && locationRequired);
 
   // "Later" is only offered while something on screen can bring the prompt
   // back (the header chip registers itself, see useIncomingReopenSurface). If
@@ -204,10 +229,36 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
   const challengeRef = React.useRef(challenge);
   challengeRef.current = challenge;
   React.useEffect(() => {
+    /**
+     * Go live, through the location step when the flag is on. A flag read
+     * that said off but a server that refuses with `location_required` means
+     * the flag was just turned on: remember that and run the location step.
+     */
+    const goLive = async () => {
+      const l = liveRef.current;
+      if (!(await readMatchLocationRequired())) {
+        const ok = await l.goLive();
+        if (ok || l.lastGoLiveRefusal() !== "location_required") return ok;
+        markMatchLocationRequired(true);
+      }
+      return goLiveWithLocation(
+        () => liveRef.current.goLive(),
+        () => liveRef.current.lastGoLiveRefusal(),
+      );
+    };
     const unregister = registerArenaController({
-      toggle: () => liveRef.current.toggle(),
+      toggle: async () => {
+        const l = liveRef.current;
+        // Going live from offline: the location step first (flag on).
+        if (!l.isLive && !l.transition && (await readMatchLocationRequired())) {
+          const ready = await ensureGoLiveLocation({ interactive: true });
+          if (ready === "failed") toast.info(GO_LIVE_FAILED_MESSAGE);
+          if (ready !== "ready") return;
+        }
+        return liveRef.current.toggle();
+      },
       goOffline: () => liveRef.current.goOffline(),
-      goLive: () => liveRef.current.goLive(),
+      goLive,
       sendChallenge: (id, name) => challengeRef.current.sendChallenge(id, name),
       cancelOutgoing: () => challengeRef.current.cancelOutgoing(),
       clearCap: () => challengeRef.current.clearCap(),
@@ -221,25 +272,37 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
     };
   }, []);
 
+  // The prompt is never over a match. A prompt that is up when a match
+  // starts by another route (deep link) is dropped by the challenge hook,
+  // not held, and recovery re-offers it after the match only if it is still
+  // fresh and its challenger is still in the lobby (jits-yiwx). The
+  // `inMatch` guard here covers the render between the match starting and
+  // that clear. A challenge tucked away with "Later" keeps its sheet down;
+  // the header chip carries it until it is reopened or clears.
   return (
-    // Never over a match. A prompt that is up when a match starts by another
-    // route (deep link) is dropped by the challenge hook, not held, and
-    // recovery re-offers it after the match only if it is still fresh and
-    // its challenger is still in the lobby (jits-yiwx). The `inMatch` guard
-    // here covers the render between the match starting and that clear.
-    // A challenge tucked away with "Later" keeps its sheet down; the header
-    // chip carries it until it is reopened or clears.
-    <ChallengePromptSheet
-      challenge={inMatch || incomingTucked ? null : incoming}
-      busy={isBusy}
-      onAccept={() => void challenge.accept()}
-      onDecline={() => void challenge.decline()}
-      // "Later" (AC-S4): minimize into the header chip; nothing is written.
-      // No chip mounted, no Later.
-      onLater={canReopen ? () => challenge.tuckIncoming() : undefined}
-      // The prompt shows the first challenge; the rest are "+N more" (AC-S6).
-      moreCount={Math.max(0, incomingCount - 1)}
-      viewer={{ elo: athlete.current_elo ?? null, weight: athlete.current_weight ?? null }}
-    />
+    <>
+      {/* Go Live location states (explain, denied, accuracy, no fix). */}
+      <GoLiveLocationSheet />
+      <ChallengePromptSheet
+        challenge={inMatch || incomingTucked ? null : incoming}
+        busy={isBusy}
+        onAccept={() => void challenge.accept()}
+        onDecline={() => void challenge.decline()}
+        // "Later" (AC-S4): minimize into the header chip; nothing is written.
+        // No chip mounted, no Later.
+        onLater={canReopen ? () => challenge.tuckIncoming() : undefined}
+        // The prompt shows the first challenge; the rest are "+N more" (AC-S6).
+        moreCount={Math.max(0, incomingCount - 1)}
+        viewer={{ elo: athlete.current_elo ?? null, weight: athlete.current_weight ?? null }}
+      />
+      {/* Accepted, but the server says the two are not on one mat yet (flag
+          on): the reason, Retry and Cancel. Never over a match. */}
+      <StartBlockedSheet
+        blocked={inMatch ? null : (challenge.startBlocked ?? null)}
+        busy={isBusy}
+        onRetry={() => void challenge.retryBlockedStart()}
+        onCancel={() => void challenge.cancelBlockedStart()}
+      />
+    </>
   );
 }

@@ -11,6 +11,9 @@
  * `dob_required` (an account from before date of birth was required): the
  * screen collects it and calls `submitDob`, which saves it on the athlete's
  * own row and claims again with the same input.
+ *
+ * With `match_location_required` OFF no location is read: the claim books
+ * the match (`start_available`) and the Booked strip offers Start match.
  */
 import * as React from "react";
 import { acceptJoinInvite, claimChallengeInvite, logInviteEvent, setMyDateOfBirth } from "@jits/shared/api/invites";
@@ -30,7 +33,13 @@ const NETWORK_COPY = "Couldn't reach ELO RATED. Check your connection and try ag
 export function useClaimRunner(
   pending: PendingInvite | null,
   athleteStatus: string | null | undefined,
-  opts: { newAccount?: boolean; athleteId?: string | null; onDobSaved?: () => void } = {},
+  opts: {
+    newAccount?: boolean;
+    athleteId?: string | null;
+    onDobSaved?: () => void;
+    /** `match_location_required` at claim time; defaults to on. */
+    readLocationRequired?: () => Promise<boolean>;
+  } = {},
 ) {
   const [state, setState] = React.useState<RunnerState>({ phase: "idle" });
   const [locationDenied, setLocationDenied] = React.useState(false);
@@ -39,6 +48,8 @@ export function useClaimRunner(
   const newAccount = Boolean(opts.newAccount);
   const athleteId = opts.athleteId ?? null;
   const onDobSaved = opts.onDobSaved;
+  const readLocationRequiredRef = React.useRef(opts.readLocationRequired);
+  readLocationRequiredRef.current = opts.readLocationRequired;
 
   const finish = React.useCallback(async (step: ClaimStep) => {
     if (clearsPendingInvite(step)) await clearPendingInvite();
@@ -55,9 +66,10 @@ export function useClaimRunner(
   // Read a location (asks once), then claim the challenge.
   const claimNow = React.useCallback(async () => {
     if (!pending) return;
-    setState({ phase: "locating" });
-    const loc = await readLocationOnce({ ask: true });
-    const denied = loc.status === "denied";
+    const required = readLocationRequiredRef.current ? await readLocationRequiredRef.current() : true;
+    setState({ phase: required ? "locating" : "claiming" });
+    const loc = required ? await readLocationOnce({ ask: true }) : null;
+    const denied = loc?.status === "denied";
     setLocationDenied(denied);
     if (denied) {
       void logInviteEvent(supabase, "location_denied", {
@@ -72,7 +84,7 @@ export function useClaimRunner(
       gateway: pending.gateway,
       firstTouchAt: pending.first_touch_at,
     };
-    const res = await claimChallengeInvite(supabase, input, loc.status === "ok" ? loc.reading : null);
+    const res = await claimChallengeInvite(supabase, input, loc?.status === "ok" ? loc.reading : null);
     if (!res.ok) {
       setState({ phase: "done", step: { type: "message", message: NETWORK_COPY, terminal: false } });
       return;
@@ -81,7 +93,8 @@ export function useClaimRunner(
       stepForClaim(res.data, {
         viaCode: Boolean(pending.code),
         athleteStatus,
-        locationOff: loc.status !== "ok",
+        // Flag off: no location was wanted, so nothing is "off".
+        locationOff: loc !== null && loc.status !== "ok",
         joinTried: Boolean(pending.token),
       }),
     );

@@ -9,6 +9,15 @@
 import * as React from "react";
 import { act, fireEvent, render } from "@testing-library/react-native";
 
+jest.mock("@/lib/supabase/client", () => ({ supabase: {} }));
+// match_location_required: off unless a test turns it on.
+let mockLocationRequired = false;
+jest.mock("@/lib/arena/match-location-flag", () => ({
+  useMatchLocationRequired: () => mockLocationRequired,
+  readMatchLocationRequired: () => Promise.resolve(mockLocationRequired),
+  markMatchLocationRequired: jest.fn(),
+}));
+
 jest.mock("@gorhom/bottom-sheet", () => {
   const R = require("react");
   const RN = require("react-native");
@@ -228,6 +237,7 @@ describe("ArenaBootstrap", () => {
       initialRanked: true,
       inMatch: false,
       onManualOffline: expect.any(Function),
+      beforeAutoLive: expect.any(Function),
     });
     expect(mockActiveMatchOwner).toHaveBeenCalledWith("me-1");
     expect(mockUseArenaChallenge).toHaveBeenLastCalledWith(

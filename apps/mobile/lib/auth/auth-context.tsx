@@ -19,6 +19,7 @@ import { unregisterPushDeviceOnSignOut } from "../notifications/register-push";
 import { resetHighlightStore } from "../highlight/highlight-store";
 import { clearPushDeferral } from "../invites/pending-invite";
 import { resetInvitesEnabledCache } from "../invites/use-invites-enabled";
+import { resetMatchLocationRequired } from "../arena/match-location-flag";
 
 type AuthError = { message: string };
 
@@ -340,6 +341,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // claim screen's "Not you?" sign-out keeps it, contract 7.)
     void clearPushDeferral();
     resetInvitesEnabledCache();
+    resetMatchLocationRequired();
     loadedAthleteForUserId.current = null;
     setSession(null);
     setUser(null);

@@ -60,6 +60,9 @@ export type DomainErrorCode =
   | "OPPONENT_NOT_CHECKED"
   | "NO_CHALLENGE"
   | "INVITE_BOOKING_USE_PRESENCE"
+  | "LOCATION_REQUIRED"
+  | "PROXIMITY_REQUIRED"
+  | "PROXIMITY_FAILED"
   | "NOT_AUTHORIZED"
   | "RLS_VIOLATION"
   | "RPC_MISSING"
@@ -224,6 +227,20 @@ const HINT_TO_CODE: Record<string, { code: DomainErrorCode; message: string }> =
     invite_booking_use_presence: {
       code: "INVITE_BOOKING_USE_PRESENCE",
       message: "This match starts when you're both on the mat. Open your booking to check in.",
+    },
+    // match_location_required (jr_be 016 addendum): Go Live needs a fresh
+    // go_live reading, and an Arena start needs both athletes on one mat.
+    location_required: {
+      code: "LOCATION_REQUIRED",
+      message: "Turn on location to go live.",
+    },
+    proximity_required: {
+      code: "PROXIMITY_REQUIRED",
+      message: "You need to be on the same mat as your opponent to start.",
+    },
+    proximity_failed: {
+      code: "PROXIMITY_FAILED",
+      message: "You need to be on the same mat as your opponent to start.",
     },
     no_challenge: {
       code: "NO_CHALLENGE",

@@ -40,6 +40,23 @@ jest.mock("@jits/shared/api/invites", () => ({
   },
 }));
 
+const mockStartBooking = jest.fn();
+// eslint-disable-next-line no-var
+var mockStatusCb: ((status: string) => void) | null = null;
+jest.mock("@jits/shared/api/location", () => ({
+  startInviteBooking: (...a: unknown[]) => mockStartBooking(...a),
+  subscribeToChallengeStatus: (_s: unknown, _id: string, cb: (status: string) => void) => {
+    mockStatusCb = cb;
+    return () => {
+      mockStatusCb = null;
+    };
+  },
+}));
+const mockMarkLocation = jest.fn();
+jest.mock("@/lib/arena/match-location-flag", () => ({
+  markMatchLocationRequired: (...a: unknown[]) => mockMarkLocation(...a),
+}));
+
 import { useChallengeInvite } from "@/lib/invites/use-challenge-invite";
 
 const INVITE = {
@@ -204,4 +221,95 @@ it("a failed code refresh marks the code stale and retries", async () => {
   } finally {
     jest.useRealTimers();
   }
+});
+
+describe("match_location_required off", () => {
+  async function bookedOff() {
+    mockCreate.mockResolvedValue({ ok: true, data: INVITE });
+    mockBookings.mockResolvedValue({
+      ok: true,
+      data: [{ challenge_id: "c1", opponent: { first_name: "Sam", display_name: "Sam K" } }],
+    });
+    const hook = renderHook(() => useChallengeInvite("arena", { locationRequired: false }));
+    await waitFor(() => expect(hook.result.current.phase.kind).toBe("open"));
+    await act(async () => {
+      mockOnRow?.({ status: "claimed", claimed_by: "b", challenge_id: "c1" });
+    });
+    await waitFor(() => expect(hook.result.current.phase.kind).toBe("booked"));
+    return hook;
+  }
+
+  it("waits for a claim with no location read and no presence report", async () => {
+    const { result } = await bookedOff();
+    expect(mockReading).not.toHaveBeenCalled();
+    expect(mockPresence).not.toHaveBeenCalled();
+    expect(result.current.locationDenied).toBe(false);
+    // The row is still re-read (the claim fallback).
+    expect(mockStatus).toHaveBeenCalled();
+  });
+
+  it("Start match starts the booking and goes to the face-off", async () => {
+    mockStartBooking.mockResolvedValue({ ok: true, data: { ok: true, match_id: "m1" } });
+    const { result } = await bookedOff();
+    await act(async () => {
+      await result.current.start();
+    });
+    expect(mockStartBooking).toHaveBeenCalledWith(expect.anything(), "c1");
+    expect(result.current.phase).toEqual({ kind: "started", matchId: "m1" });
+  });
+
+  it.each([
+    ["inviter_busy", "Finish your current match first. Your booking with Sam is saved."],
+    ["claimer_busy", "Sam is mid-match. We'll hold your spot."],
+    ["inviter_weekly_cap", "You've played this week's 3 invite matches. Challenge friends from the Arena."],
+    ["location_required", "Matches now need your location to start. Allow location, then try again."],
+  ])("%s stays booked with the copy for my side", async (code, copy) => {
+    mockStartBooking.mockResolvedValue({ ok: true, data: { ok: false, code } });
+    const { result } = await bookedOff();
+    await act(async () => {
+      await result.current.start();
+    });
+    expect(result.current.phase).toEqual(
+      expect.objectContaining({ kind: "booked", challengeId: "c1", starting: false, startError: copy }),
+    );
+    expect(mockMarkLocation).toHaveBeenCalledTimes(code === "location_required" ? 1 : 0);
+  });
+
+  it("booking_closed closes the booking", async () => {
+    mockStartBooking.mockResolvedValue({ ok: true, data: { ok: false, code: "booking_closed" } });
+    const { result } = await bookedOff();
+    await act(async () => {
+      await result.current.start();
+    });
+    expect(result.current.phase).toEqual({ kind: "closed" });
+  });
+
+  it("a failed call says so instead of nothing", async () => {
+    jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    mockStartBooking.mockResolvedValue({ ok: false, error: { hint: "unknown", message: "offline" } });
+    const { result } = await bookedOff();
+    await act(async () => {
+      await result.current.start();
+    });
+    expect(result.current.phase).toEqual(
+      expect.objectContaining({ startError: "Couldn't start the match. Check your connection and try again." }),
+    );
+  });
+
+  it("the claimer's Start match (realtime started) takes the inviter to the face-off", async () => {
+    mockStartBooking.mockResolvedValue({ ok: true, data: { ok: true, match_id: "m7" } });
+    const { result } = await bookedOff();
+    await waitFor(() => expect(mockStatusCb).not.toBeNull());
+    await act(async () => {
+      mockStatusCb?.("started");
+    });
+    await waitFor(() => expect(result.current.phase).toEqual({ kind: "started", matchId: "m7" }));
+  });
+
+  it("a cancelled booking closes", async () => {
+    const { result } = await bookedOff();
+    await waitFor(() => expect(mockStatusCb).not.toBeNull());
+    act(() => mockStatusCb?.("cancelled"));
+    expect(result.current.phase).toEqual({ kind: "closed" });
+  });
 });

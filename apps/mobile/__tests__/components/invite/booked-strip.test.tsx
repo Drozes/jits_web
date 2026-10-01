@@ -134,3 +134,47 @@ it("sits on the shared strip shell at the challenge strips' size", () => {
   expect(screen.getByTestId("booked-message").props.numberOfLines).toBe(2);
   expect(String(screen.getByTestId("booked-message").props.className)).toMatch(/text-\[11px\]/);
 });
+
+describe("match_location_required off: Start match", () => {
+  it("offers Start match (outline, not red) with the start copy and no location fix", () => {
+    const onStart = jest.fn();
+    // A denied location must not matter: nothing is read with the flag off.
+    renderStrip({ locationRequired: false, onStart, location: "denied" });
+    expect(status()).toHaveTextContent("Tap Start when you're both on the mat.");
+    expect(status().props.accessibilityLabel).toBe("You're booked. Tap Start match when you're both on the mat.");
+    expect(screen.queryByLabelText("Open Settings")).toBeNull();
+    expect(screen.queryByLabelText("Try again")).toBeNull();
+    const start = screen.getByTestId("arena-booked-start-c1");
+    expect(start.props.accessibilityLabel).toBe("Start match with Alex");
+    expect(String(start.props.className)).toMatch(/border/);
+    expect(String(start.props.className)).not.toMatch(/bg-cta/);
+    fireEvent.press(start);
+    expect(onStart).toHaveBeenCalled();
+    // Cancel stays.
+    expect(screen.getByLabelText("Cancel booking")).toBeTruthy();
+  });
+
+  it("disables Start match while a start is in flight", () => {
+    const onStart = jest.fn();
+    renderStrip({ locationRequired: false, onStart, starting: true });
+    const start = screen.getByTestId("arena-booked-start-c1");
+    expect(start.props.accessibilityState).toEqual({ disabled: true });
+    expect(screen.getByText("Starting")).toBeTruthy();
+  });
+
+  it("a refused start shows its short line, the full copy for VoiceOver, as an alert", () => {
+    renderStrip({
+      locationRequired: false,
+      onStart: jest.fn(),
+      startError: { short: "Alex is mid-match. We'll hold your spot.", full: "Alex is mid-match. We'll hold your spot." },
+    });
+    expect(status()).toHaveTextContent("Alex is mid-match. We'll hold your spot.");
+    expect(status().props.accessibilityRole).toBe("alert");
+  });
+
+  it("flag on: no Start match, the location flow as before", () => {
+    renderStrip({ locationRequired: true, onStart: jest.fn(), location: "denied" });
+    expect(screen.queryByTestId("arena-booked-start-c1")).toBeNull();
+    expect(screen.getByLabelText("Open Settings")).toBeTruthy();
+  });
+});

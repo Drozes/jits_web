@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+### Mobile: `match_location_required` flag, Go Live location, Start match (jr_be 016 addendum)
+
+Built to `specs/016-invites/contract-location-flag.md` (jr_be). JS-only on mobile (`expo-location` is already linked; the permission string comes from the native slice), so OTA-eligible once the native build that carries the location string is in the field.
+
+**Cross-repo dependency:** jr_be migrations for the addendum (flag `match_location_required` seeded off, `go_live` / `arena` presence contexts, `start_invite_booking`, the Go Live trigger and the `start_match_from_challenge` proximity gate). `start_invite_booking` is called through a cast until `npm run db:types` runs against a stack with those migrations.
+
+**Added**
+- `packages/shared/src/api/location.ts`: `getMatchLocationRequired` (Result; a failed read is an error, the apps treat it as off), `reportGoLivePresence` (`go_live`, no scope), `reportArenaPresence` (`arena`, challenge-scoped), `startInviteBooking`, `subscribeToChallengeStatus`. `packages/shared/src/api/invite-rpc.ts` holds the shared Result-style RPC caller and presence parser (moved out of `invites.ts`, which re-exports the types). Exported as `@jits/shared/api/location` and `@jits/shared/api/invite-rpc`.
+- Shared error map: HINTs `location_required`, `proximity_required`, `proximity_failed` map to `LOCATION_REQUIRED`, `PROXIMITY_REQUIRED`, `PROXIMITY_FAILED`.
+- Shared copy (`invite-copy.ts`): `start_available` in `StartBlockedReason` (`START_AVAILABLE_COPY`, `START_AVAILABLE_STRIP_COPY`), Go Live location copy, `arenaProximityMessage`, `startBookingErrorView` (every `start_invite_booking` code, short strip line plus full copy, worded for the athlete's side of the booking).
+- `apps/mobile/lib/arena/match-location-flag.ts` (`useMatchLocationRequired`, read once per foreground, reset on sign-out), `apps/mobile/lib/arena/go-live-location.ts` (explain, permission, fresh reading reported as `go_live`, then live; denied with Open Settings; accuracy and no-fix Retry; the server's `location_required` HINT with Retry; 60 s refresh while live), `apps/mobile/lib/arena/arena-presence.ts`, `apps/mobile/components/arena/go-live-location-sheet.tsx`, `apps/mobile/components/arena/start-blocked-sheet.tsx`.
+
+**Changed**
+- Flag ON: `<ArenaBootstrap />` runs the location step before every Go Live tap and a silent reading before every automatic restore (`useArenaLive` `beforeAutoLive`; a `location_required` refusal is not retried and is exposed as `lastGoLiveRefusal()`), and refreshes the `go_live` reading every 60 s while live in the foreground and not in a match. An Arena accept reports an `arena` reading before `start_match_from_challenge`, and so does the challenger's fallback start; `proximity_required` / `proximity_failed` show "You need to be on the same mat as ALEX to start." with Retry and Cancel challenge, never a generic error, and the challenge stays accepted (never withdrawn) until one of them answers.
+- Flag OFF: Go Live and Arena are unchanged. The claim reads no location; the Booked strip and the inviter's booked state show Start match (outline / secondary, red stays GO LIVE) calling `start_invite_booking`, route to `/match/<id>`, map every code, and follow the other athlete's Start match through the challenge row's realtime `started`.
+- A server refusal that proves the flag is on (`location_required`, a proximity HINT) flips the client flag at once.
+
 ### Invites and friends: integration (jr_be `feat/invites`, jits-b3js)
 
 Merges the web (`feat/invites-web`), mobile (`feat/invites-mobile`) and native (`feat/invites-native`) slices. Ships as a **TestFlight build** (the native slice adds native modules and entitlements, version 0.5.0), with the web deploy after the jr_be `20261001*` migrations are applied on prod (flag `invites_enabled` off).

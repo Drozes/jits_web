@@ -77,6 +77,9 @@ import {
   type KnownIncoming,
 } from "./incoming-challenges";
 import { requestPendingChallengeResync } from "./use-pending-challenge-recovery";
+import { arenaProximityMessage } from "@jits/shared/utils";
+import { isProximityRefusal, reportArenaReading } from "./arena-presence";
+import { markMatchLocationRequired } from "./match-location-flag";
 import { notifyIncomingChallengeEnded } from "./arena-store";
 import { superviseChannel, type SupervisedChannel } from "../supabase/supervise-channel";
 
@@ -312,6 +315,24 @@ export interface UseArenaChallengeArgs {
    * channel is down.
    */
   lobbyIds?: ReadonlySet<string> | null;
+  /**
+   * `match_location_required` is on: an accept reports an `arena` reading
+   * before starting the match, and the challenger's fallback start does too
+   * (contract-location-flag 6).
+   */
+  locationRequired?: boolean;
+}
+
+/**
+ * An accepted challenge the server would not start because the two athletes
+ * are not on one mat yet (`proximity_required` / `proximity_failed`). The
+ * challenge stays `accepted`; the athlete retries or cancels it.
+ */
+export interface StartBlocked {
+  challengeId: string;
+  challengerId: string;
+  challengerName: string;
+  message: string;
 }
 
 export interface UseArenaChallengeResult {
@@ -400,6 +421,12 @@ export interface UseArenaChallengeResult {
    * challenge is already outgoing.
    */
   restoreOutgoing: (challenge: OutgoingChallenge) => void;
+  /** An accept the proximity gate refused, waiting on Retry or Cancel. */
+  startBlocked: StartBlocked | null;
+  /** Report a fresh reading and try the refused start again. */
+  retryBlockedStart: () => Promise<void>;
+  /** Withdraw the refused (accepted) challenge, freeing both athletes. */
+  cancelBlockedStart: () => Promise<void>;
 }
 
 /**
@@ -517,8 +544,17 @@ export function useArenaChallenge({
   onOpponentUnavailable,
   onStaleCancelled,
   lobbyIds,
+  locationRequired = false,
 }: UseArenaChallengeArgs): UseArenaChallengeResult {
   const router = useRouter();
+  const locationRequiredRef = React.useRef(locationRequired);
+  locationRequiredRef.current = locationRequired;
+  const [startBlocked, setStartBlockedState] = React.useState<StartBlocked | null>(null);
+  const startBlockedRef = React.useRef<StartBlocked | null>(null);
+  const setStartBlocked = React.useCallback((next: StartBlocked | null) => {
+    startBlockedRef.current = next;
+    setStartBlockedState(next);
+  }, []);
   const [incoming, setIncoming] = React.useState<IncomingChallenge | null>(null);
   const [outgoing, setOutgoing] = React.useState<OutgoingChallenge | null>(null);
   const [isBusy, setIsBusy] = React.useState(false);
@@ -923,6 +959,10 @@ export function useArenaChallenge({
       const { status } = read.data;
       if (status === "accepted") acceptedSeenRef.current.add(challengeId);
       if (status === "started" || (status === "accepted" && mode === "fallback")) {
+        // Starting it myself: the proximity gate needs my fresh reading too.
+        if (status === "accepted" && locationRequiredRef.current) {
+          await reportArenaReading(challengeId, { ask: false });
+        }
         const started = await startMatchFromChallenge(supabase, challengeId);
         if (started.ok) {
           enterMatch(challengeId, started.data.match_id, mine.opponentId);
@@ -1084,6 +1124,11 @@ export function useArenaChallenge({
   React.useEffect(() => {
     if (inMatch && incomingRef.current) setIncomingBoth(null);
   }, [inMatch, setIncomingBoth]);
+  // In a match (the refused start went through by another path, such as the
+  // challenger's fallback): nothing left to retry.
+  React.useEffect(() => {
+    if (inMatch && startBlockedRef.current) setStartBlocked(null);
+  }, [inMatch, setStartBlocked]);
 
   // The match screen is up: `inMatch` guards entry from here, so the settle
   // window is done. Leaving a match with a plate still up (a match entered by
@@ -1237,6 +1282,16 @@ export function useArenaChallenge({
             // queued behind it gets offered.
             if (row.status === "pending") return;
             settle(row.id);
+            // A refused start whose challenge ended (the challenger cancelled
+            // it, or it expired): nothing left to retry. `started` is joined
+            // below and cleared on entering the match.
+            if (
+              startBlockedRef.current?.challengeId === row.id &&
+              !LIVE_CHALLENGE_STATUSES.has(row.status)
+            ) {
+              setStartBlocked(null);
+              toast.info("That challenge is no longer available.");
+            }
             // One I accepted but never entered, now started by the
             // challenger's fallback: join it (F1). Any other status for it
             // means there will be no match to join.
@@ -1789,9 +1844,29 @@ export function useArenaChallenge({
         // starts on `accepted`, jits-njyd): the row lock made my call re-read
         // `started`. Once more then finds the match that call created.
         // Any other failure (network) gets the same one retry.
+        // Flag on: my reading for this challenge first, so the proximity gate
+        // on the start has a fresh one (the challenger's go_live covers them).
+        if (locationRequiredRef.current) {
+          await reportArenaReading(current.challengeId, { ask: true });
+        }
         let started = await startMatchFromChallenge(supabase, current.challengeId);
-        if (!started.ok) {
+        if (!started.ok && !isProximityRefusal(started.error.code)) {
           started = await startMatchFromChallenge(supabase, current.challengeId);
+        }
+        if (!started.ok && isProximityRefusal(started.error.code)) {
+          // Not on one mat yet. Never a generic error, never withdrawn: the
+          // challenge stays accepted (the challenger's plate keeps waiting,
+          // with Cancel), and I get the reason with Retry and Cancel.
+          markMatchLocationRequired(true);
+          settle(current.challengeId);
+          setIncomingBoth(null);
+          setStartBlocked({
+            challengeId: current.challengeId,
+            challengerId: current.challengerId,
+            challengerName: current.challengerName,
+            message: arenaProximityMessage(current.challengerName),
+          });
+          return;
         }
         if (!started.ok && started.error.code !== "CHALLENGE_NOT_ACCEPTED") {
           // I accepted but could not start it: left alone the row sits at
@@ -1844,6 +1919,69 @@ export function useArenaChallenge({
         enterMatch(current.challengeId, started.data.match_id, current.challengerId);
       }),
     [runExclusive, resolveOwnOutgoing, setIncomingBoth, entryBlocked, enterMatch, settle],
+  );
+
+  /** Retry a start the proximity gate refused: a fresh reading, then start. */
+  const retryBlockedStart = React.useCallback(
+    () =>
+      runExclusive(async () => {
+        const blocked = startBlockedRef.current;
+        if (!blocked) return;
+        await reportArenaReading(blocked.challengeId, { ask: true });
+        const started = await startMatchFromChallenge(supabase, blocked.challengeId);
+        if (startBlockedRef.current?.challengeId !== blocked.challengeId) return;
+        if (started.ok) {
+          setStartBlocked(null);
+          await broadcast(blocked.challengeId, "match_started", { matchId: started.data.match_id });
+          enterMatch(blocked.challengeId, started.data.match_id, blocked.challengerId);
+          return;
+        }
+        if (isProximityRefusal(started.error.code)) {
+          // Still apart: same reason, a new object so the sheet re-announces it.
+          setStartBlocked({ ...blocked });
+          return;
+        }
+        if (started.error.code === "CHALLENGE_NOT_ACCEPTED") {
+          setStartBlocked(null);
+          acceptedNotEnteredRef.current.delete(blocked.challengeId);
+          clearAccepted(athleteIdRef.current);
+          toast.info("That challenge is no longer available.");
+          requestPendingChallengeResync();
+          return;
+        }
+        toast.error("Couldn't start the match. Try again.");
+      }),
+    [runExclusive, enterMatch, setStartBlocked],
+  );
+
+  /** Withdraw a challenge the proximity gate refused (it is `accepted`). */
+  const cancelBlockedStart = React.useCallback(
+    () =>
+      runExclusive(async () => {
+        const blocked = startBlockedRef.current;
+        if (!blocked) return;
+        const res = await cancelChallenge(supabase, blocked.challengeId);
+        if (!res.ok) {
+          toast.error("Couldn't cancel that challenge. Try again.");
+          return;
+        }
+        if (!res.data.cancelled) {
+          // Not accepted any more: most likely the challenger's fallback
+          // started it a moment ago. Join it rather than leave them alone.
+          const started = await startMatchFromChallenge(supabase, blocked.challengeId);
+          setStartBlocked(null);
+          if (started.ok) {
+            enterMatch(blocked.challengeId, started.data.match_id, blocked.challengerId);
+            return;
+          }
+        } else {
+          setStartBlocked(null);
+        }
+        acceptedNotEnteredRef.current.delete(blocked.challengeId);
+        clearAccepted(athleteIdRef.current);
+        requestPendingChallengeResync();
+      }),
+    [runExclusive, enterMatch, setStartBlocked],
   );
 
   const decline = React.useCallback(
@@ -2203,5 +2341,8 @@ export function useArenaChallenge({
     clearCap,
     offerIncoming,
     restoreOutgoing,
+    startBlocked,
+    retryBlockedStart,
+    cancelBlockedStart,
   };
 }

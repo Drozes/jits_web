@@ -72,6 +72,13 @@ export interface UseArenaLiveArgs {
    * the home screen does not (decision Q3).
    */
   onManualOffline?: () => ((wentOffline: boolean) => void) | void;
+  /**
+   * Runs before a go-live the athlete did not tap (return to the foreground,
+   * after a match, the arrival re-assert). With `match_location_required` on
+   * it reports a fresh `go_live` reading, without asking, so the server
+   * accepts the live write. Never rejects.
+   */
+  beforeAutoLive?: () => Promise<void>;
 }
 
 export interface UseArenaLiveResult {
@@ -112,6 +119,12 @@ export interface UseArenaLiveResult {
    * the athlete live whatever the current intent.
    */
   goLive: () => Promise<boolean>;
+  /**
+   * Why the last go-live write was refused, when the server said:
+   * `location_required` (flag on, no fresh `go_live` reading). Null after a
+   * write that landed or failed for any other reason (network).
+   */
+  lastGoLiveRefusal: () => "location_required" | null;
 }
 
 /**
@@ -161,6 +174,7 @@ async function settleWithin(work: Promise<unknown>, ms: number): Promise<void> {
 async function writeLookingFlag(
   athleteId: string,
   ranked: boolean,
+  onRefused?: (reason: "location_required") => void,
 ): Promise<boolean> {
   for (let attempt = 0; attempt < 2; attempt++) {
     const result = await toggleMatchPreferences(supabase, athleteId, {
@@ -168,6 +182,12 @@ async function writeLookingFlag(
       lookingForRanked: ranked,
     });
     if (result.ok) return true;
+    // A refusal the same write cannot fix (no fresh go_live reading while
+    // match_location_required is on): no retry, the caller explains it.
+    if (result.error?.code === "LOCATION_REQUIRED") {
+      onRefused?.("location_required");
+      return false;
+    }
   }
   return false;
 }
@@ -179,6 +199,7 @@ export function useArenaLive({
   initialRanked,
   inMatch = false,
   onManualOffline,
+  beforeAutoLive,
 }: UseArenaLiveArgs): UseArenaLiveResult {
   const [isLive, setIsLive] = React.useState(false);
   const [isSaving, setIsSaving] = React.useState(false);
@@ -213,6 +234,10 @@ export function useArenaLive({
   identityRef.current = { athleteId, displayName, currentElo };
   const manualOfflineRef = React.useRef(onManualOffline);
   manualOfflineRef.current = onManualOffline;
+  const beforeAutoLiveRef = React.useRef(beforeAutoLive);
+  beforeAutoLiveRef.current = beforeAutoLive;
+  /** The server's reason for the last refused go-live write, if it gave one. */
+  const refusalRef = React.useRef<"location_required" | null>(null);
 
   /**
    * The last flag clear failed (twice, see `writeLookingFlag`), so the
@@ -267,7 +292,10 @@ export function useArenaLive({
       // Flag first: presence without the flag would put the athlete in
       // "Online now" for people who already hold the roster, while
       // `get_arena_data` omits them for everyone loading it fresh.
-      const ok = await writeLookingFlag(id, true);
+      refusalRef.current = null;
+      const ok = await writeLookingFlag(id, true, (reason) => {
+        refusalRef.current = reason;
+      });
       if (!ok) {
         desiredRef.current = false;
         return false;
@@ -464,15 +492,30 @@ export function useArenaLive({
   /** Same idea for a match: whether going into it is what took them down. */
   const resumeAfterMatchRef = React.useRef(false);
 
+  /** `beforeAutoLive`, bounded so a stuck reading cannot hold a restore. */
+  const runBeforeAutoLive = React.useCallback(async () => {
+    const before = beforeAutoLiveRef.current;
+    if (!before) return;
+    await settleWithin(before(), LOBBY_CALL_BOUND_MS);
+  }, []);
+
   /**
    * Put back a live state that the app, not the athlete, took away. A failure
    * is said out loud: the athlete believes they are live, and nothing else
    * on screen would tell them otherwise.
    */
   const restoreLive = React.useCallback(async () => {
+    await runBeforeAutoLive();
+    // Backgrounded (or into a match) during that reading: hand the intent
+    // to the next foreground / the end of the match, never go live unseen.
+    if (AppState.currentState !== "active" || inMatchRef.current) {
+      if (inMatchRef.current) resumeAfterMatchRef.current = true;
+      else resumeLiveRef.current = true;
+      return;
+    }
     const ok = await requestLiveRef.current();
     if (!ok) toast.info("You're offline. Go live again in the Arena.");
-  }, []);
+  }, [runBeforeAutoLive]);
 
   // Re-assert a flag the athlete arrived with. This hook is mounted once per
   // signed-in athlete (by `<ArenaBootstrap />`), so `initialRanked` is the row
@@ -516,8 +559,20 @@ export function useArenaLive({
     // uncommitted so the reconcile loop runs a full transition (flag AND
     // lobby) instead of seeing desired === actual and doing nothing.
     actualRef.current = false;
-    void requestLiveRef.current();
-  }, [athleteId]);
+    if (!beforeAutoLiveRef.current) {
+      void requestLiveRef.current();
+      return;
+    }
+    void runBeforeAutoLive().then(() => {
+      if (AppState.currentState !== "active" || inMatchRef.current) {
+        if (inMatchRef.current) resumeAfterMatchRef.current = true;
+        else resumeLiveRef.current = true;
+        void requestOfflineRef.current();
+        return;
+      }
+      void requestLiveRef.current();
+    });
+  }, [athleteId, runBeforeAutoLive]);
 
   // THE LIFECYCLE. Live belongs to the athlete, not to a screen:
   //  - Switching tabs or pushing a profile: still live. The header LIVE pill
@@ -608,5 +663,6 @@ export function useArenaLive({
     toggle,
     goOffline: manualOffline,
     goLive: requestLive,
+    lastGoLiveRefusal: React.useCallback(() => refusalRef.current, []),
   };
 }

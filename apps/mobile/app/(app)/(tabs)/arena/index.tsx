@@ -67,6 +67,7 @@ import { sortFriendsFirst } from "@jits/shared/api/friends";
 import { useFriendIds } from "@/lib/invites/use-friend-ids";
 import { useInvitesEnabled } from "@/lib/invites/use-invites-enabled";
 import { useBookings } from "@/lib/invites/use-bookings";
+import { useMatchLocationRequired } from "@/lib/arena/match-location-flag";
 import { arenaMatchHref } from "@/lib/arena/constants";
 
 /**
@@ -189,8 +190,10 @@ export default function ArenaScreen() {
   const matHasFriend = React.useMemo(() => onTheMat.some((c) => friendIds.has(c.id)), [onTheMat, friendIds]);
   const invitesOn = useInvitesEnabled();
   const inMatch = useIsInArenaMatch();
+  const locationRequired = useMatchLocationRequired();
   const booked = useBookings({
     visible: isFocused,
+    locationRequired,
     onStarted: (matchId) => {
       if (!inMatch) router.push(arenaMatchHref(matchId) as Href);
     },
@@ -340,6 +343,10 @@ export default function ArenaScreen() {
             onRetry={() => void booked.retry()}
             onAskLocation={() => void booked.askLocation()}
             onCancel={() => booked.cancel(b.challenge_id)}
+            locationRequired={locationRequired}
+            onStart={() => void booked.start(b.challenge_id)}
+            starting={Boolean(booked.starting[b.challenge_id])}
+            startError={booked.startErrors[b.challenge_id] ?? null}
           />
         ))}
 
