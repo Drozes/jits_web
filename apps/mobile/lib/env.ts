@@ -63,3 +63,28 @@ export const env = {
     return readOptionalEnv("FACEBOOK_APP_ID");
   },
 };
+
+/**
+ * Sign in with Apple kill switch (jits_web invites release). The prod Supabase
+ * Apple provider is not configured yet, so the Apple button stays hidden on
+ * the login and signup screens until this is flipped. It is a plain JS
+ * constant (not a `feature_flags` row) because those screens render before
+ * auth and `feature_flags` is authenticated-only.
+ *
+ * To enable: set `APPLE_SIGN_IN_DEFAULT` to `true` and ship an OTA (the native
+ * module and `ios.usesAppleSignIn` are already in the binary), or bundle with
+ * `EXPO_PUBLIC_APPLE_SIGN_IN=true`. The env read is a static
+ * `process.env.EXPO_PUBLIC_*` member access so Metro can inline it; if the
+ * inlining does not happen the flag safely stays at the default.
+ */
+const APPLE_SIGN_IN_DEFAULT = false;
+
+/** `"true"` / `"1"` (case-insensitive, trimmed) enable; anything else is off. */
+export function parseBooleanFlag(raw: string | undefined | null): boolean {
+  if (typeof raw !== "string") return false;
+  const value = raw.trim().toLowerCase();
+  return value === "true" || value === "1";
+}
+
+export const APPLE_SIGN_IN_ENABLED: boolean =
+  APPLE_SIGN_IN_DEFAULT || parseBooleanFlag(process.env.EXPO_PUBLIC_APPLE_SIGN_IN);

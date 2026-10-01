@@ -20,6 +20,7 @@ import {
 } from "@/components/auth/auth-buttons";
 import { useAuth } from "@/lib/auth/hooks";
 import { AppleSignInButton } from "@/components/auth/AppleSignInButton";
+import { APPLE_SIGN_IN_ENABLED } from "@/lib/env";
 
 /**
  * Mobile login screen. Mirrors the wireframe A1 visual pattern:
@@ -137,7 +138,7 @@ export default function LoginScreen() {
               onPress={onGooglePress}
               disabled={googleSubmitting || submitting}
             />
-            <AppleSignInButton />
+            {APPLE_SIGN_IN_ENABLED ? <AppleSignInButton /> : null}
           </Plate>
 
           <View className="gap-3">

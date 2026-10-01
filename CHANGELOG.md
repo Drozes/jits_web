@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Mobile: Sign in with Apple hidden behind an OTA-flippable constant
+
+JS-only (OTA-eligible). The native module and `ios.usesAppleSignIn` stay in the binary, so enabling it later needs only an OTA.
+
+**Changed**
+- The Apple button on mobile login and signup renders only when `APPLE_SIGN_IN_ENABLED` (`apps/mobile/lib/env.ts`) is true. It defaults to false because the Supabase prod Apple provider is not configured yet (jits-2cb2); `EXPO_PUBLIC_APPLE_SIGN_IN=true` at bundle time also enables it. A plain constant, not a `feature_flags` row, because the auth screens render before sign-in. Web's Apple button is unchanged. Test: `apps/mobile/__tests__/screens/auth/apple-sign-in-gate.test.tsx`.
+
 ### Location flag and Arena nearby: review fixes (mobile, web, shared)
 
 JS-only on both apps (OTA-eligible on mobile). No backend change: every fix reads replies jr_be already sends.

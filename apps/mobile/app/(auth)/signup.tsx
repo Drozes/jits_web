@@ -14,6 +14,7 @@ import { AppHeader } from "@/components/layout/app-header";
 import { AuthFormField } from "@/components/auth/auth-form-field";
 import { CtaButton } from "@/components/auth/auth-buttons";
 import { AppleSignInButton } from "@/components/auth/AppleSignInButton";
+import { APPLE_SIGN_IN_ENABLED } from "@/lib/env";
 import { useAuth } from "@/lib/auth/hooks";
 import { InviteBanner } from "@/components/invite/invite-banner";
 import { usePendingInvite } from "@/lib/invites/use-pending-invite";
@@ -156,7 +157,7 @@ export default function SignupScreen() {
                   onPress={onSubmit}
                   disabled={submitting || (allTouched && formInvalid)}
                 />
-                <AppleSignInButton variant="continue" />
+                {APPLE_SIGN_IN_ENABLED ? <AppleSignInButton variant="continue" /> : null}
               </Plate>
 
               <Pressable
