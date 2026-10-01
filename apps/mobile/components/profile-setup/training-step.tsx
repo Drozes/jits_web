@@ -92,7 +92,7 @@ export function TrainingStep({
           helper={
             gymInstagram.readOnly
               ? "Already set for your gym. Only a gym manager can change it."
-              : "Optional. Tag your gym on shared highlights."
+              : "Optional."
           }
           value={values.gymInstagram}
           onChange={(text) => onChange({ gymInstagram: text })}

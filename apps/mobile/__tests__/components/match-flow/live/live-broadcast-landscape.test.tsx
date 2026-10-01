@@ -42,8 +42,8 @@ function props(o: Overrides = {}): LiveBroadcastProps {
   const { state = "recording", permission = { granted: true, canAskAgain: true }, ...rest } = o;
   return {
     kindLabel: "RANKED",
-    me: { name: "K. Reyes", meta: "1512 · 77 KG" },
-    opponent: { name: "M. Park", meta: "1498 · 76 KG" },
+    me: { name: "K. Reyes", meta: "1512 · 77 LBS" },
+    opponent: { name: "M. Park", meta: "1498 · 76 LBS" },
     durationSeconds: 600,
     formatted: "07:43",
     remaining: 463,

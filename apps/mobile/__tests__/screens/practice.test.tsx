@@ -571,7 +571,7 @@ describe("PracticeScreen", () => {
     expect(s.queryByText(/Hold End when someone taps/)).toBeNull();
     // The athlete bar: you on the left with your rating and weight.
     expect(s.getByTestId("live-me-name")).toHaveTextContent("ME");
-    expect(s.getByTestId("live-me-meta")).toHaveTextContent("1000 · 170 KG");
+    expect(s.getByTestId("live-me-meta")).toHaveTextContent("1000 · 170 LBS");
     const exitPill = s.getByTestId("practice-exit");
     expect(exitPill).toHaveTextContent("EXIT");
     expect(s.getByLabelText("Exit practice")).toBeTruthy();

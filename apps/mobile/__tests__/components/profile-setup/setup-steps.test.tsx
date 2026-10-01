@@ -89,7 +89,8 @@ describe("IdentityStep", () => {
       "Instagram",
     ]);
     expect(utils.getByText("Used for weight class matching.")).toBeTruthy();
-    expect(utils.getByText("Optional. Shown on your profile.")).toBeTruthy();
+    expect(utils.getByText("Optional.")).toBeTruthy();
+    expect(utils.queryByText(/Shown on your profile/)).toBeNull();
     expect(utils.getByPlaceholderText("@yourhandle")).toBeTruthy();
   });
 
@@ -116,7 +117,8 @@ describe("TrainingStep", () => {
     const utils = renderTraining({});
     expect(labelOrder(utils)).toEqual(["Home Gym", "Gym Instagram", "City"]);
     expect(utils.getByPlaceholderText("@gymhandle")).toBeTruthy();
-    expect(utils.getByText("Optional. Tag your gym on shared highlights.")).toBeTruthy();
+    expect(utils.getByText("Optional.")).toBeTruthy();
+    expect(utils.queryByText(/shared highlights/)).toBeNull();
   });
 
   it("hides Gym Instagram for a free agent", () => {

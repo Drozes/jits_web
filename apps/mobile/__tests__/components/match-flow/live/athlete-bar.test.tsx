@@ -13,9 +13,9 @@ it("shows both athletes with meta, the You mark on the left", () => {
     />,
   );
   expect(s.getByTestId("live-me-name")).toHaveTextContent("KAI REYES");
-  expect(s.getByTestId("live-me-meta")).toHaveTextContent("1512 · 77 KG");
+  expect(s.getByTestId("live-me-meta")).toHaveTextContent("1512 · 77 LBS");
   expect(s.getByTestId("live-opponent-name")).toHaveTextContent("MINA PARK");
-  expect(s.getByTestId("live-opponent-meta")).toHaveTextContent("1498 · 76 KG");
+  expect(s.getByTestId("live-opponent-meta")).toHaveTextContent("1498 · 76 LBS");
   expect(s.getByLabelText("You")).toBeTruthy();
   expect(s.getByTestId("live-me-name").props.numberOfLines).toBe(1);
   expect(s.getByTestId("live-me-name").props.ellipsizeMode).toBe("tail");

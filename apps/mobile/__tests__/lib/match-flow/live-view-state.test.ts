@@ -151,7 +151,7 @@ describe("toLiveAthlete", () => {
   it("maps a participant to the athlete bar's name and meta", () => {
     expect(toLiveAthlete({ display_name: "K. Reyes", current_elo: 1512, current_weight: 77 })).toEqual({
       name: "K. Reyes",
-      meta: "1512 · 77 KG",
+      meta: "1512 · 77 LBS",
     });
     expect(toLiveAthlete({ display_name: "Bot", current_elo: null, current_weight: null }).meta).toBeNull();
   });
@@ -166,10 +166,15 @@ describe("formatting helpers", () => {
   });
 
   it("builds the athlete meta line, leaving out what is missing", () => {
-    expect(formatAthleteMeta(1512, 77)).toBe("1512 · 77 KG");
-    expect(formatAthleteMeta(1512, 77.25)).toBe("1512 · 77.3 KG");
-    expect(formatAthleteMeta(null, 76)).toBe("76 KG");
+    expect(formatAthleteMeta(1512, 77)).toBe("1512 · 77 LBS");
+    expect(formatAthleteMeta(1512, 77.25)).toBe("1512 · 77.3 LBS");
+    expect(formatAthleteMeta(null, 76)).toBe("76 LBS");
     expect(formatAthleteMeta(1498, null)).toBe("1498");
     expect(formatAthleteMeta(null, null)).toBeNull();
+  });
+
+  it("labels weight in pounds, never KG (jits-ccrc)", () => {
+    expect(formatAthleteMeta(1487, 170)).toBe("1487 · 170 LBS");
+    expect(formatAthleteMeta(1487, 170)).not.toMatch(/KG/);
   });
 });

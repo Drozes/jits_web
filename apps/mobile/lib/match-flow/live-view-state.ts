@@ -116,14 +116,14 @@ export function spokenDuration(totalSeconds: number): string {
 }
 
 /**
- * The athlete bar's meta line: "1512 · 77 KG". Either part is left out when
+ * The athlete bar's meta line: "1512 · 77 LBS". Either part is left out when
  * missing, and the line is null when both are. Weight keeps at most one
  * decimal.
  */
-export function formatAthleteMeta(elo: number | null | undefined, weightKg: number | null | undefined): string | null {
+export function formatAthleteMeta(elo: number | null | undefined, weightLbs: number | null | undefined): string | null {
   const parts: string[] = [];
   if (elo != null && Number.isFinite(elo)) parts.push(String(Math.round(elo)));
-  if (weightKg != null && Number.isFinite(weightKg)) parts.push(`${Number(weightKg.toFixed(1))} KG`);
+  if (weightLbs != null && Number.isFinite(weightLbs)) parts.push(`${Number(weightLbs.toFixed(1))} LBS`);
   return parts.length ? parts.join(" · ") : null;
 }
 

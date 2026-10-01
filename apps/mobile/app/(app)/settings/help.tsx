@@ -13,7 +13,8 @@ import { Plate } from "@/components/ui/elo-system";
  * change the copy when the behavior changes:
  *  - every match is ranked, no casual (jits-02vo.2, jr_be-ahn.1); practice
  *    match is Settings, PRACTICE MATCH and touches no match data;
- *  - 3 pending challenges out: `can_create_challenge()` and `CapPlate`;
+ *  - one challenge out at a time: the Arena locks every action while one is
+ *    out (`actionsLocked`); 3 is only the server cap (`can_create_challenge()`);
  *  - accept goes to the face-off (`step-router` "weight"), where each athlete
  *    checks the other's weight and a flag holds the match (jits-02vo.6);
  *  - live: the header chip on tab roots (GO LIVE / LIVE menu), offline for a
@@ -34,7 +35,7 @@ const HELP_SECTIONS: HelpSection[] = [
     title: "Getting Started",
     paragraphs: [
       "ELO RATED is a participation-only ranking platform. You find opponents in the Arena, roll, and the system handles your rating. Every match is ranked. To walk through one without touching your rating, try a Practice Match from Settings.",
-      "Open the Arena tab and go live to join the lobby. Anyone else who is live can challenge you, and you can challenge them. You can have up to 3 challenges out at once.",
+      "Open the Arena tab and go live to join the lobby. Anyone else who is live can challenge you, and you can challenge them. You can have one challenge out at a time.",
       "Once you're live you stay live across the whole app, on Home, Rankings and Profile too, and challenges reach you wherever you are. The chip in the header shows it: tap LIVE to open the Arena or go offline. While you're offline it reads GO LIVE, and one tap puts you live.",
       "You stay live until you go offline from the Arena or the header chip. A match takes you offline while you roll, and so does switching away from the app. You're put back live when you leave the match or come back to the app.",
       "A challenge arrives as a live prompt. Accept it and you both go straight to the face-off, so be on the mat together before you go live.",

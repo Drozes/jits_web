@@ -80,7 +80,7 @@ export function IdentityStep({ values, onChange, onNext }: IdentityStepProps) {
       <InstagramField
         label="Instagram"
         placeholder="@yourhandle"
-        helper="Optional. Shown on your profile."
+        helper="Optional."
         value={values.instagram}
         onChange={(instagram) => onChange({ instagram })}
         testID="setup-instagram"

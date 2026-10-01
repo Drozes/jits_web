@@ -52,8 +52,9 @@ describe("Help & Support copy", () => {
     expect(text).toMatch(/Practice Match from Settings/);
   });
 
-  it("states the 3-challenge cap the server enforces", () => {
-    expect(allText()).toMatch(/up to 3 challenges out at once/);
+  it("says one challenge out at a time, matching the Arena lock", () => {
+    expect(allText()).toMatch(/one challenge out at a time/);
+    expect(allText()).not.toMatch(/up to 3 challenges/);
   });
 
   it("describes the face-off weight check and that a flag holds the match", () => {
