@@ -20,6 +20,22 @@ Adds the pure-JS `qrcode-generator` dependency (drawn on the existing `react-nat
 - `app/index.tsx` consumes a pending invite before the Home / setup redirects (signup first when signed out). Signup shows the invitee banner and drops confirm-password on the invite path; signup and login link to "Got a challenge code?".
 - Push permission for an invitee waits for the first match exit. A deliberate sign-out (Settings, Profile) clears a pending invite.
 
+### Native + account: Sign in with Apple, paste button, location copy, account deletion (invites 016, jits-b3js.9, jits-b3js.10)
+
+**TestFlight build required (NOT OTA-eligible):** new native dependencies (`expo-apple-authentication`, `expo-clipboard`, `expo-crypto`), `app.json` plugin, entitlement (`com.apple.developer.applesignin`) and permission-string changes, and a marketing version bump to **0.5.0**. With `runtimeVersion: appVersion`, 0.5.0 is a new OTA runtime: OTAs published for 0.4.0 never reach it and vice versa.
+
+**Cross-repo dependency (jr_be-0hx, branch `feat/account-deletion`):** Delete account calls the `delete-account` edge function, which needs migration `20261001200000_account_deletion` applied and the function deployed on prod before this ships. Sign in with Apple needs the Apple provider enabled on Supabase prod (currently off, jits-2cb2) with `com.elorated.mobile` in its client IDs.
+
+**Added**
+- Sign in with Apple on mobile login and signup: `apps/mobile/lib/auth/apple.ts` (SHA-256 hashed nonce to Apple, raw nonce to `signInWithIdToken({ provider: "apple" })`, first-authorization name saved to `given_name` / `family_name` / `full_name` user metadata for setup prefill) and `apps/mobile/components/auth/AppleSignInButton.tsx` (Apple's own button, black on light, white on dark, renders nothing where unavailable).
+- `apps/mobile/components/invite/PasteInviteButton.tsx`: the iOS 16+ system paste control (no paste prompt), forwards pasted text to the caller; the share guard test allows this one read-only file to import `expo-clipboard`.
+- In-app account deletion (App Store guideline 5.1.1(v)): mobile `app/(app)/settings/delete-account.tsx` and web `apps/web/app/(app)/settings/delete-account/`, two steps (read and Continue, then type DELETE), linked from the Settings account plate on both platforms; `apps/mobile/lib/account/delete-account.ts` and the web `delete-account-api.ts` map the edge function result.
+- Tests: `__tests__/lib/auth/apple.test.ts`, `__tests__/components/paste-invite-button.test.tsx`, `__tests__/lib/account/delete-account.test.ts`, `__tests__/screens/settings-delete-account.test.tsx`, `__tests__/app-json-native.test.ts`, web `delete-account-form.test.tsx`.
+
+**Changed**
+- Location permission copy: "ELO RATED uses your location to confirm you and your opponent are on the same mat before a match starts." (was nearby gyms and session check-ins).
+- `expo-clipboard` is now in the binary, so the highlight share "copy caption" path (`lib/highlight-share/clipboard.ts`, still behind `highlight_share_enabled`) finds its native module from this build on.
+
 ### Mobile: profile setup, weight on step 2, athlete and gym Instagram (Sept 30 design review, jits-02vo.5)
 
 JS-only, OTA-eligible (no native dependency, `app.json`, plugin, metro, babel or `eas.json` change).

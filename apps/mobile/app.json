@@ -2,7 +2,7 @@
   "expo": {
     "name": "ELO RATED",
     "slug": "elo-rated",
-    "version": "0.4.0",
+    "version": "0.5.0",
     "scheme": [
       "elorated"
     ],
@@ -20,6 +20,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.elorated.mobile",
+      "usesAppleSignIn": true,
       "buildNumber": "1",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
@@ -100,6 +101,7 @@
         }
       ],
       "expo-secure-store",
+      "expo-apple-authentication",
       [
         "expo-image-picker",
         {
@@ -110,7 +112,7 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location to show nearby gyms and verify session check-ins."
+          "locationWhenInUsePermission": "ELO RATED uses your location to confirm you and your opponent are on the same mat before a match starts."
         }
       ],
       [

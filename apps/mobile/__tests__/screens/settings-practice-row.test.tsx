@@ -51,3 +51,11 @@ describe("Settings practice match row", () => {
     expect(s.getByTestId("link-/practice")).toBeTruthy();
   });
 });
+
+describe("Settings delete account row", () => {
+  it("links to /settings/delete-account from the account plate", () => {
+    const s = render(<SettingsScreen />);
+    expect(s.getByText("DELETE ACCOUNT")).toBeTruthy();
+    expect(s.getByTestId("link-/settings/delete-account")).toBeTruthy();
+  });
+});
