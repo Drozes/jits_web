@@ -257,9 +257,9 @@ describe("MatchDetailScreen (Film Room match page)", () => {
     expect(colorOf(delta)).toBe("#116A33");
     expect(utils.getByText("1200 → 1216")).toBeTruthy();
     expect(utils.getByTestId("match-verdict-line")).toHaveTextContent(
-      "by Rear-naked choke · 03:57 · vs D. Red · Ranked · Sep 20",
+      "by Rear-naked choke · 03:57 · vs D. Red · Sep 20",
     );
-    expect(utils.getByText("RANKED")).toBeTruthy();
+    expect(utils.queryByText(/ranked/i)).toBeNull();
     expect(utils.queryByTestId("match-disputed-badge")).toBeNull();
   });
 
@@ -274,16 +274,16 @@ describe("MatchDetailScreen (Film Room match page)", () => {
     expect(draw.getByTestId("match-verdict")).toHaveTextContent("DRAW");
   });
 
-  it("renders a legacy casual match like any match: RANKED tag, no delta when none was recorded, never casual", async () => {
+  it("renders a legacy casual match like any match: no kind tag, no delta when none was recorded, never casual", async () => {
     const utils = await renderLoaded(
       // Real backend shape: elo_delta is NOT NULL DEFAULT 0, elo_after NULL.
       view({ match: { match_type: "casual" }, me: { elo_delta: 0, elo_before: null, elo_after: null } }),
     );
     expect(utils.queryByText(/casual/i)).toBeNull();
-    expect(utils.getByText("RANKED")).toBeTruthy();
+    expect(utils.queryByText(/ranked/i)).toBeNull();
     expect(utils.queryByTestId("match-elo-delta")).toBeNull();
     expect(utils.queryByText(/± 0/)).toBeNull();
-    expect(utils.getByTestId("match-verdict-line")).toHaveTextContent(/Ranked/);
+    expect(utils.getByTestId("match-verdict-line")).not.toHaveTextContent(/ranked|casual/i);
   });
 
   it("flags a disputed result and still lists the film", async () => {

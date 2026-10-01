@@ -362,7 +362,7 @@ export default function ArenaScreen() {
                       ? "Reconnecting to the mat"
                       : onTheMat.length === 0
                         ? "Nobody else on the mat"
-                        : "No ranked opponent free on the mat"
+                        : "No opponent free on the mat"
                 }
                 kind={cta.kind}
                 red={cta.red}

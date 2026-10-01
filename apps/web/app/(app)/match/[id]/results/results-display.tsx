@@ -47,16 +47,6 @@ export function ResultsDisplay({ match, currentAthleteId }: ResultsDisplayProps)
             <span className="text-muted-foreground">Result</span>
             <Badge variant="outline">{match.result ?? "—"}</Badge>
           </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Match Type</span>
-            <Badge
-              variant={
-                match.match_type === MATCH_TYPE.RANKED ? "default" : "secondary"
-              }
-            >
-              {match.match_type === MATCH_TYPE.RANKED ? "Ranked" : "Casual"}
-            </Badge>
-          </div>
         </CardContent>
       </Card>
 

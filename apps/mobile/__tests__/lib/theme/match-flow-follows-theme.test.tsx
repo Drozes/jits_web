@@ -36,7 +36,7 @@ import { ON_MEDIA, paletteFor, usePalette } from "@/lib/theme/palette";
 import { ForceDarkTheme } from "@/lib/theme/force-dark-theme";
 import { ThemedStatusBar } from "@/lib/theme/themed-status-bar";
 import { darkTokens, lightTokens } from "@/lib/tokens";
-import { FightButton, KindTag, StakesStrip } from "@/components/match-flow/fight/fight-ui";
+import { FightButton, StakesStrip } from "@/components/match-flow/fight/fight-ui";
 import { FilmBadge } from "@/components/film-room/status-badge";
 import { PosterCard } from "@/components/film-room/poster-card";
 import { FaceoffChip } from "@/components/match-flow/faceoff/faceoff-top";
@@ -133,31 +133,27 @@ describe("shared match-flow pieces render with the active theme", () => {
   it.each([
     ["light", lightTokens],
     ["dark", darkTokens],
-  ] as const)("%s: stakes strip plate and deltas, secondary button label, tag", (scheme, t) => {
+  ] as const)("%s: stakes strip plate and deltas, secondary button label", (scheme, t) => {
     mockScheme = scheme;
     const s = render(
       <View>
         <StakesStrip testID="stakes" win={12} draw={-2} loss={-9} />
         <FightButton testID="btn" variant="secondary" label="Record it myself" onPress={jest.fn()} />
-        <KindTag />
       </View>,
     );
     expect(bgOf(s.getByTestId("stakes"))).toBe(t.bgElevated);
     expect(color(s.getByTestId("stakes-win"))).toBe(t.statePositive);
     expect(color(s.getByTestId("stakes-loss"))).toBe(t.stateNegative);
     expect(color(s.getByText("Record it myself"))).toBe(t.textPrimary);
-    expect(color(s.getByText("RANKED"))).toBe(t.textSecondary);
   });
 
   it("chrome over camera or film keeps the fixed on-media colors in the light theme", () => {
     mockScheme = "light";
     const s = render(
       <View>
-        <KindTag onScrim />
         <FilmBadge label="2 ANGLES" tone="outline" />
       </View>,
     );
-    expect(color(s.getByText("RANKED"))).toBe(ON_MEDIA.tagText);
     expect(color(s.getByText("2 ANGLES"))).toBe(ON_MEDIA.text);
   });
 });

@@ -1,9 +1,7 @@
 import { redirect } from "next/navigation";
-import { Badge } from "@/components/ui/badge";
 import { requireAthlete } from "@/lib/guards";
 import { createClient } from "@/lib/supabase/server";
 import { getMatchDetails } from "@jits/shared/api/queries";
-import { MATCH_TYPE } from "@jits/shared/constants";
 import { MatchTimer } from "./match-timer";
 
 export async function LiveMatchContent({
@@ -37,14 +35,6 @@ export async function LiveMatchContent({
         <p className="text-sm text-muted-foreground">
           {athlete.display_name} vs {opponent?.display_name ?? "Opponent"}
         </p>
-        <Badge
-          variant={
-            match.match_type === MATCH_TYPE.RANKED ? "default" : "secondary"
-          }
-          className="mt-2"
-        >
-          {match.match_type === MATCH_TYPE.RANKED ? "Ranked" : "Casual"}
-        </Badge>
       </div>
 
       <MatchTimer

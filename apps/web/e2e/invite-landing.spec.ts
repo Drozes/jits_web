@@ -23,7 +23,7 @@ test.describe("Invite landing /c/[token]", () => {
 
     await expect(page).toHaveTitle("ALEX R. challenges you | ELO RATED");
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(/ALEX R\. challenges you/i);
-    await expect(page.getByText("1,482 ELO · 172 LBS · Ranked jiu-jitsu match")).toBeVisible();
+    await expect(page.getByText("1,482 ELO · 172 LBS · Jiu-jitsu match")).toBeVisible();
     await expect(page.getByTestId("invite-code")).toHaveText("K7Q-4M2");
 
     const appStore = page.getByRole("link", { name: /get it on the app store/i });
@@ -54,7 +54,7 @@ test.describe("Invite landing /c/[token]", () => {
     await page.goto(`/c/${JOIN}`);
     await expect(page).toHaveTitle("Join ALEX R. on ELO RATED");
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(/Join ALEX R\. on ELO RATED/i);
-    await expect(page.getByText("1,482 ELO · Ranked jiu-jitsu", { exact: true })).toBeVisible();
+    await expect(page.getByText("1,482 ELO · Jiu-jitsu", { exact: true })).toBeVisible();
     await expect(page.getByTestId("invite-code")).toHaveCount(0);
   });
 

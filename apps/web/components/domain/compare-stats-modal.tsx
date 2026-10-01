@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, useMemo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -27,17 +26,14 @@ export interface HeadToHeadMatch {
 interface CompareStatsModalProps {
   currentAthlete: AthleteStats;
   competitor: AthleteStats;
+  /**
+   * Head-to-head rows. Not shown since the All / Ranked / Casual filter was
+   * removed (every match is the same kind); kept so the caller is unchanged.
+   */
   headToHead: HeadToHeadMatch[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
-
-type Filter = "all" | "ranked" | "casual";
-const filters: { value: Filter; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "ranked", label: "Ranked" },
-  { value: "casual", label: "Casual" },
-];
 
 function StatRow({
   label,
@@ -69,39 +65,15 @@ function StatRow({
   );
 }
 
-function computeH2HStats(matches: HeadToHeadMatch[], filter: Filter) {
-  const filtered = filter === "all" ? matches : matches.filter((m) => m.matchType === filter);
-  const wins = filtered.filter((m) => m.result === "win").length;
-  const losses = filtered.filter((m) => m.result === "loss").length;
-  const draws = filtered.filter((m) => m.result === "draw").length;
-  const total = wins + losses;
-  const winRate = total > 0 ? Math.round((wins / total) * 100) : 0;
-  return { wins, losses, draws, winRate };
-}
-
 export function CompareStatsModal({
   currentAthlete,
   competitor,
-  headToHead,
   open,
   onOpenChange,
 }: CompareStatsModalProps) {
-  const [filter, setFilter] = useState<Filter>("all");
-
-  const myStats = useMemo(() => {
-    if (filter === "all") return { wins: currentAthlete.wins, losses: currentAthlete.losses, draws: currentAthlete.draws, winRate: currentAthlete.winRate };
-    return computeH2HStats(headToHead, filter);
-  }, [filter, currentAthlete, headToHead]);
-
-  const theirStats = useMemo(() => {
-    if (filter === "all") return { wins: competitor.wins, losses: competitor.losses, draws: competitor.draws, winRate: competitor.winRate };
-    // Opponent's perspective: my wins are their losses, my losses are their wins
-    const h2h = computeH2HStats(headToHead, filter);
-    return { wins: h2h.losses, losses: h2h.wins, draws: h2h.draws, winRate: h2h.winRate > 0 ? 100 - h2h.winRate : 0 };
-  }, [filter, competitor, headToHead]);
-
-  // For filtered view, use H2H stats; for "all", use overall stats
-  const isFiltered = filter !== "all";
+  // Career stats side by side. Every match is the same kind, so no filter.
+  const myStats = currentAthlete;
+  const theirStats = competitor;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -121,14 +93,12 @@ export function CompareStatsModal({
         </div>
 
         <div className="divide-y">
-          {!isFiltered && (
-            <StatRow label="ELO" left={currentAthlete.elo} right={competitor.elo} />
-          )}
+          <StatRow label="ELO" left={currentAthlete.elo} right={competitor.elo} />
           <StatRow label="Wins" left={myStats.wins} right={theirStats.wins} />
           <StatRow label="Losses" left={myStats.losses} right={theirStats.losses} higherIsBetter={false} />
           <StatRow label="Draws" left={myStats.draws} right={theirStats.draws} higherIsBetter={false} />
           <StatRow label="Win Rate" left={myStats.winRate} right={theirStats.winRate} format={(v) => `${v}%`} />
-          {!isFiltered && (currentAthlete.weight != null || competitor.weight != null) && (
+          {(currentAthlete.weight != null || competitor.weight != null) && (
             <div className="grid grid-cols-3 items-center py-2">
               <p className="text-lg font-bold tabular-nums text-center">
                 {currentAthlete.weight != null ? `${currentAthlete.weight}` : "—"}
@@ -141,23 +111,6 @@ export function CompareStatsModal({
           )}
         </div>
 
-        {/* Match type filter */}
-        <div className="flex justify-center gap-1 pt-1">
-          {filters.map((f) => (
-            <button
-              key={f.value}
-              onClick={() => setFilter(f.value)}
-              className={cn(
-                "rounded-full px-3 py-1 text-xs font-medium transition-colors",
-                filter === f.value
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground hover:bg-muted/80",
-              )}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
       </DialogContent>
     </Dialog>
   );

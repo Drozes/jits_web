@@ -45,8 +45,8 @@ const FIRST_LINES: Row[] = [
 
 describe("buildHighlightCaption", () => {
   describe.each(["casual", "ranked"] as const)("%s", (matchType) => {
-    // Every match is ranked: a legacy casual reel reads the same.
-    const second = "Ranked match.";
+    // Every match is the same kind: a legacy casual reel reads the same.
+    const second = "Every roll counts.";
     it.each(FIRST_LINES)("outcome %s, technique %s, opponent %s", (outcome, technique, opponentName, line1) => {
       expect(buildHighlightCaption(ctx({ matchType, outcome, technique, opponentName }))).toBe(
         `${line1}\n${second}\n${TAIL}`,
@@ -55,19 +55,19 @@ describe("buildHighlightCaption", () => {
   });
 
   it.each([
-    [1234, 12, "Ranked match. Now 1234 ELO (+12)."],
-    [1234, -8, "Ranked match. Now 1234 ELO (-8)."],
-    [1234, 0, "Ranked match. Now 1234 ELO."],
-    [1234, null, "Ranked match. Now 1234 ELO."],
-    [null, 12, "Ranked match."],
-  ])("ranked, eloAfter %s, delta %s", (eloAfter, eloDelta, line2) => {
+    [1234, 12, "Now 1234 ELO (+12)."],
+    [1234, -8, "Now 1234 ELO (-8)."],
+    [1234, 0, "Now 1234 ELO."],
+    [1234, null, "Now 1234 ELO."],
+    [null, 12, "Every roll counts."],
+  ])("eloAfter %s, delta %s", (eloAfter, eloDelta, line2) => {
     expect(buildHighlightCaption(ctx({ matchType: "ranked", eloAfter, eloDelta })).split("\n")[1]).toBe(line2);
   });
 
-  it("never says casual: a legacy casual reel reads like a ranked match", () => {
+  it("never says casual or ranked: a legacy casual reel reads like any match", () => {
     const caption = buildHighlightCaption(ctx({ matchType: "casual", eloAfter: null, eloDelta: null }));
-    expect(caption.split("\n")[1]).toBe("Ranked match.");
-    expect(caption).not.toMatch(/casual/i);
+    expect(caption.split("\n")[1]).toBe("Every roll counts.");
+    expect(caption).not.toMatch(/casual|ranked/i);
   });
 
   it("normalises the technique: trimmed, collapsed, lower-cased after the first letter", () => {

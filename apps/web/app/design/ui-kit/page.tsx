@@ -234,7 +234,7 @@ export default function UiKitPage() {
               <TabsTrigger value="gyms">Gyms</TabsTrigger>
             </TabsList>
             <TabsContent value="fighters">
-              <p className="py-4 text-sm">Top ranked fighters by ELO.</p>
+              <p className="py-4 text-sm">Top fighters by ELO.</p>
             </TabsContent>
             <TabsContent value="gyms">
               <p className="py-4 text-sm">Gyms with active sessions.</p>

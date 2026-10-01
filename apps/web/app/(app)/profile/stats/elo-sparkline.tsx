@@ -23,7 +23,7 @@ export function EloSparkline({ points, currentElo, className }: EloSparklineProp
   if (ratings.length < 2) {
     return (
       <div className={cn("flex items-center justify-center h-16 text-xs text-muted-foreground", className)}>
-        Play ranked matches to see your ELO trend
+        Play matches to see your ELO trend
       </div>
     );
   }

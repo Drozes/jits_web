@@ -25,7 +25,7 @@ interface CardLines {
 /** Card copy per contract 6. No expiry time: messengers cache per URL. */
 export function cardLines(preview: InvitePreview): CardLines {
   if (preview.state !== "open") {
-    return { headline: "RANKED JIU-JITSU", stats: "Find out where you stand.", cta: null, code: null };
+    return { headline: "JIU-JITSU", stats: "Find out where you stand.", cta: null, code: null };
   }
   const name = inviterShortName(preview.inviter);
   return preview.kind === "challenge"

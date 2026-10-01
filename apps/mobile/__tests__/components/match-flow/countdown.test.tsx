@@ -84,7 +84,7 @@ describe("LiveStage", () => {
     s.getByTestId("match-countdown");
     expect(s.getByTestId("countdown-numeral")).toHaveTextContent("3");
     s.getByText("REC ARMS AT GO");
-    s.getByText("RANKED");
+    expect(s.queryByText("RANKED")).toBeNull();
     expect(mockLiveProps).not.toHaveBeenCalled();
     act(() => {
       jest.advanceTimersByTime(1_000);

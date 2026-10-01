@@ -40,9 +40,6 @@ export function ActiveMatchesList({ lobbies, matches }: ActiveMatchesListProps) 
               <p className="text-sm font-medium truncate">
                 vs {lobby.opponentName}
               </p>
-              <Badge variant="outline" className="text-xs shrink-0">
-                {lobby.matchType === "ranked" ? "Ranked" : "Casual"}
-              </Badge>
             </div>
             <Button size="sm" asChild>
               <Link href={`/match/lobby/${lobby.challengeId}`}>

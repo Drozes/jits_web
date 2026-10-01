@@ -20,7 +20,8 @@ import { OpponentEndedPlate } from "./opponent-ended-plate";
 import { LiveLandscapeLayout } from "./live-landscape-layout";
 
 export interface LiveBroadcastProps {
-  kindLabel: "RANKED" | "PRACTICE";
+  /** Only a practice bout carries a kind tag; a real match needs no label. */
+  kindLabel?: "PRACTICE";
   me: LiveAthlete;
   opponent: LiveAthlete;
   durationSeconds: number;
@@ -124,7 +125,7 @@ export function LiveBroadcast(props: LiveBroadcastProps) {
   const tally = <RecTally variant={view.tally} recordingSeconds={recordingSeconds} />;
   const tags = (
     <>
-      <HudTag label={kindLabel} testID="live-kind-tag" />
+      {kindLabel ? <HudTag label={kindLabel} testID="live-kind-tag" /> : null}
       {hudExtra}
     </>
   );

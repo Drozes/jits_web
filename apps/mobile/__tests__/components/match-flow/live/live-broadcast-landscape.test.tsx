@@ -41,7 +41,6 @@ const requestPermission = jest.fn(() => Promise.resolve());
 function props(o: Overrides = {}): LiveBroadcastProps {
   const { state = "recording", permission = { granted: true, canAskAgain: true }, ...rest } = o;
   return {
-    kindLabel: "RANKED",
     me: { name: "K. Reyes", meta: "1512 · 77 LBS" },
     opponent: { name: "M. Park", meta: "1498 · 76 LBS" },
     durationSeconds: 600,
@@ -82,7 +81,7 @@ describe("frame", () => {
     expect(style(s, "live-hud")).toEqual(expect.objectContaining({ position: "absolute", left: 71, top: 16, height: 28 }));
     const hud = within(s.getByTestId("live-hud"));
     expect(hud.getByTestId("live-tally")).toHaveTextContent("REC 02:14");
-    expect(hud.getByTestId("live-kind-tag")).toHaveTextContent("RANKED");
+    expect(hud.queryByTestId("live-kind-tag")).toBeNull();
 
     expect(style(s, "live-lower-third")).toEqual(
       expect.objectContaining({ position: "absolute", left: 71, bottom: 21, width: 320 }),

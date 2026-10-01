@@ -79,11 +79,10 @@ describe("MatchResultHeader", () => {
     expect(screen.getByTestId("match-verdict")).toHaveClass("text-muted-foreground");
   });
 
-  it("casual replaces the delta with Casual, unrated", () => {
+  it("a legacy casual row reads like any match: no delta, no match-kind label", () => {
     render(<MatchResultHeader view={makeView({ matchType: "casual" })} />);
-    expect(screen.getByText("Casual, unrated")).toBeInTheDocument();
     expect(screen.queryByTestId("match-elo-delta")).toBeNull();
-    expect(screen.getByText("Casual")).toBeInTheDocument();
+    expect(screen.queryByText(/casual|ranked|unrated/i)).toBeNull();
   });
 
   it("disputed: amber chip plus the review copy", () => {
@@ -110,9 +109,9 @@ describe("MatchResultHeader", () => {
     expect(screen.getByText("1302")).toHaveClass("font-mono", "tabular-nums");
   });
 
-  it("meta row: ranked tag, mono duration, submission", () => {
+  it("meta row: no match-kind tag, mono duration, submission", () => {
     render(<MatchResultHeader view={makeView()} />);
-    expect(screen.getByText("Ranked")).toBeInTheDocument();
+    expect(screen.queryByText(/ranked|casual/i)).toBeNull();
     expect(screen.getByText("5:00")).toHaveClass("font-mono");
     expect(screen.getByText("Submission")).toBeInTheDocument();
   });

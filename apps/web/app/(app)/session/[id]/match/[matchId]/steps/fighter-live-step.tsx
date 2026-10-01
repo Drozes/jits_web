@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { createClient } from "@/lib/supabase/client";
 import { getMatchDetails } from "@jits/shared/api/queries";
 import { useSessionMatchTimer } from "@jits/shared/hooks/use-session-match-timer";
@@ -172,9 +171,6 @@ export function FighterLiveStep({ onNext, exitHref, matchId, durationSeconds, st
       )}>
         {timer.formatted}
       </p>
-      <Badge variant={matchType === "ranked" ? "default" : "secondary"}>
-        {matchType === "ranked" ? "Ranked" : "Casual"}
-      </Badge>
       {timer.paused && (
         <p className="text-sm text-amber-500 font-medium">Paused</p>
       )}

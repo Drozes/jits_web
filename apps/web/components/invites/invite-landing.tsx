@@ -50,7 +50,7 @@ export function InviteLanding({ token, preview, viewer, inAppBrowser }: InviteLa
           />
         )}
         <p style={{ ...CAPS_LABEL, textAlign: "center", marginTop: "auto", paddingTop: "var(--space-6)" }}>
-          Ranked jiu-jitsu. Find out where you stand.
+          Find out where you stand in jiu-jitsu.
         </p>
       </div>
     </main>

@@ -137,13 +137,6 @@ function PlayerBody({ id, start, approximate }: { id: string | undefined; start:
       <Text numberOfLines={1} className="flex-1 font-heading uppercase" style={{ fontSize: 14, letterSpacing: 1.12, color: ON_MEDIA.white }}>
         {title}
       </Text>
-      {view ? (
-        <View style={{ height: 24, paddingHorizontal: 8, borderRadius: 2, borderWidth: 1, borderColor: ON_MEDIA.strong, backgroundColor: "rgba(0,0,0,0.40)", justifyContent: "center" }}>
-          <Text className="font-mono-medium" style={{ fontSize: 10, letterSpacing: 2.52, color: ON_MEDIA.tagText }}>
-            RANKED
-          </Text>
-        </View>
-      ) : null}
     </View>
   );
 

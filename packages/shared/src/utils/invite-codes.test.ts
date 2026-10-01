@@ -57,15 +57,15 @@ describe("extractInviteFromText", () => {
 describe("share message", () => {
   it("uses the exact challenge template with the code", () => {
     expect(buildInviteShareMessage("challenge", "https://x/c/t", "K7Q-4M2")).toBe(
-      "I'm calling you out on ELO RATED. Ranked roll, my number vs yours. Accept: https://x/c/t (code K7Q-4M2)",
+      "I'm calling you out on ELO RATED. One roll, my number vs yours. Accept: https://x/c/t (code K7Q-4M2)",
     );
   });
   it("omits the code when there is none and uses the join template", () => {
     expect(buildInviteShareMessage("challenge", "https://x/c/t")).toBe(
-      "I'm calling you out on ELO RATED. Ranked roll, my number vs yours. Accept: https://x/c/t",
+      "I'm calling you out on ELO RATED. One roll, my number vs yours. Accept: https://x/c/t",
     );
     expect(buildInviteShareMessage("join", "https://x/c/t")).toBe(
-      "Train with me on ELO RATED, ranked jiu-jitsu. Join me: https://x/c/t",
+      "Train jiu-jitsu with me on ELO RATED. Join me: https://x/c/t",
     );
   });
 });
@@ -104,7 +104,7 @@ describe("claim copy (contract section 7)", () => {
   it("dob_required asks for the date of birth, never the underage copy", () => {
     expect(claimFailureView("dob_required")).toEqual({
       next: "dob",
-      message: "We need your date of birth before your first ranked match. You must be 16 or older.",
+      message: "We need your date of birth before your first match. You must be 16 or older.",
     });
   });
   it("an unknown future code is a generic retry, never underage or invalid-link", () => {

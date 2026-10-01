@@ -530,7 +530,7 @@ function ContextRail() {
             margin: 0,
           }}
         >
-          Log 5 ranked matches before Sunday to keep your streak alive.
+          Log 5 matches before Sunday to keep your streak alive.
         </p>
       </Plate>
     </div>

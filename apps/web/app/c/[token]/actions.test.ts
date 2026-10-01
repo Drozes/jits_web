@@ -159,7 +159,7 @@ describe("confirmDobAndClaimAction (dob_required)", () => {
     expect(outcome).toEqual({
       kind: "dob",
       title: "Confirm your date of birth",
-      body: "We need your date of birth before your first ranked match. You must be 16 or older.",
+      body: "We need your date of birth before your first match. You must be 16 or older.",
       error: null,
     });
   });

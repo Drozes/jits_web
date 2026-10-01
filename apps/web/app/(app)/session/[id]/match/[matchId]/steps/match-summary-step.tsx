@@ -259,7 +259,7 @@ function ResultBanner({ resultData, currentAthleteId, matchType }: { resultData:
       {resultData?.result === "draw" && <p className="text-3xl font-bold text-amber-500">Draw</p>}
       {!resultData && <p className="text-xl font-semibold">Match Complete</p>}
       {matchType === "ranked" && (
-        <p className="text-xs text-muted-foreground">Ranked. ELO already applied. Disputes are reviewed by an admin.</p>
+        <p className="text-xs text-muted-foreground">ELO already applied. Disputes are reviewed by an admin.</p>
       )}
     </div>
   );

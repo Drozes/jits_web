@@ -7,7 +7,7 @@ import { matchHaptics } from "@/lib/match-flow/use-haptics";
 import { useReduceMotion } from "@/lib/match-flow/use-reduce-motion";
 import { ON_MEDIA } from "@/lib/theme/palette";
 import { FIGHT_EASING, FIGHT_RADIUS } from "../fight/fight-tokens";
-import { KindTag, Mono } from "../fight/fight-ui";
+import { Mono } from "../fight/fight-ui";
 import { FaceoffChip, type FaceoffAthlete } from "../faceoff/faceoff-top";
 
 /** 3, 2, 1: the countdown runs this long from the server's `started_at`. */
@@ -105,7 +105,6 @@ export function Countdown({ goAt, recording, me, opponent, myWeight, opponentWei
             {recording ? "REC ARMS AT GO" : "NOT RECORDING"}
           </Mono>
         </View>
-        <KindTag onScrim />
       </View>
       <View
         accessible

@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { EloBadge } from "@/components/domain/elo-badge";
 import { requireAthlete } from "@/lib/guards";
@@ -39,16 +38,6 @@ export async function LobbyContent({
   return (
     <div className="space-y-6 animate-page-in">
       <VsHeader challenger={lobby.challenger} opponent={lobby.opponent} />
-
-      <div className="text-center">
-        <Badge
-          variant={
-            lobby.match_type === MATCH_TYPE.RANKED ? "default" : "secondary"
-          }
-        >
-          {lobby.match_type === MATCH_TYPE.RANKED ? "Ranked" : "Casual"} Match
-        </Badge>
-      </div>
 
       {stakes && (
         <Card>

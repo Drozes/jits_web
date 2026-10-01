@@ -57,7 +57,7 @@ export const UNDERAGE_COPY = "You must be 16 or older to compete on ELO RATED.";
 /** `dob_required` (contract section 7): an older account has no date of birth. */
 export const DOB_REQUIRED_TITLE = "Confirm your date of birth";
 export const DOB_REQUIRED_COPY =
-  "We need your date of birth before your first ranked match. You must be 16 or older.";
+  "We need your date of birth before your first match. You must be 16 or older.";
 export const DOB_SAVE_FAILED_COPY = "Couldn't save your date of birth. Check your connection and try again.";
 export const DOB_INVALID_COPY = "Enter a real date of birth.";
 

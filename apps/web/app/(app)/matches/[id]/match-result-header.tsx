@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { MetaTag, Plate } from "@/components/ui/elo-system";
+import { Plate } from "@/components/ui/elo-system";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn, getProfilePhotoUrl } from "@/lib/utils";
 import type { MatchDetailView, MatchParticipant } from "@jits/shared/api/queries";
@@ -32,14 +32,10 @@ export function MatchResultHeader({ view }: { view: MatchDetailView }) {
           </span>
           <StatusChip status={match.status} />
         </div>
-        {match.match_type === "ranked" ? (
-          // No ELO row at all when the delta is unknown: never a fake "0".
-          me.elo_delta != null && <EloChange me={me} />
-        ) : (
-          <p className="text-sm text-muted-foreground" style={{ marginTop: "var(--space-2)" }}>
-            Casual, unrated
-          </p>
-        )}
+        {/* No ELO row at all when the delta is unknown: never a fake "0". A
+            legacy casual row (casual was retired) reads like any match, with
+            no rating change and no match-kind label. */}
+        {match.match_type === "ranked" && me.elo_delta != null && <EloChange me={me} />}
         {match.status === "disputed" && (
           <p className="text-sm text-muted-foreground" style={{ marginTop: "var(--space-2)" }}>
             This result is disputed and under review.
@@ -134,7 +130,6 @@ function MetaRow({ view }: { view: MatchDetailView }) {
   return (
     <div className="flex flex-wrap items-center text-xs text-muted-foreground" style={{ gap: "var(--space-2)" }}>
       {date && <span data-testid="match-date" className="font-mono tabular-nums">{formatRelativeDate(date)}</span>}
-      <MetaTag>{match.match_type === "ranked" ? "Ranked" : "Casual"}</MetaTag>
       {duration && <span className="font-mono tabular-nums">{duration}</span>}
       {resultLabel && <span>{resultLabel}</span>}
     </div>

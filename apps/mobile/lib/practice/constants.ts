@@ -60,7 +60,7 @@ export const PRACTICE_TIPS: Record<PracticePhase, string | null> = {
   live: "No need to actually roll. Either of you can pause. Hold End when someone taps.",
   end: null,
   result:
-    "Record how it ended: a submission and winner, or a draw. Real Arena matches are ranked; practice is not.",
+    "Record how it ended: a submission and winner, or a draw. Real Arena matches move your ELO; practice does not.",
   confirm:
     "Your opponent confirms the result. In a real match you can dispute a wrong result here.",
   summary: null,

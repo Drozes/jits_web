@@ -60,7 +60,7 @@ import { useModalPresentWatchdog } from "@/lib/updates/use-modal-present-watchdo
 import type { EloStakes } from "@jits/shared/types/composites";
 import { FIGHT_RADIUS } from "@/components/match-flow/fight/fight-tokens";
 import { usePalette } from "@/lib/theme/palette";
-import { InitialsBlock, KindTag, Mono, StakesStrip, shortName } from "@/components/match-flow/fight/fight-ui";
+import { InitialsBlock, Mono, StakesStrip, shortName } from "@/components/match-flow/fight/fight-ui";
 import { StatePressable } from "@/components/ui/state-pressable";
 import { ModalToaster } from "@/components/ui/toast";
 import { OfflineBanner } from "@/components/offline-banner";
@@ -502,7 +502,6 @@ function PromptHeader({ challenge }: { challenge: IncomingChallenge }) {
           createdAt={challenge.createdAt ?? null}
           expiresAt={challenge.expiresAt ?? null}
         />
-        <KindTag maxFontSizeMultiplier={MAX_FONT_SCALE} />
       </View>
     </View>
   );

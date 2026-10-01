@@ -248,7 +248,6 @@ export function LiveStep(props: LiveStepProps) {
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       <LiveBroadcast
-        kindLabel="RANKED"
         me={toLiveAthlete(me)}
         opponent={toLiveAthlete(opponent)}
         durationSeconds={durationSeconds}

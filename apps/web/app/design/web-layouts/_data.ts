@@ -290,7 +290,7 @@ export const STORIES: Story[] = [
     id: "st2",
     tag: "Rankings",
     headline: "Ruotolo brothers both climb after Austin open mat",
-    dek: "Kade and Tye each banked ranked wins over the weekend, tightening the lightweight ladder.",
+    dek: "Kade and Tye each banked wins over the weekend, tightening the lightweight ladder.",
     timeAgo: "5h ago",
   },
   {

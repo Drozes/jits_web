@@ -4,7 +4,7 @@ import { StillScrims } from "./scrim";
 import type { UploadBannerState } from "@/lib/video/upload-banner-state";
 import { ON_MEDIA, usePalette } from "@/lib/theme/palette";
 import { FIGHT_RADIUS, TABULAR } from "../fight/fight-tokens";
-import { InitialsBlock, KindTag, Mono, shortName } from "../fight/fight-ui";
+import { InitialsBlock, Mono, shortName } from "../fight/fight-ui";
 
 export const HERO_HEIGHT = 360;
 
@@ -49,7 +49,6 @@ export function VerdictHero({ posterUrl, posterKey, left, right, upload, filmExp
           <View style={{ height: 28, paddingHorizontal: 10, justifyContent: "center", borderWidth: 1, borderColor: ON_MEDIA.strong, borderRadius: FIGHT_RADIUS.tag, backgroundColor: ON_MEDIA.tag }}>
             <Mono color={ON_MEDIA.tagText}>OPENING STILL</Mono>
           </View>
-          <KindTag onScrim />
         </View>
       </View>
     );
@@ -66,9 +65,6 @@ export function VerdictHero({ posterUrl, posterKey, left, right, upload, filmExp
           : "NO FILM FOR THIS MATCH";
   return (
     <View testID="verdict-still-fallback" style={{ height: HERO_HEIGHT, backgroundColor: p.plate, borderBottomWidth: 1, borderColor: p.hairline }}>
-      <View style={{ position: "absolute", left: 16, right: 16, top: topInset + 12, alignItems: "flex-end" }}>
-        <KindTag />
-      </View>
       <View style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 20, paddingTop: topInset }}>
         {[left, right].map((name, i) => (
           <View key={`${name}-${i}`} style={{ alignItems: "center", gap: 10 }}>

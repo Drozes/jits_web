@@ -4,7 +4,7 @@ import { ChevronLeft, Pencil } from "lucide-react-native";
 import { isValidAthleteWeight } from "@jits/shared/api/athlete-weight";
 import { ON_MEDIA, usePalette } from "@/lib/theme/palette";
 import { FIGHT_RADIUS, TABULAR } from "../fight/fight-tokens";
-import { InitialsBlock, KindTag, Mono, shortName } from "../fight/fight-ui";
+import { InitialsBlock, Mono, shortName } from "../fight/fight-ui";
 import { useFaceoffContext } from "./faceoff-context";
 import { StatePressable } from "@/components/ui/state-pressable";
 
@@ -70,7 +70,8 @@ export function FaceoffTop({ phase, me, opponent }: FaceoffTopProps) {
         <Mono bold color={p.text3}>
           {phase === "weight" ? "FACE-OFF · WEIGH IN" : "FACE-OFF · READY"}
         </Mono>
-        <KindTag />
+        {/* Right slot spacer: keeps the label off the edge (no match-kind tag). */}
+        <View style={{ width: 44 }} />
       </View>
       {phase === "weight" ? (
         <FightCard me={me} opponent={opponent} />

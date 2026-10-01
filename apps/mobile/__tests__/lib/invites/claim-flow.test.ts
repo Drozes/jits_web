@@ -87,7 +87,7 @@ describe("stepForClaim", () => {
     const step = stepForClaim(fail("dob_required"), ctx);
     expect(step).toEqual({
       type: "dob",
-      message: "We need your date of birth before your first ranked match. You must be 16 or older.",
+      message: "We need your date of birth before your first match. You must be 16 or older.",
     });
     expect(clearsPendingInvite(step)).toBe(false);
   });

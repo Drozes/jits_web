@@ -487,7 +487,7 @@ describe("Arena screen", () => {
     // Nowhere on screen: not the row, and not the Closest Match card either.
     expect(r.queryByLabelText("Challenge Alpha")).toBeNull();
     expect(r.queryByTestId("arena-closest-cta")).toBeNull();
-    expect(r.getByText("No ranked opponent free on the mat")).toBeTruthy();
+    expect(r.getByText("No opponent free on the mat")).toBeTruthy();
   });
 
   it("never suggests an athlete a challenge is already pending with; the next one instead", () => {
@@ -934,7 +934,7 @@ describe("Arena screen", () => {
       mockLobbyIds = new Set(["a-1"]);
       mockRoster.challengedIds = new Set(["a-1"]);
       const r = render(<ArenaScreen />);
-      expect(r.getByText("No ranked opponent free on the mat")).toBeTruthy();
+      expect(r.getByText("No opponent free on the mat")).toBeTruthy();
       expect(r.getByTestId("arena-closest-cta").props.accessibilityLabel).toBe("Go live to roll");
       expect(redCount(r)).toBe(1);
     });

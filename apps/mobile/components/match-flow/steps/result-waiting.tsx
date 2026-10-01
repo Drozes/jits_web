@@ -32,7 +32,6 @@ export function ResultWaiting({
   const name = shortName(claimer.displayName);
   const cells = [
     { label: "ENDED AT", value: endedAtSeconds != null ? formatElapsed(endedAtSeconds) : "--:--" },
-    { label: "TYPE", value: "RANKED" },
     { label: "CLOCK", value: formatElapsed(durationSeconds) },
   ];
   return (

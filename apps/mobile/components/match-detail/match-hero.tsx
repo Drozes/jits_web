@@ -23,8 +23,8 @@ interface MatchHeroProps {
 }
 
 /**
- * Opening still with scrims, back, the static RANKED tag (every match is
- * ranked), play, and the clock. The
+ * Opening still with scrims, back, play, and the clock (no match-kind tag:
+ * every match is the same kind). The
  * chrome sits on the photo's scrims (ON_MEDIA); the bottom scrim fades into
  * the themed page.
  */
@@ -40,11 +40,6 @@ export function MatchHero({ posterUrl, posterKey, me, opponent, fallbackLabel, c
 
       <View style={{ position: "absolute", left: 4, top: insets.top + 6 }}>
         <FilmBackButton label="Go back" fallback="/(app)/film-room" color={ON_MEDIA.white} testID="match-back" />
-      </View>
-      <View style={[tagStyle, { position: "absolute", right: 16, top: insets.top + 16 }]}>
-        <Text className="font-mono-medium" style={{ fontSize: 10, letterSpacing: 2.52, color: ON_MEDIA.tagText }}>
-          RANKED
-        </Text>
       </View>
 
       {onPlay ? (

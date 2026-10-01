@@ -69,34 +69,6 @@ export function Mono({ children, color, size = 10, bold = false, spacing = 2.52,
   );
 }
 
-/** The bordered static RANKED tag (every match is ranked); `onScrim` over camera or a photo. */
-export function KindTag({
-  onScrim = false,
-  maxFontSizeMultiplier,
-}: {
-  onScrim?: boolean;
-  maxFontSizeMultiplier?: number;
-}) {
-  const p = usePalette();
-  return (
-    <View
-      style={{
-        height: 24,
-        paddingHorizontal: 8,
-        justifyContent: "center",
-        borderWidth: 1,
-        borderColor: onScrim ? ON_MEDIA.strong : p.strong,
-        borderRadius: FIGHT_RADIUS.tag,
-        backgroundColor: onScrim ? ON_MEDIA.tag : undefined,
-      }}
-    >
-      <Mono color={onScrim ? ON_MEDIA.tagText : p.text2} maxFontSizeMultiplier={maxFontSizeMultiplier}>
-        RANKED
-      </Mono>
-    </View>
-  );
-}
-
 type ButtonVariant = "primary" | "secondary" | "ghost";
 
 interface FightButtonProps {

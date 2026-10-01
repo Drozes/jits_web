@@ -119,7 +119,6 @@ describe("weigh-in", () => {
     const s = render(<Harness phase="weight" />);
     await flush();
     s.getByText("FACE-OFF · WEIGH IN");
-    s.getByText("RANKED");
     s.getByText("K. Reyes");
     s.getByText("M. Park");
     s.getByText("ELO 1512");
@@ -138,10 +137,10 @@ describe("weigh-in", () => {
     expect(mockGetEloStakes).toHaveBeenCalledWith(expect.anything(), 1512, 1498, 170, 167);
   });
 
-  it("every match is ranked: the static RANKED tag, never CASUAL", async () => {
+  it("every match is the same kind: no RANKED or CASUAL tag", async () => {
     const s = render(<Harness phase="weight" />);
     await flush();
-    s.getByText("RANKED");
+    expect(s.queryByText(/ranked/i)).toBeNull();
     expect(s.queryByText(/casual/i)).toBeNull();
   });
 

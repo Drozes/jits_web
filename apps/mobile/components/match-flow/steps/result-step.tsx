@@ -9,7 +9,7 @@ import { formatElapsed } from "@/lib/match-flow/format-elapsed";
 import type { BroadcastResult } from "@jits/shared/hooks/use-session-match-sync";
 import type { SubmissionType } from "@jits/shared/types/submission-type";
 import { usePalette } from "@/lib/theme/palette";
-import { FightButton, KindTag, Mono, shortName } from "../fight/fight-ui";
+import { FightButton, Mono, shortName } from "../fight/fight-ui";
 import {
   DrawPlate,
   FinishTimeField,
@@ -105,10 +105,7 @@ export function ResultStep(props: ResultStepProps) {
   return (
     <View style={{ gap: 20 }}>
       <View style={{ gap: 10 }}>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-          <KindTag />
-          {endedAt ? <Mono>{endedAt}</Mono> : null}
-        </View>
+        {endedAt ? <Mono>{endedAt}</Mono> : null}
         {/* A plain text element on purpose: the match-loop harness taps the
             StaticText "Record result" to drop the numeric keyboard. */}
         <Text className="font-heading uppercase" style={{ fontSize: 30, letterSpacing: 0.6, color: p.text }}>

@@ -12,9 +12,9 @@ describe("invite formatting", () => {
   });
 
   it("builds the card stat lines, omitting LBS when weight is null", () => {
-    expect(challengeStatLine(INVITER)).toBe("1,482 ELO · 172 LBS · Ranked jiu-jitsu match");
-    expect(challengeStatLine({ ...INVITER, weight_lbs: null })).toBe("1,482 ELO · Ranked jiu-jitsu match");
-    expect(joinStatLine(INVITER)).toBe("1,482 ELO · Ranked jiu-jitsu");
+    expect(challengeStatLine(INVITER)).toBe("1,482 ELO · 172 LBS · Jiu-jitsu match");
+    expect(challengeStatLine({ ...INVITER, weight_lbs: null })).toBe("1,482 ELO · Jiu-jitsu match");
+    expect(joinStatLine(INVITER)).toBe("1,482 ELO · Jiu-jitsu");
   });
 
   it("builds the contract titles", () => {
@@ -22,7 +22,7 @@ describe("invite formatting", () => {
       "ALEX R. challenges you | ELO RATED",
     );
     expect(invitePageTitle({ state: "open", kind: "join", inviter: INVITER })).toBe("Join ALEX R. on ELO RATED");
-    expect(invitePageTitle({ state: "unavailable" })).toBe("ELO RATED | Ranked jiu-jitsu");
+    expect(invitePageTitle({ state: "unavailable" })).toBe("ELO RATED | Jiu-jitsu");
   });
 
   it("reads the invite token only from an exact /c/<token> next", () => {

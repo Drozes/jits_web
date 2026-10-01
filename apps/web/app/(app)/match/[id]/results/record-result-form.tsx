@@ -114,7 +114,7 @@ export function RecordResultForm({
           <Handshake className="mx-auto h-8 w-8 text-amber-500 mb-2" />
           <p className="text-sm font-medium">Match ends in a draw</p>
           <p className="text-xs text-muted-foreground mt-1">
-            Both athletes will lose ELO in ranked matches
+            Both athletes will lose ELO
           </p>
         </div>
       )}

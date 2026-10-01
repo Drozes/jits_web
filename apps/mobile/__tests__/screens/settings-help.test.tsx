@@ -46,9 +46,9 @@ describe("Help & Support copy", () => {
   it("does not imply casual matches exist, and does not mention a rematch", () => {
     const text = allText();
     expect(text).not.toMatch(/casual/i);
-    expect(text).not.toMatch(/ranked matches/i);
+    expect(text).not.toMatch(/ranked/i);
     expect(text).not.toMatch(/rematch/i);
-    expect(text).toMatch(/Every match is ranked\./);
+    expect(text).toMatch(/every match counts\./);
     expect(text).toMatch(/Practice Match from Settings/);
   });
 

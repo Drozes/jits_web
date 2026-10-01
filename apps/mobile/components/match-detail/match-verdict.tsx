@@ -10,7 +10,7 @@ const VERDICT: Record<string, string> = { win: "YOU WON", loss: "YOU LOST", draw
 /** Statuses whose result stands for nothing: muted chip, no rating change. */
 const MUTED: Record<string, string> = { voided: "VOIDED", cancelled: "CANCELLED" };
 
-/** "by Rear-naked choke · 06:17 · vs M. Park · Ranked · Sep 27" */
+/** "by Rear-naked choke · 06:17 · vs M. Park · Sep 27" */
 export function verdictLine(view: MatchDetailView): string {
   const { match, opponent } = view;
   const parts: string[] = [];
@@ -21,8 +21,6 @@ export function verdictLine(view: MatchDetailView): string {
     parts.push(`on ${humanizeAnalysisLabel(match.result)?.toLowerCase() ?? match.result}`);
   }
   if (opponent) parts.push(`vs ${shortName(opponent.display_name)}`);
-  // Every match is ranked (casual was retired); a legacy row reads the same.
-  parts.push("Ranked");
   const when = titleDate(match.completed_at ?? match.started_at);
   if (when) parts.push(when);
   return parts.join(" · ");

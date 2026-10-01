@@ -41,7 +41,7 @@ export function InviteHero({ kind, inviter }: InviteHeroProps) {
           initials
         )}
       </div>
-      <span style={CAPS_LABEL}>{kind === "challenge" ? "Ranked challenge" : "Invite"}</span>
+      <span style={CAPS_LABEL}>{kind === "challenge" ? "Challenge" : "Invite"}</span>
       <h1
         style={{
           fontFamily: "var(--font-display)",

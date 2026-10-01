@@ -467,7 +467,7 @@ describe("MatchVideoScreen Film Room controls", () => {
     const utils = await renderLoadedPlayer();
     expect(mockUseMatchDetail).toHaveBeenCalledWith(MATCH);
     expect(utils.getByText("K. Reyes vs M. Park")).toBeTruthy();
-    expect(utils.getByText("RANKED")).toBeTruthy();
+    expect(utils.queryByText("RANKED")).toBeNull();
     expect(mockGetVideoAnalysis).toHaveBeenCalledWith({}, "vid-1");
   });
 

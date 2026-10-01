@@ -34,7 +34,7 @@ const HELP_SECTIONS: HelpSection[] = [
   {
     title: "Getting Started",
     paragraphs: [
-      "ELO RATED is a participation-only ranking platform. You find opponents in the Arena, roll, and the system handles your rating. Every match is ranked. To walk through one without touching your rating, try a Practice Match from Settings.",
+      "ELO RATED is a participation-only ranking platform. You find opponents in the Arena, roll, and the system handles your rating: every match counts. To walk through one without touching your rating, try a Practice Match from Settings.",
       "Open the Arena tab and go live to join the lobby. Anyone else who is live can challenge you, and you can challenge them. You can have one challenge out at a time.",
       "Once you're live you stay live across the whole app, on Home, Rankings and Profile too, and challenges reach you wherever you are. The chip in the header shows it: tap LIVE to open the Arena or go offline. While you're offline it reads GO LIVE, and one tap puts you live.",
       "You stay live until you go offline from the Arena or the header chip. A match takes you offline while you roll, and so does switching away from the app. You're put back live when you leave the match or come back to the app.",

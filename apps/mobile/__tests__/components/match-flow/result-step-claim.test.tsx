@@ -92,7 +92,7 @@ describe("claim-first", () => {
     s.getByText("M. Park is recording the result");
     s.getByText("You\u2019ll confirm it in a moment.");
     s.getByText("ENDED AT");
-    s.getByText("RANKED");
+    expect(s.queryByText("RANKED")).toBeNull();
     expect(s.queryByTestId("result-winner-me-1")).toBeNull();
     expect(s.queryByTestId("result-outcome-draw")).toBeNull();
   });

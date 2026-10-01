@@ -490,7 +490,7 @@ describe("ChallengePromptSheet face-off preview (match-flow redesign)", () => {
     expect(screen.getByTestId("challenge-prompt-stakes-win")).toHaveTextContent("\u25b2 +14");
     expect(screen.getByTestId("challenge-prompt-stakes-loss")).toHaveTextContent("\u25bc \u22129");
     expect(screen.getByText("YOUR STAKES \u00b7 1512")).toBeTruthy();
-    expect(screen.getByText("RANKED")).toBeTruthy();
+    expect(screen.queryByText("RANKED")).toBeNull();
     expect(screen.getByText("Rival is live in the Arena")).toBeTruthy();
   });
 
@@ -788,7 +788,6 @@ describe("ChallengePromptSheet header at large text sizes", () => {
     const light = paletteFor("light");
     expect(StyleSheet.flatten(title.props.style).color).toBe(light.text3);
     expect(light.text3).not.toBe(light.win);
-    expect(screen.getByText("RANKED").props.maxFontSizeMultiplier).toBe(1.3);
   });
 
   it("caps every label on the prompt so Accept and Decline keep their size", async () => {

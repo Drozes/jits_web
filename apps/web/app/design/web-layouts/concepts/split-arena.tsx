@@ -193,7 +193,7 @@ function HeroStat({ value, label }: { value: number; label: string }) {
   );
 }
 
-const FILTERS = ["All", "My Weight", "Ranked", "Casual"] as const;
+const FILTERS = ["All", "My Weight"] as const;
 
 function ListPane() {
   const readyCount = ARENA.available.filter(

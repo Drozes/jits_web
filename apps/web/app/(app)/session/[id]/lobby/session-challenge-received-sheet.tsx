@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { Swords } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { InSessionChallenge } from "@/hooks/use-session-lobby-realtime";
 
@@ -52,9 +51,6 @@ export function SessionChallengeReceivedSheet({
               <p className="text-sm text-muted-foreground">
                 ELO <span className="tabular-nums font-semibold text-foreground">{challenge.fromElo}</span>
               </p>
-              <Badge variant={challenge.matchType === "ranked" ? "default" : "secondary"}>
-                {challenge.matchType === "ranked" ? "Ranked" : "Casual"}
-              </Badge>
             </div>
             <div className="flex gap-3">
               <Button variant="outline" className="flex-1 h-12" onClick={handleDecline} disabled={accepting}>

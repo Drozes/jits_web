@@ -13,8 +13,8 @@ export function buildInviteShareMessage(
   codeDisplay?: string | null,
 ): string {
   if (kind === "join") {
-    return `Train with me on ELO RATED, ranked jiu-jitsu. Join me: ${url}`;
+    return `Train jiu-jitsu with me on ELO RATED. Join me: ${url}`;
   }
   const code = codeDisplay ? ` (code ${codeDisplay})` : "";
-  return `I'm calling you out on ELO RATED. Ranked roll, my number vs yours. Accept: ${url}${code}`;
+  return `I'm calling you out on ELO RATED. One roll, my number vs yours. Accept: ${url}${code}`;
 }

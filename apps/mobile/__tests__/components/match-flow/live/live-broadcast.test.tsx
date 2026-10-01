@@ -29,7 +29,6 @@ const requestPermission = jest.fn(() => Promise.resolve());
 function props(o: Overrides = {}): LiveBroadcastProps {
   const { state = "recording", permission = { granted: true, canAskAgain: true }, ...rest } = o;
   return {
-    kindLabel: "RANKED",
     me: { name: "K. Reyes", meta: "1512 · 77 LBS" },
     opponent: { name: "M. Park", meta: "1498 · 76 LBS" },
     durationSeconds: 600,
@@ -60,14 +59,15 @@ afterEach(() => {
   announce.mockRestore();
 });
 
-it("R-P1 recording: REC tally, RANKED tag, athletes, LIVE slab, controls", () => {
+it("R-P1 recording: REC tally, no kind tag, athletes, LIVE slab, controls", () => {
   const s = render(<LiveBroadcast {...props()} />);
   act(() => {
     jest.advanceTimersByTime(134_000);
   });
   expect(s.getByTestId("live-tally")).toHaveTextContent("REC 02:14");
   expect(s.getByLabelText("Recording, 2 minutes 14 seconds")).toBeTruthy();
-  expect(s.getByTestId("live-kind-tag")).toHaveTextContent("RANKED");
+  expect(s.queryByTestId("live-kind-tag")).toBeNull();
+  expect(s.queryByText(/RANKED/i)).toBeNull();
   expect(s.getByTestId("live-me-name")).toHaveTextContent("K. REYES");
   expect(s.getByTestId("live-opponent-name")).toHaveTextContent("M. PARK");
   s.getByTestId("live-slab-live");
@@ -253,9 +253,9 @@ it("keeps the digits one color in every state (never amber or red)", () => {
   expect(new Set(colors)).toEqual(new Set(["#E8EDF2"]));
 });
 
-it("shows RANKED and the practice HUD extra", () => {
-  const ranked = render(<LiveBroadcast {...props({ kindLabel: "RANKED" })} />);
-  expect(ranked.getByTestId("live-kind-tag")).toHaveTextContent("RANKED");
+it("a real match has no kind tag; practice shows PRACTICE and its HUD extra", () => {
+  const real = render(<LiveBroadcast {...props()} />);
+  expect(real.queryByTestId("live-kind-tag")).toBeNull();
   const { Text } = require("react-native");
   const practice = render(
     <LiveBroadcast {...props({ kindLabel: "PRACTICE", hudExtra: <Text testID="extra">EXIT</Text> })} />,
