@@ -37,7 +37,7 @@ export function useBookings(opts: {
     if (!opts.visible || bookings.length === 0) return;
     let cancelled = false;
     const tick = async () => {
-      if (AppState.currentState !== "active") return;
+      if (AppState.currentState === "background") return;
       const loc = await readLocationOnce({ ask: false });
       if (cancelled) return;
       setLocationOff(loc.status === "denied");

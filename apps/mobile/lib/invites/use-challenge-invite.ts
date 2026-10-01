@@ -9,6 +9,7 @@ import * as React from "react";
 import { AppState } from "react-native";
 import {
   createInvite,
+  getInviteStatus,
   getMyBookings,
   refreshInviteCode,
   reportMatchPresence,
@@ -99,11 +100,14 @@ export function useChallengeInvite(entryPoint: InviteEntryPoint | null) {
     });
   }, []);
 
-  // Live claim updates on the invite row.
-  React.useEffect(() => {
-    if (!invite) return;
-    return subscribeToInvite(supabase, invite.invite_id, (row) => {
+  // A status change of the invite row, from realtime or the fallback read.
+  // Settled once: realtime and the fallback can both report the claim.
+  const settledRef = React.useRef(false);
+  const onRow = React.useCallback(
+    (row: { status: string; challenge_id: string | null }) => {
+      if (settledRef.current) return;
       if (row.status === "claimed" && row.challenge_id) {
+        settledRef.current = true;
         setPhase({ kind: "claimed" });
         void settleClaim(row.challenge_id);
       } else if (row.status === "expired") {
@@ -111,36 +115,54 @@ export function useChallengeInvite(entryPoint: InviteEntryPoint | null) {
       } else if (row.status === "revoked") {
         setPhase({ kind: "revoked" });
       }
-    });
-  }, [invite, settleClaim]);
+    },
+    [settleClaim],
+  );
 
-  // A reading on open and every 60 s while foregrounded and still open.
+  // Live claim updates on the invite row, keyed by id so a code refresh
+  // (a new invite object, same row) does not resubscribe.
+  const inviteId = invite?.invite_id ?? null;
   React.useEffect(() => {
-    if (!invite || phase.kind !== "open") return;
+    if (!inviteId) return;
+    settledRef.current = false;
+    return subscribeToInvite(supabase, inviteId, onRow);
+  }, [inviteId, onRow]);
+
+  // A reading on open, every 60 s and on every return to the foreground while
+  // the invite is open. Each tick also re-reads the row, in case a realtime
+  // event was missed while the app was in the background.
+  const deniedLoggedRef = React.useRef(false);
+  const isOpen = phase.kind === "open";
+  React.useEffect(() => {
+    if (!inviteId || !isOpen) return;
     let cancelled = false;
-    const report = async () => {
-      if (AppState.currentState !== "active") return;
+    const tick = async () => {
+      if (AppState.currentState === "background") return;
+      const row = await getInviteStatus(supabase, inviteId);
+      if (cancelled) return;
+      if (row) onRow(row);
       const loc = await readLocationOnce({ ask: true });
       if (cancelled) return;
-      if (loc.status === "denied") {
-        setLocationDenied((was) => {
-          if (!was) void logInviteEvent(supabase, "location_denied", { inviteId: invite.invite_id, detail: { context: "invite_waiting" } });
-          return true;
-        });
-        return;
+      setLocationDenied(loc.status === "denied");
+      if (loc.status === "denied" && !deniedLoggedRef.current) {
+        deniedLoggedRef.current = true;
+        void logInviteEvent(supabase, "location_denied", { inviteId, detail: { context: "invite_waiting" } });
       }
-      setLocationDenied(false);
       if (loc.status === "ok") {
-        void reportMatchPresence(supabase, loc.reading, "invite_waiting", { inviteId: invite.invite_id });
+        void reportMatchPresence(supabase, loc.reading, "invite_waiting", { inviteId });
       }
     };
-    void report();
-    const t = setInterval(() => void report(), PRESENCE_EVERY_MS);
+    void tick();
+    const t = setInterval(() => void tick(), PRESENCE_EVERY_MS);
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") void tick();
+    });
     return () => {
       cancelled = true;
       clearInterval(t);
+      sub.remove();
     };
-  }, [invite, phase.kind]);
+  }, [inviteId, isOpen, onRow]);
 
   const revoke = React.useCallback(async () => {
     const current = inviteRef.current;

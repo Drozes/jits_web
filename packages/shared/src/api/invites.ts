@@ -437,3 +437,26 @@ export function subscribeToInvite(
     void supabase.removeChannel(channel);
   };
 }
+
+/** One invite row's status (inviter or claimer only, RLS). Null when unreadable. */
+export async function getInviteStatus(
+  supabase: Client,
+  inviteId: string,
+): Promise<{ status: string; claimed_by: string | null; challenge_id: string | null } | null> {
+  try {
+    const from = supabase.from as unknown as (t: string) => {
+      select: (c: string) => {
+        eq: (k: string, v: string) => { maybeSingle: () => PromiseLike<{ data: unknown; error: RawError }> };
+      };
+    };
+    const { data, error } = await from
+      .call(supabase, "invites")
+      .select("status, claimed_by, challenge_id")
+      .eq("id", inviteId)
+      .maybeSingle();
+    if (error || !data) return null;
+    return data as { status: string; claimed_by: string | null; challenge_id: string | null };
+  } catch {
+    return null;
+  }
+}
