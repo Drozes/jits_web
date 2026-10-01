@@ -54,6 +54,8 @@ const controller = {
   toggle: vi.fn(async () => {}),
   goLive: vi.fn(async () => {}),
   goOffline: vi.fn(async () => {}),
+  confirmLocation: vi.fn(async () => {}),
+  dismissLocation: vi.fn(),
   sendChallenge: vi.fn(async () => {}),
   accept: vi.fn(async () => {}),
   decline: vi.fn(async () => {}),

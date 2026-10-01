@@ -51,6 +51,13 @@ vi.mock("@/hooks/use-arena-challenge", () => ({
   },
 }));
 
+const locFlag = vi.hoisted(() => ({
+  value: { required: true, ensure: async () => true, markRequired: () => {} },
+}));
+vi.mock("@/lib/location/use-match-location-required", () => ({
+  useMatchLocationRequired: () => locFlag.value,
+}));
+
 const presence = vi.hoisted(() => ({ ids: new Set<string>(), calls: [] as unknown[][] }));
 vi.mock("@/hooks/use-lobby-presence", () => ({
   useLobbyPresence: (...args: unknown[]) => presence.calls.push(args),
@@ -106,6 +113,24 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers());
 
 describe("ArenaBootstrap state", () => {
+  it("is the one owner of match_location_required: both hooks get its reader", () => {
+    mount();
+    expect(live.args?.location).toBe(locFlag.value);
+    expect(challenge.args?.locationRequired).toBe(locFlag.value.ensure);
+  });
+
+  it("publishes the go-live location state", () => {
+    const before = live.value;
+    live.value = {
+      ...live.value,
+      isLocating: true,
+      locationPrompt: "accuracy",
+    } as typeof live.value;
+    mount();
+    expect(snapshot).toMatchObject({ isLocating: true, locationPrompt: "accuracy" });
+    live.value = before;
+  });
+
   it("publishes a ready snapshot with the live flag", () => {
     live.value.isLive = true;
     mount();

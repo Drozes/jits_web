@@ -1,4 +1,11 @@
 import { Plate } from "@/components/ui/elo-system";
+import type { StartBlock } from "@/hooks/use-arena-challenge";
+import {
+  LOCATION_ACCURACY_COPY,
+  LOCATION_DENIED_COPY,
+  LOCATION_DENIED_HELP_COPY,
+  proximityCopy,
+} from "@/lib/location/match-location";
 import { PlateButton } from "./plate-button";
 
 interface IncomingChallengePlateProps {
@@ -8,6 +15,17 @@ interface IncomingChallengePlateProps {
   disabled: boolean;
   /** id for the heading, so a wrapping dialog can aria-labelledby it. */
   headingId?: string;
+  /**
+   * Accepted but not started (match_location_required on). The plate then
+   * says why, `onAccept` retries the start and `onDecline` withdraws it.
+   */
+  startBlocked?: StartBlock;
+}
+
+function blockedLines(block: StartBlock, name: string): string[] {
+  if (block === "proximity") return [proximityCopy(name)];
+  if (block === "accuracy") return [LOCATION_ACCURACY_COPY];
+  return [LOCATION_DENIED_COPY, LOCATION_DENIED_HELP_COPY];
 }
 
 /**
@@ -20,7 +38,9 @@ export function IncomingChallengePlate({
   onDecline,
   disabled,
   headingId,
+  startBlocked,
 }: IncomingChallengePlateProps) {
+  const lines = startBlocked ? blockedLines(startBlocked, name) : [];
   return (
     <Plate variant="live">
       <div
@@ -45,13 +65,34 @@ export function IncomingChallengePlate({
       >
         {name} wants to roll
       </h2>
+      {/* Always mounted so the reason is announced when it appears. */}
+      <div role="alert" aria-live="assertive">
+        {lines.map((line) => (
+          <p
+            key={line}
+            style={{
+              fontFamily: "var(--font-body)",
+              fontSize: "var(--size-body-s)",
+              color: "var(--text-primary)",
+              margin: "var(--space-2) 0 0",
+              lineHeight: "var(--lh-base)",
+            }}
+          >
+            {line}
+          </p>
+        ))}
+      </div>
       <div
         className="grid grid-cols-2"
         style={{ gap: "var(--space-2)", marginTop: "var(--space-4)" }}
       >
-        <PlateButton label="Decline" onClick={onDecline} disabled={disabled} />
         <PlateButton
-          label="Accept"
+          label={startBlocked ? "Cancel" : "Decline"}
+          onClick={onDecline}
+          disabled={disabled}
+        />
+        <PlateButton
+          label={startBlocked ? "Retry" : "Accept"}
           variant="primary"
           onClick={onAccept}
           disabled={disabled}
