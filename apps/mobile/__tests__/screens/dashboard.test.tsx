@@ -66,6 +66,12 @@ jest.mock("@/lib/supabase/client", () => ({
   supabase: {},
 }));
 
+// Any-match-ever read behind the practice offer (owner, 2026-10-01).
+let mockHasEverPlayed: boolean | null = false;
+jest.mock("@/lib/practice/use-has-ever-played", () => ({
+  useHasEverPlayed: () => mockHasEverPlayed,
+}));
+
 // Toast
 jest.mock("@/components/ui/toast", () => ({
   toast: { error: jest.fn(), info: jest.fn() },
@@ -120,6 +126,7 @@ const mockAthlete: {
   primary_gym_id: string | null;
   is_bot: boolean;
   practice_match_offered_at: string | null;
+  practice_match_completed_at: string | null;
 } = {
   id: "a1",
   display_name: "TestUser",
@@ -130,6 +137,7 @@ const mockAthlete: {
   primary_gym_id: null,
   is_bot: false,
   practice_match_offered_at: null,
+  practice_match_completed_at: null,
 };
 
 const mockRefreshSoft = jest.fn(async () => undefined);
@@ -256,6 +264,7 @@ beforeEach(() => {
   mockAthlete.primary_gym_id = null;
   mockAthlete.is_bot = false;
   mockAthlete.practice_match_offered_at = null;
+  mockAthlete.practice_match_completed_at = null;
   mockAthlete.id = `a${++athleteSeq}`;
   mockFocusCallbacks.length = 0;
   jest.spyOn(Date, "now").mockImplementation(() => mockNow);
@@ -753,6 +762,9 @@ describe("DashboardScreen new-highlight card (spec 015 section 16.6.4)", () => {
 });
 
 describe("DashboardScreen practice match offer", () => {
+  beforeEach(() => {
+    mockHasEverPlayed = false;
+  });
   const ZERO = { wins: 0, losses: 0, draws: 0, win_streak: 0, best_win_streak: 0 };
 
   function zeroMatches() {
@@ -772,6 +784,30 @@ describe("DashboardScreen practice match offer", () => {
   it("does not offer to an athlete with completed matches", async () => {
     const { getByText, queryByTestId } = render(React.createElement(DashboardScreen));
     await waitFor(() => expect(getByText(RECORD)).toBeTruthy());
+    expect(queryByTestId("practice-offer-card")).toBeNull();
+  });
+
+  it("does not offer to someone who has played a match with no confirmed result yet", async () => {
+    zeroMatches();
+    mockHasEverPlayed = true;
+    const { getByText, queryByTestId } = render(React.createElement(DashboardScreen));
+    await waitFor(() => expect(getByText(ZERO_RECORD)).toBeTruthy());
+    expect(queryByTestId("practice-offer-card")).toBeNull();
+  });
+
+  it("does not offer while the match history is unknown", async () => {
+    zeroMatches();
+    mockHasEverPlayed = null;
+    const { getByText, queryByTestId } = render(React.createElement(DashboardScreen));
+    await waitFor(() => expect(getByText(ZERO_RECORD)).toBeTruthy());
+    expect(queryByTestId("practice-offer-card")).toBeNull();
+  });
+
+  it("does not offer after a practice match", async () => {
+    zeroMatches();
+    mockAthlete.practice_match_completed_at = "2026-09-27T00:00:00Z";
+    const { getByText, queryByTestId } = render(React.createElement(DashboardScreen));
+    await waitFor(() => expect(getByText(ZERO_RECORD)).toBeTruthy());
     expect(queryByTestId("practice-offer-card")).toBeNull();
   });
 

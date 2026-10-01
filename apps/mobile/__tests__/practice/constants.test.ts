@@ -58,6 +58,7 @@ describe("shouldOfferPracticeMatch", () => {
     hasActiveMatch: false,
     statsLoaded: true,
     hasMatches: false,
+    hasEverPlayed: false as boolean | null,
   };
 
   it("offers to a brand-new athlete who has not answered yet", () => {
@@ -70,6 +71,12 @@ describe("shouldOfferPracticeMatch", () => {
     ["a match in flight", { hasActiveMatch: true }],
     ["stats not loaded yet", { statsLoaded: false }],
     ["has completed matches", { hasMatches: true }],
+    ["has ever played a match (even unconfirmed)", { hasEverPlayed: true }],
+    ["match history not loaded yet", { hasEverPlayed: null }],
+    [
+      "already did a practice match",
+      { athlete: { practice_match_offered_at: null, practice_match_completed_at: "2026-09-27", is_bot: false } },
+    ],
   ])("does not offer when %s", (_name, override) => {
     expect(shouldOfferPracticeMatch({ ...base, ...override })).toBe(false);
   });

@@ -82,24 +82,35 @@ export const PRACTICE_OFFER_BODY =
   "Walk through a real Arena match against a practice bot. No rating, nobody else sees it, about a minute.";
 
 /**
- * Whether Home offers the practice match. Only once (`offered_at` is set as
- * soon as the athlete answers), never to a bot, never over a match in
- * flight, and only to an athlete with no completed matches, so existing
- * athletes are not nagged. `statsLoaded` keeps the card from flashing for an
- * experienced athlete before the dashboard summary arrives.
+ * Whether Home offers the practice match (owner, 2026-10-01: only to an
+ * athlete who has never done a match or a practice match, ever). Only once
+ * (`offered_at` is set as soon as the athlete answers), never to a bot,
+ * never over a match in flight, never after a practice match, and never to
+ * anyone with any real match on record (`hasEverPlayed`: any started match,
+ * completed, disputed or awaiting confirmation, not only confirmed results).
+ * `statsLoaded` and `historyLoaded` keep the card from flashing for an
+ * experienced athlete before the reads arrive; an unknown history hides it.
  */
 export function shouldOfferPracticeMatch(input: {
-  athlete: { practice_match_offered_at: string | null; is_bot: boolean };
+  athlete: {
+    practice_match_offered_at: string | null;
+    practice_match_completed_at?: string | null;
+    is_bot: boolean;
+  };
   hasActiveMatch: boolean;
   statsLoaded: boolean;
   hasMatches: boolean;
+  /** Any non-cancelled match participation ever; null while unknown. */
+  hasEverPlayed: boolean | null;
 }): boolean {
-  const { athlete, hasActiveMatch, statsLoaded, hasMatches } = input;
+  const { athlete, hasActiveMatch, statsLoaded, hasMatches, hasEverPlayed } = input;
   return (
     athlete.practice_match_offered_at == null &&
+    athlete.practice_match_completed_at == null &&
     !athlete.is_bot &&
     !hasActiveMatch &&
     statsLoaded &&
-    !hasMatches
+    !hasMatches &&
+    hasEverPlayed === false
   );
 }

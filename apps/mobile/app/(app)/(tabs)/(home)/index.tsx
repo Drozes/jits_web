@@ -24,6 +24,7 @@ import { ResumeMatchCard } from "@/components/dashboard/resume-match-card";
 import { PracticeOfferCard } from "@/components/dashboard/practice-offer-card";
 import { InviteHomeCard } from "@/components/invite/invite-home-card";
 import { shouldOfferPracticeMatch } from "@/lib/practice/constants";
+import { useHasEverPlayed } from "@/lib/practice/use-has-ever-played";
 import { useMyActiveMatch } from "@/lib/match-flow/use-my-active-match";
 import { NewHighlightCard } from "@/components/dashboard/new-highlight-card";
 import { useNewHighlight } from "@/lib/highlight/use-new-highlight";
@@ -90,6 +91,9 @@ export default function DashboardScreen() {
   }, [athlete]);
   // "Not now" hides the practice offer at once, before the athlete re-reads.
   const [practiceDismissed, setPracticeDismissed] = React.useState(false);
+  // Any real match ever (not cancelled): the practice offer is only for an
+  // athlete who has never played (owner, 2026-10-01).
+  const hasEverPlayed = useHasEverPlayed(athlete?.id ?? null);
 
   if (!athlete) {
     return (
@@ -110,6 +114,7 @@ export default function DashboardScreen() {
       hasActiveMatch: !!activeMatch,
       statsLoaded: !!stats,
       hasMatches,
+      hasEverPlayed,
     });
 
   // The record rides in the Elo tile (P-Home). It needs the summary, so the
