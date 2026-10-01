@@ -7,7 +7,7 @@ import {
   bookedMessage,
 } from "@jits/shared/utils";
 import { SecondaryButton, TertiaryButton } from "@/components/auth/auth-buttons";
-import type { BookingLocation, BookingPresence } from "@/lib/invites/use-bookings";
+import type { BookingLocation, BookingPresence, CancelBookingResult } from "@/lib/invites/use-bookings";
 
 /**
  * One booked invite match on the Arena (US5): who, why it has not started
@@ -26,7 +26,7 @@ export function BookedStrip({
   presence: BookingPresence | undefined;
   onRetry: () => void;
   onAskLocation: () => void;
-  onCancel: () => Promise<boolean>;
+  onCancel: () => Promise<CancelBookingResult>;
 }) {
   const name = booking.opponent.first_name || booking.opponent.display_name;
   const confirmCancel = () =>
@@ -36,8 +36,10 @@ export function BookedStrip({
         text: "Cancel booking",
         style: "destructive",
         onPress: async () => {
-          const ok = await onCancel();
-          if (!ok) Alert.alert("Couldn't cancel", "Check your connection and try again.");
+          // `too_late`: the match started (the face-off opens) or the booking
+          // closed (the strip leaves); nothing more to say here.
+          const result = await onCancel();
+          if (result === "failed") Alert.alert("Couldn't cancel", "Check your connection and try again.");
         },
       },
     ]);

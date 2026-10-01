@@ -66,13 +66,19 @@ it("location denied: claims without a reading, books, logs location_denied, clea
 it("a join link becomes a friendship with no location prompt and no claim, and releases the push deferral", async () => {
   mockJoin.mockResolvedValue({ ok: true, data: { ok: true, result: "friends", inviter } });
   const { result } = await runWith(makePendingInvite({ token: TOKEN }, "universal_link"));
-  expect(mockJoin).toHaveBeenCalledWith(expect.anything(), TOKEN);
+  expect(mockJoin).toHaveBeenCalledWith(expect.anything(), TOKEN, expect.objectContaining({ platform: "ios" }));
   expect(mockReading).not.toHaveBeenCalled();
   expect(mockClaim).not.toHaveBeenCalled();
   expect(mockLog).not.toHaveBeenCalledWith(expect.anything(), "location_denied", expect.anything());
   expect(result.current.state).toMatchObject({ step: { type: "friends", inviterName: "Alex", already: false } });
   expect(mockRelease).toHaveBeenCalled();
   expect(await AsyncStorage.getItem(PENDING_INVITE_KEY)).toBeNull();
+});
+
+it("a scanned join QR is attributed as 'qr', not as a universal link", async () => {
+  mockJoin.mockResolvedValue({ ok: true, data: { ok: true, result: "friends", inviter } });
+  await runWith(makePendingInvite({ token: TOKEN }, "qr"));
+  expect(mockJoin).toHaveBeenCalledWith(expect.anything(), TOKEN, { gateway: "qr", platform: "ios" });
 });
 
 it("already_friends right after signup (attribution made the friendship) reads as now friends", async () => {

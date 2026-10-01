@@ -15,6 +15,16 @@ import { cancelChallenge } from "@jits/shared/api/mutations";
 import { BOOKING_CLOSED_COPY, type StartBlockedReason } from "@jits/shared/utils";
 import { supabase } from "@/lib/supabase/client";
 import { readLocationOnce } from "./location";
+import { releasePushDeferral } from "./pending-invite";
+
+/**
+ * The last booking closed without a match (cancelled, expired): an invitee
+ * whose push prompt waits for a first match has none coming, so it is
+ * released now (a no-op for everyone else).
+ */
+function releaseIfNoneLeft(remaining: Booking[]) {
+  if (remaining.length === 0) void releasePushDeferral();
+}
 
 const EVERY_MS = 60_000;
 
@@ -24,6 +34,9 @@ const EVERY_MS = 60_000;
  * (no fix in time).
  */
 export type BookingLocation = "ok" | "ask" | "denied" | "unavailable" | "unknown";
+
+/** What a cancel did: see `cancel`. */
+export type CancelBookingResult = "cancelled" | "too_late" | "failed";
 
 /** The last presence answer for one booking. */
 export interface BookingPresence {
@@ -75,8 +88,11 @@ export function useBookings(opts: {
         return;
       }
       if (!res.data.ok && res.data.code === "booking_closed") {
-        setBookings((cur) => cur.filter((x) => x.challenge_id !== b.challenge_id));
+        const remaining = bookingsRef.current.filter((x) => x.challenge_id !== b.challenge_id);
+        bookingsRef.current = remaining;
+        setBookings(remaining);
         cb.current.onClosed(BOOKING_CLOSED_COPY);
+        releaseIfNoneLeft(remaining);
         continue;
       }
       const next: BookingPresence = res.data.ok
@@ -105,13 +121,41 @@ export function useBookings(opts: {
     };
   }, [opts.visible, hasBookings, tick]);
 
-  /** Cancel a booking (either side). Resolves false when nothing was cancelled. */
-  const cancel = React.useCallback(async (challengeId: string): Promise<boolean> => {
-    const res = await cancelChallenge(supabase, challengeId);
-    if (!res.ok) return false;
-    setBookings((cur) => cur.filter((x) => x.challenge_id !== challengeId));
-    return true;
-  }, []);
+  /**
+   * Cancel a booking (either side), only while it is still `accepted`.
+   * `too_late`: nothing was cancelled because the server started (or closed)
+   * the booking a moment earlier; a started match routes this athlete to the
+   * face-off, otherwise the list is reloaded and a reading sent. `failed`:
+   * the request failed, or the booking is somehow still open.
+   */
+  const cancel = React.useCallback(
+    async (challengeId: string): Promise<CancelBookingResult> => {
+      const res = await cancelChallenge(supabase, challengeId, { onlyIfAccepted: true });
+      if (!res.ok) return "failed";
+      if (res.data.cancelled) {
+        const remaining = bookingsRef.current.filter((x) => x.challenge_id !== challengeId);
+        bookingsRef.current = remaining;
+        setBookings(remaining);
+        releaseIfNoneLeft(remaining);
+        return "cancelled";
+      }
+      const { data: match } = await supabase.from("matches").select("id").eq("challenge_id", challengeId).maybeSingle();
+      if (match?.id) {
+        setBookings((cur) => cur.filter((x) => x.challenge_id !== challengeId));
+        cb.current.onStarted(match.id);
+        return "too_late";
+      }
+      const fresh = await getMyBookings(supabase);
+      if (!fresh.ok) return "failed";
+      setBookings(fresh.data);
+      bookingsRef.current = fresh.data;
+      void tick();
+      if (fresh.data.some((b) => b.challenge_id === challengeId)) return "failed";
+      releaseIfNoneLeft(fresh.data);
+      return "too_late";
+    },
+    [tick],
+  );
 
   return {
     bookings,

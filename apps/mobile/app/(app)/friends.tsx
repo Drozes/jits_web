@@ -33,9 +33,15 @@ export default function FriendsScreen() {
     }
   }, []);
 
+  // Open challenges re-read on every return too (created or withdrawn
+  // elsewhere); the first focus is the mount, which already reads them.
+  const [focusCount, setFocusCount] = React.useState(0);
+  const focusedOnceRef = React.useRef(false);
   useFocusEffect(
     React.useCallback(() => {
       void load();
+      if (focusedOnceRef.current) setFocusCount((n) => n + 1);
+      focusedOnceRef.current = true;
     }, [load]),
   );
 
@@ -83,7 +89,7 @@ export default function FriendsScreen() {
           ListFooterComponent={
             invitesOn ? (
               <View className="gap-4 pt-4">
-                <OpenChallenges athleteId={athlete?.id ?? null} />
+                <OpenChallenges athleteId={athlete?.id ?? null} reloadKey={focusCount} />
                 <TertiaryButton label="Got a challenge code?" onPress={() => router.push("/invite-code" as Href)} />
               </View>
             ) : null

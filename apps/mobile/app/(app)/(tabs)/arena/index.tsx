@@ -188,6 +188,8 @@ export default function ArenaScreen() {
     if (!focusAthleteId) return sorted;
     return sortFriendsFirst(sorted, (c) => c.id, new Set([focusAthleteId]));
   }, [onTheMat, friendIds, focusAthleteId]);
+  // The label names the order: friends lead the list when any are on the mat.
+  const matHasFriend = React.useMemo(() => onTheMat.some((c) => friendIds.has(c.id)), [onTheMat, friendIds]);
   const invitesOn = useInvitesEnabled();
   const inMatch = useIsInArenaMatch();
   const booked = useBookings({
@@ -398,7 +400,7 @@ export default function ArenaScreen() {
             {onTheMat.length > 0 ? (
               <View testID="arena-on-the-mat">
                 <MatSectionLabel
-                  label="On the mat · closest first"
+                  label={matHasFriend ? "On the mat · friends first" : "On the mat · closest first"}
                   right={String(onTheMat.length)}
                 />
                 {matRows.map((c) => {

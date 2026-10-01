@@ -16,11 +16,16 @@ const booking = {
   opponent: { athlete_id: "a1", display_name: "Alex R", first_name: "Alex" },
 } as unknown as Booking;
 
-function renderStrip(props: Partial<React.ComponentProps<typeof BookedStrip>> = {}) {
-  const handlers = { onRetry: jest.fn(), onAskLocation: jest.fn(), onCancel: jest.fn(() => Promise.resolve(true)) };
+function renderStrip(
+  props: Partial<React.ComponentProps<typeof BookedStrip>> = {},
+  result: "cancelled" | "too_late" | "failed" = "cancelled",
+) {
+  const handlers = { onRetry: jest.fn(), onAskLocation: jest.fn(), onCancel: jest.fn(() => Promise.resolve(result)) };
   render(<BookedStrip booking={booking} location="ok" presence={undefined} {...handlers} {...props} />);
   return handlers;
 }
+
+beforeEach(() => jest.restoreAllMocks());
 
 it.each([
   ["inviter_busy", "Alex is mid-match. We'll hold your spot."],
@@ -67,4 +72,20 @@ it("Cancel booking confirms first", async () => {
     await buttons.find((b) => b.text === "Cancel booking")?.onPress?.();
   });
   expect(h.onCancel).toHaveBeenCalled();
+});
+
+it.each([
+  ["failed", true],
+  ["too_late", false],
+  ["cancelled", false],
+] as const)("a %s cancel shows the connection alert: %s", async (result, shown) => {
+  const alert = jest.spyOn(Alert, "alert");
+  renderStrip({}, result);
+  fireEvent.press(screen.getByText("Cancel booking"));
+  const buttons = alert.mock.calls[0][2] as { text: string; onPress?: () => Promise<void> }[];
+  await act(async () => {
+    await buttons.find((b) => b.text === "Cancel booking")?.onPress?.();
+  });
+  const titles = alert.mock.calls.map((c) => c[0]);
+  expect(titles.includes("Couldn't cancel")).toBe(shown);
 });

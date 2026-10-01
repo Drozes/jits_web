@@ -52,7 +52,10 @@ export function useClaimRunner(
 
       if (pending.token) {
         setState({ phase: "checking" });
-        const joined = await acceptJoinInvite(supabase, pending.token);
+        const joined = await acceptJoinInvite(supabase, pending.token, {
+          gateway: pending.gateway,
+          platform: "ios",
+        });
         if (!joined.ok) {
           setState({ phase: "done", step: { type: "message", message: NETWORK_COPY, terminal: false } });
           return;

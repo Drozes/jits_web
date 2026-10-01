@@ -75,6 +75,18 @@ it("'Not you?' signs out, keeps the pending invite and returns to the launch rou
   expect(mockJoin).not.toHaveBeenCalled();
 });
 
+it("'Not now' drops the pending invite and goes to the Arena without claiming", async () => {
+  await withPending({ token: TOKEN }, "universal_link");
+  render(<InviteClaimScreen />);
+  await screen.findByTestId("claim-confirm");
+  fireEvent.press(screen.getByText("Not now"));
+  await waitFor(() => expect(mockReplace).toHaveBeenCalledWith("/arena"));
+  expect(await AsyncStorage.getItem(PENDING_INVITE_KEY)).toBeNull();
+  expect(mockSignOut).not.toHaveBeenCalled();
+  expect(mockClaim).not.toHaveBeenCalled();
+  expect(mockJoin).not.toHaveBeenCalled();
+});
+
 it("Continue runs the invite: a join link makes friends without a location read", async () => {
   mockJoin.mockResolvedValue({ ok: true, data: { ok: true, result: "friends", inviter } });
   await withPending({ token: TOKEN }, "universal_link");

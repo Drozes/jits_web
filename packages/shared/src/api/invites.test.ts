@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { claimChallengeInvite, createInvite, listMyOpenChallengeInvites, parseClaimResult, readInvitesEnabled } from "./invites";
+import { acceptJoinInvite, claimChallengeInvite, createInvite, listMyOpenChallengeInvites, parseClaimResult, readInvitesEnabled } from "./invites";
 import { getMyFriends, parseFriends, sortFriendsFirst } from "./friends";
 
 function client(result: { data: unknown; error: unknown }) {
@@ -153,5 +153,20 @@ describe("listMyOpenChallengeInvites", () => {
   it("returns the error instead of throwing", async () => {
     const res = await listMyOpenChallengeInvites(fromClient({ data: null, error: { message: "nope" } }).supabase, "me");
     expect(res.ok).toBe(false);
+  });
+});
+
+describe("acceptJoinInvite", () => {
+  it("passes the gateway and platform for attribution", async () => {
+    const { supabase, rpc } = client({ data: { ok: true, result: "friends", inviter }, error: null });
+    const res = await acceptJoinInvite(supabase as never, "t", { gateway: "qr", platform: "ios" });
+    expect(rpc).toHaveBeenCalledWith("accept_join_invite", { p_token: "t", p_gateway: "qr", p_platform: "ios" });
+    expect(res.ok && res.data.ok && res.data.result).toBe("friends");
+  });
+
+  it("sends only the token when no gateway is given (server defaults)", async () => {
+    const { supabase, rpc } = client({ data: { ok: false, code: "invalid" }, error: null });
+    await acceptJoinInvite(supabase as never, "t");
+    expect(rpc).toHaveBeenCalledWith("accept_join_invite", { p_token: "t" });
   });
 });

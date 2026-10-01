@@ -144,17 +144,31 @@ export async function takeBufferedEvents(): Promise<BufferedInviteEvent[]> {
 
 export const DEFER_PUSH_KEY = "elorated.invite.deferPush.v1";
 
-export async function deferPushUntilFirstMatch(): Promise<void> {
+/**
+ * The longest an invitee's push prompt waits for a first match: past a
+ * booking's 3 days (plus a day), a booking that expired while the app was
+ * closed can never release it, so it lapses on its own.
+ */
+export const PUSH_DEFERRAL_MAX_MS = 4 * 24 * 60 * 60 * 1000;
+
+/** Stores when the deferral was set (epoch ms). */
+export async function deferPushUntilFirstMatch(now: number = Date.now()): Promise<void> {
   try {
-    await AsyncStorage.setItem(DEFER_PUSH_KEY, "1");
+    await AsyncStorage.setItem(DEFER_PUSH_KEY, String(now));
   } catch {
     // Worst case the prompt comes early, as for any other athlete.
   }
 }
 
-export async function isPushDeferred(): Promise<boolean> {
+/** Whether registration still waits; false once the deferral has lapsed. */
+export async function isPushDeferred(now: number = Date.now()): Promise<boolean> {
   try {
-    return (await AsyncStorage.getItem(DEFER_PUSH_KEY)) === "1";
+    const v = await AsyncStorage.getItem(DEFER_PUSH_KEY);
+    if (v === null) return false;
+    const setAt = Number(v);
+    // An unreadable value (an older "1") is still a deferral, bounded by a match exit.
+    if (!Number.isFinite(setAt) || setAt < 1e12) return true;
+    return now - setAt < PUSH_DEFERRAL_MAX_MS;
   } catch {
     return false;
   }

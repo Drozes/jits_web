@@ -25,8 +25,11 @@ export function OpenChallenges({
   excludeInviteId,
   title = "Your open challenges",
   onWithdrawn,
+  reloadKey = 0,
 }: {
   athleteId: string | null;
+  /** Bump to re-read the list (a screen coming back into focus). */
+  reloadKey?: number;
   excludeInviteId?: string | null;
   title?: string;
   onWithdrawn?: () => void;
@@ -42,7 +45,7 @@ export function OpenChallenges({
 
   React.useEffect(() => {
     void load();
-  }, [load]);
+  }, [load, reloadKey]);
 
   const visible = rows.filter((r) => r.id !== excludeInviteId);
   if (visible.length === 0) return null;

@@ -59,10 +59,17 @@ export function useChallengeInvite(entryPoint: InviteEntryPoint | null) {
   phaseRef.current = phase;
   // Shared (a share target opened) or explicitly kept: survives leaving.
   const keepRef = React.useRef(false);
+  // Set when the screen goes away. An invite whose create resolves after
+  // that (the inviter tapped back mid round trip) is withdrawn on arrival.
+  const unmountedRef = React.useRef(false);
 
   const create = React.useCallback(async () => {
     setPhase({ kind: "creating" });
     const res = await createInvite(supabase, entryPoint);
+    if (unmountedRef.current) {
+      if (res.ok) void revokeInvite(supabase, res.data.invite_id);
+      return;
+    }
     if (!res.ok) {
       setPhase({ kind: "error", message: createInviteErrorMessage(res.error.hint), hint: res.error.hint });
       return;
@@ -83,14 +90,16 @@ export function useChallengeInvite(entryPoint: InviteEntryPoint | null) {
   }, [create]);
 
   // Withdraw an unshared, unclaimed, unkept invite when the screen goes away.
-  React.useEffect(
-    () => () => {
+  // (Reset on setup: a dev double effect runs this cleanup and then mounts again.)
+  React.useEffect(() => {
+    unmountedRef.current = false;
+    return () => {
+      unmountedRef.current = true;
       const current = inviteRef.current;
       if (!current || keepRef.current || phaseRef.current.kind !== "open") return;
       void revokeInvite(supabase, current.invite_id);
-    },
-    [],
-  );
+    };
+  }, []);
 
   // Refresh the short code when it expires (the link stays the same). A
   // failed refresh (offline) marks the code stale and retries every 15 s.

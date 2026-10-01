@@ -1015,6 +1015,9 @@ describe("Arena screen", () => {
       expect(r.getByTestId("arena-friend-badge-far")).toBeTruthy();
       expect(r.queryByTestId("arena-friend-badge-near")).toBeNull();
       expect(r.getAllByLabelText("Challenge Near")[0].props.testID).toBe("arena-closest-cta");
+      // The section label names the order it shows.
+      expect(r.getByText("On the mat · friends first")).toBeTruthy();
+      expect(r.queryByText("On the mat · closest first")).toBeNull();
     });
 
     it("the empty mat offers an invite only while invites are enabled", () => {

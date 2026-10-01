@@ -94,8 +94,16 @@ describe("invitee push deferral (jr_be spec 016: asked after the first match)", 
     expect(mockRegister).toHaveBeenCalledTimes(1);
   });
 
+  it("a deferral older than a booking can live (4 days) has lapsed: registers now", async () => {
+    await AsyncStorage.setItem("elorated.invite.deferPush.v1", String(Date.now() - 5 * 24 * 60 * 60 * 1000));
+    mockAthlete = { id: "me-1", status: "active" };
+    render(<PushRegistrationBootstrap />);
+    await flush();
+    expect(mockRegister).toHaveBeenCalledTimes(1);
+  });
+
   it("holds registration until a match screen has been left, then clears the flag", async () => {
-    await AsyncStorage.setItem("elorated.invite.deferPush.v1", "1");
+    await AsyncStorage.setItem("elorated.invite.deferPush.v1", String(Date.now()));
     mockAthlete = { id: "me-1", status: "active" };
     render(<PushRegistrationBootstrap />);
     await flush();

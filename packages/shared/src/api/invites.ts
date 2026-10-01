@@ -326,8 +326,20 @@ export function recordInviteAttribution(supabase: Client, input: InviteInput) {
   return rpc(supabase, "record_invite_attribution", inputArgs(input), parseAttribution);
 }
 
-export function acceptJoinInvite(supabase: Client, token: string) {
-  return rpc<AcceptJoinResult>(supabase, "accept_join_invite", { p_token: token }, (d) => {
+/**
+ * Accept a join invite. `gateway` and `platform` attribute the accept and
+ * its `join_accepted` event (a QR scan or a pasted link is not a universal
+ * link); omitted, the server's defaults apply (`universal_link`, `ios`).
+ */
+export function acceptJoinInvite(
+  supabase: Client,
+  token: string,
+  opts: { gateway?: InviteGateway; platform?: InvitePlatform } = {},
+) {
+  const args: Record<string, unknown> = { p_token: token };
+  if (opts.gateway) args.p_gateway = opts.gateway;
+  if (opts.platform) args.p_platform = opts.platform;
+  return rpc<AcceptJoinResult>(supabase, "accept_join_invite", args, (d) => {
     const o = obj(d);
     if (!o) return null;
     if (o.ok === true && (o.result === "friends" || o.result === "already_friends")) {

@@ -9,7 +9,12 @@
  */
 import { act, renderHook, waitFor } from "@testing-library/react-native";
 
-jest.mock("@/lib/supabase/client", () => ({ supabase: {} }));
+const mockMatchRow = jest.fn();
+jest.mock("@/lib/supabase/client", () => ({
+  supabase: {
+    from: () => ({ select: () => ({ eq: () => ({ maybeSingle: () => mockMatchRow() }) }) }),
+  },
+}));
 const mockReading = jest.fn();
 jest.mock("@/lib/invites/location", () => ({ readLocationOnce: (...a: unknown[]) => mockReading(...a) }));
 const mockBookings = jest.fn();
@@ -18,6 +23,8 @@ jest.mock("@jits/shared/api/invites", () => ({
   getMyBookings: (...a: unknown[]) => mockBookings(...a),
   reportMatchPresence: (...a: unknown[]) => mockPresence(...a),
 }));
+const mockRelease = jest.fn(() => Promise.resolve());
+jest.mock("@/lib/invites/pending-invite", () => ({ releasePushDeferral: () => mockRelease() }));
 const mockCancel = jest.fn();
 jest.mock("@jits/shared/api/mutations", () => ({ cancelChallenge: (...a: unknown[]) => mockCancel(...a) }));
 
@@ -42,6 +49,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockReading.mockResolvedValue(READING);
   mockBookings.mockResolvedValue({ ok: true, data: [booking("c1")] });
+  mockMatchRow.mockResolvedValue({ data: null, error: null });
 });
 
 it("routes when the server starts the match", async () => {
@@ -56,6 +64,15 @@ it("a closed booking leaves the strip with the toast copy", async () => {
   const { result, onClosed } = setup();
   await waitFor(() => expect(onClosed).toHaveBeenCalledWith("This booking was cancelled."));
   expect(result.current.bookings).toEqual([]);
+  // The last booking closed without a match: a deferred push prompt is released.
+  expect(mockRelease).toHaveBeenCalled();
+});
+
+it("a started match does not release the push deferral (the match exit does)", async () => {
+  mockPresence.mockResolvedValue({ ok: true, data: { ok: true, started: true, match_id: "m1", verdict: "passed" } });
+  const { onStarted } = setup();
+  await waitFor(() => expect(onStarted).toHaveBeenCalledWith("m1"));
+  expect(mockRelease).not.toHaveBeenCalled();
 });
 
 it("keeps the start-blocked reason per booking (a busy athlete)", async () => {
@@ -112,13 +129,14 @@ it("cancels a booking through the challenge cancel path", async () => {
   mockCancel.mockResolvedValue({ ok: true, data: { cancelled: true } });
   const { result } = setup();
   await waitFor(() => expect(result.current.bookings).toHaveLength(1));
-  let ok = false;
+  let out = "";
   await act(async () => {
-    ok = await result.current.cancel("c1");
+    out = await result.current.cancel("c1");
   });
-  expect(ok).toBe(true);
-  expect(mockCancel).toHaveBeenCalledWith(expect.anything(), "c1");
+  expect(out).toBe("cancelled");
+  expect(mockCancel).toHaveBeenCalledWith(expect.anything(), "c1", { onlyIfAccepted: true });
   expect(result.current.bookings).toEqual([]);
+  expect(mockRelease).toHaveBeenCalled();
 });
 
 it("a failed cancel keeps the booking", async () => {
@@ -126,10 +144,52 @@ it("a failed cancel keeps the booking", async () => {
   mockCancel.mockResolvedValue({ ok: false, error: { message: "offline" } });
   const { result } = setup();
   await waitFor(() => expect(result.current.bookings).toHaveLength(1));
-  let ok = true;
+  let out = "";
   await act(async () => {
-    ok = await result.current.cancel("c1");
+    out = await result.current.cancel("c1");
   });
-  expect(ok).toBe(false);
+  expect(out).toBe("failed");
+  expect(result.current.bookings).toHaveLength(1);
+});
+
+it("a booking the server started a moment earlier routes to the face-off, not 'cancelled'", async () => {
+  mockPresence.mockResolvedValue({ ok: true, data: { ok: true, started: false, match_id: null, verdict: "waiting" } });
+  mockCancel.mockResolvedValue({ ok: true, data: { cancelled: false } });
+  mockMatchRow.mockResolvedValue({ data: { id: "m9" }, error: null });
+  const { result, onStarted } = setup();
+  await waitFor(() => expect(result.current.bookings).toHaveLength(1));
+  let out = "";
+  await act(async () => {
+    out = await result.current.cancel("c1");
+  });
+  expect(out).toBe("too_late");
+  expect(onStarted).toHaveBeenCalledWith("m9");
+  expect(result.current.bookings).toEqual([]);
+});
+
+it("nothing cancelled and no match: reloads, and a booking that closed reads 'too_late'", async () => {
+  mockPresence.mockResolvedValue({ ok: true, data: { ok: true, started: false, match_id: null, verdict: "waiting" } });
+  mockCancel.mockResolvedValue({ ok: true, data: { cancelled: false } });
+  const { result } = setup();
+  await waitFor(() => expect(result.current.bookings).toHaveLength(1));
+  mockBookings.mockResolvedValue({ ok: true, data: [] });
+  let out = "";
+  await act(async () => {
+    out = await result.current.cancel("c1");
+  });
+  expect(out).toBe("too_late");
+  expect(result.current.bookings).toEqual([]);
+});
+
+it("nothing cancelled but the booking is still open reads 'failed'", async () => {
+  mockPresence.mockResolvedValue({ ok: true, data: { ok: true, started: false, match_id: null, verdict: "waiting" } });
+  mockCancel.mockResolvedValue({ ok: true, data: { cancelled: false } });
+  const { result } = setup();
+  await waitFor(() => expect(result.current.bookings).toHaveLength(1));
+  let out = "";
+  await act(async () => {
+    out = await result.current.cancel("c1");
+  });
+  expect(out).toBe("failed");
   expect(result.current.bookings).toHaveLength(1);
 });

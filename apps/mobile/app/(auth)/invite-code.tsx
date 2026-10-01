@@ -27,9 +27,14 @@ export default function InviteCodeScreen() {
   const locked = lockedUntil > now;
   React.useEffect(() => {
     if (!locked) return;
-    const t = setInterval(() => setNow(Date.now()), 1000);
+    const t = setInterval(() => {
+      const n = Date.now();
+      setNow(n);
+      // The lock ran out: the throttle message it came with no longer applies.
+      if (n >= lockedUntil) setError(null);
+    }, 1000);
     return () => clearInterval(t);
-  }, [locked]);
+  }, [locked, lockedUntil]);
   const remaining = Math.max(0, Math.ceil((lockedUntil - now) / 1000));
 
   const submit = async () => {

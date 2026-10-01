@@ -47,6 +47,13 @@ export default function InviteClaimScreen() {
     router.replace("/");
   };
 
+  // "Not now": this account does not want the invite. Drop it, or every cold
+  // launch would bring the athlete back here until the link expires.
+  const notNow = async () => {
+    await clearPendingInvite();
+    router.replace(ARENA_HREF as Href);
+  };
+
   const step = state.phase === "done" ? state.step : null;
 
   React.useEffect(() => {
@@ -84,6 +91,7 @@ export default function InviteClaimScreen() {
             </Text>
             <CtaButton label="Continue" onPress={() => setConfirmed(true)} />
             <SecondaryButton label="Sign out" onPress={() => void notMe()} />
+            <TertiaryButton label="Not now" onPress={() => void notNow()} />
           </Plate>
         ) : name && !step ? (
           <View className="flex-row flex-wrap items-center gap-x-2" testID="claim-signed-in-as">

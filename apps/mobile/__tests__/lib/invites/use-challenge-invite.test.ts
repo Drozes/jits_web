@@ -125,6 +125,31 @@ describe("leaving the screen (orphaned invites count toward the 5-open limit)", 
     expect(mockRevoke).not.toHaveBeenCalled();
   });
 
+  it("withdraws an invite whose create resolves after the screen went away", async () => {
+    let resolveCreate: (v: unknown) => void = () => {};
+    mockCreate.mockReturnValue(new Promise((r) => (resolveCreate = r)));
+    const { result, unmount } = renderHook(() => useChallengeInvite("arena"));
+    expect(result.current.phase.kind).toBe("creating");
+    expect(result.current.wouldWithdrawOnLeave()).toBe(false);
+    unmount();
+    expect(mockRevoke).not.toHaveBeenCalled();
+    await act(async () => {
+      resolveCreate({ ok: true, data: { ...INVITE, invite_id: "i-late" } });
+    });
+    await waitFor(() => expect(mockRevoke).toHaveBeenCalledWith(expect.anything(), "i-late"));
+  });
+
+  it("a create that fails after the screen went away revokes nothing", async () => {
+    let resolveCreate: (v: unknown) => void = () => {};
+    mockCreate.mockReturnValue(new Promise((r) => (resolveCreate = r)));
+    const { unmount } = renderHook(() => useChallengeInvite("arena"));
+    unmount();
+    await act(async () => {
+      resolveCreate({ ok: false, error: { hint: "invite_limit", message: "x" } });
+    });
+    expect(mockRevoke).not.toHaveBeenCalled();
+  });
+
   it("never withdraws a claimed invite", async () => {
     mockCreate.mockResolvedValue({ ok: true, data: INVITE });
     const { result, unmount } = renderHook(() => useChallengeInvite("arena"));
