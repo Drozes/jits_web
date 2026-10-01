@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { AppHeader } from "@/components/layout/app-header";
@@ -11,6 +12,8 @@ import {
 } from "@/lib/profile-setup/signup-form-validation";
 import { CityAutocomplete } from "@/components/profile-setup/city-autocomplete";
 import { withNext } from "@/lib/auth/safe-next-path";
+import { AppleOAuthButton } from "@/components/auth/apple-oauth-button";
+import { GoogleOAuthButton } from "@/components/auth/google-oauth-button";
 
 interface GymOption {
   id: string;
@@ -325,7 +328,52 @@ export function SignUpForm({ gyms, cities, next = null, inviteBanner = null }: S
         >
           {isLoading ? "Creating account..." : "Continue"}
         </button>
+
+        {invite && (
+          <div
+            data-testid="invite-signup-alternatives"
+            style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)", marginTop: "var(--space-5)" }}
+          >
+            <OrDivider />
+            {/* Apple first: the one-tap option on the invite path (plan 10.4). */}
+            <AppleOAuthButton disabled={isLoading} onError={setError} next={next} />
+            <GoogleOAuthButton disabled={isLoading} onError={setError} next={next} />
+            <Link
+              href={withNext("/login", next)}
+              style={{
+                fontFamily: "var(--font-body)",
+                fontSize: "var(--size-body-s)",
+                color: "var(--text-secondary)",
+                textAlign: "center",
+                padding: "var(--space-2) 0",
+              }}
+            >
+              Already have an account? <span style={{ color: "var(--text-primary)", textDecoration: "underline" }}>Log in</span>
+            </Link>
+          </div>
+        )}
       </form>
+    </div>
+  );
+}
+
+function OrDivider() {
+  const rule = { height: 1, flex: 1, background: "var(--border-hairline)" };
+  return (
+    <div aria-hidden="true" style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+      <span style={rule} />
+      <span
+        style={{
+          fontFamily: "var(--font-mono)",
+          fontSize: "var(--size-num-xs)",
+          color: "var(--text-tertiary)",
+          textTransform: "uppercase",
+          letterSpacing: "var(--ls-caps-l)",
+        }}
+      >
+        Or
+      </span>
+      <span style={rule} />
     </div>
   );
 }

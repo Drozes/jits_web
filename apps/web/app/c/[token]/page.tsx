@@ -3,7 +3,8 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { InviteLanding } from "@/components/invites/invite-landing";
 import { invitePageTitle } from "@/lib/invites/format";
-import { getInvitePreview } from "@/lib/invites/preview";
+import { getInvitePreviewCached as getInvitePreview } from "@/lib/invites/preview";
+import { publicSiteOrigin } from "@/lib/invites/site-origin";
 import { detectInAppBrowser } from "@/lib/invites/user-agent";
 import { getInviteViewer } from "@/lib/invites/viewer";
 
@@ -20,6 +21,9 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
         : "Ranked jiu-jitsu. Tap to join."
       : "Ranked jiu-jitsu. Find out where you stand.";
   return {
+    // The og:image must resolve on a stable public host that crawlers can
+    // fetch, never the per-deployment VERCEL_URL of the root layout.
+    metadataBase: new URL(publicSiteOrigin()),
     title,
     description,
     robots: { index: false, follow: false },

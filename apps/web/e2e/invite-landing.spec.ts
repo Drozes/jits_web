@@ -42,6 +42,11 @@ test.describe("Invite landing /c/[token]", () => {
 
     const og = page.locator('meta[property="og:image"]');
     await expect(og).toHaveAttribute("content", new RegExp(`/c/${CHALLENGE}/opengraph-image`));
+    // `next dev` always resolves file-based OG images against localhost, so
+    // the public-origin rule (never VERCEL_URL) is pinned by page.test.ts and
+    // was verified on `next start` with NEXT_PUBLIC_SITE_URL and VERCEL_URL set.
+    const ogUrl = new URL((await og.getAttribute("content")) ?? "");
+    expect(ogUrl.hostname).not.toMatch(/\.vercel\.app$/);
     await expect(page.locator('meta[name="referrer"]')).toHaveAttribute("content", "no-referrer");
   });
 
@@ -74,6 +79,14 @@ test.describe("Invite landing /c/[token]", () => {
       page.getByRole("status").filter({ hasText: "Alex challenged you. Create your account to accept." }),
     ).toBeVisible();
     await expect(page.getByRole("option", { name: "Free agent (no gym)" })).toHaveCount(1);
+    // One-tap OAuth and a way back to log in, both carrying ?next=.
+    const alternatives = page.getByTestId("invite-signup-alternatives");
+    await expect(alternatives.getByRole("button", { name: /apple/i })).toBeVisible();
+    await expect(alternatives.getByRole("button", { name: /google/i })).toBeVisible();
+    await expect(alternatives.getByRole("link", { name: /log in/i })).toHaveAttribute(
+      "href",
+      `/login?next=${encodeURIComponent(`/c/${CHALLENGE}`)}`,
+    );
   });
 
   test("OG image is a JPEG under 250 KB", async ({ request }) => {

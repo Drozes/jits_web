@@ -5,7 +5,7 @@ import Link from "next/link";
 import { acceptJoinAction, claimInviteAction } from "@/app/c/[token]/actions";
 import { withNext } from "@/lib/auth/safe-next-path";
 import { invitePath } from "@/lib/invites/constants";
-import type { InviteOutcome } from "@/lib/invites/outcome-copy";
+import { TRY_AGAIN_OUTCOME, type InviteOutcome } from "@/lib/invites/outcome-copy";
 import type { InAppBrowser, InviteKind } from "@/lib/invites/types";
 import type { InviteViewer } from "@/lib/invites/viewer";
 import { AppStoreButton, CopyLinkButton, OpenInAppButton } from "./app-links";
@@ -28,18 +28,50 @@ interface InviteActionsProps {
 export function InviteActions({ token, kind, inviterFirstName, viewer, inAppBrowser }: InviteActionsProps) {
   const [outcome, setOutcome] = useState<InviteOutcome | null>(null);
   const [pending, startTransition] = useTransition();
-  const links = { token, inAppBrowser };
+  const links = { token, inAppBrowser, kind };
   const next = invitePath(token);
   const verb = kind === "challenge" ? "accept" : "join";
 
   const accept = () =>
     startTransition(async () => {
-      const result =
-        kind === "challenge"
-          ? await claimInviteAction(token)
-          : await acceptJoinAction(token, inviterFirstName);
-      setOutcome(result);
+      try {
+        const result =
+          kind === "challenge"
+            ? await claimInviteAction(token)
+            : await acceptJoinAction(token, inviterFirstName);
+        setOutcome(result);
+      } catch (err) {
+        // redirect() from the action (setup, login) must propagate.
+        if (isNextRedirect(err)) throw err;
+        // The action call itself failed (offline, deploy in flight).
+        setOutcome(TRY_AGAIN_OUTCOME);
+      }
     });
+
+  // Transient failure: keep the accept path open with an explicit retry.
+  if (outcome?.kind === "retry") {
+    return (
+      <div style={STACK}>
+        <InviteOutcomeCard outcome={outcome} />
+        <button type="button" onClick={accept} disabled={pending} style={{ ...PRIMARY_CTA, opacity: pending ? "var(--opacity-disabled)" : 1 }}>
+          {pending ? "Trying again..." : "Try again"}
+        </button>
+        <OpenInAppButton {...links} />
+        <AppStoreButton {...links} primary={false} />
+      </div>
+    );
+  }
+
+  // The match already exists: it is played in the app, so open it there.
+  if (outcome?.kind === "ready") {
+    return (
+      <div style={STACK}>
+        <InviteOutcomeCard outcome={outcome} />
+        <OpenInAppButton {...links} primary />
+        <AppStoreButton {...links} primary={false} />
+      </div>
+    );
+  }
 
   if (outcome && outcome.kind !== "setup") {
     return (
@@ -89,6 +121,12 @@ export function InviteActions({ token, kind, inviterFirstName, viewer, inAppBrow
       </div>
     </div>
   );
+}
+
+/** next/navigation redirect() throws an error tagged with this digest. */
+function isNextRedirect(err: unknown): boolean {
+  const digest = (err as { digest?: unknown } | null)?.digest;
+  return typeof digest === "string" && digest.startsWith("NEXT_REDIRECT");
 }
 
 const STACK: React.CSSProperties = { display: "flex", flexDirection: "column", gap: "var(--space-3)" };

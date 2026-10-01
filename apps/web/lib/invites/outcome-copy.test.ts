@@ -25,6 +25,36 @@ const success = (reason: "inviter_busy" | "claimer_busy" | "no_location" | null)
   });
 
 describe("claimOutcome", () => {
+  it("points an existing match to the app instead of the booked copy", () => {
+    for (const result of ["already_claimed", "started"] as const) {
+      expect(
+        claimOutcome({
+          ok: true,
+          result,
+          invite_id: "i",
+          challenge_id: "c",
+          match_id: "m",
+          booking_expires_at: null,
+          inviter: ALEX,
+          start_blocked_reason: null,
+        }),
+      ).toEqual({ kind: "ready", title: "Match ready", body: "Your match with Alex is ready in the app." });
+    }
+  });
+
+  it("capitalises the fallback name when it opens a sentence", () => {
+    const nameless = { ...ALEX, first_name: null };
+    expect(claimOutcome({ ok: false, code: "revoked", inviter: nameless })).toMatchObject({
+      body: "Your training partner withdrew this challenge.",
+    });
+    expect(claimOutcome({ ok: false, code: "inviter_unavailable", inviter: null })).toMatchObject({
+      body: "Your training partner can't take matches right now.",
+    });
+    expect(claimOutcome({ ok: false, code: "expired", inviter: null })).toMatchObject({
+      body: "This challenge expired. Ask your training partner for a new one.",
+    });
+  });
+
   it("books on web with the contract copy", () => {
     expect(success("no_location")).toMatchObject({
       kind: "booked",

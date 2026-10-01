@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { safeNextPath } from "@/lib/auth/safe-next-path";
 import { INVITE_COOKIE } from "@/lib/invites/constants";
 import { attributeInviteCookie } from "@/lib/invites/cookie-attribution";
+import { planCallbackInvite } from "@/lib/invites/cookie-plan";
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
@@ -20,9 +21,9 @@ export async function GET(request: NextRequest) {
         supabase,
         request.cookies.get(INVITE_COOKIE)?.value,
       );
-      const target = next === "/" && decision.acceptPath ? decision.acceptPath : next;
-      const response = NextResponse.redirect(`${origin}${target}`);
-      if (decision.clear) response.cookies.delete(INVITE_COOKIE);
+      const plan = planCallbackInvite(decision, next);
+      const response = NextResponse.redirect(`${origin}${plan.target}`);
+      if (plan.clear) response.cookies.delete(INVITE_COOKIE);
       return response;
     }
   }

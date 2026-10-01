@@ -5,7 +5,7 @@ type ShownOutcome = Exclude<InviteOutcome, { kind: "setup" }>;
 
 /** Result of an accept on web. Errors use state-negative, never red fills. */
 export function InviteOutcomeCard({ outcome }: { outcome: ShownOutcome }) {
-  const isError = outcome.kind === "error";
+  const isError = outcome.kind === "error" || outcome.kind === "retry";
   return (
     <section
       role={isError ? "alert" : "status"}

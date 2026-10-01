@@ -20,7 +20,9 @@ const KEEP: CookieAttributionDecision = { clear: false, acceptPath: null };
  * keeps the cookie so the next request retries; every RPC answer clears it,
  * which also stops a declined challenge from bouncing the athlete back to
  * the landing page on every navigation (the token lives on in the /c URL and
- * in ?next=).
+ * in ?next=). For an open challenge, `clear` is applied only once the accept
+ * redirect is actually issued (see planInviteCookie in cookie-plan.ts), so a
+ * setup page reached first does not drop the challenge.
  */
 export async function attributeInviteCookie(
   supabase: SupabaseClient,

@@ -17,7 +17,8 @@ export function isLandingStep(value: unknown): value is LandingStep {
 /**
  * Landing telemetry via log_invite_landing_event (contract 4.14). Detail is
  * limited to in_app_browser and kind: never IP, user agent or device id.
- * Best effort: a failure is swallowed so it never breaks the page.
+ * Best effort: a failure never breaks the page, but it is logged
+ * server-side (without the token) so dropped telemetry is visible.
  */
 export async function logLandingEvent(
   token: string,
@@ -26,10 +27,16 @@ export async function logLandingEvent(
 ): Promise<void> {
   if (process.env.E2E_INVITE_FIXTURES === "1") return;
   const admin = createInviteAdminClient();
-  if (!admin) return;
-  await admin.rpc("log_invite_landing_event", {
+  if (!admin) {
+    console.error("[invites] log_invite_landing_event skipped: SUPABASE_SERVICE_ROLE_KEY or NEXT_PUBLIC_SUPABASE_URL is not set");
+    return;
+  }
+  const { error } = await admin.rpc("log_invite_landing_event", {
     p_token: token,
     p_step: step,
     p_detail: detail,
   });
+  if (error) {
+    console.error("[invites] log_invite_landing_event failed", { step, code: error.code, message: error.message });
+  }
 }

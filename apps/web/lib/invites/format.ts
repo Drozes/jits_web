@@ -11,9 +11,16 @@ export function inviterShortName(inviter: {
   return (initial ? `${first} ${initial[0]}.` : first).toUpperCase();
 }
 
-/** First name as written, for sentence copy (`Ask Alex for a new one.`). */
-export function inviterFirstName(inviter: { first_name: string | null } | null | undefined): string {
-  return inviter?.first_name?.trim() || "your training partner";
+/**
+ * First name as written, for sentence copy (`Ask Alex for a new one.`).
+ * Pass `sentenceStart` when the name opens a sentence so the fallback is
+ * capitalised (`Your training partner withdrew this challenge.`).
+ */
+export function inviterFirstName(
+  inviter: { first_name: string | null } | null | undefined,
+  opts: { sentenceStart?: boolean } = {},
+): string {
+  return inviter?.first_name?.trim() || (opts.sentenceStart ? "Your training partner" : "your training partner");
 }
 
 export function formatElo(elo: number): string {

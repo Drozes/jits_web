@@ -11,12 +11,14 @@ interface InviteCodeBlockProps {
   inAppBrowser: InAppBrowser;
 }
 
+const KIND = "challenge" as const;
+
 /** The short code, shown large; tap to copy it for the app's code entry. */
 export function InviteCodeBlock({ token, code, inAppBrowser }: InviteCodeBlockProps) {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    sendLandingEvent(token, "code_viewed", inAppBrowser);
+    sendLandingEvent(token, "code_viewed", inAppBrowser, KIND);
   }, [token, inAppBrowser]);
 
   const copy = async () => {

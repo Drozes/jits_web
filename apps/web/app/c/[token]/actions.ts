@@ -10,7 +10,12 @@ import {
   INVITE_TOKEN_RE,
   invitePath,
 } from "@/lib/invites/constants";
-import { claimOutcome, joinOutcome, type InviteOutcome } from "@/lib/invites/outcome-copy";
+import {
+  claimOutcome,
+  joinOutcome,
+  TRY_AGAIN_OUTCOME,
+  type InviteOutcome,
+} from "@/lib/invites/outcome-copy";
 import type { AcceptJoinResult, ClaimResult } from "@/lib/invites/types";
 
 const INVALID: InviteOutcome = {
@@ -19,15 +24,17 @@ const INVALID: InviteOutcome = {
   body: "This invite link isn't valid. Ask your training partner to send it again.",
 };
 
-const TRY_AGAIN: InviteOutcome = {
-  kind: "error",
-  title: "Something went wrong",
-  body: "We couldn't reach ELO RATED. Check your connection and try again.",
-};
+const TRY_AGAIN = TRY_AGAIN_OUTCOME;
 
-async function finish(token: string, outcome: InviteOutcome): Promise<InviteOutcome> {
-  // A claim or join result consumes the pending invite (contract 6).
-  (await cookies()).delete(INVITE_COOKIE);
+/**
+ * No cookie write here (CONTRACT DEVIATION, see the 016 web summary): any
+ * cookies() mutation in a Server Action makes Next re-render the route, and
+ * a claimed challenge then previews as "unavailable", replacing the result
+ * the athlete just earned with "Invite unavailable". The pending er_invite
+ * cookie is consumed by the proxy instead: on the signed-in arrival at
+ * /c/<token>, or on the next request once the invite is no longer open.
+ */
+function finish(token: string, outcome: InviteOutcome): InviteOutcome {
   if (outcome.kind === "setup") redirect(withNext("/eua", invitePath(token)));
   return outcome;
 }
