@@ -174,6 +174,49 @@ export type Database = {
           },
         ]
       }
+      athlete_friendship_removals: {
+        Row: {
+          athlete_a: string
+          athlete_b: string
+          removed_at: string
+          removed_by: string
+        }
+        Insert: {
+          athlete_a: string
+          athlete_b: string
+          removed_at?: string
+          removed_by: string
+        }
+        Update: {
+          athlete_a?: string
+          athlete_b?: string
+          removed_at?: string
+          removed_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "athlete_friendship_removals_athlete_a_fkey"
+            columns: ["athlete_a"]
+            isOneToOne: false
+            referencedRelation: "athletes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "athlete_friendship_removals_athlete_b_fkey"
+            columns: ["athlete_b"]
+            isOneToOne: false
+            referencedRelation: "athletes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "athlete_friendship_removals_removed_by_fkey"
+            columns: ["removed_by"]
+            isOneToOne: false
+            referencedRelation: "athletes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       athlete_friendships: {
         Row: {
           athlete_a: string
@@ -2943,6 +2986,7 @@ export type Database = {
         }
         Returns: Json
       }
+      _coarse_distance_m: { Args: { p_d: number }; Returns: number }
       _enqueue_invite_joined: {
         Args: { p_invitee: string }
         Returns: undefined

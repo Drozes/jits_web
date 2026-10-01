@@ -6,10 +6,11 @@
 
 Merges the web (`feat/invites-web`), mobile (`feat/invites-mobile`) and native (`feat/invites-native`) slices. Ships as a **TestFlight build** (the native slice adds native modules and entitlements, version 0.5.0), with the web deploy after the jr_be `20261001*` migrations are applied on prod (flag `invites_enabled` off).
 
-**Cross-repo dependency:** jr_be `feat/invites`, migrations `20261001100000` to `20261001100400`, `20261001200000` to `20261001200200` and `20261001300000` (weekly invite cap still makes friends), plus the `delete-account` edge function.
+**Cross-repo dependency:** jr_be `feat/invites`, migrations `20261001100000` to `20261001100400`, `20261001200000` to `20261001200200` and `20261001300000` (weekly invite cap still makes friends), plus `20261001300100` (privacy fixes: a failed proximity check shows its distance only in 500 m buckets, and a removed friend is not re-made when the removed athlete re-accepts an old personal link), plus the `delete-account` edge function.
 
 **Changed**
 - `packages/shared/src/types/database.ts` regenerated against the local stack with every `20261001*` migration (invites, friendships, presence, social notifications, account deletion; `athletes.auth_user_id` is now nullable for deleted athletes). The invite and friends wrappers check RPC names against it, and the `invites` and `notification_preferences` reads use typed queries instead of local casts.
+- `database.ts` regenerated for jr_be `20261001300100`: adds the server-only `athlete_friendship_removals` table and `_coarse_distance_m`. No client code reads either; a removed pair re-accepting an old link still gets `already_friends`, by design (no removal leak).
 - Weekly invite cap copy is the contract 7 text on both clients ("You're now friends, so challenge them from the Arena."): the backend now makes the friendship before returning `inviter_weekly_cap` (jits-b3js.17).
 - Mobile Arena friend badges no longer listen to `athlete_friendships` realtime (the table left the publication, jr_be A3). `useFriendIds` re-reads on focus, on foreground and on `notifyFriendsChanged()`, which the claim runner and the Friends remove action call; a failed read keeps the last known set.
 - Web join accept sends `p_gateway: "landing_web"` and `p_platform: "web"` so attribution is recorded correctly.
