@@ -69,6 +69,23 @@ interface NotificationData {
   type?: unknown;
   id?: unknown;
   arena_href?: unknown;
+  match_href?: unknown;
+  profile_href?: unknown;
+}
+
+const MATCH_HREF_RE = /^\/match\/[0-9a-f-]{36}$/;
+const PROFILE_HREF_RE = /^\/athlete\/[0-9a-f-]{36}$/;
+
+/**
+ * Invite and friend pushes (jr_be spec 016, contract 5): precedence
+ * `match_href` (face-off ready) > `profile_href` (a friend joined) >
+ * `arena_href` (booked, or a friend on the mat). Each is validated against
+ * its exact shape; anything else is ignored.
+ */
+function inviteHref(d: NotificationData): string | null {
+  if (typeof d.match_href === "string" && MATCH_HREF_RE.test(d.match_href)) return d.match_href;
+  if (typeof d.profile_href === "string" && PROFILE_HREF_RE.test(d.profile_href)) return d.profile_href;
+  return null;
 }
 
 /**
@@ -94,6 +111,7 @@ export function notificationTarget(data: unknown): string | null {
   const d = (data ?? {}) as NotificationData;
   let route: string | null =
     typeof d.route === "string" && d.route.trim().length > 0 ? d.route : null;
+  if (!route) route = inviteHref(d);
   if (!route) route = arenaHref(d.arena_href);
   if (!route && d.type === HIGHLIGHT_READY_PUSH_TYPE && typeof d.id === "string" && d.id) {
     route = `/highlight/${encodeURIComponent(d.id)}?source=push`;

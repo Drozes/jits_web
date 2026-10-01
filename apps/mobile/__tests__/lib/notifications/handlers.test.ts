@@ -522,3 +522,18 @@ describe("sync cold-start API (NIT)", () => {
     expect(mockGetLast).not.toHaveBeenCalled();
   });
 });
+
+describe("invite and friend pushes (jr_be spec 016, contract 5)", () => {
+  const M = "/match/0b7a6f3e-2c1d-4e5f-8a9b-0c1d2e3f4a5b";
+  const P = "/athlete/0b7a6f3e-2c1d-4e5f-8a9b-0c1d2e3f4a5b";
+  it("match_href beats profile_href beats arena_href", () => {
+    expect(notificationTarget({ type: "invite", match_href: M, arena_href: "/arena" })).toBe(M);
+    expect(notificationTarget({ type: "invite", profile_href: P, arena_href: "/arena" })).toBe(P);
+    expect(notificationTarget({ type: "friend", arena_href: "/arena?athlete=a1" })).toBe("/arena?athlete=a1");
+    expect(notificationTarget({ type: "invite", arena_href: "/arena?booking=c1" })).toBe("/arena?booking=c1");
+  });
+  it("ignores hrefs that do not match their exact shape", () => {
+    expect(notificationTarget({ match_href: "/match/../settings", arena_href: "/arena" })).toBe("/arena");
+    expect(notificationTarget({ profile_href: "https://evil.example/athlete/x" })).toBeNull();
+  });
+});

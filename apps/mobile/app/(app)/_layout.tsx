@@ -45,6 +45,11 @@ export default function AppLayout() {
         {/* The practice match: a local walk through one Arena match against
           a scripted bot. Writes no match data. */}
         <Stack.Screen name="practice" />
+        {/* Invites + friends (jr_be spec 016). */}
+        <Stack.Screen name="invite/index" />
+        <Stack.Screen name="invite/join" />
+        <Stack.Screen name="invite/claim" options={{ gestureEnabled: false }} />
+        <Stack.Screen name="friends" />
       </Stack>
       {/* Live state, lobby presence and the incoming-challenge prompt, once for
         the whole signed-in app, so being live survives switching tabs and a

@@ -13,6 +13,7 @@ import {
   updateNotificationPreferences,
   type NotificationPrefs,
 } from "@jits/shared/api/mutations";
+import { getFriendsNotificationsEnabled, setFriendsNotificationsEnabled } from "@jits/shared/api/friends";
 
 const TOGGLES: {
   key: keyof NotificationPrefs;
@@ -40,11 +41,16 @@ export default function NotificationsScreen() {
   const { athlete } = useAuth();
   const tokens = useThemedTokens();
   const [prefs, setPrefs] = React.useState<NotificationPrefs | null>(null);
+  // "Friends on the mat" (jr_be spec 016): invite_joined and friend_live.
+  const [friendsOn, setFriendsOn] = React.useState(true);
 
   React.useEffect(() => {
     let cancelled = false;
     getNotificationPreferences(supabase).then((p) => {
       if (!cancelled) setPrefs(p);
+    });
+    void getFriendsNotificationsEnabled(supabase).then((on) => {
+      if (!cancelled) setFriendsOn(on);
     });
     return () => {
       cancelled = true;
@@ -68,6 +74,17 @@ export default function NotificationsScreen() {
     [prefs, athlete],
   );
 
+  const toggleFriends = React.useCallback(async () => {
+    if (!athlete) return;
+    const prev = friendsOn;
+    setFriendsOn(!prev);
+    const res = await setFriendsNotificationsEnabled(supabase, athlete.id, !prev);
+    if (!res.ok) {
+      setFriendsOn(prev);
+      toast.error("Could not save notification settings. Please try again.");
+    }
+  }, [athlete, friendsOn]);
+
   return (
     <>
       <AppHeader title="Notifications" back />
@@ -90,6 +107,13 @@ export default function NotificationsScreen() {
                 />
               </View>
             ))}
+            <View className="h-px bg-hairline-faint" />
+            <ToggleRow
+              label="FRIENDS ON THE MAT"
+              description="A friend goes live, or someone you invited joins"
+              value={friendsOn}
+              onToggle={() => void toggleFriends()}
+            />
           </Plate>
         ) : (
           <View className="items-center py-16">

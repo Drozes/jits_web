@@ -413,12 +413,13 @@ function shareApiProblems(source: string): string[] {
 }
 
 describe("5. Share.share stays as it is", () => {
-  it("has exactly three calls and none hands over a local file", () => {
+  it("has exactly four calls and none hands over a local file", () => {
     const calls = appSourceFiles().flatMap((file) =>
       shareCallArguments(fs.readFileSync(file, "utf8")).map((args) => [relative(file), args] as const),
     );
-    // Athlete profile, own profile share sheet, match summary.
-    expect(calls).toHaveLength(3);
+    // Athlete profile, own profile share sheet, match summary, and the
+    // invite share (jr_be spec 016: message only, the link inside it).
+    expect(calls).toHaveLength(4);
     const offenders = calls
       .filter(([, args]) =>
         /videoUri|videoUrl|recordingUri|clipUri|localUri|fileUri|file:\/\/|\.mp4|\.mov/.test(args),

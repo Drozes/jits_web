@@ -3,12 +3,17 @@ import { Text, View } from "react-native";
 import { ATHLETE_STATUS } from "@jits/shared/constants";
 import { CtaButton, TertiaryButton } from "@/components/auth/auth-buttons";
 import { useAuth } from "@/lib/auth/hooks";
+import { usePendingInvite } from "@/lib/invites/use-pending-invite";
+import { inviteLaunchRoute } from "@/lib/invites/launch-route";
 
 export default function Index() {
   const { user, athlete, isLoading, athleteLoadFailed, retryAthleteLoad, signOut } =
     useAuth();
+  // A pending invite (jr_be spec 016) is consumed here, before the Home /
+  // setup redirects, so an invitee is never dropped on Home.
+  const invite = usePendingInvite();
 
-  if (isLoading) {
+  if (isLoading || !invite.loaded) {
     // The athlete read keeps failing (the provider is still retrying in the
     // background). Never guess "no athlete" here: that is the /profile-setup
     // dead end for an athlete who is already active.
@@ -29,6 +34,13 @@ export default function Index() {
       </View>
     );
   }
+
+  const inviteRoute = inviteLaunchRoute({
+    pending: invite.pending,
+    signedIn: Boolean(user),
+    athleteStatus: athlete?.status ?? null,
+  });
+  if (inviteRoute) return <Redirect href={inviteRoute} />;
 
   if (!user) return <Redirect href="/login" />;
   if (!athlete || athlete.status === ATHLETE_STATUS.PENDING) {

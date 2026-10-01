@@ -14,6 +14,8 @@ import { AppHeader } from "@/components/layout/app-header";
 import { AuthFormField } from "@/components/auth/auth-form-field";
 import { CtaButton } from "@/components/auth/auth-buttons";
 import { useAuth } from "@/lib/auth/hooks";
+import { InviteBanner } from "@/components/invite/invite-banner";
+import { usePendingInvite } from "@/lib/invites/use-pending-invite";
 
 /**
  * Mobile signup screen. Mirrors wireframe A2 in spirit (account creation),
@@ -28,6 +30,9 @@ export default function SignupScreen() {
   const [password, setPassword] = React.useState("");
   const [confirmPassword, setConfirmPassword] = React.useState("");
   const [submitting, setSubmitting] = React.useState(false);
+  // Invite path (jr_be spec 016): banner, and confirm-password dropped.
+  const { pending } = usePendingInvite();
+  const invitePath = pending !== null;
   const [submitted, setSubmitted] = React.useState(false);
   const [needsConfirmation, setNeedsConfirmation] = React.useState(false);
   const [touched, setTouched] = React.useState({
@@ -44,9 +49,9 @@ export default function SignupScreen() {
     !email.trim() || !email.includes("@") ? "Enter a valid email" : null;
   const passwordError = password.length < 8 ? "At least 8 characters" : null;
   const confirmError =
-    confirmPassword !== password ? "Passwords do not match" : null;
+    !invitePath && confirmPassword !== password ? "Passwords do not match" : null;
   const formInvalid = Boolean(emailError || passwordError || confirmError);
-  const allTouched = touched.email && touched.password && touched.confirm;
+  const allTouched = touched.email && touched.password && (invitePath || touched.confirm);
 
   const onSubmit = async () => {
     setTouched({ email: true, password: true, confirm: true });
@@ -97,6 +102,12 @@ export default function SignupScreen() {
                 </Text>
               </View>
 
+              {invitePath ? (
+                <InviteBanner kind={pending?.code ? "challenge" : null} inviterName={null} />
+              ) : null}
+
+              {/* Slot: the native slice mounts <AppleSignInButton /> here. */}
+
               <Plate className="gap-5">
                 <AuthFormField
                   label="Email"
@@ -125,6 +136,7 @@ export default function SignupScreen() {
                   error={passwordError}
                   showError={touched.password}
                 />
+                {invitePath ? null : (
                 <AuthFormField
                   label="Confirm Password"
                   autoCapitalize="none"
@@ -139,6 +151,7 @@ export default function SignupScreen() {
                   error={confirmError}
                   showError={touched.confirm}
                 />
+                )}
                 <CtaButton
                   label={submitting ? "Creating account..." : "Continue"}
                   onPress={onSubmit}
@@ -155,6 +168,18 @@ export default function SignupScreen() {
                 <Text className="text-center font-mono text-[11px] text-ink-2 uppercase tracking-caps-l">
                   Already have an account?{" "}
                   <Text className="text-cta">Sign in</Text>
+                </Text>
+              </Pressable>
+
+              <Pressable
+                testID="got-a-code"
+                onPress={() => router.push("/invite-code")}
+                hitSlop={8}
+                accessibilityRole="button"
+                className="active:opacity-70"
+              >
+                <Text className="text-center font-mono text-[11px] text-ink-2 uppercase tracking-caps-l">
+                  Got a challenge code?
                 </Text>
               </Pressable>
             </>

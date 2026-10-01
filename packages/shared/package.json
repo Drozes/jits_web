@@ -19,6 +19,8 @@
     "./api/athlete-weight": "./src/api/athlete-weight.ts",
     "./api/match-weights": "./src/api/match-weights.ts",
     "./api/match-weight-checks": "./src/api/match-weight-checks.ts",
+    "./api/invites": "./src/api/invites.ts",
+    "./api/friends": "./src/api/friends.ts",
     "./constants": "./src/constants.ts",
     "./constants/highlights": "./src/constants/highlights.ts",
     "./geo": "./src/geo/index.ts",

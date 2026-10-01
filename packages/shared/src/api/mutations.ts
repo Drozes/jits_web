@@ -125,6 +125,12 @@ interface CancelChallengeOptions {
    * (`challenges_update_cancel` allows cancelling `accepted` too).
    */
   onlyIfPending?: boolean;
+  /**
+   * Only cancel while the row is still `accepted` (an invite booking). A
+   * booking the server started a moment ago is left alone and reports
+   * `cancelled: false`.
+   */
+  onlyIfAccepted?: boolean;
 }
 
 /**
@@ -147,6 +153,7 @@ export async function cancelChallenge(
     .update({ status: "cancelled" })
     .eq("id", challengeId);
   if (options.onlyIfPending) query = query.eq("status", "pending");
+  else if (options.onlyIfAccepted) query = query.eq("status", "accepted");
 
   const { data, error } = await query.select("id");
 

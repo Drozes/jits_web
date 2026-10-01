@@ -8,6 +8,7 @@ import { Plate } from "@/components/ui/elo-system";
 import { useAuth, useIsAdmin, useRequireAthlete } from "@/lib/auth/hooks";
 import { isSentryEnabled, showFeedback } from "@/lib/error-tracking/sentry";
 import { cn } from "@/lib/cn";
+import { clearPendingInvite } from "@/lib/invites/pending-invite";
 
 /**
  * G3 Settings. Mirrors the web settings index: three Plate sections grouping
@@ -39,6 +40,9 @@ export default function SettingsScreen() {
         text: "Sign out",
         style: "destructive",
         onPress: async () => {
+          // A deliberate sign-out drops a pending invite (contract 6); the
+          // claim screen's "Not you?" sign-out keeps it.
+          await clearPendingInvite();
           await signOut();
           router.replace("/login");
         },

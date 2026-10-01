@@ -12,6 +12,8 @@ import { useAuth } from "@/lib/auth/hooks";
 import { supabase } from "@/lib/supabase/client";
 import { registerForPushNotifications } from "./register-push";
 import { setupNotificationHandlers } from "./handlers";
+import { useMatchExitCount } from "@/lib/arena/arena-store";
+import { clearPushDeferral, isPushDeferred, onPushDeferralReleased } from "@/lib/invites/pending-invite";
 
 export function PushRegistrationBootstrap() {
   const { athlete } = useAuth();
@@ -27,11 +29,23 @@ export function PushRegistrationBootstrap() {
     setupNotificationHandlers();
   }, []);
 
+  // An invitee is asked after their first match (jr_be spec 016): the
+  // deferral flag set by invite setup holds registration until a match exit.
+  const matchExits = useMatchExitCount();
+  // A join-link invitee has no first match to wait for: released early.
+  const [released, setReleased] = React.useState(0);
+  React.useEffect(() => onPushDeferralReleased(() => setReleased((n) => n + 1)), []);
+
   React.useEffect(() => {
     if (!athleteId) return;
     let cancelled = false;
 
     (async () => {
+      if (await isPushDeferred()) {
+        if (matchExits === 0 || cancelled) return;
+        await clearPushDeferral();
+      }
+      if (cancelled) return;
       const result = await registerForPushNotifications(supabase, athleteId);
       if (cancelled) return;
       if (!result.ok && result.reason !== "permission_denied" && result.reason !== "not_a_device") {
@@ -42,7 +56,7 @@ export function PushRegistrationBootstrap() {
     return () => {
       cancelled = true;
     };
-  }, [athleteId]);
+  }, [athleteId, matchExits, released]);
 
   return null;
 }

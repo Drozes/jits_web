@@ -62,3 +62,59 @@ describe("PushRegistrationBootstrap", () => {
     expect(mockRegister).not.toHaveBeenCalled();
   });
 });
+
+describe("invitee push deferral (jr_be spec 016: asked after the first match)", () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const AsyncStorage = jest.requireMock("@react-native-async-storage/async-storage");
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { useArenaMatchScreen } = require("@/lib/arena/arena-store");
+
+  function MatchScreen() {
+    useArenaMatchScreen();
+    return null;
+  }
+
+  afterEach(async () => {
+    await AsyncStorage.clear();
+  });
+
+  // Runs before the match test: the match-exit count is module state.
+  it("a join-link invitee (no match to wait for) registers as soon as the deferral is released", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { releasePushDeferral } = require("@/lib/invites/pending-invite");
+    await AsyncStorage.setItem("elorated.invite.deferPush.v1", "1");
+    mockAthlete = { id: "me-1", status: "active" };
+    render(<PushRegistrationBootstrap />);
+    await flush();
+    expect(mockRegister).not.toHaveBeenCalled();
+    await act(async () => {
+      await releasePushDeferral();
+    });
+    await flush();
+    expect(mockRegister).toHaveBeenCalledTimes(1);
+  });
+
+  it("a deferral older than a booking can live (4 days) has lapsed: registers now", async () => {
+    await AsyncStorage.setItem("elorated.invite.deferPush.v1", String(Date.now() - 5 * 24 * 60 * 60 * 1000));
+    mockAthlete = { id: "me-1", status: "active" };
+    render(<PushRegistrationBootstrap />);
+    await flush();
+    expect(mockRegister).toHaveBeenCalledTimes(1);
+  });
+
+  it("holds registration until a match screen has been left, then clears the flag", async () => {
+    await AsyncStorage.setItem("elorated.invite.deferPush.v1", String(Date.now()));
+    mockAthlete = { id: "me-1", status: "active" };
+    render(<PushRegistrationBootstrap />);
+    await flush();
+    expect(mockRegister).not.toHaveBeenCalled();
+
+    const match = render(<MatchScreen />);
+    await flush();
+    match.unmount();
+    await flush();
+    expect(mockRegister).toHaveBeenCalledTimes(1);
+    expect(await AsyncStorage.getItem("elorated.invite.deferPush.v1")).toBeNull();
+  });
+
+});

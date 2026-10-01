@@ -137,6 +137,10 @@ function RootLayout() {
                   <Stack.Screen name="(auth)" />
                   <Stack.Screen name="(app)" />
                   <Stack.Screen name="profile-setup" options={{ presentation: "modal" }} />
+                  {/* Invites (jr_be spec 016): the link route works signed out and
+                    only stores the token; invite setup is the invitee's one screen. */}
+                  <Stack.Screen name="c/[token]" />
+                  <Stack.Screen name="invite-setup" />
                 </Stack>
               </AuthProvider>
             </BottomSheetModalProvider>
