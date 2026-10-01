@@ -2,13 +2,15 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { acceptJoinAction, claimInviteAction } from "@/app/c/[token]/actions";
+import { acceptJoinAction, claimInviteAction, confirmDobAndClaimAction } from "@/app/c/[token]/actions";
 import { withNext } from "@/lib/auth/safe-next-path";
 import { invitePath } from "@/lib/invites/constants";
+import { DOB_SAVE_FAILED_COPY } from "@jits/shared/utils";
 import { TRY_AGAIN_OUTCOME, type InviteOutcome } from "@/lib/invites/outcome-copy";
 import type { InAppBrowser, InviteKind } from "@/lib/invites/types";
 import type { InviteViewer } from "@/lib/invites/viewer";
 import { AppStoreButton, CopyLinkButton, OpenInAppButton } from "./app-links";
+import { InviteDobStep } from "./invite-dob-step";
 import { InviteOutcomeCard } from "./invite-outcome-card";
 import { GHOST_CTA, PRIMARY_CTA, SECONDARY_CTA } from "./styles";
 
@@ -32,21 +34,40 @@ export function InviteActions({ token, kind, inviterFirstName, viewer, inAppBrow
   const next = invitePath(token);
   const verb = kind === "challenge" ? "accept" : "join";
 
-  const accept = () =>
+  const runAction = (call: () => Promise<InviteOutcome>, onFail: InviteOutcome) =>
     startTransition(async () => {
       try {
-        const result =
-          kind === "challenge"
-            ? await claimInviteAction(token)
-            : await acceptJoinAction(token, inviterFirstName);
-        setOutcome(result);
+        setOutcome(await call());
       } catch (err) {
         // redirect() from the action (setup, login) must propagate.
         if (isNextRedirect(err)) throw err;
         // The action call itself failed (offline, deploy in flight).
-        setOutcome(TRY_AGAIN_OUTCOME);
+        setOutcome(onFail);
       }
     });
+
+  const accept = () =>
+    runAction(
+      () => (kind === "challenge" ? claimInviteAction(token) : acceptJoinAction(token, inviterFirstName)),
+      TRY_AGAIN_OUTCOME,
+    );
+
+  // dob_required: save the date of birth, then the same claim runs again.
+  if (outcome?.kind === "dob") {
+    const current = outcome;
+    return (
+      <div style={STACK}>
+        <InviteDobStep
+          outcome={current}
+          pending={pending}
+          onSubmit={(dob) =>
+            runAction(() => confirmDobAndClaimAction(token, dob), { ...current, error: DOB_SAVE_FAILED_COPY })
+          }
+        />
+        <OpenInAppButton {...links} />
+      </div>
+    );
+  }
 
   // Transient failure: keep the accept path open with an explicit retry.
   if (outcome?.kind === "retry") {

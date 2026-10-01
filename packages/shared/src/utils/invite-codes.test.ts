@@ -3,6 +3,7 @@ import { extractInviteFromText, formatInviteCode, isInviteToken, normalizeInvite
 import { buildInviteShareMessage } from "./invite-share";
 import {
   bookedMessage,
+  checkDateOfBirth,
   claimFailureView,
   createInviteErrorMessage,
   inviteSignupBanner,
@@ -100,6 +101,29 @@ describe("claim copy (contract section 7)", () => {
     expect(claimFailureView("throttled", { retryAfterS: 61 }).message).toBe("Too many tries. Try again in 2 minutes.");
     expect(claimFailureView("throttled", { retryAfterS: 5 }).message).toBe("Too many tries. Try again in 1 minute.");
   });
+  it("dob_required asks for the date of birth, never the underage copy", () => {
+    expect(claimFailureView("dob_required")).toEqual({
+      next: "dob",
+      message: "We need your date of birth before your first ranked match. You must be 16 or older.",
+    });
+  });
+  it("an unknown future code is a generic retry, never underage or invalid-link", () => {
+    const v = claimFailureView("some_new_code", n);
+    expect(v).toEqual({ next: "message", message: "Something went wrong opening this invite. Try again.", retryable: true });
+    expect(v.message).not.toMatch(/16 or older/);
+  });
+  it("checkDateOfBirth: real date, not future, not before 1900, 16+", () => {
+    const today = new Date(2026, 9, 1); // 2026-10-01 local
+    expect(checkDateOfBirth("1990-05-01", today)).toBe("ok");
+    expect(checkDateOfBirth("2010-10-01", today)).toBe("ok"); // 16th birthday today
+    expect(checkDateOfBirth("2010-10-02", today)).toBe("underage");
+    expect(checkDateOfBirth("2015-01-01", today)).toBe("underage");
+    expect(checkDateOfBirth("2026-10-02", today)).toBe("invalid");
+    expect(checkDateOfBirth("1899-12-31", today)).toBe("invalid");
+    expect(checkDateOfBirth("1990-02-30", today)).toBe("invalid");
+    expect(checkDateOfBirth("", today)).toBe("invalid");
+    expect(checkDateOfBirth("05/01/1990", today)).toBe("invalid");
+  });
   it("routes claimer_not_active to setup and accuracy to a retry", () => {
     expect(claimFailureView("claimer_not_active").next).toBe("setup");
     expect(claimFailureView("accuracy_too_low")).toMatchObject({ next: "retry_location", actionLabel: "Try again" });
@@ -124,6 +148,10 @@ describe("claim copy (contract section 7)", () => {
   it("join and signup copy", () => {
     expect(joinFailureMessage("revoked", "Alex")).toBe("This invite link was turned off. Ask Alex for a new one.");
     expect(joinFailureMessage("self", "Alex")).toBe("This is your own invite link.");
+    expect(joinFailureMessage("invalid", "Alex")).toBe(
+      "This invite link isn't valid. Ask your training partner to send it again.",
+    );
+    expect(joinFailureMessage("brand_new_code", "Alex")).toBe("Something went wrong opening this invite. Try again.");
     expect(inviteSignupBanner("challenge", "Alex")).toBe("Alex challenged you. Create your account to accept.");
     expect(inviteSignupBanner("join", "Alex")).toBe("Alex invited you. Create your account to join.");
   });

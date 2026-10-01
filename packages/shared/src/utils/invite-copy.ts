@@ -14,6 +14,7 @@ export type ClaimFailureCode =
   | "expired"
   | "inviter_unavailable"
   | "claimer_not_active"
+  | "dob_required"
   | "underage"
   | "inviter_weekly_cap"
   | "accuracy_too_low";
@@ -39,10 +40,52 @@ export type CreateInviteErrorCode =
 
 /** What a claim result screen shows. `next` tells the screen what to do. */
 export interface ClaimOutcomeView {
-  next: "message" | "setup" | "retry_location";
+  /** `dob`: ask for the date of birth, save it, then retry the same claim. */
+  next: "message" | "setup" | "retry_location" | "dob";
   message: string;
   /** Shown as a secondary action label when the outcome is recoverable. */
   actionLabel?: string;
+  /**
+   * True for a code this client does not know (a newer server): the copy is
+   * generic and the athlete may try again. Never shown as `underage`.
+   */
+  retryable?: boolean;
+}
+
+export const UNDERAGE_COPY = "You must be 16 or older to compete on ELO RATED.";
+
+/** `dob_required` (contract section 7): an older account has no date of birth. */
+export const DOB_REQUIRED_TITLE = "Confirm your date of birth";
+export const DOB_REQUIRED_COPY =
+  "We need your date of birth before your first ranked match. You must be 16 or older.";
+export const DOB_SAVE_FAILED_COPY = "Couldn't save your date of birth. Check your connection and try again.";
+export const DOB_INVALID_COPY = "Enter a real date of birth.";
+
+/** A claim code this client does not know: generic, retryable, never underage. */
+export const CLAIM_UNKNOWN_COPY = "Something went wrong opening this invite. Try again.";
+
+export type DateOfBirthCheck = "ok" | "invalid" | "underage";
+
+/**
+ * Client check of a `YYYY-MM-DD` date of birth before it is saved: a real
+ * calendar date, not in the future, not before 1900, and 16 or older on
+ * `today` (local calendar). The claim RPC re-checks age on the server date.
+ */
+export function checkDateOfBirth(value: string, today: Date = new Date()): DateOfBirthCheck {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+  if (!m) return "invalid";
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  const d = Number(m[3]);
+  const date = new Date(Date.UTC(y, mo - 1, d));
+  if (date.getUTCFullYear() !== y || date.getUTCMonth() !== mo - 1 || date.getUTCDate() !== d) return "invalid";
+  if (y < 1900) return "invalid";
+  const ty = today.getFullYear();
+  const tm = today.getMonth() + 1;
+  const td = today.getDate();
+  if (y > ty || (y === ty && (mo > tm || (mo === tm && d > td)))) return "invalid";
+  const age = ty - y - (tm < mo || (tm === mo && td < d) ? 1 : 0);
+  return age >= 16 ? "ok" : "underage";
 }
 
 /** First name for copy: `ALEX` style comes from the server card; falls back. */
@@ -98,7 +141,9 @@ export function claimFailureView(
         }.`,
       };
     case "underage":
-      return { next: "message", message: "You must be 16 or older to compete on ELO RATED." };
+      return { next: "message", message: UNDERAGE_COPY };
+    case "dob_required":
+      return { next: "dob", message: DOB_REQUIRED_COPY };
     case "claimer_not_active":
       return { next: "setup", message: "Finish your profile to accept." };
     case "inviter_unavailable":
@@ -115,10 +160,7 @@ export function claimFailureView(
         actionLabel: "Try again",
       };
     default:
-      return {
-        next: "message",
-        message: "This invite link isn't valid. Ask your training partner to send it again.",
-      };
+      return { next: "message", message: CLAIM_UNKNOWN_COPY, retryable: true };
   }
 }
 
@@ -170,9 +212,17 @@ export function joinFailureMessage(code: string, inviterName: string): string {
       return `This invite link was turned off. Ask ${inviterName} for a new one.`;
     case "claimer_not_active":
       return "Finish your profile to add friends.";
-    default:
+    case "invalid":
       return "This invite link isn't valid. Ask your training partner to send it again.";
+    default:
+      // A code this build does not know (a newer server).
+      return CLAIM_UNKNOWN_COPY;
   }
+}
+
+/** Join failure codes this build knows; anything else is retryable. */
+export function isKnownJoinFailure(code: string): boolean {
+  return code === "invalid" || code === "self" || code === "revoked" || code === "claimer_not_active";
 }
 
 /** Signup banner for a signed-out invitee. */

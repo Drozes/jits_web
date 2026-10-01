@@ -86,6 +86,24 @@ describe("claimOutcome", () => {
     });
   });
 
+  it("dob_required asks for the date of birth inline", () => {
+    expect(claimOutcome({ ok: false, code: "dob_required", inviter: ALEX })).toEqual({
+      kind: "dob",
+      title: "Confirm your date of birth",
+      body: "We need your date of birth before your first ranked match. You must be 16 or older.",
+      error: null,
+    });
+  });
+
+  it("an unknown future code is a generic retry, never the underage copy", () => {
+    const out = claimOutcome({ ok: false, code: "brand_new_code" as ClaimFailureCode, inviter: ALEX });
+    expect(out).toEqual({
+      kind: "retry",
+      title: "Something went wrong",
+      body: "Something went wrong opening this invite. Try again.",
+    });
+  });
+
   it("routes claimer_not_active to setup", () => {
     expect(claimOutcome({ ok: false, code: "claimer_not_active", inviter: ALEX })).toEqual({ kind: "setup" });
   });
@@ -99,6 +117,11 @@ describe("joinOutcome", () => {
       body: "This invite link was turned off. Ask Alex for a new one.",
     });
     expect(joinOutcome({ ok: false, code: "claimer_not_active" }, "Alex")).toEqual({ kind: "setup" });
+    expect(joinOutcome({ ok: false, code: "brand_new_code" as "invalid" }, "Alex")).toEqual({
+      kind: "retry",
+      title: "Something went wrong",
+      body: "Something went wrong opening this invite. Try again.",
+    });
   });
 
   it("does not say 'now friends' under 'Already friends'", () => {

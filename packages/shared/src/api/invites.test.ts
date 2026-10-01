@@ -1,6 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { acceptJoinInvite, claimChallengeInvite, createInvite, listMyOpenChallengeInvites, parseClaimResult, readInvitesEnabled } from "./invites";
+import {
+  acceptJoinInvite,
+  claimChallengeInvite,
+  createInvite,
+  listMyOpenChallengeInvites,
+  parseClaimResult,
+  readInvitesEnabled,
+  setMyDateOfBirth,
+} from "./invites";
 import { getMyFriends, parseFriends, sortFriendsFirst } from "./friends";
 
 function client(result: { data: unknown; error: unknown }) {
@@ -112,7 +120,7 @@ describe("friends", () => {
 function fromClient(result: { data: unknown; error: unknown }) {
   const calls: [string, ...unknown[]][] = [];
   const q: Record<string, unknown> = {};
-  for (const m of ["select", "eq", "gt"]) {
+  for (const m of ["select", "eq", "gt", "update"]) {
     q[m] = (...a: unknown[]) => {
       calls.push([m, ...a]);
       return q;
@@ -168,5 +176,31 @@ describe("acceptJoinInvite", () => {
     const { supabase, rpc } = client({ data: { ok: false, code: "invalid" }, error: null });
     await acceptJoinInvite(supabase as never, "t");
     expect(rpc).toHaveBeenCalledWith("accept_join_invite", { p_token: "t" });
+  });
+});
+
+describe("setMyDateOfBirth", () => {
+  it("updates only my row and returns the saved date", async () => {
+    const { supabase, from, calls } = fromClient({ data: { date_of_birth: "1990-05-01" }, error: null });
+    const res = await setMyDateOfBirth(supabase, "me", "1990-05-01");
+    expect(res).toEqual({ ok: true, data: { date_of_birth: "1990-05-01" } });
+    expect(from).toHaveBeenCalledWith("athletes");
+    expect(calls).toContainEqual(["update", { date_of_birth: "1990-05-01" }]);
+    expect(calls).toContainEqual(["eq", "id", "me"]);
+  });
+
+  it("is not saved when RLS matched no row", async () => {
+    const res = await setMyDateOfBirth(fromClient({ data: null, error: null }).supabase, "me", "1990-05-01");
+    expect(res).toMatchObject({ ok: false, error: { hint: "not_saved" } });
+  });
+
+  it("returns the error instead of throwing", async () => {
+    const res = await setMyDateOfBirth(fromClient({ data: null, error: { message: "offline" } }).supabase, "me", "1990-05-01");
+    expect(res).toMatchObject({ ok: false, error: { hint: "unknown", message: "offline" } });
+  });
+
+  it("keeps an unknown claim code as-is for the copy layer", () => {
+    expect(parseClaimResult({ ok: false, code: "dob_required", inviter: null })).toMatchObject({ ok: false, code: "dob_required" });
+    expect(parseClaimResult({ ok: false, code: "brand_new_code", inviter: null })).toMatchObject({ ok: false, code: "brand_new_code" });
   });
 });

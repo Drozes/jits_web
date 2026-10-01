@@ -1,3 +1,9 @@
+import {
+  CLAIM_UNKNOWN_COPY,
+  DOB_REQUIRED_COPY,
+  DOB_REQUIRED_TITLE,
+  UNDERAGE_COPY,
+} from "@jits/shared/utils";
 import { inviterFirstName } from "./format";
 import type { AcceptJoinResult, ClaimResult, InviterCard } from "./types";
 
@@ -14,7 +20,22 @@ export type InviteOutcome =
   | { kind: "error"; title: string; body: string }
   /** Transient failure (network, server): the accept can be tried again. */
   | { kind: "retry"; title: string; body: string }
+  /**
+   * `dob_required`: an older account has no date of birth. The landing page
+   * asks for it inline, saves it and retries the same claim. `error` is the
+   * inline message after a failed save or an invalid date.
+   */
+  | { kind: "dob"; title: string; body: string; error: string | null }
   | { kind: "setup" };
+
+export const DOB_OUTCOME: InviteOutcome = {
+  kind: "dob",
+  title: DOB_REQUIRED_TITLE,
+  body: DOB_REQUIRED_COPY,
+  error: null,
+};
+
+export const UNDERAGE_OUTCOME: InviteOutcome = { kind: "error", title: "16 and over", body: UNDERAGE_COPY };
 
 export const TRY_AGAIN_OUTCOME: InviteOutcome = {
   kind: "retry",
@@ -61,7 +82,9 @@ export function claimOutcome(result: ClaimResult): InviteOutcome {
     case "self":
       return { kind: "error", title: "Your challenge", body: "This is your own challenge. Send it to a training partner." };
     case "underage":
-      return { kind: "error", title: "16 and over", body: "You must be 16 or older to compete on ELO RATED." };
+      return UNDERAGE_OUTCOME;
+    case "dob_required":
+      return DOB_OUTCOME;
     case "inviter_unavailable":
       return { kind: "error", title: "Not available", body: `${nameAtStart(result.inviter)} can't take matches right now.` };
     case "inviter_weekly_cap":
@@ -80,12 +103,15 @@ export function claimOutcome(result: ClaimResult): InviteOutcome {
       };
     case "throttled":
     case "invalid":
-    default:
       return {
         kind: "error",
         title: "Link not valid",
         body: "This invite link isn't valid. Ask your training partner to send it again.",
       };
+    default:
+      // A code this build does not know (a newer server): generic and
+      // retryable, never the underage or invalid-link copy.
+      return { kind: "retry", title: "Something went wrong", body: CLAIM_UNKNOWN_COPY };
   }
 }
 
@@ -108,11 +134,12 @@ export function joinOutcome(result: AcceptJoinResult, fallbackName: string | nul
     case "revoked":
       return { kind: "error", title: "Link turned off", body: `This invite link was turned off. Ask ${who} for a new one.` };
     case "invalid":
-    default:
       return {
         kind: "error",
         title: "Link not valid",
         body: "This invite link isn't valid. Ask your training partner to send it again.",
       };
+    default:
+      return { kind: "retry", title: "Something went wrong", body: CLAIM_UNKNOWN_COPY };
   }
 }

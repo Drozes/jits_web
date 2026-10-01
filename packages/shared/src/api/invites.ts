@@ -371,6 +371,36 @@ export function claimChallengeInvite(supabase: Client, input: InviteInput, readi
   );
 }
 
+/**
+ * Saves the signed-in athlete's own date of birth (`YYYY-MM-DD`), for a claim
+ * that came back `dob_required` (accounts from before it was required). The
+ * owner UPDATE runs under `athletes_update_own`; `guard_athlete_columns` does
+ * not revert `date_of_birth`. RLS turns a wrong id into zero rows, so a row
+ * must come back for this to count as saved.
+ */
+export async function setMyDateOfBirth(
+  supabase: Client,
+  athleteId: string,
+  dateOfBirth: string,
+): Promise<InviteResult<{ date_of_birth: string }>> {
+  try {
+    const { data, error } = await supabase
+      .from("athletes")
+      .update({ date_of_birth: dateOfBirth })
+      .eq("id", athleteId)
+      .select("date_of_birth")
+      .maybeSingle();
+    if (error) return { ok: false, error: { hint: error.hint || "unknown", message: error.message ?? "" } };
+    const saved = str((data as { date_of_birth?: unknown } | null)?.date_of_birth);
+    if (saved !== dateOfBirth) {
+      return { ok: false, error: { hint: "not_saved", message: "Date of birth was not saved." } };
+    }
+    return { ok: true, data: { date_of_birth: saved } };
+  } catch (err) {
+    return { ok: false, error: { hint: "unknown", message: err instanceof Error ? err.message : String(err) } };
+  }
+}
+
 export function reportMatchPresence(
   supabase: Client,
   reading: LocationReading,

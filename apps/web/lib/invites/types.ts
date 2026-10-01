@@ -52,6 +52,7 @@ export type ClaimFailureCode =
   | "expired"
   | "inviter_unavailable"
   | "claimer_not_active"
+  | "dob_required"
   | "underage"
   | "inviter_weekly_cap"
   | "accuracy_too_low";

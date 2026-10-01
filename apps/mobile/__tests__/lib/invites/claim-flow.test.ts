@@ -83,6 +83,23 @@ describe("stepForClaim", () => {
       expect(clearsPendingInvite(step)).toBe(true);
     },
   );
+  it("dob_required asks for the date of birth and keeps the invite (never the underage copy)", () => {
+    const step = stepForClaim(fail("dob_required"), ctx);
+    expect(step).toEqual({
+      type: "dob",
+      message: "We need your date of birth before your first ranked match. You must be 16 or older.",
+    });
+    expect(clearsPendingInvite(step)).toBe(false);
+  });
+  it("an unknown future code is a generic retry that keeps the invite", () => {
+    const step = stepForClaim(fail("brand_new_code"), ctx);
+    expect(step).toEqual({
+      type: "message",
+      message: "Something went wrong opening this invite. Try again.",
+      terminal: false,
+    });
+    expect(clearsPendingInvite(step)).toBe(false);
+  });
   it("retryable outcomes keep the pending invite", () => {
     expect(clearsPendingInvite({ type: "setup" })).toBe(false);
     expect(clearsPendingInvite({ type: "retry_location", message: "" })).toBe(false);
@@ -99,6 +116,13 @@ describe("stepForJoin", () => {
     });
     expect(stepForJoin({ ok: false, code: "self" }, "active")).toMatchObject({ message: "This is your own invite link." });
     expect(stepForJoin({ ok: false, code: "claimer_not_active" }, "pending")).toEqual({ type: "setup" });
+  });
+  it("an unknown join code is a generic retry, not terminal", () => {
+    expect(stepForJoin({ ok: false, code: "brand_new_code" }, "active")).toEqual({
+      type: "message",
+      message: "Something went wrong opening this invite. Try again.",
+      terminal: false,
+    });
   });
 });
 

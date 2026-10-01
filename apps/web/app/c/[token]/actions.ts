@@ -2,6 +2,9 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { getCurrentAthlete } from "@jits/shared/api/queries";
+import { setMyDateOfBirth } from "@jits/shared/api/invites";
+import { checkDateOfBirth, DOB_INVALID_COPY, DOB_SAVE_FAILED_COPY } from "@jits/shared/utils";
 import { createClient } from "@/lib/supabase/server";
 import { withNext } from "@/lib/auth/safe-next-path";
 import {
@@ -13,6 +16,7 @@ import {
 } from "@/lib/invites/constants";
 import {
   claimOutcome,
+  DOB_OUTCOME,
   joinOutcome,
   TRY_AGAIN_OUTCOME,
   type InviteOutcome,
@@ -40,10 +44,43 @@ function finish(token: string, outcome: InviteOutcome): InviteOutcome {
   return outcome;
 }
 
+type ServerClient = Awaited<ReturnType<typeof createClient>>;
+
 /** Web claim (contract 4.10): no location on web, so it always books. */
 export async function claimInviteAction(token: string): Promise<InviteOutcome> {
   if (!INVITE_TOKEN_RE.test(token)) return INVALID;
+  return claimWith(await createClient(), token);
+}
+
+/** The DOB step with an inline message (the athlete fixes it and saves again). */
+function dobStep(error: string): InviteOutcome {
+  return { ...(DOB_OUTCOME as Extract<InviteOutcome, { kind: "dob" }>), error };
+}
+
+/**
+ * `dob_required` (contract 7): save the signed-in athlete's own date of
+ * birth, then retry the same claim. A date under 16 is saved as entered and
+ * the server answers `underage`; a date that is not real (or a failed save)
+ * stays on the step with an inline message.
+ */
+export async function confirmDobAndClaimAction(token: string, dateOfBirth: string): Promise<InviteOutcome> {
+  if (!INVITE_TOKEN_RE.test(token)) return INVALID;
+  if (checkDateOfBirth(dateOfBirth) === "invalid") return dobStep(DOB_INVALID_COPY);
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect(withNext("/login", invitePath(token)));
+  const athlete = await getCurrentAthlete(supabase, user.id);
+  if (!athlete) return dobStep(DOB_SAVE_FAILED_COPY);
+  const saved = await setMyDateOfBirth(supabase, athlete.id, dateOfBirth);
+  if (!saved.ok) return dobStep(DOB_SAVE_FAILED_COPY);
+  // The server decides age on its own date, so an under-16 date is claimed
+  // too and comes back `underage` (logged as a claim failure).
+  return claimWith(supabase, token);
+}
+
+async function claimWith(supabase: ServerClient, token: string): Promise<InviteOutcome> {
   const { data, error } = await supabase.rpc("claim_challenge_invite", {
     p_token: token,
     p_gateway: "landing_web",

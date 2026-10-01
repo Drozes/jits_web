@@ -21,7 +21,9 @@ jest.mock("@/lib/invites/location", () => ({ readLocationOnce: (...a: unknown[])
 const mockClaim = jest.fn();
 const mockJoin = jest.fn();
 const mockLog = jest.fn(() => Promise.resolve({ ok: true, data: { logged: true } }));
+const mockSetDob = jest.fn();
 jest.mock("@jits/shared/api/invites", () => ({
+  setMyDateOfBirth: (...a: unknown[]) => mockSetDob(...a),
   claimChallengeInvite: (...a: unknown[]) => mockClaim(...a),
   acceptJoinInvite: (...a: unknown[]) => mockJoin(...a),
   logInviteEvent: (...a: unknown[]) => mockLog(...(a as [])),
@@ -129,4 +131,73 @@ it("a network failure is retryable and keeps the pending invite", async () => {
   const { result } = await runWith(makePendingInvite({ token: TOKEN }, "universal_link"));
   expect(result.current.state).toMatchObject({ step: { type: "message", terminal: false } });
   expect(await AsyncStorage.getItem(PENDING_INVITE_KEY)).not.toBeNull();
+});
+
+describe("dob_required", () => {
+  const DOB_REQUIRED = { ok: true, data: { ok: false, code: "dob_required", inviter } };
+  const BOOKED = {
+    ok: true,
+    data: { ok: true, result: "booked", challenge_id: "c1", match_id: null, inviter, start_blocked_reason: "no_location" },
+  };
+
+  async function reachDob(onDobSaved = jest.fn()) {
+    const pending = makePendingInvite({ token: TOKEN }, "universal_link");
+    await AsyncStorage.setItem(PENDING_INVITE_KEY, JSON.stringify(pending));
+    mockJoin.mockResolvedValue(NOT_A_JOIN);
+    mockReading.mockResolvedValue({ status: "unavailable" });
+    mockClaim.mockResolvedValueOnce(DOB_REQUIRED);
+    const hook = renderHook(() => useClaimRunner(pending, "active", { athleteId: "me", onDobSaved }));
+    await act(async () => {
+      await hook.result.current.run();
+    });
+    return hook;
+  }
+
+  it("asks for the date of birth, keeps the invite and does not release the push deferral", async () => {
+    const { result } = await reachDob();
+    expect(result.current.state).toMatchObject({ phase: "done", step: { type: "dob" } });
+    expect(await AsyncStorage.getItem(PENDING_INVITE_KEY)).not.toBeNull();
+    expect(mockRelease).not.toHaveBeenCalled();
+  });
+
+  it("saves the date of birth, then claims again with the same token and books", async () => {
+    const onDobSaved = jest.fn();
+    const { result } = await reachDob(onDobSaved);
+    mockSetDob.mockResolvedValue({ ok: true, data: { date_of_birth: "1990-05-01" } });
+    mockClaim.mockResolvedValueOnce(BOOKED);
+    await act(async () => {
+      await result.current.submitDob("1990-05-01");
+    });
+    expect(mockSetDob).toHaveBeenCalledWith(expect.anything(), "me", "1990-05-01");
+    expect(onDobSaved).toHaveBeenCalled();
+    expect(mockClaim).toHaveBeenCalledTimes(2);
+    expect(mockClaim.mock.calls[1][1]).toMatchObject({ token: TOKEN, gateway: "universal_link" });
+    // The retry goes straight to the claim, not back through accept_join_invite.
+    expect(mockJoin).toHaveBeenCalledTimes(1);
+    expect(result.current.state).toMatchObject({ step: { type: "booked" } });
+    expect(await AsyncStorage.getItem(PENDING_INVITE_KEY)).toBeNull();
+  });
+
+  it("an under-16 date comes back underage and shows the underage copy", async () => {
+    const { result } = await reachDob();
+    mockSetDob.mockResolvedValue({ ok: true, data: { date_of_birth: "2015-01-01" } });
+    mockClaim.mockResolvedValueOnce({ ok: true, data: { ok: false, code: "underage", inviter } });
+    await act(async () => {
+      await result.current.submitDob("2015-01-01");
+    });
+    expect(result.current.state).toMatchObject({
+      step: { type: "message", message: "You must be 16 or older to compete on ELO RATED.", terminal: true },
+    });
+  });
+
+  it("a failed save stays on the date of birth step with an error and does not claim", async () => {
+    const { result } = await reachDob();
+    mockSetDob.mockResolvedValue({ ok: false, error: { hint: "unknown", message: "offline" } });
+    await act(async () => {
+      await result.current.submitDob("1990-05-01");
+    });
+    expect(mockClaim).toHaveBeenCalledTimes(1);
+    expect(result.current.state).toMatchObject({ step: { type: "dob" } });
+    expect(result.current.dobError).toBe("Couldn't save your date of birth. Check your connection and try again.");
+  });
 });

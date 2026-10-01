@@ -4,13 +4,21 @@
  * the calls; this file decides what each answer means.
  */
 import type { AcceptJoinResult, ClaimResult } from "@jits/shared/api/invites";
-import { bookedMessage, claimFailureView, inviterNameForCopy, joinFailureMessage } from "@jits/shared/utils";
+import {
+  bookedMessage,
+  claimFailureView,
+  inviterNameForCopy,
+  isKnownJoinFailure,
+  joinFailureMessage,
+} from "@jits/shared/utils";
 
 export type ClaimStep =
   | { type: "go_match"; matchId: string }
   | { type: "booked"; challengeId: string; message: string; inviterName: string; locationOff: boolean }
   | { type: "setup" }
   | { type: "retry_location"; message: string }
+  /** `dob_required`: ask for the date of birth, save it, retry the claim. */
+  | { type: "dob"; message: string }
   | { type: "message"; message: string; terminal: boolean; retryAfterS?: number | null }
   | { type: "try_join" }
   | { type: "friends"; inviterName: string; already: boolean };
@@ -23,6 +31,9 @@ export type ClaimStep =
  * - `invalid` on a token: it may be a join link, so try accept_join_invite.
  * - `claimer_not_active`: setup, but only for a pending profile (an inactive
  *   account would loop between setup and claim).
+ * - `dob_required`: an older account with no date of birth; the screen asks
+ *   for it and the runner retries. Never the underage copy.
+ * - a code this build does not know: generic copy, retryable (not terminal).
  */
 export function stepForClaim(
   result: ClaimResult,
@@ -53,9 +64,12 @@ export function stepForClaim(
     retryAfterS: result.retry_after_s,
   });
   if (view.next === "retry_location") return { type: "retry_location", message: view.message };
-  // A wrong code (tries left) or a throttle is not terminal: the athlete fixes
-  // the code. Everything else ends the invite on this device.
-  const terminal = !(ctx.viaCode && (result.code === "invalid" || result.code === "throttled"));
+  if (view.next === "dob") return { type: "dob", message: view.message };
+  // A wrong code (tries left), a throttle or an unknown code is not terminal:
+  // the athlete fixes the code or tries again. Everything else ends the
+  // invite on this device.
+  const terminal =
+    !view.retryable && !(ctx.viaCode && (result.code === "invalid" || result.code === "throttled"));
   if (result.code === "throttled") {
     return { type: "message", message: view.message, terminal, retryAfterS: result.retry_after_s };
   }
@@ -80,7 +94,12 @@ export function stepForJoin(
     };
   }
   if (result.code === "claimer_not_active" && (!athleteStatus || athleteStatus === "pending")) return { type: "setup" };
-  return { type: "message", message: joinFailureMessage(result.code, "your training partner"), terminal: true };
+  return {
+    type: "message",
+    message: joinFailureMessage(result.code, "your training partner"),
+    // An unknown code (a newer server) is a generic retry, not the end.
+    terminal: isKnownJoinFailure(result.code),
+  };
 }
 
 /** Steps after which the pending invite is cleared from the device. */

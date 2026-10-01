@@ -1,7 +1,7 @@
 import type { InviteOutcome } from "@/lib/invites/outcome-copy";
 import { BODY_TEXT, CAPS_LABEL } from "./styles";
 
-type ShownOutcome = Exclude<InviteOutcome, { kind: "setup" }>;
+type ShownOutcome = Exclude<InviteOutcome, { kind: "setup" } | { kind: "dob" }>;
 
 /** Result of an accept on web. Errors use state-negative, never red fills. */
 export function InviteOutcomeCard({ outcome }: { outcome: ShownOutcome }) {

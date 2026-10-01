@@ -16,6 +16,7 @@ import { ACCURACY_TOO_LOW_COPY, LOCATION_DENIED_COPY } from "@jits/shared/utils"
 import { AppHeader } from "@/components/layout/app-header";
 import { CtaButton, SecondaryButton, TertiaryButton } from "@/components/auth/auth-buttons";
 import { Plate } from "@/components/ui/elo-system";
+import { ClaimDobStep } from "@/components/invite/claim-dob-step";
 import { useAuth } from "@/lib/auth/hooks";
 import { usePendingInvite } from "@/lib/invites/use-pending-invite";
 import { useClaimRunner } from "@/lib/invites/use-claim-runner";
@@ -29,10 +30,15 @@ import { useThemedTokens } from "@/lib/theme/use-theme";
 export default function InviteClaimScreen() {
   const router = useRouter();
   const tokens = useThemedTokens();
-  const { user, athlete, signOut } = useAuth();
+  const { user, athlete, signOut, refreshAthleteSoft } = useAuth();
   const { pending, loaded } = usePendingInvite();
   const newAccount = pending ? isNewAccountForInvite(user?.created_at, pending.first_touch_at) : false;
-  const { state, run, locationDenied } = useClaimRunner(pending, athlete?.status, { newAccount });
+  const { state, run, locationDenied, submitDob, dobError } = useClaimRunner(pending, athlete?.status, {
+    newAccount,
+    athleteId: athlete?.id ?? null,
+    // The saved date of birth must reach the auth context's athlete row too.
+    onDobSaved: () => void refreshAthleteSoft(),
+  });
   const needsConfirm = Boolean(pending?.token) && !newAccount && pending?.gateway !== "paste";
   const [confirmed, setConfirmed] = React.useState(false);
 
@@ -118,7 +124,9 @@ export default function InviteClaimScreen() {
                 ? "Checking you're on the mat..."
                 : state.phase === "checking"
                   ? "Opening your invite..."
-                  : "Accepting the challenge..."}
+                  : state.phase === "saving_dob"
+                    ? "Saving your date of birth..."
+                    : "Accepting the challenge..."}
             </Text>
           </View>
         ) : null}
@@ -139,6 +147,15 @@ export default function InviteClaimScreen() {
             </Text>
             <CtaButton label="Go to the Arena" onPress={() => router.replace(ARENA_HREF as Href)} />
           </Plate>
+        ) : null}
+
+        {step?.type === "dob" ? (
+          <ClaimDobStep
+            message={step.message}
+            error={dobError}
+            onSubmit={(dob) => void submitDob(dob)}
+            onNotNow={() => void notNow()}
+          />
         ) : null}
 
         {step?.type === "retry_location" ? (

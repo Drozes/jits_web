@@ -17,11 +17,16 @@ vi.mock("next/navigation", () => ({
 
 const rpc = vi.fn();
 const signOut = vi.fn();
+const getUser = vi.fn();
 vi.mock("@/lib/supabase/server", () => ({
-  createClient: async () => ({ rpc, auth: { signOut } }),
+  createClient: async () => ({ rpc, auth: { signOut, getUser } }),
 }));
+const getCurrentAthlete = vi.fn();
+vi.mock("@jits/shared/api/queries", () => ({ getCurrentAthlete: (...a: unknown[]) => getCurrentAthlete(...a) }));
+const setMyDateOfBirth = vi.fn();
+vi.mock("@jits/shared/api/invites", () => ({ setMyDateOfBirth: (...a: unknown[]) => setMyDateOfBirth(...a) }));
 
-import { acceptJoinAction, claimInviteAction, signOutKeepInviteAction } from "./actions";
+import { acceptJoinAction, claimInviteAction, confirmDobAndClaimAction, signOutKeepInviteAction } from "./actions";
 
 const TOKEN = "e2eChallengeTokenAAAAA";
 const ACCEPT = `/c/${TOKEN}`;
@@ -50,6 +55,9 @@ beforeEach(() => {
   signOut.mockReset().mockResolvedValue({ error: null });
   cookieStore.delete.mockReset();
   cookieStore.set.mockReset();
+  getUser.mockReset().mockResolvedValue({ data: { user: { id: "u1" } } });
+  getCurrentAthlete.mockReset().mockResolvedValue({ id: "me", status: "active" });
+  setMyDateOfBirth.mockReset().mockResolvedValue({ ok: true, data: { date_of_birth: "1990-05-01" } });
 });
 
 describe("claimInviteAction", () => {
@@ -130,5 +138,74 @@ describe("signOutKeepInviteAction", () => {
     expect(await redirectOf(signOutKeepInviteAction(TOKEN))).toBe(ACCEPT);
     expect(signOut).toHaveBeenCalled();
     expect(cookieStore.set).toHaveBeenCalledWith("er_invite", TOKEN, expect.objectContaining({ httpOnly: true, maxAge: 604_800 }));
+  });
+});
+
+describe("confirmDobAndClaimAction (dob_required)", () => {
+  const BOOKED = {
+    ok: true,
+    result: "booked",
+    invite_id: "i",
+    challenge_id: "c",
+    match_id: null,
+    booking_expires_at: null,
+    inviter: ALEX,
+    start_blocked_reason: "no_location",
+  };
+
+  it("a claim with no date of birth asks for it (never the underage copy)", async () => {
+    rpc.mockResolvedValue({ data: { ok: false, code: "dob_required", inviter: ALEX }, error: null });
+    const outcome = await claimInviteAction(TOKEN);
+    expect(outcome).toEqual({
+      kind: "dob",
+      title: "Confirm your date of birth",
+      body: "We need your date of birth before your first ranked match. You must be 16 or older.",
+      error: null,
+    });
+  });
+
+  it("saves my date of birth, then retries the same claim and books", async () => {
+    rpc.mockResolvedValue({ data: BOOKED, error: null });
+    const outcome = await confirmDobAndClaimAction(TOKEN, "1990-05-01");
+    expect(setMyDateOfBirth).toHaveBeenCalledWith(expect.anything(), "me", "1990-05-01");
+    expect(rpc).toHaveBeenCalledWith("claim_challenge_invite", {
+      p_token: TOKEN,
+      p_gateway: "landing_web",
+      p_platform: "web",
+    });
+    expect(outcome).toMatchObject({ kind: "booked" });
+  });
+
+  it("a date under 16 is claimed and the server's underage answer shows the underage copy", async () => {
+    rpc.mockResolvedValue({ data: { ok: false, code: "underage", inviter: ALEX }, error: null });
+    const outcome = await confirmDobAndClaimAction(TOKEN, "2015-01-01");
+    expect(outcome).toMatchObject({ kind: "error", body: "You must be 16 or older to compete on ELO RATED." });
+  });
+
+  it("a date that is not real stays on the step without saving or claiming", async () => {
+    const outcome = await confirmDobAndClaimAction(TOKEN, "2999-01-01");
+    expect(outcome).toMatchObject({ kind: "dob", error: "Enter a real date of birth." });
+    expect(setMyDateOfBirth).not.toHaveBeenCalled();
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("a failed save stays on the step with a retry message and does not claim", async () => {
+    setMyDateOfBirth.mockResolvedValue({ ok: false, error: { hint: "unknown", message: "offline" } });
+    const outcome = await confirmDobAndClaimAction(TOKEN, "1990-05-01");
+    expect(outcome).toMatchObject({
+      kind: "dob",
+      error: "Couldn't save your date of birth. Check your connection and try again.",
+    });
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("sends a signed-out caller to log in and come back", async () => {
+    getUser.mockResolvedValue({ data: { user: null } });
+    expect(await redirectOf(confirmDobAndClaimAction(TOKEN, "1990-05-01"))).toBe(`/login?next=${encodeURIComponent(ACCEPT)}`);
+  });
+
+  it("refuses a malformed token", async () => {
+    expect(await confirmDobAndClaimAction("nope", "1990-05-01")).toMatchObject({ kind: "error", title: "Link not valid" });
+    expect(setMyDateOfBirth).not.toHaveBeenCalled();
   });
 });

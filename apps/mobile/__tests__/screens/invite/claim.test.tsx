@@ -23,14 +23,33 @@ jest.mock("@/lib/supabase/client", () => ({ supabase: {} }));
 jest.mock("@/lib/arena/arena-store", () => ({ isInArenaMatch: () => false }));
 
 const mockSignOut = jest.fn(() => Promise.resolve());
-const mockAuth = { user: { id: "u1", created_at: "2026-01-01T00:00:00Z" }, athlete: { status: "active", display_name: "Sam K" } };
-jest.mock("@/lib/auth/hooks", () => ({ useAuth: () => ({ ...mockAuth, signOut: mockSignOut }) }));
+const mockRefreshSoft = jest.fn(() => Promise.resolve());
+const mockAuth = {
+  user: { id: "u1", created_at: "2026-01-01T00:00:00Z" },
+  athlete: { id: "me", status: "active", display_name: "Sam K" },
+};
+jest.mock("@/lib/auth/hooks", () => ({
+  useAuth: () => ({ ...mockAuth, signOut: mockSignOut, refreshAthleteSoft: mockRefreshSoft }),
+}));
+// The native date picker cannot be driven in Jest: a press picks an adult date.
+jest.mock("@/components/profile-setup/date-of-birth-picker", () => {
+  const { Pressable, Text } = jest.requireActual("react-native");
+  return {
+    DateOfBirthPicker: ({ value, onChange }: { value: string; onChange: (v: string) => void }) => (
+      <Pressable testID="dob-picker" onPress={() => onChange("1990-05-01")}>
+        <Text>{value || "Select your date of birth"}</Text>
+      </Pressable>
+    ),
+  };
+});
 
 const mockReading = jest.fn();
 jest.mock("@/lib/invites/location", () => ({ readLocationOnce: (...a: unknown[]) => mockReading(...a) }));
 const mockClaim = jest.fn();
 const mockJoin = jest.fn();
+const mockSetDob = jest.fn();
 jest.mock("@jits/shared/api/invites", () => ({
+  setMyDateOfBirth: (...a: unknown[]) => mockSetDob(...a),
   claimChallengeInvite: (...a: unknown[]) => mockClaim(...a),
   acceptJoinInvite: (...a: unknown[]) => mockJoin(...a),
   logInviteEvent: jest.fn(() => Promise.resolve({ ok: true, data: { logged: true } })),
@@ -142,4 +161,38 @@ it("a booked claim with location off shows the booking and the location state", 
   render(<InviteClaimScreen />);
   expect(await screen.findByTestId("claim-booked")).toBeTruthy();
   expect(screen.getByTestId("claim-location-off")).toBeTruthy();
+});
+
+it("dob_required asks for the date of birth, saves it and claims again to the booking", async () => {
+  await withPending({ code: "K7Q4M2" }, "code");
+  mockClaim
+    .mockResolvedValueOnce({ ok: true, data: { ok: false, code: "dob_required", inviter } })
+    .mockResolvedValueOnce({
+      ok: true,
+      data: { ok: true, result: "booked", challenge_id: "c1", match_id: null, inviter, start_blocked_reason: "far" },
+    });
+  mockSetDob.mockResolvedValue({ ok: true, data: { date_of_birth: "1990-05-01" } });
+  render(<InviteClaimScreen />);
+  expect(await screen.findByTestId("claim-dob")).toBeTruthy();
+  expect(screen.getByText("Confirm your date of birth")).toBeTruthy();
+  expect(screen.queryByText(/16 or older to compete/)).toBeNull();
+  fireEvent.press(screen.getByTestId("dob-picker"));
+  fireEvent.press(screen.getByTestId("claim-dob-save"));
+  expect(await screen.findByTestId("claim-booked")).toBeTruthy();
+  expect(mockSetDob).toHaveBeenCalledWith(expect.anything(), "me", "1990-05-01");
+  expect(mockRefreshSoft).toHaveBeenCalled();
+  expect(mockClaim).toHaveBeenCalledTimes(2);
+});
+
+it("dob_required: a failed save keeps the step with an error", async () => {
+  await withPending({ code: "K7Q4M2" }, "code");
+  mockClaim.mockResolvedValueOnce({ ok: true, data: { ok: false, code: "dob_required", inviter } });
+  mockSetDob.mockResolvedValue({ ok: false, error: { hint: "unknown", message: "offline" } });
+  render(<InviteClaimScreen />);
+  await screen.findByTestId("claim-dob");
+  fireEvent.press(screen.getByTestId("dob-picker"));
+  fireEvent.press(screen.getByTestId("claim-dob-save"));
+  expect(await screen.findByTestId("claim-dob-error")).toBeTruthy();
+  expect(screen.getByText("Couldn't save your date of birth. Check your connection and try again.")).toBeTruthy();
+  expect(mockClaim).toHaveBeenCalledTimes(1);
 });
