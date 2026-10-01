@@ -133,6 +133,22 @@ describe("useArenaLive with match_location_required", () => {
     expect(result.current.locationPrompt).toBeNull();
   });
 
+  it("implausible movement: shows the try-again state, stays offline, never retries on its own", async () => {
+    loc.captureAndReport.mockResolvedValueOnce({ ok: false, failure: "implausible" });
+    const { result } = mount(flag(true));
+    await act(() => result.current.goLive());
+    expect(result.current.locationPrompt).toBe("implausible");
+    expect(result.current.isLive).toBe(false);
+    expect(mutations.toggleMatchPreferences).not.toHaveBeenCalled();
+    expect(loc.captureAndReport).toHaveBeenCalledTimes(1);
+    await act(async () => {});
+    expect(loc.captureAndReport).toHaveBeenCalledTimes(1);
+    // Try again is the athlete's call.
+    await act(() => result.current.confirmLocation());
+    expect(result.current.isLive).toBe(true);
+    expect(result.current.locationPrompt).toBeNull();
+  });
+
   it("a report that did not land still lets the server decide", async () => {
     loc.captureAndReport.mockResolvedValue({
       ok: false,

@@ -9,6 +9,7 @@ import {
   LOCATION_DENIED_COPY,
   LOCATION_DENIED_HELP_COPY,
   LOCATION_EXPLAIN_COPY,
+  LOCATION_IMPLAUSIBLE_COPY,
 } from "@/lib/location/match-location";
 
 interface LookingForMatchToggleProps {
@@ -141,7 +142,9 @@ function LocationAlert({ prompt }: { prompt: LiveLocationPrompt }) {
       ? [LOCATION_DENIED_COPY, LOCATION_DENIED_HELP_COPY]
       : prompt === "accuracy"
         ? [LOCATION_ACCURACY_COPY]
-        : [];
+        : prompt === "implausible"
+          ? [LOCATION_IMPLAUSIBLE_COPY]
+          : [];
   return (
     <div role="alert" aria-live="assertive">
       {lines.map((line) => (
