@@ -16,11 +16,28 @@ import {
 } from "@jits/shared/api/mutations";
 import { getPendingChallengesForAthlete } from "@jits/shared/api/queries";
 import { isFreshChallenge } from "@/lib/arena/challenge-freshness";
+import {
+  captureAndReport,
+  hintOf,
+  isProximityHint,
+  locationPermission,
+  type LocationFailure,
+} from "@/lib/location/match-location";
+
+/**
+ * Why an accepted Arena challenge could not start yet (flag on): the
+ * accepter's own reading failed (`denied` / `accuracy`), or the server's
+ * proximity gate refused (`proximity`). The challenge stays accepted, so the
+ * prompt stays up with Retry (no second accept) and Cancel.
+ */
+export type StartBlock = LocationFailure | "proximity";
 
 export interface IncomingChallenge {
   challengeId: string;
   challengerId: string;
   challengerName: string;
+  /** Set once accepted but not started; absent on a fresh prompt. */
+  startBlocked?: StartBlock;
 }
 
 export interface OutgoingChallenge {
@@ -137,12 +154,19 @@ export function useArenaChallenge({
   athleteWeight,
   canReceive = true,
   inMatch = false,
+  locationRequired,
 }: {
   athleteId: string;
   athleteWeight: number | null;
   canReceive?: boolean;
   /** A match screen is mounted: nothing is restored or joined behind it. */
   inMatch?: boolean;
+  /**
+   * `match_location_required` (resolves the read in flight). When on, the
+   * accepter reports an `arena` reading before `start_match_from_challenge`.
+   * Omitted: off.
+   */
+  locationRequired?: () => Promise<boolean>;
 }) {
   const router = useRouter();
   const [incoming, setIncomingState] = useState<IncomingChallenge | null>(null);
@@ -155,6 +179,12 @@ export function useArenaChallenge({
   canReceiveRef.current = canReceive;
   const inMatchRef = useRef(inMatch);
   inMatchRef.current = inMatch;
+  const locationRequiredRef = useRef(locationRequired);
+  locationRequiredRef.current = locationRequired;
+  const isLocationRequired = useCallback(
+    async () => (await locationRequiredRef.current?.()) ?? false,
+    [],
+  );
   /** Challenges this instance already resolved; never restored again. */
   const settledRef = useRef<Set<string>>(new Set());
   // Mirrors of state for realtime handlers, which must not read stale closures.
@@ -346,6 +376,11 @@ export function useArenaChallenge({
           if (row.status === "pending") return;
           // My own accept flips the row to accepted before the match exists.
           if (acceptingIdRef.current === row.id) return;
+          // ...and that echo can land after a blocked start; keep the prompt.
+          const shown = incomingRef.current;
+          if (row.status === "accepted" && shown?.challengeId === row.id && shown.startBlocked) {
+            return;
+          }
           if (incomingRef.current?.challengeId === row.id) setIncoming(null);
         },
       )
@@ -523,8 +558,33 @@ export function useArenaChallenge({
           return;
         }
         setOutgoing({ challengeId: result.data.id, opponentId, opponentName });
+        // Flag on: give the proximity gate a fresh reading of mine for this
+        // challenge (a challenger who is not live has no go_live one). Best
+        // effort, and only when it cannot raise a browser prompt.
+        void (async () => {
+          if (!(await isLocationRequired())) return;
+          const perm = await locationPermission();
+          if (perm === "denied" || perm === "prompt") return;
+          await captureAndReport(supabase, "arena", result.data.id);
+        })();
       }),
-    [athleteWeight, runExclusive, setOutgoing, sweepStale, explainRefusedInsert],
+    [
+      athleteWeight,
+      runExclusive,
+      setOutgoing,
+      sweepStale,
+      explainRefusedInsert,
+      isLocationRequired,
+    ],
+  );
+
+  /** Keep the prompt up, accepted but not started, with the reason. */
+  const blockStart = useCallback(
+    (current: IncomingChallenge, reason: StartBlock) => {
+      if (incomingRef.current?.challengeId !== current.challengeId) return;
+      setIncoming({ ...current, startBlocked: reason });
+    },
+    [setIncoming],
   );
 
   const accept = useCallback(
@@ -535,32 +595,59 @@ export function useArenaChallenge({
         const supabase = createClient();
         acceptingIdRef.current = current.challengeId;
         try {
-          const accepted = await acceptChallenge(supabase, {
-            challengeId: current.challengeId,
-            opponentWeight: athleteWeight ?? undefined,
-          });
-          if (!accepted.ok) {
-            toast.error(
-              accepted.error.code === "CHALLENGE_NOT_ACCEPTED"
-                ? CHALLENGE_GONE_MESSAGE
-                : accepted.error.message || "Couldn't accept that challenge.",
-            );
-            setIncoming(null);
-            return;
+          // A blocked prompt is already accepted: Retry only re-tries the start.
+          if (!current.startBlocked) {
+            const accepted = await acceptChallenge(supabase, {
+              challengeId: current.challengeId,
+              opponentWeight: athleteWeight ?? undefined,
+            });
+            if (!accepted.ok) {
+              toast.error(
+                accepted.error.code === "CHALLENGE_NOT_ACCEPTED"
+                  ? CHALLENGE_GONE_MESSAGE
+                  : accepted.error.message || "Couldn't accept that challenge.",
+              );
+              setIncoming(null);
+              return;
+            }
+          }
+
+          // Flag on: my fresh reading for this challenge goes in first, so
+          // the server's proximity gate has it (contract-location-flag 6).
+          if (await isLocationRequired()) {
+            const capture = await captureAndReport(supabase, "arena", current.challengeId);
+            if (!capture.ok && capture.failure) {
+              blockStart(current, capture.failure);
+              return;
+            }
+            if (!capture.ok && capture.report.ok === false && capture.report.code === "booking_closed") {
+              toast.error(CHALLENGE_GONE_MESSAGE);
+              setIncoming(null);
+              return;
+            }
           }
 
           // acceptChallenge filters on status = 'pending' and a no-row update
           // is not an error, so a withdrawn challenge surfaces here as
           // not_accepted. Any other failure is retried once: the RPC is
           // idempotent and returns the existing match if one was created.
+          // A proximity refusal is an answer, not a blip: never retried.
           let started = await startMatchFromChallenge(
             supabase,
             current.challengeId,
           );
-          if (!started.ok && started.error.code !== "CHALLENGE_NOT_ACCEPTED") {
+          if (
+            !started.ok &&
+            started.error.code !== "CHALLENGE_NOT_ACCEPTED" &&
+            !isProximityHint(hintOf(started.error))
+          ) {
             started = await startMatchFromChallenge(supabase, current.challengeId);
           }
           if (!started.ok) {
+            if (isProximityHint(hintOf(started.error))) {
+              blockStart(current, "proximity");
+              return;
+            }
             toast.error(
               started.error.code === "CHALLENGE_NOT_ACCEPTED"
                 ? CHALLENGE_GONE_MESSAGE
@@ -583,7 +670,7 @@ export function useArenaChallenge({
           acceptingIdRef.current = null;
         }
       }),
-    [athleteWeight, runExclusive, enterMatch, setIncoming],
+    [athleteWeight, runExclusive, enterMatch, setIncoming, isLocationRequired, blockStart],
   );
 
   const decline = useCallback(
@@ -592,6 +679,23 @@ export function useArenaChallenge({
         const current = incomingRef.current;
         if (!current) return;
         const supabase = createClient();
+        if (current.startBlocked) {
+          // Already accepted, so it cannot be declined: withdraw it. The
+          // challenger's bar resolves from the row UPDATE (and the broadcast).
+          const res = await cancelChallenge(supabase, current.challengeId, {
+            onlyIfAccepted: true,
+          });
+          if (!res.ok) {
+            toast.error("Couldn't cancel that challenge. Try again.");
+            return;
+          }
+          settledRef.current.add(current.challengeId);
+          if (res.data.cancelled) {
+            await broadcast(incomingChannelRef.current, current.challengeId, "cancelled");
+          }
+          setIncoming(null);
+          return;
+        }
         const result = await declineChallenge(supabase, current.challengeId);
         if (!result.ok) {
           // Keep the prompt: it is still pending and the challenger waiting.

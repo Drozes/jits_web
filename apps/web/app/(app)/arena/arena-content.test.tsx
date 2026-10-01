@@ -61,4 +61,42 @@ describe("ArenaContent", () => {
     );
     expect(screen.getByText("Ana wants to roll")).toBeInTheDocument();
   });
+
+  it.each([
+    ["proximity", "You need to be on the same mat as Ana to start."],
+    ["denied", "Location is off. ELO RATED checks you're both on the same mat before a match starts."],
+    ["accuracy", "Can't pin your location. Try near a window."],
+  ] as const)("a %s-blocked start shows its copy in an alert with Retry and Cancel", (block, copy) => {
+    render(<ArenaContent lookingCompetitors={[]} currentAthleteRanked={false} />);
+    act(() =>
+      publishArenaState({
+        ...IDLE_ARENA_STATE,
+        ready: true,
+        incoming: {
+          challengeId: "c1",
+          challengerId: "a",
+          challengerName: "Ana",
+          startBlocked: block,
+        },
+      }),
+    );
+    expect(screen.getByRole("alert")).toHaveTextContent(copy);
+    expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Accept" })).toBeNull();
+  });
+
+  it("a fresh prompt keeps Accept / Decline and an empty alert", () => {
+    render(<ArenaContent lookingCompetitors={[]} currentAthleteRanked={false} />);
+    act(() =>
+      publishArenaState({
+        ...IDLE_ARENA_STATE,
+        ready: true,
+        incoming: { challengeId: "c1", challengerId: "a", challengerName: "Ana" },
+      }),
+    );
+    expect(screen.getByRole("button", { name: "Accept" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Decline" })).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toBeEmptyDOMElement();
+  });
 });

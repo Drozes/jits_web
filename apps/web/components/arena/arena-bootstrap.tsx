@@ -8,6 +8,7 @@ import { useLobbyIds, useLobbyPresence } from "@/hooks/use-lobby-presence";
 import { useActiveLobbyCount } from "@/hooks/use-active-lobby-count";
 import { useRegisterArenaController } from "@/hooks/use-register-arena-controller";
 import { publishArenaState } from "@/lib/arena/arena-store";
+import { useMatchLocationRequired } from "@/lib/location/use-match-location-required";
 import { isImmersiveRoute } from "@/components/layout/nav-config";
 import { ArenaChallengeOverlay } from "./arena-challenge-overlay";
 
@@ -31,7 +32,9 @@ export function ArenaBootstrap({
   initialLive,
 }: ArenaBootstrapProps) {
   const inMatch = isImmersiveRoute(usePathname());
-  const live = useArenaLive({ athleteId, initialLive, inMatch });
+  // match_location_required: read here once, shared by both hooks.
+  const location = useMatchLocationRequired();
+  const live = useArenaLive({ athleteId, initialLive, inMatch, location });
   // Observing is not joining: self is tracked only while live.
   useLobbyPresence(athleteId, false, live.isLive);
   const onlineCount = useActiveLobbyCount(useLobbyIds(), athleteId);
@@ -40,22 +43,25 @@ export function ArenaBootstrap({
     athleteWeight,
     canReceive: live.isLive && !inMatch,
     inMatch,
+    locationRequired: location.ensure,
   });
   useRegisterArenaController(live, challenge);
 
-  const { isLive, isSaving } = live;
+  const { isLive, isSaving, isLocating, locationPrompt } = live;
   const { incoming, outgoing, isBusy } = challenge;
   useEffect(() => {
     publishArenaState({
       ready: true,
       isLive,
       isSaving,
+      isLocating,
+      locationPrompt,
       incoming,
       outgoing,
       isBusy,
       onlineCount,
     });
-  }, [isLive, isSaving, incoming, outgoing, isBusy, onlineCount]);
+  }, [isLive, isSaving, isLocating, locationPrompt, incoming, outgoing, isBusy, onlineCount]);
 
   return (
     <ArenaChallengeOverlay

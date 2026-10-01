@@ -28,6 +28,8 @@ export function useRegisterArenaController(
       toggle: () => liveRef.current.toggle(),
       goLive: () => liveRef.current.goLive(),
       goOffline: () => liveRef.current.goOffline(),
+      confirmLocation: () => liveRef.current.confirmLocation(),
+      dismissLocation: () => liveRef.current.dismissLocation(),
       sendChallenge: (id, name) => challengeRef.current.sendChallenge(id, name),
       accept: () => challengeRef.current.accept(),
       decline: () => challengeRef.current.decline(),

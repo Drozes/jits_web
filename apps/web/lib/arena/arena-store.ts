@@ -20,12 +20,17 @@ import type {
   IncomingChallenge,
   OutgoingChallenge,
 } from "@/hooks/use-arena-challenge";
+import type { LiveLocationPrompt } from "@/hooks/use-arena-live";
 
 export interface ArenaState {
   /** False until an owner has published; readers fall back to server props. */
   ready: boolean;
   isLive: boolean;
   isSaving: boolean;
+  /** Taking the go_live reading (match_location_required on). */
+  isLocating: boolean;
+  /** Explain step or why going live stopped; null when nothing to show. */
+  locationPrompt: LiveLocationPrompt;
   incoming: IncomingChallenge | null;
   outgoing: OutgoingChallenge | null;
   isBusy: boolean;
@@ -37,6 +42,9 @@ export interface ArenaController {
   toggle: () => Promise<void>;
   goLive: () => Promise<void>;
   goOffline: () => Promise<void>;
+  /** Explain step "Allow location", or Retry after a location stop. */
+  confirmLocation: () => Promise<void>;
+  dismissLocation: () => void;
   sendChallenge: (opponentId: string, opponentName: string) => Promise<void>;
   accept: () => Promise<void>;
   decline: () => Promise<void>;
@@ -47,6 +55,8 @@ export const IDLE_ARENA_STATE: ArenaState = Object.freeze({
   ready: false,
   isLive: false,
   isSaving: false,
+  isLocating: false,
+  locationPrompt: null,
   incoming: null,
   outgoing: null,
   isBusy: false,
@@ -169,6 +179,8 @@ export const arenaActions: ArenaController = Object.freeze({
   toggle: () => controller?.toggle() ?? noop(),
   goLive: () => controller?.goLive() ?? noop(),
   goOffline: () => controller?.goOffline() ?? noop(),
+  confirmLocation: () => controller?.confirmLocation() ?? noop(),
+  dismissLocation: () => controller?.dismissLocation(),
   sendChallenge: (opponentId: string, opponentName: string) =>
     controller?.sendChallenge(opponentId, opponentName) ?? noop(),
   accept: () => controller?.accept() ?? noop(),

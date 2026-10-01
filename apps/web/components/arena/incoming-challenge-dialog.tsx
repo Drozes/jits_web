@@ -67,6 +67,7 @@ export function IncomingChallengeDialog({
       <IncomingChallengePlate
         headingId={headingId}
         name={incoming.challengerName}
+        startBlocked={incoming.startBlocked}
         onAccept={onAccept}
         onDecline={onDecline}
         disabled={busy}

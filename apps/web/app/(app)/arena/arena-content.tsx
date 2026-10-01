@@ -374,6 +374,7 @@ export function ArenaContent({
       {incoming ? (
         <IncomingChallengePlate
           name={incoming.challengerName}
+          startBlocked={incoming.startBlocked}
           onAccept={accept}
           onDecline={decline}
           disabled={isBusy}
