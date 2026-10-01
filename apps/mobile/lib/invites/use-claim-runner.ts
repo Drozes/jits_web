@@ -13,6 +13,7 @@ import { acceptJoinInvite, claimChallengeInvite, logInviteEvent } from "@jits/sh
 import { supabase } from "@/lib/supabase/client";
 import { clearPendingInvite, releasePushDeferral, takeBufferedEvents, type PendingInvite } from "./pending-invite";
 import { readLocationOnce } from "./location";
+import { notifyFriendsChanged } from "./use-friend-ids";
 import { clearsPendingInvite, stepForClaim, stepForJoin, type ClaimStep } from "./claim-flow";
 
 export type RunnerState = { phase: "idle" | "checking" | "locating" | "claiming" } | { phase: "done"; step: ClaimStep };
@@ -31,6 +32,9 @@ export function useClaimRunner(
 
   const finish = React.useCallback(async (step: ClaimStep) => {
     if (clearsPendingInvite(step)) await clearPendingInvite();
+    // A join accept, a claim, or a weekly-cap claim can make friends, and
+    // friendships have no realtime stream: tell the Arena badges to re-read.
+    notifyFriendsChanged();
     // Push waits for a first match only when there is a match to wait for.
     if (step.type !== "go_match" && step.type !== "booked" && step.type !== "setup") {
       if (step.type !== "message" || step.terminal) void releasePushDeferral();

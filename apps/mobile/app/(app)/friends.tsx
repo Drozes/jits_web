@@ -14,6 +14,7 @@ import { Avatar32, LivePill, Plate } from "@/components/ui/elo-system";
 import { supabase } from "@/lib/supabase/client";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { useInvitesEnabled } from "@/lib/invites/use-invites-enabled";
+import { notifyFriendsChanged } from "@/lib/invites/use-friend-ids";
 
 export default function FriendsScreen() {
   const router = useRouter();
@@ -53,7 +54,10 @@ export default function FriendsScreen() {
         style: "destructive",
         onPress: async () => {
           const res = await removeFriend(supabase, f.athlete_id);
-          if (res.ok) setFriends((cur) => cur?.filter((x) => x.athlete_id !== f.athlete_id) ?? cur);
+          if (res.ok) {
+            setFriends((cur) => cur?.filter((x) => x.athlete_id !== f.athlete_id) ?? cur);
+            notifyFriendsChanged();
+          }
           else Alert.alert("Couldn't remove", "Check your connection and try again.");
         },
       },

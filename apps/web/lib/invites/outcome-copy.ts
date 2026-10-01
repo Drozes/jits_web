@@ -65,13 +65,12 @@ export function claimOutcome(result: ClaimResult): InviteOutcome {
     case "inviter_unavailable":
       return { kind: "error", title: "Not available", body: `${nameAtStart(result.inviter)} can't take matches right now.` };
     case "inviter_weekly_cap":
-      // CONTRACT AMENDMENT: contract 7 says "You're now friends", but the
-      // backend returns this code before _ensure_friendship (friendship only
-      // on an accepted invite), so no friendship exists. Do not claim one.
+      // Contract 7 copy. The backend makes the friendship before returning
+      // this code (jr_be 20261001300000, jits-b3js.17), so "now friends" holds.
       return {
         kind: "error",
         title: "Weekly limit reached",
-        body: `${nameAtStart(result.inviter)} has played this week's invite matches. Challenge them from the Arena.`,
+        body: `${nameAtStart(result.inviter)} has played this week's invite matches. You're now friends, so challenge them from the Arena.`,
       };
     case "accuracy_too_low":
       return {

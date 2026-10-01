@@ -105,7 +105,11 @@ describe("acceptJoinAction", () => {
   it("becomes friends", async () => {
     rpc.mockResolvedValue({ data: { ok: true, result: "friends", inviter: ALEX }, error: null });
     const outcome = await acceptJoinAction(TOKEN, "Alex");
-    expect(rpc).toHaveBeenCalledWith("accept_join_invite", { p_token: TOKEN });
+    expect(rpc).toHaveBeenCalledWith("accept_join_invite", {
+      p_token: TOKEN,
+      p_gateway: "landing_web",
+      p_platform: "web",
+    });
     expect(outcome).toMatchObject({ kind: "friends", title: "You're friends" });
     expect(cookieStore.delete).not.toHaveBeenCalled();
   });

@@ -27,6 +27,14 @@ describe("mapPostgrestError", () => {
       expect(result.raw).toBeDefined();
     });
 
+    it("maps 'invite_booking_use_presence' hint to INVITE_BOOKING_USE_PRESENCE", () => {
+      const result = mapPostgrestError(pgError("P0001", "err", "invite_booking_use_presence"));
+      expect(result.code).toBe("INVITE_BOOKING_USE_PRESENCE");
+      expect(result.message).toBe(
+        "This match starts when you're both on the mat. Open your booking to check in.",
+      );
+    });
+
     it("maps 'not_found' hint to UNKNOWN", () => {
       const result = mapPostgrestError(pgError("P0001", "err", "not_found"));
       expect(result.code).toBe("UNKNOWN");

@@ -4,14 +4,15 @@
  * back as `{ ok:false, error }` (branch on `error.hint`, kept on `hint`), and a
  * returned `{ok:false, code}` JSON is a successful call whose data says so.
  *
- * The RPCs are untyped until `database.ts` is regenerated against the
- * 20261001* migrations, hence the local `rpc` cast.
+ * RPC names are checked against the generated `Database` types; the jsonb
+ * results are parsed by hand below (the generated return type is `Json`).
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "../types/database";
 import type { ClaimFailureCode, StartBlockedReason } from "../utils/invite-copy";
 
 type Client = SupabaseClient<Database>;
+type RpcName = keyof Database["public"]["Functions"];
 
 /** A failed call: the RAISE hint (`invites_disabled`, `not_found`, ...) or `unknown`. */
 export interface InviteRpcError {
@@ -25,7 +26,7 @@ type RawError = { message?: string; hint?: string | null; code?: string } | null
 
 async function rpc<T>(
   supabase: Client,
-  fn: string,
+  fn: RpcName,
   args: Record<string, unknown>,
   parse: (data: unknown) => T | null,
 ): Promise<InviteResult<T>> {
@@ -466,13 +467,8 @@ export async function getInviteStatus(
   inviteId: string,
 ): Promise<{ status: string; claimed_by: string | null; challenge_id: string | null } | null> {
   try {
-    const from = supabase.from as unknown as (t: string) => {
-      select: (c: string) => {
-        eq: (k: string, v: string) => { maybeSingle: () => PromiseLike<{ data: unknown; error: RawError }> };
-      };
-    };
-    const { data, error } = await from
-      .call(supabase, "invites")
+    const { data, error } = await supabase
+      .from("invites")
       .select("status, claimed_by, challenge_id")
       .eq("id", inviteId)
       .maybeSingle();
@@ -503,15 +499,8 @@ export async function listMyOpenChallengeInvites(
   now: Date = new Date(),
 ): Promise<InviteResult<OpenChallengeInvite[]>> {
   try {
-    type Q = {
-      select: (c: string) => Q;
-      eq: (k: string, v: string) => Q;
-      gt: (k: string, v: string) => Q;
-      order: (k: string, o: { ascending: boolean }) => PromiseLike<{ data: unknown; error: RawError }>;
-    };
-    const from = supabase.from as unknown as (t: string) => Q;
-    const { data, error } = await from
-      .call(supabase, "invites")
+    const { data, error } = await supabase
+      .from("invites")
       .select("id, short_code, code_expires_at, link_expires_at, created_at")
       .eq("inviter_id", athleteId)
       .eq("kind", "challenge")

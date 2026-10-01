@@ -25,7 +25,7 @@ export type FriendsResult<T> = { ok: true; data: T } | { ok: false; error: { hin
 
 type RawError = { message?: string; hint?: string | null } | null;
 
-async function call(supabase: Client, fn: string, args: Record<string, unknown>) {
+async function call(supabase: Client, fn: keyof Database["public"]["Functions"], args: Record<string, unknown>) {
   const rpc = supabase.rpc as unknown as (
     f: string,
     a: Record<string, unknown>,
@@ -100,15 +100,9 @@ export function sortFriendsFirst<T>(items: readonly T[], idOf: (t: T) => string,
 
 // ---------------------------------------------------------------------------
 // "Friends on the mat" notification toggle (`notification_preferences.enable_friends`,
-// contract 3.9). Absent row or column reads as on. Untyped until database.ts
-// is regenerated against the 20261001* migrations.
+// contract 3.9). Absent row or column reads as on.
 
-type LooseTable = {
-  select: (cols: string) => { maybeSingle: () => PromiseLike<{ data: unknown; error: RawError }> };
-  upsert: (row: Record<string, unknown>, opts: { onConflict: string }) => PromiseLike<{ error: RawError }>;
-};
-const prefsTable = (supabase: Client) =>
-  (supabase.from as unknown as (t: string) => LooseTable).call(supabase, "notification_preferences");
+const prefsTable = (supabase: Client) => supabase.from("notification_preferences");
 
 export async function getFriendsNotificationsEnabled(supabase: Client): Promise<boolean> {
   try {

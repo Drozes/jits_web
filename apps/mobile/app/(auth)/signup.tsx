@@ -107,8 +107,6 @@ export default function SignupScreen() {
                 <InviteBanner kind={pending?.code ? "challenge" : null} inviterName={null} />
               ) : null}
 
-              {/* Slot: the native slice mounts <AppleSignInButton /> here. */}
-
               <Plate className="gap-5">
                 <AuthFormField
                   label="Email"

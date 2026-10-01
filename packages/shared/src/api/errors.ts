@@ -59,6 +59,7 @@ export type DomainErrorCode =
   | "NOT_FLAGGED"
   | "OPPONENT_NOT_CHECKED"
   | "NO_CHALLENGE"
+  | "INVITE_BOOKING_USE_PRESENCE"
   | "NOT_AUTHORIZED"
   | "RLS_VIOLATION"
   | "RPC_MISSING"
@@ -216,6 +217,13 @@ const HINT_TO_CODE: Record<string, { code: DomainErrorCode; message: string }> =
     opponent_not_checked: {
       code: "OPPONENT_NOT_CHECKED",
       message: "Your opponent hasn't checked your weigh-in yet.",
+    },
+    // An invite booking starts only when both athletes report being on the
+    // same mat (report_match_presence), never via start_match_from_challenge
+    // or a direct matches INSERT (jr_be A5, 20261001100400).
+    invite_booking_use_presence: {
+      code: "INVITE_BOOKING_USE_PRESENCE",
+      message: "This match starts when you're both on the mat. Open your booking to check in.",
     },
     no_challenge: {
       code: "NO_CHALLENGE",

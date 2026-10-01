@@ -61,7 +61,11 @@ export async function acceptJoinAction(
 ): Promise<InviteOutcome> {
   if (!INVITE_TOKEN_RE.test(token)) return INVALID;
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("accept_join_invite", { p_token: token });
+  const { data, error } = await supabase.rpc("accept_join_invite", {
+    p_token: token,
+    p_gateway: "landing_web",
+    p_platform: "web",
+  });
   if (error?.hint === "not_authenticated") redirect(withNext("/login", invitePath(token)));
   if (error || !data) return TRY_AGAIN;
   return finish(token, joinOutcome(data as AcceptJoinResult, inviterName));

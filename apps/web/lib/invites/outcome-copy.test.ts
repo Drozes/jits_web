@@ -76,7 +76,7 @@ describe("claimOutcome", () => {
     ["inviter_unavailable", "Alex can't take matches right now."],
     [
       "inviter_weekly_cap",
-      "Alex has played this week's invite matches. Challenge them from the Arena.",
+      "Alex has played this week's invite matches. You're now friends, so challenge them from the Arena.",
     ],
     ["invalid", "This invite link isn't valid. Ask your training partner to send it again."],
   ])("%s -> contract copy", (code, body) => {
@@ -112,9 +112,11 @@ describe("joinOutcome", () => {
     });
   });
 
-  it("never claims a friendship on the weekly cap", () => {
+  it("uses the contract 7 copy on the weekly cap (the backend makes friends first)", () => {
     const out = claimOutcome({ ok: false, code: "inviter_weekly_cap", inviter: ALEX });
-    expect(out).toMatchObject({ title: "Weekly limit reached" });
-    expect(JSON.stringify(out)).not.toMatch(/friends/i);
+    expect(out).toMatchObject({
+      title: "Weekly limit reached",
+      body: "Alex has played this week's invite matches. You're now friends, so challenge them from the Arena.",
+    });
   });
 });

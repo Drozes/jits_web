@@ -34,6 +34,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_deletion_pending_objects: {
+        Row: {
+          athlete_id: string
+          bucket_id: string
+          created_at: string
+          object_name: string
+        }
+        Insert: {
+          athlete_id: string
+          bucket_id: string
+          created_at?: string
+          object_name: string
+        }
+        Update: {
+          athlete_id?: string
+          bucket_id?: string
+          created_at?: string
+          object_name?: string
+        }
+        Relationships: []
+      }
       admin_audit: {
         Row: {
           action: string
@@ -153,9 +174,56 @@ export type Database = {
           },
         ]
       }
+      athlete_friendships: {
+        Row: {
+          athlete_a: string
+          athlete_b: string
+          created_at: string
+          invite_id: string | null
+          source: string
+        }
+        Insert: {
+          athlete_a: string
+          athlete_b: string
+          created_at?: string
+          invite_id?: string | null
+          source: string
+        }
+        Update: {
+          athlete_a?: string
+          athlete_b?: string
+          created_at?: string
+          invite_id?: string | null
+          source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "athlete_friendships_athlete_a_fkey"
+            columns: ["athlete_a"]
+            isOneToOne: false
+            referencedRelation: "athletes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "athlete_friendships_athlete_b_fkey"
+            columns: ["athlete_b"]
+            isOneToOne: false
+            referencedRelation: "athletes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "athlete_friendships_invite_id_fkey"
+            columns: ["invite_id"]
+            isOneToOne: false
+            referencedRelation: "invites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       athletes: {
         Row: {
-          auth_user_id: string
+          activated_at: string | null
+          auth_user_id: string | null
           avatar_url: string | null
           city: string | null
           created_at: string
@@ -184,7 +252,8 @@ export type Database = {
           status: string
         }
         Insert: {
-          auth_user_id: string
+          activated_at?: string | null
+          auth_user_id?: string | null
           avatar_url?: string | null
           city?: string | null
           created_at?: string
@@ -213,7 +282,8 @@ export type Database = {
           status?: string
         }
         Update: {
-          auth_user_id?: string
+          activated_at?: string | null
+          auth_user_id?: string | null
           avatar_url?: string | null
           city?: string | null
           created_at?: string
@@ -259,6 +329,7 @@ export type Database = {
           expires_at: string
           expiry_notified_at: string | null
           id: string
+          invite_id: string | null
           match_type: Database["public"]["Enums"]["match_type_enum"]
           opponent_id: string
           opponent_weight: number | null
@@ -273,6 +344,7 @@ export type Database = {
           expires_at?: string
           expiry_notified_at?: string | null
           id?: string
+          invite_id?: string | null
           match_type: Database["public"]["Enums"]["match_type_enum"]
           opponent_id: string
           opponent_weight?: number | null
@@ -287,6 +359,7 @@ export type Database = {
           expires_at?: string
           expiry_notified_at?: string | null
           id?: string
+          invite_id?: string | null
           match_type?: Database["public"]["Enums"]["match_type_enum"]
           opponent_id?: string
           opponent_weight?: number | null
@@ -295,6 +368,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "challenges_invite_id_fkey"
+            columns: ["invite_id"]
+            isOneToOne: false
+            referencedRelation: "invites"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "fk_challenges_challenger"
             columns: ["challenger_id"]
@@ -618,9 +698,227 @@ export type Database = {
         }
         Relationships: []
       }
+      invite_attributions: {
+        Row: {
+          attributed_at: string
+          channel: string | null
+          first_touch_at: string
+          gateway: string
+          invite_id: string | null
+          invite_kind: string
+          invite_status_at_attribution: string
+          invitee_athlete_id: string
+          inviter_athlete_id: string | null
+          inviter_athlete_id_snapshot: string
+          platform: string
+        }
+        Insert: {
+          attributed_at?: string
+          channel?: string | null
+          first_touch_at: string
+          gateway: string
+          invite_id?: string | null
+          invite_kind: string
+          invite_status_at_attribution: string
+          invitee_athlete_id: string
+          inviter_athlete_id?: string | null
+          inviter_athlete_id_snapshot: string
+          platform: string
+        }
+        Update: {
+          attributed_at?: string
+          channel?: string | null
+          first_touch_at?: string
+          gateway?: string
+          invite_id?: string | null
+          invite_kind?: string
+          invite_status_at_attribution?: string
+          invitee_athlete_id?: string
+          inviter_athlete_id?: string | null
+          inviter_athlete_id_snapshot?: string
+          platform?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invite_attributions_invite_id_fkey"
+            columns: ["invite_id"]
+            isOneToOne: false
+            referencedRelation: "invites"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invite_attributions_invitee_athlete_id_fkey"
+            columns: ["invitee_athlete_id"]
+            isOneToOne: true
+            referencedRelation: "athletes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invite_attributions_inviter_athlete_id_fkey"
+            columns: ["inviter_athlete_id"]
+            isOneToOne: false
+            referencedRelation: "athletes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invite_code_attempts: {
+        Row: {
+          athlete_id: string
+          attempted_at: string
+          code: string | null
+          id: number
+          success: boolean
+        }
+        Insert: {
+          athlete_id: string
+          attempted_at?: string
+          code?: string | null
+          id?: never
+          success: boolean
+        }
+        Update: {
+          athlete_id?: string
+          attempted_at?: string
+          code?: string | null
+          id?: never
+          success?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invite_code_attempts_athlete_id_fkey"
+            columns: ["athlete_id"]
+            isOneToOne: false
+            referencedRelation: "athletes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invite_events: {
+        Row: {
+          actor_athlete_id: string | null
+          created_at: string
+          detail: Json
+          id: number
+          invite_id: string | null
+          step: string
+        }
+        Insert: {
+          actor_athlete_id?: string | null
+          created_at?: string
+          detail?: Json
+          id?: never
+          invite_id?: string | null
+          step: string
+        }
+        Update: {
+          actor_athlete_id?: string | null
+          created_at?: string
+          detail?: Json
+          id?: never
+          invite_id?: string | null
+          step?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invite_events_actor_athlete_id_fkey"
+            columns: ["actor_athlete_id"]
+            isOneToOne: false
+            referencedRelation: "athletes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invite_events_invite_id_fkey"
+            columns: ["invite_id"]
+            isOneToOne: false
+            referencedRelation: "invites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invites: {
+        Row: {
+          challenge_id: string | null
+          claimed_at: string | null
+          claimed_by: string | null
+          code_expires_at: string | null
+          created_at: string
+          entry_point: string | null
+          id: string
+          inviter_id: string
+          kind: string
+          link_expires_at: string | null
+          public_token: string | null
+          revoked_at: string | null
+          short_code: string | null
+          status: string
+          token_hash: string
+          updated_at: string
+        }
+        Insert: {
+          challenge_id?: string | null
+          claimed_at?: string | null
+          claimed_by?: string | null
+          code_expires_at?: string | null
+          created_at?: string
+          entry_point?: string | null
+          id?: string
+          inviter_id: string
+          kind: string
+          link_expires_at?: string | null
+          public_token?: string | null
+          revoked_at?: string | null
+          short_code?: string | null
+          status?: string
+          token_hash: string
+          updated_at?: string
+        }
+        Update: {
+          challenge_id?: string | null
+          claimed_at?: string | null
+          claimed_by?: string | null
+          code_expires_at?: string | null
+          created_at?: string
+          entry_point?: string | null
+          id?: string
+          inviter_id?: string
+          kind?: string
+          link_expires_at?: string | null
+          public_token?: string | null
+          revoked_at?: string | null
+          short_code?: string | null
+          status?: string
+          token_hash?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invites_challenge_id_fkey"
+            columns: ["challenge_id"]
+            isOneToOne: true
+            referencedRelation: "challenges"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invites_claimed_by_fkey"
+            columns: ["claimed_by"]
+            isOneToOne: false
+            referencedRelation: "athletes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invites_inviter_id_fkey"
+            columns: ["inviter_id"]
+            isOneToOne: false
+            referencedRelation: "athletes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       match_confirmations: {
         Row: {
           athlete_id: string
+          auto_confirmed: boolean
           confirmed: boolean
           created_at: string
           id: string
@@ -628,6 +926,7 @@ export type Database = {
         }
         Insert: {
           athlete_id: string
+          auto_confirmed?: boolean
           confirmed?: boolean
           created_at?: string
           id?: string
@@ -635,6 +934,7 @@ export type Database = {
         }
         Update: {
           athlete_id?: string
+          auto_confirmed?: boolean
           confirmed?: boolean
           created_at?: string
           id?: string
@@ -768,6 +1068,114 @@ export type Database = {
             columns: ["match_id"]
             isOneToOne: false
             referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      match_presence_readings: {
+        Row: {
+          accuracy_m: number
+          athlete_id: string
+          challenge_id: string | null
+          context: string
+          id: number
+          invite_id: string | null
+          lat: number | null
+          lng: number | null
+          recorded_at: string
+        }
+        Insert: {
+          accuracy_m: number
+          athlete_id: string
+          challenge_id?: string | null
+          context: string
+          id?: never
+          invite_id?: string | null
+          lat?: number | null
+          lng?: number | null
+          recorded_at?: string
+        }
+        Update: {
+          accuracy_m?: number
+          athlete_id?: string
+          challenge_id?: string | null
+          context?: string
+          id?: never
+          invite_id?: string | null
+          lat?: number | null
+          lng?: number | null
+          recorded_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "match_presence_readings_athlete_id_fkey"
+            columns: ["athlete_id"]
+            isOneToOne: false
+            referencedRelation: "athletes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_presence_readings_challenge_id_fkey"
+            columns: ["challenge_id"]
+            isOneToOne: false
+            referencedRelation: "challenges"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_presence_readings_invite_id_fkey"
+            columns: ["invite_id"]
+            isOneToOne: false
+            referencedRelation: "invites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      match_proximity_checks: {
+        Row: {
+          accuracy_a_m: number | null
+          accuracy_b_m: number | null
+          athlete_a: string
+          athlete_b: string
+          challenge_id: string
+          checked_at: string
+          context: string
+          distance_m: number | null
+          id: number
+          reason: string | null
+          verdict: string
+        }
+        Insert: {
+          accuracy_a_m?: number | null
+          accuracy_b_m?: number | null
+          athlete_a: string
+          athlete_b: string
+          challenge_id: string
+          checked_at?: string
+          context: string
+          distance_m?: number | null
+          id?: never
+          reason?: string | null
+          verdict: string
+        }
+        Update: {
+          accuracy_a_m?: number | null
+          accuracy_b_m?: number | null
+          athlete_a?: string
+          athlete_b?: string
+          challenge_id?: string
+          checked_at?: string
+          context?: string
+          distance_m?: number | null
+          id?: never
+          reason?: string | null
+          verdict?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "match_proximity_checks_challenge_id_fkey"
+            columns: ["challenge_id"]
+            isOneToOne: false
+            referencedRelation: "challenges"
             referencedColumns: ["id"]
           },
         ]
@@ -1185,6 +1593,7 @@ export type Database = {
           athlete_id: string
           enable_challenges: boolean
           enable_chat: boolean
+          enable_friends: boolean
           enable_matches: boolean
           updated_at: string
         }
@@ -1192,6 +1601,7 @@ export type Database = {
           athlete_id: string
           enable_challenges?: boolean
           enable_chat?: boolean
+          enable_friends?: boolean
           enable_matches?: boolean
           updated_at?: string
         }
@@ -1199,6 +1609,7 @@ export type Database = {
           athlete_id?: string
           enable_challenges?: boolean
           enable_chat?: boolean
+          enable_friends?: boolean
           enable_matches?: boolean
           updated_at?: string
         }
@@ -1454,6 +1865,68 @@ export type Database = {
             columns: ["gym_id"]
             isOneToOne: false
             referencedRelation: "gyms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      social_notifications: {
+        Row: {
+          challenge_id: string | null
+          created_at: string
+          id: number
+          invite_id: string | null
+          kind: string
+          match_id: string | null
+          recipient_athlete_id: string
+          subject_athlete_id: string
+        }
+        Insert: {
+          challenge_id?: string | null
+          created_at?: string
+          id?: never
+          invite_id?: string | null
+          kind: string
+          match_id?: string | null
+          recipient_athlete_id: string
+          subject_athlete_id: string
+        }
+        Update: {
+          challenge_id?: string | null
+          created_at?: string
+          id?: never
+          invite_id?: string | null
+          kind?: string
+          match_id?: string | null
+          recipient_athlete_id?: string
+          subject_athlete_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_notifications_challenge_id_fkey"
+            columns: ["challenge_id"]
+            isOneToOne: false
+            referencedRelation: "challenges"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "social_notifications_invite_id_fkey"
+            columns: ["invite_id"]
+            isOneToOne: false
+            referencedRelation: "invites"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "social_notifications_recipient_athlete_id_fkey"
+            columns: ["recipient_athlete_id"]
+            isOneToOne: false
+            referencedRelation: "athletes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "social_notifications_subject_athlete_id_fkey"
+            columns: ["subject_athlete_id"]
+            isOneToOne: false
+            referencedRelation: "athletes"
             referencedColumns: ["id"]
           },
         ]
@@ -2434,6 +2907,59 @@ export type Database = {
         }
         Returns: string
       }
+      _athlete_busy: {
+        Args: { p_athlete: string; p_except_challenge: string }
+        Returns: boolean
+      }
+      _athlete_card: { Args: { p_athlete: string }; Returns: Json }
+      _attribute_invitee: {
+        Args: {
+          p_first_touch_at: string
+          p_gateway: string
+          p_invite_id: string
+          p_me: string
+          p_platform: string
+          p_quiet_same_invite?: boolean
+        }
+        Returns: string
+      }
+      _claim_failure: {
+        Args: {
+          p_code: string
+          p_invite_id: string
+          p_inviter: string
+          p_me: string
+        }
+        Returns: Json
+      }
+      _claim_success: {
+        Args: {
+          p_challenge_id: string
+          p_has_reading: boolean
+          p_invite_id: string
+          p_inviter: string
+          p_proximity: Json
+          p_result: string
+        }
+        Returns: Json
+      }
+      _enqueue_invite_joined: {
+        Args: { p_invitee: string }
+        Returns: undefined
+      }
+      _ensure_friendship: {
+        Args: {
+          p_invite_id: string
+          p_source: string
+          p_x: string
+          p_y: string
+        }
+        Returns: boolean
+      }
+      _evaluate_proximity: {
+        Args: { p_challenge_id: string; p_context: string }
+        Returns: Json
+      }
       _fail_stale_pending_highlight: {
         Args: { p_expected_pending_since: string; p_highlight_id: string }
         Returns: boolean
@@ -2443,6 +2969,10 @@ export type Database = {
         Returns: boolean
       }
       _gym_range_cutoff: { Args: { p_range: string }; Returns: string }
+      _haversine_m: {
+        Args: { p_lat1: number; p_lat2: number; p_lng1: number; p_lng2: number }
+        Returns: number
+      }
       _highlight_flag_changed_at: { Args: never; Returns: string }
       _highlight_list_item: { Args: { p_highlight_id: string }; Returns: Json }
       _highlight_match_facts: {
@@ -2452,6 +2982,73 @@ export type Database = {
       _highlight_max_seconds: { Args: never; Returns: number }
       _highlight_plan_max: { Args: never; Returns: number }
       _highlight_render_max: { Args: never; Returns: number }
+      _invite_booking_block: {
+        Args: { p_challenge_id: string }
+        Returns: string
+      }
+      _invite_booking_match: {
+        Args: { p_challenge_id: string }
+        Returns: string
+      }
+      _invite_code_attempt: {
+        Args: { p_athlete: string; p_code?: string; p_success: boolean }
+        Returns: number
+      }
+      _invite_code_display: { Args: { p_code: string }; Returns: string }
+      _invite_code_throttle: { Args: { p_athlete: string }; Returns: number }
+      _invite_effective_status: {
+        Args: { p_invite_id: string }
+        Returns: string
+      }
+      _invite_token_hash: { Args: { p_token: string }; Returns: string }
+      _invite_url: { Args: { p_token: string }; Returns: string }
+      _invite_weekly_matches_used: {
+        Args: { p_inviter: string }
+        Returns: number
+      }
+      _inviter_card: { Args: { p_athlete: string }; Returns: Json }
+      _latest_presence: {
+        Args: { p_athlete: string; p_challenge_id: string }
+        Returns: {
+          accuracy_m: number
+          athlete_id: string
+          challenge_id: string | null
+          context: string
+          id: number
+          invite_id: string | null
+          lat: number | null
+          lng: number | null
+          recorded_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "match_presence_readings"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      _log_invite_event: {
+        Args: {
+          p_actor: string
+          p_detail?: Json
+          p_invite_id: string
+          p_step: string
+        }
+        Returns: undefined
+      }
+      _match_weight_check_state: { Args: { p_match_id: string }; Returns: Json }
+      _new_invite_token: { Args: never; Returns: string }
+      _new_short_code: { Args: never; Returns: string }
+      _normalize_invite_code: { Args: { p_code: string }; Returns: string }
+      _proximity_params: {
+        Args: never
+        Returns: {
+          accuracy_ceiling_m: number
+          allowance_cap_m: number
+          base_m: number
+          freshness: string
+        }[]
+      }
       _reap_stale_highlight_claim: {
         Args: { p_expected_claimed_at: string; p_highlight_id: string }
         Returns: string
@@ -2476,18 +3073,67 @@ export type Database = {
         }
         Returns: boolean
       }
+      _resolve_invite: {
+        Args: { p_code: string; p_kind?: string; p_token: string }
+        Returns: {
+          challenge_id: string | null
+          claimed_at: string | null
+          claimed_by: string | null
+          code_expires_at: string | null
+          created_at: string
+          entry_point: string | null
+          id: string
+          inviter_id: string
+          kind: string
+          link_expires_at: string | null
+          public_token: string | null
+          revoked_at: string | null
+          short_code: string | null
+          status: string
+          token_hash: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "invites"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       _scrub_highlight_message: {
         Args: { p_max?: number; p_text: string }
         Returns: string
       }
+      _start_blocked_reason: {
+        Args: {
+          p_challenge_id: string
+          p_has_reading: boolean
+          p_proximity: Json
+        }
+        Returns: string
+      }
+      _start_invite_booking: {
+        Args: { p_challenge_id: string }
+        Returns: string
+      }
+      _valid_invite_token: { Args: { p_token: string }; Returns: boolean }
       _validate_highlight_feedback: {
         Args: { p_chips: string[]; p_free_text: string; p_rating: number }
         Returns: string
+      }
+      accept_join_invite: {
+        Args: { p_gateway?: string; p_platform?: string; p_token: string }
+        Returns: Json
       }
       admin_add_gym_manager: {
         Args: { p_athlete_id: string; p_gym_id: string }
         Returns: undefined
       }
+      admin_invite_funnel: {
+        Args: { p_channel?: string; p_since: string }
+        Returns: Json
+      }
+      admin_invite_leaderboard: { Args: { p_since: string }; Returns: Json }
       admin_list_athletes: {
         Args: never
         Returns: {
@@ -2498,6 +3144,11 @@ export type Database = {
           primary_gym_name: string
         }[]
       }
+      admin_list_invite_attributions: {
+        Args: { p_limit?: number; p_since: string }
+        Returns: Json
+      }
+      admin_list_invite_farming: { Args: { p_since?: string }; Returns: Json }
       admin_list_managed_gyms: {
         Args: { p_athlete_id: string }
         Returns: {
@@ -2582,6 +3233,7 @@ export type Database = {
       }
       assert_orphaned_object_sweep_healthy: { Args: never; Returns: string }
       auth_athlete_id: { Args: never; Returns: string }
+      auto_confirm_locked_results: { Args: never; Returns: number }
       begin_highlight_regeneration: {
         Args: {
           p_athlete_id: string
@@ -2616,6 +3268,19 @@ export type Database = {
       cancel_session_match: { Args: { p_match_id: string }; Returns: Json }
       check_opponent_weight: {
         Args: { p_match_id: string; p_verdict: string; p_weight_seen?: number }
+        Returns: Json
+      }
+      claim_challenge_invite: {
+        Args: {
+          p_accuracy_m?: number
+          p_code?: string
+          p_first_touch_at?: string
+          p_gateway?: string
+          p_lat?: number
+          p_lng?: number
+          p_platform?: string
+          p_token?: string
+        }
         Returns: Json
       }
       claim_highlight_for_render: {
@@ -2677,6 +3342,7 @@ export type Database = {
         Args: { p_other_athlete_id: string }
         Returns: Json
       }
+      create_invite: { Args: { p_entry_point?: string }; Returns: Json }
       create_session: {
         Args: {
           p_gym_id: string
@@ -2700,6 +3366,10 @@ export type Database = {
         }
         Returns: Json
       }
+      delete_athlete_account: {
+        Args: { p_auth_user_id: string }
+        Returns: Json
+      }
       dispute_match_result: {
         Args: { p_match_id: string; p_reason?: string }
         Returns: Json
@@ -2710,6 +3380,7 @@ export type Database = {
         Returns: string
       }
       expire_pending_challenges: { Args: never; Returns: number }
+      expire_stale_invites: { Args: never; Returns: Json }
       fail_highlight_regeneration: {
         Args: { p_detail: string; p_feedback_id: string; p_outcome: string }
         Returns: undefined
@@ -2835,6 +3506,7 @@ export type Database = {
         Args: { p_highlight_id: string }
         Returns: Json
       }
+      get_invite_preview_server: { Args: { p_token: string }; Returns: Json }
       get_match_details: { Args: { p_match_id: string }; Returns: Json }
       get_match_history: {
         Args: { p_athlete_id: string; p_since?: string }
@@ -2858,14 +3530,18 @@ export type Database = {
       get_match_rank_change: { Args: { p_match_id: string }; Returns: Json }
       get_match_videos: { Args: { p_match_id: string }; Returns: Json }
       get_match_weight_checks: { Args: { p_match_id: string }; Returns: Json }
+      get_my_bookings: { Args: never; Returns: Json }
+      get_my_friends: { Args: never; Returns: Json }
       get_my_highlights: {
         Args: { p_before?: string; p_limit?: number; p_unseen_only?: boolean }
         Returns: Json
       }
+      get_my_invite_stats: { Args: never; Returns: Json }
       get_my_match_library: {
         Args: { p_before?: string; p_before_id?: string; p_limit?: number }
         Returns: Json
       }
+      get_or_create_personal_invite: { Args: never; Returns: Json }
       get_recent_activity: {
         Args: { p_limit?: number }
         Returns: {
@@ -2913,10 +3589,12 @@ export type Database = {
       is_gym_manager: { Args: { p_gym_id: string }; Returns: boolean }
       is_highlight_rendering_enabled: { Args: never; Returns: boolean }
       is_highlight_share_enabled: { Args: never; Returns: boolean }
+      is_invites_enabled: { Args: never; Returns: boolean }
       is_match_video_participant: {
         Args: { p_video_id: string }
         Returns: boolean
       }
+      is_opponent_weight_check_required: { Args: never; Returns: boolean }
       is_valid_instagram_handle: { Args: { p: string }; Returns: boolean }
       is_video_upload_allowed: {
         Args: { p_athlete_id: string }
@@ -2926,6 +3604,19 @@ export type Database = {
       log_highlight_share_event: {
         Args: { p_detail?: Json; p_highlight_id: string; p_step: string }
         Returns: undefined
+      }
+      log_invite_event: {
+        Args: {
+          p_detail?: Json
+          p_invite_id?: string
+          p_step: string
+          p_token?: string
+        }
+        Returns: Json
+      }
+      log_invite_landing_event: {
+        Args: { p_detail?: Json; p_step: string; p_token: string }
+        Returns: Json
       }
       mark_conversation_read: {
         Args: { p_conversation_id: string }
@@ -2938,7 +3629,7 @@ export type Database = {
       mark_practice_match: {
         Args: { p_event: string }
         Returns: {
-          practice_match_completed_at: string | null
+          practice_match_completed_at: string
           practice_match_offered_at: string
         }[]
       }
@@ -2980,6 +3671,16 @@ export type Database = {
       reap_stuck_analyzing_chunks: { Args: never; Returns: number }
       reap_stuck_highlights: { Args: never; Returns: number }
       reap_stuck_slicing_videos: { Args: never; Returns: number }
+      record_invite_attribution: {
+        Args: {
+          p_code?: string
+          p_first_touch_at?: string
+          p_gateway?: string
+          p_platform?: string
+          p_token?: string
+        }
+        Returns: Json
+      }
       record_match_result: {
         Args: {
           p_finish_time_seconds?: number
@@ -2987,6 +3688,19 @@ export type Database = {
           p_result: string
           p_submission_type_code?: string
           p_winner_id?: string
+        }
+        Returns: Json
+      }
+      refresh_invite_code: { Args: { p_invite_id: string }; Returns: Json }
+      remove_friend: { Args: { p_athlete_id: string }; Returns: Json }
+      report_match_presence: {
+        Args: {
+          p_accuracy_m: number
+          p_challenge_id?: string
+          p_context: string
+          p_invite_id?: string
+          p_lat: number
+          p_lng: number
         }
         Returns: Json
       }
@@ -3018,10 +3732,12 @@ export type Database = {
         Args: { p_highlight_id: string }
         Returns: string
       }
+      revoke_invite: { Args: { p_invite_id: string }; Returns: Json }
       reweigh_for_match: {
         Args: { p_match_id: string; p_weight: number }
         Returns: Json
       }
+      scrub_presence_coordinates: { Args: never; Returns: Json }
       set_active_avatar: { Args: { p_avatar_id: string }; Returns: Json }
       set_athlete_role: {
         Args: {

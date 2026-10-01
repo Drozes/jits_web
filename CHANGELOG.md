@@ -2,11 +2,24 @@
 
 ## [Unreleased]
 
+### Invites and friends: integration (jr_be `feat/invites`, jits-b3js)
+
+Merges the web (`feat/invites-web`), mobile (`feat/invites-mobile`) and native (`feat/invites-native`) slices. Ships as a **TestFlight build** (the native slice adds native modules and entitlements, version 0.5.0), with the web deploy after the jr_be `20261001*` migrations are applied on prod (flag `invites_enabled` off).
+
+**Cross-repo dependency:** jr_be `feat/invites`, migrations `20261001100000` to `20261001100400`, `20261001200000` to `20261001200200` and `20261001300000` (weekly invite cap still makes friends), plus the `delete-account` edge function.
+
+**Changed**
+- `packages/shared/src/types/database.ts` regenerated against the local stack with every `20261001*` migration (invites, friendships, presence, social notifications, account deletion; `athletes.auth_user_id` is now nullable for deleted athletes). The invite and friends wrappers check RPC names against it, and the `invites` and `notification_preferences` reads use typed queries instead of local casts.
+- Weekly invite cap copy is the contract 7 text on both clients ("You're now friends, so challenge them from the Arena."): the backend now makes the friendship before returning `inviter_weekly_cap` (jits-b3js.17).
+- Mobile Arena friend badges no longer listen to `athlete_friendships` realtime (the table left the publication, jr_be A3). `useFriendIds` re-reads on focus, on foreground and on `notifyFriendsChanged()`, which the claim runner and the Friends remove action call; a failed read keeps the last known set.
+- Web join accept sends `p_gateway: "landing_web"` and `p_platform: "web"` so attribution is recorded correctly.
+- Shared error map: HINT `invite_booking_use_presence` maps to `INVITE_BOOKING_USE_PRESENCE` ("This match starts when you're both on the mat. Open your booking to check in.").
+
 ### Mobile: invites and friends (jr_be spec 016, jits-b3js.4 to .8)
 
 Adds the pure-JS `qrcode-generator` dependency (drawn on the existing `react-native-svg`); no native module, `app.json`, plugin, metro or babel change in this slice, so the JS is OTA-eligible on its own. The native slice (`feat/invites-native`) adds `expo-clipboard`, Sign in with Apple and the location permission string, which need a TestFlight build.
 
-**Cross-repo dependency (jr_be `20261001*` migrations, jr_be-77s):** every new screen calls the invite, friends and presence RPCs and reads `invites_enabled` from `feature_flags`. Apply the migrations (flag off) before this OTA. With the flag off every entry point stays hidden; claims of already-issued invites, friends and bookings still work. `database.ts` is NOT regenerated yet (the RPCs are called through local casts); run `npm run db:types` once the backend migrations are applied locally.
+**Cross-repo dependency (jr_be `20261001*` migrations, jr_be-77s):** every new screen calls the invite, friends and presence RPCs and reads `invites_enabled` from `feature_flags`. Apply the migrations (flag off) before this OTA. With the flag off every entry point stays hidden; claims of already-issued invites, friends and bookings still work. `database.ts` is regenerated in the integration branch (see the integration entry above).
 
 **Added**
 - `packages/shared/src/api/invites.ts` (create, refresh, revoke, personal invite, attribution, accept join, claim, presence, bookings, stats, telemetry, flag read, invite-row realtime) and `packages/shared/src/api/friends.ts` (list, remove, friend ids, friends-first sort, `enable_friends` preference). All return results and never throw; RAISE hints come back on `error.hint`.
