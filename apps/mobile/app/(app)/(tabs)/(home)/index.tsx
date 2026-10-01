@@ -82,7 +82,8 @@ export default function DashboardScreen() {
     requestBellRefresh();
   }, [refresh, refreshActiveMatch, refreshNewHighlight]);
   const { refreshing, onRefresh } = usePullToRefresh(refreshAll, isValidating);
-  useRefetchOnRefocus(refresh, useMatchExitCount());
+  const matchExits = useMatchExitCount();
+  useRefetchOnRefocus(refresh, matchExits);
   // Home is the first signed-in screen a launch lands on: from here a
   // notification tap (including the one that launched the app) can be routed
   // without the auth redirect replacing it.
@@ -91,9 +92,10 @@ export default function DashboardScreen() {
   }, [athlete]);
   // "Not now" hides the practice offer at once, before the athlete re-reads.
   const [practiceDismissed, setPracticeDismissed] = React.useState(false);
-  // Any real match ever (not cancelled): the practice offer is only for an
-  // athlete who has never played (owner, 2026-10-01).
-  const hasEverPlayed = useHasEverPlayed(athlete?.id ?? null);
+  // Any real match ever (one that started): the practice offer is only for an
+  // athlete who has never played (owner, 2026-10-01). Re-read on every match
+  // exit, because this tab stays mounted through a first match.
+  const hasEverPlayed = useHasEverPlayed(athlete?.id ?? null, matchExits);
 
   if (!athlete) {
     return (

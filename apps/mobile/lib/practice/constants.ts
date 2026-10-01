@@ -86,8 +86,9 @@ export const PRACTICE_OFFER_BODY =
  * athlete who has never done a match or a practice match, ever). Only once
  * (`offered_at` is set as soon as the athlete answers), never to a bot,
  * never over a match in flight, never after a practice match, and never to
- * anyone with any real match on record (`hasEverPlayed`: any started match,
- * completed, disputed or awaiting confirmation, not only confirmed results).
+ * anyone with any real match on record (`hasEverPlayed`: any match that
+ * started, in progress, completed, disputed or voided, as a competitor; a
+ * match left pending at a blocked or abandoned face-off does not count).
  * `statsLoaded` and `historyLoaded` keep the card from flashing for an
  * experienced athlete before the reads arrive; an unknown history hides it.
  */
@@ -100,7 +101,7 @@ export function shouldOfferPracticeMatch(input: {
   hasActiveMatch: boolean;
   statsLoaded: boolean;
   hasMatches: boolean;
-  /** Any non-cancelled match participation ever; null while unknown. */
+  /** Any started match ever, as a competitor (useHasEverPlayed); null while unknown. */
   hasEverPlayed: boolean | null;
 }): boolean {
   const { athlete, hasActiveMatch, statsLoaded, hasMatches, hasEverPlayed } = input;
