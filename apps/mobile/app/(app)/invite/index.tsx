@@ -1,7 +1,7 @@
 /**
  * Inviter screen (jr_be spec 016, M2, AC1.2 to AC1.6): one single-use
  * challenge invite with its QR (black on white), the short code in big
- * monospace, Share / WhatsApp / SMS, a live waiting state and Revoke.
+ * monospace, Share, a live waiting state and Revoke.
  */
 import * as React from "react";
 import { ActivityIndicator, Alert, Linking, ScrollView, Text, View } from "react-native";

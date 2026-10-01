@@ -18,13 +18,3 @@ export function buildInviteShareMessage(
   const code = codeDisplay ? ` (code ${codeDisplay})` : "";
   return `I'm calling you out on ELO RATED. Ranked roll, my number vs yours. Accept: ${url}${code}`;
 }
-
-/** WhatsApp shortcut: opens WhatsApp with the message prefilled. */
-export function whatsappShareUrl(message: string): string {
-  return `https://wa.me/?text=${encodeURIComponent(message)}`;
-}
-
-/** SMS shortcut (iOS form): opens Messages with the body prefilled. */
-export function smsShareUrl(message: string): string {
-  return `sms:&body=${encodeURIComponent(message)}`;
-}

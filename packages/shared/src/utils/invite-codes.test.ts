@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { extractInviteFromText, formatInviteCode, isInviteToken, normalizeInviteCode } from "./invite-codes";
-import { buildInviteShareMessage, smsShareUrl, whatsappShareUrl } from "./invite-share";
+import { buildInviteShareMessage } from "./invite-share";
 import {
   bookedMessage,
   claimFailureView,
@@ -66,12 +66,6 @@ describe("share message", () => {
     expect(buildInviteShareMessage("join", "https://x/c/t")).toBe(
       "Train with me on ELO RATED, ranked jiu-jitsu. Join me: https://x/c/t",
     );
-  });
-  it("encodes the whole message into the shortcuts", () => {
-    const msg = buildInviteShareMessage("join", "https://x/c/t?a=1&b=2");
-    expect(whatsappShareUrl(msg)).toBe(`https://wa.me/?text=${encodeURIComponent(msg)}`);
-    expect(smsShareUrl(msg)).toBe(`sms:&body=${encodeURIComponent(msg)}`);
-    expect(smsShareUrl(msg)).not.toContain("&b=2");
   });
 });
 
