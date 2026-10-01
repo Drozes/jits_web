@@ -1,0 +1,10 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["JK9Q5E3HT8.com.elorated.mobile"],
+        "components": [{ "/": "/c/*", "comment": "Invite links (016)" }]
+      }
+    ]
+  }
+}
