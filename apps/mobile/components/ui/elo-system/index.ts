@@ -13,6 +13,8 @@ export { Wordmark } from "./wordmark";
 export { Avatar32 } from "./avatar-32";
 export { LiveDot, LivePill } from "./live-pill";
 export { MetaTag } from "./meta-tag";
+export { Mono, MONO_FAMILY_CLASS, trackingFor, type MonoProps, type MonoWeight } from "./mono";
+export { Label, type LabelProps, type LabelFamily, type LabelWeight } from "./label";
 export { Chip } from "./chip";
 export { DataRow } from "./data-row";
 export { DeltaNumber } from "./delta-number";

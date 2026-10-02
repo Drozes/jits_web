@@ -34,6 +34,7 @@ This system describes the mobile app (`apps/mobile` in jits_web), which is the s
 - `heading` (DM Sans 700): buttons, tabs, chips, header titles, in caps with tracking; plate titles in sentence case.
 - `body` (Inter): prose and helper copy.
 - `mono` (JetBrains Mono): every number, with tabular figures, and caps meta labels at `tracking-caps-l` (1.68px) or wider.
+- Sizes come from the type scale, never a literal: text steps `micro` 10, `caption` 11, `small` 12, `body` 13, `callout` 14, `subhead` 16, `title` 18, `title-l` 20, `title-xl` 22, `headline` 24, `headline-l` 26, `headline-xl` 28, `headline-2xl` 30, then pinned `display-<px>` steps (36 to 240). Classes `text-<step>`, style props `typeStep("<step>")`, numbers through `<Mono>`, caps labels through `<Label>`.
 - 10px is the floor. The text styles in `tokens.json` are the real top combinations; the most common label is `meta-label` (mono 10px, 1.68px tracking, caps).
 
 ## Motion
@@ -51,7 +52,7 @@ Motion carries meaning or does not exist. Every animation is **Reactive** (a res
 ## Consuming this kit
 
 - **Token names** are the kit names in `tokens.json` (`void`, `ink-3`, `signal-red`, `radius-plate`, `space-4`, ...). In a preview or web page they are CSS custom properties of the same name (`var(--void)`, `var(--radius-plate)`, `var(--font-mono)`; dotted steps escape: `var(--space-1\.5)`), and each text style is a class (`.meta-label`).
-- **In the RN code** the same values are NativeWind classes (`bg-surface`, `bg-surface-2/3/4`, `text-ink`, `text-ink-2/3`, `text-ink-on-cta`, `bg-cta`, `text-cta`, `text-positive`, `text-negative`, `text-attention`, `border-attention(-rule)`, `bg-heat-orange`, `bg-heat-red`, `border-hairline(-faint|-strong)`, `rounded-xs/sm/md/lg`, `font-display/heading/body/mono`, `tracking-caps(-l|-xl)`); Color lists the mapping. JS call sites use `useThemedTokens()`, `usePalette()` or `ON_MEDIA` (= `onMediaTokens`).
+- **In the RN code** the same values are NativeWind classes (`bg-surface`, `bg-surface-2/3/4`, `text-ink`, `text-ink-2/3`, `text-ink-on-cta`, `bg-cta`, `text-cta`, `text-positive`, `text-negative`, `text-attention`, `border-attention(-rule)`, `bg-heat-orange`, `bg-heat-red`, `border-hairline(-faint|-strong)`, `rounded-xs/sm/md/lg`, `font-display/heading/body/mono`, `text-<step>` (`text-micro` ... `text-display-240`), `tracking-caps(-l|-xl)`, `tracking-code`); Color lists the mapping. JS call sites use `useThemedTokens()`, `usePalette()` or `ON_MEDIA` (= `onMediaTokens`).
 - **Units:** every length is device px at **NativeWind rem = 14px** (one spacing step = 3.5px; `p-4` = 14px). Arbitrary `[Npx]` values stay literal. Web renders the same class at rem 16.
 - **Where the code lives (jits_web):** colors `apps/mobile/lib/tokens.ts` (the source of truth; web `apps/web/app/design-system/tokens.css` mirrors it), classes `apps/mobile/tailwind.config.js`, match-flow palette `apps/mobile/lib/theme/palette.ts`, motion `apps/mobile/lib/motion/`, primitives `apps/mobile/components/ui/elo-system/`, Arena `apps/mobile/components/arena/`, chrome `apps/mobile/components/layout/`.
 - **Screens:** the ELO RATED Native Screens canvas mirrors the shipped app; draw boards from this kit's tokens at 390px wide, dark.

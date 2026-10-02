@@ -154,17 +154,51 @@ module.exports = {
         "mono-medium": ["JetBrainsMono_500Medium"],
         "mono-bold": ["JetBrainsMono_700Bold"],
       },
+      // ELO type scale (WP5, jits-3eeg.6). Mirrors lib/typography.ts
+      // TYPE_SCALE exactly (typography-drift.test.ts): device px, literal on
+      // native (not rem). Text steps first, then the pinned display steps.
+      // 10px is the floor. Use `text-body`, never `text-[13px]`.
+      fontSize: {
+        micro: ["10px", { lineHeight: "13px" }],
+        caption: ["11px", { lineHeight: "14px" }],
+        small: ["12px", { lineHeight: "16px" }],
+        body: ["13px", { lineHeight: "17px" }],
+        callout: ["14px", { lineHeight: "18px" }],
+        subhead: ["16px", { lineHeight: "21px" }],
+        title: ["18px", { lineHeight: "22px" }],
+        "title-l": ["20px", { lineHeight: "24px" }],
+        "title-xl": ["22px", { lineHeight: "26px" }],
+        headline: ["24px", { lineHeight: "29px" }],
+        "headline-l": ["26px", { lineHeight: "31px" }],
+        "headline-xl": ["28px", { lineHeight: "34px" }],
+        "headline-2xl": ["30px", { lineHeight: "36px" }],
+        "display-36": ["36px", { lineHeight: "40px" }],
+        "display-40": ["40px", { lineHeight: "44px" }],
+        "display-44": ["44px", { lineHeight: "48px" }],
+        "display-48": ["48px", { lineHeight: "53px" }],
+        "display-52": ["52px", { lineHeight: "57px" }],
+        "display-60": ["60px", { lineHeight: "66px" }],
+        "display-64": ["64px", { lineHeight: "70px" }],
+        "display-72": ["72px", { lineHeight: "79px" }],
+        "display-80": ["80px", { lineHeight: "88px" }],
+        "display-88": ["88px", { lineHeight: "97px" }],
+        "display-96": ["96px", { lineHeight: "106px" }],
+        "display-116": ["116px", { lineHeight: "128px" }],
+        "display-240": ["240px", { lineHeight: "264px" }],
+      },
       letterSpacing: {
-        // ELO tracking scale (em-based). RN/Tailwind expects px values for
-        // letterSpacing, so we approximate using the 14px body baseline.
+        // ELO tracking scale (em-based on web). RN/Tailwind expects px values
+        // for letterSpacing, so we approximate using the 14px body baseline.
+        // Mirrors lib/typography.ts TRACKING (typography-drift.test.ts).
         tight: "-0.28px",     // -0.02em @ 14px
-        mark: "-0.07px",      // -0.005em @ 14px — wordmark
+        mark: "-0.07px",      // -0.005em @ 14px, wordmark
         normal: "0px",
         loose: "0.56px",      // 0.04em @ 14px
-        caps: "1.12px",       // 0.08em @ 14px — display caps
-        "caps-l": "1.68px",   // 0.12em @ 14px — section labels
-        "caps-xl": "2.52px",  // 0.18em @ 14px — meta strips
-        "caps-xxl": "3.36px", // 0.24em @ 14px — smallest caps
+        caps: "1.12px",       // 0.08em @ 14px, display caps
+        "caps-l": "1.68px",   // 0.12em @ 14px, section labels
+        "caps-xl": "2.52px",  // 0.18em @ 14px, meta strips
+        "caps-xxl": "3.36px", // 0.24em @ 14px, smallest caps
+        code: "4px",          // one-time code digits (WP5, R3 ST-4)
       },
     },
   },

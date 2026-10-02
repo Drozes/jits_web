@@ -21,7 +21,7 @@ None.
 
 ## Source
 
-`apps/mobile/components/ui/elo-system/meta-tag.tsx`. 21 JSX uses in 17 files.
+`apps/mobile/components/ui/elo-system/meta-tag.tsx`. 21 JSX uses in 17 files. Since WP5 its text is a `Label` (`micro`, `caps-l`, `text-ink-2`, tabular figures).
 
 ## Web twin and parity
 
