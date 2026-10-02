@@ -29,7 +29,15 @@ import { useFreshIncomingCount } from "@/lib/notifications/bell-store";
 import { useArenaIncomingCount, useIsArenaLive } from "./arena-store";
 import { arenaTabBadge } from "./mat-board";
 
-export function useArenaTabBadge(): TabBadge | null {
+/** What the Arena tab shows, read once for the badge and the icon. */
+export interface ArenaTabState {
+  /** The red count: the larger of the Arena's and the bell's incoming count. */
+  incomingCount: number;
+  isLive: boolean;
+  hasConfirm: boolean;
+}
+
+export function useArenaTabState(): ArenaTabState {
   const { athlete } = useAuth();
   // Primitive selectors: the tab bar is always mounted, and must not
   // re-render on every Arena store change (isBusy, outgoing, and so on).
@@ -37,9 +45,13 @@ export function useArenaTabBadge(): TabBadge | null {
   const isLive = useIsArenaLive();
   const freshIncoming = useFreshIncomingCount();
   const hasConfirm = useMatchToConfirm(athlete?.id ?? null) !== null;
-  return arenaTabBadge({
+  return {
     incomingCount: Math.max(incomingCount, freshIncoming),
     isLive,
     hasConfirm,
-  });
+  };
+}
+
+export function useArenaTabBadge(): TabBadge | null {
+  return arenaTabBadge(useArenaTabState());
 }

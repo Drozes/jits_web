@@ -9,6 +9,7 @@ import {
   __resetArenaStoreForTests,
   arenaActions,
   getLeftMatchIds,
+  isAthleteGoLiveFlip,
   liveSwitch,
   notifyOpponentUnavailable,
   publishArenaSelfId,
@@ -693,5 +694,42 @@ describe("live switch guard (F11: disabled while saving, 2s cooldown, no undo)",
     });
     expect(retried).toBe(true);
     expect(goLive).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("isAthleteGoLiveFlip (Arena tab blade clash, Adding Flare)", () => {
+  it("is false with no guarded go-live, so an app restore never counts", () => {
+    registerArenaController(controller());
+    act(() => {
+      publishArenaState({ ...IDLE_ARENA_STATE, liveTransition: "going-live" });
+    });
+    expect(isAthleteGoLiveFlip()).toBe(false);
+  });
+
+  it("is true while the athlete's go-live is in flight and for 2s after it settles", async () => {
+    let release!: (v: boolean) => void;
+    registerArenaController(
+      controller({ goLive: jest.fn(() => new Promise<boolean>((r) => (release = r))) }),
+    );
+    let call!: Promise<boolean | "ignored">;
+    act(() => {
+      call = liveSwitch.goLive();
+    });
+    expect(isAthleteGoLiveFlip()).toBe(true);
+    await act(async () => {
+      release(true);
+      await call;
+    });
+    const settled = Date.now();
+    expect(isAthleteGoLiveFlip(settled + 2000)).toBe(true);
+    expect(isAthleteGoLiveFlip(settled + 2500)).toBe(false);
+  });
+
+  it("is false after a go-offline", async () => {
+    registerArenaController(controller());
+    await act(async () => {
+      await liveSwitch.goOffline();
+    });
+    expect(isAthleteGoLiveFlip()).toBe(false);
   });
 });

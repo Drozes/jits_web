@@ -225,16 +225,31 @@ describe("On The Mat rows and the counts derived from them (spec 14, D2)", () =>
 });
 
 describe("arenaTabBadge (AC-T1..4)", () => {
-  it("AC-T1: fresh incoming challenges show a red count", () => {
+  it("AC-T1: fresh incoming challenges show a count; 1 to 3 are drawn as embers in the icon (Adding Flare [09.2])", () => {
     expect(arenaTabBadge({ incomingCount: 2, isLive: true, hasConfirm: false })).toEqual({
       kind: "count",
       count: 2,
       label: "2 challenges",
+      inIcon: true,
     });
     expect(arenaTabBadge({ incomingCount: 1, isLive: false, hasConfirm: true })).toEqual({
       kind: "count",
       count: 1,
       label: "1 challenge",
+      inIcon: true,
+    });
+    expect(arenaTabBadge({ incomingCount: 3, isLive: false, hasConfirm: false })).toEqual({
+      kind: "count",
+      count: 3,
+      label: "3 challenges",
+      inIcon: true,
+    });
+  });
+  it("AC-T1: above 3 the red count pill returns", () => {
+    expect(arenaTabBadge({ incomingCount: 4, isLive: true, hasConfirm: false })).toEqual({
+      kind: "count",
+      count: 4,
+      label: "4 challenges",
     });
   });
   it("AC-T2: live shows a static green dot, including live plus a result to confirm", () => {
@@ -253,5 +268,25 @@ describe("arenaTabBadge (AC-T1..4)", () => {
   it("AC-T4: offline and idle shows nothing", () => {
     expect(arenaTabBadge({ incomingCount: 0, isLive: false, hasConfirm: false })).toBeNull();
     expect(arenaTabBadge({ incomingCount: Number.NaN, isLive: false, hasConfirm: false })).toBeNull();
+  });
+});
+
+describe("countableEmbers (Adding Flare [09.2])", () => {
+  const { countableEmbers, MAX_COUNTABLE_EMBERS } = require("@/lib/navigation/tab-badge");
+  it.each([
+    [0, 0],
+    [1, 1],
+    [2, 2],
+    [3, 3],
+    [4, 0],
+    [120, 0],
+    [2.7, 2],
+    [-1, 0],
+    [Number.NaN, 0],
+  ])("%p pending -> %p embers", (n, expected) => {
+    expect(countableEmbers(n)).toBe(expected);
+  });
+  it("caps at 3", () => {
+    expect(MAX_COUNTABLE_EMBERS).toBe(3);
   });
 });

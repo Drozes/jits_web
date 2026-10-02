@@ -26,7 +26,7 @@ jest.mock("@/lib/match-flow/active-match-store", () => ({
   useMatchToConfirm: (id: string | null) => mockUseMatchToConfirm(id),
 }));
 
-import { useArenaTabBadge } from "@/lib/arena/use-arena-tab-badge";
+import { useArenaTabBadge, useArenaTabState } from "@/lib/arena/use-arena-tab-badge";
 
 beforeEach(() => {
   mockAthlete = { id: "me-1" };
@@ -44,7 +44,7 @@ it("shows nothing offline and idle", () => {
 it("counts fresh incoming challenges in red", () => {
   mockState = { incomingCount: 2, isLive: true };
   const { result } = renderHook(() => useArenaTabBadge());
-  expect(result.current).toEqual({ kind: "count", count: 2, label: "2 challenges" });
+  expect(result.current).toEqual({ kind: "count", count: 2, label: "2 challenges", inIcon: true });
 });
 
 it("keeps the green dot live with a result to confirm, a ring offline", () => {
@@ -69,7 +69,7 @@ it("offline with two fresh incoming challenges shows a red 2, agreeing with the 
   mockState = { incomingCount: 0, isLive: false };
   mockFreshIncoming = 2;
   const { result } = renderHook(() => useArenaTabBadge());
-  expect(result.current).toEqual({ kind: "count", count: 2, label: "2 challenges" });
+  expect(result.current).toEqual({ kind: "count", count: 2, label: "2 challenges", inIcon: true });
 });
 
 it("takes the larger of the Arena's count and the bell's fresh count", () => {
@@ -79,6 +79,7 @@ it("takes the larger of the Arena's count and the bell's fresh count", () => {
     kind: "count",
     count: 3,
     label: "3 challenges",
+    inIcon: true,
   });
   mockState = { incomingCount: 1, isLive: true };
   mockFreshIncoming = 2;
@@ -86,6 +87,17 @@ it("takes the larger of the Arena's count and the bell's fresh count", () => {
     kind: "count",
     count: 2,
     label: "2 challenges",
+    inIcon: true,
+  });
+});
+
+it("exposes the raw tab state for the Arena icon: the larger count and the live bit", () => {
+  mockState = { incomingCount: 1, isLive: true };
+  mockFreshIncoming = 4;
+  expect(renderHook(() => useArenaTabState()).result.current).toEqual({
+    incomingCount: 4,
+    isLive: true,
+    hasConfirm: false,
   });
 });
 

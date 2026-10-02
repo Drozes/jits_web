@@ -1,17 +1,30 @@
+import * as React from "react";
 import { Tabs } from "expo-router";
-import { Home, Swords, Trophy, User } from "lucide-react-native";
+import { Home, Trophy, User } from "lucide-react-native";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
+import { ArenaTabBarIcon, ArenaTabSignalsProvider } from "@/components/layout/arena-tab-icon";
 import { EloTabBar } from "@/components/layout/elo-tab-bar";
-import { useArenaTabBadge } from "@/lib/arena/use-arena-tab-badge";
+import { arenaTabBadge } from "@/lib/arena/mat-board";
+import { useArenaTabState } from "@/lib/arena/use-arena-tab-badge";
 
 /**
- * The bar plus its status marks. Its own component so the Arena badge
- * (red count, green dot, hollow ring; `useArenaTabBadge`) re-renders the bar
- * only, never the navigator.
+ * The bar plus its status marks. Its own component so the Arena state (the
+ * badge: red count, green dot, hollow ring, see `arenaTabBadge`; and the
+ * Arena icon's embers and blade clash, see `ArenaTabIcon`) re-renders the bar
+ * only, never the navigator. Live is passed to the bar separately because a
+ * count overrides the green dot, and VoiceOver still says "live".
  */
 function TabBar(props: BottomTabBarProps) {
-  const arena = useArenaTabBadge();
-  return <EloTabBar {...props} badges={{ arena }} />;
+  const arena = useArenaTabState();
+  const signals = React.useMemo(
+    () => ({ live: arena.isLive, incomingCount: arena.incomingCount }),
+    [arena.isLive, arena.incomingCount],
+  );
+  return (
+    <ArenaTabSignalsProvider value={signals}>
+      <EloTabBar {...props} badges={{ arena: arenaTabBadge(arena) }} live={{ arena: arena.isLive }} />
+    </ArenaTabSignalsProvider>
+  );
 }
 
 /**
@@ -48,7 +61,9 @@ export default function TabsLayout() {
         name="arena"
         options={{
           title: "Arena",
-          tabBarIcon: ({ color, size }) => <Swords color={color} size={size} />,
+          tabBarIcon: ({ color, size, focused }) => (
+            <ArenaTabBarIcon color={color} size={size} focused={focused} />
+          ),
         }}
       />
       <Tabs.Screen

@@ -67,10 +67,22 @@ jest.mock("@/components/layout/elo-tab-bar", () => ({
   EloTabBar: (p: Record<string, unknown>) => mockEloTabBar(p),
 }));
 
-let mockArenaBadge: unknown = null;
+let mockArenaState = { incomingCount: 0, isLive: false, hasConfirm: false };
 jest.mock("@/lib/arena/use-arena-tab-badge", () => ({
-  useArenaTabBadge: () => mockArenaBadge,
+  useArenaTabState: () => mockArenaState,
 }));
+
+// The Arena icon itself is covered by arena-tab-icon.test.tsx; here it only
+// has to read the signals the bar provides.
+const mockArenaIcon = jest.fn((_p: Record<string, unknown>) => null);
+jest.mock("@/components/layout/arena-tab-icon", () => {
+  const R = require("react");
+  const Ctx = R.createContext({ live: false, incomingCount: 0 });
+  return {
+    ArenaTabSignalsProvider: Ctx.Provider,
+    ArenaTabBarIcon: (p: Record<string, unknown>) => mockArenaIcon({ ...p, ...R.useContext(Ctx) }),
+  };
+});
 
 // If the layout ever reaches for managed gyms again, this mock records it. The
 // tab it used to gate is gone, and the query cost every app launch.
@@ -156,23 +168,52 @@ describe("(tabs)/_layout", () => {
     }
   });
 
-  it("hands the Arena tab its badge from the app-wide stores (jits-dq85.16)", () => {
+  it("hands the Arena tab its badge and live state from the app-wide stores (jits-dq85.16)", () => {
     render(React.createElement(TabsLayout));
     expect(capturedTabBar.current).toBeTruthy();
-    mockArenaBadge = { kind: "count", count: 2, label: "2 challenges" };
+    mockArenaState = { incomingCount: 5, isLive: true, hasConfirm: false };
     const barProps = { state: { routes: [], index: 0 }, descriptors: {}, navigation: {} };
     render(capturedTabBar.current!(barProps) as React.ReactElement);
     expect(mockEloTabBar).toHaveBeenLastCalledWith(
       expect.objectContaining({
         ...barProps,
-        badges: { arena: { kind: "count", count: 2, label: "2 challenges" } },
+        badges: { arena: { kind: "count", count: 5, label: "5 challenges" } },
+        live: { arena: true },
       }),
     );
 
-    mockArenaBadge = null;
+    // 1 to 3 pending: the icon draws them as embers.
+    mockArenaState = { incomingCount: 2, isLive: false, hasConfirm: false };
+    render(capturedTabBar.current!(barProps) as React.ReactElement);
+    expect(mockEloTabBar).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        badges: { arena: { kind: "count", count: 2, label: "2 challenges", inIcon: true } },
+        live: { arena: false },
+      }),
+    );
+
+    mockArenaState = { incomingCount: 0, isLive: false, hasConfirm: false };
     render(capturedTabBar.current!(barProps) as React.ReactElement);
     expect(mockEloTabBar).toHaveBeenLastCalledWith(
       expect.objectContaining({ badges: { arena: null } }),
+    );
+  });
+
+  it("draws the Arena tab with the Arena icon fed by the bar's signals", () => {
+    render(React.createElement(TabsLayout));
+    const arena = capturedScreens.find((s) => s.name === "arena")!;
+    const icon = (arena.options.tabBarIcon as (p: unknown) => React.ReactElement)({
+      focused: true,
+      color: "#fff",
+      size: 18,
+    });
+    // Rendered inside the bar's provider, the icon sees live and the count.
+    mockArenaState = { incomingCount: 2, isLive: true, hasConfirm: false };
+    mockEloTabBar.mockImplementationOnce(() => icon as never);
+    const barProps = { state: { routes: [], index: 0 }, descriptors: {}, navigation: {} };
+    render(capturedTabBar.current!(barProps) as React.ReactElement);
+    expect(mockArenaIcon).toHaveBeenLastCalledWith(
+      expect.objectContaining({ focused: true, color: "#fff", size: 18, live: true, incomingCount: 2 }),
     );
   });
 });

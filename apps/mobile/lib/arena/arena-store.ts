@@ -309,6 +309,12 @@ export type LiveSwitchDirection = "going-live" | "going-offline";
  */
 export type LiveSwitchIgnored = "ignored";
 
+/** When the athlete's last guarded go-live settled (ms epoch), or null. */
+let athleteGoLiveSettledAt: number | null = null;
+
+/** How long after a guarded go-live settles a live flip is still its doing. */
+const ATHLETE_GO_LIVE_WINDOW_MS = 2000;
+
 let switchInFlight = false;
 let switchDirection: LiveSwitchDirection | null = null;
 let switchCooldown = false;
@@ -377,6 +383,7 @@ async function runGuarded<T>(
   try {
     return await work(current);
   } finally {
+    if (direction === "going-live") athleteGoLiveSettledAt = Date.now();
     switchInFlight = false;
     switchDirection = null;
     switchCooldown = true;
@@ -388,6 +395,20 @@ async function runGuarded<T>(
     }, LIVE_SWITCH_COOLDOWN_MS);
     emitArena();
   }
+}
+
+/**
+ * Whether a live flip happening NOW was caused by the athlete's own go-live
+ * (a guarded `goLive` / `toggle` toward live that is in flight or settled in
+ * the last 2s), as opposed to the app restoring live on foreground, after a
+ * match, or on arrival. The Arena tab's blade clash and its `goLive` haptic
+ * (Motion Rule: a Moment, never on app foreground) play only for the former.
+ */
+export function isAthleteGoLiveFlip(now: number = Date.now()): boolean {
+  if (switchInFlight && switchDirection === "going-live") return true;
+  return (
+    athleteGoLiveSettledAt !== null && now - athleteGoLiveSettledAt <= ATHLETE_GO_LIVE_WINDOW_MS
+  );
 }
 
 /**
@@ -707,6 +728,7 @@ export function __resetArenaStoreForTests(): void {
   listeners.clear();
   switchInFlight = false;
   switchDirection = null;
+  athleteGoLiveSettledAt = null;
   switchCooldown = false;
   if (cooldownTimer) clearTimeout(cooldownTimer);
   cooldownTimer = null;
