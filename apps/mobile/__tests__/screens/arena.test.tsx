@@ -2231,4 +2231,37 @@ describe("Arena: Adding Flare live surfaces (jits-pddd.6)", () => {
     expect(mockImpact).toHaveBeenCalledTimes(1);
     expect(mockImpact).toHaveBeenCalledWith("light");
   });
+
+  it("the On the mat rows stagger on the first load only, never on a roster refetch or lobby sync", () => {
+    mockIsLive = true;
+    mockRoster.competitors = [
+      competitor({ id: "a-1", displayName: "Alpha" }),
+      competitor({ id: "a-2", displayName: "Bravo", eloDiff: 120 }),
+    ];
+    mockLobbyIds = new Set(["a-1", "a-2"]);
+    /** Row wrappers carrying an entering animation. */
+    const entering = (r: ReturnType<typeof render>) =>
+      r.UNSAFE_root.findAll((n: { props: Record<string, unknown> }) => typeof n.props.entering === "function").length;
+
+    const r = render(<ArenaScreen />);
+    expect(entering(r)).toBeGreaterThanOrEqual(2);
+
+    // A roster refetch: new array, one more athlete.
+    mockRoster = {
+      ...mockRoster,
+      competitors: [...mockRoster.competitors, competitor({ id: "a-3", displayName: "Charlie", eloDiff: 140 })],
+    };
+    mockLobbyIds = new Set(["a-1", "a-2", "a-3"]);
+    r.rerender(<ArenaScreen />);
+    expect(r.getByTestId("arena-mat-row-a-3")).toBeTruthy();
+    expect(entering(r)).toBe(0);
+
+    // A lobby sync (a new Set with the same ids) and a pull-to-refresh state.
+    mockLobbyIds = new Set(["a-1", "a-2", "a-3"]);
+    mockRoster = { ...mockRoster, isRefreshing: true };
+    r.rerender(<ArenaScreen />);
+    mockRoster = { ...mockRoster, isRefreshing: false };
+    r.rerender(<ArenaScreen />);
+    expect(entering(r)).toBe(0);
+  });
 });

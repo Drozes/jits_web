@@ -312,7 +312,7 @@ export function IncomingStrip({
     <StripShell
       rail="red"
       testID="arena-strip-incoming"
-      edge={<AfterglowEdge challengeId={challengeId} />}
+      edge={<AfterglowEdge challengeId={challengeId} createdAt={source?.createdAt} />}
     >
       <StripLine
         head={`${name} wants to roll`}
@@ -391,7 +391,7 @@ export function OfferStrip({
     <StripShell
       rail="red"
       testID="arena-strip-offer"
-      edge={<AfterglowEdge challengeId={challengeId} />}
+      edge={<AfterglowEdge challengeId={challengeId} createdAt={source?.createdAt} />}
     >
       <StripLine
         head={`${name} wants to roll`}

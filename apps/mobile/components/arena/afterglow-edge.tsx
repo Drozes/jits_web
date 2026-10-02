@@ -4,14 +4,18 @@
  * over Signal Red, Arena heat colors) and cools to the plate-bright hairline
  * over `AFTERGLOW_MS`, ONCE per challenge id.
  *
- * Once per id, not per component: the first time an id is drawn its start
- * time is kept at module level, and any later render or remount reads the
- * heat left at that moment. So a re-render, a tab switch or a remount after
- * the cool-down shows it cooled, and a remount during the cool-down carries
- * on from where it was rather than reheating. Silent (no haptic: the
- * challenge prompt already buzzes for a new challenge).
+ * Once per id, not per component: the heat starts at the EARLIER of the
+ * challenge's `created_at` and the first time this app run drew it, kept at
+ * module level, and any later render or remount reads the heat left at that
+ * moment. So a re-render, a tab switch or a remount after the cool-down
+ * shows it cooled, a remount during the cool-down carries on rather than
+ * reheating, and a challenge already older than `AFTERGLOW_MS` (a cold
+ * start, an OTA reload, Reduce Motion turned off later) shows cooled. One
+ * that arrived on another tab moments ago may still glow. Silent (no haptic:
+ * the challenge prompt already buzzes for a new challenge).
  *
- * Reduce Motion: cooled at once.
+ * Reduce Motion: cooled at once (the id is still recorded, so turning it off
+ * later never reheats an old challenge).
  */
 import * as React from "react";
 import { View } from "react-native";
@@ -32,24 +36,38 @@ export const AFTERGLOW_TEST_ID = "arena-afterglow";
 /** Ids kept before the oldest are forgotten (a forgotten id is long cooled). */
 const MAX_REMEMBERED = 200;
 
-/** challenge id -> when its edge was first drawn (ms since epoch). */
+/** challenge id -> when its afterglow started (ms since epoch). */
 const firstDrawn = new Map<string, number>();
 
-/** When this id's afterglow started; the first call starts it. */
-function startedAt(id: string, now: number): number {
-  const at = firstDrawn.get(id);
-  if (at !== undefined) return at;
-  firstDrawn.set(id, now);
-  if (firstDrawn.size > MAX_REMEMBERED) {
-    const oldest = firstDrawn.keys().next().value;
-    if (oldest !== undefined) firstDrawn.delete(oldest);
+/** `created_at` as ms, or null when missing or unparseable. */
+function createdMs(createdAt: string | null | undefined): number | null {
+  if (!createdAt) return null;
+  const ms = Date.parse(createdAt);
+  return Number.isFinite(ms) ? ms : null;
+}
+
+/**
+ * When this id's afterglow started: the earlier of its `created_at` and its
+ * first draw. The first call records it; a later, earlier `created_at` (it
+ * was unknown at first) moves it back, never forward.
+ */
+function startedAt(id: string, now: number, createdAt?: string | null): number {
+  const created = createdMs(createdAt);
+  const known = firstDrawn.get(id);
+  const start = Math.min(known ?? now, created ?? Infinity);
+  if (start !== known) {
+    firstDrawn.set(id, start);
+    if (firstDrawn.size > MAX_REMEMBERED) {
+      const oldest = firstDrawn.keys().next().value;
+      if (oldest !== undefined) firstDrawn.delete(oldest);
+    }
   }
-  return now;
+  return start;
 }
 
 /** Heat left (1 hot to 0 cooled) for an id at `now`. */
-export function afterglowHeat(id: string, now: number): number {
-  const elapsed = now - startedAt(id, now);
+export function afterglowHeat(id: string, now: number, createdAt?: string | null): number {
+  const elapsed = now - startedAt(id, now, createdAt);
   if (elapsed <= 0) return 1;
   return Math.max(0, 1 - elapsed / AFTERGLOW_MS);
 }
@@ -68,17 +86,29 @@ function redOf(heat: number): number {
   return h * h;
 }
 
-export function AfterglowEdge({ challengeId }: { challengeId: string | null | undefined }) {
+export function AfterglowEdge({
+  challengeId,
+  createdAt,
+}: {
+  challengeId: string | null | undefined;
+  /** The challenge row's `created_at` (server time), when known. */
+  createdAt?: string | null;
+}) {
   const reduceMotion = useReduceMotion();
   const id = challengeId ?? null;
 
   // Read during render so the first frame is already right (hot or cooled).
-  const heatNow = id && !reduceMotion ? afterglowHeat(id, Date.now()) : 0;
-  const heat = useSharedValue(heatNow);
+  // Recorded under Reduce Motion too, so turning it off never reheats.
+  const heatOf = () => {
+    if (!id) return 0;
+    const left = afterglowHeat(id, Date.now(), createdAt);
+    return reduceMotion ? 0 : left;
+  };
+  const heat = useSharedValue(heatOf());
 
   React.useEffect(() => {
     cancelAnimation(heat);
-    const left = id && !reduceMotion ? afterglowHeat(id, Date.now()) : 0;
+    const left = heatOf();
     heat.value = left;
     if (left > 0) {
       heat.value = withTiming(0, {
@@ -87,6 +117,8 @@ export function AfterglowEdge({ challengeId }: { challengeId: string | null | un
       });
     }
     return () => cancelAnimation(heat);
+    // createdAt only moves the start back; the id and Reduce Motion drive it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, reduceMotion, heat]);
 
   const redStyle = useAnimatedStyle(() => ({ opacity: redOf(heat.value) }));

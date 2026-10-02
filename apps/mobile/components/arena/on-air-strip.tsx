@@ -53,13 +53,23 @@ export function OnAirStrip({ isLive }: { isLive: boolean }) {
   const { clock, animate } = useArenaTempo(isLive);
   const tokens = useThemedTokens();
 
-  // The tally fill: full unless live just flipped on while this was mounted.
-  const fill = useSharedValue(1);
+  // The tally fill: full when mounted while live; empty while offline, so a
+  // go-live's first frame is empty and the sweep starts from there.
+  // Seeded from the MOUNT's live state only, never a later render's.
+  const initialFill = React.useRef(isLive ? 1 : 0).current;
+  const fill = useSharedValue(initialFill);
   const wasLive = React.useRef(isLive);
-  React.useEffect(() => {
+  // Layout effects: they land before the frame paints, so the first live
+  // frame never flashes a filled tally ahead of the sweep.
+  React.useLayoutEffect(() => {
     const was = wasLive.current;
     wasLive.current = isLive;
-    if (!isLive || was) return;
+    if (!isLive) {
+      cancelAnimation(fill);
+      fill.value = 0;
+      return;
+    }
+    if (was) return;
     cancelAnimation(fill);
     if (reduceMotion) {
       fill.value = 1;
@@ -70,13 +80,17 @@ export function OnAirStrip({ isLive }: { isLive: boolean }) {
   }, [isLive, reduceMotion, fill]);
 
   // Reduce Motion turned on mid-fill: land it.
-  React.useEffect(() => {
-    if (!reduceMotion) return;
+  React.useLayoutEffect(() => {
+    if (!reduceMotion || !wasLive.current) return;
     cancelAnimation(fill);
     fill.value = 1;
   }, [reduceMotion, fill]);
 
-  const fillStyle = useAnimatedStyle(() => ({ transform: [{ scaleX: fill.value }] }));
+  // Under Reduce Motion the tally is simply full, whatever the shared value.
+  const fillStyle = useAnimatedStyle(
+    () => ({ transform: [{ scaleX: reduceMotion ? 1 : fill.value }] }),
+    [reduceMotion],
+  );
   // The bright trace: lit on the beat; drawn whole when nothing animates.
   const beatStyle = useAnimatedStyle(
     () => ({ opacity: animate ? beatLevel(clock.value) : 1 }),

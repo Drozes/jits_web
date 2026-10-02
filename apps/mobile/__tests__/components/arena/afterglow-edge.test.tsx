@@ -129,3 +129,54 @@ describe("incoming challenge strips carry the afterglow", () => {
     expect(opacity(incoming, "red")).toBe(0);
   });
 });
+
+describe("AfterglowEdge: heat starts at the earlier of created_at and first draw", () => {
+  const iso = (ms: number) => new Date(ms).toISOString();
+
+  it("a challenge older than the cool-down shows cooled on its first draw (cold start, OTA reload)", () => {
+    const r = render(<AfterglowEdge challengeId="ch-old" createdAt={iso(now - AFTERGLOW_MS - 1000)} />);
+    expect(opacity(r, "red")).toBe(0);
+    expect(opacity(r, "orange")).toBe(0);
+  });
+
+  it("one that arrived moments ago (on another tab) still glows what is left", () => {
+    const r = render(<AfterglowEdge challengeId="ch-recent" createdAt={iso(now - AFTERGLOW_MS / 2)} />);
+    expect(opacity(r, "red")).toBeCloseTo(0.25);
+  });
+
+  it("a created_at ahead of the device clock never delays the start past the first draw", () => {
+    const r = render(<AfterglowEdge challengeId="ch-skew" createdAt={iso(now + 60_000)} />);
+    expect(opacity(r, "red")).toBe(1);
+    now += AFTERGLOW_MS + 1;
+    r.rerender(<AfterglowEdge challengeId="ch-skew" createdAt={iso(now + 60_000)} />);
+    expect(opacity(r, "red")).toBe(0);
+  });
+
+  it("an unparseable created_at falls back to the first draw", () => {
+    const r = render(<AfterglowEdge challengeId="ch-bad" createdAt="not a date" />);
+    expect(opacity(r, "red")).toBe(1);
+  });
+
+  it("an id seen under Reduce Motion never reheats once Reduce Motion is off", () => {
+    __setReduceMotionForTests(true);
+    render(<AfterglowEdge challengeId="ch-rm" />).unmount();
+    __setReduceMotionForTests(false);
+    now += AFTERGLOW_MS + 1;
+    const r = render(<AfterglowEdge challengeId="ch-rm" />);
+    expect(opacity(r, "red")).toBe(0);
+  });
+
+  it("the strips pass the challenge's created_at", () => {
+    const r = render(
+      <IncomingStrip
+        challengeId="ch-strip-old"
+        name="Rival"
+        count={1}
+        source={{ createdAt: iso(now - AFTERGLOW_MS * 5), expiresAt: null }}
+        active={false}
+        onOpen={() => undefined}
+      />,
+    );
+    expect(opacity(r, "red")).toBe(0);
+  });
+});

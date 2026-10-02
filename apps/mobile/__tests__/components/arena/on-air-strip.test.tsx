@@ -82,9 +82,11 @@ describe("OnAirStrip", () => {
     expect(fillCalls()).toHaveLength(0);
   });
 
-  it("the tally fills once when live flips false to true", () => {
+  it("the tally fills once when live flips false to true, from an empty first frame", () => {
     const r = render(<OnAirStrip isLive={false} />);
     r.rerender(<OnAirStrip isLive />);
+    // The first live frame is empty; the sweep starts from there.
+    expect(style(r.getByTestId("arena-on-air-fill", { includeHiddenElements: true })).transform).toEqual([{ scaleX: 0 }]);
     expect(fillCalls()).toHaveLength(1);
     r.rerender(<OnAirStrip isLive />);
     expect(fillCalls()).toHaveLength(1);
