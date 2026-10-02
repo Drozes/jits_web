@@ -12,7 +12,7 @@
  * video or a photo scrim, which is dark whatever the app theme.
  */
 import { useResolvedColorScheme, type ColorScheme } from "./use-theme";
-import { darkTokens, lightTokens } from "../tokens";
+import { darkTokens, lightTokens, onMediaTokens } from "../tokens";
 
 export interface Palette {
   /** Page background (`bg-surface`). */
@@ -37,7 +37,7 @@ export interface Palette {
   win: string;
   winRule: string;
   loss: string;
-  /** Amber text / fills: draws, pending and processing states. */
+  /** Attention amber (`attention` token): draws, pressure, pending / processing / paused / disputed. */
   amber: string;
   amberRule: string;
   /** Secondary button / chip fill on the page. */
@@ -69,10 +69,9 @@ export function paletteFor(scheme: ColorScheme): Palette {
     loss: t.stateNegative,
     // Light: a #116A33 rule; dark: the gain green.
     winRule: dark ? "rgba(34,197,94,0.5)" : "rgba(17,106,51,0.55)",
-    // No amber token: amber-500 reads on the dark plates, but on the light
-    // plates only amber-800 reaches 4.5:1 (#92400E is 5.4:1 on #DEE2E9).
-    amber: dark ? "#F59E0B" : "#92400E",
-    amberRule: dark ? "rgba(245,158,11,0.7)" : "rgba(146,64,14,0.6)",
+    // The `attention` token pair (amber-500 dark, amber-800 light).
+    amber: t.attention,
+    amberRule: t.attentionRule,
     secondaryBg: dark ? "rgba(255,255,255,0.08)" : "rgba(13,15,20,0.05)",
     secondaryBgPressed: dark ? "rgba(255,255,255,0.16)" : "rgba(13,15,20,0.10)",
     selectedBg: "rgba(230,57,70,0.16)",
@@ -89,40 +88,13 @@ export function usePalette(): Palette {
 }
 
 /**
- * Chrome over camera, video or a photo scrim: dark in both app themes (like
- * the live screen's BROADCAST tokens).
+ * Chrome over camera, video or a photo scrim: dark in both app themes. An
+ * alias of `onMediaTokens` in lib/tokens.ts, the one on-media source (the
+ * live screen's BROADCAST reads from it too). Contrast rule: on-media text
+ * sits only on `ON_MEDIA.badge` or (dark inks) `ON_MEDIA.chip`; see the
+ * comment on `onMediaTokens`.
  */
-export const ON_MEDIA = {
-  white: "#FFFFFF",
-  text: "#E8EDF2",
-  text2: "rgba(232,237,242,0.72)",
-  text3: "rgba(232,237,242,0.55)",
-  tagText: "rgba(255,255,255,0.85)",
-  strong: "rgba(255,255,255,0.40)",
-  cta: "#E63946",
-  red: "#F0556B",
-  redRule: "rgba(240,85,107,0.7)",
-  win: "#22C55E",
-  amber: "#F59E0B",
-  amberRule: "rgba(245,158,11,0.7)",
-  track: "rgba(255,255,255,0.18)",
-  glass: "rgba(255,255,255,0.08)",
-  glassStrong: "rgba(255,255,255,0.12)",
-  /** Tag fill over film (on a scrim). */
-  tag: "rgba(0,0,0,0.45)",
-  /**
-   * Badge fill: dense enough that every on-media ink (red included) holds
-   * 4.5:1 over a white frame or the light theme's plate.
-   */
-  badge: "rgba(0,0,0,0.88)",
-  scrim: "rgba(0,0,0,0.55)",
-  /** The light chip over the camera (countdown) and the player's caption plate. */
-  chip: "rgba(232,235,240,0.96)",
-  chipBorder: "rgba(13,15,20,0.34)",
-  ink: "#0D0F14",
-  ink3: "#575C68",
-  inkRed: "#AC2B34",
-} as const;
+export const ON_MEDIA = onMediaTokens;
 
 /** Every number in the match flow and Film Room uses tabular figures. */
 export const TABULAR = { fontVariant: ["tabular-nums" as const] };

@@ -2,6 +2,7 @@ import * as React from "react";
 import { StyleSheet, View } from "react-native";
 import Animated, { useAnimatedProps, type SharedValue } from "react-native-reanimated";
 import Svg, { G, Path, Rect } from "react-native-svg";
+import { darkTokens } from "@/lib/tokens";
 
 // react-native-svg is declared as a peerDependency by lucide-react-native and is
 // now a pinned direct dependency (package.json), so it is autolinked into the
@@ -15,8 +16,8 @@ const AnimatedRect = Animated.createAnimatedComponent(Rect);
 // White; the interpunct is a Signal Red square. The white E/R share one opacity
 // (they crossfade out together into the wordmark); the dot has its own so it can
 // fade out on its own beat (during the hold, before the letters expand).
-const WHITE = "#E8EDF2";
-const RED = "#E63946";
+const WHITE = darkTokens.textPrimary;
+const RED = darkTokens.accentCta;
 const E_PATH =
   "M196.23 0L25.59 0L25.59-259.66L196.23-259.66L196.23-219.22L75.67-219.22L75.67-151.34L185.10-151.34L185.10-112.39L75.67-112.39L75.67-40.43L196.23-40.43";
 const R_PATH =

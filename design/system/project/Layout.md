@@ -49,7 +49,7 @@ In CSS the dotted names are escaped: `var(--space-0\.5)`, `var(--space-1\.5)`, `
 | `radius-button` | 3px | `rounded-sm` (38) | Buttons (CtaButton, FightButton, glass buttons) |
 | `radius-plate` | 4px | `rounded-md` (47) | THE default: plates, cards, rating tiles, toasts, popovers |
 | `radius-sheet` | 8px | `rounded-lg` (5) | Sheets and modals only, the ceiling |
-| `radius-round` | 9999px | `rounded-full` (14) | Live dots and status dots |
+| `radius-round` | 9999px | `rounded-full` (14) | Live dots, status dots and seek markers only (D-6: play buttons and check badges are not dots) |
 
 Sources: `tailwind.config.js:183-190`, `FIGHT_RADIUS` (`fight-tokens.ts:9`), `BROADCAST_RADIUS` (`broadcast-tokens.ts:36`), `PROMPT_RADIUS = 8` (`challenge-prompt-sheet.tsx:89`).
 

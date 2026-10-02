@@ -69,6 +69,7 @@ export function DisputeForm({ matchId, onCancel, onSubmitted, onWindowClosed }: 
 
       <TextInput
         testID="dispute-reason"
+        accessibilityLabel="What went wrong?"
         placeholder="What went wrong? (optional)"
         placeholderTextColor={tokens.textTertiary}
         value={reason}

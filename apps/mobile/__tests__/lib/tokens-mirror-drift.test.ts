@@ -1,7 +1,7 @@
 /**
  * Drift guard for the design-token MIRRORS.
  *
- * The ELO colour palette is hand-copied into five places. `lib/tokens.ts` is
+ * The ELO colour palette is hand-copied into six places. `lib/tokens.ts` is
  * the source of truth for all of them:
  *
  *   1. apps/mobile/lib/tokens.ts ................ runtime objects (SOURCE OF TRUTH)
@@ -10,8 +10,12 @@
  *   4. apps/web/public/design/tokens.css ........ web design-board stylesheet
  *   5. outside_assets/.../Brand/design-system/tokens.css ... brand canonical
  *
+ *   6. design/system/project/tokens.json ........ the design kit (brand book)
+ *
  * Mirror 2 is locked to mirror 1 by `tokens-contrast.test.ts`. This suite
- * covers the three CSS mirrors, which nothing else watches.
+ * covers the three CSS mirrors, which nothing else watches, and mirror 6 (the
+ * design kit JSON): the 17 core colours in both themes, the attention and heat
+ * tokens, and every on-media token (`onMediaTokens`). See the last section.
  *
  * WHAT THE PALETTE IS SUPPOSED TO BE
  *
@@ -74,7 +78,7 @@
  *
  * all of which are invisible to a flat scan of the recognised theme blocks.
  */
-import { darkTokens, lightTokens, type ColorTokens } from "@/lib/tokens";
+import { darkTokens, lightTokens, onMediaTokens, type ColorTokens } from "@/lib/tokens";
 import {
   AA_NORMAL_TEXT,
   ACCENT_FILL_KEYS,
@@ -210,6 +214,21 @@ const UNMAPPED_MOBILE_TOKENS: ReadonlyArray<keyof ColorTokens> = [
   "gold",
   "brandOrange",
   "deepRed",
+];
+
+/**
+ * ELO tokens that exist on mobile (and in the design kit) but in no CSS
+ * mirror yet: the attention (amber) pair and the Arena heat pair, added by
+ * WP7 (jits-3eeg.8). The web stylesheets have no amber or heat var today.
+ * They are still gated: the design-kit section below locks each one to
+ * design/system/project/tokens.json in both themes. If a web mirror gains
+ * one, move it into TOKEN_MAP (and BRAND_PALETTE_SNAPSHOT).
+ */
+const MOBILE_ONLY_TOKENS: ReadonlyArray<keyof ColorTokens> = [
+  "attention",
+  "attentionRule",
+  "heatOrange",
+  "heatRed",
 ];
 
 const MAPPED_CSS_NAMES: readonly string[] = TOKEN_MAP.map(([, cssName]) => cssName);
@@ -721,7 +740,9 @@ function describeDivergence(mirror: CssMirror, d: Divergence): string {
 describe("token mapping table", () => {
   it("covers every ColorTokens key exactly once, mapped or explicitly unmapped", () => {
     const mapped = TOKEN_MAP.map(([mobileKey]) => mobileKey);
-    const declared = [...mapped, ...UNMAPPED_MOBILE_TOKENS].map(String).sort();
+    const declared = [...mapped, ...UNMAPPED_MOBILE_TOKENS, ...MOBILE_ONLY_TOKENS]
+      .map(String)
+      .sort();
     const actual = Object.keys(darkTokens).sort();
 
     expect(new Set(declared).size).toBe(declared.length);
@@ -1185,3 +1206,142 @@ describe.each(WEB_MIRRORS.map((mirror) => [mirror.label, mirror] as const))(
     });
   },
 );
+
+// ---------------------------------------------------------------------------
+// Mirror 6: the design kit, design/system/project/tokens.json
+//
+// The kit (the "ELO RATED Design System" artifact and the repo DESIGN.md) is
+// generated from this JSON, so a palette change that skips it ships a kit that
+// documents the wrong colours. Unlike the brand file it is committed, so this
+// check runs everywhere: CI, fresh clones, every worktree.
+//
+// Covered: the 17 core ELO colours in BOTH themes, the WP7 attention and heat
+// tokens in both themes, and every on-media token (one fixed value, compared
+// against `onMediaTokens`). Every colour the kit declares must be one of these,
+// so a kit token with no mobile counterpart also fails.
+// ---------------------------------------------------------------------------
+
+const KIT_RELATIVE = "design/system/project/tokens.json";
+
+interface KitColorToken {
+  name: string;
+  value: string | Record<Theme, string>;
+  usage?: string;
+}
+
+const KIT_DOC = JSON.parse(
+  fs.readFileSync(path.resolve(REPO_ROOT, KIT_RELATIVE), "utf8"),
+) as { color: { tokens: KitColorToken[] } };
+
+/** Kit name -> ColorTokens key. Kit names are the brand book's names. */
+const KIT_THEMED_MAP: ReadonlyArray<readonly [string, keyof ColorTokens]> = [
+  // The 17 core colours.
+  ["void", "bgPrimary"],
+  ["panel", "bgSecondary"],
+  ["plate", "bgElevated"],
+  ["plate-bright", "bgElevatedHover"],
+  ["ink", "textPrimary"],
+  ["ink-2", "textSecondary"],
+  ["ink-3", "textTertiary"],
+  ["on-signal", "textOnAccent"],
+  ["signal-red", "accentCta"],
+  ["signal-red-text", "accentCtaText"],
+  ["signal-red-lift", "accentCtaHover"],
+  ["gain-green", "statePositive"],
+  ["negative", "stateNegative"],
+  ["neutral", "stateNeutral"],
+  ["hairline", "borderHairline"],
+  ["hairline-faint", "borderHairlineFaint"],
+  ["hairline-strong", "borderHairlineStrong"],
+  // WP7 (jits-3eeg.8).
+  ["attention", "attention"],
+  ["attention-rule", "attentionRule"],
+  ["heat-orange", "heatOrange"],
+  ["heat-red", "heatRed"],
+];
+
+const ON_MEDIA_PREFIX = "on-media-";
+
+/** `glassStrong` -> `on-media-glass-strong`; digits stay attached (`text2`). */
+function kitNameForOnMedia(key: string): string {
+  return ON_MEDIA_PREFIX + key.replace(/([A-Z])/g, "-$1").toLowerCase();
+}
+
+function kitToken(name: string): KitColorToken | undefined {
+  return KIT_DOC.color.tokens.find((token) => token.name === name);
+}
+
+function kitValueFor(token: KitColorToken, theme: Theme): string {
+  return typeof token.value === "string" ? token.value : token.value[theme];
+}
+
+describe(`design kit mirror (${KIT_RELATIVE})`, () => {
+  it("maps the 17 core colours plus every WP7 token", () => {
+    expect(KIT_THEMED_MAP.length).toBe(17 + MOBILE_ONLY_TOKENS.length);
+    for (const key of MOBILE_ONLY_TOKENS) {
+      expect(KIT_THEMED_MAP.map(([, mobileKey]) => mobileKey)).toContain(key);
+    }
+    // Every CSS-mirrored ELO token is also a kit core colour.
+    for (const [mobileKey] of TOKEN_MAP) {
+      expect(KIT_THEMED_MAP.map(([, k]) => k)).toContain(mobileKey);
+    }
+  });
+
+  it.each(THEMES)("every themed kit colour equals lib/tokens.ts (%s)", (theme) => {
+    const drift: string[] = [];
+    for (const [kitName, mobileKey] of KIT_THEMED_MAP) {
+      const token = kitToken(kitName);
+      const kit = token === undefined ? NOT_DECLARED : normalizeColor(kitValueFor(token, theme));
+      const mobile = normalizeColor(MOBILE_TOKENS[theme][mobileKey]);
+      if (kit !== mobile) {
+        drift.push(
+          `  [${theme}] ${kitName}: kit ${kit} vs ${theme}Tokens.${String(mobileKey)} ${mobile}`,
+        );
+      }
+    }
+    expect(drift).toEqual([]);
+  });
+
+  it("every on-media token equals onMediaTokens, in both directions", () => {
+    const drift: string[] = [];
+    const expectedNames = new Set<string>();
+    for (const [key, value] of Object.entries(onMediaTokens)) {
+      const kitName = kitNameForOnMedia(key);
+      expectedNames.add(kitName);
+      const token = kitToken(kitName);
+      if (token === undefined) {
+        drift.push(`  ${kitName}: missing from the kit (onMediaTokens.${key} ${value})`);
+        continue;
+      }
+      if (typeof token.value !== "string") {
+        drift.push(`  ${kitName}: on-media tokens are fixed, the kit gives per-theme values`);
+        continue;
+      }
+      if (normalizeColor(token.value) !== normalizeColor(value)) {
+        drift.push(`  ${kitName}: kit ${token.value} vs onMediaTokens.${key} ${value}`);
+      }
+    }
+    for (const token of KIT_DOC.color.tokens) {
+      if (token.name.startsWith(ON_MEDIA_PREFIX) && !expectedNames.has(token.name)) {
+        drift.push(`  ${token.name}: in the kit but not in onMediaTokens`);
+      }
+    }
+    expect(drift).toEqual([]);
+  });
+
+  it("declares no colour this suite does not compare", () => {
+    const covered = new Set<string>(KIT_THEMED_MAP.map(([kitName]) => kitName));
+    const uncovered = KIT_DOC.color.tokens
+      .map((token) => token.name)
+      .filter((name) => !covered.has(name) && !name.startsWith(ON_MEDIA_PREFIX));
+    expect(uncovered).toEqual([]);
+  });
+
+  it("detects drift (the comparison is not vacuous)", () => {
+    // A wrong value must not normalise to the right one.
+    expect(normalizeColor("#0D0F14")).toBe(normalizeColor("#0d0f14"));
+    expect(normalizeColor("rgba(13,15,20,0.34)")).toBe(normalizeColor("rgba(13, 15, 20, 0.34)"));
+    expect(normalizeColor("#1A1D24")).not.toBe(normalizeColor(darkTokens.bgElevated));
+    expect(kitToken("void")).toBeDefined();
+  });
+});

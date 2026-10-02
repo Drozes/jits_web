@@ -16,6 +16,7 @@ import type { SubmissionType } from "@jits/shared/types/submission-type";
 import { supabase } from "@/lib/supabase/client";
 import { useAuth, useRequireAthlete } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
+import { onMediaTokens } from "@/lib/tokens";
 import { AppHeader } from "@/components/layout/app-header";
 import { MetaTag } from "@/components/ui/elo-system";
 import { STEP_LABELS, WizardStepHeader } from "@/components/match-flow/match-flow-wizard";
@@ -148,13 +149,17 @@ export default function PracticeScreen() {
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
-      <View className={live ? "flex-1 bg-black" : "flex-1 bg-surface"}>
+      <View
+        className={live ? "flex-1" : "flex-1 bg-surface"}
+        style={live ? { backgroundColor: onMediaTokens.black } : undefined}
+      >
         {live ? null : (
           <AppHeader title="Practice Match" back backFallback="/" />
         )}
         <ScrollView
           ref={scrollRef}
-          className={live ? "flex-1 bg-black" : "flex-1"}
+          className="flex-1"
+          style={live ? { backgroundColor: onMediaTokens.black } : undefined}
           scrollEnabled={!live}
           contentContainerStyle={
             live

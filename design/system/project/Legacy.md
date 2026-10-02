@@ -23,7 +23,7 @@ Defined in `apps/mobile/lib/tokens.ts` (light l.69-93, dark l.116-140), mirrored
 | `border` | `border-border` | `hsl(218, 12%, 83%)` (#CED2D9) | `hsl(222, 13%, 18%)` (#282C34) | `hairline` |
 | `input` | `border-input` | `hsl(218, 14%, 79%)` (#C2C7D1) | `hsl(222, 13%, 21%)` (#2F333D) | `hairline-strong` |
 | `gold` | `bg-gold` | `hsl(38, 92%, 50%)` (#F59F0A) | same | `attention` |
-| `brandOrange` | `bg-brand-orange` | `hsl(25, 95%, 53%)` (#F97415) | same | KEPT as `heat-orange` (Arena heat only) |
+| `brandOrange` | `bg-brand-orange` | `hsl(25, 95%, 53%)` (#F97415) | same | `heat-orange` (WP7 added `heatOrange` / `bg-heat-orange` with this value and moved the Arena heat onto it; no ELO code reads `brandOrange` now, so WP4 can delete it) |
 | `deepRed` | `bg-deep-red` | `hsl(355, 67%, 47%)` (#C82835) | same | `signal-red` |
 
 **Naming trap.** On mobile `text-primary` is the LEGACY brand red (`--primary`), while web's `--text-primary` is the ink. ELO ink on mobile is `text-ink`. Never write `text-primary` for data. The same collision exists in web Tailwind.

@@ -112,6 +112,7 @@ export default function SettingsFeedbackScreen() {
             <View className="gap-2">
               <FieldLabel>MESSAGE</FieldLabel>
               <TextInput
+                accessibilityLabel="Message"
                 value={message}
                 onChangeText={setMessage}
                 placeholder="Tell us what you think..."

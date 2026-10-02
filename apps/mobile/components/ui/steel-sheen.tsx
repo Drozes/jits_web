@@ -27,6 +27,7 @@ import Animated, {
 } from "react-native-reanimated";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 import { easing, useAppActive, useReduceMotion } from "@/lib/motion";
+import { onMediaTokens } from "@/lib/tokens";
 
 /** One sweep across the button. */
 export const SHEEN_SWEEP_MS = 800;
@@ -103,9 +104,9 @@ function SheenBand({ testID }: { testID: string }) {
         <Svg width="100%" height="100%">
           <Defs>
             <LinearGradient id={GRADIENT_ID} x1="0" y1="0" x2="1" y2="0">
-              <Stop offset="0" stopColor="#FFFFFF" stopOpacity={0} />
-              <Stop offset="0.5" stopColor="#FFFFFF" stopOpacity={0.55} />
-              <Stop offset="1" stopColor="#FFFFFF" stopOpacity={0} />
+              <Stop offset="0" stopColor={onMediaTokens.white} stopOpacity={0} />
+              <Stop offset="0.5" stopColor={onMediaTokens.white} stopOpacity={0.55} />
+              <Stop offset="1" stopColor={onMediaTokens.white} stopOpacity={0} />
             </LinearGradient>
           </Defs>
           <Rect x="0" y="0" width="100%" height="100%" fill={`url(#${GRADIENT_ID})`} />

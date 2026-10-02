@@ -75,7 +75,7 @@ export function SeekBar({ positionS, durationS, moments, onSeek }: SeekBarProps)
       style={{ height: 44, justifyContent: "center" }}
       {...pan.panHandlers}
     >
-      <View pointerEvents="none" style={{ position: "absolute", left: 0, right: 0, top: 20, height: 3, backgroundColor: "rgba(255,255,255,0.25)" }} />
+      <View pointerEvents="none" style={{ position: "absolute", left: 0, right: 0, top: 20, height: 3, backgroundColor: ON_MEDIA.track }} />
       <View pointerEvents="none" style={{ position: "absolute", left: 0, top: 20, height: 3, width: `${frac * 100}%`, backgroundColor: ON_MEDIA.white }} />
       {moments.map((m, i) => (
         <View

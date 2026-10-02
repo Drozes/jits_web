@@ -164,11 +164,13 @@ describe("CameraOverlay in landscape", () => {
     mockWindow.width = 844;
     mockWindow.height = 390;
     const card = renderGranted("card").getByTestId("camera-card").props.style;
-    expect(card).toEqual({ width: 416, maxWidth: "100%", alignSelf: "center" });
+    // The media ground is the on-media black token (R3 MF-10, WP7), not `bg-black`.
+    expect(card).toEqual({ width: 416, maxWidth: "100%", alignSelf: "center", backgroundColor: "#000000" });
   });
 
   it("ready in portrait: the card stays full width", () => {
-    expect(renderGranted("card").getByTestId("camera-card").props.style).toBeUndefined();
+    // Full width comes from the class; the style carries only the on-media black (WP7).
+    expect(renderGranted("card").getByTestId("camera-card").props.style).toEqual({ backgroundColor: "#000000" });
   });
 
 });

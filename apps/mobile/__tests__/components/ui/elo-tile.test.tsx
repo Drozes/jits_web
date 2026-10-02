@@ -219,7 +219,7 @@ describe("after tile tone (jits-9cgj)", () => {
   it.each([
     ["positive", "border-positive"],
     ["negative", "border-negative"],
-    ["amber", "border-amber-800"],
+    ["amber", "border-attention"],
   ] as const)("%s tone borders the after tile with %s, never Signal Red", async (tone, cls) => {
     const utils = render(<EloTile label="ELO Rating" before={1000} after={1016} tone={tone} />);
     await flushReduceMotion();
@@ -227,11 +227,12 @@ describe("after tile tone (jits-9cgj)", () => {
     expect(afterTileClass(utils)).not.toContain("border-cta");
   });
 
-  it("amber follows the dark scheme", async () => {
+  it("amber is the attention token in the dark scheme too (the CSS var flips, not the class)", async () => {
     mockScheme = "dark";
     const utils = render(<EloTile label="ELO Rating" before={1000} after={992} tone="amber" />);
     await flushReduceMotion();
-    expect(afterTileClass(utils)).toContain("border-amber-500");
+    expect(afterTileClass(utils)).toContain("border-attention");
+    expect(afterTileClass(utils)).not.toMatch(/amber-\d/);
   });
 });
 

@@ -9,6 +9,12 @@ import { useThemedTokens } from "@/lib/theme/use-theme";
  * inputs / selects. Used to keep each step file lean and consistent
  * with the wireframe A2 form layout.
  */
+/**
+ * The enclosing EloField's visible label. RN does not tie a sibling <Text> to
+ * an input, so EloTextInput reads it as its default `accessibilityLabel`.
+ */
+const EloFieldLabelContext = React.createContext<string | undefined>(undefined);
+
 interface EloFieldProps {
   label: string;
   helper?: string;
@@ -22,7 +28,7 @@ export function EloField({ label, helper, error, children }: EloFieldProps) {
       <Text className="font-heading text-[10px] text-ink-3 uppercase tracking-caps-xl">
         {label}
       </Text>
-      {children}
+      <EloFieldLabelContext.Provider value={label}>{children}</EloFieldLabelContext.Provider>
       {error ? (
         <Text className="font-body text-[12px] text-negative">{error}</Text>
       ) : helper ? (
@@ -41,12 +47,14 @@ type EloTextInputProps = TextInputProps & {
 };
 
 export const EloTextInput = React.forwardRef<TextInput, EloTextInputProps>(
-  ({ className, hasError, onFocus, onBlur, ...rest }, ref) => {
+  ({ className, hasError, onFocus, onBlur, accessibilityLabel, ...rest }, ref) => {
     const tokens = useThemedTokens();
+    const fieldLabel = React.useContext(EloFieldLabelContext);
     const [focused, setFocused] = React.useState(false);
     return (
       <TextInput
         ref={ref}
+        accessibilityLabel={accessibilityLabel ?? fieldLabel}
         placeholderTextColor={tokens.textTertiary}
         onFocus={(e) => {
           setFocused(true);

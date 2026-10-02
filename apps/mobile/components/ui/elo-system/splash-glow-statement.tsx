@@ -15,6 +15,7 @@ import * as Haptics from "expo-haptics";
 import * as SplashScreen from "expo-splash-screen";
 import { SPLASH_GLOW_STATEMENT, SPLASH_REVEAL } from "@jits/shared/constants";
 import { ErMark } from "@/components/ui/elo-system/er-mark";
+import { darkTokens } from "@/lib/tokens";
 
 const S = SPLASH_GLOW_STATEMENT;
 const EASE = Easing.bezier(
@@ -33,10 +34,11 @@ const EXPAND = Easing.bezier(
 
 // Void "arena" palette, theme-independent, matches the native splash exactly so
 // the hand-off has no seam.
-const VOID = "#0D0F14";
-const WHITE = "#E8EDF2"; // ELO RATED
-const GRAY = "#9CA3AF"; // WE ARE
-const RED = "#E63946"; // Signal Red, ARE YOU? only
+// The dark (Void) tokens, pinned: the statement ignores the app theme.
+const VOID = darkTokens.bgPrimary;
+const WHITE = darkTokens.textPrimary; // ELO RATED
+const GRAY = darkTokens.textSecondary; // WE ARE
+const RED = darkTokens.accentCta; // Signal Red, ARE YOU? only
 
 // dp width of the centered mark. KEEP THIS EQUAL to app.json's expo-splash-screen
 // `imageWidth`, that's what makes the static native splash and this animated

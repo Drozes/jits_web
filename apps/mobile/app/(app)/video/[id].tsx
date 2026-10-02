@@ -143,7 +143,7 @@ function PlayerBody({ id, start, approximate }: { id: string | undefined; start:
   return (
     // Full-screen video: dark in both app themes. ForceDarkTheme pins the
     // themed pieces drawn over it (VideoStatePanel) to the dark tokens.
-    <ForceDarkTheme style={{ backgroundColor: "#000000" }}>
+    <ForceDarkTheme style={{ backgroundColor: ON_MEDIA.black }}>
       <StatusBar style="light" />
       {phase === "ready" && source ? (
         <>

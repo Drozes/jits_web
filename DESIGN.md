@@ -22,7 +22,7 @@ This system describes the mobile app (`apps/mobile` in jits_web), which is the s
 - **Dark first.** Design in the `dark` theme (Void); `light` (Paddock) must also work with the same token names.
 - **Surfaces step, nothing floats.** Paint the page `void`, chrome (headers, tab bar, Arena strips) `panel`, content `plate`, pressed and selected `plate-bright`. In dark the steps get lighter, in light darker. There are no shadows and no gradients (camera scrims excepted).
 - **Hairlines, not boxes.** Draw every border 1px in `hairline`, `hairline-faint` or `hairline-strong`. Use a 2px `stroke-edge` only for state edges (the active tab, the challenge afterglow) and a 3px `stroke-rail` only for rails (Plate accent, StripShell, the EloTile bar).
-- **Sharp corners.** `radius-tag` 2px for tags, chips and avatars, `radius-button` 3px for buttons, `radius-plate` 4px for everything else, `radius-sheet` 8px for sheets and modals and never more. Only dots are round.
+- **Sharp corners.** `radius-tag` 2px for tags, chips and avatars, `radius-button` 3px for buttons, `radius-plate` 4px for everything else, `radius-sheet` 8px for sheets and modals and never more. Only dots are round (live, status and seek-marker dots); every other control, play buttons and check badges included, takes the radius scale.
 - **Ink for content.** Text in `ink`, secondary copy in `ink-2`, mono labels 10px and up in `ink-3`. Every number is `ink` unless it is a delta.
 - **Signal Red means "act" or "lose".** Fill ONE primary action per surface with `signal-red`, label it in `on-signal` (never white), press it to `signal-red-lift`. Red text uses `negative` (losses, errors) or `signal-red-text`, never `signal-red`. Red never decorates data, spinners, icons, switches or selections.
 - **Gain Green means "gain, win, live".** `gain-green` only for rating increases, wins and LIVE. A ready check, a confirmed result or a finished upload is `ink` with a glyph.
@@ -55,7 +55,7 @@ Motion carries meaning or does not exist. Every animation is **Reactive** (a res
 ## Consuming this kit
 
 - **Token names** are the kit names in `tokens.json` (`void`, `ink-3`, `signal-red`, `radius-plate`, `space-4`, ...). In a preview or web page they are CSS custom properties of the same name (`var(--void)`, `var(--radius-plate)`, `var(--font-mono)`; dotted steps escape: `var(--space-1\.5)`), and each text style is a class (`.meta-label`).
-- **In the RN code** the same values are NativeWind classes (`bg-surface`, `bg-surface-2/3/4`, `text-ink`, `text-ink-2/3`, `text-ink-on-cta`, `bg-cta`, `text-cta`, `text-positive`, `text-negative`, `border-hairline(-faint|-strong)`, `rounded-xs/sm/md/lg`, `font-display/heading/body/mono`, `tracking-caps(-l|-xl)`); [Color](#color) lists the mapping. JS call sites use `useThemedTokens()`, `usePalette()` or `ON_MEDIA`.
+- **In the RN code** the same values are NativeWind classes (`bg-surface`, `bg-surface-2/3/4`, `text-ink`, `text-ink-2/3`, `text-ink-on-cta`, `bg-cta`, `text-cta`, `text-positive`, `text-negative`, `text-attention`, `border-attention(-rule)`, `bg-heat-orange`, `bg-heat-red`, `border-hairline(-faint|-strong)`, `rounded-xs/sm/md/lg`, `font-display/heading/body/mono`, `tracking-caps(-l|-xl)`); [Color](#color) lists the mapping. JS call sites use `useThemedTokens()`, `usePalette()` or `ON_MEDIA` (= `onMediaTokens`).
 - **Units:** every length is device px at **NativeWind rem = 14px** (one spacing step = 3.5px; `p-4` = 14px). Arbitrary `[Npx]` values stay literal. Web renders the same class at rem 16.
 - **Where the code lives (jits_web):** colors `apps/mobile/lib/tokens.ts` (the source of truth; web `apps/web/app/design-system/tokens.css` mirrors it), classes `apps/mobile/tailwind.config.js`, match-flow palette `apps/mobile/lib/theme/palette.ts`, motion `apps/mobile/lib/motion/`, primitives `apps/mobile/components/ui/elo-system/`, Arena `apps/mobile/components/arena/`, chrome `apps/mobile/components/layout/`.
 - **Screens:** the ELO RATED Native Screens canvas mirrors the shipped app; draw boards from this kit's tokens at 390px wide, dark.
@@ -81,7 +81,7 @@ Twenty cards, each a static HTML twin of the RN component with a README (`compon
 1. **Source of truth:** `apps/mobile/lib/tokens.ts` and `lib/motion/tokens.ts`; web `tokens.css` mirrors them (the old DESIGN.md claimed the reverse; the drift test already treats mobile as the source).
 2. **Units:** device px at rem 14.
 3. **Theme order:** `dark` first, then `light`.
-4. **Color set:** the 17 core tokens plus `attention` (amber, scoped to draws, pressure and pending, processing, paused or disputed states, as the code does), `heat-orange` and `heat-red` (Arena heat only), and the `on-media-*` set (named after `ON_MEDIA`; `BROADCAST` overlaps it and merges in WP7). Legacy shadcn colors are not kit tokens.
+4. **Color set:** the 17 core tokens plus `attention` (amber, scoped to draws, pressure and pending, processing, paused or disputed states, as the code does), `heat-orange` and `heat-red` (Arena heat only), and the `on-media-*` set (one source, `onMediaTokens` in `lib/tokens.ts`, behind both `ON_MEDIA` and `BROADCAST` since WP7). Legacy shadcn colors are not kit tokens.
 5. **Display numerals:** Bebas Neue is allowed for numerals 40px and up as brand moments (countdown 240px, GO 116px, the wordmark); every other number is mono. Face-off weights are 36px Bebas today: either raise them to 40px or accept 36px as the floor.
 6. **Radius scale:** 2 tag, 3 button, 4 plate (default), 8 sheets and modals maximum; dots round. Avatars: the code's `Avatar32` is a 2px-radius square, while the old DESIGN.md said avatars stay circular; the kit follows the code (square) until decided.
 7. **Shadows:** none; no shadow family.
@@ -92,10 +92,13 @@ Twenty cards, each a static HTML twin of the RN component with a README (`compon
 12. **Wizard progress segments** in `signal-red` (MF-8) and the "VS" in red display type (MF-12) are treated as brand chrome until decided.
 13. **Destructive button:** an outline in `negative` (border and label; 6.28:1 on `void` dark, 6.37:1 light), proposed by the kit. The code has no ELO destructive button: today's `DestructiveButton` (one use, Delete account) fills with the legacy red under a `#E8EDF2` label at 3.54:1 and reads as a second red CTA.
 14. **Chip selected state:** `plate-bright` fill, `hairline-strong` border, `ink` label, no red square (the WP2 target, bead jits-3eeg.3). Today the active chip takes a Signal Red border and a 6px red square.
+15. **Circular elements (D-6):** only dots are round: live dots, status dots, seek markers. Avatars are square (as code). The round play buttons (`player-controls.tsx`, `match-hero.tsx`), the round seek thumb and the round check badges in the match flow (R3 FR-8) are non-conforming and take `radius-plate` / `radius-tag` when their package touches them.
+16. **Centered modals (D-4):** sheets are the default modal. The challenge prompt is a centered card by decision (jits-02vo.3). Compare Stats, the go-live location prompt and the start-blocked notice are centered today and are decided in WP1 (R3 SH-5): move to a sheet or record the exception here.
+17. **Contrast on media:** on-media text sits on `on-media-badge` or the light `on-media-chip` only (see [Color](#color)).
 
 ## Not synced
 
-Not carried into tokens: web-only values (the web `--size-*` type scale, the web z-index ladder, web `--opacity-*`, the shadcn `--chart-*` slots), `BROADCAST` values with no `ON_MEDIA` twin, `palette.ts` match-flow mirrors (`winRule`, `secondaryBg`, `secondaryBgPressed`, `selectedBg`, `track`), the splash gold `#f59e0b`, and the push accent `#ef4444`. Components are static HTML twins hand-written from the RN sources (React Native cannot run in the preview frame); no bundle was built.
+Not carried into tokens: web-only values (the web `--size-*` type scale, the web z-index ladder, web `--opacity-*`, the shadcn `--chart-*` slots), `palette.ts` match-flow mirrors (`winRule`, `secondaryBg`, `secondaryBgPressed`, `selectedBg`, `track`), and the push accent `#ef4444` in `app.json` (native config). Components are static HTML twins hand-written from the RN sources (React Native cannot run in the preview frame); no bundle was built.
 
 ## Color
 
@@ -131,7 +134,7 @@ Every value below is exact from `apps/mobile/lib/tokens.ts` (the source of truth
 | `hairline-faint` | `rgba(107, 114, 128, 0.20)` | `rgba(13, 15, 20, 0.11)` | `border-hairline-faint` | `borderHairlineFaint` (l.158 / l.111) | Faintest divider |
 | `hairline-strong` | `rgba(107, 114, 128, 0.62)` | `rgba(13, 15, 20, 0.34)` | `border-hairline-strong` | `borderHairlineStrong` (l.159 / l.112) | Chips, actions, avatars, selected edge |
 
-The mobile CSS variables behind the classes are the web names (`--bg-primary`, `--text-tertiary`, `--accent-cta-text`, ...), written by `lib/theme/theme-provider.tsx:46-62`. One class is remapped on purpose: `text-cta` resolves to `--accent-cta-text`, while `bg-cta` and `border-cta` stay the brand red (`tailwind.config.js:176-182`).
+The mobile CSS variables behind the classes are the web names (`--bg-primary`, `--text-tertiary`, `--accent-cta-text`, ...), written by `lib/theme/theme-provider.tsx` (`buildVars`, which also writes `--attention`, `--attention-rule`, `--heat-orange` and `--heat-red`). One class is remapped on purpose: `text-cta` resolves to `--accent-cta-text`, while `bg-cta` and `border-cta` stay the brand red (`tailwind.config.js:176-182`).
 
 ### Sub-palettes
 
@@ -139,53 +142,63 @@ The mobile CSS variables behind the classes are the web names (`--bg-primary`, `
 
 | Token | Dark | Light | Source |
 |---|---|---|---|
-| `attention` | `#F59E0B` | `#92400E` | `lib/theme/palette.ts:74` |
-| `attention-rule` | `rgba(245,158,11,0.7)` | `rgba(146,64,14,0.6)` | `lib/theme/palette.ts:75` |
+| `attention` | `#F59E0B` | `#92400E` | `lib/tokens.ts` key `attention`; Tailwind `text-attention`, `border-attention`, `bg-attention` |
+| `attention-rule` | `rgba(245,158,11,0.7)` | `rgba(146,64,14,0.6)` | `lib/tokens.ts` key `attentionRule`; Tailwind `border-attention-rule` |
 
-Amber marks draws and pressure score, and the states that are waiting on something: pending, processing, paused, disputed (as the code uses it, `palette.ts:40`). It is not in `tokens.ts` yet; `components/match-detail/use-amber.ts` still reaches it through Tailwind's `text-amber-500` / `text-amber-800`. Light mode uses amber-800 because amber-500 does not reach 4.5:1 on the light plates.
+Amber marks draws and pressure score, and the states that are waiting on something: pending, processing, paused, disputed (decided 2026-10-02). The CSS vars are `--attention` and `--attention-rule`, written by `theme-provider.tsx` like the core set; `usePalette().amber` / `.amberRule` and `useAmber()` (`components/match-detail/use-amber.ts`, which returns `text-attention` / `border-attention`) read the same token. Light mode uses amber-800 because amber-500 does not reach 4.5:1 on the light plates. Amber is never decoration: the launch splash's gold cap (`splash-reveal.tsx`, the dark `attention` value) is the one sanctioned exception, a brand moment, and is not to be copied.
 
 #### Heat (Arena only)
 
 | Token | Value (both themes) | Source |
 |---|---|---|
-| `heat-orange` | `hsl(25, 95%, 53%)` (`#F97415`) | `lib/tokens.ts:92,139` (legacy key `brandOrange`) |
-| `heat-red` | `#EC6A74` | `components/layout/arena-tab-icon.tsx:138` (`HEAT_EMBER_RED`) |
+| `heat-orange` | `hsl(25, 95%, 53%)` (`#F97415`) | `lib/tokens.ts` key `heatOrange`; Tailwind `bg-heat-orange` (the legacy `brandOrange` holds the same value until WP4 deletes it) |
+| `heat-red` | `#EC6A74` | `lib/tokens.ts` key `heatRed`; Tailwind `bg-heat-red` (`arena-tab-icon.tsx` `HEAT_EMBER_RED` reads it) |
 
 Heat colors draw Arena heat and nothing else: the live embers (two `heat-orange`, one `signal-red`), the countable embers (`heat-red`), the blade clash spark (`signal-red`) and the challenge afterglow edge. Both are fixed across themes and both fall below 3:1 on every light surface (see [Accessibility](#accessibility)).
 
 #### On-media (fixed, over camera, video and photos)
 
-Chrome over a camera preview, a video or a photo does not follow the app theme. Two overlapping constant sets exist today and WP7 merges them; the kit tokens are named after `ON_MEDIA` (`lib/theme/palette.ts:95-125`), with the `BROADCAST` equivalent noted (`components/match-flow/live/broadcast-tokens.ts:6-34`).
+Chrome over a camera preview, a video or a photo does not follow the app theme. ONE source holds it: `onMediaTokens` in `apps/mobile/lib/tokens.ts`. `ON_MEDIA` (`lib/theme/palette.ts`) is that object, and the live screen's `BROADCAST` (`components/match-flow/live/broadcast-tokens.ts`) maps its own key names onto it (merged in WP7, jits-3eeg.8, with every rendered value unchanged). Kit name = `on-media-` plus the kebab-cased key; the drift test locks this table to the code.
 
-| Token | Value | ON_MEDIA key | BROADCAST twin |
+| Token | Value | `onMediaTokens` / `ON_MEDIA` key | `BROADCAST` alias |
 |---|---|---|---|
 | `on-media-white` | `#FFFFFF` | `white` | `white` |
 | `on-media-text` | `#E8EDF2` | `text` | `inkDark` |
 | `on-media-text2` | `rgba(232,237,242,0.72)` | `text2` | `body72` |
-| `on-media-text3` | `rgba(232,237,242,0.55)` | `text3` | (none; `dim62` is 0.62) |
+| `on-media-text-dim` | `rgba(232,237,242,0.62)` | `textDim` | `dim62` |
+| `on-media-text3` | `rgba(232,237,242,0.55)` | `text3` | (none) |
 | `on-media-tag-text` | `rgba(255,255,255,0.85)` | `tagText` | `tagText` |
 | `on-media-strong` | `rgba(255,255,255,0.40)` | `strong` | `glassBorder` |
 | `on-media-cta` | `#E63946` | `cta` | `cta` |
 | `on-media-red` | `#F0556B` | `red` | `ctaHover` |
 | `on-media-red-rule` | `rgba(240,85,107,0.7)` | `redRule` | (none) |
-| `on-media-win` | `#22C55E` | `win` | (none; `live-pill.tsx:41` `ON_DARK_GREEN`) |
+| `on-media-win` | `#22C55E` | `win` | (none; `LivePill` `onDark` reads it) |
 | `on-media-amber` | `#F59E0B` | `amber` | `amber` |
-| `on-media-amber-rule` | `rgba(245,158,11,0.7)` | `amberRule` | `amberRule` is 0.5 |
-| `on-media-track` | `rgba(255,255,255,0.18)` | `track` | `track` is `rgba(13,15,20,0.25)` (different) |
+| `on-media-amber-rule` | `rgba(245,158,11,0.7)` | `amberRule` | (none) |
+| `on-media-amber-rule-soft` | `rgba(245,158,11,0.5)` | `amberRuleSoft` | `amberRule` |
+| `on-media-amber-soft` | `rgba(245,158,11,0.16)` | `amberSoft` | `amberSoft` |
+| `on-media-amber-spent` | `rgba(245,158,11,0.22)` | `amberSpent` | `amberSpent` |
+| `on-media-black` | `#000000` | `black` | `black` |
+| `on-media-ground` | `#0D0F14` | `ground` | `ground` |
+| `on-media-track` | `rgba(255,255,255,0.18)` | `track` | (none) |
 | `on-media-glass` | `rgba(255,255,255,0.08)` | `glass` | (none) |
-| `on-media-glass-strong` | `rgba(255,255,255,0.12)` | `glassStrong` | `glassFill` (pressed `rgba(255,255,255,0.20)`) |
-| `on-media-tag` | `rgba(0,0,0,0.45)` | `tag` | `tagFill` is 0.40 |
+| `on-media-glass-strong` | `rgba(255,255,255,0.12)` | `glassStrong` | `glassFill` |
+| `on-media-glass-pressed` | `rgba(255,255,255,0.20)` | `glassPressed` | `glassFillPressed` |
+| `on-media-tag` | `rgba(0,0,0,0.45)` | `tag` | (none) |
+| `on-media-tag-soft` | `rgba(0,0,0,0.40)` | `tagSoft` | `tagFill` |
 | `on-media-badge` | `rgba(0,0,0,0.88)` | `badge` | (none) |
 | `on-media-scrim` | `rgba(0,0,0,0.55)` | `scrim` | `savingDim` |
+| `on-media-dim` | `rgba(0,0,0,0.35)` | `dim` | `startingDim` |
+| `on-media-slab` | `rgba(13,15,20,0.92)` | `slab` | `slab` |
+| `on-media-tally-glass` | `rgba(13,15,20,0.72)` | `tallyGlass` | `tallyGlass` |
 | `on-media-chip` | `rgba(232,235,240,0.96)` | `chip` | `plate` |
 | `on-media-chip-border` | `rgba(13,15,20,0.34)` | `chipBorder` | `plateBorder` |
+| `on-media-chip-track` | `rgba(13,15,20,0.25)` | `chipTrack` | `track` |
 | `on-media-ink` | `#0D0F14` | `ink` | `ink` |
 | `on-media-ink3` | `#575C68` | `ink3` | `ink3` |
 | `on-media-ink-red` | `#AC2B34` | `inkRed` | `ctaText` |
 
-`BROADCAST` also holds values with no `ON_MEDIA` twin: `black #000000`, `ground #0D0F14`, `amberSoft rgba(245,158,11,0.16)`, `amberSpent rgba(245,158,11,0.22)`, `slab rgba(13,15,20,0.92)`, `glassFillPressed rgba(255,255,255,0.20)`, `tallyGlass rgba(13,15,20,0.72)`, `dim62 rgba(232,237,242,0.62)`, `startingDim rgba(0,0,0,0.35)`. They stay in the live broadcast HUD and are not kit tokens.
-
-Rule: on-media text holds 4.5:1 only on `on-media-badge` (or over a frame known to be dark). Over a bare scrim or tag fill a bright frame drops it below the floor.
+**The on-media contrast rule:** on-media TEXT sits only on `on-media-badge` (the light inks: white, text, text2, text-dim, text3, tag-text, red, win, amber) or on the light `on-media-chip` (the dark inks: ink, ink3, ink-red). Those two grounds hold 4.5:1 whatever frame is under them. `on-media-tag`, `tag-soft`, `scrim`, `dim` and the glass fills are grounds for marks and controls; text on them depends on the frame (tag text over a white frame is about 2.9:1). `on-media-text3` is a label and mark tint: as text it belongs on the badge only. See [Accessibility](#accessibility) for the numbers.
 
 ### Usage rules
 
@@ -199,12 +212,12 @@ Rule: on-media text holds 4.5:1 only on `on-media-badge` (or over a frame known 
 - Use `heat-orange` and `heat-red` only on the Arena tab icon and the challenge afterglow.
 - Show a selected option with `plate-bright` plus a `hairline-strong` edge and an `ink` check glyph, never a red fill (WP2 target; the code still fills some radios, checkboxes and chips red).
 - Draw every border 1px in a hairline color; 2px (`stroke-edge`) and 3px (`stroke-rail`) widths exist only for state edges and rails.
-- Over media, use the `on-media-*` set and keep text on `on-media-badge`.
+- Over media, use the `on-media-*` set (`ON_MEDIA` or `onMediaTokens`, never a new literal) and keep text on `on-media-badge` or the light `on-media-chip`.
 
 ### Known non-tokens in code (not to copy)
 
-- Push notification accent `#ef4444` (Tailwind red-500) in `app.json:119` and `lib/notifications/register-push.ts:88` is not a brand color (WP7 points it at `signal-red`).
-- Splash files hard-code `#0D0F14`, `#E8EDF2`, `#FFFFFF`, `#9CA3AF`, `#E63946` and a gold `#f59e0b` (`splash-reveal.tsx:27-31`); the gold is outside the system.
+- Push notification accent `#ef4444` (Tailwind red-500) in `app.json:119` is not a brand color. The Android channel light in `lib/notifications/register-push.ts` now uses `signal-red` (WP7); the `app.json` value is native config and changes only with the next store build.
+- The splash files read the dark tokens (`darkTokens`, `onMediaTokens.white`) instead of hard-coding them (WP7). Their gold cap is the dark `attention` value, a sanctioned one-off for the launch moment, not a pattern.
 - `palette.ts` also carries `winRule`, `secondaryBg`, `secondaryBgPressed`, `selectedBg` (`rgba(230,57,70,0.16)`, a red tint that WP2 retires) and `track` for the match flow; they are JS mirrors, not kit tokens.
 - Legacy shadcn colors (`primary`, `muted`, `card`, `success` and friends) are retiring; see [Legacy](#legacy-retiring-wp4).
 
@@ -368,7 +381,7 @@ In CSS the dotted names are escaped: `var(--space-0\.5)`, `var(--space-1\.5)`, `
 | `radius-button` | 3px | `rounded-sm` (38) | Buttons (CtaButton, FightButton, glass buttons) |
 | `radius-plate` | 4px | `rounded-md` (47) | THE default: plates, cards, rating tiles, toasts, popovers |
 | `radius-sheet` | 8px | `rounded-lg` (5) | Sheets and modals only, the ceiling |
-| `radius-round` | 9999px | `rounded-full` (14) | Live dots and status dots |
+| `radius-round` | 9999px | `rounded-full` (14) | Live dots, status dots and seek markers only (D-6: play buttons and check badges are not dots) |
 
 Sources: `tailwind.config.js:183-190`, `FIGHT_RADIUS` (`fight-tokens.ts:9`), `BROADCAST_RADIUS` (`broadcast-tokens.ts:36`), `PROMPT_RADIUS = 8` (`challenge-prompt-sheet.tsx:89`).
 
@@ -478,7 +491,7 @@ Mobile tokens live in `apps/mobile/lib/motion/tokens.ts` and are imported from `
 2. **UI thread.** Animate transform, opacity and color with Reanimated shared values, `useAnimatedStyle` and `useAnimatedProps`. No `setState` or `setInterval` animation loops, and no per-frame re-render of always-mounted chrome such as the tab bar.
 3. **Reduce Motion.** Read the OS setting with `useReduceMotion()` (from `@/lib/motion`; correct on the first frame). Every animation has a static end state that still carries the meaning (a cooled edge, a static ember, the final number). Haptics stay on under Reduce Motion.
 4. **Ambient lifecycle.** An ambient loop mounts only while its state is true, and pauses (`cancelAnimation`) when the app leaves the foreground and restarts when it returns: gate it on `useAppActive()` from `@/lib/motion`.
-5. **Heat colors are reserved for Arena heat.** `brandOrange` through Signal Red as a heat ramp is used only for the Arena ember, the blade clash spark, and the challenge afterglow. Nowhere else.
+5. **Heat colors are reserved for Arena heat.** `heatOrange` (kit `heat-orange`) and `heatRed` through Signal Red as a heat ramp is used only for the Arena ember, the blade clash spark, and the challenge afterglow. Nowhere else.
 6. **Brand rules still hold.** No drop shadows, 4px radius, Signal Red for CTAs and negatives, Gain Green for rating increases and live state only, numbers in mono `tabular-nums` (including while they roll).
 7. **Pressables on native.** A function `style` on `Pressable` is dropped on device by NativeWind. Use `StatePressable`, or `PressableScale` (an animated Pressable that resolves a function style itself and animates only `transform`, so `className` and `active:` classes keep working); otherwise put animated styles on an inner `Animated.View`.
 
@@ -522,7 +535,7 @@ Every approved animation in the mobile app. **Adding a new animation means addin
 | ON AIR strip | Moment + Ambient | Arena screen body (`components/arena/on-air-strip.tsx`), never the header | Live false to true: the green ON AIR tally sweeps in (shown filled on a remount while already live). While live: a dim heartbeat trace brightens once per tempo-clock cycle; paused in background | none | Tally filled, full trace static |
 | Countdown slam | Moment | Face-off countdown (`components/match-flow/countdown/countdown.tsx`), replaces the plain match countdown | Each numeral drops from 1.6x and lands (about 140ms, ease-out back); a Signal Red bar drains linearly over the whole countdown to a red GO; total length and match start unchanged | `countdownTick` per numeral, `countdownGo` on GO | Numbers crossfade; the bar still drains linearly; haptics kept |
 | Verdict confetti / SlamIn / RiseIn | Moment | Verdict step | Confetti and the SlamIn of "YOU WON" on a win verdict only; RiseIn (the rank strip) on every verdict; each once | none | None (static verdict) |
-| Arena ember | Ambient | Arena tab icon (`components/layout/arena-tab-icon.tsx`) | While live and no challenge is pending: three 2px embers (two `brandOrange`, one Signal Red) rise off the blade tips, one at a time, 2400ms cycle | none | One static ember above the crossing |
+| Arena ember | Ambient | Arena tab icon (`components/layout/arena-tab-icon.tsx`) | While live and no challenge is pending: three 2px embers (two `heatOrange`, one Signal Red) rise off the blade tips, one at a time, 2400ms cycle | none | One static ember above the crossing |
 | Countable embers | Ambient | Arena tab icon | 1 to 3 pending incoming challenges: one 2.5px heat-red (`#EC6A74`) ember per challenge on one shared 2400ms clock, never fading below 0.35 opacity so they stay countable, in place of the red count pill (the pill returns above 3); they replace the live embers while showing and stop while the Arena tab is focused; VoiceOver keeps reading the count | none | N static embers |
 | Blade clash | Moment | Arena tab icon | Live false to true, or the pending incoming count increases: the Swords halves spread and snap together with a tiny Signal Red spark (about 220ms) | `goLive` on going live; none for a challenge (the prompt sheet already fires `challengeArrived`) | No clash, no spark |
 | Tab select bounce | Reactive | All four tabs | Pressing a tab that is not active: squash to 0.86, `select` spring back | `select` | No scale |
@@ -545,7 +558,7 @@ Every approved animation in the mobile app. **Adding a new animation means addin
 
 ### Kit names for the colors the Motion Rule names
 
-`brandOrange` is the kit's `heat-orange`; the countable-ember `#EC6A74` is `heat-red`; Signal Red is `signal-red`; the lifted red of the Accept sweep is `signal-red-lift`; Gain Green is `gain-green`. Heat colors appear only in the Arena ember, countable embers, the blade clash spark and the challenge afterglow.
+`heatOrange` (`lib/tokens.ts`; the legacy `brandOrange` holds the same value) is the kit's `heat-orange`; `heatRed` (`#EC6A74`, the countable embers) is `heat-red`; Signal Red is `signal-red`; the lifted red of the Accept sweep is `signal-red-lift`; Gain Green is `gain-green`. Heat colors appear only in the Arena ember, countable embers, the blade clash spark and the challenge afterglow.
 
 ## Accessibility
 
@@ -644,7 +657,7 @@ On-media chrome sits over camera, video or photos, so its ground is unknown. Wor
 | `on-media-ink3` on `on-media-chip` | 5.64 | 5.14 |
 | `on-media-ink-red` on `on-media-chip` | 5.62 | 5.12 |
 
-Rule: put on-media text on `on-media-badge` or the light `on-media-chip`. The scrim and tag fills are safe only over dark footage; `on-media-text3` belongs on the badge only (R3 CO-5, A1-4).
+Rule (the on-media contrast rule, WP7): on-media text sits only on `on-media-badge` or, for the dark inks, the light `on-media-chip`. The scrim, tag and glass fills are grounds for marks and controls; text on them is safe only over dark footage. `on-media-text3` belongs on the badge only (R3 CO-5, A1-4). `__tests__/lib/on-media-tokens.test.ts` recomputes the badge and chip columns above from the tokens and fails if one drops below 4.5:1. Text on a tag fill still ships on the HUD tag, the film tags and the opening-still tag (`hud-tag.tsx`, `match-hero.tsx`, `verdict-hero.tsx`, `poster-card.tsx`, `player-controls.tsx`, `angle-switcher.tsx`, `countdown.tsx`); those move to the badge fill in a follow-up (they change pixels on the live and Film Room boards). The camera card's REC tag already sits on the badge.
 
 ### Reduce Motion
 
@@ -658,7 +671,7 @@ Rule: put on-media text on `on-media-badge` or the light `on-media-chip`. The sc
 
 - Every pressable that acts has `accessibilityRole="button"` and a label. Missing today: the error boundary's "Try again" and "Sign out" (`components/error-boundary.tsx:88,98`, R3 A1-1).
 - A `Pressable` with a single `Text` child takes its name from the text; icon-only controls need an explicit label ("Go back" on the AppHeader back button).
-- Text inputs and switches need `accessibilityLabel` set to the visible label; React Native does not link a sibling `Text`. Seven controls lack one (R3 A1-2).
+- Text inputs and switches need `accessibilityLabel` set to the visible label; React Native does not link a sibling `Text`. The ui `Switch` requires a `label` prop (it becomes the accessible name), and `EloTextInput` takes its enclosing `EloField` label by default (WP7, R3 A1-2).
 - Tabs expose `accessibilityState.selected` and an `accessibilityValue` for badges ("2 challenges", "3 NEW"; `elo-tab-bar.tsx:66-75`); the countable embers keep the count readable.
 - Moments speak their result once: VoiceOver reads only the final ELO and delta after the odometer roll; the Accept sweep sets the value "Accepted" while the label stays.
 - Busy buttons set `accessibilityState.busy` (FightButton); make it the canonical busy pattern.
@@ -859,7 +872,7 @@ How far the shipped mobile app is from this system, and the plan to close the ga
 | jits-3eeg.2 | WP1 Sheet and modal chrome | SH-1 to SH-5, MO-5, A1-1 backdrops | One shared sheet background and handle with `radius-sheet` top corners; brand type in sheet and dialog titles; one `on-media-scrim` backdrop; a "Sheet / modal present" registry row and a Reduce-Motion-aware modal animation helper |
 | jits-3eeg.3 | WP2 Color semantics sweep | CO-1, CO-2, CO-6, CO-7, ST-1 to ST-3, ST-6, MF-5, MF-8, PR-1, PR-2, PR-6, RK-1, SC-6, FR-1, FR-2 | Red only on CTAs and negatives, green only on gains, wins and live; neutral spinners; one selected state (`plate-bright` + `hairline-strong` + check); neutral Switch track; a grep guard test |
 | jits-3eeg.4 | WP3 One Button, one press feedback | BT-1 to BT-7, SC-3 | A unified `Button` on `PressableScale` (primary, secondary, ghost, destructive, glass), one disabled style (`opacity-disabled`); auth, practice and viewer buttons migrated; `StatePressable` on 25 rows and toggles without feedback |
-| jits-3eeg.5 | WP4 Retire the legacy shadcn layer | LG-1 to LG-3, SC-1, SC-2, ST-8, TY-5, MF-9 | Delete unused primitives; restyle Badge, the offline banner, the update banner and modal; remove the legacy token keys, keeping `brandOrange` as a heat token |
+| jits-3eeg.5 | WP4 Retire the legacy shadcn layer | LG-1 to LG-3, SC-1, SC-2, ST-8, TY-5, MF-9 | Delete unused primitives; restyle Badge, the offline banner, the update banner and modal; remove the legacy token keys, `brandOrange` included (Arena heat reads `heatOrange` since WP7) |
 | jits-3eeg.6 | WP5 Type scale and numeric typography | TY-1 to TY-4, TY-6, PR-3, PR-4, MF-3, MF-6, MF-7, FR-7, ST-4, ST-5, AR-1, AR-6, A1-3 | Named size and tracking steps (the Typography styles), a scale-driven mono label, `tabular-nums` on every number, tracking on every caps label, the 10px floor |
 | jits-3eeg.7 | WP6 Motion Rule hygiene | MF-2, SP-1 to SP-4, MO-4, MO-6, MF-11, FR-3, FR-4 | Hold-to-end and time-up on Reanimated `scaleX`; the splash odometer via `RollingNumber`; the splash glow plays once; `useReduceMotion()` everywhere; literal durations named; shimmer restored in Film Room and the highlight viewer |
 | jits-3eeg.8 | WP7 Tokens, on-media, labels, doc truth | CO-3, CO-4, CO-5, AR-4, SP-5, SC-4, SC-5, FR-6, MF-10, A1-2, A1-4, D-1 to D-7 | An amber `attention` token in `tokens.ts`; the heat sub-palette; one on-media source behind `ON_MEDIA` and `BROADCAST`; labels on 7 inputs and switches; the docs brought in line with this kit |
@@ -895,7 +908,7 @@ Defined in `apps/mobile/lib/tokens.ts` (light l.69-93, dark l.116-140), mirrored
 | `border` | `border-border` | `hsl(218, 12%, 83%)` (#CED2D9) | `hsl(222, 13%, 18%)` (#282C34) | `hairline` |
 | `input` | `border-input` | `hsl(218, 14%, 79%)` (#C2C7D1) | `hsl(222, 13%, 21%)` (#2F333D) | `hairline-strong` |
 | `gold` | `bg-gold` | `hsl(38, 92%, 50%)` (#F59F0A) | same | `attention` |
-| `brandOrange` | `bg-brand-orange` | `hsl(25, 95%, 53%)` (#F97415) | same | KEPT as `heat-orange` (Arena heat only) |
+| `brandOrange` | `bg-brand-orange` | `hsl(25, 95%, 53%)` (#F97415) | same | `heat-orange` (WP7 added `heatOrange` / `bg-heat-orange` with this value and moved the Arena heat onto it; no ELO code reads `brandOrange` now, so WP4 can delete it) |
 | `deepRed` | `bg-deep-red` | `hsl(355, 67%, 47%)` (#C82835) | same | `signal-red` |
 
 **Naming trap.** On mobile `text-primary` is the LEGACY brand red (`--primary`), while web's `--text-primary` is the ink. ELO ink on mobile is `text-ink`. Never write `text-primary` for data. The same collision exists in web Tailwind.
