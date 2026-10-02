@@ -1,6 +1,6 @@
 # ELO RATED Design System
 
-> This document is the consolidated ELO RATED brand book. It carries the same text as the live Design System artifact "ELO RATED Design System", https://claude.ai/artifact/NkvxzxKo3R7acP5j6aRTTe (version `1790950472-1c4c`), whose files are mirrored in [design/system/project/](design/system/project/) (see [design/system/README.md](design/system/README.md) for how to update both). Tokens live in [design/system/project/tokens.json](design/system/project/tokens.json); component cards in `design/system/project/components/`. **Code wins:** values come from [apps/mobile/lib/tokens.ts](apps/mobile/lib/tokens.ts) and [apps/mobile/lib/motion/tokens.ts](apps/mobile/lib/motion/tokens.ts); where this document and the code disagree, fix the document. Screens are drawn on the "ELO RATED Native Screens" canvas, https://claude.ai/artifact/PJWm2WeqsG56HS13jHsd5D.
+> This document is the consolidated ELO RATED brand book. It carries the same text as the live Design System artifact "ELO RATED Design System", https://claude.ai/artifact/NkvxzxKo3R7acP5j6aRTTe (version `1790951317-29fa`), whose files are mirrored in [design/system/project/](design/system/project/) (see [design/system/README.md](design/system/README.md) for how to update both). Tokens live in [design/system/project/tokens.json](design/system/project/tokens.json); component cards in `design/system/project/components/`. **Code wins:** values come from [apps/mobile/lib/tokens.ts](apps/mobile/lib/tokens.ts) and [apps/mobile/lib/motion/tokens.ts](apps/mobile/lib/motion/tokens.ts); where this document and the code disagree, fix the document. Screens are drawn on the "ELO RATED Native Screens" canvas, https://claude.ai/artifact/PJWm2WeqsG56HS13jHsd5D.
 
 ELO RATED is a ranked-match app for Brazilian jiu-jitsu. Athletes go live in the **Arena**, challenge someone close to their rating and weight, roll, confirm the result, and watch their **ELO** move. Every match is ranked. The product should feel like premium sports tech (think timing screens and broadcast graphics): dark, precise, data-forward, and quiet until something real happens.
 
@@ -541,7 +541,7 @@ Every approved animation in the mobile app. **Adding a new animation means addin
 ### Other
 
 - **Wake lock (mobile):** the live match step keeps the screen awake via `expo-keep-awake`.
-- **Web:** the web app keeps its reactive transitions and `.stagger-children` / `animate-page-in` (see Interaction Patterns); the Motion Rule's tiers and rules apply to it as well.
+- **Web:** the web app keeps its reactive transitions and `.stagger-children` / `animate-page-in` (see [Web interaction patterns](#web-interaction-patterns)); the Motion Rule's tiers and rules apply to it as well.
 
 ### Kit names for the colors the Motion Rule names
 

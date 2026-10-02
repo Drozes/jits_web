@@ -113,7 +113,7 @@ Every approved animation in the mobile app. **Adding a new animation means addin
 ## Other
 
 - **Wake lock (mobile):** the live match step keeps the screen awake via `expo-keep-awake`.
-- **Web:** the web app keeps its reactive transitions and `.stagger-children` / `animate-page-in` (see Interaction Patterns); the Motion Rule's tiers and rules apply to it as well.
+- **Web:** the web app keeps its reactive transitions and `.stagger-children` / `animate-page-in` (see Web interaction patterns in Platform notes of the repo DESIGN.md); the Motion Rule's tiers and rules apply to it as well.
 
 ## Kit names for the colors the Motion Rule names
 
