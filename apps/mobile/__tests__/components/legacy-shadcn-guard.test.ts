@@ -9,9 +9,9 @@
  *    ...) is written anywhere; those classes no longer resolve to a color;
  *  - the legacy color plumbing is gone from tailwind.config.js and
  *    theme-provider.tsx;
- *  - the three legacy token keys that survive (`background`, `primary`,
- *    `muted`) are read only by components/ui/switch.tsx, which WP2 is moving
- *    onto ELO tokens.
+ *  - no legacy token key survives in ColorTokens (the last three,
+ *    `background`, `primary` and `muted`, left after WP2 moved the Switch onto
+ *    ELO tokens) and nothing reads one.
  */
 import * as fs from "fs";
 import * as path from "path";
@@ -113,9 +113,14 @@ describe("legacy shadcn layer is retired (WP4)", () => {
     for (const key of LEGACY_COLOR_KEYS) expect(colors).not.toContain(key);
   });
 
-  it("the surviving legacy token keys are read only by the Switch (until WP2 retires them)", () => {
+  it("no legacy token key survives in ColorTokens, and nothing reads one", () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { darkTokens, lightTokens } = require("../../lib/tokens");
+    for (const t of [darkTokens, lightTokens]) {
+      for (const key of LEGACY_COLOR_KEYS) expect(Object.keys(t)).not.toContain(key);
+    }
     const legacyRead = /\b(tokens|t|theme|colors|lightTokens|darkTokens|useThemedTokens\(\))\.(background|primary|muted)\b/;
     const readers = FILES.filter((f) => legacyRead.test(f.text)).map((f) => f.file);
-    expect(readers.filter((f) => f !== "components/ui/switch.tsx")).toEqual([]);
+    expect(readers).toEqual([]);
   });
 });

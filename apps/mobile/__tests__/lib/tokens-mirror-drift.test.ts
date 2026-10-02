@@ -180,22 +180,6 @@ const TOKEN_MAP: ReadonlyArray<readonly [keyof ColorTokens, string]> = [
 ];
 
 /**
- * Mobile tokens with no counterpart in any CSS mirror, listed rather than
- * dropped: the last three pre-redesign shadcn-style keys, read only by
- * components/ui/switch.tsx until WP2 moves it onto ELO tokens (WP4,
- * jits-3eeg.5, deleted the rest). The CSS mirrors never carried them. Delete
- * an entry here when its key leaves ColorTokens.
- *
- * An unmapped token that should have been compared is how this guard rots, so
- * the completeness test forces every ColorTokens key into exactly one list.
- */
-const UNMAPPED_MOBILE_TOKENS: ReadonlyArray<keyof ColorTokens> = [
-  "background",
-  "primary",
-  "muted",
-];
-
-/**
  * ELO tokens that exist on mobile (and in the design kit) but in no CSS
  * mirror yet: the attention (amber) pair and the Arena heat pair, added by
  * WP7 (jits-3eeg.8). The web stylesheets have no amber or heat var today.
@@ -717,9 +701,9 @@ function describeDivergence(mirror: CssMirror, d: Divergence): string {
 // ---------------------------------------------------------------------------
 
 describe("token mapping table", () => {
-  it("covers every ColorTokens key exactly once, mapped or explicitly unmapped", () => {
+  it("covers every ColorTokens key exactly once, mapped or mobile-only", () => {
     const mapped = TOKEN_MAP.map(([mobileKey]) => mobileKey);
-    const declared = [...mapped, ...UNMAPPED_MOBILE_TOKENS, ...MOBILE_ONLY_TOKENS]
+    const declared = [...mapped, ...MOBILE_ONLY_TOKENS]
       .map(String)
       .sort();
     const actual = Object.keys(darkTokens).sort();

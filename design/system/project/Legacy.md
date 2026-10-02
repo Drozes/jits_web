@@ -4,7 +4,7 @@ The pre-redesign shadcn layer is retired from the mobile app by bead jits-3eeg.5
 
 ## Legacy colors
 
-Removed. The legacy keys are gone from `apps/mobile/lib/tokens.ts`, the legacy `cssVarColors` and `lightVars` entries from `tailwind.config.js`, and the legacy variables from `lib/theme/theme-provider.tsx` `buildVars`, so a legacy class (`bg-background`, `text-foreground`, `text-muted-foreground`, `bg-primary`, `bg-destructive`, `border-input` and friends) no longer resolves to a color. One exception, until WP2 merges: `components/ui/switch.tsx` still reads three legacy keys from `useThemedTokens()` (`background`, `primary`, `muted`; no class or CSS variable carries them), and they leave `ColorTokens` when WP2 moves the Switch onto ELO tokens. The table records what each retired key mapped to, for reading old code and the web shadcn layer.
+Removed. The legacy keys are gone from `apps/mobile/lib/tokens.ts`, the legacy `cssVarColors` and `lightVars` entries from `tailwind.config.js`, and the legacy variables from `lib/theme/theme-provider.tsx` `buildVars`, so a legacy class (`bg-background`, `text-foreground`, `text-muted-foreground`, `bg-primary`, `bg-destructive`, `border-input` and friends) no longer resolves to a color. The last three keys (`background`, `primary`, `muted`), which only `components/ui/switch.tsx` read, left `ColorTokens` once WP2 moved the Switch onto ELO tokens; `__tests__/components/legacy-shadcn-guard.test.ts` fails if one comes back. The table records what each retired key mapped to, for reading old code and the web shadcn layer.
 
 | Key | Tailwind | Light | Dark | Use instead |
 |---|---|---|---|---|

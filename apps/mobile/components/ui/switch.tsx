@@ -10,8 +10,8 @@ type SwitchColors = Pick<RNSwitchProps, "trackColor" | "thumbColor" | "ios_backg
  * Gain Green. "On" is an `ink` track, "off" an `ink-3` track, and the thumb
  * is the page color (`void`), so the thumb holds contrast on both tracks in
  * both themes and on and off differ by the track's lightness as well as the
- * thumb's side. Exported so the face-off record toggle (a raw RN `Switch`
- * until WP4) shares the same look.
+ * thumb's side. Every switch in the app is this component (the face-off
+ * record toggle too, since WP4); `switchColors` is exported for the tests.
  */
 export function switchColors(t: ColorTokens): SwitchColors {
   return {

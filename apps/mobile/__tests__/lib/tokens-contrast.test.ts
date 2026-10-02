@@ -233,14 +233,7 @@ describe("token mirrors stay in lockstep", () => {
   const toCssVar = (key: string) =>
     `--${key.replace(/([A-Z])/g, "-$1").toLowerCase()}`;
 
-  /**
-   * The three legacy keys WP4 left for components/ui/switch.tsx: read through
-   * `useThemedTokens()` only, so no CSS variable carries them (no class may
-   * use them). They leave ColorTokens when WP2 moves the Switch onto ELO
-   * tokens; delete this list then.
-   */
-  const TS_ONLY_LEGACY = new Set(["background", "primary", "muted"]);
-  const mirroredTokens = () => Object.entries(lightTokens).filter(([key]) => !TS_ONLY_LEGACY.has(key));
+const mirroredTokens = () => Object.entries(lightTokens);
 
   it("tailwind.config.js light defaults match lightTokens exactly", () => {
     const vars = readTailwindLightVars();

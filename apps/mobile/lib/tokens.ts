@@ -4,8 +4,9 @@
  * The ELO design system tokens (bgPrimary/bgSecondary/bgElevated/...),
  * mirroring apps/web/app/design-system/tokens.css 1:1. Reach for them via the
  * NativeWind classes (bg-surface, text-ink-3, bg-cta, ...). The pre-redesign
- * shadcn-style tokens were removed by WP4 (jits-3eeg.5, R3 LG-3), except the
- * three below that `components/ui/switch.tsx` still reads.
+ * shadcn-style tokens are gone: WP4 (jits-3eeg.5, R3 LG-3) removed most and
+ * the last three (background, primary, muted) left once WP2 moved the Switch
+ * onto ELO tokens.
  *
  * Plus, outside ColorTokens, `onMediaTokens` (bottom of this file): the fixed
  * palette for chrome over camera, video or photo, behind ON_MEDIA and BROADCAST.
@@ -18,14 +19,6 @@
  */
 
 export type ColorTokens = {
-  // ---- Legacy (retiring) ----------------------------------------------------
-  // Read ONLY by components/ui/switch.tsx (WP2 is moving it to ELO tokens).
-  // Remove these three once nothing reads them; no CSS var or Tailwind class
-  // carries them any more.
-  background: string;
-  primary: string;
-  muted: string;
-
   // ---- ELO design system (Void / Paddock palettes) --------------------------
   bgPrimary: string;        // Void / Paddock — page background
   bgSecondary: string;      // Panel — lifted surface (nav, footer)
@@ -57,11 +50,6 @@ export type ColorTokens = {
 };
 
 export const lightTokens: ColorTokens = {
-  // Legacy, read only by components/ui/switch.tsx (see ColorTokens).
-  background: "hsl(216, 24%, 96%)",
-  primary: "hsl(355, 78%, 56%)",
-  muted: "hsl(219, 18%, 85%)",
-
   // ELO — Paddock family (light surfaces shift DARKER as they elevate)
   bgPrimary: "#F8FAFC",          // paddock (lifted: plate separation 1.18 -> 1.24)
   bgSecondary: "#E8EBF0",        // paddock-panel
@@ -91,11 +79,6 @@ export const lightTokens: ColorTokens = {
 };
 
 export const darkTokens: ColorTokens = {
-  // Legacy, read only by components/ui/switch.tsx (see ColorTokens).
-  background: "hsl(223, 21%, 6%)",
-  primary: "hsl(355, 78%, 56%)",
-  muted: "hsl(223, 16%, 17%)",
-
   // ELO — Void family (dark surfaces shift LIGHTER as they elevate)
   bgPrimary: "#0D0F14",          // void (unchanged: matches app.json splash, no native drift)
   bgSecondary: "#13151B",        // panel
