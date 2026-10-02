@@ -89,11 +89,93 @@ The system uses four purpose-bound fonts. Each has one job; do not cross-assign.
 
 ## Motion
 
-- **Durations:** `--duration-instant` 100ms (reactive feedback), `--duration-fast` 240ms, `--duration-base` 480ms (rating tick), `--duration-slow` 720ms.
-- **Easing:** `cubic-bezier(0.22, 1, 0.36, 1)` (ease-out, no bounce).
-- **Only auto-animated moments:** rating tick (480ms), LIVE pulse (1400ms loop). Everything else is reactive to hover/press.
-- **Mobile haptics:** `useHaptics()` in [apps/mobile/lib/match-flow/use-haptics.ts](apps/mobile/lib/match-flow/use-haptics.ts) exposes `matchStart`, `matchEnd`, `resultRecorded`, `error`, `timeWarning` via `expo-haptics`.
+The **Motion Rule** (Adding Flare, 2026-10-01) replaces the old "minimal motion" rule. Motion is allowed only when it carries meaning: every animation in the app is either a direct response to touch, a one-shot moment on a real state change, or an ambient loop for a live state. Nothing is decorative, and every animation is listed in the registry below.
+
+### Tokens
+
+Mobile tokens live in [apps/mobile/lib/motion/tokens.ts](apps/mobile/lib/motion/tokens.ts) and are imported from `@/lib/motion`; the first four durations mirror the web `--duration-*` tokens.
+
+- **Durations:** `instant` 100ms (reactive feedback), `fast` 240ms, `base` 480ms (rating tick), `slow` 720ms, `pulse` 1400ms (fixed LIVE pulse cycle), `ember` 2400ms (Arena ember cycle), `shimmer` 1400ms (skeleton sweep).
+- **LIVE pulse tempo:** `tempo.quiet` 3000ms, `tempo.normal` 1600ms, `tempo.busy` 800ms, chosen by how many athletes are live in the lobby. One shared clock drives every live dot so they never beat out of step.
+- **Easing:** brand ease-out `cubic-bezier(0.22, 1, 0.36, 1)` (`easing.brandOut`, no bounce) by default; `easing.outCubic` for counts.
+- **Springs:** `spring.press` (damping 18, stiffness 300) for a pressed control returning to rest; `spring.select` (damping 14, stiffness 260) for the tab select bounce.
+- **Press scale:** `PRESS_SCALE` 0.97.
+
+### The three tiers
+
+| Tier | What it is | Limits |
+|---|---|---|
+| **Reactive** | A direct response to the user's touch (press scale, tab select bounce). | Starts on the touch, settles in `instant` to `fast` (spring to rest). Never runs without a touch. |
+| **Moment** | A one-shot animation on a real state transition (a result landing, a challenge arriving, going live). | Plays once per transition, then rests in its final state. Short: about `fast` to `slow`; a cool-down or celebration may run up to about 2000ms. Never loops. |
+| **Ambient** | A loop that shows a live state (LIVE pulse, Arena embers, heartbeat trace, skeleton shimmer). | Mounted only while its state is true. Slow and low contrast, on a shared clock. Never has a haptic. |
+
+### Rules
+
+1. **Real transitions only.** A Moment fires on a state change (false to true, a count that increased, a new id), never on mount, re-render, refetch, tab switch, or app foreground with unchanged data. Track the previous value in a ref, and key once-per-thing moments on the thing's id, not on the component instance.
+2. **UI thread.** Animate transform, opacity and color with Reanimated shared values, `useAnimatedStyle` and `useAnimatedProps`. No `setState` or `setInterval` animation loops, and no per-frame re-render of always-mounted chrome such as the tab bar.
+3. **Reduce Motion.** Read the OS setting with `useReduceMotion()` (from `@/lib/motion`; correct on the first frame). Every animation has a static end state that still carries the meaning (a cooled edge, a static ember, the final number). Haptics stay on under Reduce Motion.
+4. **Ambient lifecycle.** An ambient loop mounts only while its state is true, and pauses (`cancelAnimation`) when the app leaves the foreground and restarts when it returns: gate it on `useAppActive()` from `@/lib/motion`.
+5. **Heat colors are reserved for Arena heat.** `brandOrange` through Signal Red as a heat ramp is used only for the Arena ember, the blade clash spark, and the challenge afterglow. Nowhere else.
+6. **Brand rules still hold.** No drop shadows, 4px radius, Signal Red for CTAs and negatives, Gain Green for rating increases and live state only, numbers in mono `tabular-nums` (including while they roll).
+7. **Pressables on native.** A function `style` on `Pressable` is dropped on device by NativeWind; put animated styles on an inner `Animated.View`.
+
+### Haptics
+
+Mobile haptics use ONE semantic vocabulary, `haptics` from `@/lib/motion` ([apps/mobile/lib/motion/haptics.ts](apps/mobile/lib/motion/haptics.ts); `matchHaptics` in `lib/match-flow/use-haptics.ts` is the same object under its old name). New code calls a semantic event, never `expo-haptics` directly.
+
+| Event | Feedback | When |
+|---|---|---|
+| `press` | Light impact | A commit action is tapped: Challenge, Confirm result, Go live. |
+| `accept` | Medium impact | Accept on the incoming-challenge prompt (replaces `press` there, never both). |
+| `select` | Selection | A tab that was not already active is selected. |
+| `goLive` | Light impact | The athlete goes live in the Arena (false to true). |
+| `challengeArrived` | Warning notification | A new incoming challenge. The challenge prompt sheet already fires it once per challenge id, so nothing else fires it for the same challenge. |
+| `ratingGain` | Success notification | A rating gain lands, once per confirmed result. |
+| `tapTick` | Light impact, three times | "The tap" on a submission win, for the winner only. |
+| `countdownTick` | Heavy impact | Each numeral of the face-off countdown. |
+| `countdownGo` | Success notification | GO at the end of the face-off countdown. |
+| `matchStart` | Heavy impact | The match clock starts. |
+| `matchEnd` | Success notification | End match confirmed. |
+| `resultRecorded` | Success notification | The result is recorded server-side. |
+| `timeWarning` | Medium impact | The clock crosses the low-time threshold. |
+| `error` | Error notification | A mutation or network error. |
+
+- **Never a haptic on a loss.** There is deliberately no loss event, and a draw is silent too; the loser of a submission sees the tap marks still and silent.
+- **Never a haptic for ambient motion** (pulse, embers, heartbeat, shimmer, sheen).
+- **One haptic per event.** Check what already buzzes before adding a call, and replace rather than stack.
+
+### Registry
+
+Every approved animation in the mobile app. **Adding a new animation means adding it to this registry** (with its tier, trigger and Reduce Motion state) in the same change.
+
+| Animation | Tier | Where | Trigger | Haptic | Reduce Motion |
+|---|---|---|---|---|---|
+| Rating tick (count-up; becoming the odometer roll) | Moment | `EloTile`, verdict celebration | A confirmed rating change, once | `ratingGain` on a gain only | Final value shown at once |
+| Odometer ELO roll | Moment | `RollingNumber` (replaces the count-up tick) | A confirmed rating change, once; only changed digits roll, under 720ms | `ratingGain` on a gain only | Final value shown at once |
+| ELO delta chip | Moment | Result and verdict | After the roll lands; pops in with sign and arrow glyph | none | Shown in place |
+| The tap | Moment | Submission result card | A submission win: three tick marks fill (180ms apart) | `tapTick` x3, winner only | Ticks shown filled (winner haptics kept); loser sees them filled, silent |
+| LIVE pulse | Ambient | `LiveDot` / `LivePill`, header live dot | While live; one shared clock at the lobby tempo | none | Static dot |
+| LIVE pulse tempo | Ambient | Every live dot | Lobby activity picks `tempo` quiet / normal / busy; period eases between buckets | none | Static dots |
+| Match countdown | Moment | Face-off countdown | The countdown starts | `countdownTick` per numeral | Numbers crossfade |
+| Countdown slam | Moment | Face-off countdown | Each numeral drops from 1.6x and lands; a red bar drains to GO; total length unchanged | `countdownTick` per numeral, `countdownGo` on GO | Numbers crossfade, haptics kept |
+| Verdict confetti / SlamIn / RiseIn | Moment | Verdict step | A win verdict, once | per the match-flow events | None (static verdict) |
+| Arena ember | Ambient | Arena tab icon | While live and no challenge is pending; 2400ms cycle | none | One static ember above the crossing |
+| Countable embers | Ambient | Arena tab icon | 1 to 3 pending incoming challenges, one ember each in place of the red count pill (pill returns above 3); stops while the Arena tab is focused | none | N static embers |
+| Blade clash | Moment | Arena tab icon | Live false to true, or the pending incoming count increases | `goLive`; `challengeArrived` only if nothing else buzzes for it | No clash, no spark |
+| Tab select bounce | Reactive | All four tabs | Pressing a tab that is not active: squash to 0.86, `select` spring back | `select` | No scale |
+| Press scale | Reactive | Every `Button` | Press-in to 0.97 (`instant`), release on the `press` spring; disabled buttons do not move | `press` on commit actions | 0.85 opacity dip |
+| Accept sweep | Moment | Accept on the incoming-challenge prompt | Tapping Accept: Signal Red sweeps left to right (260ms), label becomes "Accepted"; never delays the accept call | `accept` | Instant fill and label swap |
+| Steel sheen | Ambient | The one waiting-on-you button per screen (Accept, Confirm result) | While the action waits on this user: an 800ms sweep with about 2s rest | none | No sheen |
+| Challenge afterglow | Moment | Incoming challenge strips (mat board) | A new challenge id: the 2px bottom edge cools from hot to the hairline over about 2000ms | none | Cooled at once |
+| ON AIR heartbeat | Ambient | Arena screen body | While live: the ON AIR tally fills, the heartbeat trace blips on the tempo clock | none | Static full trace |
+| List enter stagger | Moment | Rankings, Arena roster, Profile recent matches | FIRST load only: rows rise 8px and fade, 60ms apart, first 8 rows; never on refetch, refresh, pagination or recycling | none | None |
+| Rank-up swap flare | Moment | Rankings | First open after the athlete's rank improved: old order swaps (about 450ms), a Signal Red flare sweeps the row (500ms); once per climb | none | New order, no transition |
+| Skeleton shimmer | Ambient | Skeletons | While loading: one module-level 1400ms clock drives a faint band across every bar, in phase | none | Plain static bars |
+
+### Other
+
 - **Wake lock (mobile):** the live match step keeps the screen awake via `expo-keep-awake`.
+- **Web:** the web app keeps its reactive transitions and `.stagger-children` / `animate-page-in` (see Interaction Patterns); the Motion Rule's tiers and rules apply to it as well.
 
 ## ELO Primitive Library
 
@@ -201,14 +283,14 @@ These rules are non-negotiable and are enforced by the token system:
 2. **Sharp corners.** Default radius is 4px. Modals can stretch to 8px. Avatars stay circular. Nothing else uses soft corners.
 3. **One primary CTA per surface.** Signal Red buttons are limited to one per screen.
 4. **No decorative color.** Signal Red is for CTAs only. Gain Green is for rating increases and live state only. Amber is reserved for draws and pressure score.
-5. **Minimal motion.** Only the rating tick (480ms) and the LIVE pulse (1400ms loop) animate without user input. All other transitions are reactive (100ms hover/focus).
+5. **Motion with meaning (the Motion Rule).** Every animation is Reactive (a response to touch), a Moment (one shot on a real state change) or Ambient (a loop for a live state), runs on the UI thread, has a still Reduce Motion end state, and is listed in the Motion registry. Never a haptic on a loss or for ambient motion. Heat colors are reserved for Arena heat.
 6. **All numeric data is mono with `tabular-nums`.** ELO, deltas, ranks, weights, timers. Never use the body font for numbers.
 7. **Mono labels in caps with letter-spacing.** Use `tracking-caps`+ on small uppercase metadata.
 8. **Weight is in kilograms.** Display unit is `kg` everywhere (compare-stats, profile, join wizard input label).
 
 ## Interaction Patterns
 
-- **Press feedback:** tappable elements scale to 98% and drop to 90% opacity on active.
+- **Press feedback:** web tappable elements scale to 98% and drop to 90% opacity on active; mobile `Button` scales to 97% (`PRESS_SCALE`) and springs back (Motion registry, press scale).
 - **Glass effect:** `.glass` class for elevated overlays (blurred Plate background, web only).
 - **Stagger animation:** `.stagger-children` for list entries on initial mount (60ms intervals, web only).
 - **Page transitions:** `animate-page-in` (translateY 6px, 300ms ease-out, web only).

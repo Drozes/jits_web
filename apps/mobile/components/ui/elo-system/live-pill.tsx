@@ -8,6 +8,7 @@ import Animated, {
   Easing,
 } from "react-native-reanimated";
 import { cn } from "@/lib/cn";
+import { duration } from "@/lib/motion";
 
 interface LivePillProps {
   label?: string;
@@ -21,7 +22,8 @@ interface LivePillProps {
 
 const ON_DARK_GREEN = "#22C55E";
 
-const PULSE_DURATION_MS = 1400;
+/** One full LIVE pulse cycle (`duration.pulse`, Motion Rule). */
+const PULSE_DURATION_MS = duration.pulse;
 
 interface LiveDotProps {
   /** Dot diameter in points. 7 by default (the LIVE pill's). */

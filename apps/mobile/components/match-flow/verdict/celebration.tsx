@@ -3,11 +3,12 @@ import { StyleSheet, Text, View, useWindowDimensions, type StyleProp, type TextS
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withDelay, withTiming } from "react-native-reanimated";
 import { useReduceMotion } from "@/lib/match-flow/use-reduce-motion";
 import { usePalette } from "@/lib/theme/palette";
+import { duration } from "@/lib/motion";
 import { FIGHT_EASING } from "../fight/fight-tokens";
 
 const EASE = Easing.bezier(...FIGHT_EASING);
-/** The brand rating tick. */
-export const RATING_TICK_MS = 480;
+/** The brand rating tick (`duration.base`, Motion Rule). */
+export const RATING_TICK_MS = duration.base;
 
 /** Sharp rectangles, brand colors only (palette keys); x is a fraction of the width. */
 const PIECES = [
@@ -24,8 +25,8 @@ const PIECES = [
 ];
 
 /**
- * One fall of confetti over the win verdict (approved exception to the
- * minimal-motion rule). Plays once; nothing at all under Reduce Motion.
+ * One fall of confetti over the win verdict (a Moment in the Motion Rule
+ * registry). Plays once; nothing at all under Reduce Motion.
  */
 export function Confetti({ height = 600 }: { height?: number }) {
   const reduceMotion = useReduceMotion();

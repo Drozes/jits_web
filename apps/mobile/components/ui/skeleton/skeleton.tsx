@@ -10,11 +10,12 @@ import Animated, {
 } from "react-native-reanimated";
 import { cva } from "class-variance-authority";
 import { cn } from "@/lib/cn";
+import { duration } from "@/lib/motion";
 
-// Mirrors live-pill.tsx PULSE_DURATION_MS exactly: the ONLY sanctioned loop
-// frequency in the app. Half-period (700ms) drives the opacity breath so a
-// full 1.0 -> 0.55 -> 1.0 cycle takes 1400ms, identical to the LIVE pulse.
-const PULSE_HALF_DURATION_MS = 700;
+// Reuses the LIVE pulse cycle (`duration.pulse`, Motion Rule) rather than
+// adding a new loop rhythm. Half-period (700ms) drives the opacity breath so
+// a full 1.0 -> 0.55 -> 1.0 cycle takes 1400ms, identical to the LIVE pulse.
+const PULSE_HALF_DURATION_MS = duration.pulse / 2;
 const PULSE_MIN_OPACITY = 0.55;
 
 const SkeletonContext = React.createContext<{ opacity: SharedValue<number> } | null>(null);

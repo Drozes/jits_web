@@ -3,6 +3,7 @@ import { AccessibilityInfo, View, Text } from "react-native";
 import * as Haptics from "expo-haptics";
 import { cn } from "@/lib/cn";
 import { useAmber } from "@/components/match-detail/use-amber";
+import { duration } from "@/lib/motion";
 
 type EloTileSize = "hero" | "large" | "medium" | "small";
 
@@ -16,8 +17,8 @@ const SIZE_PX: Record<EloTileSize, number> = {
   small: 36,
 };
 
-/** The sanctioned brand rating tick. */
-export const RATING_TICK_MS = 480;
+/** The sanctioned brand rating tick (`duration.base`, Motion Rule). */
+export const RATING_TICK_MS = duration.base;
 
 interface EloTileProps {
   /** Mono caps label above the number. Optional: Home's hero tile has none. */
