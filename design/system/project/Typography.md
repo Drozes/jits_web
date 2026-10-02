@@ -9,7 +9,7 @@ Four families, each bound to one job. The font tells you what kind of thing you 
 | `body` | Inter | 400, 500 | Prose, helper copy, toasts' descriptions | `font-body`, `font-body-medium` |
 | `mono` | JetBrains Mono | 400, 500, 700 | ALL numbers (tabular-nums) and caps meta labels | `font-mono`, `font-mono-medium`, `font-mono-bold` |
 
-Sources: `apps/mobile/tailwind.config.js:191-202` (families), `apps/mobile/app/_layout.tsx:65-75` (`useFonts`, nine faces from `@expo-google-fonts/*`: bebas-neue 0.4.1, dm-sans 0.4.2, inter 0.4.2, jetbrains-mono 0.4.1). The kit's `fonts/` folder holds those exact nine TTFs. React Native cannot synthesize weights, so each weight is its own family name (`DMSans_700Bold`, ...) and `font-semibold` / `font-medium` classes do nothing but fall back to the system font: never use them.
+Sources: `apps/mobile/tailwind.config.js` `theme.extend.fontFamily` (families), `apps/mobile/app/_layout.tsx:65-75` (`useFonts`, nine faces from `@expo-google-fonts/*`: bebas-neue 0.4.1, dm-sans 0.4.2, inter 0.4.2, jetbrains-mono 0.4.1). The kit's `fonts/` folder holds those exact nine TTFs. React Native cannot synthesize weights, so each weight is its own family name (`DMSans_700Bold`, ...) and `font-semibold` / `font-medium` classes do nothing but fall back to the system font: never use them.
 
 ## Rules
 
@@ -23,7 +23,7 @@ Sources: `apps/mobile/tailwind.config.js:191-202` (families), `apps/mobile/app/_
 
 ## Letter-spacing (tracking)
 
-Mobile tracking is a fixed px value computed at a 14px baseline (`tailwind.config.js:203-214`), so the same class is proportionally wider on small text than the web's em-based tracking (`tracking-caps-l` on a 10px label is 0.168em on mobile, 0.12em on web).
+Mobile tracking is a fixed px value computed at a 14px baseline (`tailwind.config.js` `theme.extend.letterSpacing`), so the same class is proportionally wider on small text than the web's em-based tracking (`tracking-caps-l` on a 10px label is 0.168em on mobile, 0.12em on web).
 
 | Class | Value (mobile) | Web | Uses | Job |
 |---|---|---|---|---|

@@ -99,7 +99,7 @@ function FlagRow({
       {/* Presentational only: the wrapping Pressable is the sole toggle driver,
           so the Switch ignores touches (pointerEvents="none") and has no
           onValueChange. This prevents one tap firing setFeatureFlag twice. */}
-      <Switch label={flagKey} value={value} pointerEvents="none" />
+      <Switch importantForAccessibility="no-hide-descendants" label={flagKey} value={value} pointerEvents="none" />
     </Pressable>
   );
 }

@@ -14,25 +14,25 @@ Every value below is exact from `apps/mobile/lib/tokens.ts` (the source of truth
 
 | Token | Dark | Light | Tailwind class (mobile) | tokens.ts key | Role |
 |---|---|---|---|---|---|
-| `void` | `#0D0F14` | `#F8FAFC` | `bg-surface` | `bgPrimary` (l.143 / l.96) | Page background |
-| `panel` | `#13151B` | `#E8EBF0` | `bg-surface-2` | `bgSecondary` (l.144 / l.97) | Header bars, tab bar, Arena strips, modal cards |
-| `plate` | `#1E222B` | `#DEE2E9` | `bg-surface-3` | `bgElevated` (l.145 / l.98) | Plates, cards, toasts, chips, inputs |
-| `plate-bright` | `#262A34` | `#D2D7E0` | `bg-surface-4` | `bgElevatedHover` (l.146 / l.99) | Pressed, focused and selected surfaces |
-| `ink` | `#E8EDF2` | `#0D0F14` | `text-ink` | `textPrimary` (l.147 / l.100) | Default text and all data values |
-| `ink-2` | `#9CA3AF` | `#4B5563` | `text-ink-2` | `textSecondary` (l.148 / l.101) | Secondary copy, header titles |
-| `ink-3` | `#8D929D` | `#575C68` | `text-ink-3` | `textTertiary` (l.149 / l.102) | Meta labels, helper text, inactive tabs |
-| `on-signal` | `#0D0F14` | `#0D0F14` | `text-ink-on-cta` | `textOnAccent` (l.150 / l.103) | Label on a red fill |
-| `signal-red` | `#E63946` | `#E63946` | `bg-cta`, `border-cta` | `accentCta` (l.151 / l.104) | Brand red: CTA fill and rules, never text |
-| `signal-red-text` | `#EC6A74` | `#AC2B34` | `text-cta` | `accentCtaText` (l.152 / l.105) | Red tuned for text |
-| `signal-red-lift` | `#F0556B` | `#F0556B` | `bg-cta-hover` | `accentCtaHover` (l.153 / l.106) | Pressed CTA fill |
-| `gain-green` | `#22C55E` | `#116A33` | `text-positive`, `bg-positive` | `statePositive` (l.154 / l.107) | Gains, wins, live |
-| `negative` | `#EC6A74` | `#AC2B34` | `text-negative` | `stateNegative` (l.155 / l.108) | Losses, errors, destructive |
-| `neutral` | `#8D929D` | `#575C68` | (use `text-ink-3`) | `stateNeutral` (l.156 / l.109) | No change |
-| `hairline` | `rgba(107, 114, 128, 0.45)` | `rgba(13, 15, 20, 0.22)` | `border-hairline` | `borderHairline` (l.157 / l.110) | Standard 1px border |
-| `hairline-faint` | `rgba(107, 114, 128, 0.20)` | `rgba(13, 15, 20, 0.11)` | `border-hairline-faint` | `borderHairlineFaint` (l.158 / l.111) | Faintest divider |
-| `hairline-strong` | `rgba(107, 114, 128, 0.62)` | `rgba(13, 15, 20, 0.34)` | `border-hairline-strong` | `borderHairlineStrong` (l.159 / l.112) | Chips, actions, avatars, selected edge |
+| `void` | `#0D0F14` | `#F8FAFC` | `bg-surface` | `bgPrimary` (`darkTokens` / `lightTokens`) | Page background |
+| `panel` | `#13151B` | `#E8EBF0` | `bg-surface-2` | `bgSecondary` (`darkTokens` / `lightTokens`) | Header bars, tab bar, Arena strips, modal cards |
+| `plate` | `#1E222B` | `#DEE2E9` | `bg-surface-3` | `bgElevated` (`darkTokens` / `lightTokens`) | Plates, cards, toasts, chips, inputs |
+| `plate-bright` | `#262A34` | `#D2D7E0` | `bg-surface-4` | `bgElevatedHover` (`darkTokens` / `lightTokens`) | Pressed, focused and selected surfaces |
+| `ink` | `#E8EDF2` | `#0D0F14` | `text-ink` | `textPrimary` (`darkTokens` / `lightTokens`) | Default text and all data values |
+| `ink-2` | `#9CA3AF` | `#4B5563` | `text-ink-2` | `textSecondary` (`darkTokens` / `lightTokens`) | Secondary copy, header titles |
+| `ink-3` | `#8D929D` | `#575C68` | `text-ink-3` | `textTertiary` (`darkTokens` / `lightTokens`) | Meta labels, helper text, inactive tabs |
+| `on-signal` | `#0D0F14` | `#0D0F14` | `text-ink-on-cta` | `textOnAccent` (`darkTokens` / `lightTokens`) | Label on a red fill |
+| `signal-red` | `#E63946` | `#E63946` | `bg-cta`, `border-cta` | `accentCta` (`darkTokens` / `lightTokens`) | Brand red: CTA fill and rules, never text |
+| `signal-red-text` | `#EC6A74` | `#AC2B34` | `text-cta` | `accentCtaText` (`darkTokens` / `lightTokens`) | Red tuned for text |
+| `signal-red-lift` | `#F0556B` | `#F0556B` | `bg-cta-hover` | `accentCtaHover` (`darkTokens` / `lightTokens`) | Pressed CTA fill |
+| `gain-green` | `#22C55E` | `#116A33` | `text-positive`, `bg-positive` | `statePositive` (`darkTokens` / `lightTokens`) | Gains, wins, live |
+| `negative` | `#EC6A74` | `#AC2B34` | `text-negative` | `stateNegative` (`darkTokens` / `lightTokens`) | Losses, errors, destructive |
+| `neutral` | `#8D929D` | `#575C68` | (use `text-ink-3`) | `stateNeutral` (`darkTokens` / `lightTokens`) | No change |
+| `hairline` | `rgba(107, 114, 128, 0.45)` | `rgba(13, 15, 20, 0.22)` | `border-hairline` | `borderHairline` (`darkTokens` / `lightTokens`) | Standard 1px border |
+| `hairline-faint` | `rgba(107, 114, 128, 0.20)` | `rgba(13, 15, 20, 0.11)` | `border-hairline-faint` | `borderHairlineFaint` (`darkTokens` / `lightTokens`) | Faintest divider |
+| `hairline-strong` | `rgba(107, 114, 128, 0.62)` | `rgba(13, 15, 20, 0.34)` | `border-hairline-strong` | `borderHairlineStrong` (`darkTokens` / `lightTokens`) | Chips, actions, avatars, selected edge |
 
-The mobile CSS variables behind the classes are the web names (`--bg-primary`, `--text-tertiary`, `--accent-cta-text`, ...), written by `lib/theme/theme-provider.tsx` (`buildVars`, which also writes `--attention`, `--attention-rule`, `--heat-orange` and `--heat-red`). One class is remapped on purpose: `text-cta` resolves to `--accent-cta-text`, while `bg-cta` and `border-cta` stay the brand red (`tailwind.config.js:176-182`).
+The mobile CSS variables behind the classes are the web names (`--bg-primary`, `--text-tertiary`, `--accent-cta-text`, ...), written by `lib/theme/theme-provider.tsx` (`buildVars`, which also writes `--attention`, `--attention-rule`, `--heat-orange` and `--heat-red`). One class is remapped on purpose: `text-cta` resolves to `--accent-cta-text`, while `bg-cta` and `border-cta` stay the brand red (`tailwind.config.js` `theme.extend.textColor.cta`).
 
 ## Sub-palettes
 

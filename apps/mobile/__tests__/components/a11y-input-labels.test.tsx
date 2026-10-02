@@ -18,6 +18,7 @@ jest.mock("@/lib/theme/use-theme", () => {
 import { Switch } from "@/components/ui/switch";
 import { EloField, EloTextInput } from "@/components/profile-setup/elo-form-field";
 import { useAmber } from "@/components/match-detail/use-amber";
+import { AuthFormField } from "@/components/auth/auth-form-field";
 import { darkTokens, lightTokens } from "@/lib/tokens";
 
 declare const require: (id: string) => any;
@@ -58,6 +59,43 @@ describe("EloTextInput inside EloField", () => {
   it("has no label outside a field unless one is passed", () => {
     const { getByTestId } = render(<EloTextInput testID="bare" />);
     expect(getByTestId("bare").props.accessibilityLabel).toBeUndefined();
+  });
+});
+
+describe("AuthFormField", () => {
+  it("names its input with the visible label (iOS ignores accessibilityLabelledBy)", () => {
+    const { getByLabelText } = render(<AuthFormField label="Email" testID="email" />);
+    expect(getByLabelText("Email").props.testID).toBe("email");
+  });
+
+  it("a caller's accessibilityLabel still wins", () => {
+    const { getByTestId } = render(
+      <AuthFormField label="Password" accessibilityLabel="Account password" testID="pw" secureTextEntry />,
+    );
+    expect(getByTestId("pw").props.accessibilityLabel).toBe("Account password");
+  });
+});
+
+describe("EloField visible label", () => {
+  it("is hidden from assistive tech, since the input carries the name", () => {
+    const { getByText } = render(
+      <EloField label="Weight">
+        <EloTextInput testID="w" />
+      </EloField>,
+    );
+    const label = getByText("Weight", { includeHiddenElements: true });
+    expect(label.props.accessible).toBe(false);
+    expect(label.props.importantForAccessibility).toBe("no-hide-descendants");
+    expect(label.props.accessibilityElementsHidden).toBe(true);
+  });
+
+  it("stays readable when the field holds a control that does not take the name", () => {
+    const { getByText } = render(
+      <EloField label="Home Gym">
+        <EloTextInput testID="g" accessibilityLabel="Gym search" />
+      </EloField>,
+    );
+    expect(getByText("Home Gym").props.accessible).toBeUndefined();
   });
 });
 
@@ -123,9 +161,20 @@ describe("guard: no unlabeled TextInput or Switch in app/ or components/", () =>
     expect(sites.length).toBeGreaterThan(10);
   });
 
-  it("every one carries accessibilityLabel, a Switch label, or forwards props", () => {
+  /**
+   * Thin wrappers whose label legitimately arrives through a `{...props}`
+   * spread from their callers. Only these files may rely on a spread; any
+   * other control must name itself.
+   */
+  const SPREAD_WRAPPERS = new Set(["components/ui/input.tsx", "components/ui/switch.tsx"]);
+
+  it("every one carries accessibilityLabel or a Switch label (spread only in allowlisted wrappers)", () => {
     const missing = sites
-      .filter(({ tag }: { tag: string }) => !/accessibilityLabel|\blabel=|\{\.\.\./.test(tag))
+      .filter(({ where, tag }: { where: string; tag: string }) => {
+        if (/accessibilityLabel|\blabel=/.test(tag)) return false;
+        const file = where.replace(/:\d+$/, "");
+        return !(SPREAD_WRAPPERS.has(file) && /\{\.\.\./.test(tag));
+      })
       .map(({ where }: { where: string }) => where);
     expect(missing).toEqual([]);
   });

@@ -4,7 +4,7 @@ The pre-redesign shadcn layer still ships in the mobile app as "compatibility sh
 
 ## Legacy colors
 
-Defined in `apps/mobile/lib/tokens.ts` (light l.69-93, dark l.116-140), mirrored as CSS variables in `tailwind.config.js:119-142` (light) and `lib/theme/theme-provider.tsx:21-44` (dark). Hex is computed from the HSL.
+Defined in `apps/mobile/lib/tokens.ts` (`lightTokens`, `darkTokens`), mirrored as CSS variables in `tailwind.config.js` `lightVars` (light) and `lib/theme/theme-provider.tsx` `buildVars` (dark). Hex is computed from the HSL.
 
 | Key | Tailwind | Light | Dark | Use instead |
 |---|---|---|---|---|

@@ -158,7 +158,7 @@ function ToggleRow({
           {description}
         </Text>
       </View>
-      <Switch label={label} value={value} onValueChange={onToggle} />
+      <Switch importantForAccessibility="no-hide-descendants" label={label} value={value} onValueChange={onToggle} />
     </Pressable>
   );
 }
