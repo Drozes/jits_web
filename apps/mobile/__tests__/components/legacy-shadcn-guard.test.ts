@@ -1,7 +1,7 @@
 /**
  * WP4 guard (jits-3eeg.5, R3 LG-1, LG-3, TY-5): the legacy shadcn layer is
  * retired and cannot come back unnoticed. Grep-style over `app/`,
- * `components/` and `lib/`:
+ * `components/`, `lib/`, `hooks/` and `modules/`:
  *
  *  - the deleted primitives stay deleted;
  *  - no legacy shadcn color class (`bg-background`, `text-foreground`,
@@ -31,7 +31,9 @@ function sources(): { file: string; text: string }[] {
       }
     }
   };
-  for (const d of ["app", "components", "lib"]) walk(path.join(ROOT, d));
+  for (const d of ["app", "components", "lib", "hooks", "modules"]) {
+    if (fs.existsSync(path.join(ROOT, d))) walk(path.join(ROOT, d));
+  }
   return out;
 }
 

@@ -23,10 +23,10 @@ export const UPDATE_BANNER_BUTTON_HEIGHT = 36;
 
 /**
  * Dismissible notice for a downloaded non-critical OTA (jits-5i2w.6). On the
- * ELO surfaces since WP4 (R3 SC-2): a `plate` card (`bg-surface-3`) with a
+ * ELO surfaces since WP4 (R3 SC-2): a `panel` card (`bg-surface-2`) with a
  * `hairline-strong` border so it separates from the screen under it without
  * a shadow, `ink` text, and RESTART as the unified `Button` `secondary`
- * variant (never Signal Red: the screen under it owns its one red CTA).
+ * variant (a `plate` fill, one tier up, so it reads as its own object) (never Signal Red: the screen under it owns its one red CTA).
  */
 export function UpdateBanner({
   onRestart,
@@ -52,7 +52,7 @@ export function UpdateBanner({
     >
       <View
         testID="update-banner-surface"
-        className="bg-surface-3 border border-hairline-strong rounded-md px-4 py-3 gap-2"
+        className="bg-surface-2 border border-hairline-strong rounded-md px-4 py-3 gap-2"
       >
         <UpdateBannerHeader
           accessibilityCopy={UPDATE_BANNER_COPY}

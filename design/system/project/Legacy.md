@@ -46,7 +46,7 @@ Removed. The legacy keys are gone from `apps/mobile/lib/tokens.ts`, the legacy `
 | `Sheet` | `components/ui/sheet.tsx` | Kept: the one sheet shell, and home of `useSheetChrome()` / `SheetBackdrop` (WP1) |
 | `Switch` | `components/ui/switch.tsx` | Kept: the one app switch (also the face-off "Record from my phone" toggle since WP4, R3 MF-9); neutral track in WP2 |
 | `OfflineBanner` | `components/offline-banner.tsx` | Restyled (WP4): `panel` bar, `hairline-strong` bottom edge, mono caps `ink` copy, Reanimated slide on `duration.fast`, still under Reduce Motion |
-| Update banner and modal | `components/updates/*` | Restyled (WP4): the banner is a `plate` card with a `hairline-strong` border, `ink` text and a `secondary` RESTART `Button`; the critical modal sits on `void` with `ink` / `ink-2` text and the primary `Button` |
+| Update banner and modal | `components/updates/*` | Restyled (WP4): the banner is a `panel` card with a `hairline-strong` border, `ink` text and a `secondary` RESTART `Button`; the critical modal sits on `void` with `ink` / `ink-2` text and the primary `Button` |
 
 The system-font weight classes (`font-semibold`, `font-medium`, `text-xs` without a brand family) lived in these atoms; React Native cannot synthesize weights from the custom fonts, so they rendered in the system font (R3 TY-5). They left with the deleted files and the restyles.
 

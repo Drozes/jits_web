@@ -56,7 +56,7 @@ export function CriticalUpdateModal({
             testID="critical-update-restart"
             label={restarting ? "Restarting..." : "Restart"}
             className="w-full mt-2"
-            disabled={restarting}
+            busy={restarting}
             onPress={onRestart}
           />
           {error ? (

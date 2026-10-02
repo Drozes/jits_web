@@ -80,10 +80,11 @@ describe("UpdateBanner", () => {
     expect(st.minHeight).toBe(UPDATE_BANNER_BUTTON_HEIGHT);
   });
 
-  it("sits on the ELO plate surface with ink text, no legacy inverted tokens (R3 SC-2)", () => {
+  it("sits on the ELO panel surface (one tier below its plate RESTART) with ink text, no legacy inverted tokens (R3 SC-2)", () => {
     const { getByTestId, getByText } = setup();
     const surface = getByTestId("update-banner-surface").props.className as string;
-    expect(surface).toContain("bg-surface-3");
+    expect(surface).toContain("bg-surface-2");
+    expect(surface).not.toContain("bg-surface-3");
     expect(surface).toContain("border-hairline-strong");
     expect(surface).toContain("rounded-md");
     expect(surface).not.toMatch(/bg-foreground|bg-background|shadow|elevation/);
