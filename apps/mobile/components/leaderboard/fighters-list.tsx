@@ -98,7 +98,7 @@ export function FightersList({
           );
           return (
             <Animated.View entering={entering?.(index)}>
-              {flaring && item.isCurrentUser ? <RankFlare>{row}</RankFlare> : row}
+              {item.isCurrentUser ? <RankFlare active={flaring}>{row}</RankFlare> : row}
             </Animated.View>
           );
         }}
@@ -122,7 +122,7 @@ export function FightersList({
           />
         }
       />
-      {youRow ? (flaring ? <RankFlare>{youRow}</RankFlare> : youRow) : null}
+      {youRow ? <RankFlare active={flaring}>{youRow}</RankFlare> : null}
     </View>
   );
 }

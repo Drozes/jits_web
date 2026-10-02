@@ -15,21 +15,24 @@ const BAND_WIDTH = 72;
 /**
  * Rank-up swap flare: a skewed Signal Red band sweeps once across the
  * athlete's row after the swap lands (Motion Rule registry, "Rank-up swap
- * flare"). Mount it only while the climb is in its `swapped` stage; it plays
- * once per mount and is silent. The caller skips it under Reduce Motion (no
- * climb is reported then).
+ * flare"). Wrap the athlete's row in it for good (so the row never remounts)
+ * and set `active` while the climb is in its `swapped` stage: the band then
+ * sweeps once and is silent. The caller never activates it under Reduce
+ * Motion (no climb is reported then).
  */
-export function RankFlare({ children }: { children: React.ReactNode }) {
+export function RankFlare({ active, children }: { active: boolean; children: React.ReactNode }) {
   const width = useSharedValue(0);
   const progress = useSharedValue(0);
 
   React.useEffect(() => {
+    if (!active) return undefined;
+    progress.value = 0;
     progress.value = withDelay(
       RANK_SWAP_MS,
       withTiming(1, { duration: RANK_FLARE_MS, easing: easing.brandOut }),
     );
     return () => cancelAnimation(progress);
-  }, [progress]);
+  }, [active, progress]);
 
   const onLayout = React.useCallback(
     (e: LayoutChangeEvent) => {
@@ -47,16 +50,19 @@ export function RankFlare({ children }: { children: React.ReactNode }) {
   }));
 
   return (
-    <View style={{ overflow: "hidden" }} onLayout={onLayout} testID="rank-flare">
+    <View style={{ overflow: "hidden" }} onLayout={onLayout}>
       {children}
-      <Animated.View
-        pointerEvents="none"
-        className="bg-cta"
-        style={[
-          { position: "absolute", top: 0, bottom: 0, left: 0, width: BAND_WIDTH },
-          bandStyle,
-        ]}
-      />
+      {active ? (
+        <Animated.View
+          testID="rank-flare"
+          pointerEvents="none"
+          className="bg-cta"
+          style={[
+            { position: "absolute", top: 0, bottom: 0, left: 0, width: BAND_WIDTH },
+            bandStyle,
+          ]}
+        />
+      ) : null}
     </View>
   );
 }

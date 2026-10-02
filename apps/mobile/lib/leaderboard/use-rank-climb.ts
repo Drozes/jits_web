@@ -32,20 +32,54 @@ export interface RankClimb {
 }
 
 export interface RankClimbState {
-  /** False until the last-seen rank has been read; hold the list until then so it never jumps. */
+  /**
+   * False until the last-seen rank has been read (at most RANK_READ_TIMEOUT_MS);
+   * hold the list until then so it never jumps.
+   */
   ready: boolean;
   /** The climb being shown, or null. */
   climb: RankClimb | null;
 }
 
 /**
+ * Rankings never waits on storage longer than this, ms. A slower read counts
+ * as "nothing stored": no flare, and the current rank becomes the baseline.
+ */
+export const RANK_READ_TIMEOUT_MS = 300;
+
+const TIMED_OUT = Symbol("timed-out");
+
+async function readStoredRank(athleteId: string): Promise<number | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const raw = await Promise.race([
+      AsyncStorage.getItem(RANK_STORAGE_PREFIX + athleteId),
+      new Promise<typeof TIMED_OUT>((resolve) => {
+        timer = setTimeout(() => resolve(TIMED_OUT), RANK_READ_TIMEOUT_MS);
+      }),
+    ]);
+    if (raw === TIMED_OUT || raw == null) return null;
+    const n = Number(raw);
+    return Number.isInteger(n) && n > 0 ? n : null;
+  } catch {
+    // Unreadable storage: treat as never seen (no flare, which is harmless).
+    return null;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+/**
  * Tracks the athlete's last-seen rank and reports a climb to animate.
  * `currentRank` is null while the athlete is not in the ranked list (the
- * stored rank is then left alone).
+ * stored rank is then left alone). A climb is detected, stored and played
+ * only while `enabled` (the fighters list is on screen and the screen is
+ * focused), so a climb is never used up while nobody can see it.
  */
 export function useRankClimb(
   athleteId: string | undefined,
   currentRank: number | null,
+  enabled: boolean,
 ): RankClimbState {
   const reduceMotion = useReduceMotion();
   // undefined: not read yet; null: nothing stored.
@@ -57,17 +91,9 @@ export function useRankClimb(
   React.useEffect(() => {
     if (!athleteId) return;
     let cancelled = false;
-    (async () => {
-      let rank: number | null = null;
-      try {
-        const raw = await AsyncStorage.getItem(RANK_STORAGE_PREFIX + athleteId);
-        const n = raw == null ? NaN : Number(raw);
-        rank = Number.isInteger(n) && n > 0 ? n : null;
-      } catch {
-        // Unreadable storage: treat as never seen (no flare, which is harmless).
-      }
+    void readStoredRank(athleteId).then((rank) => {
       if (!cancelled) setStored({ id: athleteId, rank });
-    })();
+    });
     return () => {
       cancelled = true;
     };
@@ -76,10 +102,11 @@ export function useRankClimb(
   const known = stored !== undefined && stored.id === athleteId ? stored.rank : undefined;
 
   // Derived during render, so the very render that first shows the better
-  // rank already shows the OLD order (no new-old-new jump).
+  // rank already shows the OLD order (no new-old-new jump). Mid-climb, the
+  // stored rank is the climb's target, so a further climb derives from it.
   const pending =
+    enabled &&
     !reduceMotion &&
-    climb === null &&
     typeof known === "number" &&
     currentRank != null &&
     currentRank < known
@@ -87,16 +114,22 @@ export function useRankClimb(
       : null;
 
   React.useEffect(() => {
-    if (!athleteId || known === undefined || currentRank == null) return;
+    if (!enabled || !athleteId || known === undefined || currentRank == null) return;
     if (currentRank === known) return;
     void AsyncStorage.setItem(RANK_STORAGE_PREFIX + athleteId, String(currentRank)).catch(
       () => undefined,
     );
-    if (pending) setClimb(pending);
+    // A new rank mid-climb replaces the climb: a further climb starts again
+    // from the old order, a drop just ends it.
+    setClimb(
+      !reduceMotion && typeof known === "number" && currentRank < known
+        ? { from: known, to: currentRank, stage: "old" }
+        : null,
+    );
     setStored({ id: athleteId, rank: currentRank });
-    // `pending` is derived from the deps below.
+    // reduceMotion is read at the moment of the change on purpose.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [athleteId, known, currentRank]);
+  }, [enabled, athleteId, known, currentRank]);
 
   const stage = climb?.stage;
   React.useEffect(() => {
@@ -113,11 +146,11 @@ export function useRankClimb(
       return () => clearTimeout(t);
     }
     return undefined;
-  }, [stage]);
+  }, [stage, climb]);
 
   return {
     ready: !athleteId || known !== undefined,
-    climb: climb ?? pending,
+    climb: pending ?? climb,
   };
 }
 

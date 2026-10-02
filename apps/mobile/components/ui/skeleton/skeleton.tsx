@@ -98,7 +98,12 @@ export function SkeletonProvider({
   );
 }
 
-/** The highlight band inside one bar, positioned from the shared clock. */
+/**
+ * The highlight band inside one bar, positioned from the shared clock. Its
+ * width is a static share of the bar; only `translateX` animates, so no
+ * layout property changes per frame. The bar's width is measured once (and
+ * again only if the bar resizes) into a shared value the transform reads.
+ */
 function ShimmerBand() {
   const width = useSharedValue(0);
   const progress = shimmerClock();
@@ -111,7 +116,6 @@ function ShimmerBand() {
   const style = useAnimatedStyle(() => {
     const band = width.value * BAND_FRACTION;
     return {
-      width: band,
       transform: [{ translateX: -band + progress.value * (width.value + band) }],
     };
   });
@@ -124,7 +128,17 @@ function ShimmerBand() {
       <Animated.View
         testID="skeleton-shimmer"
         className="bg-surface-4"
-        style={[{ position: "absolute", top: 0, bottom: 0, left: 0, opacity: BAND_OPACITY }, style]}
+        style={[
+          {
+            position: "absolute",
+            top: 0,
+            bottom: 0,
+            left: 0,
+            width: `${BAND_FRACTION * 100}%`,
+            opacity: BAND_OPACITY,
+          },
+          style,
+        ]}
       />
     </View>
   );

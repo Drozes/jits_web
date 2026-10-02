@@ -1,5 +1,6 @@
 import * as React from "react";
 import { ActivityIndicator, View } from "react-native";
+import { useIsFocused } from "@react-navigation/native";
 import { Chip, MetaTag } from "@/components/ui/elo-system";
 import { SkeletonProvider, SkeletonRankRow } from "@/components/ui/skeleton";
 import { useRequireAthlete } from "@/lib/auth/hooks";
@@ -64,7 +65,14 @@ export default function LeaderboardScreen() {
   // stagger plays when the rows first appear (never on refetch, refresh or a
   // filter change), and the rank-up swap flare plays once per climb.
   const entering = useFirstLoadEntering();
-  const rankClimb = useRankClimb(athlete?.id, currentUserAthlete?.rank ?? null);
+  // A climb is detected and used up only while the fighters list is on
+  // screen, so it is never spent while nobody can see it.
+  const isFocused = useIsFocused();
+  const rankClimb = useRankClimb(
+    athlete?.id,
+    currentUserAthlete?.rank ?? null,
+    tab === "fighters" && isFocused,
+  );
 
   // Spinner covers AUTH ONLY. Once the athlete exists the chrome paints
   // immediately and the list body carries the skeleton.
@@ -76,8 +84,9 @@ export default function LeaderboardScreen() {
     );
   }
 
-  // Hold the list on the skeleton until the last-seen rank is read, so a
-  // climb starts from the old order instead of jumping new, old, new.
+  // Hold the list on the skeleton until the last-seen rank is read (capped at
+  // RANK_READ_TIMEOUT_MS, 300ms), so a climb starts from the old order
+  // instead of jumping new, old, new.
   const listLoading = isLoading || !rankClimb.ready;
 
   const countLabel = listLoading
