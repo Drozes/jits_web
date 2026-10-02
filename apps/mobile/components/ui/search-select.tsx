@@ -146,7 +146,7 @@ export function SearchSelect({
         // Selected = the plate-bright step + an ink check, never red (WP2, R3 ST-2).
         className={cn(
           "px-4 min-h-11 flex-row items-center justify-between border-b border-hairline",
-          selected ? "bg-surface-4" : "active:bg-surface-3",
+          selected ? "bg-surface-4 active:bg-surface-3" : "active:bg-surface-3",
         )}
       >
         <Text

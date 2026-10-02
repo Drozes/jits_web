@@ -13,7 +13,10 @@ export interface ResultParticipant {
  * Submission / Draw segmented toggle. ELO design system: two chip-style
  * cells inside a hairline-bordered surface, active state lifts to
  * surface-4 with a hairline-strong edge and an ink glyph + caps label (the
- * one selected-state treatment; never red, WP2).
+ * one selected-state treatment; never red, WP2). Like the Chip, this compact
+ * segmented control carries no check mark: its icon and label both step from
+ * ink-3 to ink, so the state never rests on the edge alone (DESIGN.md Open
+ * decision 14 names the exception).
  */
 export function OutcomeToggle({
   value,

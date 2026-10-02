@@ -30,11 +30,14 @@ export function ResultBanner({
   const isDraw = resultData?.result === "draw";
 
   const variant = isWinner ? "win" : isLoser ? "loss" : "default";
+  // A draw headline is amber (`attention`), like the verdict step's DRAW.
   const verdictColor = isWinner
     ? "text-positive"
     : isLoser
       ? "text-negative"
-      : "text-ink";
+      : isDraw
+        ? "text-attention"
+        : "text-ink";
   const verdictText = isWinner
     ? "YOU WON"
     : isLoser

@@ -235,7 +235,7 @@ export function FinishTimeField({
         FINISH TIME
       </Mono>
       <View
-        style={{ height: 64, paddingLeft: 14, paddingRight: 6, flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: p.plate, borderWidth: 1, borderColor: invalid ? p.red : p.hairline, borderRadius: FIGHT_RADIUS.button }}
+        style={{ height: 64, paddingLeft: 14, paddingRight: 6, flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: p.plate, borderWidth: 1, borderColor: invalid ? p.loss : p.hairline, borderRadius: FIGHT_RADIUS.button }}
       >
         <TextInput
           ref={inputRef}
@@ -252,7 +252,7 @@ export function FinishTimeField({
         />
         <View style={{ flex: 1 }}>
           {invalid ? (
-            <Mono color={p.red}>{`WITHIN ${formatElapsed(durationSeconds)}`}</Mono>
+            <Mono color={p.loss}>{`WITHIN ${formatElapsed(durationSeconds)}`}</Mono>
           ) : fromClock ? (
             <Mono testID="result-finish-time-hint" color={p.text3}>
               FROM MATCH CLOCK

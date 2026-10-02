@@ -14,9 +14,10 @@ import { useThemedTokens } from "@/lib/theme/use-theme";
  *
  * Never a Signal Red fill, border, dot or check: red is for the step's one
  * CTA and for negatives. `hairline-strong` is below 3:1 on every surface, so
- * the surface step and the glyph carry the state, not the edge. The chip is
- * the one documented exception to the glyph (its label also steps from
- * `ink-2` to `ink`; DESIGN.md Open decision 14).
+ * the surface step and the glyph carry the state, not the edge. Compact
+ * segmented controls are the documented exception to the glyph: the Chip
+ * (its label steps from `ink-2` to `ink`) and the result OutcomeToggle (its
+ * icon and label step from `ink-3` to `ink`); DESIGN.md Open decision 14.
  */
 export const SELECTED_SURFACE = "bg-surface-4 border-hairline-strong";
 export const UNSELECTED_SURFACE = "bg-surface-3 border-hairline-strong";

@@ -61,118 +61,130 @@ function openingTags(text: string, name: string): string[] {
 
 const FILES = sources();
 
-/** Red: the classes and the JS tokens that draw Signal Red (fill, rule or red text). */
+/**
+ * Red: the classes and JS tokens that draw Signal Red (fill, rule or red text),
+ * the negative family (`negative`, `stateNegative`, `p.loss`, the same hue) and
+ * the legacy shadcn red (`primary`, `destructive`; WP4 retires them).
+ */
 const RED =
-  /\b(bg|border|border-[lrtb]|text)-cta\b|\baccentCta(Text)?\b|\bp\.(cta|red|ctaPressed)\b|\bON_MEDIA\.(cta|red|redRule|inkRed)\b|\bBROADCAST\.(cta|ctaHover|ctaText)\b/;
+  /(?<![-\w])(bg|border|border-[lrtb]|text)-(cta|negative)\b|\baccentCta(Text)?\b|\bstateNegative\b|\bp\.(cta|red|ctaPressed|loss)\b|\bON_MEDIA\.(cta|red|redRule|inkRed)\b|\bBROADCAST\.(cta|ctaHover|ctaText)\b|(?<![-\w])(bg|border|text)-(primary|destructive)\b|\btokens\.(primary|destructive)\b/;
 
-/** Green: the classes and the JS tokens that draw Gain Green. */
-const GREEN = /\b(bg|border|border-[lrtb]|text)-positive\b|\bstatePositive\b|\bp\.win(Rule)?\b|\bON_MEDIA\.win\b|\bonMediaTokens\.win\b/;
+/** Green: the classes and JS tokens that draw Gain Green, plus the legacy shadcn `success`. */
+const GREEN =
+  /(?<![-\w])(bg|border|border-[lrtb]|text)-(positive|success)\b|\bstatePositive\b|\bp\.win(Rule)?\b|\bON_MEDIA\.win\b|\bonMediaTokens\.win\b|\btokens\.success\b/;
 
 type Allow = Record<string, { lines: number; reason: string }>;
 
 /** Files that may draw Signal Red, with their matching-line count and why. */
 const RED_ALLOWED: Allow = {
-  // Token sources.
-  "lib/tokens.ts": { lines: 8, reason: "the token definitions" },
-  "lib/theme/theme-provider.tsx": { lines: 2, reason: "writes --accent-cta / --accent-cta-text" },
-  "lib/theme/palette.ts": { lines: 2, reason: "the match-flow mirror (cta, red)" },
-  // CTA fills.
-  "components/ui/elo-system/button.tsx": { lines: 3, reason: "the primary Button fill and its pressed lift" },
-  "components/match-flow/live/hold-to-end-button.tsx": { lines: 2, reason: "End match CTA fill and its hold fill" },
-  "components/arena/go-live-plate.tsx": { lines: 1, reason: "Go live CTA fill" },
-  "components/arena/mat-board.tsx": { lines: 2, reason: "Mat Board CTA fills (Challenge, Go live)" },
-  "components/arena/challenge-prompt-sheet.tsx": { lines: 2, reason: "Accept CTA fill and the Adding Flare accept sweep" },
-  "components/arena/competitor-row.tsx": { lines: 2, reason: "the Challenge outline action (an act; WP3 Button domain)" },
-  "lib/error-tracking/sentry.ts": { lines: 1, reason: "the feedback form's submit button fill" },
-  // Red text actions (signal-red-text is the red tuned for text).
+  "app/(app)/(tabs)/profile/stats.tsx": { lines: 1, reason: "the losses count (a negative)" },
+  "app/(app)/settings/_layout.tsx": { lines: 1, reason: "a comment naming the web `bg-primary` var (the ELO page surface, not red)" },
+  "app/(app)/settings/feedback.tsx": { lines: 1, reason: "the over-limit character count (an error)" },
+  "app/(auth)/invite-code.tsx": { lines: 2, reason: "the throttled and invalid-code errors (negatives)" },
   "app/(auth)/login.tsx": { lines: 1, reason: "the Register text link (an act)" },
   "app/(auth)/signup.tsx": { lines: 1, reason: "the Sign in text link (an act)" },
-  "components/ui/search-select.tsx": { lines: 1, reason: "the picker's Done text action" },
-  "components/profile-setup/date-of-birth-picker.tsx": { lines: 1, reason: "the picker's Done text action" },
-  "components/match-detail/match-detail-states.tsx": { lines: 1, reason: "the Retry / Back text action" },
-  "components/match-detail/video-state-panel.tsx": { lines: 1, reason: "the Try again / Back text action" },
-  "components/film-room/film-room-states.tsx": { lines: 1, reason: "the state panel's text action" },
-  "components/match-detail/ai-breakdown.tsx": { lines: 1, reason: "the TRY AGAIN text action after an error" },
-  "components/match-flow/steps/result-form.tsx": {
-    lines: 3,
-    reason: "the Change text action, and the invalid finish-time edge and its WITHIN error (negatives)",
-  },
-  // "Act" or "the leader" rules (DESIGN.md Usage rules).
-  "components/ui/elo-system/plate.tsx": { lines: 1, reason: "the Plate accent rail" },
-  "components/ui/skeleton/skeleton.tsx": { lines: 1, reason: "the skeleton twin of the Plate accent rail" },
-  "components/ui/elo-system/elo-tile.tsx": { lines: 2, reason: "the EloTile bar and accent edge" },
-  "components/ui/elo-system/rank-row.tsx": { lines: 1, reason: "the leader rule (the #1 numeral is ink)" },
-  "components/ui/count-pill.tsx": { lines: 1, reason: "CountPill (a count of things to act on)" },
-  "components/layout/elo-tab-bar.tsx": { lines: 1, reason: "the active tab edge" },
-  "components/layout/header-status-chip.tsx": { lines: 1, reason: "the incoming-challenge edge (an act)" },
+  "app/invite-setup.tsx": { lines: 2, reason: "the underage and claim errors (negatives)" },
+  "app/profile-setup.tsx": { lines: 1, reason: "the load error (a negative)" },
+  "components/arena/afterglow-edge.tsx": { lines: 1, reason: "the challenge afterglow edge (heat)" },
+  "components/arena/challenge-prompt-sheet.tsx": { lines: 2, reason: "Accept CTA fill and the Adding Flare accept sweep" },
+  "components/arena/competitor-row.tsx": { lines: 2, reason: "the Challenge outline action (an act; WP3 Button domain)" },
+  "components/arena/go-live-plate.tsx": { lines: 1, reason: "Go live CTA fill" },
+  "components/arena/mat-board.tsx": { lines: 2, reason: "Mat Board CTA fills (Challenge, Go live)" },
   "components/arena/strip-primitives.tsx": { lines: 1, reason: "the red StripShell rail (an act)" },
-  // Wizard progress: brand chrome by DESIGN.md Open decision 12 (R3 MF-8).
-  "components/match-flow/match-flow-wizard.tsx": { lines: 1, reason: "step progress segments, brand chrome (Open decision 12)" },
-  "components/profile-setup/wizard-progress.tsx": { lines: 1, reason: "step progress segments, brand chrome (Open decision 12)" },
-  // VS and the face-off / broadcast brand chrome (Open decision 12, R3 MF-12).
-  "components/match-flow/faceoff/faceoff-top.tsx": {
-    lines: 5,
-    reason: "the red VS and your side's accent (brand chrome, Open decision 12) and the invalid weight edge (a negative)",
-  },
+  "components/athlete/head-to-head-card.tsx": { lines: 1, reason: "the head-to-head losses count (a negative)" },
+  "components/auth/auth-form-field.tsx": { lines: 2, reason: "the error edge and error text (focus is ink-2 since WP2)" },
+  "components/error-boundary.tsx": { lines: 1, reason: "the error message (a negative)" },
+  "components/film-room/film-room-states.tsx": { lines: 1, reason: "the state panel's text action" },
   "components/film-room/opening-still.tsx": { lines: 1, reason: "the red VS (brand chrome, Open decision 12)" },
-  "components/match-flow/live/athlete-bar.tsx": { lines: 3, reason: "the broadcast VS, its rule and the you-mark (brand chrome with the VS)" },
-  // Negatives: losses, errors, failures.
-  "components/match-flow/faceoff/faceoff-weight-check.tsx": { lines: 1, reason: "the invalid weight edge" },
-  "components/ui/toast.tsx": { lines: 1, reason: "the error toast rail" },
   "components/film-room/poster-card.tsx": { lines: 4, reason: "the L outcome (a loss)" },
   "components/film-room/status-badge.tsx": { lines: 1, reason: "the failed status (a negative)" },
-  "components/match-detail/film-angles.tsx": { lines: 1, reason: "ANALYSIS FAILED (a negative)" },
-  "components/match-detail/match-verdict.tsx": { lines: 1, reason: "a negative rating delta" },
-  // Recording and countdown chrome over the camera (registered motion and REC).
-  "components/match-flow/countdown/countdown.tsx": { lines: 5, reason: "the countdown drain bar, GO slam and the REC tag (registered, Adding Flare)" },
-  "components/match-flow/camera-overlay.tsx": { lines: 1, reason: "the REC dot over the camera" },
-  "components/match-flow/live/rec-tally.tsx": { lines: 1, reason: "the ON AIR tally (Adding Flare)" },
-  "components/match-flow/verdict/rating-moment.tsx": { lines: 1, reason: "the tap marks (Adding Flare)" },
-  // Arena heat and registered red motion (Adding Flare, kept exact).
+  "components/invite/claim-dob-step.tsx": { lines: 1, reason: "the date-of-birth error (a negative)" },
   "components/layout/arena-tab-icon.tsx": { lines: 2, reason: "the live ember, blade clash spark and the registered Swords icon" },
-  "components/arena/afterglow-edge.tsx": { lines: 1, reason: "the challenge afterglow edge (heat)" },
+  "components/layout/elo-tab-bar.tsx": { lines: 1, reason: "the active tab edge" },
+  "components/layout/header-status-chip.tsx": { lines: 1, reason: "the incoming-challenge edge (an act)" },
   "components/leaderboard/rank-flare.tsx": { lines: 1, reason: "the registered rank flare" },
-  // Inputs: the focus edge (not an R3 finding; revisit with the one form field, WP3/WP5 follow-up).
-  "components/auth/auth-form-field.tsx": { lines: 2, reason: "the input focus edge" },
-  "components/profile-setup/elo-form-field.tsx": { lines: 2, reason: "the input focus edge" },
-  // Brand marks and the launch splash.
-  "components/ui/elo-system/er-mark.tsx": { lines: 1, reason: "the E·R lettermark" },
+  "components/match-card.tsx": { lines: 1, reason: "a negative rating delta" },
+  "components/match-detail/ai-breakdown.tsx": { lines: 1, reason: "the TRY AGAIN text action after an error" },
+  "components/match-detail/film-angles.tsx": { lines: 1, reason: "ANALYSIS FAILED (a negative)" },
+  "components/match-detail/match-detail-states.tsx": { lines: 1, reason: "the Retry / Back text action" },
+  "components/match-detail/match-verdict.tsx": { lines: 1, reason: "a negative rating delta" },
+  "components/match-detail/video-state-panel.tsx": { lines: 2, reason: "the failed / missing state (a negative) and the Try again / Back text action" },
+  "components/match-flow/camera-overlay.tsx": { lines: 1, reason: "the REC dot over the camera" },
+  "components/match-flow/countdown/countdown.tsx": { lines: 5, reason: "the countdown drain bar, GO slam and the REC tag (registered, Adding Flare)" },
+  "components/match-flow/faceoff/faceoff-top.tsx": { lines: 5, reason: "the red VS, your-side accent and you-mark dot (brand chrome next to the VS, Open decision 12) and the invalid weight edge (a negative)" },
+  "components/match-flow/faceoff/faceoff-weight-check.tsx": { lines: 1, reason: "the invalid weight edge" },
+  "components/match-flow/fight/fight-ui.tsx": { lines: 1, reason: "a negative rating delta" },
+  "components/match-flow/live/athlete-bar.tsx": { lines: 3, reason: "the broadcast VS, its rule and the you-mark beside it (brand chrome next to the VS, Open decision 12)" },
+  "components/match-flow/live/hold-to-end-button.tsx": { lines: 2, reason: "End match CTA fill and its hold fill" },
+  "components/match-flow/live/rec-tally.tsx": { lines: 1, reason: "the ON AIR tally (Adding Flare)" },
+  "components/match-flow/match-flow-wizard.tsx": { lines: 1, reason: "step progress segments, brand chrome (Open decision 12)" },
+  "components/match-flow/steps/confirm-step-panels.tsx": { lines: 1, reason: "YOU LOST (a loss)" },
+  "components/match-flow/steps/result-form.tsx": { lines: 3, reason: "the Change text action, and the invalid finish-time edge and its WITHIN error (negatives)" },
+  "components/match-flow/steps/submission-fields.tsx": { lines: 2, reason: "the invalid finish-time edge and its error" },
+  "components/match-flow/upload-progress-banner.tsx": { lines: 6, reason: "the upload failed / truncated warnings (negatives)" },
+  "components/match-flow/verdict/rating-moment.tsx": { lines: 1, reason: "the tap marks (Adding Flare)" },
+  "components/offline-banner.tsx": { lines: 3, reason: "retiring, WP4 (WP4 restyles the offline banner off bg-destructive)" },
+  "components/profile-setup/date-of-birth-picker.tsx": { lines: 1, reason: "the picker's Done text action" },
+  "components/profile-setup/elo-form-field.tsx": { lines: 2, reason: "the error edge and error text (focus is ink-2 since WP2)" },
+  "components/profile-setup/setup-wizard.tsx": { lines: 1, reason: "the save error (a negative)" },
+  "components/profile-setup/wizard-progress.tsx": { lines: 1, reason: "step progress segments, brand chrome (Open decision 12)" },
+  "components/profile/account-section.tsx": { lines: 1, reason: "the destructive row (Delete account)" },
+  "components/profile/elo-progression.tsx": { lines: 1, reason: "a negative rating delta" },
+  "components/profile/profile-quick-stats.tsx": { lines: 1, reason: "the losses count (a negative)" },
+  "components/profile/submission-breakdown.tsx": { lines: 2, reason: "the load error and submission loss counts (the bars are ink-2)" },
+  "components/share-profile-sheet.tsx": { lines: 1, reason: "the losses count (a negative)" },
+  "components/ui/badge.tsx": { lines: 4, reason: "retiring, WP4 (legacy shadcn primary / destructive variants)" },
+  "components/ui/button.tsx": { lines: 5, reason: "retiring, WP4 (the legacy shadcn Button)" },
+  "components/ui/count-pill.tsx": { lines: 1, reason: "CountPill (a count of things to act on)" },
+  "components/ui/elo-system/button.tsx": { lines: 6, reason: "the primary Button fill and its pressed lift, and the destructive outline in negative" },
+  "components/ui/elo-system/delta-number.tsx": { lines: 1, reason: "a negative rating delta" },
+  "components/ui/elo-system/elo-tile.tsx": { lines: 3, reason: "the EloTile bar and accent edge, and the negative (loss) tone" },
+  "components/ui/elo-system/er-mark.tsx": { lines: 1, reason: "the E\u00b7R lettermark" },
+  "components/ui/elo-system/outcome-tag.tsx": { lines: 2, reason: "the L outcome" },
+  "components/ui/elo-system/plate.tsx": { lines: 2, reason: "the Plate accent rail and the loss rail" },
+  "components/ui/elo-system/rank-row.tsx": { lines: 1, reason: "the leader rule (the #1 numeral is ink)" },
+  "components/ui/elo-system/splash-glow-statement.tsx": { lines: 1, reason: "ARE YOU? in the launch splash (brand moment)" },
   "components/ui/elo-system/splash-reveal.tsx": { lines: 1, reason: "the launch splash (brand moment)" },
   "components/ui/elo-system/splash-statement.tsx": { lines: 1, reason: "ARE YOU? in the launch splash (brand moment)" },
-  "components/ui/elo-system/splash-glow-statement.tsx": { lines: 1, reason: "ARE YOU? in the launch splash (brand moment)" },
+  "components/ui/search-select.tsx": { lines: 1, reason: "the picker's Done text action" },
+  "components/ui/skeleton/skeleton.tsx": { lines: 1, reason: "the skeleton twin of the Plate accent rail" },
+  "components/ui/toast.tsx": { lines: 1, reason: "the error toast rail" },
+  "lib/error-tracking/sentry.ts": { lines: 1, reason: "the feedback form's submit button fill" },
   "lib/notifications/register-push.ts": { lines: 1, reason: "the Android notification light" },
+  "lib/theme/palette.ts": { lines: 3, reason: "the match-flow mirror (cta, red, loss)" },
+  "lib/theme/theme-provider.tsx": { lines: 3, reason: "writes --accent-cta / --accent-cta-text / --state-negative" },
+  "lib/tokens.ts": { lines: 10, reason: "the token definitions" },
 };
 
 /** Files that may draw Gain Green (gains, wins, LIVE), with their matching-line count and why. */
 const GREEN_ALLOWED: Allow = {
-  "lib/tokens.ts": { lines: 3, reason: "the token definitions" },
-  "lib/theme/theme-provider.tsx": { lines: 1, reason: "writes --state-positive" },
-  "lib/theme/palette.ts": { lines: 1, reason: "the match-flow mirror (win)" },
-  // Gains.
-  "components/ui/elo-system/delta-number.tsx": { lines: 1, reason: "a positive rating delta" },
-  "components/match-card.tsx": { lines: 1, reason: "a positive rating delta" },
-  "components/profile/elo-progression.tsx": { lines: 1, reason: "a positive rating delta" },
-  "components/match-flow/fight/fight-ui.tsx": { lines: 1, reason: "a positive rating delta (the done StatusPlate is ink)" },
-  "components/match-detail/match-verdict.tsx": { lines: 1, reason: "a positive rating delta" },
-  "components/ui/elo-system/elo-tile.tsx": { lines: 1, reason: "the EloTile positive tone (a gain)" },
-  // Wins.
-  "components/ui/elo-system/outcome-tag.tsx": { lines: 2, reason: "the W outcome" },
-  "components/film-room/poster-card.tsx": { lines: 4, reason: "the W outcome" },
-  "components/profile/profile-quick-stats.tsx": { lines: 1, reason: "the wins count" },
-  "components/profile/submission-breakdown.tsx": { lines: 1, reason: "submission win counts (the bars are ink-2)" },
+  "components/arena/mat-board.tsx": { lines: 3, reason: "the live Mat Board rows and the live toggle state" },
+  "components/arena/on-air-strip.tsx": { lines: 4, reason: "the ON AIR strip (Adding Flare)" },
   "components/athlete/head-to-head-card.tsx": { lines: 1, reason: "the head-to-head wins count" },
-  "components/match-flow/steps/confirm-step-panels.tsx": { lines: 1, reason: "YOU WON (a win; the confirmed panel is ink)" },
-  "components/match-flow/verdict/verdict-step.tsx": { lines: 2, reason: "the rank strip, shown only on a win (a rank gain)" },
-  "components/ui/elo-system/plate.tsx": { lines: 2, reason: "the win and live Plate rails" },
-  // LIVE.
-  "components/ui/elo-system/live-pill.tsx": { lines: 4, reason: "LivePill / LiveDot" },
-  "components/ui/skeleton/skeleton.tsx": { lines: 1, reason: "the skeleton twin of the live Plate rail" },
+  "components/film-room/poster-card.tsx": { lines: 4, reason: "the W outcome" },
+  "components/layout/elo-tab-bar.tsx": { lines: 1, reason: "the live dot on the Arena tab" },
   "components/layout/header-live-dot.tsx": { lines: 1, reason: "the header live dot" },
   "components/layout/header-status-chip.tsx": { lines: 3, reason: "the live header status chip" },
-  "components/layout/elo-tab-bar.tsx": { lines: 1, reason: "the live dot on the Arena tab" },
-  "components/arena/on-air-strip.tsx": { lines: 4, reason: "the ON AIR strip (Adding Flare)" },
-  "components/arena/mat-board.tsx": { lines: 3, reason: "the live Mat Board rows and the live toggle state" },
+  "components/match-card.tsx": { lines: 1, reason: "a positive rating delta" },
+  "components/match-detail/match-verdict.tsx": { lines: 1, reason: "a positive rating delta" },
+  "components/match-flow/fight/fight-ui.tsx": { lines: 1, reason: "a positive rating delta (the done StatusPlate is ink)" },
+  "components/match-flow/steps/confirm-step-panels.tsx": { lines: 1, reason: "YOU WON (a win; the confirmed panel is ink)" },
+  "components/match-flow/verdict/verdict-step.tsx": { lines: 2, reason: "the rank strip, shown only on a win (a rank gain)" },
+  "components/online-indicator.tsx": { lines: 1, reason: "retiring, WP4 (unused; WP4 deletes it)" },
+  "components/profile/elo-progression.tsx": { lines: 1, reason: "a positive rating delta" },
+  "components/profile/profile-quick-stats.tsx": { lines: 1, reason: "the wins count" },
+  "components/profile/submission-breakdown.tsx": { lines: 1, reason: "submission win counts (the bars are ink-2)" },
+  "components/ui/badge.tsx": { lines: 2, reason: "retiring, WP4 (the legacy success variant)" },
+  "components/ui/elo-system/delta-number.tsx": { lines: 1, reason: "a positive rating delta" },
+  "components/ui/elo-system/elo-tile.tsx": { lines: 1, reason: "the EloTile positive tone (a gain)" },
+  "components/ui/elo-system/live-pill.tsx": { lines: 4, reason: "LivePill / LiveDot" },
+  "components/ui/elo-system/outcome-tag.tsx": { lines: 2, reason: "the W outcome" },
   "components/ui/elo-system/participant-row.tsx": { lines: 2, reason: "Available (an athlete who is live)" },
+  "components/ui/elo-system/plate.tsx": { lines: 2, reason: "the win and live Plate rails" },
+  "components/ui/skeleton/skeleton.tsx": { lines: 1, reason: "the skeleton twin of the live Plate rail" },
+  "lib/theme/palette.ts": { lines: 1, reason: "the match-flow mirror (win)" },
+  "lib/theme/theme-provider.tsx": { lines: 1, reason: "writes --state-positive" },
+  "lib/tokens.ts": { lines: 3, reason: "the token definitions" },
 };
 
 function linesMatching(text: string, re: RegExp): number {
@@ -229,14 +241,14 @@ describe("color semantics (WP2)", () => {
     // `isActive ? "border-cta"` (the active tab edge) is deliberately not
     // matched: `\b` does not split `isActive`.
     const sel =
-      /\b(active|selected|agreed|checked|waiverAccepted)\s*\?\s*(["'`][^"'`]*\b(bg|border|text)-cta\b|p\.(cta|red)\b|p\.selectedBg|tokens\.accentCta)/;
+      /\b(active|selected|agreed|checked|waiverAccepted)\s*\?\s*(["'`][^"'`]*(?<![-\w])(bg|border|text)-(cta|negative|primary|destructive)\b|p\.(cta|red|loss)\b|p\.selectedBg|tokens\.(accentCta|stateNegative|primary|destructive)\b)/;
     const offenders = FILES.filter((f) => sel.test(f.text)).map((f) => f.file);
     expect(offenders).toEqual([]);
   });
 
   it("no ready, confirmed, done, uploaded or recording state resolves to green (R3 CO-2)", () => {
     const done =
-      /\b(ready|confirmed|done|uploaded|recording|opponentRecording|f\.opponentRecording)\s*\?\s*(["'`][^"'`]*-positive\b|p\.win(Rule)?\b|tokens\.statePositive)/;
+      /\b(ready|confirmed|done|uploaded|recording|opponentRecording|f\.opponentRecording)\s*\?\s*(["'`][^"'`]*-(positive|success)\b|p\.win(Rule)?\b|tokens\.(statePositive|success)\b)/;
     const offenders = FILES.filter((f) => done.test(f.text)).map((f) => f.file);
     expect(offenders).toEqual([]);
   });

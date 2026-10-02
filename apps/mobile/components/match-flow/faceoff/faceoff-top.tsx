@@ -224,7 +224,7 @@ function MyWeight() {
             color: p.text,
             backgroundColor: p.plate,
             borderWidth: 1,
-            borderColor: valid ? p.strong : p.red,
+            borderColor: valid ? p.strong : p.loss,
             borderRadius: FIGHT_RADIUS.button,
           }}
         />
