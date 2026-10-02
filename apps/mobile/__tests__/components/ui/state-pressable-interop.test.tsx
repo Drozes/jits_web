@@ -22,6 +22,9 @@ import { FightButton } from "@/components/match-flow/fight/fight-ui";
 import { HudTagButton } from "@/components/match-flow/live/hud-tag";
 import { PauseButton } from "@/components/match-flow/live/pause-button";
 import { StatePressable } from "@/components/ui/state-pressable";
+import { PressableScale } from "@/components/ui/pressable-scale";
+import { Button } from "@/components/ui/button";
+import { registerCSS } from "react-native-css-interop/dist/test";
 
 type Styled = { props: { style?: unknown } };
 const flat = (el: Styled) =>
@@ -148,5 +151,45 @@ describe("no raw Pressable takes a function style", () => {
       });
     }
     expect(offenders).toEqual([]);
+  });
+});
+
+describe("className survives PressableScale (the animated Pressable behind every Button, Adding Flare)", () => {
+  // Plain CSS stand-ins for Tailwind utilities, compiled by the same interop
+  // the app runs, so the assertions do not depend on the theme's tokens.
+  beforeAll(() => {
+    registerCSS(
+      ".tst-h { height: 40px } .tst-fill { background-color: #E63946 } .active\\:tst-dim:active { opacity: 0.7 }",
+    );
+  });
+
+  it("PressableScale keeps a className fill and height, and its active: variant", () => {
+    const s = render(
+      <PressableScale testID="ps" className="tst-h tst-fill active:tst-dim" onPress={jest.fn()}>
+        <Text>x</Text>
+      </PressableScale>,
+    );
+    const st = flat(s.getByTestId("ps"));
+    expect(st.height).toBe(40);
+    expect(String(st.backgroundColor).toLowerCase()).toBe("#e63946");
+    expect(st.opacity).toBeUndefined();
+
+    fireEvent(s.getByTestId("ps"), "pressIn", {});
+    expect(flat(s.getByTestId("ps")).opacity).toBeCloseTo(0.7, 3);
+    expect(flat(s.getByTestId("ps")).height).toBe(40);
+    fireEvent(s.getByTestId("ps"), "pressOut", {});
+    expect(flat(s.getByTestId("ps")).opacity).toBeUndefined();
+  });
+
+  it("a Button keeps its className fill and height alongside the press scale", () => {
+    const s = render(
+      <Button testID="btn-cls" className="tst-h tst-fill" onPress={jest.fn()}>
+        Go
+      </Button>,
+    );
+    const st = flat(s.getByTestId("btn-cls"));
+    expect(st.height).toBe(40);
+    expect(String(st.backgroundColor).toLowerCase()).toBe("#e63946");
+    expect(st.transform).toEqual([{ scale: 1 }]);
   });
 });
