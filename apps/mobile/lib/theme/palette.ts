@@ -93,5 +93,5 @@ export function usePalette(): Palette {
  */
 export const ON_MEDIA = onMediaTokens;
 
-/** Every number in the match flow and Film Room uses tabular figures. */
-export const TABULAR = { fontVariant: ["tabular-nums" as const] };
+/** Every number in the match flow and Film Room uses tabular figures. One source: lib/typography (R3 TY-6). */
+export { TABULAR } from "@/lib/typography";

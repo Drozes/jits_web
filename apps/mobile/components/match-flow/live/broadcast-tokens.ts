@@ -76,5 +76,5 @@ export function glassButtonStyle(pressed: boolean) {
   };
 }
 
-/** Every number on the live screen uses tabular figures. */
-export const TABULAR = { fontVariant: ["tabular-nums" as const] };
+/** Every number on the live screen uses tabular figures. One source: lib/typography (R3 TY-6). */
+export { TABULAR } from "@/lib/typography";
