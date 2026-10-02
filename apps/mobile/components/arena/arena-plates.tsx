@@ -81,7 +81,7 @@ export function WaitingPlate({
             You&apos;ll both drop into the match the moment they accept.
           </Text>
         </View>
-        <LivePill label="Sent" />
+        <LivePill label="Sent" pace="fixed" />
       </View>
       <OutlineButton
         label="Cancel"

@@ -59,7 +59,7 @@ export function ClockSlab({
     >
       <View testID={`live-slab-${label}`} style={{ position: "absolute", left: 12, top: 10 }}>
         {label === "live" ? (
-          <LivePill label="LIVE" onDark />
+          <LivePill label="LIVE" onDark pace="fixed" />
         ) : label === "paused" ? (
           <StaticLabel text="PAUSED" color={BROADCAST.amber} dot />
         ) : label === "time" ? (

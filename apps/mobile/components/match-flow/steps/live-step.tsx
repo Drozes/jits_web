@@ -44,6 +44,12 @@ interface LiveStepProps {
    * off" state instead of the camera.
    */
   recordingEnabled?: boolean;
+  /**
+   * Fire the `matchStart` haptic on mount. Default true. The face-off
+   * countdown passes false when it has just fired `countdownGo` for the same
+   * moment (one haptic per event, Motion Rule).
+   */
+  startHaptic?: boolean;
 }
 
 const TIME_WARNING_SECONDS = 10;
@@ -79,6 +85,7 @@ export function LiveStep(props: LiveStepProps) {
     recorder,
     onEnded,
     recordingEnabled = true,
+    startHaptic = true,
   } = props;
   const endedRef = React.useRef(false);
   const startHapticFiredRef = React.useRef(false);
@@ -165,7 +172,8 @@ export function LiveStep(props: LiveStepProps) {
   React.useEffect(() => {
     if (startHapticFiredRef.current) return;
     startHapticFiredRef.current = true;
-    void matchHaptics.matchStart();
+    if (startHaptic) void matchHaptics.matchStart();
+    // Mount-only: the countdown decides once, at GO.
   }, []);
 
   // Auto-start recording once the camera ref is ready and permission is

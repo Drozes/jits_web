@@ -157,6 +157,20 @@ describe("usePendingChallenges", () => {
     expect(result.current.challenges).toEqual([]);
   });
 
+  it("is not loaded until the first full read is applied, even an empty one", async () => {
+    const mockSupabase = createMockSupabase(mockChannel, []);
+
+    const { result } = renderHook(() =>
+      usePendingChallenges(mockSupabase as never, "athlete-1"),
+    );
+
+    expect(result.current.loaded).toBe(false);
+    await waitFor(() => {
+      expect(result.current.loaded).toBe(true);
+    });
+    expect(result.current.count).toBe(0);
+  });
+
   it("subscribes to postgres_changes for INSERT and UPDATE", () => {
     const mockSupabase = createMockSupabase(mockChannel, []);
 

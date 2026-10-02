@@ -2,6 +2,25 @@
 
 ## [Unreleased]
 
+### Mobile: Adding Flare, the Motion Rule and motion with meaning (jits-pddd)
+
+JS-only, OTA-eligible for runtime 0.5.0 (build 25) installs only; earlier runtimes never receive it. No new native dependency (Reanimated, react-native-svg and expo-haptics are already linked). The Motion Rule in `DESIGN.md` ("Motion") replaces the old minimal-motion rule: every animation is Reactive (touch), a Moment (once, on a real state change) or Ambient (only while a live, loading or waiting-on-you state is true, paused in background), runs on the UI thread, has a still Reduce Motion state and is listed in the registry. Never a haptic on a loss or for ambient motion. Web is unchanged (the ELO odometer and delta chip have a web parity follow-up).
+
+**Added**
+- Foundation: `apps/mobile/lib/motion/` (`tokens.ts` durations, tempo, easings, springs and press scale; `haptics.ts`, the one haptics vocabulary, with `matchHaptics` kept as an alias; `use-app-active.ts`; `use-first-load-entering.ts`; `index.ts` barrel).
+- Arena tab icon (`apps/mobile/components/layout/arena-tab-icon.tsx`): ember rise while live; countable embers (one per pending challenge, 1 to 3) in place of the count pill, which returns above 3; blade clash with a spark on going live (`goLive` haptic) and on a new challenge (silent; the prompt already buzzes). Tab select bounce on all four tabs with the `select` haptic.
+- Buttons: `apps/mobile/components/ui/pressable-scale.tsx` (press scale, 0.85 opacity dip under Reduce Motion) on every `Button`, every `FightButton`, the Arena Challenge CTAs and every Arena Go live control (the header status chip's Go live is unchanged); `apps/mobile/components/ui/steel-sheen.tsx` on the incoming-challenge Accept and the match-flow Confirm result; the accept sweep on Accept (fill, glint, "Accepted", `accept` haptic; the accept call is never delayed).
+- ELO and results: `RollingNumber` odometer (`apps/mobile/components/ui/elo-system/rolling-number.tsx`, 600 ms, only changed digits roll) replaces the count-up tick in `EloTile` and the verdict celebration; `DeltaChip` (`delta-chip.tsx`) with sign and arrow; play-once per result (`play-once.ts`, persisted, 5 minute freshness); "the tap" on a submission win (three tick marks and `tapTick` haptics, winner only; still and silent for the loser); `ratingGain` haptic on a gain only.
+- Arena screen: `apps/mobile/components/arena/afterglow-edge.tsx` (incoming challenge edge cools over 2 s, keyed on `created_at`), `apps/mobile/components/arena/on-air-strip.tsx` (ON AIR tally and heartbeat trace), one shared tempo clock (`apps/mobile/lib/arena/arena-tempo.ts`) set by how many athletes are live in the lobby.
+- Rankings and Profile: first-load list stagger (Rankings, Profile recent matches, Arena roster); rank-up swap flare (`apps/mobile/lib/leaderboard/use-rank-climb.ts`, `apps/mobile/components/leaderboard/rank-flare.tsx`), once per climb.
+- Countdown slam on the face-off countdown (numerals drop from 1.6x, a Signal Red bar drains to a red GO, `countdownTick` / `countdownGo`); total length and match start unchanged.
+
+**Changed**
+- Skeletons: one module-level shimmer clock (translateX band) replaces the opacity breath.
+- LIVE pulse: Arena and header live dots share the tempo clock; the match LIVE pill and the "Sent" pill keep the fixed 1400 ms pace.
+- Haptics: the challenge prompt's arrival buzz is `challengeArrived` (once per challenge id); the Challenge tap and Confirm result use `press`. The only direct `expo-haptics` calls left are the offline-queued result and the launch splash.
+- `DESIGN.md` Motion section and the `CLAUDE.md` brand one-liner describe the Motion Rule, the haptics vocabulary and the animation registry.
+
 ## 0.5.0 (build 25), 2026-10-01
 
 Release "Invites + Friends", shipped DARK. iOS version and runtime 0.5.0, EAS build 25 (`0e1331ed-17c1-4b50-bac9-3d9556437071`) on TestFlight; web deployed to Vercel from `main` (`41d79a4`). Needs the jr_be migrations `20261001100000` to `20261001300700` (applied on prod) and the `push` and `delete-account` edge functions (deployed). Prod flags `invites_enabled` and `match_location_required` are both off. A new runtime: OTAs for 0.4.0 never reach 0.5.0 installs and vice versa.

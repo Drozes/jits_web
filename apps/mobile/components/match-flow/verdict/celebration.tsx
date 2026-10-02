@@ -6,8 +6,6 @@ import { usePalette } from "@/lib/theme/palette";
 import { FIGHT_EASING } from "../fight/fight-tokens";
 
 const EASE = Easing.bezier(...FIGHT_EASING);
-/** The brand rating tick. */
-export const RATING_TICK_MS = 480;
 
 /** Sharp rectangles, brand colors only (palette keys); x is a fraction of the width. */
 const PIECES = [
@@ -24,14 +22,15 @@ const PIECES = [
 ];
 
 /**
- * One fall of confetti over the win verdict (approved exception to the
- * minimal-motion rule). Plays once; nothing at all under Reduce Motion.
+ * One fall of confetti over the win verdict (a Moment in the Motion Rule
+ * registry). Only when the verdict plays (once per result); nothing at all
+ * under Reduce Motion.
  */
-export function Confetti({ height = 600 }: { height?: number }) {
+export function Confetti({ height = 600, play }: { height?: number; play: boolean }) {
   const reduceMotion = useReduceMotion();
   const { width } = useWindowDimensions();
   const palette = usePalette();
-  if (reduceMotion) return null;
+  if (reduceMotion || !play) return null;
   return (
     <View testID="verdict-confetti" pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[StyleSheet.absoluteFill, { height }]}>
       {PIECES.map((p, i) => (
@@ -76,9 +75,10 @@ export function SlamIn({ children, animate }: { children: React.ReactNode; anima
   return <Animated.View style={[{ alignSelf: "flex-start" }, style]}>{children}</Animated.View>;
 }
 
-/** Rises in once after the verdict (the rank strip). */
-export function RiseIn({ children, delay = 500 }: { children: React.ReactNode; delay?: number }) {
-  const reduceMotion = useReduceMotion();
+/** Rises in once after the verdict (the rank strip); static without `play`. */
+export function RiseIn({ children, delay = 500, play }: { children: React.ReactNode; delay?: number; play: boolean }) {
+  const osReduceMotion = useReduceMotion();
+  const reduceMotion = osReduceMotion || !play;
   const y = useSharedValue(reduceMotion ? 0 : 12);
   const opacity = useSharedValue(reduceMotion ? 1 : 0);
   React.useEffect(() => {
@@ -92,49 +92,6 @@ export function RiseIn({ children, delay = 500 }: { children: React.ReactNode; d
   }, [reduceMotion, delay, y, opacity]);
   const style = useAnimatedStyle(() => ({ opacity: opacity.value, transform: [{ translateY: y.value }] }));
   return <Animated.View style={style}>{children}</Animated.View>;
-}
-
-/**
- * The rating counting from `before` to `after` in RATING_TICK_MS (the one
- * brand auto-animation). Shows `after` at once when either is missing or
- * under Reduce Motion.
- */
-export function useRatingTick(before: number | null, after: number | null): number | null {
-  const reduceMotion = useReduceMotion();
-  const animate = before != null && after != null && before !== after && !reduceMotion;
-  const [value, setValue] = React.useState<number | null>(animate ? before : after);
-  React.useEffect(() => {
-    if (!animate || before == null || after == null) {
-      setValue(after);
-      return;
-    }
-    const start = Date.now();
-    setValue(before);
-    const id = setInterval(() => {
-      const t = Math.min(1, (Date.now() - start) / RATING_TICK_MS);
-      const eased = 1 - Math.pow(1 - t, 3);
-      setValue(Math.round(before + (after - before) * eased));
-      if (t >= 1) clearInterval(id);
-    }, 16);
-    return () => clearInterval(id);
-  }, [animate, before, after]);
-  return value;
-}
-
-/**
- * "1512 -> 1526" with the after value ticking up in RATING_TICK_MS. A leaf of
- * its own, so the 60 fps tick re-renders this Text only, never the verdict.
- */
-export function TickingRating({ before, after }: { before: number | null; after: number | null }) {
-  const p = usePalette();
-  const ticking = useRatingTick(before, after);
-  const shown = ticking ?? after;
-  const text = before != null && shown != null && before !== after ? `${before} \u2192 ${shown}` : shown != null ? `${shown}` : "";
-  return (
-    <Text testID="verdict-rating" className="font-mono-bold" style={{ fontSize: 22, color: p.text, fontVariant: ["tabular-nums"] }}>
-      {text}
-    </Text>
-  );
 }
 
 /** Plain text helper so the verdict file stays short. */

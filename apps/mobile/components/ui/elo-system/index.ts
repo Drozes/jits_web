@@ -19,3 +19,5 @@ export { DeltaNumber } from "./delta-number";
 export { OutcomeTag } from "./outcome-tag";
 export { ParticipantRow } from "./participant-row";
 export { RankRow } from "./rank-row";
+export { RollingNumber, usePlayOnce, ROLL_MS } from "./rolling-number";
+export { DeltaChip, formatDeltaChip, spokenDelta } from "./delta-chip";

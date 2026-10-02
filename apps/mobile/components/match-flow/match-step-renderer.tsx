@@ -204,6 +204,8 @@ export function MatchStepRenderer(props: MatchStepRendererProps) {
         upload={deriveUploadBannerState(recorder.state, recorder.error, upload)}
         uploadedVideoId={upload?.status === "uploaded" ? (upload.videoId ?? null) : null}
         confirmedAthleteIds={confirmedAthleteIds}
+        resultType={resultData?.result ?? null}
+        completedAt={extras.completedAt}
       />
     );
   }
