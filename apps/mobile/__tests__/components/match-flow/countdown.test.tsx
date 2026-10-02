@@ -5,7 +5,7 @@
  * at GO (replacing the live step's `matchStart`); re-entry past GO skips it;
  * a phone whose clock runs behind never shows it for longer than 3 s.
  * Countdown slam (Adding Flare): numerals drop in from 1.6x and land, the red
- * bar drains to GO, Reduce Motion crossfades with haptics kept.
+ * bar drains to GO; Reduce Motion crossfades (bar still drains), haptics kept.
  */
 import * as React from "react";
 import { act, render } from "@testing-library/react-native";
@@ -298,21 +298,47 @@ describe("countdown slam motion", () => {
     expect(mockTick).toHaveBeenCalledTimes(1);
   });
 
-  it("Reduce Motion: no slam, the numerals crossfade, the bar is static", () => {
+  it("Reduce Motion: no slam, the numerals crossfade, the bar still drains linearly", () => {
     __setReduceMotionForTests(true);
     const s = render(<Countdown goAt={NOW + COUNTDOWN_MS} {...props} />);
     expect(scaleOf(s.getByTestId("countdown-numeral-slam"))).toBe(1);
     expect(animated(s.getByTestId("countdown-numeral-slam")).opacity).toBe(1);
     expect(s.queryByTestId("countdown-numeral-out")).toBeNull();
+    expect(scaleXOf(s.getByTestId("countdown-progress"))).toBeCloseTo(1);
     advance(1_000);
     expect(s.getByTestId("countdown-numeral")).toHaveTextContent("2");
     // The outgoing 3 fades out over the incoming 2; nothing scales.
     expect(s.getByTestId("countdown-numeral-outgoing")).toHaveTextContent("3");
     expect(scaleOf(s.getByTestId("countdown-numeral-slam"))).toBe(1);
+    expect(scaleXOf(s.getByTestId("countdown-progress"))).toBeCloseTo(2 / 3, 1);
     advance(320);
-    expect(animated(s.getByTestId("countdown-numeral-out")).opacity).toBeCloseTo(0);
+    // The fade is done and the outgoing layer is gone.
+    expect(s.queryByTestId("countdown-numeral-out")).toBeNull();
     expect(animated(s.getByTestId("countdown-numeral-slam")).opacity).toBeCloseTo(1);
-    expect(scaleXOf(s.getByTestId("countdown-progress"))).toBe(1);
+    advance(1_680);
+    expect(scaleXOf(s.getByTestId("countdown-progress"))).toBeCloseTo(0);
+  });
+
+  it("Reduce Motion: a parent re-render mid-fade does not cut the crossfade short", () => {
+    __setReduceMotionForTests(true);
+    const s = render(<Countdown goAt={NOW + COUNTDOWN_MS} {...props} />);
+    advance(1_000);
+    s.getByTestId("countdown-numeral-outgoing");
+    s.rerender(<Countdown goAt={NOW + COUNTDOWN_MS} {...props} recording={false} />);
+    s.getByText("NOT RECORDING");
+    expect(s.getByTestId("countdown-numeral-outgoing")).toHaveTextContent("3");
+    advance(96);
+    s.getByTestId("countdown-numeral-outgoing");
+    advance(200);
+    expect(s.queryByTestId("countdown-numeral-outgoing")).toBeNull();
+    expect(mockTick).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([false, true])("re-entry mid-countdown paints the true fraction left on the first frame (reduce motion %s)", (rm) => {
+    __setReduceMotionForTests(rm);
+    const s = render(<Countdown goAt={NOW + 1_500} {...props} />);
+    expect(scaleXOf(s.getByTestId("countdown-progress"))).toBeCloseTo(0.5);
+    expect(s.getByTestId("countdown-numeral")).toHaveTextContent("2");
   });
 
   it("GO (GRAPPLE, red) slams in too; still under Reduce Motion", () => {

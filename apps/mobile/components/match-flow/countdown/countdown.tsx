@@ -22,6 +22,11 @@ export const SLAM_MS = 140;
 const SLAM_EASE = Easing.out(Easing.back(1.7));
 
 /** The numeral showing `msLeft` before GO: 3, 2 or 1 (0 once it is GO). */
+/** The fraction of the countdown still to run at `goAt`, 0 to 1. */
+function fractionLeft(goAt: number): number {
+  return Math.max(0, Math.min(1, (goAt - Date.now()) / COUNTDOWN_MS));
+}
+
 export function countdownNumeral(msLeft: number): number {
   if (msLeft <= 0) return 0;
   return Math.min(3, Math.ceil(msLeft / 1000));
@@ -51,8 +56,8 @@ export function numeralSize(windowHeight: number): number {
  * Countdown slam (Motion Rule registry): each numeral drops in from 1.6x
  * and lands, a Signal Red bar drains across the bottom to GO, and each
  * numeral fires one `countdownTick` (GO's `countdownGo` is fired by
- * `LiveStage`). Reduce Motion crossfades the numerals with a static bar,
- * haptics kept. Over the camera it is dark in both app themes (ON_MEDIA).
+ * `LiveStage`). Reduce Motion crossfades the numerals (no slam); the bar
+ * still drains and the haptics are kept. Over the camera it is dark in both app themes (ON_MEDIA).
  */
 export function Countdown({ goAt, recording, me, opponent, myWeight, opponentWeight }: CountdownProps) {
   const insets = useSafeAreaInsets();
@@ -76,17 +81,16 @@ export function Countdown({ goAt, recording, me, opponent, myWeight, opponentWei
 
   // The Signal Red bar drains from full to empty over the whole countdown,
   // on the UI thread (scaleX from the left edge). It runs to GO exactly, so
-  // it never changes when the match starts. Reduce Motion: a static bar.
-  const remaining = useSharedValue(Math.max(0, Math.min(1, (goAt - Date.now()) / COUNTDOWN_MS)));
+  // it never changes when the match starts. It drains linearly under Reduce
+  // Motion too: a progress fill tells the athlete the time left and is not
+  // vestibular motion. The first frame is the true fraction left, so a
+  // re-entry mid-countdown never paints a full bar first.
+  const remaining = useSharedValue(fractionLeft(goAt));
   React.useEffect(() => {
-    if (reduceMotion) {
-      remaining.value = 1;
-      return;
-    }
     const left = Math.max(0, goAt - Date.now());
-    remaining.value = Math.max(0, Math.min(1, left / COUNTDOWN_MS));
+    remaining.value = fractionLeft(goAt);
     remaining.value = withTiming(0, { duration: left, easing: Easing.linear });
-  }, [goAt, reduceMotion, remaining]);
+  }, [goAt, remaining]);
   const barStyle = useAnimatedStyle(() => ({ transform: [{ scaleX: remaining.value }] }));
 
   // Countdown slam: each NEW numeral drops in from 1.6x and lands, with one
@@ -101,21 +105,35 @@ export function Countdown({ goAt, recording, me, opponent, myWeight, opponentWei
   const opacity = useSharedValue(slamFirst ? 0 : 1);
   const outOpacity = useSharedValue(0);
   const lastRef = React.useRef<number | null>(null);
-  // Read during render, before the effect below records the new numeral:
-  // the numeral this render replaces, drawn (Reduce Motion only) fading out.
-  const outgoing = lastRef.current !== null && lastRef.current !== numeral ? lastRef.current : null;
+  // Reduce Motion only: the numeral being replaced, held in state for the
+  // whole crossfade (cleared after `duration.fast`), so a parent re-render
+  // mid-fade cannot cut it short.
+  const [outgoing, setOutgoing] = React.useState<number | null>(null);
+  const outgoingTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  React.useEffect(
+    () => () => {
+      if (outgoingTimer.current) clearTimeout(outgoingTimer.current);
+    },
+    [],
+  );
   React.useEffect(() => {
     if (numeral === 0 || lastRef.current === numeral) return;
-    const hadPrevious = lastRef.current !== null;
+    const previous = lastRef.current;
     lastRef.current = numeral;
     void matchHaptics.countdownTick();
     if (reduceMotion) {
       scale.value = 1;
-      if (hadPrevious) {
+      if (previous !== null) {
         opacity.value = 0;
         outOpacity.value = 1;
         opacity.value = withTiming(1, { duration: duration.fast, easing: EASE });
         outOpacity.value = withTiming(0, { duration: duration.fast, easing: EASE });
+        setOutgoing(previous);
+        if (outgoingTimer.current) clearTimeout(outgoingTimer.current);
+        outgoingTimer.current = setTimeout(() => {
+          outgoingTimer.current = null;
+          setOutgoing(null);
+        }, duration.fast);
       } else {
         opacity.value = 1;
         outOpacity.value = 0;
