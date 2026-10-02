@@ -28,6 +28,10 @@
  *   the first frame. Every animation needs a still end state for `true`.
  * - `useAppActive(): boolean`: the app is in the foreground. Ambient loops
  *   run only while their state is true AND this is true.
+ * - `useFirstLoadEntering(): (index) => entering | undefined`: the list
+ *   enter stagger (rows rise 8px and fade, 60ms apart, first 8 rows) for the
+ *   FIRST load only; `undefined` afterwards, under Reduce Motion, and for
+ *   index >= 8. Call it in the screen and pass the function to the rows.
  *
  * Tests only: `__setReduceMotionForTests(next)`, `__resetAppActiveForTests()`.
  */
@@ -44,3 +48,10 @@ export {
 export { haptics, type HapticEvent } from "./haptics";
 export { useAppActive, __resetAppActiveForTests } from "./use-app-active";
 export { useReduceMotion, __setReduceMotionForTests } from "@/lib/match-flow/use-reduce-motion";
+export {
+  useFirstLoadEntering,
+  FIRST_LOAD_MAX_ROWS,
+  FIRST_LOAD_RISE_PX,
+  FIRST_LOAD_STAGGER_MS,
+  type EnteringAnimation,
+} from "./use-first-load-entering";

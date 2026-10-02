@@ -1,6 +1,7 @@
 import * as React from "react";
 import { ActivityIndicator, Pressable, RefreshControl, Text, View } from "react-native";
 import { useRouter } from "expo-router";
+import Animated from "react-native-reanimated";
 import { ArrowUpRight } from "lucide-react-native";
 import { useRequireAthlete } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
@@ -32,6 +33,7 @@ import {
   SkeletonParticipantRow,
 } from "@/components/ui/skeleton";
 import { formatRelativeDate } from "@jits/shared/utils";
+import { useFirstLoadEntering } from "@/lib/motion";
 
 type ShareAthlete = {
   id: string;
@@ -71,7 +73,8 @@ function ShareProfileButton({ athlete }: { athlete: ShareAthlete }) {
 /**
  * Cold-load placeholder mirroring the real layout: header plate (avatar + two
  * name/gym lines), a 3-tile stat strip, then four recent-match rows under the
- * "Recent Matches" tag. Static by default per the minimal-motion brand rule.
+ * "Recent Matches" tag. The bars carry the shared skeleton shimmer (Motion
+ * Rule, Ambient tier); the real rows then rise in once (list enter stagger).
  */
 function ProfileSkeleton() {
   return (
@@ -131,6 +134,9 @@ export default function ProfileScreen() {
   // Serve recent matches from the single cached history payload fetched by
   // useProfileData; no separate round-trip.
   const recent = React.useMemo(() => history.slice(0, 5), [history]);
+  // List enter stagger (Motion Rule): the recent-match rows rise in the
+  // first time they appear, never on refetch, pull-to-refresh or refocus.
+  const entering = useFirstLoadEntering();
 
   if (!athlete) {
     return (
@@ -186,17 +192,18 @@ export default function ProfileScreen() {
                 </View>
               ) : (
                 <View className="gap-[1px]">
-                  {recent.map((m) => {
+                  {recent.map((m, i) => {
                     const name = m.opponent_display_name ?? "Opponent";
                     return (
-                      <ParticipantRow
-                        key={m.match_id}
-                        name={`vs ${name}`}
-                        subtitle={formatRelativeDate(m.completed_at)}
-                        onPress={() => router.push(matchDetailHref(m.match_id))}
-                        accessibilityLabel={`Open match vs ${name}`}
-                        action={<HistoryRowAction eloDelta={m.elo_delta} eloAfter={m.elo_after} />}
-                      />
+                      <Animated.View key={m.match_id} entering={entering(i)}>
+                        <ParticipantRow
+                          name={`vs ${name}`}
+                          subtitle={formatRelativeDate(m.completed_at)}
+                          onPress={() => router.push(matchDetailHref(m.match_id))}
+                          accessibilityLabel={`Open match vs ${name}`}
+                          action={<HistoryRowAction eloDelta={m.elo_delta} eloAfter={m.elo_after} />}
+                        />
+                      </Animated.View>
                     );
                   })}
                 </View>
