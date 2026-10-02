@@ -12,12 +12,15 @@ replacement. The canvas policy lives in `~/code/EloRated/CLAUDE.md` section 5, a
 
 The canvas has two pages.
 
-- **Current app** (45 boards, dark mode, 390 px wide). A faithful drawing of the shipped
+- **Current app** (57 boards, dark mode, 390 px wide). A faithful drawing of the shipped
   `apps/mobile` code and nothing else: literal copy, the real tokens from `apps/mobile/lib/tokens.ts`,
   NativeWind sizes at 14 px per rem, and a fixed set of sample data. Each board is one screen in one
   state (for example "Arena: offline (Go Live)" or "Match 7: verdict summary"); a few boards show an
   overlay on top of Home (the incoming challenge sheet, the notification panel, the offline and update
-  banners). This page changes only when shipped code changes.
+  banners). This page changes only when shipped code changes. Boards 50 to 61 form the row
+  "Invites, friends & location" (added at the 0.5.0 sync on 2026-10-01), drawn with the invite and
+  location flags on. A new shipped screen may get a new board, but only with the owner's approval
+  (`/canvas-sync` asks; it never adds boards silently).
 - **Proposed (Sept 30 review)**. Board `00-Triage` lists every review item (accepted, declined with a
   reason, or pending) and links to the `P-*` proposal boards. When an accepted item ships, the matching
   Current app board is redrawn and its triage row is marked SHIPPED. Later review rounds add their own
@@ -91,10 +94,10 @@ Shape:
   `lib/cn.ts`, plus everything they import that is drawn (their import closure). Root-layout overlays
   that only show in one state (the JS splash, the offline banner, the OTA update UI, the error boundary,
   toasts) are left out of `global` and mapped to the boards that draw them (01, 48). A global hit marks
-  all 45 boards; `/canvas-sync` then checks which boards actually render differently before redrawing.
+  all 57 boards; `/canvas-sync` then checks which boards actually render differently before redrawing.
   The UI kit (`components/ui/**`, including `elo-system`) is not global: each kit file is mapped to the
   boards that import it.
-- `boards`: for each of the 45 Current app boards, the repo-relative paths and globs that feed it.
+- `boards`: for each of the 57 Current app boards, the repo-relative paths and globs that feed it.
 - `ignore`: never counted as drift (tests, snapshots, Markdown).
 - `undrawn`: screen and component files that exist but that no board draws (admin subpages, the
   video settings and realtime test screens, redirects, the share-profile sheet, unused match steps).
