@@ -14,6 +14,10 @@ import * as React from "react";
  * - `freshIncoming`: the fresh incoming challenges alone (the same
  *   10-minute rule, independent of live state). The Arena tab badge reads it
  *   so its red count agrees with the bell (AC-T1).
+ * - `loaded`: the host's first full read of the pending list has landed, so
+ *   `freshIncoming` is known rather than the empty starting value. The Arena
+ *   tab's blade clash seeds from the first loaded count, so old challenges
+ *   appearing on a slow cold start never read as one arriving.
  * - `open`: whether the one panel is showing. Any header button opens it.
  * - `focusCount`: bumped when a header with a bell gains focus, so the host
  *   re-reads the highlight half (a reel watched elsewhere stops counting).
@@ -22,11 +26,18 @@ import * as React from "react";
 interface BellSnapshot {
   badgeCount: number;
   freshIncoming: number;
+  loaded: boolean;
   open: boolean;
   focusCount: number;
 }
 
-const INITIAL: BellSnapshot = { badgeCount: 0, freshIncoming: 0, open: false, focusCount: 0 };
+const INITIAL: BellSnapshot = {
+  badgeCount: 0,
+  freshIncoming: 0,
+  loaded: false,
+  open: false,
+  focusCount: 0,
+};
 let snapshot: BellSnapshot = INITIAL;
 let onOpen: (() => void) | null = null;
 const listeners = new Set<() => void>();
@@ -36,6 +47,7 @@ function set(patch: Partial<BellSnapshot>): void {
   if (
     next.badgeCount === snapshot.badgeCount &&
     next.freshIncoming === snapshot.freshIncoming &&
+    next.loaded === snapshot.loaded &&
     next.open === snapshot.open &&
     next.focusCount === snapshot.focusCount
   ) {
@@ -67,12 +79,14 @@ function toCount(n: number): number {
 /**
  * Host only: the badge it derived from the pending list and the feed, and
  * (optional, default unchanged) how many of those are fresh incoming
- * challenges.
+ * challenges, and (optional, default unchanged) whether the pending list has
+ * had its first full read.
  */
-export function publishBellBadge(count: number, freshIncoming?: number): void {
+export function publishBellBadge(count: number, freshIncoming?: number, loaded?: boolean): void {
   set({
     badgeCount: toCount(count),
     ...(freshIncoming === undefined ? {} : { freshIncoming: toCount(freshIncoming) }),
+    ...(loaded === undefined ? {} : { loaded }),
   });
 }
 
@@ -90,7 +104,7 @@ export function registerBellHost(handler: () => void): () => void {
     // freshIncoming too: the Arena tab badge reads it, and the tab bar can
     // outlive the host (sign-out, an athlete switch before the next host
     // publishes), so it must not keep the last athlete's red count.
-    set({ badgeCount: 0, freshIncoming: 0, open: false });
+    set({ badgeCount: 0, freshIncoming: 0, loaded: false, open: false });
   };
 }
 
@@ -123,6 +137,11 @@ export function useBellBadgeCount(): number {
 /** Fresh incoming challenges (no highlights), whatever the live state. */
 export function useFreshIncomingCount(): number {
   return useSelector((s) => s.freshIncoming);
+}
+
+/** The pending list has had its first full read (see `loaded`). */
+export function useBellLoaded(): boolean {
+  return useSelector((s) => s.loaded);
 }
 
 export function useBellOpen(): boolean {

@@ -17,8 +17,10 @@ jest.mock("@/lib/arena/arena-store", () => ({
 }));
 
 let mockFreshIncoming = 0;
+let mockBellLoaded = true;
 jest.mock("@/lib/notifications/bell-store", () => ({
   useFreshIncomingCount: () => mockFreshIncoming,
+  useBellLoaded: () => mockBellLoaded,
 }));
 
 const mockUseMatchToConfirm = jest.fn();
@@ -98,7 +100,11 @@ it("exposes the raw tab state for the Arena icon: the larger count and the live 
     incomingCount: 4,
     isLive: true,
     hasConfirm: false,
+    incomingKnown: true,
   });
+  mockBellLoaded = false;
+  expect(renderHook(() => useArenaTabState()).result.current.incomingKnown).toBe(false);
+  mockBellLoaded = true;
 });
 
 it("no red count once a manual go-offline dropped a tucked challenge (Q3): the bell stops counting it", () => {

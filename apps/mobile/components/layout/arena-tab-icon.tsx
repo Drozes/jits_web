@@ -7,8 +7,9 @@
  *   fade on one 2400ms clock (`duration.ember`), one launching every 800ms.
  *   Silent. Reduce Motion: one static ember above the crossing.
  * - Countable embers [09.2], Ambient: while 1 to 3 incoming challenges are
- *   pending, one 2.5px ember per challenge rises on one shared clock offset
- *   by i/N, in place of the red count pill (the bar draws no pill for an
+ *   pending, one 2.5px heat-red ember per challenge rises on one shared clock
+ *   offset by i/N, never fading below 0.35 so they stay countable, in place
+ *   of the red count pill (the bar draws no pill for an
  *   `inIcon` count; above 3 the pill returns and no embers show). They replace
  *   the live embers while showing. Still (not hidden) while the Arena tab is
  *   focused, since the Arena screen shows the challenges itself. Reduce
@@ -17,9 +18,10 @@
  *   snap back together (ease-out back) with a small Signal Red spark at the
  *   crossing, when the athlete goes live (false to true, by their own tap,
  *   never a restore on launch, foreground or after a match: `goLive` haptic)
- *   and when the pending count increases (silent: the challenge prompt sheet
- *   already buzzes `challengeArrived` for every new challenge). Reduce Motion:
- *   no clash and no spark; the go-live haptic is kept.
+ *   and when the pending count increases after its first load (silent: the
+ *   challenge prompt sheet already buzzes `challengeArrived` for every new
+ *   challenge). Reduce Motion: no clash and no spark; the go-live haptic is
+ *   kept.
  *
  * At rest the two halves are exactly lucide Swords (v1.16.0) at the given size,
  * stroke 2; `__tests__/components/layout/arena-tab-icon.test.tsx` holds the
@@ -130,10 +132,15 @@ const SPARK_DELAY_MS = CLASH_SPREAD_MS + 100;
 const SPARK_IN_MS = 80;
 const SPARK_OUT_MS = 300;
 /**
- * A pending count that rises within this long of the icon mounting is the
- * first read of the stores on launch, not a challenge arriving: no clash.
+ * The countable ember's heat color, the same in both themes (Arena heat, not
+ * the text-only Signal Red token).
  */
-export const CLASH_SETTLE_MS = 2500;
+export const HEAT_EMBER_RED = "#EC6A74";
+/**
+ * Countable embers never fade below this, so 2 or 3 of them can be counted at
+ * a glance at any moment of the cycle. Live embers keep the full fade.
+ */
+const COUNT_EMBER_MIN_OPACITY = 0.35;
 
 // ---------------------------------------------------------------------------
 // Embers
@@ -169,6 +176,8 @@ interface EmberSpec {
   toY: number;
   driftX: number;
   peakOpacity: number;
+  /** The lowest opacity across a life (0 = fades out fully). */
+  minOpacity: number;
   /** Shrink to this scale by the end of a life (1 = none). */
   endScale: number;
 }
@@ -190,8 +199,8 @@ function Ember({
     // This ember's phase on the shared clock, 0 to 1.
     const p = (clock.value + 1 - offset) % 1;
     const rise = 1 - (1 - p) * (1 - p); // out-quad
-    const opacity =
-      p < 0.2 ? (spec.peakOpacity * p) / 0.2 : (spec.peakOpacity * (1 - p)) / 0.8;
+    const fade = p < 0.2 ? p / 0.2 : (1 - p) / 0.8;
+    const opacity = spec.minOpacity + (spec.peakOpacity - spec.minOpacity) * fade;
     return {
       opacity,
       transform: [
@@ -248,12 +257,25 @@ function StillEmber({
 function LiveEmbers({ unit, still, run }: { unit: number; still: boolean; run: boolean }) {
   const tokens = useThemedTokens();
   const clock = useEmberClock(run && !still);
-  const base = { top: 6, size: 2, fromY: 0, toY: -13, driftX: 0, peakOpacity: 0.85, endScale: 0.4 };
-  const specs: EmberSpec[] = [
-    { ...base, left: 8, color: tokens.brandOrange },
-    { ...base, left: 11, color: tokens.accentCta },
-    { ...base, left: 5, color: tokens.brandOrange },
-  ];
+  const orange = tokens.brandOrange;
+  const red = tokens.accentCta;
+  const specs = React.useMemo<EmberSpec[]>(() => {
+    const base = {
+      top: 6,
+      size: 2,
+      fromY: 0,
+      toY: -13,
+      driftX: 0,
+      peakOpacity: 0.85,
+      minOpacity: 0,
+      endScale: 0.4,
+    };
+    return [
+      { ...base, left: 8, color: orange },
+      { ...base, left: 11, color: red },
+      { ...base, left: 5, color: orange },
+    ];
+  }, [orange, red]);
   if (still) {
     // One ember held just above the crossing (9, 9).
     return (
@@ -293,19 +315,23 @@ function CountEmbers({
   still: boolean;
   run: boolean;
 }) {
-  const tokens = useThemedTokens();
   const clock = useEmberClock(run && !still);
-  const specs: EmberSpec[] = Array.from({ length: count }, (_, i) => ({
-    left: 9 - 1.25,
-    top: 2,
-    size: 2.5,
-    color: tokens.accentCtaText,
-    fromY: 4,
-    toY: -16,
-    driftX: COUNT_DRIFT_X[i] ?? 0,
-    peakOpacity: 1,
-    endScale: 1,
-  }));
+  const specs = React.useMemo<EmberSpec[]>(
+    () =>
+      Array.from({ length: count }, (_, i) => ({
+        left: 9 - 1.25,
+        top: 2,
+        size: 2.5,
+        color: HEAT_EMBER_RED,
+        fromY: 4,
+        toY: -16,
+        driftX: COUNT_DRIFT_X[i] ?? 0,
+        peakOpacity: 1,
+        minOpacity: COUNT_EMBER_MIN_OPACITY,
+        endScale: 1,
+      })),
+    [count],
+  );
   if (still) {
     return (
       <View testID="arena-embers-count-still" pointerEvents="none" style={fill}>
@@ -398,6 +424,12 @@ export interface ArenaTabIconProps {
   live: boolean;
   /** Pending incoming challenges, as the tab badge counts them. */
   incomingCount: number;
+  /**
+   * The count is known (the first full read of the pending list landed).
+   * Until then a rising count is loading, not arriving: no clash. Defaults
+   * to true.
+   */
+  incomingKnown?: boolean;
 }
 
 export function ArenaTabIcon({
@@ -406,6 +438,7 @@ export function ArenaTabIcon({
   focused = false,
   live,
   incomingCount,
+  incomingKnown = true,
 }: ArenaTabIconProps) {
   const tokens = useThemedTokens();
   const reduceMotion = useReduceMotion();
@@ -423,7 +456,6 @@ export function ArenaTabIcon({
   reduceRef.current = reduceMotion;
   const activeRef = React.useRef(appActive);
   activeRef.current = appActive;
-  const mountedAtRef = React.useRef(Date.now());
 
   const playClash = React.useCallback(() => {
     if (reduceRef.current) return;
@@ -449,16 +481,22 @@ export function ArenaTabIcon({
     playClash();
   }, [live, playClash]);
 
-  const prevPendingRef = React.useRef(pending);
+  // The pending count seeds from the first LOADED value (null until the
+  // count is known, and again after it stops being known, e.g. sign-out), so
+  // old challenges appearing on a slow cold start never clash.
+  const prevPendingRef = React.useRef<number | null>(incomingKnown ? pending : null);
   React.useEffect(() => {
+    if (!incomingKnown) {
+      prevPendingRef.current = null;
+      return;
+    }
     const was = prevPendingRef.current;
     prevPendingRef.current = pending;
-    if (pending <= was) return;
+    if (was === null || pending <= was) return;
     if (!activeRef.current) return;
-    if (Date.now() - mountedAtRef.current < CLASH_SETTLE_MS) return;
     // Silent: the challenge prompt sheet already fires `challengeArrived`.
     playClash();
-  }, [pending, playClash]);
+  }, [pending, incomingKnown, playClash]);
 
   const bladeA = useAnimatedStyle(() => ({ transform: [{ translateX: -spread.value }] }));
   const bladeB = useAnimatedStyle(() => ({ transform: [{ translateX: spread.value }] }));
@@ -506,11 +544,13 @@ export function ArenaTabIcon({
 export interface ArenaTabSignals {
   live: boolean;
   incomingCount: number;
+  incomingKnown: boolean;
 }
 
 const ArenaTabSignalsContext = React.createContext<ArenaTabSignals>({
   live: false,
   incomingCount: 0,
+  incomingKnown: false,
 });
 
 /**
@@ -530,7 +570,7 @@ export function ArenaTabBarIcon({
   size: number;
   focused: boolean;
 }) {
-  const { live, incomingCount } = React.useContext(ArenaTabSignalsContext);
+  const { live, incomingCount, incomingKnown } = React.useContext(ArenaTabSignalsContext);
   return (
     <ArenaTabIcon
       color={color}
@@ -538,6 +578,7 @@ export function ArenaTabBarIcon({
       focused={focused}
       live={live}
       incomingCount={incomingCount}
+      incomingKnown={incomingKnown}
     />
   );
 }

@@ -133,14 +133,16 @@ interface EloTabBarProps extends BottomTabBarProps {
  */
 function TabIcon({
   bounce,
+  testID,
   children,
 }: {
   bounce: { value: number };
+  testID: string;
   children: React.ReactNode;
 }) {
   const style = useAnimatedStyle(() => ({ transform: [{ scale: bounce.value }] }));
   return (
-    <Animated.View pointerEvents="none" style={[{ position: "relative" }, style]}>
+    <Animated.View testID={testID} pointerEvents="none" style={[{ position: "relative" }, style]}>
       {children}
     </Animated.View>
   );
@@ -277,7 +279,7 @@ function TabButton({
         isActive ? "border-cta" : "border-transparent",
       )}
     >
-      <TabIcon bounce={bounce.scale}>
+      <TabIcon bounce={bounce.scale} testID={`tab-icon-${route.name}`}>
         {iconNode}
         {badge ? <TabBadgeMark badge={badge} routeName={route.name} /> : null}
       </TabIcon>

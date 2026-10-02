@@ -732,4 +732,35 @@ describe("isAthleteGoLiveFlip (Arena tab blade clash, Adding Flare)", () => {
     });
     expect(isAthleteGoLiveFlip()).toBe(false);
   });
+
+  it("forgets a settled go-live on sign-out, so the next athlete's arrival never counts", async () => {
+    registerArenaController(controller());
+    await act(async () => {
+      await liveSwitch.goLive();
+    });
+    expect(isAthleteGoLiveFlip()).toBe(true);
+    await act(async () => {
+      await takeArenaOfflineBeforeSignOut(10);
+    });
+    expect(isAthleteGoLiveFlip()).toBe(false);
+  });
+
+  it("forgets a settled go-live when the app goes to the background", async () => {
+    registerArenaController(controller());
+    await act(async () => {
+      await liveSwitch.goLive();
+    });
+    expect(isAthleteGoLiveFlip()).toBe(true);
+    // The module listens to AppState from load; drive its listener.
+    const { AppState } = require("react-native");
+    const calls = (AppState.addEventListener as jest.Mock).mock?.calls ?? [];
+    const listeners = calls
+      .filter((c: unknown[]) => c[0] === "change")
+      .map((c: unknown[]) => c[1] as (s: string) => void);
+    expect(listeners.length).toBeGreaterThan(0);
+    for (const l of listeners) l("inactive");
+    expect(isAthleteGoLiveFlip()).toBe(true);
+    for (const l of listeners) l("background");
+    expect(isAthleteGoLiveFlip()).toBe(false);
+  });
 });

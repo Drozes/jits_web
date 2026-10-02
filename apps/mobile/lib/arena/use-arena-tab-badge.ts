@@ -25,7 +25,7 @@
 import { useAuth } from "@/lib/auth/hooks";
 import { useMatchToConfirm } from "@/lib/match-flow/active-match-store";
 import type { TabBadge } from "@/lib/navigation/tab-badge";
-import { useFreshIncomingCount } from "@/lib/notifications/bell-store";
+import { useBellLoaded, useFreshIncomingCount } from "@/lib/notifications/bell-store";
 import { useArenaIncomingCount, useIsArenaLive } from "./arena-store";
 import { arenaTabBadge } from "./mat-board";
 
@@ -35,6 +35,11 @@ export interface ArenaTabState {
   incomingCount: number;
   isLive: boolean;
   hasConfirm: boolean;
+  /**
+   * The count is known: the bell's pending list has had its first full read.
+   * Until then a rising count is the stores loading, not a challenge arriving.
+   */
+  incomingKnown: boolean;
 }
 
 export function useArenaTabState(): ArenaTabState {
@@ -45,10 +50,12 @@ export function useArenaTabState(): ArenaTabState {
   const isLive = useIsArenaLive();
   const freshIncoming = useFreshIncomingCount();
   const hasConfirm = useMatchToConfirm(athlete?.id ?? null) !== null;
+  const incomingKnown = useBellLoaded();
   return {
     incomingCount: Math.max(incomingCount, freshIncoming),
     isLive,
     hasConfirm,
+    incomingKnown,
   };
 }
 

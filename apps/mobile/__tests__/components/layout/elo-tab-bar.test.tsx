@@ -13,6 +13,26 @@ jest.mock("@/lib/theme/use-theme", () => ({
   }),
 }));
 
+// Observe the bounce's animation calls (the jest renderer does not run them).
+const mockWithTiming = jest.fn();
+const mockWithSpring = jest.fn();
+jest.mock("react-native-reanimated", () => {
+  const actual = jest.requireActual("react-native-reanimated");
+  return {
+    ...actual,
+    __esModule: true,
+    default: actual.default,
+    withTiming: (...args: unknown[]) => {
+      mockWithTiming(...args);
+      return actual.withTiming(...args);
+    },
+    withSpring: (...args: unknown[]) => {
+      mockWithSpring(...args);
+      return actual.withSpring(...args);
+    },
+  };
+});
+
 jest.mock("@/lib/motion/haptics", () => ({
   haptics: new Proxy(
     {},
@@ -294,6 +314,27 @@ describe("tab select bounce and haptic (Adding Flare [10.2])", () => {
     fireEvent.press(u.getByLabelText("Profile"));
     expect(haptics.select).not.toHaveBeenCalled();
     expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it("squashes the pressed icon and springs it back (select spring)", () => {
+    const u = render(React.createElement(EloTabBar, buildProps(CURRENT_TABS)));
+    fireEvent.press(u.getByLabelText("Arena"));
+    expect(mockWithTiming).toHaveBeenCalledWith(0.86, expect.objectContaining({ duration: 100 }));
+    expect(mockWithSpring).toHaveBeenCalledWith(1, { damping: 14, stiffness: 260 });
+  });
+
+  it("does not bounce the active tab", () => {
+    const u = render(React.createElement(EloTabBar, buildProps(CURRENT_TABS)));
+    fireEvent.press(u.getByLabelText("Home"));
+    expect(mockWithSpring).not.toHaveBeenCalled();
+  });
+
+  it("does not scale under Reduce Motion", () => {
+    __setReduceMotionForTests(true);
+    const u = render(React.createElement(EloTabBar, buildProps(CURRENT_TABS)));
+    fireEvent.press(u.getByLabelText("Arena"));
+    expect(mockWithTiming).not.toHaveBeenCalledWith(0.86, expect.anything());
+    expect(mockWithSpring).not.toHaveBeenCalled();
   });
 
   it("keeps the haptic under Reduce Motion", () => {

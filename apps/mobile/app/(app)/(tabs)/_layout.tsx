@@ -17,8 +17,12 @@ import { useArenaTabState } from "@/lib/arena/use-arena-tab-badge";
 function TabBar(props: BottomTabBarProps) {
   const arena = useArenaTabState();
   const signals = React.useMemo(
-    () => ({ live: arena.isLive, incomingCount: arena.incomingCount }),
-    [arena.isLive, arena.incomingCount],
+    () => ({
+      live: arena.isLive,
+      incomingCount: arena.incomingCount,
+      incomingKnown: arena.incomingKnown,
+    }),
+    [arena.isLive, arena.incomingCount, arena.incomingKnown],
   );
   return (
     <ArenaTabSignalsProvider value={signals}>

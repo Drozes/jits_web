@@ -55,7 +55,7 @@ jest.mock("@/lib/arena/arena-store", () => ({
 
 import {
   ArenaTabIcon,
-  CLASH_SETTLE_MS,
+  HEAT_EMBER_RED,
   SWORDS_BLADE_A,
   SWORDS_BLADE_B,
   type ArenaTabIconProps,
@@ -94,6 +94,11 @@ function renderIcon(props: Partial<ArenaTabIconProps> = {}) {
   const update = (next: Partial<ArenaTabIconProps>) =>
     utils.rerender(<ArenaTabIcon {...BASE} {...props} {...next} />);
   return { ...utils, update };
+}
+
+function flat(style: unknown): Record<string, unknown> {
+  const { StyleSheet } = require("react-native");
+  return StyleSheet.flatten(style) ?? {};
 }
 
 /** Haptic calls of any kind. */
@@ -187,6 +192,16 @@ describe("countable embers [09.2]", () => {
     expect(u.getAllByTestId(/^arena-ember-count-/)).toHaveLength(2);
   });
 
+  it("uses the heat red in both themes, never fully fading, so N is countable", () => {
+    const u = renderIcon({ incomingCount: 3 });
+    for (let i = 0; i < 3; i++) {
+      const style = flat(u.getByTestId(`arena-ember-count-${i}`).props.style);
+      expect(style.backgroundColor).toBe(HEAT_EMBER_RED);
+      expect(style.opacity).toBeGreaterThanOrEqual(0.35);
+    }
+    expect(HEAT_EMBER_RED).toBe("#EC6A74");
+  });
+
   it("Reduce Motion: N still embers", () => {
     __setReduceMotionForTests(true);
     const u = renderIcon({ incomingCount: 3 });
@@ -253,7 +268,6 @@ describe("blade clash [04.1 + 11.1]", () => {
 
   it("plays silently when the pending count increases (the prompt sheet already buzzes)", () => {
     const u = renderIcon({ live: true, incomingCount: 0 });
-    now += CLASH_SETTLE_MS;
     u.update({ incomingCount: 1 });
     expect(u.getByTestId("arena-tab-clash-1")).toBeTruthy();
     u.update({ incomingCount: 2 });
@@ -264,24 +278,39 @@ describe("blade clash [04.1 + 11.1]", () => {
 
   it("does not play when the count drops or stays the same", () => {
     const u = renderIcon({ incomingCount: 2 });
-    now += CLASH_SETTLE_MS;
     u.update({ incomingCount: 2 });
     u.update({ incomingCount: 1 });
     u.update({ incomingCount: 0 });
     expect(u.queryByTestId(/^arena-tab-clash-/)).toBeNull();
   });
 
-  it("does not play for the first read of the stores right after mount", () => {
-    const u = renderIcon({ incomingCount: 0 });
-    now += CLASH_SETTLE_MS - 1;
-    u.update({ incomingCount: 2 });
+  it("does not play for old challenges arriving with a slow first load", () => {
+    // Cold start: the count is unknown, then the first read lands (however
+    // long it took) carrying challenges that were already waiting.
+    const u = renderIcon({ incomingCount: 0, incomingKnown: false });
+    u.update({ incomingCount: 0, incomingKnown: false });
+    u.update({ incomingCount: 2, incomingKnown: true });
+    expect(u.queryByTestId(/^arena-tab-clash-/)).toBeNull();
+  });
+
+  it("plays for a real increase after the first load", () => {
+    const u = renderIcon({ incomingCount: 0, incomingKnown: false });
+    u.update({ incomingCount: 2, incomingKnown: true });
+    u.update({ incomingCount: 3, incomingKnown: true });
+    expect(u.getByTestId("arena-tab-clash-1")).toBeTruthy();
+    expect(anyHaptic()).toBe(0);
+  });
+
+  it("re-seeds after the count stops being known (sign-out, next athlete)", () => {
+    const u = renderIcon({ incomingCount: 1, incomingKnown: true });
+    u.update({ incomingCount: 0, incomingKnown: false });
+    u.update({ incomingCount: 3, incomingKnown: true });
     expect(u.queryByTestId(/^arena-tab-clash-/)).toBeNull();
   });
 
   it("does not play while the app is in the background", () => {
     setAppState("background");
     const u = renderIcon({ live: false, incomingCount: 0 });
-    now += CLASH_SETTLE_MS;
     u.update({ live: true, incomingCount: 1 });
     expect(u.queryByTestId(/^arena-tab-clash-/)).toBeNull();
     expect(anyHaptic()).toBe(0);
@@ -290,7 +319,6 @@ describe("blade clash [04.1 + 11.1]", () => {
   it("Reduce Motion: a count increase shows no clash", () => {
     __setReduceMotionForTests(true);
     const u = renderIcon({ incomingCount: 0 });
-    now += CLASH_SETTLE_MS;
     u.update({ incomingCount: 1 });
     expect(u.queryByTestId(/^arena-tab-clash-/)).toBeNull();
     expect(anyHaptic()).toBe(0);

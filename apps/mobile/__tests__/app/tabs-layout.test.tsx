@@ -67,7 +67,7 @@ jest.mock("@/components/layout/elo-tab-bar", () => ({
   EloTabBar: (p: Record<string, unknown>) => mockEloTabBar(p),
 }));
 
-let mockArenaState = { incomingCount: 0, isLive: false, hasConfirm: false };
+let mockArenaState = { incomingCount: 0, isLive: false, hasConfirm: false, incomingKnown: true };
 jest.mock("@/lib/arena/use-arena-tab-badge", () => ({
   useArenaTabState: () => mockArenaState,
 }));
@@ -77,7 +77,7 @@ jest.mock("@/lib/arena/use-arena-tab-badge", () => ({
 const mockArenaIcon = jest.fn((_p: Record<string, unknown>) => null);
 jest.mock("@/components/layout/arena-tab-icon", () => {
   const R = require("react");
-  const Ctx = R.createContext({ live: false, incomingCount: 0 });
+  const Ctx = R.createContext({ live: false, incomingCount: 0, incomingKnown: false });
   return {
     ArenaTabSignalsProvider: Ctx.Provider,
     ArenaTabBarIcon: (p: Record<string, unknown>) => mockArenaIcon({ ...p, ...R.useContext(Ctx) }),
@@ -171,7 +171,7 @@ describe("(tabs)/_layout", () => {
   it("hands the Arena tab its badge and live state from the app-wide stores (jits-dq85.16)", () => {
     render(React.createElement(TabsLayout));
     expect(capturedTabBar.current).toBeTruthy();
-    mockArenaState = { incomingCount: 5, isLive: true, hasConfirm: false };
+    mockArenaState = { incomingCount: 5, isLive: true, hasConfirm: false, incomingKnown: true };
     const barProps = { state: { routes: [], index: 0 }, descriptors: {}, navigation: {} };
     render(capturedTabBar.current!(barProps) as React.ReactElement);
     expect(mockEloTabBar).toHaveBeenLastCalledWith(
@@ -183,7 +183,7 @@ describe("(tabs)/_layout", () => {
     );
 
     // 1 to 3 pending: the icon draws them as embers.
-    mockArenaState = { incomingCount: 2, isLive: false, hasConfirm: false };
+    mockArenaState = { incomingCount: 2, isLive: false, hasConfirm: false, incomingKnown: true };
     render(capturedTabBar.current!(barProps) as React.ReactElement);
     expect(mockEloTabBar).toHaveBeenLastCalledWith(
       expect.objectContaining({
@@ -192,7 +192,7 @@ describe("(tabs)/_layout", () => {
       }),
     );
 
-    mockArenaState = { incomingCount: 0, isLive: false, hasConfirm: false };
+    mockArenaState = { incomingCount: 0, isLive: false, hasConfirm: false, incomingKnown: true };
     render(capturedTabBar.current!(barProps) as React.ReactElement);
     expect(mockEloTabBar).toHaveBeenLastCalledWith(
       expect.objectContaining({ badges: { arena: null } }),
@@ -208,12 +208,12 @@ describe("(tabs)/_layout", () => {
       size: 18,
     });
     // Rendered inside the bar's provider, the icon sees live and the count.
-    mockArenaState = { incomingCount: 2, isLive: true, hasConfirm: false };
+    mockArenaState = { incomingCount: 2, isLive: true, hasConfirm: false, incomingKnown: true };
     mockEloTabBar.mockImplementationOnce(() => icon as never);
     const barProps = { state: { routes: [], index: 0 }, descriptors: {}, navigation: {} };
     render(capturedTabBar.current!(barProps) as React.ReactElement);
     expect(mockArenaIcon).toHaveBeenLastCalledWith(
-      expect.objectContaining({ focused: true, color: "#fff", size: 18, live: true, incomingCount: 2 }),
+      expect.objectContaining({ focused: true, color: "#fff", size: 18, live: true, incomingCount: 2, incomingKnown: true }),
     );
   });
 });

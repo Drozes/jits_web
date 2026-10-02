@@ -18,6 +18,12 @@ interface UsePendingChallengesResult {
    * long-lived consumer calls this on foreground or when it is looked at.
    */
   refetch: () => Promise<void>;
+  /**
+   * A full read has been applied for this athlete, so `count` is known rather
+   * than the empty starting list. Lets a consumer tell the first load (old
+   * challenges appearing) from a challenge arriving later.
+   */
+  loaded: boolean;
 }
 
 /** Raw challenge row shape from realtime payload (no FK joins). */
@@ -87,6 +93,9 @@ export function usePendingChallenges(
   athleteId: string,
 ): UsePendingChallengesResult {
   const [owned, setOwned] = useState<OwnedList>({ owner: athleteId, list: NO_CHALLENGES });
+  // The athlete whose list has had a full read applied (see `loaded`).
+  const [loadedFor, setLoadedFor] = useState<string | null>(null);
+  const loadedForRef = useRef<string | null>(null);
   // The latest list, updated synchronously. Every change goes through
   // `updateList`, so this is the source of truth and `owned` mirrors it.
   const ownedRef = useRef(owned);
@@ -155,6 +164,11 @@ export function usePendingChallenges(
     if (!data || athleteId !== currentAthleteId.current) return;
     if (seq <= lastAppliedSeq.current) return;
     lastAppliedSeq.current = seq;
+    // Once per athlete: a re-read must not cost a render (see `updateList`).
+    if (loadedForRef.current !== athleteId) {
+      loadedForRef.current = athleteId;
+      setLoadedFor(athleteId);
+    }
     // A newer read is still pending or failed: this one's query may have run
     // before a realtime INSERT committed, so keep the rows realtime added.
     const superseded = seq !== readSeq.current;
@@ -301,5 +315,10 @@ export function usePendingChallenges(
   }, [supabase, athleteId, fetchChallenges, afterRealtimeEvent, updateList]);
 
   const challenges = owned.owner === athleteId ? owned.list : NO_CHALLENGES;
-  return { count: challenges.length, challenges, refetch: fetchChallenges };
+  return {
+    count: challenges.length,
+    challenges,
+    refetch: fetchChallenges,
+    loaded: loadedFor === athleteId,
+  };
 }
