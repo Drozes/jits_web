@@ -81,7 +81,7 @@ Cards: **Plate** (Surfaces family); **OnAirStrip** and **ChallengeStrip** (incom
 
 ### Feedback and loading
 
-`toast` + `BrandToast` (`components/ui/toast.tsx`, 89 calls) is canonical: `plate` fill, `hairline-strong` border, `radius-plate`, a 3px left rule (success `ink`, deliberately not green; error `signal-red`; info `ink-3`), `toast-title` plus `body-12`, no shadow. The skeleton set (`components/ui/skeleton/skeleton.tsx`) runs one shared 1400ms shimmer clock. Known issue: skeleton bars (`SkeletonBlock`, `bg-surface-3`) currently share the surface tier of their host plate (`Plate`, `SkeletonPlate`, the rank and participant rows), so inside a plate they are invisible at rest and under Reduce Motion, and show only while the shimmer band crosses them; tracked in WP6, bead jits-3eeg.7. Banners (offline, update, upload progress, queue status) have no shared shell yet; the offline banner is a legacy red bar (R3 SC-1, WP4).
+`toast` + `BrandToast` (`components/ui/toast.tsx`, 89 calls) is canonical: `plate` fill, `hairline-strong` border, `radius-plate`, a 3px left rule (success `ink`, deliberately not green; error `signal-red`; info `ink-3`), `toast-title` plus `body-12`, no shadow. The skeleton set (`components/ui/skeleton/skeleton.tsx`) runs one shared 1400ms shimmer clock. Skeleton bars (`SkeletonBlock`) are `plate-bright` (`bg-surface-4`), one tier above their host plate (`Plate`, `SkeletonPlate`, the rank and participant rows), with an `ink` band at 8% opacity, so they read at rest and under Reduce Motion (WP6, bead jits-3eeg.7). Banners (offline, update, upload progress, queue status) have no shared shell yet; the offline banner is a legacy red bar (R3 SC-1, WP4).
 
 Cards (Feedback family): **Toast**, **Skeleton**.
 

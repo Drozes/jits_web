@@ -1,6 +1,6 @@
 # Motion
 
-Motion in ELO RATED carries meaning or it does not exist. This section carries over the Motion Rule as shipped in jits_web (Adding Flare, 2026-10-01; DESIGN.md "Motion", verified against `apps/mobile/lib/motion/tokens.ts` at 69e2e7f). The design-system format has no motion token family, so the exact values live here.
+Motion in ELO RATED carries meaning or it does not exist. This section carries over the Motion Rule as shipped in jits_web (Adding Flare, 2026-10-01; DESIGN.md "Motion", verified against `apps/mobile/lib/motion/tokens.ts` at 69e2e7f; line numbers refreshed for WP6). The design-system format has no motion token family, so the exact values live here.
 
 ## Token values at a glance
 
@@ -13,14 +13,17 @@ Motion in ELO RATED carries meaning or it does not exist. This section carries o
 | `duration.pulse` | 1400ms | 19 | `--duration-pulse` |
 | `duration.ember` | 2400ms | 21 | (none) |
 | `duration.shimmer` | 1400ms | 23 | (none; web Tailwind `shimmer` is 3s) |
-| `tempo.quiet` / `normal` / `busy` | 3000 / 1600 / 800ms | 36-40 | (none) |
-| `BRAND_EASE_OUT_CURVE`, `easing.brandOut` | `cubic-bezier(0.22, 1, 0.36, 1)` | 50, 55 | `--easing-default` |
-| `easing.outCubic` | `Easing.out(Easing.cubic)` | 57 | (none) |
-| `spring.press` | damping 18, stiffness 300 | 63 | (none) |
-| `spring.select` | damping 14, stiffness 260 | 65 | (none) |
-| `PRESS_SCALE` | 0.97 | 69 | web press scale 0.98 (`globals.css:143`) |
+| `moment.*` (single Moments) | `goFade` 700, `confettiFall` 1800, `confettiFadeDelay` 1200, `confettiFade` 600, `slamIn` 520, `slamInFade` 300, `riseInDelay` 500, `riseIn` 400, `tapMarkFill` 80, `tapNudge` 50ms | 33-54 | (none) |
+| `tempo.quiet` / `normal` / `busy` | 3000 / 1600 / 800ms | 66-70 | (none) |
+| `BRAND_EASE_OUT_CURVE`, `easing.brandOut` | `cubic-bezier(0.22, 1, 0.36, 1)` | 80, 85 | `--easing-default` |
+| `easing.outCubic` | `Easing.out(Easing.cubic)` | 87 | (none) |
+| `easing.inQuad` | `Easing.in(Easing.quad)` (a fall or a fade off) | 89 | (none) |
+| `easing.linear` | `Easing.linear` (elapsed-time readouts) | 91 | (none) |
+| `spring.press` | damping 18, stiffness 300 | 97 | (none) |
+| `spring.select` | damping 14, stiffness 260 | 99 | (none) |
+| `PRESS_SCALE` | 0.97 | 103 | web press scale 0.98 (`globals.css:143`) |
 
-Component constants outside the token file: `ROLL_MS` 600 and `ROLL_MAX_SPAN` 30 (`rolling-number.tsx`); blade clash 60ms spread plus 160ms snap, spark 80ms in and 300ms out (`arena-tab-icon.tsx:125-133`); `FIGHT_EASING = BRAND_EASE_OUT_CURVE` (`fight-tokens.ts:14`). Durations still written as literals (countdown 700ms, celebration 1800 / 1200 / 600 / 520 / 300 / 400ms, rating moment 80 / 50ms, offline banner 220ms) are WP6 clean-up (R3 MF-11, SC-1).
+Component constants outside the token file: `ROLL_MS` 600 and `ROLL_MAX_SPAN` 30 (`rolling-number.tsx`); blade clash 60ms spread plus 160ms snap, spark 80ms in and 300ms out (`arena-tab-icon.tsx:125-133`); `FIGHT_EASING = BRAND_EASE_OUT_CURVE` (`fight-tokens.ts:14`). The single-Moment durations that were literals (the countdown GO fade, the verdict celebration, the tap marks) are named in `moment` with their shipped values (R3 MF-11, WP6), and the hold-to-end retract is `duration.fast`. The offline banner's 220ms stays a literal until WP4 restyles the banner on `duration.fast` (R3 SC-1). The launch splash keeps its own timing in `@jits/shared/constants` (`SPLASH_REVEAL`, `SPLASH_STATEMENT`, `SPLASH_GLOW_STATEMENT`).
 
 In a static preview, draw the Reduce Motion end state: the final number, the cooled edge, the static ember, the filled tally.
 
@@ -32,7 +35,8 @@ Mobile tokens live in `apps/mobile/lib/motion/tokens.ts` and are imported from `
 
 - **Durations:** `instant` 100ms (reactive feedback), `fast` 240ms, `base` 480ms (rating tick), `slow` 720ms, `pulse` 1400ms (fixed LIVE pulse cycle), `ember` 2400ms (Arena ember cycle), `shimmer` 1400ms (skeleton sweep).
 - **LIVE pulse tempo:** `tempo.quiet` 3000ms, `tempo.normal` 1600ms, `tempo.busy` 800ms, chosen by how many athletes are live in the lobby. One shared clock drives every live dot so they never beat out of step.
-- **Easing:** brand ease-out `cubic-bezier(0.22, 1, 0.36, 1)` (`easing.brandOut`, no bounce) by default; `easing.outCubic` for counts.
+- **Single Moments:** `moment` names the durations that belong to one registered Moment (`goFade`, `confettiFall`, `confettiFadeDelay`, `confettiFade`, `slamIn`, `slamInFade`, `riseInDelay`, `riseIn`, `tapMarkFill`, `tapNudge`). Name a new Moment's own timing there instead of writing a literal.
+- **Easing:** brand ease-out `cubic-bezier(0.22, 1, 0.36, 1)` (`easing.brandOut`, no bounce) by default; `easing.outCubic` for counts; `easing.inQuad` for a fall or a fade off; `easing.linear` for a readout of elapsed time.
 - **Springs:** `spring.press` (damping 18, stiffness 300) for a pressed control returning to rest; `spring.select` (damping 14, stiffness 260) for the tab select bounce.
 - **Press scale:** `PRESS_SCALE` 0.97.
 
@@ -93,7 +97,7 @@ Every approved animation in the mobile app. **Adding a new animation means addin
 | LIVE pulse tempo | Ambient | Every tempo-clock dot and the ON AIR heartbeat | Lobby activity (others live in `lobby:online`) picks `tempo` quiet / normal / busy; the period eases between buckets instead of restarting | none | Static dots |
 | ON AIR strip | Moment + Ambient | Arena screen body (`components/arena/on-air-strip.tsx`), never the header | Live false to true: the green ON AIR tally sweeps in (shown filled on a remount while already live). While live: a dim heartbeat trace brightens once per tempo-clock cycle; paused in background | none | Tally filled, full trace static |
 | Countdown slam | Moment | Face-off countdown (`components/match-flow/countdown/countdown.tsx`), replaces the plain match countdown | Each numeral drops from 1.6x and lands (about 140ms, ease-out back); a Signal Red bar drains linearly over the whole countdown to a red GO; total length and match start unchanged | `countdownTick` per numeral, `countdownGo` on GO | Numbers crossfade; the bar still drains linearly; haptics kept |
-| Verdict confetti / SlamIn / RiseIn | Moment | Verdict step | Confetti and the SlamIn of "YOU WON" on a win verdict only; RiseIn (the rank strip) on every verdict; each once | none | None (static verdict) |
+| Verdict confetti / SlamIn / RiseIn | Moment | Verdict step | Confetti and the SlamIn of "YOU WON" on a win verdict only; RiseIn (the rank strip) on every verdict; each once (timings in `moment`) | none | None (static verdict) |
 | Arena ember | Ambient | Arena tab icon (`components/layout/arena-tab-icon.tsx`) | While live and no challenge is pending: three 2px embers (two `brandOrange`, one Signal Red) rise off the blade tips, one at a time, 2400ms cycle | none | One static ember above the crossing |
 | Countable embers | Ambient | Arena tab icon | 1 to 3 pending incoming challenges: one 2.5px heat-red (`#EC6A74`) ember per challenge on one shared 2400ms clock, never fading below 0.35 opacity so they stay countable, in place of the red count pill (the pill returns above 3); they replace the live embers while showing and stop while the Arena tab is focused; VoiceOver keeps reading the count | none | N static embers |
 | Blade clash | Moment | Arena tab icon | Live false to true, or the pending incoming count increases: the Swords halves spread and snap together with a tiny Signal Red spark (about 220ms) | `goLive` on going live; none for a challenge (the prompt sheet already fires `challengeArrived`) | No clash, no spark |
@@ -105,10 +109,10 @@ Every approved animation in the mobile app. **Adding a new animation means addin
 | Challenge afterglow | Moment | Incoming challenge strips (`components/arena/afterglow-edge.tsx`) | A new challenge: the 2px bottom edge cools from hot to the hairline over 2000ms, timed from the earlier of the challenge's `created_at` and the first time this app run drew it, so a re-render, remount or old challenge shows it cooled | none | Cooled at once |
 | List enter stagger | Moment | `useFirstLoadEntering` (`@/lib/motion`): Rankings, Arena roster, Profile recent matches | FIRST load only: rows rise 8px and fade, 60ms apart, first 8 rows; never on refetch, refresh, pagination or recycling | none | None |
 | Rank-up swap flare | Moment | Rankings | First open after the athlete's last-seen rank improved: the old order swaps to the new (450ms layout transition) and a skewed Signal Red flare sweeps the row (500ms); once per climb | none | New order, no transition |
-| Skeleton shimmer | Ambient | Skeletons | While loading: one module-level 1400ms clock drives a faint band across every bar, in phase; only `translateX` animates (replaces the old opacity breath) | none | Plain static bars |
-| Launch splash reveal | Moment | `SplashReveal` / `SplashStatement` / `SplashGlowStatement` with `ErMark` | Once per cold start, handing off from the native splash (the one sanctioned on-mount moment) | Heavy impact at the lock beat | Resting frame, still dismisses |
-| Hold-to-end fill | Reactive | Live match, End match button | While the finger holds; retracts on release | `matchEnd` when the hold completes | Unchanged (it tracks the touch) |
-| Time-up drain bar | Moment | Live match state strip | Time is up: a 2px bar empties over the auto-end delay | none | Unchanged (it is a timer, not decoration) |
+| Skeleton shimmer | Ambient | Skeletons (`components/ui/skeleton/skeleton.tsx`): Home, Rankings, Profile, Arena, match detail, Film Room, the highlight viewer poster frame | While loading: one module-level 1400ms clock drives a faint band across every bar, in phase; only `translateX` animates (replaces the old opacity breath). Bars are `plate-bright`, one tier above the `plate` they sit on, and the band is `ink` at 8% opacity, so bars read at rest | none | Plain static `plate-bright` bars, still visible on a plate |
+| Launch splash reveal | Moment | `SplashReveal` / `SplashStatement` / `SplashGlowStatement` with `ErMark` | Once per cold start, handing off from the native splash (the one sanctioned on-mount moment). The climb's odometer is `RollingNumber` on the UI thread (the whole 480-point climb over `NUMBER_ROLL_MS` 900ms, out-cubic). The Statement's glow ramps in with the ignite, breathes up and back once and rests at its baseline; it never loops. Its static white text halo (`textShadow`, `splash-statement.tsx`) is the app's only shadow, sanctioned for this moment only: never copy it to product UI. Timing and curves are splash-local, sourced from `@jits/shared/constants` rather than `@/lib/motion`: the brand ease-out from `SPLASH_REVEAL.EASING_BEZIER` (the same curve as `easing.brandOut`), the Glow Statement's expand settle `SPLASH_GLOW_STATEMENT.EASING_EXPAND`, and an `Easing.inOut(Easing.ease)` glow breathe | Heavy impact at the lock beat | Resting frame, read with `useReduceMotion()` on the first frame and dismissing at the same moment. A late switch snaps to the resting frame, drops the pending lock haptic and dismisses after at most the reduced-motion hold |
+| Hold-to-end fill | Reactive | Live match, End match button (`components/match-flow/live/hold-to-end-button.tsx`) | While the finger holds: a Reanimated shared value scales a full-size fill (`scaleX` from the left; `scaleY` from the bottom on the landscape tile) and the 2px rule under the label, linear over `HOLD_TO_END_MS` 1200ms; no width animation. The end comes from its own timer, never the fill. An early release retracts it over `duration.fast` on the brand ease-out | `matchEnd` when the hold completes | Unchanged (it tracks the touch) |
+| Time-up drain bar | Moment | Live match state strip (`components/match-flow/live/state-strip.tsx`) | Time is up: a 2px bar empties on `scaleX` from the left, linear over the auto-end delay (`AUTO_END_DELAY_MS` 1000ms), on the UI thread; the auto-end itself is timed by the live step, not the bar | none | Unchanged (it is a timer, not decoration) |
 | Offline banner | Moment | Root layout, challenge prompt | Connectivity changes: slides in when offline, out when back (220ms) | none | Unchanged |
 
 ## Other

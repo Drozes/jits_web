@@ -1,13 +1,13 @@
 import * as React from "react";
-import { AccessibilityInfo, Dimensions, StyleSheet, Text } from "react-native";
+import { Dimensions, StyleSheet, Text } from "react-native";
 import Animated, {
   Easing,
+  cancelAnimation,
   interpolate,
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
-  withRepeat,
   withSequence,
   withTiming,
 } from "react-native-reanimated";
@@ -15,6 +15,7 @@ import * as Haptics from "expo-haptics";
 import * as SplashScreen from "expo-splash-screen";
 import { SPLASH_REVEAL, SPLASH_STATEMENT } from "@jits/shared/constants";
 import { Wordmark } from "@/components/ui/elo-system/wordmark";
+import { useReduceMotion } from "@/lib/motion";
 
 const S = SPLASH_STATEMENT;
 const EASE = Easing.bezier(
@@ -57,6 +58,15 @@ interface SplashStatementProps {
   onDone: () => void;
 }
 
+/**
+ * "The Statement" launch splash (Motion Rule registry: Launch splash reveal,
+ * a Moment, once per cold start). Reduce Motion is read with
+ * `useReduceMotion()` (correct on the first frame); a late flip to on snaps
+ * to the resting frame, drops the pending lock haptic and dismisses after at
+ * most the reduced hold. The glow plays once: it
+ * ramps to its baseline with the ignite, breathes up and back one time, then
+ * rests at the baseline (a Moment never loops).
+ */
 export function SplashStatement({ onDone }: SplashStatementProps) {
   const weare = useSharedValue(0);
   const ignite = useSharedValue(0);
@@ -69,10 +79,35 @@ export function SplashStatement({ onDone }: SplashStatementProps) {
   // Whole-overlay opacity. Starts at 1; the dismissal cross-dissolves it to 0 so
   // the live app underneath is revealed smoothly instead of a hard cut.
   const farewell = useSharedValue(1);
+  const reduceMotion = useReduceMotion();
+
+  // Resting frame at final positions: no transform, scale or glow motion.
+  const rest = React.useCallback(() => {
+    [weare, ignite, areyou, glow, intro].forEach((v) => cancelAnimation(v));
+    weare.value = 1;
+    ignite.value = 1;
+    areyou.value = 1;
+    glow.value = GLOW_BASELINE;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // The pending lock haptic and dismiss, kept so a late Reduce Motion switch
+  // can drop the haptic and shorten the hold (see the effect below).
+  const startedAtRef = React.useRef(0);
+  const hapticTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dismissTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dismissFnRef = React.useRef<() => void>(() => undefined);
+  const scheduleDismiss = React.useCallback((ms: number) => {
+    if (dismissTimerRef.current != null) clearTimeout(dismissTimerRef.current);
+    dismissTimerRef.current = setTimeout(() => {
+      dismissTimerRef.current = null;
+      dismissFnRef.current();
+    }, ms);
+  }, []);
 
   React.useEffect(() => {
-    let mounted = true;
     const timers: ReturnType<typeof setTimeout>[] = [];
+    startedAtRef.current = Date.now();
 
     // Hand the native splash off to this overlay (identical Void bg → no seam).
     SplashScreen.hideAsync().catch(() => {});
@@ -84,72 +119,76 @@ export function SplashStatement({ onDone }: SplashStatementProps) {
       });
     };
 
-    (async () => {
-      let reduce = false;
-      try {
-        reduce = await AccessibilityInfo.isReduceMotionEnabled();
-      } catch {}
-      if (!mounted) return;
+    if (reduceMotion) {
+      // Resting frame at final positions (no transform/scale/glow motion), but
+      // fade the group IN via opacity so it doesn't pop, then cross-fade out.
+      rest();
+      intro.value = withTiming(1, { duration: S.REDUCED_MOTION_FADEIN_MS, easing: EASE });
+      timers.push(setTimeout(dismiss, S.REDUCED_MOTION_FADEIN_MS + S.REDUCED_MOTION_HOLD_MS));
+      return () => timers.forEach(clearTimeout);
+    }
 
-      if (reduce) {
-        // Resting frame at final positions (no transform/scale/glow motion), but
-        // fade the group IN via opacity so it doesn't pop, then cross-fade out.
-        weare.value = 1;
-        ignite.value = 1;
-        areyou.value = 1;
-        glow.value = GLOW_BASELINE;
-        intro.value = withTiming(1, { duration: S.REDUCED_MOTION_FADEIN_MS, easing: EASE });
-        timers.push(setTimeout(dismiss, S.REDUCED_MOTION_FADEIN_MS + S.REDUCED_MOTION_HOLD_MS));
-        return;
-      }
+    // Full motion: each line reveals itself, so the group is fully opaque.
+    intro.value = 1;
 
-      // Full motion: each line reveals itself, so the group is fully opaque.
-      intro.value = 1;
+    // "WE ARE" rises + fades in.
+    weare.value = withDelay(S.WEARE_DELAY_MS, withTiming(1, { duration: S.WEARE_MS, easing: EASE }));
 
-      // "WE ARE" rises + fades in.
-      weare.value = withDelay(S.WEARE_DELAY_MS, withTiming(1, { duration: S.WEARE_MS, easing: EASE }));
+    // "ELO RATED" locks in: fade + a subtle scale 1.04 → 1 (no flash, no blur).
+    ignite.value = withDelay(S.IGNITE_DELAY_MS, withTiming(1, { duration: S.IGNITE_MS, easing: EASE }));
 
-      // "ELO RATED" locks in: fade + a subtle scale 1.04 → 1 (no flash, no blur).
-      ignite.value = withDelay(S.IGNITE_DELAY_MS, withTiming(1, { duration: S.IGNITE_MS, easing: EASE }));
+    // Glow ramps to baseline during ignite, breathes up and back ONCE, then
+    // rests at the baseline (a Moment plays once; it never loops). The
+    // sequence keeps the seam continuous (baseline -> breathe up -> back).
+    const breathe = { duration: S.GLOW_BREATHE_MS / 2, easing: Easing.inOut(Easing.ease) };
+    glow.value = withDelay(
+      S.IGNITE_DELAY_MS,
+      withSequence(
+        withTiming(GLOW_BASELINE, { duration: S.IGNITE_MS, easing: EASE }),
+        withTiming(GLOW_PEAK, breathe),
+        withTiming(GLOW_BASELINE, breathe),
+      ),
+    );
 
-      // Glow ramps to baseline during ignite, then breathes gently forever.
-      // withSequence keeps the seam continuous (baseline → breathe up/back),
-      // so there's no visible jump from ignite-end into the loop.
-      glow.value = withDelay(
-        S.IGNITE_DELAY_MS,
-        withSequence(
-          withTiming(GLOW_BASELINE, { duration: S.IGNITE_MS, easing: EASE }),
-          withRepeat(
-            withTiming(GLOW_PEAK, {
-              duration: S.GLOW_BREATHE_MS / 2,
-              easing: Easing.inOut(Easing.ease),
-            }),
-            -1,
-            true, // auto-reverse → full up+back cycle = GLOW_BREATHE_MS
-          ),
-        ),
-      );
+    // "ARE YOU?" rises + fades in.
+    areyou.value = withDelay(S.AREYOU_DELAY_MS, withTiming(1, { duration: S.AREYOU_MS, easing: EASE }));
 
-      // "ARE YOU?" rises + fades in.
-      areyou.value = withDelay(S.AREYOU_DELAY_MS, withTiming(1, { duration: S.AREYOU_MS, easing: EASE }));
+    // Felt "lock" on the ARE YOU? beat: the signature.
+    hapticTimerRef.current = setTimeout(() => {
+      hapticTimerRef.current = null;
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
+    }, S.HAPTIC_DELAY_MS);
 
-      // Felt "lock" on the ARE YOU? beat — the signature.
-      timers.push(
-        setTimeout(() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
-        }, S.HAPTIC_DELAY_MS),
-      );
-
-      timers.push(setTimeout(dismiss, S.TOTAL_MS));
-    })();
+    dismissFnRef.current = dismiss;
+    scheduleDismiss(S.TOTAL_MS);
 
     return () => {
-      mounted = false;
       timers.forEach(clearTimeout);
+      if (hapticTimerRef.current != null) clearTimeout(hapticTimerRef.current);
+      if (dismissTimerRef.current != null) clearTimeout(dismissTimerRef.current);
     };
     // Mount-only: the statement plays once per cold start.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Reduce Motion switched on mid-reveal: snap to the resting frame, no lock
+  // haptic, and the dismiss comes after at most the reduced-motion hold.
+  const startedReduced = React.useRef(reduceMotion).current;
+  React.useEffect(() => {
+    if (!reduceMotion || startedReduced) return;
+    rest();
+    // No lock haptic and no full hold for a late Reduce Motion read: drop the
+    // pending haptic and dismiss after at most the reduced-motion hold.
+    if (hapticTimerRef.current != null) {
+      clearTimeout(hapticTimerRef.current);
+      hapticTimerRef.current = null;
+    }
+    if (dismissTimerRef.current != null) {
+      const remaining = Math.max(0, S.TOTAL_MS - (Date.now() - startedAtRef.current));
+      scheduleDismiss(Math.min(remaining, S.REDUCED_MOTION_HOLD_MS));
+    }
+    intro.value = 1;
+  }, [reduceMotion, startedReduced, rest, intro, scheduleDismiss]);
 
   const weareStyle = useAnimatedStyle(() => ({
     opacity: weare.value,
@@ -238,6 +277,8 @@ const styles = StyleSheet.create({
     color: HALO,
     // The one intentional glow (brand exception): a static white halo whose
     // *opacity* is animated to fake CSS's animated text-shadow/brightness.
+    // The app's only shadow, sanctioned for the launch moment and recorded in
+    // the Motion registry row (DESIGN.md); never copy it to product UI.
     textShadowColor: HALO,
     textShadowRadius: 16,
     textShadowOffset: { width: 0, height: 0 },

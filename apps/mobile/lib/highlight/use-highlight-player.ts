@@ -20,7 +20,8 @@ export interface HighlightPlayerState {
 }
 
 /**
- * The reel's expo-video player: muted, looping, no autoplay (minimal motion),
+ * The reel's expo-video player: muted, looping, no autoplay (playback starts
+ * only on the athlete's tap; autoplay is not a registered Motion Rule moment),
  * AirPlay / external playback off. Reports a status error (the usual cause is
  * an expired signed URL) and pauses when the screen loses focus.
  *

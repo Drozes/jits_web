@@ -7,7 +7,8 @@ import { useAmber } from "../use-amber";
 /**
  * GENERATING chip (the `MatchVideoStatus` processing-chip precedent) and the
  * two honest stages: planning = step 1 active, rendering = step 2 active.
- * Static: no spinner, no animation (minimal motion).
+ * Static: no spinner, no animation (not a registered animation in the
+ * Motion Rule registry, DESIGN.md "Motion").
  */
 export function HighlightProgressSteps({ activeStep }: { activeStep: 1 | 2 }) {
   const amber = useAmber();

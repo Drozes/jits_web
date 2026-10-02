@@ -1,7 +1,8 @@
 import * as React from "react";
-import { AccessibilityInfo, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import Animated, {
   Easing,
+  cancelAnimation,
   interpolate,
   useAnimatedStyle,
   useSharedValue,
@@ -14,6 +15,8 @@ import * as Haptics from "expo-haptics";
 import * as SplashScreen from "expo-splash-screen";
 import { SPLASH_REVEAL } from "@jits/shared/constants";
 import { Wordmark } from "@/components/ui/elo-system/wordmark";
+import { RollingNumber } from "@/components/ui/elo-system/rolling-number";
+import { easing, useReduceMotion } from "@/lib/motion";
 
 const S = SPLASH_REVEAL;
 const EASE = Easing.bezier(
@@ -51,6 +54,14 @@ function Bar({ progress, maxHeight }: { progress: SharedValue<number>; maxHeight
   return <Animated.View style={[styles.bar, style]} />;
 }
 
+/**
+ * The "climb" launch splash (Motion Rule registry: Launch splash reveal, a
+ * Moment, once per cold start). Reduce Motion is read with `useReduceMotion()`
+ * (correct on the first frame); a late flip to on snaps to the resting frame,
+ * drops the pending lock haptic and dismisses after at most the reduced hold. The odometer is the registered `RollingNumber`
+ * on the UI thread (no per-frame setState), rolling the whole climb over
+ * NUMBER_ROLL_MS on the out-cubic curve it always used.
+ */
 export function SplashReveal({ targetElo, onDone }: SplashRevealProps) {
   const bar0 = useSharedValue(0);
   const bar1 = useSharedValue(0);
@@ -65,92 +76,111 @@ export function SplashReveal({ targetElo, onDone }: SplashRevealProps) {
   const rule = useSharedValue(0);
   const tag = useSharedValue(0);
 
-  const startVal = Math.max(0, Math.round(targetElo) - 480);
-  const [display, setDisplay] = React.useState(startVal);
+  const reduceMotion = useReduceMotion();
+  // Decided on mount, like the rest of the reveal: the odometer rolls once.
+  const [target] = React.useState(() => Math.round(targetElo));
+  const [startVal] = React.useState(() => Math.max(0, target - 480));
+  const [rollKey, setRollKey] = React.useState(0);
+
+  // Resting frame, no motion.
+  const rest = React.useCallback(() => {
+    [...bars, peak, numOpacity, word, rule, tag].forEach((v) => {
+      cancelAnimation(v);
+      v.value = 1;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // The pending lock haptic and dismiss, kept so a late Reduce Motion switch
+  // can drop the haptic and shorten the hold (see the effect below).
+  const startedAtRef = React.useRef(0);
+  const hapticTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dismissTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dismissFnRef = React.useRef<() => void>(() => undefined);
+  const scheduleDismiss = React.useCallback((ms: number) => {
+    if (dismissTimerRef.current != null) clearTimeout(dismissTimerRef.current);
+    dismissTimerRef.current = setTimeout(() => {
+      dismissTimerRef.current = null;
+      dismissFnRef.current();
+    }, ms);
+  }, []);
 
   React.useEffect(() => {
-    let mounted = true;
-    let raf = 0;
     const timers: ReturnType<typeof setTimeout>[] = [];
+    startedAtRef.current = Date.now();
 
     // Hand the native splash off to this overlay (identical Void bg → no seam).
     SplashScreen.hideAsync().catch(() => {});
 
-    (async () => {
-      let reduce = false;
-      try {
-        reduce = await AccessibilityInfo.isReduceMotionEnabled();
-      } catch {}
-      if (!mounted) return;
+    if (reduceMotion) {
+      // Resting frame, no motion. Still dismisses.
+      rest();
+      timers.push(setTimeout(onDone, S.REDUCED_MOTION_HOLD_MS));
+      return () => timers.forEach(clearTimeout);
+    }
 
-      if (reduce) {
-        // Resting frame, no motion. Still dismisses.
-        bars.forEach((b) => (b.value = 1));
-        peak.value = 1;
-        numOpacity.value = 1;
-        word.value = 1;
-        rule.value = 1;
-        tag.value = 1;
-        setDisplay(Math.round(targetElo));
-        timers.push(setTimeout(onDone, S.REDUCED_MOTION_HOLD_MS));
-        return;
-      }
-
-      // Bars rise one-by-one, left → right.
-      bars.forEach((b, i) => {
-        b.value = withDelay(
-          S.BAR_FIRST_DELAY_MS + i * S.BAR_STAGGER_MS,
-          withTiming(1, { duration: S.BAR_RISE_MS, easing: EASE }),
-        );
-      });
-      // Gold breakthrough peak pops (slight overshoot, then settles).
-      peak.value = withDelay(
-        S.PEAK_DELAY_MS,
-        withSequence(
-          withTiming(1.18, { duration: S.PEAK_POP_MS * 0.7, easing: EASE }),
-          withTiming(1, { duration: S.PEAK_POP_MS * 0.3, easing: EASE }),
-        ),
+    // Bars rise one-by-one, left → right.
+    bars.forEach((b, i) => {
+      b.value = withDelay(
+        S.BAR_FIRST_DELAY_MS + i * S.BAR_STAGGER_MS,
+        withTiming(1, { duration: S.BAR_RISE_MS, easing: EASE }),
       );
-      // Number fades in, then rolls (rAF count-up below).
-      numOpacity.value = withDelay(S.NUMBER_DELAY_MS, withTiming(1, { duration: S.NUMBER_FADE_MS }));
-      // Wordmark locks (hard stop), then the red accent rule wipes.
-      word.value = withDelay(S.WORDMARK_DELAY_MS, withTiming(1, { duration: S.WORDMARK_MS, easing: EASE }));
-      rule.value = withDelay(S.RULE_DELAY_MS, withTiming(1, { duration: S.RULE_MS, easing: EASE }));
-      tag.value = withDelay(
-        S.RULE_DELAY_MS + S.TAG_DELAY_AFTER_RULE_MS,
-        withTiming(1, { duration: S.TAG_MS }),
-      );
+    });
+    // Gold breakthrough peak pops (slight overshoot, then settles).
+    peak.value = withDelay(
+      S.PEAK_DELAY_MS,
+      withSequence(
+        withTiming(1.18, { duration: S.PEAK_POP_MS * 0.7, easing: EASE }),
+        withTiming(1, { duration: S.PEAK_POP_MS * 0.3, easing: EASE }),
+      ),
+    );
+    // Number fades in, then rolls (RollingNumber below, delayed to this beat).
+    numOpacity.value = withDelay(S.NUMBER_DELAY_MS, withTiming(1, { duration: S.NUMBER_FADE_MS }));
+    // Wordmark locks (hard stop), then the red accent rule wipes.
+    word.value = withDelay(S.WORDMARK_DELAY_MS, withTiming(1, { duration: S.WORDMARK_MS, easing: EASE }));
+    rule.value = withDelay(S.RULE_DELAY_MS, withTiming(1, { duration: S.RULE_MS, easing: EASE }));
+    tag.value = withDelay(
+      S.RULE_DELAY_MS + S.TAG_DELAY_AFTER_RULE_MS,
+      withTiming(1, { duration: S.TAG_MS }),
+    );
 
-      // Felt "lock" — the THX-style signature, on the wordmark beat.
-      timers.push(
-        setTimeout(() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
-        }, S.WORDMARK_DELAY_MS),
-      );
+    // Felt "lock": the THX-style signature, on the wordmark beat.
+    hapticTimerRef.current = setTimeout(() => {
+      hapticTimerRef.current = null;
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
+    }, S.WORDMARK_DELAY_MS);
 
-      // Odometer roll (easeOutCubic) — JS-driven; a shared value is overkill.
-      const rollStart = Date.now() + S.NUMBER_DELAY_MS;
-      const target = Math.round(targetElo);
-      const tick = () => {
-        if (!mounted) return;
-        const p = Math.min(1, Math.max(0, (Date.now() - rollStart) / S.NUMBER_ROLL_MS));
-        const eased = 1 - Math.pow(1 - p, 3);
-        setDisplay(Math.round(startVal + (target - startVal) * eased));
-        if (p < 1) raf = requestAnimationFrame(tick);
-      };
-      raf = requestAnimationFrame(tick);
-
-      timers.push(setTimeout(onDone, S.TOTAL_MS));
-    })();
+    dismissFnRef.current = onDone;
+    scheduleDismiss(S.TOTAL_MS);
 
     return () => {
-      mounted = false;
-      if (raf) cancelAnimationFrame(raf);
       timers.forEach(clearTimeout);
+      if (hapticTimerRef.current != null) clearTimeout(hapticTimerRef.current);
+      if (dismissTimerRef.current != null) clearTimeout(dismissTimerRef.current);
     };
     // Mount-only: the reveal plays once per cold start.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Reduce Motion switched on mid-reveal: snap to the resting frame (the
+  // odometer remounts on its final value), no lock haptic, and the dismiss
+  // comes after at most the reduced-motion hold.
+  const startedReduced = React.useRef(reduceMotion).current;
+  React.useEffect(() => {
+    if (!reduceMotion || startedReduced) return;
+    rest();
+    // No lock haptic and no full hold for a late Reduce Motion read: drop the
+    // pending haptic and dismiss after at most the reduced-motion hold.
+    if (hapticTimerRef.current != null) {
+      clearTimeout(hapticTimerRef.current);
+      hapticTimerRef.current = null;
+    }
+    if (dismissTimerRef.current != null) {
+      const remaining = Math.max(0, S.TOTAL_MS - (Date.now() - startedAtRef.current));
+      scheduleDismiss(Math.min(remaining, S.REDUCED_MOTION_HOLD_MS));
+    }
+    setRollKey((k) => k + 1);
+  }, [reduceMotion, startedReduced, rest, scheduleDismiss]);
 
   const peakStyle = useAnimatedStyle(() => ({ transform: [{ scale: peak.value }] }));
   const numStyle = useAnimatedStyle(() => ({ opacity: numOpacity.value }));
@@ -171,9 +201,19 @@ export function SplashReveal({ targetElo, onDone }: SplashRevealProps) {
       </View>
 
       <Animated.View style={numStyle}>
-        <Text className="font-mono-bold" style={styles.number}>
-          {display}
-        </Text>
+        <RollingNumber
+          key={rollKey}
+          testID="splash-odometer"
+          from={rollKey === 0 ? startVal : null}
+          to={target}
+          play
+          delayMs={S.NUMBER_DELAY_MS}
+          durationMs={S.NUMBER_ROLL_MS}
+          maxSpan={Number.MAX_SAFE_INTEGER}
+          curve={easing.outCubic}
+          className="font-mono-bold"
+          style={styles.number}
+        />
       </Animated.View>
 
       <Animated.View style={[styles.wordmarkWrap, wordStyle]}>

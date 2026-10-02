@@ -1,10 +1,21 @@
 import * as React from "react";
 import { Text, View, type ViewStyle } from "react-native";
+import { SkeletonBlock, SkeletonProvider } from "@/components/ui/skeleton";
 import { ViewerButton } from "./viewer-button";
 
-/** Loading: an empty 9:16 poster frame (static; minimal motion). */
+/**
+ * Loading: an empty 9:16 poster frame, one skeleton bar with the registered
+ * shimmer (Motion Rule registry, Ambient, while loading); a plain static
+ * frame under Reduce Motion.
+ */
 export function ViewerSkeleton({ frameStyle }: { frameStyle: ViewStyle }) {
-  return <View testID="viewer-skeleton" className="bg-surface-4 rounded-md self-center" style={frameStyle} />;
+  return (
+    <View testID="viewer-skeleton" className="self-center" style={frameStyle}>
+      <SkeletonProvider>
+        <SkeletonBlock testID="viewer-skeleton-frame" radius="md" style={{ width: frameStyle.width, height: frameStyle.height }} />
+      </SkeletonProvider>
+    </View>
+  );
 }
 
 interface ViewerMessageProps {
