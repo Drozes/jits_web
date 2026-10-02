@@ -1,13 +1,95 @@
 import * as React from "react";
-import { Pressable, Text, View, type ViewProps } from "react-native";
+import { Pressable, Text, View, type ViewProps, type ViewStyle } from "react-native";
 import {
   BottomSheetModal,
   BottomSheetBackdrop,
   BottomSheetView,
   type BottomSheetBackdropProps,
+  type BottomSheetBackgroundProps,
 } from "@gorhom/bottom-sheet";
 import { cn } from "../../lib/cn";
 import { useThemedTokens } from "../../lib/theme/use-theme";
+import { ON_MEDIA } from "../../lib/theme/palette";
+import { useSheetAnimationConfigs } from "../../lib/motion/use-modal-animation";
+import type { ColorTokens } from "../../lib/tokens";
+
+// ---------------------------------------------------------------------------
+// Shared sheet chrome (DESIGN.md, "Sheet"). Every gorhom sheet in the app
+// takes its background, handle, backdrop and present animation from here, so
+// no sheet keeps gorhom's default 15px radius or its own scrim.
+// ---------------------------------------------------------------------------
+
+/** `radius-sheet`: the top corners of every sheet, the ceiling of the radius scale. */
+export const SHEET_RADIUS = 8;
+
+/**
+ * The sheet surface: `panel` fill, `radius-sheet` top corners, a square
+ * bottom and a `hairline` top edge. `borderRadius: 0` overrides gorhom's
+ * default 15px on the bottom corners too.
+ */
+export function sheetBackgroundStyle(tokens: ColorTokens): ViewStyle {
+  return {
+    backgroundColor: tokens.bgSecondary,
+    borderRadius: 0,
+    borderTopLeftRadius: SHEET_RADIUS,
+    borderTopRightRadius: SHEET_RADIUS,
+    borderTopWidth: 1,
+    borderTopColor: tokens.borderHairline,
+  };
+}
+
+/** The drag handle: a 30x4 `ink-3` bar. */
+export function sheetHandleIndicatorStyle(tokens: ColorTokens): ViewStyle {
+  return { backgroundColor: tokens.textTertiary, width: 30, height: 4, borderRadius: 2 };
+}
+
+/**
+ * The sheet background view. Purely visual: gorhom's default background is a
+ * VoiceOver stop ("Bottom Sheet", adjustable) with nothing to adjust.
+ */
+export function SheetBackground({ style, pointerEvents }: BottomSheetBackgroundProps) {
+  return <View pointerEvents={pointerEvents} accessible={false} importantForAccessibility="no" style={style} />;
+}
+
+/**
+ * The backdrop behind every gorhom sheet: the one `on-media-scrim`
+ * (black 55%), faded in with the sheet's position. `pressBehavior` defaults
+ * to closing the sheet; gorhom labels it as a button ("Bottom sheet backdrop").
+ */
+export function SheetBackdrop(props: BottomSheetBackdropProps & { pressBehavior?: "none" | "close" }) {
+  const { style, pressBehavior = "close", ...rest } = props;
+  const scrimStyle = React.useMemo(() => [style, { backgroundColor: ON_MEDIA.scrim }], [style]);
+  return (
+    <BottomSheetBackdrop
+      {...rest}
+      appearsOnIndex={0}
+      disappearsOnIndex={-1}
+      opacity={1}
+      pressBehavior={pressBehavior}
+      style={scrimStyle}
+    />
+  );
+}
+
+/**
+ * Spread onto a `BottomSheetModal`: the shared background, handle and the
+ * Reduce-Motion-aware present animation ("Sheet / modal present" in the
+ * Motion registry). Pass `backdropComponent` yourself (with `SheetBackdrop`)
+ * when the sheet needs its own press behavior.
+ */
+export function useSheetChrome() {
+  const tokens = useThemedTokens();
+  const animationConfigs = useSheetAnimationConfigs();
+  return React.useMemo(
+    () => ({
+      backgroundComponent: SheetBackground,
+      backgroundStyle: sheetBackgroundStyle(tokens),
+      handleIndicatorStyle: sheetHandleIndicatorStyle(tokens),
+      animationConfigs,
+    }),
+    [tokens, animationConfigs],
+  );
+}
 
 interface SheetContextValue {
   ref: React.RefObject<BottomSheetModal | null>;
@@ -68,12 +150,14 @@ export function SheetTrigger({ children, asChild }: { children: React.ReactEleme
       },
     });
   }
-  return <Pressable onPress={open}>{children}</Pressable>;
+  return (
+    <Pressable onPress={open} accessibilityRole="button">
+      {children}
+    </Pressable>
+  );
 }
 
-const renderBackdrop = (props: BottomSheetBackdropProps) => (
-  <BottomSheetBackdrop {...props} appearsOnIndex={0} disappearsOnIndex={-1} />
-);
+const renderBackdrop = (props: BottomSheetBackdropProps) => <SheetBackdrop {...props} />;
 
 export interface SheetContentProps {
   className?: string;
@@ -83,15 +167,14 @@ export interface SheetContentProps {
 
 export function SheetContent({ className, snapPoints = ["50%", "90%"], children }: SheetContentProps) {
   const { ref } = useSheetContext();
-  const tokens = useThemedTokens();
+  const chrome = useSheetChrome();
   return (
     <BottomSheetModal
       ref={ref}
       snapPoints={snapPoints}
       enablePanDownToClose
       backdropComponent={renderBackdrop}
-      backgroundStyle={{ backgroundColor: tokens.card }}
-      handleIndicatorStyle={{ backgroundColor: tokens.mutedForeground }}
+      {...chrome}
     >
       <BottomSheetView className={cn("flex-1 px-4 pb-4", className)}>
         {children}
@@ -107,10 +190,14 @@ export const SheetFooter = ({ className, ...props }: ViewProps & { className?: s
   <View className={cn("flex-row items-center justify-end gap-2 pt-3", className)} {...props} />
 );
 export const SheetTitle = ({ className, ...props }: React.ComponentProps<typeof Text> & { className?: string }) => (
-  <Text className={cn("text-lg font-semibold text-foreground", className)} {...props} />
+  <Text
+    accessibilityRole="header"
+    className={cn("font-heading text-[14px] uppercase tracking-caps-l text-ink", className)}
+    {...props}
+  />
 );
 export const SheetDescription = ({ className, ...props }: React.ComponentProps<typeof Text> & { className?: string }) => (
-  <Text className={cn("text-sm text-muted-foreground", className)} {...props} />
+  <Text className={cn("font-body text-[13px] text-ink-2", className)} {...props} />
 );
 
 export function SheetClose({ children, asChild }: { children: React.ReactElement; asChild?: boolean }) {
@@ -124,5 +211,9 @@ export function SheetClose({ children, asChild }: { children: React.ReactElement
       },
     });
   }
-  return <Pressable onPress={close}>{children}</Pressable>;
+  return (
+    <Pressable onPress={close} accessibilityRole="button">
+      {children}
+    </Pressable>
+  );
 }

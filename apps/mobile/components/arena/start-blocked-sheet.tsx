@@ -5,11 +5,15 @@
  * message, with Retry and Cancel. The challenge stays `accepted`
  * until one of them answers, so neither athlete is stranded: Retry sends a
  * fresh reading and starts it, Cancel withdraws it (the challenger's plate
- * then clears). Not dismissable by back or backdrop, like the prompt.
+ * then clears). Not dismissable by back or backdrop, like the prompt. A
+ * centered alert by design (DESIGN.md, "Inputs and overlays"): it blocks
+ * until answered, so it is not a bottom sheet. Fades in, or appears in place
+ * under Reduce Motion.
  */
 import { Modal, Text, View } from "react-native";
 import { CtaButton, SecondaryButton } from "@/components/auth/auth-buttons";
 import type { StartBlocked } from "@/lib/arena/use-arena-challenge";
+import { useModalAnimation } from "@/lib/motion";
 
 export function StartBlockedSheet({
   blocked,
@@ -22,9 +26,10 @@ export function StartBlockedSheet({
   onRetry: () => void;
   onCancel: () => void;
 }) {
+  const animationType = useModalAnimation("fade");
   return (
-    <Modal visible={blocked !== null} transparent animationType="fade" onRequestClose={() => undefined}>
-      <View className="flex-1 items-center justify-center bg-black/60 px-6">
+    <Modal visible={blocked !== null} transparent animationType={animationType} onRequestClose={() => undefined}>
+      <View className="flex-1 items-center justify-center bg-on-media-scrim px-6">
         {blocked ? (
           <View
             testID="arena-start-blocked"

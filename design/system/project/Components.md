@@ -28,7 +28,7 @@ Three token channels exist in code, and the kit draws all three from the same to
 | Loading | the skeleton set (`SkeletonProvider`, `SkeletonBlock`, `SkeletonPlate`, ...) | a free-floating red `ActivityIndicator` |
 | A busy action | `FightButton busy` (the busy-button pattern) | a spinner next to a button |
 | A picker | `SearchSelect` (`NativeSelect` wraps it) | shadcn `Select` (dead) |
-| A sheet | one bottom-sheet shell with 8px top corners (WP1 target; today `Sheet`, direct `BottomSheetModal`, or RN `Modal`) | gorhom's default 15px radius |
+| A sheet | `Sheet` or a `BottomSheetModal` spreading `useSheetChrome()` with `SheetBackdrop` (`components/ui/sheet.tsx`); an RN `Modal` picker uses `SHEET_RADIUS`, `panel`, `ON_MEDIA.scrim` and `useModalAnimation("slide")` | gorhom's default 15px radius, a sheet's own background, handle or black backdrop literal |
 
 ## Families
 
@@ -87,9 +87,11 @@ Cards (Feedback family): **Toast**, **Skeleton**.
 
 ### Inputs and overlays
 
-`SearchSelect` is the canonical picker. Three sheet mechanisms exist (shadcn `Sheet` once, direct `BottomSheetModal` three times, RN `Modal` seven times); the target is one sheet shell with `radius-sheet` top corners, `panel` fill, `hairline` edge, no shadow. The challenge prompt is a centered card by decision (jits-02vo.3) with `radius-sheet` and the `on-media-scrim` backdrop. `AuthFormField` and `EloField` fold into one form field (WP3/WP5 follow-ups). `Switch` still uses the legacy red track (R3 ST-1).
+`SearchSelect` is the canonical picker. Every gorhom sheet (Share Profile through the shadcn `Sheet`, the notifications panel, the highlight pre-share and feedback sheets) shares one chrome from `components/ui/sheet.tsx` (WP1): `useSheetChrome()` gives the `panel` fill, `radius-sheet` top corners with a square bottom, a `hairline` top edge, the 30x4 `ink-3` handle, a background with no VoiceOver stop and the Reduce-Motion-aware present; `SheetBackdrop` is the `on-media-scrim` backdrop. `SheetTitle` and `DialogTitle` are DM Sans 700 14px caps, tracking 1.68px, `ink`, role header; descriptions are Inter 13px `ink-2`; `DialogContent` is a `panel` card with a `hairline` border and `radius-sheet`. Every modal backdrop is the one scrim: `bg-on-media-scrim` in classes, `ON_MEDIA.scrim` in style props. A dismissable backdrop is a labeled button and a sibling of the card, never its parent (so VoiceOver reaches the card's controls). `AuthFormField` and `EloField` fold into one form field (WP3/WP5 follow-ups). `Switch` still uses the legacy red track (R3 ST-1).
 
-Card (Surfaces family): **Sheet** (target, 8px top corners).
+**Sheets are the default modal.** A centered dialog is the documented exception for two cases (R3 SH-5, decided in WP1): a blocking prompt that must be answered and is not dismissed by a backdrop tap (the incoming challenge prompt by decision jits-02vo.3 with `radius-sheet`; `StartBlockedSheet`; `GoLiveLocationSheet`, which gates the system location prompt), and a short read-only overlay with no actions (`CompareStatsModal`, through `Dialog`). Anything else with actions or a list is a sheet.
+
+Card (Surfaces family): **Sheet** (shipped in WP1, 8px top corners).
 
 ### Avatars and identity
 
@@ -121,7 +123,7 @@ The 20 cards in `components/`, by family (the `group` on each card):
 | Navigation | AppHeader (with the header status chip) | `components/layout/app-header.tsx`, `header-status-chip.tsx` |
 | Navigation | Chip (selected target: `plate-bright`, `hairline-strong`, `ink`) | `components/ui/elo-system/chip.tsx` |
 | Surfaces | Plate | `components/ui/elo-system/plate.tsx` |
-| Surfaces | Sheet (target, WP1: 8px top corners) | `components/ui/sheet.tsx` and the direct sheets |
+| Surfaces | Sheet (shipped, WP1: 8px top corners) | `components/ui/sheet.tsx` (`useSheetChrome()`) and the direct sheets |
 | Feedback | Toast | `components/ui/toast.tsx` |
 | Feedback | Skeleton | `components/ui/skeleton/skeleton.tsx` |
 | Identity | Avatar | `components/ui/elo-system/avatar-32.tsx` |

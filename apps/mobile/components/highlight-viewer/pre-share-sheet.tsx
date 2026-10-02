@@ -1,9 +1,8 @@
 import * as React from "react";
-import { BottomSheetBackdrop, BottomSheetModal, BottomSheetView, type BottomSheetBackdropProps } from "@gorhom/bottom-sheet";
+import { BottomSheetModal, BottomSheetView, type BottomSheetBackdropProps } from "@gorhom/bottom-sheet";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useThemedTokens } from "@/lib/theme/use-theme";
 import { useSheetSchemeScope } from "@/lib/theme/use-sheet-scheme-scope";
-import { SheetBackground } from "@/components/match-detail/highlight/highlight-sheet-background";
+import { SheetBackdrop, useSheetChrome } from "@/components/ui/sheet";
 
 interface PreShareSheetProps {
   open: boolean;
@@ -22,7 +21,7 @@ export function PreShareSheet({ open, onClosed, children }: PreShareSheetProps) 
   const presentedRef = React.useRef(false);
   // Background and handle come from the opener's scheme (forced dark in the
   // viewer); the portalled content re-enters that same scheme.
-  const tokens = useThemedTokens();
+  const chrome = useSheetChrome();
   const scope = useSheetSchemeScope();
   const insets = useSafeAreaInsets();
 
@@ -44,7 +43,7 @@ export function PreShareSheet({ open, onClosed, children }: PreShareSheetProps) 
 
   const renderBackdrop = React.useCallback(
     (props: BottomSheetBackdropProps) => (
-      <BottomSheetBackdrop {...props} appearsOnIndex={0} disappearsOnIndex={-1} pressBehavior="close" />
+      <SheetBackdrop {...props} pressBehavior="close" />
     ),
     [],
   );
@@ -57,9 +56,7 @@ export function PreShareSheet({ open, onClosed, children }: PreShareSheetProps) 
       onChange={handleChange}
       accessible={false} // else the whole sheet is one "Bottom Sheet" leaf to VoiceOver
       backdropComponent={renderBackdrop}
-      backgroundComponent={SheetBackground}
-      backgroundStyle={{ backgroundColor: tokens.bgSecondary }}
-      handleIndicatorStyle={{ backgroundColor: tokens.textTertiary }}
+      {...chrome}
     >
       <BottomSheetView style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: insets.bottom + 16 }}>
         {scope(children)}

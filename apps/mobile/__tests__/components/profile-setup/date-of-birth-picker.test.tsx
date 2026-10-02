@@ -6,8 +6,8 @@
  * Source: apps/mobile/components/profile-setup/date-of-birth-picker.tsx
  */
 import * as React from "react";
-import { Platform } from "react-native";
-import { fireEvent, render, screen } from "@testing-library/react-native";
+import { Modal, Platform } from "react-native";
+import { act, fireEvent, render, screen, within } from "@testing-library/react-native";
 
 const mockPickerProps: Array<Record<string, unknown>> = [];
 const mockAndroidOpen = jest.fn();
@@ -72,5 +72,53 @@ describe("DateOfBirthPicker maximumDate (16 years before the UTC date)", () => {
     expect(screen.queryByText("You must be at least 16 to compete.")).toBeNull();
     rerender(<DateOfBirthPicker value="2010-10-03" onChange={jest.fn()} />);
     expect(screen.getByText("You must be at least 16 to compete.")).toBeTruthy();
+  });
+});
+
+describe("DateOfBirthPicker iOS sheet (WP1 chrome)", () => {
+  const originalOs = Platform.OS;
+  beforeEach(() => {
+    mockPickerProps.length = 0;
+    Object.defineProperty(Platform, "OS", { value: "ios", configurable: true });
+  });
+  afterEach(() => {
+    Object.defineProperty(Platform, "OS", { value: originalOs, configurable: true });
+  });
+
+  const modalVisible = () => screen.UNSAFE_getByType(Modal).props.visible as boolean;
+
+  it("the backdrop is a labeled button that closes without committing", () => {
+    const onChange = jest.fn();
+    render(<DateOfBirthPicker value="" onChange={onChange} />);
+    fireEvent.press(screen.getByRole("button"));
+    expect(modalVisible()).toBe(true);
+    const backdrop = screen.getByTestId("dob-picker-backdrop");
+    expect(backdrop.props.accessibilityLabel).toBe("Close date picker");
+    fireEvent.press(backdrop);
+    expect(modalVisible()).toBe(false);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("the wheels and Done sit in the sheet, not inside the backdrop", () => {
+    render(<DateOfBirthPicker value="" onChange={jest.fn()} />);
+    fireEvent.press(screen.getByRole("button"));
+    const backdrop = screen.getByTestId("dob-picker-backdrop");
+    const sheet = screen.getByTestId("dob-picker-sheet");
+    expect(backdrop.findAllByProps({ testID: "native-dob-picker" })).toHaveLength(0);
+    expect(sheet.findAllByProps({ testID: "native-dob-picker" }).length).toBeGreaterThan(0);
+    expect(within(sheet).getByText("Done")).toBeTruthy();
+  });
+
+  it("Done commits a picked date and closes", () => {
+    const onChange = jest.fn();
+    render(<DateOfBirthPicker value="" onChange={onChange} />);
+    fireEvent.press(screen.getByRole("button"));
+    const props = mockPickerProps[mockPickerProps.length - 1];
+    act(() => {
+      (props.onChange as (e: unknown, d: Date) => void)({}, new Date(2000, 4, 15, 12));
+    });
+    fireEvent.press(screen.getByText("Done"));
+    expect(onChange).toHaveBeenCalledWith("2000-05-15");
+    expect(modalVisible()).toBe(false);
   });
 });

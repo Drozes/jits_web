@@ -70,7 +70,7 @@ Twenty cards, each a static HTML twin of the RN component with a README (`compon
 | Status | MetaTag, LivePill (with LiveDot), CountPill (with tab badges) |
 | Data | EloTile, RollingNumber (settled frame), DeltaChip |
 | Navigation | TabBar (with the Arena icon's embers), AppHeader (with the header status chip), Chip |
-| Surfaces | Plate, Sheet (target, WP1) |
+| Surfaces | Plate, Sheet (shipped, WP1) |
 | Feedback | Toast, Skeleton |
 | Identity | Avatar |
 | Arena | OnAirStrip, ChallengeStrip |
@@ -373,7 +373,7 @@ In CSS the dotted names are escaped: `var(--space-0\.5)`, `var(--space-1\.5)`, `
 Sources: `tailwind.config.js:183-190`, `FIGHT_RADIUS` (`fight-tokens.ts:9`), `BROADCAST_RADIUS` (`broadcast-tokens.ts:36`), `PROMPT_RADIUS = 8` (`challenge-prompt-sheet.tsx:89`).
 
 - Corners are sharp. Nothing exceeds `radius-sheet`.
-- A bottom sheet takes `radius-sheet` on its top corners only. Today every gorhom sheet renders the library's 15px default (R3 SH-1, WP1).
+- A bottom sheet takes `radius-sheet` on its top corners only, with a square bottom. Every gorhom sheet takes `useSheetChrome()` (`components/ui/sheet.tsx`, `SHEET_RADIUS` 8), which also zeroes gorhom's default 15px radius (WP1).
 - Web Tailwind `rounded-sm` is 2px, not 3px; the token is 3px.
 - `Avatar32` is a 2px-radius square in code, while the old DESIGN.md says avatars are circular. See [Open decisions](#open-decisions-decided-by-default-owner-to-confirm).
 
@@ -527,6 +527,7 @@ Every approved animation in the mobile app. **Adding a new animation means addin
 | Blade clash | Moment | Arena tab icon | Live false to true, or the pending incoming count increases: the Swords halves spread and snap together with a tiny Signal Red spark (about 220ms) | `goLive` on going live; none for a challenge (the prompt sheet already fires `challengeArrived`) | No clash, no spark |
 | Tab select bounce | Reactive | All four tabs | Pressing a tab that is not active: squash to 0.86, `select` spring back | `select` | No scale |
 | Press scale | Reactive | `PressableScale` (`apps/mobile/components/ui/pressable-scale.tsx`): every `Button`, every `FightButton`, the Arena Challenge CTAs (`OutlineAction` ROLL, the Closest Match CTA, the competitor row), every Go live control (go-live plate, Mat Board live/offline segments, offer and row Go live), and Decline / Accept on the challenge prompt | Press-in to 0.97 (`instant`), release on the `press` spring; disabled controls do not move | Opt-in `haptic` prop, used nowhere yet: Challenge already fires `press` itself, Go live gets `goLive` from the tab icon, Confirm result fires `press` after a successful confirm | 0.85 opacity dip while held, haptic kept |
+| Sheet / modal present | Reactive (a Moment for the challenge prompt and the Arena prompts, which appear on a state change) | gorhom sheets through `useSheetChrome()` (`components/ui/sheet.tsx`): Share Profile, notifications, highlight pre-share and feedback. RN `Modal` through `useModalAnimation()` (`@/lib/motion`): bottom pickers slide (date of birth, `SearchSelect`, Film Room opponent), centered dialogs fade (`Dialog` / Compare Stats, the challenge prompt, start blocked, go-live location). The live menu popover and the critical update modal have no animation | A sheet or modal opening or closing: gorhom slides on a `fast` (240ms) brand ease-out timing (also the snap after a drag) with the `on-media-scrim` backdrop fading with it; RN `Modal` uses the platform slide or fade | none (the challenge prompt's `challengeArrived` belongs to the challenge, not the present) | Appears and disappears in place: `animationType` `"none"`, gorhom `ReduceMotion.Always` |
 | Accept sweep | Moment | Accept on the incoming-challenge prompt | Tapping Accept: the lifted Signal Red fill sweeps left to right (260ms), one glint, label becomes "Accepted" (VoiceOver value "Accepted", label unchanged); the accept call goes out first and is never delayed; a failed accept returns the button to Accept | `accept` (never `press` as well) | Instant fill and label swap |
 | Steel sheen | Ambient | `SteelSheen` (`apps/mobile/components/ui/steel-sheen.tsx`) via the `sheen` prop of `Button` / `FightButton`: Accept on the challenge prompt and Confirm result in the match-flow confirm step only (one per screen) | While the action waits on this user and the button is enabled: an 800ms sweep with about 2s rest; paused in background | none | No sheen |
 | Challenge afterglow | Moment | Incoming challenge strips (`components/arena/afterglow-edge.tsx`) | A new challenge: the 2px bottom edge cools from hot to the hairline over 2000ms, timed from the earlier of the challenge's `created_at` and the first time this app run drew it, so a re-render, remount or old challenge shows it cooled | none | Cooled at once |
@@ -652,7 +653,7 @@ Rule: put on-media text on `on-media-badge` or the light `on-media-chip`. The sc
 - Every animation has a still end state that keeps the meaning: the final number, the cooled afterglow edge, one static ember, the filled ON AIR tally, plain skeleton bars (full table in the [registry](#registry)).
 - PressableScale dips to `opacity-reduced-press` (0.85) instead of scaling.
 - Haptics stay on under Reduce Motion. Never a haptic on a loss, a draw, or ambient motion.
-- Modal and sheet transitions (RN `Modal` `animationType`, gorhom slide) are not yet registered or gated (R3 MO-5, WP1).
+- Modals and sheets appear and leave in place: RN `Modal` takes `animationType` from `useModalAnimation()` (`"none"` under Reduce Motion) and gorhom sheets take `animationConfigs` from `useSheetChrome()` (`ReduceMotion.Always`). See "Sheet / modal present" in the [registry](#registry).
 
 ### Labels and roles
 
@@ -703,7 +704,7 @@ Three token channels exist in code, and the kit draws all three from the same to
 | Loading | the skeleton set (`SkeletonProvider`, `SkeletonBlock`, `SkeletonPlate`, ...) | a free-floating red `ActivityIndicator` |
 | A busy action | `FightButton busy` (the busy-button pattern) | a spinner next to a button |
 | A picker | `SearchSelect` (`NativeSelect` wraps it) | shadcn `Select` (dead) |
-| A sheet | one bottom-sheet shell with 8px top corners (WP1 target; today `Sheet`, direct `BottomSheetModal`, or RN `Modal`) | gorhom's default 15px radius |
+| A sheet | `Sheet` or a `BottomSheetModal` spreading `useSheetChrome()` with `SheetBackdrop` (`components/ui/sheet.tsx`); an RN `Modal` picker uses `SHEET_RADIUS`, `panel`, `ON_MEDIA.scrim` and `useModalAnimation("slide")` | gorhom's default 15px radius, a sheet's own background, handle or black backdrop literal |
 
 ### Families
 
@@ -762,9 +763,11 @@ Cards (Feedback family): **Toast**, **Skeleton**.
 
 #### Inputs and overlays
 
-`SearchSelect` is the canonical picker. Three sheet mechanisms exist (shadcn `Sheet` once, direct `BottomSheetModal` three times, RN `Modal` seven times); the target is one sheet shell with `radius-sheet` top corners, `panel` fill, `hairline` edge, no shadow. The challenge prompt is a centered card by decision (jits-02vo.3) with `radius-sheet` and the `on-media-scrim` backdrop. `AuthFormField` and `EloField` fold into one form field (WP3/WP5 follow-ups). `Switch` still uses the legacy red track (R3 ST-1).
+`SearchSelect` is the canonical picker. Every gorhom sheet (Share Profile through the shadcn `Sheet`, the notifications panel, the highlight pre-share and feedback sheets) shares one chrome from `components/ui/sheet.tsx` (WP1): `useSheetChrome()` gives the `panel` fill, `radius-sheet` top corners with a square bottom, a `hairline` top edge, the 30x4 `ink-3` handle, a background with no VoiceOver stop and the Reduce-Motion-aware present; `SheetBackdrop` is the `on-media-scrim` backdrop. `SheetTitle` and `DialogTitle` are DM Sans 700 14px caps, tracking 1.68px, `ink`, role header; descriptions are Inter 13px `ink-2`; `DialogContent` is a `panel` card with a `hairline` border and `radius-sheet`. Every modal backdrop is the one scrim: `bg-on-media-scrim` in classes, `ON_MEDIA.scrim` in style props. A dismissable backdrop is a labeled button and a sibling of the card, never its parent (so VoiceOver reaches the card's controls). `AuthFormField` and `EloField` fold into one form field (WP3/WP5 follow-ups). `Switch` still uses the legacy red track (R3 ST-1).
 
-Card (Surfaces family): **Sheet** (target, 8px top corners).
+**Sheets are the default modal.** A centered dialog is the documented exception for two cases (R3 SH-5, decided in WP1): a blocking prompt that must be answered and is not dismissed by a backdrop tap (the incoming challenge prompt by decision jits-02vo.3 with `radius-sheet`; `StartBlockedSheet`; `GoLiveLocationSheet`, which gates the system location prompt), and a short read-only overlay with no actions (`CompareStatsModal`, through `Dialog`). Anything else with actions or a list is a sheet.
+
+Card (Surfaces family): **Sheet** (shipped in WP1, 8px top corners).
 
 #### Avatars and identity
 
@@ -796,7 +799,7 @@ The 20 cards in `components/`, by family (the `group` on each card):
 | Navigation | AppHeader (with the header status chip) | `components/layout/app-header.tsx`, `header-status-chip.tsx` |
 | Navigation | Chip (selected target: `plate-bright`, `hairline-strong`, `ink`) | `components/ui/elo-system/chip.tsx` |
 | Surfaces | Plate | `components/ui/elo-system/plate.tsx` |
-| Surfaces | Sheet (target, WP1: 8px top corners) | `components/ui/sheet.tsx` and the direct sheets |
+| Surfaces | Sheet (shipped, WP1: 8px top corners) | `components/ui/sheet.tsx` (`useSheetChrome()`) and the direct sheets |
 | Feedback | Toast | `components/ui/toast.tsx` |
 | Feedback | Skeleton | `components/ui/skeleton/skeleton.tsx` |
 | Identity | Avatar | `components/ui/elo-system/avatar-32.tsx` |
@@ -914,7 +917,7 @@ Defined in `apps/mobile/lib/tokens.ts` (light l.69-93, dark l.116-140), mirrored
 | `OnlineIndicator` | `components/online-indicator.tsx` | 0 | Delete |
 | `Badge` | `components/ui/badge.tsx` | 1 (admin members), `rounded-lg`, system font | Restyle onto `MetaTag` / `OutcomeTag`, keep the `success` variant API |
 | `Dialog` | `components/ui/dialog.tsx` | 1 (Compare Stats), system-font title | Brand titles (WP1) |
-| `Sheet` | `components/ui/sheet.tsx` | 1 (Share Profile), `tokens.card`, 15px gorhom radius | The one sheet shell (WP1) |
+| `Sheet` | `components/ui/sheet.tsx` | 1 (Share Profile); since WP1 on the shared chrome (`panel`, 8px, brand title) | Kept: the one sheet shell, and home of `useSheetChrome()` / `SheetBackdrop` |
 | `Button` | `components/ui/button.tsx` | Admin screens, update banner, critical update modal | Replaced by the unified `Button` (WP3) |
 | `Switch` | `components/ui/switch.tsx` | 3 (settings, admin flags), red `primary` track | Neutral track (WP2) |
 | `OfflineBanner` | `components/offline-banner.tsx` | Root layout | `panel` + `hairline-strong`, mono caps `ink` (WP4) |

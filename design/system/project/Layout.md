@@ -54,7 +54,7 @@ In CSS the dotted names are escaped: `var(--space-0\.5)`, `var(--space-1\.5)`, `
 Sources: `tailwind.config.js:183-190`, `FIGHT_RADIUS` (`fight-tokens.ts:9`), `BROADCAST_RADIUS` (`broadcast-tokens.ts:36`), `PROMPT_RADIUS = 8` (`challenge-prompt-sheet.tsx:89`).
 
 - Corners are sharp. Nothing exceeds `radius-sheet`.
-- A bottom sheet takes `radius-sheet` on its top corners only. Today every gorhom sheet renders the library's 15px default (R3 SH-1, WP1).
+- A bottom sheet takes `radius-sheet` on its top corners only, with a square bottom. Every gorhom sheet takes `useSheetChrome()` (`components/ui/sheet.tsx`, `SHEET_RADIUS` 8), which also zeroes gorhom's default 15px radius (WP1).
 - Web Tailwind `rounded-sm` is 2px, not 3px; the token is 3px.
 - `Avatar32` is a 2px-radius square in code, while the old DESIGN.md says avatars are circular. See Open decisions in the README.
 

@@ -2,8 +2,10 @@
  * The Go Live location states (`match_location_required` ON, contract 6):
  * explain before the system prompt, denied with Open Settings, a reading too
  * coarse to use, and no fix in time. Driven by `lib/arena/go-live-location.ts`
- * and mounted once by `<ArenaBootstrap />`. A centered RN Modal; the hardware
- * back / backdrop answer "Not now", which never takes the athlete live.
+ * and mounted once by `<ArenaBootstrap />`. A centered RN Modal by design
+ * (DESIGN.md, "Inputs and overlays": it gates the system location prompt);
+ * the hardware back answers "Not now", which never takes the athlete live.
+ * Fades in, or appears in place under Reduce Motion.
  */
 import { ActivityIndicator, Linking, Modal, Text, View } from "react-native";
 import {
@@ -19,6 +21,7 @@ import {
   useGoLiveLocationSheet,
   type GoLiveLocationPhase,
 } from "@/lib/arena/go-live-location";
+import { useModalAnimation } from "@/lib/motion";
 
 const TITLES: Record<GoLiveLocationPhase, string> = {
   explain: "Location to go live",
@@ -39,9 +42,10 @@ const BODY: Record<GoLiveLocationPhase, string> = {
 export function GoLiveLocationSheet() {
   const state = useGoLiveLocationSheet();
   const cancel = () => answerGoLiveLocation("cancel");
+  const animationType = useModalAnimation("fade");
   return (
-    <Modal visible={state !== null} transparent animationType="fade" onRequestClose={cancel}>
-      <View className="flex-1 items-center justify-center bg-black/60 px-6">
+    <Modal visible={state !== null} transparent animationType={animationType} onRequestClose={cancel}>
+      <View className="flex-1 items-center justify-center bg-on-media-scrim px-6">
         {state ? (
           <View
             testID={`go-live-location-${state.phase}`}

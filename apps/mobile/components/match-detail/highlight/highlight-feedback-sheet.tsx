@@ -1,13 +1,7 @@
 import * as React from "react";
-import {
-  BottomSheetBackdrop,
-  BottomSheetModal,
-  BottomSheetView,
-  type BottomSheetBackdropProps,
-} from "@gorhom/bottom-sheet";
-import { useThemedTokens } from "@/lib/theme/use-theme";
+import { BottomSheetModal, BottomSheetView, type BottomSheetBackdropProps } from "@gorhom/bottom-sheet";
 import { useSheetSchemeScope } from "@/lib/theme/use-sheet-scheme-scope";
-import { SheetBackground } from "./highlight-sheet-background";
+import { SheetBackdrop, useSheetChrome } from "@/components/ui/sheet";
 
 interface HighlightFeedbackSheetProps {
   open: boolean;
@@ -28,7 +22,7 @@ export function HighlightFeedbackSheet({ open, busy, onClosed, children }: Highl
   const presentedRef = React.useRef(false);
   // Background and handle come from the opener's scheme (forced dark in the
   // viewer); the portalled content re-enters that same scheme.
-  const tokens = useThemedTokens();
+  const chrome = useSheetChrome();
   const scope = useSheetSchemeScope();
 
   React.useEffect(() => {
@@ -49,7 +43,7 @@ export function HighlightFeedbackSheet({ open, busy, onClosed, children }: Highl
 
   const renderBackdrop = React.useCallback(
     (props: BottomSheetBackdropProps) => (
-      <BottomSheetBackdrop {...props} appearsOnIndex={0} disappearsOnIndex={-1} pressBehavior={busy ? "none" : "close"} />
+      <SheetBackdrop {...props} pressBehavior={busy ? "none" : "close"} />
     ),
     [busy],
   );
@@ -64,9 +58,7 @@ export function HighlightFeedbackSheet({ open, busy, onClosed, children }: Highl
       onChange={handleChange}
       accessible={false} // else the whole sheet is one "Bottom Sheet" leaf to VoiceOver
       backdropComponent={renderBackdrop}
-      backgroundComponent={SheetBackground}
-      backgroundStyle={{ backgroundColor: tokens.bgSecondary }}
-      handleIndicatorStyle={{ backgroundColor: tokens.textTertiary }}
+      {...chrome}
     >
       <BottomSheetView>{scope(children)}</BottomSheetView>
     </BottomSheetModal>

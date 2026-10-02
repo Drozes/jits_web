@@ -40,6 +40,7 @@
 // Web `var(--border-hairline)`    → mobile `border-hairline`
 // Web `var(--border-hairline-faint)`  → mobile `border-hairline-faint`
 // Web `var(--border-hairline-strong)` → mobile `border-hairline-strong`
+// Kit `on-media-scrim` (ON_MEDIA.scrim)  → mobile `bg-on-media-scrim` (modal backdrops)
 // Letter-spacing: `var(--ls-mark|caps|caps-l|caps-xl)` → `tracking-mark|caps|caps-l|caps-xl`
 // Fonts: var(--font-display|heading|body|mono) → `font-display|heading|body|mono`
 // (Bold mono: `font-mono-bold`; Medium mono: `font-mono-medium`)
@@ -111,6 +112,10 @@ const cssVarColors = {
   hairline: "var(--border-hairline)",
   "hairline-faint": "var(--border-hairline-faint)",
   "hairline-strong": "var(--border-hairline-strong)",
+  // Fixed in both themes: the one backdrop behind every modal and sheet
+  // (`bg-on-media-scrim`). Mirrors `ON_MEDIA.scrim` in lib/theme/palette.ts;
+  // __tests__/components/ui/sheet-chrome.test.tsx fails if the two drift.
+  "on-media-scrim": "rgba(0,0,0,0.55)",
 };
 
 // Light theme defaults. Mirrors `lightTokens` in `lib/tokens.ts`.

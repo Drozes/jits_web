@@ -66,7 +66,7 @@ Twenty cards, each a static HTML twin of the RN component with a README (`compon
 | Status | MetaTag, LivePill (with LiveDot), CountPill (with tab badges) |
 | Data | EloTile, RollingNumber (settled frame), DeltaChip |
 | Navigation | TabBar (with the Arena icon's embers), AppHeader (with the header status chip), Chip |
-| Surfaces | Plate, Sheet (target, WP1) |
+| Surfaces | Plate, Sheet (shipped, WP1) |
 | Feedback | Toast, Skeleton |
 | Identity | Avatar |
 | Arena | OnAirStrip, ChallengeStrip |
