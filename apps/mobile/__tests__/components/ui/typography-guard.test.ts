@@ -58,6 +58,27 @@ const SANCTIONED: Sanctioned[] = [
     reason: "the CountPill digit (9px, capped at 1.3x Dynamic Type), the one sanctioned sub-10px text",
   },
   {
+    file: "components/ui/count-pill.tsx",
+    metric: "arbitrarySize",
+    pattern: /\btext-\[9px\]/g,
+    count: 1,
+    reason: "the CountPill digit's 9px class: no scale step is below the 10px floor, so it stays a literal",
+  },
+  {
+    file: "components/ui/elo-system/live-pill.tsx",
+    metric: "arbitrarySize",
+    pattern: /\btext-\[10px\]/g,
+    count: 1,
+    reason: "the LIVE pill label (10px), a registered Adding Flare moment (tempo pulse), kept identical",
+  },
+  {
+    file: "components/ui/elo-system/live-pill.tsx",
+    metric: "monoWithoutTabular",
+    pattern: /"font-mono-bold text-\[10px\] uppercase tracking-caps-xl"/g,
+    count: 1,
+    reason: "the LIVE pill label holds no digits; a registered Adding Flare moment, kept identical",
+  },
+  {
     file: "components/ui/elo-system/splash-statement.tsx",
     metric: "inlineFontSize",
     pattern: /\bfontSize:\s*15\b/g,
