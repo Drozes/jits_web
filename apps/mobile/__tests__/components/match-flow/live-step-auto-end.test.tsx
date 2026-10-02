@@ -56,10 +56,11 @@ jest.mock("@jits/shared/hooks/use-session-match-sync", () => ({
 
 const mockTimeWarning = jest.fn(() => Promise.resolve());
 const mockMatchEnd = jest.fn(() => Promise.resolve());
+const mockMatchStart = jest.fn(() => Promise.resolve());
 jest.mock("@/lib/match-flow/use-keep-awake", () => ({ useMatchKeepAwake: () => {} }));
 jest.mock("@/lib/match-flow/use-haptics", () => ({
   matchHaptics: {
-    matchStart: () => Promise.resolve(),
+    matchStart: () => mockMatchStart(),
     matchEnd: () => mockMatchEnd(),
     timeWarning: () => mockTimeWarning(),
   },
@@ -119,7 +120,7 @@ function makeRecorder(granted = false) {
  * `pausedForSeconds`, the step mounts into a match that was paused that many
  * seconds ago with `remainingSeconds` left (cold start / re-entry).
  */
-function renderLive(remainingSeconds: number, pausedForSeconds?: number, granted = false) {
+function renderLive(remainingSeconds: number, pausedForSeconds?: number, granted = false, startHaptic?: boolean) {
   const recorder = makeRecorder(granted);
   const onEnded = jest.fn();
   const pauseMs = (pausedForSeconds ?? 0) * 1000;
@@ -135,6 +136,7 @@ function renderLive(remainingSeconds: number, pausedForSeconds?: number, granted
       pausedAt={pausedAt}
       totalPausedDuration={0}
       recorder={recorder}
+      startHaptic={startHaptic}
       // A fresh inline callback per render, like the match-step renderer.
       onEnded={(s: number) => onEnded(s)}
     />
@@ -160,6 +162,7 @@ beforeEach(() => {
   mockBroadcastTimerPaused.mockClear();
   mockTimeWarning.mockClear();
   mockMatchEnd.mockClear();
+  mockMatchStart.mockClear();
   mockPauseMatch.mockReset();
   mockResumeMatch.mockReset();
   mockSyncParams.current = null;
@@ -569,5 +572,19 @@ describe("LiveStep opponent-ended interstitial (R-P8)", () => {
       jest.advanceTimersByTime(OPPONENT_ENDED_INTERSTITIAL_MS * 3);
     });
     expect(onEnded).not.toHaveBeenCalled();
+  });
+});
+
+describe("LiveStep match-start haptic", () => {
+  it("fires matchStart once on mount by default, not again on re-render", () => {
+    const { rerender } = renderLive(120);
+    rerender();
+    expect(mockMatchStart).toHaveBeenCalledTimes(1);
+  });
+
+  it("stays silent when the countdown already fired countdownGo for GO (startHaptic false)", () => {
+    const { rerender } = renderLive(120, undefined, false, false);
+    rerender();
+    expect(mockMatchStart).not.toHaveBeenCalled();
   });
 });
