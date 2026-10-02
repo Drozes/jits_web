@@ -7,6 +7,9 @@ import DateTimePicker, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { isAtLeast16 } from "@/lib/profile-setup/validation";
 import { useThemedTokens } from "@/lib/theme/use-theme";
+import { ON_MEDIA } from "@/lib/theme/palette";
+import { useModalAnimation } from "@/lib/motion";
+import { SHEET_RADIUS } from "@/components/ui/sheet";
 import { EloField } from "./elo-form-field";
 
 const MONTHS = [
@@ -49,6 +52,7 @@ interface DateOfBirthPickerProps {
 export function DateOfBirthPicker({ value, onChange }: DateOfBirthPickerProps) {
   const tokens = useThemedTokens();
   const insets = useSafeAreaInsets();
+  const animationType = useModalAnimation("slide");
   const [iosOpen, setIosOpen] = React.useState(false);
   // Track whether the user actually moved the iOS spinner; without this, tapping
   // "Done" without scrolling would silently commit the default (today minus 16y).
@@ -127,59 +131,60 @@ export function DateOfBirthPicker({ value, onChange }: DateOfBirthPickerProps) {
         <Modal
           visible={iosOpen}
           transparent
-          animationType="slide"
+          animationType={animationType}
           onRequestClose={() => setIosOpen(false)}
           statusBarTranslucent
         >
-          <Pressable
-            style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)" }}
-            onPress={() => setIosOpen(false)}
-          >
+          <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: ON_MEDIA.scrim }}>
+            {/* The scrim above the sheet closes it; a sibling of the sheet so
+                VoiceOver still reaches Done and the date wheels. */}
+            <Pressable
+              testID="dob-picker-backdrop"
+              accessibilityRole="button"
+              accessibilityLabel="Close date picker"
+              onPress={() => setIosOpen(false)}
+              style={{ flex: 1 }}
+            />
             <View
+              testID="dob-picker-sheet"
               style={{
-                flex: 1,
-                justifyContent: "flex-end",
+                backgroundColor: tokens.bgSecondary,
+                borderTopLeftRadius: SHEET_RADIUS,
+                borderTopRightRadius: SHEET_RADIUS,
+                borderTopWidth: 1,
+                borderTopColor: tokens.borderHairline,
+                paddingTop: 8,
                 paddingBottom: insets.bottom || 16,
               }}
             >
-              <Pressable
-                onPress={(e) => e.stopPropagation()}
+              <View
                 style={{
-                  backgroundColor: tokens.card,
-                  borderTopLeftRadius: 12,
-                  borderTopRightRadius: 12,
-                  paddingTop: 8,
+                  flexDirection: "row",
+                  justifyContent: "flex-end",
+                  paddingHorizontal: 16,
+                  paddingVertical: 8,
                 }}
               >
-                <View
-                  style={{
-                    flexDirection: "row",
-                    justifyContent: "flex-end",
-                    paddingHorizontal: 16,
-                    paddingVertical: 8,
-                  }}
-                >
-                  <Pressable onPress={confirmIos} hitSlop={8} accessibilityRole="button">
-                    <Text className="font-heading text-[14px] text-cta uppercase tracking-caps-l">
-                      Done
-                    </Text>
-                  </Pressable>
-                </View>
-                <DateTimePicker
-                  value={draft}
-                  mode="date"
-                  display="spinner"
-                  maximumDate={maximumDate}
-                  minimumDate={minimumDate}
-                  textColor={tokens.cardForeground}
-                  onChange={(_event, date) => {
-                    setTouched(true);
-                    if (date) setDraft(date);
-                  }}
-                />
-              </Pressable>
+                <Pressable onPress={confirmIos} hitSlop={8} accessibilityRole="button">
+                  <Text className="font-heading text-[14px] text-cta uppercase tracking-caps-l">
+                    Done
+                  </Text>
+                </Pressable>
+              </View>
+              <DateTimePicker
+                value={draft}
+                mode="date"
+                display="spinner"
+                maximumDate={maximumDate}
+                minimumDate={minimumDate}
+                textColor={tokens.textPrimary}
+                onChange={(_event, date) => {
+                  setTouched(true);
+                  if (date) setDraft(date);
+                }}
+              />
             </View>
-          </Pressable>
+          </View>
         </Modal>
       )}
     </EloField>

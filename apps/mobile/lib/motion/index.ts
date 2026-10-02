@@ -32,6 +32,10 @@
  *   enter stagger (rows rise 8px and fade, 60ms apart, first 8 rows) for the
  *   FIRST load only; `undefined` afterwards, under Reduce Motion, and for
  *   index >= 8. Call it in the screen and pass the function to the rows.
+ * - `useModalAnimation("slide" | "fade")`: the RN `Modal` `animationType`
+ *   ("Sheet / modal present"), `"none"` under Reduce Motion.
+ * - `useSheetAnimationConfigs()`: gorhom `animationConfigs` for the same
+ *   row (`fast` brand ease-out; lands at once under Reduce Motion).
  *
  * Tests only: `__setReduceMotionForTests(next)`, `__resetAppActiveForTests()`.
  */
@@ -55,3 +59,10 @@ export {
   FIRST_LOAD_STAGGER_MS,
   type EnteringAnimation,
 } from "./use-first-load-entering";
+export {
+  useModalAnimation,
+  modalAnimationFor,
+  useSheetAnimationConfigs,
+  sheetAnimationConfigsFor,
+  type ModalPresentation,
+} from "./use-modal-animation";

@@ -1,6 +1,7 @@
 import * as React from "react";
 import { Modal, Pressable, Text, View, type ViewProps } from "react-native";
 import { cn } from "../../lib/cn";
+import { useModalAnimation } from "../../lib/motion/use-modal-animation";
 
 interface DialogContextValue {
   open: boolean;
@@ -48,7 +49,11 @@ export function DialogTrigger({ children, asChild }: { children: React.ReactElem
       },
     });
   }
-  return <Pressable onPress={() => setOpen(true)}>{children}</Pressable>;
+  return (
+    <Pressable onPress={() => setOpen(true)} accessibilityRole="button">
+      {children}
+    </Pressable>
+  );
 }
 
 export function DialogContent({
@@ -57,31 +62,39 @@ export function DialogContent({
   ...props
 }: ViewProps & { className?: string; children?: React.ReactNode }) {
   const { open, setOpen } = useDialogContext();
+  // A centered dialog fades in; under Reduce Motion it appears in place.
+  const animationType = useModalAnimation("fade");
   return (
     <Modal
       visible={open}
       transparent
-      animationType="fade"
+      animationType={animationType}
       onRequestClose={() => setOpen(false)}
     >
-      <Pressable
-        onPress={() => setOpen(false)}
-        accessibilityRole="button"
-        accessibilityLabel="Close"
-        className="flex-1 items-center justify-center bg-black/50 px-6"
-      >
-        <Pressable onPress={(e) => e.stopPropagation()} className="w-full max-w-md">
-          <View
-            className={cn(
-              "rounded-lg border border-border bg-card p-4 gap-3",
-              className,
-            )}
-            {...props}
-          >
-            {children}
-          </View>
-        </Pressable>
-      </Pressable>
+      <View testID="dialog-scrim" className="flex-1 items-center justify-center bg-on-media-scrim px-6">
+        {/* The scrim closes the dialog. It is a sibling of the card, not its
+            parent, so VoiceOver reaches the card's own controls instead of
+            reading the whole dialog as one "Close" button. The card is not
+            `accessibilityViewIsModal`: that would hide this button, the only
+            way out of a dialog with no close action (Compare Stats). */}
+        <Pressable
+          testID="dialog-backdrop"
+          onPress={() => setOpen(false)}
+          accessibilityRole="button"
+          accessibilityLabel="Close"
+          className="absolute inset-0"
+        />
+        <View
+          testID="dialog-card"
+          className={cn(
+            "w-full max-w-md rounded-lg border border-hairline bg-surface-2 p-4 gap-3",
+            className,
+          )}
+          {...props}
+        >
+          {children}
+        </View>
+      </View>
     </Modal>
   );
 }
@@ -93,10 +106,14 @@ export const DialogFooter = ({ className, ...props }: ViewProps & { className?: 
   <View className={cn("flex-row items-center justify-end gap-2 pt-2", className)} {...props} />
 );
 export const DialogTitle = ({ className, ...props }: React.ComponentProps<typeof Text> & { className?: string }) => (
-  <Text className={cn("text-lg font-semibold text-card-foreground", className)} {...props} />
+  <Text
+    accessibilityRole="header"
+    className={cn("font-heading text-[14px] uppercase tracking-caps-l text-ink", className)}
+    {...props}
+  />
 );
 export const DialogDescription = ({ className, ...props }: React.ComponentProps<typeof Text> & { className?: string }) => (
-  <Text className={cn("text-sm text-muted-foreground", className)} {...props} />
+  <Text className={cn("font-body text-[13px] text-ink-2", className)} {...props} />
 );
 
 export function DialogClose({ children, asChild }: { children: React.ReactElement; asChild?: boolean }) {
@@ -110,5 +127,9 @@ export function DialogClose({ children, asChild }: { children: React.ReactElemen
       },
     });
   }
-  return <Pressable onPress={() => setOpen(false)}>{children}</Pressable>;
+  return (
+    <Pressable onPress={() => setOpen(false)} accessibilityRole="button">
+      {children}
+    </Pressable>
+  );
 }

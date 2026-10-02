@@ -64,12 +64,12 @@ import { useViewerStakes, viewerStakesKey } from "@/lib/match-flow/use-viewer-st
 import { useModalPresentWatchdog } from "@/lib/updates/use-modal-present-watchdog";
 import type { EloStakes } from "@jits/shared/types/composites";
 import { FIGHT_RADIUS } from "@/components/match-flow/fight/fight-tokens";
-import { usePalette } from "@/lib/theme/palette";
+import { ON_MEDIA, usePalette } from "@/lib/theme/palette";
 import { InitialsBlock, Mono, StakesStrip, shortName } from "@/components/match-flow/fight/fight-ui";
 import { StatePressable } from "@/components/ui/state-pressable";
 import { PressableScale } from "@/components/ui/pressable-scale";
 import { SteelSheen } from "@/components/ui/steel-sheen";
-import { duration, easing, haptics, useReduceMotion } from "@/lib/motion";
+import { duration, easing, haptics, useModalAnimation, useReduceMotion } from "@/lib/motion";
 import { ModalToaster } from "@/components/ui/toast";
 import { OfflineBanner } from "@/components/offline-banner";
 
@@ -87,8 +87,8 @@ export const PROMPT_HEIGHT_RATIO = 0.75;
 export const PROMPT_SIDE_INSET = 16;
 /** The card's corner radius: the brand cap for modals. */
 export const PROMPT_RADIUS = 8;
-/** The backdrop: the board's dim, the same in both themes. */
-export const PROMPT_BACKDROP = "rgba(0,0,0,0.55)";
+/** The backdrop: the one modal scrim (`on-media-scrim`), the same in both themes. */
+export const PROMPT_BACKDROP = ON_MEDIA.scrim;
 /**
  * Room kept clear above and below the card inside the safe area, so on a
  * short window (landscape iPad split view, a very large inset) the 75% card
@@ -203,6 +203,8 @@ export function ChallengePromptSheet({
   viewer,
 }: ChallengePromptSheetProps) {
   const p = usePalette();
+  // "Sheet / modal present": fades in, appears in place under Reduce Motion.
+  const animationType = useModalAnimation("fade");
   const { height: windowHeight } = useWindowDimensions();
   // Read the context directly rather than useSafeAreaInsets(), which throws
   // without a provider; the app mounts one, so this is only a safety net.
@@ -394,7 +396,7 @@ export function ChallengePromptSheet({
       key={modalKey}
       visible={visible}
       transparent
-      animationType="fade"
+      animationType={animationType}
       statusBarTranslucent
       // Never dismissed by the system: Android back and the iOS close
       // request both do nothing (AC-S7).

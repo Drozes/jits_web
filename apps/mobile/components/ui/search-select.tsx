@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { X } from "lucide-react-native";
 import { cn } from "@/lib/cn";
 import { useThemedTokens } from "@/lib/theme/use-theme";
+import { useModalAnimation } from "@/lib/motion";
 
 export interface SearchSelectOption {
   label: string;
@@ -96,6 +97,7 @@ export function SearchSelect({
   noMatchesOptions,
 }: SearchSelectProps) {
   const tokens = useThemedTokens();
+  const animationType = useModalAnimation("slide");
   const insets = useSafeAreaInsets();
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
@@ -198,7 +200,7 @@ export function SearchSelect({
       <Modal
         visible={open}
         transparent
-        animationType="slide"
+        animationType={animationType}
         onRequestClose={close}
         statusBarTranslucent
       >

@@ -184,6 +184,19 @@ describe("ChallengePromptSheet centered modal (jits-02vo.3)", () => {
     expect(modal.props.statusBarTranslucent).toBe(true);
   });
 
+  it("appears in place under Reduce Motion and stays non-dismissable (Sheet / modal present)", () => {
+    __setReduceMotionForTests(true);
+    const screen = render(<Harness challenge={RIVAL} />);
+    const modal = modalOf(screen);
+    expect(modal.props.animationType).toBe("none");
+    // Android back still does nothing: the prompt stays up.
+    act(() => {
+      modal.props.onRequestClose?.();
+    });
+    expect(modalOf(screen).props.visible).toBe(true);
+    expect(screen.getByLabelText("Accept challenge")).toBeTruthy();
+  });
+
   it("dims the screen behind with a backdrop and insets the card 16pt from each side", () => {
     const screen = render(<Harness challenge={RIVAL} />);
     const backdrop = StyleSheet.flatten(screen.getByTestId("challenge-prompt-backdrop").props.style);

@@ -42,7 +42,7 @@ Defined in `apps/mobile/lib/tokens.ts` (light l.69-93, dark l.116-140), mirrored
 | `OnlineIndicator` | `components/online-indicator.tsx` | 0 | Delete |
 | `Badge` | `components/ui/badge.tsx` | 1 (admin members), `rounded-lg`, system font | Restyle onto `MetaTag` / `OutcomeTag`, keep the `success` variant API |
 | `Dialog` | `components/ui/dialog.tsx` | 1 (Compare Stats), system-font title | Brand titles (WP1) |
-| `Sheet` | `components/ui/sheet.tsx` | 1 (Share Profile), `tokens.card`, 15px gorhom radius | The one sheet shell (WP1) |
+| `Sheet` | `components/ui/sheet.tsx` | 1 (Share Profile); since WP1 on the shared chrome (`panel`, 8px, brand title) | Kept: the one sheet shell, and home of `useSheetChrome()` / `SheetBackdrop` |
 | `Button` | `components/ui/button.tsx` | Admin screens, update banner, critical update modal | Replaced by the unified `Button` (WP3) |
 | `Switch` | `components/ui/switch.tsx` | 3 (settings, admin flags), red `primary` track | Neutral track (WP2) |
 | `OfflineBanner` | `components/offline-banner.tsx` | Root layout | `panel` + `hairline-strong`, mono caps `ink` (WP4) |

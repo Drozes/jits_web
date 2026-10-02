@@ -1,7 +1,9 @@
 import * as React from "react";
 import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { usePalette } from "@/lib/theme/palette";
+import { ON_MEDIA, usePalette } from "@/lib/theme/palette";
+import { useModalAnimation } from "@/lib/motion";
+import { SHEET_RADIUS } from "@/components/ui/sheet";
 
 interface OpponentPickerProps {
   visible: boolean;
@@ -36,18 +38,20 @@ function Row({ label, detail, on, onPress, testID }: { label: string; detail?: s
 
 /**
  * Bottom sheet listing the opponents in the loaded matches. A plain RN Modal
- * (no new native module); radius 8 is the sheet exception to the brand's 4.
+ * (no new native module); `SHEET_RADIUS` (8) is the sheet exception to the
+ * brand's 4. Slides up, or appears in place under Reduce Motion.
  */
 export function OpponentPicker({ visible, opponents, selectedId, onSelect, onClose }: OpponentPickerProps) {
   const p = usePalette();
   const insets = useSafeAreaInsets();
+  const animationType = useModalAnimation("slide");
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType={animationType} onRequestClose={onClose}>
       <View style={{ flex: 1, justifyContent: "flex-end" }}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Close opponent filter" onPress={onClose} style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.55)" }} />
+        <Pressable accessibilityRole="button" accessibilityLabel="Close opponent filter" onPress={onClose} style={{ flex: 1, backgroundColor: ON_MEDIA.scrim }} />
         <View
           testID="film-opponent-sheet"
-          style={{ backgroundColor: p.plate, borderTopLeftRadius: 8, borderTopRightRadius: 8, paddingHorizontal: 16, paddingTop: 16, paddingBottom: insets.bottom + 16, maxHeight: "70%" }}
+          style={{ backgroundColor: p.plate, borderTopLeftRadius: SHEET_RADIUS, borderTopRightRadius: SHEET_RADIUS, paddingHorizontal: 16, paddingTop: 16, paddingBottom: insets.bottom + 16, maxHeight: "70%" }}
         >
           <Text className="font-mono-bold" style={{ fontSize: 10, letterSpacing: 2.52, color: p.text, marginBottom: 8 }}>
             OPPONENT
