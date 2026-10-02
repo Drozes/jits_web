@@ -96,7 +96,11 @@ function useBoundaryNow(pending: PendingChallenge[]): number {
 function BellHost({ athleteId }: { athleteId: string }) {
   const router = useRouter();
   const open = useBellOpen();
-  const { challenges: pending, refetch: refetchPending } = usePendingChallenges(
+  const {
+    challenges: pending,
+    refetch: refetchPending,
+    loaded: pendingLoaded,
+  } = usePendingChallenges(
     supabase,
     athleteId,
   );
@@ -126,8 +130,8 @@ function BellHost({ athleteId }: { athleteId: string }) {
   );
 
   React.useEffect(() => {
-    publishBellBadge(freshCount + unseenHighlights, freshCount);
-  }, [freshCount, unseenHighlights]);
+    publishBellBadge(freshCount + unseenHighlights, freshCount, pendingLoaded);
+  }, [freshCount, unseenHighlights, pendingLoaded]);
 
   // Re-read the pending list where realtime may have missed events. The
   // history hook re-reads its whole feed on foreground, panel open and Home's

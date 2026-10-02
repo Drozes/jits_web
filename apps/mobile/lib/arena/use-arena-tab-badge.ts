@@ -25,11 +25,24 @@
 import { useAuth } from "@/lib/auth/hooks";
 import { useMatchToConfirm } from "@/lib/match-flow/active-match-store";
 import type { TabBadge } from "@/lib/navigation/tab-badge";
-import { useFreshIncomingCount } from "@/lib/notifications/bell-store";
+import { useBellLoaded, useFreshIncomingCount } from "@/lib/notifications/bell-store";
 import { useArenaIncomingCount, useIsArenaLive } from "./arena-store";
 import { arenaTabBadge } from "./mat-board";
 
-export function useArenaTabBadge(): TabBadge | null {
+/** What the Arena tab shows, read once for the badge and the icon. */
+export interface ArenaTabState {
+  /** The red count: the larger of the Arena's and the bell's incoming count. */
+  incomingCount: number;
+  isLive: boolean;
+  hasConfirm: boolean;
+  /**
+   * The count is known: the bell's pending list has had its first full read.
+   * Until then a rising count is the stores loading, not a challenge arriving.
+   */
+  incomingKnown: boolean;
+}
+
+export function useArenaTabState(): ArenaTabState {
   const { athlete } = useAuth();
   // Primitive selectors: the tab bar is always mounted, and must not
   // re-render on every Arena store change (isBusy, outgoing, and so on).
@@ -37,9 +50,15 @@ export function useArenaTabBadge(): TabBadge | null {
   const isLive = useIsArenaLive();
   const freshIncoming = useFreshIncomingCount();
   const hasConfirm = useMatchToConfirm(athlete?.id ?? null) !== null;
-  return arenaTabBadge({
+  const incomingKnown = useBellLoaded();
+  return {
     incomingCount: Math.max(incomingCount, freshIncoming),
     isLive,
     hasConfirm,
-  });
+    incomingKnown,
+  };
+}
+
+export function useArenaTabBadge(): TabBadge | null {
+  return arenaTabBadge(useArenaTabState());
 }

@@ -13,7 +13,46 @@ jest.mock("@/lib/theme/use-theme", () => ({
   }),
 }));
 
-import { EloTabBar, resolveTabBadge, type TabBadges } from "@/components/layout/elo-tab-bar";
+// Observe the bounce's animation calls (the jest renderer does not run them).
+const mockWithTiming = jest.fn();
+const mockWithSpring = jest.fn();
+jest.mock("react-native-reanimated", () => {
+  const actual = jest.requireActual("react-native-reanimated");
+  return {
+    ...actual,
+    __esModule: true,
+    default: actual.default,
+    withTiming: (...args: unknown[]) => {
+      mockWithTiming(...args);
+      return actual.withTiming(...args);
+    },
+    withSpring: (...args: unknown[]) => {
+      mockWithSpring(...args);
+      return actual.withSpring(...args);
+    },
+  };
+});
+
+jest.mock("@/lib/motion/haptics", () => ({
+  haptics: new Proxy(
+    {},
+    {
+      get: (target: Record<string, jest.Mock>, prop: string) => {
+        if (!target[prop]) target[prop] = jest.fn(() => Promise.resolve());
+        return target[prop];
+      },
+    },
+  ),
+}));
+
+import {
+  EloTabBar,
+  resolveTabBadge,
+  tabValueText,
+  type TabBadges,
+} from "@/components/layout/elo-tab-bar";
+import { haptics } from "@/lib/motion/haptics";
+import { __setReduceMotionForTests } from "@/lib/motion";
 
 type Screen = { name: string; title: string; hidden?: boolean };
 
@@ -66,6 +105,11 @@ const CURRENT_TABS: Screen[] = [
 
 beforeEach(() => {
   jest.clearAllMocks();
+  __setReduceMotionForTests(false);
+});
+
+afterEach(() => {
+  __setReduceMotionForTests(false);
 });
 
 describe("EloTabBar", () => {
@@ -251,6 +295,93 @@ describe("EloTabBar badges (jits-dq85.9)", () => {
   });
 });
 
+describe("tab select bounce and haptic (Adding Flare [10.2])", () => {
+  it("fires the select haptic when a tab that is not active is pressed", () => {
+    const u = render(React.createElement(EloTabBar, buildProps(CURRENT_TABS)));
+    fireEvent.press(u.getByLabelText("Arena"));
+    expect(haptics.select).toHaveBeenCalledTimes(1);
+  });
+
+  it("does nothing for the active tab", () => {
+    const u = render(React.createElement(EloTabBar, buildProps(CURRENT_TABS)));
+    fireEvent.press(u.getByLabelText("Home"));
+    expect(haptics.select).not.toHaveBeenCalled();
+  });
+
+  it("does nothing when the tabPress was prevented", () => {
+    mockEmit.mockReturnValueOnce({ defaultPrevented: true });
+    const u = render(React.createElement(EloTabBar, buildProps(CURRENT_TABS)));
+    fireEvent.press(u.getByLabelText("Profile"));
+    expect(haptics.select).not.toHaveBeenCalled();
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it("squashes the pressed icon and springs it back (select spring)", () => {
+    const u = render(React.createElement(EloTabBar, buildProps(CURRENT_TABS)));
+    fireEvent.press(u.getByLabelText("Arena"));
+    expect(mockWithTiming).toHaveBeenCalledWith(0.86, expect.objectContaining({ duration: 100 }));
+    expect(mockWithSpring).toHaveBeenCalledWith(1, { damping: 14, stiffness: 260 });
+  });
+
+  it("does not bounce the active tab", () => {
+    const u = render(React.createElement(EloTabBar, buildProps(CURRENT_TABS)));
+    fireEvent.press(u.getByLabelText("Home"));
+    expect(mockWithSpring).not.toHaveBeenCalled();
+  });
+
+  it("does not scale under Reduce Motion", () => {
+    __setReduceMotionForTests(true);
+    const u = render(React.createElement(EloTabBar, buildProps(CURRENT_TABS)));
+    fireEvent.press(u.getByLabelText("Arena"));
+    expect(mockWithTiming).not.toHaveBeenCalledWith(0.86, expect.anything());
+    expect(mockWithSpring).not.toHaveBeenCalled();
+  });
+
+  it("keeps the haptic under Reduce Motion", () => {
+    __setReduceMotionForTests(true);
+    const u = render(React.createElement(EloTabBar, buildProps(CURRENT_TABS)));
+    fireEvent.press(u.getByLabelText("Rankings"));
+    expect(haptics.select).toHaveBeenCalledTimes(1);
+    expect(mockNavigate).toHaveBeenCalledWith("leaderboard", undefined);
+  });
+});
+
+describe("countable embers and live (Adding Flare [09.2])", () => {
+  function renderWith(badges: TabBadges, live?: Record<string, boolean>) {
+    return render(React.createElement(EloTabBar, { ...buildProps(CURRENT_TABS), badges, live }));
+  }
+
+  it("draws no pill for a count the icon draws, but VoiceOver still reads it", () => {
+    const u = renderWith({ arena: { kind: "count", count: 2, label: "2 challenges", inIcon: true } });
+    expect(u.queryByTestId("tab-badge-count-arena")).toBeNull();
+    expect(u.getByLabelText("Arena").props.accessibilityValue).toMatchObject({ text: "2 challenges" });
+  });
+
+  it("adds live to the spoken value when a count overrides the live dot", () => {
+    const u = renderWith(
+      { arena: { kind: "count", count: 2, label: "2 challenges", inIcon: true } },
+      { arena: true },
+    );
+    expect(u.getByLabelText("Arena").props.accessibilityValue).toMatchObject({ text: "2 challenges, live" });
+  });
+
+  it("does not repeat live when the dot already says it", () => {
+    const u = renderWith({ arena: { kind: "dot", label: "Live" } }, { arena: true });
+    expect(u.getByLabelText("Arena").props.accessibilityValue).toMatchObject({ text: "Live" });
+    expect(u.getByTestId("tab-badge-dot-arena")).toBeTruthy();
+  });
+
+  it.each([
+    [null, false, undefined],
+    [null, true, "Live"],
+    [{ kind: "count", count: 5, label: "5 challenges" }, true, "5 challenges, live"],
+    [{ kind: "dot", label: "Live, result to confirm" }, true, "Live, result to confirm"],
+    [{ kind: "ring", label: "Result to confirm" }, false, "Result to confirm"],
+  ] as const)("tabValueText(%p, %p) -> %p", (badge, live, expected) => {
+    expect(tabValueText(badge as never, live)).toBe(expected);
+  });
+});
+
 describe("resolveTabBadge", () => {
   it.each([
     [undefined, undefined, null],
@@ -276,6 +407,8 @@ describe("resolveTabBadge", () => {
     [{ kind: "count", count: 0.5 }, undefined, null],
     [undefined, 2.5, { kind: "count", count: 2 }],
     [undefined, "0.5", null],
+    // A count the icon draws keeps that mark through normalisation.
+    [{ kind: "count", count: 2, label: "2 challenges", inIcon: true }, undefined, { kind: "count", count: 2, label: "2 challenges", inIcon: true }],
   ] as const)("explicit %p, tabBarBadge %p -> %p", (explicit, option, expected) => {
     expect(resolveTabBadge(explicit as never, option)).toEqual(expected);
   });

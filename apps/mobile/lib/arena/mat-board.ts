@@ -3,7 +3,7 @@
  * behind what it shows. No stores, no network, no hooks: the screen passes
  * in what the Arena store, the lobby and the roster know.
  */
-import type { TabBadge } from "@/lib/navigation/tab-badge";
+import { countableEmbers, type TabBadge } from "@/lib/navigation/tab-badge";
 import { ARENA_BAND_ORDER, type ArenaCloseBand } from "@jits/shared/api/location";
 import { IN_BAND_ELO } from "./constants";
 import type { ArenaNearbyView } from "./use-arena-nearby";
@@ -229,7 +229,11 @@ export function formatMatCounts(onMat: number | null, inBand: number | null): st
 
 /**
  * The Arena tab's mark:
- *  - fresh incoming challenges: a red count (AC-T1);
+ *  - fresh incoming challenges: a red count (AC-T1). From 1 to
+ *    `MAX_COUNTABLE_EMBERS` it is marked `inIcon`: the Arena icon draws one
+ *    ember per challenge in place of the pill (Adding Flare [09.2]), and
+ *    VoiceOver still reads the count. Live is passed to the bar separately,
+ *    since a count overrides the green dot;
  *  - live, none incoming: a static green dot, including live plus a result
  *    to confirm (AC-T2; a pending result never changes live state);
  *  - offline with a result to confirm: a hollow ring (AC-T3);
@@ -242,7 +246,12 @@ export function arenaTabBadge(input: {
 }): TabBadge | null {
   const n = input.incomingCount;
   if (n > 0) {
-    return { kind: "count", count: n, label: n === 1 ? "1 challenge" : `${n} challenges` };
+    const label = n === 1 ? "1 challenge" : `${n} challenges`;
+    // 1 to 3: the Arena icon draws one ember per challenge instead of the
+    // pill (Adding Flare [09.2]); more than that, the pill returns.
+    return countableEmbers(n) > 0
+      ? { kind: "count", count: n, label, inIcon: true }
+      : { kind: "count", count: n, label };
   }
   if (input.isLive) {
     return {
