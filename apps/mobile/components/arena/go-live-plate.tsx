@@ -6,7 +6,8 @@
  * `apps/web/app/(app)/arena/looking-for-match-toggle.tsx`.
  */
 import * as React from "react";
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
+import { PressableScale } from "@/components/ui/pressable-scale";
 import { Plate, LivePill } from "@/components/ui/elo-system";
 
 interface GoLivePlateProps {
@@ -36,7 +37,9 @@ export function GoLivePlate({ isLive, isSaving, onToggle, body }: GoLivePlatePro
         {isLive ? <LivePill label="Live" /> : null}
       </View>
 
-      <Pressable
+      {/* Press scale only: going live buzzes `goLive` from the Arena tab
+          icon on the live transition, so no press haptic here. */}
+      <PressableScale
         accessibilityRole="button"
         accessibilityState={{ disabled: isSaving, busy: isSaving }}
         accessibilityLabel={isLive ? "Go offline" : "Go live"}
@@ -58,7 +61,7 @@ export function GoLivePlate({ isLive, isSaving, onToggle, body }: GoLivePlatePro
         >
           {isLive ? "Go offline" : "Go live"}
         </Text>
-      </Pressable>
+      </PressableScale>
     </Plate>
   );
 }

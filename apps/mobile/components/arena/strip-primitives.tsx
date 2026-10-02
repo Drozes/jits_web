@@ -4,13 +4,18 @@
  * import them.
  */
 import * as React from "react";
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import { cn } from "@/lib/cn";
+import { PressableScale } from "@/components/ui/pressable-scale";
 
 /** Largest Dynamic Type scale on the dense Arena strip text (spec 4.2). */
 export const MAX_SCALE = 1.3;
 
-/** A small outline action: ROLL, OPEN, CANCEL, CONFIRM. 44pt hit area. */
+/**
+ * A small outline action: ROLL, OPEN, CANCEL, CONFIRM. 44pt hit area. Press
+ * scale (Motion Rule, Reactive); no haptic prop: a caller that commits
+ * (ROLL sends a challenge) fires `haptics.press` itself.
+ */
 export function OutlineAction({
   label,
   accessibilityLabel,
@@ -31,7 +36,7 @@ export function OutlineAction({
   testID?: string;
 }) {
   return (
-    <Pressable
+    <PressableScale
       testID={testID}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
@@ -55,7 +60,7 @@ export function OutlineAction({
       >
         {label}
       </Text>
-    </Pressable>
+    </PressableScale>
   );
 }
 

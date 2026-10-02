@@ -25,6 +25,7 @@ jest.mock("@/lib/motion/haptics", () => ({
 
 import { PressableScale, REDUCED_PRESS_OPACITY } from "@/components/ui/pressable-scale";
 import { Button } from "@/components/ui/button";
+import { FightButton } from "@/components/match-flow/fight/fight-ui";
 import { PRESS_SCALE, __setReduceMotionForTests } from "@/lib/motion";
 
 function scaleOf(node: Parameters<typeof getAnimatedStyle>[0]): number {
@@ -263,5 +264,35 @@ describe("Button press scale, haptic and sheen", () => {
     act(() => jest.advanceTimersByTime(10_000));
     expect(mockPress).not.toHaveBeenCalled();
     expect(mockAccept).not.toHaveBeenCalled();
+  });
+});
+
+describe("FightButton press scale and sheen (Adding Flare integration)", () => {
+  it("scales on press and stays silent without a haptic prop", () => {
+    const screen = render(<FightButton testID="fb" label="Confirm result" onPress={jest.fn()} />);
+    fireEvent(screen.getByTestId("fb"), "pressIn", {});
+    act(() => jest.advanceTimersByTime(500));
+    expect(scaleOf(screen.getByTestId("fb"))).toBeCloseTo(PRESS_SCALE, 3);
+    fireEvent.press(screen.getByTestId("fb"));
+    expect(mockPress).not.toHaveBeenCalled();
+  });
+
+  it("draws the sheen only while enabled, clipped to the button", () => {
+    const screen = render(<FightButton testID="fb" label="Confirm result" sheen onPress={jest.fn()} />);
+    expect(screen.getByTestId("steel-sheen", { includeHiddenElements: true })).toBeTruthy();
+    expect(StyleSheet.flatten(screen.getByTestId("fb").props.style).overflow).toBe("hidden");
+
+    screen.rerender(<FightButton testID="fb" label="Confirm result" sheen busy onPress={jest.fn()} />);
+    expect(screen.queryByTestId("steel-sheen", { includeHiddenElements: true })).toBeNull();
+    screen.rerender(<FightButton testID="fb" label="Confirm result" sheen disabled onPress={jest.fn()} />);
+    expect(screen.queryByTestId("steel-sheen", { includeHiddenElements: true })).toBeNull();
+  });
+
+  it("a disabled FightButton keeps its 0.5 opacity and does not scale", () => {
+    const screen = render(<FightButton testID="fb" label="Go" disabled onPress={jest.fn()} />);
+    expect(StyleSheet.flatten(screen.getByTestId("fb").props.style).opacity).toBe(0.5);
+    fireEvent(screen.getByTestId("fb"), "pressIn", {});
+    act(() => jest.advanceTimersByTime(500));
+    expect(scaleOf(screen.getByTestId("fb"))).toBe(1);
   });
 });

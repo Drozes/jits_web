@@ -24,6 +24,7 @@
 import * as React from "react";
 import {
   Pressable,
+  StyleSheet,
   type GestureResponderEvent,
   type PressableProps,
   type PressableStateCallbackType,
@@ -122,7 +123,9 @@ export const PressableScale = React.forwardRef<View, PressableScaleProps>(functi
     typeof style === "function" ? style({ pressed: shownPressed }) : style;
   // No null/undefined entries: Reanimated's jest style reader cannot skip them.
   const composed: StyleProp<ViewStyle>[] = [];
-  if (resolved) composed.push(resolved);
+  // Flattened: a function style may return a nested array with `false`
+  // entries (FightButton), which the jest style reader cannot walk either.
+  if (resolved) composed.push(StyleSheet.flatten(resolved));
   if (shownPressed && reduceMotion) composed.push(REDUCED_DIP_STYLE);
 
   return (

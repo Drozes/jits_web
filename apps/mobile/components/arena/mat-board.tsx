@@ -16,6 +16,7 @@
  */
 import { Pressable, Text, View } from "react-native";
 import { haptics } from "@/lib/motion";
+import { PressableScale } from "@/components/ui/pressable-scale";
 import { Avatar32, MetaTag } from "@/components/ui/elo-system";
 import { cn } from "@/lib/cn";
 import { MAX_SCALE, OutlineAction, StripShell } from "@/components/arena/strip-primitives";
@@ -166,7 +167,7 @@ export function MatControlBar({
     const selected = isLive === live;
     const disabled = selected || locked;
     return (
-      <Pressable
+      <PressableScale
         testID={live ? "arena-segment-live" : "arena-segment-offline"}
         accessibilityRole="button"
         accessibilityLabel={
@@ -196,7 +197,7 @@ export function MatControlBar({
         >
           {live ? "Live" : "Offline"}
         </Text>
-      </Pressable>
+      </PressableScale>
     );
   };
 
@@ -400,7 +401,7 @@ export function OfferStrip({
         countdownTestID="arena-strip-countdown"
         count={count}
       />
-      <Pressable
+      <PressableScale
         testID="arena-offer-go-live"
         accessibilityRole="button"
         accessibilityLabel={`Go live to answer ${name}`}
@@ -417,7 +418,7 @@ export function OfferStrip({
         >
           Go live
         </Text>
-      </Pressable>
+      </PressableScale>
     </StripShell>
   );
 }
@@ -636,7 +637,7 @@ function ClosestCtaButton({
 }) {
   const label = kind === "challenge" && name ? `Challenge ${name}` : "Go live to roll";
   return (
-    <Pressable
+    <PressableScale
       testID="arena-closest-cta"
       accessibilityRole="button"
       accessibilityLabel={label}
@@ -668,7 +669,7 @@ function ClosestCtaButton({
       >
         {label}
       </Text>
-    </Pressable>
+    </PressableScale>
   );
 }
 

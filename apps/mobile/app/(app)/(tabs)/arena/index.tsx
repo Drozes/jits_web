@@ -68,7 +68,7 @@ import {
 } from "@/components/arena/mat-board";
 import { ArenaSkeleton } from "@/components/arena/arena-skeleton";
 import { OnAirStrip } from "@/components/arena/on-air-strip";
-import { useFirstLoadEntering } from "@/components/arena/use-first-load-entering";
+import { useFirstLoadEntering } from "@/lib/motion";
 import { CapPlate, RosterErrorPlate } from "@/components/arena/arena-plates";
 import { SecondaryButton, TertiaryButton } from "@/components/auth/auth-buttons";
 import { toast } from "@/components/ui/toast";

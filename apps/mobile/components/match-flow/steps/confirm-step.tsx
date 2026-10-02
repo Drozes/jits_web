@@ -226,7 +226,7 @@ export function ConfirmStep(props: ConfirmStepProps) {
 
       {!myConfirmed ? (
         <View style={{ gap: 12 }}>
-          <FightButton testID="confirm-result" label="Confirm result" onPress={() => void handleConfirm()} icon={(c) => <Check size={16} color={c} />} />
+          <FightButton testID="confirm-result" label="Confirm result" sheen onPress={() => void handleConfirm()} icon={(c) => <Check size={16} color={c} />} />
           {windowClosed ? null : (
             <FightButton
               testID="confirm-dispute"

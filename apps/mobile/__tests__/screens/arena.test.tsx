@@ -2240,8 +2240,10 @@ describe("Arena: Adding Flare live surfaces (jits-pddd.6)", () => {
     ];
     mockLobbyIds = new Set(["a-1", "a-2"]);
     /** Row wrappers carrying an entering animation. */
+    // The shared `@/lib/motion` helper returns a Reanimated Keyframe (an
+    // object), not an entry function: count any entering animation.
     const entering = (r: ReturnType<typeof render>) =>
-      r.UNSAFE_root.findAll((n: { props: Record<string, unknown> }) => typeof n.props.entering === "function").length;
+      r.UNSAFE_root.findAll((n: { props: Record<string, unknown> }) => n.props.entering != null).length;
 
     const r = render(<ArenaScreen />);
     expect(entering(r)).toBeGreaterThanOrEqual(2);

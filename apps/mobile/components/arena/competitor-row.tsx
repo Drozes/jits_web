@@ -11,6 +11,7 @@
 import * as React from "react";
 import { Pressable, Text, View } from "react-native";
 import { haptics } from "@/lib/motion";
+import { PressableScale } from "@/components/ui/pressable-scale";
 import { Plate, Avatar32, LivePill, MetaTag } from "@/components/ui/elo-system";
 import type { ArenaCompetitor } from "@/lib/arena/use-arena-roster";
 
@@ -109,7 +110,7 @@ export function CompetitorRow({
 
         <View className="shrink-0 items-end gap-1">
           {action.kind === "challenge" ? (
-            <Pressable
+            <PressableScale
               accessibilityRole="button"
               accessibilityLabel={`Challenge ${displayName}`}
               accessibilityState={{ disabled }}
@@ -126,11 +127,11 @@ export function CompetitorRow({
               <Text className="font-heading text-[11px] text-ink uppercase tracking-caps">
                 Challenge
               </Text>
-            </Pressable>
+            </PressableScale>
           ) : null}
 
           {action.kind === "go-live" ? (
-            <Pressable
+            <PressableScale
               accessibilityRole="button"
               accessibilityLabel={`Go live to challenge ${displayName}`}
               accessibilityState={{ disabled }}
@@ -142,7 +143,7 @@ export function CompetitorRow({
               <Text className="font-heading text-[11px] text-cta uppercase tracking-caps">
                 Go live
               </Text>
-            </Pressable>
+            </PressableScale>
           ) : null}
 
           {action.kind === "pending" ? <Tag label="Pending" /> : null}
