@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## OTA "Adding Flare" (runtime 0.5.0), 2026-10-01
+
+Production OTA group `e74e62b0-ae9a-4f90-a46d-dd755adbf19c` from `main` `02157d3` (PRs #33, #34). Design canvas synced to version `1790908046-09bc` (boards 13, 14, 15, 23, 27, 29, 57, 59).
+
 ### Mobile: Adding Flare, the Motion Rule and motion with meaning (jits-pddd)
 
 JS-only, OTA-eligible for runtime 0.5.0 (build 25) installs only; earlier runtimes never receive it. No new native dependency (Reanimated, react-native-svg and expo-haptics are already linked). The Motion Rule in `DESIGN.md` ("Motion") replaces the old minimal-motion rule: every animation is Reactive (touch), a Moment (once, on a real state change) or Ambient (only while a live, loading or waiting-on-you state is true, paused in background), runs on the UI thread, has a still Reduce Motion state and is listed in the registry. Never a haptic on a loss or for ambient motion. Web is unchanged (the ELO odometer and delta chip have a web parity follow-up).
