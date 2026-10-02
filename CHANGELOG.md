@@ -2,9 +2,18 @@
 
 ## [Unreleased]
 
-### Mobile: Sign in with Apple hidden behind an OTA-flippable constant
+## 0.5.0 (build 25), 2026-10-01
 
-JS-only (OTA-eligible). The native module and `ios.usesAppleSignIn` stay in the binary, so enabling it later needs only an OTA.
+Release "Invites + Friends", shipped DARK. iOS version and runtime 0.5.0, EAS build 25 (`0e1331ed-17c1-4b50-bac9-3d9556437071`) on TestFlight; web deployed to Vercel from `main` (`41d79a4`). Needs the jr_be migrations `20261001100000` to `20261001300700` (applied on prod) and the `push` and `delete-account` edge functions (deployed). Prod flags `invites_enabled` and `match_location_required` are both off. A new runtime: OTAs for 0.4.0 never reach 0.5.0 installs and vice versa.
+
+**Release notes**
+- Build 24 failed (the App Store provisioning profile lacked the Sign in with Apple capability). Build 25 ships without the Apple entitlement: `ios.usesAppleSignIn` and the `expo-apple-authentication` plugin entry are removed from `app.json`, `apps/mobile/plugins/with-no-apple-signin.js` strips the entitlement Expo's default plugins add for the installed package, and the button is hidden by `APPLE_SIGN_IN_ENABLED = false` (`apps/mobile/lib/env.ts`). Re-enabling needs a native build (jits-22mp).
+- Also in this release without a separate entry below: web `/c/<token>` invite landing with OG card, `?next=` and attribution plumbing, free-agent invite signup, and the AASA file served from `apps/web/public/.well-known` (jits-b3js.1 to .3); a single Share button (WhatsApp and SMS shortcuts dropped); no user-visible "ranked" copy anywhere (every match is ranked); a missing date of birth is asked for instead of showing underage, with the age rule on the UTC date on web and mobile; invite actions pinned at the bottom of the Arena; Just Rolled removed from the Arena; the practice card only for athletes who never played; web `match_location_required` on Go Live and Arena accept.
+- Known issue: the "Got a challenge code?" link on mobile login and signup renders regardless of `invites_enabled` (pre-auth screens cannot read `feature_flags`); fix planned as an OTA constant gate.
+
+### Mobile: Sign in with Apple hidden behind `APPLE_SIGN_IN_ENABLED` (default off)
+
+Build 25 ships without the Apple entitlement (see the release notes above), so enabling Sign in with Apple needs a native build, not only an OTA (jits-22mp).
 
 **Changed**
 - The Apple button on mobile login and signup renders only when `APPLE_SIGN_IN_ENABLED` (`apps/mobile/lib/env.ts`) is true. It defaults to false because the Supabase prod Apple provider is not configured yet (jits-2cb2); `EXPO_PUBLIC_APPLE_SIGN_IN=true` at bundle time also enables it. A plain constant, not a `feature_flags` row, because the auth screens render before sign-in. Web's Apple button is unchanged. Test: `apps/mobile/__tests__/screens/auth/apple-sign-in-gate.test.tsx`.
@@ -83,10 +92,10 @@ Adds the pure-JS `qrcode-generator` dependency (drawn on the existing `react-nat
 
 **Added**
 - `packages/shared/src/api/invites.ts` (create, refresh, revoke, personal invite, attribution, accept join, claim, presence, bookings, stats, telemetry, flag read, invite-row realtime) and `packages/shared/src/api/friends.ts` (list, remove, friend ids, friends-first sort, `enable_friends` preference). All return results and never throw; RAISE hints come back on `error.hint`.
-- `packages/shared/src/utils/invite-codes.ts` (code normaliser identical to the server, `XXX-XXX` display, link and code extraction from pasted text), `invite-share.ts` (exact share templates, WhatsApp and SMS shortcuts) and `invite-copy.ts` (every contract section 7 message).
-- Routes: `app/c/[token].tsx` (stores the token, signed out or in), `app/invite-setup.tsx` (one-screen setup: waiver, names, gender, DOB 16+, weight; free agent; city deferred; attribution first), `app/(auth)/invite-code.tsx` ("Got a challenge code?", wrong-code and throttle countdown), `app/(app)/invite/index.tsx` (QR, big monospace code, Share / WhatsApp / SMS, live waiting, code refresh, withdraw, presence every 60 s), `app/(app)/invite/join.tsx` (personal QR and link, friends-joined count), `app/(app)/invite/claim.tsx` (location, claim, face-off or booking, every error state, "Signed in as ... Not you?"), `app/(app)/friends.tsx`.
+- `packages/shared/src/utils/invite-codes.ts` (code normaliser identical to the server, `XXX-XXX` display, link and code extraction from pasted text), `invite-share.ts` (exact share templates; the WhatsApp and SMS shortcuts were later dropped for a single Share button) and `invite-copy.ts` (every contract section 7 message).
+- Routes: `app/c/[token].tsx` (stores the token, signed out or in), `app/invite-setup.tsx` (one-screen setup: waiver, names, gender, DOB 16+, weight; free agent; city deferred; attribution first), `app/(auth)/invite-code.tsx` ("Got a challenge code?", wrong-code and throttle countdown), `app/(app)/invite/index.tsx` (QR, big monospace code, Share, live waiting, code refresh, withdraw, presence every 60 s), `app/(app)/invite/join.tsx` (personal QR and link, friends-joined count), `app/(app)/invite/claim.tsx` (location, claim, face-off or booking, every error state, "Signed in as ... Not you?"), `app/(app)/friends.tsx`.
 - `apps/mobile/lib/invites/*`: pre-auth AsyncStorage persistence (`elorated.invite.pending.v1`, buffered `token_captured` events), launch routing, claim decisions, location reading, share logging, bookings with presence, friend ids, flag hook, QR matrix.
-- Entry points behind `invites_enabled`: Arena empty state (secondary), Profile (invite row and Friends row), post-match verdict, Home fallback card. Arena friend badges and friends-first sort, Booked strip, `?athlete=<id>` puts that friend on top. Settings > Notifications: "Friends on the mat".
+- Entry points behind `invites_enabled`: Arena invite actions (pinned footer at the bottom of the Arena), Profile (invite row and Friends row), post-match verdict, Home fallback card. Arena friend badges and friends-first sort, Booked strip, `?athlete=<id>` puts that friend on top. Settings > Notifications: "Friends on the mat".
 - Push routing: `match_href` > `profile_href` > `arena_href`, each validated.
 
 **Changed**
@@ -95,7 +104,7 @@ Adds the pure-JS `qrcode-generator` dependency (drawn on the existing `react-nat
 
 ### Native + account: Sign in with Apple, paste button, location copy, account deletion (invites 016, jits-b3js.9, jits-b3js.10)
 
-**TestFlight build required (NOT OTA-eligible):** new native dependencies (`expo-apple-authentication`, `expo-clipboard`, `expo-crypto`), `app.json` plugin, entitlement (`com.apple.developer.applesignin`) and permission-string changes, and a marketing version bump to **0.5.0**. With `runtimeVersion: appVersion`, 0.5.0 is a new OTA runtime: OTAs published for 0.4.0 never reach it and vice versa.
+**TestFlight build required (NOT OTA-eligible):** new native dependencies (`expo-apple-authentication`, `expo-clipboard`, `expo-crypto`), `app.json` plugin and permission-string changes (the `com.apple.developer.applesignin` entitlement added here was removed again for build 25), and a marketing version bump to **0.5.0**. With `runtimeVersion: appVersion`, 0.5.0 is a new OTA runtime: OTAs published for 0.4.0 never reach it and vice versa.
 
 **Cross-repo dependency (jr_be-0hx, branch `feat/account-deletion`):** Delete account calls the `delete-account` edge function, which needs migration `20261001200000_account_deletion` applied and the function deployed on prod before this ships. Sign in with Apple needs the Apple provider enabled on Supabase prod (currently off, jits-2cb2) with `com.elorated.mobile` in its client IDs.
 
@@ -108,6 +117,8 @@ Adds the pure-JS `qrcode-generator` dependency (drawn on the existing `react-nat
 **Changed**
 - Location permission copy: "ELO RATED uses your location to confirm you and your opponent are on the same mat before a match starts." (was nearby gyms and session check-ins).
 - `expo-clipboard` is now in the binary, so the highlight share "copy caption" path (`lib/highlight-share/clipboard.ts`, still behind `highlight_share_enabled`) finds its native module from this build on.
+
+## Earlier (unversioned, before 0.5.0; shipped through build 23 and its OTAs)
 
 ### Mobile: profile setup, weight on step 2, athlete and gym Instagram (Sept 30 design review, jits-02vo.5)
 
