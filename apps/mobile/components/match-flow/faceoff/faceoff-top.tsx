@@ -199,7 +199,12 @@ function MyWeight() {
         </View>
         {f.profileWeightSaved != null ? (
           <Text testID="faceoff-profile-weight-saved" className="font-body" style={[typeStep("small"), { color: p.text2 }]}>
-            {`Profile weight saved: ${Number(f.profileWeightSaved.toFixed(1))} lbs, for future matches.`}
+            {"Profile weight saved: "}
+            {/* The weight is the point of the line: mono, tabular (R3 MF-3). */}
+            <Text testID="faceoff-profile-weight-saved-value" className="font-mono" style={TABULAR}>
+              {String(Number(f.profileWeightSaved.toFixed(1)))}
+            </Text>
+            {" lbs, for future matches."}
           </Text>
         ) : null}
       </View>

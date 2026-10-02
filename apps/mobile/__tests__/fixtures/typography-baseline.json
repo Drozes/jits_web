@@ -71,7 +71,6 @@
   "components/leaderboard/fighters-list.tsx": {"arbitrarySize": 2, "monoWithoutTabular": 1},
   "components/leaderboard/gyms-list.tsx": {"arbitrarySize": 2, "monoWithoutTabular": 1},
   "components/match-card.tsx": {"arbitrarySize": 5, "monoWithoutTabular": 3},
-  "components/match-flow/verdict/verdict-step.tsx": {"offScaleTracking": 1},
   "components/notifications/notification-item.tsx": {"arbitrarySize": 3, "monoWithoutTabular": 1},
   "components/notifications/notification-panel.tsx": {"arbitrarySize": 3, "monoWithoutTabular": 1},
   "components/offline-banner.tsx": {"arbitrarySize": 1, "monoWithoutTabular": 1},

@@ -2,8 +2,8 @@ import * as React from "react";
 import { Text, View } from "react-native";
 import { Image } from "expo-image";
 import { usePalette } from "@/lib/theme/palette";
-import { AthleteTile, nearestStep } from "./athlete-tile";
-import { TABULAR, TRACKING, typeSize, typeStep } from "@/lib/typography";
+import { AthleteTile } from "./athlete-tile";
+import { nearestStep, TABULAR, TRACKING, typeSize, typeStep } from "@/lib/typography";
 
 export interface StillAthlete {
   name: string;

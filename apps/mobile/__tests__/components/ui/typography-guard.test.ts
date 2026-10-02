@@ -99,6 +99,13 @@ const SANCTIONED: Sanctioned[] = [
     count: 1,
     reason: "the GO slam's 2px tracking (Adding Flare countdown)",
   },
+  {
+    file: "components/match-flow/verdict/verdict-step.tsx",
+    metric: "offScaleTracking",
+    pattern: /\bletterSpacing:\s*1(?![.\d])/g,
+    count: 1,
+    reason: "the verdict SlamIn's 1px tracking (WIN / LOSS / DRAW), a registered verdict moment, kept identical",
+  },
 ];
 
 /** Files built on the scale: zero literals, zero untracked or untabular mono, from day one. */
