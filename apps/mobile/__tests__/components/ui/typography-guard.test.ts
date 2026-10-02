@@ -8,6 +8,8 @@
  * - inlineFontSize:     `fontSize: N`, `fontSize: c ? N : M`, `fontSize={N}`
  *                       literals (use `typeStep("<step>")`, `<Mono size>`, `<Label size>`).
  * - belowFloor:         any of the above under 10px (A1-3).
+ * - remSize:            rem-named Tailwind sizes `text-xs|sm|base|lg|xl|2xl..9xl`
+ *                       (12.25px and friends at rem 14; use the step instead).
  * - offScaleTracking:   `tracking-[...]` and `letterSpacing: N` whose N is not a
  *                       TRACKING step (use `tracking-<step>` / `TRACKING["<step>"]`,
  *                       or `numeralTracking(px)` for hero numerals).
@@ -35,13 +37,69 @@ const BASELINE_PATH = path.resolve(__dirname, "../../fixtures/typography-baselin
 /** The scale's own definition is not a call site. */
 const EXCLUDED = new Set(["lib/typography.ts"]);
 
-/** Sub-10px text the brand book sanctions (DESIGN.md "Typography"), with the exact count. */
-const SANCTIONED_BELOW_FLOOR: Record<string, { count: number; reason: string }> = {
-  "components/ui/count-pill.tsx": {
+/**
+ * Registered moments that keep an off-scale literal on purpose (DESIGN.md
+ * "Typography" and the Motion registry). Each is pinned to an exact count of
+ * an exact pattern, is subtracted from the ratchet, and must never move.
+ */
+interface Sanctioned {
+  file: string;
+  metric: Metric;
+  pattern: RegExp;
+  count: number;
+  reason: string;
+}
+const SANCTIONED: Sanctioned[] = [
+  {
+    file: "components/ui/count-pill.tsx",
+    metric: "belowFloor",
+    pattern: /\btext-\[9px\]/g,
     count: 1,
-    reason: "the CountPill digit (9px, capped at 1.3x Dynamic Type), the one sanctioned exception",
+    reason: "the CountPill digit (9px, capped at 1.3x Dynamic Type), the one sanctioned sub-10px text",
   },
-};
+  {
+    file: "components/ui/elo-system/splash-statement.tsx",
+    metric: "inlineFontSize",
+    pattern: /\bfontSize:\s*15\b/g,
+    count: 1,
+    reason: 'the splash "WE ARE" line (15px), a registered Adding Flare splash moment',
+  },
+  {
+    file: "components/ui/elo-system/splash-statement.tsx",
+    metric: "offScaleTracking",
+    pattern: /\bletterSpacing:\s*(6\.3|3\.6)\b/g,
+    count: 2,
+    reason: "the splash statement's 0.42em / 0.15em tracking (6.3, 3.6)",
+  },
+  {
+    file: "components/ui/elo-system/splash-glow-statement.tsx",
+    metric: "inlineFontSize",
+    pattern: /\bfontSize:\s*15\b/g,
+    count: 1,
+    reason: 'the glow splash "WE ARE" line (15px), a registered Adding Flare splash moment',
+  },
+  {
+    file: "components/ui/elo-system/splash-glow-statement.tsx",
+    metric: "offScaleTracking",
+    pattern: /\bletterSpacing:\s*(6\.3|3\.6)\b/g,
+    count: 2,
+    reason: "the glow splash statement's 0.42em / 0.15em tracking (6.3, 3.6)",
+  },
+  {
+    file: "components/ui/elo-system/splash-reveal.tsx",
+    metric: "offScaleTracking",
+    pattern: /\bletterSpacing:\s*3\b/g,
+    count: 1,
+    reason: "the splash reveal tagline tracking (3), a registered splash moment",
+  },
+  {
+    file: "components/match-flow/countdown/countdown.tsx",
+    metric: "offScaleTracking",
+    pattern: /\bletterSpacing:\s*2\b/g,
+    count: 1,
+    reason: "the GO slam's 2px tracking (Adding Flare countdown)",
+  },
+];
 
 /** Files built on the scale: zero literals, zero untracked or untabular mono, from day one. */
 const STRICT_FILES = [
@@ -54,6 +112,7 @@ const METRICS = [
   "arbitrarySize",
   "inlineFontSize",
   "belowFloor",
+  "remSize",
   "offScaleTracking",
   "monoWithoutTabular",
 ] as const;
@@ -105,6 +164,8 @@ const FONT_SIZE_TERNARY = new RegExp(
   "g",
 );
 const FONT_SIZE_PROP = new RegExp(String.raw`\bfontSize=\{\s*${NUM}\s*\}`, "g");
+/** Word-bounded, so `text-small` / `text-xs-foo` never count. */
+const REM_SIZE = /(?<![\w-])text-(xs|sm|base|lg|[2-9]?xl)(?![\w-])/g;
 const ARBITRARY_TRACKING = /\btracking-\[[^\]]+\]/g;
 const LETTER_SPACING_LITERAL = new RegExp(String.raw`\bletterSpacing\s*:\s*(-?\s*${NUM})(?![\w.\[])`, "g");
 
@@ -146,7 +207,9 @@ function countTypography(text: string): Counts {
     }
   }
 
-  return { arbitrarySize, inlineFontSize, belowFloor, offScaleTracking, monoWithoutTabular };
+  const remSize = (text.match(REM_SIZE) ?? []).length;
+
+  return { arbitrarySize, inlineFontSize, belowFloor, remSize, offScaleTracking, monoWithoutTabular };
 }
 
 type Baseline = { _note?: string; files: Record<string, Partial<Counts>> };
@@ -175,10 +238,8 @@ function baselineCount(baseline: Baseline, file: string, metric: Metric): number
 /** Sanctioned sub-10px sizes are not counted against the ratchet. */
 function effective(file: string, metric: Metric): number {
   const n = CURRENT[file]?.[metric] ?? 0;
-  if (metric === "belowFloor" && SANCTIONED_BELOW_FLOOR[file]) {
-    return Math.max(0, n - SANCTIONED_BELOW_FLOOR[file].count);
-  }
-  return n;
+  const sanctioned = SANCTIONED.filter((s) => s.file === file && s.metric === metric).reduce((sum, s) => sum + s.count, 0);
+  return Math.max(0, n - sanctioned);
 }
 
 // Lower-only rewrite of the fixture (see the header).
@@ -224,17 +285,30 @@ describe("typography ratchet (WP5)", () => {
     expect(stale).toEqual([]);
   });
 
-  it("the sanctioned sub-10px text is still exactly what the brand book allows", () => {
-    for (const [file, { count }] of Object.entries(SANCTIONED_BELOW_FLOOR)) {
-      expect(CURRENT[file]?.belowFloor).toBe(count);
-    }
-  });
+  it.each(SANCTIONED.map((s) => [`${s.file} ${s.metric}`, s] as const))(
+    "sanctioned moment is still exactly as registered: %s",
+    (_label, s) => {
+      const text = FILES.find((f) => f.file === s.file)?.text ?? "";
+      expect({ reason: s.reason, matches: (text.match(s.pattern) ?? []).length }).toEqual({
+        reason: s.reason,
+        matches: s.count,
+      });
+      expect(CURRENT[s.file][s.metric]).toBeGreaterThanOrEqual(s.count);
+    },
+  );
 
   it("the components built on the scale have no literal, off-scale or untabular text", () => {
     for (const file of STRICT_FILES) {
       expect({ file, counts: CURRENT[file] }).toEqual({
         file,
-        counts: { arbitrarySize: 0, inlineFontSize: 0, belowFloor: 0, offScaleTracking: 0, monoWithoutTabular: 0 },
+        counts: {
+          arbitrarySize: 0,
+          inlineFontSize: 0,
+          belowFloor: 0,
+          remSize: 0,
+          offScaleTracking: 0,
+          monoWithoutTabular: 0,
+        },
       });
       expect(baseline.files[file]).toBeUndefined();
     }
@@ -250,11 +324,13 @@ describe("typography ratchet counter (not vacuous)", () => {
       `<Text style={{ fontSize: win ? 96 : 80, letterSpacing: 1.68 }} />`,
       `<Initials fontSize={34} />`,
       `<Text style={{ fontSize: px, letterSpacing: -SIZE * 0.04, fontSize: SIZE_PX[size] }} />`,
+      `<Text className="text-sm text-2xl text-small text-body text-xs-foo" />`,
     ].join("\n");
     expect(countTypography(sample)).toEqual({
       arbitrarySize: 2,
       inlineFontSize: 3,
       belowFloor: 2,
+      remSize: 2,
       offScaleTracking: 2,
       monoWithoutTabular: 2,
     });

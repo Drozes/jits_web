@@ -34,7 +34,7 @@ This system describes the mobile app (`apps/mobile` in jits_web), which is the s
 - `heading` (DM Sans 700): buttons, tabs, chips, header titles, in caps with tracking; plate titles in sentence case.
 - `body` (Inter): prose and helper copy.
 - `mono` (JetBrains Mono): every number, with tabular figures, and caps meta labels at `tracking-caps-l` (1.68px) or wider.
-- Sizes come from the type scale, never a literal: text steps `micro` 10, `caption` 11, `small` 12, `body` 13, `callout` 14, `subhead` 16, `title` 18, `title-l` 20, `title-xl` 22, `headline` 24, `headline-l` 26, `headline-xl` 28, `headline-2xl` 30, then pinned `display-<px>` steps (36 to 240). Classes `text-<step>`, style props `typeStep("<step>")`, numbers through `<Mono>`, caps labels through `<Label>`.
+- Sizes come from the type scale, never a literal: text steps `micro` 10, `caption` 11, `small` 12, `body` 13, `callout` 14, `subhead` 16, `title` 18, `title-l` 20, `title-xl` 22, `headline` 24, `headline-l` 26, `headline-xl` 28, `headline-2xl` 30, then pinned `display-<px>` steps (36 to 240). Classes `text-<step>`, style props `typeStep("<step>")` (`typeSize("<step>")`, size only, for TextInputs and line-height-free moments), numbers through `<Mono>`, caps labels through `<Label>`.
 - 10px is the floor. The text styles in `tokens.json` are the real top combinations; the most common label is `meta-label` (mono 10px, 1.68px tracking, caps).
 
 ## Motion

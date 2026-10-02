@@ -113,6 +113,16 @@ export function typeStep(step: TypeStep): { fontSize: number; lineHeight: number
   return { fontSize: value.fontSize, lineHeight: value.lineHeight };
 }
 
+/**
+ * `{ fontSize }` only, with no line height. Use it (never `typeStep` or a
+ * `text-<step>` class) for every TextInput, so iOS single-line inputs keep
+ * their caret, and for registered Adding Flare / match-flow moments that set
+ * no lineHeight today (the GO slam, the face-off weight), so no glyph box moves.
+ */
+export function typeSize(step: TypeStep): { fontSize: number } {
+  return { fontSize: TYPE_SCALE[step].fontSize };
+}
+
 /** The step whose size is exactly `px`, if any (used by the guard and drift tests). */
 export function stepForSize(px: number): TypeStep | undefined {
   return TYPE_STEP_NAMES.find((name) => TYPE_SCALE[name].fontSize === px);

@@ -21,7 +21,11 @@ const DEFAULT_TONE: Record<LabelFamily, string> = {
 };
 
 export interface LabelProps extends Omit<TextProps, "style"> {
-  /** A text step (display steps are not labels). Default `micro` (10px, the floor). */
+  /**
+   * A text step (display steps are not labels). Default `micro` (10px, the
+   * floor). The size comes ONLY from here: never pass a `fontSize` in `style`
+   * or a `text-[Npx]` / `text-<step>` class.
+   */
   size?: TextStep;
   /** `mono` for meta labels (LBS, CLOSEST MATCH), `heading` for labels you act on. Default `mono`. */
   family?: LabelFamily;

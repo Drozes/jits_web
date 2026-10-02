@@ -38,7 +38,7 @@ This system describes the mobile app (`apps/mobile` in jits_web), which is the s
 - `heading` (DM Sans 700): buttons, tabs, chips, header titles, in caps with tracking; plate titles in sentence case.
 - `body` (Inter): prose and helper copy.
 - `mono` (JetBrains Mono): every number, with tabular figures, and caps meta labels at `tracking-caps-l` (1.68px) or wider.
-- Sizes come from the type scale, never a literal: text steps `micro` 10, `caption` 11, `small` 12, `body` 13, `callout` 14, `subhead` 16, `title` 18, `title-l` 20, `title-xl` 22, `headline` 24, `headline-l` 26, `headline-xl` 28, `headline-2xl` 30, then pinned `display-<px>` steps (36 to 240). Classes `text-<step>`, style props `typeStep("<step>")`, numbers through `<Mono>`, caps labels through `<Label>`.
+- Sizes come from the type scale, never a literal: text steps `micro` 10, `caption` 11, `small` 12, `body` 13, `callout` 14, `subhead` 16, `title` 18, `title-l` 20, `title-xl` 22, `headline` 24, `headline-l` 26, `headline-xl` 28, `headline-2xl` 30, then pinned `display-<px>` steps (36 to 240). Classes `text-<step>`, style props `typeStep("<step>")` (`typeSize("<step>")`, size only, for TextInputs and line-height-free moments), numbers through `<Mono>`, caps labels through `<Label>`.
 - 10px is the floor. The text styles in `tokens.json` are the real top combinations; the most common label is `meta-label` (mono 10px, 1.68px tracking, caps).
 
 ## Motion
@@ -255,7 +255,7 @@ Sources: `apps/mobile/tailwind.config.js` `theme.extend.fontFamily` (families), 
 
 ### Type scale
 
-One name per size, the same everywhere: the Tailwind class `text-<step>` (`apps/mobile/tailwind.config.js` `theme.extend.fontSize`), the style-prop export `typeStep("<step>")` / `TYPE_SCALE` (`apps/mobile/lib/typography.ts`), and the kit (`tokens.json` type group "Scale", styles `text-<step>`). `typography-drift.test.ts` fails if any of them, this page or DESIGN.md disagree. The steps are the sizes the app already used (R1 section 2.3), so most sites move with no pixel change. Sizes are device px, literal on native (NativeWind rem does not apply).
+One name per size, the same everywhere: the Tailwind class `text-<step>` (`apps/mobile/tailwind.config.js` `theme.extend.fontSize`), the style-prop exports `typeStep("<step>")` (size and line height) and `typeSize("<step>")` (size only, for TextInputs and line-height-free moments) / `TYPE_SCALE` (`apps/mobile/lib/typography.ts`), and the kit (`tokens.json` type group "Scale", styles `text-<step>`). `typography-drift.test.ts` fails if any of them, this page or DESIGN.md disagree. The steps are the sizes the app already used (R1 section 2.3), so most sites move with no pixel change. Sizes are device px, literal on native (NativeWind rem does not apply).
 
 #### Text steps
 
@@ -338,17 +338,25 @@ Both live in `apps/mobile/components/ui/elo-system/` (exported from its `index.t
 
 The WP5 sweeps (5a: Arena, Rankings, Profile, Home, invites, the className sites; 5b: match flow, Film Room, match detail, the style-prop sites) follow this table. Keep pixels unless the row says otherwise; never move a registered Adding Flare element (odometer, delta chip, tap marks, countdown, verdict, splash) to a different size.
 
+Rules for every site:
+
+- **Size only, no line height (`typeSize`):** every `TextInput`, and every registered Adding Flare or match-flow moment that sets no `lineHeight` today (the GO slam, `countdown.tsx:236`, 116px; the face-off weight, `faceoff-top.tsx`, 36px), takes `typeSize("<step>")` (`{ fontSize }` only). Never `typeStep` or a `text-<step>` class there: a step's line height would move the glyph box, and on iOS a single-line `TextInput` with a line height loses its caret. Known `TextInput` sites: `app/(auth)/invite-code.tsx`, `components/match-flow/steps/result-form.tsx`, `components/match-flow/faceoff/faceoff-weight-check.tsx`, `components/match-flow/faceoff/faceoff-top.tsx`, `components/match-flow/steps/submission-fields.tsx`, `app/(app)/settings/feedback.tsx`, `app/(app)/settings/delete-account.tsx`, `components/match-flow/steps/dispute-form.tsx`, `components/match-detail/highlight/highlight-feedback-text.tsx`, plus `components/auth/auth-form-field.tsx`, `components/profile-setup/elo-form-field.tsx` and `components/ui/search-select.tsx`.
+- **`leading-*` goes after the size:** in a `className` or `cn()` string write `text-<step>` first and any `leading-*` after it (`"font-body text-callout leading-6"`), so the site's own line height wins over the step's.
+- **Never hide a size in a named constant** (`const NAME_SIZE = 15`, `const LABEL = { fontSize: 10 }`): the guard cannot see it and the scale loses the site. Use the step name at the site, or a constant built from it (`const LABEL = { ...typeStep("micro"), letterSpacing: TRACKING["caps-l"] }`).
+- **`Mono` and `Label` take their size only from `size`:** no `fontSize` in their `style`, no size class.
+
 #### Sizes
 
 | Old literal | Step | Change |
 |---|---|---|
-| `text-[8px]`, `text-[9px]`, `fontSize: 8` / `9` | `micro` | +1 to +2px (the A1-3 floor fix). Not the CountPill digit, which stays. |
+| `text-[8px]`, `text-[9px]`, `fontSize: 8` / `9` | `micro` | +1 to +2px (the A1-3 floor fix). Not the CountPill digit, which stays. **Verify on device:** `components/film-room/player-controls.tsx:28` (the 8px "10" inside the 28px skip icon) and `components/arena/mat-board.tsx:757`, `:832` (the 9px chips); the bigger glyph may not fit its box. |
 | `text-[10px]`, `fontSize: 10`, `text-xs` (10.5) | `micro` | none (`text-xs` -0.5px) |
 | `text-[11px]`, `fontSize: 11` | `caption` | none |
 | `text-[12px]`, `fontSize: 12`, `text-sm` (12.25) | `small` | none |
 | `text-[13px]`, `fontSize: 13` | `body` | none |
 | `text-[14px]`, `fontSize: 14`, `text-base` | `callout` | none |
 | `text-[15px]`, `fontSize: 15` | `callout` for prose and numbers; `subhead` for heading names and caps labels | -1 / +1px |
+| `fontSize: 15` on the splash "WE ARE" line (`splash-statement.tsx:260`, `splash-glow-statement.tsx:346`) and the computed `FITTED_SIZE` "ELO RATED" | keep | none: registered splash moments, sanctioned in the guard |
 | `text-[16px]`, `fontSize: 16`, `text-lg` (15.75) | `subhead` | none |
 | `text-[18px]`, `fontSize: 18`, `text-xl` (17.5) | `title` | none |
 | `text-[20px]` | `title-l` | none |
@@ -374,7 +382,7 @@ Line height: a site with no line height gets the step's (within a pixel or two o
 | `tracking-[4px]`, `tracking-[6px]` (invite codes, R3 ST-4) | `code` (4) |
 | `-2.8`, `-3.2`, `-3.52`, `-fontSize * 0.04` | `numeralTracking(px)` / `tracking="numeral"` |
 | `-0.6`, `-0.18` | `tight` (-0.28) |
-| `2` on the GO slam, `3`, `3.6`, `6.3` on the splash statement | keep: registered Adding Flare moments |
+| `2` on the GO slam, `3` on the splash reveal, `3.6`, `6.3` on the splash statement | keep: registered Adding Flare moments, sanctioned in the guard |
 
 #### Recipes
 
@@ -386,6 +394,7 @@ Line height: a site with no line height gets the step's (within a pixel or two o
 | `font-heading text-[12px] uppercase tracking-caps` | `<Label family="heading" size="small" tracking="caps">` |
 | `font-heading text-[18px] uppercase` (no tracking, R3 AR-6) | `<Label family="heading" size="title" tracking="caps">` |
 | `font-mono text-[12px]` holding a number | `<Mono>` |
+| `text-sm` (12.25), `text-xs` (10.5), `text-base`, `text-lg`, `text-xl` | `small`, `micro`, `callout`, `subhead`, `title` (see Sizes) |
 | `font-mono-bold text-[24px] tracking-caps` (a record) | `<Mono size="headline" weight="bold" tracking="caps">` |
 | `font-mono-bold` + `style={{ fontSize: 72, letterSpacing: -2.8 }}` (R3 PR-3) | `<Mono size="display-72" weight="bold" tracking="numeral">` |
 | `style={{ fontSize: 10, letterSpacing: 1.68, color: p.text3 }}` | `<Label style={{ color: p.text3 }}>` or `style={[typeStep("micro"), { letterSpacing: TRACKING["caps-l"], color: p.text3 }]}` |
@@ -393,7 +402,7 @@ Line height: a site with no line height gets the step's (within a pixel or two o
 
 #### The guard
 
-`apps/mobile/__tests__/components/ui/typography-guard.test.ts` counts, per file: `text-[Npx]` classes, `fontSize` literals, sizes under 10px, off-scale tracking and `font-mono` `<Text>` tags with no tabular figures. The baseline (`__tests__/fixtures/typography-baseline.json`, WP5-core: 445 / 174 / 12 / 59 / 192 across 187 files) only goes down: a count above it fails, and a count below it fails until you lower it with `UPDATE_TYPOGRAPHY_BASELINE=1 npx jest __tests__/components/ui/typography-guard` (it never raises a count). `Mono`, `Label` and `MetaTag` are held at zero.
+`apps/mobile/__tests__/components/ui/typography-guard.test.ts` counts, per file: `text-[Npx]` classes, `fontSize` literals, sizes under 10px, rem-named sizes (`text-xs`, `text-sm`, `text-base`, `text-lg`, `text-xl` to `text-9xl`; 10.5 / 12.25 / 14 / 15.75 / 17.5px at rem 14), off-scale tracking and `font-mono` `<Text>` tags with no tabular figures. The registered moments that keep a literal on purpose (the CountPill 9px digit, the splash 15px line and its 6.3 / 3.6 / 3 tracking, the GO slam's 2px tracking) are a named sanctioned list pinned to exact counts, outside the ratchet. The baseline (`__tests__/fixtures/typography-baseline.json`, WP5-core: 445 `text-[Npx]` / 172 `fontSize` / 12 under 10px / 8 rem-named / 53 off-scale tracking / 192 untabular mono, across 189 files) only goes down: a count above it fails, and a count below it fails until you lower it with `UPDATE_TYPOGRAPHY_BASELINE=1 npx jest __tests__/components/ui/typography-guard` (it never raises a count). `Mono`, `Label` and `MetaTag` are held at zero.
 
 ### Text styles
 

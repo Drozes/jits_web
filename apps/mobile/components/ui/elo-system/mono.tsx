@@ -20,7 +20,11 @@ export const MONO_FAMILY_CLASS: Record<MonoWeight, string> = {
 };
 
 export interface MonoProps extends Omit<TextProps, "style"> {
-  /** A step from the type scale (lib/typography.ts). Default `small` (12px). */
+  /**
+   * A step from the type scale (lib/typography.ts). Default `small` (12px).
+   * The size comes ONLY from here: never pass a `fontSize` in `style` or a
+   * `text-[Npx]` / `text-<step>` class.
+   */
   size?: TypeStep;
   /** JetBrains Mono weight. Default `regular`. */
   weight?: MonoWeight;

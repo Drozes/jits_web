@@ -21,6 +21,7 @@ import {
   TYPE_STEP_NAMES,
   numeralTracking,
   stepForSize,
+  typeSize,
   typeStep,
   type TrackingStep,
   type TypeStep,
@@ -68,6 +69,16 @@ describe("the scale itself", () => {
     expect(typeStep("micro")).toEqual({ fontSize: 10, lineHeight: 13 });
     expect(typeStep("display-240")).toEqual({ fontSize: 240, lineHeight: 264 });
     expect(typeStep("body")).not.toBe(TYPE_SCALE.body);
+  });
+
+  it("typeSize returns the size only (TextInputs and line-height-free moments)", () => {
+    expect(typeSize("display-116")).toEqual({ fontSize: 116 });
+    expect(typeSize("display-36")).toEqual({ fontSize: 36 });
+    for (const name of TYPE_STEP_NAMES) {
+      const value = typeSize(name);
+      expect(Object.keys(value)).toEqual(["fontSize"]);
+      expect(value.fontSize).toBe(TYPE_SCALE[name].fontSize);
+    }
   });
 
   it("numeral tracking is -0.04em, as EloTile and the live clock", () => {
