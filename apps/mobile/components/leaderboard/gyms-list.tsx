@@ -36,7 +36,7 @@ export function GymsList({ gyms, isRefreshing, onRefresh }: GymsListProps) {
         <RefreshControl
           refreshing={isRefreshing}
           onRefresh={onRefresh}
-          tintColor={tokens.accentCta}
+          tintColor={tokens.textTertiary}
         />
       }
     />

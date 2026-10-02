@@ -52,7 +52,7 @@ export default function ProfileSetupScreen() {
         >
           {isLoading && (
             <View className="flex-1 items-center justify-center py-16">
-              <ActivityIndicator color={tokens.accentCta} />
+              <ActivityIndicator color={tokens.textTertiary} />
             </View>
           )}
 

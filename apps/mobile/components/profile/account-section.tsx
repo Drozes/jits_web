@@ -30,7 +30,7 @@ function SettingsRow({
       <Text
         className={cn(
           "font-heading text-[12px] uppercase tracking-caps",
-          destructive ? "text-cta" : "text-ink",
+          destructive ? "text-negative" : "text-ink",
         )}
       >
         {label}

@@ -44,7 +44,7 @@ Removed. The legacy keys are gone from `apps/mobile/lib/tokens.ts`, the legacy `
 | `Badge` | `components/ui/badge.tsx` | Kept, restyled (WP4): the `MetaTag` look (`radius-tag`, 1px border, 10px mono caps) with tones `default` (`hairline-strong`, `ink`), `secondary` (`plate` fill, `ink-2`), `destructive` (`negative`), `success` (`gain-green`, kept for win badges) and `outline` (exactly `MetaTag`). One caller (admin members) |
 | `Dialog` | `components/ui/dialog.tsx` | Kept: brand titles since WP1 (Compare Stats) |
 | `Sheet` | `components/ui/sheet.tsx` | Kept: the one sheet shell, and home of `useSheetChrome()` / `SheetBackdrop` (WP1) |
-| `Switch` | `components/ui/switch.tsx` | Kept: the one app switch (also the face-off "Record from my phone" toggle since WP4, R3 MF-9); neutral track in WP2 |
+| `Switch` | `components/ui/switch.tsx` | Kept: the one app switch (also the face-off "Record from my phone" toggle since WP4, R3 MF-9); since WP2 on ELO tokens with a neutral track (`switchColors()`: `ink` on, `ink-3` off, `void` thumb), no legacy tokens |
 | `OfflineBanner` | `components/offline-banner.tsx` | Restyled (WP4): `panel` bar, `hairline-strong` bottom edge, mono caps `ink` copy, Reanimated slide on `duration.fast`, still under Reduce Motion |
 | Update banner and modal | `components/updates/*` | Restyled (WP4): the banner is a `panel` card with a `hairline-strong` border, `ink` text and a `secondary` RESTART `Button`; the critical modal sits on `void` with `ink` / `ink-2` text and the primary `Button` |
 

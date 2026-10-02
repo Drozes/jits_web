@@ -64,7 +64,7 @@ export function EloField({ label, helper, error, children }: EloFieldProps) {
 
 /**
  * ELO-styled text input. Mirrors the .field-input wireframe spec:
- * bg-surface-3, border hairline-strong, rounded-xs, focus = border-cta.
+ * bg-surface-3, border hairline-strong, rounded-xs, focus = border-ink-2 (a neutral 1px edge, 5.8:1 or better on the plate in both themes; never red, so focus and error do not look alike).
  */
 type EloTextInputProps = TextInputProps & {
   hasError?: boolean;
@@ -96,7 +96,7 @@ export const EloTextInput = React.forwardRef<TextInput, EloTextInputProps>(
           hasError
             ? "border-negative"
             : focused
-              ? "border-cta"
+              ? "border-ink-2"
               : "border-hairline-strong",
           className,
         )}

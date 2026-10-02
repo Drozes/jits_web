@@ -22,7 +22,7 @@ type AuthFormFieldProps = TextInputProps & {
  *
  * Visual targets (wireframe A2 .field/.field-label/.field-input):
  *   - Label: font-heading bold, uppercase, tracking-caps-xl, text-ink-3
- *   - Input: bg-surface-3, border-hairline-strong, rounded-xs, focus = border-cta
+ *   - Input: bg-surface-3, border-hairline-strong, rounded-xs, focus = border-ink-2 (a neutral 1px edge, 5.8:1 or better on the plate in both themes; never red, so focus and error do not look alike)
  *
  * When `secureTextEntry` is passed, renders a show/hide toggle button
  * inside the input row.
@@ -70,7 +70,7 @@ export function AuthFormField({
             hasError
               ? "border-negative"
               : focused
-                ? "border-cta"
+                ? "border-ink-2"
                 : "border-hairline-strong",
             isPassword ? "pr-11" : undefined,
           )}

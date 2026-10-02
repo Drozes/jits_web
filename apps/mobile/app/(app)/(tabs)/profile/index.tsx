@@ -142,7 +142,7 @@ export default function ProfileScreen() {
   if (!athlete) {
     return (
       <View className="flex-1 bg-surface items-center justify-center">
-        <ActivityIndicator color={tokens.accentCta} />
+        <ActivityIndicator color={tokens.textTertiary} />
       </View>
     );
   }
@@ -162,7 +162,7 @@ export default function ProfileScreen() {
       <TabHeader title="Profile" />
       <PageContainer
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={tokens.accentCta} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={tokens.textTertiary} />
         }
         contentContainerStyle={{ paddingTop: 24, gap: 24 }}
       >

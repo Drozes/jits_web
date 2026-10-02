@@ -82,7 +82,7 @@ export function WinnerTiles({
             gap: 16,
             backgroundColor: pressed ? p.panel : p.plate,
             borderWidth: 1,
-            borderColor: pressed ? p.cta : p.hairline,
+            borderColor: pressed ? p.strong : p.hairline,
             borderRadius: FIGHT_RADIUS.plate,
           })}
         >
@@ -96,7 +96,7 @@ export function WinnerTiles({
                 {meta(a)}
               </Mono>
             ) : null}
-            <Mono color={a.id === me.id ? p.red : p.text3}>{a.id === me.id ? "YOU" : "OPPONENT"}</Mono>
+            <Mono color={a.id === me.id ? p.text : p.text3}>{a.id === me.id ? "YOU" : "OPPONENT"}</Mono>
           </View>
         </StatePressable>
       ))}
@@ -179,16 +179,18 @@ export function SubmissionGrid({
                 flexDirection: "row",
                 alignItems: "center",
                 justifyContent: "space-between",
-                backgroundColor: selected ? p.selectedBg : p.plate,
+                // The one selected-state treatment: plate-bright, a strong edge and
+                // an ink check; never a red tint, edge or check (WP2, R3 MF-5).
+                backgroundColor: selected ? p.panel : p.plate,
                 borderWidth: 1,
-                borderColor: selected ? p.cta : p.hairline,
+                borderColor: selected ? p.strong : p.hairline,
                 borderRadius: FIGHT_RADIUS.button,
               }}
             >
               <Text numberOfLines={2} className="font-heading" style={{ flex: 1, fontSize: 14, color: p.text }}>
                 {t.display_name}
               </Text>
-              {selected ? <Check size={16} color={p.red} /> : null}
+              {selected ? <Check size={16} color={p.text} /> : null}
             </StatePressable>
           );
         })}
@@ -233,7 +235,7 @@ export function FinishTimeField({
         FINISH TIME
       </Mono>
       <View
-        style={{ height: 64, paddingLeft: 14, paddingRight: 6, flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: p.plate, borderWidth: 1, borderColor: invalid ? p.red : p.hairline, borderRadius: FIGHT_RADIUS.button }}
+        style={{ height: 64, paddingLeft: 14, paddingRight: 6, flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: p.plate, borderWidth: 1, borderColor: invalid ? p.loss : p.hairline, borderRadius: FIGHT_RADIUS.button }}
       >
         <TextInput
           ref={inputRef}
@@ -250,7 +252,7 @@ export function FinishTimeField({
         />
         <View style={{ flex: 1 }}>
           {invalid ? (
-            <Mono color={p.red}>{`WITHIN ${formatElapsed(durationSeconds)}`}</Mono>
+            <Mono color={p.loss}>{`WITHIN ${formatElapsed(durationSeconds)}`}</Mono>
           ) : fromClock ? (
             <Mono testID="result-finish-time-hint" color={p.text3}>
               FROM MATCH CLOCK

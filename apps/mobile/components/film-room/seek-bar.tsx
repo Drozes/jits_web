@@ -77,12 +77,19 @@ export function SeekBar({ positionS, durationS, moments, onSeek }: SeekBarProps)
     >
       <View pointerEvents="none" style={{ position: "absolute", left: 0, right: 0, top: 20, height: 3, backgroundColor: ON_MEDIA.track }} />
       <View pointerEvents="none" style={{ position: "absolute", left: 0, top: 20, height: 3, width: `${frac * 100}%`, backgroundColor: ON_MEDIA.white }} />
+      {/* The finish marker is a white square with a ground edge (visible on the
+          played and unplayed track alike), told apart by shape: a finish is not a
+          gain, so it is never Gain Green (WP2, R3 FR-1). */}
       {moments.map((m, i) => (
         <View
           key={`${m.t}-${i}`}
           pointerEvents="none"
           testID={`seek-marker-${i}`}
-          style={{ position: "absolute", left: pct(m.t), top: 18, width: 7, height: 7, marginLeft: -3.5, borderRadius: 3.5, backgroundColor: m.kind === "finish" ? ON_MEDIA.win : ON_MEDIA.amber }}
+          style={
+            m.kind === "finish"
+              ? { position: "absolute", left: pct(m.t), top: 17.5, width: 8, height: 8, marginLeft: -4, borderRadius: 1, borderWidth: 1, borderColor: ON_MEDIA.ground, backgroundColor: ON_MEDIA.white }
+              : { position: "absolute", left: pct(m.t), top: 18, width: 7, height: 7, marginLeft: -3.5, borderRadius: 3.5, backgroundColor: ON_MEDIA.amber }
+          }
         />
       ))}
       <View

@@ -52,7 +52,7 @@ export function ClaimDobStep({ message, error, busy = false, onSubmit, onNotNow 
         }}
       />
       {shown && !busy ? (
-        <Text testID="claim-dob-error" accessibilityRole="alert" className="font-body text-[14px] text-cta">
+        <Text testID="claim-dob-error" accessibilityRole="alert" className="font-body text-[14px] text-negative">
           {shown}
         </Text>
       ) : null}

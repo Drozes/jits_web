@@ -2,6 +2,7 @@ import { Text, View } from "react-native";
 import { StatePressable } from "@/components/ui/state-pressable";
 import { Plate } from "@/components/ui/elo-system";
 import { Button } from "@/components/ui/elo-system/button";
+import { SelectCheck, selectionSurface } from "@/components/ui/elo-system/selection";
 import { isIdentityComplete, isValidWeight } from "@/lib/profile-setup/validation";
 import { cn } from "@/lib/cn";
 import type { WizardValues } from "./types";
@@ -108,16 +109,15 @@ function GenderChip({
       accessibilityState={{ selected: active }}
       onPress={onPress}
       className={cn(
-        "flex-1 items-center justify-center rounded-xs border px-4 py-3",
-        active
-          ? "bg-cta border-cta"
-          : "bg-surface-3 border-hairline-strong",
+        "flex-1 flex-row items-center justify-center gap-1.5 rounded-xs border px-4 py-3",
+        selectionSurface(active),
       )}
     >
+      {active ? <SelectCheck size={12} /> : null}
       <Text
         className={cn(
           "font-heading text-[12px] uppercase tracking-caps-l",
-          active ? "text-ink-on-cta" : "text-ink",
+          active ? "text-ink" : "text-ink-2",
         )}
       >
         {label}

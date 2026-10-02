@@ -206,7 +206,11 @@ export function StakesStrip({
   );
 }
 
-/** A 44 px per-athlete status plate: amber dashed while pending, green when done. */
+/**
+ * A 44 px per-athlete status plate: amber dashed while pending (attention),
+ * a solid strong edge with an ink check when done. Done is not a gain, so it
+ * is never Gain Green (WP2, R3 CO-2).
+ */
 export function StatusPlate({
   label,
   done,
@@ -221,7 +225,7 @@ export function StatusPlate({
   accessibilityLabel?: string;
 }) {
   const p = usePalette();
-  const color = done ? p.win : p.amber;
+  const color = done ? p.text : p.amber;
   return (
     <View
       testID={testID}
@@ -237,7 +241,7 @@ export function StatusPlate({
         gap: 8,
         borderWidth: 1,
         borderStyle: done ? "solid" : "dashed",
-        borderColor: done ? p.winRule : p.amber,
+        borderColor: done ? p.strong : p.amber,
         borderRadius: FIGHT_RADIUS.button,
       }}
     >

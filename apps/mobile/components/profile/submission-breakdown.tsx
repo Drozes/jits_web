@@ -63,7 +63,7 @@ export function SubmissionBreakdownSection({
         </Text>
       ) : submissions === null ? (
         <View testID="submissions-loading" className="py-3 items-center">
-          <ActivityIndicator color={tokens.accentCta} />
+          <ActivityIndicator color={tokens.textTertiary} />
         </View>
       ) : top5.length === 0 ? (
         <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">
@@ -88,7 +88,7 @@ export function SubmissionBreakdownSection({
                   </Text>
                 </View>
                 <View className="h-1.5 rounded-xs bg-surface-4 overflow-hidden">
-                  <View className="h-full bg-cta" style={{ width: `${pct}%` }} />
+                  <View className="h-full bg-ink-2" style={{ width: `${pct}%` }} />
                 </View>
               </View>
             );

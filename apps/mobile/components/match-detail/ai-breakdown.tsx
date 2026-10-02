@@ -13,8 +13,9 @@ function Heading({ tier }: { tier: string | null }) {
         AI BREAKDOWN
       </Text>
       {tier ? (
-        <View style={{ height: 18, paddingHorizontal: 6, borderRadius: 2, borderWidth: 1, borderColor: tier === "premium" ? p.amberRule : p.strong, justifyContent: "center" }}>
-          <Text className="font-mono-bold" style={{ fontSize: 9, letterSpacing: 1.6, color: tier === "premium" ? p.amber : p.text2 }}>
+        <View style={{ height: 18, paddingHorizontal: 6, borderRadius: 2, borderWidth: 1, borderColor: p.strong, justifyContent: "center" }}>
+          {/* The tier is a label, not a waiting state: ink steps only, never amber (WP2, R3 FR-2). */}
+          <Text className="font-mono-bold" style={{ fontSize: 9, letterSpacing: 1.6, color: tier === "premium" ? p.text : p.text2 }}>
             {tier.toUpperCase()}
           </Text>
         </View>

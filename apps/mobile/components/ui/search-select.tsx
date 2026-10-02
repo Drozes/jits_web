@@ -6,6 +6,7 @@ import { X } from "lucide-react-native";
 import { cn } from "@/lib/cn";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { useModalAnimation } from "@/lib/motion";
+import { SelectCheck } from "@/components/ui/elo-system/selection";
 
 export interface SearchSelectOption {
   label: string;
@@ -142,18 +143,23 @@ export function SearchSelect({
         accessibilityRole="button"
         accessibilityLabel={item.kind === "free" ? `Use ${item.label}` : item.label}
         accessibilityState={{ selected }}
-        className="px-4 min-h-11 flex-row items-center justify-between border-b border-hairline active:bg-surface-3"
+        // Selected = the plate-bright step + an ink check, never red (WP2, R3 ST-2).
+        className={cn(
+          "px-4 min-h-11 flex-row items-center justify-between border-b border-hairline",
+          selected ? "bg-surface-4 active:bg-surface-3" : "active:bg-surface-3",
+        )}
       >
         <Text
-          className={cn(
-            "text-[14px] font-body flex-1 py-3",
-            selected ? "text-cta" : "text-ink",
-          )}
+          className="text-[14px] font-body flex-1 py-3 text-ink"
           numberOfLines={1}
         >
           {item.kind === "free" ? `Use "${item.label}"` : item.label}
         </Text>
-        {selected ? <Text className="text-cta text-[14px] ml-2">{"✓"}</Text> : null}
+        {selected ? (
+          <View className="ml-2">
+            <SelectCheck size={16} />
+          </View>
+        ) : null}
       </Pressable>
     );
   };

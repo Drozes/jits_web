@@ -118,7 +118,7 @@ export function FightersList({
           <RefreshControl
             refreshing={isRefreshing}
             onRefresh={onRefresh}
-            tintColor={tokens.accentCta}
+            tintColor={tokens.textTertiary}
           />
         }
       />

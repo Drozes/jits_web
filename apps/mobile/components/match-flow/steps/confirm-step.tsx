@@ -264,7 +264,7 @@ function StatusRow({ name, status, done, divider = false, testID }: { name: stri
       <Text numberOfLines={1} className="font-heading uppercase" style={{ flex: 1, fontSize: 13, letterSpacing: 0.52, color: p.text }}>
         {name}
       </Text>
-      <Mono bold size={11} spacing={1.68} color={done ? p.win : p.amber}>
+      <Mono bold size={11} spacing={1.68} color={done ? p.text : p.amber}>
         {status}
       </Mono>
     </View>

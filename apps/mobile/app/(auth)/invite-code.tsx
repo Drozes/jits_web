@@ -80,7 +80,7 @@ export default function InviteCodeScreen() {
             className="rounded-sm border border-hairline-strong bg-surface-3 px-4 py-4 text-center font-mono text-[28px] tracking-[6px] text-ink"
           />
           {locked ? (
-            <Text accessibilityRole="alert" className="font-body text-[13px] text-cta" testID="invite-code-throttled">
+            <Text accessibilityRole="alert" className="font-body text-[13px] text-negative" testID="invite-code-throttled">
               Too many tries. Try again in{" "}
               <Text className="font-mono tabular-nums">
                 {Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, "0")}
@@ -88,7 +88,7 @@ export default function InviteCodeScreen() {
               .
             </Text>
           ) : error ? (
-            <Text accessibilityRole="alert" className="font-body text-[13px] text-cta">
+            <Text accessibilityRole="alert" className="font-body text-[13px] text-negative">
               {error}
             </Text>
           ) : null}

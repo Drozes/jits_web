@@ -164,7 +164,7 @@ function RecordingPanel({ oppName }: { oppName: string }) {
           <Text className="font-heading uppercase" style={{ fontSize: 13, letterSpacing: 0.8, color: p.text }}>
             Record from my phone
           </Text>
-          <Mono testID="faceoff-opponent-recording" color={f.opponentRecording ? p.win : p.text3}>
+          <Mono testID="faceoff-opponent-recording" color={f.opponentRecording ? p.text : p.text3}>
             {oppLabel}
           </Mono>
         </View>
