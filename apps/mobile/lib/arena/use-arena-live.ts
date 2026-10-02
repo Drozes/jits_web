@@ -599,9 +599,12 @@ export function useArenaLive({
         else if (proceed) resumeLiveRef.current = true;
         // The arrived `true` is still committed in the database (presence is
         // not): mark it so, so this clear actually writes `false` instead of
-        // reading as a no-op and leaving the athlete advertised.
-        if (!desiredRef.current) actualRef.current = true;
-        void requestOfflineRef.current();
+        // reading as a no-op and leaving the athlete advertised. Not when the
+        // athlete has tapped Go live meanwhile: that intent wins.
+        if (!desiredRef.current) {
+          actualRef.current = true;
+          void requestOfflineRef.current();
+        }
         return;
       }
       void requestLiveRef.current();

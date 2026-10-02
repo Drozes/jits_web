@@ -335,11 +335,13 @@ export const GO_LIVE_LOCATION_DENIED_COPY =
 
 /**
  * Go Live with iOS Precise Location off (or Android approximate location):
- * the reading is kilometre-scale, so "try near a window" is the wrong advice.
+ * the reading is kilometre-scale, so "try near a window" alone is the wrong
+ * advice. The iOS signal is a heuristic (a reading of 1000 m or worse), so
+ * the copy still covers a Precise-on phone with a poor fix.
  */
 export const PRECISE_LOCATION_TITLE = "Turn on Precise Location for ELO RATED";
 export const PRECISE_LOCATION_COPY =
-  "Settings > ELO RATED > Location > Precise Location. We use it only to confirm you're on the same mat.";
+  "Settings > ELO RATED > Location > Precise Location. We use it only to confirm you're on the same mat. Already on? Move near a window or turn on Wi-Fi, then Retry.";
 
 /**
  * A live restore the athlete did not tap (foreground, after a match, the

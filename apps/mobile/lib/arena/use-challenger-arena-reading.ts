@@ -18,12 +18,14 @@
  * comes back from the background or the permission status changes (live
  * location fixes 1c): an iOS "Allow Once" grant lapses in the background
  * and reads as re-askable, so a once-per-process ask would never ask again.
- * Returning from the system prompt itself is "inactive" to "active", not a
- * background, so it never re-arms the ask.
+ * Returning from the system prompt never re-arms the ask: on iOS it is
+ * "inactive" to "active", and on Android (where the dialog reads as a
+ * background) the transition is ignored while the request is in flight.
  */
 import * as React from "react";
 import { AppState } from "react-native";
 import * as Location from "expo-location";
+import { permissionRequestInFlight } from "@/lib/invites/location";
 import { reportArenaReading } from "./arena-presence";
 import { cancelLocationSheet, closeLocationSheet, explainArenaLocation } from "./go-live-location";
 
@@ -44,7 +46,11 @@ let appStateSub: { remove: () => void } | null = null;
 function watchForeground(): void {
   if (appStateSub) return;
   appStateSub = AppState.addEventListener("change", (next) => {
-    if (next === "background") wentBackground = true;
+    // Android's permission dialog pauses the activity ("background" then
+    // "active"): a Deny there must not re-arm the ask it just answered.
+    if (next === "background") {
+      if (!permissionRequestInFlight()) wentBackground = true;
+    }
     else if (next === "active" && wentBackground) {
       wentBackground = false;
       askedThisSession = false;

@@ -16,12 +16,10 @@
  */
 export const PLATFORM_HEADER = "x-elo-platform";
 
-function isRestRequest(url: string): boolean {
-  try {
-    return new URL(url).pathname.includes("/rest/v1/");
-  } catch {
-    return false;
-  }
+/** True for `<supabase url>/rest/v1/...` exactly (no other host or path). */
+export function isRestRequest(url: string, supabaseUrl: string): boolean {
+  const base = supabaseUrl.replace(/\/+$/, "");
+  return base.length > 0 && url.startsWith(`${base}/rest/v1/`);
 }
 
 function urlOf(input: RequestInfo | URL): string {
@@ -30,10 +28,13 @@ function urlOf(input: RequestInfo | URL): string {
   return input.url;
 }
 
-/** A `fetch` that adds `x-elo-platform: web` to PostgREST requests. */
-export function platformFetch(base: typeof fetch = (...args) => fetch(...args)): typeof fetch {
+/** A `fetch` that adds `x-elo-platform: web` to this project's PostgREST requests. */
+export function platformFetch(
+  supabaseUrl: string,
+  base: typeof fetch = (...args) => fetch(...args),
+): typeof fetch {
   return (input, init) => {
-    if (!isRestRequest(urlOf(input))) return base(input, init);
+    if (!isRestRequest(urlOf(input), supabaseUrl)) return base(input, init);
     const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
     headers.set(PLATFORM_HEADER, "web");
     return base(input, { ...init, headers });

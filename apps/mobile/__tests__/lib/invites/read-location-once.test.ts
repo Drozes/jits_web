@@ -203,3 +203,30 @@ describe("default path (invites) is unchanged", () => {
     expect(r).toEqual({ status: "ok", reading: { lat: 43.6, lng: -79.4, accuracyM: 10 } });
   });
 });
+
+describe("review N1: no fix is started once the 10 s budget is spent", () => {
+  it("a last known lookup that hangs the whole budget never starts a live fix", async () => {
+    mockLastKnown.mockReturnValue(new Promise(() => undefined));
+    const p = readLocationOnce({ ask: false, fast: true });
+    await jest.advanceTimersByTimeAsync(READING_TIMEOUT_MS);
+    expect(await p).toEqual({ status: "unavailable", reason: "timeout" });
+    expect(mockCurrent).not.toHaveBeenCalled();
+  });
+});
+
+describe("permission request in flight (review B1, S2)", () => {
+  it("is set only while the system prompt is up", async () => {
+    const { permissionRequestInFlight } = jest.requireActual("@/lib/invites/location") as typeof import("@/lib/invites/location");
+    mockGetPermission.mockResolvedValue({ granted: false, canAskAgain: true });
+    let release!: (v: unknown) => void;
+    mockRequestPermission.mockReturnValue(new Promise((r) => (release = r)));
+    expect(permissionRequestInFlight()).toBe(false);
+    const p = readLocationOnce({ ask: true, fast: true });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(permissionRequestInFlight()).toBe(true);
+    release({ granted: true, canAskAgain: true });
+    await p;
+    expect(permissionRequestInFlight()).toBe(false);
+  });
+});

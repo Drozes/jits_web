@@ -39,7 +39,11 @@ jest.mock("expo-location", () => ({
   getForegroundPermissionsAsync: () => mockPermission(),
 }));
 const mockReading = jest.fn();
-jest.mock("@/lib/invites/location", () => ({ readLocationOnce: (...a: unknown[]) => mockReading(...a) }));
+let mockInFlight = false;
+jest.mock("@/lib/invites/location", () => ({
+  readLocationOnce: (...a: unknown[]) => mockReading(...a),
+  permissionRequestInFlight: () => mockInFlight,
+}));
 const mockReport = jest.fn();
 const mockArenaReport = jest.fn();
 const mockLog = jest.fn();
@@ -156,6 +160,7 @@ const EXPLAIN =
   "ELO RATED checks you're on the same mat as your opponent. Your location is only used to start matches.";
 
 beforeEach(() => {
+  mockInFlight = false;
   jest.clearAllMocks();
   jest.useRealTimers();
   __resetArenaStoreForTests();

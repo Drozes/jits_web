@@ -33,7 +33,7 @@ import * as Location from "expo-location";
 import { reportGoLivePresence, type LocationEventOutcome } from "@jits/shared/api/location";
 import type { LocationReading } from "@jits/shared/api/invites";
 import { supabase } from "@/lib/supabase/client";
-import { readLocationOnce } from "@/lib/invites/location";
+import { permissionRequestInFlight, readLocationOnce } from "@/lib/invites/location";
 import type { LiveSwitchIgnored } from "./arena-store";
 import { logGoLiveAttempt } from "./location-telemetry";
 
@@ -90,17 +90,28 @@ function present(
   });
 }
 
-function closeSheet() {
+/**
+ * Close the sheet, but only one shown for `purpose`: a Go Live flow never
+ * closes the challenger's `arena` explain (and vice versa). A wait still
+ * open on the closed sheet is answered "cancel", never dropped, so its
+ * owner always unwinds.
+ */
+function closeSheet(purpose: "go_live" | "arena" = "go_live") {
+  if (sheet && (sheet.purpose ?? "go_live") !== purpose) return;
+  const resolve = resolver;
   resolver = null;
   if (sheet) setSheet(null);
+  resolve?.("cancel");
 }
 
 /** The sheet's buttons. Continue / Retry keep it up (busy) while reading. */
 export function answerGoLiveLocation(choice: Exclude<GoLiveLocationChoice, "background">): void {
   const resolve = resolver;
   resolver = null;
-  if (choice === "cancel") closeSheet();
-  else if (sheet) setSheet({ ...sheet, busy: true });
+  // The athlete's own tap on the sheet on screen, whatever its purpose.
+  if (choice === "cancel") {
+    if (sheet) setSheet(null);
+  } else if (sheet) setSheet({ ...sheet, busy: true });
   resolve?.(choice);
 }
 
@@ -135,8 +146,9 @@ export async function explainArenaLocation(): Promise<boolean> {
   return (await present("explain", "arena")) === "continue";
 }
 
+/** The challenger's close: only its own `arena` sheet. */
 export function closeLocationSheet(): void {
-  closeSheet();
+  closeSheet("arena");
 }
 
 /**
@@ -162,27 +174,78 @@ export function cancelLocationSheet(
 // Flow lifetime (1e): backgrounding cancels a Go Live in progress
 // ---------------------------------------------------------------------------
 
-/** One athlete-initiated Go Live flow. `aborted` once the app went to the background. */
+/**
+ * One athlete-initiated Go Live flow. `aborted` once the app went to the
+ * background (not for a permission prompt, see below); `abortSignal`
+ * resolves at that moment, so a reading in flight is not waited on.
+ */
 export interface GoLiveFlow {
   aborted: boolean;
+  abortSignal: Promise<"aborted">;
+  abort: () => void;
 }
 
 let activeFlow: GoLiveFlow | null = null;
 let appStateSub: { remove: () => void } | null = null;
 
+function newFlow(): GoLiveFlow {
+  let fire!: () => void;
+  const flow: GoLiveFlow = {
+    aborted: false,
+    abortSignal: new Promise<"aborted">((resolve) => {
+      fire = () => resolve("aborted");
+    }),
+    abort: () => {
+      if (flow.aborted) return;
+      flow.aborted = true;
+      fire();
+    },
+  };
+  return flow;
+}
+
 function beginFlow(): GoLiveFlow {
-  const flow: GoLiveFlow = { aborted: false };
+  const flow = newFlow();
   activeFlow = flow;
   if (!appStateSub) {
     appStateSub = AppState.addEventListener("change", (next) => {
-      // "inactive" is the system prompt itself, the notification shade or
-      // the app switcher: only a real background ends the flow.
-      if (next !== "background" || !activeFlow) return;
-      activeFlow.aborted = true;
+      // "inactive" is the iOS system prompt, the notification shade or the
+      // app switcher: only a real background ends the flow. On Android the
+      // runtime permission dialog itself pauses the activity and reads as
+      // "background": that is not the athlete leaving, so it is ignored
+      // while a permission request is in flight. Whether the app is in the
+      // foreground is checked again before the live write.
+      if (next !== "background" || !activeFlow || permissionRequestInFlight()) return;
+      activeFlow.abort();
       cancelLocationSheet("go_live", "background");
     });
   }
   return flow;
+}
+
+/** How long the live write waits for the app to come back to "active". */
+export const ACTIVE_WAIT_MS = 1_500;
+
+/**
+ * The decision point before the live write: the app is in the foreground
+ * now, or comes back within `ms` (Android reports "active" again only after
+ * the permission dialog has closed, which can trail its answer).
+ */
+function waitForActive(flow: GoLiveFlow, ms = ACTIVE_WAIT_MS): Promise<boolean> {
+  if (AppState.currentState === "active") return Promise.resolve(true);
+  return new Promise((resolve) => {
+    let sub: { remove: () => void } | null = null;
+    const done = (v: boolean) => {
+      clearTimeout(timer);
+      sub?.remove();
+      resolve(v);
+    };
+    const timer = setTimeout(() => done(AppState.currentState === "active"), ms);
+    sub = AppState.addEventListener("change", (next) => {
+      if (next === "active") done(true);
+    });
+    void flow.abortSignal.then(() => done(false));
+  });
 }
 
 function endFlow(flow: GoLiveFlow): void {
@@ -320,8 +383,10 @@ async function locationStep(flow: GoLiveFlow): Promise<GoLiveLocationResult> {
         continue;
       }
     }
-    const r = await readAndReport(true);
-    if (flow.aborted) return end("dismissed", "reading" in r ? r.reading : reading);
+    // A background mid-reading resolves the flow at once (the chip goes back
+    // to offline), not after the fix and the report finish.
+    const r = await Promise.race([readAndReport(true), flow.abortSignal]);
+    if (r === "aborted" || flow.aborted) return end("dismissed", r !== "aborted" && "reading" in r ? r.reading : reading);
     if (r.kind === "ok") {
       closeSheet();
       return { outcome: "ready", attempt: "ok", reading: r.reading };
@@ -374,8 +439,9 @@ export async function goLiveWithLocation(
         return ready.outcome === "declined" ? "ignored" : false;
       }
       // Backgrounded while the sheet or the reading was up: never advertise
-      // an athlete whose app is closed.
-      if (flow.aborted || AppState.currentState !== "active") {
+      // an athlete whose app is closed. After a permission prompt the app
+      // may still be on its way back to "active" (Android), so wait briefly.
+      if (flow.aborted || !(await waitForActive(flow))) {
         attempt = "dismissed";
         return "ignored";
       }

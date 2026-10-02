@@ -41,13 +41,30 @@ export const REDUCED_PRECISION_ACCURACY_M = 1000;
 
 const TIMED_OUT = Symbol("timed-out");
 
-/** `work`, or `TIMED_OUT` after `ms`. The timer never outlives the race. */
-async function within<T>(work: Promise<T>, ms: number): Promise<T | typeof TIMED_OUT> {
+/**
+ * System permission prompts in flight. On Android the runtime permission
+ * dialog pauses the activity, so AppState reports "background" (then
+ * "active") while it is up; iOS reports "inactive". Owners that treat a
+ * background as "the athlete left" (the Go Live flow, the challenger's
+ * one-time ask) ignore transitions while this is set.
+ */
+let permissionRequests = 0;
+
+export function permissionRequestInFlight(): boolean {
+  return permissionRequests > 0;
+}
+
+/**
+ * `start()`, or `TIMED_OUT` after `ms`. Lazy: with no time left the work is
+ * never started (so it cannot reject unobserved). The race observes the
+ * work's rejection, and the timer never outlives the race.
+ */
+async function within<T>(start: () => Promise<T>, ms: number): Promise<T | typeof TIMED_OUT> {
   if (ms <= 0) return TIMED_OUT;
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     return await Promise.race([
-      work,
+      start(),
       new Promise<typeof TIMED_OUT>((resolve) => {
         timer = setTimeout(() => resolve(TIMED_OUT), ms);
       }),
@@ -92,7 +109,7 @@ async function fastFix(): Promise<Location.LocationObject | "timeout" | "error">
   const left = () => deadline - Date.now();
   try {
     const last = await within(
-      Location.getLastKnownPositionAsync({ maxAge: LAST_KNOWN_MAX_AGE_MS, requiredAccuracy: GOOD_ACCURACY_M }),
+      () => Location.getLastKnownPositionAsync({ maxAge: LAST_KNOWN_MAX_AGE_MS, requiredAccuracy: GOOD_ACCURACY_M }),
       left(),
     );
     if (last !== TIMED_OUT && last && acceptLastKnown(last, Date.now())) return last;
@@ -102,7 +119,7 @@ async function fastFix(): Promise<Location.LocationObject | "timeout" | "error">
   let balanced: Location.LocationObject | null = null;
   let failed = false;
   try {
-    const b = await within(Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }), left());
+    const b = await within(() => Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }), left());
     if (b === TIMED_OUT) return "timeout";
     balanced = b;
     const a = accuracyOf(b);
@@ -111,7 +128,8 @@ async function fastFix(): Promise<Location.LocationObject | "timeout" | "error">
     failed = true;
   }
   try {
-    const h = await within(Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High }), left());
+    // `within` never starts the fix once the budget is spent.
+    const h = await within(() => Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High }), left());
     if (h !== TIMED_OUT) {
       // The better of the two (a High fix can come back coarser indoors).
       const ha = accuracyOf(h);
@@ -134,7 +152,13 @@ export async function readLocationOnce(
     let canAskAgain = current.canAskAgain;
     let coarse = current.android?.accuracy === "coarse";
     if (!granted && opts.ask && canAskAgain) {
-      const asked = await within(Location.requestForegroundPermissionsAsync(), PERMISSION_REQUEST_TIMEOUT_MS);
+      permissionRequests += 1;
+      let asked: Awaited<ReturnType<typeof Location.requestForegroundPermissionsAsync>> | typeof TIMED_OUT;
+      try {
+        asked = await within(() => Location.requestForegroundPermissionsAsync(), PERMISSION_REQUEST_TIMEOUT_MS);
+      } finally {
+        permissionRequests -= 1;
+      }
       if (asked === TIMED_OUT) return { status: "unavailable", reason: "timeout" };
       granted = asked.granted;
       canAskAgain = asked.canAskAgain;
@@ -147,7 +171,7 @@ export async function readLocationOnce(
       return toResult(fix, coarse);
     }
     const position = await within(
-      Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High }),
+      () => Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High }),
       READING_TIMEOUT_MS,
     );
     if (position === TIMED_OUT) return { status: "unavailable", reason: "timeout" };

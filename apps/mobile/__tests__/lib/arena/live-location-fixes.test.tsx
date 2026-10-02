@@ -41,13 +41,18 @@ jest.mock("expo-location", () => ({
   getForegroundPermissionsAsync: () => mockPermission(),
 }));
 const mockReading = jest.fn();
-jest.mock("@/lib/invites/location", () => ({ readLocationOnce: (...a: unknown[]) => mockReading(...a) }));
+let mockInFlight = false;
+jest.mock("@/lib/invites/location", () => ({
+  readLocationOnce: (...a: unknown[]) => mockReading(...a),
+  permissionRequestInFlight: () => mockInFlight,
+}));
 const mockReport = jest.fn();
 const mockLog = jest.fn();
+const mockArenaReport = jest.fn();
 const mockServerRanked = jest.fn();
 jest.mock("@jits/shared/api/location", () => ({
   reportGoLivePresence: (...a: unknown[]) => mockReport(...a),
-  reportArenaPresence: jest.fn(),
+  reportArenaPresence: (...a: unknown[]) => mockArenaReport(...a),
   logLocationEvent: (...a: unknown[]) => mockLog(...a),
   getMyLookingForRanked: (...a: unknown[]) => mockServerRanked(...a),
 }));
@@ -83,6 +88,7 @@ jest.mock("@/lib/arena/use-lobby-presence", () => ({
 }));
 
 let mockIsLive = false;
+let mockOutgoing: unknown = null;
 const mockGoLive = jest.fn();
 let mockRefusal: string | null = null;
 const mockLiveArgs = jest.fn();
@@ -105,8 +111,9 @@ jest.mock("@/lib/arena/use-arena-live", () => ({
 }));
 jest.mock("@/lib/arena/use-arena-challenge", () => ({
   useArenaChallenge: () => ({
+    // (outgoing is overridden below when a test sets mockOutgoing)
     incoming: null,
-    outgoing: null,
+    outgoing: mockOutgoing,
     incomingCount: 0,
     incomingTucked: false,
     isBusy: false,
@@ -149,6 +156,7 @@ function emitAppState(s: string) {
 }
 
 beforeEach(() => {
+  mockInFlight = false;
   jest.clearAllMocks();
   jest.useRealTimers();
   __resetArenaStoreForTests();
@@ -166,6 +174,8 @@ beforeEach(() => {
   }) as never);
   mockLocationRequired = true;
   mockIsLive = false;
+  mockOutgoing = null;
+  mockArenaReport.mockResolvedValue(RECORDED);
   mockRefusal = null;
   mockGoLive.mockResolvedValue(true);
   mockPermission.mockResolvedValue({ granted: true, canAskAgain: true });
@@ -666,5 +676,84 @@ describe("item 1d: the 60 s refresh while live", () => {
     await tick();
     expect(ctaShown()).toBe(2);
     expect(mockToastInfo).not.toHaveBeenCalledWith("You're offline. Go live again in the Arena.");
+  });
+});
+
+describe("review B1 / S3: the permission prompt is not the athlete leaving", () => {
+  it("Android: the dialog reads as background then active; Allow still goes live and logs ok", async () => {
+    mockPermission.mockResolvedValue({ granted: false, canAskAgain: true });
+    mockReading.mockImplementation(async () => {
+      // The runtime dialog pauses the activity while the request is up.
+      mockInFlight = true;
+      emitAppState("background");
+      await Promise.resolve();
+      mockInFlight = false;
+      // "active" trails the answer.
+      setTimeout(() => emitAppState("active"), 50);
+      return OK_READING;
+    });
+    render(<ArenaBootstrap />);
+    const tap = tapGoLive();
+    await waitFor(() => expect(screen.getByTestId("go-live-location-explain")).toBeTruthy());
+    fireEvent.press(screen.getByText("Continue"));
+    expect(await tap.done).toBe(true);
+    expect(mockGoLive).toHaveBeenCalledTimes(1);
+    expect(logged()).toEqual(["ok"]);
+  });
+
+  it("iOS: a real background during the prompt, then back and Allow: goes live", async () => {
+    mockPermission.mockResolvedValue({ granted: false, canAskAgain: true });
+    mockReading.mockImplementation(async () => {
+      mockInFlight = true;
+      emitAppState("background");
+      emitAppState("active");
+      mockInFlight = false;
+      return OK_READING;
+    });
+    render(<ArenaBootstrap />);
+    const tap = tapGoLive();
+    await waitFor(() => expect(screen.getByTestId("go-live-location-explain")).toBeTruthy());
+    fireEvent.press(screen.getByText("Continue"));
+    expect(await tap.done).toBe(true);
+    expect(logged()).toEqual(["ok"]);
+  });
+
+  it("still not in the foreground after the answer: no live write, dismissed", async () => {
+    mockReading.mockImplementation(async () => {
+      mockInFlight = true;
+      emitAppState("background");
+      mockInFlight = false;
+      return OK_READING;
+    });
+    render(<ArenaBootstrap />);
+    expect(await tapGoLive().done).toBe("ignored");
+    expect(mockGoLive).not.toHaveBeenCalled();
+    expect(logged()).toEqual(["dismissed"]);
+  });
+
+  it("a background mid-reading resolves the flow at once (no wait on a hung fix), releasing the switch", async () => {
+    mockReading.mockReturnValue(new Promise(() => undefined));
+    render(<ArenaBootstrap />);
+    const tap = tapGoLive();
+    await waitFor(() => expect(mockReading).toHaveBeenCalled());
+    act(() => emitAppState("background"));
+    expect(await tap.done).toBe("ignored");
+    expect(logged()).toEqual(["dismissed"]);
+  });
+});
+
+describe("review S1: a Go Live never closes the challenger's arena explain", () => {
+  it("the arena explain survives a Go Live that completes, and its Continue still reads and reports", async () => {
+    mockOutgoing = { challengeId: "ch-out", opponentId: "a-2", opponentName: "ALEX", createdAt: null, expiresAt: null };
+    mockPermission.mockResolvedValue({ granted: false, canAskAgain: true });
+    render(<ArenaBootstrap />);
+    await waitFor(() => expect(screen.getByText("Location to start")).toBeTruthy());
+    // Granted meanwhile (another surface): a programmatic Go Live completes.
+    mockPermission.mockResolvedValue({ granted: true, canAskAgain: true });
+    expect(await tapGoLive().done).toBe(true);
+    expect(screen.getByText("Location to start")).toBeTruthy();
+    fireEvent.press(screen.getByTestId("go-live-location-continue"));
+    await waitFor(() => expect(mockArenaReport).toHaveBeenCalledWith(expect.anything(), READING, "ch-out"));
+    await waitFor(() => expect(screen.queryByText("Location to start")).toBeNull());
   });
 });

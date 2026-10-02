@@ -16,6 +16,8 @@ const mockArenaReading = jest.fn((..._a: unknown[]) => Promise.resolve());
 jest.mock("@/lib/arena/arena-presence", () => ({
   reportArenaReading: (...a: unknown[]) => mockArenaReading(...a),
 }));
+let mockInFlight = false;
+jest.mock("@/lib/invites/location", () => ({ permissionRequestInFlight: () => mockInFlight }));
 const mockExplain = jest.fn();
 const mockClose = jest.fn();
 const mockCancelSheet = jest.fn();
@@ -260,5 +262,35 @@ describe("askedThisSession resets (live location fixes 1c)", () => {
     });
     await flush();
     expect(mockExplain).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("review S2: Android's permission dialog does not re-arm the ask", () => {
+  function emit(st: string) {
+    setAppState(st);
+    for (const h of [...appStateHandlers]) h(st);
+  }
+
+  it("a Deny in the runtime dialog (background then active while the request is up) never re-shows the explain", async () => {
+    mockInFlight = false;
+    mockPermission.mockResolvedValue({ granted: false, canAskAgain: true });
+    mockExplain.mockResolvedValue(true);
+    mockArenaReading.mockImplementationOnce(async () => {
+      mockInFlight = true;
+      emit("background");
+      emit("active");
+      mockInFlight = false;
+    });
+    mount({ id: "ch-1", active: true });
+    await flush();
+    await flush();
+    expect(mockExplain).toHaveBeenCalledTimes(1);
+    expect(mockArenaReading).toHaveBeenCalledWith("ch-1", { ask: true });
+    // Android Deny keeps canAskAgain true; nothing re-asks on its own.
+    await act(async () => {
+      jest.advanceTimersByTime(CHALLENGER_READING_REFRESH_MS);
+    });
+    await flush();
+    expect(mockExplain).toHaveBeenCalledTimes(1);
   });
 });

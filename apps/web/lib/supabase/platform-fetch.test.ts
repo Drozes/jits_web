@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { PLATFORM_HEADER, platformFetch } from "./platform-fetch";
+import { PLATFORM_HEADER, isRestRequest, platformFetch } from "./platform-fetch";
 
 function capture() {
   const base = vi.fn((...args: [RequestInfo | URL, RequestInit?]) => Promise.resolve(new Response(String(args.length))));
-  return { base, f: platformFetch(base as unknown as typeof fetch) };
+  return { base, f: platformFetch("https://x.supabase.co", base as unknown as typeof fetch) };
 }
 
 function headerOf(call: unknown[]): string | null {
@@ -28,7 +28,7 @@ describe("platformFetch", () => {
 
   it("covers table reads too (a URL object input)", async () => {
     const { base, f } = capture();
-    await f(new URL("http://127.0.0.1:54321/rest/v1/athletes?select=id"));
+    await f(new URL("https://x.supabase.co/rest/v1/athletes?select=id"));
     expect(headerOf(base.mock.calls[0])).toBe("web");
   });
 
@@ -47,5 +47,17 @@ describe("platformFetch", () => {
     const { base, f } = capture();
     await f("not a url");
     expect(base).toHaveBeenCalledWith("not a url", undefined);
+  });
+});
+
+describe("isRestRequest", () => {
+  it("matches only this project's /rest/v1/ prefix", () => {
+    expect(isRestRequest("https://x.supabase.co/rest/v1/rpc/f", "https://x.supabase.co/")).toBe(true);
+    expect(isRestRequest("http://127.0.0.1:54321/rest/v1/athletes", "http://127.0.0.1:54321")).toBe(true);
+    // Another host, or /rest/v1/ somewhere else in the path or query.
+    expect(isRestRequest("https://evil.example/rest/v1/x", "https://x.supabase.co")).toBe(false);
+    expect(isRestRequest("https://x.supabase.co/functions/v1/a/rest/v1/", "https://x.supabase.co")).toBe(false);
+    expect(isRestRequest("https://x.supabase.co/storage/v1/object?p=/rest/v1/", "https://x.supabase.co")).toBe(false);
+    expect(isRestRequest("https://x.supabase.co/rest/v1/x", "")).toBe(false);
   });
 });
