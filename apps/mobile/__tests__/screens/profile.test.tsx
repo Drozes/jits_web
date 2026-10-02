@@ -162,6 +162,22 @@ describe("Profile recent matches and refresh", () => {
     expect(mockPush).toHaveBeenCalledWith("/(app)/match-detail/m-7");
   });
 
+  it("staggers the recent-match rows in on the first load only (Adding Flare list enter)", () => {
+    mockHistory.push(
+      { match_id: "m-1", opponent_display_name: "A", completed_at: "2026-09-24T12:00:00.000Z", match_type: "ranked", elo_delta: 5 },
+      { match_id: "m-2", opponent_display_name: "B", completed_at: "2026-09-23T12:00:00.000Z", match_type: "ranked", elo_delta: -5 },
+    );
+    const withEntering = (root: HostNode) =>
+      root.findAll((n: HostNode) => typeof n.type === "string" && n.props.entering != null);
+    const view = render(<ProfileScreen />);
+    expect(withEntering(view.UNSAFE_root)).toHaveLength(2);
+
+    // A refetch re-render keeps the rows still.
+    view.rerender(<ProfileScreen />);
+    expect(withEntering(view.UNSAFE_root)).toHaveLength(0);
+    expect(view.getByLabelText("Open match vs A")).toBeTruthy();
+  });
+
   it("refetches profile and videos when the tab regains focus, not on the first focus", () => {
     render(<ProfileScreen />);
     expect(mockProfileRefetch).not.toHaveBeenCalled();

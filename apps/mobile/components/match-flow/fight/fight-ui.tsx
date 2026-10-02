@@ -2,7 +2,8 @@ import * as React from "react";
 import { ActivityIndicator, Text, View, type StyleProp, type ViewStyle } from "react-native";
 import { ON_MEDIA, usePalette, type Palette } from "@/lib/theme/palette";
 import { FIGHT_RADIUS, TABULAR } from "./fight-tokens";
-import { StatePressable } from "@/components/ui/state-pressable";
+import { PressableScale, type PressHaptic } from "@/components/ui/pressable-scale";
+import { SteelSheen } from "@/components/ui/steel-sheen";
 
 /**
  * Small building blocks shared by the match-flow screens. Kept deliberately
@@ -84,6 +85,16 @@ interface FightButtonProps {
   /** Right-aligned mono note inside the button (e.g. "PROCESSING"). */
   trailing?: React.ReactNode;
   style?: StyleProp<ViewStyle>;
+  /**
+   * Commit-action haptic on press (Motion Rule). Omit it where the caller
+   * already buzzes for the same event (one haptic per event).
+   */
+  haptic?: PressHaptic;
+  /**
+   * Steel sheen while this action waits on THIS user (Motion Rule, Ambient):
+   * at most one per screen. Never drawn while disabled or busy.
+   */
+  sheen?: boolean;
 }
 
 /**
@@ -103,18 +114,21 @@ export function FightButton({
   icon,
   trailing,
   style,
+  haptic,
+  sheen = false,
 }: FightButtonProps) {
   const p = usePalette();
   const fg = variant === "primary" ? p.onCta : p.text;
   const inert = disabled || busy;
   return (
-    <StatePressable
+    <PressableScale
       testID={testID}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled: inert, busy }}
       onPress={onPress}
       disabled={inert}
+      haptic={haptic}
       style={({ pressed }) => [
         {
           height,
@@ -126,6 +140,8 @@ export function FightButton({
           borderRadius: FIGHT_RADIUS.button,
           opacity: disabled ? 0.5 : 1,
         },
+        // Clips the sheen to the button.
+        sheen && { overflow: "hidden" as const },
         variant === "primary" && { backgroundColor: pressed ? p.ctaPressed : p.cta },
         variant === "secondary" && {
           backgroundColor: pressed ? p.secondaryBgPressed : p.secondaryBg,
@@ -146,7 +162,8 @@ export function FightButton({
         </Text>
       </View>
       {trailing ?? null}
-    </StatePressable>
+      <SteelSheen active={sheen && !inert} />
+    </PressableScale>
   );
 }
 
@@ -340,7 +357,7 @@ export function RatingBlock({
   deltaTestID?: string;
   /** Replaces the plain delta text. */
   deltaNode?: React.ReactNode;
-  /** Replaces the rating text (the verdict ticks it in its own leaf). */
+  /** Replaces the rating text (the verdict rolls it in its own leaf). */
   ratingNode?: React.ReactNode;
 }) {
   const p = usePalette();

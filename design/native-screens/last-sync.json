@@ -1,7 +1,7 @@
 {
   "canvas": "https://claude.ai/artifact/PJWm2WeqsG56HS13jHsd5D",
-  "commit": "554ddca58f8fd5ecebd99c06cc6653282ed519a7",
-  "synced_at": "2026-10-01T11:00:29-04:00",
-  "version": "1790866817-a71b",
-  "note": "Synced 2026-10-01 to production OTA f7393962 (main 554ddca): redrew 07, 08 (Instagram helpers 'Optional.'), 24 (live meta LBS) and 46 (Help: one challenge out at a time) per jits-xchq; 41 unaffected. Earlier the same day: full audit against OTA 9c5e3210, weight-check boards 21b/21c/22b added (v1790863147-d5c2)."
+  "commit": "41d79a45b8a20681e0968a6e3a7b3154849994df",
+  "synced_at": "2026-10-01T19:55:52-04:00",
+  "version": "1790898940-22a1",
+  "note": "Synced 2026-10-01 to release 0.5.0 build 25 (main 41d79a4; invites, friends, location flag, live sessions, Arena nearby, account deletion; shipped dark). Redrew 02, 03 (Got a challenge code? link, renders with invites off; v0.5.0 (25)), 12, 13, 14, 15 (Just Rolled removed, RANKED tags and ranked copy gone), 17, 43, 44, 46 (Delete account, Friends toggle, help copy), 21, 21b, 21c, 22, 22b, 23, 24, 25, 26, 29 (RANKED tags removed, centred face-off label), 32, 33. Heights: 14 850->844, 17 2010->2073, 32 2151->2135. Added 12 boards in a new row 'Invites, friends & location' (50-61), drawn flag-on. Skipped 16, 18, 31, 34, 36, 37, 45, 47, 49 (only app/_layout.tsx changed, no visible effect) and 04-08, Main, 11, 35, 41, 42, 48 (no visible change). Triage: all shipped items already marked."
 }

@@ -19,6 +19,7 @@
  */
 import * as React from "react";
 import { RefreshControl, View } from "react-native";
+import Animated from "react-native-reanimated";
 import { useLocalSearchParams, useRouter, type Href } from "expo-router";
 import { useIsFocused } from "@react-navigation/native";
 import { useRequireAthlete } from "@/lib/auth/hooks";
@@ -66,6 +67,8 @@ import {
   type MatRowAction,
 } from "@/components/arena/mat-board";
 import { ArenaSkeleton } from "@/components/arena/arena-skeleton";
+import { OnAirStrip } from "@/components/arena/on-air-strip";
+import { useFirstLoadEntering } from "@/lib/motion";
 import { CapPlate, RosterErrorPlate } from "@/components/arena/arena-plates";
 import { SecondaryButton, TertiaryButton } from "@/components/auth/auth-buttons";
 import { toast } from "@/components/ui/toast";
@@ -255,6 +258,9 @@ export default function ArenaScreen() {
     capped: capReached,
   });
 
+  // On the mat rows rise in on the FIRST load only (list enter stagger).
+  const enterRow = useFirstLoadEntering();
+
   // Countdowns tick in leaf components, only while this tab is focused.
   const ticking = isFocused;
 
@@ -310,8 +316,12 @@ export default function ArenaScreen() {
           />
         }
       >
+        {/* While live: ON AIR tally and the heartbeat on the tempo clock. */}
+        <OnAirStrip isLive={isLive} />
+
         {strip.challenge === "incoming" && incoming ? (
           <IncomingStrip
+            challengeId={incoming.challengeId}
             name={incoming.challengerName}
             // Offline, fresh on-mat challenges not in hand count here too.
             count={incomingCount + deepLink.moreOnMat}
@@ -322,6 +332,7 @@ export default function ArenaScreen() {
         ) : null}
         {strip.challenge === "offer" && offer ? (
           <OfferStrip
+            challengeId={offer.challengeId}
             name={offer.challengerName}
             count={1 + deepLink.moreOnMat}
             source={offer}
@@ -425,24 +436,25 @@ export default function ArenaScreen() {
                   }
                   right={String(onTheMat.length)}
                 />
-                {matRows.map((c) => {
+                {matRows.map((c, i) => {
                   const action = actionFor(c.id);
                   return (
-                    <MatRow
-                      key={c.id}
-                      competitor={c}
-                      action={action}
-                      // A row's go-live is the live switch too; ROLL is not.
-                      disabled={
-                        action.kind === "go-live"
-                          ? actionsLocked || switchLocked
-                          : actionsLocked || liveSaving
-                      }
-                      onRoll={() => void sendChallenge(c.id, c.displayName)}
-                      onGoLive={goLive}
-                      onOpenProfile={() => openProfile(c.id)}
-                      isFriend={friendIds.has(c.id)}
-                    />
+                    <Animated.View key={c.id} entering={enterRow(i)}>
+                      <MatRow
+                        competitor={c}
+                        action={action}
+                        // A row's go-live is the live switch too; ROLL is not.
+                        disabled={
+                          action.kind === "go-live"
+                            ? actionsLocked || switchLocked
+                            : actionsLocked || liveSaving
+                        }
+                        onRoll={() => void sendChallenge(c.id, c.displayName)}
+                        onGoLive={goLive}
+                        onOpenProfile={() => openProfile(c.id)}
+                        isFriend={friendIds.has(c.id)}
+                      />
+                    </Animated.View>
                   );
                 })}
               </View>

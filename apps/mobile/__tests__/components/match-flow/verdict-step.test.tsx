@@ -75,6 +75,13 @@ import { Share } from "react-native";
 import { VerdictStep } from "@/components/match-flow/verdict/verdict-step";
 import { WizardScrollContext, useWizardScrollSource } from "@/components/match-flow/wizard-scroll";
 import { ARENA_EXIT_LABEL, ARENA_HREF } from "@/lib/arena/constants";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import {
+  PLAYED_STORAGE_KEY,
+  __reloadPlayedForTests,
+  __resetFreshForTests,
+  __resetPlayedMomentsForTests,
+} from "@/components/ui/elo-system/play-once";
 
 type Props = React.ComponentProps<typeof VerdictStep>;
 const HIDDEN = { kind: "hidden", message: null, truncation: null, progress: null } as const;
@@ -101,6 +108,8 @@ const color = (el: { props: { style?: unknown } }) => (StyleSheet.flatten(el.pro
 
 beforeEach(() => {
   jest.clearAllMocks();
+  __resetPlayedMomentsForTests();
+  __resetFreshForTests();
   mockSyncParams = {};
   mockDetailView.mockResolvedValue({ ok: true, data: { videos: [] } });
   mockRankChange.mockResolvedValue({ ok: false, error: { code: "UNKNOWN", message: "missing" } });
@@ -124,6 +133,54 @@ describe("verdict copy and the harness contract", () => {
     expect(delta).toHaveTextContent("▲ +14");
     expect(color(delta)).toBe("#22C55E");
     expect(s.getByTestId("verdict-confetti", { includeHiddenElements: true })).toBeTruthy();
+  });
+
+  it("the rating card reads only the final value and delta, with the tap marks on a submission (Adding Flare)", async () => {
+    const s = renderVerdict();
+    await flush();
+    expect(s.getByTestId("verdict-rating-card").props.accessibilityLabel).toBe("Rating 1526, up 14");
+    expect(s.getByTestId("verdict-tap-marks", { includeHiddenElements: true })).toBeTruthy();
+  });
+
+  it("the whole celebration plays once per result: a remount is static (Adding Flare)", async () => {
+    const first = renderVerdict();
+    await flush();
+    expect(first.getByTestId("verdict-confetti", { includeHiddenElements: true })).toBeTruthy();
+    first.unmount();
+    const again = renderVerdict();
+    await flush();
+    expect(again.queryByTestId("verdict-confetti", { includeHiddenElements: true })).toBeNull();
+    expect(again.getByTestId("verdict-rating-value", { includeHiddenElements: true })).toHaveTextContent("1526");
+  });
+
+  it("a result played on an earlier launch (stored key) is static (Adding Flare)", async () => {
+    await AsyncStorage.setItem(PLAYED_STORAGE_KEY, JSON.stringify({ "verdict:M1": 1 }));
+    await __reloadPlayedForTests();
+    try {
+      const s = renderVerdict();
+      await flush();
+      expect(s.queryByTestId("verdict-confetti", { includeHiddenElements: true })).toBeNull();
+      expect(s.getByTestId("verdict-rating-value", { includeHiddenElements: true })).toHaveTextContent("1526");
+    } finally {
+      await AsyncStorage.removeItem(PLAYED_STORAGE_KEY);
+    }
+  });
+
+  it("an old result (completed over 5 minutes ago) is static (Adding Flare)", async () => {
+    const s = renderVerdict({ completedAt: new Date(Date.now() - 60 * 60_000).toISOString() });
+    await flush();
+    expect(s.queryByTestId("verdict-confetti", { includeHiddenElements: true })).toBeNull();
+    expect(s.getByTestId("verdict-rating-value", { includeHiddenElements: true })).toHaveTextContent("1526");
+  });
+
+  it("prefers the result type over the catalogue name for the tap (Adding Flare)", async () => {
+    const draw = renderVerdict({ outcome: "draw", resultType: "draw", submissionName: "Armbar" });
+    await flush();
+    expect(draw.queryByTestId("verdict-tap-marks", { includeHiddenElements: true })).toBeNull();
+    draw.unmount();
+    const sub = renderVerdict({ resultType: "submission", submissionName: null });
+    await flush();
+    expect(sub.getByTestId("verdict-tap-marks", { includeHiddenElements: true })).toBeTruthy();
   });
 
   it("a loss: YOU LOST, a red ▼ delta, no confetti", async () => {

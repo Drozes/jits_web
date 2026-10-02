@@ -116,6 +116,19 @@ jest.mock("@/lib/supabase/client", () => ({
   },
 }));
 
+// The LIVE pulse tempo feed (Adding Flare): observe what the lobby publishes.
+const mockPublishTempo = jest.fn();
+jest.mock("@/lib/arena/arena-tempo", () => {
+  const actual = jest.requireActual("@/lib/arena/arena-tempo");
+  return {
+    ...actual,
+    publishTempoOthersLive: (n: number) => {
+      mockPublishTempo(n);
+      actual.publishTempoOthersLive(n);
+    },
+  };
+});
+
 import {
   joinLobby,
   leaveLobby,
@@ -1289,5 +1302,69 @@ describe("useOnMatCount in the Arena's nearby mode (M2)", () => {
     act(() => store.publishNearbyOnMatCount(null));
     expect(result.current).toBe(3);
     unmount();
+  });
+});
+
+describe("useLobbyPresence: LIVE pulse tempo feed (Adding Flare, jits-pddd.6)", () => {
+  beforeEach(() => mockPublishTempo.mockClear());
+
+  it("a sync publishes the lobby size minus self", async () => {
+    const { unmount } = mount();
+    await settle();
+    const channel = mockChannels[0];
+    channel.presenceState.mockReturnValue({ [ME]: [{}], "athlete-a": [{}], "athlete-b": [{}] });
+    act(() => {
+      channel.syncHandler?.();
+    });
+    expect(mockPublishTempo).toHaveBeenLastCalledWith(2);
+
+    // Offline (self not tracked): everyone present counts.
+    channel.presenceState.mockReturnValue({ "athlete-a": [{}], "athlete-b": [{}], "athlete-c": [{}] });
+    act(() => {
+      channel.syncHandler?.();
+    });
+    expect(mockPublishTempo).toHaveBeenLastCalledWith(3);
+    unmount();
+  });
+
+  it("a channel loss publishes 0", async () => {
+    jest.useFakeTimers();
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    const { unmount } = mount();
+    await settle();
+    const channel = mockChannels[0];
+    act(() => {
+      channel.subscribeHandler?.("SUBSCRIBED");
+    });
+    channel.presenceState.mockReturnValue({ "athlete-a": [{}], "athlete-b": [{}] });
+    act(() => {
+      channel.syncHandler?.();
+    });
+    expect(mockPublishTempo).toHaveBeenLastCalledWith(2);
+    act(() => {
+      mockClose(channel);
+    });
+    expect(mockPublishTempo).toHaveBeenLastCalledWith(0);
+    warn.mockRestore();
+    unmount();
+  });
+
+  it("a release publishes 0", async () => {
+    const first = mount();
+    await settle();
+    const channel = mockChannels[0];
+    channel.presenceState.mockReturnValue({ "athlete-a": [{}] });
+    act(() => {
+      channel.syncHandler?.();
+    });
+    expect(mockPublishTempo).toHaveBeenLastCalledWith(1);
+    await act(async () => {
+      first.unmount();
+      await Promise.resolve();
+    });
+    // An athlete change releases the old channel (clearing the lobby).
+    const second = mount("someone-else");
+    await waitFor(() => expect(mockPublishTempo).toHaveBeenLastCalledWith(0));
+    second.unmount();
   });
 });

@@ -10,6 +10,7 @@ import {
   registerBellHost,
   resetBellStore,
   useBellBadgeCount,
+  useBellLoaded,
   useBellOpen,
   useFreshIncomingCount,
 } from "@/lib/notifications/bell-store";
@@ -123,5 +124,20 @@ describe("bell-store", () => {
     expect(result.current).toBe(2);
     act(() => unregister());
     expect(result.current).toBe(0);
+  });
+
+  it("is not loaded until the host says its first read landed; unregistering forgets it", () => {
+    const unregister = registerBellHost(jest.fn());
+    const { result } = renderHook(() => useBellLoaded());
+    expect(result.current).toBe(false);
+    act(() => publishBellBadge(0, 0, false));
+    expect(result.current).toBe(false);
+    act(() => publishBellBadge(2, 2, true));
+    expect(result.current).toBe(true);
+    // Omitting it leaves the last value alone.
+    act(() => publishBellBadge(1, 1));
+    expect(result.current).toBe(true);
+    act(() => unregister());
+    expect(result.current).toBe(false);
   });
 });

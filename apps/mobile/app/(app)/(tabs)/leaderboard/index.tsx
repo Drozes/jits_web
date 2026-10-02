@@ -1,5 +1,6 @@
 import * as React from "react";
 import { ActivityIndicator, View } from "react-native";
+import { useIsFocused } from "@react-navigation/native";
 import { Chip, MetaTag } from "@/components/ui/elo-system";
 import { SkeletonProvider, SkeletonRankRow } from "@/components/ui/skeleton";
 import { useRequireAthlete } from "@/lib/auth/hooks";
@@ -12,13 +13,15 @@ import {
 } from "@/components/leaderboard/gender-filter-row";
 import { FightersList } from "@/components/leaderboard/fighters-list";
 import { GymsList } from "@/components/leaderboard/gyms-list";
+import { useFirstLoadEntering } from "@/lib/motion";
+import { useRankClimb } from "@/lib/leaderboard/use-rank-climb";
 
 type TabValue = "fighters" | "gyms";
 
 /**
  * List-body placeholder shown until BOTH the athletes SELECT and the stats RPC
- * land. Always 8 full rows — never a half-empty list (the brief's hard rule).
- * Static by default per the minimal-motion brand rule.
+ * land. Always 8 full rows, never a half-empty list (the brief's hard rule).
+ * The bars carry the shared skeleton shimmer (Motion Rule, Ambient tier).
  */
 function RankingsSkeleton() {
   return (
@@ -58,6 +61,19 @@ export default function LeaderboardScreen() {
     return athletes.find((a) => a.isCurrentUser) ?? null;
   }, [athletes]);
 
+  // Motion Rule moments, both on real transitions only: the list enter
+  // stagger plays when the rows first appear (never on refetch, refresh or a
+  // filter change), and the rank-up swap flare plays once per climb.
+  const entering = useFirstLoadEntering();
+  // A climb is detected and used up only while the fighters list is on
+  // screen, so it is never spent while nobody can see it.
+  const isFocused = useIsFocused();
+  const rankClimb = useRankClimb(
+    athlete?.id,
+    currentUserAthlete?.rank ?? null,
+    tab === "fighters" && isFocused,
+  );
+
   // Spinner covers AUTH ONLY. Once the athlete exists the chrome paints
   // immediately and the list body carries the skeleton.
   if (authLoading || !athlete) {
@@ -68,7 +84,12 @@ export default function LeaderboardScreen() {
     );
   }
 
-  const countLabel = isLoading
+  // Hold the list on the skeleton until the last-seen rank is read (capped at
+  // RANK_READ_TIMEOUT_MS, 300ms), so a climb starts from the old order
+  // instead of jumping new, old, new.
+  const listLoading = isLoading || !rankClimb.ready;
+
+  const countLabel = listLoading
     ? "Loading · Live"
     : tab === "fighters"
       ? `${filteredAthletes.length} Athletes · Live`
@@ -96,7 +117,7 @@ export default function LeaderboardScreen() {
         <MetaTag>{countLabel}</MetaTag>
       </View>
 
-      {isLoading ? (
+      {listLoading ? (
         <RankingsSkeleton />
       ) : tab === "fighters" ? (
         <FightersList
@@ -104,6 +125,8 @@ export default function LeaderboardScreen() {
           isRefreshing={isRefreshing}
           onRefresh={refresh}
           currentUser={currentUserAthlete}
+          entering={entering}
+          climb={rankClimb.climb}
         />
       ) : (
         <GymsList

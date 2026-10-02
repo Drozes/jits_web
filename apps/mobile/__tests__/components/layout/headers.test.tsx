@@ -183,7 +183,10 @@ describe("HeaderLiveDot", () => {
     expect(queryByTestId("header-live-dot")).toBeTruthy();
   });
 
-  it("is a static dot, never the pulsing LiveDot (the chip's dot is the only pulse, spec 3)", () => {
+  it("is its own small mark, not the chip's LiveDot, on the one shared pulse clock (Motion Rule)", () => {
+    // Adding Flare: every live dot breathes on the ONE Arena tempo clock
+    // (lib/arena/arena-tempo.ts), so this dot pulsing keeps one rhythm. Its
+    // phase and Reduce Motion behaviour are covered in arena-tempo.test.tsx.
     setLive(true);
     const { UNSAFE_root, getByTestId } = render(<HeaderLiveDot />);
     expect(UNSAFE_root.findAllByType(LiveDot)).toHaveLength(0);
