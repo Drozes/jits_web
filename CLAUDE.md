@@ -119,7 +119,7 @@ Bebas Neue (`font-display`, the wordmark and display numerals 40px and up such a
 - **Mobile `apps/mobile/components/ui/`** are hand-written RN primitives (NativeWind v4 + class-variance-authority); edit directly. Mobile `badge` also has a custom `success` variant.
 - A shared **`elo-system/`** brand-primitive set exists under `components/ui/elo-system/` on both web and mobile; keep the two in parity when touching either.
 - Components that can't take a `className` (RN `Switch`, gorhom `BottomSheet`) read `useThemedTokens()` for the right runtime token map.
-- `MatchCard` accepts optional `matchType: "ranked" | "casual"`, rendered inline with the date ("2d ago, Ranked"). Mobile mirrors the API.
+- `MatchCard`: casual matches are retired and every match is ranked, so `MatchType` is only `"ranked"` (`packages/shared/src/constants.ts`). Mobile `MatchCard` has no `matchType` prop and its subtitle is just the relative date, with no "Ranked" suffix (`apps/mobile/components/match-card.tsx:55-56`); web still accepts an optional `matchType` prop but does not render it.
 
 ## Routes
 
@@ -135,7 +135,7 @@ Bebas Neue (`font-display`, the wordmark and display numerals 40px and up such a
 ## Mobile Specifics
 
 - **Routing:** file-based under `apps/mobile/app/`. `(app)/` is a Stack; inside it `(tabs)/` is the 4-tab navigator; `athlete/[id]`, `match/[matchId]`, `settings` push on top.
-- **Theming:** `apps/mobile/tailwind.config.js` declares semantic tokens as CSS vars; `<ThemeProvider>` applies `vars()` overrides from `apps/mobile/lib/tokens.ts` by system color scheme.
+- **Theming:** `apps/mobile/tailwind.config.js` declares semantic tokens as CSS vars and sets `darkMode: "class"` (needed for NativeWind's `setColorScheme()`); `<ThemeProvider>` applies `vars()` overrides from `apps/mobile/lib/tokens.ts` on a root View. The app forces dark before first paint (`app/_layout.tsx`), restores a stored preference, and has an in-app Light / Dark / System toggle in Settings.
 - **Match-flow state machine (8 steps):** `wait, weight, ready, live, end, result, confirm, summary`, driven by `apps/mobile/lib/match-flow/step-router.ts`. The live step mounts the camera overlay, keeps awake, fires haptics, and auto-stops recording on end. Recording is best-effort; permission-denied users still progress.
 - **Match exits:** every exit from `match/[matchId]` goes through `exitMatchTo()` (`router.dismissTo`) in `apps/mobile/lib/match-flow/exit-to.ts`. Never `router.replace` out of a match: it stacks a duplicate `(tabs)` navigator (stale screens, duplicate subscriptions). Exits pop back without refocusing, so post-match refreshes key off `useMatchExitCount()` (`lib/arena/arena-store.ts`), not focus alone.
 - **Getting back into a match:** Home's "Resume your match" card (`getMyActiveMatch()`, `lib/match-flow/use-my-active-match.ts`) only offers; resuming is the athlete's tap. The only auto-navigation is the accepter rejoin (`rejoinStartedMatch` in `use-arena-challenge.ts`, AsyncStorage record): an accepter whose app died right after accepting is put into the match the challenger started, only within the 10 min window and only if it never entered it. Do not add other auto-navigation into matches.
