@@ -1,12 +1,12 @@
 import * as React from "react";
 import { Text, View } from "react-native";
 import { SHARE_COPY, type SharePath, type ShareStage, type UseHighlightShareResult } from "@/lib/highlight-share";
-import { ViewerButton } from "./viewer-button";
 import { CaptionCard } from "./caption-card";
 import { CollabTip } from "./collab-tip";
 import { ShareProgress } from "./share-progress";
 import { ShareReturned } from "./share-returned";
 import { ShareFailed } from "./share-failed";
+import { Button } from "@/components/ui/elo-system/button";
 
 const DOWNLOADING: ReadonlySet<ShareStage> = new Set<ShareStage>(["idle", "preparing", "downloading"]);
 const CAN_HAND_OFF: ReadonlySet<ShareStage> = new Set<ShareStage>(["ready", "done"]);
@@ -60,7 +60,8 @@ export function ShareSheetBody({ share, onHandoff, iosReels, onCopy, onDone }: S
           )}
           <CollabTip tip={share.collabTip} />
           {activePath ? (
-            <ViewerButton
+            <Button
+              height={44}
               testID="share-handoff"
               label={activePath === "reels" ? SHARE_COPY.openInstagram : SHARE_COPY.share}
               variant="primary"

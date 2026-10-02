@@ -2,7 +2,7 @@ import * as React from "react";
 import { Alert, Text, View } from "react-native";
 import { listMyOpenChallengeInvites, revokeInvite, type OpenChallengeInvite } from "@jits/shared/api/invites";
 import { formatInviteCode, revokeInviteErrorMessage } from "@jits/shared/utils";
-import { TertiaryButton } from "@/components/auth/auth-buttons";
+import { Button } from "@/components/ui/elo-system/button";
 import { supabase } from "@/lib/supabase/client";
 
 function sentAgo(iso: string, now: number): string {
@@ -79,11 +79,13 @@ export function OpenChallenges({
               <Text className="font-mono text-[12px] text-ink-3">Code {formatInviteCode(r.short_code)}</Text>
             ) : null}
           </View>
-          <TertiaryButton
+          <Button
+            variant="ghost"
+            height={28}
+            style={{ paddingHorizontal: 0 }}
             label={busyId === r.id ? "Withdrawing..." : "Withdraw"}
             disabled={busyId !== null}
             onPress={() => void withdraw(r.id)}
-            className="px-0 py-1"
           />
         </View>
       ))}

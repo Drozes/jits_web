@@ -23,6 +23,7 @@ import { TabHeader } from "@/components/layout/tab-header";
 import { PageContainer } from "@/components/layout/page-container";
 import { AppVersionLabel } from "@/components/layout/app-version-label";
 import { MetaTag, ParticipantRow } from "@/components/ui/elo-system";
+import { Button } from "@/components/ui/elo-system/button";
 import { HistoryRowAction } from "@/components/profile/history-row-action";
 import {
   SkeletonProvider,
@@ -224,15 +225,11 @@ export default function ProfileScreen() {
             />
 
             <View className="gap-2">
-              <Pressable
+              <Button
+                variant="secondary"
+                label="View Detailed Stats"
                 onPress={() => router.push("/(app)/profile/stats")}
-                accessibilityRole="button"
-                className="bg-surface-3 border border-hairline-strong rounded-sm px-5 py-4 items-center active:bg-surface-4"
-              >
-                <Text className="font-heading text-[12px] text-ink uppercase tracking-caps">
-                  View Detailed Stats
-                </Text>
-              </Pressable>
+              />
             </View>
 
             <AccountSection />

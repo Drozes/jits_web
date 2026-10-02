@@ -1,7 +1,7 @@
 import * as React from "react";
 import { Text, View } from "react-native";
 import { useRouter } from "expo-router";
-import { TertiaryButton } from "@/components/auth/auth-buttons";
+import { Button } from "@/components/ui/elo-system/button";
 import { useAuth } from "@/lib/auth/hooks";
 import { useSetupSubmit } from "@/lib/profile-setup/use-setup-submit";
 import { gymInstagramField, type GymAccess } from "@/lib/profile-setup/gym-instagram";
@@ -163,7 +163,7 @@ export function SetupWizard({
       ) : null}
 
       {currentIdx > 0 && currentStep !== "tos" && (
-        <TertiaryButton label="Back" onPress={goBack} disabled={loading} />
+        <Button variant="ghost" height={44} label="Back" onPress={goBack} disabled={loading} />
       )}
 
       {/* Sign-out escape hatch on the identity/training steps. The TOS step
@@ -172,7 +172,7 @@ export function SetupWizard({
           session lands on the identity step (which has no Back) and is trapped
           with no way to switch accounts. */}
       {currentStep !== "tos" && (
-        <TertiaryButton label="Sign Out" onPress={handleExit} disabled={loading} />
+        <Button variant="ghost" height={44} label="Sign Out" onPress={handleExit} disabled={loading} />
       )}
     </View>
   );

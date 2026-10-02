@@ -1,9 +1,8 @@
 import * as React from "react";
-import { ActivityIndicator, Text, View, type StyleProp, type ViewStyle } from "react-native";
+import { Text, View, type StyleProp, type ViewStyle } from "react-native";
 import { ON_MEDIA, usePalette, type Palette } from "@/lib/theme/palette";
 import { FIGHT_RADIUS, TABULAR } from "./fight-tokens";
-import { PressableScale, type PressHaptic } from "@/components/ui/pressable-scale";
-import { SteelSheen } from "@/components/ui/steel-sheen";
+import { Button, type ButtonProps } from "@/components/ui/elo-system/button";
 
 /**
  * Small building blocks shared by the match-flow screens. Kept deliberately
@@ -70,101 +69,17 @@ export function Mono({ children, color, size = 10, bold = false, spacing = 2.52,
   );
 }
 
-type ButtonVariant = "primary" | "secondary" | "ghost";
-
-interface FightButtonProps {
-  label: string;
-  onPress: () => void;
-  variant?: ButtonVariant;
-  disabled?: boolean;
-  busy?: boolean;
-  testID?: string;
-  accessibilityLabel?: string;
-  height?: number;
-  icon?: (color: string) => React.ReactNode;
-  /** Right-aligned mono note inside the button (e.g. "PROCESSING"). */
-  trailing?: React.ReactNode;
-  style?: StyleProp<ViewStyle>;
-  /**
-   * Commit-action haptic on press (Motion Rule). Omit it where the caller
-   * already buzzes for the same event (one haptic per event).
-   */
-  haptic?: PressHaptic;
-  /**
-   * Steel sheen while this action waits on THIS user (Motion Rule, Ambient):
-   * at most one per screen. Never drawn while disabled or busy.
-   */
-  sheen?: boolean;
-}
+type FightButtonProps = Omit<ButtonProps, "variant" | "className" | "hitSlop" | "accessibilityHint"> & {
+  variant?: "primary" | "secondary" | "ghost";
+};
 
 /**
- * The one button shape of the match flow: primary is Signal Red with the
- * on-accent label (one per screen), secondary is a faint fill with the strong
- * hairline, ghost is text only.
+ * The match flow's name for the one ELO `Button` (WP3): a thin alias kept so
+ * the match-flow call sites and the Adding Flare tests read unchanged. New
+ * code imports `Button` from `@/components/ui/elo-system`.
  */
-export function FightButton({
-  label,
-  onPress,
-  variant = "primary",
-  disabled = false,
-  busy = false,
-  testID,
-  accessibilityLabel,
-  height = 56,
-  icon,
-  trailing,
-  style,
-  haptic,
-  sheen = false,
-}: FightButtonProps) {
-  const p = usePalette();
-  const fg = variant === "primary" ? p.onCta : p.text;
-  const inert = disabled || busy;
-  return (
-    <PressableScale
-      testID={testID}
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
-      accessibilityState={{ disabled: inert, busy }}
-      onPress={onPress}
-      disabled={inert}
-      haptic={haptic}
-      style={({ pressed }) => [
-        {
-          height,
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: trailing ? "space-between" : "center",
-          gap: 10,
-          paddingHorizontal: 16,
-          borderRadius: FIGHT_RADIUS.button,
-          opacity: disabled ? 0.5 : 1,
-        },
-        // Clips the sheen to the button.
-        sheen && { overflow: "hidden" as const },
-        variant === "primary" && { backgroundColor: pressed ? p.ctaPressed : p.cta },
-        variant === "secondary" && {
-          backgroundColor: pressed ? p.secondaryBgPressed : p.secondaryBg,
-          borderWidth: 1,
-          borderColor: p.strong,
-        },
-        variant === "ghost" && { opacity: pressed ? 0.7 : disabled ? 0.5 : 1 },
-        style,
-      ]}
-    >
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-        {busy ? <ActivityIndicator size="small" color={fg} /> : icon ? icon(fg) : null}
-        <Text
-          className="font-heading uppercase"
-          style={{ fontSize: variant === "ghost" ? 13 : 14, letterSpacing: 1.12, color: fg }}
-        >
-          {label}
-        </Text>
-      </View>
-      {trailing ?? null}
-      <SteelSheen active={sheen && !inert} />
-    </PressableScale>
-  );
+export function FightButton(props: FightButtonProps) {
+  return <Button {...props} />;
 }
 
 /** Initials on a bordered panel square (no photos in the match flow yet). */

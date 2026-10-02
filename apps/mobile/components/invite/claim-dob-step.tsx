@@ -6,9 +6,9 @@
 import * as React from "react";
 import { Text } from "react-native";
 import { checkDateOfBirth, DOB_INVALID_COPY, DOB_REQUIRED_TITLE, UNDERAGE_COPY } from "@jits/shared/utils";
-import { CtaButton, SecondaryButton } from "@/components/auth/auth-buttons";
 import { DateOfBirthPicker } from "@/components/profile-setup/date-of-birth-picker";
 import { Plate } from "@/components/ui/elo-system";
+import { Button } from "@/components/ui/elo-system/button";
 
 interface ClaimDobStepProps {
   message: string;
@@ -56,13 +56,13 @@ export function ClaimDobStep({ message, error, busy = false, onSubmit, onNotNow 
           {shown}
         </Text>
       ) : null}
-      <CtaButton
+      <Button
         label={busy ? "Saving..." : "Save and accept"}
         testID="claim-dob-save"
         disabled={!value || busy}
         onPress={submit}
       />
-      <SecondaryButton label="Not now" disabled={busy} onPress={onNotNow} />
+      <Button variant="secondary" label="Not now" disabled={busy} onPress={onNotNow} />
     </Plate>
   );
 }

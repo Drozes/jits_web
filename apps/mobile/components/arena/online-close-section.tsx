@@ -8,7 +8,8 @@
  * mat" hint in place of ROLL (a challenge would fail the proximity gate).
  * Secondary styling only: the red stays GO LIVE / the Closest Match CTA.
  */
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
+import { StatePressable } from "@/components/ui/state-pressable";
 import { ChevronDown, ChevronRight } from "lucide-react-native";
 import { ARENA_BAND_LABEL, ARENA_BAND_SPOKEN, type ArenaCloseBand } from "@jits/shared/api/location";
 import { useThemedTokens } from "@/lib/theme/use-theme";
@@ -35,7 +36,8 @@ export function OnlineCloseSection({ rows, friendIds, actionFor, onOpenProfile }
   const Chevron = expanded ? ChevronDown : ChevronRight;
   return (
     <View testID="arena-online-close">
-      <Pressable
+      <StatePressable
+        dim
         testID="arena-online-close-header"
         accessibilityRole="button"
         accessibilityLabel={`Online and close, ${n} ${n === 1 ? "athlete" : "athletes"}`}
@@ -59,7 +61,7 @@ export function OnlineCloseSection({ rows, friendIds, actionFor, onOpenProfile }
         >
           {"< 2 km"}
         </Text>
-      </Pressable>
+      </StatePressable>
       {expanded
         ? rows.map(({ row, band }) => {
             const own = actionFor(row.id);

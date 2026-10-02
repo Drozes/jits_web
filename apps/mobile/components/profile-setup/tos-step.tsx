@@ -1,8 +1,9 @@
 import * as React from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { ScrollView, Text, View } from "react-native";
+import { StatePressable } from "@/components/ui/state-pressable";
 import { TOS_TEXT } from "@jits/shared/utils";
 import { Plate } from "@/components/ui/elo-system";
-import { CtaButton, TertiaryButton } from "@/components/auth/auth-buttons";
+import { Button } from "@/components/ui/elo-system/button";
 import { cn } from "@/lib/cn";
 
 interface TosStepProps {
@@ -103,7 +104,8 @@ export function TosStep({ onAccept, onExit, submittingExternal }: TosStepProps) 
         </ScrollView>
       </Plate>
 
-      <Pressable
+      <StatePressable
+        dim
         accessibilityRole="checkbox"
         accessibilityState={{ checked: agreed }}
         onPress={() => setAgreed((v) => !v)}
@@ -124,15 +126,15 @@ export function TosStep({ onAccept, onExit, submittingExternal }: TosStepProps) 
         <Text className="font-body text-[14px] text-ink flex-1">
           I agree to the End User Agreement
         </Text>
-      </Pressable>
+      </StatePressable>
 
-      <CtaButton
+      <Button
         label={isBusy ? "Saving..." : "I Acknowledge"}
         onPress={handleContinue}
         disabled={!agreed || isBusy}
       />
       {onExit ? (
-        <TertiaryButton label="Exit" onPress={onExit} disabled={isBusy} />
+        <Button variant="ghost" height={44} label="Exit" onPress={onExit} disabled={isBusy} />
       ) : null}
     </View>
   );

@@ -14,6 +14,7 @@ import { CompetitorHeader } from "@/components/athlete/competitor-header";
 import { HeadToHeadCard } from "@/components/athlete/head-to-head-card";
 import { AppHeader } from "@/components/layout/app-header";
 import { MetaTag, ParticipantRow } from "@/components/ui/elo-system";
+import { Button } from "@/components/ui/elo-system/button";
 import { HistoryRowAction } from "@/components/profile/history-row-action";
 import { useRequireAthlete } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
@@ -129,18 +130,16 @@ export default function AthleteProfileScreen() {
         {/* No Challenge button here (jits-qwn5): challenges happen in the
             Arena, and a disabled "coming soon" CTA read as broken. */}
         <View className="gap-2">
-          <Pressable
-            accessibilityRole="button"
+          <Button
+            variant="secondary"
+            label="Compare Stats"
             onPress={() => setCompareOpen(true)}
-            className="flex-row items-center justify-center gap-2 bg-surface-3 border border-hairline-strong rounded-sm px-5 py-4 active:bg-surface-4"
-          >
-            <View pointerEvents="none">
-              <BarChart3 size={16} color={tokens.textPrimary} />
-            </View>
-            <Text className="font-heading text-[12px] text-ink uppercase tracking-caps">
-              Compare Stats
-            </Text>
-          </Pressable>
+            icon={(color) => (
+              <View pointerEvents="none">
+                <BarChart3 size={16} color={color} />
+              </View>
+            )}
+          />
         </View>
 
         <HeadToHeadCard matches={data.headToHead} />

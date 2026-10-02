@@ -43,7 +43,7 @@ export function ViewerScreen({ id, source }: { id: string | undefined; source: H
       <ViewerMessage
         testID="viewer-not-found"
         message={highlightErrorCopy(error)}
-        action={{ testID: "viewer-back", label: VIEWER_COPY.back, variant: "outline", onPress: close }}
+        action={{ testID: "viewer-back", label: VIEWER_COPY.back, variant: "secondary", onPress: close }}
       />
     );
   } else if (!detail) {

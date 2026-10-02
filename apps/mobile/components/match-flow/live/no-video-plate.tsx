@@ -1,8 +1,8 @@
 import { Text, View } from "react-native";
 import { CameraOff } from "lucide-react-native";
 import type { UnavailableVariant } from "@/lib/match-flow/live-view-state";
-import { BROADCAST, glassButtonStyle } from "./broadcast-tokens";
-import { StatePressable } from "@/components/ui/state-pressable";
+import { BROADCAST } from "./broadcast-tokens";
+import { Button } from "@/components/ui/elo-system/button";
 
 /**
  * The plate's words. Deliberately no Settings button: iOS restarts the app
@@ -82,24 +82,16 @@ export function NoVideoPlate({
         {copy.body}
       </Text>
       {variant === "canAsk" ? (
-        <StatePressable
+        <Button
           testID="live-allow-camera"
-          accessibilityRole="button"
+          variant="glass"
+          label="ALLOW CAMERA"
           accessibilityLabel="Allow camera"
-          onPress={onAllowCamera}
+          height={48}
           hitSlop={10}
-          style={({ pressed }) => ({
-            width: Math.min(180, maxWidth),
-            height: 48,
-            alignItems: "center",
-            justifyContent: "center",
-            ...glassButtonStyle(pressed),
-          })}
-        >
-          <Text className="font-heading" style={{ fontSize: 14, lineHeight: 16, letterSpacing: 1.12, color: BROADCAST.white }}>
-            ALLOW CAMERA
-          </Text>
-        </StatePressable>
+          style={{ width: Math.min(180, maxWidth) }}
+          onPress={onAllowCamera}
+        />
       ) : null}
     </View>
   );

@@ -52,11 +52,14 @@ describe("function styles survive the NativeWind Pressable interop (light theme,
     );
     const st = flat(s.getByTestId("result-record"));
     expect(st.backgroundColor).toBe(lightTokens.accentCta);
-    expect(st.height).toBe(56);
+    // WP3 review: a minimum height, so a large Dynamic Type label can grow it.
+    expect(st.minHeight).toBe(56);
     expect(st.paddingHorizontal).toBe(16);
   });
 
-  it("secondary FightButton (WATCH FILM) keeps its fill and strong hairline", () => {
+  it("secondary FightButton (WATCH FILM) keeps its plate fill and strong hairline", () => {
+    // WP3 (kit Button card, "Secondary fill"): the secondary fill is the
+    // `plate` token, not the old translucent `secondaryBg`.
     const p = paletteFor("light");
     const s = render(
       <ThemeProvider>
@@ -64,10 +67,10 @@ describe("function styles survive the NativeWind Pressable interop (light theme,
       </ThemeProvider>,
     );
     const st = flat(s.getByTestId("summary-watch-film"));
-    expect(st.backgroundColor).toBe(p.secondaryBg);
+    expect(st.backgroundColor).toBe(p.plate);
     expect(st.borderWidth).toBe(1);
     expect(st.borderColor).toBe(p.strong);
-    expect(st.height).toBe(56);
+    expect(st.minHeight).toBe(56);
   });
 
   it("ghost FightButton (the full-width SHARE row) keeps its layout", () => {
@@ -77,7 +80,7 @@ describe("function styles survive the NativeWind Pressable interop (light theme,
       </ThemeProvider>,
     );
     const st = flat(s.getByTestId("summary-share"));
-    expect(st.height).toBe(44);
+    expect(st.minHeight).toBe(44);
     expect(st.flex).toBeUndefined();
     expect(st.flexDirection).toBe("row");
   });

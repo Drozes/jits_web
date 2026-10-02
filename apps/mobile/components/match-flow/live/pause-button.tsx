@@ -1,7 +1,7 @@
 import { Text, View } from "react-native";
 import { Pause, Play } from "lucide-react-native";
 import { BROADCAST, BROADCAST_LANDSCAPE, BROADCAST_SIZE, glassButtonStyle } from "./broadcast-tokens";
-import { StatePressable } from "@/components/ui/state-pressable";
+import { PressableScale } from "@/components/ui/pressable-scale";
 
 /**
  * Glass Pause button; while paused it is the amber Resume (the next action).
@@ -19,7 +19,7 @@ export function PauseButton({
   tile?: boolean;
 }) {
   return (
-    <StatePressable
+    <PressableScale
       testID="live-pause-toggle"
       accessibilityRole="button"
       accessibilityLabel={paused ? "Resume match clock" : "Pause match clock"}
@@ -49,6 +49,6 @@ export function PauseButton({
       <Text className="font-heading" style={{ fontSize: 14, lineHeight: 16, letterSpacing: 1.12, color: BROADCAST.white }}>
         {paused ? "RESUME" : "PAUSE"}
       </Text>
-    </StatePressable>
+    </PressableScale>
   );
 }

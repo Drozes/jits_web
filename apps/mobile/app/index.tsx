@@ -1,7 +1,7 @@
 import { Redirect } from "expo-router";
 import { Text, View } from "react-native";
 import { ATHLETE_STATUS } from "@jits/shared/constants";
-import { CtaButton, TertiaryButton } from "@/components/auth/auth-buttons";
+import { Button } from "@/components/ui/elo-system/button";
 import { useAuth } from "@/lib/auth/hooks";
 import { usePendingInvite } from "@/lib/invites/use-pending-invite";
 import { inviteLaunchRoute } from "@/lib/invites/launch-route";
@@ -23,8 +23,8 @@ export default function Index() {
           <Text className="font-body text-[14px] text-ink-2 text-center">
             Can't reach ELO RATED right now. Check your connection.
           </Text>
-          <CtaButton testID="athlete-load-retry" label="Try Again" onPress={retryAthleteLoad} />
-          <TertiaryButton label="Sign Out" onPress={() => void signOut()} />
+          <Button testID="athlete-load-retry" label="Try Again" onPress={retryAthleteLoad} />
+          <Button variant="ghost" height={44} label="Sign Out" onPress={() => void signOut()} />
         </View>
       );
     }

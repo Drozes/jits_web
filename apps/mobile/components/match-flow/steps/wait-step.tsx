@@ -1,7 +1,8 @@
 import * as React from "react";
-import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Text, View } from "react-native";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { Plate } from "@/components/ui/elo-system";
+import { Button } from "@/components/ui/elo-system/button";
 
 interface WaitStepProps {
   /** Optional headline message (defaults to "Waiting..."). */
@@ -55,15 +56,7 @@ export function WaitStep({ message, allowSkip, onSkip, timeoutMs = 30_000 }: Wai
               Continue without?
             </Text>
             {onSkip ? (
-              <Pressable
-                accessibilityRole="button"
-                onPress={onSkip}
-                className="mt-2 bg-cta items-center justify-center py-3 px-5 rounded-sm active:bg-cta-hover"
-              >
-                <Text className="font-heading text-[13px] text-ink-on-cta uppercase tracking-caps">
-                  Continue
-                </Text>
-              </Pressable>
+              <Button label="Continue" height={44} className="mt-2" onPress={onSkip} />
             ) : null}
           </>
         )}

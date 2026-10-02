@@ -7,6 +7,7 @@
  */
 import * as React from "react";
 import { Pressable, Text, View } from "react-native";
+import { DISABLED_OPACITY } from "@/components/ui/elo-system/button";
 import { Plate, LivePill } from "@/components/ui/elo-system";
 
 function OutlineButton({
@@ -28,7 +29,7 @@ function OutlineButton({
       onPress={onPress}
       disabled={disabled}
       className="mt-4 min-h-[44px] items-center justify-center rounded-sm border border-hairline-strong px-5 active:bg-surface-4"
-      style={disabled ? { opacity: 0.6 } : undefined}
+      style={disabled ? { opacity: DISABLED_OPACITY } : undefined}
     >
       <Text className="font-heading text-[12px] text-ink-2 uppercase tracking-caps">
         {label}

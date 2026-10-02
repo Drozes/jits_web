@@ -1,6 +1,7 @@
 import * as React from "react";
-import { Alert, Pressable, Text, View } from "react-native";
-import { Button } from "@/components/ui/button";
+import { Alert, Text, View } from "react-native";
+import { StatePressable } from "@/components/ui/state-pressable";
+import { Button } from "@/components/ui/elo-system/button";
 import { Plate } from "@/components/ui/elo-system";
 import { toast } from "@/components/ui/toast";
 import { useAuth } from "@/lib/auth/hooks";
@@ -101,7 +102,8 @@ export function MemberRoleSection({
           {ROLE_OPTIONS.map(({ role, label }) => {
             const active = targetRole === role;
             return (
-              <Pressable
+              <StatePressable
+                dim
                 key={role}
                 onPress={() => setTargetRole(role)}
                 accessibilityRole="radio"
@@ -119,17 +121,18 @@ export function MemberRoleSection({
                 >
                   {label}
                 </Text>
-              </Pressable>
+              </StatePressable>
             );
           })}
         </View>
       </View>
       <Button
-        onPress={handleSubmit}
+        variant="secondary"
+        label={submitting ? "Saving…" : "Update Role"}
+        height={44}
         disabled={submitting || targetRole === member.platform_role}
-      >
-        {submitting ? "Saving…" : "Update Role"}
-      </Button>
+        onPress={handleSubmit}
+      />
     </Plate>
   );
 }

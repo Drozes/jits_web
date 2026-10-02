@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
+import { StatePressable } from "@/components/ui/state-pressable";
 import { Pause, Play, RotateCcw, RotateCw } from "lucide-react-native";
 import { formatClock, type KeyMoment } from "@jits/shared/utils";
 import { ON_MEDIA, TABULAR } from "@/lib/theme/palette";
@@ -92,7 +93,8 @@ export function MomentChips({ moments, currentT, onJump }: { moments: KeyMoment[
         const on = currentT === m.t;
         const label = `${formatClock(m.t)} ${m.label.toUpperCase()}${m.kind === "finish" ? " · FINISH" : ""}`;
         return (
-          <Pressable
+          <StatePressable
+            dim
             key={`${m.t}-${i}`}
             testID={`moment-chip-${i}`}
             accessibilityRole="button"
@@ -104,7 +106,7 @@ export function MomentChips({ moments, currentT, onJump }: { moments: KeyMoment[
             <Text className="font-mono-bold" style={[{ fontSize: 11, letterSpacing: 1.2, color: on ? ON_MEDIA.ink : ON_MEDIA.white }, TABULAR]}>
               {label}
             </Text>
-          </Pressable>
+          </StatePressable>
         );
       })}
     </ScrollView>

@@ -3,8 +3,8 @@ import { ActivityIndicator, Text, View } from "react-native";
 import { Redirect } from "expo-router";
 import { AppHeader } from "@/components/layout/app-header";
 import { PageContainer } from "@/components/layout/page-container";
-import { Button } from "@/components/ui/button";
 import { Plate } from "@/components/ui/elo-system";
+import { Button } from "@/components/ui/elo-system/button";
 import { useAuth, useIsAdmin } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { useAdminMetrics } from "@/lib/admin/use-admin-metrics";
@@ -36,9 +36,7 @@ export default function AdminMetricsScreen() {
             <Text className="font-body text-[13px] text-ink leading-relaxed">
               {error}
             </Text>
-            <Button variant="outline" size="sm" onPress={reload}>
-              Retry
-            </Button>
+            <Button variant="secondary" label="Retry" height={36} className="self-start" onPress={reload} />
           </Plate>
         ) : metrics ? (
           <>
@@ -64,9 +62,7 @@ export default function AdminMetricsScreen() {
                 { label: "Last 7 days", value: metrics.matches_7d },
               ]}
             />
-            <Button variant="outline" size="sm" onPress={reload}>
-              Refresh
-            </Button>
+            <Button variant="secondary" label="Refresh" height={36} className="self-start" onPress={reload} />
           </>
         ) : null}
       </PageContainer>

@@ -9,10 +9,10 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Plate, Wordmark } from "@/components/ui/elo-system";
+import { Button } from "@/components/ui/elo-system/button";
 import { toast } from "@/components/ui";
 import { AppHeader } from "@/components/layout/app-header";
 import { AuthFormField } from "@/components/auth/auth-form-field";
-import { CtaButton } from "@/components/auth/auth-buttons";
 import { AppleSignInButton } from "@/components/auth/AppleSignInButton";
 import { APPLE_SIGN_IN_ENABLED } from "@/lib/env";
 import { useAuth } from "@/lib/auth/hooks";
@@ -152,7 +152,7 @@ export default function SignupScreen() {
                   showError={touched.confirm}
                 />
                 )}
-                <CtaButton
+                <Button
                   label={submitting ? "Creating account..." : "Continue"}
                   onPress={onSubmit}
                   disabled={submitting || (allTouched && formInvalid)}
@@ -215,7 +215,7 @@ function ConfirmEmailContent({
             ? `We sent a confirmation link to ${email}. Tap it to activate your account, then sign in.`
             : `Your account for ${email} is ready. Sign in to set up your profile.`}
         </Text>
-        <CtaButton
+        <Button
           label={needsConfirmation ? "Back to Sign In" : "Sign In"}
           onPress={onBack}
         />

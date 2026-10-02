@@ -71,6 +71,11 @@ export interface ButtonProps
 }
 
 /**
+ * @deprecated Legacy shadcn button on the legacy token layer, kept only for
+ * the update banner until WP4 (jits-3eeg.5) restyles it and deletes this
+ * file. New code uses the ELO `Button` from `@/components/ui/elo-system`
+ * (guarded by `__tests__/components/ui/one-button-guard.test.ts`).
+ *
  * Every Button gets the Motion Rule's press scale (0.97, spring back; an
  * opacity dip under Reduce Motion). Disabled buttons do not scale or buzz.
  */

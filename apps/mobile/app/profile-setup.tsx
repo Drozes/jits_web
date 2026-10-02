@@ -7,7 +7,7 @@ import {
   View,
 } from "react-native";
 import { Wordmark } from "@/components/ui/elo-system";
-import { CtaButton } from "@/components/auth/auth-buttons";
+import { Button } from "@/components/ui/elo-system/button";
 import { AppHeader } from "@/components/layout/app-header";
 import { SetupWizard } from "@/components/profile-setup/setup-wizard";
 import { useRequireAuth } from "@/lib/auth/hooks";
@@ -61,7 +61,7 @@ export default function ProfileSetupScreen() {
               <Text className="font-body text-[14px] text-negative text-center">
                 {error}
               </Text>
-              <CtaButton label="Try Again" onPress={() => reload()} />
+              <Button label="Try Again" onPress={() => reload()} />
             </View>
           )}
 

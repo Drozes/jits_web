@@ -63,8 +63,9 @@ export const BROADCAST_LANDSCAPE = {
 } as const;
 
 /**
- * The glass button look shared by Pause and Allow camera: 1 px white-40
- * border, white-12 fill (white-20 pressed), a 0.98 press-in.
+ * The glass button look of Pause (and the `glass` Button, Allow camera):
+ * 1 px white-40 border, white-12 fill (white-20 pressed). The press-in is
+ * `PressableScale`'s registered press scale (0.97), not part of this style.
  */
 export function glassButtonStyle(pressed: boolean) {
   return {
@@ -72,7 +73,6 @@ export function glassButtonStyle(pressed: boolean) {
     borderWidth: 1,
     borderColor: BROADCAST.glassBorder,
     backgroundColor: pressed ? BROADCAST.glassFillPressed : BROADCAST.glassFill,
-    transform: [{ scale: pressed ? 0.98 : 1 }],
   };
 }
 

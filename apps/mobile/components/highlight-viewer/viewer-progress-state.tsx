@@ -53,7 +53,7 @@ export function ViewerNoPlayback({
       <ViewerMessage
         testID="viewer-progress-error"
         message={VIEWER_COPY.cannotPlay}
-        action={{ testID: "viewer-progress-retry", label: SHARE_COPY.tryAgain, variant: "outline", onPress: onRetry }}
+        action={{ testID: "viewer-progress-retry", label: SHARE_COPY.tryAgain, variant: "secondary", onPress: onRetry }}
       />
     );
   }

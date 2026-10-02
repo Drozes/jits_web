@@ -9,8 +9,8 @@ import { useLocalSearchParams, useNavigation, useRouter, type Href } from "expo-
 import type { InviteEntryPoint } from "@jits/shared/api/invites";
 import { BOOKED_COPY, BOOKING_CLOSED_COPY, LOCATION_DENIED_COPY, START_AVAILABLE_COPY } from "@jits/shared/utils";
 import { AppHeader } from "@/components/layout/app-header";
-import { CtaButton, SecondaryButton, TertiaryButton } from "@/components/auth/auth-buttons";
 import { Plate } from "@/components/ui/elo-system";
+import { Button } from "@/components/ui/elo-system/button";
 import { InviteQr } from "@/components/invite/invite-qr";
 import { InviteShareRow } from "@/components/invite/share-row";
 import { OpenChallenges } from "@/components/invite/open-challenges";
@@ -102,7 +102,7 @@ export default function InviteScreen() {
                 onWithdrawn={() => void retry()}
               />
             ) : null}
-            <SecondaryButton label="Try again" onPress={() => void retry()} />
+            <Button variant="secondary" label="Try again" onPress={() => void retry()} />
           </Plate>
         ) : null}
 
@@ -141,14 +141,14 @@ export default function InviteScreen() {
             {locationDenied ? (
               <View className="gap-2">
                 <Text className="font-body text-[13px] text-ink-2 leading-5">{LOCATION_DENIED_COPY}</Text>
-                <SecondaryButton label="Open Settings" onPress={() => void Linking.openSettings()} />
+                <Button variant="secondary" label="Open Settings" onPress={() => void Linking.openSettings()} />
               </View>
             ) : null}
             <InviteShareRow
               invite={{ inviteId: invite.invite_id, kind: "challenge", url: invite.url, codeDisplay: invite.short_code_display }}
               onShared={keepOpen}
             />
-            {phase.kind === "open" ? <TertiaryButton label="Withdraw challenge" onPress={confirmRevoke} /> : null}
+            {phase.kind === "open" ? <Button variant="ghost" height={44} label="Withdraw challenge" onPress={confirmRevoke} /> : null}
             {phase.kind === "open" ? (
               <OpenChallenges
                 key={openListKey}
@@ -176,13 +176,14 @@ export default function InviteScreen() {
             ) : null}
             {showStart ? (
               // Secondary: red stays the one CTA on this plate.
-              <SecondaryButton
+              <Button
+                variant="secondary"
                 label={phase.starting ? "Starting..." : "Start match"}
                 disabled={Boolean(phase.starting)}
                 onPress={() => void start()}
               />
             ) : null}
-            <CtaButton label="Go to the Arena" onPress={() => router.replace(`${ARENA_HREF}?booking=${phase.challengeId}` as Href)} />
+            <Button label="Go to the Arena" onPress={() => router.replace(`${ARENA_HREF}?booking=${phase.challengeId}` as Href)} />
           </Plate>
         ) : null}
 
@@ -191,7 +192,7 @@ export default function InviteScreen() {
             <Text accessibilityRole="alert" className="font-body text-[14px] text-ink leading-6">
               {BOOKING_CLOSED_COPY}
             </Text>
-            <CtaButton label="Go to the Arena" onPress={() => router.replace(ARENA_HREF as Href)} />
+            <Button label="Go to the Arena" onPress={() => router.replace(ARENA_HREF as Href)} />
           </Plate>
         ) : null}
 
@@ -201,7 +202,7 @@ export default function InviteScreen() {
             <Text className="font-body text-[14px] text-ink leading-6">
               Finish your current match, then start this one.
             </Text>
-            <CtaButton label="Go to the match" onPress={() => router.replace(arenaMatchHref(phase.matchId) as Href)} />
+            <Button label="Go to the match" onPress={() => router.replace(arenaMatchHref(phase.matchId) as Href)} />
           </Plate>
         ) : null}
 
@@ -210,7 +211,7 @@ export default function InviteScreen() {
             <Text className="font-body text-[14px] text-ink leading-6">
               {phase.kind === "revoked" ? "Challenge withdrawn." : "This challenge expired."}
             </Text>
-            <CtaButton label="New challenge" onPress={() => void retry()} />
+            <Button label="New challenge" onPress={() => void retry()} />
           </Plate>
         ) : null}
       </ScrollView>

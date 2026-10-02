@@ -39,7 +39,7 @@ export function HighlightFailed({ errorMessage, canRetry, busy, onRetry }: Faile
           onPress={onRetry}
           className={cn(
             "items-center justify-center rounded-sm px-5 py-3 border border-hairline-strong active:bg-surface-4",
-            busy && "opacity-60",
+            busy && "opacity-50",
           )}
         >
           <Text className="font-heading text-[12px] uppercase tracking-caps text-ink">

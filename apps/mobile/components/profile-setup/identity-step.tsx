@@ -1,6 +1,7 @@
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
+import { StatePressable } from "@/components/ui/state-pressable";
 import { Plate } from "@/components/ui/elo-system";
-import { CtaButton } from "@/components/auth/auth-buttons";
+import { Button } from "@/components/ui/elo-system/button";
 import { isIdentityComplete, isValidWeight } from "@/lib/profile-setup/validation";
 import { cn } from "@/lib/cn";
 import type { WizardValues } from "./types";
@@ -86,7 +87,7 @@ export function IdentityStep({ values, onChange, onNext }: IdentityStepProps) {
         testID="setup-instagram"
       />
 
-      <CtaButton label="Continue" onPress={onNext} disabled={!canContinue} />
+      <Button label="Continue" onPress={onNext} disabled={!canContinue} />
     </Plate>
   );
 }
@@ -101,7 +102,8 @@ function GenderChip({
   onPress: () => void;
 }) {
   return (
-    <Pressable
+    <StatePressable
+      dim
       accessibilityRole="radio"
       accessibilityState={{ selected: active }}
       onPress={onPress}
@@ -120,6 +122,6 @@ function GenderChip({
       >
         {label}
       </Text>
-    </Pressable>
+    </StatePressable>
   );
 }

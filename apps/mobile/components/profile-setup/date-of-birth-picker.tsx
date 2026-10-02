@@ -1,5 +1,7 @@
 import * as React from "react";
 import { Modal, Platform, Pressable, Text, View } from "react-native";
+import { StatePressable } from "@/components/ui/state-pressable";
+import { PressableScale } from "@/components/ui/pressable-scale";
 import DateTimePicker, {
   DateTimePickerAndroid,
   type DateTimePickerEvent,
@@ -116,7 +118,7 @@ export function DateOfBirthPicker({ value, onChange }: DateOfBirthPickerProps) {
 
   return (
     <EloField label="Date of Birth" helper={helper} error={errorMsg}>
-      <Pressable onPress={open} accessibilityRole="button">
+      <StatePressable dim onPress={open} accessibilityRole="button">
         <View className="bg-surface-3 border border-hairline-strong rounded-xs h-12 px-4 flex-row items-center">
           <Text
             className={`text-[14px] font-body flex-1 ${formatted ? "text-ink" : "text-ink-3"}`}
@@ -125,7 +127,7 @@ export function DateOfBirthPicker({ value, onChange }: DateOfBirthPickerProps) {
             {formatted ?? "Select your date of birth"}
           </Text>
         </View>
-      </Pressable>
+      </StatePressable>
 
       {Platform.OS === "ios" && (
         <Modal
@@ -168,11 +170,11 @@ export function DateOfBirthPicker({ value, onChange }: DateOfBirthPickerProps) {
                   paddingVertical: 8,
                 }}
               >
-                <Pressable onPress={confirmIos} hitSlop={8} accessibilityRole="button">
+                <PressableScale onPress={confirmIos} hitSlop={8} accessibilityRole="button">
                   <Text className="font-heading text-[14px] text-cta uppercase tracking-caps-l">
                     Done
                   </Text>
-                </Pressable>
+                </PressableScale>
               </View>
               <DateTimePicker
                 value={draft}

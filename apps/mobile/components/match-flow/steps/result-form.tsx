@@ -1,5 +1,6 @@
 import * as React from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { Text, TextInput, View } from "react-native";
+import { PressableScale } from "@/components/ui/pressable-scale";
 import { Check, Handshake, Pencil } from "lucide-react-native";
 import { SearchSelect, type SearchSelectOption } from "@/components/ui/search-select";
 import { OTHER_SUBMISSION_CODE, filterSubmissionTypes } from "@/lib/match-flow/filter-submissions";
@@ -130,11 +131,11 @@ export function WinnerChip({ winner, onChange }: { winner: ResultAthlete; onChan
 export function ChangeButton({ onPress, testID = "result-change" }: { onPress: () => void; testID?: string }) {
   const p = usePalette();
   return (
-    <Pressable testID={testID} accessibilityRole="button" accessibilityLabel="Change" onPress={onPress} style={{ height: 44, paddingHorizontal: 12, justifyContent: "center" }}>
+    <PressableScale testID={testID} accessibilityRole="button" accessibilityLabel="Change" onPress={onPress} style={{ height: 44, paddingHorizontal: 12, justifyContent: "center" }}>
       <Text className="font-heading uppercase" style={{ fontSize: 13, letterSpacing: 0.8, color: p.red }}>
         Change
       </Text>
-    </Pressable>
+    </PressableScale>
   );
 }
 
@@ -164,7 +165,8 @@ export function SubmissionGrid({
         {common.map((t) => {
           const selected = t.code === value;
           return (
-            <Pressable
+            <StatePressable
+              dim
               key={t.code}
               testID={`result-submission-${t.code}`}
               accessibilityRole="button"
@@ -187,7 +189,7 @@ export function SubmissionGrid({
                 {t.display_name}
               </Text>
               {selected ? <Check size={16} color={p.red} /> : null}
-            </Pressable>
+            </StatePressable>
           );
         })}
       </View>
@@ -255,14 +257,14 @@ export function FinishTimeField({
             </Mono>
           ) : null}
         </View>
-        <Pressable
+        <PressableScale
           accessibilityRole="button"
           accessibilityLabel="Edit finish time"
           onPress={() => inputRef.current?.focus()}
           style={{ width: 44, height: 44, alignItems: "center", justifyContent: "center" }}
         >
           <Pencil size={16} color={p.text2} />
-        </Pressable>
+        </PressableScale>
       </View>
     </View>
   );

@@ -41,7 +41,7 @@ export function ViewerFrame({ source, playbackFailed, onPlayerError, onRetry }: 
         <ViewerMessage
           testID="viewer-cannot-play"
           message={VIEWER_COPY.cannotPlay}
-          action={{ testID: "viewer-play-retry", label: SHARE_COPY.tryAgain, variant: "outline", onPress: onRetry }}
+          action={{ testID: "viewer-play-retry", label: SHARE_COPY.tryAgain, variant: "secondary", onPress: onRetry }}
         />
       ) : !frame ? null : source ? (
         <HighlightPlayer source={source} onError={onPlayerError} frameStyle={frame} showFullscreenButton={false} />

@@ -10,14 +10,10 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Wordmark, Plate } from "@/components/ui/elo-system";
+import { Button } from "@/components/ui/elo-system/button";
 import { toast } from "@/components/ui";
 import { AuthFormField } from "@/components/auth/auth-form-field";
 import { AppVersionLabel } from "@/components/layout/app-version-label";
-import {
-  CtaButton,
-  SecondaryButton,
-  TertiaryButton,
-} from "@/components/auth/auth-buttons";
 import { useAuth } from "@/lib/auth/hooks";
 import { AppleSignInButton } from "@/components/auth/AppleSignInButton";
 import { APPLE_SIGN_IN_ENABLED } from "@/lib/env";
@@ -125,13 +121,14 @@ export default function LoginScreen() {
               error={passwordError}
               showError={touched.password}
             />
-            <CtaButton
+            <Button
               testID="login-submit"
               label={submitting ? "Signing in..." : "Sign In"}
               onPress={onSubmit}
               disabled={submitting || (allTouched && formInvalid)}
             />
-            <SecondaryButton
+            <Button
+              variant="secondary"
               label={
                 googleSubmitting ? "Opening Google..." : "Continue with Google"
               }
@@ -153,11 +150,15 @@ export default function LoginScreen() {
                 <Text className="text-cta">Register</Text>
               </Text>
             </Pressable>
-            <TertiaryButton
+            <Button
+              variant="ghost"
+              height={44}
               label="Forgot password?"
               onPress={() => router.push("/forgot-password")}
             />
-            <TertiaryButton
+            <Button
+              variant="ghost"
+              height={44}
               label="Got a challenge code?"
               onPress={() => router.push("/invite-code")}
             />

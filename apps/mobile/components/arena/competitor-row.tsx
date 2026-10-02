@@ -9,7 +9,9 @@
  * working control, not a label.
  */
 import * as React from "react";
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
+import { DISABLED_OPACITY } from "@/components/ui/elo-system/button";
+import { StatePressable } from "@/components/ui/state-pressable";
 import { haptics } from "@/lib/motion";
 import { PressableScale } from "@/components/ui/pressable-scale";
 import { Plate, Avatar32, LivePill, MetaTag } from "@/components/ui/elo-system";
@@ -96,14 +98,15 @@ export function CompetitorRow({
     <Plate variant={inLobby ? "live" : "default"} className="px-4 py-3">
       <View className="flex-row items-center gap-3">
         {onOpenProfile ? (
-          <Pressable
+          <StatePressable
+            dim
             accessibilityRole="button"
             accessibilityLabel={`${displayName}, ELO ${rating}`}
             onPress={onOpenProfile}
             className="flex-1 flex-row items-center gap-3"
           >
             {identity}
-          </Pressable>
+          </StatePressable>
         ) : (
           <View className="flex-1 flex-row items-center gap-3">{identity}</View>
         )}
@@ -122,7 +125,7 @@ export function CompetitorRow({
               }}
               disabled={disabled}
               className="min-h-[44px] justify-center rounded-sm border border-hairline-strong px-3 active:bg-surface-4"
-              style={disabled ? { opacity: 0.5 } : undefined}
+              style={disabled ? { opacity: DISABLED_OPACITY } : undefined}
             >
               <Text className="font-heading text-[11px] text-ink uppercase tracking-caps">
                 Challenge
@@ -138,7 +141,7 @@ export function CompetitorRow({
               onPress={onGoLive}
               disabled={disabled}
               className="min-h-[44px] justify-center rounded-sm border border-cta px-3 active:bg-surface-4"
-              style={disabled ? { opacity: 0.5 } : undefined}
+              style={disabled ? { opacity: DISABLED_OPACITY } : undefined}
             >
               <Text className="font-heading text-[11px] text-cta uppercase tracking-caps">
                 Go live

@@ -4,6 +4,8 @@ import { useRouter } from "expo-router";
 import { Clapperboard, X } from "lucide-react-native";
 import { logHighlightEvent } from "@/lib/highlight/highlight-event";
 import { MetaTag, Plate } from "@/components/ui/elo-system";
+import { Button } from "@/components/ui/elo-system/button";
+import { PressableScale } from "@/components/ui/pressable-scale";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { DISCOVERY_COPY, highlightHref } from "@/lib/highlight/discovery";
 import type { NewHighlight } from "@/lib/highlight/use-new-highlight";
@@ -34,7 +36,7 @@ export function NewHighlightCard({
 
   return (
     <Plate testID="new-highlight-card" className="flex-row gap-3">
-      <Pressable
+      <PressableScale
         testID="new-highlight-poster"
         onPress={open}
         accessibilityRole="button"
@@ -48,7 +50,7 @@ export function NewHighlightCard({
             <Clapperboard size={18} color={tokens.textTertiary} />
           </View>
         )}
-      </Pressable>
+      </PressableScale>
       <View className="flex-1 min-w-0 gap-2">
         <View className="flex-row items-start justify-between gap-2">
           <MetaTag>{DISCOVERY_COPY.homeMetaTag}</MetaTag>
@@ -72,16 +74,14 @@ export function NewHighlightCard({
           {opponent ? `vs ${opponent} · ` : ""}
           <Text className="font-mono tabular-nums">{seconds}s</Text>
         </Text>
-        <Pressable
+        <Button
           testID="new-highlight-watch"
+          variant="secondary"
+          label={DISCOVERY_COPY.watch}
+          height={36}
+          className="self-start"
           onPress={open}
-          accessibilityRole="button"
-          className="self-start border border-hairline-strong rounded-sm bg-surface-3 py-2 px-4 active:bg-surface-4"
-        >
-          <Text className="font-heading text-[12px] text-ink uppercase tracking-caps">
-            {DISCOVERY_COPY.watch}
-          </Text>
-        </Pressable>
+        />
       </View>
     </Plate>
   );

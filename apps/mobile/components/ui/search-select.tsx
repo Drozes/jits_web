@@ -1,5 +1,6 @@
 import * as React from "react";
 import { FlatList, Modal, Pressable, Text, TextInput, View } from "react-native";
+import { PressableScale } from "@/components/ui/pressable-scale";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { X } from "lucide-react-native";
 import { cn } from "@/lib/cn";
@@ -216,7 +217,7 @@ export function SearchSelect({
               <Text className="font-heading text-[12px] text-ink uppercase tracking-caps-l">
                 {title}
               </Text>
-              <Pressable
+              <PressableScale
                 testID={tid("close")}
                 onPress={close}
                 accessibilityLabel="Close"
@@ -226,7 +227,7 @@ export function SearchSelect({
                 <Text className="font-heading text-[14px] text-cta uppercase tracking-caps-l">
                   Done
                 </Text>
-              </Pressable>
+              </PressableScale>
             </View>
             <View className="justify-center">
               <TextInput

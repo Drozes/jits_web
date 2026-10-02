@@ -1,4 +1,5 @@
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
+import { PressableScale } from "@/components/ui/pressable-scale";
 import { RefreshCw, X } from "lucide-react-native";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 
@@ -27,7 +28,7 @@ export function UpdateBannerHeader({
       >
         Update ready
       </Text>
-      <Pressable
+      <PressableScale
         testID="update-banner-dismiss"
         onPress={onDismiss}
         hitSlop={8}
@@ -36,7 +37,7 @@ export function UpdateBannerHeader({
         className="h-[44px] w-[44px] items-center justify-center -my-[13px] -mr-[13px]"
       >
         <X size={18} color={tokens.background} />
-      </Pressable>
+      </PressableScale>
     </View>
   );
 }

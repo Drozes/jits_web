@@ -48,7 +48,7 @@ export function HighlightFormActions({ form, progress }: Props) {
         onPress={form.send}
         className={cn(
           "min-h-[44px] items-center justify-center rounded-sm border border-hairline-strong px-5",
-          sendDisabled ? "opacity-60" : "active:bg-surface-4",
+          sendDisabled ? "opacity-50" : "active:bg-surface-4",
         )}
       >
         <Text className="font-heading text-[12px] uppercase tracking-caps text-ink">{HIGHLIGHT_COPY.justSend}</Text>

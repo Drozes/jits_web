@@ -15,8 +15,8 @@ import {
 } from "@jits/shared/api/invites";
 import { createInviteErrorMessage } from "@jits/shared/utils";
 import { AppHeader } from "@/components/layout/app-header";
-import { CtaButton, SecondaryButton } from "@/components/auth/auth-buttons";
 import { Plate } from "@/components/ui/elo-system";
+import { Button } from "@/components/ui/elo-system/button";
 import { InviteQr } from "@/components/invite/invite-qr";
 import { InviteShareRow } from "@/components/invite/share-row";
 import { supabase } from "@/lib/supabase/client";
@@ -56,7 +56,7 @@ export default function JoinInviteScreen() {
             <Text accessibilityRole="alert" className="font-body text-[14px] text-ink leading-6">
               {error}
             </Text>
-            <SecondaryButton label="Try again" onPress={() => void load()} />
+            <Button variant="secondary" label="Try again" onPress={() => void load()} />
           </Plate>
         ) : !invite ? (
           <View className="items-center py-16">
@@ -79,7 +79,7 @@ export default function JoinInviteScreen() {
               </Text>
             ) : null}
             <InviteShareRow invite={{ inviteId: invite.invite_id, kind: "join", url: invite.url }} />
-            <CtaButton label="Challenge a friend" onPress={() => router.push("/invite?from=profile" as Href)} />
+            <Button label="Challenge a friend" onPress={() => router.push("/invite?from=profile" as Href)} />
           </>
         )}
       </ScrollView>

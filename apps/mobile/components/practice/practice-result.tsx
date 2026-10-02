@@ -1,6 +1,7 @@
 import * as React from "react";
 import { Text, View } from "react-native";
 import { Plate } from "@/components/ui/elo-system";
+import { Button } from "@/components/ui/elo-system/button";
 import { OutcomeToggle, WinnerPicker } from "@/components/match-flow/steps/result-step-fields";
 import { SubmissionFields } from "@/components/match-flow/steps/submission-fields";
 import { isFinishTimeValid, parseFinishTime } from "@/lib/match-flow/parse-finish-time";
@@ -12,7 +13,6 @@ import {
   PRACTICE_BOT_NAME,
   PRACTICE_DURATION_SECONDS,
 } from "@/lib/practice/constants";
-import { PracticeButton } from "./practice-steps";
 
 /**
  * Record the practice result with the real result leaves and the real
@@ -114,7 +114,8 @@ export function PracticeResult({
           </Text>
         </Plate>
       ) : null}
-      <PracticeButton
+      <Button
+        height={44}
         testID="result-record"
         label="Record Result"
         onPress={submit}

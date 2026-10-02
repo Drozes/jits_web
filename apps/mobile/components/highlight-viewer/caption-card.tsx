@@ -1,7 +1,7 @@
 import * as React from "react";
 import { Text, View } from "react-native";
 import { SHARE_COPY } from "@/lib/highlight-share";
-import { ViewerButton } from "./viewer-button";
+import { Button } from "@/components/ui/elo-system/button";
 
 interface CaptionCardProps {
   caption: string;
@@ -36,7 +36,7 @@ export function CaptionCard({ caption, clipboard, showCopyButton, onCopy }: Capt
       </View>
       {clipboard ? (
         showCopyButton ? (
-          <ViewerButton testID="share-copy-caption" label={SHARE_COPY.copyCaption} variant="outline" onPress={onCopy} />
+          <Button height={44} testID="share-copy-caption" label={SHARE_COPY.copyCaption} variant="secondary" onPress={onCopy} />
         ) : null
       ) : (
         <Text testID="share-press-hold" className="font-body text-[12px] text-ink-3">
