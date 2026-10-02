@@ -21,7 +21,9 @@
  * without dimming it.
  *
  * Layout: `className` is for placement only (`w-full`, `flex-1`, margins,
- * `self-center`); the look is the variant, the size is `height`.
+ * `self-center`); the look is the variant, the size is `height` (a minimum:
+ * the button grows when a large Dynamic Type label wraps; the label scale is
+ * capped at `BUTTON_MAX_FONT_SCALE`).
  */
 import * as React from "react";
 import { ActivityIndicator, Text, View, type Insets, type StyleProp, type ViewStyle } from "react-native";
@@ -41,6 +43,17 @@ export const DISABLED_OPACITY = 0.5;
 export const BUTTON_RADIUS = 3;
 /** Default height (kit `size-button`). */
 export const BUTTON_HEIGHT = 56;
+/**
+ * Dynamic Type cap on the label: it still grows for large accessibility
+ * sizes (the button grows with it, `height` is a minimum) but stops short of
+ * the largest steps, where a caps label would wrap into several lines.
+ */
+export const BUTTON_MAX_FONT_SCALE = 1.6;
+
+/** Vertical padding that keeps the default size at `height` and lets a wrapped label grow it. */
+export function buttonPaddingVertical(height: number): number {
+  return Math.max(0, Math.min(8, (height - 20) / 2));
+}
 
 export interface ButtonProps {
   /** The visible label and the default accessible name. */
@@ -59,7 +72,11 @@ export interface ButtonProps {
   /** Defaults to `label`. */
   accessibilityLabel?: string;
   accessibilityHint?: string;
-  /** Height, default 56 (real sizes: 44, 56, 64, 72). */
+  /**
+   * Minimum height, default 56 (real sizes: 28 to 72). The button is exactly
+   * this tall at normal text sizes and grows when a large Dynamic Type label
+   * wraps.
+   */
   height?: number;
   /** Drawn left of the label in the label color. */
   icon?: (color: string) => React.ReactNode;
@@ -170,7 +187,8 @@ export function Button({
       className={cn(VARIANT_CLASS[variant], className)}
       style={({ pressed }) => [
         {
-          height,
+          minHeight: height,
+          paddingVertical: buttonPaddingVertical(height),
           flexDirection: "row",
           alignItems: "center",
           justifyContent: trailing ? "space-between" : "center",
@@ -186,15 +204,16 @@ export function Button({
         style,
       ]}
     >
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 10, flexShrink: 1 }}>
         {busy ? (
           <ActivityIndicator testID={testID ? `${testID}-spinner` : undefined} size="small" color={look.fg} />
         ) : icon ? (
           icon(look.fg)
         ) : null}
         <Text
+          maxFontSizeMultiplier={BUTTON_MAX_FONT_SCALE}
           className="font-heading uppercase"
-          style={{ fontSize: ghost ? 13 : 14, letterSpacing: 1.12, color: look.fg }}
+          style={{ fontSize: ghost ? 13 : 14, letterSpacing: 1.12, color: look.fg, flexShrink: 1, textAlign: "center" }}
         >
           {labelContent ?? label}
         </Text>

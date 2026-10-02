@@ -8,12 +8,13 @@ Button is the one brand button of the kit (work package WP3): Signal Red primary
 
 | Prop | Values | Notes |
 |---|---|---|
-| `label` | string | DM Sans Bold, uppercase, 14px (ghost 13px), tracking 1.12px. |
+| `label` | string | DM Sans Bold, uppercase, 14px (ghost 13px), tracking 1.12px. Dynamic Type scales it up to `BUTTON_MAX_FONT_SCALE` (1.6); a wrapped label grows the button, since `height` is a minimum. |
 | `labelContent` | node | Drawn inside the label in place of `label` (for example mono digits, "Regenerate (3 left)"); `label` stays the accessible name. |
 | `accessibilityLabel` | string | Defaults to `label`. |
 | `className`, `style` | | Placement only (`w-full`, `flex-1`, margins, `self-center`); `style` is applied last (for example `paddingHorizontal: 0` on an inline ghost link). |
+| `hitSlop` | number or insets | Defaults to 8 on `ghost` and on any button shorter than 44, so the touch target stays 44pt. |
 | `variant` | `primary` (default), `secondary`, `ghost`, `destructive`, `glass` | `glass` is the on-media look over camera or film (fixed in both themes: white 12% fill, white 40% hairline, white 20% pressed); it is not drawn here. |
-| `height` | number, default 56 | Real call sites use 44, 56, 64 and 72. |
+| `height` | number, default 56 | A minimum height (`minHeight` plus up to 8px vertical padding): exactly this tall at normal text sizes, taller when a large label wraps. Real call sites use 28 to 72. |
 | `icon` | `(color) => node` | Drawn left of the label in the label color, 10px gap. |
 | `trailing` | node | Right-aligned mono note (for example "PROCESSING"); the row becomes space-between. |
 | `busy` | boolean | Spinner replaces the icon, the button is inert, `accessibilityState.busy`. |
@@ -31,6 +32,8 @@ Button is the one brand button of the kit (work package WP3): Signal Red primary
 Disabled text below 4.5:1 is the WCAG inactive-control exception; never use 0.5 opacity for an enabled control.
 
 **Destructive is an outline in `negative`** (decided 2026-10-02). The retired `DestructiveButton` (one use, Delete account) filled with the legacy `bg-destructive` red under a #E8EDF2 label at 3.54:1, which also read as a second red CTA. The outline is AA in both themes: 6.28:1 on `void` dark, 6.37:1 light; 5.22:1 and 5.13:1 on `plate`.
+
+**Ghost padding.** Ghost buttons use 8px side padding (the other variants 16px) and a default `hitSlop` of 8, so a text action sits close to its neighbours without shrinking its touch target. The retired `TertiaryButton` used 20px.
 
 **Secondary fill.** `FightButton` secondary used `usePalette().secondaryBg` (white 8% dark, Void 5% light), which is not a kit token; the shipped Button uses `plate` with `hairline-strong` for every secondary, as the auth `SecondaryButton` did.
 

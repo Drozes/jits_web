@@ -23,7 +23,14 @@ jest.mock("nativewind", () => ({
   useColorScheme: () => ({ colorScheme: "light", setColorScheme: jest.fn() }),
 }));
 
-import { Button, BUTTON_HEIGHT, BUTTON_RADIUS, DISABLED_OPACITY } from "@/components/ui/elo-system/button";
+import {
+  Button,
+  BUTTON_HEIGHT,
+  BUTTON_MAX_FONT_SCALE,
+  BUTTON_RADIUS,
+  DISABLED_OPACITY,
+  buttonPaddingVertical,
+} from "@/components/ui/elo-system/button";
 import { REDUCED_PRESS_OPACITY } from "@/components/ui/pressable-scale";
 import { PRESSED_OPACITY } from "@/components/ui/state-pressable";
 import { BROADCAST } from "@/components/match-flow/live/broadcast-tokens";
@@ -59,7 +66,7 @@ describe("Button variants", () => {
     const s = render(<Button testID="b" label="Sign in" onPress={jest.fn()} />);
     const st = flat(s.getByTestId("b"));
     expect(st.backgroundColor).toBe(t.accentCta);
-    expect(st.height).toBe(BUTTON_HEIGHT);
+    expect(st.minHeight).toBe(BUTTON_HEIGHT);
     expect(st.borderRadius).toBe(BUTTON_RADIUS);
     expect(String(s.getByTestId("b").props.className)).toMatch(/(^|\s)bg-cta(\s|$)/);
     expect(labelColor(s.getByText("Sign in"))).toBe(t.textOnAccent);
@@ -117,6 +124,35 @@ describe("Button variants", () => {
     expect(labelColor(s.getByText("Allow camera"))).toBe(ON_MEDIA.white);
     fireEvent(s.getByTestId("b"), "pressIn", {});
     expect(flat(s.getByTestId("b")).backgroundColor).toBe(BROADCAST.glassFillPressed);
+  });
+});
+
+describe("Button and Dynamic Type", () => {
+  it("height is a minimum, so a large-text label that wraps grows the button instead of clipping", () => {
+    const s = render(<Button testID="b" label="I Acknowledge" onPress={jest.fn()} />);
+    const st = flat(s.getByTestId("b"));
+    expect(st.height).toBeUndefined();
+    expect(st.minHeight).toBe(BUTTON_HEIGHT);
+    expect(st.paddingVertical).toBe(8);
+    const label = s.getByText("I Acknowledge");
+    expect(label.props.maxFontSizeMultiplier).toBe(BUTTON_MAX_FONT_SCALE);
+    expect((StyleSheet.flatten(label.props.style) as { flexShrink?: number }).flexShrink).toBe(1);
+  });
+
+  it("caps the label scale near 1.6 (it still grows, short of the largest steps)", () => {
+    expect(BUTTON_MAX_FONT_SCALE).toBeGreaterThan(1.3);
+    expect(BUTTON_MAX_FONT_SCALE).toBeLessThanOrEqual(1.6);
+  });
+
+  it("keeps the normal-size height: the padding never exceeds what a one-line label leaves", () => {
+    // A 14px caps label lays out about 18 to 20pt tall.
+    for (const h of [28, 32, 36, 44, 48, 56, 64, 72]) {
+      const pad = buttonPaddingVertical(h);
+      expect(pad).toBeGreaterThanOrEqual(0);
+      expect(pad * 2 + 20).toBeLessThanOrEqual(h);
+    }
+    expect(buttonPaddingVertical(56)).toBe(8);
+    expect(buttonPaddingVertical(28)).toBe(4);
   });
 });
 

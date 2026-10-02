@@ -88,9 +88,36 @@ describe("one Button (WP3)", () => {
     expect(body).not.toMatch(/transform|scale/);
   });
 
-  it("one disabled style: no 60% disabled dims left (DISABLED_OPACITY is 0.5)", () => {
-    const sixty = /(^|["'\s])opacity-60(["'\s]|$)|(disabled|isSaving|busy)\s*\?\s*\{\s*opacity:\s*0\.6\s*\}/m;
-    const offenders = FILES.filter((f) => sixty.test(f.text)).map((f) => f.file);
+  it("one disabled style: no 0.6 dim anywhere outside the reviewed exceptions (DISABLED_OPACITY is 0.5)", () => {
+    // Any 0.6 opacity: an `opacity: 0.6` style (whatever its condition) or an
+    // `opacity-60` class, `active:` included.
+    const sixty = /opacity:\s*0\.6\b|(^|[\s"'`:])opacity-60\b/g;
+    // Reviewed exceptions, each with its count in that file and the reason.
+    const ALLOWED: Record<string, { count: number; reason: string }> = {
+      "components/arena/challenge-prompt-sheet.tsx": {
+        count: 3,
+        reason: "Adding Flare: the busy dims of Accept / Decline / Later are part of the shipped accept sweep",
+      },
+      "components/arena/mat-board.tsx": {
+        count: 1,
+        reason: "the locked (not disabled) Go live / offline toggle, a separate state from disabled",
+      },
+      "components/match-flow/faceoff/faceoff-top.tsx": {
+        count: 1,
+        reason: "the face-off Cancel match control: its pressed dip and its in-flight cancelling dip (harness label, unchanged)",
+      },
+    };
+    const offenders: string[] = [];
+    for (const f of FILES) {
+      const n = (f.text.match(sixty) ?? []).length;
+      if (n === 0) continue;
+      const allowed = ALLOWED[f.file];
+      if (!allowed || n !== allowed.count) offenders.push(`${f.file} (${n})`);
+    }
     expect(offenders).toEqual([]);
+    for (const [file, { reason }] of Object.entries(ALLOWED)) {
+      expect(reason.length).toBeGreaterThan(0);
+      expect(fs.existsSync(path.join(ROOT, file))).toBe(true);
+    }
   });
 });
