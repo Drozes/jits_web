@@ -18,6 +18,7 @@
  *  - `"ignored"`: the switch was locked or busy and nothing was attempted,
  *    so stay silent.
  */
+import { LOCATION_OFF_GO_LIVE_CTA_COPY } from "@jits/shared/utils";
 import { toast } from "@/components/ui/toast";
 import { arenaActions } from "./arena-store";
 import { GO_OFFLINE_FAILED_MESSAGE } from "./constants";
@@ -56,4 +57,26 @@ export function goOfflineWithFeedback(): Promise<void> {
       toast.info(GO_OFFLINE_FAILED_MESSAGE);
     },
   );
+}
+
+/** How long the tap-to-go-live CTA stays up (longer than a plain toast: it is an action). */
+export const LOCATION_OFF_CTA_VISIBLE_MS = 8_000;
+
+/**
+ * A live restore or refresh the athlete did not tap found location
+ * permission gone (live location fixes 1b, 1d): a non-blocking toast whose
+ * tap runs the full Go Live flow (explain, the system prompt, the reading,
+ * the live write). It never opens the system dialog by itself: only the
+ * athlete's tap does. The header chip's GO LIVE stays the way back after
+ * the toast has gone.
+ */
+export function showLocationOffGoLiveCta(): void {
+  toast.info({
+    text1: LOCATION_OFF_GO_LIVE_CTA_COPY,
+    visibilityTime: LOCATION_OFF_CTA_VISIBLE_MS,
+    onPress: () => {
+      toast.hide();
+      void goLiveWithFeedback();
+    },
+  });
 }

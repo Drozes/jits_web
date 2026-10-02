@@ -1528,3 +1528,155 @@ describe("match_location_required (contract-location-flag 4 and 6)", () => {
     expect(result.current.isLive).toBe(true);
   });
 });
+
+describe("live location fixes 1b: a restore whose reading says permission is gone", () => {
+  it("foreground restore: beforeAutoLive false makes NO live write and stays offline, silently", async () => {
+    const beforeAutoLive = jest.fn(async () => true as boolean);
+    const { result } = mount({ beforeAutoLive });
+    await act(async () => {
+      await result.current.goLive();
+    });
+    await act(async () => {
+      setAppState("background");
+      appStateHandler?.("background");
+      await flush();
+    });
+    beforeAutoLive.mockResolvedValue(false);
+    mockCalls.length = 0;
+    mockToastInfo.mockClear();
+    await act(async () => {
+      setAppState("active");
+      appStateHandler?.("active");
+      await flush();
+      await flush();
+    });
+    expect(beforeAutoLive).toHaveBeenCalledTimes(1);
+    expect(mockCalls).not.toContain("flag:true");
+    expect(mockCalls).not.toContain("joinLobby");
+    expect(result.current.isLive).toBe(false);
+    // The caller already offered the CTA: no "You're offline" toast on top.
+    expect(mockToastInfo).not.toHaveBeenCalled();
+    // A later tap still goes live.
+    await act(async () => {
+      await result.current.goLive();
+    });
+    expect(result.current.isLive).toBe(true);
+  });
+
+  it("post-match resume: beforeAutoLive false makes no live write", async () => {
+    const beforeAutoLive = jest.fn(async () => true as boolean);
+    const { result, rerender } = mount({ beforeAutoLive });
+    await act(async () => {
+      await result.current.goLive();
+    });
+    await act(async () => {
+      rerender({ ...ARGS, beforeAutoLive, inMatch: true });
+      await flush();
+    });
+    beforeAutoLive.mockResolvedValue(false);
+    mockCalls.length = 0;
+    await act(async () => {
+      rerender({ ...ARGS, beforeAutoLive, inMatch: false });
+      await flush();
+      await flush();
+    });
+    expect(mockCalls).not.toContain("flag:true");
+    expect(result.current.isLive).toBe(false);
+  });
+
+  it("arrival with the flag set: beforeAutoLive false clears the stale flag instead of re-asserting it", async () => {
+    const beforeAutoLive = jest.fn(async () => false);
+    const { result } = mount({ initialRanked: true, beforeAutoLive });
+    await act(async () => {
+      await flush();
+      await flush();
+    });
+    expect(mockCalls).not.toContain("flag:true");
+    expect(mockCalls).toContain("flag:false");
+    expect(result.current.isLive).toBe(false);
+  });
+
+  it("a reading that resolves undefined (other failures) still goes ahead, as before", async () => {
+    const beforeAutoLive = jest.fn(async () => undefined);
+    const { result } = mount({ initialRanked: true, beforeAutoLive });
+    await act(async () => {
+      await flush();
+      await flush();
+    });
+    expect(mockCalls).toContain("flag:true");
+    expect(result.current.isLive).toBe(true);
+  });
+});
+
+describe("live location fixes D7: the server expired the live session", () => {
+  it("drops to offline when the server says off and nothing moved meanwhile (no flag write)", async () => {
+    const { result } = mount();
+    await act(async () => {
+      await result.current.goLive();
+    });
+    mockCalls.length = 0;
+    let dropped = false;
+    await act(async () => {
+      dropped = await result.current.dropIfServerOffline(async () => false);
+    });
+    expect(dropped).toBe(true);
+    expect(result.current.isLive).toBe(false);
+    expect(mockCalls).toEqual(["leaveLobby"]);
+    // Going live again works (intent and committed state were both reset).
+    await act(async () => {
+      await result.current.goLive();
+    });
+    expect(result.current.isLive).toBe(true);
+    expect(mockCalls).toContain("flag:true");
+  });
+
+  it("keeps live when the server says live, or the read failed (null)", async () => {
+    const { result } = mount();
+    await act(async () => {
+      await result.current.goLive();
+    });
+    for (const answer of [true, null]) {
+      let dropped = true;
+      await act(async () => {
+        dropped = await result.current.dropIfServerOffline(async () => answer);
+      });
+      expect(dropped).toBe(false);
+      expect(result.current.isLive).toBe(true);
+    }
+  });
+
+  it("never drops when not live, and never reads", async () => {
+    const { result } = mount();
+    const read = jest.fn(async () => false);
+    let dropped = true;
+    await act(async () => {
+      dropped = await result.current.dropIfServerOffline(read);
+    });
+    expect(dropped).toBe(false);
+    expect(read).not.toHaveBeenCalled();
+  });
+
+  it("a transition that started during the read wins (a stale 'off' never undoes it)", async () => {
+    const { result } = mount();
+    await act(async () => {
+      await result.current.goLive();
+    });
+    const answer = deferred<boolean | null>();
+    let pending!: Promise<boolean>;
+    act(() => {
+      pending = result.current.dropIfServerOffline(() => answer.promise);
+    });
+    // The athlete goes offline and back live while the read is in flight.
+    await act(async () => {
+      await result.current.goOffline();
+      await result.current.goLive();
+    });
+    let dropped = true;
+    await act(async () => {
+      answer.resolve(false);
+      dropped = await pending;
+    });
+    expect(dropped).toBe(false);
+    expect(result.current.isLive).toBe(true);
+  });
+});

@@ -293,6 +293,7 @@ jest.mock("@/lib/arena/arena-store", () => ({
   useIsArenaLive: () => mockIsLive,
   useIsInArenaMatch: () => mockInMatch,
   useLiveSwitchPhase: () => mockSwitchPhase,
+  useLiveSwitchDirection: () => (mockSwitchPhase === "saving" ? "going-live" : null),
   arenaActions: {
     toggle: (...a: unknown[]) => mockToggle(...a),
     sendChallenge: (...a: unknown[]) => mockSendChallenge(...a),

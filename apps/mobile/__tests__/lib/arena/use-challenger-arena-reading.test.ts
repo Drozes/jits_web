@@ -27,6 +27,7 @@ jest.mock("@/lib/arena/go-live-location", () => ({
 
 import {
   CHALLENGER_READING_REFRESH_MS,
+  __askedThisSessionForTests,
   __resetChallengerArenaReadingForTests,
   useChallengerArenaReading,
 } from "@/lib/arena/use-challenger-arena-reading";
@@ -196,5 +197,68 @@ describe("useChallengerArenaReading cleanup (L6)", () => {
     await flush();
     r.unmount();
     expect(mockCancelSheet).toHaveBeenCalledWith("arena");
+  });
+});
+
+describe("askedThisSession resets (live location fixes 1c)", () => {
+  function emit(s: string) {
+    setAppState(s);
+    for (const h of [...appStateHandlers]) h(s);
+  }
+
+  it("a real return from the background re-arms the one ask (a lapsed Allow Once is asked again)", async () => {
+    mockPermission.mockResolvedValue({ granted: false, canAskAgain: true });
+    mockExplain.mockResolvedValue(false);
+    mount({ id: "ch-1", active: true });
+    await flush();
+    expect(mockExplain).toHaveBeenCalledTimes(1);
+    expect(__askedThisSessionForTests()).toBe(true);
+    await act(async () => {
+      emit("background");
+      emit("inactive");
+      emit("active");
+    });
+    await flush();
+    expect(mockExplain).toHaveBeenCalledTimes(2);
+  });
+
+  it("coming back from the system prompt ('inactive' to 'active') does NOT re-arm it", async () => {
+    mockPermission.mockResolvedValue({ granted: false, canAskAgain: true });
+    mockExplain.mockResolvedValue(false);
+    mount({ id: "ch-1", active: true });
+    await flush();
+    await act(async () => {
+      emit("inactive");
+      emit("active");
+    });
+    await flush();
+    expect(mockExplain).toHaveBeenCalledTimes(1);
+  });
+
+  it("a permission status change re-arms it (granted, then lapsed, is asked again on the next tick)", async () => {
+    mockPermission.mockResolvedValue({ granted: false, canAskAgain: true });
+    mockExplain.mockResolvedValue(false);
+    mount({ id: "ch-1", active: true });
+    await flush();
+    expect(mockExplain).toHaveBeenCalledTimes(1);
+    // Still the same status: the next tick respects the "Not now".
+    await act(async () => {
+      jest.advanceTimersByTime(CHALLENGER_READING_REFRESH_MS);
+    });
+    await flush();
+    expect(mockExplain).toHaveBeenCalledTimes(1);
+    // Granted in Settings (reads silently), then the Allow Once grant lapses.
+    mockPermission.mockResolvedValue({ granted: true, canAskAgain: true });
+    await act(async () => {
+      jest.advanceTimersByTime(CHALLENGER_READING_REFRESH_MS);
+    });
+    await flush();
+    expect(mockArenaReading).toHaveBeenLastCalledWith("ch-1", { ask: false });
+    mockPermission.mockResolvedValue({ granted: false, canAskAgain: true });
+    await act(async () => {
+      jest.advanceTimersByTime(CHALLENGER_READING_REFRESH_MS);
+    });
+    await flush();
+    expect(mockExplain).toHaveBeenCalledTimes(2);
   });
 });

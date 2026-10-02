@@ -12,10 +12,14 @@
  * every 60 s.
  *
  * Only with location permission already granted. If it is not granted (and
- * the system can still ask), the waiting state asks ONCE per app session
- * with the Go Live explain copy, then the system prompt; a "Not now" or a
- * denial is respected for the rest of the session (the accepter then sees
- * "Waiting for <name>'s location.").
+ * the system can still ask), the waiting state asks ONCE with the Go Live
+ * explain copy, then the system prompt; a "Not now" or a denial is respected
+ * (the accepter then sees "Waiting for <name>'s location.") until the app
+ * comes back from the background or the permission status changes (live
+ * location fixes 1c): an iOS "Allow Once" grant lapses in the background
+ * and reads as re-askable, so a once-per-process ask would never ask again.
+ * Returning from the system prompt itself is "inactive" to "active", not a
+ * background, so it never re-arms the ask.
  */
 import * as React from "react";
 import { AppState } from "react-native";
@@ -27,10 +31,39 @@ import { cancelLocationSheet, closeLocationSheet, explainArenaLocation } from ".
 export const CHALLENGER_READING_REFRESH_MS = 60_000;
 
 let askedThisSession = false;
+/** The last permission status seen (`granted:canAskAgain`), to spot a change. */
+let lastPermissionKey: string | null = null;
+/** The app has been in the background since the last "active". */
+let wentBackground = false;
+let appStateSub: { remove: () => void } | null = null;
+
+/**
+ * Re-arm the one ask on every real return from the background (iOS may pass
+ * through "inactive" on the way back, so the background is remembered).
+ */
+function watchForeground(): void {
+  if (appStateSub) return;
+  appStateSub = AppState.addEventListener("change", (next) => {
+    if (next === "background") wentBackground = true;
+    else if (next === "active" && wentBackground) {
+      wentBackground = false;
+      askedThisSession = false;
+    }
+  });
+}
 
 /** Tests only. */
 export function __resetChallengerArenaReadingForTests(): void {
   askedThisSession = false;
+  lastPermissionKey = null;
+  wentBackground = false;
+  appStateSub?.remove();
+  appStateSub = null;
+}
+
+/** Tests only. */
+export function __askedThisSessionForTests(): boolean {
+  return askedThisSession;
 }
 
 async function permission(): Promise<{ granted: boolean; canAskAgain: boolean }> {
@@ -56,6 +89,9 @@ export function useChallengerArenaReading(challengeId: string | null, active: bo
     inflight.current = true;
     try {
       const perm = await permission();
+      const key = `${perm.granted}:${perm.canAskAgain}`;
+      if (lastPermissionKey !== null && key !== lastPermissionKey) askedThisSession = false;
+      lastPermissionKey = key;
       if (perm.granted) {
         await reportArenaReading(id, { ask: false });
         return;
@@ -76,6 +112,7 @@ export function useChallengerArenaReading(challengeId: string | null, active: bo
 
   React.useEffect(() => {
     if (!active || !challengeId) return;
+    watchForeground();
     void tick(challengeId);
     const t = setInterval(() => void tick(challengeId), CHALLENGER_READING_REFRESH_MS);
     const sub = AppState.addEventListener("change", (s) => {

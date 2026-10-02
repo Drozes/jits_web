@@ -42,9 +42,26 @@ const mockReading = jest.fn();
 jest.mock("@/lib/invites/location", () => ({ readLocationOnce: (...a: unknown[]) => mockReading(...a) }));
 const mockReport = jest.fn();
 const mockArenaReport = jest.fn();
+const mockLog = jest.fn();
+const mockServerRanked = jest.fn();
 jest.mock("@jits/shared/api/location", () => ({
   reportGoLivePresence: (...a: unknown[]) => mockReport(...a),
   reportArenaPresence: (...a: unknown[]) => mockArenaReport(...a),
+  logLocationEvent: (...a: unknown[]) => mockLog(...a),
+  getMyLookingForRanked: (...a: unknown[]) => mockServerRanked(...a),
+}));
+jest.mock("@/lib/updates/app-version", () => ({
+  readAppVersionInfo: () => ({ appVersion: "0.5.0", buildNumber: "25", updateId: null, isEmbeddedLaunch: true }),
+}));
+const mockToastInfo = jest.fn();
+const mockToastHide = jest.fn();
+jest.mock("@/components/ui/toast", () => ({
+  toast: {
+    info: (...a: unknown[]) => mockToastInfo(...a),
+    error: jest.fn(),
+    success: jest.fn(),
+    hide: () => mockToastHide(),
+  },
 }));
 
 jest.mock("expo-keep-awake", () => ({
@@ -72,6 +89,7 @@ jest.mock("@/lib/arena/use-lobby-presence", () => ({
 
 let mockIsLive = false;
 const mockGoLive = jest.fn();
+const mockDropIfServerOffline = jest.fn();
 let mockRefusal: string | null = null;
 const mockLiveArgs = jest.fn();
 jest.mock("@/lib/arena/use-arena-live", () => ({
@@ -86,6 +104,7 @@ jest.mock("@/lib/arena/use-arena-live", () => ({
       goOffline: jest.fn(),
       goLive: () => mockGoLive(),
       lastGoLiveRefusal: () => mockRefusal,
+      dropIfServerOffline: (read: () => Promise<boolean | null>) => mockDropIfServerOffline(read),
     };
   },
 }));
@@ -155,6 +174,9 @@ beforeEach(() => {
   mockPermission.mockResolvedValue({ granted: true, canAskAgain: true });
   mockReading.mockResolvedValue(OK_READING);
   mockReport.mockResolvedValue(RECORDED);
+  mockLog.mockResolvedValue({ ok: true, data: { logged: true } });
+  mockDropIfServerOffline.mockResolvedValue(false);
+  mockServerRanked.mockResolvedValue(true);
 });
 
 /** Start a Go Live tap; resolves once it settles. */
@@ -224,7 +246,7 @@ describe("flag ON: Go Live needs a fresh reading", () => {
     render(<ArenaBootstrap />);
     const { done } = tapGoLive();
     expect(await done).toBe(true);
-    expect(mockReading).toHaveBeenCalledWith({ ask: true });
+    expect(mockReading).toHaveBeenCalledWith({ ask: true, fast: true });
     expect(mockReport).toHaveBeenCalledWith({}, OK_READING.reading);
     expect(order).toEqual(["report", "live"]);
   });
@@ -238,7 +260,7 @@ describe("flag ON: Go Live needs a fresh reading", () => {
     expect(mockReading).not.toHaveBeenCalled();
     fireEvent.press(screen.getByText("Continue"));
     expect(await done).toBe(true);
-    expect(mockReading).toHaveBeenCalledWith({ ask: true });
+    expect(mockReading).toHaveBeenCalledWith({ ask: true, fast: true });
     expect(screen.queryByTestId("go-live-location-explain")).toBeNull();
   });
 
@@ -328,11 +350,13 @@ describe("flag ON: Go Live needs a fresh reading", () => {
 
   it("a restore reads silently (never asks) before the live write", async () => {
     render(<ArenaBootstrap />);
-    const { beforeAutoLive } = mockLiveArgs.mock.calls.at(-1)[0] as { beforeAutoLive: () => Promise<void> };
+    const { beforeAutoLive } = mockLiveArgs.mock.calls.at(-1)[0] as { beforeAutoLive: () => Promise<boolean> };
+    let proceed: boolean | undefined;
     await act(async () => {
-      await beforeAutoLive();
+      proceed = await beforeAutoLive();
     });
-    expect(mockReading).toHaveBeenCalledWith({ ask: false });
+    expect(proceed).toBe(true);
+    expect(mockReading).toHaveBeenCalledWith({ ask: false, fast: true });
     expect(mockReport).toHaveBeenCalledTimes(1);
     expect(mockPermission).not.toHaveBeenCalled();
   });
@@ -361,7 +385,7 @@ describe("60 s go_live refresh", () => {
     await advance(GO_LIVE_REFRESH_MS - 1);
     expect(mockReport).not.toHaveBeenCalled();
     await advance(1);
-    expect(mockReading).toHaveBeenCalledWith({ ask: false });
+    expect(mockReading).toHaveBeenCalledWith({ ask: false, fast: true });
     await waitFor(() => expect(mockReport).toHaveBeenCalledTimes(1));
     await advance(GO_LIVE_REFRESH_MS);
     await waitFor(() => expect(mockReport).toHaveBeenCalledTimes(2));

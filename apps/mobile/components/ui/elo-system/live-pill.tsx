@@ -8,6 +8,7 @@ import Animated, {
   Easing,
 } from "react-native-reanimated";
 import { cn } from "@/lib/cn";
+import { useReduceMotion } from "@/lib/match-flow/use-reduce-motion";
 
 interface LivePillProps {
   label?: string;
@@ -72,6 +73,52 @@ export function LiveDot({ size = 7, onDark = false, testID }: LiveDotProps) {
         onDark ? { backgroundColor: ON_DARK_GREEN } : null,
         dotStyle,
       ]}
+    />
+  );
+}
+
+/**
+ * The GOING LIVE dot (live location fixes 4.2): an ink-3 ring on the same
+ * 1400ms pulse as `LiveDot` (one rhythm in the app), shown from the Go Live
+ * tap until the flow resolves, so a slow permission check or location fix
+ * never reads as a dead tap. With Reduce Motion on it is a still ring.
+ * Decorative: the caller labels the state.
+ */
+export function PendingDot({ size = 7, testID }: { size?: number; testID?: string }) {
+  const reduceMotion = useReduceMotion();
+  const opacity = useSharedValue(1);
+  const scale = useSharedValue(1);
+
+  React.useEffect(() => {
+    if (reduceMotion) {
+      opacity.value = 1;
+      scale.value = 1;
+      return;
+    }
+    opacity.value = withRepeat(
+      withTiming(0.35, { duration: PULSE_DURATION_MS / 2, easing: Easing.inOut(Easing.ease) }),
+      -1,
+      true,
+    );
+    scale.value = withRepeat(
+      withTiming(0.8, { duration: PULSE_DURATION_MS / 2, easing: Easing.inOut(Easing.ease) }),
+      -1,
+      true,
+    );
+  }, [opacity, scale, reduceMotion]);
+
+  const dotStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ scale: scale.value }],
+  }));
+
+  return (
+    <Animated.View
+      testID={testID}
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      className="rounded-full border border-ink-3"
+      style={[{ width: size, height: size, borderRadius: size / 2 }, dotStyle]}
     />
   );
 }

@@ -65,6 +65,7 @@ interface SecondaryButtonProps {
   onPress: () => void;
   disabled?: boolean;
   className?: string;
+  testID?: string;
 }
 
 /** Secondary button: bg-surface-3 plate, bordered, ink primary text. */
@@ -73,9 +74,11 @@ export function SecondaryButton({
   onPress,
   disabled,
   className,
+  testID,
 }: SecondaryButtonProps) {
   return (
     <Pressable
+      testID={testID}
       accessibilityRole="button"
       onPress={onPress}
       disabled={disabled}
