@@ -4,8 +4,10 @@
  * Presentational only; the screen decides what shows with the rules in
  * `lib/arena/mat-board.ts`.
  *
- * Brand: one Signal Red CTA per surface, no shadows, radius 2 to 4, no
- * animation (only the header chip pulses).
+ * Brand: one Signal Red CTA per surface, no shadows, radius 2 to 4. Motion
+ * (Motion Rule, DESIGN.md): a new incoming challenge strip's bottom edge
+ * cools from hot (the challenge afterglow, `afterglow-edge.tsx`); nothing
+ * else here moves.
  *
  * Match-loop harness contract (tools/match-loop/sim/screens.ts), keep exact:
  * the live segments `Go live` / `Go offline`, every challenge button
@@ -13,10 +15,11 @@
  * the waiting strip's StaticText `Waiting for <name>` and `Cancel challenge`.
  */
 import { Pressable, Text, View } from "react-native";
-import * as Haptics from "expo-haptics";
+import { haptics } from "@/lib/motion";
 import { Avatar32, MetaTag } from "@/components/ui/elo-system";
 import { cn } from "@/lib/cn";
 import { MAX_SCALE, OutlineAction, StripShell } from "@/components/arena/strip-primitives";
+import { AfterglowEdge } from "@/components/arena/afterglow-edge";
 import type { ArenaCompetitor } from "@/lib/arena/use-arena-roster";
 import {
   formatCountdown,
@@ -73,7 +76,7 @@ export function CountdownText({
 
 /** A light acknowledgement on the one tap that sends something to someone. */
 function tapHaptic(): void {
-  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
+  void haptics.press();
 }
 
 /** `+32`, `−14`, `±0` (U+2212 minus, the mockup's). */
@@ -288,12 +291,15 @@ function StripLine({
  * 8:41 · +2`.
  */
 export function IncomingStrip({
+  challengeId,
   name,
   count,
   source,
   active,
   onOpen,
 }: {
+  /** The challenge in hand: its afterglow cools once per id. */
+  challengeId?: string | null;
   name: string;
   count: number;
   /** The challenge whose live window the countdown shows. */
@@ -303,7 +309,11 @@ export function IncomingStrip({
   onOpen: () => void;
 }) {
   return (
-    <StripShell rail="red" testID="arena-strip-incoming">
+    <StripShell
+      rail="red"
+      testID="arena-strip-incoming"
+      edge={<AfterglowEdge challengeId={challengeId} createdAt={source?.createdAt} />}
+    >
       <StripLine
         head={`${name} wants to roll`}
         source={source}
@@ -359,6 +369,7 @@ export function WaitingStrip({
  * shows (the Closest Match button demotes).
  */
 export function OfferStrip({
+  challengeId,
   name,
   count = 1,
   source,
@@ -366,6 +377,8 @@ export function OfferStrip({
   onGoLive,
   disabled,
 }: {
+  /** The offered challenge: its afterglow cools once per id. */
+  challengeId?: string | null;
   name: string;
   /** This challenge plus the other fresh on-mat ones (`· +N`). */
   count?: number;
@@ -375,7 +388,11 @@ export function OfferStrip({
   disabled: boolean;
 }) {
   return (
-    <StripShell rail="red" testID="arena-strip-offer">
+    <StripShell
+      rail="red"
+      testID="arena-strip-offer"
+      edge={<AfterglowEdge challengeId={challengeId} createdAt={source?.createdAt} />}
+    >
       <StripLine
         head={`${name} wants to roll`}
         source={source}

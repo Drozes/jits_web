@@ -10,7 +10,7 @@
  */
 import * as React from "react";
 import { Pressable, Text, View } from "react-native";
-import * as Haptics from "expo-haptics";
+import { haptics } from "@/lib/motion";
 import { Plate, Avatar32, LivePill, MetaTag } from "@/components/ui/elo-system";
 import type { ArenaCompetitor } from "@/lib/arena/use-arena-roster";
 
@@ -115,10 +115,8 @@ export function CompetitorRow({
               accessibilityState={{ disabled }}
               onPress={() => {
                 // The one tap that sends something to another person gets a
-                // light acknowledgement. Feedback only, never fatal.
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
-                  () => undefined,
-                );
+                // light acknowledgement (the `press` commit haptic).
+                void haptics.press();
                 onChallenge();
               }}
               disabled={disabled}
