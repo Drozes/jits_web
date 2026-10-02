@@ -56,7 +56,9 @@ describe("function styles survive the NativeWind Pressable interop (light theme,
     expect(st.paddingHorizontal).toBe(16);
   });
 
-  it("secondary FightButton (WATCH FILM) keeps its fill and strong hairline", () => {
+  it("secondary FightButton (WATCH FILM) keeps its plate fill and strong hairline", () => {
+    // WP3 (kit Button card, "Secondary fill"): the secondary fill is the
+    // `plate` token, not the old translucent `secondaryBg`.
     const p = paletteFor("light");
     const s = render(
       <ThemeProvider>
@@ -64,7 +66,7 @@ describe("function styles survive the NativeWind Pressable interop (light theme,
       </ThemeProvider>,
     );
     const st = flat(s.getByTestId("summary-watch-film"));
-    expect(st.backgroundColor).toBe(p.secondaryBg);
+    expect(st.backgroundColor).toBe(p.plate);
     expect(st.borderWidth).toBe(1);
     expect(st.borderColor).toBe(p.strong);
     expect(st.height).toBe(56);

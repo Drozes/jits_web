@@ -8,7 +8,7 @@
  * then clears). Not dismissable by back or backdrop, like the prompt.
  */
 import { Modal, Text, View } from "react-native";
-import { CtaButton, SecondaryButton } from "@/components/auth/auth-buttons";
+import { Button } from "@/components/ui/elo-system/button";
 import type { StartBlocked } from "@/lib/arena/use-arena-challenge";
 
 export function StartBlockedSheet({
@@ -45,8 +45,8 @@ export function StartBlockedSheet({
             >
               {blocked.message}
             </Text>
-            <CtaButton testID="arena-start-blocked-retry" label="Retry" disabled={busy} onPress={onRetry} />
-            <SecondaryButton label="Cancel challenge" disabled={busy} onPress={onCancel} />
+            <Button testID="arena-start-blocked-retry" label="Retry" disabled={busy} onPress={onRetry} />
+            <Button variant="secondary" label="Cancel challenge" disabled={busy} onPress={onCancel} />
           </View>
         ) : null}
       </View>

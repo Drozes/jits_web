@@ -1,6 +1,6 @@
 import { Text, View } from "react-native";
 import { useRouter, type Href } from "expo-router";
-import { SecondaryButton } from "@/components/auth/auth-buttons";
+import { Button } from "@/components/ui/elo-system/button";
 import { useInvitesEnabled } from "@/lib/invites/use-invites-enabled";
 
 /**
@@ -17,7 +17,7 @@ export function InviteHomeCard() {
       <Text className="font-body text-[14px] text-ink leading-6">
         Got a training partner who isn't on ELO RATED yet? Invite them.
       </Text>
-      <SecondaryButton label="Invite a training partner" onPress={() => router.push("/invite?from=home" as Href)} />
+      <Button variant="secondary" label="Invite a training partner" onPress={() => router.push("/invite?from=home" as Href)} />
     </View>
   );
 }

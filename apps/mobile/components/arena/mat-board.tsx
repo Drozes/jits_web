@@ -14,7 +14,9 @@
  * `Challenge <name>` (the Closest Match one adds the hint `Closest match`),
  * the waiting strip's StaticText `Waiting for <name>` and `Cancel challenge`.
  */
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
+import { DISABLED_OPACITY } from "@/components/ui/elo-system/button";
+import { StatePressable } from "@/components/ui/state-pressable";
 import { haptics } from "@/lib/motion";
 import { PressableScale } from "@/components/ui/pressable-scale";
 import { Avatar32, MetaTag } from "@/components/ui/elo-system";
@@ -410,7 +412,7 @@ export function OfferStrip({
         disabled={disabled}
         hitSlop={{ top: 8, bottom: 8 }}
         className="h-8 justify-center rounded-xs bg-cta px-3 active:bg-cta-hover"
-        style={disabled ? { opacity: 0.6 } : undefined}
+        style={disabled ? { opacity: DISABLED_OPACITY } : undefined}
       >
         <Text
           maxFontSizeMultiplier={MAX_SCALE}
@@ -657,7 +659,7 @@ function ClosestCtaButton({
         "h-11 items-center justify-center rounded-sm px-4",
         red ? "bg-cta active:bg-cta-hover" : "border border-hairline-strong active:bg-surface-4",
       )}
-      style={disabled ? { opacity: 0.6 } : undefined}
+      style={disabled ? { opacity: DISABLED_OPACITY } : undefined}
     >
       <Text
         numberOfLines={1}
@@ -731,7 +733,8 @@ export function MatRow({
       testID={`arena-mat-row-${competitor.id}`}
       className="min-h-[48px] flex-row items-center gap-3 border-b border-l-2 border-b-hairline border-l-positive py-1.5 pl-2"
     >
-      <Pressable
+      <StatePressable
+        dim
         accessibilityRole="button"
         accessibilityLabel={`${isFriend ? "Friend, " : ""}${matRowLabel(displayName, currentElo, eloDiff, weight)}${band ? `, ${band.spoken}` : ""}`}
         onPress={onOpenProfile}
@@ -775,7 +778,7 @@ export function MatRow({
             {weight ? ` · ${weight} lbs` : ""}
           </Text>
         </View>
-      </Pressable>
+      </StatePressable>
 
       <View className="shrink-0 flex-row items-center gap-2">
         {band ? (

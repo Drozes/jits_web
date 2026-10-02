@@ -10,6 +10,7 @@ import {
 import { AppHeader } from "@/components/layout/app-header";
 import { PageContainer } from "@/components/layout/page-container";
 import { Plate, Chip } from "@/components/ui/elo-system";
+import { Button } from "@/components/ui/elo-system/button";
 import { toast } from "@/components/ui/toast";
 import { useAuth } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
@@ -187,19 +188,6 @@ function SubmitButton({
   label: string;
 }) {
   return (
-    <Pressable
-      onPress={onPress}
-      disabled={disabled}
-      accessibilityRole="button"
-      accessibilityState={{ disabled }}
-      className={cn(
-        "w-full items-center justify-center rounded-sm px-4 py-3",
-        disabled ? "bg-cta opacity-50" : "bg-cta active:bg-cta-hover",
-      )}
-    >
-      <Text className="font-heading text-[14px] text-ink-on-cta uppercase tracking-caps">
-        {label}
-      </Text>
-    </Pressable>
+    <Button label={label} height={44} className="w-full" disabled={disabled} onPress={onPress} />
   );
 }

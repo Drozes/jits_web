@@ -1,7 +1,8 @@
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { markPracticeMatch } from "@jits/shared/api/mutations";
 import { MetaTag, Plate } from "@/components/ui/elo-system";
+import { Button } from "@/components/ui/elo-system/button";
 import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth/hooks";
 import { PRACTICE_OFFER_BODY, PRACTICE_OFFER_TITLE } from "@/lib/practice/constants";
@@ -37,26 +38,20 @@ export function PracticeOfferCard({ onDismiss }: { onDismiss: () => void }) {
         <MetaTag>Practice</MetaTag>
       </View>
       <Text className="font-body text-[13px] text-ink-2 mb-3">{PRACTICE_OFFER_BODY}</Text>
-      <Pressable
+      <Button
         testID="practice-offer-start"
+        label="Start practice"
+        height={44}
         onPress={() => router.push("/practice")}
-        accessibilityRole="button"
-        className="bg-cta rounded-sm min-h-[44px] py-3 px-5 items-center justify-center active:bg-cta-hover"
-      >
-        <Text className="font-heading text-[13px] text-ink-on-cta uppercase tracking-caps">
-          Start practice
-        </Text>
-      </Pressable>
-      <Pressable
+      />
+      <Button
         testID="practice-offer-not-now"
+        variant="ghost"
+        label="Not now"
+        height={44}
+        className="mt-2"
         onPress={notNow}
-        accessibilityRole="button"
-        className="mt-2 min-h-[44px] items-center justify-center"
-      >
-        <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l underline">
-          Not now
-        </Text>
-      </Pressable>
+      />
     </Plate>
   );
 }

@@ -1,7 +1,8 @@
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import type { MyActiveMatch } from "@jits/shared/api/queries";
 import { MetaTag, Plate } from "@/components/ui/elo-system";
+import { Button } from "@/components/ui/elo-system/button";
 import { arenaMatchHref } from "@/lib/arena/constants";
 
 /**
@@ -30,16 +31,12 @@ export function ResumeMatchCard({ match }: { match: MyActiveMatch }) {
         {match.opponentName ? `vs ${match.opponentName}. ` : ""}
         Pick up where you left off.
       </Text>
-      <Pressable
-        onPress={() => router.push(arenaMatchHref(match.matchId))}
-        accessibilityRole="button"
+      <Button
+        label="Resume match →"
         accessibilityLabel="Resume your match"
-        className="bg-cta rounded-sm min-h-[44px] py-3 px-5 items-center justify-center active:bg-cta-hover"
-      >
-        <Text className="font-heading text-[13px] text-ink-on-cta uppercase tracking-caps">
-          Resume match →
-        </Text>
-      </Pressable>
+        height={44}
+        onPress={() => router.push(arenaMatchHref(match.matchId))}
+      />
     </Plate>
   );
 }

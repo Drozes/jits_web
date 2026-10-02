@@ -1,6 +1,6 @@
 import { Modal, Text, View } from "react-native";
-import { Button } from "@/components/ui/button";
 import { Wordmark } from "@/components/ui/elo-system";
+import { Button } from "@/components/ui/elo-system/button";
 import { useModalPresentWatchdog } from "@/lib/updates/use-modal-present-watchdog";
 
 export const CRITICAL_UPDATE_DEFAULT_BODY =
@@ -54,14 +54,11 @@ export function CriticalUpdateModal({
           </Text>
           <Button
             testID="critical-update-restart"
-            size="lg"
+            label={restarting ? "Restarting..." : "Restart"}
             className="w-full mt-2"
-            textClassName="font-heading text-[14px] uppercase tracking-caps-l"
             disabled={restarting}
             onPress={onRestart}
-          >
-            {restarting ? "Restarting..." : "Restart"}
-          </Button>
+          />
           {error ? (
             <Text
               className="font-body text-sm text-muted-foreground text-center"

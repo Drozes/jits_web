@@ -1,5 +1,6 @@
 import * as React from "react";
-import { Pressable, View, type ViewStyle } from "react-native";
+import { View, type ViewStyle } from "react-native";
+import { StatePressable } from "@/components/ui/state-pressable";
 import { VideoView } from "expo-video";
 import { playerLabel } from "@/lib/highlight/highlight-copy";
 import { useHighlightPlayer } from "@/lib/highlight/use-highlight-player";
@@ -44,7 +45,8 @@ export function HighlightPlayer({ source, onError, frameStyle, showFullscreenBut
 
   return (
     <View testID="highlight-player" className="bg-surface-4 overflow-hidden rounded-md" style={frameStyle ?? HIGHLIGHT_FRAME_STYLE}>
-      <Pressable
+      <StatePressable
+        dim
         testID="highlight-player-toggle"
         accessibilityRole="button"
         accessibilityLabel={playerLabel(source.durationS)}
@@ -67,7 +69,7 @@ export function HighlightPlayer({ source, onError, frameStyle, showFullscreenBut
         {source.posterUrl && covered ? (
           <HighlightPoster source={source} />
         ) : null}
-      </Pressable>
+      </StatePressable>
       {showFullscreenButton ? (
         <HighlightFullscreenButton onPress={fullscreen.enterFullscreen} />
       ) : null}

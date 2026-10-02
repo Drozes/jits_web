@@ -13,7 +13,7 @@ import {
   IMPLAUSIBLE_MOVEMENT_COPY,
   LOCATION_UNAVAILABLE_COPY,
 } from "@jits/shared/utils";
-import { CtaButton, SecondaryButton, TertiaryButton } from "@/components/auth/auth-buttons";
+import { Button } from "@/components/ui/elo-system/button";
 import {
   answerGoLiveLocation,
   useGoLiveLocationSheet,
@@ -76,29 +76,30 @@ function Actions({ phase, busy, onCancel }: { phase: GoLiveLocationPhase; busy: 
   if (phase === "explain") {
     return (
       <>
-        <CtaButton testID="go-live-location-continue" label="Continue" disabled={busy} onPress={() => answerGoLiveLocation("continue")} />
-        <TertiaryButton label="Not now" disabled={busy} onPress={onCancel} />
+        <Button testID="go-live-location-continue" label="Continue" disabled={busy} onPress={() => answerGoLiveLocation("continue")} />
+        <Button variant="ghost" height={44} label="Not now" disabled={busy} onPress={onCancel} />
       </>
     );
   }
   if (phase === "denied") {
     return (
       <>
-        <SecondaryButton
+        <Button
+          variant="secondary"
           label="Open Settings"
           onPress={() => {
             onCancel();
             void Linking.openSettings();
           }}
         />
-        <TertiaryButton label="Not now" onPress={onCancel} />
+        <Button variant="ghost" height={44} label="Not now" onPress={onCancel} />
       </>
     );
   }
   return (
     <>
-      <SecondaryButton label="Retry" disabled={busy} onPress={() => answerGoLiveLocation("retry")} />
-      <TertiaryButton label="Not now" disabled={busy} onPress={onCancel} />
+      <Button variant="secondary" label="Retry" disabled={busy} onPress={() => answerGoLiveLocation("retry")} />
+      <Button variant="ghost" height={44} label="Not now" disabled={busy} onPress={onCancel} />
     </>
   );
 }

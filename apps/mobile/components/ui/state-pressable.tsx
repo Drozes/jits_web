@@ -9,8 +9,18 @@ import {
   type ViewStyle,
 } from "react-native";
 
+/** The pressed dip of rows, chips, toggles and ghost links (kit `opacity-pressed`). */
+export const PRESSED_OPACITY = 0.7;
+const PRESSED_DIM_STYLE = { opacity: PRESSED_OPACITY } as const;
+
 export interface StatePressableProps extends Omit<PressableProps, "style"> {
   style?: StyleProp<ViewStyle> | ((state: PressableStateCallbackType) => StyleProp<ViewStyle>);
+  /**
+   * Press feedback for a row, chip or toggle that does not scale: dips to
+   * `PRESSED_OPACITY` while held (never while disabled). Buttons use
+   * `PressableScale` / `Button` instead.
+   */
+  dim?: boolean;
 }
 
 /**
@@ -28,14 +38,15 @@ export interface StatePressableProps extends Omit<PressableProps, "style"> {
  * object/array, which the interop merges correctly.
  */
 export const StatePressable = React.forwardRef<View, StatePressableProps>(function StatePressable(
-  { style, onPressIn, onPressOut, disabled, ...rest },
+  { style, onPressIn, onPressOut, disabled, dim = false, ...rest },
   ref,
 ) {
   const [pressed, setPressed] = React.useState(false);
   // A button disabled mid-press never gets its onPressOut: do not keep
   // drawing it pressed.
   const shownPressed = pressed && !disabled;
-  const resolved = typeof style === "function" ? style({ pressed: shownPressed }) : style;
+  const own = typeof style === "function" ? style({ pressed: shownPressed }) : style;
+  const resolved = dim && shownPressed ? [own, PRESSED_DIM_STYLE] : own;
   const handlePressIn = React.useCallback(
     (e: GestureResponderEvent) => {
       setPressed(true);

@@ -11,8 +11,9 @@
  * walkthrough on the Mat Board", which carries the tracker reference).
  */
 import * as React from "react";
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import { Plate } from "@/components/ui/elo-system";
+import { Button } from "@/components/ui/elo-system/button";
 import { GoLivePlate } from "@/components/arena/go-live-plate";
 import { SectionLabel, WaitingPlate } from "@/components/arena/arena-plates";
 import { CompetitorRow } from "@/components/arena/competitor-row";
@@ -26,45 +27,6 @@ import {
   PRACTICE_LOBBY_BODY,
   type PracticePhase,
 } from "@/lib/practice/constants";
-import { cn } from "@/lib/cn";
-
-const BUTTON_STYLES = {
-  primary: ["bg-cta active:bg-cta-hover", "text-ink-on-cta"],
-  secondary: ["border border-hairline-strong bg-surface-3 active:bg-surface-4", "text-ink"],
-  tertiary: ["", "text-ink-3 underline"],
-} as const;
-
-export function PracticeButton({
-  label,
-  onPress,
-  variant = "primary",
-  testID,
-  disabled = false,
-}: {
-  label: string;
-  onPress: () => void;
-  variant?: keyof typeof BUTTON_STYLES;
-  testID?: string;
-  disabled?: boolean;
-}) {
-  const [box, text] = BUTTON_STYLES[variant];
-  return (
-    <Pressable
-      testID={testID}
-      accessibilityRole="button"
-      accessibilityState={{ disabled }}
-      onPress={onPress}
-      disabled={disabled}
-      className={cn(
-        "min-h-[44px] items-center justify-center rounded-sm px-5 py-3",
-        box,
-        disabled && "opacity-50",
-      )}
-    >
-      <Text className={cn("font-heading text-[13px] uppercase tracking-caps", text)}>{label}</Text>
-    </Pressable>
-  );
-}
 
 /** The coach line shown above each phase. */
 export function PracticeTip({ text }: { text: string }) {
@@ -142,7 +104,7 @@ export function PracticeWeight({
         <WeightTile name="You" weight={weight} />
         <WeightTile name={PRACTICE_BOT_NAME} weight={weight} />
       </View>
-      <PracticeButton testID="weight-confirm" label="Confirm Weights" onPress={onConfirm} />
+      <Button height={44} testID="weight-confirm" label="Confirm Weights" onPress={onConfirm} />
     </View>
   );
 }
@@ -164,8 +126,8 @@ export function PracticeReady({
         <ReadyPanel label="You" ready={userReady} />
         <ReadyPanel label={PRACTICE_BOT_NAME} ready={botReady} testID="ready-panel-opponent" />
       </View>
-      {userReady ? null : <PracticeButton testID="ready-button" label="Ready" onPress={onReady} />}
-      <PracticeButton label="Cancel" variant="secondary" onPress={onCancel} />
+      {userReady ? null : <Button height={44} testID="ready-button" label="Ready" onPress={onReady} />}
+      <Button height={44} label="Cancel" variant="secondary" onPress={onCancel} />
     </View>
   );
 }
@@ -199,7 +161,7 @@ export function PracticeConfirm({
           state={botConfirmed ? "confirmed" : "confirming"}
         />
       </View>
-      <PracticeButton testID="confirm-result" label="Confirm Result" onPress={onConfirm} />
+      <Button height={44} testID="confirm-result" label="Confirm Result" onPress={onConfirm} />
     </View>
   );
 }

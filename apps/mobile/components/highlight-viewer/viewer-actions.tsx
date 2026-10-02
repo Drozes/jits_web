@@ -2,7 +2,7 @@ import * as React from "react";
 import { Linking, Text, View } from "react-native";
 import { HIGHLIGHT_COPY } from "@/lib/highlight/highlight-copy";
 import { SHARE_COPY, type SharePath } from "@/lib/highlight-share";
-import { ViewerButton } from "./viewer-button";
+import { Button } from "@/components/ui/elo-system/button";
 
 export interface ViewerActionsProps {
   /** `highlight_share_enabled`: false removes Share and Save entirely. */
@@ -31,7 +31,8 @@ export function ViewerActions(props: ViewerActionsProps) {
   return (
     <View className="gap-2">
       {showShare ? (
-        <ViewerButton
+        <Button
+          height={44}
           testID="viewer-share"
           label={primaryPath === "reels" ? SHARE_COPY.shareToInstagram : SHARE_COPY.shareReel}
           variant="primary"
@@ -39,30 +40,33 @@ export function ViewerActions(props: ViewerActionsProps) {
         />
       ) : null}
       {showSave ? (
-        <ViewerButton
+        <Button
+          height={44}
           testID="viewer-save"
           label={saving ? SHARE_COPY.saving : SHARE_COPY.saveToPhotos}
-          variant="outline"
+          variant="secondary"
           busy={saving}
-          disabled={saving}
           onPress={props.onSave}
         />
       ) : null}
       {showSave && savePermissionDenied ? (
         <View testID="viewer-save-permission" className="gap-2 py-1">
           <Text className="font-body text-[12px] text-ink-2">{SHARE_COPY.savePermissionDenied}</Text>
-          <ViewerButton
+          <Button
+            height={44}
             testID="viewer-open-settings"
             label={SHARE_COPY.openSettings}
-            variant="text"
+            variant="ghost"
+            className="self-center"
             onPress={() => void Linking.openSettings().catch(() => undefined)}
           />
         </View>
       ) : null}
-      <ViewerButton
+      <Button
+        height={44}
         testID="viewer-improve"
         label={HIGHLIGHT_COPY.improve}
-        variant="outline"
+        variant="secondary"
         disabled={props.improveDisabled}
         onPress={props.onImprove}
       />

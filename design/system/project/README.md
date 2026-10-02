@@ -62,7 +62,7 @@ Twenty cards, each a static HTML twin of the RN component with a README (`compon
 
 | Family | Cards |
 |---|---|
-| Actions | Button (target, WP3), OutlineAction |
+| Actions | Button, OutlineAction |
 | Status | MetaTag, LivePill (with LiveDot), CountPill (with tab badges) |
 | Data | EloTile, RollingNumber (settled frame), DeltaChip |
 | Navigation | TabBar (with the Arena icon's embers), AppHeader (with the header status chip), Chip |

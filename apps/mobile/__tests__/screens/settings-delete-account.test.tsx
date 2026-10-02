@@ -114,11 +114,12 @@ it("does not claim match records, weigh-ins or videos are erased", () => {
   expect(s.getByText(/open invites/)).toBeTruthy();
 });
 
-it("uses the destructive button, not the accent CTA, for the final delete", () => {
+it("uses the destructive button (an outline in negative, WP3), not the accent CTA, for the final delete", () => {
   const s = toConfirm();
   const cls = String(s.getByTestId("delete-submit").props.className ?? "");
-  expect(cls).toContain("bg-destructive");
+  expect(cls).toContain("border-negative");
   expect(cls).not.toContain("bg-cta");
+  expect(cls).not.toContain("bg-destructive");
 });
 
 it("Keep my account goes back", () => {

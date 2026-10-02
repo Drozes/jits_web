@@ -21,3 +21,4 @@ export { ParticipantRow } from "./participant-row";
 export { RankRow } from "./rank-row";
 export { RollingNumber, usePlayOnce, ROLL_MS } from "./rolling-number";
 export { DeltaChip, formatDeltaChip, spokenDelta } from "./delta-chip";
+export { Button, DISABLED_OPACITY, BUTTON_RADIUS, BUTTON_HEIGHT, type ButtonProps, type ButtonVariant } from "./button";

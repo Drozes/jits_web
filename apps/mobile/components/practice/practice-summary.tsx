@@ -2,6 +2,8 @@ import * as React from "react";
 import { Text, View } from "react-native";
 import { Audio, ResizeMode, Video } from "expo-av";
 import { Plate } from "@/components/ui/elo-system";
+import { Button } from "@/components/ui/elo-system/button";
+import { PracticeTip } from "./practice-steps";
 import { useMatchRecorder } from "@/components/match-flow/match-recorder-context";
 import type { BroadcastResult } from "@jits/shared/hooks/use-session-match-sync";
 import {
@@ -9,7 +11,6 @@ import {
   PRACTICE_SUMMARY_TIP_NO_CLIP,
   PRACTICE_SUMMARY_TIP_NO_CLIP_GRANTED,
 } from "@/lib/practice/constants";
-import { PracticeButton, PracticeTip } from "./practice-steps";
 
 function verdict(result: BroadcastResult | null, athleteId: string): string {
   if (!result || result.result === "draw") return "DRAW";
@@ -79,19 +80,21 @@ export function PracticeSummary({
         />
       ) : null}
       {localUri && !watching ? (
-        <PracticeButton
+        <Button
+          height={44}
           testID="practice-watch-clip"
           label="Watch your clip"
           variant="secondary"
           onPress={() => setWatching(true)}
         />
       ) : null}
-      <PracticeButton testID="practice-go-arena" label="Go to the Arena" onPress={onArena} />
-      <PracticeButton testID="practice-done" label="Done" variant="secondary" onPress={onDone} />
-      <PracticeButton
+      <Button height={44} testID="practice-go-arena" label="Go to the Arena" onPress={onArena} />
+      <Button height={44} testID="practice-done" label="Done" variant="secondary" onPress={onDone} />
+      <Button
+        height={44}
         testID="practice-again"
         label="Practice again"
-        variant="tertiary"
+        variant="ghost"
         onPress={onAgain}
       />
     </View>

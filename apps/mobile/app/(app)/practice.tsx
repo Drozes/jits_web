@@ -18,6 +18,8 @@ import { useAuth, useRequireAthlete } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { AppHeader } from "@/components/layout/app-header";
 import { MetaTag } from "@/components/ui/elo-system";
+import { Button } from "@/components/ui/elo-system/button";
+import { PracticeTip } from "@/components/practice/practice-steps";
 import { STEP_LABELS, WizardStepHeader } from "@/components/match-flow/match-flow-wizard";
 import { MatchRecorderProvider, useMatchRecorder } from "@/components/match-flow/match-recorder-context";
 import { MatchRecorderCamera } from "@/components/match-flow/match-recorder-surface";
@@ -25,7 +27,6 @@ import {
   MatchOrientationController,
   orientationModeFor,
 } from "@/components/match-flow/match-orientation-controller";
-import { PracticeButton, PracticeTip } from "@/components/practice/practice-steps";
 import { PracticePhaseView } from "@/components/practice/practice-phase";
 import { usePracticeMatch } from "@/lib/practice/use-practice-match";
 import {
@@ -204,10 +205,11 @@ export default function PracticeScreen() {
               onExit={exit}
             />
             {phase === "summary" || live ? null : (
-              <PracticeButton
+              <Button
+                height={44}
                 testID="practice-exit"
                 label="Exit practice"
-                variant="tertiary"
+                variant="ghost"
                 onPress={exit}
               />
             )}

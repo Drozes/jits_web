@@ -1,15 +1,18 @@
 # Button
 
-Button is the one brand button of the target kit (work package WP3): Signal Red primary, plate-and-hairline secondary, text-only ghost and an outlined destructive, all on `PressableScale` so every press scales to 0.97.
+Button is the one brand button of the kit (work package WP3): Signal Red primary, plate-and-hairline secondary, text-only ghost and an outlined destructive, all on `PressableScale` so every press scales to 0.97.
 
-**Status: Target (WP3).** Today the app has five overlapping button implementations (`FightButton`, the auth `CtaButton`/`SecondaryButton`/`TertiaryButton`/`DestructiveButton`, `ViewerButton`, `PracticeButton`, and the legacy shadcn `Button`). WP3 (bead jits-3eeg.4) replaces them with this one component, built from `FightButton`'s API. The card shows the target first and today's most-used family (the auth buttons) at the bottom.
+**Status: Shipped (WP3, bead jits-3eeg.4).** `apps/mobile/components/ui/elo-system/button.tsx` is the one button, built from `FightButton`'s API; `FightButton` is now a thin match-flow alias of it. It replaced the auth `CtaButton`/`SecondaryButton`/`TertiaryButton`/`DestructiveButton`, `ViewerButton`, `PracticeButton`, about ten hand-rolled red CTAs and four hand-rolled secondary buttons, and the legacy shadcn `Button` everywhere except the update banner (WP4 restyles that and deletes the shadcn file). The preview's bottom row still shows the retired auth buttons for comparison.
 
 ## Props, variants, states
 
 | Prop | Values | Notes |
 |---|---|---|
 | `label` | string | DM Sans Bold, uppercase, 14px (ghost 13px), tracking 1.12px. |
-| `variant` | `primary` (default), `secondary`, `ghost`, `destructive` | `glass` (over media) is also planned in WP3; it is not drawn here. |
+| `labelContent` | node | Drawn inside the label in place of `label` (for example mono digits, "Regenerate (3 left)"); `label` stays the accessible name. |
+| `accessibilityLabel` | string | Defaults to `label`. |
+| `className`, `style` | | Placement only (`w-full`, `flex-1`, margins, `self-center`); `style` is applied last (for example `paddingHorizontal: 0` on an inline ghost link). |
+| `variant` | `primary` (default), `secondary`, `ghost`, `destructive`, `glass` | `glass` is the on-media look over camera or film (fixed in both themes: white 12% fill, white 40% hairline, white 20% pressed); it is not drawn here. |
 | `height` | number, default 56 | Real call sites use 44, 56, 64 and 72. |
 | `icon` | `(color) => node` | Drawn left of the label in the label color, 10px gap. |
 | `trailing` | node | Right-aligned mono note (for example "PROCESSING"); the row becomes space-between. |
@@ -27,9 +30,9 @@ Button is the one brand button of the target kit (work package WP3): Signal Red 
 
 Disabled text below 4.5:1 is the WCAG inactive-control exception; never use 0.5 opacity for an enabled control.
 
-**Destructive is a kit proposal.** The code has no ELO destructive button: today's `DestructiveButton` (one use, Delete account) fills with the legacy `bg-destructive` red under a #E8EDF2 label at 3.54:1, which would also read as a second red CTA. The kit draws it as an outline in `negative` (AA in both themes: 6.28:1 on `void` dark, 6.37:1 light; 5.22:1 and 5.13:1 on `plate`) and lists it under Open decisions for the owner to confirm.
+**Destructive is an outline in `negative`** (decided 2026-10-02). The retired `DestructiveButton` (one use, Delete account) filled with the legacy `bg-destructive` red under a #E8EDF2 label at 3.54:1, which also read as a second red CTA. The outline is AA in both themes: 6.28:1 on `void` dark, 6.37:1 light; 5.22:1 and 5.13:1 on `plate`.
 
-**Secondary fill.** `FightButton` secondary uses `usePalette().secondaryBg` (white 8% dark, Void 5% light), which is not a kit token; the target uses the BT-2 fix (`plate` with `hairline-strong`), matching the auth `SecondaryButton` that 16 call sites already use.
+**Secondary fill.** `FightButton` secondary used `usePalette().secondaryBg` (white 8% dark, Void 5% light), which is not a kit token; the shipped Button uses `plate` with `hairline-strong` for every secondary, as the auth `SecondaryButton` did.
 
 The spinner is a static stand-in for the native `ActivityIndicator`, which the preview cannot draw.
 
@@ -43,9 +46,11 @@ Registry row **Press scale** (Reactive): press-in to `PRESS_SCALE` 0.97 over `du
 
 ## Source
 
-- Target API: `apps/mobile/components/match-flow/fight/fight-ui.tsx` (`FightButton`), `apps/mobile/components/ui/pressable-scale.tsx`, `apps/mobile/components/ui/steel-sheen.tsx`.
-- Today: `apps/mobile/components/auth/auth-buttons.tsx` (CtaButton 30, SecondaryButton 16, TertiaryButton 19 call sites, DestructiveButton 1), `apps/mobile/components/ui/button.tsx` (legacy shadcn, admin only), `components/highlight-viewer/viewer-button.tsx`, `components/practice/practice-steps.tsx`.
-- Work package: WP3 in Conformance (findings BT-1 to BT-7).
+- `apps/mobile/components/ui/elo-system/button.tsx` (`Button`, `DISABLED_OPACITY`, `BUTTON_HEIGHT`, `BUTTON_RADIUS`), on `apps/mobile/components/ui/pressable-scale.tsx` and `apps/mobile/components/ui/steel-sheen.tsx`. Colors come from the theme tokens (`useThemedTokens()`); the variant class (`bg-cta`, `bg-surface-3 border-hairline-strong`, `border-negative`) is set too.
+- Alias: `apps/mobile/components/match-flow/fight/fight-ui.tsx` (`FightButton`).
+- Rows, chips and toggles that do not scale use `StatePressable dim` (`PRESSED_OPACITY` 0.7, `apps/mobile/components/ui/state-pressable.tsx`).
+- Guard: `apps/mobile/__tests__/components/ui/one-button-guard.test.ts`.
+- Work package: WP3 in Conformance (findings BT-1 to BT-7, SC-3, A1-1 error boundary, MO-9).
 
 ## Web twin and parity
 

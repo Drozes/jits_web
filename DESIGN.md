@@ -66,7 +66,7 @@ Twenty cards, each a static HTML twin of the RN component with a README (`compon
 
 | Family | Cards |
 |---|---|
-| Actions | Button (target, WP3), OutlineAction |
+| Actions | Button, OutlineAction |
 | Status | MetaTag, LivePill (with LiveDot), CountPill (with tab badges) |
 | Data | EloTile, RollingNumber (settled frame), DeltaChip |
 | Navigation | TabBar (with the Arena icon's embers), AppHeader (with the header status chip), Chip |
@@ -410,8 +410,8 @@ Other fixed sizes live with their components: the live broadcast HUD uses `BROAD
 
 | Token | Value | Use |
 |---|---|---|
-| `opacity-disabled` | 0.5 | The one disabled style (`button.tsx:100`, FightButton, OutlineAction). Three sites still use 0.6 (R3 BT-7) |
-| `opacity-pressed` | 0.7 | Press dip on rows, chips and ghost links that do not scale (`active:opacity-70`) |
+| `opacity-disabled` | 0.5 | The one disabled style: `DISABLED_OPACITY` in `components/ui/elo-system/button.tsx`, used by `Button`, `OutlineAction` and the Arena controls (WP3; guarded against 0.6) |
+| `opacity-pressed` | 0.7 | Press dip on rows, chips and ghost links that do not scale (`active:opacity-70`, `StatePressable dim`, `Button` ghost; `PRESSED_OPACITY`) |
 | `opacity-reduced-press` | 0.85 | PressableScale's dip under Reduce Motion (`pressable-scale.tsx:45`) |
 | `opacity-ember-min` | 0.35 | Countable embers never fade below this (`arena-tab-icon.tsx:143`) |
 
@@ -683,12 +683,13 @@ Three token channels exist in code, and the kit draws all three from the same to
 
 | I need... | Use | Not |
 |---|---|---|
-| A destructive action | `Button` destructive: an outline in `negative` (kit proposal) | today's `DestructiveButton` red fill under a 3.54:1 label |
-| A primary action | `Button` primary (today: `CtaButton`, `FightButton` primary) | the shadcn `Button` default variant, a hand-rolled `bg-cta` Pressable |
-| A secondary or text action | `Button` secondary / ghost (today: `SecondaryButton`, `TertiaryButton`, `FightButton`) | `ViewerButton`, `PracticeButton` (copies) |
+| A destructive action | `Button` destructive: an outline in `negative` | a red fill (the retired `DestructiveButton`) |
+| A primary action | `Button` primary (`components/ui/elo-system/button.tsx`; `FightButton` is its match-flow alias) | the shadcn `Button` default variant, a hand-rolled `bg-cta` Pressable |
+| A secondary or text action | `Button` secondary / ghost | a raw `Pressable` with an `active:` class |
+| An action over camera or film | `Button` glass | a hand-rolled glass `Pressable` |
 | A compact strip action (ROLL, OPEN, CANCEL, CONFIRM) | `OutlineAction` | a small `Button` |
 | Anything pressable that commits | `PressableScale` underneath | raw `Pressable` with a function `style` |
-| A still pressable (rows, chrome over video) | `StatePressable` | raw `Pressable` with a function `style` |
+| A still pressable (rows, chips, toggles, chrome over video) | `StatePressable` (`dim` for the 0.7 pressed dip) | raw `Pressable` with no pressed feedback or a function `style` |
 | A container | `Plate` (variants default, accent, live, win, loss) | shadcn `Card` (dead) |
 | An Arena strip | `StripShell` (compact Plate on `panel`, 3px rail) | |
 | A caps label tag | `MetaTag` | shadcn `Badge` |
@@ -701,7 +702,7 @@ Three token channels exist in code, and the kit draws all three from the same to
 | A person | `Avatar32` (square initials or photo) | shadcn `Avatar` (round, unused), `InitialsBlock` outside the match flow |
 | A notice | `toast.success / error / info` (`BrandToast`) | a banner for a one-off message |
 | Loading | the skeleton set (`SkeletonProvider`, `SkeletonBlock`, `SkeletonPlate`, ...) | a free-floating red `ActivityIndicator` |
-| A busy action | `FightButton busy` (the busy-button pattern) | a spinner next to a button |
+| A busy action | `Button busy` (the busy-button pattern) | a spinner next to a button |
 | A picker | `SearchSelect` (`NativeSelect` wraps it) | shadcn `Select` (dead) |
 | A sheet | one bottom-sheet shell with 8px top corners (WP1 target; today `Sheet`, direct `BottomSheetModal`, or RN `Modal`) | gorhom's default 15px radius |
 
@@ -713,14 +714,13 @@ Three token channels exist in code, and the kit draws all three from the same to
 |---|---|---|
 | `PressableScale` | `components/ui/pressable-scale.tsx` | Canonical press primitive: 0.97 scale on `duration.instant` brand ease-out, `spring.press` release, optional semantic haptic |
 | `StatePressable` | `components/ui/state-pressable.tsx` | Canonical still pressable |
-| `FightButton` | `components/match-flow/fight/fight-ui.tsx:105` | The API the unified `Button` takes: primary / secondary / ghost, `busy`, `disabled`, `height` 56, `icon`, `trailing`, `haptic`, `sheen` |
-| `CtaButton`, `SecondaryButton`, `TertiaryButton`, `DestructiveButton` | `components/auth/auth-buttons.tsx` | The real app-wide buttons (30 / 16 / 19 / 1 call sites) but on raw `Pressable` with no press scale (R3 BT-1); WP3 aliases them onto `Button` |
+| `Button` | `components/ui/elo-system/button.tsx` | The one brand button (WP3): primary / secondary / ghost / destructive / glass, `busy`, `disabled` (the one 0.5 dim), `height` 56, `icon`, `trailing`, `haptic`, `sheen`, on `PressableScale` |
+| `FightButton` | `components/match-flow/fight/fight-ui.tsx` | Thin match-flow alias of `Button` (primary / secondary / ghost) |
 | `OutlineAction` | `components/arena/strip-primitives.tsx` | Canonical compact action: 28px tall, `radius-tag`, `hairline-strong`, `action-sm` label, 44px hit area |
 | `SteelSheen` | `components/ui/steel-sheen.tsx` | Ambient sweep on a waiting-on-you button (Accept, Confirm result) |
-| `ViewerButton`, `PracticeButton` | highlight-viewer, practice | Copies of the three tiers; fold into `Button` |
-| shadcn `Button` | `components/ui/button.tsx` | Legacy: admin and the update banner only; white label on red (3.54:1) |
+| shadcn `Button` | `components/ui/button.tsx` | Legacy, deprecated: the update banner only (WP4 deletes it); white label on red (3.54:1) |
 
-Cards (Actions family): **Button** (target: primary, secondary, ghost, destructive outline in `negative`; states rest, pressed, disabled, busy) and **OutlineAction**.
+Cards (Actions family): **Button** (primary, secondary, ghost, destructive outline in `negative`; states rest, pressed, disabled, busy) and **OutlineAction**.
 
 #### Status and badges
 
@@ -784,7 +784,7 @@ The 20 cards in `components/`, by family (the `group` on each card):
 
 | Family | Card | RN source |
 |---|---|---|
-| Actions | Button (target, WP3: primary, secondary, ghost, destructive outline in `negative`; rest, pressed, disabled, busy) | `fight-ui.tsx` API; today `auth-buttons.tsx` |
+| Actions | Button (WP3: primary, secondary, ghost, destructive outline in `negative`; rest, pressed, disabled, busy) | `components/ui/elo-system/button.tsx` |
 | Actions | OutlineAction | `components/arena/strip-primitives.tsx` |
 | Status | MetaTag | `components/ui/elo-system/meta-tag.tsx` |
 | Status | LivePill (with LiveDot) | `components/ui/elo-system/live-pill.tsx` |

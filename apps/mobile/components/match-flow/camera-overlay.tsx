@@ -1,11 +1,12 @@
 import * as React from "react";
-import { Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { CameraView } from "expo-camera";
 import { Camera, CameraOff } from "lucide-react-native";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { cn } from "@/lib/cn";
 import { fitRecordedFrame, readyPreviewWidth } from "@/lib/video/recorded-frame";
 import { BROADCAST } from "./live/broadcast-tokens";
+import { Button } from "@/components/ui/elo-system/button";
 
 interface CameraOverlayProps {
   cameraRef: React.MutableRefObject<CameraView | null>;
@@ -86,17 +87,15 @@ export function CameraOverlay({
           </View>
         </View>
         {permissionCanAskAgain ? (
-          <Pressable
-            accessibilityRole="button"
-            onPress={onRequestPermission}
+          <Button
+            variant="secondary"
+            label="Grant Access"
+            height={36}
             hitSlop={10}
-            className="mt-3 self-start flex-row items-center gap-2 border border-hairline-strong rounded-xs bg-surface-3 px-3 py-2 active:bg-surface-4"
-          >
-            <Camera size={14} color={tokens.textPrimary} />
-            <Text className="font-heading text-[10px] text-ink uppercase tracking-caps">
-              Grant Access
-            </Text>
-          </Pressable>
+            className="mt-3 self-start"
+            onPress={onRequestPermission}
+            icon={(color) => <Camera size={14} color={color} />}
+          />
         ) : null}
       </View>
     );

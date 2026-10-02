@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Pressable } from "react-native";
+import { PressableScale } from "@/components/ui/pressable-scale";
 import { Maximize2 } from "lucide-react-native";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { HIGHLIGHT_COPY } from "@/lib/highlight/highlight-copy";
@@ -8,7 +8,7 @@ import { HIGHLIGHT_COPY } from "@/lib/highlight/highlight-copy";
 export function HighlightFullscreenButton({ onPress }: { onPress: () => void }) {
   const tokens = useThemedTokens();
   return (
-    <Pressable
+    <PressableScale
       testID="highlight-fullscreen"
       accessibilityRole="button"
       accessibilityLabel={HIGHLIGHT_COPY.fullscreen}
@@ -17,6 +17,6 @@ export function HighlightFullscreenButton({ onPress }: { onPress: () => void }) 
       className="absolute right-2 bottom-2 p-2 bg-surface-3 border border-hairline rounded-xs"
     >
       <Maximize2 size={16} color={tokens.textPrimary} />
-    </Pressable>
+    </PressableScale>
   );
 }

@@ -1,5 +1,6 @@
 import * as React from "react";
-import { ActivityIndicator, BackHandler, Pressable, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, BackHandler, Text, TextInput, View } from "react-native";
+import { PressableScale } from "@/components/ui/pressable-scale";
 import { ChevronLeft, Pencil } from "lucide-react-native";
 import { isValidAthleteWeight } from "@jits/shared/api/athlete-weight";
 import { ON_MEDIA, usePalette } from "@/lib/theme/palette";
@@ -180,7 +181,7 @@ function MyWeight() {
             {weightText(f.myWeight)}
           </Text>
           {f.myWeighed ? null : (
-            <Pressable
+            <PressableScale
               testID="faceoff-edit-weight"
               accessibilityRole="button"
               accessibilityLabel="Edit your profile weight"
@@ -192,7 +193,7 @@ function MyWeight() {
               style={{ width: 44, height: 44, alignItems: "center", justifyContent: "center" }}
             >
               <Pencil size={16} color={p.text2} />
-            </Pressable>
+            </PressableScale>
           )}
         </View>
         {f.profileWeightSaved != null ? (
@@ -227,7 +228,7 @@ function MyWeight() {
             borderRadius: FIGHT_RADIUS.button,
           }}
         />
-        <Pressable
+        <PressableScale
           testID="faceoff-weight-save"
           accessibilityRole="button"
           accessibilityLabel="Save profile weight"
@@ -241,8 +242,8 @@ function MyWeight() {
           <Text className="font-heading uppercase" style={{ fontSize: 13, letterSpacing: 0.8, color: p.text }}>
             {f.savingWeight ? "Saving" : "Save"}
           </Text>
-        </Pressable>
-        <Pressable
+        </PressableScale>
+        <PressableScale
           testID="faceoff-weight-cancel"
           accessibilityRole="button"
           accessibilityLabel="Cancel weight edit"
@@ -252,7 +253,7 @@ function MyWeight() {
           <Text className="font-heading uppercase" style={{ fontSize: 13, letterSpacing: 0.8, color: p.text2 }}>
             Cancel
           </Text>
-        </Pressable>
+        </PressableScale>
       </View>
       <Text testID="faceoff-weight-edit-note" className="font-body" style={{ fontSize: 12, color: p.text2 }}>
         Updates your profile weight for future matches. This match keeps its weigh-in.

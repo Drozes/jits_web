@@ -5,9 +5,9 @@ import { toast } from "@/components/ui/toast";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { useAmber } from "@/components/match-detail/use-amber";
 import { matchHaptics } from "@/lib/match-flow/use-haptics";
+import { Button } from "@/components/ui/elo-system/button";
 import { supabase } from "@/lib/supabase/client";
 import { disputeMatchResult } from "@jits/shared/api/mutations";
-import { cn } from "@/lib/cn";
 
 interface DisputeFormProps {
   matchId: string;
@@ -78,20 +78,13 @@ export function DisputeForm({ matchId, onCancel, onSubmitted, onWindowClosed }: 
         className="h-24 rounded-sm border border-hairline-strong bg-surface-3 px-3 py-2 font-body text-[13px] text-ink"
       />
 
-      <Pressable
+      <Button
         testID="dispute-submit"
-        accessibilityRole="button"
-        onPress={handleSubmit}
+        label={submitting ? "Submitting..." : "Submit Dispute"}
+        height={44}
         disabled={submitting}
-        className={cn(
-          "bg-cta items-center justify-center py-3 rounded-sm active:bg-cta-hover",
-          submitting && "opacity-50",
-        )}
-      >
-        <Text className="font-heading text-[13px] text-ink-on-cta uppercase tracking-caps">
-          {submitting ? "Submitting..." : "Submit Dispute"}
-        </Text>
-      </Pressable>
+        onPress={handleSubmit}
+      />
 
       <Pressable
         testID="dispute-back"

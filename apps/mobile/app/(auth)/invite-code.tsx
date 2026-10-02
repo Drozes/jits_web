@@ -9,8 +9,8 @@ import { KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, View } fro
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { extractInviteFromText, formatInviteCode } from "@jits/shared/utils";
 import { AppHeader } from "@/components/layout/app-header";
-import { CtaButton } from "@/components/auth/auth-buttons";
 import { Plate } from "@/components/ui/elo-system";
+import { Button } from "@/components/ui/elo-system/button";
 import { makePendingInvite, savePendingInvite } from "@/lib/invites/pending-invite";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 
@@ -93,7 +93,7 @@ export default function InviteCodeScreen() {
             </Text>
           ) : null}
           {/* Slot: the native slice mounts <PasteInviteButton /> here. */}
-          <CtaButton label={saving ? "Checking..." : "Continue"} onPress={() => void submit()} disabled={saving || locked || !value.trim()} />
+          <Button label={saving ? "Checking..." : "Continue"} onPress={() => void submit()} disabled={saving || locked || !value.trim()} />
         </Plate>
         <View>
           <Text className="font-body text-[12px] text-ink-3 text-center">

@@ -7,6 +7,7 @@
  */
 import * as React from "react";
 import { Text, View } from "react-native";
+import { DISABLED_OPACITY } from "@/components/ui/elo-system/button";
 import { PressableScale } from "@/components/ui/pressable-scale";
 import { Plate, LivePill } from "@/components/ui/elo-system";
 
@@ -50,7 +51,7 @@ export function GoLivePlate({ isLive, isSaving, onToggle, body }: GoLivePlatePro
             ? "mt-4 min-h-[44px] items-center justify-center rounded-sm border border-hairline-strong px-5 active:bg-surface-4"
             : "mt-4 min-h-[44px] items-center justify-center rounded-sm bg-cta px-5 active:bg-cta-hover"
         }
-        style={isSaving ? { opacity: 0.6 } : undefined}
+        style={isSaving ? { opacity: DISABLED_OPACITY } : undefined}
       >
         <Text
           className={

@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Alert, Pressable, Text, View } from "react-native";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/elo-system/button";
 import { Plate } from "@/components/ui/elo-system";
 import { NativeSelect } from "@/components/ui/native-select";
 import { toast } from "@/components/ui/toast";
@@ -153,9 +153,13 @@ export function MemberGymOwnerSection({
           title="Gyms"
           searchPlaceholder="Search gyms"
         />
-        <Button onPress={handleAdd} disabled={busy || !pendingGymId}>
-          {busy ? "Saving…" : "Make Gym Owner"}
-        </Button>
+        <Button
+          variant="secondary"
+          label={busy ? "Saving…" : "Make Gym Owner"}
+          height={44}
+          disabled={busy || !pendingGymId}
+          onPress={handleAdd}
+        />
       </View>
     </Plate>
   );

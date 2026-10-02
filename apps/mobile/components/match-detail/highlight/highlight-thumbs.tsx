@@ -29,7 +29,7 @@ export function HighlightThumb({ kind, selected, disabled, onPress, testIDPrefix
       className={cn(
         "items-center justify-center rounded-sm border",
         selected ? "bg-surface-4 border-ink" : "border-hairline-strong active:bg-surface-4",
-        disabled && "opacity-60",
+        disabled && "opacity-50",
       )}
       style={{ width: 44, height: 44 }}
     >

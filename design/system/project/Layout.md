@@ -91,8 +91,8 @@ Other fixed sizes live with their components: the live broadcast HUD uses `BROAD
 
 | Token | Value | Use |
 |---|---|---|
-| `opacity-disabled` | 0.5 | The one disabled style (`button.tsx:100`, FightButton, OutlineAction). Three sites still use 0.6 (R3 BT-7) |
-| `opacity-pressed` | 0.7 | Press dip on rows, chips and ghost links that do not scale (`active:opacity-70`) |
+| `opacity-disabled` | 0.5 | The one disabled style: `DISABLED_OPACITY` in `components/ui/elo-system/button.tsx`, used by `Button`, `OutlineAction` and the Arena controls (WP3; guarded against 0.6) |
+| `opacity-pressed` | 0.7 | Press dip on rows, chips and ghost links that do not scale (`active:opacity-70`, `StatePressable dim`, `Button` ghost; `PRESSED_OPACITY`) |
 | `opacity-reduced-press` | 0.85 | PressableScale's dip under Reduce Motion (`pressable-scale.tsx:45`) |
 | `opacity-ember-min` | 0.35 | Countable embers never fade below this (`arena-tab-icon.tsx:143`) |
 

@@ -14,8 +14,8 @@ import { ActivityIndicator, Linking, ScrollView, Text, View } from "react-native
 import { Redirect, useRouter, type Href } from "expo-router";
 import { ACCURACY_TOO_LOW_COPY, DOB_REQUIRED_COPY, LOCATION_DENIED_COPY } from "@jits/shared/utils";
 import { AppHeader } from "@/components/layout/app-header";
-import { CtaButton, SecondaryButton, TertiaryButton } from "@/components/auth/auth-buttons";
 import { Plate } from "@/components/ui/elo-system";
+import { Button } from "@/components/ui/elo-system/button";
 import { ClaimDobStep } from "@/components/invite/claim-dob-step";
 import { useAuth } from "@/lib/auth/hooks";
 import { usePendingInvite } from "@/lib/invites/use-pending-invite";
@@ -102,14 +102,14 @@ export default function InviteClaimScreen() {
             <Text className="font-body text-[14px] text-ink leading-6">
               Signed in as {name ?? "your account"}. Not you? Sign out and the invite waits for the right account.
             </Text>
-            <CtaButton label="Continue" onPress={() => setConfirmed(true)} />
-            <SecondaryButton label="Sign out" onPress={() => void notMe()} />
-            <TertiaryButton label="Not now" onPress={() => void notNow()} />
+            <Button label="Continue" onPress={() => setConfirmed(true)} />
+            <Button variant="secondary" label="Sign out" onPress={() => void notMe()} />
+            <Button variant="ghost" height={44} label="Not now" onPress={() => void notNow()} />
           </Plate>
         ) : name && !step && !savingDob ? (
           <View className="flex-row flex-wrap items-center gap-x-2" testID="claim-signed-in-as">
             <Text className="font-body text-[12px] text-ink-3">Signed in as {name}. Not you?</Text>
-            <TertiaryButton label="Sign out" onPress={() => void notMe()} className="px-0 py-1" />
+            <Button variant="ghost" height={28} style={{ paddingHorizontal: 0 }} label="Sign out" onPress={() => void notMe()} />
           </View>
         ) : null}
 
@@ -119,7 +119,7 @@ export default function InviteClaimScreen() {
             <Text className="font-body text-[14px] text-ink leading-6">
               Finish your current match, then start this one.
             </Text>
-            <CtaButton label="Go to the match" onPress={() => router.replace(arenaMatchHref(step.matchId) as Href)} />
+            <Button label="Go to the match" onPress={() => router.replace(arenaMatchHref(step.matchId) as Href)} />
           </Plate>
         ) : null}
 
@@ -141,7 +141,7 @@ export default function InviteClaimScreen() {
             <Text className="font-heading text-[18px] text-ink uppercase">Booked</Text>
             <Text className="font-body text-[14px] text-ink leading-6">{step.message}</Text>
             {locationDenied ? <LocationOff /> : null}
-            <CtaButton label="Go to the Arena" onPress={() => router.replace(`${ARENA_HREF}?booking=${step.challengeId}` as Href)} />
+            <Button label="Go to the Arena" onPress={() => router.replace(`${ARENA_HREF}?booking=${step.challengeId}` as Href)} />
           </Plate>
         ) : null}
 
@@ -150,7 +150,7 @@ export default function InviteClaimScreen() {
             <Text className="font-body text-[16px] text-ink leading-6">
               {step.already ? `You and ${step.inviterName} are already friends.` : `You and ${step.inviterName} are now friends.`}
             </Text>
-            <CtaButton label="Go to the Arena" onPress={() => router.replace(ARENA_HREF as Href)} />
+            <Button label="Go to the Arena" onPress={() => router.replace(ARENA_HREF as Href)} />
           </Plate>
         ) : null}
 
@@ -169,7 +169,7 @@ export default function InviteClaimScreen() {
             <Text accessibilityRole="alert" className="font-body text-[14px] text-ink leading-6">
               {ACCURACY_TOO_LOW_COPY}
             </Text>
-            <CtaButton label="Try again" onPress={() => void run()} />
+            <Button label="Try again" onPress={() => void run()} />
           </Plate>
         ) : null}
 
@@ -179,11 +179,11 @@ export default function InviteClaimScreen() {
               {step.message}
             </Text>
             {step.terminal ? (
-              <CtaButton label="Go to the Arena" onPress={() => router.replace(ARENA_HREF as Href)} />
+              <Button label="Go to the Arena" onPress={() => router.replace(ARENA_HREF as Href)} />
             ) : (
               <>
                 {pending?.code ? (
-                  <CtaButton
+                  <Button
                     label="Enter the code again"
                     onPress={() => {
                       void clearPendingInvite();
@@ -191,9 +191,10 @@ export default function InviteClaimScreen() {
                     }}
                   />
                 ) : (
-                  <CtaButton label="Try again" onPress={() => void run()} />
+                  <Button label="Try again" onPress={() => void run()} />
                 )}
-                <SecondaryButton
+                <Button
+                  variant="secondary"
                   label="Not now"
                   onPress={() => {
                     void clearPendingInvite();
@@ -213,7 +214,7 @@ function LocationOff() {
   return (
     <View className="gap-2" testID="claim-location-off">
       <Text className="font-body text-[13px] text-ink-2 leading-5">{LOCATION_DENIED_COPY}</Text>
-      <SecondaryButton label="Open Settings" onPress={() => void Linking.openSettings()} />
+      <Button variant="secondary" label="Open Settings" onPress={() => void Linking.openSettings()} />
     </View>
   );
 }

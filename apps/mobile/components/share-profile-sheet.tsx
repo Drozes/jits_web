@@ -1,9 +1,10 @@
 import * as React from "react";
-import { Pressable, Share, Text, View } from "react-native";
+import { Share, Text, View } from "react-native";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "./ui/sheet";
 import { Info, Share2 } from "lucide-react-native";
 import { toast } from "./ui/toast";
 import { Plate } from "./ui/elo-system";
+import { Button } from "@/components/ui/elo-system/button";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { buildShareUrl, buildShareText } from "@jits/shared/utils";
 
@@ -77,18 +78,15 @@ export function ShareProfileSheet({ athlete, children }: ShareProfileSheetProps)
             </View>
           </Plate>
 
-          <Pressable
+          <Button
+            label="Share My Number"
             onPress={handleShare}
-            accessibilityRole="button"
-            className="flex-row items-center justify-center gap-2 bg-cta rounded-sm px-5 py-4 active:bg-cta-hover"
-          >
-            <View pointerEvents="none">
-              <Share2 size={16} color={tokens.textOnAccent} />
-            </View>
-            <Text className="font-heading text-[12px] text-ink-on-cta uppercase tracking-caps">
-              Share My Number
-            </Text>
-          </Pressable>
+            icon={(color) => (
+              <View pointerEvents="none">
+                <Share2 size={16} color={color} />
+              </View>
+            )}
+          />
 
           <View className="flex-row items-start gap-2">
             <Info size={14} color={tokens.textTertiary} style={{ marginTop: 2 }} />

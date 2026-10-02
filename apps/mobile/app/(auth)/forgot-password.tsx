@@ -8,10 +8,10 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Plate, Wordmark } from "@/components/ui/elo-system";
+import { Button } from "@/components/ui/elo-system/button";
 import { toast } from "@/components/ui";
 import { AppHeader } from "@/components/layout/app-header";
 import { AuthFormField } from "@/components/auth/auth-form-field";
-import { CtaButton, TertiaryButton } from "@/components/auth/auth-buttons";
 import { useAuth } from "@/lib/auth/hooks";
 
 /**
@@ -77,7 +77,7 @@ export default function ForgotPasswordScreen() {
                 If an account exists for {email}, we sent a password reset link.
                 Follow the instructions to choose a new password.
               </Text>
-              <CtaButton
+              <Button
                 label="Back to Sign In"
                 onPress={() => router.replace("/login")}
               />
@@ -102,13 +102,15 @@ export default function ForgotPasswordScreen() {
                   error={emailError}
                   showError={touched}
                 />
-                <CtaButton
+                <Button
                   label={submitting ? "Sending..." : "Send Reset Email"}
                   onPress={onSubmit}
                   disabled={submitting || (touched && Boolean(emailError))}
                 />
               </Plate>
-              <TertiaryButton
+              <Button
+                variant="ghost"
+                height={44}
                 label="Back to Sign In"
                 onPress={() => router.replace("/login")}
               />

@@ -70,7 +70,7 @@ import { ArenaSkeleton } from "@/components/arena/arena-skeleton";
 import { OnAirStrip } from "@/components/arena/on-air-strip";
 import { useFirstLoadEntering } from "@/lib/motion";
 import { CapPlate, RosterErrorPlate } from "@/components/arena/arena-plates";
-import { SecondaryButton, TertiaryButton } from "@/components/auth/auth-buttons";
+import { Button } from "@/components/ui/elo-system/button";
 import { toast } from "@/components/ui/toast";
 import { BookedStrip } from "@/components/invite/booked-strip";
 import { sortFriendsFirst } from "@jits/shared/api/friends";
@@ -482,15 +482,17 @@ export default function ArenaScreen() {
           testID="arena-invite-actions"
           className="gap-0.5 border-t border-hairline bg-surface px-4 pb-1 pt-2"
         >
-          <SecondaryButton
+          <Button
+            variant="secondary"
+            height={44}
             label="Invite a training partner"
             onPress={() => router.push("/invite?from=arena" as Href)}
-            className="py-3"
           />
-          <TertiaryButton
+          <Button
+            variant="ghost"
+            height={32}
             label="Got a challenge code?"
             onPress={() => router.push("/invite-code" as Href)}
-            className="py-1.5"
           />
         </View>
       ) : null}

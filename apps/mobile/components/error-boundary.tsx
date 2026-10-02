@@ -1,5 +1,6 @@
 import * as React from "react";
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
+import { Button } from "@/components/ui/elo-system/button";
 import { useAuth } from "@/lib/auth/hooks";
 import { captureException } from "@/lib/error-tracking/sentry";
 
@@ -85,24 +86,10 @@ function ErrorFallback({
       ) : null}
 
       <View className="gap-3 w-full">
-        <Pressable
-          onPress={onRetry}
-          className="rounded-md bg-cta py-3 items-center active:bg-cta-hover"
-        >
-          <Text className="text-sm font-heading text-ink-on-cta">
-            Try again
-          </Text>
-        </Pressable>
+        <Button label="Try again" onPress={onRetry} />
 
         {signOut ? (
-          <Pressable
-            onPress={handleSignOut}
-            className="rounded-md border border-hairline py-3 items-center active:bg-surface-3"
-          >
-            <Text className="text-sm font-heading text-ink">
-              Sign out
-            </Text>
-          </Pressable>
+          <Button variant="secondary" label="Sign out" onPress={() => void handleSignOut()} />
         ) : null}
       </View>
     </View>
