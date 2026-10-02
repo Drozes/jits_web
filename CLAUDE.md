@@ -94,20 +94,23 @@ Not discoverable from frontend code. Full reference: `research/005-backend-refer
 
 **Main design artifact:** the team's canonical mobile screen set is the Claude Design canvas "ELO RATED Native Screens", https://claude.ai/artifact/PJWm2WeqsG56HS13jHsd5D. Its "Current app" page must mirror the shipped `apps/mobile` code, so update the affected boards whenever a mobile UI change ships. Its proposed pages hold review items and redesigns. Always update it in place, reading `project/canvas.json` first. Full rules are in `~/code/EloRated/CLAUDE.md` section 5. The old `apps/web/public/design/native-screen-inventory.html` and `wireframe.html` are stale; don't use them as a source. Drift is tracked, not synced per commit: a husky post-commit hook tags every commit that touches a drawn screen onto one open `canvas-drift` bead (`design/native-screens/board-map.json` maps boards to source files), and after each mobile release (OTA or TestFlight) `/canvas-sync` redraws only the affected boards and records the synced commit in `design/native-screens/last-sync.json`. See `design/native-screens/README.md`. **Design canvas at session end:** if `node design/native-screens/drift.mjs --to <released sha>` exits 2 after a release, run `/canvas-sync`.
 
+**Design source:** [DESIGN.md](DESIGN.md) is the consolidated brand book, the same text as the live "ELO RATED Design System" artifact (https://claude.ai/artifact/NkvxzxKo3R7acP5j6aRTTe), mirrored file for file in `design/system/project/` (update both together, see `design/system/README.md`). Values come from `apps/mobile/lib/tokens.ts`; code wins.
+
 ### Color and token semantics (no decorative color)
-- **Signal Red** (`text-primary`, `#E63946` / hsl(355 78% 56%)): CTAs and state-negative (losses, destructive) only.
-- **Gain Green** (`text-success`): rating increases only.
-- **Draws/pressure:** `text-amber-500`. **Metadata:** `text-muted-foreground`.
-- **Numeric data values:** default foreground + `font-mono tabular-nums`. NEVER `text-primary` for data.
-- **Dual token encoding (keep in sync):** web `apps/web/app/globals.css` is HSL (shadcn slots), mobile `apps/mobile/lib/tokens.ts` is hex (brand precision). This dual representation is by design, do not unify it.
+- **Signal Red** (`#E63946`, `bg-cta` / `border-cta`): the one primary CTA fill per surface, labelled `text-ink-on-cta` (Void, never white), plus rules that mean "act" (active tab edge, accent rail). Never text and never data. Red TEXT for losses, errors and destructive copy is `text-negative` (or `text-cta`, which resolves to the AA-tuned `--accent-cta-text`).
+- **Gain Green** (`text-positive` / `bg-positive` / `border-positive`): rating increases, wins and LIVE only, never generic success (ready, confirmed, uploaded).
+- **Draws, pressure, pending/processing/paused/disputed:** amber via `usePalette().amber` / `use-amber.ts` (amber-500 dark, amber-800 light); no amber token yet (WP7).
+- **Text:** `text-ink` default and ALL data values, `text-ink-2` secondary, `text-ink-3` metadata and mono labels (10px and up). Surfaces: `bg-surface`, `bg-surface-2`, `bg-surface-3` (Plate), `bg-surface-4` (pressed/selected); borders `border-hairline(-faint|-strong)`.
+- **Numeric data values:** `text-ink` + `font-mono tabular-nums`. NEVER red for data.
+- **Legacy shadcn classes are retiring (WP4), do not use them in new code:** on mobile `text-primary` is the legacy red (not the ink), and `text-success`, `text-muted-foreground`, `bg-card`, `bg-muted`, `border-border` are the pre-ELO layer. Web keeps shadcn HSL slots in `apps/web/app/globals.css`; its ELO values live in `apps/web/app/design-system/tokens.css`, a mirror of `apps/mobile/lib/tokens.ts` (gated by `tokens-mirror-drift.test.ts`).
 
 ### Typography (4 purpose-bound fonts)
-Bebas Neue (`font-display`, wordmarks/taglines, all caps) · DM Sans Bold (`font-heading`, headings/labels/buttons) · Inter (`font-body`, prose, default) · JetBrains Mono (`font-mono`, ALL numeric data, always tabular-nums).
+Bebas Neue (`font-display`, the wordmark and display numerals 40px and up such as the countdown, all caps) · DM Sans Bold (`font-heading`, headings/labels/buttons, caps labels with `tracking-caps`+) · Inter (`font-body`, prose) · JetBrains Mono (`font-mono`, `font-mono-bold`, ALL numeric data, always tabular-nums, and caps meta labels). 10px minimum text. Mobile rem is 14px (`p-4` = 14px). Weight is shown in **lbs** (`LBS` in mono data strips, `lbs` in prose), never kg.
 
 ### Brand hard rules (easy to violate)
 - **No drop shadows.** Hierarchy via background-color shifts, not elevation.
-- **Sharp corners:** default radius 4px (`--radius: 0.25rem`); max 8px for modals; avatars stay circular.
-- **One primary (Signal Red) CTA per surface.**
+- **Sharp corners:** 2px tags/chips (`rounded-xs`), 3px buttons (`rounded-sm`), 4px plates (`rounded-md`, default), 8px max for sheets and modals (`rounded-lg`); only dots are round.
+- **One primary (Signal Red) CTA per surface.** A selected state is `bg-surface-4` + `border-hairline-strong`, never a red fill.
 - **Motion Rule (motion with meaning):** every animation is Reactive (touch), a Moment (one shot on a real state change, never on mount or refetch) or Ambient (a loop only while an ongoing state such as live, loading or waiting on you is true, paused in background), on the UI thread, with a still Reduce Motion state, and listed in the DESIGN.md Motion registry; tokens and the one haptics vocabulary live in `apps/mobile/lib/motion` (never a haptic on a loss or for ambient motion; heat colors only for Arena heat).
 
 ## UI Kit Rules

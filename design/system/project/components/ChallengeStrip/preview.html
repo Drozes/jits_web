@@ -1,0 +1,49 @@
+<!-- @dsCard group="Arena" height=358 subtitle="Mat Board challenge strips" -->
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ChallengeStrip preview</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--void);color:var(--ink);font-family:var(--font-body);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+.k{padding:16px;display:flex;flex-direction:column;gap:18px;max-width:100%}
+.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start}
+.col{display:flex;flex-direction:column;gap:8px}
+.cell{display:flex;flex-direction:column;gap:6px;min-width:0}
+.cap{font-family:var(--font-mono);font-weight:400;font-size:10px;line-height:14px;letter-spacing:1.68px;text-transform:uppercase;color:var(--ink-3);margin:0}
+.sec{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.flag{display:inline-flex;align-items:center;height:18px;padding:0 6px;border:1px solid var(--hairline-strong);border-radius:var(--radius-tag);font-family:var(--font-mono);font-weight:700;font-size:9px;letter-spacing:1.68px;text-transform:uppercase;color:var(--ink)}
+.flag.today{color:var(--ink-2);border-color:var(--hairline)}
+.note{font-family:var(--font-body);font-size:12px;line-height:17px;color:var(--ink-2);margin:0;max-width:358px}
+.tab{font-variant-numeric:tabular-nums}
+.ico{display:block;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.shell{position:relative;min-height:48px;display:flex;align-items:center;gap:10.5px;background:var(--panel);border:1px solid var(--hairline);border-left:3px solid var(--ink-3);border-radius:var(--radius-tag);padding:5.25px 7px 5.25px 10.5px;width:358px;max-width:100%;overflow:hidden}
+.shell.red{border-left-color:var(--signal-red)}
+.line{flex:1;min-width:0;display:flex;align-items:center;white-space:nowrap;overflow:hidden}
+.mx{font-family:var(--font-mono);font-weight:700;font-size:11px;line-height:14px;text-transform:uppercase;color:var(--ink);font-variant-numeric:tabular-nums}
+.oa{height:28px;display:inline-flex;align-items:center;padding:0 10.5px;border:1px solid var(--hairline-strong);border-radius:var(--radius-tag);font-family:var(--font-heading);font-weight:700;font-size:11px;letter-spacing:1.12px;text-transform:uppercase;color:var(--ink);flex:none}
+.edge{position:absolute;left:0;right:0;bottom:0;height:2px;background:var(--plate-bright)}
+.edge.hot{background:var(--signal-red)}
+.edge.hot::after{content:"";position:absolute;inset:0;background:var(--heat-orange)}
+</style>
+</head>
+<body>
+<div class="k">
+  <div class="cell"><p class="cap">Incoming, afterglow edge cooled (settled)</p>
+    <div class="shell red"><span class="line"><span class="mx">Alex wants to roll</span><span class="mx">&nbsp;&middot; 8:41</span></span><span class="oa">Open</span><span class="edge"></span></div>
+  </div>
+  <div class="cell"><p class="cap">Incoming, several fresh challenges</p>
+    <div class="shell red"><span class="line"><span class="mx">Alex wants to roll</span><span class="mx">&nbsp;&middot; 8:41</span><span class="mx">&nbsp;&middot; +2</span></span><span class="oa">Open</span><span class="edge"></span></div>
+  </div>
+  <div class="cell"><p class="cap">Afterglow first frame (hot, cools over 2000ms)</p>
+    <div class="shell red"><span class="line"><span class="mx">Alex wants to roll</span><span class="mx">&nbsp;&middot; 9:59</span></span><span class="oa">Open</span><span class="edge hot"></span></div>
+  </div>
+  <div class="cell"><p class="cap">Waiting (neutral rail)</p>
+    <div class="shell"><span class="line"><span class="mx">Waiting &middot; Alex</span><span class="mx">&nbsp;&middot; 8:12</span></span><span class="oa">Cancel</span></div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,67 @@
+<!-- @dsCard group="Surfaces" height=510 subtitle="Standard content container" -->
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plate preview</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--void);color:var(--ink);font-family:var(--font-body);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+.k{padding:16px;display:flex;flex-direction:column;gap:18px;max-width:100%}
+.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start}
+.col{display:flex;flex-direction:column;gap:8px}
+.cell{display:flex;flex-direction:column;gap:6px;min-width:0}
+.cap{font-family:var(--font-mono);font-weight:400;font-size:10px;line-height:14px;letter-spacing:1.68px;text-transform:uppercase;color:var(--ink-3);margin:0}
+.sec{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.flag{display:inline-flex;align-items:center;height:18px;padding:0 6px;border:1px solid var(--hairline-strong);border-radius:var(--radius-tag);font-family:var(--font-mono);font-weight:700;font-size:9px;letter-spacing:1.68px;text-transform:uppercase;color:var(--ink)}
+.flag.today{color:var(--ink-2);border-color:var(--hairline)}
+.note{font-family:var(--font-body);font-size:12px;line-height:17px;color:var(--ink-2);margin:0;max-width:358px}
+.tab{font-variant-numeric:tabular-nums}
+.ico{display:block;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.plate{background:var(--plate);border:1px solid var(--hairline);border-left-width:1px;border-left-color:var(--hairline);border-radius:var(--radius-plate);padding:14px;width:358px;max-width:100%}
+.plate.accent{border-left:3px solid var(--signal-red)}
+.plate.live,.plate.win{border-left:3px solid var(--gain-green)}
+.plate.loss{border-left:3px solid var(--negative)}
+.hd{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:7px}
+.ttl{font-family:var(--font-heading);font-weight:700;font-size:18px;line-height:22px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.meta{flex:none;display:inline-flex;align-items:center;padding:3.5px 7px;border:1px solid var(--hairline);border-radius:var(--radius-tag);font-family:var(--font-mono);font-size:10px;line-height:13px;letter-spacing:1.68px;text-transform:uppercase;color:var(--ink-2)}
+.body{font-family:var(--font-body);font-size:13px;line-height:18px;color:var(--ink-2);margin:0 0 10.5px}
+.cta{min-height:44px;padding:10.5px 17.5px;display:flex;align-items:center;justify-content:center;background:var(--signal-red);border-radius:var(--radius-button);font-family:var(--font-heading);font-weight:700;font-size:13px;letter-spacing:1.12px;text-transform:uppercase;color:var(--on-signal)}
+.later{margin-top:7px;min-height:44px;display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:10px;letter-spacing:1.68px;text-transform:uppercase;color:var(--ink-3);text-decoration:underline}
+.mini{display:flex;gap:10px;flex-wrap:wrap}
+.mini .plate{width:112px;padding:14px}
+.v{font-family:var(--font-mono);font-size:10px;letter-spacing:1.68px;text-transform:uppercase;color:var(--ink-2)}
+</style>
+</head>
+<body>
+<div class="k">
+  <div class="cell">
+    <p class="cap">variant="default" (1px hairline left edge)</p>
+    <div class="plate">
+      <div class="hd"><span class="ttl">Try a practice match</span><span class="meta">Practice</span></div>
+      <p class="body">Walk through a real Arena match against a practice bot. No rating, nobody else sees it, about a minute.</p>
+      <div class="cta">Start practice</div>
+      <div class="later">Not now</div>
+    </div>
+  </div>
+  <div class="cell">
+    <p class="cap">variant="accent" (3px Signal Red rail)</p>
+    <div class="plate accent">
+      <div class="hd"><span class="ttl">Match in progress</span><span class="meta">In progress</span></div>
+      <p class="body">vs Alex. Pick up where you left off.</p>
+      <div class="cta">Resume match &rarr;</div>
+    </div>
+  </div>
+  <div class="cell">
+    <p class="cap">State rails</p>
+    <div class="mini">
+      <div class="plate live"><span class="v">live</span></div>
+      <div class="plate win"><span class="v">win</span></div>
+      <div class="plate loss"><span class="v">loss</span></div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,53 @@
+<!-- @dsCard group="Status" height=236 subtitle="LIVE pill and LiveDot" -->
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LivePill preview</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--void);color:var(--ink);font-family:var(--font-body);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+.k{padding:16px;display:flex;flex-direction:column;gap:18px;max-width:100%}
+.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start}
+.col{display:flex;flex-direction:column;gap:8px}
+.cell{display:flex;flex-direction:column;gap:6px;min-width:0}
+.cap{font-family:var(--font-mono);font-weight:400;font-size:10px;line-height:14px;letter-spacing:1.68px;text-transform:uppercase;color:var(--ink-3);margin:0}
+.sec{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.flag{display:inline-flex;align-items:center;height:18px;padding:0 6px;border:1px solid var(--hairline-strong);border-radius:var(--radius-tag);font-family:var(--font-mono);font-weight:700;font-size:9px;letter-spacing:1.68px;text-transform:uppercase;color:var(--ink)}
+.flag.today{color:var(--ink-2);border-color:var(--hairline)}
+.note{font-family:var(--font-body);font-size:12px;line-height:17px;color:var(--ink-2);margin:0;max-width:358px}
+.tab{font-variant-numeric:tabular-nums}
+.ico{display:block;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.pill{display:inline-flex;align-items:center;gap:7px}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--gain-green);flex:none}
+.lbl{font-family:var(--font-mono);font-weight:700;font-size:10px;line-height:13px;letter-spacing:2.52px;text-transform:uppercase;color:var(--gain-green)}
+.media{background:var(--on-media-ink);padding:14px;border-radius:var(--radius-plate);display:inline-flex;gap:14px;align-items:center}
+.slab{background:var(--on-media-tag);padding:6px 8px;border-radius:var(--radius-tag);display:inline-flex}
+.media .pill{gap:6px}
+.media .dot{background:var(--on-media-win)}
+.media .lbl{color:var(--on-media-win)}
+.hdr{width:16px;height:28px;display:flex;align-items:center;justify-content:center}
+.dots{display:flex;gap:18px;align-items:center}
+.fade{opacity:0.45;transform:scale(0.7)}
+</style>
+</head>
+<body>
+<div class="k">
+  <div class="cell"><p class="cap">LivePill, real labels</p>
+    <div class="row">
+      <span class="pill"><span class="dot"></span><span class="lbl">Live</span></span>
+      <span class="pill"><span class="dot"></span><span class="lbl">In lobby</span></span>
+      <span class="pill"><span class="dot"></span><span class="lbl">Sent</span></span>
+    </div>
+  </div>
+  <div class="cell"><p class="cap">onDark over video (fixed #22C55E, 6px gap)</p>
+    <div class="media"><span class="slab"><span class="pill"><span class="dot"></span><span class="lbl">Live</span></span></span></div>
+  </div>
+  <div class="cell"><p class="cap">LiveDot sizes: 7 (pill, header live dot), 6 (status chip)</p>
+    <div class="dots"><span class="dot"></span><span class="hdr"><span class="dot"></span></span><span class="dot" style="width:6px;height:6px"></span></div>
+  </div>
+</div>
+</body>
+</html>
