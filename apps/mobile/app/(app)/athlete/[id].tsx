@@ -103,7 +103,7 @@ export default function AthleteProfileScreen() {
       <View className="flex-1 bg-surface">
         <AppHeader title="Athlete" back />
         <View className="flex-1 items-center justify-center px-6">
-          <Text className="font-heading text-[14px] text-ink uppercase tracking-caps">
+          <Text className="font-heading text-callout text-ink uppercase tracking-caps">
             Athlete Not Found
           </Text>
         </View>

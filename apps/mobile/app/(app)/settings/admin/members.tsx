@@ -72,7 +72,7 @@ function MembersManager() {
   return (
     <>
       <View className="gap-2">
-        <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">
+        <Text className="font-mono tabular-nums text-micro text-ink-3 uppercase tracking-caps-l">
           SELECT MEMBER ({members.length})
         </Text>
         <NativeSelect
@@ -105,14 +105,14 @@ function MemberHeader({ member }: { member: AdminAthlete }) {
     <Plate className="gap-1">
       <View className="flex-row items-center justify-between">
         <Text
-          className="font-heading text-[15px] text-ink flex-1 pr-3"
+          className="font-heading text-subhead text-ink flex-1 pr-3"
           numberOfLines={1}
         >
           {member.display_name}
         </Text>
         <RoleBadge role={member.platform_role} />
       </View>
-      <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">
+      <Text className="font-mono tabular-nums text-micro text-ink-3 uppercase tracking-caps-l">
         {member.primary_gym_name
           ? `GYM: ${member.primary_gym_name}`
           : "NO PRIMARY GYM"}

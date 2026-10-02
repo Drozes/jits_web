@@ -82,10 +82,10 @@ export function MemberRoleSection({
   if (!isFounder) {
     return (
       <Plate className="gap-2">
-        <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">
+        <Text className="font-mono tabular-nums text-micro text-ink-3 uppercase tracking-caps-l">
           PLATFORM ROLE
         </Text>
-        <Text className="font-body text-[13px] text-ink-2 leading-relaxed">
+        <Text className="font-body text-body text-ink-2 leading-relaxed">
           Only a founder can change platform roles. You can still manage gym
           ownership below.
         </Text>
@@ -96,7 +96,7 @@ export function MemberRoleSection({
   return (
     <Plate className="gap-4">
       <View className="gap-2">
-        <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">
+        <Text className="font-mono tabular-nums text-micro text-ink-3 uppercase tracking-caps-l">
           SET PLATFORM ROLE
         </Text>
         <View className="flex-row gap-2">
@@ -113,7 +113,7 @@ export function MemberRoleSection({
               >
                 {active ? <SelectCheck size={11} /> : null}
                 <Text
-                  className={`font-mono text-[10px] uppercase tracking-caps-l ${
+                  className={`font-mono tabular-nums text-micro uppercase tracking-caps-l ${
                     active ? "text-ink" : "text-ink-3"
                   }`}
                 >

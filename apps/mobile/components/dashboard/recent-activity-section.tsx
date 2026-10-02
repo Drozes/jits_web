@@ -44,7 +44,7 @@ function EmptyState({
 }) {
   return (
     <View className="border border-dashed border-hairline-strong rounded-md p-6 items-center">
-      <Text className="font-body text-[13px] text-ink-2 text-center">
+      <Text className="font-body text-body text-ink-2 text-center">
         {message}
       </Text>
       {showLink ? (
@@ -58,7 +58,7 @@ function EmptyState({
               the practice offer. This empty-state link is not the removed
               Arena nudge card (jits-02vo.1); Recent Activity is out of that
               slice's scope (triage rows 25-26), so it stays for now. */}
-          <Text className="font-mono-bold text-[10px] text-ink-2 uppercase tracking-caps-l mt-2">
+          <Text className="font-mono-bold tabular-nums text-micro text-ink-2 uppercase tracking-caps-l mt-2">
             Find a match in the Arena →
           </Text>
         </Pressable>
@@ -89,7 +89,7 @@ export function RecentActivitySection({
             hitSlop={{ top: 14, bottom: 14, left: 8, right: 8 }}
             className="active:opacity-70"
           >
-            <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-l">
+            <Text className="font-mono-bold tabular-nums text-micro text-ink-3 uppercase tracking-caps-l">
               View all
             </Text>
           </Pressable>

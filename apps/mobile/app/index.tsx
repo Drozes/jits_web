@@ -20,7 +20,7 @@ export default function Index() {
     if (user && athleteLoadFailed) {
       return (
         <View className="flex-1 items-center justify-center gap-4 bg-surface px-6">
-          <Text className="font-body text-[14px] text-ink-2 text-center">
+          <Text className="font-body text-callout text-ink-2 text-center">
             Can't reach ELO RATED right now. Check your connection.
           </Text>
           <Button testID="athlete-load-retry" label="Try Again" onPress={retryAthleteLoad} />
@@ -30,7 +30,7 @@ export default function Index() {
     }
     return (
       <View className="flex-1 items-center justify-center">
-        <Text className="font-body text-base text-ink-3">Loading...</Text>
+        <Text className="font-body text-callout text-ink-3">Loading...</Text>
       </View>
     );
   }

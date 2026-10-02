@@ -157,7 +157,7 @@ export function SetupWizard({
       )}
 
       {error ? (
-        <Text className="font-body text-[13px] text-negative text-center">
+        <Text className="font-body text-body text-negative text-center">
           {error}
         </Text>
       ) : null}

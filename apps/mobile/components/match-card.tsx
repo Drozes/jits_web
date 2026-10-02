@@ -44,7 +44,7 @@ function ChallengePill({ children, accent }: { children: React.ReactNode; accent
     >
       <Text
         className={cn(
-          "font-mono-bold text-[10px] uppercase tracking-caps-l",
+          "font-mono-bold tabular-nums text-micro uppercase tracking-caps-l",
           accent ? "text-ink" : "text-ink-2",
         )}
       >
@@ -67,12 +67,12 @@ function CardInner({ type = "match", opponentName, opponentPhotoUrl, result, sta
           {photoSrc ? (
             <Image source={{ uri: photoSrc }} style={{ width: "100%", height: "100%" }} contentFit="cover" />
           ) : (
-            <Text className="font-mono-bold text-ink text-[10px] tracking-caps-l">{getInitials(opponentName)}</Text>
+            <Text className="font-mono-bold tabular-nums text-ink text-micro tracking-caps-l">{getInitials(opponentName)}</Text>
           )}
         </View>
         <View className="flex-1 min-w-0">
-          <Text className="font-heading text-[14px] text-ink" numberOfLines={1}>{opponentName}</Text>
-          <Text className="font-mono text-[11px] text-ink-3 mt-[2px]" numberOfLines={1}>
+          <Text className="font-heading text-callout text-ink" numberOfLines={1}>{opponentName}</Text>
+          <Text className="font-mono tabular-nums text-caption text-ink-3 mt-[2px]" numberOfLines={1}>
             {subtitle}
           </Text>
         </View>
@@ -82,7 +82,7 @@ function CardInner({ type = "match", opponentName, opponentPhotoUrl, result, sta
         {type === "match" && eloDelta != null ? (
           <Text
             className={cn(
-              "font-mono-bold text-[16px] tabular-nums",
+              "font-mono-bold text-subhead tabular-nums",
               eloDelta > 0 && "text-positive",
               eloDelta < 0 && "text-negative",
               eloDelta === 0 && "text-ink-3",

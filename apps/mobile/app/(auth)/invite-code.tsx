@@ -13,6 +13,7 @@ import { Plate } from "@/components/ui/elo-system";
 import { Button } from "@/components/ui/elo-system/button";
 import { makePendingInvite, savePendingInvite } from "@/lib/invites/pending-invite";
 import { useThemedTokens } from "@/lib/theme/use-theme";
+import { typeSize } from "@/lib/typography";
 
 export default function InviteCodeScreen() {
   const router = useRouter();
@@ -57,7 +58,7 @@ export default function InviteCodeScreen() {
     <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }} className="bg-surface">
       <AppHeader title="Challenge Code" back backFallback="/" />
       <ScrollView contentContainerStyle={{ padding: 24, gap: 20 }} keyboardShouldPersistTaps="handled">
-        <Text className="font-body text-[14px] text-ink-2 leading-6">
+        <Text className="font-body text-callout text-ink-2 leading-6">
           Type the code your training partner is showing you, or paste their link.
         </Text>
         <Plate className="gap-4">
@@ -77,10 +78,11 @@ export default function InviteCodeScreen() {
             editable={!locked}
             maxLength={200}
             onSubmitEditing={() => void submit()}
-            className="rounded-sm border border-hairline-strong bg-surface-3 px-4 py-4 text-center font-mono text-[28px] tracking-[6px] text-ink"
+            className="rounded-sm border border-hairline-strong bg-surface-3 px-4 py-4 text-center font-mono tracking-code text-ink"
+            style={typeSize("headline-xl")}
           />
           {locked ? (
-            <Text accessibilityRole="alert" className="font-body text-[13px] text-negative" testID="invite-code-throttled">
+            <Text accessibilityRole="alert" className="font-body text-body text-negative" testID="invite-code-throttled">
               Too many tries. Try again in{" "}
               <Text className="font-mono tabular-nums">
                 {Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, "0")}
@@ -88,7 +90,7 @@ export default function InviteCodeScreen() {
               .
             </Text>
           ) : error ? (
-            <Text accessibilityRole="alert" className="font-body text-[13px] text-negative">
+            <Text accessibilityRole="alert" className="font-body text-body text-negative">
               {error}
             </Text>
           ) : null}
@@ -96,7 +98,7 @@ export default function InviteCodeScreen() {
           <Button label={saving ? "Checking..." : "Continue"} onPress={() => void submit()} disabled={saving || locked || !value.trim()} />
         </Plate>
         <View>
-          <Text className="font-body text-[12px] text-ink-3 text-center">
+          <Text className="font-body text-small text-ink-3 text-center">
             Codes look like {formatInviteCode("K7Q4M2")} and last 30 minutes.
           </Text>
         </View>

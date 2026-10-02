@@ -121,7 +121,7 @@ export default function InviteSetupScreen() {
       <View className="flex-1 items-center justify-center bg-surface gap-4 px-6">
         {setup.error ? (
           <>
-            <Text className="font-body text-[14px] text-ink-2 text-center">{setup.error}</Text>
+            <Text className="font-body text-callout text-ink-2 text-center">{setup.error}</Text>
             <Button label="Try Again" onPress={() => void setup.reload()} />
           </>
         ) : (
@@ -143,7 +143,7 @@ export default function InviteSetupScreen() {
             accessibilityRole="summary"
             className="rounded-sm border border-hairline-strong bg-surface-2 px-4 py-3"
           >
-            <Text className="font-heading text-[14px] text-ink">
+            <Text className="font-heading text-callout text-ink">
               {inviteSetupBanner(pending.code ? "challenge" : null)}
             </Text>
           </View>
@@ -166,28 +166,28 @@ export default function InviteSetupScreen() {
             >
               {waiverAccepted ? <SelectCheck size={13} /> : null}
             </View>
-            <Text className="flex-1 font-body text-[14px] text-ink">
+            <Text className="flex-1 font-body text-callout text-ink">
               I accept the ELO RATED terms and liability waiver.
             </Text>
           </StatePressable>
           <Button variant="ghost" height={44} label={showWaiver ? "Hide terms" : "Read terms"} onPress={() => setShowWaiver((v) => !v)} />
           {showWaiver ? (
             <ScrollView style={{ maxHeight: 220 }} nestedScrollEnabled className="rounded-sm bg-surface-2 p-3">
-              <Text className="font-body text-[12px] text-ink-2 leading-5">{TOS_TEXT}</Text>
+              <Text className="font-body text-small text-ink-2 leading-5">{TOS_TEXT}</Text>
             </ScrollView>
           ) : null}
         </Plate>
 
         {underage ? (
-          <Text testID="invite-setup-underage" accessibilityRole="alert" className="font-body text-[14px] text-negative">
+          <Text testID="invite-setup-underage" accessibilityRole="alert" className="font-body text-callout text-negative">
             {UNDERAGE_COPY}
           </Text>
         ) : null}
         {!waiverAccepted ? (
-          <Text className="font-body text-[12px] text-ink-3">Accept the waiver to continue.</Text>
+          <Text className="font-body text-small text-ink-3">Accept the waiver to continue.</Text>
         ) : null}
         {error ? (
-          <Text accessibilityRole="alert" className="font-body text-[14px] text-negative">
+          <Text accessibilityRole="alert" className="font-body text-callout text-negative">
             {error}
           </Text>
         ) : null}

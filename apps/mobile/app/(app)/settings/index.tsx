@@ -65,7 +65,7 @@ export default function SettingsScreen() {
         <SupportPlate />
         {isAdmin ? <AdminPlate /> : null}
         {isSentryEnabled() ? (
-          <Text className="font-body text-[11px] text-ink-3 leading-relaxed px-1">
+          <Text className="font-body text-caption text-ink-3 leading-relaxed px-1">
             Tip: shake your phone on any screen to report a bug with a
             screenshot.
           </Text>
@@ -96,7 +96,7 @@ function AccountPlate({
         accessibilityLabel="Sign out"
         className="flex-row items-center justify-between px-4 py-3 min-h-11 active:bg-surface-4"
       >
-        <Text className="font-mono text-[10px] text-ink-2 uppercase tracking-caps-l">
+        <Text className="font-mono tabular-nums text-micro text-ink-2 uppercase tracking-caps-l">
           SIGN OUT
         </Text>
       </Pressable>
@@ -229,7 +229,7 @@ function PlateRow({ children }: { children: React.ReactNode }) {
 
 function RowLabel({ children }: { children: React.ReactNode }) {
   return (
-    <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">
+    <Text className="font-mono tabular-nums text-micro text-ink-3 uppercase tracking-caps-l">
       {children}
     </Text>
   );
@@ -241,7 +241,7 @@ function RowValue({ children }: { children: React.ReactNode }) {
       numberOfLines={1}
       ellipsizeMode="tail"
       className={cn(
-        "font-mono-medium text-[12px] text-ink uppercase tracking-caps-l",
+        "font-mono-medium tabular-nums text-small text-ink uppercase tracking-caps-l",
         "max-w-[60%] text-right",
       )}
     >
@@ -257,7 +257,7 @@ function RowDivider() {
 function Chevron() {
   return (
     <Text
-      className="font-mono text-[14px] text-ink-3"
+      className="font-mono tabular-nums text-callout text-ink-3"
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
     >

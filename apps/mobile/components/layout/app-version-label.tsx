@@ -6,7 +6,7 @@ export function AppVersionLabel() {
   return (
     <Text
       testID="app-version-label"
-      className="text-center font-mono text-[9px] text-ink-3 tracking-caps"
+      className="text-center font-mono tabular-nums text-micro text-ink-3 tracking-caps"
     >
       {formatAppVersion(readAppVersionInfo())}
     </Text>

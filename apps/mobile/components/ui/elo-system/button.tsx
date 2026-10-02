@@ -29,6 +29,7 @@ import * as React from "react";
 import { ActivityIndicator, Text, View, type Insets, type StyleProp, type ViewStyle } from "react-native";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { cn } from "@/lib/cn";
+import { typeStep } from "@/lib/typography";
 import { onMediaTokens } from "@/lib/tokens";
 import { PressableScale, type PressHaptic } from "@/components/ui/pressable-scale";
 import { PRESSED_OPACITY } from "@/components/ui/state-pressable";
@@ -212,8 +213,11 @@ export function Button({
         ) : null}
         <Text
           maxFontSizeMultiplier={BUTTON_MAX_FONT_SCALE}
-          className="font-heading uppercase"
-          style={{ fontSize: ghost ? 13 : 14, letterSpacing: 1.12, color: look.fg, flexShrink: 1, textAlign: "center" }}
+          className="font-heading uppercase tracking-caps"
+          style={[
+            typeStep(ghost ? "body" : "callout"),
+            { color: look.fg, flexShrink: 1, textAlign: "center" },
+          ]}
         >
           {labelContent ?? label}
         </Text>

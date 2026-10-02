@@ -52,20 +52,20 @@ export function GoLiveLocationSheet() {
             accessibilityViewIsModal
             className="w-full max-w-md gap-4 rounded-lg border border-hairline bg-surface-2 p-5"
           >
-            <Text accessibilityRole="header" className="font-heading text-[18px] uppercase text-ink">
+            <Text accessibilityRole="header" className="font-heading text-title uppercase tracking-caps text-ink">
               {state.purpose === "arena" && state.phase === "explain" ? "Location to start" : TITLES[state.phase]}
             </Text>
             <Text
               testID="go-live-location-body"
               accessibilityRole={state.phase === "explain" ? undefined : "alert"}
-              className="font-body text-[14px] leading-6 text-ink"
+              className="font-body text-callout leading-6 text-ink"
             >
               {BODY[state.phase]}
             </Text>
             {state.busy ? (
               <View className="flex-row items-center gap-2" accessibilityLiveRegion="polite">
                 <ActivityIndicator accessibilityLabel="Finding your location" />
-                <Text className="font-body text-[13px] text-ink-2">Finding your location...</Text>
+                <Text className="font-body text-body text-ink-2">Finding your location...</Text>
               </View>
             ) : null}
             <Actions phase={state.phase} busy={state.busy} onCancel={cancel} />

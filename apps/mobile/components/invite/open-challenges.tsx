@@ -66,7 +66,7 @@ export function OpenChallenges({
   const now = Date.now();
   return (
     <View testID="open-challenges" className="gap-2">
-      <Text className="font-mono text-[11px] uppercase tracking-caps-l text-ink-3">{title}</Text>
+      <Text className="font-mono tabular-nums text-caption uppercase tracking-caps-l text-ink-3">{title}</Text>
       {visible.map((r) => (
         <View
           key={r.id}
@@ -74,9 +74,9 @@ export function OpenChallenges({
           className="flex-row items-center justify-between gap-3 border-b border-hairline py-2"
         >
           <View className="flex-1 gap-0.5">
-            <Text className="font-body text-[14px] text-ink">{sentAgo(r.created_at, now)}</Text>
+            <Text className="font-body text-callout text-ink">{sentAgo(r.created_at, now)}</Text>
             {r.short_code && r.code_expires_at && Date.parse(r.code_expires_at) > now ? (
-              <Text className="font-mono text-[12px] text-ink-3">Code {formatInviteCode(r.short_code)}</Text>
+              <Text className="font-mono tabular-nums text-small text-ink-3">Code {formatInviteCode(r.short_code)}</Text>
             ) : null}
           </View>
           <Button

@@ -107,7 +107,7 @@ export function NotificationPanel({
       {...chrome}
     >
       <View className="border-b border-hairline px-4 pb-3">
-        <Text className="font-heading text-[14px] text-ink uppercase tracking-caps-l">
+        <Text className="font-heading text-callout text-ink uppercase tracking-caps-l">
           Notifications
         </Text>
       </View>
@@ -115,7 +115,7 @@ export function NotificationPanel({
       <BottomSheetScrollView contentContainerStyle={{ paddingBottom: 24 }}>
         {items.length === 0 && missed.length === 0 ? (
           <View className="items-center py-12">
-            <Text className="font-body text-[13px] text-ink-2">
+            <Text className="font-body text-body text-ink-2">
               No notifications yet
             </Text>
           </View>
@@ -144,7 +144,7 @@ function SectionLabel({ label }: { label: string }) {
   return (
     <Text
       accessibilityRole="header"
-      className="px-4 pb-1 pt-4 font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-l"
+      className="px-4 pb-1 pt-4 font-mono-bold tabular-nums text-micro text-ink-3 uppercase tracking-caps-l"
     >
       {label}
     </Text>

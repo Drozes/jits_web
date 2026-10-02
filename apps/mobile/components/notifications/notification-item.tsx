@@ -55,19 +55,19 @@ export function NotificationRow({
       <View className="flex-1 min-w-0 gap-1">
         <Text
           numberOfLines={1}
-          className="font-heading text-[13px] text-ink"
+          className="font-heading text-body text-ink"
         >
           {item.title}
         </Text>
         <Text
           numberOfLines={2}
-          className="font-body text-[12px] text-ink-2"
+          className="font-body text-small text-ink-2"
         >
           {item.body}
         </Text>
       </View>
       <View className="items-end gap-1.5 pt-0.5">
-        <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">
+        <Text className="font-mono tabular-nums text-micro text-ink-3 uppercase tracking-caps-l">
           {formatRelativeDate(item.createdAt)}
         </Text>
         {unread ? (

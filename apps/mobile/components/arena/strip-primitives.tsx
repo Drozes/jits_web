@@ -55,7 +55,7 @@ export function OutlineAction({
       <Text
         maxFontSizeMultiplier={MAX_SCALE}
         className={cn(
-          "font-heading text-[11px] uppercase tracking-caps",
+          "font-heading text-caption uppercase tracking-caps",
           dim ? "text-ink-3" : "text-ink",
         )}
       >

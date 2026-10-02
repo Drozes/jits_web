@@ -8,6 +8,7 @@ import {
 } from "react-native";
 import { Eye, EyeOff } from "lucide-react-native";
 import { cn } from "@/lib/cn";
+import { typeSize } from "@/lib/typography";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 
 type AuthFormFieldProps = TextInputProps & {
@@ -45,7 +46,7 @@ export function AuthFormField({
     <View className="gap-2">
       <Text
         nativeID={labelId}
-        className="font-heading text-[10px] text-ink-3 uppercase tracking-caps-xl"
+        className="font-heading text-micro text-ink-3 uppercase tracking-caps-xl"
       >
         {label}
       </Text>
@@ -66,7 +67,7 @@ export function AuthFormField({
             inputProps.onBlur?.(e);
           }}
           className={cn(
-            "bg-surface-3 border rounded-xs px-4 py-3 text-[14px] font-body text-ink",
+            "bg-surface-3 border rounded-xs px-4 py-3 font-body text-ink",
             hasError
               ? "border-negative"
               : focused
@@ -74,6 +75,7 @@ export function AuthFormField({
                 : "border-hairline-strong",
             isPassword ? "pr-11" : undefined,
           )}
+          style={[typeSize("callout"), inputProps.style]}
         />
         {isPassword ? (
           <Pressable
@@ -94,7 +96,7 @@ export function AuthFormField({
         ) : null}
       </View>
       {hasError ? (
-        <Text className="font-body text-[12px] text-negative">{error}</Text>
+        <Text className="font-body text-small text-negative">{error}</Text>
       ) : null}
     </View>
   );

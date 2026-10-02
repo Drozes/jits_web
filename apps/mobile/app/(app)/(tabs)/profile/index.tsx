@@ -63,7 +63,7 @@ function ShareProfileButton({ athlete }: { athlete: ShareAthlete }) {
         <View pointerEvents="none">
           <ArrowUpRight size={16} color={tokens.textSecondary} />
         </View>
-        <Text className="font-heading text-[12px] text-ink uppercase tracking-caps">
+        <Text className="font-heading text-small text-ink uppercase tracking-caps">
           Share profile
         </Text>
       </Pressable>
@@ -187,7 +187,7 @@ export default function ProfileScreen() {
               <MetaTag>Recent Matches</MetaTag>
               {recent.length === 0 ? (
                 <View className="bg-surface-3 border border-hairline-faint rounded-xs px-4 py-6 items-center">
-                  <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">
+                  <Text className="font-mono tabular-nums text-micro text-ink-3 uppercase tracking-caps-l">
                     No Matches Yet
                   </Text>
                 </View>
@@ -235,7 +235,7 @@ export default function ProfileScreen() {
             <AccountSection />
 
             <View className="items-center gap-1 py-2">
-              <Text className="text-center font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">
+              <Text className="text-center font-mono tabular-nums text-micro text-ink-3 uppercase tracking-caps-l">
                 ELO RATED Beta
               </Text>
               <AppVersionLabel />

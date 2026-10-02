@@ -268,7 +268,7 @@ describe("optional label and meta line", () => {
     const meta = utils.getByTestId("elo-tile-meta");
     expect(meta.props.children).toBe("14W · 6L · 1D");
     expect(meta.props.accessibilityLabel).toBe("Record: 14 wins, 6 losses, 1 draw");
-    expect(meta.props.className).toContain("text-[14px]");
+    expect(meta.props.className).toContain("text-callout");
     // P-Home draws the record in #9CA3AF: ink-2, not ink-3.
     expect(meta.props.className).toContain("text-ink-2");
     expect(meta.props.className).not.toContain("text-ink-3");

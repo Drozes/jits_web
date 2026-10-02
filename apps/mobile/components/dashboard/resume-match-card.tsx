@@ -22,12 +22,12 @@ export function ResumeMatchCard({ match }: { match: MyActiveMatch }) {
   return (
     <Plate variant="accent">
       <View className="flex-row items-center justify-between mb-2">
-        <Text className="font-heading text-[18px] text-ink flex-1" numberOfLines={1}>
+        <Text className="font-heading text-title text-ink flex-1" numberOfLines={1}>
           {started ? "Match in progress" : "Match waiting to start"}
         </Text>
         <MetaTag>{started ? "In progress" : "Waiting"}</MetaTag>
       </View>
-      <Text className="font-body text-[13px] text-ink-2 mb-3" numberOfLines={2}>
+      <Text className="font-body text-body text-ink-2 mb-3" numberOfLines={2}>
         {match.opponentName ? `vs ${match.opponentName}. ` : ""}
         Pick up where you left off.
       </Text>

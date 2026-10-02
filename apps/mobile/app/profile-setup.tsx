@@ -58,7 +58,7 @@ export default function ProfileSetupScreen() {
 
           {!isLoading && error && (
             <View className="flex-1 items-center justify-center gap-4 py-16">
-              <Text className="font-body text-[14px] text-negative text-center">
+              <Text className="font-body text-callout text-negative text-center">
                 {error}
               </Text>
               <Button label="Try Again" onPress={() => reload()} />
@@ -69,7 +69,7 @@ export default function ProfileSetupScreen() {
             <>
               <View className="items-center gap-2">
                 <Wordmark size="lg" />
-                <Text className="font-mono text-[11px] text-ink-3 uppercase tracking-caps-l text-center">
+                <Text className="font-mono tabular-nums text-caption text-ink-3 uppercase tracking-caps-l text-center">
                   {data.isEditing
                     ? "Update Your Athlete Details"
                     : "What's your number?"}

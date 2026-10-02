@@ -18,15 +18,15 @@ export function DataRow({ label, value, valueMono = true, className }: DataRowPr
         className,
       )}
     >
-      <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">
+      <Text className="font-mono tabular-nums text-micro text-ink-3 uppercase tracking-caps-l">
         {label}
       </Text>
       {isString ? (
         <Text
           className={cn(
-            "text-[12px] text-ink text-right",
+            "text-small text-ink text-right",
             valueMono
-              ? "font-mono-medium uppercase tracking-caps-l"
+              ? "font-mono-medium tabular-nums uppercase tracking-caps-l"
               : "font-body",
           )}
         >

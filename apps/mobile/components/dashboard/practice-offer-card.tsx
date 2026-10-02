@@ -32,12 +32,12 @@ export function PracticeOfferCard({ onDismiss }: { onDismiss: () => void }) {
   return (
     <Plate testID="practice-offer-card">
       <View className="flex-row items-center justify-between mb-2">
-        <Text className="font-heading text-[18px] text-ink flex-1" numberOfLines={1}>
+        <Text className="font-heading text-title text-ink flex-1" numberOfLines={1}>
           {PRACTICE_OFFER_TITLE}
         </Text>
         <MetaTag>Practice</MetaTag>
       </View>
-      <Text className="font-body text-[13px] text-ink-2 mb-3">{PRACTICE_OFFER_BODY}</Text>
+      <Text className="font-body text-body text-ink-2 mb-3">{PRACTICE_OFFER_BODY}</Text>
       <Button
         testID="practice-offer-start"
         label="Start practice"

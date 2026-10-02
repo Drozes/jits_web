@@ -120,7 +120,7 @@ export function BookedStrip({
           <Text
             numberOfLines={1}
             maxFontSizeMultiplier={MAX_SCALE}
-            className="font-mono-bold text-[11px] text-ink uppercase"
+            className="font-mono-bold tabular-nums text-caption text-ink uppercase"
           >
             {`Booked · ${name}`}
           </Text>
@@ -130,7 +130,7 @@ export function BookedStrip({
             maxFontSizeMultiplier={MAX_SCALE}
             accessibilityRole={fix || startError ? "alert" : undefined}
             accessibilityLabel={status.full}
-            className="font-body text-[11px] leading-4 text-ink-3"
+            className="font-body text-caption leading-4 text-ink-3"
           >
             {status.short}
           </Text>

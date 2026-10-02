@@ -192,12 +192,12 @@ export const SheetFooter = ({ className, ...props }: ViewProps & { className?: s
 export const SheetTitle = ({ className, ...props }: React.ComponentProps<typeof Text> & { className?: string }) => (
   <Text
     accessibilityRole="header"
-    className={cn("font-heading text-[14px] uppercase tracking-caps-l text-ink", className)}
+    className={cn("font-heading text-callout uppercase tracking-caps-l text-ink", className)}
     {...props}
   />
 );
 export const SheetDescription = ({ className, ...props }: React.ComponentProps<typeof Text> & { className?: string }) => (
-  <Text className={cn("font-body text-[13px] text-ink-2", className)} {...props} />
+  <Text className={cn("font-body text-body text-ink-2", className)} {...props} />
 );
 
 export function SheetClose({ children, asChild }: { children: React.ReactElement; asChild?: boolean }) {

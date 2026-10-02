@@ -31,7 +31,7 @@ export function Chip({ active = false, className, children, ...rest }: ChipProps
     >
       <Text
         className={cn(
-          "font-heading text-[10px] uppercase tracking-caps",
+          "font-heading text-micro uppercase tracking-caps",
           active ? "text-ink" : "text-ink-2",
         )}
       >

@@ -12,11 +12,11 @@ export function WeeklyActivitySection({ weeks }: WeeklyActivitySectionProps) {
 
   return (
     <Plate>
-      <Text className="font-heading text-[12px] text-ink uppercase tracking-caps mb-3">
+      <Text className="font-heading text-small text-ink uppercase tracking-caps mb-3">
         Weekly Activity
       </Text>
       {!hasActivity ? (
-        <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l text-center py-2">
+        <Text className="font-mono tabular-nums text-micro text-ink-3 uppercase tracking-caps-l text-center py-2">
           No matches in the last 8 weeks
         </Text>
       ) : (
@@ -33,7 +33,7 @@ export function WeeklyActivitySection({ weeks }: WeeklyActivitySectionProps) {
                     />
                   )}
                 </View>
-                <Text className="font-mono text-[9px] text-ink-3 tabular-nums">
+                <Text className="font-mono text-micro text-ink-3 tabular-nums">
                   {w.week}
                 </Text>
               </View>

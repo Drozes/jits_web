@@ -17,8 +17,7 @@ import { useCloseSectionExpanded } from "@/lib/arena/use-arena-nearby";
 import type { ArenaCompetitor } from "@/lib/arena/use-arena-roster";
 import { MAX_SCALE } from "@/components/arena/strip-primitives";
 import { MatRow, type MatRowAction } from "@/components/arena/mat-board";
-
-const TABULAR = { fontVariant: ["tabular-nums" as const] };
+import { TABULAR } from "@/lib/typography";
 
 interface Props {
   rows: { row: ArenaCompetitor; band: ArenaCloseBand }[];
@@ -49,14 +48,14 @@ export function OnlineCloseSection({ rows, friendIds, actionFor, onOpenProfile }
           <Chevron size={14} color={tokens.textTertiary} />
           <Text
             maxFontSizeMultiplier={MAX_SCALE}
-            className="font-heading text-[10px] text-ink-3 uppercase tracking-caps-xl"
+            className="font-heading text-micro text-ink-3 uppercase tracking-caps-xl"
           >
             {`Online & close · ${n}`}
           </Text>
         </View>
         <Text
           maxFontSizeMultiplier={MAX_SCALE}
-          className="font-mono-bold text-[10px] text-ink-2 uppercase"
+          className="font-mono-bold text-micro text-ink-2 uppercase tracking-caps-l"
           style={TABULAR}
         >
           {"< 2 km"}

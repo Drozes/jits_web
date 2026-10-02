@@ -24,7 +24,7 @@ export function UpdateBannerHeader({
       <RefreshCw size={16} color={tokens.textPrimary} />
       <Text
         accessibilityLabel={accessibilityCopy}
-        className="font-heading text-[12px] uppercase tracking-caps-l text-ink flex-1"
+        className="font-heading text-small uppercase tracking-caps-l text-ink flex-1"
       >
         Update ready
       </Text>

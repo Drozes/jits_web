@@ -163,7 +163,7 @@ export default function DashboardScreen() {
       >
         <View>
           <MetaTag>{hasMatches ? "Welcome back" : "Welcome"}</MetaTag>
-          <Text className="font-heading text-[26px] text-ink mt-2" numberOfLines={1}>
+          <Text className="font-heading text-headline-l text-ink mt-2" numberOfLines={1}>
             {athlete.display_name}
           </Text>
         </View>

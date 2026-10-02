@@ -72,15 +72,15 @@ function ErrorFallback({
 
   return (
     <View className="flex-1 bg-surface items-center justify-center px-8 gap-6">
-      <Text className="text-3xl font-display text-ink tracking-mark">
+      <Text className="text-headline-l font-display text-ink tracking-mark">
         SOMETHING WENT WRONG
       </Text>
-      <Text className="text-sm font-body text-ink-3 text-center">
+      <Text className="text-small font-body text-ink-3 text-center">
         The app hit an unexpected error. Try again, or sign out and back in if
         the problem persists.
       </Text>
       {__DEV__ ? (
-        <Text className="text-xs text-negative text-center font-mono">
+        <Text className="text-micro text-negative text-center font-mono tabular-nums">
           {error.message}
         </Text>
       ) : null}

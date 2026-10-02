@@ -40,7 +40,7 @@ export function SubmissionBreakdownSection({
   return (
     <Plate>
       <View className="flex-row items-center justify-between mb-3">
-        <Text className="font-heading text-[12px] text-ink uppercase tracking-caps">
+        <Text className="font-heading text-small text-ink uppercase tracking-caps">
           Top Submissions
         </Text>
         <View className="flex-row gap-2" accessibilityLabel="Submission view">
@@ -58,7 +58,7 @@ export function SubmissionBreakdownSection({
       </View>
 
       {error ? (
-        <Text className="font-mono text-[10px] text-negative uppercase tracking-caps-l">
+        <Text className="font-mono tabular-nums text-micro text-negative uppercase tracking-caps-l">
           Could not load submissions. Pull to refresh.
         </Text>
       ) : submissions === null ? (
@@ -66,7 +66,7 @@ export function SubmissionBreakdownSection({
           <ActivityIndicator color={tokens.textTertiary} />
         </View>
       ) : top5.length === 0 ? (
-        <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">
+        <Text className="font-mono tabular-nums text-micro text-ink-3 uppercase tracking-caps-l">
           {outcome === "wins" ? "No submission wins yet" : "No submission losses yet"}
         </Text>
       ) : (
@@ -76,11 +76,11 @@ export function SubmissionBreakdownSection({
             return (
               <View key={s.code || s.name} className="gap-1">
                 <View className="flex-row items-center justify-between">
-                  <Text className="font-body text-[12px] text-ink" numberOfLines={1}>
+                  <Text className="font-body text-small text-ink" numberOfLines={1}>
                     {s.name}
                   </Text>
                   <Text
-                    className={`font-mono-bold text-[11px] tabular-nums ${
+                    className={`font-mono-bold text-caption tabular-nums ${
                       outcome === "wins" ? "text-positive" : "text-negative"
                     }`}
                   >
