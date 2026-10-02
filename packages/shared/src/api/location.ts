@@ -36,6 +36,26 @@ export async function getMatchLocationRequired(supabase: Client): Promise<Result
   }
 }
 
+/**
+ * The athlete's own `looking_for_ranked` as the server has it now: true /
+ * false, or null when the read failed. The mobile live owner reads it after
+ * a failed `go_live` refresh, because the server may have expired the live
+ * session (`expire_stale_live_sessions`, live location fixes D7).
+ */
+export async function getMyLookingForRanked(supabase: Client, athleteId: string): Promise<boolean | null> {
+  try {
+    const { data, error } = await supabase
+      .from("athletes")
+      .select("looking_for_ranked")
+      .eq("id", athleteId)
+      .maybeSingle();
+    if (error || !data) return null;
+    return (data as { looking_for_ranked?: boolean | null }).looking_for_ranked === true;
+  } catch {
+    return null;
+  }
+}
+
 function readingArgs(reading: LocationReading) {
   return { p_lat: reading.lat, p_lng: reading.lng, p_accuracy_m: reading.accuracyM };
 }
@@ -225,3 +245,76 @@ export const ARENA_BAND_ORDER: Record<ArenaCloseBand, number> = {
   under_1km: 1,
   under_2km: 2,
 };
+
+// ---------------------------------------------------------------------------
+// Location event telemetry (016 addendum: live location fixes, section 3.2)
+// ---------------------------------------------------------------------------
+
+/** `athlete_location_events.event`. */
+export type LocationEventKind = "go_live_attempt" | "match_start";
+
+/** `athlete_location_events.outcome` (the server's allowlist). */
+export type LocationEventOutcome =
+  | "ok"
+  | "permission_denied"
+  | "dismissed"
+  | "timeout"
+  | "unavailable"
+  | "accuracy_too_low"
+  | "implausible_movement"
+  | "location_required"
+  | "error";
+
+export interface LocationEventInput {
+  event: LocationEventKind;
+  outcome: LocationEventOutcome;
+  /** The reading the flow ended with, when there was one. */
+  reading?: LocationReading | null;
+  /** Required for `match_start`, absent for `go_live_attempt`. */
+  matchId?: string | null;
+  /** The client build, at most 32 characters (the server truncates longer). */
+  appVersion?: string | null;
+  /** Device time at the end of the flow. */
+  occurredAt?: Date | null;
+}
+
+/** The `log_location_event` answer: `logged` false when rate capped or a duplicate. */
+export interface LocationEventLogged {
+  logged: boolean;
+}
+
+const finite = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
+
+/**
+ * Log one location attempt (`log_location_event`). Fire and forget: the
+ * caller never awaits it on a UI path. Never throws; a refusal (validation,
+ * not a participant, the RPC missing on an older backend) comes back as
+ * `{ ok:false, error }`. A reading with a non-finite coordinate is sent
+ * without coordinates rather than refused by the server.
+ */
+export function logLocationEvent(
+  supabase: Client,
+  input: LocationEventInput,
+): Promise<InviteResult<LocationEventLogged>> {
+  const r = input.reading;
+  const hasPoint = !!r && finite(r.lat) && finite(r.lng);
+  const accuracy = r && finite(r.accuracyM) && r.accuracyM >= 0 ? r.accuracyM : null;
+  const version = input.appVersion?.trim().slice(0, 32) || null;
+  const at = input.occurredAt && Number.isFinite(input.occurredAt.getTime()) ? input.occurredAt.toISOString() : null;
+  return rpc(
+    supabase,
+    // Newer than the generated types until jr_be migration 20261002100100 lands.
+    "log_location_event" as never,
+    {
+      p_event: input.event,
+      p_outcome: input.outcome,
+      p_lat: hasPoint ? r!.lat : null,
+      p_lng: hasPoint ? r!.lng : null,
+      p_accuracy_m: hasPoint ? accuracy : null,
+      p_match_id: input.event === "match_start" ? (input.matchId ?? null) : null,
+      p_app_version: version,
+      p_occurred_at: at,
+    },
+    (d) => (obj(d) ? { logged: obj(d)?.logged === true } : null),
+  );
+}
