@@ -19,7 +19,8 @@ import { useVideoPlayback } from "@/lib/match-detail/use-video-playback";
 import { useMatchDetail } from "@/lib/match-detail/use-match-detail";
 import { useVideoAnalysis } from "@/lib/film-room/use-video-analysis";
 import { shortName } from "@/lib/film-room/format";
-import { ON_MEDIA, TABULAR } from "@/lib/theme/palette";
+import { ON_MEDIA } from "@/lib/theme/palette";
+import { TABULAR, TRACKING, typeStep } from "@/lib/typography";
 
 /** A moment stays "current" (chip lit) this long after its time. */
 const CURRENT_HOLD_S = 10;
@@ -134,7 +135,7 @@ function PlayerBody({ id, start, approximate }: { id: string | undefined; start:
   const topBar = (
     <View className="flex-row items-center" style={{ position: "absolute", left: 4, right: 16, top: insets.top + 8, height: 44, gap: 6 }}>
       <FilmBackButton label="Go back" icon="close" fallback="/" color={ON_MEDIA.white} />
-      <Text numberOfLines={1} className="flex-1 font-heading uppercase" style={{ fontSize: 14, letterSpacing: 1.12, color: ON_MEDIA.white }}>
+      <Text numberOfLines={1} className="flex-1 font-heading uppercase" style={[typeStep("callout"), { letterSpacing: TRACKING.caps, color: ON_MEDIA.white }]}>
         {title}
       </Text>
     </View>
@@ -143,7 +144,7 @@ function PlayerBody({ id, start, approximate }: { id: string | undefined; start:
   return (
     // Full-screen video: dark in both app themes. ForceDarkTheme pins the
     // themed pieces drawn over it (VideoStatePanel) to the dark tokens.
-    <ForceDarkTheme style={{ backgroundColor: "#000000" }}>
+    <ForceDarkTheme style={{ backgroundColor: ON_MEDIA.black }}>
       <StatusBar style="light" />
       {phase === "ready" && source ? (
         <>
@@ -192,7 +193,7 @@ function PlayerBody({ id, start, approximate }: { id: string | undefined; start:
               pointerEvents="none"
               style={{ position: "absolute", left: 16, right: 16, top: insets.top + 110, alignItems: "center" }}
             >
-              <Text className="font-mono-medium" style={{ fontSize: 10, letterSpacing: 1.2, color: ON_MEDIA.text2, backgroundColor: ON_MEDIA.badge, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 2 }}>
+              <Text className="font-mono-medium" style={[typeStep("micro"), { letterSpacing: TRACKING.caps, color: ON_MEDIA.text2, backgroundColor: ON_MEDIA.badge, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 2 }, TABULAR]}>
                 Angles aren't synced; position is approximate
               </Text>
             </View>
@@ -200,7 +201,7 @@ function PlayerBody({ id, start, approximate }: { id: string | undefined; start:
           <View style={{ position: "absolute", left: 16, right: 16, bottom: insets.bottom + 24, gap: 14 }}>
             {noMatch ? (
               <View testID="player-no-match" className="self-start" style={{ paddingVertical: 8, paddingHorizontal: 10, borderRadius: 2, backgroundColor: ON_MEDIA.badge, maxWidth: "100%" }}>
-                <Text className="font-body-medium" style={{ fontSize: 13, lineHeight: 16, color: ON_MEDIA.text }}>
+                <Text className="font-body-medium" style={[typeStep("body"), { lineHeight: 16, color: ON_MEDIA.text }]}>
                   {NO_MATCH_COPY.short}
                 </Text>
               </View>
@@ -210,11 +211,11 @@ function PlayerBody({ id, start, approximate }: { id: string | undefined; start:
             <View style={{ gap: 6 }}>
               <SeekBar positionS={positionS} durationS={duration} moments={moments} onSeek={seek} />
               <View className="flex-row justify-between">
-                <Text testID="player-time" className="font-mono-bold" style={[{ fontSize: 12, color: ON_MEDIA.white }, TABULAR]}>
+                <Text testID="player-time" className="font-mono-bold" style={[typeStep("small"), { color: ON_MEDIA.white }, TABULAR]}>
                   {`${formatClock(positionS)} / ${formatClock(duration)}`}
                 </Text>
                 {moments.length > 0 ? (
-                  <Text className="font-mono-medium" style={{ fontSize: 10, letterSpacing: 1.68, color: ON_MEDIA.text2 }}>
+                  <Text className="font-mono-medium" style={[typeStep("micro"), { letterSpacing: TRACKING["caps-l"], color: ON_MEDIA.text2 }, TABULAR]}>
                     {`${moments.length} KEY MOMENT${moments.length === 1 ? "" : "S"}`}
                   </Text>
                 ) : null}

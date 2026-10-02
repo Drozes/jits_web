@@ -1,7 +1,8 @@
 import * as React from "react";
-import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Text, View } from "react-native";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { Plate } from "@/components/ui/elo-system";
+import { Button } from "@/components/ui/elo-system/button";
 
 interface WaitStepProps {
   /** Optional headline message (defaults to "Waiting..."). */
@@ -38,32 +39,24 @@ export function WaitStep({ message, allowSkip, onSkip, timeoutMs = 30_000 }: Wai
       <Plate className="items-center gap-4 py-8">
         {!timedOut ? (
           <>
-            <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-xl">
+            <Text className="font-mono-bold tabular-nums text-micro text-ink-3 uppercase tracking-caps-xl">
               Waiting
             </Text>
             <ActivityIndicator size="large" color={tokens.textSecondary} />
-            <Text className="text-center font-body text-[13px] text-ink-2">
+            <Text className="text-center font-body text-body text-ink-2">
               {message ?? "Waiting..."}
             </Text>
           </>
         ) : (
           <>
-            <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-xl">
+            <Text className="font-mono-bold tabular-nums text-micro text-ink-3 uppercase tracking-caps-xl">
               Still waiting
             </Text>
-            <Text className="text-center font-body text-[13px] text-ink-2">
+            <Text className="text-center font-body text-body text-ink-2">
               Continue without?
             </Text>
             {onSkip ? (
-              <Pressable
-                accessibilityRole="button"
-                onPress={onSkip}
-                className="mt-2 bg-cta items-center justify-center py-3 px-5 rounded-sm active:bg-cta-hover"
-              >
-                <Text className="font-heading text-[13px] text-ink-on-cta uppercase tracking-caps">
-                  Continue
-                </Text>
-              </Pressable>
+              <Button label="Continue" height={44} className="mt-2" onPress={onSkip} />
             ) : null}
           </>
         )}

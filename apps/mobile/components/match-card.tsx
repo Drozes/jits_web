@@ -29,18 +29,23 @@ const outcomeMap: Record<MatchOutcome, "win" | "loss" | "draw"> = {
   [MATCH_OUTCOME.DRAW]: "draw",
 };
 
+/**
+ * A challenge's state tag. `accent` (incoming, accepted) steps up to the
+ * plate-bright surface with an `ink` label; it is a state, not a call to act
+ * or a loss, so it is never Signal Red (WP2, R3 CO-7).
+ */
 function ChallengePill({ children, accent }: { children: React.ReactNode; accent?: boolean }) {
   return (
     <View
       className={cn(
-        "px-2 py-1 border rounded-xs",
-        accent ? "border-cta" : "border-hairline-strong",
+        "px-2 py-1 border border-hairline-strong rounded-xs",
+        accent && "bg-surface-4",
       )}
     >
       <Text
         className={cn(
-          "font-mono-bold text-[10px] uppercase tracking-caps-l",
-          accent ? "text-cta" : "text-ink-2",
+          "font-mono-bold tabular-nums text-micro uppercase tracking-caps-l",
+          accent ? "text-ink" : "text-ink-2",
         )}
       >
         {children}
@@ -62,12 +67,12 @@ function CardInner({ type = "match", opponentName, opponentPhotoUrl, result, sta
           {photoSrc ? (
             <Image source={{ uri: photoSrc }} style={{ width: "100%", height: "100%" }} contentFit="cover" />
           ) : (
-            <Text className="font-mono-bold text-ink text-[10px] tracking-caps-l">{getInitials(opponentName)}</Text>
+            <Text className="font-mono-bold tabular-nums text-ink text-micro tracking-caps-l">{getInitials(opponentName)}</Text>
           )}
         </View>
         <View className="flex-1 min-w-0">
-          <Text className="font-heading text-[14px] text-ink" numberOfLines={1}>{opponentName}</Text>
-          <Text className="font-mono text-[11px] text-ink-3 mt-[2px]" numberOfLines={1}>
+          <Text className="font-heading text-callout text-ink" numberOfLines={1}>{opponentName}</Text>
+          <Text className="font-mono tabular-nums text-caption text-ink-3 mt-[2px]" numberOfLines={1}>
             {subtitle}
           </Text>
         </View>
@@ -77,7 +82,7 @@ function CardInner({ type = "match", opponentName, opponentPhotoUrl, result, sta
         {type === "match" && eloDelta != null ? (
           <Text
             className={cn(
-              "font-mono-bold text-[16px] tabular-nums",
+              "font-mono-bold text-subhead tabular-nums",
               eloDelta > 0 && "text-positive",
               eloDelta < 0 && "text-negative",
               eloDelta === 0 && "text-ink-3",

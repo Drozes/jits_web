@@ -49,12 +49,12 @@ In CSS the dotted names are escaped: `var(--space-0\.5)`, `var(--space-1\.5)`, `
 | `radius-button` | 3px | `rounded-sm` (38) | Buttons (CtaButton, FightButton, glass buttons) |
 | `radius-plate` | 4px | `rounded-md` (47) | THE default: plates, cards, rating tiles, toasts, popovers |
 | `radius-sheet` | 8px | `rounded-lg` (5) | Sheets and modals only, the ceiling |
-| `radius-round` | 9999px | `rounded-full` (14) | Live dots and status dots |
+| `radius-round` | 9999px | `rounded-full` (14) | Live dots, status dots and seek markers only (D-6: play buttons and check badges are not dots) |
 
-Sources: `tailwind.config.js:183-190`, `FIGHT_RADIUS` (`fight-tokens.ts:9`), `BROADCAST_RADIUS` (`broadcast-tokens.ts:36`), `PROMPT_RADIUS = 8` (`challenge-prompt-sheet.tsx:89`).
+Sources: `tailwind.config.js` `theme.extend.borderRadius`, `FIGHT_RADIUS` (`fight-tokens.ts:9`), `BROADCAST_RADIUS` (`broadcast-tokens.ts`), `PROMPT_RADIUS = 8` (`challenge-prompt-sheet.tsx:89`).
 
 - Corners are sharp. Nothing exceeds `radius-sheet`.
-- A bottom sheet takes `radius-sheet` on its top corners only. Today every gorhom sheet renders the library's 15px default (R3 SH-1, WP1).
+- A bottom sheet takes `radius-sheet` on its top corners only, with a square bottom. Every gorhom sheet takes `useSheetChrome()` (`components/ui/sheet.tsx`, `SHEET_RADIUS` 8), which also zeroes gorhom's default 15px radius (WP1).
 - Web Tailwind `rounded-sm` is 2px, not 3px; the token is 3px.
 - `Avatar32` is a 2px-radius square in code, while the old DESIGN.md says avatars are circular. See Open decisions in the README.
 
@@ -85,14 +85,14 @@ None. There is no shadow token family and there will not be one. Hierarchy comes
 | `safe-top` | 47px | Top safe area for 390px frames (`design/native-screens/BUILD-SPEC.md:123`) |
 | `safe-bottom` | 34px | Bottom safe area (`BUILD-SPEC.md:124`) |
 
-Other fixed sizes live with their components: the live broadcast HUD uses `BROADCAST_SIZE` (strip 32, bar 56, slab 104, controls 64, tally 28, max width 480; `broadcast-tokens.ts:38-45`) and `BROADCAST_LANDSCAPE`.
+Other fixed sizes live with their components: the live broadcast HUD uses `BROADCAST_SIZE` (strip 32, bar 56, slab 104, controls 64, tally 28, max width 480; `broadcast-tokens.ts`) and `BROADCAST_LANDSCAPE`.
 
 ## Opacity
 
 | Token | Value | Use |
 |---|---|---|
-| `opacity-disabled` | 0.5 | The one disabled style (`button.tsx:100`, FightButton, OutlineAction). Three sites still use 0.6 (R3 BT-7) |
-| `opacity-pressed` | 0.7 | Press dip on rows, chips and ghost links that do not scale (`active:opacity-70`) |
+| `opacity-disabled` | 0.5 | The one disabled style: `DISABLED_OPACITY` in `components/ui/elo-system/button.tsx`, used by `Button`, `OutlineAction` and the Arena controls (WP3). `__tests__/components/ui/one-button-guard.test.ts` fails on any 0.6 dim (`opacity: 0.6` or an `opacity-60` class) except three reviewed ones: the challenge prompt busy dims (Adding Flare), the Mat Board locked live toggle (locked, not disabled) and the face-off Cancel match pressed / cancelling dip |
+| `opacity-pressed` | 0.7 | Press dip on rows, chips and ghost links that do not scale (`active:opacity-70`, `StatePressable dim`, `Button` ghost; `PRESSED_OPACITY`) |
 | `opacity-reduced-press` | 0.85 | PressableScale's dip under Reduce Motion (`pressable-scale.tsx:45`) |
 | `opacity-ember-min` | 0.35 | Countable embers never fade below this (`arena-tab-icon.tsx:143`) |
 

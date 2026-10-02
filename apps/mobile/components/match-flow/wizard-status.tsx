@@ -1,7 +1,8 @@
-import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { exitMatchTo } from "@/lib/match-flow/exit-to";
 import { useThemedTokens } from "@/lib/theme/use-theme";
+import { Button } from "@/components/ui/elo-system/button";
 
 /**
  * Centered spinner used while the wizard is loading match details.
@@ -13,7 +14,7 @@ export function WizardLoading() {
   return (
     <View className="flex-1 items-center justify-center bg-surface gap-3">
       <ActivityIndicator color={tokens.textSecondary} />
-      <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">
+      <Text className="font-mono tabular-nums text-micro text-ink-3 uppercase tracking-caps-l">
         Loading match...
       </Text>
     </View>
@@ -42,22 +43,19 @@ export function WizardError({
   const router = useRouter();
   return (
     <View className="flex-1 items-center justify-center bg-surface px-6 gap-3">
-      <Text className="font-heading text-[14px] text-ink uppercase tracking-caps text-center">
+      <Text className="font-heading text-callout text-ink uppercase tracking-caps text-center">
         {title}
       </Text>
       {message ? (
-        <Text className="text-center font-body text-[13px] text-ink-2">{message}</Text>
+        <Text className="text-center font-body text-body text-ink-2">{message}</Text>
       ) : null}
-      <Pressable
+      <Button
         testID="wizard-error-exit"
-        accessibilityRole="button"
+        label={exitLabel}
+        height={44}
+        className="mt-2"
         onPress={() => exitMatchTo(router, exitHref)}
-        className="mt-2 bg-cta items-center justify-center py-3 px-5 rounded-sm active:bg-cta-hover"
-      >
-        <Text className="font-heading text-[13px] text-ink-on-cta uppercase tracking-caps">
-          {exitLabel}
-        </Text>
-      </Pressable>
+      />
     </View>
   );
 }

@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Pressable, Text, View } from "react-native";
+import { TRACKING, typeStep } from "@/lib/typography";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Play } from "lucide-react-native";
 import { formatClock } from "@jits/shared/utils";
@@ -59,14 +60,14 @@ export function MatchHero({ posterUrl, posterKey, me, opponent, fallbackLabel, c
 
       {posterUrl ? (
         <View style={[tagStyle, { position: "absolute", left: 16, bottom: 16, height: 22 }]}>
-          <Text className="font-mono-medium" style={{ fontSize: 10, letterSpacing: 1.68, color: ON_MEDIA.tagText }}>
+          <Text className="font-mono-medium" style={[typeStep("micro"), { letterSpacing: TRACKING["caps-l"], color: ON_MEDIA.tagText }, TABULAR]}>
             OPENING STILL
           </Text>
         </View>
       ) : null}
       {clockSeconds ? (
         <View style={{ position: "absolute", right: 16, bottom: 16, height: 22, paddingHorizontal: 7, borderRadius: 2, backgroundColor: ON_MEDIA.badge, justifyContent: "center" }}>
-          <Text className="font-mono-bold" style={[{ fontSize: 11, letterSpacing: 0.8, color: ON_MEDIA.white }, TABULAR]}>
+          <Text className="font-mono-bold" style={[typeStep("caption"), { letterSpacing: TRACKING.loose, color: ON_MEDIA.white }, TABULAR]}>
             {formatClock(clockSeconds)}
           </Text>
         </View>

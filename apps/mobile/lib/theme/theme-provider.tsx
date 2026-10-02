@@ -6,7 +6,7 @@
  * propagates the dark token values to all descendants.
  *
  * Components do NOT need to add `dark:` modifiers to every className — they
- * simply use `bg-background`, `text-foreground`, `bg-elevated`, `text-tertiary`,
+ * simply use `bg-surface`, `text-ink`, `bg-surface-3`, `text-ink-3`,
  * etc. and the values flip automatically when the system theme changes.
  */
 import * as React from "react";
@@ -17,31 +17,6 @@ import { darkTokens, lightTokens } from "../tokens";
 
 export function buildVars(t: typeof lightTokens) {
   return vars({
-    // Legacy shadcn-style tokens
-    "--background": t.background,
-    "--foreground": t.foreground,
-    "--card": t.card,
-    "--card-foreground": t.cardForeground,
-    "--popover": t.popover,
-    "--popover-foreground": t.popoverForeground,
-    "--primary": t.primary,
-    "--primary-foreground": t.primaryForeground,
-    "--secondary": t.secondary,
-    "--secondary-foreground": t.secondaryForeground,
-    "--muted": t.muted,
-    "--muted-foreground": t.mutedForeground,
-    "--accent": t.accent,
-    "--accent-foreground": t.accentForeground,
-    "--destructive": t.destructive,
-    "--destructive-foreground": t.destructiveForeground,
-    "--success": t.success,
-    "--success-foreground": t.successForeground,
-    "--border": t.border,
-    "--input": t.input,
-    "--ring": t.ring,
-    "--gold": t.gold,
-    "--brand-orange": t.brandOrange,
-    "--deep-red": t.deepRed,
     // ELO design system tokens
     "--bg-primary": t.bgPrimary,
     "--bg-secondary": t.bgSecondary,
@@ -60,6 +35,10 @@ export function buildVars(t: typeof lightTokens) {
     "--border-hairline": t.borderHairline,
     "--border-hairline-faint": t.borderHairlineFaint,
     "--border-hairline-strong": t.borderHairlineStrong,
+    "--attention": t.attention,
+    "--attention-rule": t.attentionRule,
+    "--heat-orange": t.heatOrange,
+    "--heat-red": t.heatRed,
   });
 }
 

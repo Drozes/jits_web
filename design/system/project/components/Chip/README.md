@@ -1,8 +1,8 @@
 # Chip
 
-Chip is the tappable filter and segment pill: a plate-tier box with a strong hairline and a 10px DM Sans caps label; in the target kit the selected chip steps up one surface tier (`plate-bright`) with an `ink` label, and no longer uses red.
+Chip is the tappable filter and segment pill: a plate-tier box with a strong hairline and a 10px DM Sans caps label; the selected chip steps up one surface tier (`plate-bright`) with an `ink` label, and never uses red.
 
-**Status: Target (WP2) shown first, today below.** Today the active chip swaps to a Signal Red border and draws a 6px red square before its label. Conformance finding ST-2 lists this as decorative red (red is for CTAs and negatives only), and decision D-7 asks for one selected-state treatment. The kit decides by default: selected = surface tier plus hairline (`plate-bright` fill, `hairline-strong` border, `ink` label), never red. The owner confirms this under Open decisions; WP2 (bead jits-3eeg.3) ships it.
+**Status: Shipped (WP2, bead jits-3eeg.3).** The selected chip takes the one selected-state treatment, `selectionSurface(active)` from `components/ui/elo-system/selection.tsx`: a `plate-bright` fill, the `hairline-strong` border and an `ink` label. The pre-WP2 Signal Red border and 6px red square (conformance finding ST-2, decision D-7) are gone; `__tests__/components/ui/color-semantics-guard.test.ts` fails if a red selected state returns. On this compact control the label's step from `ink-2` to `ink` stands in for the check glyph that radios, checkboxes and list options carry (`SelectCheck`). The card shows the shipped chip first and the pre-WP2 chip below for reference.
 
 ## Props, variants, states
 
@@ -15,15 +15,15 @@ Chip is the tappable filter and segment pill: a plate-tier box with a strong hai
 | State | Fill | Border | Label |
 |---|---|---|---|
 | inactive | `plate` | `hairline-strong` | `ink-2` |
-| selected (target) | `plate-bright` | `hairline-strong` | `ink` |
-| selected (today) | `plate` | `signal-red` | `ink`, plus a 6px `signal-red` square 7px before it |
+| selected | `plate-bright` | `hairline-strong` | `ink` |
+| selected (before WP2) | `plate` | `signal-red` | `ink`, plus a 6px `signal-red` square 7px before it |
 | pressed | unchanged | unchanged | 0.7 opacity (`active:opacity-70`) |
 
-Padding 10.5px x 7px (`px-3 py-2`). Rows of chips sit 8px apart (`GenderFilterRow`, the Fighters/Gyms switch on Rankings). Chip plus a chip row is the kit's segmented control; the shadcn `Tabs` is unused.
+Padding 10.5px x 7px (`px-3 py-2`). Rows of chips sit 8px apart (`GenderFilterRow`, the Fighters/Gyms switch on Rankings). Chip plus a chip row is the kit's segmented control; the shadcn `Tabs` was deleted (WP4).
 
 ## Tokens used
 
-`plate`, `plate-bright` (selected fill), `hairline-strong`, `ink`, `ink-2`, `radius-tag` 2px, `opacity-pressed` 0.7; today also `signal-red`. Type `heading` 700 10px, tracking 1.12px.
+`plate`, `plate-bright` (selected fill), `hairline-strong`, `ink`, `ink-2`, `radius-tag` 2px, `opacity-pressed` 0.7. No `signal-red` since WP2. Type `heading` 700 10px, tracking 1.12px.
 
 ## Motion
 
@@ -35,7 +35,7 @@ None today: a raw `Pressable` with an opacity dip, no press scale. WP3 moves row
 
 ## Web twin and parity
 
-`apps/web/components/ui/elo-system/chip.tsx`; it carries the same red active treatment and moves with WP2.
+`apps/web/components/ui/elo-system/chip.tsx`; it still carries the pre-WP2 red active treatment (WP2 changed the mobile app only) and follows in a web parity pass.
 
 ## Do and don't
 

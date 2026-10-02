@@ -37,7 +37,7 @@ export function HighlightTile({ item, onPress }: { item: ProfileHighlight; onPre
         </View>
       ) : null}
       <View className="absolute bottom-1 left-1 bg-surface-2 rounded-xs px-1">
-        <Text className="font-mono text-[10px] text-ink" style={{ fontVariant: ["tabular-nums"] }}>
+        <Text className="font-mono text-micro text-ink" style={{ fontVariant: ["tabular-nums"] }}>
           {`${Math.round(item.durationS)}s`}
         </Text>
       </View>

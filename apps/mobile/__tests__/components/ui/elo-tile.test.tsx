@@ -219,7 +219,7 @@ describe("after tile tone (jits-9cgj)", () => {
   it.each([
     ["positive", "border-positive"],
     ["negative", "border-negative"],
-    ["amber", "border-amber-800"],
+    ["amber", "border-attention"],
   ] as const)("%s tone borders the after tile with %s, never Signal Red", async (tone, cls) => {
     const utils = render(<EloTile label="ELO Rating" before={1000} after={1016} tone={tone} />);
     await flushReduceMotion();
@@ -227,11 +227,12 @@ describe("after tile tone (jits-9cgj)", () => {
     expect(afterTileClass(utils)).not.toContain("border-cta");
   });
 
-  it("amber follows the dark scheme", async () => {
+  it("amber is the attention token in the dark scheme too (the CSS var flips, not the class)", async () => {
     mockScheme = "dark";
     const utils = render(<EloTile label="ELO Rating" before={1000} after={992} tone="amber" />);
     await flushReduceMotion();
-    expect(afterTileClass(utils)).toContain("border-amber-500");
+    expect(afterTileClass(utils)).toContain("border-attention");
+    expect(afterTileClass(utils)).not.toMatch(/amber-\d/);
   });
 });
 
@@ -267,7 +268,7 @@ describe("optional label and meta line", () => {
     const meta = utils.getByTestId("elo-tile-meta");
     expect(meta.props.children).toBe("14W · 6L · 1D");
     expect(meta.props.accessibilityLabel).toBe("Record: 14 wins, 6 losses, 1 draw");
-    expect(meta.props.className).toContain("text-[14px]");
+    expect(meta.props.className).toContain("text-callout");
     // P-Home draws the record in #9CA3AF: ink-2, not ink-3.
     expect(meta.props.className).toContain("text-ink-2");
     expect(meta.props.className).not.toContain("text-ink-3");

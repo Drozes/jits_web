@@ -40,7 +40,7 @@ export function Avatar32({ name, photoUrl, className }: Avatar32Props) {
       className={cn(BASE_CLASS, "bg-surface-4", className)}
       accessibilityLabel={name}
     >
-      <Text className="font-mono-bold text-[10px] text-ink tracking-caps-l">
+      <Text className="font-mono-bold tabular-nums text-micro text-ink tracking-caps-l">
         {getInitials(name)}
       </Text>
     </View>

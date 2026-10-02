@@ -10,6 +10,7 @@ import type { LiveSwitchDirection, LiveSwitchPhase } from "./arena-store";
 import { freshRemainingMs } from "./incoming-challenges";
 import { formatCountdown, spokenCountdown } from "./fresh-countdown";
 import { formatBadgeCount } from "@/lib/navigation/tab-badge";
+import { TYPE_SCALE } from "@/lib/typography";
 
 // ---------------------------------------------------------------------------
 // Model
@@ -51,8 +52,8 @@ export const CONFIRM_COPY_COMPACT = "▪";
 export const MIN_NAME_CHARS = 3;
 
 // Geometry the width budget and the render share.
-/** The chip copy's font size (TEXT_CLASS `text-[10px]`). */
-export const FONT_PX = 10;
+/** The chip copy's font size (TEXT_CLASS `text-micro`). */
+export const FONT_PX = TYPE_SCALE.micro.fontSize;
 /** JetBrains Mono's advance width is 600/1000 em for every glyph. */
 const MONO_ADVANCE_EM = 0.6;
 export const SEGMENT_PAD_X = 8;

@@ -26,6 +26,36 @@ export const duration = {
 export type DurationToken = keyof typeof duration;
 
 /**
+ * Named durations of single registered Moments whose timing is their own
+ * rather than one of the shared steps above (R3 MF-11). The values are the
+ * ones the moments shipped with; naming them changed no timing.
+ */
+export const moment = {
+  /** Countdown: "GRAPPLE" (GO) fades off the live screen. */
+  goFade: 700,
+  /** Verdict confetti: one piece falls and turns. */
+  confettiFall: 1800,
+  /** Verdict confetti: a piece starts fading this long after it starts to fall... */
+  confettiFadeDelay: 1200,
+  /** ...and fades out over this long. */
+  confettiFade: 600,
+  /** Verdict SlamIn ("YOU WON"): the scale lands. */
+  slamIn: 520,
+  /** Verdict SlamIn: the fade in. */
+  slamInFade: 300,
+  /** Verdict RiseIn (the rank strip): the default wait after the verdict... */
+  riseInDelay: 500,
+  /** ...then the rise and fade. */
+  riseIn: 400,
+  /** "The tap": one tick mark fills. */
+  tapMarkFill: 80,
+  /** "The tap": each mark's micro-nudge out (it settles over the rest of the stagger). */
+  tapNudge: 50,
+} as const;
+
+export type MomentToken = keyof typeof moment;
+
+/**
  * LIVE pulse tempo: the full cycle of every live dot, chosen by how many
  * athletes are live in the lobby. One shared clock drives every live dot, so
  * they never beat out of step. `duration.pulse` stays the fixed cycle for
@@ -53,8 +83,12 @@ export const BRAND_EASE_OUT_CURVE = [0.22, 1, 0.36, 1] as const;
 export const easing = {
   /** Brand ease-out, `cubic-bezier(0.22, 1, 0.36, 1)`. The default. */
   brandOut: Easing.bezier(...BRAND_EASE_OUT_CURVE),
-  /** Out-cubic, the rating tick's count curve. */
+  /** Out-cubic, the rating tick's count curve (and the splash odometer). */
   outCubic: Easing.out(Easing.cubic),
+  /** In-quad: a fall or a fade off (confetti falling, GO fading). */
+  inQuad: Easing.in(Easing.quad),
+  /** Linear: a readout of elapsed time (the hold-to-end fill, the time-up drain, the skeleton clock). */
+  linear: Easing.linear,
 } as const;
 
 /** Reanimated spring configs, ready to pass to `withSpring(to, config)`. */

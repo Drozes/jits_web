@@ -20,9 +20,9 @@ body{background:var(--void);color:var(--ink);font-family:var(--font-body);-webki
 .note{font-family:var(--font-body);font-size:12px;line-height:17px;color:var(--ink-2);margin:0;max-width:358px}
 .tab{font-variant-numeric:tabular-nums}
 .ico{display:block;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.b{position:relative;overflow:hidden;background:var(--plate);border-radius:var(--radius-tag)}
+.b{position:relative;overflow:hidden;background:var(--plate-bright);border-radius:var(--radius-tag)}
 .b.md{border-radius:var(--radius-plate)}
-.band{position:absolute;top:0;bottom:0;left:30%;width:40%;background:var(--plate-bright);opacity:0.55}
+.band{position:absolute;top:0;bottom:0;left:30%;width:40%;background:var(--ink);opacity:0.08}
 .txt{display:flex;flex-direction:column;gap:6px;width:240px}
 .splate{background:var(--plate);border:1px solid var(--hairline);border-left-width:1px;border-radius:var(--radius-plate);padding:14px;display:flex;gap:10.5px;align-items:center;width:358px;max-width:100%}
 .rr{background:var(--plate);border-left:3px solid transparent;padding:10.5px 14px;display:flex;align-items:center;gap:10.5px;width:358px;max-width:100%}
@@ -44,7 +44,7 @@ body{background:var(--void);color:var(--ink);font-family:var(--font-body);-webki
   </div>
   <div class="cell static"><p class="cap">Same row under Reduce Motion (static bars)</p>
     <div class="rr"><span class="b " style="display:block;width:36px;height:16px"><span class="band"></span></span><div class="grow"><span class="b " style="display:block;width:55%;height:15px"><span class="band"></span></span><span class="b " style="display:block;width:35%;height:11px"><span class="band"></span></span></div><div class="end"><span class="b " style="display:block;width:64px;height:24px"><span class="band"></span></span><span class="b " style="display:block;width:40px;height:18px"><span class="band"></span></span></div></div>
-    <p class="note">The bars are plate-tier like the row, so with no band the row reads as an empty plate (see README).</p>
+    <p class="note">The bars are plate-bright, one tier above the plate-tier row, so they still read with no band.</p>
   </div>
 </div>
 </body>

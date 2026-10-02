@@ -6,7 +6,7 @@ export function CollabTip({ tip }: { tip: string }) {
   if (!tip) return null;
   return (
     <View testID="share-collab-tip" className="border-l-2 border-hairline-strong pl-3">
-      <Text className="font-body text-[12px] text-ink-2">{tip}</Text>
+      <Text className="font-body text-small text-ink-2">{tip}</Text>
     </View>
   );
 }

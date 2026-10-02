@@ -12,7 +12,8 @@ import { useMatchLibrary } from "@/lib/film-room/use-match-library";
 import { useSeenMatches } from "@/lib/film-room/seen-store";
 import { applyFilter, buildRows, NO_FILTER, opponentsOf, recordOf, type LibraryFilter, type LibraryRow } from "@/lib/film-room/rows";
 import { recordStrip } from "@/lib/film-room/format";
-import { TABULAR, usePalette } from "@/lib/theme/palette";
+import { usePalette } from "@/lib/theme/palette";
+import { TABULAR, TRACKING, typeStep } from "@/lib/typography";
 import { ThemedStatusBar } from "@/lib/theme/themed-status-bar";
 import { FilmBackButton } from "@/components/film-room/film-back-button";
 import { FilterChips } from "@/components/film-room/filter-chips";
@@ -82,11 +83,11 @@ export default function FilmRoomScreen() {
         <View style={{ marginLeft: -12 }}>
           <FilmBackButton label="Go back" fallback="/(app)/(tabs)/profile" color={p.text} />
         </View>
-        <Text accessibilityRole="header" className="font-display text-ink" style={{ fontSize: 40, lineHeight: 44, letterSpacing: 0.8, paddingTop: 4 }}>
+        <Text accessibilityRole="header" className="font-display text-display-40 tracking-loose text-ink" style={{ paddingTop: 4 }}>
           FILM ROOM
         </Text>
       </View>
-      <Text testID="film-room-record" className="font-mono-medium" style={[{ marginTop: 6, marginBottom: 18, fontSize: 11, letterSpacing: 1.68, color: p.text2 }, TABULAR]}>
+      <Text testID="film-room-record" className="font-mono-medium" style={[typeStep("caption"), { marginTop: 6, marginBottom: 18, letterSpacing: TRACKING["caps-l"], color: p.text2 }, TABULAR]}>
         {recordStrip(recordOf(history), athlete?.current_elo)}
       </Text>
       <FilterChips

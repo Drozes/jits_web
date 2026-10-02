@@ -2,19 +2,19 @@
 
 Sheet is the bottom sheet chrome for every modal surface: a panel-tier sheet with 8px top corners, a hairline top edge, a 30x4 ink-3 handle, a brand caps title, and the shared 55% black scrim behind it.
 
-**Status: Target (WP1).** Today the app has three sheet mechanisms (the shadcn `Sheet` wrapper on `@gorhom/bottom-sheet`, used once by Share Profile; direct `BottomSheetModal` in the notifications panel, pre-share and highlight feedback sheets; RN `Modal` sheets for the challenge prompt, start-blocked and go-live-location prompts and pickers). Every gorhom sheet keeps the library's default 15px corner radius (finding SH-1), the shadcn wrapper uses the legacy `card` and `mutedForeground` tokens (SH-2), and its title falls back to the system font (SH-3). WP1 (bead jits-3eeg.2) gives them one shared background and handle style with 8px top corners, the brand title, one scrim token and a Reduce-Motion-aware present animation. The card shows the target first and today's Share Profile chrome below (its legacy `card` fill is approximated with `panel`; the 15px corners and the system-font title are exact).
+**Status: Shipped (WP1, bead jits-3eeg.2).** Every gorhom sheet (Share Profile through the shadcn `Sheet` wrapper; the notifications panel, highlight pre-share and highlight feedback sheets as direct `BottomSheetModal`s) spreads `useSheetChrome()` from `components/ui/sheet.tsx`: the `panel` background with 8px top corners, a square bottom and a `hairline` top edge (gorhom's default 15px radius, finding SH-1, is gone), the 30x4 `ink-3` handle, a background with no VoiceOver stop, and the Reduce-Motion-aware present. `SheetBackdrop` is the one `on-media-scrim` backdrop. `SheetTitle` is the brand caps title (SH-3) and the legacy `card` / `mutedForeground` tokens are gone (SH-2). RN `Modal` pickers (date of birth, Film Room opponent) use `SHEET_RADIUS`, the same scrim and `useModalAnimation("slide")`. The card shows the shipped chrome first and the pre-WP1 Share Profile chrome below for reference (its legacy `card` fill is approximated with `panel`; the 15px corners and the system-font title are exact).
 
 ## Props, variants, states
 
-Today's API (`components/ui/sheet.tsx`): `Sheet`, `SheetTrigger` (`asChild`), `SheetContent` (`snapPoints`, default `["50%", "90%"]`; pan down to close), `SheetHeader` (6px gap, 10.5px bottom padding), `SheetFooter`, `SheetTitle`, `SheetDescription`, `SheetClose`, `controllerRef`. Content padding 14px.
+API (`components/ui/sheet.tsx`): `Sheet`, `SheetTrigger` (`asChild`), `SheetContent` (`snapPoints`, default `["50%", "90%"]`; pan down to close), `SheetHeader` (6px gap, 10.5px bottom padding), `SheetFooter`, `SheetTitle` (role header), `SheetDescription`, `SheetClose`, `controllerRef`. Content padding 14px. Shared chrome for any `BottomSheetModal`: `useSheetChrome()` (spread it), `SheetBackdrop` (`pressBehavior` `close` by default), `SheetBackground`, `sheetBackgroundStyle(tokens)`, `sheetHandleIndicatorStyle(tokens)`, `SHEET_RADIUS`.
 
-| Part | Target |
+| Part | Shipped (WP1) |
 |---|---|
-| Background | `panel` (the notifications panel already uses it), top corners `radius-sheet` 8px, square bottom |
+| Background | `panel`, top corners `radius-sheet` 8px, square bottom, 1px `hairline` top edge |
 | Handle | gorhom indicator 30x4, `ink-3` |
-| Title | DM Sans 700 caps, `ink` (Notifications uses 14px with tracking 1.68px) |
-| Description | Inter, `ink-2` |
-| Scrim | `on-media-scrim` (black 55%); five literals today (SH-4) |
+| Title | DM Sans 700 14px caps, tracking 1.68px, `ink` (same as Notifications) |
+| Description | Inter 13px, `ink-2` |
+| Scrim | `on-media-scrim` (black 55%): `SheetBackdrop`, `bg-on-media-scrim`, `ON_MEDIA.scrim` |
 
 States: closed, open at a snap point, dragging, closing. The challenge prompt is centred by decision and keeps `PROMPT_RADIUS` 8.
 
@@ -26,7 +26,7 @@ The preview's content is the real Share Profile sheet (`components/share-profile
 
 ## Motion
 
-Today: gorhom's slide and RN `Modal` `fade`/`slide`, none registered or gated on Reduce Motion (MO-5). WP1 adds a "Sheet / modal present" Reactive registry row and `useModalAnimation()` returning no animation under Reduce Motion. The preview shows the open, settled frame.
+"Sheet / modal present" (Reactive registry row): gorhom sheets slide on a `fast` (240ms) brand ease-out timing (`useSheetAnimationConfigs()`, inside `useSheetChrome()`), RN `Modal` sheets slide and centered dialogs fade (`useModalAnimation()`). Under Reduce Motion both appear and leave in place (gorhom `ReduceMotion.Always`, `animationType` `"none"`). The preview shows the open, settled frame.
 
 ## Source
 
@@ -38,7 +38,7 @@ Today: gorhom's slide and RN `Modal` `fade`/`slide`, none registered or gated on
 
 ## Do and don't
 
-- Do use a sheet as the default modal; document any centred exception.
+- Do use a sheet as the default modal. Centred exceptions are documented (DESIGN.md, "Inputs and overlays"): blocking prompts (challenge prompt, start blocked, go-live location) and the read-only Compare Stats dialog.
 - Do keep corners at 8px or less and no shadow.
 - Don't stack two sheets.
-- Don't use the shadcn `SheetTitle` styling (system font) on a user-facing sheet.
+- Don't set a sheet's own `backgroundStyle`, `handleIndicatorStyle` or black backdrop literal; the guard test `__tests__/components/ui/modal-chrome-guard.test.ts` fails on it.

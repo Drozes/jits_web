@@ -9,6 +9,8 @@ import { act, render } from "@testing-library/react-native";
 import { AppState } from "react-native";
 import {
   SkeletonBlock,
+  SkeletonParticipantRow,
+  SkeletonPlate,
   SkeletonProvider,
   SkeletonRankRow,
 } from "@/components/ui/skeleton";
@@ -92,4 +94,46 @@ it("releases the clock while the app is in the background and takes it back on f
   act(() => appListeners.forEach((l) => l("active")));
   expect(__shimmerHoldersForTests()).toBe(1);
   view.unmount();
+});
+
+describe("skeleton bar tier (kit K2, jits-3eeg.7)", () => {
+  const classOf = (n: { props: { className?: unknown } }) =>
+    typeof n.props.className === "string" ? (n.props.className as string) : "";
+  const has = (cls: string, token: string) => new RegExp(`(^|\\s)${token}(\\s|$)`).test(cls);
+
+  it("draws bars on plate-bright, one tier above the plate of their host plate and rows", () => {
+    const view = render(
+      <SkeletonProvider pulse={false}>
+        <SkeletonPlate testID="host-plate">
+          <SkeletonBlock testID="lone-bar" width={40} height={10} />
+        </SkeletonPlate>
+        <SkeletonRankRow />
+        <SkeletonParticipantRow />
+      </SkeletonProvider>,
+    );
+    expect(has(classOf(view.getByTestId("host-plate")), "bg-surface-3")).toBe(true);
+    expect(has(classOf(view.getByTestId("lone-bar", HIDDEN)), "bg-surface-4")).toBe(true);
+    // Every bar (the overflow-hidden placeholder rects) is plate-bright, never plate.
+    const bars = view.UNSAFE_root.findAll(
+      (n: { type: unknown; props: { className?: unknown } }) => typeof n.type === "string" && has(classOf(n), "overflow-hidden") && has(classOf(n), "bg-surface-4"),
+    );
+    // 1 lone bar + 5 rank-row bars + 3 participant-row bars.
+    expect(bars).toHaveLength(9);
+    const plateBars = view.UNSAFE_root.findAll(
+      (n: { type: unknown; props: { className?: unknown } }) => typeof n.type === "string" && has(classOf(n), "overflow-hidden") && has(classOf(n), "bg-surface-3"),
+    );
+    expect(plateBars).toHaveLength(0);
+  });
+
+  it("keeps the band a different color from the bar so it still reads while shimmering", () => {
+    const view = render(
+      <SkeletonProvider>
+        <SkeletonBlock width={40} height={10} />
+      </SkeletonProvider>,
+    );
+    const band = view.getByTestId("skeleton-shimmer", HIDDEN);
+    expect(has(classOf(band), "bg-surface-4")).toBe(false);
+    expect(has(classOf(band), "bg-ink")).toBe(true);
+    view.unmount();
+  });
 });

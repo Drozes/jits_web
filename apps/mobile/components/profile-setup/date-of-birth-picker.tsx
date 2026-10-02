@@ -1,5 +1,7 @@
 import * as React from "react";
 import { Modal, Platform, Pressable, Text, View } from "react-native";
+import { StatePressable } from "@/components/ui/state-pressable";
+import { PressableScale } from "@/components/ui/pressable-scale";
 import DateTimePicker, {
   DateTimePickerAndroid,
   type DateTimePickerEvent,
@@ -7,6 +9,9 @@ import DateTimePicker, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { isAtLeast16 } from "@/lib/profile-setup/validation";
 import { useThemedTokens } from "@/lib/theme/use-theme";
+import { ON_MEDIA } from "@/lib/theme/palette";
+import { useModalAnimation } from "@/lib/motion";
+import { SHEET_RADIUS } from "@/components/ui/sheet";
 import { EloField } from "./elo-form-field";
 
 const MONTHS = [
@@ -49,6 +54,7 @@ interface DateOfBirthPickerProps {
 export function DateOfBirthPicker({ value, onChange }: DateOfBirthPickerProps) {
   const tokens = useThemedTokens();
   const insets = useSafeAreaInsets();
+  const animationType = useModalAnimation("slide");
   const [iosOpen, setIosOpen] = React.useState(false);
   // Track whether the user actually moved the iOS spinner; without this, tapping
   // "Done" without scrolling would silently commit the default (today minus 16y).
@@ -112,74 +118,78 @@ export function DateOfBirthPicker({ value, onChange }: DateOfBirthPickerProps) {
 
   return (
     <EloField label="Date of Birth" helper={helper} error={errorMsg}>
-      <Pressable onPress={open} accessibilityRole="button">
+      <StatePressable dim onPress={open} accessibilityRole="button">
         <View className="bg-surface-3 border border-hairline-strong rounded-xs h-12 px-4 flex-row items-center">
           <Text
-            className={`text-[14px] font-body flex-1 ${formatted ? "text-ink" : "text-ink-3"}`}
+            className={`text-callout font-body flex-1 ${formatted ? "text-ink" : "text-ink-3"}`}
             numberOfLines={1}
           >
             {formatted ?? "Select your date of birth"}
           </Text>
         </View>
-      </Pressable>
+      </StatePressable>
 
       {Platform.OS === "ios" && (
         <Modal
           visible={iosOpen}
           transparent
-          animationType="slide"
+          animationType={animationType}
           onRequestClose={() => setIosOpen(false)}
           statusBarTranslucent
         >
-          <Pressable
-            style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)" }}
-            onPress={() => setIosOpen(false)}
+          <View
+            style={{ flex: 1, justifyContent: "flex-end", backgroundColor: ON_MEDIA.scrim }}
+            onAccessibilityEscape={() => setIosOpen(false)}
           >
+            {/* The scrim above the sheet closes it; a sibling of the sheet so
+                VoiceOver still reaches Done and the date wheels. */}
+            <Pressable
+              testID="dob-picker-backdrop"
+              accessibilityRole="button"
+              accessibilityLabel="Close date picker"
+              onPress={() => setIosOpen(false)}
+              style={{ flex: 1 }}
+            />
             <View
+              testID="dob-picker-sheet"
               style={{
-                flex: 1,
-                justifyContent: "flex-end",
+                backgroundColor: tokens.bgSecondary,
+                borderTopLeftRadius: SHEET_RADIUS,
+                borderTopRightRadius: SHEET_RADIUS,
+                borderTopWidth: 1,
+                borderTopColor: tokens.borderHairline,
+                paddingTop: 8,
                 paddingBottom: insets.bottom || 16,
               }}
             >
-              <Pressable
-                onPress={(e) => e.stopPropagation()}
+              <View
                 style={{
-                  backgroundColor: tokens.card,
-                  borderTopLeftRadius: 12,
-                  borderTopRightRadius: 12,
-                  paddingTop: 8,
+                  flexDirection: "row",
+                  justifyContent: "flex-end",
+                  paddingHorizontal: 16,
+                  paddingVertical: 8,
                 }}
               >
-                <View
-                  style={{
-                    flexDirection: "row",
-                    justifyContent: "flex-end",
-                    paddingHorizontal: 16,
-                    paddingVertical: 8,
-                  }}
-                >
-                  <Pressable onPress={confirmIos} hitSlop={8} accessibilityRole="button">
-                    <Text className="font-heading text-[14px] text-cta uppercase tracking-caps-l">
-                      Done
-                    </Text>
-                  </Pressable>
-                </View>
-                <DateTimePicker
-                  value={draft}
-                  mode="date"
-                  display="spinner"
-                  maximumDate={maximumDate}
-                  minimumDate={minimumDate}
-                  textColor={tokens.cardForeground}
-                  onChange={(_event, date) => {
-                    setTouched(true);
-                    if (date) setDraft(date);
-                  }}
-                />
-              </Pressable>
+                <PressableScale onPress={confirmIos} hitSlop={8} accessibilityRole="button">
+                  <Text className="font-heading text-callout text-cta uppercase tracking-caps-l">
+                    Done
+                  </Text>
+                </PressableScale>
+              </View>
+              <DateTimePicker
+                value={draft}
+                mode="date"
+                display="spinner"
+                maximumDate={maximumDate}
+                minimumDate={minimumDate}
+                textColor={tokens.textPrimary}
+                onChange={(_event, date) => {
+                  setTouched(true);
+                  if (date) setDraft(date);
+                }}
+              />
             </View>
-          </Pressable>
+          </View>
         </Modal>
       )}
     </EloField>

@@ -9,8 +9,8 @@ import { useLocalSearchParams, useNavigation, useRouter, type Href } from "expo-
 import type { InviteEntryPoint } from "@jits/shared/api/invites";
 import { BOOKED_COPY, BOOKING_CLOSED_COPY, LOCATION_DENIED_COPY, START_AVAILABLE_COPY } from "@jits/shared/utils";
 import { AppHeader } from "@/components/layout/app-header";
-import { CtaButton, SecondaryButton, TertiaryButton } from "@/components/auth/auth-buttons";
 import { Plate } from "@/components/ui/elo-system";
+import { Button } from "@/components/ui/elo-system/button";
 import { InviteQr } from "@/components/invite/invite-qr";
 import { InviteShareRow } from "@/components/invite/share-row";
 import { OpenChallenges } from "@/components/invite/open-challenges";
@@ -92,7 +92,7 @@ export default function InviteScreen() {
 
         {phase.kind === "error" ? (
           <Plate className="gap-4" testID="invite-error">
-            <Text accessibilityRole="alert" className="font-body text-[14px] text-ink leading-6">
+            <Text accessibilityRole="alert" className="font-body text-callout text-ink leading-6">
               {phase.message}
             </Text>
             {phase.hint === "too_many_open_invites" ? (
@@ -102,35 +102,35 @@ export default function InviteScreen() {
                 onWithdrawn={() => void retry()}
               />
             ) : null}
-            <SecondaryButton label="Try again" onPress={() => void retry()} />
+            <Button variant="secondary" label="Try again" onPress={() => void retry()} />
           </Plate>
         ) : null}
 
         {invite && (phase.kind === "open" || phase.kind === "claimed") ? (
           <>
-            <Text className="font-body text-[14px] text-ink-2 text-center leading-6">
+            <Text className="font-body text-callout text-ink-2 text-center leading-6">
               Have them scan this with their phone camera, or type the code in ELO RATED.
             </Text>
             <View className="items-center">
               <InviteQr value={invite.url} />
             </View>
             <View className="items-center gap-1">
-              <Text className="font-mono text-[11px] uppercase tracking-caps-l text-ink-3">Code</Text>
+              <Text className="font-mono tabular-nums text-caption uppercase tracking-caps-l text-ink-3">Code</Text>
               <Text
                 testID="invite-code"
                 accessibilityLabel={`Code ${invite.short_code.split("").join(" ")}`}
-                className={`font-mono text-[40px] tabular-nums tracking-[4px] ${codeStale ? "text-ink-3" : "text-ink"}`}
+                className={`font-mono text-display-40 tabular-nums tracking-code ${codeStale ? "text-ink-3" : "text-ink"}`}
               >
                 {invite.short_code_display}
               </Text>
               {codeStale ? (
-                <Text testID="invite-code-stale" className="font-body text-[12px] text-ink-3 text-center">
+                <Text testID="invite-code-stale" className="font-body text-small text-ink-3 text-center">
                   This code expired. Getting a new one... The QR and link still work.
                 </Text>
               ) : null}
             </View>
             <View className="items-center py-2" accessibilityLiveRegion="polite">
-              <Text className="font-heading text-[14px] text-ink uppercase tracking-caps-l">
+              <Text className="font-heading text-callout text-ink uppercase tracking-caps-l">
                 {phase.kind === "claimed"
                   ? phase.claimerName
                     ? `Waiting for ${phase.claimerName}...`
@@ -140,15 +140,15 @@ export default function InviteScreen() {
             </View>
             {locationDenied ? (
               <View className="gap-2">
-                <Text className="font-body text-[13px] text-ink-2 leading-5">{LOCATION_DENIED_COPY}</Text>
-                <SecondaryButton label="Open Settings" onPress={() => void Linking.openSettings()} />
+                <Text className="font-body text-body text-ink-2 leading-5">{LOCATION_DENIED_COPY}</Text>
+                <Button variant="secondary" label="Open Settings" onPress={() => void Linking.openSettings()} />
               </View>
             ) : null}
             <InviteShareRow
               invite={{ inviteId: invite.invite_id, kind: "challenge", url: invite.url, codeDisplay: invite.short_code_display }}
               onShared={keepOpen}
             />
-            {phase.kind === "open" ? <TertiaryButton label="Withdraw challenge" onPress={confirmRevoke} /> : null}
+            {phase.kind === "open" ? <Button variant="ghost" height={44} label="Withdraw challenge" onPress={confirmRevoke} /> : null}
             {phase.kind === "open" ? (
               <OpenChallenges
                 key={openListKey}
@@ -163,54 +163,55 @@ export default function InviteScreen() {
 
         {phase.kind === "booked" ? (
           <Plate className="gap-4" testID="invite-booked">
-            <Text className="font-heading text-[18px] text-ink uppercase">
+            <Text className="font-heading text-title text-ink uppercase tracking-caps">
               {phase.opponentName ? `You're booked: ${me} vs ${phase.opponentName}` : "You're booked"}
             </Text>
-            <Text className="font-body text-[14px] text-ink leading-6">
+            <Text className="font-body text-callout text-ink leading-6">
               {showStart ? START_AVAILABLE_COPY : BOOKED_COPY}
             </Text>
             {showStart && phase.startError ? (
-              <Text testID="invite-start-error" accessibilityRole="alert" className="font-body text-[14px] text-ink leading-6">
+              <Text testID="invite-start-error" accessibilityRole="alert" className="font-body text-callout text-ink leading-6">
                 {phase.startError}
               </Text>
             ) : null}
             {showStart ? (
               // Secondary: red stays the one CTA on this plate.
-              <SecondaryButton
+              <Button
+                variant="secondary"
                 label={phase.starting ? "Starting..." : "Start match"}
                 disabled={Boolean(phase.starting)}
                 onPress={() => void start()}
               />
             ) : null}
-            <CtaButton label="Go to the Arena" onPress={() => router.replace(`${ARENA_HREF}?booking=${phase.challengeId}` as Href)} />
+            <Button label="Go to the Arena" onPress={() => router.replace(`${ARENA_HREF}?booking=${phase.challengeId}` as Href)} />
           </Plate>
         ) : null}
 
         {phase.kind === "closed" ? (
           <Plate className="gap-4" testID="invite-booking-closed">
-            <Text accessibilityRole="alert" className="font-body text-[14px] text-ink leading-6">
+            <Text accessibilityRole="alert" className="font-body text-callout text-ink leading-6">
               {BOOKING_CLOSED_COPY}
             </Text>
-            <CtaButton label="Go to the Arena" onPress={() => router.replace(ARENA_HREF as Href)} />
+            <Button label="Go to the Arena" onPress={() => router.replace(ARENA_HREF as Href)} />
           </Plate>
         ) : null}
 
         {phase.kind === "started" && isInArenaMatch() ? (
           <Plate className="gap-4" testID="invite-started">
-            <Text className="font-heading text-[18px] text-ink uppercase">Your match is ready</Text>
-            <Text className="font-body text-[14px] text-ink leading-6">
+            <Text className="font-heading text-title text-ink uppercase tracking-caps">Your match is ready</Text>
+            <Text className="font-body text-callout text-ink leading-6">
               Finish your current match, then start this one.
             </Text>
-            <CtaButton label="Go to the match" onPress={() => router.replace(arenaMatchHref(phase.matchId) as Href)} />
+            <Button label="Go to the match" onPress={() => router.replace(arenaMatchHref(phase.matchId) as Href)} />
           </Plate>
         ) : null}
 
         {phase.kind === "revoked" || phase.kind === "expired" ? (
           <Plate className="gap-4">
-            <Text className="font-body text-[14px] text-ink leading-6">
+            <Text className="font-body text-callout text-ink leading-6">
               {phase.kind === "revoked" ? "Challenge withdrawn." : "This challenge expired."}
             </Text>
-            <CtaButton label="New challenge" onPress={() => void retry()} />
+            <Button label="New challenge" onPress={() => void retry()} />
           </Plate>
         ) : null}
       </ScrollView>

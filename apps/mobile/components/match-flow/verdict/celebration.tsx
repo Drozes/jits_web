@@ -1,11 +1,11 @@
 import * as React from "react";
 import { StyleSheet, Text, View, useWindowDimensions, type StyleProp, type TextStyle } from "react-native";
-import Animated, { Easing, useAnimatedStyle, useSharedValue, withDelay, withTiming } from "react-native-reanimated";
-import { useReduceMotion } from "@/lib/match-flow/use-reduce-motion";
+import Animated, { useAnimatedStyle, useSharedValue, withDelay, withTiming } from "react-native-reanimated";
+import { easing, moment, useReduceMotion } from "@/lib/motion";
 import { usePalette } from "@/lib/theme/palette";
-import { FIGHT_EASING } from "../fight/fight-tokens";
 
-const EASE = Easing.bezier(...FIGHT_EASING);
+/** The brand ease-out (`FIGHT_EASING` is the same curve). */
+const EASE = easing.brandOut;
 
 /** Sharp rectangles, brand colors only (palette keys); x is a fraction of the width. */
 const PIECES = [
@@ -45,9 +45,9 @@ function Piece({ left, w, h, color, delay, fall }: { left: number; w: number; h:
   const rot = useSharedValue(0);
   const opacity = useSharedValue(1);
   React.useEffect(() => {
-    y.value = withDelay(delay, withTiming(fall, { duration: 1800, easing: Easing.in(Easing.quad) }));
-    rot.value = withDelay(delay, withTiming(360, { duration: 1800 }));
-    opacity.value = withDelay(delay + 1200, withTiming(0, { duration: 600 }));
+    y.value = withDelay(delay, withTiming(fall, { duration: moment.confettiFall, easing: easing.inQuad }));
+    rot.value = withDelay(delay, withTiming(360, { duration: moment.confettiFall }));
+    opacity.value = withDelay(delay + moment.confettiFadeDelay, withTiming(0, { duration: moment.confettiFade }));
   }, [y, rot, opacity, delay, fall]);
   const style = useAnimatedStyle(() => ({
     opacity: opacity.value,
@@ -68,15 +68,15 @@ export function SlamIn({ children, animate }: { children: React.ReactNode; anima
       opacity.value = 1;
       return;
     }
-    scale.value = withTiming(1, { duration: 520, easing: EASE });
-    opacity.value = withTiming(1, { duration: 300, easing: EASE });
+    scale.value = withTiming(1, { duration: moment.slamIn, easing: EASE });
+    opacity.value = withTiming(1, { duration: moment.slamInFade, easing: EASE });
   }, [play, scale, opacity]);
   const style = useAnimatedStyle(() => ({ opacity: opacity.value, transform: [{ scale: scale.value }] }));
   return <Animated.View style={[{ alignSelf: "flex-start" }, style]}>{children}</Animated.View>;
 }
 
 /** Rises in once after the verdict (the rank strip); static without `play`. */
-export function RiseIn({ children, delay = 500, play }: { children: React.ReactNode; delay?: number; play: boolean }) {
+export function RiseIn({ children, delay = moment.riseInDelay, play }: { children: React.ReactNode; delay?: number; play: boolean }) {
   const osReduceMotion = useReduceMotion();
   const reduceMotion = osReduceMotion || !play;
   const y = useSharedValue(reduceMotion ? 0 : 12);
@@ -87,8 +87,8 @@ export function RiseIn({ children, delay = 500, play }: { children: React.ReactN
       opacity.value = 1;
       return;
     }
-    y.value = withDelay(delay, withTiming(0, { duration: 400, easing: EASE }));
-    opacity.value = withDelay(delay, withTiming(1, { duration: 400, easing: EASE }));
+    y.value = withDelay(delay, withTiming(0, { duration: moment.riseIn, easing: EASE }));
+    opacity.value = withDelay(delay, withTiming(1, { duration: moment.riseIn, easing: EASE }));
   }, [reduceMotion, delay, y, opacity]);
   const style = useAnimatedStyle(() => ({ opacity: opacity.value, transform: [{ translateY: y.value }] }));
   return <Animated.View style={style}>{children}</Animated.View>;

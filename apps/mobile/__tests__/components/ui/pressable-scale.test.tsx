@@ -24,7 +24,7 @@ jest.mock("@/lib/motion/haptics", () => ({
 }));
 
 import { PressableScale, REDUCED_PRESS_OPACITY } from "@/components/ui/pressable-scale";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/elo-system/button";
 import { FightButton } from "@/components/match-flow/fight/fight-ui";
 import { PRESS_SCALE, __setReduceMotionForTests } from "@/lib/motion";
 
@@ -188,9 +188,7 @@ describe("PressableScale", () => {
 describe("Button press scale, haptic and sheen", () => {
   it("every Button scales on press", () => {
     const screen = render(
-      <Button testID="b" onPress={jest.fn()}>
-        Tap
-      </Button>,
+      <Button testID="b" onPress={jest.fn()} label="Tap" />,
     );
     fireEvent(screen.getByTestId("b"), "pressIn", {});
     act(() => jest.advanceTimersByTime(500));
@@ -199,9 +197,7 @@ describe("Button press scale, haptic and sheen", () => {
 
   it("a disabled Button keeps its dimmed opacity (the animation does not override it)", () => {
     const screen = render(
-      <Button testID="b" disabled style={{ opacity: 0.5 }} onPress={jest.fn()}>
-        Tap
-      </Button>,
+      <Button testID="b" disabled onPress={jest.fn()} label="Tap" />,
     );
     expect(StyleSheet.flatten(screen.getByTestId("b").props.style).opacity).toBe(0.5);
   });
@@ -209,12 +205,8 @@ describe("Button press scale, haptic and sheen", () => {
   it("is silent by default and buzzes press when opted in", () => {
     const screen = render(
       <>
-        <Button testID="plain" onPress={jest.fn()}>
-          Plain
-        </Button>
-        <Button testID="commit" haptic onPress={jest.fn()}>
-          Commit
-        </Button>
+        <Button testID="plain" onPress={jest.fn()} label="Plain" />
+        <Button testID="commit" haptic onPress={jest.fn()} label="Commit" />
       </>,
     );
     fireEvent.press(screen.getByTestId("plain"));
@@ -225,41 +217,31 @@ describe("Button press scale, haptic and sheen", () => {
 
   it("draws the sheen only when asked, enabled and motion is allowed", () => {
     const screen = render(
-      <Button testID="b" onPress={jest.fn()}>
-        Tap
-      </Button>,
+      <Button testID="b" onPress={jest.fn()} label="Tap" />,
     );
     expect(screen.queryByTestId("steel-sheen", { includeHiddenElements: true })).toBeNull();
 
     screen.rerender(
-      <Button testID="b" sheen onPress={jest.fn()}>
-        Tap
-      </Button>,
+      <Button testID="b" sheen onPress={jest.fn()} label="Tap" />,
     );
     expect(screen.getByTestId("steel-sheen", { includeHiddenElements: true })).toBeTruthy();
     expect(screen.getByTestId("steel-sheen", { includeHiddenElements: true }).props.pointerEvents).toBe("none");
 
     screen.rerender(
-      <Button testID="b" sheen disabled onPress={jest.fn()}>
-        Tap
-      </Button>,
+      <Button testID="b" sheen disabled onPress={jest.fn()} label="Tap" />,
     );
     expect(screen.queryByTestId("steel-sheen", { includeHiddenElements: true })).toBeNull();
 
     act(() => __setReduceMotionForTests(true));
     screen.rerender(
-      <Button testID="b" sheen onPress={jest.fn()}>
-        Tap
-      </Button>,
+      <Button testID="b" sheen onPress={jest.fn()} label="Tap" />,
     );
     expect(screen.queryByTestId("steel-sheen", { includeHiddenElements: true })).toBeNull();
   });
 
   it("a sheened Button never buzzes for the sheen", () => {
     render(
-      <Button testID="b" sheen onPress={jest.fn()}>
-        Tap
-      </Button>,
+      <Button testID="b" sheen onPress={jest.fn()} label="Tap" />,
     );
     act(() => jest.advanceTimersByTime(10_000));
     expect(mockPress).not.toHaveBeenCalled();

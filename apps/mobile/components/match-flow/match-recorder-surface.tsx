@@ -85,14 +85,14 @@ export function MatchRecorderCamera({
       {/* Only alongside an actual preview. Under the "camera access
           denied" card it would promise a recording that cannot happen. */}
       {warming && granted ? (
-        <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">
+        <Text className="font-mono tabular-nums text-micro text-ink-3 uppercase tracking-caps-l">
           Preview only. Recording starts with the match.
         </Text>
       ) : null}
       {/* Rotation is the control: the ready check follows the phone and
           going live locks it (MatchOrientationController). */}
       {warming && granted ? (
-        <Text testID="ready-rotate-hint" className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">
+        <Text testID="ready-rotate-hint" className="font-mono tabular-nums text-micro text-ink-3 uppercase tracking-caps-l">
           Turn your phone sideways for a wide shot. It locks when the match starts.
         </Text>
       ) : null}

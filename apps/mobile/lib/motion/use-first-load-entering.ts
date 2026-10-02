@@ -1,7 +1,7 @@
 import * as React from "react";
 import type Animated from "react-native-reanimated";
 import { Keyframe } from "react-native-reanimated";
-import { useReduceMotion } from "@/lib/match-flow/use-reduce-motion";
+import { useReduceMotion } from "./use-reduce-motion";
 import { duration, easing } from "./tokens";
 
 /** The `entering` prop of an `Animated.View`. */

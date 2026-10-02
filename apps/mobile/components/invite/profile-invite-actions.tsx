@@ -35,7 +35,7 @@ function Row({ icon, label, onPress }: { icon: "qr" | "friends"; label: string; 
       <View pointerEvents="none">
         <Icon size={16} color={tokens.textSecondary} />
       </View>
-      <Text className="flex-1 font-heading text-[12px] text-ink uppercase tracking-caps">{label}</Text>
+      <Text className="flex-1 font-heading text-small text-ink uppercase tracking-caps">{label}</Text>
       <View pointerEvents="none">
         <ChevronRight size={16} color={tokens.textTertiary} />
       </View>

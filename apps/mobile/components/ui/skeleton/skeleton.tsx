@@ -59,9 +59,14 @@ export function __shimmerHoldersForTests(): number {
   return holders;
 }
 
-/** The band's width as a share of the bar, and its opacity at full. */
+/**
+ * The band's width as a share of the bar, and its opacity. The band is `ink`
+ * at a low opacity: one step further in the theme's lift direction than the
+ * `plate-bright` bar (lighter in dark, darker in light), since there is no
+ * surface tier above the bar.
+ */
 const BAND_FRACTION = 0.4;
-const BAND_OPACITY = 0.55;
+const BAND_OPACITY = 0.08;
 
 const SkeletonContext = React.createContext<{ shimmer: boolean } | null>(null);
 
@@ -127,7 +132,7 @@ function ShimmerBand() {
     >
       <Animated.View
         testID="skeleton-shimmer"
-        className="bg-surface-4"
+        className="bg-ink"
         style={[
           {
             position: "absolute",
@@ -146,7 +151,14 @@ function ShimmerBand() {
 
 const RADIUS_CLASS = { xs: "rounded-xs", md: "rounded-md", full: "rounded-full" } as const;
 
-const blockVariants = cva("bg-surface-3");
+/**
+ * Bars are `plate-bright` (`bg-surface-4`), one tier above the `plate`
+ * (`bg-surface-3`) of the plates and rows that host them (`SkeletonPlate`,
+ * `SkeletonRankRow`, `SkeletonParticipantRow`), so they read at rest and
+ * under Reduce Motion, not only while the band crosses them (kit K2,
+ * jits-3eeg.7).
+ */
+const blockVariants = cva("bg-surface-4");
 
 /** One neutral placeholder rect. Shimmers inside a shimmering provider; static otherwise. */
 export function SkeletonBlock({

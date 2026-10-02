@@ -1,13 +1,14 @@
 import { Text, View } from "react-native";
 import { BROADCAST, BROADCAST_RADIUS, BROADCAST_SIZE, TABULAR } from "./broadcast-tokens";
+import { TRACKING, typeStep } from "@/lib/typography";
 
 export interface LiveAthlete {
   name: string;
   meta: string | null;
 }
 
-const NAME_STYLE = { fontSize: 15, lineHeight: 18, letterSpacing: 0.6, color: BROADCAST.ink };
-const META_STYLE = [{ fontSize: 11, lineHeight: 13, letterSpacing: 0.56, color: BROADCAST.ink3 }, TABULAR];
+const NAME_STYLE = { ...typeStep("subhead"), lineHeight: 18, letterSpacing: TRACKING.loose, color: BROADCAST.ink };
+const META_STYLE = { ...typeStep("caption"), lineHeight: 13, letterSpacing: TRACKING.loose, color: BROADCAST.ink3 };
 
 /**
  * You (left, with the red mark) vs your opponent (right) on the light plate.
@@ -49,7 +50,7 @@ export function AthleteBar({ me, opponent, flatTop }: { me: LiveAthlete; opponen
           </Text>
         </View>
         {me.meta ? (
-          <Text testID="live-me-meta" className="font-mono" numberOfLines={1} style={[META_STYLE, { paddingLeft: 11 }]}>
+          <Text testID="live-me-meta" className="font-mono" numberOfLines={1} style={[META_STYLE, { paddingLeft: 11 }, TABULAR]}>
             {me.meta}
           </Text>
         ) : null}
@@ -59,7 +60,7 @@ export function AthleteBar({ me, opponent, flatTop }: { me: LiveAthlete; opponen
         importantForAccessibility="no-hide-descendants"
         style={{ width: 44, alignItems: "center", paddingTop: 7, gap: 3 }}
       >
-        <Text className="font-display" style={{ fontSize: 22, lineHeight: 19, letterSpacing: 0.4, color: BROADCAST.ctaText }}>
+        <Text className="font-display" style={[typeStep("title-xl"), { lineHeight: 19, letterSpacing: TRACKING.loose, color: BROADCAST.ctaText }]}>
           VS
         </Text>
         <View style={{ width: 1, flexGrow: 1, backgroundColor: BROADCAST.cta }} />
@@ -75,7 +76,7 @@ export function AthleteBar({ me, opponent, flatTop }: { me: LiveAthlete; opponen
           {opponent.name.toUpperCase()}
         </Text>
         {opponent.meta ? (
-          <Text testID="live-opponent-meta" className="font-mono" numberOfLines={1} style={META_STYLE}>
+          <Text testID="live-opponent-meta" className="font-mono" numberOfLines={1} style={[META_STYLE, TABULAR]}>
             {opponent.meta}
           </Text>
         ) : null}

@@ -42,7 +42,7 @@ export function PasteInviteButton({
           if (data.type === "text" && data.text.trim()) onPasteText(data.text);
         }}
       />
-      <Text className="text-center font-body text-[13px] text-ink-2">{hint}</Text>
+      <Text className="text-center font-body text-body text-ink-2">{hint}</Text>
     </View>
   );
 }

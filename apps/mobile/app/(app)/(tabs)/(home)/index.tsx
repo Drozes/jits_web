@@ -100,7 +100,7 @@ export default function DashboardScreen() {
   if (!athlete) {
     return (
       <View className="flex-1 bg-surface items-center justify-center">
-        <ActivityIndicator color={tokens.accentCta} />
+        <ActivityIndicator color={tokens.textTertiary} />
       </View>
     );
   }
@@ -157,13 +157,13 @@ export default function DashboardScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={tokens.accentCta}
+            tintColor={tokens.textTertiary}
           />
         }
       >
         <View>
           <MetaTag>{hasMatches ? "Welcome back" : "Welcome"}</MetaTag>
-          <Text className="font-heading text-[26px] text-ink mt-2" numberOfLines={1}>
+          <Text className="font-heading text-headline-l text-ink mt-2" numberOfLines={1}>
             {athlete.display_name}
           </Text>
         </View>

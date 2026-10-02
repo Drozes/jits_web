@@ -2,7 +2,7 @@ import * as React from "react";
 import { Alert, Text, View } from "react-native";
 import { listMyOpenChallengeInvites, revokeInvite, type OpenChallengeInvite } from "@jits/shared/api/invites";
 import { formatInviteCode, revokeInviteErrorMessage } from "@jits/shared/utils";
-import { TertiaryButton } from "@/components/auth/auth-buttons";
+import { Button } from "@/components/ui/elo-system/button";
 import { supabase } from "@/lib/supabase/client";
 
 function sentAgo(iso: string, now: number): string {
@@ -66,7 +66,7 @@ export function OpenChallenges({
   const now = Date.now();
   return (
     <View testID="open-challenges" className="gap-2">
-      <Text className="font-mono text-[11px] uppercase tracking-caps-l text-ink-3">{title}</Text>
+      <Text className="font-mono tabular-nums text-caption uppercase tracking-caps-l text-ink-3">{title}</Text>
       {visible.map((r) => (
         <View
           key={r.id}
@@ -74,16 +74,18 @@ export function OpenChallenges({
           className="flex-row items-center justify-between gap-3 border-b border-hairline py-2"
         >
           <View className="flex-1 gap-0.5">
-            <Text className="font-body text-[14px] text-ink">{sentAgo(r.created_at, now)}</Text>
+            <Text className="font-body text-callout text-ink">{sentAgo(r.created_at, now)}</Text>
             {r.short_code && r.code_expires_at && Date.parse(r.code_expires_at) > now ? (
-              <Text className="font-mono text-[12px] text-ink-3">Code {formatInviteCode(r.short_code)}</Text>
+              <Text className="font-mono tabular-nums text-small text-ink-3">Code {formatInviteCode(r.short_code)}</Text>
             ) : null}
           </View>
-          <TertiaryButton
+          <Button
+            variant="ghost"
+            height={28}
+            style={{ paddingHorizontal: 0 }}
             label={busyId === r.id ? "Withdrawing..." : "Withdraw"}
             disabled={busyId !== null}
             onPress={() => void withdraw(r.id)}
-            className="px-0 py-1"
           />
         </View>
       ))}

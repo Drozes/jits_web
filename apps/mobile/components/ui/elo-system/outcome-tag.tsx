@@ -38,7 +38,7 @@ export function OutcomeTag({ outcome, className }: OutcomeTagProps) {
     >
       <Text
         className={cn(
-          "font-mono-bold text-[10px] uppercase tracking-caps-l",
+          "font-mono-bold tabular-nums text-micro uppercase tracking-caps-l",
           TEXT_CLASS[outcome],
         )}
       >

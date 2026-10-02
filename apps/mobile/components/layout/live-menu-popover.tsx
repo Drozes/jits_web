@@ -81,7 +81,7 @@ export function LiveMenuPopover({ visible, onClose }: LiveMenuPopoverProps) {
           gap: 12,
         }}
       >
-        <Text maxFontSizeMultiplier={1.3} className="font-body text-[13px] leading-[18px] text-ink-2">
+        <Text maxFontSizeMultiplier={1.3} className="font-body text-body leading-[18px] text-ink-2">
           {LIVE_MENU_COPY}
         </Text>
         <View className="flex-row" style={{ gap: 8 }}>
@@ -124,7 +124,7 @@ function MenuButton({
       <Text
         maxFontSizeMultiplier={1.3}
         numberOfLines={1}
-        className="font-heading text-[12px] uppercase tracking-caps-l text-ink"
+        className="font-heading text-small uppercase tracking-caps-l text-ink"
       >
         {label}
       </Text>

@@ -22,11 +22,11 @@ This system describes the mobile app (`apps/mobile` in jits_web), which is the s
 - **Dark first.** Design in the `dark` theme (Void); `light` (Paddock) must also work with the same token names.
 - **Surfaces step, nothing floats.** Paint the page `void`, chrome (headers, tab bar, Arena strips) `panel`, content `plate`, pressed and selected `plate-bright`. In dark the steps get lighter, in light darker. There are no shadows and no gradients (camera scrims excepted).
 - **Hairlines, not boxes.** Draw every border 1px in `hairline`, `hairline-faint` or `hairline-strong`. Use a 2px `stroke-edge` only for state edges (the active tab, the challenge afterglow) and a 3px `stroke-rail` only for rails (Plate accent, StripShell, the EloTile bar).
-- **Sharp corners.** `radius-tag` 2px for tags, chips and avatars, `radius-button` 3px for buttons, `radius-plate` 4px for everything else, `radius-sheet` 8px for sheets and modals and never more. Only dots are round.
+- **Sharp corners.** `radius-tag` 2px for tags, chips and avatars, `radius-button` 3px for buttons, `radius-plate` 4px for everything else, `radius-sheet` 8px for sheets and modals and never more. Only dots are round (live, status and seek-marker dots); every other control, play buttons and check badges included, takes the radius scale.
 - **Ink for content.** Text in `ink`, secondary copy in `ink-2`, mono labels 10px and up in `ink-3`. Every number is `ink` unless it is a delta.
 - **Signal Red means "act" or "lose".** Fill ONE primary action per surface with `signal-red`, label it in `on-signal` (never white), press it to `signal-red-lift`. Red text uses `negative` (losses, errors) or `signal-red-text`, never `signal-red`. Red never decorates data, spinners, icons, switches or selections.
 - **Gain Green means "gain, win, live".** `gain-green` only for rating increases, wins and LIVE. A ready check, a confirmed result or a finished upload is `ink` with a glyph.
-- **Amber means "draw" or "waiting".** `attention` for draws, pressure score, and pending, processing, paused or disputed states.
+- **Amber means "draw" or "waiting".** `attention` for the draw headline (the verdict DRAW and the draw delta), pressure score, and pending, processing, paused or disputed states. The D outcome letter in a list stays neutral.
 - **Heat is the Arena's alone.** `heat-orange` and `heat-red` appear only on the Arena tab icon's embers and the challenge afterglow.
 - **Selected is a surface, not a color.** A selected option steps to `plate-bright` with a `hairline-strong` edge and an `ink` check. Never a red fill.
 - **No decorative color.** If a color does not mean one of the above, it is grey.
@@ -38,6 +38,7 @@ This system describes the mobile app (`apps/mobile` in jits_web), which is the s
 - `heading` (DM Sans 700): buttons, tabs, chips, header titles, in caps with tracking; plate titles in sentence case.
 - `body` (Inter): prose and helper copy.
 - `mono` (JetBrains Mono): every number, with tabular figures, and caps meta labels at `tracking-caps-l` (1.68px) or wider.
+- Sizes come from the type scale, never a literal: text steps `micro` 10, `caption` 11, `small` 12, `body` 13, `callout` 14, `subhead` 16, `title` 18, `title-l` 20, `title-xl` 22, `headline` 24, `headline-l` 26, `headline-xl` 28, `headline-2xl` 30, then pinned `display-<px>` steps (36 to 240). Classes `text-<step>`, style props `typeStep("<step>")` (`typeSize("<step>")`, size only, for TextInputs and line-height-free moments), numbers through `<Mono>`, caps labels through `<Label>`.
 - 10px is the floor. The text styles in `tokens.json` are the real top combinations; the most common label is `meta-label` (mono 10px, 1.68px tracking, caps).
 
 ## Motion
@@ -55,7 +56,7 @@ Motion carries meaning or does not exist. Every animation is **Reactive** (a res
 ## Consuming this kit
 
 - **Token names** are the kit names in `tokens.json` (`void`, `ink-3`, `signal-red`, `radius-plate`, `space-4`, ...). In a preview or web page they are CSS custom properties of the same name (`var(--void)`, `var(--radius-plate)`, `var(--font-mono)`; dotted steps escape: `var(--space-1\.5)`), and each text style is a class (`.meta-label`).
-- **In the RN code** the same values are NativeWind classes (`bg-surface`, `bg-surface-2/3/4`, `text-ink`, `text-ink-2/3`, `text-ink-on-cta`, `bg-cta`, `text-cta`, `text-positive`, `text-negative`, `border-hairline(-faint|-strong)`, `rounded-xs/sm/md/lg`, `font-display/heading/body/mono`, `tracking-caps(-l|-xl)`); [Color](#color) lists the mapping. JS call sites use `useThemedTokens()`, `usePalette()` or `ON_MEDIA`.
+- **In the RN code** the same values are NativeWind classes (`bg-surface`, `bg-surface-2/3/4`, `text-ink`, `text-ink-2/3`, `text-ink-on-cta`, `bg-cta`, `text-cta`, `text-positive`, `text-negative`, `text-attention`, `border-attention(-rule)`, `bg-heat-orange`, `bg-heat-red`, `border-hairline(-faint|-strong)`, `rounded-xs/sm/md/lg`, `font-display/heading/body/mono`, `text-<step>` (`text-micro` ... `text-display-240`), `tracking-caps(-l|-xl)`, `tracking-code`); [Color](#color) lists the mapping. JS call sites use `useThemedTokens()`, `usePalette()` or `ON_MEDIA` (= `onMediaTokens`).
 - **Units:** every length is device px at **NativeWind rem = 14px** (one spacing step = 3.5px; `p-4` = 14px). Arbitrary `[Npx]` values stay literal. Web renders the same class at rem 16.
 - **Where the code lives (jits_web):** colors `apps/mobile/lib/tokens.ts` (the source of truth; web `apps/web/app/design-system/tokens.css` mirrors it), classes `apps/mobile/tailwind.config.js`, match-flow palette `apps/mobile/lib/theme/palette.ts`, motion `apps/mobile/lib/motion/`, primitives `apps/mobile/components/ui/elo-system/`, Arena `apps/mobile/components/arena/`, chrome `apps/mobile/components/layout/`.
 - **Screens:** the ELO RATED Native Screens canvas mirrors the shipped app; draw boards from this kit's tokens at 390px wide, dark.
@@ -66,11 +67,11 @@ Twenty cards, each a static HTML twin of the RN component with a README (`compon
 
 | Family | Cards |
 |---|---|
-| Actions | Button (target, WP3), OutlineAction |
+| Actions | Button, OutlineAction |
 | Status | MetaTag, LivePill (with LiveDot), CountPill (with tab badges) |
 | Data | EloTile, RollingNumber (settled frame), DeltaChip |
-| Navigation | TabBar (with the Arena icon's embers), AppHeader (with the header status chip), Chip |
-| Surfaces | Plate, Sheet (target, WP1) |
+| Navigation | TabBar (with the Arena icon's embers), AppHeader (with the header status chip), Chip (shipped, WP2) |
+| Surfaces | Plate, Sheet (shipped, WP1) |
 | Feedback | Toast, Skeleton |
 | Identity | Avatar |
 | Arena | OnAirStrip, ChallengeStrip |
@@ -81,21 +82,26 @@ Twenty cards, each a static HTML twin of the RN component with a README (`compon
 1. **Source of truth:** `apps/mobile/lib/tokens.ts` and `lib/motion/tokens.ts`; web `tokens.css` mirrors them (the old DESIGN.md claimed the reverse; the drift test already treats mobile as the source).
 2. **Units:** device px at rem 14.
 3. **Theme order:** `dark` first, then `light`.
-4. **Color set:** the 17 core tokens plus `attention` (amber, scoped to draws, pressure and pending, processing, paused or disputed states, as the code does), `heat-orange` and `heat-red` (Arena heat only), and the `on-media-*` set (named after `ON_MEDIA`; `BROADCAST` overlaps it and merges in WP7). Legacy shadcn colors are not kit tokens.
+4. **Color set:** the 17 core tokens plus `attention` (amber, scoped to draws, pressure and pending, processing, paused or disputed states, as the code does), `heat-orange` and `heat-red` (Arena heat only), and the `on-media-*` set (one source, `onMediaTokens` in `lib/tokens.ts`, behind both `ON_MEDIA` and `BROADCAST` since WP7). Legacy shadcn colors are not kit tokens.
 5. **Display numerals:** Bebas Neue is allowed for numerals 40px and up as brand moments (countdown 240px, GO 116px, the wordmark); every other number is mono. Face-off weights are 36px Bebas today: either raise them to 40px or accept 36px as the floor.
 6. **Radius scale:** 2 tag, 3 button, 4 plate (default), 8 sheets and modals maximum; dots round. Avatars: the code's `Avatar32` is a 2px-radius square, while the old DESIGN.md said avatars stay circular; the kit follows the code (square) until decided.
 7. **Shadows:** none; no shadow family.
 8. **Weight unit:** lbs (code truth; DESIGN.md's kg is wrong).
-9. **Selected state:** `plate-bright` plus a `hairline-strong` edge and an `ink` check, never a red fill (the WP2 target; `hairline-strong` alone is below 3:1, so the surface step and the glyph are required).
+9. **Selected state:** `plate-bright` plus a `hairline-strong` edge and an `ink` check, never a red fill (shipped in WP2, jits-3eeg.3: `selectionSurface()` and `SelectCheck` in `components/ui/elo-system/selection.tsx`; `hairline-strong` alone is below 3:1, so the surface step and the glyph are required).
 10. **Motion values** live in the [Motion](#motion-1) section (the format has no motion family).
 11. **Logo:** the E·R lettermark SVGs; the old `apps/web/public/logo.svg` is retired; the wordmark is live Bebas Neue text, no file.
-12. **Wizard progress segments** in `signal-red` (MF-8) and the "VS" in red display type (MF-12) are treated as brand chrome until decided.
+12. **Wizard progress segments** in `signal-red` (MF-8) and the "VS" in red display type (MF-12) are treated as brand chrome until decided. The same brand chrome covers your-side accent and you-mark next to the VS: the red accent block and dot on your side of the face-off (`faceoff-top.tsx`) and the 4px you-mark beside the broadcast VS on the live screen (`athlete-bar.tsx`, `live-you-mark`). Identity red appears only beside the VS; anywhere else "you" is `ink` (the result form's YOU label is ink since WP2). WP2 kept all of these red under this decision; the color guard test allowlists them by name, so changing the decision is an allowlist edit plus those classes.
 13. **Destructive button:** an outline in `negative` (border and label; 6.28:1 on `void` dark, 6.37:1 light), proposed by the kit. The code has no ELO destructive button: today's `DestructiveButton` (one use, Delete account) fills with the legacy red under a `#E8EDF2` label at 3.54:1 and reads as a second red CTA.
-14. **Chip selected state:** `plate-bright` fill, `hairline-strong` border, `ink` label, no red square (the WP2 target, bead jits-3eeg.3). Today the active chip takes a Signal Red border and a 6px red square.
+14. **Chip selected state:** `plate-bright` fill, `hairline-strong` border, `ink` label, no red square (shipped in WP2, bead jits-3eeg.3). On this compact control the label's step from `ink-2` to `ink` stands in for the check glyph. The result OutcomeToggle (Submission / Draw) is the other compact segmented control under this exception: its icon and label step from `ink-3` to `ink`.
+15. **Circular elements (D-6):** only dots are round: live dots, status dots, seek markers. Avatars are square (as code). The round play buttons (`player-controls.tsx`, `match-hero.tsx`), the round seek thumb and the round check badges in the match flow (R3 FR-8) are non-conforming and take `radius-plate` / `radius-tag` when their package touches them.
+16. **Centered modals (D-4):** sheets are the default modal. The challenge prompt is a centered card by decision (jits-02vo.3). Compare Stats, the go-live location prompt and the start-blocked notice are centered today and are decided in WP1 (R3 SH-5): move to a sheet or record the exception here.
+17. **Contrast on media:** on-media text sits on `on-media-badge` or the light `on-media-chip` only (see [Color](#color)).
+18. **Draws (decided 2026-10-02, WP2):** amber (`attention`) marks the draw headline: the verdict DRAW (the verdict step and the confirm banner), and the draw delta in the rating moment, `DeltaChip`, the `EloTile` draw tone and the stakes strip. The D outcome letter in lists (`OutcomeTag`, Film Room poster cards) stays neutral (`ink-3` / on-media `text`, with a `hairline-strong` edge): a list is not a headline.
+19. **Input focus (decided 2026-10-02, WP2):** a focused input takes a neutral `ink-2` edge at the same 1px stroke (6.27:1 on dark `plate`, 5.82:1 on light), never `signal-red`, so focus and error (`negative`) no longer look alike (`AuthFormField`, `EloTextInput`).
 
 ## Not synced
 
-Not carried into tokens: web-only values (the web `--size-*` type scale, the web z-index ladder, web `--opacity-*`, the shadcn `--chart-*` slots), `BROADCAST` values with no `ON_MEDIA` twin, `palette.ts` match-flow mirrors (`winRule`, `secondaryBg`, `secondaryBgPressed`, `selectedBg`, `track`), the splash gold `#f59e0b`, and the push accent `#ef4444`. Components are static HTML twins hand-written from the RN sources (React Native cannot run in the preview frame); no bundle was built.
+Not carried into tokens: web-only values (the web `--size-*` type scale, the web z-index ladder, web `--opacity-*`, the shadcn `--chart-*` slots), `palette.ts` match-flow mirrors (`winRule`, `secondaryBg`, `secondaryBgPressed`, `track`), and the push accent `#ef4444` in `app.json` (native config). Components are static HTML twins hand-written from the RN sources (React Native cannot run in the preview frame); no bundle was built.
 
 ## Color
 
@@ -113,25 +119,25 @@ Every value below is exact from `apps/mobile/lib/tokens.ts` (the source of truth
 
 | Token | Dark | Light | Tailwind class (mobile) | tokens.ts key | Role |
 |---|---|---|---|---|---|
-| `void` | `#0D0F14` | `#F8FAFC` | `bg-surface` | `bgPrimary` (l.143 / l.96) | Page background |
-| `panel` | `#13151B` | `#E8EBF0` | `bg-surface-2` | `bgSecondary` (l.144 / l.97) | Header bars, tab bar, Arena strips, modal cards |
-| `plate` | `#1E222B` | `#DEE2E9` | `bg-surface-3` | `bgElevated` (l.145 / l.98) | Plates, cards, toasts, chips, inputs |
-| `plate-bright` | `#262A34` | `#D2D7E0` | `bg-surface-4` | `bgElevatedHover` (l.146 / l.99) | Pressed, focused and selected surfaces |
-| `ink` | `#E8EDF2` | `#0D0F14` | `text-ink` | `textPrimary` (l.147 / l.100) | Default text and all data values |
-| `ink-2` | `#9CA3AF` | `#4B5563` | `text-ink-2` | `textSecondary` (l.148 / l.101) | Secondary copy, header titles |
-| `ink-3` | `#8D929D` | `#575C68` | `text-ink-3` | `textTertiary` (l.149 / l.102) | Meta labels, helper text, inactive tabs |
-| `on-signal` | `#0D0F14` | `#0D0F14` | `text-ink-on-cta` | `textOnAccent` (l.150 / l.103) | Label on a red fill |
-| `signal-red` | `#E63946` | `#E63946` | `bg-cta`, `border-cta` | `accentCta` (l.151 / l.104) | Brand red: CTA fill and rules, never text |
-| `signal-red-text` | `#EC6A74` | `#AC2B34` | `text-cta` | `accentCtaText` (l.152 / l.105) | Red tuned for text |
-| `signal-red-lift` | `#F0556B` | `#F0556B` | `bg-cta-hover` | `accentCtaHover` (l.153 / l.106) | Pressed CTA fill |
-| `gain-green` | `#22C55E` | `#116A33` | `text-positive`, `bg-positive` | `statePositive` (l.154 / l.107) | Gains, wins, live |
-| `negative` | `#EC6A74` | `#AC2B34` | `text-negative` | `stateNegative` (l.155 / l.108) | Losses, errors, destructive |
-| `neutral` | `#8D929D` | `#575C68` | (use `text-ink-3`) | `stateNeutral` (l.156 / l.109) | No change |
-| `hairline` | `rgba(107, 114, 128, 0.45)` | `rgba(13, 15, 20, 0.22)` | `border-hairline` | `borderHairline` (l.157 / l.110) | Standard 1px border |
-| `hairline-faint` | `rgba(107, 114, 128, 0.20)` | `rgba(13, 15, 20, 0.11)` | `border-hairline-faint` | `borderHairlineFaint` (l.158 / l.111) | Faintest divider |
-| `hairline-strong` | `rgba(107, 114, 128, 0.62)` | `rgba(13, 15, 20, 0.34)` | `border-hairline-strong` | `borderHairlineStrong` (l.159 / l.112) | Chips, actions, avatars, selected edge |
+| `void` | `#0D0F14` | `#F8FAFC` | `bg-surface` | `bgPrimary` (`darkTokens` / `lightTokens`) | Page background |
+| `panel` | `#13151B` | `#E8EBF0` | `bg-surface-2` | `bgSecondary` (`darkTokens` / `lightTokens`) | Header bars, tab bar, Arena strips, modal cards |
+| `plate` | `#1E222B` | `#DEE2E9` | `bg-surface-3` | `bgElevated` (`darkTokens` / `lightTokens`) | Plates, cards, toasts, chips, inputs |
+| `plate-bright` | `#262A34` | `#D2D7E0` | `bg-surface-4` | `bgElevatedHover` (`darkTokens` / `lightTokens`) | Pressed, focused and selected surfaces |
+| `ink` | `#E8EDF2` | `#0D0F14` | `text-ink` | `textPrimary` (`darkTokens` / `lightTokens`) | Default text and all data values |
+| `ink-2` | `#9CA3AF` | `#4B5563` | `text-ink-2` | `textSecondary` (`darkTokens` / `lightTokens`) | Secondary copy, header titles |
+| `ink-3` | `#8D929D` | `#575C68` | `text-ink-3` | `textTertiary` (`darkTokens` / `lightTokens`) | Meta labels, helper text, inactive tabs |
+| `on-signal` | `#0D0F14` | `#0D0F14` | `text-ink-on-cta` | `textOnAccent` (`darkTokens` / `lightTokens`) | Label on a red fill |
+| `signal-red` | `#E63946` | `#E63946` | `bg-cta`, `border-cta` | `accentCta` (`darkTokens` / `lightTokens`) | Brand red: CTA fill and rules, never text |
+| `signal-red-text` | `#EC6A74` | `#AC2B34` | `text-cta` | `accentCtaText` (`darkTokens` / `lightTokens`) | Red tuned for text |
+| `signal-red-lift` | `#F0556B` | `#F0556B` | `bg-cta-hover` | `accentCtaHover` (`darkTokens` / `lightTokens`) | Pressed CTA fill |
+| `gain-green` | `#22C55E` | `#116A33` | `text-positive`, `bg-positive` | `statePositive` (`darkTokens` / `lightTokens`) | Gains, wins, live |
+| `negative` | `#EC6A74` | `#AC2B34` | `text-negative` | `stateNegative` (`darkTokens` / `lightTokens`) | Losses, errors, destructive |
+| `neutral` | `#8D929D` | `#575C68` | (use `text-ink-3`) | `stateNeutral` (`darkTokens` / `lightTokens`) | No change |
+| `hairline` | `rgba(107, 114, 128, 0.45)` | `rgba(13, 15, 20, 0.22)` | `border-hairline` | `borderHairline` (`darkTokens` / `lightTokens`) | Standard 1px border |
+| `hairline-faint` | `rgba(107, 114, 128, 0.20)` | `rgba(13, 15, 20, 0.11)` | `border-hairline-faint` | `borderHairlineFaint` (`darkTokens` / `lightTokens`) | Faintest divider |
+| `hairline-strong` | `rgba(107, 114, 128, 0.62)` | `rgba(13, 15, 20, 0.34)` | `border-hairline-strong` | `borderHairlineStrong` (`darkTokens` / `lightTokens`) | Chips, actions, avatars, selected edge |
 
-The mobile CSS variables behind the classes are the web names (`--bg-primary`, `--text-tertiary`, `--accent-cta-text`, ...), written by `lib/theme/theme-provider.tsx:46-62`. One class is remapped on purpose: `text-cta` resolves to `--accent-cta-text`, while `bg-cta` and `border-cta` stay the brand red (`tailwind.config.js:176-182`).
+The mobile CSS variables behind the classes are the web names (`--bg-primary`, `--text-tertiary`, `--accent-cta-text`, ...), written by `lib/theme/theme-provider.tsx` (`buildVars`, which also writes `--attention`, `--attention-rule`, `--heat-orange` and `--heat-red`). One class is remapped on purpose: `text-cta` resolves to `--accent-cta-text`, while `bg-cta` and `border-cta` stay the brand red (`tailwind.config.js` `theme.extend.textColor.cta`).
 
 ### Sub-palettes
 
@@ -139,53 +145,63 @@ The mobile CSS variables behind the classes are the web names (`--bg-primary`, `
 
 | Token | Dark | Light | Source |
 |---|---|---|---|
-| `attention` | `#F59E0B` | `#92400E` | `lib/theme/palette.ts:74` |
-| `attention-rule` | `rgba(245,158,11,0.7)` | `rgba(146,64,14,0.6)` | `lib/theme/palette.ts:75` |
+| `attention` | `#F59E0B` | `#92400E` | `lib/tokens.ts` key `attention`; Tailwind `text-attention`, `border-attention`, `bg-attention` |
+| `attention-rule` | `rgba(245,158,11,0.7)` | `rgba(146,64,14,0.6)` | `lib/tokens.ts` key `attentionRule`; Tailwind `border-attention-rule` |
 
-Amber marks draws and pressure score, and the states that are waiting on something: pending, processing, paused, disputed (as the code uses it, `palette.ts:40`). It is not in `tokens.ts` yet; `components/match-detail/use-amber.ts` still reaches it through Tailwind's `text-amber-500` / `text-amber-800`. Light mode uses amber-800 because amber-500 does not reach 4.5:1 on the light plates.
+Amber marks the draw headline (the verdict DRAW and the draw delta; a D letter in a list stays neutral) and pressure score, and the states that are waiting on something: pending, processing, paused, disputed (decided 2026-10-02). The CSS vars are `--attention` and `--attention-rule`, written by `theme-provider.tsx` like the core set; `usePalette().amber` / `.amberRule` and `useAmber()` (`components/match-detail/use-amber.ts`, which returns `text-attention` / `border-attention`) read the same token. Light mode uses amber-800 because amber-500 does not reach 4.5:1 on the light plates. Amber is never decoration: the launch splash's gold cap (`splash-reveal.tsx`, the dark `attention` value) is the one sanctioned exception, a brand moment, and is not to be copied.
 
 #### Heat (Arena only)
 
 | Token | Value (both themes) | Source |
 |---|---|---|
-| `heat-orange` | `hsl(25, 95%, 53%)` (`#F97415`) | `lib/tokens.ts:92,139` (legacy key `brandOrange`) |
-| `heat-red` | `#EC6A74` | `components/layout/arena-tab-icon.tsx:138` (`HEAT_EMBER_RED`) |
+| `heat-orange` | `hsl(25, 95%, 53%)` (`#F97415`) | `lib/tokens.ts` key `heatOrange`; Tailwind `bg-heat-orange` (the legacy `brandOrange` with the same value was deleted by WP4) |
+| `heat-red` | `#EC6A74` | `lib/tokens.ts` key `heatRed`; Tailwind `bg-heat-red` (`arena-tab-icon.tsx` `HEAT_EMBER_RED` reads it) |
 
 Heat colors draw Arena heat and nothing else: the live embers (two `heat-orange`, one `signal-red`), the countable embers (`heat-red`), the blade clash spark (`signal-red`) and the challenge afterglow edge. Both are fixed across themes and both fall below 3:1 on every light surface (see [Accessibility](#accessibility)).
 
 #### On-media (fixed, over camera, video and photos)
 
-Chrome over a camera preview, a video or a photo does not follow the app theme. Two overlapping constant sets exist today and WP7 merges them; the kit tokens are named after `ON_MEDIA` (`lib/theme/palette.ts:95-125`), with the `BROADCAST` equivalent noted (`components/match-flow/live/broadcast-tokens.ts:6-34`).
+Chrome over a camera preview, a video or a photo does not follow the app theme. ONE source holds it: `onMediaTokens` in `apps/mobile/lib/tokens.ts`. `ON_MEDIA` (`lib/theme/palette.ts`) is that object, and the live screen's `BROADCAST` (`components/match-flow/live/broadcast-tokens.ts`) maps its own key names onto it (merged in WP7, jits-3eeg.8, with every rendered value unchanged). Kit name = `on-media-` plus the kebab-cased key; the drift test locks this table to the code.
 
-| Token | Value | ON_MEDIA key | BROADCAST twin |
+| Token | Value | `onMediaTokens` / `ON_MEDIA` key | `BROADCAST` alias |
 |---|---|---|---|
 | `on-media-white` | `#FFFFFF` | `white` | `white` |
 | `on-media-text` | `#E8EDF2` | `text` | `inkDark` |
 | `on-media-text2` | `rgba(232,237,242,0.72)` | `text2` | `body72` |
-| `on-media-text3` | `rgba(232,237,242,0.55)` | `text3` | (none; `dim62` is 0.62) |
+| `on-media-text-dim` | `rgba(232,237,242,0.62)` | `textDim` | `dim62` |
+| `on-media-text3` | `rgba(232,237,242,0.55)` | `text3` | (none) |
 | `on-media-tag-text` | `rgba(255,255,255,0.85)` | `tagText` | `tagText` |
 | `on-media-strong` | `rgba(255,255,255,0.40)` | `strong` | `glassBorder` |
 | `on-media-cta` | `#E63946` | `cta` | `cta` |
 | `on-media-red` | `#F0556B` | `red` | `ctaHover` |
 | `on-media-red-rule` | `rgba(240,85,107,0.7)` | `redRule` | (none) |
-| `on-media-win` | `#22C55E` | `win` | (none; `live-pill.tsx:41` `ON_DARK_GREEN`) |
+| `on-media-win` | `#22C55E` | `win` | (none; `LivePill` `onDark` reads it) |
 | `on-media-amber` | `#F59E0B` | `amber` | `amber` |
-| `on-media-amber-rule` | `rgba(245,158,11,0.7)` | `amberRule` | `amberRule` is 0.5 |
-| `on-media-track` | `rgba(255,255,255,0.18)` | `track` | `track` is `rgba(13,15,20,0.25)` (different) |
+| `on-media-amber-rule` | `rgba(245,158,11,0.7)` | `amberRule` | (none) |
+| `on-media-amber-rule-soft` | `rgba(245,158,11,0.5)` | `amberRuleSoft` | `amberRule` |
+| `on-media-amber-soft` | `rgba(245,158,11,0.16)` | `amberSoft` | `amberSoft` |
+| `on-media-amber-spent` | `rgba(245,158,11,0.22)` | `amberSpent` | `amberSpent` |
+| `on-media-black` | `#000000` | `black` | `black` |
+| `on-media-ground` | `#0D0F14` | `ground` | `ground` |
+| `on-media-track` | `rgba(255,255,255,0.18)` | `track` | (none) |
 | `on-media-glass` | `rgba(255,255,255,0.08)` | `glass` | (none) |
-| `on-media-glass-strong` | `rgba(255,255,255,0.12)` | `glassStrong` | `glassFill` (pressed `rgba(255,255,255,0.20)`) |
-| `on-media-tag` | `rgba(0,0,0,0.45)` | `tag` | `tagFill` is 0.40 |
+| `on-media-glass-strong` | `rgba(255,255,255,0.12)` | `glassStrong` | `glassFill` |
+| `on-media-glass-pressed` | `rgba(255,255,255,0.20)` | `glassPressed` | `glassFillPressed` |
+| `on-media-tag` | `rgba(0,0,0,0.45)` | `tag` | (none) |
+| `on-media-tag-soft` | `rgba(0,0,0,0.40)` | `tagSoft` | `tagFill` |
 | `on-media-badge` | `rgba(0,0,0,0.88)` | `badge` | (none) |
 | `on-media-scrim` | `rgba(0,0,0,0.55)` | `scrim` | `savingDim` |
+| `on-media-dim` | `rgba(0,0,0,0.35)` | `dim` | `startingDim` |
+| `on-media-slab` | `rgba(13,15,20,0.92)` | `slab` | `slab` |
+| `on-media-tally-glass` | `rgba(13,15,20,0.72)` | `tallyGlass` | `tallyGlass` |
 | `on-media-chip` | `rgba(232,235,240,0.96)` | `chip` | `plate` |
 | `on-media-chip-border` | `rgba(13,15,20,0.34)` | `chipBorder` | `plateBorder` |
+| `on-media-chip-track` | `rgba(13,15,20,0.25)` | `chipTrack` | `track` |
 | `on-media-ink` | `#0D0F14` | `ink` | `ink` |
 | `on-media-ink3` | `#575C68` | `ink3` | `ink3` |
 | `on-media-ink-red` | `#AC2B34` | `inkRed` | `ctaText` |
 
-`BROADCAST` also holds values with no `ON_MEDIA` twin: `black #000000`, `ground #0D0F14`, `amberSoft rgba(245,158,11,0.16)`, `amberSpent rgba(245,158,11,0.22)`, `slab rgba(13,15,20,0.92)`, `glassFillPressed rgba(255,255,255,0.20)`, `tallyGlass rgba(13,15,20,0.72)`, `dim62 rgba(232,237,242,0.62)`, `startingDim rgba(0,0,0,0.35)`. They stay in the live broadcast HUD and are not kit tokens.
-
-Rule: on-media text holds 4.5:1 only on `on-media-badge` (or over a frame known to be dark). Over a bare scrim or tag fill a bright frame drops it below the floor.
+**The on-media contrast rule:** on-media TEXT sits only on `on-media-badge` (the light inks: white, text, text2, text-dim, text3, tag-text, red, win, amber) or on the light `on-media-chip` (the dark inks: ink, ink3, ink-red). Those two grounds hold 4.5:1 whatever frame is under them. `on-media-tag`, `tag-soft`, `scrim`, `dim` and the glass fills are grounds for marks and controls; text on them depends on the frame (tag text over a white frame is about 2.9:1). `on-media-text3` is a label and mark tint: as text it belongs on the badge only. See [Accessibility](#accessibility) for the numbers.
 
 ### Usage rules
 
@@ -195,18 +211,23 @@ Rule: on-media text holds 4.5:1 only on `on-media-badge` (or over a frame known 
 - Never set text in `signal-red`. Red words use `negative` (losses, errors) or `signal-red-text`.
 - Use `signal-red` as a rule only where it means "act" or "the leader": the active tab edge, the accent Plate rail, the EloTile bar, the countdown drain bar, CountPill, the leader rule.
 - Use `gain-green` only for rating increases, wins and LIVE. A ready check, a confirmed result, an upload that finished and a recording light are not gains: draw them in `ink` with a glyph.
-- Use `attention` for draws, pressure, and pending, processing, paused or disputed states; its rules use `attention-rule`.
+- Use `attention` for the draw headline (the verdict DRAW on the verdict step and the confirm banner; the draw delta in the rating moment, `DeltaChip`, the `EloTile` draw tone and the stakes strip), pressure, and pending, processing, paused or disputed states; its rules use `attention-rule`. The D outcome letter in lists (`OutcomeTag`, poster cards) stays neutral.
+- Edge a focused input in `ink-2` (1px, the same stroke as rest), never red: red edges mean an error (`negative`).
 - Use `heat-orange` and `heat-red` only on the Arena tab icon and the challenge afterglow.
-- Show a selected option with `plate-bright` plus a `hairline-strong` edge and an `ink` check glyph, never a red fill (WP2 target; the code still fills some radios, checkboxes and chips red).
+- Show a selected option with `plate-bright` plus a `hairline-strong` edge and an `ink` check glyph, never a red fill, edge, dot or check: `selectionSurface(selected)` and `SelectCheck` in `components/ui/elo-system/selection.tsx` (shipped in WP2). The Chip and the result OutcomeToggle (compact segmented controls) use the surface step and an `ink` label without the glyph; the match flow uses `usePalette().panel` (the same `plate-bright`) and an `ink` check.
+- Tint spinners and pull-to-refresh `ink-3` (`textTertiary`) or `ink-2`, never red. Draw data bars (submission breakdown, weekly activity) in `ink-2` and the leader's rank numeral in `ink`: data is ink, the leader is marked by its red rule.
+- Draw a switch with the one neutral look, `switchColors()` in `components/ui/switch.tsx`: `ink` track when on, `ink-3` when off, a `void` thumb. Never a red or green track.
+- Tint icons with ink steps (`ink-2`, `ink-3`); a notification or section icon is never red or green.
+- `__tests__/components/ui/color-semantics-guard.test.ts` holds every file that still draws Signal Red or Gain Green, with its line count and the reason (a CTA fill, an "act" or leader rule, a negative, a gain, a win, LIVE, Arena heat, brand chrome under Open decision 12); the negative family (`negative`, `stateNegative`, `p.loss`) and the legacy `primary` / `destructive` / `success` classes count as red and green too (the restyled `Badge` keeps `success` for gains and wins only). A new red or green line fails until it is reviewed and listed.
 - Draw every border 1px in a hairline color; 2px (`stroke-edge`) and 3px (`stroke-rail`) widths exist only for state edges and rails.
-- Over media, use the `on-media-*` set and keep text on `on-media-badge`.
+- Over media, use the `on-media-*` set (`ON_MEDIA` or `onMediaTokens`, never a new literal) and keep text on `on-media-badge` or the light `on-media-chip`.
 
 ### Known non-tokens in code (not to copy)
 
-- Push notification accent `#ef4444` (Tailwind red-500) in `app.json:119` and `lib/notifications/register-push.ts:88` is not a brand color (WP7 points it at `signal-red`).
-- Splash files hard-code `#0D0F14`, `#E8EDF2`, `#FFFFFF`, `#9CA3AF`, `#E63946` and a gold `#f59e0b` (`splash-reveal.tsx:27-31`); the gold is outside the system.
-- `palette.ts` also carries `winRule`, `secondaryBg`, `secondaryBgPressed`, `selectedBg` (`rgba(230,57,70,0.16)`, a red tint that WP2 retires) and `track` for the match flow; they are JS mirrors, not kit tokens.
-- Legacy shadcn colors (`primary`, `muted`, `card`, `success` and friends) are retiring; see [Legacy](#legacy-retiring-wp4).
+- Push notification accent `#ef4444` (Tailwind red-500) in `app.json:119` is not a brand color. The Android channel light in `lib/notifications/register-push.ts` now uses `signal-red` (WP7); the `app.json` value is native config and changes only with the next store build.
+- The splash files read the dark tokens (`darkTokens`, `onMediaTokens.white`) instead of hard-coding them (WP7). Their gold cap is the dark `attention` value, a sanctioned one-off for the launch moment, not a pattern.
+- `palette.ts` also carries `winRule`, `secondaryBg`, `secondaryBgPressed` and `track` for the match flow; they are JS mirrors, not kit tokens. Its old `selectedBg` (`rgba(230,57,70,0.16)`, a red selection tint) was retired in WP2.
+- Legacy shadcn colors (`primary`, `muted`, `card`, `success` and friends) were removed by WP4 and no longer resolve; see [Legacy](#legacy-retiring-wp4).
 
 ## Typography
 
@@ -219,93 +240,233 @@ Four families, each bound to one job. The font tells you what kind of thing you 
 | `body` | Inter | 400, 500 | Prose, helper copy, toasts' descriptions | `font-body`, `font-body-medium` |
 | `mono` | JetBrains Mono | 400, 500, 700 | ALL numbers (tabular-nums) and caps meta labels | `font-mono`, `font-mono-medium`, `font-mono-bold` |
 
-Sources: `apps/mobile/tailwind.config.js:191-202` (families), `apps/mobile/app/_layout.tsx:65-75` (`useFonts`, nine faces from `@expo-google-fonts/*`: bebas-neue 0.4.1, dm-sans 0.4.2, inter 0.4.2, jetbrains-mono 0.4.1). The kit's `fonts/` folder holds those exact nine TTFs. React Native cannot synthesize weights, so each weight is its own family name (`DMSans_700Bold`, ...) and `font-semibold` / `font-medium` classes do nothing but fall back to the system font: never use them.
+Sources: `apps/mobile/tailwind.config.js` `theme.extend.fontFamily` (families), `apps/mobile/app/_layout.tsx:65-75` (`useFonts`, nine faces from `@expo-google-fonts/*`: bebas-neue 0.4.1, dm-sans 0.4.2, inter 0.4.2, jetbrains-mono 0.4.1). The kit's `fonts/` folder holds those exact nine TTFs. React Native cannot synthesize weights, so each weight is its own family name (`DMSans_700Bold`, ...) and `font-semibold` / `font-medium` classes do nothing but fall back to the system font: never use them.
 
 ### Rules
 
-- Set every number in `mono` with tabular figures: ELO, deltas, ranks, records, weights, timers, counts, step counters ("Step 2 / 3"). Numbers keep tabular figures while they roll.
+- Set every size from the [type scale](#type-scale): a `text-<step>` class or, in a style prop, `typeStep("<step>")`. Never a literal (`text-[13px]`, `fontSize: 13`). The typography guard test fails on any new literal.
+- Set every number in `mono` with tabular figures: ELO, deltas, ranks, records, weights, timers, counts, step counters ("Step 2 / 3"). Numbers keep tabular figures while they roll. `<Mono>` does this for you.
 - The one exception: `display` (Bebas Neue) may set a numeral at 40px and up when it is a brand moment, namely the face-off countdown (240px) and the GO slam (116px). Face-off weights are 36px Bebas today (`faceoff-top.tsx:152,179`), recorded under [Open decisions](#open-decisions-decided-by-default-owner-to-confirm).
 - Set labels you act on (buttons, tabs, chips, header titles) in `heading`, uppercase, with tracking.
-- Set small metadata in `mono`, uppercase, at `tracking-caps-l` (1.68px) or wider. A caps label with no tracking is a bug (R3 TY-3).
-- Set prose in `body`. A number inside a sentence may stay in the sentence ("Profile weight saved: 172.5 lbs, for future matches."), but a number that is the point of the line goes in `mono`.
-- Never set text below 10px. The only sanctioned exception is the CountPill digit (9px, capped at 1.3x Dynamic Type).
+- Set small metadata in `mono`, uppercase, at `tracking-caps-l` (1.68px) or wider. A caps label with no tracking is a bug (R3 TY-3); `<Label>` cannot render one.
+- 11px mono data lines in strips (a name, a countdown, stakes, a booked time: the Mat Board strip lines, ConfirmStrip, the Closest stakes, the booked strip) stay untracked even when uppercase: caps tracking is for labels, and a data line carries a name or figures that must not truncate (the kit ChallengeStrip card). The 10px section labels and counts beside them keep `tracking-caps-l` or wider.
+- Set prose in `body`. A number inside a sentence may stay in the sentence, but a number that is the point of the line goes in `mono`: a nested `font-mono` tabular span keeps the sentence whole ("Profile weight saved: **172.5** lbs, for future matches." in `faceoff-top.tsx`, R3 MF-3; `MonoNumbers` in `components/match-detail/highlight/mono-numbers.tsx` does it for every digit run).
+- Never set text below 10px (`micro`, the floor). The only sanctioned exception is the CountPill digit (9px, capped at 1.3x Dynamic Type).
 - Write the wordmark "ELO RATED" as live Bebas Neue text in `ink` with `tracking-mark`; there is no wordmark file.
+
+### Type scale
+
+One name per size, the same everywhere: the Tailwind class `text-<step>` (`apps/mobile/tailwind.config.js` `theme.extend.fontSize`), the style-prop exports `typeStep("<step>")` (size and line height) and `typeSize("<step>")` (size only, for TextInputs and line-height-free moments) / `TYPE_SCALE` (`apps/mobile/lib/typography.ts`), and the kit (`tokens.json` type group "Scale", styles `text-<step>`). `typography-drift.test.ts` fails if any of them, this page or DESIGN.md disagree. The steps are the sizes the app already used (R1 section 2.3), so most sites move with no pixel change. Sizes are device px, literal on native (NativeWind rem does not apply).
+
+#### Text steps
+
+Copy, labels and inline data, in any family. Line height is about 1.3x up to 16px and 1.2x above; a step brings its line height, and a site that tunes its own (`leading-*`, or `lineHeight` in a style) keeps it.
+
+| Step | Class | Size | Line | Used for |
+|---|---|---|---|---|
+| `micro` | `text-micro` | 10 | 13 | Caps meta labels, tab labels, chips, strip labels; the 10px floor (text-[10px], 117 uses). |
+| `caption` | `text-caption` | 11 | 14 | Small actions (ROLL), small data, captions (text-[11px]). |
+| `small` | `text-small` | 12 | 16 | Secondary body, header titles, small buttons, inline data (text-[12px]). |
+| `body` | `text-body` | 13 | 17 | Body copy, the most common size; toast titles (text-[13px]). |
+| `callout` | `text-callout` | 14 | 18 | Large body, button labels, athlete names (text-[14px]). |
+| `subhead` | `text-subhead` | 16 | 21 | Plate titles, subheads, the large delta (text-[16px]). |
+| `title` | `text-title` | 18 | 22 | Screen, step and sheet titles (text-[18px]). |
+| `title-l` | `text-title-l` | 20 | 24 | Compare-stats figures, the feedback sheet title (text-[20px]). |
+| `title-xl` | `text-title-xl` | 22 | 26 | The rating-moment odometer (Adding Flare), stat figures, the BrandHeader wordmark (22px). |
+| `headline` | `text-headline` | 24 | 29 | Profile and competitor names and records (24px). |
+| `headline-l` | `text-headline-l` | 26 | 31 | The rating-moment delta chip (Adding Flare), the fight delta, the Home greeting (26px). |
+| `headline-xl` | `text-headline-xl` | 28 | 34 | Stat figures, the invite code input, practice titles (28px). |
+| `headline-2xl` | `text-headline-2xl` | 30 | 36 | Match-flow step headers, the result score input (30px). |
+
+#### Display steps
+
+Brand moments and hero numerals, named by their px because each is pinned to its owner (the Adding Flare moments, EloTile, the Wordmark, the verdicts, the live clock). They never move to fit a layout. Line height is 1.1x (Bebas and JetBrains Mono clip at 1.0 on RN); a moment that tunes its own line height keeps it. Bebas sets numerals only at 40px and up (Open decision 5: the face-off weight at 36px).
+
+| Step | Class | Size | Line | Used for |
+|---|---|---|---|---|
+| `display-36` | `text-display-36` | 36 | 40 | Face-off weights (Bebas, Open decision 5), EloTile small, the share-card ELO, the practice verdict. |
+| `display-40` | `text-display-40` | 40 | 44 | The Film Room title, the invite code, the opponent-ended plate; the 40px Bebas threshold. |
+| `display-44` | `text-display-44` | 44 | 48 | EloTile medium, the challenge prompt rating. |
+| `display-48` | `text-display-48` | 48 | 53 | Wordmark lg, the result-waiting headline. |
+| `display-52` | `text-display-52` | 52 | 57 | The match-detail verdict. |
+| `display-60` | `text-display-60` | 60 | 66 | The confirm-step result. |
+| `display-64` | `text-display-64` | 64 | 70 | EloTile large. |
+| `display-72` | `text-display-72` | 72 | 79 | Wordmark hero, the splash statement, the profile and competitor ELO. |
+| `display-80` | `text-display-80` | 80 | 88 | The live clock in landscape, the LOSS and DRAW verdict. |
+| `display-88` | `text-display-88` | 88 | 97 | The live clock in portrait. |
+| `display-96` | `text-display-96` | 96 | 106 | EloTile hero, the WIN verdict, the countdown numeral minimum. |
+| `display-116` | `text-display-116` | 116 | 128 | The GO slam (Adding Flare countdown). |
+| `display-240` | `text-display-240` | 240 | 264 | The face-off countdown numeral (Adding Flare). |
 
 ### Letter-spacing (tracking)
 
-Mobile tracking is a fixed px value computed at a 14px baseline (`tailwind.config.js:203-214`), so the same class is proportionally wider on small text than the web's em-based tracking (`tracking-caps-l` on a 10px label is 0.168em on mobile, 0.12em on web).
+Mobile tracking is a fixed px value computed at a 14px baseline (`tailwind.config.js` `theme.extend.letterSpacing`, `TRACKING` in `lib/typography.ts`, the kit group "Tracking"), so the same step is proportionally wider on small text than the web's em-based tracking (`tracking-caps-l` on a 10px label is 0.168em on mobile, 0.12em on web). WP5 added only `code`.
 
-| Class | Value (mobile) | Web | Uses | Job |
+| Step | Class | Value (mobile) | Web | Job |
 |---|---|---|---|---|
-| `tracking-tight` | -0.28px | -0.02em | 0 | Avoid |
-| `tracking-mark` | -0.07px | -0.005em | 7 | Wordmark |
-| `tracking-normal` | 0px | 0em | 0 | Default |
-| `tracking-loose` | 0.56px | 0.04em | 0 (inline x3) | Loose caps |
-| `tracking-caps` | 1.12px | 0.08em | 59 | Buttons, chips, display caps |
-| `tracking-caps-l` | 1.68px | 0.12em | 105 | Section and meta labels, tab labels |
-| `tracking-caps-xl` | 2.52px | 0.18em | 38 | Strip headers, LIVE pill |
-| `tracking-caps-xxl` | 3.36px | 0.24em | 0 | Smallest caps |
+| `tight` | `tracking-tight` | -0.28px | -0.02em | Avoid (-0.02em at 14px). |
+| `mark` | `tracking-mark` | -0.07px | -0.005em | The wordmark, live Bebas text. |
+| `normal` | `tracking-normal` | 0px | 0em | Default; numbers and prose. |
+| `loose` | `tracking-loose` | 0.56px | 0.04em | Loose caps on headings 13px and up (0.04em at 14px). |
+| `caps` | `tracking-caps` | 1.12px | 0.08em | Buttons, chips, display caps (0.08em at 14px). |
+| `caps-l` | `tracking-caps-l` | 1.68px | 0.12em | Section and meta labels, tab labels: the default caps label (0.12em at 14px). |
+| `caps-xl` | `tracking-caps-xl` | 2.52px | 0.18em | Strip headers, the LIVE pill (0.18em at 14px). |
+| `caps-xxl` | `tracking-caps-xxl` | 3.36px | 0.24em | The smallest caps (0.24em at 14px). |
+| `code` | `tracking-code` | 4px | none | One-time code digits, the invite code (added in WP5, R3 ST-4). |
 
-EloTile numbers track at `-fontSize * 0.04` (`elo-tile.tsx:81,145`).
+Hero numerals track at -0.04em of their size: `numeralTracking(px)` in `lib/typography.ts` (`tracking="numeral"` on `Mono`), as EloTile (`elo-tile.tsx`), the live clock (-3.52px at 88) and the profile ELO do. It is proportional, so it is a function, not a step.
+
+### Primitives: Mono and Label
+
+Both live in `apps/mobile/components/ui/elo-system/` (exported from its `index.ts`) and take a scale step, never a number.
+
+| Component | Props (default) | Renders |
+|---|---|---|
+| `Mono` | `size` (`small`), `weight` `regular` / `medium` / `bold` (`regular`), `tracking` a step or `numeral` (`normal`), `caps` (false), `className` (color; default `text-ink`), `style` | JetBrains Mono at the step's size and line height with tabular figures always on (the caller's `style` cannot turn them off) |
+| `Label` | `size` a text step (`micro`), `family` `mono` / `heading` (`mono`), `weight` (`regular` for mono, `bold` for heading), `tracking` `caps` / `caps-l` / `caps-xl` / `caps-xxl` (`caps-l`), `className` (color; default `text-ink-3` mono, `text-ink` heading), `style` | A caps label: uppercase by style (write the source in sentence case so VoiceOver reads words), always tracked, tabular figures in mono |
+
+```tsx
+<Label>Closest match</Label>                                   // mono 10, caps-l, ink-3 (meta-label)
+<Label family="heading" size="small" tracking="caps">Sign out</Label>  // label-12
+<Mono size="title-xl" weight="bold">1512</Mono>                // a stat figure
+<Mono size="display-72" weight="bold" tracking="numeral">1526</Mono>  // the profile ELO
+<Text style={[typeStep("micro"), { letterSpacing: TRACKING["caps-l"], color: p.text3 }, TABULAR]}>
+```
+
+`MetaTag` renders its text through `Label`. `TABULAR` (`{ fontVariant: ["tabular-nums"] }`) has one home, `lib/typography.ts`; `lib/theme/palette.ts` and `broadcast-tokens.ts` re-export it (R3 TY-6). Prefer the `tabular-nums` class where `className` is available. `cn()` knows every step and tracking name, so `cn("text-micro", "text-ink")` keeps both.
+
+### How to migrate
+
+The WP5 sweeps (5a: Arena, Rankings, Profile, Home, invites, the className sites; 5b: match flow, Film Room, match detail, the style-prop sites) follow this table. Keep pixels unless the row says otherwise; never move a registered Adding Flare element (odometer, delta chip, tap marks, countdown, verdict, splash) to a different size.
+
+Rules for every site:
+
+- **Size only, no line height (`typeSize`):** every `TextInput`, and every registered Adding Flare or match-flow moment that sets no `lineHeight` today (the GO slam, `countdown.tsx:236`, 116px; the face-off weight, `faceoff-top.tsx`, 36px), takes `typeSize("<step>")` (`{ fontSize }` only). Never `typeStep` or a `text-<step>` class there: a step's line height would move the glyph box, and on iOS a single-line `TextInput` with a line height loses its caret. Known `TextInput` sites: `app/(auth)/invite-code.tsx`, `components/match-flow/steps/result-form.tsx`, `components/match-flow/faceoff/faceoff-weight-check.tsx`, `components/match-flow/faceoff/faceoff-top.tsx`, `components/match-flow/steps/submission-fields.tsx`, `app/(app)/settings/feedback.tsx`, `app/(app)/settings/delete-account.tsx`, `components/match-flow/steps/dispute-form.tsx`, `components/match-detail/highlight/highlight-feedback-text.tsx`, plus `components/auth/auth-form-field.tsx`, `components/profile-setup/elo-form-field.tsx` and `components/ui/search-select.tsx`.
+- **`leading-*` goes after the size:** in a `className` or `cn()` string write `text-<step>` first and any `leading-*` after it (`"font-body text-callout leading-6"`), so the site's own line height wins over the step's.
+- **Never hide a size in a named constant** (`const NAME_SIZE = 15`, `const LABEL = { fontSize: 10 }`): the guard cannot see it and the scale loses the site. Use the step name at the site, or a constant built from it (`const LABEL = { ...typeStep("micro"), letterSpacing: TRACKING["caps-l"] }`).
+- **`Mono` and `Label` take their size only from `size`:** no `fontSize` in their `style`, no size class.
+
+#### Sizes
+
+| Old literal | Step | Change |
+|---|---|---|
+| `text-[8px]`, `text-[9px]`, `fontSize: 8` / `9` | `micro` | +1 to +2px (the A1-3 floor fix). Not the CountPill digit, which stays. **Verify on device:** `components/film-room/player-controls.tsx:28` (the 8px "10" inside the 28px skip icon) and `components/arena/mat-board.tsx:757`, `:832` (the 9px chips); the bigger glyph may not fit its box. |
+| `text-[10px]`, `fontSize: 10`, `text-xs` (10.5) | `micro` | none (`text-xs` -0.5px) |
+| `text-[11px]`, `fontSize: 11` | `caption` | none |
+| `text-[12px]`, `fontSize: 12`, `text-sm` (12.25) | `small` | none |
+| `text-[13px]`, `fontSize: 13` | `body` | none |
+| `text-[14px]`, `fontSize: 14`, `text-base` | `callout` | none |
+| `text-[15px]`, `fontSize: 15` | `callout` for prose and numbers; `subhead` for heading names and caps labels | -1 / +1px |
+| `fontSize: 15` on the splash "WE ARE" line (`splash-statement.tsx:260`, `splash-glow-statement.tsx:346`) and the computed `FITTED_SIZE` "ELO RATED" | keep | none: registered splash moments, sanctioned in the guard |
+| `text-[16px]`, `fontSize: 16`, `text-lg` (15.75) | `subhead` | none |
+| `text-[18px]`, `fontSize: 18`, `text-xl` (17.5) | `title` | none |
+| `text-[20px]` | `title-l` | none |
+| `fontSize: 22` | `title-xl` | none |
+| `text-[24px]`, `fontSize: 24` | `headline` | none |
+| `text-[26px]`, `fontSize: 26`, `text-3xl` (26.25) | `headline-l` | none |
+| `text-[28px]`, `fontSize: 28` | `headline-xl` | none |
+| `fontSize: 30` | `headline-2xl` | none |
+| `text-[36px]` ... `fontSize: 240` | `display-<px>` (36, 40, 44, 48, 52, 60, 64, 72, 80, 88, 96, 116, 240) | none |
+| Computed sizes (`SIZE_PX[size]`, `Math.round(size * 0.33)`) | key the size table by step and read `typeStep()` | none |
+| Sizes computed from a box (tile initials at `size * 0.33`, the Film Room VS at `tileSize * 0.3`) | `typeSize(nearestStep(px))`: `nearestStep` (`lib/typography.ts`) snaps to the nearest step, a tie to the smaller one, and clamps to `micro` / `display-240`; size only, since the glyph is centered in a fixed box | up to half the gap between steps; the 88px tile initials (`athlete-tile.tsx`, also the match-detail hero) 29 to `headline-2xl` 30 (+1px) |
+| `InitialsBlock` `fontSize={32}` (`result-waiting.tsx`, the claimer block) | `headline-2xl` | -2px: sanctioned off-scale snap. Initials in a fixed 96px box; no 32 step, and a step is not added for one block |
+| `InitialsBlock` `fontSize={34}` (`verdict-hero.tsx`, the no-still fallback plate; not the SlamIn verdict) | `display-36` | +2px: sanctioned off-scale snap. Initials in a fixed 104px box; no 34 step |
+
+Line height: a site with no line height gets the step's (within a pixel or two of the font's natural line); a site with its own `lineHeight` keeps it in `style` after the step (`style={[typeStep("micro"), { lineHeight: 12 }]}`).
+
+#### Tracking
+
+| Old literal | Step |
+|---|---|
+| `0.4`, `0.52`, `0.6`, `0.64`, `0.72` (0.04em of the size) | `loose` (0.56) |
+| `0.8` | `caps` on caps labels up to 14px; `loose` on display 40px and up |
+| `1`, `1.2` | `caps` (1.12) |
+| `1.6` | `caps-l` (1.68) |
+| `2.2` | `caps-xl` (2.52) |
+| `tracking-[4px]`, `tracking-[6px]` (invite codes, R3 ST-4) | `code` (4) |
+| `-2.8`, `-3.2`, `-3.52`, `-fontSize * 0.04` | `numeralTracking(px)` / `tracking="numeral"` |
+| `-0.6`, `-0.18` | `tight` (-0.28) |
+| `2` on the GO slam, `3` on the splash reveal, `3.6`, `6.3` on the splash statement | keep: registered Adding Flare moments, sanctioned in the guard |
+| `1` on the verdict SlamIn (WIN / LOSS / DRAW, `verdict-step.tsx`) | keep: the registered verdict moment, kept identical, sanctioned in the guard |
+
+#### Recipes
+
+| Old recipe | New |
+|---|---|
+| `font-mono text-[10px] text-ink-3 uppercase tracking-caps-l` | `<Label>` |
+| `font-mono-bold text-[10px] uppercase tracking-caps-xl` | `<Label weight="bold" tracking="caps-xl">` |
+| `font-mono-bold text-[10px] uppercase` (no tracking, R3 AR-1) | `<Label weight="bold">` |
+| `font-heading text-[12px] uppercase tracking-caps` | `<Label family="heading" size="small" tracking="caps">` |
+| `font-heading text-[18px] uppercase` (no tracking, R3 AR-6) | `<Label family="heading" size="title" tracking="caps">` |
+| `font-mono text-[12px]` holding a number | `<Mono>` |
+| `text-sm` (12.25), `text-xs` (10.5), `text-base`, `text-lg`, `text-xl` | `small`, `micro`, `callout`, `subhead`, `title` (see Sizes) |
+| `font-mono-bold text-[24px] tracking-caps` (a record) | `<Mono size="headline" weight="bold" tracking="caps">` |
+| `font-mono-bold` + `style={{ fontSize: 72, letterSpacing: -2.8 }}` (R3 PR-3) | `<Mono size="display-72" weight="bold" tracking="numeral">` |
+| `style={{ fontSize: 10, letterSpacing: 1.68, color: p.text3 }}` | `<Label style={{ color: p.text3 }}>` or `style={[typeStep("micro"), { letterSpacing: TRACKING["caps-l"], color: p.text3 }]}` |
+| a local `const TABULAR = ...` | `import { TABULAR } from "@/lib/typography"` |
+
+#### The guard
+
+`apps/mobile/__tests__/components/ui/typography-guard.test.ts` counts, per file: `text-[Npx]` classes, `fontSize` literals, sizes under 10px, rem-named sizes (`text-xs`, `text-sm`, `text-base`, `text-lg`, `text-xl` to `text-9xl`; 10.5 / 12.25 / 14 / 15.75 / 17.5px at rem 14), off-scale tracking and `font-mono` `<Text>` tags with no tabular figures. The registered moments that keep a literal on purpose (the CountPill 9px digit, the splash 15px line and its 6.3 / 3.6 / 3 tracking, the GO slam's 2px tracking, the verdict SlamIn's 1px tracking) are a named sanctioned list pinned to exact counts, outside the ratchet. The baseline (`__tests__/fixtures/typography-baseline.json`, WP5-core: 445 `text-[Npx]` / 172 `fontSize` / 12 under 10px / 8 rem-named / 53 off-scale tracking / 192 untabular mono, across 189 files) only goes down: a count above it fails, and a count below it fails until you lower it with `UPDATE_TYPOGRAPHY_BASELINE=1 npx jest __tests__/components/ui/typography-guard` (it never raises a count). `Mono`, `Label` and `MetaTag` are held at zero.
 
 ### Text styles
 
-The styles in `tokens.json` (`type.groups`) are the real top combinations in the app, by frequency (R1 section 2.4). Mobile has no named size scale yet (TY-1: 464 arbitrary `text-[Npx]` sizes); these styles are the scale WP5 will name.
+The styles in `tokens.json` (`type.groups`) are the real top combinations in the app, by frequency (R1 section 2.4). Each names its [type scale](#type-scale) step (`step` in `tokens.json`) and, where it is tracked, its tracking step (`tracking`; `numeral` is -0.04em of the size). `typography-drift.test.ts` checks every style's size and tracking against the scale.
 
 #### Display (`display`)
 
-| Style | Size / line | Tracking | Example | Source |
-|---|---|---|---|---|
-| `wordmark-hero` | 72 / 72 | -0.07px | ELO RATED | `wordmark.tsx:11-16` |
-| `wordmark-lg` | 48 / 48 | -0.07px | ELO RATED | same |
-| `wordmark-md` | 22 / 22 | -0.07px | ELO RATED (BrandHeader) | same |
-| `countdown-numeral` | 240 / 240 | 0 | 3 | `countdown.tsx:46-48,182` |
-| `countdown-go` | 116 | 2px | GO | `countdown.tsx:235-236` |
-| `faceoff-weight` | 36 | 0 | 172.5 LBS | `faceoff-top.tsx:152,179` |
+| Style | Step | Size / line | Tracking | Example | Source |
+|---|---|---|---|---|---|
+| `wordmark-hero` | `display-72` | 72 / 72 | -0.07px | ELO RATED | `wordmark.tsx:11-16` |
+| `wordmark-lg` | `display-48` | 48 / 48 | -0.07px | ELO RATED | same |
+| `wordmark-md` | `title-xl` | 22 / 22 | -0.07px | ELO RATED (BrandHeader) | same |
+| `countdown-numeral` | `display-240` | 240 / 240 | 0 | 3 | `countdown.tsx:46-48,182` |
+| `countdown-go` | `display-116` | 116 | 2px | GO | `countdown.tsx:235-236` |
+| `faceoff-weight` | `display-36` | 36 | 0 | 172.5 LBS | `faceoff-top.tsx:152,179` |
 
 #### Heading (`heading`, 700)
 
-| Style | Size | Tracking | Case | Example | Source |
-|---|---|---|---|---|---|
-| `screen-title` | 18 | 0 | caps | LOCATION TO START | `go-live-location-sheet.tsx:51`, 8 uses |
-| `heading-16` | 16 | 0 | sentence | Closest match | 6 uses |
-| `heading-14` | 14 | 0 | sentence | Uploaded by unknown | athlete names, `match-card.tsx:69`, 11 uses |
-| `button` | 14 | 1.68px | caps | CONFIRM RESULT | `auth-buttons.tsx:32` |
-| `toast-title` | 13 | 0 | sentence | Could not load dashboard | `toast.tsx:136` |
-| `header-title` | 12 | 1.68px | caps, `ink-2` | PROFILE | `app-header.tsx:101` |
-| `label-12` | 12 | 1.12px | caps | SIGN OUT | 19 uses |
-| `action-sm` | 11 | 1.12px | caps | ROLL | `strip-primitives.tsx:57` |
-| `tab-label` | 10 | 1.68px | caps | ARENA | `elo-tab-bar.tsx:287-289` |
-| `chip` | 10 | 1.12px | caps | ALL | `chip.tsx:34` |
+| Style | Step | Size | Tracking | Case | Example | Source |
+|---|---|---|---|---|---|---|
+| `screen-title` | `title` | 18 | 0 | caps | LOCATION TO START | `go-live-location-sheet.tsx:51`, 8 uses |
+| `heading-16` | `subhead` | 16 | 0 | sentence | Closest match | 6 uses |
+| `heading-14` | `callout` | 14 | 0 | sentence | Uploaded by unknown | athlete names, `match-card.tsx:69`, 11 uses |
+| `button` | `callout` | 14 | 1.68px | caps | CONFIRM RESULT | `auth-buttons.tsx:32` |
+| `toast-title` | `body` | 13 | 0 | sentence | Could not load dashboard | `toast.tsx:136` |
+| `header-title` | `small` | 12 | 1.68px | caps, `ink-2` | PROFILE | `app-header.tsx:101` |
+| `label-12` | `small` | 12 | 1.12px | caps | SIGN OUT | 19 uses |
+| `action-sm` | `caption` | 11 | 1.12px | caps | ROLL | `strip-primitives.tsx:57` |
+| `tab-label` | `micro` | 10 | 1.68px | caps | ARENA | `elo-tab-bar.tsx:287-289` |
+| `chip` | `micro` | 10 | 1.12px | caps | ALL | `chip.tsx:34` |
 
 #### Body (`body`, 400)
 
-| Style | Size / line | Example | Source |
-|---|---|---|---|
-| `body-14` | 14 / 21 | Profile weight saved for future matches. | 37 uses; `leading-6` = 21px |
-| `body-13` | 13 | Could not save notification settings. Please try again. | 51 uses (the most common) |
-| `body-12` | 12 | Could not submit feedback. Please try again. | 45 uses; toast description |
-| `body-11` | 11 | Not now | 7 uses |
+| Style | Step | Size / line | Example | Source |
+|---|---|---|---|---|
+| `body-14` | `callout` | 14 / 21 | Profile weight saved for future matches. | 37 uses; `leading-6` = 21px |
+| `body-13` | `body` | 13 | Could not save notification settings. Please try again. | 51 uses (the most common) |
+| `body-12` | `small` | 12 | Could not submit feedback. Please try again. | 45 uses; toast description |
+| `body-11` | `caption` | 11 | Not now | 7 uses |
 
 #### Data (`mono`)
 
-| Style | Weight | Size / line | Tracking | Example | Source |
-|---|---|---|---|---|---|
-| `elo-hero` | 700 | 96 / 105.6 | -3.84px | 1512 | `elo-tile.tsx:13-18` |
-| `elo-profile` | 700 | 72 | 0 | 1526 | `profile-header.tsx:70` |
-| `elo-large` | 700 | 64 / 70.4 | -2.56px | 1526 | `elo-tile.tsx` |
-| `elo-medium` | 700 | 44 / 48.4 | -1.76px | 1512 | `elo-tile.tsx` |
-| `elo-small` | 700 | 36 / 39.6 | -1.44px | 1512 | `elo-tile.tsx` |
-| `delta-m` | 700 | 16 | 0 | ▲ +14 | `delta-number.tsx:6-8` |
-| `delta-s` | 700 | 12 | 0 | ▲ +14 | same |
-| `elo-meta` | 700 | 14 / 18 | 1.12px | RATING | `elo-tile.tsx:86-90` |
-| `data-12` | 400 | 12 | 0 | 2 / 3 | 14 uses |
-| `data-11` | 400 | 11 | 0 | 0:42 | 12 uses |
-| `meta-label-11` | 400 | 11 | 1.68px | CLOSEST MATCH | 10 uses |
-| `meta-label` | 400 | 10 | 1.68px | LBS | `meta-tag.tsx:19`, 53 uses (the top recipe) |
-| `strip-label` | 700 | 10 | 2.52px | LIVE | `elo-tile.tsx:124`, `live-pill.tsx:121` |
-| `strip-label-l` | 700 | 10 | 1.68px | ON AIR | 7 uses |
-| `count-badge` | 700 | 9 | 0 | 3 | `count-pill.tsx:31` |
+| Style | Step | Weight | Size / line | Tracking | Example | Source |
+|---|---|---|---|---|---|---|
+| `elo-hero` | `display-96` | 700 | 96 / 105.6 | -3.84px | 1512 | `elo-tile.tsx:13-18` |
+| `elo-profile` | `display-72` | 700 | 72 | 0 | 1526 | `profile-header.tsx:70` |
+| `elo-large` | `display-64` | 700 | 64 / 70.4 | -2.56px | 1526 | `elo-tile.tsx` |
+| `elo-medium` | `display-44` | 700 | 44 / 48.4 | -1.76px | 1512 | `elo-tile.tsx` |
+| `elo-small` | `display-36` | 700 | 36 / 39.6 | -1.44px | 1512 | `elo-tile.tsx` |
+| `delta-m` | `subhead` | 700 | 16 | 0 | ▲ +14 | `delta-number.tsx:6-8` |
+| `delta-s` | `small` | 700 | 12 | 0 | ▲ +14 | same |
+| `elo-meta` | `callout` | 700 | 14 / 18 | 1.12px | RATING | `elo-tile.tsx:86-90` |
+| `data-12` | `small` | 400 | 12 | 0 | 2 / 3 | 14 uses |
+| `data-11` | `caption` | 400 | 11 | 0 | 0:42 | 12 uses |
+| `meta-label-11` | `caption` | 400 | 11 | 1.68px | CLOSEST MATCH | 10 uses |
+| `meta-label` | `micro` | 400 | 10 | 1.68px | LBS | `meta-tag.tsx` (through `Label`), 53 uses (the top recipe) |
+| `strip-label` | `micro` | 700 | 10 | 2.52px | LIVE | `elo-tile.tsx:124`, `live-pill.tsx:121` |
+| `strip-label-l` | `micro` | 700 | 10 | 1.68px | ON AIR | 7 uses |
+| `count-badge` | none (sanctioned 9px) | 700 | 9 | 0 | 3 | `count-pill.tsx:31` |
 
 ### Units and casing
 
@@ -315,7 +476,7 @@ The styles in `tokens.json` (`type.groups`) are the real top combinations in the
 
 ### Web parity
 
-Web loads the same four families through `next/font/google` (`apps/web/app/layout.tsx:32-35`), names them `--font-display`, `--font-heading`, `--font-body`, `--font-mono` (`tokens.css:83-86`), and has a named size scale (`--size-*`, `tokens.css:95-126`) that mobile lacks. Web body default is Inter 14px / 1.5.
+Web loads the same four families through `next/font/google` (`apps/web/app/layout.tsx:32-35`), names them `--font-display`, `--font-heading`, `--font-body`, `--font-mono` (`tokens.css:83-86`), and has its own named size scale (`--size-*`, `tokens.css:95-126`); mobile's scale (above, WP5) is named for the app's real sizes and does not mirror it. Web body default is Inter 14px / 1.5.
 
 ## Layout
 
@@ -368,12 +529,12 @@ In CSS the dotted names are escaped: `var(--space-0\.5)`, `var(--space-1\.5)`, `
 | `radius-button` | 3px | `rounded-sm` (38) | Buttons (CtaButton, FightButton, glass buttons) |
 | `radius-plate` | 4px | `rounded-md` (47) | THE default: plates, cards, rating tiles, toasts, popovers |
 | `radius-sheet` | 8px | `rounded-lg` (5) | Sheets and modals only, the ceiling |
-| `radius-round` | 9999px | `rounded-full` (14) | Live dots and status dots |
+| `radius-round` | 9999px | `rounded-full` (14) | Live dots, status dots and seek markers only (D-6: play buttons and check badges are not dots) |
 
-Sources: `tailwind.config.js:183-190`, `FIGHT_RADIUS` (`fight-tokens.ts:9`), `BROADCAST_RADIUS` (`broadcast-tokens.ts:36`), `PROMPT_RADIUS = 8` (`challenge-prompt-sheet.tsx:89`).
+Sources: `tailwind.config.js` `theme.extend.borderRadius`, `FIGHT_RADIUS` (`fight-tokens.ts:9`), `BROADCAST_RADIUS` (`broadcast-tokens.ts`), `PROMPT_RADIUS = 8` (`challenge-prompt-sheet.tsx:89`).
 
 - Corners are sharp. Nothing exceeds `radius-sheet`.
-- A bottom sheet takes `radius-sheet` on its top corners only. Today every gorhom sheet renders the library's 15px default (R3 SH-1, WP1).
+- A bottom sheet takes `radius-sheet` on its top corners only, with a square bottom. Every gorhom sheet takes `useSheetChrome()` (`components/ui/sheet.tsx`, `SHEET_RADIUS` 8), which also zeroes gorhom's default 15px radius (WP1).
 - Web Tailwind `rounded-sm` is 2px, not 3px; the token is 3px.
 - `Avatar32` is a 2px-radius square in code, while the old DESIGN.md says avatars are circular. See [Open decisions](#open-decisions-decided-by-default-owner-to-confirm).
 
@@ -404,14 +565,14 @@ None. There is no shadow token family and there will not be one. Hierarchy comes
 | `safe-top` | 47px | Top safe area for 390px frames (`design/native-screens/BUILD-SPEC.md:123`) |
 | `safe-bottom` | 34px | Bottom safe area (`BUILD-SPEC.md:124`) |
 
-Other fixed sizes live with their components: the live broadcast HUD uses `BROADCAST_SIZE` (strip 32, bar 56, slab 104, controls 64, tally 28, max width 480; `broadcast-tokens.ts:38-45`) and `BROADCAST_LANDSCAPE`.
+Other fixed sizes live with their components: the live broadcast HUD uses `BROADCAST_SIZE` (strip 32, bar 56, slab 104, controls 64, tally 28, max width 480; `broadcast-tokens.ts`) and `BROADCAST_LANDSCAPE`.
 
 ### Opacity
 
 | Token | Value | Use |
 |---|---|---|
-| `opacity-disabled` | 0.5 | The one disabled style (`button.tsx:100`, FightButton, OutlineAction). Three sites still use 0.6 (R3 BT-7) |
-| `opacity-pressed` | 0.7 | Press dip on rows, chips and ghost links that do not scale (`active:opacity-70`) |
+| `opacity-disabled` | 0.5 | The one disabled style: `DISABLED_OPACITY` in `components/ui/elo-system/button.tsx`, used by `Button`, `OutlineAction` and the Arena controls (WP3). `__tests__/components/ui/one-button-guard.test.ts` fails on any 0.6 dim (`opacity: 0.6` or an `opacity-60` class) except three reviewed ones: the challenge prompt busy dims (Adding Flare), the Mat Board locked live toggle (locked, not disabled) and the face-off Cancel match pressed / cancelling dip |
+| `opacity-pressed` | 0.7 | Press dip on rows, chips and ghost links that do not scale (`active:opacity-70`, `StatePressable dim`, `Button` ghost; `PRESSED_OPACITY`) |
 | `opacity-reduced-press` | 0.85 | PressableScale's dip under Reduce Motion (`pressable-scale.tsx:45`) |
 | `opacity-ember-min` | 0.35 | Countable embers never fade below this (`arena-tab-icon.tsx:143`) |
 
@@ -428,7 +589,7 @@ Mobile has no z tokens. In use: splash overlays 9999, the offline banner 1000, t
 
 ## Motion
 
-Motion in ELO RATED carries meaning or it does not exist. This section carries over the Motion Rule as shipped in jits_web (Adding Flare, 2026-10-01; the previous DESIGN.md "Motion" section, verified against `apps/mobile/lib/motion/tokens.ts` at 69e2e7f). The design-system format has no motion token family, so the exact values live here.
+Motion in ELO RATED carries meaning or it does not exist. This section carries over the Motion Rule as shipped in jits_web (Adding Flare, 2026-10-01; the previous DESIGN.md "Motion" section, verified against `apps/mobile/lib/motion/tokens.ts` at 69e2e7f; line numbers refreshed for WP6). The design-system format has no motion token family, so the exact values live here.
 
 ### Token values at a glance
 
@@ -441,14 +602,17 @@ Motion in ELO RATED carries meaning or it does not exist. This section carries o
 | `duration.pulse` | 1400ms | 19 | `--duration-pulse` |
 | `duration.ember` | 2400ms | 21 | (none) |
 | `duration.shimmer` | 1400ms | 23 | (none; web Tailwind `shimmer` is 3s) |
-| `tempo.quiet` / `normal` / `busy` | 3000 / 1600 / 800ms | 36-40 | (none) |
-| `BRAND_EASE_OUT_CURVE`, `easing.brandOut` | `cubic-bezier(0.22, 1, 0.36, 1)` | 50, 55 | `--easing-default` |
-| `easing.outCubic` | `Easing.out(Easing.cubic)` | 57 | (none) |
-| `spring.press` | damping 18, stiffness 300 | 63 | (none) |
-| `spring.select` | damping 14, stiffness 260 | 65 | (none) |
-| `PRESS_SCALE` | 0.97 | 69 | web press scale 0.98 (`globals.css:143`) |
+| `moment.*` (single Moments) | `goFade` 700, `confettiFall` 1800, `confettiFadeDelay` 1200, `confettiFade` 600, `slamIn` 520, `slamInFade` 300, `riseInDelay` 500, `riseIn` 400, `tapMarkFill` 80, `tapNudge` 50ms | 33-54 | (none) |
+| `tempo.quiet` / `normal` / `busy` | 3000 / 1600 / 800ms | 66-70 | (none) |
+| `BRAND_EASE_OUT_CURVE`, `easing.brandOut` | `cubic-bezier(0.22, 1, 0.36, 1)` | 80, 85 | `--easing-default` |
+| `easing.outCubic` | `Easing.out(Easing.cubic)` | 87 | (none) |
+| `easing.inQuad` | `Easing.in(Easing.quad)` (a fall or a fade off) | 89 | (none) |
+| `easing.linear` | `Easing.linear` (elapsed-time readouts) | 91 | (none) |
+| `spring.press` | damping 18, stiffness 300 | 97 | (none) |
+| `spring.select` | damping 14, stiffness 260 | 99 | (none) |
+| `PRESS_SCALE` | 0.97 | 103 | web press scale 0.98 (`globals.css:143`) |
 
-Component constants outside the token file: `ROLL_MS` 600 and `ROLL_MAX_SPAN` 30 (`rolling-number.tsx`); blade clash 60ms spread plus 160ms snap, spark 80ms in and 300ms out (`arena-tab-icon.tsx:125-133`); `FIGHT_EASING = BRAND_EASE_OUT_CURVE` (`fight-tokens.ts:14`). Durations still written as literals (countdown 700ms, celebration 1800 / 1200 / 600 / 520 / 300 / 400ms, rating moment 80 / 50ms, offline banner 220ms) are WP6 clean-up (R3 MF-11, SC-1).
+Component constants outside the token file: `ROLL_MS` 600 and `ROLL_MAX_SPAN` 30 (`rolling-number.tsx`); blade clash 60ms spread plus 160ms snap, spark 80ms in and 300ms out (`arena-tab-icon.tsx:125-133`); `FIGHT_EASING = BRAND_EASE_OUT_CURVE` (`fight-tokens.ts:14`). The single-Moment durations that were literals (the countdown GO fade, the verdict celebration, the tap marks) are named in `moment` with their shipped values (R3 MF-11, WP6), and the hold-to-end retract is `duration.fast`. The offline banner slides over `duration.fast` (WP4, R3 SC-1). The launch splash keeps its own timing in `@jits/shared/constants` (`SPLASH_REVEAL`, `SPLASH_STATEMENT`, `SPLASH_GLOW_STATEMENT`).
 
 In a static preview, draw the Reduce Motion end state: the final number, the cooled edge, the static ember, the filled tally.
 
@@ -460,7 +624,8 @@ Mobile tokens live in `apps/mobile/lib/motion/tokens.ts` and are imported from `
 
 - **Durations:** `instant` 100ms (reactive feedback), `fast` 240ms, `base` 480ms (rating tick), `slow` 720ms, `pulse` 1400ms (fixed LIVE pulse cycle), `ember` 2400ms (Arena ember cycle), `shimmer` 1400ms (skeleton sweep).
 - **LIVE pulse tempo:** `tempo.quiet` 3000ms, `tempo.normal` 1600ms, `tempo.busy` 800ms, chosen by how many athletes are live in the lobby. One shared clock drives every live dot so they never beat out of step.
-- **Easing:** brand ease-out `cubic-bezier(0.22, 1, 0.36, 1)` (`easing.brandOut`, no bounce) by default; `easing.outCubic` for counts.
+- **Single Moments:** `moment` names the durations that belong to one registered Moment (`goFade`, `confettiFall`, `confettiFadeDelay`, `confettiFade`, `slamIn`, `slamInFade`, `riseInDelay`, `riseIn`, `tapMarkFill`, `tapNudge`). Name a new Moment's own timing there instead of writing a literal.
+- **Easing:** brand ease-out `cubic-bezier(0.22, 1, 0.36, 1)` (`easing.brandOut`, no bounce) by default; `easing.outCubic` for counts; `easing.inQuad` for a fall or a fade off; `easing.linear` for a readout of elapsed time.
 - **Springs:** `spring.press` (damping 18, stiffness 300) for a pressed control returning to rest; `spring.select` (damping 14, stiffness 260) for the tab select bounce.
 - **Press scale:** `PRESS_SCALE` 0.97.
 
@@ -478,7 +643,7 @@ Mobile tokens live in `apps/mobile/lib/motion/tokens.ts` and are imported from `
 2. **UI thread.** Animate transform, opacity and color with Reanimated shared values, `useAnimatedStyle` and `useAnimatedProps`. No `setState` or `setInterval` animation loops, and no per-frame re-render of always-mounted chrome such as the tab bar.
 3. **Reduce Motion.** Read the OS setting with `useReduceMotion()` (from `@/lib/motion`; correct on the first frame). Every animation has a static end state that still carries the meaning (a cooled edge, a static ember, the final number). Haptics stay on under Reduce Motion.
 4. **Ambient lifecycle.** An ambient loop mounts only while its state is true, and pauses (`cancelAnimation`) when the app leaves the foreground and restarts when it returns: gate it on `useAppActive()` from `@/lib/motion`.
-5. **Heat colors are reserved for Arena heat.** `brandOrange` through Signal Red as a heat ramp is used only for the Arena ember, the blade clash spark, and the challenge afterglow. Nowhere else.
+5. **Heat colors are reserved for Arena heat.** `heatOrange` (kit `heat-orange`) and `heatRed` through Signal Red as a heat ramp is used only for the Arena ember, the blade clash spark, and the challenge afterglow. Nowhere else.
 6. **Brand rules still hold.** No drop shadows, 4px radius, Signal Red for CTAs and negatives, Gain Green for rating increases and live state only, numbers in mono `tabular-nums` (including while they roll).
 7. **Pressables on native.** A function `style` on `Pressable` is dropped on device by NativeWind. Use `StatePressable`, or `PressableScale` (an animated Pressable that resolves a function style itself and animates only `transform`, so `className` and `active:` classes keep working); otherwise put animated styles on an inner `Animated.View`.
 
@@ -521,22 +686,23 @@ Every approved animation in the mobile app. **Adding a new animation means addin
 | LIVE pulse tempo | Ambient | Every tempo-clock dot and the ON AIR heartbeat | Lobby activity (others live in `lobby:online`) picks `tempo` quiet / normal / busy; the period eases between buckets instead of restarting | none | Static dots |
 | ON AIR strip | Moment + Ambient | Arena screen body (`components/arena/on-air-strip.tsx`), never the header | Live false to true: the green ON AIR tally sweeps in (shown filled on a remount while already live). While live: a dim heartbeat trace brightens once per tempo-clock cycle; paused in background | none | Tally filled, full trace static |
 | Countdown slam | Moment | Face-off countdown (`components/match-flow/countdown/countdown.tsx`), replaces the plain match countdown | Each numeral drops from 1.6x and lands (about 140ms, ease-out back); a Signal Red bar drains linearly over the whole countdown to a red GO; total length and match start unchanged | `countdownTick` per numeral, `countdownGo` on GO | Numbers crossfade; the bar still drains linearly; haptics kept |
-| Verdict confetti / SlamIn / RiseIn | Moment | Verdict step | Confetti and the SlamIn of "YOU WON" on a win verdict only; RiseIn (the rank strip) on every verdict; each once | none | None (static verdict) |
-| Arena ember | Ambient | Arena tab icon (`components/layout/arena-tab-icon.tsx`) | While live and no challenge is pending: three 2px embers (two `brandOrange`, one Signal Red) rise off the blade tips, one at a time, 2400ms cycle | none | One static ember above the crossing |
+| Verdict confetti / SlamIn / RiseIn | Moment | Verdict step | Confetti and the SlamIn of "YOU WON" on a win verdict only; RiseIn (the rank strip) on every verdict; each once (timings in `moment`) | none | None (static verdict) |
+| Arena ember | Ambient | Arena tab icon (`components/layout/arena-tab-icon.tsx`) | While live and no challenge is pending: three 2px embers (two `heatOrange`, one Signal Red) rise off the blade tips, one at a time, 2400ms cycle | none | One static ember above the crossing |
 | Countable embers | Ambient | Arena tab icon | 1 to 3 pending incoming challenges: one 2.5px heat-red (`#EC6A74`) ember per challenge on one shared 2400ms clock, never fading below 0.35 opacity so they stay countable, in place of the red count pill (the pill returns above 3); they replace the live embers while showing and stop while the Arena tab is focused; VoiceOver keeps reading the count | none | N static embers |
 | Blade clash | Moment | Arena tab icon | Live false to true, or the pending incoming count increases: the Swords halves spread and snap together with a tiny Signal Red spark (about 220ms) | `goLive` on going live; none for a challenge (the prompt sheet already fires `challengeArrived`) | No clash, no spark |
 | Tab select bounce | Reactive | All four tabs | Pressing a tab that is not active: squash to 0.86, `select` spring back | `select` | No scale |
-| Press scale | Reactive | `PressableScale` (`apps/mobile/components/ui/pressable-scale.tsx`): every `Button`, every `FightButton`, the Arena Challenge CTAs (`OutlineAction` ROLL, the Closest Match CTA, the competitor row), every Go live control (go-live plate, Mat Board live/offline segments, offer and row Go live), and Decline / Accept on the challenge prompt | Press-in to 0.97 (`instant`), release on the `press` spring; disabled controls do not move | Opt-in `haptic` prop, used nowhere yet: Challenge already fires `press` itself, Go live gets `goLive` from the tab icon, Confirm result fires `press` after a successful confirm | 0.85 opacity dip while held, haptic kept |
+| Press scale | Reactive | `PressableScale` (`apps/mobile/components/ui/pressable-scale.tsx`): every `Button` (including glass Allow camera on the live screen), every `FightButton`, the Arena Challenge CTAs (`OutlineAction` ROLL, the Closest Match CTA, the competitor row), every Go live control (go-live plate, Mat Board live/offline segments, offer and row Go live), Decline / Accept on the challenge prompt, the live Pause / Resume, the face-off weight edit, save and cancel, the result Change and finish-time edit, the highlight fullscreen button and player toggle, the new-highlight poster, the SearchSelect and date-of-birth Done, and the update-banner dismiss | Press-in to 0.97 (`instant`), release on the `press` spring; disabled controls do not move | Opt-in `haptic` prop, used nowhere yet: Challenge already fires `press` itself, Go live gets `goLive` from the tab icon, Confirm result fires `press` after a successful confirm | 0.85 opacity dip while held, haptic kept |
+| Sheet / modal present | Reactive (a Moment for the challenge prompt and the Arena prompts, which appear on a state change) | gorhom sheets through `useSheetChrome()` (`components/ui/sheet.tsx`): Share Profile, notifications, highlight pre-share and feedback. RN `Modal` through `useModalAnimation()` (`@/lib/motion`): bottom pickers slide (date of birth, `SearchSelect`, Film Room opponent), centered dialogs fade (`Dialog` / Compare Stats, the challenge prompt, start blocked, go-live location). The live menu popover and the critical update modal have no animation | A sheet or modal opening or closing: gorhom slides on a `fast` (240ms) brand ease-out timing (also the snap after a drag) with the `on-media-scrim` backdrop fading with it; RN `Modal` uses the platform slide or fade | none (the challenge prompt's `challengeArrived` belongs to the challenge, not the present) | Appears and disappears in place: `animationType` `"none"`, gorhom `ReduceMotion.Always` |
 | Accept sweep | Moment | Accept on the incoming-challenge prompt | Tapping Accept: the lifted Signal Red fill sweeps left to right (260ms), one glint, label becomes "Accepted" (VoiceOver value "Accepted", label unchanged); the accept call goes out first and is never delayed; a failed accept returns the button to Accept | `accept` (never `press` as well) | Instant fill and label swap |
 | Steel sheen | Ambient | `SteelSheen` (`apps/mobile/components/ui/steel-sheen.tsx`) via the `sheen` prop of `Button` / `FightButton`: Accept on the challenge prompt and Confirm result in the match-flow confirm step only (one per screen) | While the action waits on this user and the button is enabled: an 800ms sweep with about 2s rest; paused in background | none | No sheen |
 | Challenge afterglow | Moment | Incoming challenge strips (`components/arena/afterglow-edge.tsx`) | A new challenge: the 2px bottom edge cools from hot to the hairline over 2000ms, timed from the earlier of the challenge's `created_at` and the first time this app run drew it, so a re-render, remount or old challenge shows it cooled | none | Cooled at once |
 | List enter stagger | Moment | `useFirstLoadEntering` (`@/lib/motion`): Rankings, Arena roster, Profile recent matches | FIRST load only: rows rise 8px and fade, 60ms apart, first 8 rows; never on refetch, refresh, pagination or recycling | none | None |
 | Rank-up swap flare | Moment | Rankings | First open after the athlete's last-seen rank improved: the old order swaps to the new (450ms layout transition) and a skewed Signal Red flare sweeps the row (500ms); once per climb | none | New order, no transition |
-| Skeleton shimmer | Ambient | Skeletons | While loading: one module-level 1400ms clock drives a faint band across every bar, in phase; only `translateX` animates (replaces the old opacity breath) | none | Plain static bars |
-| Launch splash reveal | Moment | `SplashReveal` / `SplashStatement` / `SplashGlowStatement` with `ErMark` | Once per cold start, handing off from the native splash (the one sanctioned on-mount moment) | Heavy impact at the lock beat | Resting frame, still dismisses |
-| Hold-to-end fill | Reactive | Live match, End match button | While the finger holds; retracts on release | `matchEnd` when the hold completes | Unchanged (it tracks the touch) |
-| Time-up drain bar | Moment | Live match state strip | Time is up: a 2px bar empties over the auto-end delay | none | Unchanged (it is a timer, not decoration) |
-| Offline banner | Moment | Root layout, challenge prompt | Connectivity changes: slides in when offline, out when back (220ms) | none | Unchanged |
+| Skeleton shimmer | Ambient | Skeletons (`components/ui/skeleton/skeleton.tsx`): Home, Rankings, Profile, Arena, match detail, Film Room, the highlight viewer poster frame | While loading: one module-level 1400ms clock drives a faint band across every bar, in phase; only `translateX` animates (replaces the old opacity breath). Bars are `plate-bright`, one tier above the `plate` they sit on, and the band is `ink` at 8% opacity, so bars read at rest | none | Plain static `plate-bright` bars, still visible on a plate |
+| Launch splash reveal | Moment | `SplashReveal` / `SplashStatement` / `SplashGlowStatement` with `ErMark` | Once per cold start, handing off from the native splash (the one sanctioned on-mount moment). The climb's odometer is `RollingNumber` on the UI thread (the whole 480-point climb over `NUMBER_ROLL_MS` 900ms, out-cubic). The Statement's glow ramps in with the ignite, breathes up and back once and rests at its baseline; it never loops. Its static white text halo (`textShadow`, `splash-statement.tsx`) is the app's only shadow, sanctioned for this moment only: never copy it to product UI. Timing and curves are splash-local, sourced from `@jits/shared/constants` rather than `@/lib/motion`: the brand ease-out from `SPLASH_REVEAL.EASING_BEZIER` (the same curve as `easing.brandOut`), the Glow Statement's expand settle `SPLASH_GLOW_STATEMENT.EASING_EXPAND`, and an `Easing.inOut(Easing.ease)` glow breathe | Heavy impact at the lock beat | Resting frame, read with `useReduceMotion()` on the first frame and dismissing at the same moment. A late switch snaps to the resting frame, drops the pending lock haptic and dismisses after at most the reduced-motion hold |
+| Hold-to-end fill | Reactive | Live match, End match button (`components/match-flow/live/hold-to-end-button.tsx`) | While the finger holds: a Reanimated shared value scales a full-size fill (`scaleX` from the left; `scaleY` from the bottom on the landscape tile) and the 2px rule under the label, linear over `HOLD_TO_END_MS` 1200ms; no width animation. The end comes from its own timer, never the fill. An early release retracts it over `duration.fast` on the brand ease-out | `matchEnd` when the hold completes | Unchanged (it tracks the touch) |
+| Time-up drain bar | Moment | Live match state strip (`components/match-flow/live/state-strip.tsx`) | Time is up: a 2px bar empties on `scaleX` from the left, linear over the auto-end delay (`AUTO_END_DELAY_MS` 1000ms), on the UI thread; the auto-end itself is timed by the live step, not the bar | none | Unchanged (it is a timer, not decoration) |
+| Offline banner | Moment | Root layout, challenge prompt (`components/offline-banner.tsx`) | Connectivity changes: slides down on the UI thread when offline (Reanimated `translateY`, `duration.fast` 240ms, brand ease-out); its content drops at once when back online | none | Appears in place, no slide |
 
 ### Other
 
@@ -545,7 +711,7 @@ Every approved animation in the mobile app. **Adding a new animation means addin
 
 ### Kit names for the colors the Motion Rule names
 
-`brandOrange` is the kit's `heat-orange`; the countable-ember `#EC6A74` is `heat-red`; Signal Red is `signal-red`; the lifted red of the Accept sweep is `signal-red-lift`; Gain Green is `gain-green`. Heat colors appear only in the Arena ember, countable embers, the blade clash spark and the challenge afterglow.
+`heatOrange` (`lib/tokens.ts`) is the kit's `heat-orange`; `heatRed` (`#EC6A74`, the countable embers) is `heat-red`; Signal Red is `signal-red`; the lifted red of the Accept sweep is `signal-red-lift`; Gain Green is `gain-green`. Heat colors appear only in the Arena ember, countable embers, the blade clash spark and the challenge afterglow.
 
 ## Accessibility
 
@@ -587,7 +753,7 @@ Every text token passes 4.5:1 on every surface in both themes. `plate-bright` is
 |---|---|---|
 | `on-signal` on `signal-red` | 4.60 | Pass (both themes; the same values) |
 | `on-signal` on `signal-red-lift` | 5.67 | Pass |
-| `ink` (dark, `#E8EDF2`) on `signal-red` | 3.54 | FAIL: the pre-repair pairing. Never put white on the red. The legacy shadcn `Button` default variant still does (`components/ui/button.tsx:15`, WP3/WP4) |
+| `ink` (dark, `#E8EDF2`) on `signal-red` | 3.54 | FAIL: the pre-repair pairing. Never put white on the red. The legacy shadcn `Button` default variant did, until WP4 deleted it |
 
 ### Fills, rules and marks
 
@@ -644,21 +810,21 @@ On-media chrome sits over camera, video or photos, so its ground is unknown. Wor
 | `on-media-ink3` on `on-media-chip` | 5.64 | 5.14 |
 | `on-media-ink-red` on `on-media-chip` | 5.62 | 5.12 |
 
-Rule: put on-media text on `on-media-badge` or the light `on-media-chip`. The scrim and tag fills are safe only over dark footage; `on-media-text3` belongs on the badge only (R3 CO-5, A1-4).
+Rule (the on-media contrast rule, WP7): on-media text sits only on `on-media-badge` or, for the dark inks, the light `on-media-chip`. The scrim, tag and glass fills are grounds for marks and controls; text on them is safe only over dark footage. `on-media-text3` belongs on the badge only (R3 CO-5, A1-4). `__tests__/lib/on-media-tokens.test.ts` recomputes the badge and chip columns above from the tokens and fails if one drops below 4.5:1. Text on a tag fill still ships on the HUD tag, the film tags and the opening-still tag (`hud-tag.tsx`, `match-hero.tsx`, `verdict-hero.tsx`, `poster-card.tsx`, `player-controls.tsx`, `angle-switcher.tsx`, `countdown.tsx`); those move to the badge fill in a follow-up (they change pixels on the live and Film Room boards). The camera card's REC tag already sits on the badge.
 
 ### Reduce Motion
 
-- Read the OS setting with `useReduceMotion()` from `@/lib/motion`; it is correct on the first frame. The splash files still read it asynchronously (R3 SP-3, WP6).
+- Read the OS setting with `useReduceMotion()` from `@/lib/motion` (`lib/motion/use-reduce-motion.ts`); it is correct on the first frame. The launch splash reads it the same way (WP6); `lib/match-flow/use-reduce-motion.ts` is only a re-export for old imports.
 - Every animation has a still end state that keeps the meaning: the final number, the cooled afterglow edge, one static ember, the filled ON AIR tally, plain skeleton bars (full table in the [registry](#registry)).
 - PressableScale dips to `opacity-reduced-press` (0.85) instead of scaling.
 - Haptics stay on under Reduce Motion. Never a haptic on a loss, a draw, or ambient motion.
-- Modal and sheet transitions (RN `Modal` `animationType`, gorhom slide) are not yet registered or gated (R3 MO-5, WP1).
+- Modals and sheets appear and leave in place: RN `Modal` takes `animationType` from `useModalAnimation()` (`"none"` under Reduce Motion) and gorhom sheets take `animationConfigs` from `useSheetChrome()` (`ReduceMotion.Always`). See "Sheet / modal present" in the [registry](#registry).
 
 ### Labels and roles
 
 - Every pressable that acts has `accessibilityRole="button"` and a label. Missing today: the error boundary's "Try again" and "Sign out" (`components/error-boundary.tsx:88,98`, R3 A1-1).
 - A `Pressable` with a single `Text` child takes its name from the text; icon-only controls need an explicit label ("Go back" on the AppHeader back button).
-- Text inputs and switches need `accessibilityLabel` set to the visible label; React Native does not link a sibling `Text`. Seven controls lack one (R3 A1-2).
+- Text inputs and switches need `accessibilityLabel` set to the visible label; React Native does not link a sibling `Text`. The ui `Switch` requires a `label` prop (it becomes the accessible name), and `EloTextInput` takes its enclosing `EloField` label by default (WP7, R3 A1-2).
 - Tabs expose `accessibilityState.selected` and an `accessibilityValue` for badges ("2 challenges", "3 NEW"; `elo-tab-bar.tsx:66-75`); the countable embers keep the count readable.
 - Moments speak their result once: VoiceOver reads only the final ELO and delta after the odometer roll; the Accept sweep sets the value "Accepted" while the label stays.
 - Busy buttons set `accessibilityState.busy` (FightButton); make it the canonical busy pattern.
@@ -677,33 +843,34 @@ Rule: put on-media text on `on-media-badge` or the light `on-media-chip`. The sc
 
 The family map of the mobile app (`apps/mobile`), which component is canonical in each family, and what is legacy. Each kit card (`components/<Comp>/`) is a static HTML twin of a React Native component, drawn from the code with these tokens; React Native cannot run in the preview frame, so every card README says which RN file it was hand-written from.
 
-Three token channels exist in code, and the kit draws all three from the same tokens: NativeWind ELO classes (most components), `usePalette()` JS colors (the match flow; a mirror of the same values), and the fixed `ON_MEDIA` / `BROADCAST` on-media set (chrome over video). Legacy shadcn classes are a fourth channel that is retiring (see [Legacy](#legacy-retiring-wp4)).
+Three token channels exist in code, and the kit draws all three from the same tokens: NativeWind ELO classes (most components), `usePalette()` JS colors (the match flow; a mirror of the same values), and the fixed `ON_MEDIA` / `BROADCAST` on-media set (chrome over video). The legacy shadcn classes were a fourth channel; WP4 removed them (see [Legacy](#legacy-retiring-wp4)).
 
 ### Which component to use
 
 | I need... | Use | Not |
 |---|---|---|
-| A destructive action | `Button` destructive: an outline in `negative` (kit proposal) | today's `DestructiveButton` red fill under a 3.54:1 label |
-| A primary action | `Button` primary (today: `CtaButton`, `FightButton` primary) | the shadcn `Button` default variant, a hand-rolled `bg-cta` Pressable |
-| A secondary or text action | `Button` secondary / ghost (today: `SecondaryButton`, `TertiaryButton`, `FightButton`) | `ViewerButton`, `PracticeButton` (copies) |
+| A destructive action | `Button` destructive: an outline in `negative` | a red fill (the retired `DestructiveButton`) |
+| A primary action | `Button` primary (`components/ui/elo-system/button.tsx`; `FightButton` is its match-flow alias) | a hand-rolled `bg-cta` Pressable (the shadcn `Button` was deleted by WP4) |
+| A secondary or text action | `Button` secondary / ghost | a raw `Pressable` with an `active:` class |
+| An action over camera or film | `Button` glass | a hand-rolled glass `Pressable` |
 | A compact strip action (ROLL, OPEN, CANCEL, CONFIRM) | `OutlineAction` | a small `Button` |
 | Anything pressable that commits | `PressableScale` underneath | raw `Pressable` with a function `style` |
-| A still pressable (rows, chrome over video) | `StatePressable` | raw `Pressable` with a function `style` |
-| A container | `Plate` (variants default, accent, live, win, loss) | shadcn `Card` (dead) |
+| A still pressable (rows, chips, toggles, chrome over video) | `StatePressable` (`dim` for the 0.7 pressed dip) | raw `Pressable` with no pressed feedback or a function `style` |
+| A container | `Plate` (variants default, accent, live, win, loss) | shadcn `Card` (deleted, WP4) |
 | An Arena strip | `StripShell` (compact Plate on `panel`, 3px rail) | |
-| A caps label tag | `MetaTag` | shadcn `Badge` |
+| A caps label tag | `MetaTag`; `Badge` is the same tag with tones (WP4) | |
 | Win / loss / draw | `OutcomeTag` | |
-| A filter or segment | `Chip` (+ a row of chips); selected = `plate-bright` fill, `hairline-strong` border, `ink` label | shadcn `Tabs` (unused) |
+| A filter or segment | `Chip` (+ a row of chips); selected = `plate-bright` fill, `hairline-strong` border, `ink` label | shadcn `Tabs` (deleted, WP4) |
 | A count badge | `CountPill` | |
 | Live state | `LivePill`, `LiveDot` | a green dot drawn by hand |
 | A rating | `EloTile` with `RollingNumber` | |
 | A rating change | `DeltaNumber` (static) or `DeltaChip` (after a roll) | a third formatter |
-| A person | `Avatar32` (square initials or photo) | shadcn `Avatar` (round, unused), `InitialsBlock` outside the match flow |
+| A person | `Avatar32` (square initials or photo) | shadcn `Avatar` (round, deleted by WP4), `InitialsBlock` outside the match flow |
 | A notice | `toast.success / error / info` (`BrandToast`) | a banner for a one-off message |
 | Loading | the skeleton set (`SkeletonProvider`, `SkeletonBlock`, `SkeletonPlate`, ...) | a free-floating red `ActivityIndicator` |
-| A busy action | `FightButton busy` (the busy-button pattern) | a spinner next to a button |
-| A picker | `SearchSelect` (`NativeSelect` wraps it) | shadcn `Select` (dead) |
-| A sheet | one bottom-sheet shell with 8px top corners (WP1 target; today `Sheet`, direct `BottomSheetModal`, or RN `Modal`) | gorhom's default 15px radius |
+| A busy action | `Button busy` (the busy-button pattern) | a spinner next to a button |
+| A picker | `SearchSelect` (`NativeSelect` wraps it) | shadcn `Select` (deleted, WP4) |
+| A sheet | `Sheet` or a `BottomSheetModal` spreading `useSheetChrome()` with `SheetBackdrop` (`components/ui/sheet.tsx`); an RN `Modal` picker uses `SHEET_RADIUS`, `panel`, `ON_MEDIA.scrim` and `useModalAnimation("slide")` | gorhom's default 15px radius, a sheet's own background, handle or black backdrop literal |
 
 ### Families
 
@@ -713,18 +880,17 @@ Three token channels exist in code, and the kit draws all three from the same to
 |---|---|---|
 | `PressableScale` | `components/ui/pressable-scale.tsx` | Canonical press primitive: 0.97 scale on `duration.instant` brand ease-out, `spring.press` release, optional semantic haptic |
 | `StatePressable` | `components/ui/state-pressable.tsx` | Canonical still pressable |
-| `FightButton` | `components/match-flow/fight/fight-ui.tsx:105` | The API the unified `Button` takes: primary / secondary / ghost, `busy`, `disabled`, `height` 56, `icon`, `trailing`, `haptic`, `sheen` |
-| `CtaButton`, `SecondaryButton`, `TertiaryButton`, `DestructiveButton` | `components/auth/auth-buttons.tsx` | The real app-wide buttons (30 / 16 / 19 / 1 call sites) but on raw `Pressable` with no press scale (R3 BT-1); WP3 aliases them onto `Button` |
+| `Button` | `components/ui/elo-system/button.tsx` | The one brand button (WP3): primary / secondary / ghost / destructive / glass, `busy`, `disabled` (the one 0.5 dim), `height` 56, `icon`, `trailing`, `haptic`, `sheen`, on `PressableScale` |
+| `FightButton` | `components/match-flow/fight/fight-ui.tsx` | Thin match-flow alias of `Button` (primary / secondary / ghost) |
 | `OutlineAction` | `components/arena/strip-primitives.tsx` | Canonical compact action: 28px tall, `radius-tag`, `hairline-strong`, `action-sm` label, 44px hit area |
 | `SteelSheen` | `components/ui/steel-sheen.tsx` | Ambient sweep on a waiting-on-you button (Accept, Confirm result) |
-| `ViewerButton`, `PracticeButton` | highlight-viewer, practice | Copies of the three tiers; fold into `Button` |
-| shadcn `Button` | `components/ui/button.tsx` | Legacy: admin and the update banner only; white label on red (3.54:1) |
+| shadcn `Button` | `components/ui/button.tsx` | Deleted by WP4; the update banner, its last caller, is on the unified `Button` |
 
-Cards (Actions family): **Button** (target: primary, secondary, ghost, destructive outline in `negative`; states rest, pressed, disabled, busy) and **OutlineAction**.
+Cards (Actions family): **Button** (primary, secondary, ghost, destructive outline in `negative`; states rest, pressed, disabled, busy) and **OutlineAction**.
 
 #### Status and badges
 
-`MetaTag` (21 sites) is the canonical tag: `hairline` border, `radius-tag`, `meta-label` text in `ink-2`. `OutcomeTag` and `LivePill` are semantic wrappers. `CountPill` (`components/ui/count-pill.tsx`) is the filled count: `signal-red` fill, `on-signal` 9px mono bold digits, `radius-tag`, shared by the header bell and the tab bar. `HeaderStatusChip` (`components/layout/header-status-chip.tsx`) sits on every tab root and says live (`gain-green` edge), neutral (`ink-3` edge) or incoming (`signal-red` edge). Overlapping tags (`FilmBadge`, `HudTag`, participant `StatusBadge`, shadcn `Badge`) fold into one tag with tones.
+`MetaTag` (21 sites) is the canonical tag: `hairline` border, `radius-tag`, `meta-label` text in `ink-2`. `OutcomeTag` and `LivePill` are semantic wrappers. `CountPill` (`components/ui/count-pill.tsx`) is the filled count: `signal-red` fill, `on-signal` 9px mono bold digits, `radius-tag`, shared by the header bell and the tab bar. `HeaderStatusChip` (`components/layout/header-status-chip.tsx`) sits on every tab root and says live (`gain-green` edge), neutral (`ink-3` edge) or incoming (`signal-red` edge). Overlapping tags (`FilmBadge`, `HudTag`, participant `StatusBadge`) fold into one tag with tones. `Badge` (`components/ui/badge.tsx`, admin members) already is that tag since WP4: the `MetaTag` look with tones `default` (`hairline-strong` border, `ink`), `secondary` (`plate` fill, `ink-2`), `destructive` (`negative`), `success` (`gain-green`, wins only) and `outline` (exactly `MetaTag`).
 
 Cards (Status family): **MetaTag**, **LivePill** (with LiveDot), **CountPill** (with tab badges). The header status chip is drawn in the AppHeader card.
 
@@ -736,7 +902,7 @@ Cards (Status family): **MetaTag**, **LivePill** (with LiveDot), **CountPill** (
 | `RollingNumber` | `components/ui/elo-system/rolling-number.tsx` | The odometer roll (600ms, once per result); mobile only |
 | `DeltaChip` | `components/ui/elo-system/delta-chip.tsx` | "▲ +14" pop after the roll; mobile only |
 | `DeltaNumber` | `components/ui/elo-system/delta-number.tsx` | Static signed delta, s 12 / m 16 / l 28 |
-| `RankRow` | `components/ui/elo-system/rank-row.tsx` | Ladder row; leader marked by a `signal-red` left rule. Its rank numeral is red today (R3 RK-1): it should be `ink` |
+| `RankRow` | `components/ui/elo-system/rank-row.tsx` | Ladder row; leader marked by a `signal-red` left rule; every rank numeral is data, the leader's in `ink` (WP2, R3 RK-1) |
 | `ParticipantRow`, `DataRow` | `components/ui/elo-system/` | `DataRow` is unused on mobile |
 | `Mono`, `StakesStrip`, `RatingBlock`, `StatusPlate` | `fight-ui.tsx` | Match-flow building blocks on `usePalette()` |
 
@@ -746,7 +912,7 @@ Cards (Data family): **EloTile**, **RollingNumber** (settled frame), **DeltaChip
 
 `EloTabBar` (`components/layout/elo-tab-bar.tsx`): four tabs (Home, Arena, Rankings, Profile) on `panel`, 18px lucide icons, `tab-label` text (`ink` active, `ink-3` inactive), a 2px `signal-red` top edge on the active tab, tab select bounce. `ArenaTabIcon` (`components/layout/arena-tab-icon.tsx`) draws lucide `Swords` as two blade halves so it can carry heat: live embers, countable embers (1 to 3 pending), blade clash. Headers are one system of three slots on the same 56px `panel` bar: `AppHeader` (pushed screens), `BrandHeader` (wordmark; Home, Rankings), `TabHeader` (Arena, Profile).
 
-Cards (Navigation family): **TabBar** (with the Arena icon's live ember and countable embers), **AppHeader** (with the header status chip) and **Chip**.
+Cards (Navigation family): **TabBar** (with the Arena icon's live ember and countable embers), **AppHeader** (with the header status chip) and **Chip** (shipped in WP2: selected = `plate-bright`, `hairline-strong`, `ink`).
 
 #### Surfaces
 
@@ -756,15 +922,17 @@ Cards: **Plate** (Surfaces family); **OnAirStrip** and **ChallengeStrip** (incom
 
 #### Feedback and loading
 
-`toast` + `BrandToast` (`components/ui/toast.tsx`, 89 calls) is canonical: `plate` fill, `hairline-strong` border, `radius-plate`, a 3px left rule (success `ink`, deliberately not green; error `signal-red`; info `ink-3`), `toast-title` plus `body-12`, no shadow. The skeleton set (`components/ui/skeleton/skeleton.tsx`) runs one shared 1400ms shimmer clock. Known issue: skeleton bars (`SkeletonBlock`, `bg-surface-3`) currently share the surface tier of their host plate (`Plate`, `SkeletonPlate`, the rank and participant rows), so inside a plate they are invisible at rest and under Reduce Motion, and show only while the shimmer band crosses them; tracked in WP6, bead jits-3eeg.7. Banners (offline, update, upload progress, queue status) have no shared shell yet; the offline banner is a legacy red bar (R3 SC-1, WP4).
+`toast` + `BrandToast` (`components/ui/toast.tsx`, 89 calls) is canonical: `plate` fill, `hairline-strong` border, `radius-plate`, a 3px left rule (success `ink`, deliberately not green; error `signal-red`; info `ink-3`), `toast-title` plus `body-12`, no shadow. The skeleton set (`components/ui/skeleton/skeleton.tsx`) runs one shared 1400ms shimmer clock. Skeleton bars (`SkeletonBlock`) are `plate-bright` (`bg-surface-4`), one tier above their host plate (`Plate`, `SkeletonPlate`, the rank and participant rows), with an `ink` band at 8% opacity, so they read at rest and under Reduce Motion (WP6, bead jits-3eeg.7). Banners (offline, update, upload progress, queue status) have no shared shell yet. Since WP4 the offline banner is a `panel` bar with a `hairline-strong` bottom edge and mono caps `ink` copy (R3 SC-1), the update banner is a `panel` card with a `hairline-strong` border, `ink` text and a `secondary` RESTART `Button`, and the critical update modal sits on `void` with `ink` / `ink-2` text (R3 SC-2).
 
 Cards (Feedback family): **Toast**, **Skeleton**.
 
 #### Inputs and overlays
 
-`SearchSelect` is the canonical picker. Three sheet mechanisms exist (shadcn `Sheet` once, direct `BottomSheetModal` three times, RN `Modal` seven times); the target is one sheet shell with `radius-sheet` top corners, `panel` fill, `hairline` edge, no shadow. The challenge prompt is a centered card by decision (jits-02vo.3) with `radius-sheet` and the `on-media-scrim` backdrop. `AuthFormField` and `EloField` fold into one form field (WP3/WP5 follow-ups). `Switch` still uses the legacy red track (R3 ST-1).
+`SearchSelect` is the canonical picker. Every gorhom sheet (Share Profile through the shadcn `Sheet`, the notifications panel, the highlight pre-share and feedback sheets) shares one chrome from `components/ui/sheet.tsx` (WP1): `useSheetChrome()` gives the `panel` fill, `radius-sheet` top corners with a square bottom, a `hairline` top edge, the 30x4 `ink-3` handle, a background with no VoiceOver stop and the Reduce-Motion-aware present; `SheetBackdrop` is the `on-media-scrim` backdrop. `SheetTitle` and `DialogTitle` are DM Sans 700 14px caps, tracking 1.68px, `ink`, role header; descriptions are Inter 13px `ink-2`; `DialogContent` is a `panel` card with a `hairline` border and `radius-sheet`. Every modal backdrop is the one scrim: `bg-on-media-scrim` in classes, `ON_MEDIA.scrim` in style props. A dismissable backdrop is a labeled button and a sibling of the card, never its parent (so VoiceOver reaches the card's controls). `AuthFormField` and `EloField` fold into one form field (WP3/WP5 follow-ups); both edge a focused input in `ink-2` (since WP2), and an error in `negative`. `Switch` has the one neutral look since WP2 (R3 ST-1): `switchColors()` gives an `ink` track when on, `ink-3` when off and a `void` thumb, and the face-off record toggle shares it.
 
-Card (Surfaces family): **Sheet** (target, 8px top corners).
+**Sheets are the default modal.** A centered dialog is the documented exception for two cases (R3 SH-5, decided in WP1): a blocking prompt that must be answered and is not dismissed by a backdrop tap (the incoming challenge prompt by decision jits-02vo.3 with `radius-sheet`; `StartBlockedSheet`; `GoLiveLocationSheet`, which gates the system location prompt), and a short read-only overlay with no actions (`CompareStatsModal`, through `Dialog`). Anything else with actions or a list is a sheet.
+
+Card (Surfaces family): **Sheet** (shipped in WP1, 8px top corners).
 
 #### Avatars and identity
 
@@ -784,7 +952,7 @@ The 20 cards in `components/`, by family (the `group` on each card):
 
 | Family | Card | RN source |
 |---|---|---|
-| Actions | Button (target, WP3: primary, secondary, ghost, destructive outline in `negative`; rest, pressed, disabled, busy) | `fight-ui.tsx` API; today `auth-buttons.tsx` |
+| Actions | Button (WP3: primary, secondary, ghost, destructive outline in `negative`; rest, pressed, disabled, busy) | `components/ui/elo-system/button.tsx` |
 | Actions | OutlineAction | `components/arena/strip-primitives.tsx` |
 | Status | MetaTag | `components/ui/elo-system/meta-tag.tsx` |
 | Status | LivePill (with LiveDot) | `components/ui/elo-system/live-pill.tsx` |
@@ -794,9 +962,9 @@ The 20 cards in `components/`, by family (the `group` on each card):
 | Data | DeltaChip | `components/ui/elo-system/delta-chip.tsx` |
 | Navigation | TabBar (Arena icon live ember and countable embers) | `components/layout/elo-tab-bar.tsx`, `arena-tab-icon.tsx` |
 | Navigation | AppHeader (with the header status chip) | `components/layout/app-header.tsx`, `header-status-chip.tsx` |
-| Navigation | Chip (selected target: `plate-bright`, `hairline-strong`, `ink`) | `components/ui/elo-system/chip.tsx` |
+| Navigation | Chip (shipped, WP2; selected: `plate-bright`, `hairline-strong`, `ink`) | `components/ui/elo-system/chip.tsx` |
 | Surfaces | Plate | `components/ui/elo-system/plate.tsx` |
-| Surfaces | Sheet (target, WP1: 8px top corners) | `components/ui/sheet.tsx` and the direct sheets |
+| Surfaces | Sheet (shipped, WP1: 8px top corners) | `components/ui/sheet.tsx` (`useSheetChrome()`) and the direct sheets |
 | Feedback | Toast | `components/ui/toast.tsx` |
 | Feedback | Skeleton | `components/ui/skeleton/skeleton.tsx` |
 | Identity | Avatar | `components/ui/elo-system/avatar-32.tsx` |
@@ -859,7 +1027,7 @@ How far the shipped mobile app is from this system, and the plan to close the ga
 | jits-3eeg.2 | WP1 Sheet and modal chrome | SH-1 to SH-5, MO-5, A1-1 backdrops | One shared sheet background and handle with `radius-sheet` top corners; brand type in sheet and dialog titles; one `on-media-scrim` backdrop; a "Sheet / modal present" registry row and a Reduce-Motion-aware modal animation helper |
 | jits-3eeg.3 | WP2 Color semantics sweep | CO-1, CO-2, CO-6, CO-7, ST-1 to ST-3, ST-6, MF-5, MF-8, PR-1, PR-2, PR-6, RK-1, SC-6, FR-1, FR-2 | Red only on CTAs and negatives, green only on gains, wins and live; neutral spinners; one selected state (`plate-bright` + `hairline-strong` + check); neutral Switch track; a grep guard test |
 | jits-3eeg.4 | WP3 One Button, one press feedback | BT-1 to BT-7, SC-3 | A unified `Button` on `PressableScale` (primary, secondary, ghost, destructive, glass), one disabled style (`opacity-disabled`); auth, practice and viewer buttons migrated; `StatePressable` on 25 rows and toggles without feedback |
-| jits-3eeg.5 | WP4 Retire the legacy shadcn layer | LG-1 to LG-3, SC-1, SC-2, ST-8, TY-5, MF-9 | Delete unused primitives; restyle Badge, the offline banner, the update banner and modal; remove the legacy token keys, keeping `brandOrange` as a heat token |
+| jits-3eeg.5 | WP4 Retire the legacy shadcn layer | LG-1 to LG-3, SC-1, SC-2, ST-8, TY-5, MF-9 | Delete unused primitives; restyle Badge, the offline banner, the update banner and modal; remove the legacy token keys, `brandOrange` included (Arena heat reads `heatOrange` since WP7) |
 | jits-3eeg.6 | WP5 Type scale and numeric typography | TY-1 to TY-4, TY-6, PR-3, PR-4, MF-3, MF-6, MF-7, FR-7, ST-4, ST-5, AR-1, AR-6, A1-3 | Named size and tracking steps (the Typography styles), a scale-driven mono label, `tabular-nums` on every number, tracking on every caps label, the 10px floor |
 | jits-3eeg.7 | WP6 Motion Rule hygiene | MF-2, SP-1 to SP-4, MO-4, MO-6, MF-11, FR-3, FR-4 | Hold-to-end and time-up on Reanimated `scaleX`; the splash odometer via `RollingNumber`; the splash glow plays once; `useReduceMotion()` everywhere; literal durations named; shimmer restored in Film Room and the highlight viewer |
 | jits-3eeg.8 | WP7 Tokens, on-media, labels, doc truth | CO-3, CO-4, CO-5, AR-4, SP-5, SC-4, SC-5, FR-6, MF-10, A1-2, A1-4, D-1 to D-7 | An amber `attention` token in `tokens.ts`; the heat sub-palette; one on-media source behind `ON_MEDIA` and `BROADCAST`; labels on 7 inputs and switches; the docs brought in line with this kit |
@@ -872,11 +1040,11 @@ Finding IDs (SH, BT, HO, AR, RK, PR, MF, FR, ST, SC, SP, LG, CO, TY, MO, RA, A1,
 
 ## Legacy (retiring, WP4)
 
-The pre-redesign shadcn layer still ships in the mobile app as "compatibility shims" (`__tests__/lib/tokens-contrast.test.ts:15-17`). It is NOT part of this system: its colors are not kit tokens, they are not contrast-gated, and new code must not use them. Bead jits-3eeg.5 (WP4) deletes it after WP3 lands the unified Button.
+The pre-redesign shadcn layer is retired from the mobile app by bead jits-3eeg.5 (WP4), after WP3 landed the unified Button. It was never part of this system: its colors were not kit tokens and were not contrast-gated. `__tests__/components/legacy-shadcn-guard.test.ts` fails if a deleted primitive, a legacy color class or the legacy CSS-variable plumbing comes back.
 
 ### Legacy colors
 
-Defined in `apps/mobile/lib/tokens.ts` (light l.69-93, dark l.116-140), mirrored as CSS variables in `tailwind.config.js:119-142` (light) and `lib/theme/theme-provider.tsx:21-44` (dark). Hex is computed from the HSL.
+Removed. The legacy keys are gone from `apps/mobile/lib/tokens.ts`, the legacy `cssVarColors` and `lightVars` entries from `tailwind.config.js`, and the legacy variables from `lib/theme/theme-provider.tsx` `buildVars`, so a legacy class (`bg-background`, `text-foreground`, `text-muted-foreground`, `bg-primary`, `bg-destructive`, `border-input` and friends) no longer resolves to a color. The last three keys (`background`, `primary`, `muted`), which only `components/ui/switch.tsx` read, left `ColorTokens` once WP2 moved the Switch onto ELO tokens; `__tests__/components/legacy-shadcn-guard.test.ts` fails if one comes back. The table records what each retired key mapped to, for reading old code and the web shadcn layer.
 
 | Key | Tailwind | Light | Dark | Use instead |
 |---|---|---|---|---|
@@ -895,32 +1063,32 @@ Defined in `apps/mobile/lib/tokens.ts` (light l.69-93, dark l.116-140), mirrored
 | `border` | `border-border` | `hsl(218, 12%, 83%)` (#CED2D9) | `hsl(222, 13%, 18%)` (#282C34) | `hairline` |
 | `input` | `border-input` | `hsl(218, 14%, 79%)` (#C2C7D1) | `hsl(222, 13%, 21%)` (#2F333D) | `hairline-strong` |
 | `gold` | `bg-gold` | `hsl(38, 92%, 50%)` (#F59F0A) | same | `attention` |
-| `brandOrange` | `bg-brand-orange` | `hsl(25, 95%, 53%)` (#F97415) | same | KEPT as `heat-orange` (Arena heat only) |
+| `brandOrange` | `bg-brand-orange` | `hsl(25, 95%, 53%)` (#F97415) | same | `heat-orange` (`heatOrange` / `bg-heat-orange`, the same value, added by WP7) |
 | `deepRed` | `bg-deep-red` | `hsl(355, 67%, 47%)` (#C82835) | same | `signal-red` |
 
-**Naming trap.** On mobile `text-primary` is the LEGACY brand red (`--primary`), while web's `--text-primary` is the ink. ELO ink on mobile is `text-ink`. Never write `text-primary` for data. The same collision exists in web Tailwind.
+**Naming trap.** On mobile `text-primary` was the LEGACY brand red (`--primary`), while web's `--text-primary` is the ink. ELO ink on mobile is `text-ink`. Never write `text-primary`. The same collision exists in web Tailwind, where the shadcn layer still lives.
 
 ### Legacy components
 
-| Component | Path | Real users | Fate |
-|---|---|---|---|
-| `Card` family | `components/ui/card.tsx` | 0 (also `rounded-lg` on a non-modal) | Delete; use `Plate` |
-| `Input` | `components/ui/input.tsx` | 0 (raw `TextInput` is used 13 times) | Re-skin to ELO tokens as the form field input |
-| `Label` | `components/ui/label.tsx` | 0 | Delete |
-| `Separator` | `components/ui/separator.tsx` | 0 | Delete; a 1px `hairline` view |
-| `Avatar` | `components/ui/avatar.tsx` | 0 (round, contradicts the square `Avatar32`) | Delete |
-| `Select` | `components/ui/select.tsx` | 0 | Delete; use `SearchSelect` |
-| `Tabs` | `components/ui/tabs.tsx` | 0 (the `<Tabs>` hits are expo-router) | Delete; use `Chip` rows |
-| `OnlineIndicator` | `components/online-indicator.tsx` | 0 | Delete |
-| `Badge` | `components/ui/badge.tsx` | 1 (admin members), `rounded-lg`, system font | Restyle onto `MetaTag` / `OutcomeTag`, keep the `success` variant API |
-| `Dialog` | `components/ui/dialog.tsx` | 1 (Compare Stats), system-font title | Brand titles (WP1) |
-| `Sheet` | `components/ui/sheet.tsx` | 1 (Share Profile), `tokens.card`, 15px gorhom radius | The one sheet shell (WP1) |
-| `Button` | `components/ui/button.tsx` | Admin screens, update banner, critical update modal | Replaced by the unified `Button` (WP3) |
-| `Switch` | `components/ui/switch.tsx` | 3 (settings, admin flags), red `primary` track | Neutral track (WP2) |
-| `OfflineBanner` | `components/offline-banner.tsx` | Root layout | `panel` + `hairline-strong`, mono caps `ink` (WP4) |
-| Update banner and modal | `components/updates/*` | Root layout | ELO surfaces and the unified Button (WP4) |
+| Component | Path | Fate |
+|---|---|---|
+| `Card` family | `components/ui/card.tsx` | Deleted (WP4); use `Plate` |
+| `Input` | `components/ui/input.tsx` | Deleted (WP4; it had no callers). The raw `TextInput`s fold into one ELO form field (WP3/WP5 follow-up) |
+| `Label` | `components/ui/label.tsx` | Deleted (WP4) |
+| `Separator` | `components/ui/separator.tsx` | Deleted (WP4); a 1px `hairline` view |
+| `Avatar` | `components/ui/avatar.tsx` | Deleted (WP4); round, contradicted the square `Avatar32` |
+| `Select` | `components/ui/select.tsx` | Deleted (WP4); use `SearchSelect` |
+| `Tabs` | `components/ui/tabs.tsx` | Deleted (WP4); use `Chip` rows |
+| `OnlineIndicator` | `components/online-indicator.tsx` | Deleted (WP4) |
+| `Button` | `components/ui/button.tsx` | Deleted (WP4); every caller is on the unified `Button` (`components/ui/elo-system/button.tsx`, WP3), the update banner last |
+| `Badge` | `components/ui/badge.tsx` | Kept, restyled (WP4): the `MetaTag` look (`radius-tag`, 1px border, 10px mono caps) with tones `default` (`hairline-strong`, `ink`), `secondary` (`plate` fill, `ink-2`), `destructive` (`negative`), `success` (`gain-green`, kept for win badges) and `outline` (exactly `MetaTag`). One caller (admin members) |
+| `Dialog` | `components/ui/dialog.tsx` | Kept: brand titles since WP1 (Compare Stats) |
+| `Sheet` | `components/ui/sheet.tsx` | Kept: the one sheet shell, and home of `useSheetChrome()` / `SheetBackdrop` (WP1) |
+| `Switch` | `components/ui/switch.tsx` | Kept: the one app switch (also the face-off "Record from my phone" toggle since WP4, R3 MF-9); since WP2 on ELO tokens with a neutral track (`switchColors()`: `ink` on, `ink-3` off, `void` thumb), no legacy tokens |
+| `OfflineBanner` | `components/offline-banner.tsx` | Restyled (WP4): `panel` bar, `hairline-strong` bottom edge, mono caps `ink` copy, Reanimated slide on `duration.fast`, still under Reduce Motion |
+| Update banner and modal | `components/updates/*` | Restyled (WP4): the banner is a `panel` card with a `hairline-strong` border, `ink` text and a `secondary` RESTART `Button`; the critical modal sits on `void` with `ink` / `ink-2` text and the primary `Button` |
 
-Weight classes `font-semibold` and `font-medium` appear only in these atoms; React Native cannot synthesize weights from the custom fonts, so they render in the system font.
+The system-font weight classes (`font-semibold`, `font-medium`, `text-xs` without a brand family) lived in these atoms; React Native cannot synthesize weights from the custom fonts, so they rendered in the system font (R3 TY-5). They left with the deleted files and the restyles.
 
 ### Retired brand assets
 

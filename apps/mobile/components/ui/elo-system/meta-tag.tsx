@@ -1,6 +1,7 @@
 import * as React from "react";
-import { View, Text, type ViewProps } from "react-native";
+import { View, type ViewProps } from "react-native";
 import { cn } from "@/lib/cn";
+import { Label } from "./label";
 
 interface MetaTagProps extends ViewProps {
   children: React.ReactNode;
@@ -16,9 +17,7 @@ export function MetaTag({ children, className, ...rest }: MetaTagProps) {
       )}
       {...rest}
     >
-      <Text className="font-mono text-[10px] text-ink-2 uppercase tracking-caps-l">
-        {children}
-      </Text>
+      <Label className="text-ink-2">{children}</Label>
     </View>
   );
 }

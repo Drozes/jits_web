@@ -4,15 +4,20 @@ import { useThemedTokens } from "@/lib/theme/use-theme";
 import { formatRelativeDate } from "@jits/shared/utils";
 import type { BellItem } from "@/lib/notifications/notification-items";
 
-type IconKind = "ranked" | "challenge" | "positive" | "neutral";
+/**
+ * Icon tones are ink steps only (WP2, R3 SC-6): a notification icon is a
+ * marker, not a call to act, a gain or a live state, so it is never Signal
+ * Red or Gain Green. The rows that need attention carry the unread dot.
+ */
+type IconKind = "strong" | "neutral";
 
 const iconConfig: Record<
   BellItem["type"],
   { Icon: typeof Swords; tone: IconKind }
 > = {
-  match_result: { Icon: Swords, tone: "ranked" },
-  challenge_received: { Icon: Zap, tone: "challenge" },
-  challenge_accepted: { Icon: CheckCircle, tone: "positive" },
+  match_result: { Icon: Swords, tone: "strong" },
+  challenge_received: { Icon: Zap, tone: "strong" },
+  challenge_accepted: { Icon: CheckCircle, tone: "strong" },
   challenge_declined: { Icon: XCircle, tone: "neutral" },
   session_joined: { Icon: Swords, tone: "neutral" },
   highlight_ready: { Icon: Clapperboard, tone: "neutral" },
@@ -20,17 +25,7 @@ const iconConfig: Record<
 
 function useIconColor(tone: IconKind) {
   const tokens = useThemedTokens();
-  switch (tone) {
-    case "ranked":
-      return tokens.accentCta;
-    case "challenge":
-      return tokens.accentCta;
-    case "positive":
-      return tokens.statePositive;
-    case "neutral":
-    default:
-      return tokens.textTertiary;
-  }
+  return tone === "strong" ? tokens.textSecondary : tokens.textTertiary;
 }
 
 export function NotificationRow({
@@ -60,19 +55,19 @@ export function NotificationRow({
       <View className="flex-1 min-w-0 gap-1">
         <Text
           numberOfLines={1}
-          className="font-heading text-[13px] text-ink"
+          className="font-heading text-body text-ink"
         >
           {item.title}
         </Text>
         <Text
           numberOfLines={2}
-          className="font-body text-[12px] text-ink-2"
+          className="font-body text-small text-ink-2"
         >
           {item.body}
         </Text>
       </View>
       <View className="items-end gap-1.5 pt-0.5">
-        <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">
+        <Text className="font-mono tabular-nums text-micro text-ink-3 uppercase tracking-caps-l">
           {formatRelativeDate(item.createdAt)}
         </Text>
         {unread ? (

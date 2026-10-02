@@ -13,7 +13,7 @@ export function InviteBanner({ kind, inviterName }: { kind: "join" | "challenge"
       accessibilityRole="summary"
       className="rounded-sm border border-hairline-strong bg-surface-2 px-4 py-3"
     >
-      <Text className="font-heading text-[14px] text-ink">{inviteSignupBanner(kind, inviterName)}</Text>
+      <Text className="font-heading text-callout text-ink">{inviteSignupBanner(kind, inviterName)}</Text>
     </View>
   );
 }

@@ -133,12 +133,12 @@ export function BrandToast({
       style={{ shadowOpacity: 0, elevation: 0 }}
     >
       {text1 ? (
-        <Text className="font-heading text-[13px] text-ink" numberOfLines={2}>
+        <Text className="font-heading text-body text-ink" numberOfLines={2}>
           {text1}
         </Text>
       ) : null}
       {text2 ? (
-        <Text className="font-body text-[12px] text-ink-2" numberOfLines={3}>
+        <Text className="font-body text-small text-ink-2" numberOfLines={3}>
           {text2}
         </Text>
       ) : null}

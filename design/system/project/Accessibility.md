@@ -38,7 +38,7 @@ Every text token passes 4.5:1 on every surface in both themes. `plate-bright` is
 |---|---|---|
 | `on-signal` on `signal-red` | 4.60 | Pass (both themes; the same values) |
 | `on-signal` on `signal-red-lift` | 5.67 | Pass |
-| `ink` (dark, `#E8EDF2`) on `signal-red` | 3.54 | FAIL: the pre-repair pairing. Never put white on the red. The legacy shadcn `Button` default variant still does (`components/ui/button.tsx:15`, WP3/WP4) |
+| `ink` (dark, `#E8EDF2`) on `signal-red` | 3.54 | FAIL: the pre-repair pairing. Never put white on the red. The legacy shadcn `Button` default variant did, until WP4 deleted it |
 
 ## Fills, rules and marks
 
@@ -95,21 +95,21 @@ On-media chrome sits over camera, video or photos, so its ground is unknown. Wor
 | `on-media-ink3` on `on-media-chip` | 5.64 | 5.14 |
 | `on-media-ink-red` on `on-media-chip` | 5.62 | 5.12 |
 
-Rule: put on-media text on `on-media-badge` or the light `on-media-chip`. The scrim and tag fills are safe only over dark footage; `on-media-text3` belongs on the badge only (R3 CO-5, A1-4).
+Rule (the on-media contrast rule, WP7): on-media text sits only on `on-media-badge` or, for the dark inks, the light `on-media-chip`. The scrim, tag and glass fills are grounds for marks and controls; text on them is safe only over dark footage. `on-media-text3` belongs on the badge only (R3 CO-5, A1-4). `__tests__/lib/on-media-tokens.test.ts` recomputes the badge and chip columns above from the tokens and fails if one drops below 4.5:1. Text on a tag fill still ships on the HUD tag, the film tags and the opening-still tag (`hud-tag.tsx`, `match-hero.tsx`, `verdict-hero.tsx`, `poster-card.tsx`, `player-controls.tsx`, `angle-switcher.tsx`, `countdown.tsx`); those move to the badge fill in a follow-up (they change pixels on the live and Film Room boards). The camera card's REC tag already sits on the badge.
 
 ## Reduce Motion
 
-- Read the OS setting with `useReduceMotion()` from `@/lib/motion`; it is correct on the first frame. The splash files still read it asynchronously (R3 SP-3, WP6).
+- Read the OS setting with `useReduceMotion()` from `@/lib/motion` (`lib/motion/use-reduce-motion.ts`); it is correct on the first frame. The launch splash reads it the same way (WP6); `lib/match-flow/use-reduce-motion.ts` is only a re-export for old imports.
 - Every animation has a still end state that keeps the meaning: the final number, the cooled afterglow edge, one static ember, the filled ON AIR tally, plain skeleton bars (full table in Motion).
 - PressableScale dips to `opacity-reduced-press` (0.85) instead of scaling.
 - Haptics stay on under Reduce Motion. Never a haptic on a loss, a draw, or ambient motion.
-- Modal and sheet transitions (RN `Modal` `animationType`, gorhom slide) are not yet registered or gated (R3 MO-5, WP1).
+- Modals and sheets appear and leave in place: RN `Modal` takes `animationType` from `useModalAnimation()` (`"none"` under Reduce Motion) and gorhom sheets take `animationConfigs` from `useSheetChrome()` (`ReduceMotion.Always`). See "Sheet / modal present" in Motion.
 
 ## Labels and roles
 
 - Every pressable that acts has `accessibilityRole="button"` and a label. Missing today: the error boundary's "Try again" and "Sign out" (`components/error-boundary.tsx:88,98`, R3 A1-1).
 - A `Pressable` with a single `Text` child takes its name from the text; icon-only controls need an explicit label ("Go back" on the AppHeader back button).
-- Text inputs and switches need `accessibilityLabel` set to the visible label; React Native does not link a sibling `Text`. Seven controls lack one (R3 A1-2).
+- Text inputs and switches need `accessibilityLabel` set to the visible label; React Native does not link a sibling `Text`. The ui `Switch` requires a `label` prop (it becomes the accessible name), and `EloTextInput` takes its enclosing `EloField` label by default (WP7, R3 A1-2).
 - Tabs expose `accessibilityState.selected` and an `accessibilityValue` for badges ("2 challenges", "3 NEW"; `elo-tab-bar.tsx:66-75`); the countable embers keep the count readable.
 - Moments speak their result once: VoiceOver reads only the final ELO and delta after the odometer roll; the Accept sweep sets the value "Accepted" while the label stays.
 - Busy buttons set `accessibilityState.busy` (FightButton); make it the canonical busy pattern.

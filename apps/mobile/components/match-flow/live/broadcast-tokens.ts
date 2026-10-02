@@ -1,36 +1,40 @@
+import { onMediaTokens as M } from "@/lib/tokens";
+
 /**
  * Fixed colors and sizes for the live broadcast screen. The chrome sits over
  * camera video in both app themes, so it does not follow the light / dark
- * theme tokens.
+ * theme tokens. Every color is an alias into `onMediaTokens` (lib/tokens.ts),
+ * the one on-media source shared with `ON_MEDIA`; the keys keep the live
+ * screen's own names so call sites do not change.
  */
 export const BROADCAST = {
-  black: "#000000",
-  ground: "#0D0F14",
-  ink: "#0D0F14",
-  inkDark: "#E8EDF2",
-  ink3: "#575C68",
-  cta: "#E63946",
-  ctaHover: "#F0556B",
-  ctaText: "#AC2B34",
-  amber: "#F59E0B",
-  amberSoft: "rgba(245,158,11,0.16)",
-  amberSpent: "rgba(245,158,11,0.22)",
-  amberRule: "rgba(245,158,11,0.5)",
-  slab: "rgba(13,15,20,0.92)",
-  plate: "rgba(232,235,240,0.96)",
-  plateBorder: "rgba(13,15,20,0.34)",
-  glassFill: "rgba(255,255,255,0.12)",
-  glassFillPressed: "rgba(255,255,255,0.20)",
-  glassBorder: "rgba(255,255,255,0.40)",
-  tagFill: "rgba(0,0,0,0.40)",
-  tagText: "rgba(255,255,255,0.85)",
-  tallyGlass: "rgba(13,15,20,0.72)",
-  white: "#FFFFFF",
-  dim62: "rgba(232,237,242,0.62)",
-  body72: "rgba(232,237,242,0.72)",
-  track: "rgba(13,15,20,0.25)",
-  startingDim: "rgba(0,0,0,0.35)",
-  savingDim: "rgba(0,0,0,0.55)",
+  black: M.black,
+  ground: M.ground,
+  ink: M.ink,
+  inkDark: M.text,
+  ink3: M.ink3,
+  cta: M.cta,
+  ctaHover: M.red,
+  ctaText: M.inkRed,
+  amber: M.amber,
+  amberSoft: M.amberSoft,
+  amberSpent: M.amberSpent,
+  amberRule: M.amberRuleSoft,
+  slab: M.slab,
+  plate: M.chip,
+  plateBorder: M.chipBorder,
+  glassFill: M.glassStrong,
+  glassFillPressed: M.glassPressed,
+  glassBorder: M.strong,
+  tagFill: M.tagSoft,
+  tagText: M.tagText,
+  tallyGlass: M.tallyGlass,
+  white: M.white,
+  dim62: M.textDim,
+  body72: M.text2,
+  track: M.chipTrack,
+  startingDim: M.dim,
+  savingDim: M.scrim,
 } as const;
 
 export const BROADCAST_RADIUS = { tag: 2, button: 3, plate: 4 } as const;
@@ -59,8 +63,9 @@ export const BROADCAST_LANDSCAPE = {
 } as const;
 
 /**
- * The glass button look shared by Pause and Allow camera: 1 px white-40
- * border, white-12 fill (white-20 pressed), a 0.98 press-in.
+ * The glass button look of Pause (and the `glass` Button, Allow camera):
+ * 1 px white-40 border, white-12 fill (white-20 pressed). The press-in is
+ * `PressableScale`'s registered press scale (0.97), not part of this style.
  */
 export function glassButtonStyle(pressed: boolean) {
   return {
@@ -68,9 +73,8 @@ export function glassButtonStyle(pressed: boolean) {
     borderWidth: 1,
     borderColor: BROADCAST.glassBorder,
     backgroundColor: pressed ? BROADCAST.glassFillPressed : BROADCAST.glassFill,
-    transform: [{ scale: pressed ? 0.98 : 1 }],
   };
 }
 
-/** Every number on the live screen uses tabular figures. */
-export const TABULAR = { fontVariant: ["tabular-nums" as const] };
+/** Every number on the live screen uses tabular figures. One source: lib/typography (R3 TY-6). */
+export { TABULAR } from "@/lib/typography";

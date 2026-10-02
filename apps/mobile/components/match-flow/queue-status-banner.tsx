@@ -38,7 +38,7 @@ export function QueueStatusBanner() {
     <View className="flex-row items-center gap-2 rounded-xs bg-surface-3 border border-hairline-strong px-3 py-2">
       <CloudOff size={14} color={tokens.textSecondary} />
       <Text
-        className="flex-1 font-mono text-[10px] text-ink-2 uppercase tracking-caps-l"
+        className="flex-1 font-mono tabular-nums text-micro text-ink-2 uppercase tracking-caps-l"
         numberOfLines={2}
       >
         {label}

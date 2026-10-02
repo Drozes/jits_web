@@ -42,8 +42,8 @@ export function RankRow({
     >
       <Text
         className={cn(
-          "font-mono-bold text-[16px] text-right",
-          leader ? "text-cta" : "text-ink-2",
+          "font-mono-bold tabular-nums text-subhead text-right",
+          leader ? "text-ink" : "text-ink-2",
         )}
         style={{ width: 36 }}
       >
@@ -52,19 +52,19 @@ export function RankRow({
       <View className="flex-1 min-w-0">
         <Text
           numberOfLines={1}
-          className="font-heading text-[15px] text-ink"
+          className="font-heading text-subhead text-ink"
         >
           {name}
         </Text>
         <Text
           numberOfLines={1}
-          className="font-body text-[11px] text-ink-3 mt-[2px]"
+          className="font-body text-caption text-ink-3 mt-[2px]"
         >
           {subtitle}
         </Text>
       </View>
       <View className="items-end gap-[2px]">
-        <Text className="font-mono-bold text-[28px] text-ink" style={{ lineHeight: 34 }}>
+        <Text className="font-mono-bold tabular-nums text-headline-xl text-ink" style={{ lineHeight: 34 }}>
           {value}
         </Text>
         <DeltaNumber value={delta} size="s" />

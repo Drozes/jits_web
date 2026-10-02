@@ -3,8 +3,8 @@ import { ActivityIndicator, Text, View } from "react-native";
 import { Redirect } from "expo-router";
 import { AppHeader } from "@/components/layout/app-header";
 import { PageContainer } from "@/components/layout/page-container";
-import { Button } from "@/components/ui/button";
 import { Plate } from "@/components/ui/elo-system";
+import { Button } from "@/components/ui/elo-system/button";
 import { NoMatchVideoRowCard } from "@/components/admin/no-match-video-row";
 import { useAuth, useIsAdmin } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
@@ -28,7 +28,7 @@ export default function AdminNoMatchVideosScreen() {
     <>
       <AppHeader title="No-match videos" back />
       <PageContainer noTabBar contentContainerStyle={{ paddingTop: 24, gap: 12 }}>
-        <Text className="font-body text-[12px] text-ink-3 px-1">
+        <Text className="font-body text-small text-ink-3 px-1">
           Videos from the last 30 days where the analysis found no match. A signal only: nothing is changed
           automatically.
         </Text>
@@ -38,27 +38,23 @@ export default function AdminNoMatchVideosScreen() {
           </View>
         ) : error ? (
           <Plate variant="loss" className="gap-3">
-            <Text testID="no-match-error" className="font-body text-[13px] text-ink leading-relaxed">
+            <Text testID="no-match-error" className="font-body text-body text-ink leading-relaxed">
               {error}
             </Text>
-            <Button variant="outline" size="sm" onPress={reload}>
-              Retry
-            </Button>
+            <Button variant="secondary" label="Retry" height={36} className="self-start" onPress={reload} />
           </Plate>
         ) : (
           <>
             {rows.length === 0 ? (
               <Plate>
-                <Text testID="no-match-empty" className="font-body text-[13px] text-ink-2">
+                <Text testID="no-match-empty" className="font-body text-body text-ink-2">
                   No no-match videos in this window.
                 </Text>
               </Plate>
             ) : (
               rows.map((row) => <NoMatchVideoRowCard key={row.key} row={row} />)
             )}
-            <Button variant="outline" size="sm" onPress={reload}>
-              Refresh
-            </Button>
+            <Button variant="secondary" label="Refresh" height={36} className="self-start" onPress={reload} />
           </>
         )}
       </PageContainer>

@@ -1,5 +1,5 @@
-import { SecondaryButton } from "@/components/auth/auth-buttons";
 import { shareInvite, type ShareableInvite } from "@/lib/invites/share-invite";
+import { Button } from "@/components/ui/elo-system/button";
 
 /**
  * One Share button: the iOS share sheet already lists WhatsApp, Messages,
@@ -11,5 +11,5 @@ export function InviteShareRow({ invite, onShared }: { invite: ShareableInvite; 
     void shareInvite(invite).then((shared) => {
       if (shared) onShared?.();
     });
-  return <SecondaryButton label="Share" onPress={share} />;
+  return <Button variant="secondary" label="Share" onPress={share} />;
 }

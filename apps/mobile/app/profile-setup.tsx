@@ -7,7 +7,7 @@ import {
   View,
 } from "react-native";
 import { Wordmark } from "@/components/ui/elo-system";
-import { CtaButton } from "@/components/auth/auth-buttons";
+import { Button } from "@/components/ui/elo-system/button";
 import { AppHeader } from "@/components/layout/app-header";
 import { SetupWizard } from "@/components/profile-setup/setup-wizard";
 import { useRequireAuth } from "@/lib/auth/hooks";
@@ -52,16 +52,16 @@ export default function ProfileSetupScreen() {
         >
           {isLoading && (
             <View className="flex-1 items-center justify-center py-16">
-              <ActivityIndicator color={tokens.accentCta} />
+              <ActivityIndicator color={tokens.textTertiary} />
             </View>
           )}
 
           {!isLoading && error && (
             <View className="flex-1 items-center justify-center gap-4 py-16">
-              <Text className="font-body text-[14px] text-negative text-center">
+              <Text className="font-body text-callout text-negative text-center">
                 {error}
               </Text>
-              <CtaButton label="Try Again" onPress={() => reload()} />
+              <Button label="Try Again" onPress={() => reload()} />
             </View>
           )}
 
@@ -69,7 +69,7 @@ export default function ProfileSetupScreen() {
             <>
               <View className="items-center gap-2">
                 <Wordmark size="lg" />
-                <Text className="font-mono text-[11px] text-ink-3 uppercase tracking-caps-l text-center">
+                <Text className="font-mono tabular-nums text-caption text-ink-3 uppercase tracking-caps-l text-center">
                   {data.isEditing
                     ? "Update Your Athlete Details"
                     : "What's your number?"}

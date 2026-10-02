@@ -6,9 +6,9 @@
 import * as React from "react";
 import { Text } from "react-native";
 import { checkDateOfBirth, DOB_INVALID_COPY, DOB_REQUIRED_TITLE, UNDERAGE_COPY } from "@jits/shared/utils";
-import { CtaButton, SecondaryButton } from "@/components/auth/auth-buttons";
 import { DateOfBirthPicker } from "@/components/profile-setup/date-of-birth-picker";
 import { Plate } from "@/components/ui/elo-system";
+import { Button } from "@/components/ui/elo-system/button";
 
 interface ClaimDobStepProps {
   message: string;
@@ -42,8 +42,8 @@ export function ClaimDobStep({ message, error, busy = false, onSubmit, onNotNow 
 
   return (
     <Plate className="gap-4" testID="claim-dob">
-      <Text className="font-heading text-[18px] text-ink uppercase">{DOB_REQUIRED_TITLE}</Text>
-      <Text className="font-body text-[14px] text-ink leading-6">{message}</Text>
+      <Text className="font-heading text-title text-ink uppercase tracking-caps">{DOB_REQUIRED_TITLE}</Text>
+      <Text className="font-body text-callout text-ink leading-6">{message}</Text>
       <DateOfBirthPicker
         value={value}
         onChange={(dob) => {
@@ -52,17 +52,17 @@ export function ClaimDobStep({ message, error, busy = false, onSubmit, onNotNow 
         }}
       />
       {shown && !busy ? (
-        <Text testID="claim-dob-error" accessibilityRole="alert" className="font-body text-[14px] text-cta">
+        <Text testID="claim-dob-error" accessibilityRole="alert" className="font-body text-callout text-negative">
           {shown}
         </Text>
       ) : null}
-      <CtaButton
+      <Button
         label={busy ? "Saving..." : "Save and accept"}
         testID="claim-dob-save"
         disabled={!value || busy}
         onPress={submit}
       />
-      <SecondaryButton label="Not now" disabled={busy} onPress={onNotNow} />
+      <Button variant="secondary" label="Not now" disabled={busy} onPress={onNotNow} />
     </Plate>
   );
 }

@@ -48,10 +48,10 @@ export function HighlightCard({ matchVideoId, angleLabel, reloadToken = 0 }: Hig
   return (
     <View testID={`highlight-card-${matchVideoId}`} className="gap-3">
       <View className="gap-1">
-        <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-xl">
+        <Text className="font-mono-bold text-micro text-ink-3 uppercase tracking-caps-xl tabular-nums">
           {HIGHLIGHT_COPY.title}
         </Text>
-        {angleLabel ? <Text className="font-heading text-[12px] text-ink">{angleLabel}</Text> : null}
+        {angleLabel ? <Text className="font-heading text-small text-ink">{angleLabel}</Text> : null}
       </View>
       <View className="bg-surface-3 border border-hairline rounded-md p-4 gap-3">
         {phase === "waiting_for_analysis" ? (

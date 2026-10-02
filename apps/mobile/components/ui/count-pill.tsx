@@ -28,7 +28,7 @@ export function CountPill({ text, className, testID }: CountPillProps) {
         className,
       )}
     >
-      <Text maxFontSizeMultiplier={1.3} className="font-mono-bold text-[9px] text-ink-on-cta">
+      <Text maxFontSizeMultiplier={1.3} className="font-mono-bold tabular-nums text-[9px] text-ink-on-cta">
         {text}
       </Text>
     </View>
