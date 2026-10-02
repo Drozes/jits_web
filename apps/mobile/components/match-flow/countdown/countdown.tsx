@@ -3,7 +3,7 @@ import { StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
-import { duration, easing, useReduceMotion } from "@/lib/motion";
+import { duration, easing, moment, useReduceMotion } from "@/lib/motion";
 // The match-flow name for the one haptics vocabulary (same object as
 // `haptics` in @/lib/motion), so the match-flow suites' mocks intercept it.
 import { matchHaptics } from "@/lib/match-flow/use-haptics";
@@ -89,7 +89,7 @@ export function Countdown({ goAt, recording, me, opponent, myWeight, opponentWei
   React.useEffect(() => {
     const left = Math.max(0, goAt - Date.now());
     remaining.value = fractionLeft(goAt);
-    remaining.value = withTiming(0, { duration: left, easing: Easing.linear });
+    remaining.value = withTiming(0, { duration: left, easing: easing.linear });
   }, [goAt, remaining]);
   const barStyle = useAnimatedStyle(() => ({ transform: [{ scaleX: remaining.value }] }));
 
@@ -223,7 +223,7 @@ export function GoFlash() {
   React.useEffect(() => {
     if (reduceMotion) return;
     scale.value = withTiming(1, { duration: SLAM_MS, easing: SLAM_EASE });
-    opacity.value = withTiming(0, { duration: 700, easing: Easing.in(Easing.quad) });
+    opacity.value = withTiming(0, { duration: moment.goFade, easing: easing.inQuad });
   }, [reduceMotion, opacity, scale]);
   const style = useAnimatedStyle(() => ({ opacity: opacity.value, transform: [{ scale: scale.value }] }));
   return (

@@ -1,5 +1,7 @@
 import * as React from "react";
-import { Animated, Easing, Text, View } from "react-native";
+import { Text, View } from "react-native";
+import Animated, { cancelAnimation, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
+import { easing } from "@/lib/motion";
 import { AUTO_END_DELAY_MS } from "@/lib/video/recording-limits";
 import { FINAL_SECONDS, type StripVariant } from "@/lib/match-flow/live-view-state";
 import { BROADCAST, BROADCAST_RADIUS, BROADCAST_SIZE, TABULAR } from "./broadcast-tokens";
@@ -71,27 +73,30 @@ function Segments({ lit }: { lit: number }) {
   );
 }
 
-/** 2 px bar that empties over the auto-end delay. Restarts when it mounts. */
+/**
+ * Time-up drain bar (Motion Rule registry): a 2 px bar that empties over the
+ * auto-end delay, linear, on the UI thread (a shared value drives `scaleX`
+ * from the left edge; no width animation). Restarts when it mounts. It is a
+ * timer readout, so it is unchanged under Reduce Motion; the auto-end itself
+ * is timed by the parent, never by this bar.
+ */
 function DrainBar() {
-  const progress = React.useRef(new Animated.Value(1)).current;
+  const progress = useSharedValue(1);
   React.useEffect(() => {
-    const anim = Animated.timing(progress, {
-      toValue: 0,
-      duration: AUTO_END_DELAY_MS,
-      easing: Easing.linear,
-      useNativeDriver: false,
-    });
-    anim.start();
-    return () => anim.stop();
+    progress.value = withTiming(0, { duration: AUTO_END_DELAY_MS, easing: easing.linear });
+    return () => cancelAnimation(progress);
   }, [progress]);
-  const width = progress.interpolate({ inputRange: [0, 1], outputRange: ["0%", "100%"] });
+  const drainStyle = useAnimatedStyle(() => ({ transform: [{ scaleX: progress.value }] }));
   return (
     <View
       testID="timeup-drain"
       pointerEvents="none"
       style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 2, backgroundColor: BROADCAST.track }}
     >
-      <Animated.View style={{ height: 2, width, backgroundColor: BROADCAST.ink }} />
+      <Animated.View
+        testID="timeup-drain-fill"
+        style={[{ height: 2, width: "100%", backgroundColor: BROADCAST.ink, transformOrigin: "left" }, drainStyle]}
+      />
     </View>
   );
 }

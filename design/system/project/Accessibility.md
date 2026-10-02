@@ -99,7 +99,7 @@ Rule: put on-media text on `on-media-badge` or the light `on-media-chip`. The sc
 
 ## Reduce Motion
 
-- Read the OS setting with `useReduceMotion()` from `@/lib/motion`; it is correct on the first frame. The splash files still read it asynchronously (R3 SP-3, WP6).
+- Read the OS setting with `useReduceMotion()` from `@/lib/motion` (`lib/motion/use-reduce-motion.ts`); it is correct on the first frame. The launch splash reads it the same way (WP6); `lib/match-flow/use-reduce-motion.ts` is only a re-export for old imports.
 - Every animation has a still end state that keeps the meaning: the final number, the cooled afterglow edge, one static ember, the filled ON AIR tally, plain skeleton bars (full table in Motion).
 - PressableScale dips to `opacity-reduced-press` (0.85) instead of scaling.
 - Haptics stay on under Reduce Motion. Never a haptic on a loss, a draw, or ambient motion.

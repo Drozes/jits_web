@@ -3,7 +3,7 @@
  * the odometer roll, LIVE pulse and fight easing follow them so the
  * app keeps one rhythm.
  */
-import { duration, tempo, spring, PRESS_SCALE, BRAND_EASE_OUT_CURVE, easing } from "@/lib/motion";
+import { duration, tempo, spring, PRESS_SCALE, BRAND_EASE_OUT_CURVE, easing, moment } from "@/lib/motion";
 import { ROLL_MS } from "@/components/ui/elo-system/rolling-number";
 import { FIGHT_EASING } from "@/components/match-flow/fight/fight-tokens";
 
@@ -41,5 +41,24 @@ describe("motion tokens", () => {
     expect(ROLL_MS).toBeGreaterThanOrEqual(duration.base);
     expect(ROLL_MS).toBeLessThanOrEqual(duration.slow);
     expect(FIGHT_EASING).toBe(BRAND_EASE_OUT_CURVE);
+  });
+
+  it("names the single-moment durations with their shipped values (R3 MF-11, WP6)", () => {
+    expect(moment).toEqual({
+      goFade: 700,
+      confettiFall: 1800,
+      confettiFadeDelay: 1200,
+      confettiFade: 600,
+      slamIn: 520,
+      slamInFade: 300,
+      riseInDelay: 500,
+      riseIn: 400,
+      tapMarkFill: 80,
+      tapNudge: 50,
+    });
+    // A Moment may run up to about 2000ms (DESIGN.md, the three tiers).
+    for (const ms of Object.values(moment)) expect(ms).toBeLessThanOrEqual(2000);
+    expect(easing.inQuad).toBeDefined();
+    expect(easing.linear).toBeDefined();
   });
 });

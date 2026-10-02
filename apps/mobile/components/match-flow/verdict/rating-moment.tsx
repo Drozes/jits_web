@@ -1,7 +1,7 @@
 import * as React from "react";
 import { Text, View } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withDelay, withSequence, withTiming } from "react-native-reanimated";
-import { haptics, useReduceMotion } from "@/lib/motion";
+import { haptics, moment, useReduceMotion } from "@/lib/motion";
 import { usePalette, TABULAR } from "@/lib/theme/palette";
 import { DeltaChip, spokenDelta } from "@/components/ui/elo-system/delta-chip";
 import { RollingNumber } from "@/components/ui/elo-system/rolling-number";
@@ -44,7 +44,7 @@ function TapMark({ index, play, track, fill }: { index: number; play: boolean; t
   const filled = useSharedValue(animate ? 0 : 1);
   React.useEffect(() => {
     if (!animate) return;
-    filled.value = withDelay(index * TAP_STAGGER_MS, withTiming(1, { duration: 80 }));
+    filled.value = withDelay(index * TAP_STAGGER_MS, withTiming(1, { duration: moment.tapMarkFill }));
     // Mount-only: the moment plays once.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -113,7 +113,7 @@ export function RatingMoment({ play: playProp, outcome, disputed, submission, be
   const nudge = useSharedValue(0);
   React.useEffect(() => {
     if (!tapPlays || reduceMotion) return;
-    const beat = () => withSequence(withTiming(NUDGE_PX, { duration: 50 }), withTiming(0, { duration: TAP_STAGGER_MS - 50 }));
+    const beat = () => withSequence(withTiming(NUDGE_PX, { duration: moment.tapNudge }), withTiming(0, { duration: TAP_STAGGER_MS - moment.tapNudge }));
     nudge.value = withSequence(beat(), beat(), beat());
     // Mount-only: the moment plays once.
     // eslint-disable-next-line react-hooks/exhaustive-deps
