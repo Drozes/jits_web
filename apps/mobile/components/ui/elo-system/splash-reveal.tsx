@@ -17,6 +17,7 @@ import { SPLASH_REVEAL } from "@jits/shared/constants";
 import { Wordmark } from "@/components/ui/elo-system/wordmark";
 import { RollingNumber } from "@/components/ui/elo-system/rolling-number";
 import { easing, useReduceMotion } from "@/lib/motion";
+import { darkTokens } from "@/lib/tokens";
 
 const S = SPLASH_REVEAL;
 const EASE = Easing.bezier(
@@ -27,11 +28,14 @@ const EASE = Easing.bezier(
 );
 
 // Void "arena" palette — the reveal is intentionally theme-independent.
-const VOID = "#0D0F14";
-const WHITE = "#E8EDF2";
-const GOLD = "#f59e0b";
-const RED = "#E63946";
-const GRAY = "#9CA3AF";
+// The dark (Void) tokens, pinned: the reveal ignores the app theme.
+const VOID = darkTokens.bgPrimary;
+const WHITE = darkTokens.textPrimary;
+// The gold cap is the dark `attention` amber, a documented brand exception
+// (DESIGN.md "Color": the launch reveal's breakthrough cap). Do not copy it.
+const GOLD = darkTokens.attention;
+const RED = darkTokens.accentCta;
+const GRAY = darkTokens.textSecondary;
 
 // Ascending bars = a rating climbing; the gold cap = the breakthrough.
 const BAR_HEIGHTS = [42, 66, 90, 112, 130] as const;
@@ -217,7 +221,7 @@ export function SplashReveal({ targetElo, onDone }: SplashRevealProps) {
       </Animated.View>
 
       <Animated.View style={[styles.wordmarkWrap, wordStyle]}>
-        <Wordmark size="lg" className="text-[#E8EDF2]" />
+        <Wordmark size="lg" style={{ color: WHITE }} />
       </Animated.View>
 
       <Animated.View style={[styles.rule, ruleStyle]} />

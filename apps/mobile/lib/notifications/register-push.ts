@@ -16,6 +16,7 @@ import { Platform } from "react-native";
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
 import Constants from "expo-constants";
+import { darkTokens } from "../tokens";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { registerPushDevice, removePushDeviceByToken } from "@jits/shared/api/mutations";
 
@@ -85,7 +86,9 @@ async function ensureAndroidChannel(): Promise<void> {
     name: "Default",
     importance: Notifications.AndroidImportance.HIGH,
     vibrationPattern: [0, 250, 250, 250],
-    lightColor: "#ef4444",
+    // Signal Red, the brand red (was Tailwind red-500). Android keeps an
+    // existing channel's light color, so this reaches new installs only.
+    lightColor: darkTokens.accentCta,
   });
 }
 

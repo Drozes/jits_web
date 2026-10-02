@@ -52,6 +52,8 @@ export function AuthFormField({
       <View className="relative justify-center">
         <TextInput
           accessibilityLabelledBy={labelId}
+          // iOS ignores accessibilityLabelledBy; the visible label is the name.
+          accessibilityLabel={label}
           placeholderTextColor={tokens.textTertiary}
           {...inputProps}
           secureTextEntry={isPassword ? hidden : undefined}

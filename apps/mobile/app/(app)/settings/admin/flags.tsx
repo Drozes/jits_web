@@ -83,6 +83,8 @@ function FlagRow({
     <Pressable
       onPress={() => onToggle(!value)}
       accessibilityRole="switch"
+      accessibilityLabel={flagKey}
+      accessibilityHint={description ?? undefined}
       accessibilityState={{ checked: value }}
       className="flex-row items-center gap-3 px-4 py-3 active:bg-surface-4"
     >
@@ -97,7 +99,7 @@ function FlagRow({
       {/* Presentational only: the wrapping Pressable is the sole toggle driver,
           so the Switch ignores touches (pointerEvents="none") and has no
           onValueChange. This prevents one tap firing setFeatureFlag twice. */}
-      <Switch value={value} pointerEvents="none" />
+      <Switch importantForAccessibility="no-hide-descendants" label={flagKey} value={value} pointerEvents="none" />
     </Pressable>
   );
 }

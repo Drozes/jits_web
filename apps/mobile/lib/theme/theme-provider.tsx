@@ -60,6 +60,10 @@ export function buildVars(t: typeof lightTokens) {
     "--border-hairline": t.borderHairline,
     "--border-hairline-faint": t.borderHairlineFaint,
     "--border-hairline-strong": t.borderHairlineStrong,
+    "--attention": t.attention,
+    "--attention-rule": t.attentionRule,
+    "--heat-orange": t.heatOrange,
+    "--heat-red": t.heatRed,
   });
 }
 

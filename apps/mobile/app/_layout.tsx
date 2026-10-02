@@ -27,6 +27,7 @@ import {
 } from "@expo-google-fonts/jetbrains-mono";
 import { AuthProvider } from "@/lib/auth/auth-context";
 import { ThemeProvider } from "@/lib/theme";
+import { darkTokens } from "@/lib/tokens";
 import { Toaster } from "@/components/ui/toast";
 import { PushRegistrationBootstrap } from "@/lib/notifications/push-registration-bootstrap";
 import { SentryUserBootstrap } from "@/lib/error-tracking/sentry-user-bootstrap";
@@ -113,7 +114,7 @@ function RootLayout() {
 
   // While fonts load, paint the Void background (matches the native splash and
   // the reveal) so there's never a white flash if the native splash lifts early.
-  if (!fontsLoaded) return <View style={{ flex: 1, backgroundColor: "#0D0F14" }} />;
+  if (!fontsLoaded) return <View style={{ flex: 1, backgroundColor: darkTokens.bgPrimary }} />;
 
   return (
     <ErrorBoundary>

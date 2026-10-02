@@ -16,6 +16,7 @@ import * as SplashScreen from "expo-splash-screen";
 import { SPLASH_REVEAL, SPLASH_STATEMENT } from "@jits/shared/constants";
 import { Wordmark } from "@/components/ui/elo-system/wordmark";
 import { useReduceMotion } from "@/lib/motion";
+import { darkTokens, onMediaTokens } from "@/lib/tokens";
 
 const S = SPLASH_STATEMENT;
 const EASE = Easing.bezier(
@@ -27,11 +28,12 @@ const EASE = Easing.bezier(
 
 // Void "arena" palette — intentionally theme-independent (matches the native
 // splash exactly so the hand-off has no seam). Backdrop is a FLAT fill for v1.
-const VOID = "#0D0F14";
-const WHITE = "#E8EDF2"; // brand wordmark base
-const HALO = "#FFFFFF"; // pure-white glow layer (the halo only)
-const GRAY = "#9CA3AF"; // "WE ARE"
-const RED = "#E63946"; // Signal Red — "ARE YOU?" only
+// The dark (Void) tokens, pinned: the statement ignores the app theme.
+const VOID = darkTokens.bgPrimary;
+const WHITE = darkTokens.textPrimary; // brand wordmark base
+const HALO = onMediaTokens.white; // pure-white glow layer (the halo only)
+const GRAY = darkTokens.textSecondary; // "WE ARE"
+const RED = darkTokens.accentCta; // Signal Red, "ARE YOU?" only
 
 // Centered block; the wordmark is the widest child and sets the column width.
 const BLOCK_W = Math.min(Dimensions.get("window").width - 48, 360);
@@ -220,10 +222,10 @@ export function SplashStatement({ onDone }: SplashStatementProps) {
 
         <Animated.View style={[styles.wordmarkGroup, igniteStyle]}>
           {/* BASE */}
-          <Wordmark numberOfLines={1} className="text-[#E8EDF2]" style={[styles.wordmarkText, wordStyle]} />
+          <Wordmark numberOfLines={1} style={[styles.wordmarkText, wordStyle]} />
           {/* GLOW LAYER — pure-white duplicate, static text-shadow halo, opacity-animated */}
           <Animated.View style={[styles.glowLayer, glowStyle]} pointerEvents="none">
-            <Wordmark numberOfLines={1} className="text-[#FFFFFF]" style={[styles.wordmarkText, styles.glowText, wordStyle]} />
+            <Wordmark numberOfLines={1} style={[styles.wordmarkText, styles.glowText, wordStyle]} />
           </Animated.View>
         </Animated.View>
 

@@ -87,6 +87,7 @@ export function SubmissionFields({
         </Text>
         <TextInput
           testID="result-finish-time"
+          accessibilityLabel="Finish Time"
           placeholder="mm:ss or seconds"
           placeholderTextColor={tokens.textTertiary}
           value={finishTimeStr}

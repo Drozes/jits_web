@@ -95,7 +95,7 @@ On-media chrome sits over camera, video or photos, so its ground is unknown. Wor
 | `on-media-ink3` on `on-media-chip` | 5.64 | 5.14 |
 | `on-media-ink-red` on `on-media-chip` | 5.62 | 5.12 |
 
-Rule: put on-media text on `on-media-badge` or the light `on-media-chip`. The scrim and tag fills are safe only over dark footage; `on-media-text3` belongs on the badge only (R3 CO-5, A1-4).
+Rule (the on-media contrast rule, WP7): on-media text sits only on `on-media-badge` or, for the dark inks, the light `on-media-chip`. The scrim, tag and glass fills are grounds for marks and controls; text on them is safe only over dark footage. `on-media-text3` belongs on the badge only (R3 CO-5, A1-4). `__tests__/lib/on-media-tokens.test.ts` recomputes the badge and chip columns above from the tokens and fails if one drops below 4.5:1. Text on a tag fill still ships on the HUD tag, the film tags and the opening-still tag (`hud-tag.tsx`, `match-hero.tsx`, `verdict-hero.tsx`, `poster-card.tsx`, `player-controls.tsx`, `angle-switcher.tsx`, `countdown.tsx`); those move to the badge fill in a follow-up (they change pixels on the live and Film Room boards). The camera card's REC tag already sits on the badge.
 
 ## Reduce Motion
 
@@ -109,7 +109,7 @@ Rule: put on-media text on `on-media-badge` or the light `on-media-chip`. The sc
 
 - Every pressable that acts has `accessibilityRole="button"` and a label. Missing today: the error boundary's "Try again" and "Sign out" (`components/error-boundary.tsx:88,98`, R3 A1-1).
 - A `Pressable` with a single `Text` child takes its name from the text; icon-only controls need an explicit label ("Go back" on the AppHeader back button).
-- Text inputs and switches need `accessibilityLabel` set to the visible label; React Native does not link a sibling `Text`. Seven controls lack one (R3 A1-2).
+- Text inputs and switches need `accessibilityLabel` set to the visible label; React Native does not link a sibling `Text`. The ui `Switch` requires a `label` prop (it becomes the accessible name), and `EloTextInput` takes its enclosing `EloField` label by default (WP7, R3 A1-2).
 - Tabs expose `accessibilityState.selected` and an `accessibilityValue` for badges ("2 challenges", "3 NEW"; `elo-tab-bar.tsx:66-75`); the countable embers keep the count readable.
 - Moments speak their result once: VoiceOver reads only the final ELO and delta after the odometer roll; the Accept sweep sets the value "Accepted" while the label stays.
 - Busy buttons set `accessibilityState.busy` (FightButton); make it the canonical busy pattern.

@@ -9,6 +9,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { cn } from "@/lib/cn";
+import { onMediaTokens } from "@/lib/tokens";
 import { duration, useAppActive, useReduceMotion } from "@/lib/motion";
 import {
   LIVE_DOT_MIN_OPACITY,
@@ -38,7 +39,8 @@ interface LivePillProps {
   onDark?: boolean;
 }
 
-const ON_DARK_GREEN = "#22C55E";
+/** Gain Green over media (`onMediaTokens.win`), whatever the app theme. */
+const ON_DARK_GREEN = onMediaTokens.win;
 
 interface LiveDotProps {
   /** `arena` (shared tempo clock, default) or `fixed` (1400 ms). */

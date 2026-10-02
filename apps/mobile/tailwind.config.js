@@ -41,6 +41,9 @@
 // Web `var(--border-hairline-faint)`  → mobile `border-hairline-faint`
 // Web `var(--border-hairline-strong)` → mobile `border-hairline-strong`
 // Kit `on-media-scrim` (ON_MEDIA.scrim)  → mobile `bg-on-media-scrim` (modal backdrops)
+// (mobile only, no web var yet) `--attention` → `text-attention` / `border-attention`,
+//   `--attention-rule` → `border-attention-rule`, `--heat-orange` / `--heat-red`
+//   → `bg-heat-orange` / `bg-heat-red`
 // Letter-spacing: `var(--ls-mark|caps|caps-l|caps-xl)` → `tracking-mark|caps|caps-l|caps-xl`
 // Fonts: var(--font-display|heading|body|mono) → `font-display|heading|body|mono`
 // (Bold mono: `font-mono-bold`; Medium mono: `font-mono-medium`)
@@ -113,9 +116,17 @@ const cssVarColors = {
   "hairline-faint": "var(--border-hairline-faint)",
   "hairline-strong": "var(--border-hairline-strong)",
   // Fixed in both themes: the one backdrop behind every modal and sheet
-  // (`bg-on-media-scrim`). Mirrors `ON_MEDIA.scrim` in lib/theme/palette.ts;
+  // (`bg-on-media-scrim`). Mirrors `ON_MEDIA.scrim` (`onMediaTokens.scrim`, lib/tokens.ts);
   // __tests__/components/ui/sheet-chrome.test.tsx fails if the two drift.
   "on-media-scrim": "rgba(0,0,0,0.55)",
+  // Attention (amber): draws, pressure, pending / processing / paused /
+  // disputed. `text-attention` / `border-attention` / `bg-attention`, and
+  // `border-attention-rule` for rules. Kit: attention, attention-rule.
+  attention: "var(--attention)",
+  "attention-rule": "var(--attention-rule)",
+  // Arena heat only (tab-icon embers, afterglow edge). Fixed in both themes.
+  "heat-orange": "var(--heat-orange)",
+  "heat-red": "var(--heat-red)",
 };
 
 // Light theme defaults. Mirrors `lightTokens` in `lib/tokens.ts`.
@@ -164,6 +175,11 @@ const lightVars = {
   "--border-hairline": "rgba(13, 15, 20, 0.22)",
   "--border-hairline-faint": "rgba(13, 15, 20, 0.11)",
   "--border-hairline-strong": "rgba(13, 15, 20, 0.34)",
+  // Attention + heat (WP7). Same lockstep rule as the block above.
+  "--attention": "#92400E",
+  "--attention-rule": "rgba(146,64,14,0.6)",
+  "--heat-orange": "hsl(25, 95%, 53%)",
+  "--heat-red": "#EC6A74",
 };
 
 module.exports = {

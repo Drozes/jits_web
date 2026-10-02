@@ -3,6 +3,7 @@ import { Text, View } from "react-native";
 import { Audio, ResizeMode, Video } from "expo-av";
 import { Plate } from "@/components/ui/elo-system";
 import { useMatchRecorder } from "@/components/match-flow/match-recorder-context";
+import { onMediaTokens } from "@/lib/tokens";
 import type { BroadcastResult } from "@jits/shared/hooks/use-session-match-sync";
 import {
   PRACTICE_SUMMARY_TIP_CLIP,
@@ -71,7 +72,7 @@ export function PracticeSummary({
         <Video
           testID="practice-clip-player"
           source={{ uri: localUri }}
-          style={{ width: "100%", aspectRatio: 16 / 9, backgroundColor: "#000" }}
+          style={{ width: "100%", aspectRatio: 16 / 9, backgroundColor: onMediaTokens.black }}
           useNativeControls
           isMuted
           shouldPlay

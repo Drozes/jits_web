@@ -6,6 +6,7 @@ import { useThemedTokens } from "@/lib/theme/use-theme";
 import { cn } from "@/lib/cn";
 import { fitRecordedFrame, readyPreviewWidth } from "@/lib/video/recorded-frame";
 import { BROADCAST } from "./live/broadcast-tokens";
+import { onMediaTokens } from "@/lib/tokens";
 
 interface CameraOverlayProps {
   cameraRef: React.MutableRefObject<CameraView | null>;
@@ -112,14 +113,14 @@ export function CameraOverlay({
       className={
         fullscreen
           ? undefined
-          : cn(cardWidth == null && "w-full", "overflow-hidden rounded-md border border-hairline-strong bg-black")
+          : cn(cardWidth == null && "w-full", "overflow-hidden rounded-md border border-hairline-strong")
       }
       style={
         fullscreen
           ? [StyleSheet.absoluteFill, { backgroundColor: BROADCAST.black, overflow: "hidden" }]
           : cardWidth != null
-            ? { width: cardWidth, maxWidth: "100%", alignSelf: "center" }
-            : undefined
+            ? { width: cardWidth, maxWidth: "100%", alignSelf: "center", backgroundColor: BROADCAST.black }
+            : { backgroundColor: BROADCAST.black }
       }
     >
       <View
@@ -140,9 +141,13 @@ export function CameraOverlay({
           onCameraReady={onCameraReady}
         />
         {recording && !fullscreen ? (
-          <View className="absolute right-2 top-2 flex-row items-center gap-1.5 rounded-xs bg-black/60 px-2 py-1">
+          // On-media text sits on the badge fill (the on-media contrast rule).
+          <View
+            className="absolute right-2 top-2 flex-row items-center gap-1.5 rounded-xs px-2 py-1"
+            style={{ backgroundColor: onMediaTokens.badge }}
+          >
             <View className={cn("h-2 w-2 rounded-full bg-cta")} />
-            <Text className="font-mono-bold text-[10px] uppercase tracking-caps-l text-white">
+            <Text className="font-mono-bold text-[10px] uppercase tracking-caps-l" style={{ color: BROADCAST.white }}>
               REC
             </Text>
           </View>

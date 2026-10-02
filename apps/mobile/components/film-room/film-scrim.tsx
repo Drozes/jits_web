@@ -1,6 +1,7 @@
 import * as React from "react";
 import { View, type StyleProp, type ViewStyle } from "react-native";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
+import { onMediaTokens } from "@/lib/tokens";
 
 interface FilmScrimProps {
   /** [offset 0..1, opacity 0..1] of `color`, top to bottom. */
@@ -15,7 +16,7 @@ interface FilmScrimProps {
  * gradient the brand allows (camera scrims). react-native-svg is already in
  * the native build, so this stays OTA-safe.
  */
-export function FilmScrim({ stops, color = "#000000", style, testID }: FilmScrimProps) {
+export function FilmScrim({ stops, color = onMediaTokens.black, style, testID }: FilmScrimProps) {
   const id = `filmScrim${React.useId().replace(/[^a-zA-Z0-9]/g, "")}`;
   return (
     <View pointerEvents="none" testID={testID} style={[{ position: "absolute" }, style]}>

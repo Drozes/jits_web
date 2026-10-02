@@ -145,6 +145,8 @@ function ToggleRow({
     <Pressable
       onPress={onToggle}
       accessibilityRole="switch"
+      accessibilityLabel={label}
+      accessibilityHint={description}
       accessibilityState={{ checked: value }}
       className="flex-row items-center gap-3 px-4 py-3 active:bg-surface-4"
     >
@@ -156,7 +158,7 @@ function ToggleRow({
           {description}
         </Text>
       </View>
-      <Switch value={value} onValueChange={onToggle} />
+      <Switch importantForAccessibility="no-hide-descendants" label={label} value={value} onValueChange={onToggle} />
     </Pressable>
   );
 }
