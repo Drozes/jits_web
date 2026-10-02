@@ -3,12 +3,9 @@ import { StyleSheet, Text, View, useWindowDimensions, type StyleProp, type TextS
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withDelay, withTiming } from "react-native-reanimated";
 import { useReduceMotion } from "@/lib/match-flow/use-reduce-motion";
 import { usePalette } from "@/lib/theme/palette";
-import { duration } from "@/lib/motion";
 import { FIGHT_EASING } from "../fight/fight-tokens";
 
 const EASE = Easing.bezier(...FIGHT_EASING);
-/** The brand rating tick (`duration.base`, Motion Rule). */
-export const RATING_TICK_MS = duration.base;
 
 /** Sharp rectangles, brand colors only (palette keys); x is a fraction of the width. */
 const PIECES = [
@@ -93,49 +90,6 @@ export function RiseIn({ children, delay = 500 }: { children: React.ReactNode; d
   }, [reduceMotion, delay, y, opacity]);
   const style = useAnimatedStyle(() => ({ opacity: opacity.value, transform: [{ translateY: y.value }] }));
   return <Animated.View style={style}>{children}</Animated.View>;
-}
-
-/**
- * The rating counting from `before` to `after` in RATING_TICK_MS (the one
- * brand auto-animation). Shows `after` at once when either is missing or
- * under Reduce Motion.
- */
-export function useRatingTick(before: number | null, after: number | null): number | null {
-  const reduceMotion = useReduceMotion();
-  const animate = before != null && after != null && before !== after && !reduceMotion;
-  const [value, setValue] = React.useState<number | null>(animate ? before : after);
-  React.useEffect(() => {
-    if (!animate || before == null || after == null) {
-      setValue(after);
-      return;
-    }
-    const start = Date.now();
-    setValue(before);
-    const id = setInterval(() => {
-      const t = Math.min(1, (Date.now() - start) / RATING_TICK_MS);
-      const eased = 1 - Math.pow(1 - t, 3);
-      setValue(Math.round(before + (after - before) * eased));
-      if (t >= 1) clearInterval(id);
-    }, 16);
-    return () => clearInterval(id);
-  }, [animate, before, after]);
-  return value;
-}
-
-/**
- * "1512 -> 1526" with the after value ticking up in RATING_TICK_MS. A leaf of
- * its own, so the 60 fps tick re-renders this Text only, never the verdict.
- */
-export function TickingRating({ before, after }: { before: number | null; after: number | null }) {
-  const p = usePalette();
-  const ticking = useRatingTick(before, after);
-  const shown = ticking ?? after;
-  const text = before != null && shown != null && before !== after ? `${before} \u2192 ${shown}` : shown != null ? `${shown}` : "";
-  return (
-    <Text testID="verdict-rating" className="font-mono-bold" style={{ fontSize: 22, color: p.text, fontVariant: ["tabular-nums"] }}>
-      {text}
-    </Text>
-  );
 }
 
 /** Plain text helper so the verdict file stays short. */

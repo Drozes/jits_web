@@ -15,9 +15,10 @@ import type { UploadBannerState } from "@/lib/video/upload-banner-state";
 import { buildShareText, buildShareUrl } from "@jits/shared/utils";
 import { UploadProgressBanner } from "../upload-progress-banner";
 import { usePalette } from "@/lib/theme/palette";
-import { FIGHT_RADIUS, TABULAR } from "../fight/fight-tokens";
-import { FightButton, Mono, RatingBlock, deltaColor, formatSignedDelta, shortName } from "../fight/fight-ui";
-import { Confetti, RiseIn, SlamIn, TickingRating } from "./celebration";
+import { FIGHT_RADIUS } from "../fight/fight-tokens";
+import { FightButton, Mono, shortName } from "../fight/fight-ui";
+import { Confetti, RiseIn, SlamIn } from "./celebration";
+import { RatingMoment } from "./rating-moment";
 import { HERO_HEIGHT, VerdictHero } from "./verdict-hero";
 import { ThemedStatusBar } from "@/lib/theme/themed-status-bar";
 import { useScrolledPast } from "../wizard-scroll";
@@ -58,7 +59,7 @@ interface VerdictStepProps {
 
 /**
  * Step 8, the verdict. A win celebrates (confetti, the verdict slams in, the
- * rating ticks, the rank strip rises); a loss is calm. Every outcome gets
+ * rating rolls, the rank strip rises); a loss is calm. Every outcome gets
  * the same actions (P-Verdict, jits-02vo.8): Watch film, Back to Arena, and
  * Share match as one full-width tertiary row. Running it back is an
  * ordinary Arena challenge, never a shortcut here. The opening still (or the
@@ -191,18 +192,14 @@ export function VerdictStep(props: VerdictStepProps) {
         </View>
 
         {eloAfter != null ? (
-          <RatingBlock
+          <RatingMoment
+            matchId={matchId}
+            outcome={outcome}
+            disputed={disputed}
+            submission={submissionName != null}
             before={eloBefore}
             after={eloAfter}
             delta={eloDelta}
-            ratingNode={<TickingRating before={disputed ? null : eloBefore} after={eloAfter} />}
-            deltaNode={
-              eloDelta != null && eloDelta !== 0 ? (
-                <Text testID="summary-elo-delta" className="font-mono-bold" style={[{ fontSize: 26, color: outcome === "draw" ? p.amber : deltaColor(eloDelta, p) }, TABULAR]}>
-                  {formatSignedDelta(eloDelta)}
-                </Text>
-              ) : null
-            }
           />
         ) : null}
 

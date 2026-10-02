@@ -1,22 +1,28 @@
 /**
- * EloTile before/after mode (jits-0b37, jits-v6ri, jits-9cgj).
+ * EloTile before/after mode (jits-0b37, jits-v6ri, jits-9cgj; Adding Flare
+ * jits-pddd.4).
  *
- * - The after number ticks from before to after over the brand's 480ms, in
- *   integer steps, once, then fires one light haptic.
- * - Reduce motion shows the final value with no intermediate frames.
- * - The ticking number's accessibility label is always the final value.
+ * - The after number rolls like an odometer from before to after in ROLL_MS
+ *   (UI thread), once, then lands as a plain Text with the final value.
+ * - A gain lands with ONE `ratingGain` (Success); a loss or a draw is silent.
+ * - Reduce motion shows the final value from the first frame.
+ * - The number's accessibility label is always the final value.
  * - A pair of 4-digit ratings shares the row and shrinks to fit instead of
  *   overflowing a phone-width screen.
  * - The after tile's border follows the outcome tone, never Signal Red.
  */
 import * as React from "react";
-import { AccessibilityInfo, Text } from "react-native";
+import { Text } from "react-native";
 import { render, act } from "@testing-library/react-native";
 
 const mockImpact = jest.fn((_style?: unknown) => Promise.resolve());
+const mockNotify = jest.fn((_type?: unknown) => Promise.resolve());
 jest.mock("expo-haptics", () => ({
   impactAsync: (style: unknown) => mockImpact(style),
+  notificationAsync: (type: unknown) => mockNotify(type),
+  selectionAsync: () => Promise.resolve(),
   ImpactFeedbackStyle: { Light: "light", Medium: "medium", Heavy: "heavy" },
+  NotificationFeedbackType: { Success: "success", Warning: "warning", Error: "error" },
 }));
 
 let mockScheme: "light" | "dark" = "light";
@@ -24,26 +30,25 @@ jest.mock("@/lib/theme/use-theme", () => ({
   useResolvedColorScheme: () => mockScheme,
 }));
 
-import { EloTile, RATING_TICK_MS } from "@/components/ui/elo-system/elo-tile";
-
-let reduceMotion = false;
+import { EloTile } from "@/components/ui/elo-system/elo-tile";
+import { ROLL_MS, __resetPlayedMomentsForTests } from "@/components/ui/elo-system/rolling-number";
+import { __setReduceMotionForTests } from "@/lib/motion";
 
 beforeEach(() => {
   jest.useFakeTimers();
   mockImpact.mockClear();
-  reduceMotion = false;
+  mockNotify.mockClear();
+  __setReduceMotionForTests(false);
+  __resetPlayedMomentsForTests();
   mockScheme = "light";
-  jest
-    .spyOn(AccessibilityInfo, "isReduceMotionEnabled")
-    .mockImplementation(() => Promise.resolve(reduceMotion));
 });
 
 afterEach(() => {
   jest.useRealTimers();
-  jest.restoreAllMocks();
+  __setReduceMotionForTests(false);
 });
 
-/** Let the reduce-motion promise resolve. */
+/** Let any pending microtasks settle (kept for the async tone tests). */
 async function flushReduceMotion() {
   await act(async () => {
     await Promise.resolve();
@@ -53,111 +58,109 @@ async function flushReduceMotion() {
 
 function afterValue(utils: ReturnType<typeof render>) {
   const el = utils.getByTestId("elo-tile-after-value");
-  return { text: String(el.props.children), label: el.props.accessibilityLabel, props: el.props };
+  return { text: el.type === "Text" ? String(el.props.children) : null, label: el.props.accessibilityLabel, props: el.props };
 }
 
-describe("rating tick", () => {
-  it("counts up from before to after over 480ms in integer steps, then one light haptic", async () => {
+function land() {
+  act(() => {
+    jest.advanceTimersByTime(ROLL_MS + 16);
+  });
+}
+
+const flush = async () => {
+  await Promise.resolve();
+};
+
+describe("odometer roll", () => {
+  it("rolls (digit columns, not a ticking Text), then lands on the final value with one ratingGain", async () => {
     const utils = render(<EloTile label="ELO Rating" before={1000} after={1016} tone="positive" />);
-    expect(afterValue(utils).text).toBe("1000");
-    await flushReduceMotion();
-
-    const seen: string[] = [];
-    for (let t = 0; t < RATING_TICK_MS; t += 16) {
-      act(() => {
-        jest.advanceTimersByTime(16);
-      });
-      seen.push(afterValue(utils).text);
-    }
+    // Mid-roll: the number is digit strips, labelled with the final value.
+    expect(afterValue(utils).text).toBeNull();
+    expect(afterValue(utils).label).toBe("1016");
+    expect(mockNotify).not.toHaveBeenCalled();
     act(() => {
-      jest.advanceTimersByTime(64);
+      jest.advanceTimersByTime(ROLL_MS / 2);
     });
-
+    expect(afterValue(utils).text).toBeNull();
+    land();
+    await flush();
     expect(afterValue(utils).text).toBe("1016");
-    // Intermediate frames were whole numbers strictly between the two.
-    const mids = seen.map(Number).filter((n) => n > 1000 && n < 1016);
-    expect(mids.length).toBeGreaterThan(0);
-    for (const n of seen.map(Number)) expect(Number.isInteger(n)).toBe(true);
-    // Monotonic, never overshooting.
-    const nums = seen.map(Number);
-    for (let i = 1; i < nums.length; i++) expect(nums[i]).toBeGreaterThanOrEqual(nums[i - 1]);
-    expect(Math.max(...nums)).toBeLessThanOrEqual(1016);
-    expect(mockImpact).toHaveBeenCalledTimes(1);
-    expect(mockImpact).toHaveBeenCalledWith("light");
+    expect(mockNotify).toHaveBeenCalledTimes(1);
+    expect(mockNotify).toHaveBeenCalledWith("success");
+    // The legacy Light impact is gone.
+    expect(mockImpact).not.toHaveBeenCalled();
   });
 
-  it("is still running before 480ms and never replays after it lands", async () => {
+  it("a loss lands silent (no haptic on a loss) and never replays on re-render", async () => {
     const utils = render(<EloTile label="ELO Rating" before={1016} after={1000} tone="negative" />);
-    await flushReduceMotion();
-    act(() => {
-      jest.advanceTimersByTime(RATING_TICK_MS / 3);
-    });
-    expect(Number(afterValue(utils).text)).toBeGreaterThan(1000);
-    act(() => {
-      jest.advanceTimersByTime(RATING_TICK_MS);
-    });
+    land();
+    await flush();
     expect(afterValue(utils).text).toBe("1000");
+    utils.rerender(<EloTile label="ELO Rating" before={1016} after={1000} tone="negative" />);
     act(() => {
       jest.advanceTimersByTime(5_000);
     });
-    utils.rerender(<EloTile label="ELO Rating" before={1016} after={1000} tone="negative" />);
     expect(afterValue(utils).text).toBe("1000");
-    expect(mockImpact).toHaveBeenCalledTimes(1);
+    expect(mockNotify).not.toHaveBeenCalled();
+    expect(mockImpact).not.toHaveBeenCalled();
   });
 
-  it("a new after value mid-tick jumps to it and lands once, never restarting from before", async () => {
+  it("a draw tile (amber) that gains is silent", async () => {
+    render(<EloTile label="ELO Rating" before={1000} after={1004} tone="amber" />);
+    land();
+    await flush();
+    expect(mockNotify).not.toHaveBeenCalled();
+  });
+
+  it("a new after value mid-roll jumps to it and lands once, never restarting", async () => {
     const utils = render(<EloTile label="ELO Rating" before={1000} after={1016} />);
-    await flushReduceMotion();
     act(() => {
       jest.advanceTimersByTime(200);
     });
-    const mid = Number(afterValue(utils).text);
-    expect(mid).toBeGreaterThan(1000);
-    expect(mid).toBeLessThan(1016);
-
     utils.rerender(<EloTile label="ELO Rating" before={1000} after={1020} />);
     expect(afterValue(utils).text).toBe("1020");
-    expect(mockImpact).toHaveBeenCalledTimes(1);
-
-    const seen: string[] = [];
-    for (let t = 0; t < 2 * RATING_TICK_MS; t += 16) {
-      act(() => {
-        jest.advanceTimersByTime(16);
-      });
-      seen.push(afterValue(utils).text);
-    }
-    expect(new Set(seen)).toEqual(new Set(["1020"]));
-    expect(mockImpact).toHaveBeenCalledTimes(1);
-  });
-
-  it("with reduce motion on, shows the final value with no intermediate frames", async () => {
-    reduceMotion = true;
-    const utils = render(<EloTile label="ELO Rating" before={1000} after={1016} />);
-    await flushReduceMotion();
-    expect(afterValue(utils).text).toBe("1016");
-    expect(mockImpact).toHaveBeenCalledTimes(1);
-  });
-
-  it("labels the ticking number with the final value from the first frame", async () => {
-    const utils = render(<EloTile label="ELO Rating" before={1000} after={1016} />);
-    expect(afterValue(utils).label).toBe("1016");
-    await flushReduceMotion();
+    land();
     act(() => {
-      jest.advanceTimersByTime(RATING_TICK_MS / 2);
+      jest.advanceTimersByTime(2 * ROLL_MS);
     });
-    expect(afterValue(utils).label).toBe("1016");
+    await flush();
+    expect(afterValue(utils).text).toBe("1020");
+    expect(mockNotify).toHaveBeenCalledTimes(1);
+  });
+
+  it("with reduce motion on, shows the final value from the first frame (gain haptic kept)", async () => {
+    __setReduceMotionForTests(true);
+    const utils = render(<EloTile label="ELO Rating" before={1000} after={1016} />);
+    expect(afterValue(utils).text).toBe("1016");
+    await flushReduceMotion();
+    expect(mockNotify).toHaveBeenCalledTimes(1);
+  });
+
+  it("with a playKey, a remount of the same result shows the end state, silent", async () => {
+    const first = render(<EloTile label="ELO Rating" before={1000} after={1016} playKey="m1" />);
+    land();
+    await flush();
+    first.unmount();
+    expect(mockNotify).toHaveBeenCalledTimes(1);
+    const again = render(<EloTile label="ELO Rating" before={1000} after={1016} playKey="m1" />);
+    expect(afterValue(again).text).toBe("1016");
+    land();
+    await flush();
+    expect(mockNotify).toHaveBeenCalledTimes(1);
   });
 
   it("does not animate a non-numeric pair", async () => {
     const utils = render(<EloTile label="ELO Rating" before="N/A" after="N/A" />);
     await flushReduceMotion();
     expect(afterValue(utils).text).toBe("N/A");
+    expect(mockNotify).not.toHaveBeenCalled();
   });
 });
 
 describe("4-digit ratings fit a phone-width row (jits-v6ri)", () => {
   it("shares the row equally and shrinks the number to fit, never overflowing", async () => {
     const utils = render(<EloTile label="ELO Rating" before={1000} after={1016} size="large" />);
+    land();
     await flushReduceMotion();
     const numbers = utils
       .UNSAFE_getAllByType(Text)

@@ -10,7 +10,9 @@
  *   match_result_lock_seconds().
  * - After confirming, the step moves on to the verdict, even while the
  *   opponent is still pending: no "Continue without waiting" exit.
- * - A successful confirm gives a light impact; a failed one the error buzz.
+ * - A successful confirm gives a light impact (`haptics.press`); a failed one
+ *   the error buzz.
+ * - A submission result draws the tap marks still and silent (Adding Flare).
  */
 import * as React from "react";
 import { act, fireEvent, render } from "@testing-library/react-native";
@@ -172,6 +174,20 @@ describe("ConfirmStep (opponent view, match-flow redesign)", () => {
     s.getByText("\u25bc \u22129");
     // The heading and the red CTA both say it.
     expect(s.getAllByText("Confirm result")).toHaveLength(2);
+  });
+
+  it("draws the tap marks still and silent on a submission, none on a draw (Adding Flare)", () => {
+    jest.useFakeTimers();
+    const sub = renderStep({ resultData: { result: "submission", winnerId: "opp-1" }, submissionName: "Armbar" });
+    expect(sub.getByTestId("verdict-tap-marks", { includeHiddenElements: true })).toBeTruthy();
+    act(() => {
+      jest.runAllTimers();
+    });
+    // No haptic before the athlete confirms: the moment belongs to the verdict.
+    expect(mockImpact).not.toHaveBeenCalled();
+    sub.unmount();
+    const draw = renderStep({ resultData: { result: "draw" }, finishTimeSeconds: 300 });
+    expect(draw.queryByTestId("verdict-tap-marks", { includeHiddenElements: true })).toBeNull();
   });
 
   it("the recorder is shown already confirmed (auto-confirmed server-side)", () => {

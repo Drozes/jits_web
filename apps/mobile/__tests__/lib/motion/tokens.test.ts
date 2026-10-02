@@ -1,11 +1,10 @@
 /**
  * Motion tokens (Adding Flare, jits-pddd.1): the Motion Rule values, and
- * the existing rating tick, LIVE pulse and fight easing point at them so the
+ * the odometer roll, LIVE pulse and fight easing follow them so the
  * app keeps one rhythm.
  */
 import { duration, tempo, spring, PRESS_SCALE, BRAND_EASE_OUT_CURVE, easing } from "@/lib/motion";
-import { RATING_TICK_MS as TILE_TICK } from "@/components/ui/elo-system/elo-tile";
-import { RATING_TICK_MS as VERDICT_TICK } from "@/components/match-flow/verdict/celebration";
+import { ROLL_MS } from "@/components/ui/elo-system/rolling-number";
 import { FIGHT_EASING } from "@/components/match-flow/fight/fight-tokens";
 
 describe("motion tokens", () => {
@@ -37,9 +36,10 @@ describe("motion tokens", () => {
     expect(easing.outCubic).toBeDefined();
   });
 
-  it("points the existing rating tick and fight easing at the tokens", () => {
-    expect(TILE_TICK).toBe(duration.base);
-    expect(VERDICT_TICK).toBe(duration.base);
+  it("keeps the odometer roll within the slow ceiling and the fight easing on the tokens", () => {
+    // The odometer roll replaced the 480ms tick (slice D); no dedicated token.
+    expect(ROLL_MS).toBeGreaterThanOrEqual(duration.base);
+    expect(ROLL_MS).toBeLessThanOrEqual(duration.slow);
     expect(FIGHT_EASING).toBe(BRAND_EASE_OUT_CURVE);
   });
 });

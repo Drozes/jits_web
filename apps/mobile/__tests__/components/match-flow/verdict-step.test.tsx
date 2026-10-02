@@ -126,6 +126,13 @@ describe("verdict copy and the harness contract", () => {
     expect(s.getByTestId("verdict-confetti", { includeHiddenElements: true })).toBeTruthy();
   });
 
+  it("the rating card reads only the final value and delta, with the tap marks on a submission (Adding Flare)", async () => {
+    const s = renderVerdict();
+    await flush();
+    expect(s.getByTestId("verdict-rating-card").props.accessibilityLabel).toBe("Rating 1526, up 14");
+    expect(s.getByTestId("verdict-tap-marks", { includeHiddenElements: true })).toBeTruthy();
+  });
+
   it("a loss: YOU LOST, a red ▼ delta, no confetti", async () => {
     const s = renderVerdict({ outcome: "loss", me: { athlete_id: "me", display_name: "Kai Reyes", elo_before: 1498, elo_after: 1489, elo_delta: -9 } });
     await flush();
