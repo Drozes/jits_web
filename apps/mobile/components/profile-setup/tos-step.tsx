@@ -4,6 +4,7 @@ import { StatePressable } from "@/components/ui/state-pressable";
 import { TOS_TEXT } from "@jits/shared/utils";
 import { Plate } from "@/components/ui/elo-system";
 import { Button } from "@/components/ui/elo-system/button";
+import { SelectCheck, selectionSurface } from "@/components/ui/elo-system/selection";
 import { cn } from "@/lib/cn";
 
 interface TosStepProps {
@@ -114,14 +115,10 @@ export function TosStep({ onAccept, onExit, submittingExternal }: TosStepProps) 
         <View
           className={cn(
             "h-5 w-5 items-center justify-center rounded-xs border",
-            agreed ? "bg-cta border-cta" : "border-hairline-strong",
+            selectionSurface(agreed),
           )}
         >
-          {agreed && (
-            <Text className="text-[11px] font-mono-bold text-ink-on-cta leading-none">
-              {"✓"}
-            </Text>
-          )}
+          {agreed ? <SelectCheck size={13} /> : null}
         </View>
         <Text className="font-body text-[14px] text-ink flex-1">
           I agree to the End User Agreement

@@ -3,6 +3,7 @@ import { Alert, Text, View } from "react-native";
 import { StatePressable } from "@/components/ui/state-pressable";
 import { Button } from "@/components/ui/elo-system/button";
 import { Plate } from "@/components/ui/elo-system";
+import { SelectCheck } from "@/components/ui/elo-system/selection";
 import { toast } from "@/components/ui/toast";
 import { useAuth } from "@/lib/auth/hooks";
 import { supabase } from "@/lib/supabase/client";
@@ -108,12 +109,13 @@ export function MemberRoleSection({
                 onPress={() => setTargetRole(role)}
                 accessibilityRole="radio"
                 accessibilityState={{ selected: active }}
-                className={`flex-1 items-center rounded-md border px-2 py-2 ${
+                className={`flex-1 flex-row items-center justify-center gap-1 rounded-md border px-2 py-2 ${
                   active
-                    ? "border-cta bg-surface-4"
+                    ? "border-hairline-strong bg-surface-4"
                     : "border-hairline bg-transparent"
                 }`}
               >
+                {active ? <SelectCheck size={11} /> : null}
                 <Text
                   className={`font-mono text-[10px] uppercase tracking-caps-l ${
                     active ? "text-ink" : "text-ink-3"

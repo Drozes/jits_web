@@ -100,13 +100,14 @@ export function ConfirmPanel({
     <View
       testID={`confirm-panel-${side}-${state}`}
       className={cn(
-        "flex-1 items-center gap-2 rounded-md bg-surface-3 border px-3 py-4",
-        confirmed ? "border-positive" : "border-hairline-strong",
+        "flex-1 items-center gap-2 rounded-md border border-hairline-strong px-3 py-4",
+        // Confirmed is a surface step plus an ink check, never Gain Green (WP2).
+        confirmed ? "bg-surface-4" : "bg-surface-3",
       )}
     >
       {confirmed ? (
-        <View className="h-8 w-8 items-center justify-center rounded-full border border-positive">
-          <Check size={16} color={tokens.statePositive} />
+        <View className="h-8 w-8 items-center justify-center rounded-full border border-ink">
+          <Check size={16} color={tokens.textPrimary} />
         </View>
       ) : state === "your-call" ? (
         <View className="h-8 w-8 rounded-full border border-hairline-strong" />
@@ -118,7 +119,7 @@ export function ConfirmPanel({
       <Text
         className={cn(
           "w-full text-center font-heading text-[11px] uppercase tracking-caps",
-          confirmed ? "text-positive" : "text-ink-2",
+          confirmed ? "text-ink" : "text-ink-2",
         )}
         numberOfLines={1}
       >

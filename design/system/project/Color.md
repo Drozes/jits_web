@@ -108,7 +108,11 @@ Chrome over a camera preview, a video or a photo does not follow the app theme. 
 - Use `gain-green` only for rating increases, wins and LIVE. A ready check, a confirmed result, an upload that finished and a recording light are not gains: draw them in `ink` with a glyph.
 - Use `attention` for draws, pressure, and pending, processing, paused or disputed states; its rules use `attention-rule`.
 - Use `heat-orange` and `heat-red` only on the Arena tab icon and the challenge afterglow.
-- Show a selected option with `plate-bright` plus a `hairline-strong` edge and an `ink` check glyph, never a red fill (WP2 target; the code still fills some radios, checkboxes and chips red).
+- Show a selected option with `plate-bright` plus a `hairline-strong` edge and an `ink` check glyph, never a red fill, edge, dot or check: `selectionSurface(selected)` and `SelectCheck` in `components/ui/elo-system/selection.tsx` (shipped in WP2). The Chip uses the surface step and an `ink` label without the glyph; the match flow uses `usePalette().panel` (the same `plate-bright`) and an `ink` check.
+- Tint spinners and pull-to-refresh `ink-3` (`textTertiary`) or `ink-2`, never red. Draw data bars (submission breakdown, weekly activity) in `ink-2` and the leader's rank numeral in `ink`: data is ink, the leader is marked by its red rule.
+- Draw a switch with the one neutral look, `switchColors()` in `components/ui/switch.tsx`: `ink` track when on, `ink-3` when off, a `void` thumb. Never a red or green track.
+- Tint icons with ink steps (`ink-2`, `ink-3`); a notification or section icon is never red or green.
+- `__tests__/components/ui/color-semantics-guard.test.ts` holds every file that still draws Signal Red or Gain Green, with its line count and the reason (a CTA fill, an "act" or leader rule, a negative, a gain, a win, LIVE, Arena heat, brand chrome under Open decision 12). A new red or green line fails until it is reviewed and listed.
 - Draw every border 1px in a hairline color; 2px (`stroke-edge`) and 3px (`stroke-rail`) widths exist only for state edges and rails.
 - Over media, use the `on-media-*` set (`ON_MEDIA` or `onMediaTokens`, never a new literal) and keep text on `on-media-badge` or the light `on-media-chip`.
 
@@ -116,5 +120,5 @@ Chrome over a camera preview, a video or a photo does not follow the app theme. 
 
 - Push notification accent `#ef4444` (Tailwind red-500) in `app.json:119` is not a brand color. The Android channel light in `lib/notifications/register-push.ts` now uses `signal-red` (WP7); the `app.json` value is native config and changes only with the next store build.
 - The splash files read the dark tokens (`darkTokens`, `onMediaTokens.white`) instead of hard-coding them (WP7). Their gold cap is the dark `attention` value, a sanctioned one-off for the launch moment, not a pattern.
-- `palette.ts` also carries `winRule`, `secondaryBg`, `secondaryBgPressed`, `selectedBg` (`rgba(230,57,70,0.16)`, a red tint that WP2 retires) and `track` for the match flow; they are JS mirrors, not kit tokens.
+- `palette.ts` also carries `winRule`, `secondaryBg`, `secondaryBgPressed` and `track` for the match flow; they are JS mirrors, not kit tokens. Its old `selectedBg` (`rgba(230,57,70,0.16)`, a red selection tint) was retired in WP2.
 - Legacy shadcn colors (`primary`, `muted`, `card`, `success` and friends) are retiring; see Legacy.

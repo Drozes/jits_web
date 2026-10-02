@@ -128,7 +128,7 @@ export function MemberGymOwnerSection({
                 accessibilityRole="button"
                 className="px-3 py-2 rounded-md border border-hairline active:bg-surface-4"
               >
-                <Text className="font-mono text-[10px] text-primary uppercase tracking-caps-l">
+                <Text className="font-mono text-[10px] text-ink-2 uppercase tracking-caps-l">
                   REMOVE
                 </Text>
               </Pressable>

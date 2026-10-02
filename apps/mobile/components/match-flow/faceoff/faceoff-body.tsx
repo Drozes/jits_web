@@ -4,6 +4,7 @@ import { CameraOff } from "lucide-react-native";
 import { useViewerStakes } from "@/lib/match-flow/use-viewer-stakes";
 import { setRecordingOptIn } from "@/lib/match-flow/recording-optin";
 import { usePalette } from "@/lib/theme/palette";
+import { useSwitchColors } from "@/components/ui/switch";
 import { FIGHT_RADIUS } from "../fight/fight-tokens";
 import { FightButton, Mono, StakesStrip, StatusPlate, shortName } from "../fight/fight-ui";
 import { useFaceoffContext } from "./faceoff-context";
@@ -151,6 +152,7 @@ function ReadyCheck({ opponent }: FaceoffBodyProps) {
 function RecordingPanel({ oppName }: { oppName: string }) {
   const f = useFaceoffContext();
   const p = usePalette();
+  const switchColors = useSwitchColors();
   const nobody = !f.recording && f.opponentRecording === false;
   const oppLabel =
     f.opponentRecording == null ? `${oppName} · CHOOSING` : f.opponentRecording ? `${oppName} RECORDING` : `${oppName} NOT RECORDING`;
@@ -163,7 +165,7 @@ function RecordingPanel({ oppName }: { oppName: string }) {
           <Text className="font-heading uppercase" style={{ fontSize: 13, letterSpacing: 0.8, color: p.text }}>
             Record from my phone
           </Text>
-          <Mono testID="faceoff-opponent-recording" color={f.opponentRecording ? p.win : p.text3}>
+          <Mono testID="faceoff-opponent-recording" color={f.opponentRecording ? p.text : p.text3}>
             {oppLabel}
           </Mono>
         </View>
@@ -173,9 +175,7 @@ function RecordingPanel({ oppName }: { oppName: string }) {
           value={f.recording}
           disabled={f.myReady}
           onValueChange={setRecordingOptIn}
-          trackColor={{ false: p.panel, true: p.win }}
-          thumbColor="#FFFFFF"
-          ios_backgroundColor={p.panel}
+          {...switchColors}
         />
       </View>
       {nobody ? (

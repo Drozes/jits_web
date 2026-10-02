@@ -65,7 +65,7 @@ Twenty cards, each a static HTML twin of the RN component with a README (`compon
 | Actions | Button, OutlineAction |
 | Status | MetaTag, LivePill (with LiveDot), CountPill (with tab badges) |
 | Data | EloTile, RollingNumber (settled frame), DeltaChip |
-| Navigation | TabBar (with the Arena icon's embers), AppHeader (with the header status chip), Chip |
+| Navigation | TabBar (with the Arena icon's embers), AppHeader (with the header status chip), Chip (shipped, WP2) |
 | Surfaces | Plate, Sheet (shipped, WP1) |
 | Feedback | Toast, Skeleton |
 | Identity | Avatar |
@@ -82,16 +82,16 @@ Twenty cards, each a static HTML twin of the RN component with a README (`compon
 6. **Radius scale:** 2 tag, 3 button, 4 plate (default), 8 sheets and modals maximum; dots round. Avatars: the code's `Avatar32` is a 2px-radius square, while the old DESIGN.md said avatars stay circular; the kit follows the code (square) until decided.
 7. **Shadows:** none; no shadow family.
 8. **Weight unit:** lbs (code truth; DESIGN.md's kg is wrong).
-9. **Selected state:** `plate-bright` plus a `hairline-strong` edge and an `ink` check, never a red fill (the WP2 target; `hairline-strong` alone is below 3:1, so the surface step and the glyph are required).
+9. **Selected state:** `plate-bright` plus a `hairline-strong` edge and an `ink` check, never a red fill (shipped in WP2, jits-3eeg.3: `selectionSurface()` and `SelectCheck` in `components/ui/elo-system/selection.tsx`; `hairline-strong` alone is below 3:1, so the surface step and the glyph are required).
 10. **Motion values** live in the Motion section (the format has no motion family).
 11. **Logo:** the E·R lettermark SVGs; the old `apps/web/public/logo.svg` is retired; the wordmark is live Bebas Neue text, no file.
-12. **Wizard progress segments** in `signal-red` (MF-8) and the "VS" in red display type (MF-12) are treated as brand chrome until decided.
+12. **Wizard progress segments** in `signal-red` (MF-8) and the "VS" in red display type (MF-12) are treated as brand chrome until decided. WP2 kept them red under this decision; the color guard test allowlists them by name, so changing the decision is a one-line allowlist edit plus the two segment classes.
 13. **Destructive button:** an outline in `negative` (border and label; 6.28:1 on `void` dark, 6.37:1 light), proposed by the kit. The code has no ELO destructive button: today's `DestructiveButton` (one use, Delete account) fills with the legacy red under a `#E8EDF2` label at 3.54:1 and reads as a second red CTA.
-14. **Chip selected state:** `plate-bright` fill, `hairline-strong` border, `ink` label, no red square (the WP2 target, bead jits-3eeg.3). Today the active chip takes a Signal Red border and a 6px red square.
+14. **Chip selected state:** `plate-bright` fill, `hairline-strong` border, `ink` label, no red square (shipped in WP2, bead jits-3eeg.3). On this compact control the label's step from `ink-2` to `ink` stands in for the check glyph.
 15. **Circular elements (D-6):** only dots are round: live dots, status dots, seek markers. Avatars are square (as code). The round play buttons (`player-controls.tsx`, `match-hero.tsx`), the round seek thumb and the round check badges in the match flow (R3 FR-8) are non-conforming and take `radius-plate` / `radius-tag` when their package touches them.
 16. **Centered modals (D-4):** sheets are the default modal. The challenge prompt is a centered card by decision (jits-02vo.3). Compare Stats, the go-live location prompt and the start-blocked notice are centered today and are decided in WP1 (R3 SH-5): move to a sheet or record the exception here.
 17. **Contrast on media:** on-media text sits on `on-media-badge` or the light `on-media-chip` only (see Color).
 
 ## Not synced
 
-Not carried into tokens: web-only values (the web `--size-*` type scale, the web z-index ladder, web `--opacity-*`, the shadcn `--chart-*` slots), `palette.ts` match-flow mirrors (`winRule`, `secondaryBg`, `secondaryBgPressed`, `selectedBg`, `track`), and the push accent `#ef4444` in `app.json` (native config). Components are static HTML twins hand-written from the RN sources (React Native cannot run in the preview frame); no bundle was built.
+Not carried into tokens: web-only values (the web `--size-*` type scale, the web z-index ladder, web `--opacity-*`, the shadcn `--chart-*` slots), `palette.ts` match-flow mirrors (`winRule`, `secondaryBg`, `secondaryBgPressed`, `track`), and the push accent `#ef4444` in `app.json` (native config). Components are static HTML twins hand-written from the RN sources (React Native cannot run in the preview frame); no bundle was built.

@@ -113,7 +113,7 @@ Bebas Neue (`font-display`, the wordmark and display numerals 40px and up such a
 ### Brand hard rules (easy to violate)
 - **No drop shadows.** Hierarchy via background-color shifts, not elevation.
 - **Sharp corners:** 2px tags/chips (`rounded-xs`), 3px buttons (`rounded-sm`), 4px plates (`rounded-md`, default), 8px max for sheets and modals (`rounded-lg`); only dots are round.
-- **One primary (Signal Red) CTA per surface.** A selected state is `bg-surface-4` + `border-hairline-strong`, never a red fill.
+- **One primary (Signal Red) CTA per surface.** A selected state is `bg-surface-4` + `border-hairline-strong` + an `ink` check (`selectionSurface()` / `SelectCheck` in `components/ui/elo-system/selection.tsx`), never a red fill, edge or check. Spinners and pull-to-refresh are `textTertiary`, switches use `switchColors()` (neutral track), icons are ink steps. `__tests__/components/ui/color-semantics-guard.test.ts` allowlists every remaining red and green line with its reason: a new one fails until reviewed.
 - **Motion Rule (motion with meaning):** every animation is Reactive (touch), a Moment (one shot on a real state change, never on mount or refetch) or Ambient (a loop only while an ongoing state such as live, loading or waiting on you is true, paused in background), on the UI thread, with a still Reduce Motion state, and listed in the DESIGN.md Motion registry; tokens and the one haptics vocabulary live in `apps/mobile/lib/motion` (never a haptic on a loss or for ambient motion; heat colors only for Arena heat).
 
 ## UI Kit Rules

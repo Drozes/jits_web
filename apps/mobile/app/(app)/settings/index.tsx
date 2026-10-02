@@ -96,7 +96,7 @@ function AccountPlate({
         accessibilityLabel="Sign out"
         className="flex-row items-center justify-between px-4 py-3 min-h-11 active:bg-surface-4"
       >
-        <Text className="font-mono text-[10px] text-cta uppercase tracking-caps-l">
+        <Text className="font-mono text-[10px] text-ink-2 uppercase tracking-caps-l">
           SIGN OUT
         </Text>
       </Pressable>

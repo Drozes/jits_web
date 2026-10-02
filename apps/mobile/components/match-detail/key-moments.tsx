@@ -4,7 +4,11 @@ import { PlayCircle } from "lucide-react-native";
 import { formatClock, type KeyMoment } from "@jits/shared/utils";
 import { usePalette, TABULAR } from "@/lib/theme/palette";
 
-/** Dots along a hairline, placed by time over the clip (the finish in green). */
+/**
+ * Dots along a hairline, placed by time over the clip. The finish is a larger
+ * ink square: a finish is not a gain (it shows on losses too), so it is told
+ * apart by shape and size, never by Gain Green (WP2, R3 FR-1).
+ */
 export function MomentTimeline({ moments, durationS }: { moments: KeyMoment[]; durationS: number }) {
   const p = usePalette();
   const pct = (t: number) => `${Math.min(100, Math.max(0, (t / durationS) * 100))}%` as const;
@@ -18,7 +22,7 @@ export function MomentTimeline({ moments, durationS }: { moments: KeyMoment[]; d
         return (
           <View
             key={`${m.t}-${i}`}
-            style={{ position: "absolute", left: pct(m.t), top: 9 - size / 2, width: size, height: size, marginLeft: -size / 2, borderRadius: size / 2, backgroundColor: m.kind === "finish" ? p.win : p.text }}
+            style={{ position: "absolute", left: pct(m.t), top: 9 - size / 2, width: size, height: size, marginLeft: -size / 2, borderRadius: m.kind === "finish" ? 2 : size / 2, backgroundColor: p.text }}
           />
         );
       })}
@@ -70,8 +74,8 @@ export function KeyMoments({ moments, durationS, tags, onJump }: KeyMomentsProps
               {m.label}
             </Text>
             {m.kind === "finish" ? (
-              <View style={{ height: 18, paddingHorizontal: 6, borderRadius: 2, borderWidth: 1, borderColor: p.win, justifyContent: "center" }}>
-                <Text className="font-mono-bold" style={{ fontSize: 9, letterSpacing: 1.6, color: p.win }}>
+              <View style={{ height: 18, paddingHorizontal: 6, borderRadius: 2, borderWidth: 1, borderColor: p.strong, justifyContent: "center" }}>
+                <Text className="font-mono-bold" style={{ fontSize: 9, letterSpacing: 1.6, color: p.text }}>
                   FINISH
                 </Text>
               </View>

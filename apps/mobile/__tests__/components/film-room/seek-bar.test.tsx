@@ -18,10 +18,10 @@ function setup(positionS = 100) {
 }
 
 describe("SeekBar", () => {
-  it("places a marker per moment, the finish in green", () => {
+  it("places a marker per moment, the finish a white square (never Gain Green, WP2 FR-1)", () => {
     const { getByTestId } = setup();
     expect(getByTestId("seek-marker-0", { includeHiddenElements: true }).props.style).toMatchObject({ left: "6.75%", backgroundColor: "#F59E0B" });
-    expect(getByTestId("seek-marker-1", { includeHiddenElements: true }).props.style).toMatchObject({ left: "94.25%", backgroundColor: "#22C55E" });
+    expect(getByTestId("seek-marker-1", { includeHiddenElements: true }).props.style).toMatchObject({ left: "94.25%", backgroundColor: "#FFFFFF", borderColor: "#0D0F14", borderRadius: 1 });
   });
 
   it("seeks to the touched point on release", () => {

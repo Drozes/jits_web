@@ -44,7 +44,7 @@ Defined in `apps/mobile/lib/tokens.ts` (`lightTokens`, `darkTokens`), mirrored a
 | `Dialog` | `components/ui/dialog.tsx` | 1 (Compare Stats), system-font title | Brand titles (WP1) |
 | `Sheet` | `components/ui/sheet.tsx` | 1 (Share Profile); since WP1 on the shared chrome (`panel`, 8px, brand title) | Kept: the one sheet shell, and home of `useSheetChrome()` / `SheetBackdrop` |
 | `Button` | `components/ui/button.tsx` | Admin screens, update banner, critical update modal | Replaced by the unified `Button` (WP3) |
-| `Switch` | `components/ui/switch.tsx` | 3 (settings, admin flags), red `primary` track | Neutral track (WP2) |
+| `Switch` | `components/ui/switch.tsx` | 3 (settings, admin flags, the face-off record toggle's colors) | Kept: since WP2 on ELO tokens with a neutral track (`switchColors()`), no legacy tokens |
 | `OfflineBanner` | `components/offline-banner.tsx` | Root layout | `panel` + `hairline-strong`, mono caps `ink` (WP4) |
 | Update banner and modal | `components/updates/*` | Root layout | ELO surfaces and the unified Button (WP4) |
 

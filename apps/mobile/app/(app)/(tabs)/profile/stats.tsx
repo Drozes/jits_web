@@ -142,7 +142,7 @@ export default function ProfileStatsScreen() {
   if (!athlete) {
     return (
       <View className="flex-1 bg-surface items-center justify-center">
-        <ActivityIndicator color={tokens.accentCta} />
+        <ActivityIndicator color={tokens.textTertiary} />
       </View>
     );
   }
@@ -155,7 +155,7 @@ export default function ProfileStatsScreen() {
         data={stale ? [] : matchHistory}
         keyExtractor={(m) => m.match_id}
         contentContainerStyle={{ padding: 16, paddingBottom: 120, gap: 8 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={tokens.accentCta} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={tokens.textTertiary} />}
         ListHeaderComponent={
           <StatsHeader
             athlete={athlete}
@@ -177,7 +177,7 @@ export default function ProfileStatsScreen() {
         }
         ListEmptyComponent={
           isLoading ? (
-            <View className="py-12 items-center"><ActivityIndicator color={tokens.accentCta} /></View>
+            <View className="py-12 items-center"><ActivityIndicator color={tokens.textTertiary} /></View>
           ) : (
             <View className="py-12 items-center gap-2">
               <Swords size={28} color={tokens.textTertiary} />
@@ -276,7 +276,7 @@ function StatsHeader({
         ))}
         {isLoading && data && (
           <View testID="stats-window-loading" className="justify-center">
-            <ActivityIndicator size="small" color={tokens.accentCta} />
+            <ActivityIndicator size="small" color={tokens.textTertiary} />
           </View>
         )}
       </View>

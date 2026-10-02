@@ -45,7 +45,7 @@ export function HeadToHeadCard({ matches }: { matches: HeadToHeadMatch[] }) {
   return (
     <Plate>
       <View className="flex-row items-center gap-2 mb-3">
-        <Swords size={14} color={tokens.accentCta} />
+        <Swords size={14} color={tokens.textTertiary} />
         <Text className="font-heading text-[12px] text-ink uppercase tracking-caps">
           Head-to-Head
         </Text>

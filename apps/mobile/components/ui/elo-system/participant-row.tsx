@@ -23,13 +23,14 @@ const STATUS_LABEL: Record<ParticipantStatus, string> = {
 
 const STATUS_BORDER: Record<ParticipantStatus, string> = {
   available: "border-positive",
-  busy: "border-negative",
+  // "In Match" is a status, not a loss: neutral, never red (WP2, R3 CO-7).
+  busy: "border-hairline-strong",
   self: "border-hairline-strong",
 };
 
 const STATUS_TEXT: Record<ParticipantStatus, string> = {
   available: "text-positive",
-  busy: "text-negative",
+  busy: "text-ink-2",
   self: "text-ink-3",
 };
 

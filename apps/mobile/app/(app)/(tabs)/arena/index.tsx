@@ -312,7 +312,7 @@ export default function ArenaScreen() {
           <RefreshControl
             refreshing={isRefreshing}
             onRefresh={refresh}
-            tintColor={tokens.accentCta}
+            tintColor={tokens.textTertiary}
           />
         }
       >

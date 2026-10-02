@@ -29,18 +29,23 @@ const outcomeMap: Record<MatchOutcome, "win" | "loss" | "draw"> = {
   [MATCH_OUTCOME.DRAW]: "draw",
 };
 
+/**
+ * A challenge's state tag. `accent` (incoming, accepted) steps up to the
+ * plate-bright surface with an `ink` label; it is a state, not a call to act
+ * or a loss, so it is never Signal Red (WP2, R3 CO-7).
+ */
 function ChallengePill({ children, accent }: { children: React.ReactNode; accent?: boolean }) {
   return (
     <View
       className={cn(
-        "px-2 py-1 border rounded-xs",
-        accent ? "border-cta" : "border-hairline-strong",
+        "px-2 py-1 border border-hairline-strong rounded-xs",
+        accent && "bg-surface-4",
       )}
     >
       <Text
         className={cn(
           "font-mono-bold text-[10px] uppercase tracking-caps-l",
-          accent ? "text-cta" : "text-ink-2",
+          accent ? "text-ink" : "text-ink-2",
         )}
       >
         {children}

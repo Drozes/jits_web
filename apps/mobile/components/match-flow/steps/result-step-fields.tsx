@@ -2,6 +2,7 @@ import { Pressable, Text, View } from "react-native";
 import { Handshake, Swords } from "lucide-react-native";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { cn } from "@/lib/cn";
+import { SelectCheck, selectionSurface } from "@/components/ui/elo-system/selection";
 
 export interface ResultParticipant {
   id: string;
@@ -11,7 +12,8 @@ export interface ResultParticipant {
 /**
  * Submission / Draw segmented toggle. ELO design system: two chip-style
  * cells inside a hairline-bordered surface, active state lifts to
- * surface-4 with a Signal Red glyph + caps label.
+ * surface-4 with a hairline-strong edge and an ink glyph + caps label (the
+ * one selected-state treatment; never red, WP2).
  */
 export function OutcomeToggle({
   value,
@@ -38,18 +40,18 @@ export function OutcomeToggle({
               onPress={() => onChange(opt)}
               className={cn(
                 "flex-1 flex-row items-center justify-center gap-2 rounded-xs py-3",
-                active ? "bg-surface-4 border border-cta" : "border border-transparent active:bg-surface-4",
+                active ? "bg-surface-4 border border-hairline-strong" : "border border-transparent active:bg-surface-4",
               )}
             >
               {opt === "submission" ? (
                 <Swords
                   size={14}
-                  color={active ? tokens.accentCta : tokens.textTertiary}
+                  color={active ? tokens.textPrimary : tokens.textTertiary}
                 />
               ) : (
                 <Handshake
                   size={14}
-                  color={active ? tokens.accentCta : tokens.textTertiary}
+                  color={active ? tokens.textPrimary : tokens.textTertiary}
                 />
               )}
               <Text
@@ -69,8 +71,8 @@ export function OutcomeToggle({
 }
 
 /**
- * Two-button winner picker. ELO design system: two-up cards that
- * tappable, active state gets the Signal Red border + tinted surface.
+ * Two-button winner picker. ELO design system: two-up tappable cards; the
+ * active one steps to surface-4 with an ink check (never red, WP2).
  * Mirrors D8 wireframe (lines 1249-1253).
  */
 export function WinnerPicker({
@@ -98,13 +100,14 @@ export function WinnerPicker({
               accessibilityState={{ selected: active }}
               onPress={() => onChange(p.id)}
               className={cn(
-                "flex-1 rounded-md border bg-surface-3 px-3 py-4 active:bg-surface-4",
-                active ? "border-cta bg-surface-4" : "border-hairline-strong",
+                "flex-1 flex-row items-center justify-center gap-1.5 rounded-md border px-3 py-4 active:bg-surface-4",
+                selectionSurface(active),
               )}
             >
+              {active ? <SelectCheck size={12} /> : null}
               <Text
                 className={cn(
-                  "text-center font-heading text-[12px] uppercase tracking-caps",
+                  "shrink text-center font-heading text-[12px] uppercase tracking-caps",
                   active ? "text-ink" : "text-ink-2",
                 )}
                 numberOfLines={1}

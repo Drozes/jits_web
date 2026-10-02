@@ -79,7 +79,7 @@ export default function LeaderboardScreen() {
   if (authLoading || !athlete) {
     return (
       <View className="flex-1 bg-surface items-center justify-center">
-        <ActivityIndicator color={tokens.accentCta} />
+        <ActivityIndicator color={tokens.textTertiary} />
       </View>
     );
   }

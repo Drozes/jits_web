@@ -149,7 +149,7 @@ export function ResultStep(props: ResultStepProps) {
 
       {claim.state === "mine" ? (
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 }}>
-          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: p.win }} />
+          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: p.text }} />
           <Mono size={11} spacing={0.4}>
             {`You're recording for both of you. ${shortName(opponent.displayName)} sees this live.`}
           </Mono>

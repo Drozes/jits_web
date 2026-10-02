@@ -100,7 +100,7 @@ export default function DashboardScreen() {
   if (!athlete) {
     return (
       <View className="flex-1 bg-surface items-center justify-center">
-        <ActivityIndicator color={tokens.accentCta} />
+        <ActivityIndicator color={tokens.textTertiary} />
       </View>
     );
   }
@@ -157,7 +157,7 @@ export default function DashboardScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={tokens.accentCta}
+            tintColor={tokens.textTertiary}
           />
         }
       >

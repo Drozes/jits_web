@@ -61,7 +61,7 @@ Cards (Status family): **MetaTag**, **LivePill** (with LiveDot), **CountPill** (
 | `RollingNumber` | `components/ui/elo-system/rolling-number.tsx` | The odometer roll (600ms, once per result); mobile only |
 | `DeltaChip` | `components/ui/elo-system/delta-chip.tsx` | "▲ +14" pop after the roll; mobile only |
 | `DeltaNumber` | `components/ui/elo-system/delta-number.tsx` | Static signed delta, s 12 / m 16 / l 28 |
-| `RankRow` | `components/ui/elo-system/rank-row.tsx` | Ladder row; leader marked by a `signal-red` left rule. Its rank numeral is red today (R3 RK-1): it should be `ink` |
+| `RankRow` | `components/ui/elo-system/rank-row.tsx` | Ladder row; leader marked by a `signal-red` left rule; every rank numeral is data, the leader's in `ink` (WP2, R3 RK-1) |
 | `ParticipantRow`, `DataRow` | `components/ui/elo-system/` | `DataRow` is unused on mobile |
 | `Mono`, `StakesStrip`, `RatingBlock`, `StatusPlate` | `fight-ui.tsx` | Match-flow building blocks on `usePalette()` |
 
@@ -71,7 +71,7 @@ Cards (Data family): **EloTile**, **RollingNumber** (settled frame), **DeltaChip
 
 `EloTabBar` (`components/layout/elo-tab-bar.tsx`): four tabs (Home, Arena, Rankings, Profile) on `panel`, 18px lucide icons, `tab-label` text (`ink` active, `ink-3` inactive), a 2px `signal-red` top edge on the active tab, tab select bounce. `ArenaTabIcon` (`components/layout/arena-tab-icon.tsx`) draws lucide `Swords` as two blade halves so it can carry heat: live embers, countable embers (1 to 3 pending), blade clash. Headers are one system of three slots on the same 56px `panel` bar: `AppHeader` (pushed screens), `BrandHeader` (wordmark; Home, Rankings), `TabHeader` (Arena, Profile).
 
-Cards (Navigation family): **TabBar** (with the Arena icon's live ember and countable embers), **AppHeader** (with the header status chip) and **Chip**.
+Cards (Navigation family): **TabBar** (with the Arena icon's live ember and countable embers), **AppHeader** (with the header status chip) and **Chip** (shipped in WP2: selected = `plate-bright`, `hairline-strong`, `ink`).
 
 ### Surfaces
 
@@ -87,7 +87,7 @@ Cards (Feedback family): **Toast**, **Skeleton**.
 
 ### Inputs and overlays
 
-`SearchSelect` is the canonical picker. Every gorhom sheet (Share Profile through the shadcn `Sheet`, the notifications panel, the highlight pre-share and feedback sheets) shares one chrome from `components/ui/sheet.tsx` (WP1): `useSheetChrome()` gives the `panel` fill, `radius-sheet` top corners with a square bottom, a `hairline` top edge, the 30x4 `ink-3` handle, a background with no VoiceOver stop and the Reduce-Motion-aware present; `SheetBackdrop` is the `on-media-scrim` backdrop. `SheetTitle` and `DialogTitle` are DM Sans 700 14px caps, tracking 1.68px, `ink`, role header; descriptions are Inter 13px `ink-2`; `DialogContent` is a `panel` card with a `hairline` border and `radius-sheet`. Every modal backdrop is the one scrim: `bg-on-media-scrim` in classes, `ON_MEDIA.scrim` in style props. A dismissable backdrop is a labeled button and a sibling of the card, never its parent (so VoiceOver reaches the card's controls). `AuthFormField` and `EloField` fold into one form field (WP3/WP5 follow-ups). `Switch` still uses the legacy red track (R3 ST-1).
+`SearchSelect` is the canonical picker. Every gorhom sheet (Share Profile through the shadcn `Sheet`, the notifications panel, the highlight pre-share and feedback sheets) shares one chrome from `components/ui/sheet.tsx` (WP1): `useSheetChrome()` gives the `panel` fill, `radius-sheet` top corners with a square bottom, a `hairline` top edge, the 30x4 `ink-3` handle, a background with no VoiceOver stop and the Reduce-Motion-aware present; `SheetBackdrop` is the `on-media-scrim` backdrop. `SheetTitle` and `DialogTitle` are DM Sans 700 14px caps, tracking 1.68px, `ink`, role header; descriptions are Inter 13px `ink-2`; `DialogContent` is a `panel` card with a `hairline` border and `radius-sheet`. Every modal backdrop is the one scrim: `bg-on-media-scrim` in classes, `ON_MEDIA.scrim` in style props. A dismissable backdrop is a labeled button and a sibling of the card, never its parent (so VoiceOver reaches the card's controls). `AuthFormField` and `EloField` fold into one form field (WP3/WP5 follow-ups). `Switch` has the one neutral look since WP2 (R3 ST-1): `switchColors()` gives an `ink` track when on, `ink-3` when off and a `void` thumb, and the face-off record toggle shares it.
 
 **Sheets are the default modal.** A centered dialog is the documented exception for two cases (R3 SH-5, decided in WP1): a blocking prompt that must be answered and is not dismissed by a backdrop tap (the incoming challenge prompt by decision jits-02vo.3 with `radius-sheet`; `StartBlockedSheet`; `GoLiveLocationSheet`, which gates the system location prompt), and a short read-only overlay with no actions (`CompareStatsModal`, through `Dialog`). Anything else with actions or a list is a sheet.
 
@@ -121,7 +121,7 @@ The 20 cards in `components/`, by family (the `group` on each card):
 | Data | DeltaChip | `components/ui/elo-system/delta-chip.tsx` |
 | Navigation | TabBar (Arena icon live ember and countable embers) | `components/layout/elo-tab-bar.tsx`, `arena-tab-icon.tsx` |
 | Navigation | AppHeader (with the header status chip) | `components/layout/app-header.tsx`, `header-status-chip.tsx` |
-| Navigation | Chip (selected target: `plate-bright`, `hairline-strong`, `ink`) | `components/ui/elo-system/chip.tsx` |
+| Navigation | Chip (shipped, WP2; selected: `plate-bright`, `hairline-strong`, `ink`) | `components/ui/elo-system/chip.tsx` |
 | Surfaces | Plate | `components/ui/elo-system/plate.tsx` |
 | Surfaces | Sheet (shipped, WP1: 8px top corners) | `components/ui/sheet.tsx` (`useSheetChrome()`) and the direct sheets |
 | Feedback | Toast | `components/ui/toast.tsx` |

@@ -19,7 +19,7 @@ export interface Palette {
   bg: string;
   /** Plate: cards, strips, inputs (`bg-surface-3`, as `<Plate>`). */
   plate: string;
-  /** A step above the plate: tiles, the Switch track (`bg-surface-4`). */
+  /** A step above the plate (`plate-bright`, `bg-surface-4`): tiles, pressed and selected options. */
   panel: string;
   hairline: string;
   strong: string;
@@ -43,8 +43,6 @@ export interface Palette {
   /** Secondary button / chip fill on the page. */
   secondaryBg: string;
   secondaryBgPressed: string;
-  /** A selected option's fill. */
-  selectedBg: string;
   /** Progress / timeline track. */
   track: string;
 }
@@ -74,7 +72,6 @@ export function paletteFor(scheme: ColorScheme): Palette {
     amberRule: t.attentionRule,
     secondaryBg: dark ? "rgba(255,255,255,0.08)" : "rgba(13,15,20,0.05)",
     secondaryBgPressed: dark ? "rgba(255,255,255,0.16)" : "rgba(13,15,20,0.10)",
-    selectedBg: "rgba(230,57,70,0.16)",
     track: dark ? "rgba(255,255,255,0.18)" : "rgba(13,15,20,0.14)",
   };
 }

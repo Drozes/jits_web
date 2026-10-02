@@ -69,7 +69,7 @@ Twenty cards, each a static HTML twin of the RN component with a README (`compon
 | Actions | Button, OutlineAction |
 | Status | MetaTag, LivePill (with LiveDot), CountPill (with tab badges) |
 | Data | EloTile, RollingNumber (settled frame), DeltaChip |
-| Navigation | TabBar (with the Arena icon's embers), AppHeader (with the header status chip), Chip |
+| Navigation | TabBar (with the Arena icon's embers), AppHeader (with the header status chip), Chip (shipped, WP2) |
 | Surfaces | Plate, Sheet (shipped, WP1) |
 | Feedback | Toast, Skeleton |
 | Identity | Avatar |
@@ -86,19 +86,19 @@ Twenty cards, each a static HTML twin of the RN component with a README (`compon
 6. **Radius scale:** 2 tag, 3 button, 4 plate (default), 8 sheets and modals maximum; dots round. Avatars: the code's `Avatar32` is a 2px-radius square, while the old DESIGN.md said avatars stay circular; the kit follows the code (square) until decided.
 7. **Shadows:** none; no shadow family.
 8. **Weight unit:** lbs (code truth; DESIGN.md's kg is wrong).
-9. **Selected state:** `plate-bright` plus a `hairline-strong` edge and an `ink` check, never a red fill (the WP2 target; `hairline-strong` alone is below 3:1, so the surface step and the glyph are required).
+9. **Selected state:** `plate-bright` plus a `hairline-strong` edge and an `ink` check, never a red fill (shipped in WP2, jits-3eeg.3: `selectionSurface()` and `SelectCheck` in `components/ui/elo-system/selection.tsx`; `hairline-strong` alone is below 3:1, so the surface step and the glyph are required).
 10. **Motion values** live in the [Motion](#motion-1) section (the format has no motion family).
 11. **Logo:** the E·R lettermark SVGs; the old `apps/web/public/logo.svg` is retired; the wordmark is live Bebas Neue text, no file.
-12. **Wizard progress segments** in `signal-red` (MF-8) and the "VS" in red display type (MF-12) are treated as brand chrome until decided.
+12. **Wizard progress segments** in `signal-red` (MF-8) and the "VS" in red display type (MF-12) are treated as brand chrome until decided. WP2 kept them red under this decision; the color guard test allowlists them by name, so changing the decision is a one-line allowlist edit plus the two segment classes.
 13. **Destructive button:** an outline in `negative` (border and label; 6.28:1 on `void` dark, 6.37:1 light), proposed by the kit. The code has no ELO destructive button: today's `DestructiveButton` (one use, Delete account) fills with the legacy red under a `#E8EDF2` label at 3.54:1 and reads as a second red CTA.
-14. **Chip selected state:** `plate-bright` fill, `hairline-strong` border, `ink` label, no red square (the WP2 target, bead jits-3eeg.3). Today the active chip takes a Signal Red border and a 6px red square.
+14. **Chip selected state:** `plate-bright` fill, `hairline-strong` border, `ink` label, no red square (shipped in WP2, bead jits-3eeg.3). On this compact control the label's step from `ink-2` to `ink` stands in for the check glyph.
 15. **Circular elements (D-6):** only dots are round: live dots, status dots, seek markers. Avatars are square (as code). The round play buttons (`player-controls.tsx`, `match-hero.tsx`), the round seek thumb and the round check badges in the match flow (R3 FR-8) are non-conforming and take `radius-plate` / `radius-tag` when their package touches them.
 16. **Centered modals (D-4):** sheets are the default modal. The challenge prompt is a centered card by decision (jits-02vo.3). Compare Stats, the go-live location prompt and the start-blocked notice are centered today and are decided in WP1 (R3 SH-5): move to a sheet or record the exception here.
 17. **Contrast on media:** on-media text sits on `on-media-badge` or the light `on-media-chip` only (see [Color](#color)).
 
 ## Not synced
 
-Not carried into tokens: web-only values (the web `--size-*` type scale, the web z-index ladder, web `--opacity-*`, the shadcn `--chart-*` slots), `palette.ts` match-flow mirrors (`winRule`, `secondaryBg`, `secondaryBgPressed`, `selectedBg`, `track`), and the push accent `#ef4444` in `app.json` (native config). Components are static HTML twins hand-written from the RN sources (React Native cannot run in the preview frame); no bundle was built.
+Not carried into tokens: web-only values (the web `--size-*` type scale, the web z-index ladder, web `--opacity-*`, the shadcn `--chart-*` slots), `palette.ts` match-flow mirrors (`winRule`, `secondaryBg`, `secondaryBgPressed`, `track`), and the push accent `#ef4444` in `app.json` (native config). Components are static HTML twins hand-written from the RN sources (React Native cannot run in the preview frame); no bundle was built.
 
 ## Color
 
@@ -210,7 +210,11 @@ Chrome over a camera preview, a video or a photo does not follow the app theme. 
 - Use `gain-green` only for rating increases, wins and LIVE. A ready check, a confirmed result, an upload that finished and a recording light are not gains: draw them in `ink` with a glyph.
 - Use `attention` for draws, pressure, and pending, processing, paused or disputed states; its rules use `attention-rule`.
 - Use `heat-orange` and `heat-red` only on the Arena tab icon and the challenge afterglow.
-- Show a selected option with `plate-bright` plus a `hairline-strong` edge and an `ink` check glyph, never a red fill (WP2 target; the code still fills some radios, checkboxes and chips red).
+- Show a selected option with `plate-bright` plus a `hairline-strong` edge and an `ink` check glyph, never a red fill, edge, dot or check: `selectionSurface(selected)` and `SelectCheck` in `components/ui/elo-system/selection.tsx` (shipped in WP2). The Chip uses the surface step and an `ink` label without the glyph; the match flow uses `usePalette().panel` (the same `plate-bright`) and an `ink` check.
+- Tint spinners and pull-to-refresh `ink-3` (`textTertiary`) or `ink-2`, never red. Draw data bars (submission breakdown, weekly activity) in `ink-2` and the leader's rank numeral in `ink`: data is ink, the leader is marked by its red rule.
+- Draw a switch with the one neutral look, `switchColors()` in `components/ui/switch.tsx`: `ink` track when on, `ink-3` when off, a `void` thumb. Never a red or green track.
+- Tint icons with ink steps (`ink-2`, `ink-3`); a notification or section icon is never red or green.
+- `__tests__/components/ui/color-semantics-guard.test.ts` holds every file that still draws Signal Red or Gain Green, with its line count and the reason (a CTA fill, an "act" or leader rule, a negative, a gain, a win, LIVE, Arena heat, brand chrome under Open decision 12). A new red or green line fails until it is reviewed and listed.
 - Draw every border 1px in a hairline color; 2px (`stroke-edge`) and 3px (`stroke-rail`) widths exist only for state edges and rails.
 - Over media, use the `on-media-*` set (`ON_MEDIA` or `onMediaTokens`, never a new literal) and keep text on `on-media-badge` or the light `on-media-chip`.
 
@@ -218,7 +222,7 @@ Chrome over a camera preview, a video or a photo does not follow the app theme. 
 
 - Push notification accent `#ef4444` (Tailwind red-500) in `app.json:119` is not a brand color. The Android channel light in `lib/notifications/register-push.ts` now uses `signal-red` (WP7); the `app.json` value is native config and changes only with the next store build.
 - The splash files read the dark tokens (`darkTokens`, `onMediaTokens.white`) instead of hard-coding them (WP7). Their gold cap is the dark `attention` value, a sanctioned one-off for the launch moment, not a pattern.
-- `palette.ts` also carries `winRule`, `secondaryBg`, `secondaryBgPressed`, `selectedBg` (`rgba(230,57,70,0.16)`, a red tint that WP2 retires) and `track` for the match flow; they are JS mirrors, not kit tokens.
+- `palette.ts` also carries `winRule`, `secondaryBg`, `secondaryBgPressed` and `track` for the match flow; they are JS mirrors, not kit tokens. Its old `selectedBg` (`rgba(230,57,70,0.16)`, a red selection tint) was retired in WP2.
 - Legacy shadcn colors (`primary`, `muted`, `card`, `success` and friends) are retiring; see [Legacy](#legacy-retiring-wp4).
 
 ## Typography
@@ -754,7 +758,7 @@ Cards (Status family): **MetaTag**, **LivePill** (with LiveDot), **CountPill** (
 | `RollingNumber` | `components/ui/elo-system/rolling-number.tsx` | The odometer roll (600ms, once per result); mobile only |
 | `DeltaChip` | `components/ui/elo-system/delta-chip.tsx` | "▲ +14" pop after the roll; mobile only |
 | `DeltaNumber` | `components/ui/elo-system/delta-number.tsx` | Static signed delta, s 12 / m 16 / l 28 |
-| `RankRow` | `components/ui/elo-system/rank-row.tsx` | Ladder row; leader marked by a `signal-red` left rule. Its rank numeral is red today (R3 RK-1): it should be `ink` |
+| `RankRow` | `components/ui/elo-system/rank-row.tsx` | Ladder row; leader marked by a `signal-red` left rule; every rank numeral is data, the leader's in `ink` (WP2, R3 RK-1) |
 | `ParticipantRow`, `DataRow` | `components/ui/elo-system/` | `DataRow` is unused on mobile |
 | `Mono`, `StakesStrip`, `RatingBlock`, `StatusPlate` | `fight-ui.tsx` | Match-flow building blocks on `usePalette()` |
 
@@ -764,7 +768,7 @@ Cards (Data family): **EloTile**, **RollingNumber** (settled frame), **DeltaChip
 
 `EloTabBar` (`components/layout/elo-tab-bar.tsx`): four tabs (Home, Arena, Rankings, Profile) on `panel`, 18px lucide icons, `tab-label` text (`ink` active, `ink-3` inactive), a 2px `signal-red` top edge on the active tab, tab select bounce. `ArenaTabIcon` (`components/layout/arena-tab-icon.tsx`) draws lucide `Swords` as two blade halves so it can carry heat: live embers, countable embers (1 to 3 pending), blade clash. Headers are one system of three slots on the same 56px `panel` bar: `AppHeader` (pushed screens), `BrandHeader` (wordmark; Home, Rankings), `TabHeader` (Arena, Profile).
 
-Cards (Navigation family): **TabBar** (with the Arena icon's live ember and countable embers), **AppHeader** (with the header status chip) and **Chip**.
+Cards (Navigation family): **TabBar** (with the Arena icon's live ember and countable embers), **AppHeader** (with the header status chip) and **Chip** (shipped in WP2: selected = `plate-bright`, `hairline-strong`, `ink`).
 
 #### Surfaces
 
@@ -780,7 +784,7 @@ Cards (Feedback family): **Toast**, **Skeleton**.
 
 #### Inputs and overlays
 
-`SearchSelect` is the canonical picker. Every gorhom sheet (Share Profile through the shadcn `Sheet`, the notifications panel, the highlight pre-share and feedback sheets) shares one chrome from `components/ui/sheet.tsx` (WP1): `useSheetChrome()` gives the `panel` fill, `radius-sheet` top corners with a square bottom, a `hairline` top edge, the 30x4 `ink-3` handle, a background with no VoiceOver stop and the Reduce-Motion-aware present; `SheetBackdrop` is the `on-media-scrim` backdrop. `SheetTitle` and `DialogTitle` are DM Sans 700 14px caps, tracking 1.68px, `ink`, role header; descriptions are Inter 13px `ink-2`; `DialogContent` is a `panel` card with a `hairline` border and `radius-sheet`. Every modal backdrop is the one scrim: `bg-on-media-scrim` in classes, `ON_MEDIA.scrim` in style props. A dismissable backdrop is a labeled button and a sibling of the card, never its parent (so VoiceOver reaches the card's controls). `AuthFormField` and `EloField` fold into one form field (WP3/WP5 follow-ups). `Switch` still uses the legacy red track (R3 ST-1).
+`SearchSelect` is the canonical picker. Every gorhom sheet (Share Profile through the shadcn `Sheet`, the notifications panel, the highlight pre-share and feedback sheets) shares one chrome from `components/ui/sheet.tsx` (WP1): `useSheetChrome()` gives the `panel` fill, `radius-sheet` top corners with a square bottom, a `hairline` top edge, the 30x4 `ink-3` handle, a background with no VoiceOver stop and the Reduce-Motion-aware present; `SheetBackdrop` is the `on-media-scrim` backdrop. `SheetTitle` and `DialogTitle` are DM Sans 700 14px caps, tracking 1.68px, `ink`, role header; descriptions are Inter 13px `ink-2`; `DialogContent` is a `panel` card with a `hairline` border and `radius-sheet`. Every modal backdrop is the one scrim: `bg-on-media-scrim` in classes, `ON_MEDIA.scrim` in style props. A dismissable backdrop is a labeled button and a sibling of the card, never its parent (so VoiceOver reaches the card's controls). `AuthFormField` and `EloField` fold into one form field (WP3/WP5 follow-ups). `Switch` has the one neutral look since WP2 (R3 ST-1): `switchColors()` gives an `ink` track when on, `ink-3` when off and a `void` thumb, and the face-off record toggle shares it.
 
 **Sheets are the default modal.** A centered dialog is the documented exception for two cases (R3 SH-5, decided in WP1): a blocking prompt that must be answered and is not dismissed by a backdrop tap (the incoming challenge prompt by decision jits-02vo.3 with `radius-sheet`; `StartBlockedSheet`; `GoLiveLocationSheet`, which gates the system location prompt), and a short read-only overlay with no actions (`CompareStatsModal`, through `Dialog`). Anything else with actions or a list is a sheet.
 
@@ -814,7 +818,7 @@ The 20 cards in `components/`, by family (the `group` on each card):
 | Data | DeltaChip | `components/ui/elo-system/delta-chip.tsx` |
 | Navigation | TabBar (Arena icon live ember and countable embers) | `components/layout/elo-tab-bar.tsx`, `arena-tab-icon.tsx` |
 | Navigation | AppHeader (with the header status chip) | `components/layout/app-header.tsx`, `header-status-chip.tsx` |
-| Navigation | Chip (selected target: `plate-bright`, `hairline-strong`, `ink`) | `components/ui/elo-system/chip.tsx` |
+| Navigation | Chip (shipped, WP2; selected: `plate-bright`, `hairline-strong`, `ink`) | `components/ui/elo-system/chip.tsx` |
 | Surfaces | Plate | `components/ui/elo-system/plate.tsx` |
 | Surfaces | Sheet (shipped, WP1: 8px top corners) | `components/ui/sheet.tsx` (`useSheetChrome()`) and the direct sheets |
 | Feedback | Toast | `components/ui/toast.tsx` |
@@ -936,7 +940,7 @@ Defined in `apps/mobile/lib/tokens.ts` (`lightTokens`, `darkTokens`), mirrored a
 | `Dialog` | `components/ui/dialog.tsx` | 1 (Compare Stats), system-font title | Brand titles (WP1) |
 | `Sheet` | `components/ui/sheet.tsx` | 1 (Share Profile); since WP1 on the shared chrome (`panel`, 8px, brand title) | Kept: the one sheet shell, and home of `useSheetChrome()` / `SheetBackdrop` |
 | `Button` | `components/ui/button.tsx` | Admin screens, update banner, critical update modal | Replaced by the unified `Button` (WP3) |
-| `Switch` | `components/ui/switch.tsx` | 3 (settings, admin flags), red `primary` track | Neutral track (WP2) |
+| `Switch` | `components/ui/switch.tsx` | 3 (settings, admin flags, the face-off record toggle's colors) | Kept: since WP2 on ELO tokens with a neutral track (`switchColors()`), no legacy tokens |
 | `OfflineBanner` | `components/offline-banner.tsx` | Root layout | `panel` + `hairline-strong`, mono caps `ink` (WP4) |
 | Update banner and modal | `components/updates/*` | Root layout | ELO surfaces and the unified Button (WP4) |
 

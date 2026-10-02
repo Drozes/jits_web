@@ -16,6 +16,7 @@ import { TOS_TEXT, claimFailureView, inviteSetupBanner } from "@jits/shared/util
 import { AppHeader } from "@/components/layout/app-header";
 import { Plate } from "@/components/ui/elo-system";
 import { Button } from "@/components/ui/elo-system/button";
+import { SelectCheck, selectionSurface } from "@/components/ui/elo-system/selection";
 import { IdentityStep } from "@/components/profile-setup/identity-step";
 import { FREE_AGENT_OPTION, type WizardValues } from "@/components/profile-setup/types";
 import { useAuth } from "@/lib/auth/hooks";
@@ -160,10 +161,10 @@ export default function InviteSetupScreen() {
             <View
               className={cn(
                 "h-5 w-5 items-center justify-center rounded-xs border",
-                waiverAccepted ? "bg-cta border-cta" : "border-hairline-strong bg-surface-3",
+                selectionSurface(waiverAccepted),
               )}
             >
-              {waiverAccepted ? <Text className="font-heading text-[12px] text-ink-on-cta">✓</Text> : null}
+              {waiverAccepted ? <SelectCheck size={13} /> : null}
             </View>
             <Text className="flex-1 font-body text-[14px] text-ink">
               I accept the ELO RATED terms and liability waiver.
@@ -178,7 +179,7 @@ export default function InviteSetupScreen() {
         </Plate>
 
         {underage ? (
-          <Text testID="invite-setup-underage" accessibilityRole="alert" className="font-body text-[14px] text-cta">
+          <Text testID="invite-setup-underage" accessibilityRole="alert" className="font-body text-[14px] text-negative">
             {UNDERAGE_COPY}
           </Text>
         ) : null}
@@ -186,7 +187,7 @@ export default function InviteSetupScreen() {
           <Text className="font-body text-[12px] text-ink-3">Accept the waiver to continue.</Text>
         ) : null}
         {error ? (
-          <Text accessibilityRole="alert" className="font-body text-[14px] text-cta">
+          <Text accessibilityRole="alert" className="font-body text-[14px] text-negative">
             {error}
           </Text>
         ) : null}

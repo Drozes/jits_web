@@ -120,10 +120,10 @@ export function UploadProgressBanner({
       <View
         testID="upload-status-banner"
         accessibilityLiveRegion="polite"
-        className="w-full flex-row items-center gap-2 rounded-xs bg-surface-3 border border-positive px-3 py-2"
+        className="w-full flex-row items-center gap-2 rounded-xs bg-surface-3 border border-hairline-strong px-3 py-2"
       >
-        <CheckCircle2 size={14} color={tokens.statePositive} />
-        <Text className="font-mono text-[10px] text-positive uppercase tracking-caps-l">
+        <CheckCircle2 size={14} color={tokens.textPrimary} />
+        <Text className="font-mono text-[10px] text-ink uppercase tracking-caps-l">
           Match video uploaded
         </Text>
       </View>

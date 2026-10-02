@@ -28,7 +28,7 @@ export function WeeklyActivitySection({ weeks }: WeeklyActivitySectionProps) {
                 <View className="w-full justify-end" style={{ height: 48 }}>
                   {w.matches > 0 && (
                     <View
-                      className="w-full bg-cta rounded-xs"
+                      className="w-full bg-ink-2 rounded-xs"
                       style={{ height: `${height}%` }}
                     />
                   )}

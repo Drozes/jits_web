@@ -92,7 +92,7 @@ export default function AthleteProfileScreen() {
       <View className="flex-1 bg-surface">
         <AppHeader title="Athlete" back />
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator color={tokens.accentCta} />
+          <ActivityIndicator color={tokens.textTertiary} />
         </View>
       </View>
     );

@@ -22,3 +22,4 @@ export { RankRow } from "./rank-row";
 export { RollingNumber, usePlayOnce, ROLL_MS } from "./rolling-number";
 export { DeltaChip, formatDeltaChip, spokenDelta } from "./delta-chip";
 export { Button, DISABLED_OPACITY, BUTTON_RADIUS, BUTTON_HEIGHT, BUTTON_MAX_FONT_SCALE, type ButtonProps, type ButtonVariant } from "./button";
+export { SELECTED_SURFACE, UNSELECTED_SURFACE, selectionSurface, SelectCheck } from "./selection";
