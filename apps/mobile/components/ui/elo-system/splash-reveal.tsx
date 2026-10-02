@@ -57,8 +57,8 @@ function Bar({ progress, maxHeight }: { progress: SharedValue<number>; maxHeight
 /**
  * The "climb" launch splash (Motion Rule registry: Launch splash reveal, a
  * Moment, once per cold start). Reduce Motion is read with `useReduceMotion()`
- * (correct on the first frame); a late flip to on snaps to the resting frame
- * without moving the dismiss. The odometer is the registered `RollingNumber`
+ * (correct on the first frame); a late flip to on snaps to the resting frame,
+ * drops the pending lock haptic and dismisses after at most the reduced hold. The odometer is the registered `RollingNumber`
  * on the UI thread (no per-frame setState), rolling the whole climb over
  * NUMBER_ROLL_MS on the out-cubic curve it always used.
  */
@@ -91,8 +91,23 @@ export function SplashReveal({ targetElo, onDone }: SplashRevealProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // The pending lock haptic and dismiss, kept so a late Reduce Motion switch
+  // can drop the haptic and shorten the hold (see the effect below).
+  const startedAtRef = React.useRef(0);
+  const hapticTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dismissTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dismissFnRef = React.useRef<() => void>(() => undefined);
+  const scheduleDismiss = React.useCallback((ms: number) => {
+    if (dismissTimerRef.current != null) clearTimeout(dismissTimerRef.current);
+    dismissTimerRef.current = setTimeout(() => {
+      dismissTimerRef.current = null;
+      dismissFnRef.current();
+    }, ms);
+  }, []);
+
   React.useEffect(() => {
     const timers: ReturnType<typeof setTimeout>[] = [];
+    startedAtRef.current = Date.now();
 
     // Hand the native splash off to this overlay (identical Void bg → no seam).
     SplashScreen.hideAsync().catch(() => {});
@@ -130,27 +145,42 @@ export function SplashReveal({ targetElo, onDone }: SplashRevealProps) {
     );
 
     // Felt "lock": the THX-style signature, on the wordmark beat.
-    timers.push(
-      setTimeout(() => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
-      }, S.WORDMARK_DELAY_MS),
-    );
+    hapticTimerRef.current = setTimeout(() => {
+      hapticTimerRef.current = null;
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
+    }, S.WORDMARK_DELAY_MS);
 
-    timers.push(setTimeout(onDone, S.TOTAL_MS));
+    dismissFnRef.current = onDone;
+    scheduleDismiss(S.TOTAL_MS);
 
-    return () => timers.forEach(clearTimeout);
+    return () => {
+      timers.forEach(clearTimeout);
+      if (hapticTimerRef.current != null) clearTimeout(hapticTimerRef.current);
+      if (dismissTimerRef.current != null) clearTimeout(dismissTimerRef.current);
+    };
     // Mount-only: the reveal plays once per cold start.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Reduce Motion switched on mid-reveal: snap to the resting frame (the
-  // odometer remounts on its final value); the dismiss keeps its moment.
+  // odometer remounts on its final value), no lock haptic, and the dismiss
+  // comes after at most the reduced-motion hold.
   const startedReduced = React.useRef(reduceMotion).current;
   React.useEffect(() => {
     if (!reduceMotion || startedReduced) return;
     rest();
+    // No lock haptic and no full hold for a late Reduce Motion read: drop the
+    // pending haptic and dismiss after at most the reduced-motion hold.
+    if (hapticTimerRef.current != null) {
+      clearTimeout(hapticTimerRef.current);
+      hapticTimerRef.current = null;
+    }
+    if (dismissTimerRef.current != null) {
+      const remaining = Math.max(0, S.TOTAL_MS - (Date.now() - startedAtRef.current));
+      scheduleDismiss(Math.min(remaining, S.REDUCED_MOTION_HOLD_MS));
+    }
     setRollKey((k) => k + 1);
-  }, [reduceMotion, startedReduced, rest]);
+  }, [reduceMotion, startedReduced, rest, scheduleDismiss]);
 
   const peakStyle = useAnimatedStyle(() => ({ transform: [{ scale: peak.value }] }));
   const numStyle = useAnimatedStyle(() => ({ opacity: numOpacity.value }));

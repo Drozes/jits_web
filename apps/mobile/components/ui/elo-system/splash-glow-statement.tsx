@@ -144,7 +144,8 @@ interface SplashGlowStatementProps {
  * "Glow Statement" launch splash (Motion Rule registry: Launch splash reveal,
  * a Moment, once per cold start). Reduce Motion is read with
  * `useReduceMotion()` (correct on the first frame); a late flip to on snaps
- * to the resting frame without moving the dismiss.
+ * to the resting frame, drops the pending lock haptic and dismisses after at
+ * most the reduced hold.
  */
 export function SplashGlowStatement({ onDone }: SplashGlowStatementProps) {
   // DM Sans mark layers. Frame 0 = the static splash: mark fully on. The mark holds
@@ -180,8 +181,23 @@ export function SplashGlowStatement({ onDone }: SplashGlowStatementProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // The pending lock haptic and dismiss, kept so a late Reduce Motion switch
+  // can drop the haptic and shorten the hold (see the effect below).
+  const startedAtRef = React.useRef(0);
+  const hapticTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dismissTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dismissFnRef = React.useRef<() => void>(() => undefined);
+  const scheduleDismiss = React.useCallback((ms: number) => {
+    if (dismissTimerRef.current != null) clearTimeout(dismissTimerRef.current);
+    dismissTimerRef.current = setTimeout(() => {
+      dismissTimerRef.current = null;
+      dismissFnRef.current();
+    }, ms);
+  }, []);
+
   React.useEffect(() => {
     const timers: ReturnType<typeof setTimeout>[] = [];
+    startedAtRef.current = Date.now();
 
     // Hand the native splash off to this overlay (identical Void bg → no seam).
     SplashScreen.hideAsync().catch(() => {});
@@ -216,27 +232,41 @@ export function SplashGlowStatement({ onDone }: SplashGlowStatementProps) {
 
     // LOCK: a Heavy haptic + "ARE YOU?" rises in red (right-aligned).
     areyou.value = withDelay(S.AREYOU_DELAY_MS, withTiming(1, { duration: S.AREYOU_MS, easing: EASE }));
-    timers.push(
-      setTimeout(() => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
-      }, S.HAPTIC_DELAY_MS),
-    );
+    hapticTimerRef.current = setTimeout(() => {
+      hapticTimerRef.current = null;
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
+    }, S.HAPTIC_DELAY_MS);
 
-    timers.push(setTimeout(dismiss, S.TOTAL_MS));
+    dismissFnRef.current = dismiss;
+    scheduleDismiss(S.TOTAL_MS);
 
-    return () => timers.forEach(clearTimeout);
+    return () => {
+      timers.forEach(clearTimeout);
+      if (hapticTimerRef.current != null) clearTimeout(hapticTimerRef.current);
+      if (dismissTimerRef.current != null) clearTimeout(dismissTimerRef.current);
+    };
     // Mount-only: the statement plays once per cold start.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Reduce Motion switched on mid-reveal: snap to the resting frame; the
-  // dismiss keeps its moment.
+  // Reduce Motion switched on mid-reveal: snap to the resting frame, no lock
+  // haptic, and the dismiss comes after at most the reduced-motion hold.
   const startedReduced = React.useRef(reduceMotion).current;
   React.useEffect(() => {
     if (!reduceMotion || startedReduced) return;
     rest();
+    // No lock haptic and no full hold for a late Reduce Motion read: drop the
+    // pending haptic and dismiss after at most the reduced-motion hold.
+    if (hapticTimerRef.current != null) {
+      clearTimeout(hapticTimerRef.current);
+      hapticTimerRef.current = null;
+    }
+    if (dismissTimerRef.current != null) {
+      const remaining = Math.max(0, S.TOTAL_MS - (Date.now() - startedAtRef.current));
+      scheduleDismiss(Math.min(remaining, S.REDUCED_MOTION_HOLD_MS));
+    }
     intro.value = 1;
-  }, [reduceMotion, startedReduced, rest, intro]);
+  }, [reduceMotion, startedReduced, rest, intro, scheduleDismiss]);
 
   const weareStyle = useAnimatedStyle(() => ({
     opacity: weare.value,

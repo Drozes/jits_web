@@ -146,3 +146,51 @@ describe("SplashGlowStatement", () => {
     expect(mockImpact).not.toHaveBeenCalled();
   });
 });
+
+describe("a late Reduce Motion read (before the lock beat) drops the haptic and the full hold", () => {
+  it("SplashReveal: no Heavy haptic, dismisses after the reduced hold", () => {
+    const onDone = jest.fn();
+    render(<SplashReveal targetElo={1481} onDone={onDone} />);
+    advance(320);
+    expect(320).toBeLessThan(SPLASH_REVEAL.WORDMARK_DELAY_MS);
+    act(() => __setReduceMotionForTests(true));
+    advance(SPLASH_REVEAL.REDUCED_MOTION_HOLD_MS - 32);
+    expect(onDone).not.toHaveBeenCalled();
+    advance(64);
+    expect(onDone).toHaveBeenCalledTimes(1);
+    advance(SPLASH_REVEAL.TOTAL_MS);
+    expect(onDone).toHaveBeenCalledTimes(1);
+    expect(mockImpact).not.toHaveBeenCalled();
+  });
+
+  it("SplashStatement: no Heavy haptic, dismiss starts after the reduced hold", () => {
+    const onDone = jest.fn();
+    render(<SplashStatement onDone={onDone} />);
+    advance(320);
+    expect(320).toBeLessThan(SPLASH_STATEMENT.HAPTIC_DELAY_MS);
+    act(() => __setReduceMotionForTests(true));
+    advance(SPLASH_STATEMENT.REDUCED_MOTION_HOLD_MS + SPLASH_STATEMENT.FADEOUT_MS + 96);
+    expect(onDone).toHaveBeenCalledTimes(1);
+    // Well before the full-motion dismiss would have begun.
+    expect(320 + SPLASH_STATEMENT.REDUCED_MOTION_HOLD_MS + SPLASH_STATEMENT.FADEOUT_MS + 96).toBeLessThan(SPLASH_STATEMENT.TOTAL_MS);
+    advance(SPLASH_STATEMENT.TOTAL_MS);
+    expect(onDone).toHaveBeenCalledTimes(1);
+    expect(mockImpact).not.toHaveBeenCalled();
+  });
+
+  it("SplashGlowStatement: no Heavy haptic, dismiss starts after the reduced hold", () => {
+    const onDone = jest.fn();
+    render(<SplashGlowStatement onDone={onDone} />);
+    advance(320);
+    expect(320).toBeLessThan(SPLASH_GLOW_STATEMENT.HAPTIC_DELAY_MS);
+    act(() => __setReduceMotionForTests(true));
+    advance(SPLASH_GLOW_STATEMENT.REDUCED_MOTION_HOLD_MS + SPLASH_GLOW_STATEMENT.FADEOUT_MS + 96);
+    expect(onDone).toHaveBeenCalledTimes(1);
+    expect(320 + SPLASH_GLOW_STATEMENT.REDUCED_MOTION_HOLD_MS + SPLASH_GLOW_STATEMENT.FADEOUT_MS + 96).toBeLessThan(
+      SPLASH_GLOW_STATEMENT.TOTAL_MS,
+    );
+    advance(SPLASH_GLOW_STATEMENT.TOTAL_MS);
+    expect(onDone).toHaveBeenCalledTimes(1);
+    expect(mockImpact).not.toHaveBeenCalled();
+  });
+});
