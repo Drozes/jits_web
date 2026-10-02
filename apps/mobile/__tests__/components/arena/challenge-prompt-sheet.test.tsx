@@ -1327,6 +1327,44 @@ describe("ChallengePromptSheet Adding Flare (jits-pddd.3): accept sweep, sheen, 
     expect(mockImpact).toHaveBeenCalledTimes(1);
   });
 
+  it("a failed accept (busy settles with the same challenge still up) returns to Accept with its sheen", () => {
+    const onAccept = jest.fn();
+    const screen = render(<Sheet onAccept={onAccept} />);
+    act(() => jest.advanceTimersByTime(PROMPT_INPUT_GUARD_MS));
+    fireEvent.press(screen.getByLabelText("Accept challenge"));
+    screen.rerender(<Sheet onAccept={onAccept} busy />);
+    expect(screen.getByTestId("challenge-prompt-accept-text")).toHaveTextContent("Accepted", { exact: true });
+
+    // The accept was stopped: the answer settled and the prompt stayed up.
+    screen.rerender(<Sheet onAccept={onAccept} busy={false} />);
+    expect(screen.getByTestId("challenge-prompt-accept-text")).toHaveTextContent("Accept", { exact: true });
+    expect(screen.queryByTestId("challenge-prompt-accept-sweep", HIDDEN)).toBeNull();
+    expect(screen.getByTestId("challenge-prompt-accept-sheen", HIDDEN)).toBeTruthy();
+    expect(screen.getByTestId("challenge-prompt-accept").props.accessibilityValue?.text).toBeUndefined();
+
+    // And it can be answered again, with its sweep and one more haptic.
+    fireEvent.press(screen.getByLabelText("Accept challenge"));
+    expect(onAccept).toHaveBeenCalledTimes(2);
+    expect(mockImpact).toHaveBeenCalledTimes(2);
+    expect(screen.getByTestId("challenge-prompt-accept-text")).toHaveTextContent("Accepted", { exact: true });
+  });
+
+  it("busy settling without an accept, or for another challenge, changes nothing", () => {
+    const screen = render(<Sheet busy />);
+    screen.rerender(<Sheet busy={false} />);
+    expect(screen.getByTestId("challenge-prompt-accept-text")).toHaveTextContent("Accept", { exact: true });
+  });
+
+  it("VoiceOver keeps the label and hears Accepted as the value after the tap", () => {
+    const screen = render(<Sheet />);
+    act(() => jest.advanceTimersByTime(PROMPT_INPUT_GUARD_MS));
+    const button = () => screen.getByTestId("challenge-prompt-accept");
+    expect(button().props.accessibilityValue?.text).toBeUndefined();
+    fireEvent.press(screen.getByLabelText("Accept challenge"));
+    expect(button().props.accessibilityLabel).toBe("Accept challenge");
+    expect(button().props.accessibilityValue?.text).toBe("Accepted");
+  });
+
   it("a new appearance starts unaccepted", () => {
     const screen = render(<Sheet />);
     act(() => jest.advanceTimersByTime(PROMPT_INPUT_GUARD_MS));

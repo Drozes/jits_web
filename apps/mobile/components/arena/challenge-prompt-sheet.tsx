@@ -376,6 +376,19 @@ export function ChallengePromptSheet({
   }, [onAccept, challengeId]);
   const accepted = shown !== null && acceptedId === shown.challenge.challengeId;
 
+  // A failed accept: the answer settled (busy true to false) and the same
+  // challenge is still up (use-arena-challenge's "stop" path and its
+  // no-current-challenge return keep the prompt). The button goes back to
+  // Accept, with its sheen, so the athlete can answer again.
+  const wasBusyRef = React.useRef(busy);
+  React.useEffect(() => {
+    const wasBusy = wasBusyRef.current;
+    wasBusyRef.current = busy;
+    if (wasBusy && !busy && challengeId !== null && acceptedId === challengeId) {
+      setAcceptedId(null);
+    }
+  }, [busy, challengeId, acceptedId]);
+
   return (
     <Modal
       key={modalKey}
@@ -650,6 +663,9 @@ function PromptActions({
           testID="challenge-prompt-accept"
           accessibilityRole="button"
           accessibilityLabel="Accept challenge"
+          // The label stays "Accept challenge" (the match-loop harness taps
+          // it); VoiceOver hears "Accepted" as the value after the tap.
+          accessibilityValue={accepted ? { text: "Accepted" } : undefined}
           accessibilityState={{ disabled }}
           onPress={onAccept}
           disabled={disabled}
