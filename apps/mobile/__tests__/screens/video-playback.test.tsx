@@ -438,7 +438,10 @@ async function renderLoadedPlayer(opts: { videos?: number; analysis?: unknown } 
   );
   mockGetVideoAnalysis.mockResolvedValue(opts.analysis ?? ANALYSIS);
   const utils = render(React.createElement(MatchVideoScreen));
-  await waitFor(() => expect(mockPlayers.length).toBe(1));
+  // The first full Film Room render loads and transforms the controls on a
+  // cold jest cache (always the case on CI): ~1 s on a Linux runner, past
+  // waitFor's 1 s default, then ~200 ms warm (jits-psyv).
+  await waitFor(() => expect(mockPlayers.length).toBe(1), { timeout: 5000 });
   act(() => {
     lastPlayer().onPlaybackStatusUpdate({ isLoaded: true, positionMillis: 0, durationMillis: 400_000, shouldPlay: true });
   });
