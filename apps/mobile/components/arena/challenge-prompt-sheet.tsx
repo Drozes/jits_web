@@ -47,7 +47,12 @@
 import * as React from "react";
 import { Keyboard, Modal, ScrollView, Text, View, useWindowDimensions } from "react-native";
 import { SafeAreaInsetsContext } from "react-native-safe-area-context";
-import * as Haptics from "expo-haptics";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withTiming,
+} from "react-native-reanimated";
 import type { IncomingChallenge } from "@/lib/arena/use-arena-challenge";
 import { PROMPT_INPUT_GUARD_MS } from "@/lib/arena/constants";
 import {
@@ -62,6 +67,9 @@ import { FIGHT_RADIUS } from "@/components/match-flow/fight/fight-tokens";
 import { usePalette } from "@/lib/theme/palette";
 import { InitialsBlock, Mono, StakesStrip, shortName } from "@/components/match-flow/fight/fight-ui";
 import { StatePressable } from "@/components/ui/state-pressable";
+import { PressableScale } from "@/components/ui/pressable-scale";
+import { SteelSheen } from "@/components/ui/steel-sheen";
+import { duration, easing, haptics, useReduceMotion } from "@/lib/motion";
 import { ModalToaster } from "@/components/ui/toast";
 import { OfflineBanner } from "@/components/offline-banner";
 
@@ -106,6 +114,15 @@ export function promptCardHeight(
 const blockClose = () => {};
 
 const NO_INSETS = { top: 0, bottom: 0, left: 0, right: 0 };
+
+/**
+ * The accept sweep (Motion Rule, Moment, registry row "Accept sweep"): the
+ * fill crosses the Accept button left to right in this long, then one glint
+ * passes. Cosmetic only: the accept call has already been made.
+ */
+export const ACCEPT_SWEEP_MS = 260;
+/** The accept glint's band width before the skew. */
+const GLINT_WIDTH = 24;
 
 /**
  * The live window (AC-S1): m:ss until 10 minutes after the challenge was
@@ -273,6 +290,10 @@ export function ChallengePromptSheet({
   // Warning notification: it wants an answer). Keyed by id so a re-render
   // with the same challenge never buzzes twice.
   const buzzedIdRef = React.useRef<string | null>(null);
+  // The challenge this athlete tapped Accept on. The button keeps its
+  // "Accepted" fill through the fade-out; a new appearance (a new challenge,
+  // or the same one shown again) starts unaccepted.
+  const [acceptedId, setAcceptedId] = React.useState<string | null>(null);
   // The input guard (AC-S3) runs for exactly PROMPT_INPUT_GUARD_MS from each
   // APPEARANCE: a new challenge, or the same one brought back up from the
   // chip after Later. A re-render with the same challenge while it is showing
@@ -310,6 +331,7 @@ export function ChallengePromptSheet({
       if (shownIdRef.current !== challenge.challengeId) {
         shownIdRef.current = challenge.challengeId;
         armGuard();
+        setAcceptedId(null);
         // A focused field's keyboard is its own window on iOS and would stay
         // above the Modal, covering Decline, Accept and Later on a small
         // phone. The prompt has no inputs, so the keyboard just goes away.
@@ -317,9 +339,9 @@ export function ChallengePromptSheet({
       }
       if (buzzedIdRef.current !== challenge.challengeId) {
         buzzedIdRef.current = challenge.challengeId;
-        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(
-          () => undefined,
-        );
+        // The ONE challengeArrived haptic in the app (Motion Rule): nothing
+        // else buzzes for a new challenge.
+        void haptics.challengeArrived();
       }
     } else {
       shownIdRef.current = null;
@@ -343,6 +365,16 @@ export function ChallengePromptSheet({
 
   // No answers from a card that is fading out after its challenge cleared.
   const inputDisabled = busy || guardActive || !visible;
+
+  // Accept: the answer goes out FIRST and at once; the haptic and the sweep
+  // are cosmetic and never delay it. `accept` replaces `press` here.
+  const challengeId = challenge?.challengeId ?? null;
+  const handleAccept = React.useCallback(() => {
+    onAccept();
+    void haptics.accept();
+    setAcceptedId(challengeId);
+  }, [onAccept, challengeId]);
+  const accepted = shown !== null && acceptedId === shown.challenge.challengeId;
 
   return (
     <Modal
@@ -452,7 +484,8 @@ export function ChallengePromptSheet({
                 <PromptActions
                   busy={busy}
                   disabled={inputDisabled}
-                  onAccept={guarded(onAccept)}
+                  accepted={accepted}
+                  onAccept={guarded(handleAccept)}
                   onDecline={guarded(onDecline)}
                   onLater={onLater ? guarded(onLater) : undefined}
                 />
@@ -561,12 +594,14 @@ function PromptChallenger({ challenge }: { challenge: IncomingChallenge }) {
 function PromptActions({
   busy,
   disabled,
+  accepted,
   onAccept,
   onDecline,
   onLater,
 }: {
   busy: boolean;
   disabled: boolean;
+  accepted: boolean;
   onAccept: () => void;
   onDecline: () => void;
   onLater?: () => void;
@@ -577,7 +612,7 @@ function PromptActions({
       {/* Thumb zone (AC-S2): 56pt, Decline 1/3 outline, Accept 2/3 in Signal
           Red, the prompt's one red CTA. */}
       <View style={{ flexDirection: "row", gap: 12 }}>
-        <StatePressable
+        <PressableScale
           testID="challenge-prompt-decline"
           accessibilityRole="button"
           accessibilityLabel="Decline challenge"
@@ -607,8 +642,11 @@ function PromptActions({
           >
             Decline
           </Text>
-        </StatePressable>
-        <StatePressable
+        </PressableScale>
+        {/* Press scale, the accept sweep and the steel sheen (Motion Rule).
+            The `accept` haptic fires from the sheet's accept handler, so no
+            `haptic` prop here: one haptic per tap. */}
+        <PressableScale
           testID="challenge-prompt-accept"
           accessibilityRole="button"
           accessibilityLabel="Accept challenge"
@@ -621,12 +659,16 @@ function PromptActions({
             alignItems: "center",
             justifyContent: "center",
             borderRadius: FIGHT_RADIUS.button,
-            backgroundColor: pressed ? p.ctaPressed : p.cta,
-            opacity: busy ? 0.6 : 1,
+            // Clips the sweep, the glint and the sheen to the button.
+            overflow: "hidden",
+            backgroundColor: pressed && !accepted ? p.ctaPressed : p.cta,
+            // Accepted stays at full strength while the answer is in flight.
+            opacity: busy && !accepted ? 0.6 : 1,
           })}
         >
-          {/* Visible "ACCEPT" (spec 5); the harness and VoiceOver keep the
-              label "Accept challenge". */}
+          <AcceptSweep accepted={accepted} fill={p.ctaPressed} />
+          {/* Visible "ACCEPT", then "ACCEPTED" once tapped (spec 5); the
+              harness and VoiceOver keep the label "Accept challenge". */}
           <Text
             testID="challenge-prompt-accept-text"
             numberOfLines={1}
@@ -634,9 +676,11 @@ function PromptActions({
             className="font-heading uppercase"
             style={{ fontSize: 14, letterSpacing: 1.12, color: p.onCta }}
           >
-            Accept
+            {accepted ? "Accepted" : "Accept"}
           </Text>
-        </StatePressable>
+          {/* Waiting on this athlete: the one sheened button on screen. */}
+          <SteelSheen active={!disabled && !accepted} testID="challenge-prompt-accept-sheen" />
+        </PressableScale>
       </View>
       {onLater ? (
         // A plain text button (AC-S7). Tucks the prompt into the header chip
@@ -666,6 +710,90 @@ function PromptActions({
           </Text>
         </StatePressable>
       ) : null}
+    </View>
+  );
+}
+
+/**
+ * The accept sweep's fill and glint, drawn under the Accept label. The fill
+ * (the lifted Signal Red, since the button is already Signal Red) scales
+ * from the left edge to full width over `ACCEPT_SWEEP_MS`, then one white
+ * glint crosses it, and both rest. Plays once, on the tap (accepted false to
+ * true); a remount of an accepted button shows it filled and still. Reduce
+ * Motion: filled at once, no glint.
+ */
+function AcceptSweep({ accepted, fill }: { accepted: boolean; fill: string }) {
+  const reduceMotion = useReduceMotion();
+  const progress = useSharedValue(accepted ? 1 : 0);
+  // 0 parks the glint off the left edge, 1 is past the right edge.
+  const glint = useSharedValue(0);
+  const [width, setWidth] = React.useState(0);
+  const wasAccepted = React.useRef(accepted);
+
+  React.useEffect(() => {
+    const was = wasAccepted.current;
+    wasAccepted.current = accepted;
+    if (!accepted) {
+      progress.value = 0;
+      glint.value = 0;
+      return;
+    }
+    if (was) return;
+    if (reduceMotion) {
+      progress.value = 1;
+      return;
+    }
+    progress.value = withTiming(1, { duration: ACCEPT_SWEEP_MS, easing: easing.brandOut });
+    glint.value = withDelay(
+      ACCEPT_SWEEP_MS,
+      withTiming(1, { duration: duration.fast, easing: easing.brandOut }),
+    );
+  }, [accepted, reduceMotion, progress, glint]);
+
+  const fillStyle = useAnimatedStyle(() => ({
+    transform: [{ scaleX: progress.value }],
+  }));
+  const glintStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: -GLINT_WIDTH * 2 + glint.value * (width + GLINT_WIDTH * 3) },
+      { skewX: "-20deg" },
+    ],
+  }));
+
+  if (!accepted) return null;
+  return (
+    <View
+      testID="challenge-prompt-accept-sweep"
+      pointerEvents="none"
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      onLayout={(e) => setWidth(Math.round(e.nativeEvent.layout.width))}
+      style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0 }}
+    >
+      <Animated.View
+        testID="challenge-prompt-accept-fill"
+        style={[
+          { position: "absolute", top: 0, right: 0, bottom: 0, left: 0 },
+          { backgroundColor: fill, transformOrigin: "left" },
+          fillStyle,
+        ]}
+      />
+      {reduceMotion ? null : (
+        <Animated.View
+          testID="challenge-prompt-accept-glint"
+          style={[
+            {
+              position: "absolute",
+              top: 0,
+              bottom: 0,
+              left: 0,
+              width: GLINT_WIDTH,
+              backgroundColor: "rgba(255,255,255,0.35)",
+            },
+            glintStyle,
+          ]}
+        />
+      )}
     </View>
   );
 }

@@ -25,9 +25,13 @@ import { Keyboard, Modal, ScrollView, StyleSheet } from "react-native";
 import { SafeAreaInsetsContext } from "react-native-safe-area-context";
 
 const mockNotify = jest.fn((_type: unknown) => Promise.resolve());
+const mockImpact = jest.fn((_style: unknown) => Promise.resolve());
 jest.mock("expo-haptics", () => ({
   notificationAsync: (t: unknown) => mockNotify(t),
+  impactAsync: (s: unknown) => mockImpact(s),
+  selectionAsync: () => Promise.resolve(),
   NotificationFeedbackType: { Success: "success", Warning: "warning", Error: "error" },
+  ImpactFeedbackStyle: { Light: "light", Medium: "medium", Heavy: "heavy" },
 }));
 
 jest.mock("@/lib/theme/use-theme", () => ({
@@ -104,6 +108,9 @@ import { __resetServerClockForTests } from "@/lib/arena/incoming-challenges";
 import { formatCountdown, useFreshCountdown } from "@/lib/arena/fresh-countdown";
 import { paletteFor } from "@/lib/theme/palette";
 import type { IncomingChallenge } from "@/lib/arena/use-arena-challenge";
+import { getAnimatedStyle } from "react-native-reanimated";
+import { __setReduceMotionForTests } from "@/lib/motion";
+import { ACCEPT_SWEEP_MS } from "@/components/arena/challenge-prompt-sheet";
 
 const RIVAL: IncomingChallenge = {
   challengeId: "ch-1",
@@ -133,6 +140,8 @@ beforeEach(() => {
   mockGetEloStakes.mockReset();
   mockGetEloStakes.mockResolvedValue(null);
   mockNotify.mockClear();
+  mockImpact.mockClear();
+  __setReduceMotionForTests(false);
   mockWatchdogOnShow.mockClear();
   mockWatchdogKey = 0;
   mockUseRealWatchdog = false;
@@ -1231,5 +1240,145 @@ describe("ChallengePromptSheet fade-out accessibility", () => {
     // So the title the match-loop harness looks for is gone from the tree.
     expect(queryByText("INCOMING CHALLENGE")).toBeNull();
     expect(queryByText("INCOMING CHALLENGE", { includeHiddenElements: true })).toBeTruthy();
+  });
+});
+
+describe("ChallengePromptSheet Adding Flare (jits-pddd.3): accept sweep, sheen, haptics", () => {
+  const HIDDEN = { includeHiddenElements: true } as const;
+
+  function fillScale(screen: Screen): number {
+    const style = getAnimatedStyle(
+      screen.getByTestId("challenge-prompt-accept-fill", HIDDEN),
+    ) as { transform?: { scaleX?: number }[] };
+    return (style.transform ?? []).find((t) => t.scaleX !== undefined)?.scaleX ?? NaN;
+  }
+
+  beforeEach(() => {
+    jest.useFakeTimers({ now: NOW });
+  });
+
+  afterEach(() => {
+    __setReduceMotionForTests(false);
+  });
+
+  it("routes the arrival buzz through challengeArrived: one Warning per id, no impact", () => {
+    const screen = render(<Sheet />);
+    expect(mockNotify).toHaveBeenCalledTimes(1);
+    expect(mockNotify).toHaveBeenCalledWith("warning");
+    screen.rerender(<Sheet challenge={{ ...RIVAL }} />);
+    expect(mockNotify).toHaveBeenCalledTimes(1);
+    expect(mockImpact).not.toHaveBeenCalled();
+  });
+
+  it("Accept answers at once, buzzes accept (Medium) once and never press (Light)", () => {
+    const onAccept = jest.fn();
+    const screen = render(<Sheet onAccept={onAccept} />);
+    act(() => jest.advanceTimersByTime(PROMPT_INPUT_GUARD_MS));
+
+    fireEvent.press(screen.getByLabelText("Accept challenge"));
+    // The answer is not held back by the animation.
+    expect(onAccept).toHaveBeenCalledTimes(1);
+    expect(mockImpact).toHaveBeenCalledTimes(1);
+    expect(mockImpact).toHaveBeenCalledWith("medium");
+    expect(mockImpact).not.toHaveBeenCalledWith("light");
+  });
+
+  it("a tap dropped by the input guard neither sweeps nor buzzes", () => {
+    const onAccept = jest.fn();
+    const screen = render(<Sheet onAccept={onAccept} />);
+    fireEvent.press(screen.getByLabelText("Accept challenge"));
+    expect(onAccept).not.toHaveBeenCalled();
+    expect(mockImpact).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("challenge-prompt-accept-sweep", HIDDEN)).toBeNull();
+    expect(screen.getByTestId("challenge-prompt-accept-text")).toHaveTextContent("Accept", { exact: true });
+  });
+
+  it("sweeps the fill left to right, glints once, and swaps the label to Accepted", () => {
+    const screen = render(<Sheet />);
+    act(() => jest.advanceTimersByTime(PROMPT_INPUT_GUARD_MS));
+    expect(screen.queryByTestId("challenge-prompt-accept-sweep", HIDDEN)).toBeNull();
+
+    fireEvent.press(screen.getByLabelText("Accept challenge"));
+    expect(screen.getByTestId("challenge-prompt-accept-text")).toHaveTextContent("Accepted", { exact: true });
+    // The harness and VoiceOver label does not change.
+    expect(screen.getByTestId("challenge-prompt-accept").props.accessibilityLabel).toBe("Accept challenge");
+    expect(screen.getByTestId("challenge-prompt-accept-glint", HIDDEN)).toBeTruthy();
+
+    act(() => jest.advanceTimersByTime(ACCEPT_SWEEP_MS / 2));
+    const mid = fillScale(screen);
+    expect(mid).toBeGreaterThan(0);
+    expect(mid).toBeLessThan(1);
+    act(() => jest.advanceTimersByTime(ACCEPT_SWEEP_MS));
+    expect(fillScale(screen)).toBeCloseTo(1, 3);
+  });
+
+  it("does not replay on a re-render of the same challenge", () => {
+    const screen = render(<Sheet />);
+    act(() => jest.advanceTimersByTime(PROMPT_INPUT_GUARD_MS));
+    fireEvent.press(screen.getByLabelText("Accept challenge"));
+    act(() => jest.advanceTimersByTime(1_000));
+    expect(fillScale(screen)).toBeCloseTo(1, 3);
+
+    screen.rerender(<Sheet challenge={{ ...RIVAL }} busy />);
+    act(() => jest.advanceTimersByTime(16));
+    expect(fillScale(screen)).toBeCloseTo(1, 3);
+
+    expect(screen.getByTestId("challenge-prompt-accept-text")).toHaveTextContent("Accepted", { exact: true });
+    expect(mockImpact).toHaveBeenCalledTimes(1);
+  });
+
+  it("a new appearance starts unaccepted", () => {
+    const screen = render(<Sheet />);
+    act(() => jest.advanceTimersByTime(PROMPT_INPUT_GUARD_MS));
+    fireEvent.press(screen.getByLabelText("Accept challenge"));
+    screen.rerender(<Sheet challenge={null} />);
+    screen.rerender(<Sheet challenge={{ ...RIVAL, challengeId: "ch-2" }} />);
+    expect(screen.getByTestId("challenge-prompt-accept-text")).toHaveTextContent("Accept", { exact: true });
+    expect(screen.queryByTestId("challenge-prompt-accept-sweep", HIDDEN)).toBeNull();
+  });
+
+  it("under Reduce Motion fills at once with no glint, label swapped, haptic kept", () => {
+    __setReduceMotionForTests(true);
+    const screen = render(<Sheet />);
+    act(() => jest.advanceTimersByTime(PROMPT_INPUT_GUARD_MS));
+    fireEvent.press(screen.getByLabelText("Accept challenge"));
+    act(() => jest.advanceTimersByTime(16));
+    expect(fillScale(screen)).toBe(1);
+    expect(screen.queryByTestId("challenge-prompt-accept-glint", HIDDEN)).toBeNull();
+    expect(screen.getByTestId("challenge-prompt-accept-text")).toHaveTextContent("Accepted", { exact: true });
+    expect(mockImpact).toHaveBeenCalledWith("medium");
+  });
+
+  it("sheens Accept only while it waits on this athlete, and never Decline", () => {
+    const screen = render(<Sheet />);
+    // Not during the input guard (the buttons are disabled).
+    expect(screen.queryByTestId("challenge-prompt-accept-sheen", HIDDEN)).toBeNull();
+    act(() => jest.advanceTimersByTime(PROMPT_INPUT_GUARD_MS));
+    expect(screen.getByTestId("challenge-prompt-accept-sheen", HIDDEN)).toBeTruthy();
+    // One sheened button on the screen.
+    expect(screen.queryAllByTestId(/sheen$/, HIDDEN)).toHaveLength(1);
+
+    screen.rerender(<Sheet busy />);
+    expect(screen.queryByTestId("challenge-prompt-accept-sheen", HIDDEN)).toBeNull();
+
+    screen.rerender(<Sheet />);
+    fireEvent.press(screen.getByLabelText("Accept challenge"));
+    expect(screen.queryByTestId("challenge-prompt-accept-sheen", HIDDEN)).toBeNull();
+  });
+
+  it("no sheen under Reduce Motion", () => {
+    __setReduceMotionForTests(true);
+    const screen = render(<Sheet />);
+    act(() => jest.advanceTimersByTime(PROMPT_INPUT_GUARD_MS));
+    expect(screen.queryByTestId("challenge-prompt-accept-sheen", HIDDEN)).toBeNull();
+  });
+
+  it("Decline and Later are silent", () => {
+    const screen = render(<Sheet onLater={jest.fn()} />);
+    act(() => jest.advanceTimersByTime(PROMPT_INPUT_GUARD_MS));
+    fireEvent.press(screen.getByLabelText("Decline challenge"));
+    fireEvent.press(screen.getByLabelText("Later"));
+    expect(mockImpact).not.toHaveBeenCalled();
+    expect(mockNotify).toHaveBeenCalledTimes(1);
   });
 });
